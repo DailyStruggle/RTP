@@ -1,0 +1,40 @@
+name: RTP
+version: ${project.version}
+main: leafcraft.rtp.RTP
+api-version: 1.17
+authors: [ leaf26 ]
+description: an optimized RTP plugin
+
+commands:
+  rtp:
+    description: Teleport randomly
+    permission: rtp.see
+    usage: |
+      /rtp
+  rtp help:
+    description: rtp command help
+    permission: rtp.see
+    usage: |
+      /rtp help
+  rtp reload:
+    description: Reloads the plugin configuration files
+    permission: rtp.reload
+    usage: |
+      /rtp help
+
+permissions:
+  rtp.see:
+    description: allow player to tab for rtp commands
+    default: true
+  rtp.use:
+    description: allow player to use /rtp
+    default: true
+  rtp.reload:
+    description: allow player to use /rtp reload
+    default: op
+  rtp.instant:
+    description: skip the teleport delay and cooldown
+    default: op
+  rtp.world:
+    description: allow player to teleport to a world they aren't in.
+    default: op

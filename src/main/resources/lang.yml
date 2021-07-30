@@ -1,0 +1,50 @@
+#logs and command responses
+
+#when teleporting, say this
+# placeholder: [time] - how long before teleporting
+delayMessage: "&e[rtp] Teleporting in [time]. Don't move"
+# placeholder: [numAttempts] - number of attempts
+teleportMessage: "&e[rtp] Teleported in [numAttempts] attempts"
+
+#if player moves
+teleportCancel: "&e[rtp] Teleport cancelled!"
+
+#if no safe places after reaching max attempts
+unsafe: "&e[rtp] could not find a safe location within [numAttempts] attempts"
+
+# placeholder: [time] - how long before player is able to teleport again
+cooldownMessage: "&eYou can't teleport again for [time]"
+
+# for time placeholders, what to call days, hours, minutes, seconds
+days: "d"
+hours: "h"
+minutes: "m"
+seconds: "s"
+
+# a configuration file 'version' is lower than the latest
+# placeholder: [filename] - name of file, including file extension
+oldFile: "&b[sleep] old [filename] detected. Updating"
+
+# plugin reload text
+reloading: "&b[rtp] reloading..."
+reloaded: "&b[rtp] successfully reloaded."
+
+# plugin doesn't have the command the user requested
+# placeholder: [arg] - the argument attempted
+badArg: "&cinvalid rtp command argument [arg]"
+
+consoleCmdNotAllowed: "&cYou can't do this from console"
+
+# user doesn't have permission for the command requested
+noPerms: "&eI'm sorry, but you do not have permission to perform this command. Please contact the server administrators if you believe that this is in error."
+
+# user tried to wake a world that doesn't send messages to their location, without perms
+# placeholder: [worldName] - the world attempted in the command
+noGlobalPerms: "&eYou don't have permission to teleport to [worldName] from your location"
+
+#command descriptions
+rtp: "&b/rtp - teleport to a random location"
+help: "&b/rtp help - see this"
+reload: "&b/rtp reload - reload config files"
+
+version: 1.0
