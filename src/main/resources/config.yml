@@ -1,0 +1,23 @@
+#time, in seconds, to delay teleportation
+# allows server time to preload the chunks
+teleportDelay: 2
+
+#how far a player can move before teleportation cancels, in meters/blocks
+cancelDistance: 2
+
+#sleep attempt cooldown, in seconds, to prevent spam
+teleportCooldown: 300
+
+resetCooldownOnCancel: true
+
+#reroll location if player would land in a bad spot
+rerollLiquid: true
+
+#how many rerolls before stopping
+maxAttempts: 100
+
+#if player doesn't have permission for the world they're in, default to this world
+defaultWorld: "world"
+
+#DO NOT TOUCH VERSION NUMBER
+version: 1.0

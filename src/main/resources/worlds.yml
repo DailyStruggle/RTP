@@ -1,0 +1,24 @@
+#autofilled per-world settings
+#world name according to bukkit
+default:
+    #world name placeholder
+    name: "default"
+    #shape of bounds
+    # SQUARE - random x + random z then stretched into place, tends towards center
+    # CIRCLE - spiral curve (suggested)
+    shape: "CIRCLE"
+    #radius of randomization in meters
+    radius: 4096
+    #donut hole, where players shouldn't land
+    centerRadius: 1024
+    #center position, using regular coordinates
+    centerX: 0
+    centerZ: 0
+    #starting height for placement, set lower for more caves and ravines
+    minY: 48
+    #ensure above ground by checking sky light level
+    requireSkyLight: true
+    #check rtp.[world] node
+    requirePermission: true
+
+version: 1.0
