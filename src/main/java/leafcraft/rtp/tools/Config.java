@@ -15,7 +15,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 
 public class Config {
@@ -393,7 +392,7 @@ public class Config {
 	public Location getRandomLocation(World world) {
 		Location res;
 
-		String shapeStr = this.worlds.getConfigurationSection(world.getName()).getString("shape", "SQUARE");
+		String shapeStr = this.worlds.getConfigurationSection(world.getName()).getString("shape", "CIRCLE");
 		Integer radius = this.worlds.getConfigurationSection(world.getName()).getInt("radius", 4096);
 		Integer centerRadius = this.worlds.getConfigurationSection(world.getName()).getInt("centerRadius", 1024);
 		Integer centerX = this.worlds.getConfigurationSection(world.getName()).getInt("centerX", 0);
@@ -405,41 +404,79 @@ public class Config {
 			shape = Shapes.valueOf(shapeStr.toUpperCase(Locale.ENGLISH));
 		}
 		catch (IllegalArgumentException exception) {
-			shape = Shapes.SQUARE;
+			shape = Shapes.CIRCLE;
 		}
 
 		Double x = 0.0;
 		Double z = 0.0;
 		final int tmpRadius = (radius > centerRadius) ? radius - centerRadius : centerRadius - radius;
 		final int pushRadius = (radius > centerRadius) ? centerRadius : radius;
-		final double totalSpace = Math.PI * (radius - centerRadius) * (radius + centerRadius);
+		final double totalSpace;
 
 		switch (shape) {
-			case SQUARE: {
-				Double rX = r.nextDouble(-tmpRadius,tmpRadius);
-				Double rZ = r.nextDouble(-tmpRadius,tmpRadius);
+			case SQUARE: { //square spiral
+				totalSpace = (radius - centerRadius) * (radius + centerRadius);
+				Double rSpace = r.nextDouble(totalSpace);
 
-				Double h = (rX*rX)+(rZ*rZ);
-				Double newH = h+pushRadius;
+				Double rDistance = Math.sqrt(rSpace+centerRadius*centerRadius);
+				Double perimeterStep = 8*(rDistance*(rDistance-rDistance.intValue()));
+				Double shortStep = perimeterStep%rDistance;
 
-				x = rX * (newH/h) + centerX;
-				z = rZ * (newH/h) + centerZ;
-
+				if(perimeterStep<rDistance*4) {
+					if(perimeterStep<rDistance*2) {
+						if(perimeterStep<rDistance) {
+							x = rDistance;
+							z = shortStep;
+						}
+						else {
+							x = rDistance - shortStep;
+							z = rDistance;
+						}
+					}
+					else {
+						if(perimeterStep<rDistance*3) {
+							x = -shortStep;
+							z = rDistance;
+						}
+						else {
+							x = -rDistance;
+							z = rDistance - shortStep;
+						}
+					}
+				}
+				else {
+					if(perimeterStep<rDistance*6) {
+						if(perimeterStep<rDistance*5) {
+							x = -rDistance;
+							z = -shortStep;
+						}
+						else {
+							x = -(rDistance - shortStep);
+							z = -rDistance;
+						}
+					}
+					else {
+						if(perimeterStep<rDistance*7) {
+							x = shortStep;
+							z = -rDistance;
+						}
+						else {
+							x = rDistance;
+							z = -(rDistance-shortStep);
+						}
+					}
+				}
 				break;
 			}
-			case CIRCLE: {
+			default: {
+				totalSpace = Math.PI * (radius - centerRadius) * (radius + centerRadius);
 				Double rSpace = r.nextDouble(totalSpace);
-				Double rDistance = 0.5*(Math.sqrt(4*rSpace/Math.PI + centerRadius*centerRadius)-centerRadius);
+				Double rDistance = Math.sqrt(rSpace/Math.PI + centerRadius*centerRadius);
 
-				Integer distance = rDistance.intValue();
-				Double rotation = (rDistance - distance)*2*Math.PI;
-				distance += centerRadius;
+				Double rotation = (rDistance - rDistance.intValue())*2*Math.PI;
 
-				//close enough approximation for most distances, because Math.sin is slow
-				x = distance * Math.cos(rotation);
-				z = distance * Math.sin(rotation);
-
-				break;
+				x = rDistance * Math.cos(rotation);
+				z = rDistance * Math.sin(rotation);
 			}
 		}
 		res = new Location(world,x,0,z);
@@ -454,35 +491,70 @@ public class Config {
 				(	this.acceptableAir.contains(res.getBlock().getType())
 					|| res.getBlock().getType()==Material.BEDROCK
 					|| (rerollLiquid && res.getBlock().isLiquid()))) {
-			//check if it was already force loaded to avoid unloading other plugins' chunks
 			switch (shape) {
-				case SQUARE: {
-					Double rX = r.nextDouble(-tmpRadius,tmpRadius);
-					Double rZ = r.nextDouble(-tmpRadius,tmpRadius);
-
-					Double h = (rX*rX)+(rZ*rZ);
-					Double newH = h+pushRadius;
-
-					x = rX * (newH/h) + centerX;
-					z = rZ * (newH/h) + centerZ;
-
-					break;
-				}
-				case CIRCLE: {
+				case SQUARE: { //square spiral
 					Double rSpace = r.nextDouble(totalSpace);
-					Double rDistance = 0.5*(Math.sqrt(4*rSpace/Math.PI + centerRadius*centerRadius)-centerRadius);
 
-					Integer distance = rDistance.intValue();
-					Double rotation = (rDistance - distance)*2*Math.PI;
-					distance += centerRadius;
+					Double rDistance = Math.sqrt(rSpace+centerRadius*centerRadius);
+					Double perimeterStep = 8*(rDistance*(rDistance-rDistance.intValue()));
+					Double shortStep = perimeterStep%rDistance;
 
-					x = distance * Math.cos(rotation);
-					z = distance * Math.sin(rotation);
-
+					if(perimeterStep<rDistance*4) {
+						if(perimeterStep<rDistance*2) {
+							if(perimeterStep<rDistance) {
+								x = rDistance;
+								z = shortStep;
+							}
+							else {
+								x = rDistance - shortStep;
+								z = rDistance;
+							}
+						}
+						else {
+							if(perimeterStep<rDistance*3) {
+								x = -shortStep;
+								z = rDistance;
+							}
+							else {
+								x = -rDistance;
+								z = rDistance - shortStep;
+							}
+						}
+					}
+					else {
+						if(perimeterStep<rDistance*6) {
+							if(perimeterStep<rDistance*5) {
+								x = -rDistance;
+								z = -shortStep;
+							}
+							else {
+								x = -(rDistance - shortStep);
+								z = -rDistance;
+							}
+						}
+						else {
+							if(perimeterStep<rDistance*7) {
+								x = shortStep;
+								z = -rDistance;
+							}
+							else {
+								x = rDistance;
+								z = -(rDistance-shortStep);
+							}
+						}
+					}
 					break;
 				}
-			}
-			res = new Location(world,x,0,z);
+				default: {
+					Double rSpace = r.nextDouble(totalSpace);
+					Double rDistance = Math.sqrt(rSpace/Math.PI + centerRadius*centerRadius);
+
+					Double rotation = (rDistance - rDistance.intValue())*2*Math.PI;
+
+					x = rDistance * Math.cos(rotation);
+					z = rDistance * Math.sin(rotation);
+				}
+			}res = new Location(world,x,0,z);
 			if(res.getChunk() == null) res.getChunk().load(true);
 
 			res = this.getLastNonAir(res);
@@ -491,25 +563,6 @@ public class Config {
 
 		res.setY(res.getBlockY()+1);
 		this.cache.setNumTeleportAttempts(res, numAttempts);
-		return res;
-	}
-
-	public List<CompletableFuture<Chunk>> getChunksInRadius(Location location) {
-		List<CompletableFuture<Chunk>> res = new ArrayList<>();
-
-		Integer r = Bukkit.getViewDistance();
-
-		final double area = Math.PI*r*r;
-
-		for(int i = 0; i < area; i++) {
-			Double radius = Math.sqrt(area/Math.PI);
-			Integer distance = radius.intValue();
-			Double rotation = (radius - distance)*2*Math.PI;
-			Double x = distance * Cache.cos(rotation);
-			Double z = distance * Cache.sin(rotation);
-			res.add(PaperLib.getChunkAtAsync(location.getWorld(),location.getBlockX()/16+x.intValue(), location.getBlockZ()/16+z.intValue(),true));
-		}
-
 		return res;
 	}
 
