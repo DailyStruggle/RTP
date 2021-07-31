@@ -5,6 +5,8 @@ import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Config;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
+import org.bukkit.World;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
@@ -16,20 +18,24 @@ import java.util.concurrent.TimeUnit;
 
 public class SetupTeleport extends BukkitRunnable {
     private final RTP plugin;
+    private final CommandSender sender;
     private final Player player;
+    private final World world;
     private final Config config;
     private final Cache cache;
 
-    public SetupTeleport(RTP plugin, Player player, Config config, Cache cache) {
+    public SetupTeleport(RTP plugin, CommandSender sender, Player player, World world, Config config, Cache cache) {
+        this.sender = sender;
         this.plugin = plugin;
         this.player = player;
+        this.world = world;
         this.config = config;
         this.cache = cache;
     }
 
     @Override
     public void run() {
-        int delay = (player.hasPermission("rtp.instant")) ? 0 : (Integer)this.config.getConfigValue("teleportDelay", 2);
+        int delay = (sender.hasPermission("rtp.instant")) ? 0 : (Integer)this.config.getConfigValue("teleportDelay", 2);
 
         //message player
         if(delay>0) {
@@ -43,13 +49,17 @@ public class SetupTeleport extends BukkitRunnable {
             if(minutes>0) replacement += minutes + this.config.getLog("minutes") + " ";
             replacement += seconds%60 + this.config.getLog("seconds");
             player.sendMessage(config.getLog("delayMessage", replacement));
+            if(!sender.getName().equals(player.getName()))
+                sender.sendMessage(config.getLog("delayMessage", replacement));
         }
 
         //get a random location
-        Location location = this.config.getRandomLocation(this.player.getWorld());
+        Location location = this.config.getRandomLocation(world);
         Integer maxAttempts = (Integer) this.config.getConfigValue("maxAttempts",100);
         if(this.cache.getNumTeleportAttempts(location) >= maxAttempts) {
             player.sendMessage(this.config.getLog("unsafe",maxAttempts.toString()));
+            if(!sender.getName().equals(player.getName()))
+                sender.sendMessage(this.config.getLog("unsafe",maxAttempts.toString()));
             this.cache.removePlayer(player);
             return;
         }
