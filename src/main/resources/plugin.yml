@@ -11,6 +11,11 @@ commands:
     permission: rtp.see
     usage: |
       /rtp
+  wild:
+    description: Teleport randomly
+    permission: rtp.see
+    usage: |
+      /wild
   rtp help:
     description: rtp command help
     permission: rtp.see
@@ -23,6 +28,19 @@ commands:
       /rtp help
 
 permissions:
+  rtp.*:
+    description: access all rtp subcommands
+    default: op
+    children:
+      rtp.see: true
+      rtp.use: true
+      rtp.reload: true
+      rtp.instant: true
+      rtp.other: true
+      rtp.notme: true
+      rtp.world: true
+      rtp.worlds.*: true
+      rtp.set: true
   rtp.see:
     description: allow player to tab for rtp commands
     default: true
@@ -35,6 +53,18 @@ permissions:
   rtp.instant:
     description: skip the teleport delay and cooldown
     default: op
+  rtp.other:
+    description: allow player to teleport another player.
+    default: op
+  rtp.notme:
+    description: don't let player be teleported by someone else.
+    default: op
   rtp.world:
-    description: allow player to teleport to a world they aren't in.
+    description: allow player to specify any world they have permission for
+    default: op
+  rtp.worlds.*:
+    description: allow player to teleport to any world from any world
+    default: op
+  rtp.set:
+    description: allow player to update rtp settings for each world
     default: op

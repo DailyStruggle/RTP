@@ -60,7 +60,7 @@ public class Config {
 		}
 		this.lang = YamlConfiguration.loadConfiguration(f);
 
-		if( 	(this.lang.getDouble("version") < 1.0) ) {
+		if( 	(this.lang.getDouble("version") < 1.1) ) {
 			Bukkit.getLogger().log(Level.WARNING, this.getLog("oldFile", "lang.yml"));
 			updateLang();
 
@@ -76,7 +76,7 @@ public class Config {
 		}
 		this.config = YamlConfiguration.loadConfiguration(f);
 
-		if( 	(this.config.getDouble("version") < 1.0) ) {
+		if( 	(this.config.getDouble("version") < 1.1) ) {
 			Bukkit.getLogger().log(Level.WARNING, this.getLog("oldFile", "config.yml"));
 
 			updateConfig();
@@ -93,7 +93,7 @@ public class Config {
 		}
 		this.worlds = YamlConfiguration.loadConfiguration(f);
 
-		if( 	(this.worlds.getDouble("version") < 1.0) ) {
+		if( 	(this.worlds.getDouble("version") < 1.1) ) {
 			Bukkit.getLogger().log(Level.WARNING, this.getLog("oldFile", "worlds.yml"));
 			this.renameFileInPluginDir("worlds.yml","worlds.old.yml");
 
@@ -127,7 +127,7 @@ public class Config {
 		for (String line : linesInDefaultConfig) {
 			String newline = line;
 			if (line.startsWith("version:")) {
-				newline = "version: 1.0";
+				newline = "version: 1.1";
 			} else {
 				for (String node : oldValues.keySet()) {
 					if (line.startsWith(node + ":")) {
@@ -174,7 +174,7 @@ public class Config {
 		for (String line : linesInDefaultConfig) {
 			String newline = line;
 			if (line.startsWith("version:")) {
-				newline = "version: 1.0";
+				newline = "version: 1.1";
 			} else {
 				for (String node : oldValues.keySet()) {
 					if (line.startsWith(node + ":")) {
@@ -214,12 +214,14 @@ public class Config {
 		Integer defaultMinY = this.worlds.getConfigurationSection("default").getInt("minY", 48);
 		Boolean defaultRequireDaylight = this.worlds.getConfigurationSection("default").getBoolean("requireSkyLight", true);
 		Boolean defaultRequirePermission = this.worlds.getConfigurationSection("default").getBoolean("requirePermission",true);
+		String defaultOverride = this.worlds.getConfigurationSection("default").getString("override","world");
 
 		for(World w : Bukkit.getWorlds()) {
 			String permName = "rtp.worlds." + w.getName();
 			if(Bukkit.getPluginManager().getPermission(permName) == null) {
 				Permission permission = new Permission(permName);
 				permission.setDefault(PermissionDefault.OP);
+				permission.addParent("rtp.worlds.*",true);
 				Bukkit.getPluginManager().addPermission(permission);
 			}
 		}
@@ -258,10 +260,11 @@ public class Config {
 							linesInWorlds.add("    requirePermission: " + false);
 						else
 							linesInWorlds.add("    requirePermission: " + defaultRequirePermission);
+						linesInWorlds.add("    override: " + quotes + defaultOverride + quotes);
 					}
 				}
 				else { //if not a blank line
-					if(!s.startsWith(" ") && !s.startsWith("version"))
+					if(!s.startsWith("version") && s.matches(".*[a-z].*") || s.matches(".*[A-Z].*"))
 						currWorldName = s.replace(":","");
 					else if(s.startsWith("    name:"))
 						s = "    name: " + quotes + this.worlds.getConfigurationSection(currWorldName).getString("name",currWorldName) + quotes;
@@ -277,6 +280,12 @@ public class Config {
 						s = "    centerZ: " + this.worlds.getConfigurationSection(currWorldName).getInt("centerZ",defaultCenterZ);
 					else if(s.startsWith("    minY:"))
 						s = "    minY: " + this.worlds.getConfigurationSection(currWorldName).getInt("minY",defaultMinY);
+					else if(s.startsWith("    requireSkyLight:"))
+						s = "    requireSkyLight: " + this.worlds.getConfigurationSection(currWorldName).getBoolean("requireSkyLight",true);
+					else if(s.startsWith("    requirePermission:"))
+						s = "    requirePermission: " + this.worlds.getConfigurationSection(currWorldName).getBoolean("requirePermission",true);
+					else if(s.startsWith("    override:"))
+						s = "    override: " + this.worlds.getConfigurationSection(currWorldName).getBoolean("override",true);
 				}
 
 				//add line
@@ -331,6 +340,14 @@ public class Config {
 		return this.worlds.getConfigurationSection(worldName).getString("name");
 	}
 
+	public Boolean getWorldPermReq(String worldName) {
+		return this.worlds.getConfigurationSection(worldName).getBoolean("requirePermission");
+	}
+
+	public String getWorldOverride(String worldName) {
+		return this.worlds.getConfigurationSection(worldName).getString("override");
+	}
+
 	public String getLog(String key) {
 		String msg = this.lang.getString(key);
 		msg = ChatColor.translateAlternateColorCodes('&',msg);
@@ -343,6 +360,7 @@ public class Config {
 		String replace;
 		switch(key) {
 			case "oldFile": replace = "[filename]"; break;
+			case "invalidWorld":
 			case "noGlobalPerms": replace = "[worldName]"; break;
 			case "cooldownMessage" :
 			case "delayMessage": replace = "[time]"; break;
@@ -364,7 +382,6 @@ public class Config {
 		Boolean bukkitWorldExists = Bukkit.getWorld(worldName)!=null;
 		Boolean worldKnown = this.worlds.contains(worldName);
 		if( !bukkitWorldExists ) {
-			Bukkit.getLogger().log(Level.WARNING, this.getLog("invalidWorld", worldName));
 			return false;
 		}
 		else if( !worldKnown ) {
@@ -433,7 +450,10 @@ public class Config {
 
 		Integer numAttempts = 1;
 		Integer maxAttempts = this.config.getInt("maxAttempts",100);
-		while(numAttempts < maxAttempts && rerollLiquid && res.getBlock().isLiquid()) {
+		while(numAttempts < maxAttempts &&
+				(	this.acceptableAir.contains(res.getBlock().getType())
+					|| res.getBlock().getType()==Material.BEDROCK
+					|| (rerollLiquid && res.getBlock().isLiquid()))) {
 			//check if it was already force loaded to avoid unloading other plugins' chunks
 			switch (shape) {
 				case SQUARE: {

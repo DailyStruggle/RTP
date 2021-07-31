@@ -13,7 +13,7 @@ teleportCancel: "&e[rtp] Teleport cancelled!"
 unsafe: "&e[rtp] could not find a safe location within [numAttempts] attempts"
 
 # placeholder: [time] - how long before player is able to teleport again
-cooldownMessage: "&eYou can't teleport again for [time]"
+cooldownMessage: "&e[rtp] You can't teleport again for [time]"
 
 # for time placeholders, what to call days, hours, minutes, seconds
 days: "d"
@@ -23,7 +23,7 @@ seconds: "s"
 
 # a configuration file 'version' is lower than the latest
 # placeholder: [filename] - name of file, including file extension
-oldFile: "&b[sleep] old [filename] detected. Updating"
+oldFile: "&b[rtp] old [filename] detected. Updating"
 
 # plugin reload text
 reloading: "&b[rtp] reloading..."
@@ -31,9 +31,9 @@ reloaded: "&b[rtp] successfully reloaded."
 
 # plugin doesn't have the command the user requested
 # placeholder: [arg] - the argument attempted
-badArg: "&cinvalid rtp command argument [arg]"
+badArg: "&c[rtp] invalid command argument [arg]"
 
-consoleCmdNotAllowed: "&cYou can't do this from console"
+consoleCmdNotAllowed: "&cYou can't do this from console. Try adding a player name."
 
 # user doesn't have permission for the command requested
 noPerms: "&eI'm sorry, but you do not have permission to perform this command. Please contact the server administrators if you believe that this is in error."
@@ -42,9 +42,12 @@ noPerms: "&eI'm sorry, but you do not have permission to perform this command. P
 # placeholder: [worldName] - the world attempted in the command
 noGlobalPerms: "&eYou don't have permission to teleport to [worldName] from your location"
 
+# world doesn't exist in bukkit
+invalidWorld: "&e[rtp] could not find world '[worldName]'"
+
 #command descriptions
 rtp: "&b/rtp - teleport to a random location"
 help: "&b/rtp help - see this"
 reload: "&b/rtp reload - reload config files"
 
-version: 1.0
+version: 1.1

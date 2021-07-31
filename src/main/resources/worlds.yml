@@ -4,7 +4,7 @@ default:
     #world name placeholder
     name: "default"
     #shape of bounds
-    # SQUARE - random x + random z then stretched into place, tends towards center
+    # SQUARE - random x + random z then stretched into place
     # CIRCLE - spiral curve (suggested)
     shape: "CIRCLE"
     #radius of randomization in meters
@@ -20,5 +20,7 @@ default:
     requireSkyLight: true
     #check rtp.[world] node
     requirePermission: true
+    #if no perm for the world, send player to this world
+    override: "world"
 
-version: 1.0
+version: 1.1

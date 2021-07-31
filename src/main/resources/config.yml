@@ -16,8 +16,5 @@ rerollLiquid: true
 #how many rerolls before stopping
 maxAttempts: 100
 
-#if player doesn't have permission for the world they're in, default to this world
-defaultWorld: "world"
-
 #DO NOT TOUCH VERSION NUMBER
-version: 1.0
+version: 1.1
