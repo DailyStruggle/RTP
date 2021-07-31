@@ -244,7 +244,6 @@ public class Config {
 						if(linesInWorlds.get(linesInWorlds.size()-1).length() < 4)
 							linesInWorlds.set(linesInWorlds.size()-1,"    " + worldName + ":");
 						else linesInWorlds.add(worldName + ":");
-						linesInWorlds.add("    name: \"[" + worldName + "]\"");
 						linesInWorlds.add("    shape: \"" + defaultShape + "\"");
 						linesInWorlds.add("    radius: " + defaultRadius);
 						linesInWorlds.add("    centerRadius: " + defaultCenterRadius);
@@ -265,8 +264,6 @@ public class Config {
 				else { //if not a blank line
 					if(!s.startsWith("version") && s.matches(".*[a-z].*") || s.matches(".*[A-Z].*"))
 						currWorldName = s.replace(":","");
-					else if(s.startsWith("    name:"))
-						s = "    name: " + quotes + this.worlds.getConfigurationSection(currWorldName).getString("name",currWorldName) + quotes;
 					else if(s.startsWith("    shape:"))
 						s = "    shape: " + quotes + this.worlds.getConfigurationSection(currWorldName).getString("shape","SQUARE") + quotes;
 					else if(s.startsWith("    radius:"))
