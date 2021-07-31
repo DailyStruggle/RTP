@@ -407,10 +407,8 @@ public class Config {
 			shape = Shapes.CIRCLE;
 		}
 
-		Double x = 0.0;
-		Double z = 0.0;
-		final int tmpRadius = (radius > centerRadius) ? radius - centerRadius : centerRadius - radius;
-		final int pushRadius = (radius > centerRadius) ? centerRadius : radius;
+		Double x;
+		Double z;
 		final double totalSpace;
 
 		switch (shape) {
