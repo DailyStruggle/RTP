@@ -1,8 +1,6 @@
 #autofilled per-world settings
 #world name according to bukkit
 default:
-    #world name placeholder
-    name: "default"
     #shape of bounds
     # SQUARE - random x + random z then stretched into place
     # CIRCLE - spiral curve (suggested)
