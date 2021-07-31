@@ -477,7 +477,7 @@ public class Config {
 				z = rDistance * Math.sin(rotation);
 			}
 		}
-		res = new Location(world,x,0,z);
+		res = new Location(world,x+centerX,0,z+centerZ);
 
 		if(res.getChunk() == null) res.getChunk().load(true);
 
@@ -552,7 +552,8 @@ public class Config {
 					x = rDistance * Math.cos(rotation);
 					z = rDistance * Math.sin(rotation);
 				}
-			}res = new Location(world,x,0,z);
+			}
+			res = new Location(world,x+centerX,0,z+centerZ);
 			if(res.getChunk() == null) res.getChunk().load(true);
 
 			res = this.getLastNonAir(res);
