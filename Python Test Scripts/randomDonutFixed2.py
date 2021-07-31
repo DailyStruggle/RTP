@@ -9,7 +9,7 @@ plt.title('Method 2')
 
 radius = 4096
 centerRadius = 1024
-for i in range(60000) :
+for i in range(5000) :
     distance = centerRadius + (radius-centerRadius)*math.sqrt(random.uniform(0,1))
     rotation = random.uniform(0,1)*math.pi*2
     

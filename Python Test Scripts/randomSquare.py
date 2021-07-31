@@ -7,7 +7,7 @@ plt.title('SQUARE')
 radius = 4096
 centerRadius = 1024
 totalSpace = (radius-centerRadius)*(radius+centerRadius)
-for i in range(60000) :
+for i in range(5000) :
     rSpace = random.randrange(0,int(totalSpace))
     
     rDistance = math.sqrt(rSpace + centerRadius*centerRadius)
