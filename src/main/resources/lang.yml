@@ -25,6 +25,13 @@ seconds: "s"
 # placeholder: [filename] - name of file, including file extension
 oldFile: "&b[rtp] old [filename] detected. Updating"
 
+# detected a bukkit world that isn't in the config file
+# placeholder: [worldName] - the world detected
+newWorld: "&b[rtp] detected a new world '[worldName]'"
+
+updatingWorlds: "&b[rtp] updating worlds configuration..."
+updatedWorlds: "&b[rtp] updated worlds configuration!"
+
 # plugin reload text
 reloading: "&b[rtp] reloading..."
 reloaded: "&b[rtp] successfully reloaded."
@@ -33,7 +40,7 @@ reloaded: "&b[rtp] successfully reloaded."
 # placeholder: [arg] - the argument attempted
 badArg: "&c[rtp] invalid command argument [arg]"
 
-consoleCmdNotAllowed: "&cYou can't do this from console. Try adding a player name."
+consoleCmdNotAllowed: "&cYou can't do this from console. Try adding a player or world argument."
 
 # user doesn't have permission for the command requested
 noPerms: "&eI'm sorry, but you do not have permission to perform this command. Please contact the server administrators if you believe that this is in error."
@@ -50,4 +57,4 @@ rtp: "&b/rtp - teleport to a random location"
 help: "&b/rtp help - see this"
 reload: "&b/rtp reload - reload config files"
 
-version: 1.1
+version: 1.2

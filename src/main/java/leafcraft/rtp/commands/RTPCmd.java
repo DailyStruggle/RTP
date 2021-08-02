@@ -9,7 +9,6 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -28,27 +27,34 @@ public class RTPCmd implements CommandExecutor {
         this.config = config;
         this.cache = cache;
 
+        this.perms.put("set","rtp.set");
         this.perms.put("help","rtp.use");
         this.perms.put("reload","rtp.reload");
 
-        // TODO: rtp set
         this.rtpParams.put("player", "rtp.other");
         this.rtpParams.put("world", "rtp.world");
     }
 
     @Override
-    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if(!command.getName().equalsIgnoreCase("rtp") && !command.getName().equalsIgnoreCase("wild")) return true;
 
         if(args.length > 0 && this.perms.containsKey(args[0])) {
-            if(!sender.hasPermission(this.perms.get(args[0])))
+            if(!sender.hasPermission(this.perms.get(args[0]))) {
                 sender.sendMessage(this.config.getLog("noPerms"));
+            }
             else {
                 plugin.getCommand("rtp " + args[0]).execute(sender, label, Arrays.copyOfRange(args, 1, args.length));
             }
             return true;
         }
 
+        if(!sender.hasPermission("rtp.use")) {
+            sender.sendMessage(this.config.getLog("noPerms"));
+            return true;
+        }
+
+        //--teleport logic--
         //check for args
         Map<String,String> rtpArgs = new HashMap<>();
         for(int i = 0; i < args.length; i++) {
@@ -98,12 +104,11 @@ public class RTPCmd implements CommandExecutor {
             world = Bukkit.getWorld(worldName);
         }
 
+        //check time
         Long time = System.currentTimeMillis();
         Long lastTime = (sender instanceof Player) ? this.cache.getLastTeleportTime((Player) sender) : 0;
         Long cooldownTime = TimeUnit.SECONDS.toMillis((Integer)this.config.getConfigValue("teleportCooldown",300));
-        if(!sender.hasPermission("rtp.use"))
-            sender.sendMessage(this.config.getLog("noPerms"));
-        else if(!sender.hasPermission("rtp.instant")
+        if(!sender.hasPermission("rtp.instant")
                 && time - lastTime < cooldownTime) {
             Long remaining = (lastTime+cooldownTime)-time;
             Long days = TimeUnit.MILLISECONDS.toDays(remaining);
@@ -125,4 +130,6 @@ public class RTPCmd implements CommandExecutor {
 
         return true;
     }
+
+
 }

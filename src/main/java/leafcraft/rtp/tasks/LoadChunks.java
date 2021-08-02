@@ -41,11 +41,16 @@ public class LoadChunks extends BukkitRunnable {
             this.cache.playerAssChunks.put(player.getName(), new ArrayList<>());
         List<CompletableFuture<Chunk>> res = this.cache.playerAssChunks.get(this.player.getName());
 
-        Integer r = Bukkit.getViewDistance();
+        Integer r;
+        try{
+            r = Bukkit.getViewDistance();
+        }
+        catch (Exception exception) {
+            r = 10;
+        }
 
         final double area = Math.PI*r*r;
         double currArea = area * (totalTime - remainingTime);
-
         for(int i = 0; i < currArea; i++) {
             Double radius = Math.sqrt(area/Math.PI);
             Integer distance = radius.intValue();
@@ -55,7 +60,11 @@ public class LoadChunks extends BukkitRunnable {
             res.add(PaperLib.getChunkAtAsync(location.getWorld(),location.getBlockX()/16+x.intValue(), location.getBlockZ()/16+z.intValue(),true));
         }
 
-        if(remainingTime>0) this.cache.addLoadChunks(this.player,new LoadChunks(this.plugin,this.config,this.player,this.cache,this.totalTime,this.remainingTime-1,this.location).runTaskLaterAsynchronously(this.plugin,1));
-        else this.cache.addDoTeleport(this.player, new DoTeleport(this.config, this.player, location, this.cache).runTaskLater(this.plugin, 1));
+        if(remainingTime>0) {
+            this.cache.addLoadChunks(this.player,new LoadChunks(this.plugin,this.config,this.player,this.cache,this.totalTime,this.remainingTime-1,this.location).runTaskLaterAsynchronously(this.plugin,1));
+        }
+        else {
+            this.cache.addDoTeleport(this.player, new DoTeleport(this.config, this.player, location, this.cache).runTaskLater(this.plugin, 1));
+        }
     }
 }

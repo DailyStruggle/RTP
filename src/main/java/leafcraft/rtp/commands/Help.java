@@ -8,7 +8,6 @@ import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -25,7 +24,12 @@ public class Help implements CommandExecutor {
     }
 
     @Override
-    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if(!sender.hasPermission("rtp.see")) {
+            sender.sendMessage(config.getLog("noPerms"));
+            return true;
+        }
+
         for(Map.Entry<String,String> entry : this.perms.entrySet()) {
             if(sender.hasPermission(entry.getValue())){
                 TextComponent msg = new TextComponent(this.config.getLog(entry.getKey()));

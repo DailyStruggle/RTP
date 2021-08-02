@@ -37,7 +37,7 @@ public class SetupTeleport extends BukkitRunnable {
     public void run() {
         int delay = (sender.hasPermission("rtp.instant")) ? 0 : (Integer)this.config.getConfigValue("teleportDelay", 2);
 
-        //message player
+        //let player know if they'll have to wait to teleport
         if(delay>0) {
             long days = TimeUnit.SECONDS.toDays(delay);
             long hours = TimeUnit.SECONDS.toHours(delay)%24;
@@ -69,7 +69,7 @@ public class SetupTeleport extends BukkitRunnable {
             this.cache.addLoadChunks(this.player, new LoadChunks(this.plugin,this.config,this.player,this.cache,delay*20,delay*20,location).runTaskLaterAsynchronously(this.plugin,1));
         }
         else {
-            this.cache.addDoTeleport(this.player, new DoTeleport(this.config, this.player, location, this.cache).runTaskLater(this.plugin, (long)delay*20));
+            this.cache.addDoTeleport(this.player, new DoTeleport(this.config, this.player, location, this.cache).runTask(this.plugin));
         }
 
     }

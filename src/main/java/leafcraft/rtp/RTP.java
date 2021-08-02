@@ -1,27 +1,38 @@
 package leafcraft.rtp;
 
-import io.papermc.lib.PaperLib;
-import leafcraft.rtp.commands.Help;
-import leafcraft.rtp.commands.RTPCmd;
-import leafcraft.rtp.commands.Reload;
-import leafcraft.rtp.commands.TabComplete;
+import leafcraft.rtp.commands.*;
 import leafcraft.rtp.events.OnPlayerMove;
 import leafcraft.rtp.events.OnPlayerQuit;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Config;
 import leafcraft.rtp.tools.Metrics;
+import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.plugin.java.JavaPluginLoader;
+
+import java.io.File;
 
 
 public final class RTP extends JavaPlugin {
     private Config config;
-    private Cache cache;
+    public Cache cache;
 
     private Metrics metrics;
 
+    public RTP()
+    {
+        super();
+    }
+
+    protected RTP(JavaPluginLoader loader, PluginDescriptionFile description, File dataFolder, File file)
+    {
+        super(loader, description, dataFolder, file);
+    }
+
+
     @Override
     public void onEnable() {
-        PaperLib.suggestPaper(this);
+        //PaperLib.suggestPaper(this);
 
         this.metrics = new Metrics(this, 12277);
         this.cache = new Cache();
@@ -29,6 +40,7 @@ public final class RTP extends JavaPlugin {
 
         getCommand("wild").setExecutor(new RTPCmd(this, this.config, this.cache));
         getCommand("rtp").setExecutor(new RTPCmd(this, this.config, this.cache));
+        getCommand("rtp set").setExecutor(new SetCmd(this,this.config));
         getCommand("rtp help").setExecutor(new Help(this.config));
         getCommand("rtp reload").setExecutor(new Reload(this.config));
 
