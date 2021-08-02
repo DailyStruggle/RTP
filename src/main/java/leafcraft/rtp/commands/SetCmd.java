@@ -76,6 +76,48 @@ public class SetCmd implements CommandExecutor {
 
         for(Map.Entry<String,String> entry : setArgs.entrySet()) {
             if(entry.getKey().equals("world")) continue;
+            Integer isCoord = 0;
+            if(entry.getKey().endsWith("X")) isCoord = 1;
+            else if(entry.getKey().endsWith("Y")) isCoord = 2;
+            else if(entry.getKey().endsWith("Z")) isCoord = 3;
+
+            if( isCoord>0 ) {
+                Integer res = 0;
+                if(entry.getValue().startsWith("~")) {
+                    if(!(sender instanceof Player)) {
+                        sender.sendMessage(this.config.getLog("consoleCmdNotAllowed"));
+                        continue;
+                    }
+                    switch(isCoord) {
+                        case 1: res = ((Player)sender).getLocation().getBlockX(); break;
+                        case 2: res = ((Player)sender).getLocation().getBlockY(); break;
+                        case 3: res = ((Player)sender).getLocation().getBlockZ(); break;
+                    }
+                    String numStr;
+                    if(entry.getValue().startsWith("~-")) {
+                        numStr = entry.getValue().substring(2);
+                        try{
+                            if(numStr.length()>0) res -= Integer.valueOf(numStr);
+                        }
+                        catch (NumberFormatException exception) {
+                            sender.sendMessage(this.config.getLog("badArg",entry.getKey()+":"+entry.getValue()));
+                            continue;
+                        }
+                    }
+                    else {
+                        numStr = entry.getValue().substring(1);
+                        try{
+                            if(numStr.length()>0) res += Integer.valueOf(numStr);
+                        }
+                        catch (NumberFormatException exception) {
+                            sender.sendMessage(this.config.getLog("badArg",entry.getKey()+":"+entry.getValue()));
+                            continue;
+                        }
+                    }
+                    entry.setValue(res.toString());
+                }
+            }
+
             if(entry.getKey().equals("override")) {
                 String worldName = entry.getValue();
                 if(!this.config.checkWorldExists(worldName)) {
