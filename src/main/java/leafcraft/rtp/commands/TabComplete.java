@@ -91,6 +91,14 @@ public class TabComplete implements TabCompleter {
                         for (Player player : Bukkit.getOnlinePlayers()) {
                             res.add(arg + ":" + player.getName());
                         }
+                        break;
+                    }
+                    case "minY":
+                    case "maxY":
+                    case "centerX":
+                    case "centerZ": {
+                        if(sender instanceof  Player) res.add(arg + ":" +"~");
+                        break;
                     }
                     default: {
                         res.add(arg+":");
