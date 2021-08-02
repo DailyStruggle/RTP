@@ -7,7 +7,6 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.jetbrains.annotations.NotNull;
 
 public class Reload implements CommandExecutor {
     private Config config;
@@ -16,8 +15,11 @@ public class Reload implements CommandExecutor {
         this.config = config;
     }
     @Override
-    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
-        if(!sender.hasPermission("rtp.reload")) return false;
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if(!sender.hasPermission("rtp.reload")) {
+            sender.sendMessage(config.getLog("noPerms"));
+            return true;
+        }
 
         String str = this.config.getLog("reloading");
         Bukkit.getConsoleSender().sendMessage(str);

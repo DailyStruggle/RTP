@@ -7,28 +7,48 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
-import org.bukkit.event.player.PlayerTeleportEvent;
-import org.bukkit.permissions.Permission;
-import org.bukkit.permissions.PermissionDefault;
 import org.bukkit.util.StringUtil;
 
 import java.util.*;
-import java.util.function.Predicate;
+import java.util.Set;
+
 
 public class TabComplete implements TabCompleter {
-    private Map<String,String> subCommands = new HashMap<String,String>();
-    private Map<String,String> rtpParams = new HashMap<String,String>();
+    private class SubCommand {
+        String perm;
+        //parameter,perm
+        Map<String,String> subParams = new HashMap<>();
+        //command name, commands
+        Map<String,SubCommand> commands = new HashMap<>();
+
+        SubCommand(String perm) { this.perm = perm; }
+    }
+
+    private SubCommand subCommands = new SubCommand("rtp");
 
     private Config config;
 
     public TabComplete(Config config) {
         //load OnePlayerSleep.commands and permission nodes into map
-        subCommands.put("reload","rtp.reload");
-        subCommands.put("help","rtp.see");
+        subCommands.subParams.put("world","rtp.world");
+        subCommands.subParams.put("player","rtp.other");
+        subCommands.commands.put("help",new SubCommand("rtp.see"));
+        subCommands.commands.put("reload",new SubCommand("rtp.reload"));
+        subCommands.commands.put("set",new SubCommand("rtp.set"));
 
-        //alternate parameters
-        rtpParams.put("player", "rtp.other");
-        rtpParams.put("world", "rtp.world");
+        subCommands.commands.get("set").subParams.put("world","rtp.set");
+        subCommands.commands.get("set").subParams.put("shape","rtp.set");
+        subCommands.commands.get("set").subParams.put("radius","rtp.set");
+        subCommands.commands.get("set").subParams.put("centerRadius","rtp.set");
+        subCommands.commands.get("set").subParams.put("centerX","rtp.set");
+        subCommands.commands.get("set").subParams.put("centerZ","rtp.set");
+        subCommands.commands.get("set").subParams.put("weight","rtp.set");
+        subCommands.commands.get("set").subParams.put("minY","rtp.set");
+        subCommands.commands.get("set").subParams.put("maxY","rtp.set");
+        subCommands.commands.get("set").subParams.put("requireSkyLight","rtp.set");
+        subCommands.commands.get("set").subParams.put("requirePermission","rtp.set");
+        subCommands.commands.get("set").subParams.put("override","rtp.set");
+
         this.config = config;
     }
 
@@ -36,68 +56,75 @@ public class TabComplete implements TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command,
                                       String alias, String[] args) {
         if(!sender.hasPermission("rtp.see")) return null;
-        if(args.length > 5) return null;
-
-        //don't suggest redundant args
-        Set<String> hasRtpArg = new HashSet<>();
-        for(int i = 0; i < args.length-1; i++) {
-            int idx = args[i].indexOf(':');
-            String arg = idx>0 ? args[i].substring(0,idx) : args[i];
-            if(rtpParams.keySet().contains(arg))
-                hasRtpArg.add(arg);
-        }
-        int idx = args[args.length-1].indexOf(':');
-        String subArg = idx>0 ? args[args.length-1].substring(0,idx) : "";
-        if(hasRtpArg.contains(subArg)) return null; //stop suggesting if redundant
 
         List<String> res = new ArrayList<>();
-        List<String> subCom = new ArrayList<>();
-        if(rtpParams.containsKey(subArg) && sender.hasPermission(rtpParams.get(subArg))){
-            switch (subArg) {
-                case "player" : {
-                    for(Player player : Bukkit.getOnlinePlayers())
-                        if(!player.hasPermission("rtp.notme"))
-                            subCom.add("player:"+player.getName());
-                        break;
+        Set<String> knownParams = new HashSet<>();
+        List<String> match = new ArrayList<>();
+        this.getList(knownParams,res,this.subCommands,args, 0,sender);
+
+        StringUtil.copyPartialMatches(args[args.length-1],match,res);
+        return res;
+    }
+
+    public void getList(Set<String> knownParams,List<String> res, SubCommand command, String[] args, int i, CommandSender sender) {
+        if(i>=args.length) return;
+        int idx = args[i].indexOf(':');
+        String arg = idx > 0 ? args[i].substring(0, idx) : args[i];
+        if(i == args.length-1) { //if last arg
+            //if semicolon, maybe suggest
+            if (command.subParams.containsKey(arg) && !knownParams.contains(arg)) {
+                if(!sender.hasPermission(command.subParams.get(arg))){
+                    return;
                 }
-                case "world" : {
-                    for(World world : Bukkit.getWorlds()) {
-                        String worldName  = world.getName();
-                        this.config.checkWorldExists(worldName);
-                        if(     !this.config.getWorldPermReq(worldName)
-                                || sender.hasPermission("rtp.worlds."+worldName)
-                                || sender.hasPermission("rtp.worlds.*"))
-                            subCom.add("world:"+worldName);
+                switch (arg) {
+                    case "world" :
+                    case "override" : {
+                        for (World world : Bukkit.getWorlds()) {
+                            this.config.checkWorldExists(world.getName());
+                            if (!this.config.getWorldPermReq(world.getName()) || sender.hasPermission("rtp.worlds." + world.getName())) {
+                                res.add(arg + ":" + world.getName());
+                            }
+                        }
+                        break;
+                    }
+                    case "player" : {
+                        for (Player player : Bukkit.getOnlinePlayers()) {
+                            res.add(arg + ":" + player.getName());
+                        }
+                    }
+                    default: {
+                        res.add(arg+":");
+                    }
+                }
+            }
+            else { //if no semicolon add all sub-commands or sub-parameters
+                for(Map.Entry<String, String> entry : command.subParams.entrySet()) {
+                    if(knownParams.contains(entry.getKey())) continue;
+                    if(sender.hasPermission(entry.getValue())) {
+                        res.add(entry.getKey() + ":");
+                    }
+                }
+                if(knownParams.size() == 0) {
+                    for (Map.Entry<String, SubCommand> entry : command.commands.entrySet()) {
+                        if (sender.hasPermission(entry.getValue().perm)) {
+                            res.add(entry.getKey());
+                        }
                     }
                 }
             }
         }
         else {
-            switch (args.length) {
-                case 1: { //help, reload, set or rtp parameters
-                    // TODO: rtp set
-                    for(Map.Entry<String,String> entry : subCommands.entrySet()) {
-                        if(sender.hasPermission(entry.getValue()))
-                            subCom.add(entry.getKey());
-                    }
-                    for(Map.Entry<String,String> entry : rtpParams.entrySet()) {
-                        if(sender.hasPermission(entry.getValue()) && !hasRtpArg.contains(entry.getKey()))
-                            subCom.add(entry.getKey()+":");
-                    }
-                    break;
-                }
-                default: {
-                    if(subCommands.keySet().contains(args[0])) break; //skip rtp params if help or reload
-                    for(Map.Entry<String,String> entry : rtpParams.entrySet()) {
-                        if(hasRtpArg.contains(entry.getKey())) continue; //skip if redundant
-                        if(!sender.hasPermission(entry.getValue())) continue; //skip if no perm
-                        subCom.add(entry.getKey()+":");
-                    }
-                }
+            //if current current argument is a parameter, add it to the list and go to next parameter
+            if(command.subParams.containsKey(arg)) {
+                if(sender.hasPermission(command.subParams.get(arg)))
+                    knownParams.add(arg);
             }
+            else if(command.commands.containsKey(args[i])) { //if argument is a command, use next layer
+                SubCommand subCommand = command.commands.get(args[i]);
+                if(sender.hasPermission(subCommand.perm))
+                    command = command.commands.get(args[i]);
+            }
+            getList(knownParams,res,command,args,i+1,sender);
         }
-
-        StringUtil.copyPartialMatches(args[args.length-1],subCom,res);
-        return res;
     }
 }

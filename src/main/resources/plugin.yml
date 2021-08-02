@@ -21,6 +21,11 @@ commands:
     permission: rtp.see
     usage: |
       /rtp help
+  rtp set:
+    description: update rtp settings
+    permission: rtp.set
+    usage: |
+      /rtp set
   rtp reload:
     description: Reloads the plugin configuration files
     permission: rtp.reload

@@ -8,8 +8,6 @@ cancelDistance: 2
 #sleep attempt cooldown, in seconds, to prevent spam
 teleportCooldown: 300
 
-resetCooldownOnCancel: true
-
 #reroll location if player would land in a bad spot
 rerollLiquid: true
 
