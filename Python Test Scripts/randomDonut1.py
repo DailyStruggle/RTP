@@ -5,16 +5,11 @@ import random
 import time
 plt.style.use('seaborn-whitegrid')
 
-plt.title('Method 2')
+plt.title('Before')
 
-wgX1 = 0
-wgZ1 = 0
-wgX2 = 0
-wgZ2 = 0
-
-it = 1000000
+it = 5000
 radius = 4096
-centerRadius = 1024
+centerRadius = 0
 x = np.zeros(it)
 z = np.zeros(it)
 def randomSelect(i) :
@@ -24,12 +19,8 @@ def randomSelect(i) :
     xLoc = int(distance * math.cos(rotation))
     zLoc = int(distance * math.sin(rotation))
 
-    isInWgRegion = (xLoc > wgX1) & (xLoc < wgX2) & (zLoc > wgZ1) & (zLoc < wgZ2)
-    if isInWgRegion :
-        randomSelect(i)
-    else :
-        x[i] = xLoc
-        z[i] = zLoc
+    x[i] = xLoc
+    z[i] = zLoc
         
     
 start = time.time()
