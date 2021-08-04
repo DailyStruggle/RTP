@@ -1,10 +1,9 @@
 package leafcraft.rtp.tools;
 
-import io.papermc.lib.PaperLib;
 import leafcraft.rtp.RTP;
+import leafcraft.rtp.tools.selection.RandomSelectParams;
 import org.bukkit.*;
 import org.bukkit.block.BlockFace;
-import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.permissions.Permission;
@@ -29,11 +28,6 @@ public class Config {
 	public String version;
 
 	private Set<Material> acceptableAir;
-
-	private enum Shapes {
-		SQUARE,
-		CIRCLE
-	}
 
 	public Config(RTP plugin, Cache cache) {
 		this.acceptableAir = new HashSet<>();
@@ -415,85 +409,26 @@ public class Config {
 
 		Boolean rerollLiquid = this.config.getBoolean("rerollLiquid",true);
 
-		Shapes shape;
-		try{
-			shape = Shapes.valueOf(shapeStr.toUpperCase(Locale.ENGLISH));
-		}
-		catch (IllegalArgumentException exception) {
-			shape = Shapes.CIRCLE;
-		}
-
 		Double x;
 		Double z;
 		final double totalSpace;
 
-		switch (shape) {
-			case SQUARE: { //square spiral
-				totalSpace = (radius - centerRadius) * (radius + centerRadius);
-				Double rSpace = totalSpace*Math.pow(r.nextDouble(),weight);
-
-				Double rDistance = Math.sqrt(rSpace+centerRadius*centerRadius);
-				Double perimeterStep = 8*(rDistance*(rDistance-rDistance.intValue()));
-				Double shortStep = perimeterStep%rDistance;
-
-				if(perimeterStep<rDistance*4) {
-					if(perimeterStep<rDistance*2) {
-						if(perimeterStep<rDistance) {
-							x = rDistance;
-							z = shortStep;
-						}
-						else {
-							x = rDistance - shortStep;
-							z = rDistance;
-						}
-					}
-					else {
-						if(perimeterStep<rDistance*3) {
-							x = -shortStep;
-							z = rDistance;
-						}
-						else {
-							x = -rDistance;
-							z = rDistance - shortStep;
-						}
-					}
-				}
-				else {
-					if(perimeterStep<rDistance*6) {
-						if(perimeterStep<rDistance*5) {
-							x = -rDistance;
-							z = -shortStep;
-						}
-						else {
-							x = -(rDistance - shortStep);
-							z = -rDistance;
-						}
-					}
-					else {
-						if(perimeterStep<rDistance*7) {
-							x = shortStep;
-							z = -rDistance;
-						}
-						else {
-							x = rDistance;
-							z = -(rDistance-shortStep);
-						}
-					}
-				}
-				break;
-			}
-			default: {
-				totalSpace = Math.PI * (radius - centerRadius) * (radius + centerRadius);
-				Double rSpace = totalSpace*Math.pow(r.nextDouble(),weight);
-				Double rDistance = Math.sqrt(rSpace/Math.PI + centerRadius*centerRadius);
-
-				Double rotation = (rDistance - rDistance.intValue())*2*Math.PI;
-
-				x = rDistance * Math.cos(rotation);
-				z = rDistance * Math.sin(rotation);
-			}
-		}
-		res = new Location(world,x+centerX,0,z+centerZ);
+//		switch (shape) {
+//			case SQUARE: { //square spiral
+//
+//			}
+//			default: {
+//				totalSpace = Math.PI * (radius - centerRadius) * (radius + centerRadius);
+//				Double rSpace = totalSpace*Math.pow(r.nextDouble(),weight);
+//				Double rDistance = Math.sqrt(rSpace/Math.PI + centerRadius*centerRadius);
+//
+//				Double rotation = (rDistance - rDistance.intValue())*2*Math.PI;
+//
+//				x = rDistance * Math.cos(rotation);
+//				z = rDistance * Math.sin(rotation);
+//			}
+//		}
+		res = new Location(world,centerX,0,centerZ);
 
 		if(res.getChunk() == null) res.getChunk().load(true);
 
@@ -505,75 +440,7 @@ public class Config {
 				(	this.acceptableAir.contains(res.getBlock().getType())
 					|| res.getBlockY() >= this.worlds.getConfigurationSection(world.getName()).getInt("maxY",128)
 					|| (rerollLiquid && res.getBlock().isLiquid()))) {
-			switch (shape) {
-				case SQUARE: { //square spiral
-					Double rSpace = r.nextDouble(totalSpace);
 
-					Double rDistance = Math.sqrt(rSpace+centerRadius*centerRadius);
-					Double perimeterStep = 8*(rDistance*(rDistance-rDistance.intValue()));
-					Double shortStep = perimeterStep%rDistance;
-
-					if(perimeterStep<rDistance*4) {
-						if(perimeterStep<rDistance*2) {
-							if(perimeterStep<rDistance) {
-								x = rDistance;
-								z = shortStep;
-							}
-							else {
-								x = rDistance - shortStep;
-								z = rDistance;
-							}
-						}
-						else {
-							if(perimeterStep<rDistance*3) {
-								x = -shortStep;
-								z = rDistance;
-							}
-							else {
-								x = -rDistance;
-								z = rDistance - shortStep;
-							}
-						}
-					}
-					else {
-						if(perimeterStep<rDistance*6) {
-							if(perimeterStep<rDistance*5) {
-								x = -rDistance;
-								z = -shortStep;
-							}
-							else {
-								x = -(rDistance - shortStep);
-								z = -rDistance;
-							}
-						}
-						else {
-							if(perimeterStep<rDistance*7) {
-								x = shortStep;
-								z = -rDistance;
-							}
-							else {
-								x = rDistance;
-								z = -(rDistance-shortStep);
-							}
-						}
-					}
-					break;
-				}
-				default: {
-					Double rSpace = r.nextDouble(totalSpace);
-					Double rDistance = Math.sqrt(rSpace/Math.PI + centerRadius*centerRadius);
-
-					Double rotation = (rDistance - rDistance.intValue())*2*Math.PI;
-
-					x = rDistance * Math.cos(rotation);
-					z = rDistance * Math.sin(rotation);
-				}
-			}
-			res = new Location(world,x+centerX,0,z+centerZ);
-			if(res.getChunk() == null) res.getChunk().load(true);
-
-			res = this.getLastNonAir(res);
-			numAttempts++;
 		}
 
 		res.setY(res.getBlockY()+1);
@@ -626,7 +493,7 @@ public class Config {
 		if(this.worlds.getConfigurationSection(worldName).isString(setting)) {
 			Boolean goodEnum = true;
 			try {
-				Shapes.valueOf(value.toUpperCase(Locale.ROOT));
+				RandomSelectParams.Shapes.valueOf(value.toUpperCase(Locale.ROOT));
 			}
 			catch (IllegalArgumentException ex) {
 				goodEnum = false;

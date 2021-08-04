@@ -23,6 +23,8 @@ default:
     requireSkyLight: true
     #check rtp.[world] node
     requirePermission: true
+    #override shape, radius, center with vanilla worldborder settings
+    worldBorderOverride: false
     #if no perm for the world, send player to this world
     override: "world"
 

@@ -1,6 +1,7 @@
 package leafcraft.rtp.tools;
 
 import io.papermc.lib.PaperLib;
+import javafx.util.Pair;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -9,45 +10,50 @@ import org.bukkit.scheduler.BukkitTask;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 
 public class Cache {
-    private static final Integer precision = 100;
-    private static final Integer modulus = 360*precision;
-    private static final Double[] sin = new Double[modulus];
+    private static final Integer precision = 100000;
+    private static final Integer modulus = (int)(Math.PI*precision); //314159.265358979323846
+    private static final Double[] sin = new Double[modulus]; //<1MB
     static {
         for(int i = 0; i<sin.length; i++) {
-            sin[i] = Math.sin(i*Math.PI)/(precision*100);
+            sin[i] = Math.sin(i*Math.PI/(sin.length)); //sin(i/sz)
         }
     }
     // Private function for table lookup
-    private static Double sinLookup(int a) {
-        return a>=0 ? sin[a%(modulus)] : -sin[-a%(modulus)];
+    private static Double sinLookup(Double a) {
+        a = a%sin.length;
+        return a>=0 ? sin[(int)(a/(sin.length))] : -sin[(int)(a/(sin.length))];
     }
 
     // These are your working functions:
     public static Double sin(Double a) {
-        return sinLookup((int)(a * precision + 0.5f));
+        return sinLookup(a);
     }
     public static Double cos(Double a) {
-        return sinLookup((int)((a+90f) * precision + 0.5f));
+        return sinLookup(a+(Math.PI/2));
     }
 
     //Bukkit task list in case of cancellation
-    private Map<String, BukkitTask> doTeleports = new HashMap<>();
-    private Map<String, BukkitTask> loadChunks = new HashMap<>();
+    private Map<String, BukkitTask> doTeleports = new ConcurrentHashMap<>();
+    private Map<String, BukkitTask> loadChunks = new ConcurrentHashMap<>();
 
     //pre-teleport location info for checking distance from command location
-    private Map<String, Location> playerFromLocations = new HashMap<>();
+    private Map<String, Location> playerFromLocations = new ConcurrentHashMap<>();
 
     //post-teleport chunks set up so far
-    public Map<String,List<CompletableFuture<Chunk>>> playerAssChunks = new HashMap<>();
+    public Map<String,List<CompletableFuture<Chunk>>> playerAssChunks = new ConcurrentHashMap<>();
 
     //info on number of attempts on last rtp command
-    private Map<Location, Integer> numTeleportAttempts = new HashMap<>();
+    private Map<Location, Integer> numTeleportAttempts = new ConcurrentHashMap<>();
 
-    //teleport command time
-    private Map<String,Long> lastTeleportTime = new HashMap<>();
+    //store for teleport command cooldown
+    private Map<String,Long> lastTeleportTime = new ConcurrentHashMap<>();
+
+    private ConcurrentLinkedQueue<Pair<Location,BukkitTask>> locationQueue = new ConcurrentLinkedQueue<>();
 
     public void addLoadChunks(Player player, BukkitTask loadChunks) {
         if(this.loadChunks.containsKey(player)) {
