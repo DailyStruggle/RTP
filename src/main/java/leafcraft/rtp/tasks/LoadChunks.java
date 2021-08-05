@@ -4,6 +4,7 @@ import io.papermc.lib.PaperLib;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Config;
+import leafcraft.rtp.tools.selection.RandomSelect;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
@@ -13,6 +14,8 @@ import org.bukkit.scheduler.BukkitRunnable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutionException;
 
 public class LoadChunks extends BukkitRunnable {
     private final RTP plugin;
@@ -20,51 +23,45 @@ public class LoadChunks extends BukkitRunnable {
     private final Player player;
     private final Cache cache;
     private final Integer totalTime;
-    private Integer remainingTime;
     private final Location location;
+    private List<CompletableFuture<Chunk>> chunks = null;
 
-    public LoadChunks(RTP plugin, Config config, Player player, Cache cache, Integer totalTime, Integer remainingTime, Location location) {
+    public LoadChunks(RTP plugin, Config config, Player player, Cache cache, Integer totalTime, Location location) {
         this.plugin = plugin;
         this.config = config;
         this.player = player;
         this.cache = cache;
         this.totalTime = totalTime;
-        this.remainingTime = remainingTime;
         this.location = location;
     }
 
     @Override
     public void run() {
-        remainingTime--;
+        this.cache.locAssChunks.putIfAbsent(location, new ArrayList<>());
+        chunks = this.cache.locAssChunks.get(location);
 
-        if(!this.cache.playerAssChunks.containsKey(player.getName()))
-            this.cache.playerAssChunks.put(player.getName(), new ArrayList<>());
-        List<CompletableFuture<Chunk>> res = this.cache.playerAssChunks.get(this.player.getName());
+        Long startTime = System.currentTimeMillis();
+        for (int i = 0; i < chunks.size(); i++) {
+            try {
+                chunks.get(i).get();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } catch (ExecutionException e) {
+                e.printStackTrace();
+            }
+        }
+        long finTime = System.currentTimeMillis();
+        long remTime = totalTime - 20*(finTime - startTime)/1000;
+        if(remTime < 0) remTime = 0;
 
-        Integer r;
-        try{
-            r = Bukkit.getViewDistance();
-        }
-        catch (Exception exception) {
-            r = 10;
-        }
+        this.cache.doTeleports.put(this.player.getName(),new DoTeleport(plugin,config,player,location,cache).runTaskLater(plugin,remTime));
+    }
 
-        final double area = Math.PI*r*r;
-        double currArea = area * (totalTime - remainingTime);
-        for(int i = 0; i < currArea; i++) {
-            Double radius = Math.sqrt(area/Math.PI);
-            Integer distance = radius.intValue();
-            Double rotation = (radius - distance)*2*Math.PI;
-            Double x = distance * Cache.cos(rotation);
-            Double z = distance * Cache.sin(rotation);
-            res.add(PaperLib.getChunkAtAsync(location.getWorld(),location.getBlockX()/16+x.intValue(), location.getBlockZ()/16+z.intValue(),true));
-        }
-
-        if(remainingTime>0) {
-            this.cache.addLoadChunks(this.player,new LoadChunks(this.plugin,this.config,this.player,this.cache,this.totalTime,this.remainingTime-1,this.location).runTaskLaterAsynchronously(this.plugin,1));
-        }
-        else {
-            this.cache.addDoTeleport(this.player, new DoTeleport(this.config, this.player, location, this.cache).runTaskLater(this.plugin, 1));
-        }
+    @Override
+    public void cancel() {
+        cache.locationQueue.putIfAbsent(location.getWorld().getName(),new ConcurrentLinkedQueue<>());
+        cache.locationQueue.get(location.getWorld().getName()).offer(location);
+        cache.locAssChunks.putIfAbsent(location,chunks);
+        super.cancel();
     }
 }

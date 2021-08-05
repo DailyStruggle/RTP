@@ -36,6 +36,7 @@ public class SetCmd implements CommandExecutor {
         setParams.add("maxY");
         setParams.add("requireSkyLight");
         setParams.add("requirePermission");
+        setParams.add("worldBorderOverride");
         setParams.add("override");
 
     }

@@ -47,6 +47,7 @@ public class TabComplete implements TabCompleter {
         subCommands.commands.get("set").subParams.put("maxY","rtp.set");
         subCommands.commands.get("set").subParams.put("requireSkyLight","rtp.set");
         subCommands.commands.get("set").subParams.put("requirePermission","rtp.set");
+        subCommands.commands.get("set").subParams.put("worldBorderOverride","rtp.set");
         subCommands.commands.get("set").subParams.put("override","rtp.set");
 
         this.config = config;
@@ -98,6 +99,13 @@ public class TabComplete implements TabCompleter {
                     case "centerX":
                     case "centerZ": {
                         if(sender instanceof  Player) res.add(arg + ":" +"~");
+                        break;
+                    }
+                    case "requireSkyLight":
+                    case "requirePermission":
+                    case "worldBorderOverride": {
+                        res.add(arg+":true");
+                        res.add(arg+":false");
                         break;
                     }
                     default: {
