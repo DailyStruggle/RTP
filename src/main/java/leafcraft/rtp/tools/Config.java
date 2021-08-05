@@ -1,6 +1,8 @@
 package leafcraft.rtp.tools;
 
+import io.papermc.lib.PaperLib;
 import leafcraft.rtp.RTP;
+import leafcraft.rtp.tools.selection.RandomSelect;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import org.bukkit.*;
 import org.bukkit.block.BlockFace;
@@ -16,18 +18,23 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 
 public class Config {
-	private SplittableRandom r;
 	private final RTP plugin;
 	private FileConfiguration config;
-	private FileConfiguration worlds;
+	public FileConfiguration worlds;
 	private FileConfiguration lang;
 	private Cache cache;
 	public String version;
 
 	private Set<Material> acceptableAir;
+
+	public void setCache(Cache cache) {
+		this.cache = cache;
+	}
 
 	public Config(RTP plugin, Cache cache) {
 		this.acceptableAir = new HashSet<>();
@@ -45,8 +52,6 @@ public class Config {
 	
 	
 	public void refreshConfigs() {
-		this.r = new SplittableRandom();
-
 		//load lang.yml file first
 		File f = new File(this.plugin.getDataFolder(), "lang.yml");
 		if(!f.exists())
@@ -71,7 +76,7 @@ public class Config {
 		}
 		this.config = YamlConfiguration.loadConfiguration(f);
 
-		if( 	(this.config.getDouble("version") < 1.1) ) {
+		if( 	(this.config.getDouble("version") < 1.2) ) {
 			Bukkit.getLogger().log(Level.WARNING, this.getLog("oldFile", "config.yml"));
 
 			updateConfig();
@@ -88,7 +93,7 @@ public class Config {
 		}
 		this.worlds = YamlConfiguration.loadConfiguration(f);
 
-		if( 	(this.worlds.getDouble("version") < 1.2) ) {
+		if( 	(this.worlds.getDouble("version") < 1.3) ) {
 			Bukkit.getLogger().log(Level.WARNING, this.getLog("oldFile", "worlds.yml"));
 			this.renameFileInPluginDir("worlds.yml","worlds.old.yml");
 
@@ -169,7 +174,7 @@ public class Config {
 		for (String line : linesInDefaultConfig) {
 			String newline = line;
 			if (line.startsWith("version:")) {
-				newline = "version: 1.1";
+				newline = "version: 1.2";
 			} else {
 				for (String node : oldValues.keySet()) {
 					if (line.startsWith(node + ":")) {
@@ -211,7 +216,9 @@ public class Config {
 		Integer defaultMaxY = this.worlds.getConfigurationSection("default").getInt("maxY", 128);
 		Boolean defaultRequireDaylight = this.worlds.getConfigurationSection("default").getBoolean("requireSkyLight", true);
 		Boolean defaultRequirePermission = this.worlds.getConfigurationSection("default").getBoolean("requirePermission",true);
+		Boolean defaultWorldBorderOverride = this.worlds.getConfigurationSection("default").getBoolean("worldBorderOverride",false);
 		String defaultOverride = this.worlds.getConfigurationSection("default").getString("override","world");
+		Integer defaultQueueLen = this.worlds.getConfigurationSection("default").getInt("queueLen", 10);
 
 		for(World w : Bukkit.getWorlds()) {
 			String permName = "rtp.worlds." + w.getName();
@@ -258,7 +265,9 @@ public class Config {
 							linesInWorlds.add("    requirePermission: " + false);
 						else
 							linesInWorlds.add("    requirePermission: " + defaultRequirePermission);
+						linesInWorlds.add("    worldBorderOverride: " + defaultWorldBorderOverride);
 						linesInWorlds.add("    override: " + quotes + defaultOverride + quotes);
+						linesInWorlds.add("    queueLen: " + defaultQueueLen);
 					}
 				}
 				else { //if not a blank line
@@ -282,8 +291,12 @@ public class Config {
 						s = "    requireSkyLight: " + this.worlds.getConfigurationSection(currWorldName).getBoolean("requireSkyLight",defaultRequireDaylight);
 					else if(s.startsWith("    requirePermission:"))
 						s = "    requirePermission: " + this.worlds.getConfigurationSection(currWorldName).getBoolean("requirePermission",defaultRequirePermission);
+					else if(s.startsWith("    worldBorderOverride:"))
+						s = "    worldBorderOverride: " + this.worlds.getConfigurationSection(currWorldName).getBoolean("worldBorderOverride",defaultWorldBorderOverride);
 					else if(s.startsWith("    override:"))
 						s = "    override: " + quotes + this.worlds.getConfigurationSection(currWorldName).getString("override",defaultOverride) + quotes;
+					else if(s.startsWith("    queueLen:"))
+						s = "    queueLen: " + this.worlds.getConfigurationSection(currWorldName).getInt("queueLen",defaultQueueLen);
 					else if(!s.startsWith("#") && !s.startsWith("  ") && !s.startsWith("version") && (s.matches(".*[a-z].*") || s.matches(".*[A-Z].*")))
 					{
 						currWorldName = s.replace(":","");
@@ -391,73 +404,116 @@ public class Config {
 			Bukkit.getLogger().log(Level.INFO,this.getLog("newWorld",worldName));
 			Bukkit.getLogger().log(Level.INFO,this.getLog("updatingWorlds"));
 			this.fillWorldsFile(); //not optimal but it works
+			this.cache.resetQueues();
 			Bukkit.getLogger().log(Level.INFO,this.getLog("updatedWorlds"));
 		}
 		return true;
 	}
 
-	public Location getRandomLocation(World world) {
+	public Location getRandomLocation(World world, boolean urgent) {
 		Location res;
 
-		String shapeStr = this.worlds.getConfigurationSection(world.getName()).getString("shape", "CIRCLE");
-		Integer radius = this.worlds.getConfigurationSection(world.getName()).getInt("radius", 4096);
+		Boolean worldBorderOverride = this.worlds.getConfigurationSection(world.getName()).getBoolean("worldBorderOverride",false);
+		String shapeStr = (!worldBorderOverride) ?
+				this.worlds.getConfigurationSection(world.getName()).getString("shape", "CIRCLE") :
+				"SQUARE";
+		Integer radius = (!worldBorderOverride) ?
+				this.worlds.getConfigurationSection(world.getName()).getInt("radius", 4096) :
+				(int)world.getWorldBorder().getSize()/2;
 		Integer centerRadius = this.worlds.getConfigurationSection(world.getName()).getInt("centerRadius", 1024);
-		Integer centerX = this.worlds.getConfigurationSection(world.getName()).getInt("centerX", 0);
+		Integer centerX = (!worldBorderOverride) ?
+				this.worlds.getConfigurationSection(world.getName()).getInt("centerX", 0) :
+				world.getWorldBorder().getCenter().getBlockX();
+		Integer centerZ = (!worldBorderOverride) ?
+				this.worlds.getConfigurationSection(world.getName()).getInt("centerZ", 0) :
+				world.getWorldBorder().getCenter().getBlockZ();
 		Double weight = this.worlds.getConfigurationSection(world.getName()).getDouble("weight", 1.0);
 
-		Integer centerZ = this.worlds.getConfigurationSection(world.getName()).getInt("centerZ", 0);
+		RandomSelectParams params = new RandomSelectParams(shapeStr,radius,centerRadius,centerX,centerZ,weight);
+
+		Integer minY = this.worlds.getConfigurationSection(world.getName()).getInt("minY",48);
+		Integer maxY = this.worlds.getConfigurationSection(world.getName()).getInt("maxY",128);
 
 		Boolean rerollLiquid = this.config.getBoolean("rerollLiquid",true);
 
-		Double x;
-		Double z;
-		final double totalSpace;
+		long[] xz = RandomSelect.select(params);
+		res = new Location(world,xz[0],minY,xz[1]);
 
-//		switch (shape) {
-//			case SQUARE: { //square spiral
-//
-//			}
-//			default: {
-//				totalSpace = Math.PI * (radius - centerRadius) * (radius + centerRadius);
-//				Double rSpace = totalSpace*Math.pow(r.nextDouble(),weight);
-//				Double rDistance = Math.sqrt(rSpace/Math.PI + centerRadius*centerRadius);
-//
-//				Double rotation = (rDistance - rDistance.intValue())*2*Math.PI;
-//
-//				x = rDistance * Math.cos(rotation);
-//				z = rDistance * Math.sin(rotation);
-//			}
-//		}
-		res = new Location(world,centerX,0,centerZ);
+		CompletableFuture<Chunk> cfChunk = (urgent) ?
+				PaperLib.getChunkAtAsyncUrgently(world,res.getBlockX()/16,res.getBlockZ()/16,true) :
+				PaperLib.getChunkAtAsync(world,res.getBlockX()/16,res.getBlockZ()/16,true);
 
-		if(res.getChunk() == null) res.getChunk().load(true);
+		try {
+			cfChunk.get();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		} catch (ExecutionException e) {
+			e.printStackTrace();
+		}
 
+		res = this.getFirstNonAir(res);
 		res = this.getLastNonAir(res);
 
 		Integer numAttempts = 1;
 		Integer maxAttempts = this.config.getInt("maxAttempts",100);
 		while(numAttempts < maxAttempts &&
-				(	this.acceptableAir.contains(res.getBlock().getType())
-					|| res.getBlockY() >= this.worlds.getConfigurationSection(world.getName()).getInt("maxY",128)
+				( this.acceptableAir.contains(res.getBlock().getType())
+					|| (res.getBlockY() >= maxY)
 					|| (rerollLiquid && res.getBlock().isLiquid()))) {
+			xz = RandomSelect.select(params);
+			res = new Location(world,xz[0],minY,xz[1]);
 
+			cfChunk = (urgent) ?
+					PaperLib.getChunkAtAsyncUrgently(world,res.getBlockX()/16,res.getBlockZ()/16,true) :
+					PaperLib.getChunkAtAsync(world,res.getBlockX()/16,res.getBlockZ()/16,true);
+
+			try {
+				cfChunk.get();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+				this.cache.numTeleportAttempts.put(res,maxAttempts);
+				return res;
+			} catch (ExecutionException e) {
+				e.printStackTrace();
+				this.cache.numTeleportAttempts.put(res,maxAttempts);
+				return res;
+			}
+
+			res = this.getLastNonAir(res);
+			numAttempts++;
 		}
 
 		res.setY(res.getBlockY()+1);
-		this.cache.setNumTeleportAttempts(res, numAttempts);
+		res.setX(res.getBlockX()+0.5);
+		res.setZ(res.getBlockZ()+0.5);
+		this.cache.numTeleportAttempts.put(res, numAttempts);
 		return res;
 	}
 
-	private Location getLastNonAir(Location start) {
+	public Location getFirstNonAir(Location start) {
 		World world = start.getWorld();
-		Integer minY = this.worlds.getConfigurationSection(world.getName()).getInt("minY", 48);
+		Integer minY = start.getBlockY();
+		Integer maxY = this.worlds.getConfigurationSection(world.getName()).getInt("maxY",128);
+
+		//iterate over a good distance to reduce thin floors
+		for(int i = minY; i <= maxY; i+=8) {
+			start.setY(i);
+			if(!this.acceptableAir.contains(start.getBlock().getType())) {
+				break;
+			}
+		}
+		return start;
+	}
+
+	public Location getLastNonAir(Location start) {
+		World world = start.getWorld();
+		Integer minY = start.getBlockY();
 		Integer maxY = this.worlds.getConfigurationSection(world.getName()).getInt("maxY",128);
 		Integer oldY;
-		start.setY(minY);
 		Boolean requireSkyLight = this.worlds.getConfigurationSection(start.getWorld().getName()).getBoolean("requireSkyLight");
 
-		//iterate over a larger distance first, then fine-tuneD
-		for(Integer it_length = (maxY-minY)/2; it_length > 0; it_length/=2) {
+		//iterate over a larger distance first, then fine-tune
+		for(Integer it_length = (maxY-minY)/2; it_length > 0; it_length = it_length/2) {
 			for(int i = minY; i <= maxY; i+=it_length) {
 				oldY = start.getBlockY();
 				start.setY(i);
@@ -479,8 +535,6 @@ public class Config {
 				}
 			}
 		}
-		start.setX(((Integer)start.getBlockX()).doubleValue()+0.5);
-		start.setZ(((Integer)start.getBlockZ()).doubleValue()+0.5);
 		return start;
 	}
 
@@ -534,6 +588,11 @@ public class Config {
 			this.worlds.getConfigurationSection(worldName).set(setting,num);
 		}
 
+		cache.resetQueues();
 		return 0;
+	}
+
+	public Integer getQueueLen(World world) {
+		return this.worlds.getConfigurationSection(world.getName()).getInt("queueLen",10);
 	}
 }

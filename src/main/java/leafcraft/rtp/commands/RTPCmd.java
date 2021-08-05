@@ -105,16 +105,16 @@ public class RTPCmd implements CommandExecutor {
         }
 
         //check time
-        Long time = System.currentTimeMillis();
-        Long lastTime = (sender instanceof Player) ? this.cache.getLastTeleportTime((Player) sender) : 0;
-        Long cooldownTime = TimeUnit.SECONDS.toMillis((Integer)this.config.getConfigValue("teleportCooldown",300));
+        long time = System.currentTimeMillis();
+        long lastTime = (sender instanceof Player) ? this.cache.lastTeleportTime.getOrDefault(sender.getName(),Long.valueOf(0)) : 0;
+        long cooldownTime = TimeUnit.SECONDS.toMillis((Integer)this.config.getConfigValue("teleportCooldown",300));
         if(!sender.hasPermission("rtp.instant")
                 && time - lastTime < cooldownTime) {
-            Long remaining = (lastTime+cooldownTime)-time;
-            Long days = TimeUnit.MILLISECONDS.toDays(remaining);
-            Long hours = TimeUnit.MILLISECONDS.toHours(remaining)%24;
-            Long minutes = TimeUnit.MILLISECONDS.toMinutes(remaining)%60;
-            Long seconds = TimeUnit.MILLISECONDS.toSeconds(remaining)%60;
+            long remaining = (lastTime+cooldownTime)-time;
+            long days = TimeUnit.MILLISECONDS.toDays(remaining);
+            long hours = TimeUnit.MILLISECONDS.toHours(remaining)%24;
+            long minutes = TimeUnit.MILLISECONDS.toMinutes(remaining)%60;
+            long seconds = TimeUnit.MILLISECONDS.toSeconds(remaining)%60;
             String replacement = new String();
             if(days>0) replacement += days + this.config.getLog("days") + " ";
             if(days>0 || hours>0) replacement += hours + this.config.getLog("hours") + " ";
@@ -123,9 +123,9 @@ public class RTPCmd implements CommandExecutor {
             sender.sendMessage(config.getLog("cooldownMessage", replacement));
         }
         else {
-            new SetupTeleport(this.plugin,sender,player,world,this.config, this.cache).runTask(this.plugin);
-            this.cache.setLastTeleportTime(player, time);
-            this.cache.setPlayerFromLocation(player,player.getLocation());
+            new SetupTeleport(this.plugin,sender,player,world,this.config, this.cache).runTaskAsynchronously(this.plugin);
+            this.cache.lastTeleportTime.put(player.getName(), time);
+            this.cache.playerFromLocations.put(player.getName(),player.getLocation());
         }
 
         return true;

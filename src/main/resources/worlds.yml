@@ -6,6 +6,7 @@ default:
     # CIRCLE - spiral curve (suggested)
     shape: "CIRCLE"
     #radius of randomization in meters
+    # radius over 1.5b will use less efficient arithmetic
     radius: 4096
     #donut hole, where players shouldn't land
     centerRadius: 1024
@@ -27,5 +28,8 @@ default:
     worldBorderOverride: false
     #if no perm for the world, send player to this world
     override: "world"
+    #max length for the location queue per world, recommend 0 for unused worlds
+    # each location also queues a number of chunks to be loaded (async), based on view distance
+    queueLen: 10
 
-version: 1.2
+version: 1.3

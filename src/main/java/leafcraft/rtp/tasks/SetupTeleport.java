@@ -3,6 +3,7 @@ package leafcraft.rtp.tasks;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Config;
+import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -35,6 +36,10 @@ public class SetupTeleport extends BukkitRunnable {
 
     @Override
     public void run() {
+        if(this.cache.todoTP.containsKey(player.getName())) {
+            //probably say something
+            return;
+        }
         int delay = (sender.hasPermission("rtp.instant")) ? 0 : (Integer)this.config.getConfigValue("teleportDelay", 2);
 
         //let player know if they'll have to wait to teleport
@@ -54,23 +59,18 @@ public class SetupTeleport extends BukkitRunnable {
         }
 
         //get a random location
-        Location location = this.config.getRandomLocation(world);
+        Location location = this.cache.getRandomLocation(world,true);
         Integer maxAttempts = (Integer) this.config.getConfigValue("maxAttempts",100);
-        if(this.cache.getNumTeleportAttempts(location) >= maxAttempts) {
+        if(     this.cache.numTeleportAttempts.containsKey(location)
+                && this.cache.numTeleportAttempts.get(location) >= maxAttempts) {
             player.sendMessage(this.config.getLog("unsafe",maxAttempts.toString()));
             if(!sender.getName().equals(player.getName()))
                 sender.sendMessage(this.config.getLog("unsafe",maxAttempts.toString()));
-            this.cache.removePlayer(player);
             return;
         }
+        this.cache.todoTP.put(player.getName(),location);
 
-        //if t>0, set up task to load chunks
-        if(delay>0) {
-            this.cache.addLoadChunks(this.player, new LoadChunks(this.plugin,this.config,this.player,this.cache,delay*20,delay*20,location).runTaskLaterAsynchronously(this.plugin,1));
-        }
-        else {
-            this.cache.addDoTeleport(this.player, new DoTeleport(this.config, this.player, location, this.cache).runTask(this.plugin));
-        }
-
+        //set up task to load chunks then teleport
+        this.cache.loadChunks.put(this.player.getName(), new LoadChunks(this.plugin,this.config,this.player,this.cache,delay*20,location).runTaskLaterAsynchronously(this.plugin,1));
     }
 }
