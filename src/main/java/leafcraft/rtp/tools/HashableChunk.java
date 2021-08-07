@@ -4,28 +4,26 @@ import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.World;
 
-import java.util.Objects;
+import java.util.UUID;
 
 public class HashableChunk {
-    String worldname;
-    private int x,z;
+    UUID worldUID;
+    private Long coordinate;
     private Chunk chunk;
 
     public HashableChunk(Chunk chunk) {
-        this.worldname = chunk.getWorld().getName();
         this.chunk = chunk;
-        x = chunk.getX();
-        z = chunk.getZ();
+        coordinate = (Long.valueOf(chunk.getX())<<32) + chunk.getZ();
+        worldUID = chunk.getWorld().getUID();
     }
 
-    public HashableChunk(String worldname, int x, int z) {
-        this.worldname = worldname;
-        this.x = x;
-        this.z = z;
+    public HashableChunk(World world, int x, int z) {
+        this.worldUID = world.getUID();
+        this.coordinate = (Long.valueOf(x)<<32)+z;
     }
 
     public Chunk getChunk() {
-        return (chunk != null) ? chunk : Bukkit.getWorld(worldname).getChunkAt(x,z);
+        return (chunk != null) ? chunk : Bukkit.getWorld(worldUID).getChunkAt((int)(coordinate >>32), (int)(coordinate &0xFFFF));
     }
 
     @Override
@@ -34,17 +32,17 @@ public class HashableChunk {
         if (o == null) return false;
         if(o instanceof Chunk) {
             Chunk that = (Chunk) o;
-            return (x == that.getX()) && (z == that.getZ()) && (worldname.equals(that.getWorld().getName()));
+            return (coordinate == ((Long.valueOf(that.getX())<<32)+that.getZ())) && (worldUID.equals(that.getWorld().getUID()));
         }
         else if(o instanceof HashableChunk) {
             HashableChunk that = (HashableChunk) o;
-            return (x == that.x) && (z == that.z) && (worldname.equals(that.worldname));
+            return (coordinate.equals(that.coordinate)) && (worldUID.equals(that.worldUID));
         }
         return false;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(worldname + x + z);
+        return worldUID.hashCode() ^ coordinate.hashCode();
     }
 }

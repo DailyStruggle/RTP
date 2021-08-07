@@ -1,5 +1,6 @@
 package leafcraft.rtp.commands;
 
+import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Config;
 import me.clip.placeholderapi.PlaceholderAPI;
 import org.bukkit.Bukkit;
@@ -10,9 +11,11 @@ import org.bukkit.entity.Player;
 
 public class Reload implements CommandExecutor {
     private Config config;
+    private Cache cache;
 
-    public Reload(Config config) {
+    public Reload(Config config, Cache cache) {
         this.config = config;
+        this.cache = cache;
     }
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
@@ -28,6 +31,7 @@ public class Reload implements CommandExecutor {
             sender.sendMessage(str);
         }
 
+        this.cache.resetQueues();
         this.config.refreshConfigs();
 
         str = this.config.getLog("reloaded");

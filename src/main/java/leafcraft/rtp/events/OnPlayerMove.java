@@ -12,6 +12,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerMoveEvent;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class OnPlayerMove implements Listener {
     private RTP plugin;
@@ -41,13 +42,10 @@ public class OnPlayerMove implements Listener {
         }
 
         Location randomLocation = cache.todoTP.get(player.getName());
-        if(cache.locAssChunks.containsKey(randomLocation)) {
-            for(CompletableFuture<Chunk> cfChunk : cache.locAssChunks.get(randomLocation)) {
-                cfChunk.cancel(true);
-            }
-        }
         cache.todoTP.remove(player.getName());
         cache.playerFromLocations.remove(player.getName());
+        cache.locationQueue.putIfAbsent(randomLocation.getWorld().getName(), new ConcurrentLinkedQueue<>());
+        cache.locationQueue.get(randomLocation.getWorld().getName()).offer(randomLocation);
 
         player.sendMessage(this.config.getLog("teleportCancel"));
     }

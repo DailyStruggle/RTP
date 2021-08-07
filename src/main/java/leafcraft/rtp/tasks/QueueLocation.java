@@ -2,11 +2,14 @@ package leafcraft.rtp.tasks;
 
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Config;
+import leafcraft.rtp.tools.selection.RandomSelectParams;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 //TODO
@@ -23,14 +26,15 @@ public class QueueLocation extends BukkitRunnable {
 
     @Override
     public void run() {
-        Integer queueLen = config.getQueueLen(world);
+        Integer queueLen = (Integer) config.getWorldSetting(world.getName(),"queueLen",10);
         if(cache.locationQueue.get(world.getName()).size() >= queueLen) {
             return;
         }
 
         //get location and queue up the chunks
-        Location res = config.getRandomLocation(world,false);
-        if(cache.numTeleportAttempts.get(res) > (Integer)config.getConfigValue("maxAttempts",100)) {
+        RandomSelectParams rsParams = new RandomSelectParams(world,new HashMap<>(),config);
+        Location res = config.getRandomLocation(rsParams,false);
+        if(res == null) {
             return;
         }
 

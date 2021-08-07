@@ -55,8 +55,8 @@ public class DoTeleport extends BukkitRunnable {
             }
         }
 
-        player.teleport(location);
+        PaperLib.teleportAsync(player,location);
         this.player.sendMessage(this.config.getLog("teleportMessage", this.cache.numTeleportAttempts.getOrDefault(location,0).toString()));
-        new TeleportCleanup(location,cache).runTaskAsynchronously(plugin);
+        new TeleportCleanup(location,cache).runTask(plugin);
     }
 }

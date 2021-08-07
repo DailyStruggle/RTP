@@ -2,12 +2,15 @@ package leafcraft.rtp;
 
 import io.papermc.lib.PaperLib;
 import leafcraft.rtp.commands.*;
+import leafcraft.rtp.events.OnChunkUnload;
 import leafcraft.rtp.events.OnPlayerMove;
 import leafcraft.rtp.events.OnPlayerQuit;
+import leafcraft.rtp.events.OnPlayerTeleport;
 import leafcraft.rtp.tasks.QueueLocation;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Config;
 import leafcraft.rtp.tools.Metrics;
+import leafcraft.rtp.tools.TPS;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.plugin.PluginDescriptionFile;
@@ -23,6 +26,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 public final class RTP extends JavaPlugin {
     private Config config;
+
     public Cache cache;
 
     public ConcurrentHashMap<String,BukkitTask> timers = new ConcurrentHashMap<>();
@@ -46,6 +50,7 @@ public final class RTP extends JavaPlugin {
         RTP plugin = this;
         PaperLib.suggestPaper(this);
 
+
         this.metrics = new Metrics(this, 12277);
         this.config = new Config(this, cache);
         this.cache = new Cache(this.config);
@@ -55,22 +60,28 @@ public final class RTP extends JavaPlugin {
         getCommand("rtp").setExecutor(new RTPCmd(this, this.config, this.cache));
         getCommand("rtp set").setExecutor(new SetCmd(this,this.config));
         getCommand("rtp help").setExecutor(new Help(this.config));
-        getCommand("rtp reload").setExecutor(new Reload(this.config));
+        getCommand("rtp reload").setExecutor(new Reload(this.config, this.cache));
 
         getCommand("rtp").setTabCompleter(new TabComplete(this.config));
         getCommand("wild").setTabCompleter(new TabComplete(this.config));
 
         getServer().getPluginManager().registerEvents(new OnPlayerMove(this,this.config,this.cache),this);
         getServer().getPluginManager().registerEvents(new OnPlayerQuit(this.cache),this);
+        getServer().getPluginManager().registerEvents(new OnChunkUnload(this.cache),this);
 
         //TODO: make this work
+        Bukkit.getServer().getScheduler().scheduleSyncRepeatingTask(this, new TPS(), 100L, 1L);
+
         int period = 20*(Integer)(config.getConfigValue("queuePeriod",30));
         if(period > 0) {
             int i = 0;
             int iter_len = period / Bukkit.getWorlds().size();
             for (World world : Bukkit.getWorlds()) {
                 timers.put(world.getName(), Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
-                    Integer queueLen = config.getQueueLen(world);
+                    double tps = TPS.getTPS();
+                    double minTps = (Double)config.getConfigValue("minTPS",19.0);
+                    if(tps < minTps) return;
+                    Integer queueLen = (Integer)config.getWorldSetting(world.getName(),"queueLen",10);
                     if (!cache.locationQueue.containsKey(world.getName()))
                         cache.locationQueue.put(world.getName(), new ConcurrentLinkedQueue<>());
                     if (cache.locationQueue.get(world.getName()).size() < queueLen) {
@@ -85,6 +96,10 @@ public final class RTP extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if(this.cache == null) {
+            super.onDisable();
+            return;
+        }
         this.cache.shutdown();
         for(Map.Entry<String,BukkitTask> entry : timers.entrySet()) {
             entry.getValue().cancel();
@@ -93,5 +108,6 @@ public final class RTP extends JavaPlugin {
         for(BukkitTask task : queueTasks) {
             task.cancel();
         }
+        super.onDisable();
     }
 }

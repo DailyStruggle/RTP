@@ -12,7 +12,7 @@ wgZ1 = 0
 wgX2 = 0
 wgZ2 = 0
 
-it = 1000000
+it = 100000
 radius = 4096
 centerRadius = 1024
 x = np.zeros(it)

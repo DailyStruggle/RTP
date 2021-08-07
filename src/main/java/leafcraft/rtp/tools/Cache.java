@@ -12,7 +12,6 @@ import org.bukkit.scheduler.BukkitTask;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.logging.Level;
 
 public class Cache {
     Config config;
@@ -45,13 +44,18 @@ public class Cache {
     //info on number of attempts on last rtp command
     public ConcurrentHashMap<Location, Integer> numTeleportAttempts = new ConcurrentHashMap<>();
 
-    //store for teleport command cooldown
+    //store teleport command cooldown
     public ConcurrentHashMap<String,Long> lastTeleportTime = new ConcurrentHashMap<>();
 
+    //store locations
     public ConcurrentHashMap<String,ConcurrentLinkedQueue<Location>> locationQueue = new ConcurrentHashMap<>();
 
+    //Collection of bad sector detections, populated by rerolls to prevent future rerolls at those locations
+    // key: the starting point along the curve
+    // value: length of bad segment
+    public ConcurrentSkipListMap<Long,Long> badChunks = new ConcurrentSkipListMap<>();
+
     public void shutdown() {
-        Bukkit.getLogger().log(Level.INFO, "[rtp] cancelling teleportations");
         for(ConcurrentHashMap.Entry<String,BukkitTask> entry : loadChunks.entrySet()) {
             entry.getValue().cancel();
         }
@@ -62,7 +66,6 @@ public class Cache {
         }
         doTeleports.clear();
 
-        Bukkit.getLogger().log(Level.INFO, "[rtp] cancelling chunk loads");
         for(Map.Entry<Location,List<CompletableFuture<Chunk>>> entry : this.locAssChunks.entrySet()) {
             for(CompletableFuture<Chunk> cfChunk : entry.getValue()) {
                 cfChunk.cancel(true);
@@ -78,7 +81,6 @@ public class Cache {
         forceLoadedChunks.clear();
     }
 
-
     //add location and adjacent chunks to cache
     public void addLocation(Location location) {
         if(!locationQueue.containsKey(location.getWorld().getName())) {
@@ -88,15 +90,19 @@ public class Cache {
 
         if(locAssChunks.containsKey(location)) return;
 
+        addChunks(location);
+    }
+
+    public void addChunks(Location location) {
         List<CompletableFuture<Chunk>> chunks = new ArrayList<>();
         int vd = Bukkit.getViewDistance();
         int cx = location.getBlockX()/16;
         int cz = location.getBlockZ()/16;
-        int area = (int)(vd*vd*Math.PI+0.5d);
+        int area = (int)(vd*vd*4+0.5d);
         for(int i = 0; i < area; i++) {
-            long[] xz = RandomSelect.circleLocationToXZ(0,cx,cz,BigDecimal.valueOf(i));
-            chunks.add(PaperLib.getChunkAtAsync(location.getWorld(),(int)xz[0],(int)xz[1]));
-            HashableChunk hc = new HashableChunk(location.getWorld().getName(),(int)xz[0],(int)xz[1]);
+            int[] xz = RandomSelect.squareLocationToXZ(0,cx,cz,i);
+            chunks.add(PaperLib.getChunkAtAsync(location.getWorld(),xz[0],xz[1]));
+            HashableChunk hc = new HashableChunk(location.getWorld(),xz[0],xz[1]);
             keepChunks.putIfAbsent(hc,Long.valueOf(0));
             keepChunks.compute(hc, (k,v) -> v + 1);
         }
@@ -104,16 +110,20 @@ public class Cache {
     }
 
 
-    public Location getRandomLocation(World world, boolean urgent) {
+    public Location getRandomLocation(RandomSelectParams rsParams, boolean urgent) {
+        if(rsParams.hasCustomValues) return config.getRandomLocation(rsParams,urgent);
+
         Location res;
+
+
         try{
-            res = locationQueue.get(world.getName()).remove();
+            res = locationQueue.get(rsParams.world.getName()).remove();
         }
         catch (NoSuchElementException exception) {
-            res = config.getRandomLocation(world, urgent);
+            res = config.getRandomLocation(rsParams, urgent);
         }
         catch (NullPointerException exception) {
-            res = config.getRandomLocation(world, urgent);
+            res = config.getRandomLocation(rsParams, urgent);
         }
         return res;
     }
@@ -128,5 +138,9 @@ public class Cache {
             }
             locAssChunks.remove(entry);
         }
+    }
+
+    public void addBadChunk(int x, int z) {
+
     }
 }

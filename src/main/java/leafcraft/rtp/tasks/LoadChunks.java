@@ -37,7 +37,9 @@ public class LoadChunks extends BukkitRunnable {
 
     @Override
     public void run() {
-        this.cache.locAssChunks.putIfAbsent(location, new ArrayList<>());
+        if(!this.cache.locAssChunks.containsKey(location)) {
+            this.cache.addChunks(location);
+        }
         chunks = this.cache.locAssChunks.get(location);
 
         Long startTime = System.currentTimeMillis();
