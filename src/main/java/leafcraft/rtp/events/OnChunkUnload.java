@@ -10,16 +10,15 @@ import org.bukkit.event.world.ChunkUnloadEvent;
 public class OnChunkUnload implements Listener {
     private Cache cache;
 
-    OnChunkUnload(Cache cache) {
+    public OnChunkUnload(Cache cache) {
         this.cache = cache;
     }
 
     @EventHandler
     public void onChunkUnload(ChunkUnloadEvent event) {
-        if(cache.keepChunks.containsKey(event.getChunk())) {
-            Bukkit.getLogger().warning("keeping chunk: " + event.getChunk().getX() + ","+ event.getChunk().getZ());
+        HashableChunk hashableChunk = new HashableChunk(event.getChunk());
+        if(cache.keepChunks.containsKey(hashableChunk)) {
             event.getChunk().setForceLoaded(true);
-            HashableChunk hashableChunk = new HashableChunk(event.getChunk());
             cache.forceLoadedChunks.put(hashableChunk,Long.valueOf(0));
         }
     }

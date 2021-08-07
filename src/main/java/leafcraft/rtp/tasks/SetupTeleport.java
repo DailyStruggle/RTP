@@ -3,6 +3,7 @@ package leafcraft.rtp.tasks;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Config;
+import leafcraft.rtp.tools.selection.RandomSelectParams;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
@@ -21,17 +22,17 @@ public class SetupTeleport extends BukkitRunnable {
     private final RTP plugin;
     private final CommandSender sender;
     private final Player player;
-    private final World world;
     private final Config config;
     private final Cache cache;
+    private final RandomSelectParams rsParams;
 
-    public SetupTeleport(RTP plugin, CommandSender sender, Player player, World world, Config config, Cache cache) {
+    public SetupTeleport(RTP plugin, CommandSender sender, Player player, Config config, Cache cache, RandomSelectParams rsParams) {
         this.sender = sender;
         this.plugin = plugin;
         this.player = player;
-        this.world = world;
         this.config = config;
         this.cache = cache;
+        this.rsParams = rsParams;
     }
 
     @Override
@@ -59,10 +60,10 @@ public class SetupTeleport extends BukkitRunnable {
         }
 
         //get a random location
-        Location location = this.cache.getRandomLocation(world,true);
+        Location location = this.cache.getRandomLocation(rsParams,true);
+
         Integer maxAttempts = (Integer) this.config.getConfigValue("maxAttempts",100);
-        if(     this.cache.numTeleportAttempts.containsKey(location)
-                && this.cache.numTeleportAttempts.get(location) >= maxAttempts) {
+        if(location == null) {
             player.sendMessage(this.config.getLog("unsafe",maxAttempts.toString()));
             if(!sender.getName().equals(player.getName()))
                 sender.sendMessage(this.config.getLog("unsafe",maxAttempts.toString()));

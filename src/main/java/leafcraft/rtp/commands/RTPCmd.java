@@ -3,6 +3,7 @@ package leafcraft.rtp.commands;
 import leafcraft.rtp.tasks.SetupTeleport;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Config;
+import leafcraft.rtp.tools.selection.RandomSelectParams;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.command.Command;
@@ -33,6 +34,17 @@ public class RTPCmd implements CommandExecutor {
 
         this.rtpParams.put("player", "rtp.other");
         this.rtpParams.put("world", "rtp.world");
+
+        this.rtpParams.put("shape","rtp.params");
+        this.rtpParams.put("radius","rtp.params");
+        this.rtpParams.put("centerRadius","rtp.params");
+        this.rtpParams.put("centerX","rtp.params");
+        this.rtpParams.put("centerZ","rtp.params");
+        this.rtpParams.put("weight","rtp.params");
+        this.rtpParams.put("minY","rtp.params");
+        this.rtpParams.put("maxY","rtp.params");
+        this.rtpParams.put("requireSkyLight","rtp.params");
+        this.rtpParams.put("worldBorderOverride","rtp.params");
     }
 
     @Override
@@ -60,7 +72,7 @@ public class RTPCmd implements CommandExecutor {
         for(int i = 0; i < args.length; i++) {
             int idx = args[i].indexOf(':');
             String arg = idx>0 ? args[i].substring(0,idx) : args[i];
-            if(this.rtpParams.keySet().contains(arg) && idx < args[i].length()-1) {
+            if(this.rtpParams.containsKey(arg) && sender.hasPermission(rtpParams.get(arg)) && idx < args[i].length()-1) {
                 rtpArgs.putIfAbsent(arg,args[i].substring(idx+1)); //only use first instance
             }
         }
@@ -121,12 +133,13 @@ public class RTPCmd implements CommandExecutor {
             if(days>0 || hours>0 || minutes>0) replacement += minutes + this.config.getLog("minutes") + " ";
             replacement += seconds + this.config.getLog("seconds");
             sender.sendMessage(config.getLog("cooldownMessage", replacement));
+            return true;
         }
-        else {
-            new SetupTeleport(this.plugin,sender,player,world,this.config, this.cache).runTaskAsynchronously(this.plugin);
-            this.cache.lastTeleportTime.put(player.getName(), time);
-            this.cache.playerFromLocations.put(player.getName(),player.getLocation());
-        }
+
+        RandomSelectParams rsParams = new RandomSelectParams(world,rtpArgs,config);
+        new SetupTeleport(this.plugin,sender,player,this.config, this.cache, rsParams).runTaskAsynchronously(this.plugin);
+        this.cache.lastTeleportTime.put(player.getName(), time);
+        this.cache.playerFromLocations.put(player.getName(),player.getLocation());
 
         return true;
     }

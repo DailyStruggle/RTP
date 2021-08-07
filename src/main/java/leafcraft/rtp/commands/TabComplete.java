@@ -16,12 +16,23 @@ import java.util.Set;
 public class TabComplete implements TabCompleter {
     private class SubCommand {
         String perm;
-        //parameter,perm
+
+        //parameter name,perm, for
         Map<String,String> subParams = new HashMap<>();
+
+        //perm, list of params
+        Map<String,ArrayList<String>> subParamsPermList = new HashMap<>();
+
         //command name, commands
         Map<String,SubCommand> commands = new HashMap<>();
 
         SubCommand(String perm) { this.perm = perm; }
+
+        void addSubParam(String name, String perm) {
+            subParams.put(name,perm);
+            subParamsPermList.putIfAbsent(perm, new ArrayList<>());
+            subParamsPermList.get(perm).add(name+":");
+        }
     }
 
     private SubCommand subCommands = new SubCommand("rtp");
@@ -30,25 +41,38 @@ public class TabComplete implements TabCompleter {
 
     public TabComplete(Config config) {
         //load OnePlayerSleep.commands and permission nodes into map
-        subCommands.subParams.put("world","rtp.world");
-        subCommands.subParams.put("player","rtp.other");
+        subCommands.addSubParam("world","rtp.world");
+        subCommands.addSubParam("player","rtp.other");
+        subCommands.addSubParam("shape","rtp.params");
+        subCommands.addSubParam("radius","rtp.params");
+        subCommands.addSubParam("centerRadius","rtp.params");
+        subCommands.addSubParam("centerX","rtp.params");
+        subCommands.addSubParam("centerZ","rtp.params");
+        subCommands.addSubParam("weight","rtp.params");
+        subCommands.addSubParam("minY","rtp.params");
+        subCommands.addSubParam("maxY","rtp.params");
+        subCommands.addSubParam("requireSkyLight","rtp.params");
+        subCommands.addSubParam("worldBorderOverride","rtp.params");
+        
         subCommands.commands.put("help",new SubCommand("rtp.see"));
         subCommands.commands.put("reload",new SubCommand("rtp.reload"));
         subCommands.commands.put("set",new SubCommand("rtp.set"));
 
-        subCommands.commands.get("set").subParams.put("world","rtp.set");
-        subCommands.commands.get("set").subParams.put("shape","rtp.set");
-        subCommands.commands.get("set").subParams.put("radius","rtp.set");
-        subCommands.commands.get("set").subParams.put("centerRadius","rtp.set");
-        subCommands.commands.get("set").subParams.put("centerX","rtp.set");
-        subCommands.commands.get("set").subParams.put("centerZ","rtp.set");
-        subCommands.commands.get("set").subParams.put("weight","rtp.set");
-        subCommands.commands.get("set").subParams.put("minY","rtp.set");
-        subCommands.commands.get("set").subParams.put("maxY","rtp.set");
-        subCommands.commands.get("set").subParams.put("requireSkyLight","rtp.set");
-        subCommands.commands.get("set").subParams.put("requirePermission","rtp.set");
-        subCommands.commands.get("set").subParams.put("worldBorderOverride","rtp.set");
-        subCommands.commands.get("set").subParams.put("override","rtp.set");
+        subCommands.commands.get("set").addSubParam("world","rtp.set");
+        subCommands.commands.get("set").addSubParam("shape","rtp.set");
+        subCommands.commands.get("set").addSubParam("radius","rtp.set");
+        subCommands.commands.get("set").addSubParam("centerRadius","rtp.set");
+        subCommands.commands.get("set").addSubParam("centerX","rtp.set");
+        subCommands.commands.get("set").addSubParam("centerZ","rtp.set");
+        subCommands.commands.get("set").addSubParam("weight","rtp.set");
+        subCommands.commands.get("set").addSubParam("minY","rtp.set");
+        subCommands.commands.get("set").addSubParam("maxY","rtp.set");
+        subCommands.commands.get("set").addSubParam("requireSkyLight","rtp.set");
+        subCommands.commands.get("set").addSubParam("requirePermission","rtp.set");
+        subCommands.commands.get("set").addSubParam("worldBorderOverride","rtp.set");
+        subCommands.commands.get("set").addSubParam("override","rtp.set");
+        
+        
 
         this.config = config;
     }
@@ -78,11 +102,16 @@ public class TabComplete implements TabCompleter {
                     return;
                 }
                 switch (arg) {
+                    case "shape": {
+                        res.add(arg+":CIRCLE");
+                        res.add(arg+":SQUARE");
+                    }
                     case "world" :
                     case "override" : {
                         for (World world : Bukkit.getWorlds()) {
                             this.config.checkWorldExists(world.getName());
-                            if (!this.config.getWorldPermReq(world.getName()) || sender.hasPermission("rtp.worlds." + world.getName())) {
+                            if (!((Boolean)this.config.getWorldSetting(world.getName(),"requirePermission",true))
+                                    || sender.hasPermission("rtp.worlds." + world.getName())) {
                                 res.add(arg + ":" + world.getName());
                             }
                         }
@@ -114,10 +143,10 @@ public class TabComplete implements TabCompleter {
                 }
             }
             else { //if no semicolon add all sub-commands or sub-parameters
-                for(Map.Entry<String, String> entry : command.subParams.entrySet()) {
+                for(Map.Entry<String, ArrayList<String>> entry : command.subParamsPermList.entrySet()) {
                     if(knownParams.contains(entry.getKey())) continue;
-                    if(sender.hasPermission(entry.getValue())) {
-                        res.add(entry.getKey() + ":");
+                    if(sender.hasPermission(entry.getKey())) {
+                        res.addAll(entry.getValue());
                     }
                 }
                 if(knownParams.size() == 0) {

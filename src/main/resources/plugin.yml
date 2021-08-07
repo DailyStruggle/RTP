@@ -73,3 +73,6 @@ permissions:
   rtp.set:
     description: allow player to update rtp settings for each world
     default: op
+  rtp.params:
+    description: allow player to update rtp settings for each world
+    default: op
