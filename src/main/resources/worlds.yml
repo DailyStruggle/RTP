@@ -34,4 +34,4 @@ default:
     # each location also queues a number of chunks to be loaded (async), based on view distance
     queueLen: 10
 
-version: 1.3
+version: 1.4

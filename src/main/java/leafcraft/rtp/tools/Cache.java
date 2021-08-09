@@ -6,10 +6,8 @@ import leafcraft.rtp.tools.selection.RandomSelectParams;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
-import org.bukkit.World;
 import org.bukkit.scheduler.BukkitTask;
 
-import java.math.BigDecimal;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -48,12 +46,13 @@ public class Cache {
     public ConcurrentHashMap<String,Long> lastTeleportTime = new ConcurrentHashMap<>();
 
     //store locations
-    public ConcurrentHashMap<String,ConcurrentLinkedQueue<Location>> locationQueue = new ConcurrentHashMap<>();
+    public ConcurrentHashMap<UUID,ConcurrentLinkedQueue<Location>> locationQueue = new ConcurrentHashMap<>();
 
     //Collection of bad sector detections, populated by rerolls to prevent future rerolls at those locations
     // key: the starting point along the curve
     // value: length of bad segment
-    public ConcurrentSkipListMap<Long,Long> badChunks = new ConcurrentSkipListMap<>();
+    public ConcurrentHashMap<UUID,ConcurrentSkipListMap<Long,Long>> badChunks = new ConcurrentHashMap<>();
+    public ConcurrentHashMap<UUID,Long> badChunkSum = new ConcurrentHashMap<>();
 
     public void shutdown() {
         for(ConcurrentHashMap.Entry<String,BukkitTask> entry : loadChunks.entrySet()) {
@@ -83,10 +82,10 @@ public class Cache {
 
     //add location and adjacent chunks to cache
     public void addLocation(Location location) {
-        if(!locationQueue.containsKey(location.getWorld().getName())) {
-            locationQueue.put(location.getWorld().getName(),new ConcurrentLinkedQueue<>());
+        if(!locationQueue.containsKey(location.getWorld().getUID())) {
+            locationQueue.put(location.getWorld().getUID(),new ConcurrentLinkedQueue<>());
         }
-        locationQueue.get(location.getWorld().getName()).offer(location);
+        locationQueue.get(location.getWorld().getUID()).offer(location);
 
         if(locAssChunks.containsKey(location)) return;
 
@@ -129,7 +128,7 @@ public class Cache {
     }
 
     public void resetQueues() {
-        for(Map.Entry<String,ConcurrentLinkedQueue<Location>> entry : locationQueue.entrySet()) {
+        for(Map.Entry<UUID,ConcurrentLinkedQueue<Location>> entry : locationQueue.entrySet()) {
             entry.getValue().clear();
         }
         for(Map.Entry<Location,List<CompletableFuture<Chunk>>> entry : locAssChunks.entrySet()) {
@@ -140,7 +139,43 @@ public class Cache {
         }
     }
 
-    public void addBadChunk(int x, int z) {
+    public void addBadChunk(UUID uuid, long pos) {
+        badChunks.putIfAbsent(uuid,new ConcurrentSkipListMap<>());
+        ConcurrentSkipListMap map = badChunks.get(uuid);
 
+        Map.Entry<Long,Long> lower = map.floorEntry(pos);
+        Map.Entry<Long,Long> upper = map.ceilingEntry(pos);
+
+        //goal: merge adjacent values
+        // if lower start+length meets position, add 1 to its length and use that
+        if((lower!=null) && (pos == lower.getKey()+lower.getValue())) {
+            map.put(lower.getKey(),lower.getValue()+1);
+        }
+        else {
+            map.put(pos,Long.valueOf(1));
+        }
+
+        lower = map.floorEntry(pos);
+
+        // if upper start meets position + length, merge its length and delete
+        if((upper!=null)&&(lower.getKey()+lower.getValue() >= upper.getKey())) {
+            map.put(lower.getKey(),lower.getValue()+upper.getValue());
+            map.remove(upper.getKey());
+        }
+    }
+
+    public Long shiftedLocation(UUID uuid, Long pos) {
+        badChunks.putIfAbsent(uuid,new ConcurrentSkipListMap<>());
+        ConcurrentSkipListMap map = badChunks.get(uuid);
+        Map.Entry<Long,Long> idx =  map.firstEntry();
+        if((idx==null) || (pos<idx.getKey())) {
+            return pos;
+        }
+
+        while((idx!=null) && (pos >= (idx.getKey()))) {
+            pos += idx.getValue();
+            idx = map.ceilingEntry(idx.getKey()+idx.getValue());
+        }
+        return pos;
     }
 }

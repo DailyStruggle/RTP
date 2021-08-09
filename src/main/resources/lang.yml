@@ -36,6 +36,9 @@ updatedWorlds: "&b[rtp] updated worlds configuration!"
 reloading: "&b[rtp] reloading..."
 reloaded: "&b[rtp] successfully reloaded."
 
+reloadQueue: "&b[rtp] &aresetting queues..."
+reloadBadChunks: "&b[rtp] &dresetting the list of bad chunks..."
+
 # plugin doesn't have the command the user requested
 # placeholder: [arg] - the argument attempted
 badArg: "&c[rtp] invalid command argument [arg]"

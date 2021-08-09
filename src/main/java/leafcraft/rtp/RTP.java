@@ -13,6 +13,7 @@ import leafcraft.rtp.tools.Metrics;
 import leafcraft.rtp.tools.TPS;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.plugin.java.JavaPluginLoader;
@@ -69,7 +70,6 @@ public final class RTP extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new OnPlayerQuit(this.cache),this);
         getServer().getPluginManager().registerEvents(new OnChunkUnload(this.cache),this);
 
-        //TODO: make this work
         Bukkit.getServer().getScheduler().scheduleSyncRepeatingTask(this, new TPS(), 100L, 1L);
 
         int period = 20*(Integer)(config.getConfigValue("queuePeriod",30));
@@ -83,8 +83,8 @@ public final class RTP extends JavaPlugin {
                     if(tps < minTps) return;
                     Integer queueLen = (Integer)config.getWorldSetting(world.getName(),"queueLen",10);
                     if (!cache.locationQueue.containsKey(world.getName()))
-                        cache.locationQueue.put(world.getName(), new ConcurrentLinkedQueue<>());
-                    if (cache.locationQueue.get(world.getName()).size() < queueLen) {
+                        cache.locationQueue.put(world.getUID(), new ConcurrentLinkedQueue<>());
+                    if (cache.locationQueue.get(world.getUID()).size() < queueLen) {
                         BukkitTask task = new QueueLocation(config, cache, world).runTaskAsynchronously(plugin);
                         queueTasks.add(task);
                     }
