@@ -27,7 +27,7 @@ public class QueueLocation extends BukkitRunnable {
     @Override
     public void run() {
         Integer queueLen = (Integer) config.getWorldSetting(world.getName(),"queueLen",10);
-        if(cache.locationQueue.get(world.getName()).size() >= queueLen) {
+        if(cache.locationQueue.get(world.getUID()).size() >= queueLen) {
             return;
         }
 

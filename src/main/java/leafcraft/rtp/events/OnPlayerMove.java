@@ -44,8 +44,8 @@ public class OnPlayerMove implements Listener {
         Location randomLocation = cache.todoTP.get(player.getName());
         cache.todoTP.remove(player.getName());
         cache.playerFromLocations.remove(player.getName());
-        cache.locationQueue.putIfAbsent(randomLocation.getWorld().getName(), new ConcurrentLinkedQueue<>());
-        cache.locationQueue.get(randomLocation.getWorld().getName()).offer(randomLocation);
+        cache.locationQueue.putIfAbsent(randomLocation.getWorld().getUID(), new ConcurrentLinkedQueue<>());
+        cache.locationQueue.get(randomLocation.getWorld().getUID()).offer(randomLocation);
 
         player.sendMessage(this.config.getLog("teleportCancel"));
     }

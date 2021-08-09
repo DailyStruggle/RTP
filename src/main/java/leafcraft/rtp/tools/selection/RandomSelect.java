@@ -23,7 +23,7 @@ public class RandomSelect {
         }
     }
 
-    public static int[] circleLocationToXZ(long cr, long cx, long cz, long location) {
+    public static int[] circleLocationToXZ(long cr, long cx, long cz, double location) {
         int[] res = new int[2];
 
         //get a distance from the center
@@ -64,13 +64,13 @@ public class RandomSelect {
         return res;
     }
 
-    public static long xzToCircleLocation(long x, long z, int cx, int cz) {
+    public static double xzToCircleLocation(int cr, int x, int z, int cx, int cz) {
         long res = 0;
 
         x = x-cx;
         z = z-cz;
 
-        double rotation = (Math.atan(((double)z)/x)/(2*Math.PI)) % 0.25;
+        double rotation = ((Math.atan(((double)z)/x)/(2*Math.PI))+1) % 0.25;
 
         if((z<0) && (x<0)) {
             rotation += 0.5;
@@ -82,21 +82,21 @@ public class RandomSelect {
             rotation += 0.25;
         }
 
-        double radius = ((long)(Math.sqrt(x*x+z*z)+0.5))+rotation;
+        double radius = ((long)(Math.sqrt(x*x+z*z)+0.5));
 
-        return (long)(radius*radius*Math.PI+0.5);
+        return (radius*radius - cr*cr)*Math.PI + rotation*(2*radius*Math.PI);
     }
 
-    public static int[] squareLocationToXZ(long cr, long cx, long cz, long location) {
+    public static int[] squareLocationToXZ(long cr, long cx, long cz, double location) {
         int[] res;
         //get a distance from the center
-        Double radius = Math.sqrt(location + cr*cr)/2;
+        Double radius = Math.sqrt(location + cr*cr*4)/2;
 
         //get how far to step around the square
-        Double perimeterStep = 8*(radius*(radius-radius.intValue()));
-        System.out.println("location = " + location);
-        System.out.println("radius = " + radius);
-        System.out.println("perimeterStep = " + perimeterStep);
+        Double theta = radius-radius.intValue();
+        Double perimeterStep = 8*(radius*(theta));
+
+        radius = (double)radius.intValue();
 
         res = squareOct2Coords(radius,perimeterStep);
         res[0] += cx;
@@ -127,7 +127,8 @@ public class RandomSelect {
     private static int[] squareOct2Coords(Double radius, Double perimeterStep) {
         int[] res = new int[2];
         //get how far to go from a corner
-        Double shortStep = (perimeterStep%radius) + 0.5;
+        radius = radius+0.5;
+        Double shortStep = (perimeterStep%radius)+0.5;
 
         if(perimeterStep<radius*4) {
             if(perimeterStep<radius*2) {
@@ -169,20 +170,18 @@ public class RandomSelect {
                 }
                 else {                          //octant 8
                     res[0] = radius.intValue();
-                    res[1] = -(int)(radius-shortStep);
+                    res[1] = -(int)((radius-shortStep));
                 }
             }
         }
         return res;
     }
 
-    public static long xzToSquareLocation(long x, long z, int cx, int cz) {
-        long res = 0;
-
+    public static double xzToSquareLocation(int cr, long x, long z, int cx, int cz) {
         x = x-cx;
         z = z-cz;
 
-        double theta = (Math.atan(((double)z)/x)/(2*Math.PI)) % 0.25;
+        double theta = ((Math.atan(((double)z)/x)/(2*Math.PI))+1) % 0.25;
 
         if((z<0) && (x<0)) {
             theta += 0.5;
@@ -200,10 +199,6 @@ public class RandomSelect {
         if(ax>az) radius = ax;
         else radius = az;
 
-        System.out.println("radius = " + radius);
-        System.out.println("ax = " + ax);
-        System.out.println("az = " + az);
-
         int perimeterStep = 0;
         if(theta<0.5) {
             if(theta<0.25) {
@@ -211,10 +206,8 @@ public class RandomSelect {
                     perimeterStep+=az;
                 }
                 else {              //octant 2, from pi/4 to pi/2
-                    System.out.println("2");
                     perimeterStep+=radius;
                     perimeterStep+=(radius-ax);
-                    System.out.println("perimeterStep = " + perimeterStep);
                 }
             }
             else {
@@ -242,7 +235,7 @@ public class RandomSelect {
             else {
                 if(theta<0.875) {   //octant 7
                     perimeterStep+=radius*6;
-                    perimeterStep+=x;
+                    perimeterStep+=ax;
                 }
                 else {              //octant 8
                     perimeterStep+=radius*7;
@@ -251,6 +244,6 @@ public class RandomSelect {
             }
         }
 
-        return (long)(radius*radius*4)+perimeterStep;
+        return ((radius*radius-cr*cr)*4)+perimeterStep;
     }
 }

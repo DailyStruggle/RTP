@@ -1,8 +1,10 @@
 package leafcraft.rtp.tools;
 
 import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
 import io.papermc.lib.PaperLib;
 import leafcraft.rtp.RTP;
+import leafcraft.rtp.tasks.QueueLocation;
 import leafcraft.rtp.tools.selection.RandomSelect;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import org.bukkit.*;
@@ -11,6 +13,7 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.permissions.Permission;
 import org.bukkit.permissions.PermissionDefault;
+import org.bukkit.scheduler.BukkitTask;
 import org.opentest4j.TestAbortedException;
 
 import java.io.File;
@@ -20,6 +23,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
@@ -99,7 +103,7 @@ public class Config {
 		}
 		this.worlds = YamlConfiguration.loadConfiguration(f);
 
-		if( 	(this.worlds.getDouble("version") < 1.3) ) {
+		if( 	(this.worlds.getDouble("version") < 1.4) ) {
 			Bukkit.getLogger().log(Level.WARNING, this.getLog("oldFile", "worlds.yml"));
 			this.renameFileInPluginDir("worlds.yml","worlds.old.yml");
 
@@ -255,6 +259,7 @@ public class Config {
 						if(linesInWorlds.get(linesInWorlds.size()-1).length() < 4)
 							linesInWorlds.set(linesInWorlds.size()-1,"    " + worldName + ":");
 						else linesInWorlds.add(worldName + ":");
+						linesInWorlds.add("    name: \"" + worldName + "\"");
 						linesInWorlds.add("    shape: \"" + defaultShape + "\"");
 						linesInWorlds.add("    radius: " + defaultRadius);
 						linesInWorlds.add("    centerRadius: " + defaultCenterRadius);
@@ -277,7 +282,9 @@ public class Config {
 					}
 				}
 				else { //if not a blank line
-					if(s.startsWith("    shape:"))
+					if(s.startsWith("    name:"))
+						s = "    name: " + quotes + this.worlds.getConfigurationSection(currWorldName).getString("name",currWorldName) + quotes;
+					else if(s.startsWith("    shape:"))
 						s = "    shape: " + quotes + this.worlds.getConfigurationSection(currWorldName).getString("shape","SQUARE") + quotes;
 					else if(s.startsWith("    radius:"))
 						s = "    radius: " + this.worlds.getConfigurationSection(currWorldName).getInt("radius",defaultRadius);
@@ -334,9 +341,39 @@ public class Config {
 		//-------------UPDATE INTERNAL VERSION ACCORDINGLY-------------
 		this.worlds = YamlConfiguration.loadConfiguration(new File(this.plugin.getDataFolder(), "worlds.yml"));
 
+		this.worldNameLookup = HashBiMap.create();
 		for(String worldName : this.worlds.getKeys(false)) {
 			if(this.checkWorldExists(worldName)) {
-				this.worldNameLookup.put(worldName,config.getConfigurationSection(worldName).getString("name"));
+				this.worldNameLookup.put(worldName,worlds.getConfigurationSection(worldName).getString("name"));
+			}
+		}
+
+		for(Map.Entry<String,BukkitTask> entry : plugin.timers.entrySet()) {
+			entry.getValue().cancel();
+			plugin.timers.remove(entry);
+		}
+		for(BukkitTask task : plugin.queueTasks) {
+			task.cancel();
+		}
+
+		int period = 20*(Integer)(getConfigValue("queuePeriod",30));
+		if(period > 0) {
+			int i = 0;
+			int iter_len = period / Bukkit.getWorlds().size();
+			double minTps = (Double)getConfigValue("minTPS",19.0);
+			for (World world : Bukkit.getWorlds()) {
+				Integer queueLen = (Integer)getWorldSetting(world.getName(),"queueLen",10);
+				plugin.timers.put(world.getName(), Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
+					double tps = TPS.getTPS();
+					if(tps < minTps) return;
+					if (!cache.locationQueue.containsKey(world.getName()))
+						cache.locationQueue.put(world.getUID(), new ConcurrentLinkedQueue<>());
+					if (cache.locationQueue.get(world.getUID()).size() < queueLen) {
+						BukkitTask task = new QueueLocation(this, cache, world).runTaskAsynchronously(plugin);
+						plugin.queueTasks.add(task);
+					}
+				}, 100 + i, period));
+				i += iter_len;
 			}
 		}
 	}
@@ -410,15 +447,44 @@ public class Config {
 	public Location getRandomLocation(RandomSelectParams rsParams, boolean urgent) {
 		World world = rsParams.world;
 
+		long oldSpace = rsParams.totalSpaceNative;
 		Location res;
 
 		Boolean rerollLiquid = this.config.getBoolean("rerollLiquid",true);
 
+		if(!rsParams.hasCustomValues) rsParams.totalSpaceNative = oldSpace - cache.badChunkSum.getOrDefault(rsParams.world.getUID(),0l);
 		int[] xz = RandomSelect.select(rsParams);
+		int[] xzChunk = new int[2];
+
+		xzChunk[0] = (xz[0] >= 0) ? (xz[0] / 16) : (xz[0] / 16) - 1;
+		xzChunk[1] = (xz[1] >= 0) ? (xz[1] / 16) : (xz[1] / 16) - 1;
+
+		Long chunkLocation = 0l;
+		if(!rsParams.hasCustomValues) {
+			xz[0] -= rsParams.cx;
+			xz[1] -= rsParams.cz;
+
+			int[] centerChunk = new int[2];
+			centerChunk[0] = (rsParams.cx >= 0) ? ((rsParams.cx) / 16) : ((rsParams.cx) / 16) - 1;
+			centerChunk[1] = (rsParams.cz >= 0) ? ((rsParams.cz) / 16) : ((rsParams.cz) / 16) - 1;
+
+			chunkLocation = rsParams.shape.equals(RandomSelectParams.Shapes.SQUARE) ?
+					(long)(RandomSelect.xzToSquareLocation( (rsParams.cr/16)-1, xzChunk[0], xzChunk[1], centerChunk[0], centerChunk[1])) :
+					(long)(RandomSelect.xzToCircleLocation((rsParams.cr/16)-1, xzChunk[0], xzChunk[1], centerChunk[0], centerChunk[1]));
+
+			int[] posInChunk = {Math.abs(xz[0]%16),Math.abs(xz[1]%16)};
+			chunkLocation = cache.shiftedLocation(rsParams.world.getUID(),chunkLocation);
+
+			xzChunk = rsParams.shape.equals(RandomSelectParams.Shapes.SQUARE) ?
+					(RandomSelect.squareLocationToXZ(rsParams.cr/16-1, centerChunk[0], centerChunk[1], chunkLocation.doubleValue())) :
+					(RandomSelect.circleLocationToXZ(rsParams.cr/16-1, centerChunk[0], centerChunk[1], chunkLocation.doubleValue()));
+			xz[0] = 16*(xzChunk[0]+centerChunk[0]) + posInChunk[0] + rsParams.cx;
+			xz[1] = 16*(xzChunk[1]+centerChunk[1]) + posInChunk[1] + rsParams.cz;
+		}
 
 		CompletableFuture<Chunk> cfChunk = (urgent) ?
-				PaperLib.getChunkAtAsyncUrgently(world,xz[0],xz[1],true) :
-				PaperLib.getChunkAtAsync(world,xz[0],xz[1],true);
+				PaperLib.getChunkAtAsyncUrgently(world,xzChunk[0],xzChunk[1],true) :
+				PaperLib.getChunkAtAsync(world,xzChunk[0],xzChunk[1],true);
 
 		Chunk chunk;
 		try {
@@ -431,10 +497,7 @@ public class Config {
 			return null;
 		}
 
-		Long chunkPos = (ThreadLocalRandom.current().nextLong(255));
-		int xInChunk = chunkPos.intValue()/16;
-		int zInChunk = chunkPos.intValue()%16;
-		res = new Location(world,xz[0]*16+xInChunk,rsParams.minY,xz[1]*16+zInChunk);
+		res = new Location(world,xz[0],rsParams.minY,xz[1]);
 
 		res = this.getFirstNonAir(res);
 		res = this.getLastNonAir(res);
@@ -445,8 +508,38 @@ public class Config {
 				( this.acceptableAir.contains(res.getBlock().getType())
 					|| (res.getBlockY() >= rsParams.maxY)
 					|| (rerollLiquid && res.getBlock().isLiquid()))) {
+			if(!rsParams.hasCustomValues) {
+				cache.addBadChunk(world.getUID(),chunkLocation);
+			}
 
+			if(!rsParams.hasCustomValues) rsParams.totalSpaceNative = oldSpace - cache.badChunkSum.getOrDefault(rsParams.world.getUID(),0l);
 			xz = RandomSelect.select(rsParams);
+
+			xzChunk[0] = (xz[0] >= 0) ? (xz[0] / 16) : (xz[0] / 16) - 1;
+			xzChunk[1] = (xz[1] >= 0) ? (xz[1] / 16) : (xz[1] / 16) - 1;
+
+			if(!rsParams.hasCustomValues) {
+				xz[0] -= rsParams.cx;
+				xz[1] -= rsParams.cz;
+
+				int[] centerChunk = new int[2];
+				centerChunk[0] = (rsParams.cx >= 0) ? (rsParams.cx / 16) : (rsParams.cx / 16) - 1;
+				centerChunk[1] = (rsParams.cz >= 0) ? (rsParams.cz / 16) : (rsParams.cz / 16) - 1;
+
+				chunkLocation = rsParams.shape.equals(RandomSelectParams.Shapes.SQUARE) ?
+						(long)(RandomSelect.xzToSquareLocation( (rsParams.cr/16)-1, xzChunk[0], xzChunk[1], centerChunk[0], centerChunk[1])) :
+						(long)(RandomSelect.xzToCircleLocation((rsParams.cr/16)-1, xzChunk[0], xzChunk[1], centerChunk[0], centerChunk[1]));
+
+				int[] posInChunk = {Math.abs(xz[0]%16),Math.abs(xz[1]%16)};
+
+				chunkLocation = cache.shiftedLocation(rsParams.world.getUID(),chunkLocation.longValue());
+
+				xzChunk = rsParams.shape.equals(RandomSelectParams.Shapes.SQUARE) ?
+						(RandomSelect.squareLocationToXZ(rsParams.cr/16-1, centerChunk[0], centerChunk[1], chunkLocation.doubleValue())) :
+						(RandomSelect.circleLocationToXZ(rsParams.cr/16-1, centerChunk[0], centerChunk[1], chunkLocation.doubleValue()));
+				xz[0] = 16*(xzChunk[0]+centerChunk[0]) + posInChunk[0] + rsParams.cx;
+				xz[1] = 16*(xzChunk[1]+centerChunk[1]) + posInChunk[1] + rsParams.cz;
+			}
 
 			cfChunk = (urgent) ?
 					PaperLib.getChunkAtAsyncUrgently(world,xz[0],xz[1],true) :
@@ -462,7 +555,7 @@ public class Config {
 				return null;
 			}
 
-			res = new Location(world,xz[0]*16+xInChunk,rsParams.minY,xz[1]*16+zInChunk);
+			res = new Location(world,xz[0],rsParams.minY,xz[1]);
 
 			res = this.getFirstNonAir(res);
 			res = this.getLastNonAir(res);

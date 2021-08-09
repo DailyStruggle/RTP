@@ -16,8 +16,8 @@ public class RandomSelectParams {
     private static final long maxRadBeforeBig = (long)Math.sqrt(Long.MAX_VALUE/4);
     public boolean hasCustomValues;
     public boolean isBig;
-    private BigDecimal totalSpaceBig;
-    private long totalSpaceNative;
+    public BigDecimal totalSpaceBig;
+    public long totalSpaceNative;
 
     public static MathContext mc = new MathContext(10);
     public static BigDecimal bigPi = BigDecimal.valueOf(Math.PI);
@@ -27,7 +27,7 @@ public class RandomSelectParams {
     public World world;
 
     public Shapes shape;
-    public long r,cr,cx,cz, minY, maxY; //radius, centerRadius, center x,z
+    public int r,cr,cx,cz, minY, maxY; //radius, centerRadius, center x,z
 
     public double weight;
 
@@ -54,17 +54,14 @@ public class RandomSelectParams {
         String maxYStr =    params.getOrDefault("maxY", (config.getWorldSetting(worldName,"maxY",128)).toString());
         String rslStr =     params.getOrDefault("requireSkyLight", (config.getWorldSetting(worldName,"requireSkyLight",true)).toString());
 
-        r = Long.valueOf(rStr)/16; //switch to chunks for better good/bad detection
-        cr = Long.valueOf(crStr)/16;
-        cx = Long.valueOf(cxStr);
-        cz = Long.valueOf(czStr);
-
-        cx = (cx>0) ? cx/16 : cx/16-1;
-        cz = (cz>0) ? cz/16 : cz/16-1;
+        r = Integer.valueOf(rStr);
+        cr = Integer.valueOf(crStr);
+        cx = Integer.valueOf(cxStr);
+        cz = Integer.valueOf(czStr);
 
         weight = Double.valueOf(weightStr);
-        minY = Long.valueOf(minYStr);
-        maxY = Long.valueOf(maxYStr);
+        minY = Integer.valueOf(minYStr);
+        maxY = Integer.valueOf(maxYStr);
         requireSkyLight = Boolean.valueOf(rslStr);
 
         if(r>maxRadBeforeBig) isBig = true;

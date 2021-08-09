@@ -61,8 +61,8 @@ public class LoadChunks extends BukkitRunnable {
 
     @Override
     public void cancel() {
-        cache.locationQueue.putIfAbsent(location.getWorld().getName(),new ConcurrentLinkedQueue<>());
-        cache.locationQueue.get(location.getWorld().getName()).offer(location);
+        cache.locationQueue.putIfAbsent(location.getWorld().getUID(),new ConcurrentLinkedQueue<>());
+        cache.locationQueue.get(location.getWorld().getUID()).offer(location);
         cache.locAssChunks.putIfAbsent(location,chunks);
         super.cancel();
     }

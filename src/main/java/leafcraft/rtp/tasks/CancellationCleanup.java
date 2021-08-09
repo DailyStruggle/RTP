@@ -18,7 +18,7 @@ public class CancellationCleanup extends BukkitRunnable {
     @Override
     public void run() {
         Location location= cache.todoTP.get(player.getName());
-        cache.locationQueue.get(location.getWorld()).offer(location);
+        cache.locationQueue.get(location.getWorld().getUID()).offer(location);
         cache.todoTP.remove(player.getName());
 
         //redundant but make sure this happens
