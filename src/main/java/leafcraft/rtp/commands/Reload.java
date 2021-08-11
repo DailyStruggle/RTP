@@ -1,7 +1,7 @@
 package leafcraft.rtp.commands;
 
 import leafcraft.rtp.tools.Cache;
-import leafcraft.rtp.tools.Config;
+import leafcraft.rtp.tools.Configuration.Configs;
 import me.clip.placeholderapi.PlaceholderAPI;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
@@ -10,21 +10,21 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 public class Reload implements CommandExecutor {
-    private Config config;
+    private Configs configs;
     private Cache cache;
 
-    public Reload(Config config, Cache cache) {
-        this.config = config;
+    public Reload(Configs configs, Cache cache) {
+        this.configs = configs;
         this.cache = cache;
     }
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if(!sender.hasPermission("rtp.reload")) {
-            sender.sendMessage(config.getLog("noPerms"));
+            sender.sendMessage(configs.lang.getLog("noPerms"));
             return true;
         }
 
-        String str = this.config.getLog("reloading");
+        String str = configs.lang.getLog("reloading");
         Bukkit.getConsoleSender().sendMessage(str);
         if(sender instanceof Player) {
             if(Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) str = PlaceholderAPI.setPlaceholders((Player)sender, str);
@@ -32,9 +32,9 @@ public class Reload implements CommandExecutor {
         }
 
         this.cache.resetQueues();
-        this.config.refreshConfigs();
+        configs.refresh();
 
-        str = this.config.getLog("reloaded");
+        str = configs.lang.getLog("reloaded");
         Bukkit.getConsoleSender().sendMessage(str);
         if(sender instanceof Player) {
             if(Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) str = PlaceholderAPI.setPlaceholders((Player)sender, str);

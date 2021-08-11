@@ -2,27 +2,7 @@ package leafcraft.rtp.tools.selection;
 
 import java.math.BigDecimal;
 
-public class RandomSelect {
-    public static int[] select(RandomSelectParams params) {
-        params.randPos();
-        if(params.isBig) {
-            switch (params.shape) {
-                case SQUARE:
-                    return squareLocationToXZ(params.cr, params.cx, params.cz, params.positionBig);
-                default:
-                    return circleLocationToXZ(params.cr, params.cx, params.cz, params.positionBig);
-            }
-        }
-        else {
-            switch (params.shape) {
-                case SQUARE:
-                    return squareLocationToXZ(params.cr, params.cx, params.cz, params.positionNative);
-                default:
-                    return circleLocationToXZ(params.cr, params.cx, params.cz, params.positionNative);
-            }
-        }
-    }
-
+public class Translate {
     public static int[] circleLocationToXZ(long cr, long cx, long cz, double location) {
         int[] res = new int[2];
 
@@ -38,28 +18,6 @@ public class RandomSelect {
         //polar to cartesian
         res[0] = (int)((radius * cosRes)+cx+0.5);
         res[1] = (int)((radius * sinRes)+cz+0.5);
-
-        return res;
-    }
-
-    public static int[] circleLocationToXZ(long cr, long cx, long cz, BigDecimal location) {
-        int[] res = new int[2];
-
-        BigDecimal crSqr = BigDecimal.valueOf(cr).pow(2);
-
-        //get a distance from the center
-
-        double radius = location.divide(RandomSelectParams.bigPi,RandomSelectParams.mc).add(crSqr,RandomSelectParams.mc).sqrt(RandomSelectParams.mc).doubleValue();
-
-        //get a % around the curve, convert to radians
-        double rotation = (radius - (int)radius)*2*Math.PI;
-
-        double cosRes = Math.cos(rotation);
-        double sinRes = Math.sin(rotation);
-
-        //polar to cartesian
-        res[0] = (int)((radius * cosRes)+cx);
-        res[1] = (int)((radius * sinRes)+cz);
 
         return res;
     }
@@ -97,25 +55,6 @@ public class RandomSelect {
         Double perimeterStep = 8*(radius*(theta));
 
         radius = (double)radius.intValue();
-
-        res = squareOct2Coords(radius,perimeterStep);
-        res[0] += cx;
-        res[1] += cz;
-
-        return res;
-    }
-
-    public static int[] squareLocationToXZ(long cr, long cx, long cz, BigDecimal location) {
-        int[] res;
-
-        BigDecimal four = BigDecimal.valueOf(4);
-        BigDecimal crSqr = BigDecimal.valueOf(cr).pow(2).multiply(four);
-
-        //get a distance from the center
-        Double radius = location.add(crSqr,RandomSelectParams.mc).divide(four).sqrt(RandomSelectParams.mc).doubleValue();
-
-        //get how far to step around the square
-        Double perimeterStep = 8*(radius*(radius-radius.intValue()));
 
         res = squareOct2Coords(radius,perimeterStep);
         res[0] += cx;

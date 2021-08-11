@@ -21,16 +21,26 @@ commands:
     permission: rtp.see
     usage: |
       /rtp help
-  rtp set:
-    description: update rtp settings
-    permission: rtp.set
-    usage: |
-      /rtp set
   rtp reload:
-    description: Reloads the plugin configuration files
+    description: Reload the plugin configuration files
     permission: rtp.reload
     usage: |
-      /rtp help
+      /rtp reload
+  rtp setWorld:
+    description: update rtp world settings
+    permission: rtp.setWorld
+    usage: |
+      /rtp setWorld
+  rtp setRegion:
+    description: create or modify a rtp region
+    permission: rtp.setRegion
+    usage: |
+      /rtp setRegion
+#  rtp fill:
+#    description: load and check each chunk in the rtp area
+#    permission: rtp.fill
+#    usage: |
+#      /rtp help
 
 permissions:
   rtp.*:
@@ -46,6 +56,7 @@ permissions:
       rtp.world: true
       rtp.worlds.*: true
       rtp.set: true
+      rtp.fill: true
   rtp.see:
     description: allow player to tab for rtp commands
     default: true
@@ -55,8 +66,11 @@ permissions:
   rtp.reload:
     description: allow player to use /rtp reload
     default: op
-  rtp.instant:
-    description: skip the teleport delay and cooldown
+  rtp.noDelay:
+    description: skip the teleport delay
+    default: op
+  rtp.noCooldown:
+    description: skip the teleport cooldown
     default: op
   rtp.other:
     description: allow player to teleport another player.
@@ -67,12 +81,24 @@ permissions:
   rtp.world:
     description: allow player to specify any world they have permission for
     default: op
+  rtp.region:
+    description: allow player to specify any region they have permission for
+    default: op
+  rtp.regions.*:
+    description: allow player to teleport to any region
+    default: op
   rtp.worlds.*:
     description: allow player to teleport to any world from any world
     default: op
-  rtp.set:
+  rtp.setWorld:
     description: allow player to update rtp settings for each world
+    default: op
+  rtp.setRegion:
+    description: allow player to update rtp settings for each region
     default: op
   rtp.params:
-    description: allow player to update rtp settings for each world
+    description: allow player to use custom parameters for their teleport
     default: op
+#  rtp.fill:
+#    description: allow player to call region filling command
+#    default: op
