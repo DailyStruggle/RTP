@@ -1,8 +1,7 @@
-import leafcraft.rtp.tools.selection.RandomSelect;
-import leafcraft.rtp.tools.selection.RandomSelectParams;
+import leafcraft.rtp.tools.selection.Translate;
 import org.junit.jupiter.api.Test;
 
-public class RandomSelectTest {
+public class TranslateTest {
 
     @Test
     public void translateTest() {
@@ -12,21 +11,21 @@ public class RandomSelectTest {
         int cr = 1024/16;
         System.out.println("initial coords: " + xz[0] + ", " + xz[1]);
 
-        double res = RandomSelect.xzToCircleLocation(cr, xz[0],xz[1],0,0);
-        xz = RandomSelect.circleLocationToXZ(cr,0,0,res);
+        double res = Translate.xzToCircleLocation(cr, xz[0],xz[1],0,0);
+        xz = Translate.circleLocationToXZ(cr,0,0,res);
 
         System.out.println("nearest circle location: " + res);
         System.out.println("nearest circle coords: " + xz[0] + ", " + xz[1]);
 
-        res = RandomSelect.xzToSquareLocation(cr, xz[0],xz[1],0,0);
-        xz = RandomSelect.squareLocationToXZ(cr,0,0,res);
+        res = Translate.xzToSquareLocation(cr, xz[0],xz[1],0,0);
+        xz = Translate.squareLocationToXZ(cr,0,0,res);
 
         System.out.println("nearest square location: " + res);
         System.out.println("nearest square coords: " + xz[0] + ", " + xz[1]);
 
 
-        res = RandomSelect.xzToSquareLocation(cr, xz[0],xz[1],0,0);
-        xz = RandomSelect.squareLocationToXZ(cr,0,0,res);
+        res = Translate.xzToSquareLocation(cr, xz[0],xz[1],0,0);
+        xz = Translate.squareLocationToXZ(cr,0,0,res);
 
         System.out.println("nearest square location: " + res);
         System.out.println("nearest square coords: " + xz[0] + ", " + xz[1]);

@@ -2,76 +2,76 @@ package leafcraft.rtp.tasks;
 
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
-import leafcraft.rtp.tools.Config;
+import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
-import org.bukkit.Bukkit;
-import org.bukkit.Chunk;
 import org.bukkit.Location;
-import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.scheduler.BukkitTask;
 
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
+//prep teleportation
 public class SetupTeleport extends BukkitRunnable {
     private final RTP plugin;
     private final CommandSender sender;
     private final Player player;
-    private final Config config;
+    private final Configs configs;
     private final Cache cache;
     private final RandomSelectParams rsParams;
 
-    public SetupTeleport(RTP plugin, CommandSender sender, Player player, Config config, Cache cache, RandomSelectParams rsParams) {
+    public SetupTeleport(RTP plugin, CommandSender sender, Player player, Configs configs, Cache cache, RandomSelectParams rsParams) {
         this.sender = sender;
         this.plugin = plugin;
         this.player = player;
-        this.config = config;
+        this.configs = configs;
         this.cache = cache;
         this.rsParams = rsParams;
     }
 
     @Override
     public void run() {
-        if(this.cache.todoTP.containsKey(player.getName())) {
+        //if already teleporting, don't do it again
+        if(cache.loadChunks.containsKey(player.getUniqueId()) || cache.todoTP.containsKey(player.getUniqueId())) {
             //probably say something
             return;
         }
-        int delay = (sender.hasPermission("rtp.instant")) ? 0 : (Integer)this.config.getConfigValue("teleportDelay", 2);
 
-        //let player know if they'll have to wait to teleport
+        //get warmup delay
+        int delay = (sender.hasPermission("rtp.instant")) ? 0 : (Integer)configs.config.getConfigValue("teleportDelay", 2);
+
+        //let player know if warmup delay > 0
         if(delay>0) {
             long days = TimeUnit.SECONDS.toDays(delay);
             long hours = TimeUnit.SECONDS.toHours(delay)%24;
             long minutes = TimeUnit.SECONDS.toMinutes(delay)%60;
             long seconds = TimeUnit.SECONDS.toSeconds(delay)%60;
             String replacement = "";
-            if(days>0) replacement += days + this.config.getLog("days") + " ";
-            if(hours>0) replacement += hours + this.config.getLog("hours") + " ";
-            if(minutes>0) replacement += minutes + this.config.getLog("minutes") + " ";
-            replacement += seconds%60 + this.config.getLog("seconds");
-            player.sendMessage(config.getLog("delayMessage", replacement));
+            if(days>0) replacement += days + configs.lang.getLog("days") + " ";
+            if(hours>0) replacement += hours + configs.lang.getLog("hours") + " ";
+            if(minutes>0) replacement += minutes + configs.lang.getLog("minutes") + " ";
+            replacement += seconds%60 + configs.lang.getLog("seconds");
+            player.sendMessage(configs.lang.getLog("delayMessage", replacement));
             if(!sender.getName().equals(player.getName()))
-                sender.sendMessage(config.getLog("delayMessage", replacement));
+                sender.sendMessage(configs.lang.getLog("delayMessage", replacement));
         }
 
-        //get a random location
-        Location location = this.cache.getRandomLocation(rsParams,true);
+        //get a random location according to the parameters
+        long start = System.currentTimeMillis();
+        Location location = cache.getRandomLocation(rsParams,true);
+        long stop = System.currentTimeMillis();
 
-        Integer maxAttempts = (Integer) this.config.getConfigValue("maxAttempts",100);
+        Integer maxAttempts = (Integer) configs.config.getConfigValue("maxAttempts",100);
         if(location == null) {
-            player.sendMessage(this.config.getLog("unsafe",maxAttempts.toString()));
+            player.sendMessage(configs.lang.getLog("unsafe",maxAttempts.toString()));
             if(!sender.getName().equals(player.getName()))
-                sender.sendMessage(this.config.getLog("unsafe",maxAttempts.toString()));
+                sender.sendMessage(configs.lang.getLog("unsafe",maxAttempts.toString()));
             return;
         }
-        this.cache.todoTP.put(player.getName(),location);
+        cache.todoTP.put(player.getUniqueId(),location);
+        cache.regionKeys.put(player.getUniqueId(),rsParams);
 
         //set up task to load chunks then teleport
-        this.cache.loadChunks.put(this.player.getName(), new LoadChunks(this.plugin,this.config,this.player,this.cache,delay*20,location).runTaskLaterAsynchronously(this.plugin,1));
+        cache.loadChunks.put(player.getUniqueId(), new LoadChunks(plugin,configs,player,cache,(int)((20*delay)-((stop-start)/50)),location).runTaskLaterAsynchronously(plugin,1));
     }
 }

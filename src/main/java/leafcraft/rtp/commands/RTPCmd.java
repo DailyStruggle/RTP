@@ -2,7 +2,7 @@ package leafcraft.rtp.commands;
 
 import leafcraft.rtp.tasks.SetupTeleport;
 import leafcraft.rtp.tools.Cache;
-import leafcraft.rtp.tools.Config;
+import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
@@ -17,20 +17,22 @@ import java.util.logging.Level;
 
 public class RTPCmd implements CommandExecutor {
     private leafcraft.rtp.RTP plugin;
-    private Config config;
+    private Configs configs;
     private Map<String,String> perms = new HashMap<>();
     private Map<String,String> rtpParams = new HashMap<>();
 
     private Cache cache;
 
-    public RTPCmd(leafcraft.rtp.RTP plugin, Config config, Cache cache) {
+    public RTPCmd(leafcraft.rtp.RTP plugin, Configs configs, Cache cache) {
         this.plugin = plugin;
-        this.config = config;
+        this.configs = configs;
         this.cache = cache;
 
-        this.perms.put("set","rtp.set");
         this.perms.put("help","rtp.use");
         this.perms.put("reload","rtp.reload");
+        this.perms.put("setRegion","rtp.setRegion");
+        this.perms.put("setWorld","rtp.setWorld");
+//        this.perms.put("fill","rtp.fill");
 
         this.rtpParams.put("player", "rtp.other");
         this.rtpParams.put("world", "rtp.world");
@@ -51,9 +53,9 @@ public class RTPCmd implements CommandExecutor {
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if(!command.getName().equalsIgnoreCase("rtp") && !command.getName().equalsIgnoreCase("wild")) return true;
 
-        if(args.length > 0 && this.perms.containsKey(args[0])) {
-            if(!sender.hasPermission(this.perms.get(args[0]))) {
-                sender.sendMessage(this.config.getLog("noPerms"));
+        if(args.length > 0 && perms.containsKey(args[0])) {
+            if(!sender.hasPermission(perms.get(args[0]))) {
+                sender.sendMessage(configs.lang.getLog("noPerms"));
             }
             else {
                 plugin.getCommand("rtp " + args[0]).execute(sender, label, Arrays.copyOfRange(args, 1, args.length));
@@ -62,7 +64,7 @@ public class RTPCmd implements CommandExecutor {
         }
 
         if(!sender.hasPermission("rtp.use")) {
-            sender.sendMessage(this.config.getLog("noPerms"));
+            sender.sendMessage(configs.lang.getLog("noPerms"));
             return true;
         }
 
@@ -82,7 +84,7 @@ public class RTPCmd implements CommandExecutor {
         if(sender.hasPermission("rtp.other") && rtpArgs.containsKey("player")) {
             player = Bukkit.getPlayer(rtpArgs.get("player"));
             if(player == null) {
-                sender.sendMessage(this.config.getLog("badArg", "player:"+rtpArgs.get("player")));
+                sender.sendMessage(configs.lang.getLog("badArg", "player:"+rtpArgs.get("player")));
                 return true;
             }
         }
@@ -90,7 +92,7 @@ public class RTPCmd implements CommandExecutor {
             player = (Player) sender;
         }
         else {
-            sender.sendMessage(this.config.getLog("consoleCmdNotAllowed"));
+            sender.sendMessage(configs.lang.getLog("consoleCmdNotAllowed"));
             return true;
         }
 
@@ -98,8 +100,9 @@ public class RTPCmd implements CommandExecutor {
         World world;
         if(sender.hasPermission("rtp.world") && rtpArgs.containsKey("world")) {
             String worldName = rtpArgs.get("world");
-            if(!this.config.checkWorldExists(worldName)) {
-                sender.sendMessage(this.config.getLog("badArg", "world:"+worldName));
+            worldName = configs.worlds.worldPlaceholder2Name(worldName);
+            if(!configs.worlds.checkWorldExists(worldName)) {
+                sender.sendMessage(configs.lang.getLog("badArg", "world:"+worldName));
                 return true;
             }
             world = Bukkit.getWorld(rtpArgs.get("world"));
@@ -108,9 +111,9 @@ public class RTPCmd implements CommandExecutor {
             world = player.getWorld();
         }
         if(!sender.hasPermission("rtp.worlds."+world.getName())) {
-            String worldName = this.config.getWorldOverride(world.getName());
-            if(!this.config.checkWorldExists(worldName)) {
-                Bukkit.getLogger().log(Level.WARNING, this.config.getLog("invalidWorld", worldName));
+            String worldName = (String) configs.worlds.getWorldSetting(world.getName(),"override","world");
+            if(!configs.worlds.checkWorldExists(worldName)) {
+                Bukkit.getLogger().log(Level.WARNING, configs.lang.getLog("invalidWorld", worldName));
                 return true;
             }
             world = Bukkit.getWorld(worldName);
@@ -119,7 +122,7 @@ public class RTPCmd implements CommandExecutor {
         //check time
         long time = System.currentTimeMillis();
         long lastTime = (sender instanceof Player) ? this.cache.lastTeleportTime.getOrDefault(sender.getName(),Long.valueOf(0)) : 0;
-        long cooldownTime = TimeUnit.SECONDS.toMillis((Integer)this.config.getConfigValue("teleportCooldown",300));
+        long cooldownTime = TimeUnit.SECONDS.toMillis((Integer)configs.config.getConfigValue("teleportCooldown",300));
         if(!sender.hasPermission("rtp.instant")
                 && time - lastTime < cooldownTime) {
             long remaining = (lastTime+cooldownTime)-time;
@@ -128,18 +131,21 @@ public class RTPCmd implements CommandExecutor {
             long minutes = TimeUnit.MILLISECONDS.toMinutes(remaining)%60;
             long seconds = TimeUnit.MILLISECONDS.toSeconds(remaining)%60;
             String replacement = new String();
-            if(days>0) replacement += days + this.config.getLog("days") + " ";
-            if(days>0 || hours>0) replacement += hours + this.config.getLog("hours") + " ";
-            if(days>0 || hours>0 || minutes>0) replacement += minutes + this.config.getLog("minutes") + " ";
-            replacement += seconds + this.config.getLog("seconds");
-            sender.sendMessage(config.getLog("cooldownMessage", replacement));
+            if(days>0) replacement += days + configs.lang.getLog("days") + " ";
+            if(days>0 || hours>0) replacement += hours + configs.lang.getLog("hours") + " ";
+            if(days>0 || hours>0 || minutes>0) replacement += minutes + configs.lang.getLog("minutes") + " ";
+            replacement += seconds + configs.lang.getLog("seconds");
+            sender.sendMessage(configs.lang.getLog("cooldownMessage", replacement));
             return true;
         }
 
-        RandomSelectParams rsParams = new RandomSelectParams(world,rtpArgs,config);
-        new SetupTeleport(this.plugin,sender,player,this.config, this.cache, rsParams).runTaskAsynchronously(this.plugin);
-        this.cache.lastTeleportTime.put(player.getName(), time);
-        this.cache.playerFromLocations.put(player.getName(),player.getLocation());
+        //set up parameters for selection
+        RandomSelectParams rsParams = new RandomSelectParams(world,rtpArgs,configs);
+
+        //prep teleportation
+        new SetupTeleport(plugin,sender,player,configs, cache, rsParams).runTaskAsynchronously(plugin);
+        this.cache.lastTeleportTime.put(player.getUniqueId(), time);
+        this.cache.playerFromLocations.put(player.getUniqueId(),player.getLocation());
 
         return true;
     }

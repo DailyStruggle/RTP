@@ -1,0 +1,33 @@
+#region parameters
+# defaults are copied when making a new region
+default:
+    #case-sensitive name of world this region is in
+    world: "world"
+    #shape of bounds
+    # CIRCLE, SQUARE - spiral curves
+    shape: "CIRCLE"
+    #outer radius of selection in meters
+    radius: 4096
+    #donut hole in center, where players shouldn't land
+    centerRadius: 1024
+    #center position, using regular x-z coordinates
+    centerX: 0
+    centerZ: 0
+    #shift players towards or away from the center, by exponent
+    # rand()^(x), given rand() is between 0 and 1
+    # bigger is closer, smaller is farther
+    weight: 1.0
+    #height range for placement, set lower for more caves and ravines
+    minY: 48
+    maxY: 96
+    #ensure above ground by checking sky light level
+    requireSkyLight: true
+    #check rtp.[region] node on command
+    requirePermission: false
+    #override shape, radius, center with vanilla worldborder settings
+    worldBorderOverride: false
+    #max length for the location queue per world, recommend 0 for unused regions
+    # each location also queues a number of chunks to be loaded (async), based on view distance
+    queueLen: 8
+
+version: 1.0

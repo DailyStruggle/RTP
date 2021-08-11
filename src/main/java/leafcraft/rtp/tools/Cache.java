@@ -1,19 +1,47 @@
 package leafcraft.rtp.tools;
 
-import io.papermc.lib.PaperLib;
-import leafcraft.rtp.tools.selection.RandomSelect;
+import leafcraft.rtp.RTP;
+import leafcraft.rtp.tools.Configuration.Configs;
+import leafcraft.rtp.tools.selection.TeleportRegion;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import org.bukkit.Bukkit;
-import org.bukkit.Chunk;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.*;
 import java.util.concurrent.*;
 
 public class Cache {
-    Config config;
-    public Cache(Config config) {this.config = config;}
+    private Configs configs;
+    public Cache(RTP plugin, Configs configs) {
+        this.configs = configs;
+        for(String region : configs.regions.getRegionNames()) {
+            String worldName = (String) configs.regions.getRegionSetting(region,"world","world");
+            World world = Bukkit.getWorld(worldName);
+            if(world == null) world = Bukkit.getWorlds().get(0);
+            Map<String,String> map = new HashMap<>();
+            map.put("region",region);
+            RandomSelectParams key = new RandomSelectParams(world,map,configs);
+            permRegions.put(key, new TeleportRegion(key.params,configs,this));
+            permRegions.get(key).name = region;
+        }
+
+        Double i = 0d;
+        Integer period = (Integer)configs.config.getConfigValue("queuePeriod",30);
+        Double increment = period.doubleValue()/permRegions.size();
+        for(Map.Entry<RandomSelectParams,TeleportRegion> entry : permRegions.entrySet()) {
+            timers.put(entry.getKey(),Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, ()->{
+                double tps = TPS.getTPS();
+                double minTps = (Double)configs.config.getConfigValue("minTPS",19.0);
+                if(tps < minTps) return;
+                entry.getValue().queueRandomLocation();
+            },200+i.intValue(),period*20));
+            i+=increment;
+        }
+    }
+
+    public ConcurrentHashMap<RandomSelectParams,BukkitTask> timers = new ConcurrentHashMap<>();
 
     //keyed table of which chunks to keep alive, for quick checking
     // key: chunk coordinate
@@ -27,50 +55,46 @@ public class Cache {
     //table of which players are teleporting to what location
     // key: player name
     // value: location they're going to, to be re-added to the queue on cancellation
-    public ConcurrentHashMap<String,Location> todoTP = new ConcurrentHashMap<>();
+    public ConcurrentHashMap<UUID,Location> todoTP = new ConcurrentHashMap<>();
+    public ConcurrentHashMap<UUID,RandomSelectParams> regionKeys = new ConcurrentHashMap<>();
 
     //Bukkit task list in case of cancellation
-    public ConcurrentHashMap<String, BukkitTask> doTeleports = new ConcurrentHashMap<>();
-    public ConcurrentHashMap<String, BukkitTask> loadChunks = new ConcurrentHashMap<>();
+    public ConcurrentHashMap<UUID, BukkitTask> doTeleports = new ConcurrentHashMap<>();
+    public ConcurrentHashMap<UUID, BukkitTask> loadChunks = new ConcurrentHashMap<>();
 
     //pre-teleport location info for checking distance from command location
-    public ConcurrentHashMap<String, Location> playerFromLocations = new ConcurrentHashMap<>();
-
-    //post-teleport chunks set up so far
-    public ConcurrentHashMap<Location,List<CompletableFuture<Chunk>>> locAssChunks = new ConcurrentHashMap<>();
+    public ConcurrentHashMap<UUID, Location> playerFromLocations = new ConcurrentHashMap<>();
 
     //info on number of attempts on last rtp command
     public ConcurrentHashMap<Location, Integer> numTeleportAttempts = new ConcurrentHashMap<>();
 
     //store teleport command cooldown
-    public ConcurrentHashMap<String,Long> lastTeleportTime = new ConcurrentHashMap<>();
+    public ConcurrentHashMap<UUID,Long> lastTeleportTime = new ConcurrentHashMap<>();
 
-    //store locations
-    public ConcurrentHashMap<UUID,ConcurrentLinkedQueue<Location>> locationQueue = new ConcurrentHashMap<>();
+    public ConcurrentHashMap<RandomSelectParams, TeleportRegion> tempRegions = new ConcurrentHashMap<>();
+    public ConcurrentHashMap<RandomSelectParams, TeleportRegion> permRegions = new ConcurrentHashMap<>();
 
-    //Collection of bad sector detections, populated by rerolls to prevent future rerolls at those locations
-    // key: the starting point along the curve
-    // value: length of bad segment
-    public ConcurrentHashMap<UUID,ConcurrentSkipListMap<Long,Long>> badChunks = new ConcurrentHashMap<>();
-    public ConcurrentHashMap<UUID,Long> badChunkSum = new ConcurrentHashMap<>();
+    //Collection of chunks in each world and their coordinates, to reuse on reload
+    public ConcurrentHashMap<UUID,ConcurrentHashMap<HashableChunk,Long>> allBadChunks = new ConcurrentHashMap<>();
 
     public void shutdown() {
-        for(ConcurrentHashMap.Entry<String,BukkitTask> entry : loadChunks.entrySet()) {
+        for(ConcurrentHashMap.Entry<UUID,BukkitTask> entry : loadChunks.entrySet()) {
             entry.getValue().cancel();
         }
         loadChunks.clear();
 
-        for(ConcurrentHashMap.Entry<String,BukkitTask> entry : doTeleports.entrySet()) {
+        for(ConcurrentHashMap.Entry<UUID,BukkitTask> entry : doTeleports.entrySet()) {
             entry.getValue().cancel();
         }
         doTeleports.clear();
 
-        for(Map.Entry<Location,List<CompletableFuture<Chunk>>> entry : this.locAssChunks.entrySet()) {
-            for(CompletableFuture<Chunk> cfChunk : entry.getValue()) {
-                cfChunk.cancel(true);
-            }
+        for(TeleportRegion region : tempRegions.values()) {
+            region.shutdown();
         }
-        locAssChunks.clear();
+
+        for(TeleportRegion region : permRegions.values()) {
+            region.shutdown();
+        }
 
         keepChunks.clear();
 
@@ -78,104 +102,35 @@ public class Cache {
             entry.getKey().getChunk().setForceLoaded(false);
         }
         forceLoadedChunks.clear();
-    }
 
-    //add location and adjacent chunks to cache
-    public void addLocation(Location location) {
-        if(!locationQueue.containsKey(location.getWorld().getUID())) {
-            locationQueue.put(location.getWorld().getUID(),new ConcurrentLinkedQueue<>());
+        for(Map.Entry<RandomSelectParams,BukkitTask> entry : timers.entrySet()) {
+            entry.getValue().cancel();
+            timers.remove(entry);
         }
-        locationQueue.get(location.getWorld().getUID()).offer(location);
-
-        if(locAssChunks.containsKey(location)) return;
-
-        addChunks(location);
-    }
-
-    public void addChunks(Location location) {
-        List<CompletableFuture<Chunk>> chunks = new ArrayList<>();
-        int vd = Bukkit.getViewDistance();
-        int cx = location.getBlockX()/16;
-        int cz = location.getBlockZ()/16;
-        int area = (int)(vd*vd*4+0.5d);
-        for(int i = 0; i < area; i++) {
-            int[] xz = RandomSelect.squareLocationToXZ(0,cx,cz,i);
-            chunks.add(PaperLib.getChunkAtAsync(location.getWorld(),xz[0],xz[1]));
-            HashableChunk hc = new HashableChunk(location.getWorld(),xz[0],xz[1]);
-            keepChunks.putIfAbsent(hc,Long.valueOf(0));
-            keepChunks.compute(hc, (k,v) -> v + 1);
-        }
-        locAssChunks.put(location,chunks);
     }
 
 
     public Location getRandomLocation(RandomSelectParams rsParams, boolean urgent) {
-        if(rsParams.hasCustomValues) return config.getRandomLocation(rsParams,urgent);
-
-        Location res;
-
-
-        try{
-            res = locationQueue.get(rsParams.world.getName()).remove();
+        TeleportRegion region;
+        if(permRegions.containsKey(rsParams)) {
+            region = permRegions.get(rsParams);
         }
-        catch (NoSuchElementException exception) {
-            res = config.getRandomLocation(rsParams, urgent);
+        else {
+            region = new TeleportRegion(rsParams.params, configs, this);
+            tempRegions.put(rsParams,region);
         }
-        catch (NullPointerException exception) {
-            res = config.getRandomLocation(rsParams, urgent);
-        }
-        return res;
+        return region.getLocation(urgent);
     }
 
     public void resetQueues() {
-        for(Map.Entry<UUID,ConcurrentLinkedQueue<Location>> entry : locationQueue.entrySet()) {
-            entry.getValue().clear();
-        }
-        for(Map.Entry<Location,List<CompletableFuture<Chunk>>> entry : locAssChunks.entrySet()) {
-            for(CompletableFuture<Chunk> chunk : entry.getValue()) {
-                chunk.cancel(true);
-            }
-            locAssChunks.remove(entry);
+        for(TeleportRegion region : permRegions.values()) {
+            region.shutdown();
         }
     }
 
-    public void addBadChunk(UUID uuid, long pos) {
-        badChunks.putIfAbsent(uuid,new ConcurrentSkipListMap<>());
-        ConcurrentSkipListMap map = badChunks.get(uuid);
-
-        Map.Entry<Long,Long> lower = map.floorEntry(pos);
-        Map.Entry<Long,Long> upper = map.ceilingEntry(pos);
-
-        //goal: merge adjacent values
-        // if lower start+length meets position, add 1 to its length and use that
-        if((lower!=null) && (pos == lower.getKey()+lower.getValue())) {
-            map.put(lower.getKey(),lower.getValue()+1);
-        }
-        else {
-            map.put(pos,Long.valueOf(1));
-        }
-
-        lower = map.floorEntry(pos);
-
-        // if upper start meets position + length, merge its length and delete
-        if((upper!=null)&&(lower.getKey()+lower.getValue() >= upper.getKey())) {
-            map.put(lower.getKey(),lower.getValue()+upper.getValue());
-            map.remove(upper.getKey());
-        }
-    }
-
-    public Long shiftedLocation(UUID uuid, Long pos) {
-        badChunks.putIfAbsent(uuid,new ConcurrentSkipListMap<>());
-        ConcurrentSkipListMap map = badChunks.get(uuid);
-        Map.Entry<Long,Long> idx =  map.firstEntry();
-        if((idx==null) || (pos<idx.getKey())) {
-            return pos;
-        }
-
-        while((idx!=null) && (pos >= (idx.getKey()))) {
-            pos += idx.getValue();
-            idx = map.ceilingEntry(idx.getKey()+idx.getValue());
-        }
-        return pos;
+    public void addBadChunk(World world, int x, int z) {
+        UUID uuid = world.getUID();
+        allBadChunks.putIfAbsent(uuid, new ConcurrentHashMap<>());
+        allBadChunks.get(uuid).put(new HashableChunk(world,x,z),0l);
     }
 }

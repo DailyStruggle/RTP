@@ -1,15 +1,14 @@
 package leafcraft.rtp.events;
 
-import leafcraft.rtp.tasks.CancellationCleanup;
 import leafcraft.rtp.tools.Cache;
-import org.bukkit.Chunk;
+import leafcraft.rtp.tools.selection.RandomSelectParams;
+import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Location;
-import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
 
-import java.util.concurrent.CompletableFuture;
+import java.util.UUID;
 
 public class OnPlayerQuit implements Listener {
     private Cache cache;
@@ -20,25 +19,27 @@ public class OnPlayerQuit implements Listener {
 
     @EventHandler
     public void OnPlayerQuit(PlayerQuitEvent event) {
-        Player player = event.getPlayer();
-        if(!this.cache.todoTP.containsKey(player.getName())) return;
+        UUID playerId = event.getPlayer().getUniqueId();
+        if(!this.cache.todoTP.containsKey(playerId)) return;
 
-        if(cache.loadChunks.containsKey(player.getName())) {
-            cache.loadChunks.get(player.getName()).cancel();
-            cache.loadChunks.remove(player.getName());
+        if(cache.loadChunks.containsKey(playerId)) {
+            cache.loadChunks.get(playerId).cancel();
+            cache.loadChunks.remove(playerId);
         }
-        if(cache.doTeleports.containsKey(player.getName())) {
-            cache.doTeleports.get(player.getName()).cancel();
-            cache.doTeleports.remove(player.getName());
+        if(cache.doTeleports.containsKey(playerId)) {
+            cache.doTeleports.get(playerId).cancel();
+            cache.doTeleports.remove(playerId);
         }
 
-        Location randomLocation = cache.todoTP.get(player.getName());
-        if(cache.locAssChunks.containsKey(randomLocation)) {
-            for(CompletableFuture<Chunk> cfChunk : cache.locAssChunks.get(randomLocation)) {
-                cfChunk.cancel(true);
-            }
+        RandomSelectParams rsParams = cache.regionKeys.get(playerId);
+        if(cache.permRegions.containsKey(rsParams)) {
+            Location randomLocation = cache.todoTP.get(playerId);
+            cache.permRegions.get(cache.regionKeys.get(playerId)).queueLocation(randomLocation);
+
         }
-        cache.todoTP.remove(player.getName());
-        cache.playerFromLocations.remove(player.getName());
+        else cache.tempRegions.remove(rsParams);
+        cache.regionKeys.remove(playerId);
+        cache.todoTP.remove(playerId);
+        cache.playerFromLocations.remove(playerId);
     }
 }

@@ -1,98 +1,113 @@
 package leafcraft.rtp.tools.selection;
 
-import leafcraft.rtp.tools.Cache;
-import leafcraft.rtp.tools.Config;
+import leafcraft.rtp.tools.Configuration.Configs;
 import org.bukkit.Bukkit;
+import org.bukkit.Chunk;
 import org.bukkit.World;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.math.MathContext;
-import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.UUID;
 
 public class RandomSelectParams {
-    private static final long maxRadBeforeBig = (long)Math.sqrt(Long.MAX_VALUE/4);
-    public boolean hasCustomValues;
-    public boolean isBig;
-    public BigDecimal totalSpaceBig;
-    public long totalSpaceNative;
+    public TeleportRegion.Shapes shape;
+    public UUID worldID;
+    public int r, cr, cx, cz, minY, maxY;
+    public boolean requireSkyLight,worldBorderOverride;
 
-    public static MathContext mc = new MathContext(10);
-    public static BigDecimal bigPi = BigDecimal.valueOf(Math.PI);
+    public boolean modifiedRegionSpecs;
+    public Map<String,String> params;
 
-    public enum Shapes{SQUARE,CIRCLE};
+    public RandomSelectParams(World world, Map<String,String> params, Configs configs) {
+        modifiedRegionSpecs = params.size()>0;
+        if(params.size()<=2) { // where region specs are unmodified
+            boolean hasWorld = params.containsKey("world");
+            boolean hasPlayer = params.containsKey("player");
+            if(params.size() == 1 && (hasWorld || hasPlayer)) {
+                modifiedRegionSpecs = false;
+            }
+            else if(hasWorld && hasPlayer) {
+                modifiedRegionSpecs = false;
+            }
+        }
 
-    public World world;
+        String worldName = params.getOrDefault("world",configs.worlds.worldName2Placeholder(world.getName()));
+        worldName = configs.worlds.worldPlaceholder2Name(worldName);
+        if(!configs.worlds.checkWorldExists(worldName)) worldName = world.getName();
+        world = Bukkit.getWorld(worldName);
 
-    public Shapes shape;
-    public int r,cr,cx,cz, minY, maxY; //radius, centerRadius, center x,z
+        String defaultRegion = (String)configs.worlds.getWorldSetting(world.getName(),"region","default");
+        String regionName = params.getOrDefault("region",defaultRegion);
 
-    public double weight;
+        this.params = params;
 
-    public boolean requireSkyLight, worldBorderOverride;
-
-    public BigDecimal positionBig; //how much space is occupied
-    public long positionNative;
-
-    public RandomSelectParams(World world, Map<String,String> params, Config config) {
-        String worldName = params.getOrDefault("world",world.getName());
-        if(!config.checkWorldExists(worldName)) worldName = world.getName();
-        this.world = Bukkit.getWorld(worldName);
-
-        hasCustomValues = params.size()>0;
+        worldBorderOverride = Boolean.getBoolean(this.params.getOrDefault("worldBorderOverride","false"));
+        if(worldBorderOverride) {
+            this.params.put("shape", "SQUARE");
+            this.params.put("radius", String.valueOf((int)world.getWorldBorder().getSize()));
+            this.params.put("centerX", String.valueOf(world.getWorldBorder().getCenter().getBlockX()));
+            this.params.put("centerZ", String.valueOf(world.getWorldBorder().getCenter().getBlockZ()));
+        }
 
         //ugh string parsing, but at least it's short and clean
-        String shapeStr =   params.getOrDefault("shape",(String)config.getWorldSetting(worldName,"shape","CIRCLE"));
-        String rStr =       params.getOrDefault("radius", (config.getWorldSetting(worldName,"radius",4096)).toString());
-        String crStr =      params.getOrDefault("centerRadius", (config.getWorldSetting(worldName,"centerRadius",1024)).toString());
-        String cxStr =      params.getOrDefault("centerX", (config.getWorldSetting(worldName,"centerX",0)).toString());
-        String czStr =      params.getOrDefault("centerZ", (config.getWorldSetting(worldName,"centerZ",0)).toString());
-        String weightStr =  params.getOrDefault("centerX", (config.getWorldSetting(worldName,"weight",1.0)).toString());
-        String minYStr =    params.getOrDefault("minY", (config.getWorldSetting(worldName,"minY",0)).toString());
-        String maxYStr =    params.getOrDefault("maxY", (config.getWorldSetting(worldName,"maxY",128)).toString());
-        String rslStr =     params.getOrDefault("requireSkyLight", (config.getWorldSetting(worldName,"requireSkyLight",true)).toString());
+        // fills in any missing values
+        this.params.put("world",worldName);
+        this.params.putIfAbsent("shape",(String)configs.regions.getRegionSetting(regionName,"shape","CIRCLE"));
+        this.params.putIfAbsent("radius", (configs.regions.getRegionSetting(regionName,"radius",4096)).toString());
+        this.params.putIfAbsent("centerRadius", (configs.regions.getRegionSetting(regionName,"centerRadius",1024)).toString());
+        this.params.putIfAbsent("centerX", (configs.regions.getRegionSetting(regionName,"centerX",0)).toString());
+        this.params.putIfAbsent("centerZ", (configs.regions.getRegionSetting(regionName,"centerZ",0)).toString());
+        this.params.putIfAbsent("weight", (configs.regions.getRegionSetting(regionName,"weight",1.0)).toString());
+        this.params.putIfAbsent("minY", (configs.regions.getRegionSetting(regionName,"minY",0)).toString());
+        this.params.putIfAbsent("maxY", (configs.regions.getRegionSetting(regionName,"maxY",128)).toString());
+        this.params.putIfAbsent("requireSkyLight", (configs.regions.getRegionSetting(regionName,"requireSkyLight",true)).toString());
+        this.params.putIfAbsent("worldBorderOverride", (configs.regions.getRegionSetting(regionName,"worldBorderOverride",false)).toString());
 
-        r = Integer.valueOf(rStr);
-        cr = Integer.valueOf(crStr);
-        cx = Integer.valueOf(cxStr);
-        cz = Integer.valueOf(czStr);
-
-        weight = Double.valueOf(weightStr);
-        minY = Integer.valueOf(minYStr);
-        maxY = Integer.valueOf(maxYStr);
-        requireSkyLight = Boolean.valueOf(rslStr);
-
-        if(r>maxRadBeforeBig) isBig = true;
-        try{
-            this.shape = Shapes.valueOf(shapeStr.toUpperCase(Locale.ENGLISH));
-        }
-        catch (IllegalArgumentException exception) {
-            this.shape = Shapes.CIRCLE;
-        }
-
-        if(isBig) {
-            this.totalSpaceBig = BigDecimal.valueOf(r-cr).multiply(BigDecimal.valueOf(r).add(BigDecimal.valueOf(cr)));
-            switch (this.shape) {
-                case SQUARE: this.totalSpaceBig = totalSpaceBig.multiply(BigDecimal.valueOf(4)); break;
-                default: this.totalSpaceBig = totalSpaceBig.multiply(bigPi);
-            }
-        }
-        else {
-            this.totalSpaceNative = (r-cr)*(r+cr);
-            switch (this.shape) {
-                case SQUARE: this.totalSpaceNative = totalSpaceNative*4; break;
-                default: this.totalSpaceNative = (int)(totalSpaceNative * Math.PI);
-            }
-        }
+        worldID = world.getUID();
+        shape = TeleportRegion.Shapes.valueOf(this.params.getOrDefault("shape","CIRCLE"));
+        r = Integer.valueOf(this.params.get("radius"));
+        cr = Integer.valueOf(this.params.get("centerRadius"));
+        cx = Integer.valueOf(this.params.get("centerX"));
+        cz = Integer.valueOf(this.params.get("centerZ"));
+        minY = Integer.valueOf(this.params.get("minY"));
+        maxY = Integer.valueOf(this.params.get("maxY"));
+        requireSkyLight = Boolean.valueOf(this.params.get("requireSkyLight"));
+        worldBorderOverride = Boolean.valueOf(this.params.get("worldBorderOverride"));
     }
-    public void randPos() {
-        if(isBig) {
-            this.positionBig = totalSpaceBig.multiply(BigDecimal.valueOf(Math.pow(ThreadLocalRandom.current().nextDouble(),weight)));
+
+    @Override
+    public boolean equals(Object o) {
+        if(this == o) return true;
+        if(o == null) return false;
+        if(o instanceof RandomSelectParams) {
+            RandomSelectParams that = (RandomSelectParams) o;
+            if(this.worldID != that.worldID) return false;
+            if(this.shape != that.shape) return false;
+            if(this.r != that.r) return false;
+            if(this.cr != that.cr) return false;
+            if(this.cx != that.cx) return false;
+            if(this.cz != that.cz) return false;
+            if(this.maxY != that.maxY) return false;
+            if(this.minY != that.minY) return false;
+            if(this.requireSkyLight != that.requireSkyLight) return false;
+            if(this.worldBorderOverride != that.worldBorderOverride) return false;
+            return true;
         }
-        else {
-            this.positionNative = (long)(totalSpaceNative * Math.pow(ThreadLocalRandom.current().nextDouble(),weight));
-        }
+        return false;
+    }
+
+    @Override
+    public int hashCode() {
+        int res = 0;
+        res ^= worldID.hashCode();
+        res ^= shape.hashCode();
+        res ^= Integer.hashCode(r);
+        res ^= Integer.hashCode(cr);
+        res ^= Integer.hashCode(cx);
+        res ^= Integer.hashCode(cz);
+        res ^= Integer.hashCode(minY);
+        res ^= Integer.hashCode(maxY);
+        res ^= Boolean.hashCode(requireSkyLight);
+        res ^= Boolean.hashCode(worldBorderOverride);
+        return res;
     }
 }
