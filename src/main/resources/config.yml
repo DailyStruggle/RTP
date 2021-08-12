@@ -14,5 +14,18 @@ rerollLiquid: true
 #how many rerolls before stopping
 maxAttempts: 100
 
+#how often, in seconds, to queue a new location in each world
+# set to 0 or lower to turn off the timer
+# heads up: queueing locations also schedules chunk loading, including generation, so use wisely
+# also heads up: if it's interrupted while it's loading a chunk, it will tell you to nag me.
+#   I'm taking suggestions on how to fix that.
+queuePeriod: 30
+
+#minimum TPS requirement before trying to queue a new location
+minTPS: 19.0
+
+#whether to extend regions beyond their outer radius as space gets used up
+extend: false
+
 #DO NOT TOUCH VERSION NUMBER
-version: 1.1
+version: 1.3

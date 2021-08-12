@@ -1,6 +1,6 @@
 package leafcraft.rtp.commands;
 
-import leafcraft.rtp.tools.Config;
+import leafcraft.rtp.tools.Configuration.Configs;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.command.Command;
@@ -16,40 +16,78 @@ import java.util.Set;
 public class TabComplete implements TabCompleter {
     private class SubCommand {
         String perm;
-        //parameter,perm
+
+        //parameter name,perm, for
         Map<String,String> subParams = new HashMap<>();
+
+        //perm, list of params
+        Map<String,ArrayList<String>> subParamsPermList = new HashMap<>();
+
         //command name, commands
         Map<String,SubCommand> commands = new HashMap<>();
 
         SubCommand(String perm) { this.perm = perm; }
+
+        void addSubParam(String name, String perm) {
+            subParams.put(name,perm);
+            subParamsPermList.putIfAbsent(perm, new ArrayList<>());
+            subParamsPermList.get(perm).add(name+":");
+        }
     }
 
     private SubCommand subCommands = new SubCommand("rtp");
 
-    private Config config;
+    private Configs configs;
 
-    public TabComplete(Config config) {
+    public TabComplete(Configs configs) {
         //load OnePlayerSleep.commands and permission nodes into map
-        subCommands.subParams.put("world","rtp.world");
-        subCommands.subParams.put("player","rtp.other");
+        subCommands.addSubParam("world","rtp.world");
+        subCommands.addSubParam("region","rtp.region");
+        subCommands.addSubParam("player","rtp.other");
+        subCommands.addSubParam("shape","rtp.params");
+        subCommands.addSubParam("radius","rtp.params");
+        subCommands.addSubParam("centerRadius","rtp.params");
+        subCommands.addSubParam("centerX","rtp.params");
+        subCommands.addSubParam("centerZ","rtp.params");
+        subCommands.addSubParam("weight","rtp.params");
+        subCommands.addSubParam("minY","rtp.params");
+        subCommands.addSubParam("maxY","rtp.params");
+        subCommands.addSubParam("requireSkyLight","rtp.params");
+        subCommands.addSubParam("worldBorderOverride","rtp.params");
+        
         subCommands.commands.put("help",new SubCommand("rtp.see"));
         subCommands.commands.put("reload",new SubCommand("rtp.reload"));
-        subCommands.commands.put("set",new SubCommand("rtp.set"));
+        subCommands.commands.put("setRegion",new SubCommand("rtp.setRegion"));
+        subCommands.commands.put("setWorld",new SubCommand("rtp.setWorld"));
 
-        subCommands.commands.get("set").subParams.put("world","rtp.set");
-        subCommands.commands.get("set").subParams.put("shape","rtp.set");
-        subCommands.commands.get("set").subParams.put("radius","rtp.set");
-        subCommands.commands.get("set").subParams.put("centerRadius","rtp.set");
-        subCommands.commands.get("set").subParams.put("centerX","rtp.set");
-        subCommands.commands.get("set").subParams.put("centerZ","rtp.set");
-        subCommands.commands.get("set").subParams.put("weight","rtp.set");
-        subCommands.commands.get("set").subParams.put("minY","rtp.set");
-        subCommands.commands.get("set").subParams.put("maxY","rtp.set");
-        subCommands.commands.get("set").subParams.put("requireSkyLight","rtp.set");
-        subCommands.commands.get("set").subParams.put("requirePermission","rtp.set");
-        subCommands.commands.get("set").subParams.put("override","rtp.set");
+        subCommands.commands.get("setRegion").addSubParam("region","rtp.setRegion");
+        subCommands.commands.get("setRegion").addSubParam("world","rtp.setRegion");
+        subCommands.commands.get("setRegion").addSubParam("shape","rtp.setRegion");
+        subCommands.commands.get("setRegion").addSubParam("radius","rtp.setRegion");
+        subCommands.commands.get("setRegion").addSubParam("centerRadius","rtp.setRegion");
+        subCommands.commands.get("setRegion").addSubParam("centerX","rtp.setRegion");
+        subCommands.commands.get("setRegion").addSubParam("centerZ","rtp.setRegion");
+        subCommands.commands.get("setRegion").addSubParam("weight","rtp.setRegion");
+        subCommands.commands.get("setRegion").addSubParam("minY","rtp.setRegion");
+        subCommands.commands.get("setRegion").addSubParam("maxY","rtp.setRegion");
+        subCommands.commands.get("setRegion").addSubParam("requireSkyLight","rtp.setRegion");
+        subCommands.commands.get("setRegion").addSubParam("requirePermission","rtp.setRegion");
+        subCommands.commands.get("setRegion").addSubParam("worldBorderOverride","rtp.setRegion");
+        subCommands.commands.get("setRegion").addSubParam("override","rtp.setRegion");
+        subCommands.commands.get("setRegion").addSubParam("queueLen","rtp.setRegion");
 
-        this.config = config;
+        subCommands.commands.get("setWorld").addSubParam("world","rtp.setWorld");
+        subCommands.commands.get("setWorld").addSubParam("name","rtp.setWorld");
+        subCommands.commands.get("setWorld").addSubParam("region","rtp.setWorld");
+        subCommands.commands.get("setWorld").addSubParam("override","rtp.setWorld");
+
+
+//        subCommands.commands.put("fill",new SubCommand("rtp.fill"));
+//        subCommands.commands.get("fill").addSubParam("world","rtp.fill");
+//        subCommands.commands.get("fill").commands.put("cancel",new SubCommand("rtp.fill"));
+//        subCommands.commands.get("fill").commands.get("cancel").addSubParam("world","rtp.fill");
+
+        this.configs = configs;
     }
 
     @Override
@@ -57,11 +95,11 @@ public class TabComplete implements TabCompleter {
                                       String alias, String[] args) {
         if(!sender.hasPermission("rtp.see")) return null;
 
-        List<String> res = new ArrayList<>();
-        Set<String> knownParams = new HashSet<>();
         List<String> match = new ArrayList<>();
-        this.getList(knownParams,res,this.subCommands,args, 0,sender);
+        Set<String> knownParams = new HashSet<>();
+        this.getList(knownParams,match,this.subCommands,args, 0,sender);
 
+        List<String> res = new ArrayList<>();
         StringUtil.copyPartialMatches(args[args.length-1],match,res);
         return res;
     }
@@ -77,19 +115,35 @@ public class TabComplete implements TabCompleter {
                     return;
                 }
                 switch (arg) {
+                    case "shape": {
+                        res.add(arg+":CIRCLE");
+                        res.add(arg+":SQUARE");
+                        break;
+                    }
+                    case "region" : {
+                        List<String> regions = configs.regions.getRegionNames();
+                        for(String region : regions) {
+                            if (!((Boolean)configs.regions.getRegionSetting(region,"requirePermission",true))
+                                    || sender.hasPermission("rtp.regions." + region)) {
+                                res.add(arg + ":" + region);
+                            }
+                        }
+                        break;
+                    }
                     case "world" :
                     case "override" : {
                         for (World world : Bukkit.getWorlds()) {
-                            this.config.checkWorldExists(world.getName());
-                            if (!this.config.getWorldPermReq(world.getName()) || sender.hasPermission("rtp.worlds." + world.getName())) {
-                                res.add(arg + ":" + world.getName());
+                            configs.worlds.checkWorldExists(world.getName());
+                            if (!((Boolean)configs.worlds.getWorldSetting(world.getName(),"requirePermission",true))
+                                    || sender.hasPermission("rtp.worlds." + world.getName())) {
+                                res.add(arg + ":" + configs.worlds.worldName2Placeholder(world.getName()));
                             }
                         }
                         break;
                     }
                     case "player" : {
                         for (Player player : Bukkit.getOnlinePlayers()) {
-                            res.add(arg + ":" + player.getName());
+                            res.add(arg + ":" + player.getUniqueId());
                         }
                         break;
                     }
@@ -100,16 +154,23 @@ public class TabComplete implements TabCompleter {
                         if(sender instanceof  Player) res.add(arg + ":" +"~");
                         break;
                     }
+                    case "requireSkyLight":
+                    case "requirePermission":
+                    case "worldBorderOverride": {
+                        res.add(arg+":true");
+                        res.add(arg+":false");
+                        break;
+                    }
                     default: {
                         res.add(arg+":");
                     }
                 }
             }
             else { //if no semicolon add all sub-commands or sub-parameters
-                for(Map.Entry<String, String> entry : command.subParams.entrySet()) {
+                for(Map.Entry<String, ArrayList<String>> entry : command.subParamsPermList.entrySet()) {
                     if(knownParams.contains(entry.getKey())) continue;
-                    if(sender.hasPermission(entry.getValue())) {
-                        res.add(entry.getKey() + ":");
+                    if(sender.hasPermission(entry.getKey())) {
+                        res.addAll(entry.getValue());
                     }
                 }
                 if(knownParams.size() == 0) {

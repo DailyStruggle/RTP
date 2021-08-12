@@ -1,29 +1,11 @@
 #autofilled per-world settings
 #world name according to bukkit
 default:
-    #shape of bounds
-    # SQUARE - random x + random z then stretched into place
-    # CIRCLE - spiral curve (suggested)
-    shape: "CIRCLE"
-    #radius of randomization in meters
-    radius: 4096
-    #donut hole, where players shouldn't land
-    centerRadius: 1024
-    #center position, using regular coordinates
-    centerX: 0
-    centerZ: 0
-    #shift players towards or away from the center
-    # rand()^(x), given rand() is between 0 and 1
-    # bigger is closer, smaller is farther
-    weight: 1.0
-    #height range for placement, set lower for more caves and ravines
-    minY: 0
-    maxY: 128
-    #ensure above ground by checking sky light level
-    requireSkyLight: true
-    #check rtp.[world] node
-    requirePermission: true
-    #if no perm for the world, send player to this world
+    #name of world in commands
+    name: "default"
+    #which region to use by default, when no region is specified
+    region: "default"
+    #if no perm for this world, use this world
     override: "world"
 
-version: 1.2
+version: 1.5
