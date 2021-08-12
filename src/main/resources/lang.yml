@@ -32,6 +32,9 @@ newWorld: "&b[rtp] detected a new world '[worldName]'"
 updatingWorlds: "&b[rtp] updating worlds configuration..."
 updatedWorlds: "&b[rtp] updated worlds configuration!"
 
+updatingRegions: "&b[rtp] updating regions configuration..."
+updatedRegions: "&b[rtp] updated regions configuration!"
+
 # plugin reload text
 reloading: "&b[rtp] reloading..."
 reloaded: "&b[rtp] successfully reloaded."
@@ -52,9 +55,12 @@ noGlobalPerms: "&eYou don't have permission to teleport to [worldName] from your
 # world doesn't exist in bukkit
 invalidWorld: "&e[rtp] could not find world '[worldName]'"
 
+# when more than on user fails to specify region in updateRegion
+missingRegionParam: "&e[rtp] region parameter is required"
+
 #command descriptions
 rtp: "&b/rtp - teleport to a random location"
 help: "&b/rtp help - see this"
 reload: "&b/rtp reload - reload config files"
 
-version: 1.2
+version: 1.3
