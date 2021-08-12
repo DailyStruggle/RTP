@@ -55,7 +55,11 @@ permissions:
       rtp.notme: true
       rtp.world: true
       rtp.worlds.*: true
-      rtp.set: true
+      rtp.region: true
+      rtp.regions.*: true
+      rtp.setWorld: true
+      rtp.setRegion: true
+      rtp.params: true
       rtp.fill: true
   rtp.see:
     description: allow player to tab for rtp commands

@@ -72,6 +72,11 @@ public class RandomSelectParams {
         maxY = Integer.valueOf(this.params.get("maxY"));
         requireSkyLight = Boolean.valueOf(this.params.get("requireSkyLight"));
         worldBorderOverride = Boolean.valueOf(this.params.get("worldBorderOverride"));
+
+//        System.out.println("creating RandomSelectParams with params:");
+//        for(Map.Entry<String,String> entry : this.params.entrySet()) {
+//            System.out.println("  " + entry.getKey() + ": " + entry.getValue());
+//        }
     }
 
     @Override
