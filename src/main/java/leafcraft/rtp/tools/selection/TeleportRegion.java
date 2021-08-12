@@ -222,6 +222,10 @@ public class TeleportRegion {
 
         Boolean rerollLiquid = (Boolean) configs.config.getConfigValue("rerollLiquid",true);
 
+        long selectTime = 0l;
+        long chunkTime = 0l;
+
+        long start = System.currentTimeMillis();
         double location = select();
         int[] xz;
         switch (shape) {
@@ -265,13 +269,17 @@ public class TeleportRegion {
         xz[0] = 16*(xzChunk[0]+centerChunk[0]) + posInChunk[0] + cx;
         xz[1] = 16*(xzChunk[1]+centerChunk[1]) + posInChunk[1] + cz;
 
+        long stop = System.currentTimeMillis();
+        selectTime += (stop-start);
+
+        start = System.currentTimeMillis();
         CompletableFuture<Chunk> cfChunk = (urgent) ?
                 PaperLib.getChunkAtAsyncUrgently(world,xzChunk[0],xzChunk[1],true) :
                 PaperLib.getChunkAtAsync(world,xzChunk[0],xzChunk[1],true);
 
         Chunk chunk;
         try {
-            chunk = cfChunk.get();
+            chunk = cfChunk.get(); //wait on chunk load/gen
         } catch (InterruptedException e) {
             e.printStackTrace();
             return null;
@@ -281,9 +289,11 @@ public class TeleportRegion {
         }
 
         res = new Location(world,xz[0],minY,xz[1]);
-
         res = this.getFirstNonAir(res);
         res = this.getLastNonAir(res);
+
+        stop = System.currentTimeMillis();
+        chunkTime += (stop-start);
 
         Integer numAttempts = 1;
         Integer maxAttempts = (Integer) configs.config.getConfigValue("maxAttempts",100);
@@ -293,6 +303,7 @@ public class TeleportRegion {
                         || (rerollLiquid && res.getBlock().isLiquid()))) {
             addBadChunk(chunkLocation);
 
+            start = System.currentTimeMillis();
             location = select();
             switch (shape) {
                 case SQUARE: {
@@ -330,6 +341,10 @@ public class TeleportRegion {
             xz[0] = 16*(xzChunk[0]+centerChunk[0]) + posInChunk[0] + cx;
             xz[1] = 16*(xzChunk[1]+centerChunk[1]) + posInChunk[1] + cz;
 
+            stop = System.currentTimeMillis();
+            selectTime += (stop-start);
+
+            start = System.currentTimeMillis();
             cfChunk = (urgent) ?
                     PaperLib.getChunkAtAsyncUrgently(world,xz[0],xz[1],true) :
                     PaperLib.getChunkAtAsync(world,xz[0],xz[1],true);
@@ -345,13 +360,16 @@ public class TeleportRegion {
             }
 
             res = new Location(world,xz[0],minY,xz[1]);
-
-            //int y = world.getHighestBlockYAt(res.getBlockX(),res.getBlockZ(),HeightMap.WORLD_SURFACE);
-            //res.setY(y);
             res = this.getFirstNonAir(res);
             res = this.getLastNonAir(res);
+
+            stop = System.currentTimeMillis();
+            chunkTime += (stop-start);
             numAttempts++;
         }
+
+//        System.out.println("time spent on position selection and translation: " + selectTime);
+//        System.out.println("time spent on chunk loading and block placement:  " + chunkTime);
 
         res.setY(res.getBlockY()+1);
         res.setX(res.getBlockX()+0.5);
@@ -397,6 +415,7 @@ public class TeleportRegion {
                     if(acceptableAir.contains(start.getBlock().getType())) skyLight = 15;
                     else skyLight = 0;
                 }
+
                 if(acceptableAir.contains(start.getBlock().getType())
                         && acceptableAir.contains(start.getBlock().getRelative(BlockFace.UP).getType())
                         && !(requireSkyLight && skyLight==0)) {
@@ -405,10 +424,6 @@ public class TeleportRegion {
                     maxY = i;
                     break;
                 }
-            }
-            if(i>= this.maxY) {
-                start.setY(this.maxY);
-                break;
             }
         }
         return start;

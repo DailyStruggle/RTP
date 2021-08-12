@@ -36,6 +36,7 @@ public class RTPCmd implements CommandExecutor {
 
         this.rtpParams.put("player", "rtp.other");
         this.rtpParams.put("world", "rtp.world");
+        this.rtpParams.put("region","rtp.region");
 
         this.rtpParams.put("shape","rtp.params");
         this.rtpParams.put("radius","rtp.params");
@@ -98,25 +99,39 @@ public class RTPCmd implements CommandExecutor {
 
         //set up world parameter
         World world;
-        if(sender.hasPermission("rtp.world") && rtpArgs.containsKey("world")) {
-            String worldName = rtpArgs.get("world");
-            worldName = configs.worlds.worldPlaceholder2Name(worldName);
-            if(!configs.worlds.checkWorldExists(worldName)) {
-                sender.sendMessage(configs.lang.getLog("badArg", "world:"+worldName));
+        if(sender.hasPermission("rtp.region") && rtpArgs.containsKey("region")) {
+            String regionName = rtpArgs.get("region");
+            String worldName = (String) configs.regions.getRegionSetting(regionName,"world","");
+            if (worldName == null || worldName == "") {
+                sender.sendMessage(configs.lang.getLog("badArg", "region:" + regionName));
                 return true;
             }
-            world = Bukkit.getWorld(rtpArgs.get("world"));
-        }
-        else {
-            world = player.getWorld();
-        }
-        if(!sender.hasPermission("rtp.worlds."+world.getName())) {
-            String worldName = (String) configs.worlds.getWorldSetting(world.getName(),"override","world");
-            if(!configs.worlds.checkWorldExists(worldName)) {
-                Bukkit.getLogger().log(Level.WARNING, configs.lang.getLog("invalidWorld", worldName));
+            if (!configs.worlds.checkWorldExists(worldName)) {
+                sender.sendMessage(configs.lang.getLog("badArg", "world:" + worldName));
                 return true;
             }
             world = Bukkit.getWorld(worldName);
+        }
+        else {
+            if (sender.hasPermission("rtp.world") && rtpArgs.containsKey("world")) {
+                String worldName = rtpArgs.get("world");
+                worldName = configs.worlds.worldPlaceholder2Name(worldName);
+                if (!configs.worlds.checkWorldExists(worldName)) {
+                    sender.sendMessage(configs.lang.getLog("badArg", "world:" + worldName));
+                    return true;
+                }
+                world = Bukkit.getWorld(rtpArgs.get("world"));
+            } else {
+                world = player.getWorld();
+            }
+            if (!sender.hasPermission("rtp.worlds." + world.getName())) {
+                String worldName = (String) configs.worlds.getWorldSetting(world.getName(), "override", "world");
+                if (!configs.worlds.checkWorldExists(worldName)) {
+                    Bukkit.getLogger().log(Level.WARNING, configs.lang.getLog("invalidWorld", worldName));
+                    return true;
+                }
+                world = Bukkit.getWorld(worldName);
+            }
         }
 
         //check time

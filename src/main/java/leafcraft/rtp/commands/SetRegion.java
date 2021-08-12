@@ -4,6 +4,7 @@ import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
+import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.command.Command;
@@ -70,6 +71,20 @@ public class SetRegion implements CommandExecutor {
                 return true;
             }
             world = Bukkit.getWorld(worldName);
+            switch(world.getEnvironment()) {
+                case NETHER: {
+                    regionArgs.putIfAbsent("requireSkyLight", "false");
+                    regionArgs.putIfAbsent("maxY", "127");
+                    regionArgs.putIfAbsent("minY", "32");
+                    break;
+                }
+                case THE_END: {
+                    regionArgs.putIfAbsent("requireSkyLight", "false");
+                    regionArgs.putIfAbsent("maxY", "96");
+                    regionArgs.putIfAbsent("minY", "48");
+                    break;
+                }
+            }
         }
         else {
             if(regionArgs.containsKey("region")) {
@@ -99,11 +114,13 @@ public class SetRegion implements CommandExecutor {
             String region = regionArgs.get("region");
             //check region exists
             String probe = (String) configs.regions.getRegionSetting(region,"world","");
+            Map<String,String> map = new HashMap<>();
+            RandomSelectParams params = new RandomSelectParams(world,regionArgs,configs);
             if(probe.equals("")) {
-                Map<String,String> map = new HashMap<>();
-                RandomSelectParams params = new RandomSelectParams(world,regionArgs,configs);
                 configs.regions.addRegion(region,params);
             }
+            cache.permRegions.remove(params);
+            cache.permRegions.put(params, new TeleportRegion(params.params,configs,cache));
         }
         else {
             sender.sendMessage(configs.lang.getLog("missingRegionParam"));
