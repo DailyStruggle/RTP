@@ -98,7 +98,7 @@ public class SetRegion implements CommandExecutor {
                 }
                 regionArgs.putIfAbsent("world",worldName);
                 world = Bukkit.getWorld(regionArgs.get("world"));
-                if(world == null) world = Bukkit.getWorlds().get(0);
+                if(!configs.worlds.checkWorldExists(world.getName())) world = Bukkit.getWorlds().get(0);
             }
             else if(sender instanceof Player) {
                 world = ((Player) sender).getWorld();
@@ -108,23 +108,6 @@ public class SetRegion implements CommandExecutor {
                 sender.sendMessage(configs.lang.getLog("consoleCmdNotAllowed"));
                 return true;
             }
-        }
-
-        if(regionArgs.containsKey("region")) {
-            String region = regionArgs.get("region");
-            //check region exists
-            String probe = (String) configs.regions.getRegionSetting(region,"world","");
-            Map<String,String> map = new HashMap<>();
-            RandomSelectParams params = new RandomSelectParams(world,regionArgs,configs);
-            if(probe.equals("")) {
-                configs.regions.addRegion(region,params);
-            }
-            cache.permRegions.remove(params);
-            cache.permRegions.put(params, new TeleportRegion(params.params,configs,cache));
-        }
-        else {
-            sender.sendMessage(configs.lang.getLog("missingRegionParam"));
-            return true;
         }
 
         for(Map.Entry<String,String> entry : regionArgs.entrySet()) {
@@ -170,9 +153,30 @@ public class SetRegion implements CommandExecutor {
                     entry.setValue(res.toString());
                 }
             }
-            Integer result = configs.regions.updateRegionSetting(regionArgs.get("region"),entry.getKey(),entry.getValue());
-            if(result<0) sender.sendMessage(configs.lang.getLog("badArg",entry.getValue()));
         }
+
+        if(regionArgs.containsKey("region")) {
+            String region = regionArgs.get("region");
+            //check region exists
+            String probe = (String) configs.regions.getRegionSetting(region,"world","");
+            RandomSelectParams params = new RandomSelectParams(world,regionArgs,configs);
+            if(probe.equals("")) {
+                configs.regions.addRegion(region,params);
+            }
+            cache.permRegions.remove(params);
+            cache.permRegions.put(params, new TeleportRegion(params.params,configs,cache));
+        }
+        else {
+            sender.sendMessage(configs.lang.getLog("missingRegionParam"));
+            return true;
+        }
+
+        for(Map.Entry<String,String> entry : regionArgs.entrySet()) {
+            if (entry.getKey().equals("region")) continue;
+            Integer result = configs.regions.updateRegionSetting(regionArgs.get("region"), entry.getKey(), entry.getValue());
+            if (result < 0) sender.sendMessage(configs.lang.getLog("badArg", entry.getValue()));
+        }
+
         Bukkit.getLogger().log(Level.INFO,configs.lang.getLog("updatingRegions"));
         if(sender instanceof Player)sender.sendMessage(configs.lang.getLog("updatingRegions"));
         configs.regions.update();

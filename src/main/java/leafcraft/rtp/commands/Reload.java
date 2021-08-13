@@ -31,8 +31,8 @@ public class Reload implements CommandExecutor {
             sender.sendMessage(str);
         }
 
-        this.cache.resetQueues();
         configs.refresh();
+        cache.resetRegions();
 
         str = configs.lang.getLog("reloaded");
         Bukkit.getConsoleSender().sendMessage(str);

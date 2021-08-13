@@ -13,8 +13,10 @@ import java.util.*;
 import java.util.concurrent.*;
 
 public class Cache {
+    private RTP plugin;
     private Configs configs;
     public Cache(RTP plugin, Configs configs) {
+        this.plugin = plugin;
         this.configs = configs;
         for(String region : configs.regions.getRegionNames()) {
             String worldName = (String) configs.regions.getRegionSetting(region,"world","world");
@@ -122,6 +124,43 @@ public class Cache {
         return region.getLocation(urgent);
     }
 
+    public void resetRegions() {
+        for(TeleportRegion region : tempRegions.values()) {
+            region.shutdown();
+        }
+        tempRegions.clear();
+
+        for(TeleportRegion region : permRegions.values()) {
+            region.shutdown();
+        }
+        permRegions.clear();
+
+        for(String region : configs.regions.getRegionNames()) {
+            String worldName = (String) configs.regions.getRegionSetting(region,"world","world");
+            World world = Bukkit.getWorld(worldName);
+            if(world == null) world = Bukkit.getWorlds().get(0);
+            Map<String,String> map = new HashMap<>();
+            map.put("region",region);
+            RandomSelectParams key = new RandomSelectParams(world,map,configs);
+            permRegions.put(key, new TeleportRegion(key.params,configs,this));
+            permRegions.get(key).name = region;
+        }
+
+        Double i = 0d;
+        Integer period = (Integer)configs.config.getConfigValue("queuePeriod",30);
+        Double increment = period.doubleValue()/permRegions.size();
+        for(Map.Entry<RandomSelectParams,TeleportRegion> entry : permRegions.entrySet()) {
+            timers.put(entry.getKey(),Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, ()->{
+                double tps = TPS.getTPS();
+                double minTps = (Double)configs.config.getConfigValue("minTPS",19.0);
+                if(tps < minTps) return;
+                entry.getValue().queueRandomLocation();
+            },200+i.intValue(),period*20));
+            i+=increment;
+        }
+    }
+
+    //reset just the queues
     public void resetQueues() {
         for(TeleportRegion region : permRegions.values()) {
             region.shutdown();

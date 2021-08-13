@@ -27,5 +27,8 @@ minTPS: 19.0
 #whether to extend regions beyond their outer radius as space gets used up
 extend: false
 
+#whether output debug logs, mostly for development purposes
+debug: false
+
 #DO NOT TOUCH VERSION NUMBER
 version: 1.3
