@@ -85,14 +85,14 @@ permissions:
   rtp.world:
     description: allow player to specify any world they have permission for
     default: op
+  rtp.worlds.*:
+    description: allow player to teleport to any world from any world
+    default: op
   rtp.region:
     description: allow player to specify any region they have permission for
     default: op
   rtp.regions.*:
     description: allow player to teleport to any region
-    default: op
-  rtp.worlds.*:
-    description: allow player to teleport to any world from any world
     default: op
   rtp.setWorld:
     description: allow player to update rtp settings for each world

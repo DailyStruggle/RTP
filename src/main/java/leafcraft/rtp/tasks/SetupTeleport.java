@@ -38,7 +38,7 @@ public class SetupTeleport extends BukkitRunnable {
         }
 
         //get warmup delay
-        int delay = (sender.hasPermission("rtp.instant")) ? 0 : (Integer)configs.config.getConfigValue("teleportDelay", 2);
+        int delay = (sender.hasPermission("rtp.noDelay")) ? 0 : (Integer)configs.config.getConfigValue("teleportDelay", 2);
 
         //let player know if warmup delay > 0
         if(delay>0) {

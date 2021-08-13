@@ -28,6 +28,6 @@ default:
     worldBorderOverride: false
     #max length for the location queue per world, recommend 0 for unused regions
     # each location also queues a number of chunks to be loaded (async), based on view distance
-    queueLen: 8
+    queueLen: 4
 
 version: 1.0

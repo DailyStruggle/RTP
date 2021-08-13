@@ -145,20 +145,22 @@ public class Regions {
                         if(regionName.equals("version")) continue;
                         if(regions.contains(regionName)) continue;
 
+                        ConfigurationSection regionSection = config.getConfigurationSection(regionName);
+                        
                         linesInRegions.add(regionName + ":");
-                        linesInRegions.add("    world: \"" + defaultWorld + "\"");
-                        linesInRegions.add("    shape: \"" + defaultShape + "\"");
-                        linesInRegions.add("    radius: " + defaultRadius);
-                        linesInRegions.add("    centerRadius: " + defaultCenterRadius);
-                        linesInRegions.add("    centerX: " + defaultCenterX);
-                        linesInRegions.add("    centerZ: " + defaultCenterZ);
-                        linesInRegions.add("    minY: " + defaultMinY);
-                        linesInRegions.add("    maxY: " + defaultMaxY);
-                        linesInRegions.add("    weight: " + defaultWeight);
-                        linesInRegions.add("    requireSkyLight: " + defaultRequireSkylight);
-                        linesInRegions.add("    requirePermission: " + defaultRequirePermission);
-                        linesInRegions.add("    worldBorderOverride: " + defaultWorldBorderOverride);
-                        linesInRegions.add("    queueLen: " + defaultQueueLen);
+                        linesInRegions.add("    world: \"" + regionSection.getString("world",defaultWorld) + "\"");
+                        linesInRegions.add("    shape: \"" + regionSection.getString("shape",defaultShape) + "\"");
+                        linesInRegions.add("    radius: " + regionSection.getInt("radius",defaultRadius));
+                        linesInRegions.add("    centerRadius: " + regionSection.getInt("centerRadius",defaultCenterRadius));
+                        linesInRegions.add("    centerX: " + regionSection.getInt("centerX",defaultCenterX));
+                        linesInRegions.add("    centerZ: " + regionSection.getInt("centerZ",defaultCenterZ));
+                        linesInRegions.add("    minY: " + regionSection.getInt("minY",defaultMinY));
+                        linesInRegions.add("    maxY: " + regionSection.getInt("maxY", defaultMaxY));
+                        linesInRegions.add("    weight: " + regionSection.getDouble("weight",defaultWeight));
+                        linesInRegions.add("    requireSkyLight: " + regionSection.getBoolean("requireSkyLight", defaultRequireSkylight));
+                        linesInRegions.add("    requirePermission: " + regionSection.getBoolean("requirePermission",defaultRequirePermission));
+                        linesInRegions.add("    worldBorderOverride: " + regionSection.getBoolean("worldBorderOverride",defaultWorldBorderOverride));
+                        linesInRegions.add("    queueLen: " + regionSection.getInt("queueLen",defaultQueueLen));
                     }
                 }
                 else { //if not a blank line

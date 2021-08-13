@@ -30,13 +30,21 @@ public class RandomSelectParams {
             }
         }
 
-        String worldName = params.getOrDefault("world",configs.worlds.worldName2Placeholder(world.getName()));
+        String worldName = params.getOrDefault("world",world.getName());
         worldName = configs.worlds.worldPlaceholder2Name(worldName);
         if(!configs.worlds.checkWorldExists(worldName)) worldName = world.getName();
         world = Bukkit.getWorld(worldName);
 
         String defaultRegion = (String)configs.worlds.getWorldSetting(world.getName(),"region","default");
         String regionName = params.getOrDefault("region",defaultRegion);
+
+        worldName = (String)configs.regions.getRegionSetting(regionName,"world",world.getName());
+        if(configs.worlds.checkWorldExists(worldName)) {
+            world = Bukkit.getWorld(worldName);
+        }
+        else {
+            worldName = world.getName();
+        }
 
         this.params = params;
 

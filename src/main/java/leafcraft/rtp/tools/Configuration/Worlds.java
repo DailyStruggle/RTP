@@ -51,6 +51,7 @@ public class Worlds {
 
         ArrayList<String> linesInWorlds = new ArrayList<>();
         String defaultRegion = config.getConfigurationSection("default").getString("region","default");
+        Boolean defaultRequirePermission = config.getConfigurationSection("default").getBoolean("requirePermission",true);
         String defaultOverride = config.getConfigurationSection("default").getString("override","world");
 
         for(World w : Bukkit.getWorlds()) {
@@ -84,6 +85,7 @@ public class Worlds {
                         else linesInWorlds.add(worldName + ":");
                         linesInWorlds.add("    name: " + quotes + worldName + quotes);
                         linesInWorlds.add("    region: " + quotes + defaultRegion + quotes);
+                        linesInWorlds.add("    requirePermission: " + defaultRequirePermission);
                         linesInWorlds.add("    override: " + quotes + defaultOverride + quotes);
                     }
                 }
@@ -92,6 +94,8 @@ public class Worlds {
                         s = "    name: " + quotes + config.getConfigurationSection(currWorldName).getString("name",currWorldName) + quotes;
                     else if(s.startsWith("    region:"))
                         s = "    region: " + quotes + config.getConfigurationSection(currWorldName).getString("region",defaultRegion) + quotes;
+                    else if(s.startsWith("    requirePermission:"))
+                        s = "    requirePermission: " + config.getConfigurationSection(currWorldName).getBoolean("requirePermission",defaultRequirePermission);
                     else if(s.startsWith("    override:"))
                         s = "    override: " + quotes + config.getConfigurationSection(currWorldName).getString("override",defaultOverride) + quotes;
                     else if(!s.startsWith("#") && !s.startsWith("  ") && !s.startsWith("version") && (s.matches(".*[a-z].*") || s.matches(".*[A-Z].*")))

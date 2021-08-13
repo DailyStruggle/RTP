@@ -102,43 +102,47 @@ public class RTPCmd implements CommandExecutor {
         if(sender.hasPermission("rtp.region") && rtpArgs.containsKey("region")) {
             String regionName = rtpArgs.get("region");
             String worldName = (String) configs.regions.getRegionSetting(regionName,"world","");
-            if (worldName == null || worldName == "") {
+            if (worldName == null
+                    || worldName == ""
+                    || (!sender.hasPermission("rtp.regions."+regionName)
+                    && (Boolean)configs.worlds.getWorldSetting(worldName,"requirePermission",true))) {
                 sender.sendMessage(configs.lang.getLog("badArg", "region:" + regionName));
                 return true;
             }
-            if (!configs.worlds.checkWorldExists(worldName)) {
+            if (!configs.worlds.checkWorldExists(worldName) || !sender.hasPermission("rtp.worlds."+worldName)) {
                 sender.sendMessage(configs.lang.getLog("badArg", "world:" + worldName));
                 return true;
             }
             world = Bukkit.getWorld(worldName);
         }
         else {
-            if (sender.hasPermission("rtp.world") && rtpArgs.containsKey("world")) {
+            if (rtpArgs.containsKey("world") && sender.hasPermission("rtp.world")) {
                 String worldName = rtpArgs.get("world");
                 worldName = configs.worlds.worldPlaceholder2Name(worldName);
                 if (!configs.worlds.checkWorldExists(worldName)) {
                     sender.sendMessage(configs.lang.getLog("badArg", "world:" + worldName));
                     return true;
                 }
-                world = Bukkit.getWorld(rtpArgs.get("world"));
-            } else {
+                if(sender.hasPermission("rtp.worlds."+worldName) || !((Boolean)configs.worlds.getWorldSetting(worldName,"requirePermission",true)))
+                    world = Bukkit.getWorld(rtpArgs.get("world"));
+                else {
+                    world = player.getWorld();
+                }
+            }
+            else {
                 world = player.getWorld();
             }
-            if (!sender.hasPermission("rtp.worlds." + world.getName())) {
-                String worldName = (String) configs.worlds.getWorldSetting(world.getName(), "override", "world");
-                if (!configs.worlds.checkWorldExists(worldName)) {
-                    Bukkit.getLogger().log(Level.WARNING, configs.lang.getLog("invalidWorld", worldName));
-                    return true;
-                }
-                world = Bukkit.getWorld(worldName);
-            }
+        }
+        String worldName = world.getName();
+        if (!sender.hasPermission("rtp.worlds." + worldName) && (Boolean) configs.worlds.getWorldSetting(worldName, "requirePermission", true)) {
+            world = Bukkit.getWorld((String) configs.worlds.getWorldSetting(worldName,"override","world"));
         }
 
         //check time
         long time = System.currentTimeMillis();
         long lastTime = (sender instanceof Player) ? this.cache.lastTeleportTime.getOrDefault(sender.getName(),Long.valueOf(0)) : 0;
         long cooldownTime = TimeUnit.SECONDS.toMillis((Integer)configs.config.getConfigValue("teleportCooldown",300));
-        if(!sender.hasPermission("rtp.instant")
+        if(!sender.hasPermission("rtp.noCooldown")
                 && time - lastTime < cooldownTime) {
             long remaining = (lastTime+cooldownTime)-time;
             long days = TimeUnit.MILLISECONDS.toDays(remaining);
