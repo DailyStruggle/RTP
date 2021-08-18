@@ -7,13 +7,15 @@ import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
 import org.bukkit.event.world.ChunkLoadEvent;
 
+import javax.sound.sampled.Line;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-public class OnChunkLoad {
+public class OnChunkLoad implements Listener {
     private static Set<Material> acceptableAir = new HashSet<>();;
     static {
         acceptableAir.add(Material.AIR);

@@ -2,9 +2,7 @@ package leafcraft.rtp;
 
 import io.papermc.lib.PaperLib;
 import leafcraft.rtp.commands.*;
-import leafcraft.rtp.events.OnChunkUnload;
-import leafcraft.rtp.events.OnPlayerMove;
-import leafcraft.rtp.events.OnPlayerQuit;
+import leafcraft.rtp.events.*;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.Metrics;
@@ -63,10 +61,18 @@ public final class RTP extends JavaPlugin {
         getCommand("wild").setTabCompleter(new TabComplete(this.configs));
 
         getServer().getPluginManager().registerEvents(new OnPlayerMove(this,configs,cache),this);
+        getServer().getPluginManager().registerEvents(new OnPlayerTeleport(this,configs,cache),this);
+        getServer().getPluginManager().registerEvents(new OnPlayerDeath(this,configs,cache),this);
+        getServer().getPluginManager().registerEvents(new OnPlayerRespawn(this,configs,cache),this);
+        getServer().getPluginManager().registerEvents(new OnPlayerJoin(this,configs,cache),this);
+        getServer().getPluginManager().registerEvents(new OnPlayerChangeWorld(this,configs,cache),this);
         getServer().getPluginManager().registerEvents(new OnPlayerQuit(cache),this);
         getServer().getPluginManager().registerEvents(new OnChunkUnload(cache),this);
+        getServer().getPluginManager().registerEvents(new OnChunkLoad(configs,cache),this);
 
         Bukkit.getServer().getScheduler().scheduleSyncRepeatingTask(this, new TPS(), 100L, 1L);
+
+
 
 //        Bukkit.getScheduler().runTaskTimer(this, () -> {
 //            Player me = Bukkit.getPlayer("leaf26");

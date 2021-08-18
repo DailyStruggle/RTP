@@ -5,7 +5,7 @@ default:
     name: "default"
     #which region to use by default, when no region is specified
     region: "default"
-    #check rtp.[world] node on command
+    #check rtp.worlds.[world] node on command
     requirePermission: true
     #if no perm for this world, use this world
     override: "world"

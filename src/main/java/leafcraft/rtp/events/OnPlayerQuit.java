@@ -20,8 +20,13 @@ public class OnPlayerQuit implements Listener {
     @EventHandler
     public void OnPlayerQuit(PlayerQuitEvent event) {
         UUID playerId = event.getPlayer().getUniqueId();
+        //if currently teleporting, stop that and clean up
         if(!this.cache.todoTP.containsKey(playerId)) return;
 
+        if(cache.setupTeleports.containsKey(playerId)) {
+            cache.setupTeleports.get(playerId).cancel();
+            cache.setupTeleports.remove(playerId);
+        }
         if(cache.loadChunks.containsKey(playerId)) {
             cache.loadChunks.get(playerId).cancel();
             cache.loadChunks.remove(playerId);
@@ -35,7 +40,6 @@ public class OnPlayerQuit implements Listener {
         if(cache.permRegions.containsKey(rsParams)) {
             Location randomLocation = cache.todoTP.get(playerId);
             cache.permRegions.get(cache.regionKeys.get(playerId)).queueLocation(randomLocation);
-
         }
         else cache.tempRegions.remove(rsParams);
         cache.regionKeys.remove(playerId);
