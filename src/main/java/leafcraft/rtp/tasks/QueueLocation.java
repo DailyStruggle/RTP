@@ -7,7 +7,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 
 //BukkitTask container for queueing asynchronously
 public class QueueLocation extends BukkitRunnable {
-    private TeleportRegion region;
+    private final TeleportRegion region;
     private Player player = null;
     private Location location = null;
 

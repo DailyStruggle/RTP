@@ -16,8 +16,8 @@ import java.util.*;
 import java.util.logging.Level;
 
 public class Regions {
-    private RTP plugin;
-    private Lang lang;
+    private final RTP plugin;
+    private final Lang lang;
     private FileConfiguration config;
 
     public Regions(RTP plugin, Lang lang) {

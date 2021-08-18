@@ -2,7 +2,6 @@ package leafcraft.rtp.events;
 
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
-import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Location;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -11,7 +10,7 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import java.util.UUID;
 
 public class OnPlayerQuit implements Listener {
-    private Cache cache;
+    private final Cache cache;
 
     public OnPlayerQuit(Cache cache) {
         this.cache = cache;

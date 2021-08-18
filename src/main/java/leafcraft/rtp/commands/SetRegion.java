@@ -19,11 +19,11 @@ import java.util.Set;
 import java.util.logging.Level;
 
 public class SetRegion implements CommandExecutor {
-    private RTP plugin;
-    private Configs configs;
+    private final RTP plugin;
+    private final Configs configs;
     Cache cache;
 
-    private Set<String> regionParams = new HashSet<>();
+    private final Set<String> regionParams = new HashSet<>();
 
     public SetRegion(leafcraft.rtp.RTP plugin, Configs configs) {
         this.plugin = plugin;

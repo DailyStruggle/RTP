@@ -35,9 +35,9 @@ public class TabComplete implements TabCompleter {
         }
     }
 
-    private SubCommand subCommands = new SubCommand("rtp");
+    private final SubCommand subCommands = new SubCommand("rtp");
 
-    private Configs configs;
+    private final Configs configs;
 
     public TabComplete(Configs configs) {
         //load OnePlayerSleep.commands and permission nodes into map

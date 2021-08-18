@@ -13,8 +13,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class Help implements CommandExecutor {
-    private Configs configs;
-    private Map<String,String> perms = new HashMap<String,String>();
+    private final Configs configs;
+    private final Map<String,String> perms = new HashMap<String,String>();
 
     public Help(Configs configs) {
         this.configs = configs;

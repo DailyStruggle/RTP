@@ -14,7 +14,8 @@ import java.util.*;
 import java.util.concurrent.*;
 
 public class TeleportRegion {
-    private static Set<Material> acceptableAir = new HashSet<>();;
+    private static final Set<Material> acceptableAir = new HashSet<>();
+
     static {
         acceptableAir.add(Material.AIR);
         acceptableAir.add(Material.CAVE_AIR);
@@ -23,29 +24,29 @@ public class TeleportRegion {
 
     public String name;
 
-    private Configs configs;
-    private Cache cache;
+    private final Configs configs;
+    private final Cache cache;
 
-    private World world;
+    private final World world;
     private double totalSpace;
 
     public enum Shapes{SQUARE,CIRCLE}
     public Shapes shape;
 
-    private double weight;
+    private final double weight;
 
-    public boolean requireSkyLight;
+    public boolean requireSkyLight, uniquePlacements, expand;
 
     //location queue for this region and associated chunks
     private ConcurrentLinkedQueue<Location> locationQueue = new ConcurrentLinkedQueue<>();
-    private ConcurrentHashMap<Location, List<CompletableFuture<Chunk>>> locAssChunks = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Location, List<CompletableFuture<Chunk>>> locAssChunks = new ConcurrentHashMap<>();
 
     //player reservation queue for reserving a spot on death
-    private ConcurrentHashMap<UUID,Location> playerNextLocation = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID,Location> playerNextLocation = new ConcurrentHashMap<>();
 
     //list of bad chunks in this region to avoid retries
     private ConcurrentSkipListMap<Long,Long> badChunks = new ConcurrentSkipListMap<>();
-    private long badChunkSum = 0;
+    private final long badChunkSum = 0;
 
     public int r, cr, cx, cz, minY, maxY;
 
@@ -65,6 +66,8 @@ public class TeleportRegion {
         String minYStr =    params.get("minY");
         String maxYStr =    params.get("maxY");
         String rslStr =     params.get("requireSkyLight");
+        String upStr =      params.get("uniquePlacements");
+        String expandStr =  params.get("expand");
 
         r = Integer.valueOf(rStr);
         cr = Integer.valueOf(crStr);
@@ -75,6 +78,8 @@ public class TeleportRegion {
         minY = Integer.valueOf(minYStr);
         maxY = Integer.valueOf(maxYStr);
         requireSkyLight = Boolean.valueOf(rslStr);
+        uniquePlacements = Boolean.valueOf(upStr);
+        expand = Boolean.valueOf(expandStr);
 
         try{
             this.shape = TeleportRegion.Shapes.valueOf(shapeStr.toUpperCase(Locale.ENGLISH));
@@ -159,9 +164,13 @@ public class TeleportRegion {
                 HashableChunk hc = new HashableChunk(location.getWorld(), cx+i, cz+j);
                 cache.keepChunks.putIfAbsent(hc, Long.valueOf(0));
                 cache.keepChunks.compute(hc, (k, v) -> v + 1);
+                if(uniquePlacements) {
+                    addBadChunk(cx+i,cz+j);
+                }
             }
         }
         locAssChunks.put(location,chunks);
+
     }
 
     public List<CompletableFuture<Chunk>> getChunks(Location location) {
@@ -259,7 +268,9 @@ public class TeleportRegion {
     }
 
     private double select() {
-        double res = (totalSpace-badChunkSum) * Math.pow(ThreadLocalRandom.current().nextDouble(),weight);
+        double space = totalSpace;
+        if(!expand) space-=badChunkSum;
+        double res = (space) * Math.pow(ThreadLocalRandom.current().nextDouble(),weight);
         return res;
     }
 

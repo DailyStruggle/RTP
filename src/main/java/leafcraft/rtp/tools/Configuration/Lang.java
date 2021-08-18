@@ -31,7 +31,7 @@ public class Lang {
             update(plugin);
 
             f = new File(plugin.getDataFolder(), "lang.yml");
-            this.config = YamlConfiguration.loadConfiguration(f);;
+            this.config = YamlConfiguration.loadConfiguration(f);
         }
     }
 

@@ -95,8 +95,7 @@ public class RandomSelectParams {
             if(this.requireSkyLight != that.requireSkyLight) return false;
             if(this.worldBorderOverride != that.worldBorderOverride) return false;
             if(this.uniquePlacements != that.uniquePlacements) return false;
-            if(this.expand != that.expand) return false;
-            return true;
+            return this.expand == that.expand;
         }
         return false;
     }

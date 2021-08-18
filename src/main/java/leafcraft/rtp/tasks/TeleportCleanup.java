@@ -38,7 +38,7 @@ public class TeleportCleanup extends BukkitRunnable {
         }
 
         RandomSelectParams rsParams = cache.regionKeys.get(player.getUniqueId());
-        if(cache.permRegions.containsKey(rsParams))
+        if(rsParams!=null && cache.permRegions.containsKey(rsParams))
             cache.permRegions.get(rsParams).removeChunks(location);
     }
 }

@@ -13,15 +13,14 @@ import org.bukkit.entity.Player;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
 
 public class RTPCmd implements CommandExecutor {
-    private leafcraft.rtp.RTP plugin;
-    private Configs configs;
-    private Map<String,String> perms = new HashMap<>();
-    private Map<String,String> rtpParams = new HashMap<>();
+    private final leafcraft.rtp.RTP plugin;
+    private final Configs configs;
+    private final Map<String,String> perms = new HashMap<>();
+    private final Map<String,String> rtpParams = new HashMap<>();
 
-    private Cache cache;
+    private final Cache cache;
 
     public RTPCmd(leafcraft.rtp.RTP plugin, Configs configs, Cache cache) {
         this.plugin = plugin;
@@ -149,7 +148,7 @@ public class RTPCmd implements CommandExecutor {
             long hours = TimeUnit.MILLISECONDS.toHours(remaining)%24;
             long minutes = TimeUnit.MILLISECONDS.toMinutes(remaining)%60;
             long seconds = TimeUnit.MILLISECONDS.toSeconds(remaining)%60;
-            String replacement = new String();
+            String replacement = "";
             if(days>0) replacement += days + configs.lang.getLog("days") + " ";
             if(days>0 || hours>0) replacement += hours + configs.lang.getLog("hours") + " ";
             if(days>0 || hours>0 || minutes>0) replacement += minutes + configs.lang.getLog("minutes") + " ";

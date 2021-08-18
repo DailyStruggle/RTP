@@ -18,8 +18,8 @@ import java.util.*;
 import java.util.concurrent.*;
 
 public class Cache {
-    private RTP plugin;
-    private Configs configs;
+    private final RTP plugin;
+    private final Configs configs;
     public Cache(RTP plugin, Configs configs) {
         this.plugin = plugin;
         this.configs = configs;
