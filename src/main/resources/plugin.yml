@@ -50,7 +50,9 @@ permissions:
       rtp.see: true
       rtp.use: true
       rtp.reload: true
-      rtp.instant: true
+      rtp.noCooldown: true
+      rtp.noDelay: true
+      rtp.noDelay.chunks: true
       rtp.other: true
       rtp.notme: true
       rtp.world: true
@@ -72,6 +74,9 @@ permissions:
     default: op
   rtp.noDelay:
     description: skip the teleport delay
+    default: op
+  rtp.noDelay.chunks:
+    description: skip chunk loading
     default: op
   rtp.noCooldown:
     description: skip the teleport cooldown
@@ -103,6 +108,39 @@ permissions:
   rtp.params:
     description: allow player to use custom parameters for their teleport
     default: op
+    children:
+      rtp.unqueued: true
+  rtp.unqueued:
+    description: if no locations are queued, generate a new location
+    default: op
+  rtp.onEvent.*:
+    description: inescapable chaos
+    default: false
+    children:
+      rtp.onEvent.join: true
+      rtp.onEvent.respawn: true
+      rtp.onEvent.changeWorld: true
+      rtp.onEvent.move: true
+      rtp.onEvent.teleport: true
+  rtp.onEvent.join:
+    description: randomly teleport player on every join
+    default: false
+  rtp.onEvent.firstJoin:
+    description: randomly teleport player on player's first join
+    default: false
+  rtp.onEvent.respawn:
+    description: randomly teleport player on respawn after death
+    default: false
+  rtp.onEvent.changeWorld:
+    description: randomly teleport player upon changing worlds
+    default: false
+  rtp.onEvent.move:
+    description: randomly teleport player on movement
+    default: false
+  rtp.onEvent.teleport:
+    description: randomly teleport player on teleport, recursively
+    default: false
+
 #  rtp.fill:
 #    description: allow player to call region filling command
 #    default: op

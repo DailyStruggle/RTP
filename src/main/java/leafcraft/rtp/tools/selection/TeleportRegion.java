@@ -6,6 +6,8 @@ import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.HashableChunk;
 import org.bukkit.*;
 import org.bukkit.block.BlockFace;
+import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 import org.opentest4j.TestAbortedException;
 
 import java.util.*;
@@ -37,6 +39,9 @@ public class TeleportRegion {
     //location queue for this region and associated chunks
     private ConcurrentLinkedQueue<Location> locationQueue = new ConcurrentLinkedQueue<>();
     private ConcurrentHashMap<Location, List<CompletableFuture<Chunk>>> locAssChunks = new ConcurrentHashMap<>();
+
+    //player reservation queue for reserving a spot on death
+    private ConcurrentHashMap<UUID,Location> playerNextLocation = new ConcurrentHashMap<>();
 
     //list of bad chunks in this region to avoid retries
     private ConcurrentSkipListMap<Long,Long> badChunks = new ConcurrentSkipListMap<>();
@@ -95,17 +100,49 @@ public class TeleportRegion {
         locationQueue.clear();
     }
 
-    public Location getLocation(boolean urgent) {
-        Location res;
+    public Location getLocation(boolean urgent, CommandSender sender, Player player) {
+        Location res = null;
+
+        if(playerNextLocation.containsKey(player.getUniqueId())) {
+            Location location = playerNextLocation.get(player.getUniqueId());
+            playerNextLocation.remove(player.getUniqueId());
+            return location;
+        }
 
         try{
             res = locationQueue.remove();
         }
         catch (NoSuchElementException exception) {
-            res = getRandomLocation(urgent);
+            if(sender.hasPermission("rtp.unqueued")) {
+                res = getRandomLocation(urgent);
+                if(res == null) {
+                    Integer maxAttempts = (Integer) configs.config.getConfigValue("maxAttempts", 100);
+                    player.sendMessage(configs.lang.getLog("unsafe",maxAttempts.toString()));
+                    if(!sender.getName().equals(player.getName()))
+                        sender.sendMessage(configs.lang.getLog("unsafe",maxAttempts.toString()));
+                }
+            }
+            else {
+                player.sendMessage(configs.lang.getLog("noLocationsQueued"));
+                if(!sender.getName().equals(player.getName()))
+                    sender.sendMessage(configs.lang.getLog("noLocationsQueued"));
+            }
         }
         catch (NullPointerException exception) {
-            res = getRandomLocation(urgent);
+            if(sender.hasPermission("rtp.unqueued")) {
+                res = getRandomLocation(urgent);
+                if (res == null) {
+                    Integer maxAttempts = (Integer) configs.config.getConfigValue("maxAttempts", 100);
+                    player.sendMessage(configs.lang.getLog("unsafe", maxAttempts.toString()));
+                    if (!sender.getName().equals(player.getName()))
+                        sender.sendMessage(configs.lang.getLog("unsafe", maxAttempts.toString()));
+                }
+            }
+            else {
+                player.sendMessage(configs.lang.getLog("noLocationsQueued"));
+                if(!sender.getName().equals(player.getName()))
+                    sender.sendMessage(configs.lang.getLog("noLocationsQueued"));
+            }
         }
         return res;
     }
@@ -151,6 +188,15 @@ public class TeleportRegion {
             return false;
         }
         queueLocation(location);
+        return true;
+    }
+
+    public boolean queueRandomLocation(Player player) {
+        Location location = getRandomLocation(true);
+        if(location == null) {
+            return false;
+        }
+        playerNextLocation.put(player.getUniqueId(),location);
         return true;
     }
 

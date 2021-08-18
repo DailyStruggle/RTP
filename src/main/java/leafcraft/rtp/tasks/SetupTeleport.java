@@ -19,6 +19,7 @@ public class SetupTeleport extends BukkitRunnable {
     private final Configs configs;
     private final Cache cache;
     private final RandomSelectParams rsParams;
+    private Location location = null;
 
     public SetupTeleport(RTP plugin, CommandSender sender, Player player, Configs configs, Cache cache, RandomSelectParams rsParams) {
         this.sender = sender;
@@ -58,20 +59,32 @@ public class SetupTeleport extends BukkitRunnable {
 
         //get a random location according to the parameters
         long start = System.currentTimeMillis();
-        Location location = cache.getRandomLocation(rsParams,true);
+        location = cache.getRandomLocation(rsParams,true,sender, player);
         long stop = System.currentTimeMillis();
-
-        Integer maxAttempts = (Integer) configs.config.getConfigValue("maxAttempts",100);
-        if(location == null) {
-            player.sendMessage(configs.lang.getLog("unsafe",maxAttempts.toString()));
-            if(!sender.getName().equals(player.getName()))
-                sender.sendMessage(configs.lang.getLog("unsafe",maxAttempts.toString()));
-            return;
-        }
-        cache.todoTP.put(player.getUniqueId(),location);
-        cache.regionKeys.put(player.getUniqueId(),rsParams);
+        if(location == null) return;
 
         //set up task to load chunks then teleport
-        cache.loadChunks.put(player.getUniqueId(), new LoadChunks(plugin,configs,player,cache,(int)((20*delay)-((stop-start)/50)),location).runTaskLaterAsynchronously(plugin,1));
+        if(!this.isCancelled()){
+            cache.todoTP.put(player.getUniqueId(),location);
+            cache.regionKeys.put(player.getUniqueId(),rsParams);
+            LoadChunks loadChunks = new LoadChunks(plugin,configs,sender,player,cache,(int)((20*delay)-((stop-start)/50)),location);
+            loadChunks.runTaskLaterAsynchronously(plugin,1);
+            cache.loadChunks.put(player.getUniqueId(), loadChunks);
+        }
+        cache.setupTeleports.remove(player.getUniqueId());
     }
+
+    @Override
+    public void cancel() {
+        if(cache.permRegions.containsKey(rsParams) && location != null) {
+            cache.permRegions.get(rsParams).queueLocation(location);
+        }
+        super.cancel();
+    }
+
+    public boolean isNoDelay() {
+        return sender.hasPermission("rtp.noDelay");
+    }
+
+
 }

@@ -162,7 +162,9 @@ public class RTPCmd implements CommandExecutor {
         RandomSelectParams rsParams = new RandomSelectParams(world,rtpArgs,configs);
 
         //prep teleportation
-        new SetupTeleport(plugin,sender,player,configs, cache, rsParams).runTaskAsynchronously(plugin);
+        SetupTeleport setupTeleport = new SetupTeleport(plugin,sender,player,configs, cache, rsParams);
+        setupTeleport.runTaskAsynchronously(plugin);
+        cache.setupTeleports.put(player.getUniqueId(),setupTeleport);
         this.cache.lastTeleportTime.put(player.getUniqueId(), time);
         this.cache.playerFromLocations.put(player.getUniqueId(),player.getLocation());
 
