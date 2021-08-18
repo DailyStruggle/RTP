@@ -2,13 +2,12 @@ package leafcraft.rtp.events;
 
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.HashableChunk;
-import org.bukkit.Bukkit;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.world.ChunkUnloadEvent;
 
 public class OnChunkUnload implements Listener {
-    private Cache cache;
+    private final Cache cache;
 
     public OnChunkUnload(Cache cache) {
         this.cache = cache;

@@ -4,7 +4,7 @@ import leafcraft.rtp.RTP;
 
 //route for all config classes
 public class Configs {
-    private RTP plugin;
+    private final RTP plugin;
     public Config config;
     public Lang lang;
     public Regions regions;

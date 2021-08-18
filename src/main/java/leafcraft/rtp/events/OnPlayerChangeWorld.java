@@ -14,12 +14,11 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
-import org.bukkit.event.player.PlayerTeleportEvent;
 
 public class OnPlayerChangeWorld implements Listener {
-    private RTP plugin;
-    private Configs configs;
-    private Cache cache;
+    private final RTP plugin;
+    private final Configs configs;
+    private final Cache cache;
 
     public OnPlayerChangeWorld(RTP plugin, Configs configs, Cache cache) {
         this.plugin = plugin;
@@ -38,9 +37,9 @@ public class OnPlayerChangeWorld implements Listener {
         //if has this perm, go again
         if (player.hasPermission("rtp.onEvent.teleport")) {
             //skip if already going
-            SetupTeleport setupTeleport = (SetupTeleport) this.cache.setupTeleports.get(player.getUniqueId());
-            LoadChunks loadChunks = (LoadChunks) this.cache.loadChunks.get(player.getUniqueId());
-            DoTeleport doTeleport = (DoTeleport) this.cache.doTeleports.get(player.getUniqueId());
+            SetupTeleport setupTeleport = this.cache.setupTeleports.get(player.getUniqueId());
+            LoadChunks loadChunks = this.cache.loadChunks.get(player.getUniqueId());
+            DoTeleport doTeleport = this.cache.doTeleports.get(player.getUniqueId());
             if(setupTeleport!=null && setupTeleport.isNoDelay()) return;
             if(loadChunks!=null && loadChunks.isNoDelay()) return;
             if(doTeleport!=null && doTeleport.isNoDelay()) return;
@@ -55,9 +54,9 @@ public class OnPlayerChangeWorld implements Listener {
         Player player = event.getPlayer();
 
         //don't stop teleporting if there isn't supposed to be a delay
-        SetupTeleport setupTeleport = (SetupTeleport) this.cache.setupTeleports.get(player.getUniqueId());
-        LoadChunks loadChunks = (LoadChunks) this.cache.loadChunks.get(player.getUniqueId());
-        DoTeleport doTeleport = (DoTeleport) this.cache.doTeleports.get(player.getUniqueId());
+        SetupTeleport setupTeleport = this.cache.setupTeleports.get(player.getUniqueId());
+        LoadChunks loadChunks = this.cache.loadChunks.get(player.getUniqueId());
+        DoTeleport doTeleport = this.cache.doTeleports.get(player.getUniqueId());
         if(setupTeleport!=null && setupTeleport.isNoDelay()) return;
         if(loadChunks!=null && loadChunks.isNoDelay()) return;
         if(doTeleport!=null && doTeleport.isNoDelay()) return;

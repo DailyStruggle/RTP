@@ -8,7 +8,7 @@ import java.util.UUID;
 
 public class HashableChunk {
     UUID worldUID;
-    private Long coordinate;
+    private final Long coordinate;
     private Chunk chunk;
 
     public HashableChunk(Chunk chunk) {

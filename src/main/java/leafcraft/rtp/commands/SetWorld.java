@@ -18,11 +18,11 @@ import java.util.Set;
 import java.util.logging.Level;
 
 public class SetWorld implements CommandExecutor {
-    private RTP plugin;
-    private Configs configs;
+    private final RTP plugin;
+    private final Configs configs;
     Cache cache;
 
-    private Set<String> worldParams = new HashSet<>();
+    private final Set<String> worldParams = new HashSet<>();
 
     public SetWorld(RTP plugin, Configs configs) {
         this.plugin = plugin;

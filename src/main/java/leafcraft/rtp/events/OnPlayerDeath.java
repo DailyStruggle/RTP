@@ -8,22 +8,19 @@ import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
-import org.bukkit.event.player.PlayerMoveEvent;
-import org.bukkit.event.player.PlayerTeleportEvent;
 
 import java.util.HashMap;
 
 //set up a location for respawn event
 public class OnPlayerDeath implements Listener {
-    private RTP plugin;
-    private Configs configs;
-    private Cache cache;
+    private final RTP plugin;
+    private final Configs configs;
+    private final Cache cache;
 
     public OnPlayerDeath(RTP plugin, Configs configs, Cache cache) {
         this.plugin = plugin;

@@ -5,16 +5,10 @@ import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
-import leafcraft.rtp.tools.selection.TeleportRegion;
-import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
-
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 public class DoTeleport extends BukkitRunnable {
     private final RTP plugin;
@@ -46,7 +40,7 @@ public class DoTeleport extends BukkitRunnable {
         if(!this.isCancelled()) {
             PaperLib.teleportAsync(player,location);
             this.player.sendMessage(configs.lang.getLog("teleportMessage", this.cache.numTeleportAttempts.getOrDefault(location,0).toString()));
-            new TeleportCleanup(player,location,cache).runTaskAsynchronously(plugin);
+            new TeleportCleanup(player,location,cache).runTask(plugin);
         }
         cache.doTeleports.remove(player.getUniqueId());
     }

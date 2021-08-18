@@ -10,8 +10,8 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 public class Reload implements CommandExecutor {
-    private Configs configs;
-    private Cache cache;
+    private final Configs configs;
+    private final Cache cache;
 
     public Reload(Configs configs, Cache cache) {
         this.configs = configs;

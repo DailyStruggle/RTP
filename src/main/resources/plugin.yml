@@ -36,11 +36,6 @@ commands:
     permission: rtp.setRegion
     usage: |
       /rtp setRegion
-#  rtp fill:
-#    description: load and check each chunk in the rtp area
-#    permission: rtp.fill
-#    usage: |
-#      /rtp help
 
 permissions:
   rtp.*:
@@ -62,7 +57,6 @@ permissions:
       rtp.setWorld: true
       rtp.setRegion: true
       rtp.params: true
-      rtp.fill: true
   rtp.see:
     description: allow player to tab for rtp commands
     default: true
@@ -140,7 +134,3 @@ permissions:
   rtp.onEvent.teleport:
     description: randomly teleport player on teleport, recursively
     default: false
-
-#  rtp.fill:
-#    description: allow player to call region filling command
-#    default: op

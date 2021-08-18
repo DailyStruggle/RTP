@@ -14,12 +14,11 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerMoveEvent;
-import org.bukkit.event.player.PlayerTeleportEvent;
 
 public class OnPlayerMove implements Listener {
-    private RTP plugin;
-    private Configs configs;
-    private Cache cache;
+    private final RTP plugin;
+    private final Configs configs;
+    private final Cache cache;
 
     public OnPlayerMove(RTP plugin, Configs configs, Cache cache) {
         this.plugin = plugin;
@@ -39,8 +38,8 @@ public class OnPlayerMove implements Listener {
         //if has this perm, go again
         if (player.hasPermission("rtp.onEvent.move")) {
             //skip if already going
-            LoadChunks loadChunks = (LoadChunks) this.cache.loadChunks.get(player.getUniqueId());
-            DoTeleport doTeleport = (DoTeleport) this.cache.doTeleports.get(player.getUniqueId());
+            LoadChunks loadChunks = this.cache.loadChunks.get(player.getUniqueId());
+            DoTeleport doTeleport = this.cache.doTeleports.get(player.getUniqueId());
             if(loadChunks!=null && loadChunks.isNoDelay()) return;
             if(doTeleport!=null && doTeleport.isNoDelay()) return;
 

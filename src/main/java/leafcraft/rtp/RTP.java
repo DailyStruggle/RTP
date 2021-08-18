@@ -8,17 +8,14 @@ import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.Metrics;
 import leafcraft.rtp.tools.TPS;
 import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.plugin.java.JavaPluginLoader;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.io.File;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
 
 public final class RTP extends JavaPlugin {

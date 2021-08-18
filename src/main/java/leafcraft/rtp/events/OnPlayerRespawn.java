@@ -15,9 +15,9 @@ import java.util.HashMap;
 
 //get queued location
 public class OnPlayerRespawn implements Listener {
-    private RTP plugin;
-    private Configs configs;
-    private Cache cache;
+    private final RTP plugin;
+    private final Configs configs;
+    private final Cache cache;
 
     public OnPlayerRespawn(RTP plugin, Configs configs, Cache cache) {
         this.plugin = plugin;

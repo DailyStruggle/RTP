@@ -10,20 +10,20 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.world.ChunkLoadEvent;
 
-import javax.sound.sampled.Line;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
 public class OnChunkLoad implements Listener {
-    private static Set<Material> acceptableAir = new HashSet<>();;
+    private static final Set<Material> acceptableAir = new HashSet<>();
+
     static {
         acceptableAir.add(Material.AIR);
         acceptableAir.add(Material.CAVE_AIR);
         acceptableAir.add(Material.VOID_AIR);
     }
-    private Configs configs;
-    private Cache cache;
+    private final Configs configs;
+    private final Cache cache;
 
     public OnChunkLoad(Configs configs, Cache cache) {
         this.configs = configs;
