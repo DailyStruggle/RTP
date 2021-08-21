@@ -73,7 +73,8 @@ public class TabComplete implements TabCompleter {
         subCommands.commands.get("setRegion").addSubParam("requireSkyLight","rtp.setRegion");
         subCommands.commands.get("setRegion").addSubParam("requirePermission","rtp.setRegion");
         subCommands.commands.get("setRegion").addSubParam("worldBorderOverride","rtp.setRegion");
-        subCommands.commands.get("setRegion").addSubParam("override","rtp.setRegion");
+        subCommands.commands.get("setRegion").addSubParam("uniquePlacements","rtp.setRegion");
+        subCommands.commands.get("setRegion").addSubParam("expand","rtp.setRegion");
         subCommands.commands.get("setRegion").addSubParam("queueLen","rtp.setRegion");
 
         subCommands.commands.get("setWorld").addSubParam("world","rtp.setWorld");

@@ -10,6 +10,7 @@ public class Configs {
     public Regions regions;
     public Worlds worlds;
     public String version;
+    public WorldGuardChecker worldGuardChecker;
 
     public Configs(RTP plugin) {
         this.plugin = plugin;

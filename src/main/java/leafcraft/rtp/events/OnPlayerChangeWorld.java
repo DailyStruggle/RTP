@@ -12,41 +12,34 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 
-public class OnPlayerChangeWorld implements Listener {
-    private final RTP plugin;
-    private final Configs configs;
-    private final Cache cache;
+public record OnPlayerChangeWorld(RTP plugin, Configs configs,
+                                  Cache cache) implements Listener {
 
-    public OnPlayerChangeWorld(RTP plugin, Configs configs, Cache cache) {
-        this.plugin = plugin;
-        this.configs = configs;
-        this.cache = cache;
-    }
-
-    @EventHandler
+    @EventHandler(priority = EventPriority.NORMAL)
     public void OnPlayerChangeWorld(PlayerChangedWorldEvent event) {
         Player player = event.getPlayer();
         //if currently teleporting, stop that and clean up
-        if(this.cache.todoTP.containsKey(player.getUniqueId())) {
+        if (this.cache.todoTP.containsKey(player.getUniqueId())) {
             stopTeleport(event);
         }
 
         //if has this perm, go again
-        if (player.hasPermission("rtp.onEvent.teleport")) {
+        if (player.hasPermission("rtp.onEvent.changeWorld")) {
             //skip if already going
             SetupTeleport setupTeleport = this.cache.setupTeleports.get(player.getUniqueId());
             LoadChunks loadChunks = this.cache.loadChunks.get(player.getUniqueId());
             DoTeleport doTeleport = this.cache.doTeleports.get(player.getUniqueId());
-            if(setupTeleport!=null && setupTeleport.isNoDelay()) return;
-            if(loadChunks!=null && loadChunks.isNoDelay()) return;
-            if(doTeleport!=null && doTeleport.isNoDelay()) return;
+            if (setupTeleport != null && setupTeleport.isNoDelay()) return;
+            if (loadChunks != null && loadChunks.isNoDelay()) return;
+            if (doTeleport != null && doTeleport.isNoDelay()) return;
 
             //run command as console
             Bukkit.dispatchCommand(Bukkit.getConsoleSender(),
-                    "rtp player:"+player.getName()+" world:"+player.getWorld().getName());
+                    "rtp player:" + player.getName() + " world:" + player.getWorld().getName());
         }
     }
 
@@ -57,29 +50,28 @@ public class OnPlayerChangeWorld implements Listener {
         SetupTeleport setupTeleport = this.cache.setupTeleports.get(player.getUniqueId());
         LoadChunks loadChunks = this.cache.loadChunks.get(player.getUniqueId());
         DoTeleport doTeleport = this.cache.doTeleports.get(player.getUniqueId());
-        if(setupTeleport!=null && setupTeleport.isNoDelay()) return;
-        if(loadChunks!=null && loadChunks.isNoDelay()) return;
-        if(doTeleport!=null && doTeleport.isNoDelay()) return;
+        if (setupTeleport != null && setupTeleport.isNoDelay()) return;
+        if (loadChunks != null && loadChunks.isNoDelay()) return;
+        if (doTeleport != null && doTeleport.isNoDelay()) return;
 
-        if(setupTeleport!=null) {
+        if (setupTeleport != null) {
             setupTeleport.cancel();
             cache.setupTeleports.remove(player.getUniqueId());
         }
-        if(loadChunks!=null) {
+        if (loadChunks != null) {
             loadChunks.cancel();
             cache.loadChunks.remove(player.getUniqueId());
         }
-        if(doTeleport!=null) {
+        if (doTeleport != null) {
             doTeleport.cancel();
             cache.doTeleports.remove(player.getUniqueId());
         }
 
         RandomSelectParams rsParams = cache.regionKeys.get(player.getUniqueId());
-        if(cache.permRegions.containsKey(rsParams)) {
+        if (cache.permRegions.containsKey(rsParams)) {
             Location randomLocation = cache.todoTP.get(player.getUniqueId());
-            new QueueLocation(cache.permRegions.get(rsParams), randomLocation).runTaskLaterAsynchronously(plugin,1);
-        }
-        else cache.tempRegions.remove(rsParams);
+            new QueueLocation(cache.permRegions.get(rsParams), randomLocation).runTaskLaterAsynchronously(plugin, 1);
+        } else cache.tempRegions.remove(rsParams);
         cache.regionKeys.remove(player.getUniqueId());
         cache.todoTP.remove(player.getUniqueId());
         cache.playerFromLocations.remove(player.getUniqueId());

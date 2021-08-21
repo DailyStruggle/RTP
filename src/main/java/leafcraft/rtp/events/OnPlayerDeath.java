@@ -1,8 +1,6 @@
 package leafcraft.rtp.events;
 
 import leafcraft.rtp.RTP;
-import leafcraft.rtp.tasks.DoTeleport;
-import leafcraft.rtp.tasks.LoadChunks;
 import leafcraft.rtp.tasks.QueueLocation;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
@@ -11,24 +9,17 @@ import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
 
 import java.util.HashMap;
 
 //set up a location for respawn event
-public class OnPlayerDeath implements Listener {
-    private final RTP plugin;
-    private final Configs configs;
-    private final Cache cache;
+public record OnPlayerDeath(RTP plugin, Configs configs,
+                            Cache cache) implements Listener {
 
-    public OnPlayerDeath(RTP plugin, Configs configs, Cache cache) {
-        this.plugin = plugin;
-        this.configs = configs;
-        this.cache = cache;
-    }
-
-    @EventHandler
+    @EventHandler(priority = EventPriority.LOW)
     public void OnPlayerDeath(PlayerDeathEvent event) {
         Player player = event.getEntity();
 
@@ -40,7 +31,7 @@ public class OnPlayerDeath implements Listener {
         if (player.hasPermission("rtp.onEvent.respawn")) {
             RandomSelectParams rsParams = new RandomSelectParams(event.getEntity().getWorld(), new HashMap<>(), configs);
             TeleportRegion region = cache.permRegions.get(rsParams);
-            new QueueLocation(region,player).runTaskAsynchronously(plugin);
+            new QueueLocation(region, player).runTaskAsynchronously(plugin);
         }
     }
 
