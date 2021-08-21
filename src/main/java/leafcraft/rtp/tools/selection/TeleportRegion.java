@@ -3,6 +3,7 @@ package leafcraft.rtp.tools.selection;
 import io.papermc.lib.PaperLib;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
+import leafcraft.rtp.tools.Configuration.WorldGuardChecker;
 import leafcraft.rtp.tools.HashableChunk;
 import org.bukkit.*;
 import org.bukkit.block.BlockFace;
@@ -45,8 +46,8 @@ public class TeleportRegion {
     private final ConcurrentHashMap<UUID,Location> playerNextLocation = new ConcurrentHashMap<>();
 
     //list of bad chunks in this region to avoid retries
-    private ConcurrentSkipListMap<Long,Long> badChunks = new ConcurrentSkipListMap<>();
-    private final long badChunkSum = 0;
+    private ConcurrentSkipListMap<Long,Long> badLocations = new ConcurrentSkipListMap<>();
+    private long badLocationSum = 0;
 
     public int r, cr, cx, cz, minY, maxY;
 
@@ -69,17 +70,17 @@ public class TeleportRegion {
         String upStr =      params.get("uniquePlacements");
         String expandStr =  params.get("expand");
 
-        r = Integer.valueOf(rStr);
-        cr = Integer.valueOf(crStr);
-        cx = Integer.valueOf(cxStr);
-        cz = Integer.valueOf(czStr);
+        r = Integer.parseInt(rStr);
+        cr = Integer.parseInt(crStr);
+        cx = Integer.parseInt(cxStr);
+        cz = Integer.parseInt(czStr);
 
-        weight = Double.valueOf(weightStr);
-        minY = Integer.valueOf(minYStr);
-        maxY = Integer.valueOf(maxYStr);
-        requireSkyLight = Boolean.valueOf(rslStr);
-        uniquePlacements = Boolean.valueOf(upStr);
-        expand = Boolean.valueOf(expandStr);
+        weight = Double.parseDouble(weightStr);
+        minY = Integer.parseInt(minYStr);
+        maxY = Integer.parseInt(maxYStr);
+        requireSkyLight = Boolean.parseBoolean(rslStr);
+        uniquePlacements = Boolean.parseBoolean(upStr);
+        expand = Boolean.parseBoolean(expandStr);
 
         try{
             this.shape = TeleportRegion.Shapes.valueOf(shapeStr.toUpperCase(Locale.ENGLISH));
@@ -89,9 +90,10 @@ public class TeleportRegion {
         }
 
         this.totalSpace = (r-cr)*(r+cr);
-        switch (this.shape) {
-            case SQUARE: this.totalSpace = totalSpace*4; break;
-            default: this.totalSpace = totalSpace*Math.PI;
+        if (this.shape == Shapes.SQUARE) {
+            this.totalSpace = totalSpace * 4;
+        } else {
+            this.totalSpace = totalSpace * Math.PI;
         }
     }
 
@@ -117,7 +119,7 @@ public class TeleportRegion {
         try{
             res = locationQueue.remove();
         }
-        catch (NoSuchElementException exception) {
+        catch (NoSuchElementException | NullPointerException exception) {
             if(sender.hasPermission("rtp.unqueued")) {
                 res = getRandomLocation(urgent);
                 if(res == null) {
@@ -125,22 +127,6 @@ public class TeleportRegion {
                     player.sendMessage(configs.lang.getLog("unsafe",maxAttempts.toString()));
                     if(!sender.getName().equals(player.getName()))
                         sender.sendMessage(configs.lang.getLog("unsafe",maxAttempts.toString()));
-                }
-            }
-            else {
-                player.sendMessage(configs.lang.getLog("noLocationsQueued"));
-                if(!sender.getName().equals(player.getName()))
-                    sender.sendMessage(configs.lang.getLog("noLocationsQueued"));
-            }
-        }
-        catch (NullPointerException exception) {
-            if(sender.hasPermission("rtp.unqueued")) {
-                res = getRandomLocation(urgent);
-                if (res == null) {
-                    Integer maxAttempts = (Integer) configs.config.getConfigValue("maxAttempts", 100);
-                    player.sendMessage(configs.lang.getLog("unsafe", maxAttempts.toString()));
-                    if (!sender.getName().equals(player.getName()))
-                        sender.sendMessage(configs.lang.getLog("unsafe", maxAttempts.toString()));
                 }
             }
             else {
@@ -160,9 +146,9 @@ public class TeleportRegion {
         int cz = (location.getBlockZ()>0) ? location.getBlockZ()/16 : location.getBlockZ()/16-1;
         for(int i = -vd; i < vd; i++) {
             for(int j = -vd; j < vd; j++) {
-                chunks.add(PaperLib.getChunkAtAsync(location.getWorld(), cx+i, cz+j));
+                chunks.add(PaperLib.getChunkAtAsync(Objects.requireNonNull(location.getWorld()), cx+i, cz+j));
                 HashableChunk hc = new HashableChunk(location.getWorld(), cx+i, cz+j);
-                cache.keepChunks.putIfAbsent(hc, Long.valueOf(0));
+                cache.keepChunks.putIfAbsent(hc, 0L);
                 cache.keepChunks.compute(hc, (k, v) -> v + 1);
                 if(uniquePlacements) {
                     addBadChunk(cx+i,cz+j);
@@ -170,7 +156,6 @@ public class TeleportRegion {
             }
         }
         locAssChunks.put(location,chunks);
-
     }
 
     public List<CompletableFuture<Chunk>> getChunks(Location location) {
@@ -185,53 +170,49 @@ public class TeleportRegion {
         locationQueue.offer(location);
     }
 
-    public boolean queueRandomLocation() {
+    public void queueRandomLocation() {
         if(locationQueue == null) {
             locationQueue = new ConcurrentLinkedQueue<>();
         }
         Integer queueLen = (Integer)configs.regions.getRegionSetting(name,"queueLen",0);
-        if(locationQueue.size() >= queueLen) return false;
+        if(locationQueue.size() >= queueLen) return;
 
         Location location = getRandomLocation(false);
         if(location == null) {
-            return false;
+            return;
         }
         queueLocation(location);
-        return true;
     }
 
-    public boolean queueRandomLocation(Player player) {
+    public void queueRandomLocation(Player player) {
         Location location = getRandomLocation(true);
         if(location == null) {
-            return false;
+            return;
         }
         playerNextLocation.put(player.getUniqueId(),location);
-        return true;
     }
 
-    public void addBadChunk(int x, int z) {
-        double location;
-        int chunkCr = (cr/16)-1;
-        int chunkCx = (cx>0) ? cx/16 : (cx/16)-1;
-        int chunkCz = (cz>0) ? cz/16 : (cz/16)-1;
-        switch (shape) {
-            case SQUARE: {
-                location = Translate.xzToSquareLocation(chunkCr,x,z,chunkCx,chunkCz);
-                break;
-            }
-            default: {
-                location = Translate.xzToCircleLocation(chunkCr,x,z,chunkCx,chunkCz);
+    public void addBadChunk(int chunkX, int chunkZ) {
+        for(int i = 0; i < 16; i++) {
+            for(int j = 0; j < 16; j++) {
+                int localX = chunkX*16+i;
+                int localZ = chunkZ*16+j;
+                double location = (shape.equals(Shapes.SQUARE)) ?
+                        Translate.xzToSquareLocation(cr,localX,localZ,cx,cz) :
+                        Translate.xzToCircleLocation(cr,localX,localZ,cx,cz);
+                addBadLocation((long)location);
             }
         }
-        if(location<0) return;
-        addBadChunk((long)location);
     }
 
-    private void addBadChunk(long location) {
-        if(badChunks == null) badChunks = new ConcurrentSkipListMap<>();
+    private void addBadLocation(Long location) {
+        if(location < 0) return;
+        if(location > totalSpace) return;
 
-        Map.Entry<Long,Long> lower = badChunks.floorEntry(location);
-        Map.Entry<Long,Long> upper = badChunks.ceilingEntry(location);
+        if(badLocations == null) badLocations = new ConcurrentSkipListMap<>();
+
+        Map.Entry<Long,Long> lower = badLocations.floorEntry(location);
+        Map.Entry<Long,Long> upper = badLocations.ceilingEntry(location);
 
         //goal: merge adjacent values
         // if within bounds of lower entry, do nothing
@@ -240,91 +221,57 @@ public class TeleportRegion {
             return;
         }
         else if((lower!=null) && (location == lower.getKey()+lower.getValue())) {
-            badChunks.put(lower.getKey(),lower.getValue()+1);
+            badLocations.put(lower.getKey(),lower.getValue()+1);
         }
         else {
-            badChunks.put(location,Long.valueOf(1));
+            badLocations.put(location, 1L);
         }
 
-        lower = badChunks.floorEntry(location);
+        lower = badLocations.floorEntry(location);
 
         // if upper start meets position + length, merge its length and delete upper entry
         if((upper!=null)&&(lower.getKey()+lower.getValue() >= upper.getKey())) {
-            badChunks.put(lower.getKey(),lower.getValue()+upper.getValue());
-            badChunks.remove(upper.getKey());
+            badLocations.put(lower.getKey(),lower.getValue()+upper.getValue());
+            badLocations.remove(upper.getKey());
         }
 
-        int[] xz;
-        switch (shape) {
-            case SQUARE: {
-                xz = Translate.squareLocationToXZ(cr,cx,cz,location);
-                break;
-            }
-            default: {
-                xz = Translate.circleLocationToXZ(cr,cx,cz,location);
-            }
-        }
-        cache.addBadChunk(world,xz[0],xz[1]);
+        badLocationSum++;
     }
 
-    private double select() {
+    private long select() {
         double space = totalSpace;
-        if(!expand) space-=badChunkSum;
+        if(!expand) space -= badLocationSum;
         double res = (space) * Math.pow(ThreadLocalRandom.current().nextDouble(),weight);
-        return res;
+        return (long)res;
     }
 
     private Location getRandomLocation(boolean urgent) {
         Location res;
 
         Boolean rerollLiquid = (Boolean) configs.config.getConfigValue("rerollLiquid",true);
+        Boolean rerollWorldGuard = (Boolean) configs.config.getConfigValue("rerollWorldGuard",true);
 
-        long selectTime = 0l;
-        long chunkTime = 0l;
+
+        long selectTime = 0L;
+        long chunkTime = 0L;
 
         long start = System.currentTimeMillis();
-        double location = select();
-        int[] xz;
-        switch (shape) {
-            case SQUARE: {
-                xz = Translate.squareLocationToXZ(cr,0,0,location);
-                break;
-            }
-            default: {
-                xz = Translate.circleLocationToXZ(cr,0,0,location);
-            }
+        long location = select();
+
+        Map.Entry<Long,Long> idx = badLocations.firstEntry();
+        while((idx!=null) && (location >= (idx.getKey()))) {
+            location += idx.getValue();
+            idx = badLocations.ceilingEntry(idx.getKey()+idx.getValue());
         }
+
+        int[] xz = shape.equals(TeleportRegion.Shapes.SQUARE) ?
+                (Translate.squareLocationToXZ(cr, cx, cz, location)) :
+                (Translate.circleLocationToXZ(cr, cx, cz, location));
+
         int[] xzChunk = new int[2];
 
-        xzChunk[0] = (xz[0] >= 0) ? (xz[0] / 16) : (xz[0] / 16) - 1;
-        xzChunk[1] = (xz[1] >= 0) ? (xz[1] / 16) : (xz[1] / 16) - 1;
-
-        Long chunkLocation = 0l;
-
-        int[] centerChunk = new int[2];
-        centerChunk[0] = (cx >= 0) ? ((cx) / 16) : ((cx) / 16) - 1;
-        centerChunk[1] = (cz >= 0) ? ((cz) / 16) : ((cz) / 16) - 1;
-
-        chunkLocation = shape.equals(TeleportRegion.Shapes.SQUARE) ?
-                (long)(Translate.xzToSquareLocation( (cr/16)-1, xzChunk[0], xzChunk[1], centerChunk[0], centerChunk[1])) :
-                (long)(Translate.xzToCircleLocation((cr/16)-1, xzChunk[0], xzChunk[1], centerChunk[0], centerChunk[1]));
-
-        int[] posInChunk = new int[2];
-        posInChunk[0] = Math.abs(xz[0]%16);
-        posInChunk[1] = Math.abs(xz[1]%16);
-
-        //shift location
-        Map.Entry<Long,Long> idx = badChunks.firstEntry();
-        while((idx!=null) && (chunkLocation >= (idx.getKey()))) {
-            chunkLocation += idx.getValue();
-            idx = badChunks.ceilingEntry(idx.getKey()+idx.getValue());
-        }
-
-        xzChunk = shape.equals(TeleportRegion.Shapes.SQUARE) ?
-                (Translate.squareLocationToXZ((cr/16)-1, centerChunk[0], centerChunk[1], chunkLocation.doubleValue())) :
-                (Translate.circleLocationToXZ((cr/16)-1, centerChunk[0], centerChunk[1], chunkLocation.doubleValue()));
-        xz[0] = 16*(xzChunk[0]+centerChunk[0]) + posInChunk[0] + cx;
-        xz[1] = 16*(xzChunk[1]+centerChunk[1]) + posInChunk[1] + cz;
+        xzChunk[0] = (xz[0] >= 0 || (xz[0]%16==0)) ? (xz[0] / 16) : (xz[0] / 16) - 1;
+        xzChunk[1] = (xz[1] >= 0 || (xz[1]%16==0)) ? (xz[1] / 16) : (xz[1] / 16) - 1;
 
         long stop = System.currentTimeMillis();
         selectTime += (stop-start);
@@ -337,10 +284,7 @@ public class TeleportRegion {
         Chunk chunk;
         try {
             chunk = cfChunk.get(); //wait on chunk load/gen
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-            return null;
-        } catch (ExecutionException e) {
+        } catch (InterruptedException | ExecutionException e) {
             e.printStackTrace();
             return null;
         }
@@ -357,61 +301,38 @@ public class TeleportRegion {
         while(numAttempts < maxAttempts &&
                 ( acceptableAir.contains(res.getBlock().getType())
                         || (res.getBlockY() >= maxY)
-                        || (rerollLiquid && res.getBlock().isLiquid()))) {
-            addBadChunk(chunkLocation);
+                        || (rerollLiquid && res.getBlock().isLiquid())
+                        || (rerollWorldGuard && WorldGuardChecker.isInRegion(res)))) {
+            addBadLocation(location);
+            addBadChunk(xzChunk[0], xzChunk[1]);
 
             start = System.currentTimeMillis();
             location = select();
-            switch (shape) {
-                case SQUARE: {
-                    xz = Translate.squareLocationToXZ(cr,0,0,location);
-                    break;
-                }
-                default: {
-                    xz = Translate.circleLocationToXZ(cr,0,0,location);
-                }
+
+            idx = badLocations.firstEntry();
+            while((idx!=null) && (location >= (idx.getKey()))) {
+                location += idx.getValue();
+                idx = badLocations.ceilingEntry(idx.getKey()+idx.getValue());
             }
+
+            xz = shape.equals(TeleportRegion.Shapes.SQUARE) ?
+                    (Translate.squareLocationToXZ(cr, cx, cz, location)) :
+                    (Translate.circleLocationToXZ(cr, cx, cz, location));
 
             xzChunk[0] = (xz[0] >= 0) ? (xz[0] / 16) : (xz[0] / 16) - 1;
             xzChunk[1] = (xz[1] >= 0) ? (xz[1] / 16) : (xz[1] / 16) - 1;
-
-            centerChunk[0] = (cx >= 0) ? (cx / 16) : (cx / 16) - 1;
-            centerChunk[1] = (cz >= 0) ? (cz / 16) : (cz / 16) - 1;
-
-            chunkLocation = shape.equals(TeleportRegion.Shapes.SQUARE) ?
-                    (long)(Translate.xzToSquareLocation( (cr/16)-1, xzChunk[0], xzChunk[1], centerChunk[0], centerChunk[1])) :
-                    (long)(Translate.xzToCircleLocation((cr/16)-1, xzChunk[0], xzChunk[1], centerChunk[0], centerChunk[1]));
-
-            posInChunk[0] = Math.abs(xz[0]%16);
-            posInChunk[1] = Math.abs(xz[1]%16);
-
-            //shift location
-            idx =  badChunks.firstEntry();
-            while((idx!=null) && (chunkLocation >= (idx.getKey()))) {
-                chunkLocation += idx.getValue();
-                idx = badChunks.ceilingEntry(idx.getKey()+idx.getValue());
-            }
-
-            xzChunk = shape.equals(TeleportRegion.Shapes.SQUARE) ?
-                    (Translate.squareLocationToXZ(cr/16-1, centerChunk[0], centerChunk[1], chunkLocation.doubleValue())) :
-                    (Translate.circleLocationToXZ(cr/16-1, centerChunk[0], centerChunk[1], chunkLocation.doubleValue()));
-            xz[0] = 16*(xzChunk[0]+centerChunk[0]) + posInChunk[0] + cx;
-            xz[1] = 16*(xzChunk[1]+centerChunk[1]) + posInChunk[1] + cz;
 
             stop = System.currentTimeMillis();
             selectTime += (stop-start);
 
             start = System.currentTimeMillis();
             cfChunk = (urgent) ?
-                    PaperLib.getChunkAtAsyncUrgently(world,xz[0],xz[1],true) :
-                    PaperLib.getChunkAtAsync(world,xz[0],xz[1],true);
+                    PaperLib.getChunkAtAsyncUrgently(world,xzChunk[0],xzChunk[1],true) :
+                    PaperLib.getChunkAtAsync(world,xzChunk[0],xzChunk[1],true);
 
             try {
                 chunk = cfChunk.get();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-                return null;
-            } catch (ExecutionException e) {
+            } catch (InterruptedException | ExecutionException e) {
                 e.printStackTrace();
                 return null;
             }
@@ -424,9 +345,6 @@ public class TeleportRegion {
             chunkTime += (stop-start);
             numAttempts++;
         }
-
-//        System.out.println("time spent on position selection and translation: " + selectTime);
-//        System.out.println("time spent on chunk loading and block placement:  " + chunkTime);
 
         res.setY(res.getBlockY()+1);
         res.setX(res.getBlockX()+0.5);
@@ -454,12 +372,12 @@ public class TeleportRegion {
     }
 
     public Location getLastNonAir(Location start) {
-        Integer oldY;
-        Integer minY = start.getBlockY();
-        Integer maxY = this.maxY;
+        int oldY;
+        int minY = start.getBlockY();
+        int maxY = this.maxY;
 
         //iterate over a larger distance first, then fine-tune
-        for(Integer it_length = (maxY-minY)/2; it_length > 0; it_length = it_length/2) {
+        for(int it_length = (maxY-minY)/2; it_length > 0; it_length = it_length/2) {
             int i = minY;
             for(; i <= maxY; i+=it_length) {
                 oldY = start.getBlockY();

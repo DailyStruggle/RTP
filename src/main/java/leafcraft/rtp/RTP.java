@@ -50,7 +50,7 @@ public final class RTP extends JavaPlugin {
         getCommand("rtp").setExecutor(new RTPCmd(this, configs, cache));
         getCommand("rtp help").setExecutor(new Help(configs));
         getCommand("rtp reload").setExecutor(new Reload(configs, cache));
-        getCommand("rtp setRegion").setExecutor(new SetRegion(this,configs));
+        getCommand("rtp setRegion").setExecutor(new SetRegion(this,configs, cache));
         getCommand("rtp setWorld").setExecutor(new SetWorld(this,configs));
 //        getCommand("rtp fill").setExecutor(new Fill(this,this.config));
 

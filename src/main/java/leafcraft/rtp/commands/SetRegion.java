@@ -21,14 +21,14 @@ import java.util.logging.Level;
 public class SetRegion implements CommandExecutor {
     private final RTP plugin;
     private final Configs configs;
-    Cache cache;
+    private final Cache cache;
 
     private final Set<String> regionParams = new HashSet<>();
 
-    public SetRegion(leafcraft.rtp.RTP plugin, Configs configs) {
+    public SetRegion(leafcraft.rtp.RTP plugin, Configs configs, Cache cache) {
         this.plugin = plugin;
         this.configs = configs;
-        this.cache = plugin.cache;
+        this.cache = cache;
 
         regionParams.add("region");
         regionParams.add("world");
@@ -43,6 +43,8 @@ public class SetRegion implements CommandExecutor {
         regionParams.add("requireSkyLight");
         regionParams.add("requirePermission");
         regionParams.add("worldBorderOverride");
+        regionParams.add("uniquePlacements");
+        regionParams.add("expand");
         regionParams.add("queueLen");
     }
 
