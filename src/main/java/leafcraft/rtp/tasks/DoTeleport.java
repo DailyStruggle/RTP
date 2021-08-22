@@ -5,6 +5,7 @@ import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -38,6 +39,7 @@ public class DoTeleport extends BukkitRunnable {
         cache.todoTP.remove(player.getUniqueId());
 
         if(!this.isCancelled()) {
+            //player.teleport(location);
             PaperLib.teleportAsync(player,location);
             this.player.sendMessage(configs.lang.getLog("teleportMessage", this.cache.numTeleportAttempts.getOrDefault(location,0).toString()));
             new TeleportCleanup(player,location,cache).runTask(plugin);
@@ -50,6 +52,7 @@ public class DoTeleport extends BukkitRunnable {
         if(cache.permRegions.containsKey(rsParams)) {
             cache.permRegions.get(rsParams).queueLocation(location);
         }
+        cache.todoTP.remove(player.getUniqueId());
         super.cancel();
     }
 

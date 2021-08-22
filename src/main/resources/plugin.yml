@@ -1,10 +1,10 @@
 name: RTP
 version: ${project.version}
 main: leafcraft.rtp.RTP
-api-version: 1.17
+api-version: 1.13
 authors: [ leaf26 ]
 description: an optimized RTP plugin
-softdepend: [WorldGuard, WorldEdit, PlaceholderAPI]
+softdepend: [WorldGuard, WorldEdit, GriefPrevention, ProtocolLib, PlaceholderAPI]
 
 commands:
   rtp:

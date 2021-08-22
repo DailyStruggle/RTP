@@ -169,6 +169,4 @@ public class RTPCmd implements CommandExecutor {
 
         return true;
     }
-
-
 }

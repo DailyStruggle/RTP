@@ -4,6 +4,7 @@ import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -78,6 +79,16 @@ public class SetupTeleport extends BukkitRunnable {
     public void cancel() {
         if(cache.permRegions.containsKey(rsParams) && location != null) {
             cache.permRegions.get(rsParams).queueLocation(location);
+        }
+        cache.todoTP.remove(player.getUniqueId());
+        cache.setupTeleports.remove(player.getUniqueId());
+        if(cache.loadChunks.containsKey(player.getUniqueId())) {
+            cache.loadChunks.get(player.getUniqueId()).cancel();
+            cache.loadChunks.remove(player.getUniqueId());
+        }
+        if(cache.doTeleports.containsKey(player.getUniqueId())) {
+            cache.doTeleports.get(player.getUniqueId()).cancel();
+            cache.doTeleports.remove(player.getUniqueId());
         }
         super.cancel();
     }

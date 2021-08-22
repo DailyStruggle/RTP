@@ -4,6 +4,7 @@ import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
+import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
@@ -11,6 +12,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.List;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
@@ -24,6 +26,7 @@ public class LoadChunks extends BukkitRunnable {
     private final Location location;
     private final RandomSelectParams rsParams;
     private List<CompletableFuture<Chunk>> chunks = null;
+    private Boolean cancelled = false;
 
     public LoadChunks(RTP plugin, Configs configs, CommandSender sender, Player player, Cache cache, Integer totalTime, Location location) {
         this.plugin = plugin;
@@ -45,22 +48,22 @@ public class LoadChunks extends BukkitRunnable {
                 chunks = cache.permRegions.get(rsParams).getChunks(location);
             else chunks = cache.tempRegions.get(rsParams).getChunks(location);
             for (CompletableFuture<Chunk> chunk : chunks) {
-                if (this.isCancelled()) break;
+                if (isCancelled() || cancelled) break;
                 try {
                     chunk.get();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
+                } catch (CancellationException | InterruptedException e) {
+                    break;
                 } catch (ExecutionException e) {
                     e.printStackTrace();
                 }
             }
         }
 
-        long finTime = System.currentTimeMillis();
-        long remTime = totalTime - ((finTime - startTime) / 50);
-        if (remTime < 0) remTime = 0;
+        if (!isCancelled() && !cancelled) {
+            long finTime = System.currentTimeMillis();
+            long remTime = totalTime - ((finTime - startTime) / 50);
+            if (remTime < 0) remTime = 0;
 
-        if(!this.isCancelled()) {
             DoTeleport doTeleport = new DoTeleport(plugin,configs,sender,player,location,cache);
             doTeleport.runTaskLater(plugin,remTime);
             this.cache.doTeleports.put(this.player.getUniqueId(),doTeleport);
@@ -73,6 +76,13 @@ public class LoadChunks extends BukkitRunnable {
         if(cache.permRegions.containsKey(rsParams)) {
             cache.permRegions.get(rsParams).queueLocation(location);
         }
+        cache.loadChunks.remove(player.getUniqueId());
+        cache.todoTP.remove(player.getUniqueId());
+        if(cache.doTeleports.containsKey(player.getUniqueId())) {
+            cache.doTeleports.get(player.getUniqueId()).cancel();
+            cache.doTeleports.remove(player.getUniqueId());
+        }
+        cancelled = true;
         super.cancel();
     }
 

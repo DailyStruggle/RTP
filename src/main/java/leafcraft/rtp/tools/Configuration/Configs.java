@@ -1,6 +1,7 @@
 package leafcraft.rtp.tools.Configuration;
 
 import leafcraft.rtp.RTP;
+import leafcraft.rtp.tools.softdepends.WorldGuardChecker;
 
 //route for all config classes
 public class Configs {
@@ -10,7 +11,6 @@ public class Configs {
     public Regions regions;
     public Worlds worlds;
     public String version;
-    public WorldGuardChecker worldGuardChecker;
 
     public Configs(RTP plugin) {
         this.plugin = plugin;

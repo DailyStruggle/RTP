@@ -3,7 +3,8 @@ package leafcraft.rtp.tools.selection;
 import io.papermc.lib.PaperLib;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
-import leafcraft.rtp.tools.Configuration.WorldGuardChecker;
+import leafcraft.rtp.tools.softdepends.GriefPreventionChecker;
+import leafcraft.rtp.tools.softdepends.WorldGuardChecker;
 import leafcraft.rtp.tools.HashableChunk;
 import org.bukkit.*;
 import org.bukkit.block.BlockFace;
@@ -250,7 +251,7 @@ public class TeleportRegion {
 
         Boolean rerollLiquid = (Boolean) configs.config.getConfigValue("rerollLiquid",true);
         Boolean rerollWorldGuard = (Boolean) configs.config.getConfigValue("rerollWorldGuard",true);
-
+        Boolean rerollGriefPrevention = (Boolean) configs.config.getConfigValue("rerollGriefPrevention",true);
 
         long selectTime = 0L;
         long chunkTime = 0L;
@@ -284,8 +285,10 @@ public class TeleportRegion {
         Chunk chunk;
         try {
             chunk = cfChunk.get(); //wait on chunk load/gen
-        } catch (InterruptedException | ExecutionException e) {
+        } catch (ExecutionException e) {
             e.printStackTrace();
+            return null;
+        } catch (InterruptedException | CancellationException e) {
             return null;
         }
 
@@ -302,7 +305,8 @@ public class TeleportRegion {
                 ( acceptableAir.contains(res.getBlock().getType())
                         || (res.getBlockY() >= maxY)
                         || (rerollLiquid && res.getBlock().isLiquid())
-                        || (rerollWorldGuard && WorldGuardChecker.isInRegion(res)))) {
+                        || (rerollWorldGuard && WorldGuardChecker.isInRegion(res))
+                        || (rerollGriefPrevention && GriefPreventionChecker.isInClaim(res)))) {
             addBadLocation(location);
             addBadChunk(xzChunk[0], xzChunk[1]);
 
@@ -332,8 +336,10 @@ public class TeleportRegion {
 
             try {
                 chunk = cfChunk.get();
-            } catch (InterruptedException | ExecutionException e) {
+            } catch (ExecutionException e) {
                 e.printStackTrace();
+                return null;
+            } catch (InterruptedException | CancellationException e) {
                 return null;
             }
 
