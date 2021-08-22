@@ -1,4 +1,4 @@
-package leafcraft.rtp.tools.Configuration;
+package leafcraft.rtp.tools.softdepends;
 
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.math.BlockVector3;

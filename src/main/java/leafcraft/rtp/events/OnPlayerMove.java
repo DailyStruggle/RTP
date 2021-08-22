@@ -60,15 +60,15 @@ public record OnPlayerMove(RTP plugin, Configs configs,
         Location location = cache.playerFromLocations.getOrDefault(player.getUniqueId(), player.getLocation());
         if (location.distance(event.getTo()) < (Integer) configs.config.getConfigValue("cancelDistance", 2)) return;
 
-        if (setupTeleport != null) {
+        if (setupTeleport != null && !setupTeleport.isCancelled()) {
             setupTeleport.cancel();
             cache.loadChunks.remove(player.getUniqueId());
         }
-        if (loadChunks != null) {
+        if (loadChunks != null && !loadChunks.isCancelled()) {
             loadChunks.cancel();
             cache.loadChunks.remove(player.getUniqueId());
         }
-        if (doTeleport != null) {
+        if (doTeleport != null && !doTeleport.isCancelled()) {
             doTeleport.cancel();
             cache.doTeleports.remove(player.getUniqueId());
         }

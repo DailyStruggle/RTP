@@ -2,9 +2,9 @@ package leafcraft.rtp.commands;
 
 import leafcraft.rtp.tools.Configuration.Configs;
 import net.md_5.bungee.api.chat.ClickEvent;
+import net.md_5.bungee.api.chat.ComponentBuilder;
 import net.md_5.bungee.api.chat.HoverEvent;
 import net.md_5.bungee.api.chat.TextComponent;
-import net.md_5.bungee.api.chat.hover.content.Text;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -37,7 +37,7 @@ public class Help implements CommandExecutor {
                 if(entry.getKey().equals("rtp")) arg = "";
                 else arg = entry.getKey();
 
-                msg.setHoverEvent( new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text( "/rtp " + arg )));
+                msg.setHoverEvent( new HoverEvent(HoverEvent.Action.SHOW_TEXT, new ComponentBuilder( "/rtp " + arg ).create()));
                 msg.setClickEvent( new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/rtp " + arg));
                 sender.spigot().sendMessage(msg);
             }

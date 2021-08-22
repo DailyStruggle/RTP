@@ -1,5 +1,12 @@
 package leafcraft.rtp;
 
+import com.comphenix.protocol.PacketType;
+import com.comphenix.protocol.ProtocolLib;
+import com.comphenix.protocol.ProtocolLibrary;
+import com.comphenix.protocol.ProtocolManager;
+import com.comphenix.protocol.events.ListenerPriority;
+import com.comphenix.protocol.events.PacketAdapter;
+import com.comphenix.protocol.events.PacketEvent;
 import io.papermc.lib.PaperLib;
 import leafcraft.rtp.commands.*;
 import leafcraft.rtp.events.*;
@@ -7,7 +14,9 @@ import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.Metrics;
 import leafcraft.rtp.tools.TPS;
+import leafcraft.rtp.tools.softdepends.ProtocolLibChecker;
 import org.bukkit.Bukkit;
+import org.bukkit.event.Listener;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.plugin.java.JavaPluginLoader;
@@ -68,8 +77,6 @@ public final class RTP extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new OnChunkLoad(configs,cache),this);
 
         Bukkit.getServer().getScheduler().scheduleSyncRepeatingTask(this, new TPS(), 100L, 1L);
-
-
 
 //        Bukkit.getScheduler().runTaskTimer(this, () -> {
 //            Player me = Bukkit.getPlayer("leaf26");
