@@ -38,9 +38,9 @@ public class RandomSelectParams {
         worldBorderOverride = Boolean.getBoolean(this.params.getOrDefault("worldBorderOverride","false"));
         if(worldBorderOverride) {
             this.params.put("shape", "SQUARE");
-            this.params.put("radius", String.valueOf((int)world.getWorldBorder().getSize()));
-            this.params.put("centerX", String.valueOf(world.getWorldBorder().getCenter().getBlockX()));
-            this.params.put("centerZ", String.valueOf(world.getWorldBorder().getCenter().getBlockZ()));
+            this.params.put("radius", String.valueOf((int)world.getWorldBorder().getSize()/16));
+            this.params.put("centerX", String.valueOf(world.getWorldBorder().getCenter().getBlockX()/16));
+            this.params.put("centerZ", String.valueOf(world.getWorldBorder().getCenter().getBlockZ()/16));
         }
 
         //ugh string parsing, but at least it's short and clean

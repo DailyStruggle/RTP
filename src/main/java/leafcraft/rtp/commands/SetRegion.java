@@ -165,8 +165,25 @@ public class SetRegion implements CommandExecutor {
             if(probe.equals("")) {
                 configs.regions.addRegion(region,params);
             }
+
+            for(Map.Entry<RandomSelectParams,TeleportRegion> entry : cache.permRegions.entrySet()) {
+                if(entry.getValue().name.equals(region)) {
+                    entry.getValue().storeFile();
+                    entry.getValue().shutdown();
+                }
+                cache.permRegions.remove(entry);
+            }
+
+            if(cache.permRegions.containsKey(params)){
+                cache.permRegions.get(params).storeFile();
+                cache.permRegions.get(params).shutdown();
+                cache.permRegions.remove(params);
+            }
+
             cache.permRegions.remove(params);
-            cache.permRegions.put(params, new TeleportRegion(region,params.params,configs,cache));
+            TeleportRegion teleportRegion = new TeleportRegion(region,params.params,configs,cache);
+            cache.permRegions.put(params, teleportRegion);
+            teleportRegion.loadFile();
         }
         else {
             sender.sendMessage(configs.lang.getLog("missingRegionParam"));
