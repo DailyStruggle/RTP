@@ -7,7 +7,7 @@ public class TranslateTest {
     public void translateTest() {
         long len = 100l;
 
-        int[] xz = {50000,0};
+        int[] xz = {500,0};
         int[] xzRes;
         int cr = 0;
         System.out.println("initial coords: " + xz[0] + ", " + xz[1]);

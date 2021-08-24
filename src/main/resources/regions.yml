@@ -7,9 +7,9 @@ default:
     # CIRCLE, SQUARE - spiral curves
     shape: "CIRCLE"
     #outer radius of selection in meters
-    radius: 4096
+    radius: 256
     #donut hole in center, where players shouldn't land
-    centerRadius: 1024
+    centerRadius: 64
     #center position, using regular x-z coordinates
     centerX: 0
     centerZ: 0

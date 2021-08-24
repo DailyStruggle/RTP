@@ -1,5 +1,6 @@
 package leafcraft.rtp.tools;
 
+import io.papermc.lib.PaperLib;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tasks.DoTeleport;
 import leafcraft.rtp.tasks.LoadChunks;
@@ -8,6 +9,7 @@ import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import org.bukkit.Bukkit;
+import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.command.CommandSender;
@@ -20,6 +22,9 @@ import java.util.concurrent.*;
 public class Cache {
     private final RTP plugin;
     private final Configs configs;
+
+    public ConcurrentHashMap<RandomSelectParams,BukkitTask> queueTimers = new ConcurrentHashMap<>();
+
     public Cache(RTP plugin, Configs configs) {
         this.plugin = plugin;
         this.configs = configs;
@@ -30,14 +35,16 @@ public class Cache {
             Map<String,String> map = new HashMap<>();
             map.put("region",region);
             RandomSelectParams key = new RandomSelectParams(world,map,configs);
-            permRegions.put(key, new TeleportRegion(region,key.params,configs,this));
+            TeleportRegion teleportRegion = new TeleportRegion(region,key.params,configs,this);
+            permRegions.put(key, teleportRegion);
+            teleportRegion.loadFile();
         }
 
         Double i = 0d;
         Integer period = configs.config.queuePeriod;
         Double increment = ((period.doubleValue())/permRegions.size())*20;
         for(Map.Entry<RandomSelectParams,TeleportRegion> entry : permRegions.entrySet()) {
-            timers.put(entry.getKey(),Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, ()->{
+            queueTimers.put(entry.getKey(),Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, ()->{
                 double tps = TPS.getTPS();
                 double minTps = (Double)configs.config.getConfigValue("minTPS",19.0);
                 if(tps < minTps) return;
@@ -46,8 +53,6 @@ public class Cache {
             i+=increment;
         }
     }
-
-    public ConcurrentHashMap<RandomSelectParams,BukkitTask> timers = new ConcurrentHashMap<>();
 
     //keyed table of which chunks to keep alive, for quick checking
     // key: chunk coordinate
@@ -106,6 +111,7 @@ public class Cache {
 
         for(TeleportRegion region : permRegions.values()) {
             region.shutdown();
+            region.storeFile();
         }
 
         keepChunks.clear();
@@ -115,9 +121,9 @@ public class Cache {
         }
         forceLoadedChunks.clear();
 
-        for(Map.Entry<RandomSelectParams,BukkitTask> entry : timers.entrySet()) {
+        for(Map.Entry<RandomSelectParams,BukkitTask> entry : queueTimers.entrySet()) {
             entry.getValue().cancel();
-            timers.remove(entry);
+            queueTimers.remove(entry);
         }
     }
 
@@ -140,6 +146,7 @@ public class Cache {
         tempRegions.clear();
 
         for(TeleportRegion region : permRegions.values()) {
+            region.storeFile();
             region.shutdown();
         }
         permRegions.clear();
@@ -151,14 +158,16 @@ public class Cache {
             Map<String,String> map = new HashMap<>();
             map.put("region",region);
             RandomSelectParams key = new RandomSelectParams(world,map,configs);
-            permRegions.put(key, new TeleportRegion(region, key.params,configs,this));
+            TeleportRegion teleportRegion = new TeleportRegion(region, key.params,configs,this);
+            permRegions.put(key, teleportRegion);
+            teleportRegion.loadFile();
         }
 
         Double i = 0d;
         Integer period = (Integer)configs.config.getConfigValue("queuePeriod",30);
         Double increment = ((period.doubleValue())/permRegions.size())*20;
         for(Map.Entry<RandomSelectParams,TeleportRegion> entry : permRegions.entrySet()) {
-            timers.put(entry.getKey(),Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, ()->{
+            queueTimers.put(entry.getKey(),Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, ()->{
                 double tps = TPS.getTPS();
                 double minTps = (Double)configs.config.getConfigValue("minTPS",19.0);
                 if(tps < minTps) return;

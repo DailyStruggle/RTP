@@ -50,14 +50,17 @@ public class DoTeleport extends BukkitRunnable {
             int vd = Bukkit.getViewDistance();
             int cx = location.getChunk().getX();
             int cz = location.getChunk().getZ();
-            long area = (long)(vd*vd*4+0.5d);
-            for (long i = 0; i < area; i++) {
-                int[] xz = Translate.squareLocationToXZ(0,cx,cz,area);
-                Chunk chunk = location.getWorld().getChunkAt(xz[0],xz[1]);
-                HashableChunk hashableChunk = new HashableChunk(chunk);
-                if (cache.forceLoadedChunks.containsKey(hashableChunk)) {
-                    chunk.setForceLoaded(false);
-                    cache.forceLoadedChunks.remove(chunk);
+            for (int i = -vd; i < vd; i++) {
+                for (int j = -vd; j < vd; j++) {
+                    Chunk chunk = location.getWorld().getChunkAt(cx+i, cz+j);
+                    HashableChunk hashableChunk = new HashableChunk(chunk);
+                    if (cache.forceLoadedChunks.containsKey(hashableChunk)
+                            || cache.keepChunks.containsKey(hashableChunk)) {
+                        chunk.setForceLoaded(false);
+                        cache.forceLoadedChunks.remove(hashableChunk);
+                        long intersect = cache.keepChunks.get(hashableChunk) - 1;
+                        if (intersect <= 0) cache.keepChunks.remove(hashableChunk);
+                    }
                 }
             }
 
