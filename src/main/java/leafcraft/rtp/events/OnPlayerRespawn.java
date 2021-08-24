@@ -15,8 +15,17 @@ import org.bukkit.event.player.PlayerRespawnEvent;
 import java.util.HashMap;
 
 //get queued location
-public record OnPlayerRespawn(RTP plugin, Configs configs,
-                              Cache cache) implements Listener {
+public final class OnPlayerRespawn implements Listener {
+    private final RTP plugin;
+    private final Configs configs;
+    private final Cache cache;
+
+    public OnPlayerRespawn(RTP plugin, Configs configs,
+                           Cache cache) {
+        this.plugin = plugin;
+        this.configs = configs;
+        this.cache = cache;
+    }
 
     @EventHandler(priority = EventPriority.HIGH)
     public void OnPlayerRespawn(PlayerRespawnEvent event) {

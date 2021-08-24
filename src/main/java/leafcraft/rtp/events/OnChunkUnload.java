@@ -7,7 +7,12 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.world.ChunkUnloadEvent;
 
-public record OnChunkUnload(Cache cache) implements Listener {
+public final class OnChunkUnload implements Listener {
+    private final Cache cache;
+
+    public OnChunkUnload(Cache cache) {
+        this.cache = cache;
+    }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onChunkUnload(ChunkUnloadEvent event) {

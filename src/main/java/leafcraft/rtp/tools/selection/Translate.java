@@ -1,7 +1,5 @@
 package leafcraft.rtp.tools.selection;
 
-import java.math.BigDecimal;
-
 public class Translate {
     public static int[] circleLocationToXZ(long cr, long cx, long cz, double location) {
         int[] res = new int[2];
@@ -10,7 +8,8 @@ public class Translate {
         double radius = Math.sqrt(location/Math.PI + cr*cr);
 
         //get a % around the curve, convert to radians
-        double rotation = (radius - (int)radius)*2*Math.PI;
+        double rotation = (radius - (int)radius + 0.000069)*2*Math.PI;
+        //rotation = ((0.875)*2*Math.PI);
 
         double cosRes = Math.cos(rotation);
         double sinRes = Math.sin(rotation);
@@ -22,9 +21,7 @@ public class Translate {
         return res;
     }
 
-    public static double xzToCircleLocation(int cr, int x, int z, int cx, int cz) {
-        long res = 0;
-
+    public static double xzToCircleLocation(int cr, long x, long z, int cx, int cz) {
         x = x-cx;
         z = z-cz;
 
@@ -40,8 +37,7 @@ public class Translate {
             rotation += 0.25;
         }
 
-        double radius = ((long)(Math.sqrt(x*x+z*z)+0.5));
-
+        double radius = ((long)(Math.sqrt(x*x+z*z)));
         return (radius*radius - cr*cr)*Math.PI + rotation*(2*radius*Math.PI);
     }
 

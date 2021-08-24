@@ -21,6 +21,7 @@ public class SetupTeleport extends BukkitRunnable {
     private final Cache cache;
     private final RandomSelectParams rsParams;
     private Location location = null;
+    private boolean cancelled = false;
 
     public SetupTeleport(RTP plugin, CommandSender sender, Player player, Configs configs, Cache cache, RandomSelectParams rsParams) {
         this.sender = sender;
@@ -39,8 +40,13 @@ public class SetupTeleport extends BukkitRunnable {
             return;
         }
 
+        //get a random location according to the parameters
+        long start = System.currentTimeMillis();
+        location = cache.getRandomLocation(rsParams,true,sender, player);
+        if(location == null) return;
+
         //get warmup delay
-        int delay = (sender.hasPermission("rtp.noDelay")) ? 0 : (Integer)configs.config.getConfigValue("teleportDelay", 2);
+        int delay = (sender.hasPermission("rtp.noDelay")) ? 0 : configs.config.teleportDelay;
 
         //let player know if warmup delay > 0
         if(delay>0) {
@@ -58,16 +64,11 @@ public class SetupTeleport extends BukkitRunnable {
                 sender.sendMessage(configs.lang.getLog("delayMessage", replacement));
         }
 
-        //get a random location according to the parameters
-        long start = System.currentTimeMillis();
-        location = cache.getRandomLocation(rsParams,true,sender, player);
-        long stop = System.currentTimeMillis();
-        if(location == null) return;
-
         //set up task to load chunks then teleport
-        if(!this.isCancelled()){
+        if(!this.isCancelled() && !cancelled){
             cache.todoTP.put(player.getUniqueId(),location);
             cache.regionKeys.put(player.getUniqueId(),rsParams);
+            long stop = System.currentTimeMillis();
             LoadChunks loadChunks = new LoadChunks(plugin,configs,sender,player,cache,(int)((20*delay)-((stop-start)/50)),location);
             loadChunks.runTaskLaterAsynchronously(plugin,1);
             cache.loadChunks.put(player.getUniqueId(), loadChunks);
@@ -90,6 +91,7 @@ public class SetupTeleport extends BukkitRunnable {
             cache.doTeleports.get(player.getUniqueId()).cancel();
             cache.doTeleports.remove(player.getUniqueId());
         }
+        cancelled = true;
         super.cancel();
     }
 

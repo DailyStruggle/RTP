@@ -16,8 +16,17 @@ import org.bukkit.event.entity.PlayerDeathEvent;
 import java.util.HashMap;
 
 //set up a location for respawn event
-public record OnPlayerDeath(RTP plugin, Configs configs,
-                            Cache cache) implements Listener {
+public final class OnPlayerDeath implements Listener {
+    private final RTP plugin;
+    private final Configs configs;
+    private final Cache cache;
+
+    public OnPlayerDeath(RTP plugin, Configs configs,
+                         Cache cache) {
+        this.plugin = plugin;
+        this.configs = configs;
+        this.cache = cache;
+    }
 
     @EventHandler(priority = EventPriority.LOW)
     public void OnPlayerDeath(PlayerDeathEvent event) {

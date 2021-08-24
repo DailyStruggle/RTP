@@ -1,5 +1,7 @@
 package leafcraft.rtp.tools.selection;
 
+import com.sun.org.apache.xpath.internal.operations.Bool;
+import de.schlichtherle.io.archive.zip.CheckedJarDriver;
 import io.papermc.lib.PaperLib;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
@@ -7,11 +9,13 @@ import leafcraft.rtp.tools.softdepends.GriefPreventionChecker;
 import leafcraft.rtp.tools.softdepends.WorldGuardChecker;
 import leafcraft.rtp.tools.HashableChunk;
 import org.bukkit.*;
+import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.opentest4j.TestAbortedException;
 
+import java.time.Year;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -52,7 +56,8 @@ public class TeleportRegion {
 
     public int r, cr, cx, cz, minY, maxY;
 
-    public TeleportRegion(Map<String,String> params, Configs configs, Cache cache) {
+    public TeleportRegion(String name, Map<String,String> params, Configs configs, Cache cache) {
+        this.name = name;
         this.configs = configs;
         this.cache = cache;
         String worldName = params.getOrDefault("world","world");
@@ -124,7 +129,7 @@ public class TeleportRegion {
             if(sender.hasPermission("rtp.unqueued")) {
                 res = getRandomLocation(urgent);
                 if(res == null) {
-                    Integer maxAttempts = (Integer) configs.config.getConfigValue("maxAttempts", 100);
+                    Integer maxAttempts = configs.config.maxAttempts;
                     player.sendMessage(configs.lang.getLog("unsafe",maxAttempts.toString()));
                     if(!sender.getName().equals(player.getName()))
                         sender.sendMessage(configs.lang.getLog("unsafe",maxAttempts.toString()));
@@ -152,7 +157,7 @@ public class TeleportRegion {
                 cache.keepChunks.putIfAbsent(hc, 0L);
                 cache.keepChunks.compute(hc, (k, v) -> v + 1);
                 if(uniquePlacements) {
-                    addBadChunk(cx+i,cz+j);
+                    addBadLocation(cx+i,cz+j);
                 }
             }
         }
@@ -168,6 +173,7 @@ public class TeleportRegion {
     }
 
     public void queueLocation(Location location) {
+        if(location == null) return;
         locationQueue.offer(location);
     }
 
@@ -193,17 +199,11 @@ public class TeleportRegion {
         playerNextLocation.put(player.getUniqueId(),location);
     }
 
-    public void addBadChunk(int chunkX, int chunkZ) {
-        for(int i = 0; i < 16; i++) {
-            for(int j = 0; j < 16; j++) {
-                int localX = chunkX*16+i;
-                int localZ = chunkZ*16+j;
-                double location = (shape.equals(Shapes.SQUARE)) ?
-                        Translate.xzToSquareLocation(cr,localX,localZ,cx,cz) :
-                        Translate.xzToCircleLocation(cr,localX,localZ,cx,cz);
-                addBadLocation((long)location);
-            }
-        }
+    public void addBadLocation(int chunkX, int chunkZ) {
+        double location = (shape.equals(Shapes.SQUARE)) ?
+            Translate.xzToSquareLocation(cr,chunkX,chunkZ,cx,cz) :
+            Translate.xzToCircleLocation(cr,chunkX,chunkZ,cx,cz);
+        addBadLocation((long)location);
     }
 
     private void addBadLocation(Long location) {
@@ -249,12 +249,13 @@ public class TeleportRegion {
     private Location getRandomLocation(boolean urgent) {
         Location res;
 
-        Boolean rerollLiquid = (Boolean) configs.config.getConfigValue("rerollLiquid",true);
-        Boolean rerollWorldGuard = (Boolean) configs.config.getConfigValue("rerollWorldGuard",true);
-        Boolean rerollGriefPrevention = (Boolean) configs.config.getConfigValue("rerollGriefPrevention",true);
+        boolean rerollLiquid = configs.config.rerollLiquid;
+        boolean rerollWorldGuard = configs.config.rerollWorldGuard;
+        boolean rerollGriefPrevention = configs.config.rerollGriefPrevention;
 
-        long selectTime = 0L;
-        long chunkTime = 0L;
+        double selectTime = 0D;
+        double chunkTime = 0D;
+        double yTime = 0D;
 
         long start = System.currentTimeMillis();
         long location = select();
@@ -265,14 +266,18 @@ public class TeleportRegion {
             idx = badLocations.ceilingEntry(idx.getKey()+idx.getValue());
         }
 
-        int[] xz = shape.equals(TeleportRegion.Shapes.SQUARE) ?
+        int[] xz = new int[2];
+        int[] xzChunk;
+
+        xzChunk = shape.equals(TeleportRegion.Shapes.SQUARE) ?
                 (Translate.squareLocationToXZ(cr, cx, cz, location)) :
                 (Translate.circleLocationToXZ(cr, cx, cz, location));
 
-        int[] xzChunk = new int[2];
+        xz[0] = (xzChunk[0]*16)+7;
+        xz[1] = (xzChunk[1]*16)+7;
 
-        xzChunk[0] = (xz[0] >= 0 || (xz[0]%16==0)) ? (xz[0] / 16) : (xz[0] / 16) - 1;
-        xzChunk[1] = (xz[1] >= 0 || (xz[1]%16==0)) ? (xz[1] / 16) : (xz[1] / 16) - 1;
+//        xzChunk[0] = (xz[0] >= 0 || (xz[0]%16==0)) ? (xz[0] / 16) : (xz[0] / 16) - 1;
+//        xzChunk[1] = (xz[1] >= 0 || (xz[1]%16==0)) ? (xz[1] / 16) : (xz[1] / 16) - 1;
 
         long stop = System.currentTimeMillis();
         selectTime += (stop-start);
@@ -282,9 +287,9 @@ public class TeleportRegion {
                 PaperLib.getChunkAtAsyncUrgently(world,xzChunk[0],xzChunk[1],true) :
                 PaperLib.getChunkAtAsync(world,xzChunk[0],xzChunk[1],true);
 
-        Chunk chunk;
+        ChunkSnapshot chunk;
         try {
-            chunk = cfChunk.get(); //wait on chunk load/gen
+            chunk = cfChunk.get().getChunkSnapshot(); //wait on chunk load/gen
         } catch (ExecutionException e) {
             e.printStackTrace();
             return null;
@@ -292,15 +297,19 @@ public class TeleportRegion {
             return null;
         }
 
-        res = new Location(world,xz[0],minY,xz[1]);
-        res = this.getFirstNonAir(res);
-        res = this.getLastNonAir(res);
-
         stop = System.currentTimeMillis();
         chunkTime += (stop-start);
 
+        int y;
+        start = System.currentTimeMillis();
+        y = this.getFirstNonAir(chunk);
+        y = this.getLastNonAir(chunk,y);
+        res = new Location(world,xz[0],y,xz[1]);
+        stop = System.currentTimeMillis();
+        yTime += (stop - start);
+
         Integer numAttempts = 1;
-        Integer maxAttempts = (Integer) configs.config.getConfigValue("maxAttempts",100);
+        Integer maxAttempts = configs.config.maxAttempts;
         while(numAttempts < maxAttempts &&
                 ( acceptableAir.contains(res.getBlock().getType())
                         || (res.getBlockY() >= maxY)
@@ -308,7 +317,6 @@ public class TeleportRegion {
                         || (rerollWorldGuard && WorldGuardChecker.isInRegion(res))
                         || (rerollGriefPrevention && GriefPreventionChecker.isInClaim(res)))) {
             addBadLocation(location);
-            addBadChunk(xzChunk[0], xzChunk[1]);
 
             start = System.currentTimeMillis();
             location = select();
@@ -319,12 +327,12 @@ public class TeleportRegion {
                 idx = badLocations.ceilingEntry(idx.getKey()+idx.getValue());
             }
 
-            xz = shape.equals(TeleportRegion.Shapes.SQUARE) ?
+            xzChunk = shape.equals(TeleportRegion.Shapes.SQUARE) ?
                     (Translate.squareLocationToXZ(cr, cx, cz, location)) :
                     (Translate.circleLocationToXZ(cr, cx, cz, location));
 
-            xzChunk[0] = (xz[0] >= 0) ? (xz[0] / 16) : (xz[0] / 16) - 1;
-            xzChunk[1] = (xz[1] >= 0) ? (xz[1] / 16) : (xz[1] / 16) - 1;
+            xz[0] = (xzChunk[0]*16)+7;
+            xz[1] = (xzChunk[1]*16)+7;
 
             stop = System.currentTimeMillis();
             selectTime += (stop-start);
@@ -335,7 +343,7 @@ public class TeleportRegion {
                     PaperLib.getChunkAtAsync(world,xzChunk[0],xzChunk[1],true);
 
             try {
-                chunk = cfChunk.get();
+                chunk = cfChunk.get().getChunkSnapshot(); //wait on chunk load/gen
             } catch (ExecutionException e) {
                 e.printStackTrace();
                 return null;
@@ -343,12 +351,16 @@ public class TeleportRegion {
                 return null;
             }
 
-            res = new Location(world,xz[0],minY,xz[1]);
-            res = this.getFirstNonAir(res);
-            res = this.getLastNonAir(res);
-
             stop = System.currentTimeMillis();
             chunkTime += (stop-start);
+
+            start = System.currentTimeMillis();
+            y = this.getFirstNonAir(chunk);
+            y = this.getLastNonAir(chunk,y);
+            res = new Location(world,xz[0],y,xz[1]);
+            stop = System.currentTimeMillis();
+            yTime += (stop - start);
+
             numAttempts++;
         }
 
@@ -362,51 +374,92 @@ public class TeleportRegion {
 
         this.cache.numTeleportAttempts.put(res, numAttempts);
         addChunks(res);
+
+//        Bukkit.getLogger().warning(ChatColor.AQUA + "AVG TIME SPENT ON SELECTION: " + selectTime/numAttempts);
+//        Bukkit.getLogger().warning(ChatColor.LIGHT_PURPLE + "AVG TIME SPENT ON CHUNKS: " + chunkTime/numAttempts);
+//        Bukkit.getLogger().warning(ChatColor.GREEN + "AVG TIME SPENT ON BLOCKS: " + yTime/numAttempts);
+
         return res;
     }
 
-    public Location getFirstNonAir(Location start) {
+    public int getFirstNonAir(ChunkSnapshot chunk) {
+        int i = minY;
         //iterate over a good distance to reduce thin floors
-        int i = start.getBlockY();
         for(; i <= maxY; i+=8) {
-            start.setY(i);
-            if(!acceptableAir.contains(start.getBlock().getType())) {
+            if(!acceptableAir.contains(chunk.getBlockType(7,i,7))) {
                 break;
             }
+            if(i >= this.maxY-8) return this.maxY;
         }
-        return start;
+        return i;
     }
 
-    public Location getLastNonAir(Location start) {
-        int oldY;
-        int minY = start.getBlockY();
+    public int getLastNonAir(ChunkSnapshot chunk, int y) {
+        int oldY = y;
+        int minY = y;
         int maxY = this.maxY;
 
         //iterate over a larger distance first, then fine-tune
-        for(int it_length = (maxY-minY)/2; it_length > 0; it_length = it_length/2) {
+        for(int it_length = (maxY-minY)/16; it_length > 0; it_length = it_length/2) {
             int i = minY;
             for(; i <= maxY; i+=it_length) {
-                oldY = start.getBlockY();
-                start.setY(i);
-                byte skyLight;
-                try{
-                    skyLight = start.getBlock().getLightFromSky();
-                }
-                catch (TestAbortedException ex) {
-                    if(acceptableAir.contains(start.getBlock().getType())) skyLight = 15;
-                    else skyLight = 0;
-                }
+                int skyLight = 15;
+                if(requireSkyLight) skyLight = chunk.getBlockSkyLight(7,i,7);
 
-                if(acceptableAir.contains(start.getBlock().getType())
-                        && acceptableAir.contains(start.getBlock().getRelative(BlockFace.UP).getType())
-                        && !(requireSkyLight && skyLight==0)) {
-                    start.setY(oldY);
+                if(acceptableAir.contains(chunk.getBlockType(7,i,7))
+                        && acceptableAir.contains(chunk.getBlockType(7,i+1,7))
+                        && skyLight>0) {
                     minY = oldY;
                     maxY = i;
                     break;
                 }
+                if(i >= this.maxY-it_length) return this.maxY;
+                oldY = i;
             }
         }
-        return start;
+
+        for(int i = minY; i <= maxY; i++) {
+            int skyLight = 15;
+            if(requireSkyLight) skyLight = chunk.getBlockSkyLight(7,i,7);
+
+            if(acceptableAir.contains(chunk.getBlockType(7,i,7))
+                    && acceptableAir.contains(chunk.getBlockType(7,i+1,7))
+                    && skyLight>0) {
+                minY = oldY;
+                break;
+            }
+            oldY = i;
+        }
+        return minY;
+    }
+
+    public boolean isKnownBad(int x, int z) {
+        double location = (shape.equals(Shapes.SQUARE)) ?
+                Translate.xzToSquareLocation(cr,x,z,cx,cz) :
+                Translate.xzToCircleLocation(cr,x,z,cx,cz);
+        return isKnownBad((long)location);
+    }
+
+    public boolean isKnownBad(long location) {
+        Map.Entry<Long,Long> lower = badLocations.floorEntry(location);
+
+        if((lower!=null) && (location < lower.getKey()+lower.getValue())) {
+            return true;
+        }
+        return false;
+    }
+
+    public boolean isInBounds(int x, int z) {
+        double location = (shape.equals(Shapes.SQUARE)) ?
+                Translate.xzToSquareLocation(cr,x,z,cx,cz) :
+                Translate.xzToCircleLocation(cr,x,z,cx,cz);
+        return isInBounds((long)location);
+    }
+
+    public boolean isInBounds(long location) {
+        if((location > totalSpace) || (location < 0)) {
+            return false;
+        }
+        return true;
     }
 }

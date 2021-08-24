@@ -14,9 +14,7 @@ import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.Metrics;
 import leafcraft.rtp.tools.TPS;
-import leafcraft.rtp.tools.softdepends.ProtocolLibChecker;
 import org.bukkit.Bukkit;
-import org.bukkit.event.Listener;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.plugin.java.JavaPluginLoader;
@@ -77,18 +75,6 @@ public final class RTP extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new OnChunkLoad(configs,cache),this);
 
         Bukkit.getServer().getScheduler().scheduleSyncRepeatingTask(this, new TPS(), 100L, 1L);
-
-//        Bukkit.getScheduler().runTaskTimer(this, () -> {
-//            Player me = Bukkit.getPlayer("leaf26");
-//            if(me!=null && !cache.todoTP.containsKey(me.getName())) {
-//                me.performCommand("rtp");
-//            }
-//
-//            me = Bukkit.getPlayer("leaf_26");
-//            if(me!=null && !cache.todoTP.containsKey(me.getName())) {
-//                me.performCommand("rtp");
-//            }
-//        }, 240, 10);
     }
 
     @Override
