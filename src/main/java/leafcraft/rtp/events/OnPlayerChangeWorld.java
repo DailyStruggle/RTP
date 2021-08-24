@@ -16,8 +16,17 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 
-public record OnPlayerChangeWorld(RTP plugin, Configs configs,
-                                  Cache cache) implements Listener {
+public final class OnPlayerChangeWorld implements Listener {
+    private final RTP plugin;
+    private final Configs configs;
+    private final Cache cache;
+
+    public OnPlayerChangeWorld(RTP plugin, Configs configs,
+                               Cache cache) {
+        this.plugin = plugin;
+        this.configs = configs;
+        this.cache = cache;
+    }
 
     @EventHandler(priority = EventPriority.NORMAL)
     public void OnPlayerChangeWorld(PlayerChangedWorldEvent event) {

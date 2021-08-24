@@ -30,13 +30,12 @@ public class Cache {
             Map<String,String> map = new HashMap<>();
             map.put("region",region);
             RandomSelectParams key = new RandomSelectParams(world,map,configs);
-            permRegions.put(key, new TeleportRegion(key.params,configs,this));
-            permRegions.get(key).name = region;
+            permRegions.put(key, new TeleportRegion(region,key.params,configs,this));
         }
 
         Double i = 0d;
-        Integer period = (Integer)configs.config.getConfigValue("queuePeriod",30);
-        Double increment = period.doubleValue()/permRegions.size();
+        Integer period = configs.config.queuePeriod;
+        Double increment = ((period.doubleValue())/permRegions.size())*20;
         for(Map.Entry<RandomSelectParams,TeleportRegion> entry : permRegions.entrySet()) {
             timers.put(entry.getKey(),Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, ()->{
                 double tps = TPS.getTPS();
@@ -129,8 +128,7 @@ public class Cache {
             region = permRegions.get(rsParams);
         }
         else {
-            region = new TeleportRegion(rsParams.params, configs, this);
-            tempRegions.put(rsParams,region);
+            region = new TeleportRegion("temp", rsParams.params, configs, this);
         }
         return region.getLocation(urgent, sender, player);
     }
@@ -153,13 +151,12 @@ public class Cache {
             Map<String,String> map = new HashMap<>();
             map.put("region",region);
             RandomSelectParams key = new RandomSelectParams(world,map,configs);
-            permRegions.put(key, new TeleportRegion(key.params,configs,this));
-            permRegions.get(key).name = region;
+            permRegions.put(key, new TeleportRegion(region, key.params,configs,this));
         }
 
         Double i = 0d;
         Integer period = (Integer)configs.config.getConfigValue("queuePeriod",30);
-        Double increment = period.doubleValue()/permRegions.size();
+        Double increment = ((period.doubleValue())/permRegions.size())*20;
         for(Map.Entry<RandomSelectParams,TeleportRegion> entry : permRegions.entrySet()) {
             timers.put(entry.getKey(),Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, ()->{
                 double tps = TPS.getTPS();

@@ -140,7 +140,7 @@ public class RTPCmd implements CommandExecutor {
         //check time
         long time = System.currentTimeMillis();
         long lastTime = (sender instanceof Player) ? this.cache.lastTeleportTime.getOrDefault(sender.getName(),Long.valueOf(0)) : 0;
-        long cooldownTime = TimeUnit.SECONDS.toMillis((Integer)configs.config.getConfigValue("teleportCooldown",300));
+        long cooldownTime = TimeUnit.SECONDS.toMillis(configs.config.teleportCooldown);
         if(!sender.hasPermission("rtp.noCooldown")
                 && time - lastTime < cooldownTime) {
             long remaining = (lastTime+cooldownTime)-time;

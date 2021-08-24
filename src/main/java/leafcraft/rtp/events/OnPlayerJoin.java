@@ -13,18 +13,26 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 
-public record OnPlayerJoin(RTP plugin, Configs configs,
-                           Cache cache) implements Listener {
+public final class OnPlayerJoin implements Listener {
+    private final RTP plugin;
+    private final Configs configs;
+    private final Cache cache;
+
+    public OnPlayerJoin(RTP plugin, Configs configs,
+                        Cache cache) {
+        this.plugin = plugin;
+        this.configs = configs;
+        this.cache = cache;
+    }
 
     @EventHandler(priority = EventPriority.HIGH)
     public void OnPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
 
-        if(player.hasPermission("rtp.onEvent.firstJoin") && !player.hasPlayedBefore()) {
+        if (player.hasPermission("rtp.onEvent.firstJoin") && !player.hasPlayedBefore()) {
             Bukkit.dispatchCommand(Bukkit.getConsoleSender(),
                     "rtp player:" + player.getName() + " world:" + player.getWorld().getName());
-        }
-        else if (player.hasPermission("rtp.onEvent.join")) {
+        } else if (player.hasPermission("rtp.onEvent.join")) {
             //skip if already going
             SetupTeleport setupTeleport = this.cache.setupTeleports.get(player.getUniqueId());
             LoadChunks loadChunks = this.cache.loadChunks.get(player.getUniqueId());

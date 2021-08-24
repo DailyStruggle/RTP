@@ -166,7 +166,7 @@ public class SetRegion implements CommandExecutor {
                 configs.regions.addRegion(region,params);
             }
             cache.permRegions.remove(params);
-            cache.permRegions.put(params, new TeleportRegion(params.params,configs,cache));
+            cache.permRegions.put(params, new TeleportRegion(region,params.params,configs,cache));
         }
         else {
             sender.sendMessage(configs.lang.getLog("missingRegionParam"));

@@ -7,7 +7,9 @@ import leafcraft.rtp.tasks.QueueLocation;
 import leafcraft.rtp.tasks.SetupTeleport;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
+import leafcraft.rtp.tools.TPS;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -17,8 +19,17 @@ import org.bukkit.event.player.PlayerTeleportEvent;
 
 import java.util.HashMap;
 
-public record OnPlayerTeleport(RTP plugin, Configs configs,
-                               Cache cache) implements Listener {
+public final class OnPlayerTeleport implements Listener {
+    private final RTP plugin;
+    private final Configs configs;
+    private final Cache cache;
+
+    public OnPlayerTeleport(RTP plugin, Configs configs,
+                            Cache cache) {
+        this.plugin = plugin;
+        this.configs = configs;
+        this.cache = cache;
+    }
 
     @EventHandler(priority = EventPriority.LOWEST)
     public void OnPlayerTeleport(PlayerTeleportEvent event) {
@@ -40,8 +51,9 @@ public record OnPlayerTeleport(RTP plugin, Configs configs,
 
             //run command
             if (setupTeleport == null && loadChunks == null && doTeleport == null) {
+                //Bukkit.getScheduler().runTaskLater(plugin, ()-> Bukkit.dispatchCommand(player,"rtp"),2);
                 setupTeleport = new SetupTeleport(plugin, player, player, configs, cache, new RandomSelectParams(player.getWorld(), new HashMap<>(), configs));
-                setupTeleport.runTaskLaterAsynchronously(plugin, 1);
+                setupTeleport.runTaskLaterAsynchronously(plugin, 2);
                 this.cache.setupTeleports.put(player.getUniqueId(), setupTeleport);
             }
         }
@@ -59,7 +71,7 @@ public record OnPlayerTeleport(RTP plugin, Configs configs,
         if (doTeleport != null && doTeleport.isNoDelay()) return;
 
         Location location = this.cache.playerFromLocations.getOrDefault(player.getUniqueId(), player.getLocation());
-        if (location.distance(event.getTo()) < (Integer) configs.config.getConfigValue("cancelDistance", 2)) return;
+        if (location.distance(event.getTo()) < configs.config.cancelDistance) return;
 
         if (setupTeleport != null) {
             setupTeleport.cancel();

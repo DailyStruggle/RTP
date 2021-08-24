@@ -8,9 +8,15 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
 
+import java.util.Objects;
 import java.util.UUID;
 
-public record OnPlayerQuit(Cache cache) implements Listener {
+public final class OnPlayerQuit implements Listener {
+    private final Cache cache;
+
+    public OnPlayerQuit(Cache cache) {
+        this.cache = cache;
+    }
 
     @EventHandler(priority = EventPriority.LOWEST)
     public void OnPlayerQuit(PlayerQuitEvent event) {
@@ -40,4 +46,28 @@ public record OnPlayerQuit(Cache cache) implements Listener {
         cache.todoTP.remove(playerId);
         cache.playerFromLocations.remove(playerId);
     }
+
+    public Cache cache() {
+        return cache;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == this) return true;
+        if (obj == null || obj.getClass() != this.getClass()) return false;
+        OnPlayerQuit that = (OnPlayerQuit) obj;
+        return Objects.equals(this.cache, that.cache);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(cache);
+    }
+
+    @Override
+    public String toString() {
+        return "OnPlayerQuit[" +
+                "cache=" + cache + ']';
+    }
+
 }

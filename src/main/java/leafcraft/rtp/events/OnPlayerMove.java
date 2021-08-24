@@ -16,8 +16,17 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerMoveEvent;
 
-public record OnPlayerMove(RTP plugin, Configs configs,
-                           Cache cache) implements Listener {
+public final class OnPlayerMove implements Listener {
+    private final RTP plugin;
+    private final Configs configs;
+    private final Cache cache;
+
+    public OnPlayerMove(RTP plugin, Configs configs,
+                        Cache cache) {
+        this.plugin = plugin;
+        this.configs = configs;
+        this.cache = cache;
+    }
 
     @EventHandler(priority = EventPriority.LOW)
     public void onPlayerMove(PlayerMoveEvent event) {
@@ -46,8 +55,7 @@ public record OnPlayerMove(RTP plugin, Configs configs,
         Player player = event.getPlayer();
 
         Location originalLocation = cache.playerFromLocations.getOrDefault(player.getUniqueId(), player.getLocation());
-        if (originalLocation.distance(event.getTo()) < (Integer) configs.config.getConfigValue("cancelDistance", 2))
-            return;
+        if (originalLocation.distance(event.getTo()) < configs.config.cancelDistance) return;
 
         //don't stop teleporting if there isn't supposed to be a delay
         SetupTeleport setupTeleport = cache.setupTeleports.get(player.getUniqueId());
@@ -58,7 +66,7 @@ public record OnPlayerMove(RTP plugin, Configs configs,
         if (doTeleport != null && doTeleport.isNoDelay()) return;
 
         Location location = cache.playerFromLocations.getOrDefault(player.getUniqueId(), player.getLocation());
-        if (location.distance(event.getTo()) < (Integer) configs.config.getConfigValue("cancelDistance", 2)) return;
+        if (location.distance(event.getTo()) < configs.config.cancelDistance) return;
 
         if (setupTeleport != null && !setupTeleport.isCancelled()) {
             setupTeleport.cancel();
@@ -84,5 +92,4 @@ public record OnPlayerMove(RTP plugin, Configs configs,
 
         player.sendMessage(configs.lang.getLog("teleportCancel"));
     }
-
 }

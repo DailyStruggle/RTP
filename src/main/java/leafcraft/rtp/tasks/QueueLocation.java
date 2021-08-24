@@ -28,10 +28,11 @@ public class QueueLocation extends BukkitRunnable {
     @Override
     public void run() {
         if(player == null) {
-            if (location != null)
-                region.queueLocation(location);
-            else
+            if (location == null)
                 region.queueRandomLocation();
+            else
+                region.queueLocation(location);
+
         }
         else {
             region.queueRandomLocation(player);
