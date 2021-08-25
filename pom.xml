@@ -6,7 +6,7 @@
 
     <groupId>leafcraft</groupId>
     <artifactId>RTP</artifactId>
-    <version>1.1.9</version>
+    <version>1.1.10</version>
     <packaging>jar</packaging>
 
     <name>RTP</name>
@@ -126,11 +126,6 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.google.code.gson</groupId>
-            <artifactId>gson</artifactId>
-            <version>2.2.4</version>
-        </dependency>
-        <dependency>
             <groupId>org.spigotmc</groupId>
             <artifactId>spigot-api</artifactId>
             <version>1.13.2-R0.1-SNAPSHOT</version>
@@ -167,12 +162,6 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>com.github.seeseemelk</groupId>
-            <artifactId>MockBukkit-v1.16</artifactId>
-            <version>1.5.0</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
             <version>5.7.0</version>
@@ -183,12 +172,6 @@
             <artifactId>junit-jupiter-engine</artifactId>
             <version>5.7.0</version>
             <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.opentest4j</groupId>
-            <artifactId>opentest4j</artifactId>
-            <version>1.2.0</version>
-            <scope>compile</scope>
         </dependency>
     </dependencies>
 </project>

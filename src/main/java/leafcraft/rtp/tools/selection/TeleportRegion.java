@@ -247,7 +247,7 @@ public class TeleportRegion {
             // if within bounds of lower entry, do nothing
             // if lower start+length meets position, add 1 to its length and use that
             if((lower!=null) && (location < lower.getKey()+lower.getValue())) {
-                Bukkit.getLogger().warning("[rtp] Location:" + location + " was already known bad, skipping...");
+//                Bukkit.getLogger().warning("[rtp] Location:" + location + " was already known bad, skipping...");
                 return;
             }
             else if((lower!=null) && (location == lower.getKey()+lower.getValue())) {
@@ -494,7 +494,7 @@ public class TeleportRegion {
 
         public void loadFile() {
             Plugin plugin = Bukkit.getPluginManager().getPlugin("RTP");
-            File f = new File(plugin.getDataFolder(), "regions"+File.separatorChar+name+".yml");
+            File f = new File(plugin.getDataFolder(), "regions"+File.separatorChar+name+".dat");
             if(!f.exists()) return;
 
             ArrayList<String> linesArray = new ArrayList<>();
@@ -512,19 +512,17 @@ public class TeleportRegion {
             String name = linesArray.get(0).substring(5);
             Shapes shape = Shapes.valueOf(linesArray.get(1).substring(6));
             String worldName = linesArray.get(2).substring(6);
-            int r = Integer.parseInt(linesArray.get(3).substring(2));
-            int cr = Integer.parseInt(linesArray.get(4).substring(3));
-            int cx = Integer.parseInt(linesArray.get(5).substring(3));
-            int cz = Integer.parseInt(linesArray.get(6).substring(3));
-            int minY = Integer.parseInt(linesArray.get(7).substring(5));
-            int maxY = Integer.parseInt(linesArray.get(8).substring(5));
-            boolean requireSkyLight = Boolean.parseBoolean(linesArray.get(9).substring(16));
-            boolean uniquePlacements = Boolean.parseBoolean(linesArray.get(10).substring(17));
+            int cr = Integer.parseInt(linesArray.get(3).substring(3));
+            int cx = Integer.parseInt(linesArray.get(4).substring(3));
+            int cz = Integer.parseInt(linesArray.get(5).substring(3));
+            int minY = Integer.parseInt(linesArray.get(6).substring(5));
+            int maxY = Integer.parseInt(linesArray.get(7).substring(5));
+            boolean requireSkyLight = Boolean.parseBoolean(linesArray.get(8).substring(16));
+            boolean uniquePlacements = Boolean.parseBoolean(linesArray.get(9).substring(17));
 
             if(!name.equals(this.name)) return;
             if(!shape.equals(this.shape)) return;
             if(!worldName.equals(this.world.getName())) return;
-            if(!(r==this.r)) return;
             if(!(cr==this.cr)) return;
             if(!(cx==this.cx)) return;
             if(!(cz==this.cz)) return;
@@ -533,10 +531,14 @@ public class TeleportRegion {
             if(!(requireSkyLight==this.requireSkyLight)) return;
             if(!(uniquePlacements==this.uniquePlacements)) return;
 
-            for(int i = 12; i < linesArray.size(); i++) {
+            for(int i = 11; i < linesArray.size(); i++) {
                 String val = linesArray.get(i).substring(3);
                 int delimiterIdx = val.indexOf(',');
-                badLocations.put(Long.parseLong(val.substring(0,delimiterIdx)),Long.parseLong(val.substring(delimiterIdx+1)));
+                Long location = Long.parseLong(val.substring(0,delimiterIdx));
+                Long length = Long.parseLong(val.substring(delimiterIdx+1));
+                if(location<0) continue;
+                badLocations.put(location,length);
+                badLocationSum+=length;
             }
         }
 
@@ -545,7 +547,6 @@ public class TeleportRegion {
             linesArray.add("name:"+name);
             linesArray.add("shape:"+shape.toString());
             linesArray.add("world:"+world.getName());
-            linesArray.add("r:"+r);
             linesArray.add("cr:"+cr);
             linesArray.add("cx:"+cx);
             linesArray.add("cz:"+cz);
@@ -559,7 +560,7 @@ public class TeleportRegion {
             }
 
             Plugin plugin = Bukkit.getPluginManager().getPlugin("RTP");
-            File f = new File(plugin.getDataFolder(), "regions"+File.separatorChar+name+".yml");
+            File f = new File(plugin.getDataFolder(), "regions"+File.separatorChar+name+".dat");
             File parentDir = f.getParentFile();
             if(!parentDir.exists()) {
                 parentDir.mkdirs();
