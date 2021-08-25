@@ -16,6 +16,10 @@ public class Config {
 	private final RTP plugin;
 	private FileConfiguration config;
 
+	public int teleportDelay, cancelDistance, teleportCooldown, maxAttempts, queuePeriod, minTPS;
+	public boolean rerollLiquid, rerollWorldGuard, rerollGriefPrevention;
+
+
 	public Config(RTP plugin, Lang lang) {
 		this.plugin = plugin;
 
@@ -26,13 +30,24 @@ public class Config {
 		}
 		this.config = YamlConfiguration.loadConfiguration(f);
 
-		if( 	(this.config.getDouble("version") < 1.3) ) {
+		if( 	(this.config.getDouble("version") < 1.5) ) {
 			Bukkit.getLogger().log(Level.WARNING, lang.getLog("oldFile", "config.yml"));
 			update();
 
 			f = new File(this.plugin.getDataFolder(), "config.yml");
 			this.config = YamlConfiguration.loadConfiguration(f);
 		}
+
+		this.rerollLiquid = config.getBoolean("rerollLiquid",true);
+		this.rerollWorldGuard = config.getBoolean("rerollWorldGuard",true);
+		this.rerollGriefPrevention = config.getBoolean("rerollGriefPrevention",true);
+
+		this.teleportDelay = config.getInt("teleportDelay",2);
+		this.cancelDistance = config.getInt("cancelDistance",2);
+		this.teleportCooldown = config.getInt("teleportCooldown",300);
+		this.maxAttempts = config.getInt("maxAttempts",100);
+		this.queuePeriod = config.getInt("queuePeriod",30);
+		this.minTPS = config.getInt("minTPS",19);
 	}
 
 	private void update() {
@@ -57,7 +72,7 @@ public class Config {
 		for (String line : linesInDefaultConfig) {
 			String newline = line;
 			if (line.startsWith("version:")) {
-				newline = "version: 1.3";
+				newline = "version: 1.5";
 			} else {
 				for (String node : oldValues.keySet()) {
 					if (line.startsWith(node + ":")) {

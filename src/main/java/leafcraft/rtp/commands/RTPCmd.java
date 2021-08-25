@@ -13,15 +13,14 @@ import org.bukkit.entity.Player;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
 
 public class RTPCmd implements CommandExecutor {
-    private leafcraft.rtp.RTP plugin;
-    private Configs configs;
-    private Map<String,String> perms = new HashMap<>();
-    private Map<String,String> rtpParams = new HashMap<>();
+    private final leafcraft.rtp.RTP plugin;
+    private final Configs configs;
+    private final Map<String,String> perms = new HashMap<>();
+    private final Map<String,String> rtpParams = new HashMap<>();
 
-    private Cache cache;
+    private final Cache cache;
 
     public RTPCmd(leafcraft.rtp.RTP plugin, Configs configs, Cache cache) {
         this.plugin = plugin;
@@ -141,7 +140,7 @@ public class RTPCmd implements CommandExecutor {
         //check time
         long time = System.currentTimeMillis();
         long lastTime = (sender instanceof Player) ? this.cache.lastTeleportTime.getOrDefault(sender.getName(),Long.valueOf(0)) : 0;
-        long cooldownTime = TimeUnit.SECONDS.toMillis((Integer)configs.config.getConfigValue("teleportCooldown",300));
+        long cooldownTime = TimeUnit.SECONDS.toMillis(configs.config.teleportCooldown);
         if(!sender.hasPermission("rtp.noCooldown")
                 && time - lastTime < cooldownTime) {
             long remaining = (lastTime+cooldownTime)-time;
@@ -149,7 +148,7 @@ public class RTPCmd implements CommandExecutor {
             long hours = TimeUnit.MILLISECONDS.toHours(remaining)%24;
             long minutes = TimeUnit.MILLISECONDS.toMinutes(remaining)%60;
             long seconds = TimeUnit.MILLISECONDS.toSeconds(remaining)%60;
-            String replacement = new String();
+            String replacement = "";
             if(days>0) replacement += days + configs.lang.getLog("days") + " ";
             if(days>0 || hours>0) replacement += hours + configs.lang.getLog("hours") + " ";
             if(days>0 || hours>0 || minutes>0) replacement += minutes + configs.lang.getLog("minutes") + " ";
@@ -162,12 +161,12 @@ public class RTPCmd implements CommandExecutor {
         RandomSelectParams rsParams = new RandomSelectParams(world,rtpArgs,configs);
 
         //prep teleportation
-        new SetupTeleport(plugin,sender,player,configs, cache, rsParams).runTaskAsynchronously(plugin);
+        SetupTeleport setupTeleport = new SetupTeleport(plugin,sender,player,configs, cache, rsParams);
+        setupTeleport.runTaskAsynchronously(plugin);
+        cache.setupTeleports.put(player.getUniqueId(),setupTeleport);
         this.cache.lastTeleportTime.put(player.getUniqueId(), time);
         this.cache.playerFromLocations.put(player.getUniqueId(),player.getLocation());
 
         return true;
     }
-
-
 }

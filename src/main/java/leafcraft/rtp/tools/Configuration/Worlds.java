@@ -3,7 +3,6 @@ package leafcraft.rtp.tools.Configuration;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import leafcraft.rtp.RTP;
-import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -19,9 +18,9 @@ import java.util.*;
 import java.util.logging.Level;
 
 public class Worlds {
-    private RTP plugin;
+    private final RTP plugin;
     private FileConfiguration config;
-    private Lang lang;
+    private final Lang lang;
 
     //key: world name
     //value: world placeholder

@@ -1,10 +1,11 @@
 package leafcraft.rtp.tools.Configuration;
 
 import leafcraft.rtp.RTP;
+import leafcraft.rtp.tools.softdepends.WorldGuardChecker;
 
 //route for all config classes
 public class Configs {
-    private RTP plugin;
+    private final RTP plugin;
     public Config config;
     public Lang lang;
     public Regions regions;

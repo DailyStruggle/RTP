@@ -8,22 +8,24 @@ import java.util.UUID;
 
 public class HashableChunk {
     UUID worldUID;
-    private Long coordinate;
+    public final int x,z;
     private Chunk chunk;
 
     public HashableChunk(Chunk chunk) {
         this.chunk = chunk;
-        coordinate = (Long.valueOf(chunk.getX())<<32) + chunk.getZ();
         worldUID = chunk.getWorld().getUID();
+        this.x = chunk.getX();
+        this.z = chunk.getZ();
     }
 
     public HashableChunk(World world, int x, int z) {
         this.worldUID = world.getUID();
-        this.coordinate = (Long.valueOf(x)<<32)+z;
+        this.x = x;
+        this.z = z;
     }
 
     public Chunk getChunk() {
-        return (chunk != null) ? chunk : Bukkit.getWorld(worldUID).getChunkAt((int)(coordinate >>32), (int)(coordinate &0xFFFF));
+        return (chunk != null) ? chunk : Bukkit.getWorld(worldUID).getChunkAt(x,z);
     }
 
     @Override
@@ -32,17 +34,17 @@ public class HashableChunk {
         if (o == null) return false;
         if(o instanceof Chunk) {
             Chunk that = (Chunk) o;
-            return (coordinate == ((Long.valueOf(that.getX())<<32)+that.getZ())) && (worldUID.equals(that.getWorld().getUID()));
+            return (x == that.getX()) && (z == that.getZ()) && (worldUID.equals(that.getWorld().getUID()));
         }
         else if(o instanceof HashableChunk) {
             HashableChunk that = (HashableChunk) o;
-            return (coordinate.equals(that.coordinate)) && (worldUID.equals(that.worldUID));
+            return (x == that.x) && (z == that.z) && (worldUID.equals(that.worldUID));
         }
         return false;
     }
 
     @Override
     public int hashCode() {
-        return worldUID.hashCode() ^ coordinate.hashCode();
+        return worldUID.hashCode() ^ Integer.hashCode(x) ^ Integer.hashCode(z);
     }
 }

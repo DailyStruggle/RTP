@@ -35,9 +35,9 @@ public class TabComplete implements TabCompleter {
         }
     }
 
-    private SubCommand subCommands = new SubCommand("rtp");
+    private final SubCommand subCommands = new SubCommand("rtp");
 
-    private Configs configs;
+    private final Configs configs;
 
     public TabComplete(Configs configs) {
         //load OnePlayerSleep.commands and permission nodes into map
@@ -73,7 +73,8 @@ public class TabComplete implements TabCompleter {
         subCommands.commands.get("setRegion").addSubParam("requireSkyLight","rtp.setRegion");
         subCommands.commands.get("setRegion").addSubParam("requirePermission","rtp.setRegion");
         subCommands.commands.get("setRegion").addSubParam("worldBorderOverride","rtp.setRegion");
-        subCommands.commands.get("setRegion").addSubParam("override","rtp.setRegion");
+        subCommands.commands.get("setRegion").addSubParam("uniquePlacements","rtp.setRegion");
+        subCommands.commands.get("setRegion").addSubParam("expand","rtp.setRegion");
         subCommands.commands.get("setRegion").addSubParam("queueLen","rtp.setRegion");
 
         subCommands.commands.get("setWorld").addSubParam("world","rtp.setWorld");
