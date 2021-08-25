@@ -58,8 +58,10 @@ public class DoTeleport extends BukkitRunnable {
                             || cache.keepChunks.containsKey(hashableChunk)) {
                         chunk.setForceLoaded(false);
                         cache.forceLoadedChunks.remove(hashableChunk);
-                        long intersect = cache.keepChunks.get(hashableChunk) - 1;
-                        if (intersect <= 0) cache.keepChunks.remove(hashableChunk);
+                        if(cache.keepChunks.containsKey(hashableChunk)) {
+                            long intersect = cache.keepChunks.get(hashableChunk) - 1;
+                            if (intersect <= 0) cache.keepChunks.remove(hashableChunk);
+                        }
                     }
                 }
             }
