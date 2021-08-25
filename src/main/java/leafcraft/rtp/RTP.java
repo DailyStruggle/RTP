@@ -1,26 +1,28 @@
 package leafcraft.rtp;
 
+import com.comphenix.protocol.PacketType;
+import com.comphenix.protocol.ProtocolLib;
+import com.comphenix.protocol.ProtocolLibrary;
+import com.comphenix.protocol.ProtocolManager;
+import com.comphenix.protocol.events.ListenerPriority;
+import com.comphenix.protocol.events.PacketAdapter;
+import com.comphenix.protocol.events.PacketEvent;
 import io.papermc.lib.PaperLib;
 import leafcraft.rtp.commands.*;
-import leafcraft.rtp.events.OnChunkUnload;
-import leafcraft.rtp.events.OnPlayerMove;
-import leafcraft.rtp.events.OnPlayerQuit;
+import leafcraft.rtp.events.*;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.Metrics;
 import leafcraft.rtp.tools.TPS;
 import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.plugin.java.JavaPluginLoader;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.io.File;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
 
 public final class RTP extends JavaPlugin {
@@ -55,7 +57,7 @@ public final class RTP extends JavaPlugin {
         getCommand("rtp").setExecutor(new RTPCmd(this, configs, cache));
         getCommand("rtp help").setExecutor(new Help(configs));
         getCommand("rtp reload").setExecutor(new Reload(configs, cache));
-        getCommand("rtp setRegion").setExecutor(new SetRegion(this,configs));
+        getCommand("rtp setRegion").setExecutor(new SetRegion(this,configs, cache));
         getCommand("rtp setWorld").setExecutor(new SetWorld(this,configs));
 //        getCommand("rtp fill").setExecutor(new Fill(this,this.config));
 
@@ -63,22 +65,16 @@ public final class RTP extends JavaPlugin {
         getCommand("wild").setTabCompleter(new TabComplete(this.configs));
 
         getServer().getPluginManager().registerEvents(new OnPlayerMove(this,configs,cache),this);
+        getServer().getPluginManager().registerEvents(new OnPlayerTeleport(this,configs,cache),this);
+        getServer().getPluginManager().registerEvents(new OnPlayerDeath(this,configs,cache),this);
+        getServer().getPluginManager().registerEvents(new OnPlayerRespawn(this,configs,cache),this);
+        getServer().getPluginManager().registerEvents(new OnPlayerJoin(this,configs,cache),this);
+        getServer().getPluginManager().registerEvents(new OnPlayerChangeWorld(this,configs,cache),this);
         getServer().getPluginManager().registerEvents(new OnPlayerQuit(cache),this);
         getServer().getPluginManager().registerEvents(new OnChunkUnload(cache),this);
+        getServer().getPluginManager().registerEvents(new OnChunkLoad(configs,cache),this);
 
         Bukkit.getServer().getScheduler().scheduleSyncRepeatingTask(this, new TPS(), 100L, 1L);
-
-//        Bukkit.getScheduler().runTaskTimer(this, () -> {
-//            Player me = Bukkit.getPlayer("leaf26");
-//            if(me!=null && !cache.todoTP.containsKey(me.getName())) {
-//                me.performCommand("rtp");
-//            }
-//
-//            me = Bukkit.getPlayer("leaf_26");
-//            if(me!=null && !cache.todoTP.containsKey(me.getName())) {
-//                me.performCommand("rtp");
-//            }
-//        }, 240, 10);
     }
 
     @Override

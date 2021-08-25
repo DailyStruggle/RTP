@@ -15,6 +15,8 @@ unsafe: "&e[rtp] could not find a safe location within [numAttempts] attempts"
 # placeholder: [time] - how long before player is able to teleport again
 cooldownMessage: "&e[rtp] You can't teleport again for [time]"
 
+noLocationsQueued: "&e[rtp] no locations ready at this time"
+
 # for time placeholders, what to call days, hours, minutes, seconds
 days: "d"
 hours: "h"
@@ -63,4 +65,4 @@ rtp: "&b/rtp - teleport to a random location"
 help: "&b/rtp help - see this"
 reload: "&b/rtp reload - reload config files"
 
-version: 1.3
+version: 1.4

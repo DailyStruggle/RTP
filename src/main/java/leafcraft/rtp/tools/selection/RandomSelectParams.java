@@ -12,24 +12,11 @@ public class RandomSelectParams {
     public TeleportRegion.Shapes shape;
     public UUID worldID;
     public int r, cr, cx, cz, minY, maxY;
-    public boolean requireSkyLight,worldBorderOverride;
+    public boolean requireSkyLight,worldBorderOverride,uniquePlacements,expand;
 
-    public boolean modifiedRegionSpecs;
     public Map<String,String> params;
 
     public RandomSelectParams(World world, Map<String,String> params, Configs configs) {
-        modifiedRegionSpecs = params.size()>0;
-        if(params.size()<=2) { // where region specs are unmodified
-            boolean hasWorld = params.containsKey("world");
-            boolean hasPlayer = params.containsKey("player");
-            if(params.size() == 1 && (hasWorld || hasPlayer)) {
-                modifiedRegionSpecs = false;
-            }
-            else if(hasWorld && hasPlayer) {
-                modifiedRegionSpecs = false;
-            }
-        }
-
         String worldName = params.getOrDefault("world",world.getName());
         worldName = configs.worlds.worldPlaceholder2Name(worldName);
         if(!configs.worlds.checkWorldExists(worldName)) worldName = world.getName();
@@ -51,9 +38,9 @@ public class RandomSelectParams {
         worldBorderOverride = Boolean.getBoolean(this.params.getOrDefault("worldBorderOverride","false"));
         if(worldBorderOverride) {
             this.params.put("shape", "SQUARE");
-            this.params.put("radius", String.valueOf((int)world.getWorldBorder().getSize()));
-            this.params.put("centerX", String.valueOf(world.getWorldBorder().getCenter().getBlockX()));
-            this.params.put("centerZ", String.valueOf(world.getWorldBorder().getCenter().getBlockZ()));
+            this.params.put("radius", String.valueOf((int)world.getWorldBorder().getSize()/16));
+            this.params.put("centerX", String.valueOf(world.getWorldBorder().getCenter().getBlockX()/16));
+            this.params.put("centerZ", String.valueOf(world.getWorldBorder().getCenter().getBlockZ()/16));
         }
 
         //ugh string parsing, but at least it's short and clean
@@ -69,6 +56,8 @@ public class RandomSelectParams {
         this.params.putIfAbsent("maxY", (configs.regions.getRegionSetting(regionName,"maxY",128)).toString());
         this.params.putIfAbsent("requireSkyLight", (configs.regions.getRegionSetting(regionName,"requireSkyLight",true)).toString());
         this.params.putIfAbsent("worldBorderOverride", (configs.regions.getRegionSetting(regionName,"worldBorderOverride",false)).toString());
+        this.params.putIfAbsent("uniquePlacements", (configs.regions.getRegionSetting(regionName,"uniquePlacements",false)).toString());
+        this.params.putIfAbsent("expand", (configs.regions.getRegionSetting(regionName,"expand",false)).toString());
 
         worldID = world.getUID();
         shape = TeleportRegion.Shapes.valueOf(this.params.getOrDefault("shape","CIRCLE"));
@@ -80,6 +69,8 @@ public class RandomSelectParams {
         maxY = Integer.valueOf(this.params.get("maxY"));
         requireSkyLight = Boolean.valueOf(this.params.get("requireSkyLight"));
         worldBorderOverride = Boolean.valueOf(this.params.get("worldBorderOverride"));
+        uniquePlacements = Boolean.valueOf(this.params.get("uniquePlacements"));
+        expand = Boolean.valueOf(this.params.get("expand"));
 
 //        System.out.println("creating RandomSelectParams with params:");
 //        for(Map.Entry<String,String> entry : this.params.entrySet()) {
@@ -103,7 +94,8 @@ public class RandomSelectParams {
             if(this.minY != that.minY) return false;
             if(this.requireSkyLight != that.requireSkyLight) return false;
             if(this.worldBorderOverride != that.worldBorderOverride) return false;
-            return true;
+            if(this.uniquePlacements != that.uniquePlacements) return false;
+            return this.expand == that.expand;
         }
         return false;
     }
@@ -121,6 +113,26 @@ public class RandomSelectParams {
         res ^= Integer.hashCode(maxY);
         res ^= Boolean.hashCode(requireSkyLight);
         res ^= Boolean.hashCode(worldBorderOverride);
+        res ^= Boolean.hashCode(uniquePlacements);
+        res ^= Boolean.hashCode(expand);
         return res;
+    }
+
+    @Override
+    public String toString() {
+        return "RandomSelectParams{" +
+                "shape=" + shape +
+                ", world=" + Bukkit.getWorld(worldID).getName() +
+                ", r=" + r +
+                ", cr=" + cr +
+                ", cx=" + cx +
+                ", cz=" + cz +
+                ", minY=" + minY +
+                ", maxY=" + maxY +
+                ", requireSkyLight=" + requireSkyLight +
+                ", worldBorderOverride=" + worldBorderOverride +
+                ", uniquePlacements=" + uniquePlacements +
+                ", expand=" + expand +
+                '}';
     }
 }

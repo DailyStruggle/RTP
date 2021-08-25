@@ -26,12 +26,12 @@ public class Lang {
         }
         this.config = YamlConfiguration.loadConfiguration(f);
 
-        if( 	(this.config.getDouble("version") < 1.3) ) {
+        if( 	(this.config.getDouble("version") < 1.4) ) {
             Bukkit.getLogger().log(Level.WARNING, getLog("oldFile", "lang.yml"));
             update(plugin);
 
             f = new File(plugin.getDataFolder(), "lang.yml");
-            this.config = YamlConfiguration.loadConfiguration(f);;
+            this.config = YamlConfiguration.loadConfiguration(f);
         }
     }
 
@@ -83,7 +83,7 @@ public class Lang {
         for (String line : linesInDefaultConfig) {
             String newline = line;
             if (line.startsWith("version:")) {
-                newline = "version: 1.3";
+                newline = "version: 1.4";
             } else {
                 for (String node : oldValues.keySet()) {
                     if (line.startsWith(node + ":")) {

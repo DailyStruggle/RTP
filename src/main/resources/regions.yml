@@ -7,9 +7,9 @@ default:
     # CIRCLE, SQUARE - spiral curves
     shape: "CIRCLE"
     #outer radius of selection in meters
-    radius: 4096
+    radius: 256
     #donut hole in center, where players shouldn't land
-    centerRadius: 1024
+    centerRadius: 64
     #center position, using regular x-z coordinates
     centerX: 0
     centerZ: 0
@@ -22,12 +22,16 @@ default:
     maxY: 96
     #ensure above ground by checking sky light level
     requireSkyLight: true
-    #check rtp.[region] node on command
+    #check rtp.regions.[region] node on command
     requirePermission: false
     #override shape, radius, center with vanilla worldborder settings
     worldBorderOverride: false
+    #prevent nearby placements by adding pre-loaded chunks to the region's list of bad chunks
+    uniquePlacements: false
+    #expand region as locations are removed, keeping a constant number of possible placements
+    expand: false
     #max length for the location queue per world, recommend 0 for unused regions
     # each location also queues a number of chunks to be loaded (async), based on view distance
     queueLen: 4
 
-version: 1.0
+version: 1.1

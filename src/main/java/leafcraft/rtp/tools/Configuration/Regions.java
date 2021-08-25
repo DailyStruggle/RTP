@@ -16,8 +16,8 @@ import java.util.*;
 import java.util.logging.Level;
 
 public class Regions {
-    private RTP plugin;
-    private Lang lang;
+    private final RTP plugin;
+    private final Lang lang;
     private FileConfiguration config;
 
     public Regions(RTP plugin, Lang lang) {
@@ -31,7 +31,7 @@ public class Regions {
         }
         config = YamlConfiguration.loadConfiguration(f);
 
-        if( 	(config.getDouble("version") < 1.0) ) {
+        if( 	(config.getDouble("version") < 1.1) ) {
             Bukkit.getLogger().log(Level.WARNING, lang.getLog("oldFile", "regions.yml"));
             FileStuff.renameFiles(plugin,"regions");
             config = YamlConfiguration.loadConfiguration(f);
@@ -55,6 +55,8 @@ public class Regions {
         section.set("requireSkyLight",params.requireSkyLight);
         section.set("requirePermission",Boolean.valueOf(params.params.getOrDefault("requirePermission",Boolean.toString(config.getConfigurationSection("default").getBoolean("requirePermission",true)))));
         section.set("worldBorderOverride",params.worldBorderOverride);
+        section.set("uniquePlacements",params.uniquePlacements);
+        section.set("expand",params.expand);
         section.set("queueLen",Integer.valueOf(params.params.getOrDefault("queueLen",Integer.toString(config.getConfigurationSection("default").getInt("queueLen",0)))));
 
     }
@@ -127,6 +129,8 @@ public class Regions {
         Boolean defaultRequireSkylight = config.getConfigurationSection("default").getBoolean("requireSkyLight", true);
         Boolean defaultRequirePermission = config.getConfigurationSection("default").getBoolean("requirePermission",true);
         Boolean defaultWorldBorderOverride = config.getConfigurationSection("default").getBoolean("worldBorderOverride",false);
+        Boolean defaultUniquePlacements = config.getConfigurationSection("default").getBoolean("uniquePlacements",true);
+        Boolean defaultExpand = config.getConfigurationSection("default").getBoolean("expand",false);
         Integer defaultQueueLen = config.getConfigurationSection("default").getInt("queueLen", 10);
 
         try {
@@ -160,6 +164,8 @@ public class Regions {
                         linesInRegions.add("    requireSkyLight: " + regionSection.getBoolean("requireSkyLight", defaultRequireSkylight));
                         linesInRegions.add("    requirePermission: " + regionSection.getBoolean("requirePermission",defaultRequirePermission));
                         linesInRegions.add("    worldBorderOverride: " + regionSection.getBoolean("worldBorderOverride",defaultWorldBorderOverride));
+                        linesInRegions.add("    uniquePlacements: " + regionSection.getBoolean("uniquePlacements",defaultUniquePlacements));
+                        linesInRegions.add("    expand: " + regionSection.getBoolean("expand",defaultExpand));
                         linesInRegions.add("    queueLen: " + regionSection.getInt("queueLen",defaultQueueLen));
                     }
                 }
@@ -188,6 +194,10 @@ public class Regions {
                         s = "    requirePermission: " + config.getConfigurationSection(region).getBoolean("requirePermission",defaultRequirePermission);
                     else if(s.startsWith("    worldBorderOverride:"))
                         s = "    worldBorderOverride: " + config.getConfigurationSection(region).getBoolean("worldBorderOverride",defaultWorldBorderOverride);
+                    else if(s.startsWith("    uniquePlacements:"))
+                        s = "    uniquePlacements: " + config.getConfigurationSection(region).getBoolean("uniquePlacements",defaultRequirePermission);
+                    else if(s.startsWith("    expand:"))
+                        s = "    expand: " + config.getConfigurationSection(region).getBoolean("expand",defaultWorldBorderOverride);
                     else if(s.startsWith("    queueLen:"))
                         s = "    queueLen: " + config.getConfigurationSection(region).getInt("queueLen",defaultQueueLen);
                     else if(!s.startsWith("#") && !s.startsWith("  ") && !s.startsWith("version") && (s.matches(".*[a-z].*") || s.matches(".*[A-Z].*")))

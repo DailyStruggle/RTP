@@ -4,6 +4,7 @@ import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -19,6 +20,8 @@ public class SetupTeleport extends BukkitRunnable {
     private final Configs configs;
     private final Cache cache;
     private final RandomSelectParams rsParams;
+    private Location location = null;
+    private boolean cancelled = false;
 
     public SetupTeleport(RTP plugin, CommandSender sender, Player player, Configs configs, Cache cache, RandomSelectParams rsParams) {
         this.sender = sender;
@@ -37,8 +40,13 @@ public class SetupTeleport extends BukkitRunnable {
             return;
         }
 
+        //get a random location according to the parameters
+        long start = System.currentTimeMillis();
+        location = cache.getRandomLocation(rsParams,true,sender, player);
+        if(location == null) return;
+
         //get warmup delay
-        int delay = (sender.hasPermission("rtp.noDelay")) ? 0 : (Integer)configs.config.getConfigValue("teleportDelay", 2);
+        int delay = (sender.hasPermission("rtp.noDelay")) ? 0 : configs.config.teleportDelay;
 
         //let player know if warmup delay > 0
         if(delay>0) {
@@ -56,22 +64,40 @@ public class SetupTeleport extends BukkitRunnable {
                 sender.sendMessage(configs.lang.getLog("delayMessage", replacement));
         }
 
-        //get a random location according to the parameters
-        long start = System.currentTimeMillis();
-        Location location = cache.getRandomLocation(rsParams,true);
-        long stop = System.currentTimeMillis();
-
-        Integer maxAttempts = (Integer) configs.config.getConfigValue("maxAttempts",100);
-        if(location == null) {
-            player.sendMessage(configs.lang.getLog("unsafe",maxAttempts.toString()));
-            if(!sender.getName().equals(player.getName()))
-                sender.sendMessage(configs.lang.getLog("unsafe",maxAttempts.toString()));
-            return;
-        }
-        cache.todoTP.put(player.getUniqueId(),location);
-        cache.regionKeys.put(player.getUniqueId(),rsParams);
-
         //set up task to load chunks then teleport
-        cache.loadChunks.put(player.getUniqueId(), new LoadChunks(plugin,configs,player,cache,(int)((20*delay)-((stop-start)/50)),location).runTaskLaterAsynchronously(plugin,1));
+        if(!this.isCancelled() && !cancelled){
+            cache.todoTP.put(player.getUniqueId(),location);
+            cache.regionKeys.put(player.getUniqueId(),rsParams);
+            long stop = System.currentTimeMillis();
+            LoadChunks loadChunks = new LoadChunks(plugin,configs,sender,player,cache,(int)((20*delay)-((stop-start)/50)),location);
+            loadChunks.runTaskLaterAsynchronously(plugin,1);
+            cache.loadChunks.put(player.getUniqueId(), loadChunks);
+        }
+        cache.setupTeleports.remove(player.getUniqueId());
     }
+
+    @Override
+    public void cancel() {
+        if(cache.permRegions.containsKey(rsParams) && location != null) {
+            cache.permRegions.get(rsParams).queueLocation(location);
+        }
+        cache.todoTP.remove(player.getUniqueId());
+        cache.setupTeleports.remove(player.getUniqueId());
+        if(cache.loadChunks.containsKey(player.getUniqueId())) {
+            cache.loadChunks.get(player.getUniqueId()).cancel();
+            cache.loadChunks.remove(player.getUniqueId());
+        }
+        if(cache.doTeleports.containsKey(player.getUniqueId())) {
+            cache.doTeleports.get(player.getUniqueId()).cancel();
+            cache.doTeleports.remove(player.getUniqueId());
+        }
+        cancelled = true;
+        super.cancel();
+    }
+
+    public boolean isNoDelay() {
+        return sender.hasPermission("rtp.noDelay");
+    }
+
+
 }
