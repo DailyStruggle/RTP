@@ -40,7 +40,9 @@ public final class OnPlayerDeath implements Listener {
         if (player.hasPermission("rtp.onEvent.respawn")) {
             RandomSelectParams rsParams = new RandomSelectParams(event.getEntity().getWorld(), new HashMap<>(), configs);
             TeleportRegion region = cache.permRegions.get(rsParams);
-            new QueueLocation(region, player).runTaskAsynchronously(plugin);
+            QueueLocation queueLocation = new QueueLocation(region, player, cache);
+            cache.queueLocationTasks.put(queueLocation.idx,queueLocation);
+            queueLocation.runTaskLaterAsynchronously(plugin, 1);
         }
     }
 
@@ -63,7 +65,11 @@ public final class OnPlayerDeath implements Listener {
         RandomSelectParams rsParams = cache.regionKeys.get(player.getUniqueId());
         if (cache.permRegions.containsKey(rsParams)) {
             Location randomLocation = cache.todoTP.get(player.getUniqueId());
-            new QueueLocation(cache.permRegions.get(rsParams), randomLocation).runTaskLaterAsynchronously(plugin, 1);
+            TeleportRegion region = cache.permRegions.get(rsParams);
+            QueueLocation queueLocation = new QueueLocation(region, randomLocation, cache);
+            cache.queueLocationTasks.put(queueLocation.idx,queueLocation);
+            queueLocation.runTaskLaterAsynchronously(plugin, 1);
+            region.recyclePlayerLocation(player);
         } else cache.tempRegions.remove(rsParams);
         cache.regionKeys.remove(player.getUniqueId());
         cache.todoTP.remove(player.getUniqueId());

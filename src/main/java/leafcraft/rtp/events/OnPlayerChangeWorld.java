@@ -10,11 +10,14 @@ import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
+
+import java.util.HashMap;
 
 public final class OnPlayerChangeWorld implements Listener {
     private final RTP plugin;
@@ -50,6 +53,30 @@ public final class OnPlayerChangeWorld implements Listener {
             Bukkit.dispatchCommand(Bukkit.getConsoleSender(),
                     "rtp player:" + player.getName() + " world:" + player.getWorld().getName());
         }
+
+        if(player.hasPermission("rtp.personalQueue")) {
+            World fromWorld = event.getFrom();
+            String fromWorldName = fromWorld.getName();
+            if (!player.hasPermission("rtp.worlds." + fromWorldName) && (Boolean) configs.worlds.getWorldSetting(fromWorldName, "requirePermission", true)) {
+                fromWorld = Bukkit.getWorld((String) configs.worlds.getWorldSetting(fromWorldName, "override", "world"));
+            }
+            RandomSelectParams fromParams = new RandomSelectParams(fromWorld, new HashMap<>(), configs);
+            if (cache.permRegions.containsKey(fromParams)) {
+                cache.permRegions.get(fromParams).recyclePlayerLocation(player);
+            }
+
+            World toWorld = event.getFrom();
+            String toWorldName = toWorld.getName();
+            if (!player.hasPermission("rtp.worlds." + toWorldName) && (Boolean) configs.worlds.getWorldSetting(toWorldName, "requirePermission", true)) {
+                toWorld = Bukkit.getWorld((String) configs.worlds.getWorldSetting(toWorldName, "override", "world"));
+            }
+            RandomSelectParams toParams = new RandomSelectParams(toWorld, new HashMap<>(), configs);
+            if (cache.permRegions.containsKey(toParams)) {
+                QueueLocation queueLocation = new QueueLocation(cache.permRegions.get(toParams), player, cache);
+                cache.queueLocationTasks.put(queueLocation.idx,queueLocation);
+                queueLocation.runTaskLaterAsynchronously(plugin, 1);
+            }
+        }
     }
 
     private void stopTeleport(PlayerChangedWorldEvent event) {
@@ -79,7 +106,9 @@ public final class OnPlayerChangeWorld implements Listener {
         RandomSelectParams rsParams = cache.regionKeys.get(player.getUniqueId());
         if (cache.permRegions.containsKey(rsParams)) {
             Location randomLocation = cache.todoTP.get(player.getUniqueId());
-            new QueueLocation(cache.permRegions.get(rsParams), randomLocation).runTaskLaterAsynchronously(plugin, 1);
+            QueueLocation queueLocation = new QueueLocation(cache.permRegions.get(rsParams), randomLocation, cache);
+            cache.queueLocationTasks.put(queueLocation.idx,queueLocation);
+            queueLocation.runTaskLaterAsynchronously(plugin, 1);
         } else cache.tempRegions.remove(rsParams);
         cache.regionKeys.remove(player.getUniqueId());
         cache.todoTP.remove(player.getUniqueId());

@@ -1,5 +1,6 @@
 package leafcraft.rtp.tasks;
 
+import io.papermc.lib.PaperLib;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
@@ -11,6 +12,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.awt.print.Paper;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
@@ -44,17 +46,29 @@ public class LoadChunks extends BukkitRunnable {
         Long startTime = System.currentTimeMillis();
 
         if(!sender.hasPermission("rtp.noDelay.chunks")) {
+            boolean unqueued = sender.hasPermission("rtp.unqueued");
             if (cache.permRegions.containsKey(rsParams))
                 chunks = cache.permRegions.get(rsParams).getChunks(location);
             else chunks = cache.tempRegions.get(rsParams).getChunks(location);
+
             for (CompletableFuture<Chunk> chunk : chunks) {
-                if (isCancelled() || cancelled) break;
-                try {
-                    chunk.get();
-                } catch (CancellationException | InterruptedException e) {
-                    break;
-                } catch (ExecutionException e) {
-                    e.printStackTrace();
+                if(isCancelled() || cancelled) break;
+                if(chunk.isDone()) continue;
+                if(!unqueued) {
+                    player.sendMessage(configs.lang.getLog("noLocationsQueued"));
+                    if(!sender.getName().equals(player.getName()))
+                        sender.sendMessage(configs.lang.getLog("noLocationsQueued"));
+                    cancel();
+                }
+                else {
+                    try {
+                        chunk.get();
+                    } catch (InterruptedException | CancellationException | StackOverflowError e) {
+                        cancel();
+                        break;
+                    } catch (ExecutionException e) {
+                        e.printStackTrace();
+                    }
                 }
             }
         }

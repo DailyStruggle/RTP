@@ -108,6 +108,9 @@ permissions:
   rtp.unqueued:
     description: if no locations are queued, generate a new location
     default: op
+  rtp.personalQueue:
+    description: reserve a next location for this player
+    default: false
   rtp.onEvent.*:
     description: inescapable chaos
     default: false
