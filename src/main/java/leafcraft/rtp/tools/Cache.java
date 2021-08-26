@@ -4,6 +4,7 @@ import io.papermc.lib.PaperLib;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tasks.DoTeleport;
 import leafcraft.rtp.tasks.LoadChunks;
+import leafcraft.rtp.tasks.QueueLocation;
 import leafcraft.rtp.tasks.SetupTeleport;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.selection.TeleportRegion;
@@ -48,7 +49,9 @@ public class Cache {
                 double tps = TPS.getTPS();
                 double minTps = (Double)configs.config.getConfigValue("minTPS",19.0);
                 if(tps < minTps) return;
-                entry.getValue().queueRandomLocation();
+                QueueLocation queueLocation = new QueueLocation(entry.getValue(),this);
+                queueLocationTasks.put(queueLocation.idx,queueLocation);
+                queueLocation.runTaskAsynchronously(plugin);
             },200+i.intValue(),period*20));
             i+=increment;
         }
@@ -73,6 +76,7 @@ public class Cache {
     public ConcurrentHashMap<UUID, SetupTeleport> setupTeleports = new ConcurrentHashMap<>();
     public ConcurrentHashMap<UUID, LoadChunks> loadChunks = new ConcurrentHashMap<>();
     public ConcurrentHashMap<UUID, DoTeleport> doTeleports = new ConcurrentHashMap<>();
+    public ConcurrentHashMap<Long, QueueLocation> queueLocationTasks = new ConcurrentHashMap<>();
 
     //pre-teleport location info for checking distance from command location
     public ConcurrentHashMap<UUID, Location> playerFromLocations = new ConcurrentHashMap<>();
@@ -104,6 +108,11 @@ public class Cache {
             entry.getValue().cancel();
         }
         doTeleports.clear();
+
+        for(ConcurrentHashMap.Entry<Long,QueueLocation> entry : queueLocationTasks.entrySet()) {
+            entry.getValue().cancel();
+        }
+        queueLocationTasks.clear();
 
         for(TeleportRegion region : tempRegions.values()) {
             region.shutdown();
@@ -171,22 +180,11 @@ public class Cache {
                 double tps = TPS.getTPS();
                 double minTps = (Double)configs.config.getConfigValue("minTPS",19.0);
                 if(tps < minTps) return;
-                entry.getValue().queueRandomLocation();
+                QueueLocation queueLocation = new QueueLocation(entry.getValue(),this);
+                queueLocationTasks.put(queueLocation.idx,queueLocation);
+                queueLocation.runTaskAsynchronously(plugin);
             },200+i.intValue(),period*20));
             i+=increment;
         }
-    }
-
-    //reset just the queues
-    public void resetQueues() {
-        for(TeleportRegion region : permRegions.values()) {
-            region.shutdown();
-        }
-    }
-
-    public void addBadChunk(World world, int x, int z) {
-        UUID uuid = world.getUID();
-        allBadChunks.putIfAbsent(uuid, new ConcurrentHashMap<>());
-        allBadChunks.get(uuid).put(new HashableChunk(world,x,z),0l);
     }
 }

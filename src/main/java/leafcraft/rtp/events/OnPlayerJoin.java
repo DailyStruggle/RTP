@@ -3,15 +3,24 @@ package leafcraft.rtp.events;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tasks.DoTeleport;
 import leafcraft.rtp.tasks.LoadChunks;
+import leafcraft.rtp.tasks.QueueLocation;
 import leafcraft.rtp.tasks.SetupTeleport;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
+import leafcraft.rtp.tools.selection.RandomSelectParams;
+import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Bukkit;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.scheduler.BukkitTask;
+
+import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 public final class OnPlayerJoin implements Listener {
     private final RTP plugin;
@@ -44,6 +53,20 @@ public final class OnPlayerJoin implements Listener {
             //run command as console
             Bukkit.dispatchCommand(Bukkit.getConsoleSender(),
                     "rtp player:" + player.getName() + " world:" + player.getWorld().getName());
+        }
+
+        if(player.hasPermission("rtp.personalQueue")) {
+            World toWorld = event.getPlayer().getWorld();
+            String toWorldName = toWorld.getName();
+            if (!player.hasPermission("rtp.worlds." + toWorldName) && (Boolean) configs.worlds.getWorldSetting(toWorldName, "requirePermission", true)) {
+                toWorld = Bukkit.getWorld((String) configs.worlds.getWorldSetting(toWorldName, "override", "world"));
+            }
+            RandomSelectParams toParams = new RandomSelectParams(toWorld, new HashMap<>(), configs);
+            if (cache.permRegions.containsKey(toParams)) {
+                QueueLocation queueLocation = new QueueLocation(cache.permRegions.get(toParams), player, cache);
+                cache.queueLocationTasks.put(queueLocation.idx, queueLocation);
+                queueLocation.runTaskAsynchronously(plugin);
+            }
         }
     }
 }

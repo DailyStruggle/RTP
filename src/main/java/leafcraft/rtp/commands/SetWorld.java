@@ -20,14 +20,14 @@ import java.util.logging.Level;
 public class SetWorld implements CommandExecutor {
     private final RTP plugin;
     private final Configs configs;
-    Cache cache;
+    private final Cache cache;
 
     private final Set<String> worldParams = new HashSet<>();
 
-    public SetWorld(RTP plugin, Configs configs) {
+    public SetWorld(RTP plugin, Configs configs, Cache cache) {
         this.plugin = plugin;
         this.configs = configs;
-        this.cache = plugin.cache;
+        this.cache = cache;
 
         worldParams.add("world");
         worldParams.add("name");

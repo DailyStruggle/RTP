@@ -6,6 +6,7 @@ import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.HashableChunk;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
+import leafcraft.rtp.tools.selection.TeleportRegion;
 import leafcraft.rtp.tools.selection.Translate;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
@@ -66,9 +67,17 @@ public class DoTeleport extends BukkitRunnable {
                 }
             }
 
-            RandomSelectParams rsParams = cache.regionKeys.get(player.getUniqueId());
-            if(rsParams!=null && cache.permRegions.containsKey(rsParams))
-                cache.permRegions.get(rsParams).removeChunks(location);
+            if(rsParams!=null && cache.permRegions.containsKey(rsParams)) {
+                TeleportRegion region = cache.permRegions.get(rsParams);
+                region.removeChunks(location);
+                QueueLocation queueLocation;
+                if(player.hasPermission("rtp.personalQueue"))
+                    queueLocation = new QueueLocation(region,player, cache);
+                else
+                    queueLocation = new QueueLocation(region, cache);
+                cache.queueLocationTasks.put(queueLocation.idx,queueLocation);
+                queueLocation.runTaskAsynchronously(plugin);
+            }
         }
     }
 

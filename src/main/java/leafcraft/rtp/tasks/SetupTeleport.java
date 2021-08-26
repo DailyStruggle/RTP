@@ -70,7 +70,7 @@ public class SetupTeleport extends BukkitRunnable {
             cache.regionKeys.put(player.getUniqueId(),rsParams);
             long stop = System.currentTimeMillis();
             LoadChunks loadChunks = new LoadChunks(plugin,configs,sender,player,cache,(int)((20*delay)-((stop-start)/50)),location);
-            loadChunks.runTaskLaterAsynchronously(plugin,1);
+            loadChunks.runTaskAsynchronously(plugin);
             cache.loadChunks.put(player.getUniqueId(), loadChunks);
         }
         cache.setupTeleports.remove(player.getUniqueId());

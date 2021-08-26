@@ -84,7 +84,9 @@ public final class OnPlayerMove implements Listener {
         RandomSelectParams rsParams = cache.regionKeys.get(player.getUniqueId());
         if (cache.permRegions.containsKey(rsParams)) {
             Location randomLocation = cache.todoTP.get(player.getUniqueId());
-            new QueueLocation(cache.permRegions.get(rsParams), randomLocation).runTaskLaterAsynchronously(plugin, 1);
+            QueueLocation queueLocation =  new QueueLocation(cache.permRegions.get(rsParams), randomLocation, cache);
+            cache.queueLocationTasks.put(queueLocation.idx,queueLocation);
+            queueLocation.runTaskLaterAsynchronously(plugin, 1);
         } else cache.tempRegions.remove(rsParams);
         cache.regionKeys.remove(player.getUniqueId());
         cache.todoTP.remove(player.getUniqueId());

@@ -1,31 +1,37 @@
 package leafcraft.rtp.events;
 
+import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
+import leafcraft.rtp.tools.HashableChunk;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import leafcraft.rtp.tools.softdepends.GriefPreventionChecker;
 import leafcraft.rtp.tools.softdepends.WorldGuardChecker;
-import org.bukkit.Bukkit;
-import org.bukkit.Location;
-import org.bukkit.Material;
+import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.world.ChunkLoadEvent;
+import org.bukkit.scheduler.BukkitRunnable;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
 public final class OnChunkLoad implements Listener {
     private static final Set<Material> acceptableAir = new HashSet<>();
+    private final RTP plugin;
     private final Configs configs;
     private final Cache cache;
+    private Map<HashableChunk,CheckChunk> checkChunkMap = new HashMap<>();
 
-    public OnChunkLoad(Configs configs,
+    public OnChunkLoad(RTP plugin,
+                       Configs configs,
                        Cache cache) {
+        this.plugin = plugin;
         this.configs = configs;
         this.cache = cache;
     }
@@ -38,29 +44,60 @@ public final class OnChunkLoad implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST)
     public void onChunkLoad(ChunkLoadEvent event) {
-        boolean rerollLiquid = configs.config.rerollLiquid;
-        boolean rerollWorldGuard = configs.config.rerollWorldGuard;
-        boolean rerollGriefPrevention = configs.config.rerollGriefPrevention;
+        Chunk chunk = event.getChunk();
+        HashableChunk hashableChunk = new HashableChunk(chunk);
+        if(checkChunkMap.containsKey(hashableChunk)) return;
+        CheckChunk checkChunk = new CheckChunk(event.getWorld(),hashableChunk);
+        checkChunkMap.put(hashableChunk,checkChunk);
+        checkChunk.runTaskAsynchronously(plugin);
+    }
 
-        //for each region in the world, check & add
-        // todo: optimize
-        for (Map.Entry<RandomSelectParams, TeleportRegion> entry : cache.permRegions.entrySet()) {
-            if (!entry.getKey().worldID.equals(event.getWorld().getUID())) continue;
-            if (!entry.getValue().isInBounds(event.getChunk().getX(),event.getChunk().getZ())) continue;
-            if (entry.getValue().isKnownBad(event.getChunk().getX(),event.getChunk().getZ())) continue;
+    public void shutdown() {
+        for(CheckChunk checkChunk : checkChunkMap.values()) {
+            if(checkChunk!=null) checkChunk.cancel();
+        }
+    }
 
-            int y;
-            y = entry.getValue().getFirstNonAir(event.getChunk().getChunkSnapshot());
-            y = entry.getValue().getLastNonAir(event.getChunk().getChunkSnapshot(),y);
-            Block b = event.getChunk().getBlock(7,y,7);
-            Location res = b.getLocation();
-            if (acceptableAir.contains(b.getType())
-                    || (y >= entry.getKey().maxY)
-                    || (rerollLiquid && b.isLiquid())
-                    || (rerollWorldGuard && WorldGuardChecker.isInRegion(res))
-                    || (rerollGriefPrevention && GriefPreventionChecker.isInClaim(res))) {
-                entry.getValue().addBadLocation(event.getChunk().getX(), event.getChunk().getZ());
+    private class CheckChunk extends BukkitRunnable {
+        private final World world;
+        private final HashableChunk hashableChunk;
+        private final Chunk chunk;
+        private final ChunkSnapshot chunkSnapshot;
+        private final boolean rerollLiquid = configs.config.rerollLiquid;
+        private final boolean rerollWorldGuard = configs.config.rerollWorldGuard;
+        private final boolean rerollGriefPrevention = configs.config.rerollGriefPrevention;
+
+        public CheckChunk(World world, HashableChunk hashableChunk) {
+            this.world = world;
+            this.hashableChunk = hashableChunk;
+            this.chunk = hashableChunk.getChunk();
+            this.chunkSnapshot = chunk.getChunkSnapshot();
+        }
+
+        @Override
+        public void run() {
+            //for each region in the world, check & add
+            // todo: optimize
+            for (Map.Entry<RandomSelectParams, TeleportRegion> entry : cache.permRegions.entrySet()) {
+                if(isCancelled()) return;
+                if (!entry.getKey().worldID.equals(world.getUID())) continue;
+                if (!entry.getValue().isInBounds(chunk.getX(),chunk.getZ())) continue;
+                if (entry.getValue().isKnownBad(chunk.getX(),chunk.getZ())) continue;
+
+                int y;
+                y = entry.getValue().getFirstNonAir(chunkSnapshot);
+                y = entry.getValue().getLastNonAir(chunkSnapshot,y);
+                Block b = chunk.getBlock(7,y,7);
+                Location location = b.getLocation();
+                if (acceptableAir.contains(b.getType())
+                        || (y >= entry.getKey().maxY)
+                        || (rerollLiquid && b.isLiquid())
+                        || (rerollWorldGuard && WorldGuardChecker.isInRegion(location))
+                        || (rerollGriefPrevention && GriefPreventionChecker.isInClaim(location))) {
+                    entry.getValue().addBadLocation(chunk.getX(), chunk.getZ());
+                }
             }
+            checkChunkMap.put(hashableChunk,null);
         }
     }
 }

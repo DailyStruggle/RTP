@@ -53,8 +53,8 @@ public final class OnPlayerTeleport implements Listener {
             if (setupTeleport == null && loadChunks == null && doTeleport == null) {
                 //Bukkit.getScheduler().runTaskLater(plugin, ()-> Bukkit.dispatchCommand(player,"rtp"),2);
                 setupTeleport = new SetupTeleport(plugin, player, player, configs, cache, new RandomSelectParams(player.getWorld(), new HashMap<>(), configs));
-                setupTeleport.runTaskLaterAsynchronously(plugin, 2);
                 this.cache.setupTeleports.put(player.getUniqueId(), setupTeleport);
+                setupTeleport.runTaskLaterAsynchronously(plugin, 2);
             }
         }
     }
@@ -89,7 +89,9 @@ public final class OnPlayerTeleport implements Listener {
         RandomSelectParams rsParams = cache.regionKeys.get(player.getUniqueId());
         if (cache.permRegions.containsKey(rsParams)) {
             Location randomLocation = cache.todoTP.get(player.getUniqueId());
-            new QueueLocation(cache.permRegions.get(rsParams), randomLocation).runTaskLaterAsynchronously(plugin, 1);
+            QueueLocation queueLocation = new QueueLocation(cache.permRegions.get(rsParams), randomLocation, cache);
+            cache.queueLocationTasks.put(queueLocation.idx,queueLocation);
+            queueLocation.runTaskLaterAsynchronously(plugin, 1);
         } else cache.tempRegions.remove(rsParams);
         cache.regionKeys.remove(player.getUniqueId());
         cache.todoTP.remove(player.getUniqueId());

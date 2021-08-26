@@ -1,6 +1,7 @@
 package leafcraft.rtp.tools.selection;
 
 import io.papermc.lib.PaperLib;
+import it.unimi.dsi.fastutil.Hash;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.softdepends.GriefPreventionChecker;
@@ -55,6 +56,7 @@ public class TeleportRegion {
     //location queue for this region and associated chunks
     private ConcurrentLinkedQueue<Location> locationQueue = new ConcurrentLinkedQueue<>();
     private final ConcurrentHashMap<Location, List<CompletableFuture<Chunk>>> locAssChunks = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<HashableChunk, CompletableFuture<Chunk>> currChunks = new ConcurrentHashMap<>();
 
     //player reservation queue for reserving a spot on death
     private final ConcurrentHashMap<UUID,Location> playerNextLocation = new ConcurrentHashMap<>();
@@ -122,6 +124,13 @@ public class TeleportRegion {
         public void shutdown() {
             for(List<CompletableFuture<Chunk>> chunks : locAssChunks.values()) {
                 for(CompletableFuture<Chunk> chunk : chunks) {
+                    if(!chunk.isDone()) {
+                        chunk.cancel(true);
+                    }
+                }
+            }
+            for(CompletableFuture<Chunk> chunk : currChunks.values()) {
+                if(!chunk.isDone()) {
                     chunk.cancel(true);
                 }
             }
@@ -160,36 +169,27 @@ public class TeleportRegion {
             return res;
         }
 
-        private void addChunks(Location location) {
+        private void addChunks(Location location, boolean urgent) {
             List<CompletableFuture<Chunk>> chunks = new ArrayList<>();
+            locAssChunks.put(location,chunks);
 
             int vd = Bukkit.getViewDistance();
             int cx = (location.getBlockX()>0) ? location.getBlockX()/16 : location.getBlockX()/16-1;
             int cz = (location.getBlockZ()>0) ? location.getBlockZ()/16 : location.getBlockZ()/16-1;
             for(int i = -vd; i < vd; i++) {
                 for(int j = -vd; j < vd; j++) {
-                    chunks.add(PaperLib.getChunkAtAsync(Objects.requireNonNull(location.getWorld()), cx+i, cz+j));
                     HashableChunk hc = new HashableChunk(location.getWorld(), cx+i, cz+j);
                     cache.keepChunks.putIfAbsent(hc, 0L);
                     cache.keepChunks.compute(hc, (k, v) -> v + 1);
-                    if(chunks.get(chunks.size()-1).isDone()) {
-                        try {
-                            Chunk chunk = chunks.get(chunks.size()-1).get();
-                            if(chunk.isForceLoaded()) {
-                                cache.keepChunks.remove(hc);
-                            }
-                        } catch (ExecutionException e) {
-                            e.printStackTrace();
-                        } catch (InterruptedException | CancellationException e) {
-                            return;
-                        }
-                    }
+                    CompletableFuture<Chunk> cfChunk;
+                    cfChunk = (urgent) ? PaperLib.getChunkAtAsyncUrgently(Objects.requireNonNull(location.getWorld()), cx+i, cz+j, true)
+                            : PaperLib.getChunkAtAsync(Objects.requireNonNull(location.getWorld()), cx+i, cz+j, true);
+                    chunks.add(cfChunk);
                     if(uniquePlacements) {
                         addBadLocation(cx+i,cz+j);
                     }
                 }
             }
-            locAssChunks.put(location,chunks);
         }
 
         public List<CompletableFuture<Chunk>> getChunks(Location location) {
@@ -220,11 +220,24 @@ public class TeleportRegion {
         }
 
         public void queueRandomLocation(Player player) {
+            if(playerNextLocation.containsKey(player.getUniqueId())) return;
+            if(locationQueue.size() > 1 && locationQueue.size() >= (Integer)configs.regions.getRegionSetting(name,"queueLen",0)) {
+                playerNextLocation.put(player.getUniqueId(),locationQueue.remove());
+                return;
+            }
+
             Location location = getRandomLocation(true);
             if(location == null) {
                 return;
             }
             playerNextLocation.put(player.getUniqueId(),location);
+        }
+
+        public void recyclePlayerLocation(Player player) {
+            if(!playerNextLocation.containsKey(player.getUniqueId())) return;
+            Location location = playerNextLocation.get(player.getUniqueId());
+            playerNextLocation.remove(player.getUniqueId());
+            queueLocation(location);
         }
 
         public void addBadLocation(int chunkX, int chunkZ) {
@@ -305,9 +318,6 @@ public class TeleportRegion {
             xz[0] = (xzChunk[0]*16)+7;
             xz[1] = (xzChunk[1]*16)+7;
 
-//        xzChunk[0] = (xz[0] >= 0 || (xz[0]%16==0)) ? (xz[0] / 16) : (xz[0] / 16) - 1;
-//        xzChunk[1] = (xz[1] >= 0 || (xz[1]%16==0)) ? (xz[1] / 16) : (xz[1] / 16) - 1;
-
             long stop = System.currentTimeMillis();
             selectTime += (stop-start);
 
@@ -315,24 +325,27 @@ public class TeleportRegion {
             CompletableFuture<Chunk> cfChunk = (urgent) ?
                     PaperLib.getChunkAtAsyncUrgently(world,xzChunk[0],xzChunk[1],true) :
                     PaperLib.getChunkAtAsync(world,xzChunk[0],xzChunk[1],true);
+            HashableChunk hashableChunk = new HashableChunk(world,xzChunk[0],xzChunk[1]);
+            currChunks.put(hashableChunk,cfChunk);
 
-            ChunkSnapshot chunk;
+            ChunkSnapshot chunkSnapshot;
             try {
-                chunk = cfChunk.get().getChunkSnapshot(); //wait on chunk load/gen
+                chunkSnapshot = cfChunk.get().getChunkSnapshot(); //wait on chunk load/gen
             } catch (ExecutionException e) {
                 e.printStackTrace();
                 return null;
-            } catch (InterruptedException | CancellationException e) {
+            } catch (InterruptedException | CancellationException | StackOverflowError e) {
                 return null;
             }
+            currChunks.remove(hashableChunk);
 
             stop = System.currentTimeMillis();
             chunkTime += (stop-start);
 
             int y;
             start = System.currentTimeMillis();
-            y = this.getFirstNonAir(chunk);
-            y = this.getLastNonAir(chunk,y);
+            y = this.getFirstNonAir(chunkSnapshot);
+            y = this.getLastNonAir(chunkSnapshot,y);
             res = new Location(world,xz[0],y,xz[1]);
             stop = System.currentTimeMillis();
             yTime += (stop - start);
@@ -370,22 +383,25 @@ public class TeleportRegion {
                 cfChunk = (urgent) ?
                         PaperLib.getChunkAtAsyncUrgently(world,xzChunk[0],xzChunk[1],true) :
                         PaperLib.getChunkAtAsync(world,xzChunk[0],xzChunk[1],true);
+                hashableChunk = new HashableChunk(world,xzChunk[0],xzChunk[1]);
+                currChunks.put(hashableChunk,cfChunk);
 
                 try {
-                    chunk = cfChunk.get().getChunkSnapshot(); //wait on chunk load/gen
+                    chunkSnapshot = cfChunk.get().getChunkSnapshot(); //wait on chunk load/gen
                 } catch (ExecutionException e) {
                     e.printStackTrace();
                     return null;
-                } catch (InterruptedException | CancellationException e) {
+                } catch (InterruptedException | CancellationException | StackOverflowError e) {
                     return null;
                 }
+                currChunks.remove(hashableChunk);
 
                 stop = System.currentTimeMillis();
                 chunkTime += (stop-start);
 
                 start = System.currentTimeMillis();
-                y = this.getFirstNonAir(chunk);
-                y = this.getLastNonAir(chunk,y);
+                y = this.getFirstNonAir(chunkSnapshot);
+                y = this.getLastNonAir(chunkSnapshot,y);
                 res = new Location(world,xz[0],y,xz[1]);
                 stop = System.currentTimeMillis();
                 yTime += (stop - start);
@@ -402,7 +418,7 @@ public class TeleportRegion {
             }
 
             this.cache.numTeleportAttempts.put(res, numAttempts);
-            addChunks(res);
+            addChunks(res, urgent);
 
 //        Bukkit.getLogger().warning(ChatColor.AQUA + "AVG TIME SPENT ON SELECTION: " + selectTime/numAttempts);
 //        Bukkit.getLogger().warning(ChatColor.LIGHT_PURPLE + "AVG TIME SPENT ON CHUNKS: " + chunkTime/numAttempts);

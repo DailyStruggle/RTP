@@ -1,12 +1,5 @@
 package leafcraft.rtp;
 
-import com.comphenix.protocol.PacketType;
-import com.comphenix.protocol.ProtocolLib;
-import com.comphenix.protocol.ProtocolLibrary;
-import com.comphenix.protocol.ProtocolManager;
-import com.comphenix.protocol.events.ListenerPriority;
-import com.comphenix.protocol.events.PacketAdapter;
-import com.comphenix.protocol.events.PacketEvent;
 import io.papermc.lib.PaperLib;
 import leafcraft.rtp.commands.*;
 import leafcraft.rtp.events.*;
@@ -18,19 +11,15 @@ import org.bukkit.Bukkit;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.plugin.java.JavaPluginLoader;
-import org.bukkit.scheduler.BukkitTask;
 
 import java.io.File;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 
 public final class RTP extends JavaPlugin {
     private Configs configs;
+    private Cache cache;
 
-    public Cache cache;
-
-    public ConcurrentHashMap<UUID,BukkitTask> fillers = new ConcurrentHashMap<>();
+    private OnChunkLoad onChunkLoad;
 
     private Metrics metrics;
 
@@ -58,7 +47,7 @@ public final class RTP extends JavaPlugin {
         getCommand("rtp help").setExecutor(new Help(configs));
         getCommand("rtp reload").setExecutor(new Reload(configs, cache));
         getCommand("rtp setRegion").setExecutor(new SetRegion(this,configs, cache));
-        getCommand("rtp setWorld").setExecutor(new SetWorld(this,configs));
+        getCommand("rtp setWorld").setExecutor(new SetWorld(this,configs, cache));
 //        getCommand("rtp fill").setExecutor(new Fill(this,this.config));
 
         getCommand("rtp").setTabCompleter(new TabComplete(this.configs));
@@ -72,22 +61,20 @@ public final class RTP extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new OnPlayerChangeWorld(this,configs,cache),this);
         getServer().getPluginManager().registerEvents(new OnPlayerQuit(cache),this);
         getServer().getPluginManager().registerEvents(new OnChunkUnload(cache),this);
-        getServer().getPluginManager().registerEvents(new OnChunkLoad(configs,cache),this);
+
+        this.onChunkLoad = new OnChunkLoad(this,configs,cache);
+        getServer().getPluginManager().registerEvents(onChunkLoad,this);
 
         Bukkit.getServer().getScheduler().scheduleSyncRepeatingTask(this, new TPS(), 100L, 1L);
     }
 
     @Override
     public void onDisable() {
-        if(this.cache == null) {
-            super.onDisable();
-            return;
-        }
-        for(BukkitTask task : fillers.values()) {
-            task.cancel();
+        onChunkLoad.shutdown();
+        if(this.cache != null) {
+            this.cache.shutdown();
         }
 
-        this.cache.shutdown();
         super.onDisable();
     }
 }
