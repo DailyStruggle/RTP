@@ -8,6 +8,9 @@ cancelDistance: 2
 #sleep attempt cooldown, in seconds, to prevent spam
 teleportCooldown: 300
 
+#price for custom teleport parameters
+price: 1000000000.0
+
 #reroll location if player would land in a bad spot
 rerollLiquid: true
 rerollWorldGuard: true
@@ -18,13 +21,16 @@ maxAttempts: 100
 
 #how often, in seconds, to queue a new location in each world
 # set to 0 or lower to turn off the timer
-# heads up: queueing locations also schedules chunk loading, including generation, so use wisely
-# also heads up: if it's interrupted while it's loading a chunk, it will tell you to nag me.
-#   I'm taking suggestions on how to fix that.
 queuePeriod: 30
 
 #minimum TPS requirement before trying to queue a new location
+# must be a positive integer
 minTPS: 19.0
 
+#what radius, in chunks, around the destination to pre-load
+# number of chunks loaded is (1 + 2*viewDistance)^2
+# if larger than bukkit view distance, uses bukkit view distance
+viewDistance: 10
+
 #DO NOT TOUCH VERSION NUMBER
-version: 1.5
+version: 1.7

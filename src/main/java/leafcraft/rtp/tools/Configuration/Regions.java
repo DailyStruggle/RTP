@@ -13,6 +13,7 @@ import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 
 public class Regions {
@@ -31,7 +32,7 @@ public class Regions {
         }
         config = YamlConfiguration.loadConfiguration(f);
 
-        if( 	(config.getDouble("version") < 1.1) ) {
+        if( 	(config.getDouble("version") < 1.2) ) {
             Bukkit.getLogger().log(Level.WARNING, lang.getLog("oldFile", "regions.yml"));
             FileStuff.renameFiles(plugin,"regions");
             config = YamlConfiguration.loadConfiguration(f);
@@ -58,7 +59,7 @@ public class Regions {
         section.set("uniquePlacements",params.uniquePlacements);
         section.set("expand",params.expand);
         section.set("queueLen",Integer.valueOf(params.params.getOrDefault("queueLen",Integer.toString(config.getConfigurationSection("default").getInt("queueLen",0)))));
-
+        section.set("price",Double.valueOf(params.params.getOrDefault("price",Double.toString(config.getConfigurationSection("default").getDouble("price",0)))));
     }
 
     public Integer updateRegionSetting(String regionName, String setting, String value){
@@ -132,6 +133,7 @@ public class Regions {
         Boolean defaultUniquePlacements = config.getConfigurationSection("default").getBoolean("uniquePlacements",true);
         Boolean defaultExpand = config.getConfigurationSection("default").getBoolean("expand",false);
         Integer defaultQueueLen = config.getConfigurationSection("default").getInt("queueLen", 10);
+        Double defaultPrice = config.getConfigurationSection("default").getDouble("price", 50.0);
 
         try {
             Scanner scanner = new Scanner(
@@ -167,6 +169,7 @@ public class Regions {
                         linesInRegions.add("    uniquePlacements: " + regionSection.getBoolean("uniquePlacements",defaultUniquePlacements));
                         linesInRegions.add("    expand: " + regionSection.getBoolean("expand",defaultExpand));
                         linesInRegions.add("    queueLen: " + regionSection.getInt("queueLen",defaultQueueLen));
+                        linesInRegions.add("    price: " + regionSection.getDouble("price",defaultPrice));
                     }
                 }
                 else { //if not a blank line
@@ -200,6 +203,8 @@ public class Regions {
                         s = "    expand: " + config.getConfigurationSection(region).getBoolean("expand",defaultWorldBorderOverride);
                     else if(s.startsWith("    queueLen:"))
                         s = "    queueLen: " + config.getConfigurationSection(region).getInt("queueLen",defaultQueueLen);
+                    else if(s.startsWith("    price:"))
+                        s = "    price: " + config.getConfigurationSection(region).getDouble("price",defaultPrice);
                     else if(!s.startsWith("#") && !s.startsWith("  ") && !s.startsWith("version") && (s.matches(".*[a-z].*") || s.matches(".*[A-Z].*")))
                     {
                         region = s.replace(":","");

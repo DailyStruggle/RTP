@@ -16,9 +16,9 @@ public class Config {
 	private final RTP plugin;
 	private FileConfiguration config;
 
-	public int teleportDelay, cancelDistance, teleportCooldown, maxAttempts, queuePeriod, minTPS;
-	public boolean rerollLiquid, rerollWorldGuard, rerollGriefPrevention;
-
+	public final int teleportDelay, cancelDistance, teleportCooldown, maxAttempts, queuePeriod, minTPS, vd;
+	public final double price;
+	public final boolean rerollLiquid, rerollWorldGuard, rerollGriefPrevention;
 
 	public Config(RTP plugin, Lang lang) {
 		this.plugin = plugin;
@@ -30,7 +30,7 @@ public class Config {
 		}
 		this.config = YamlConfiguration.loadConfiguration(f);
 
-		if( 	(this.config.getDouble("version") < 1.5) ) {
+		if( 	(this.config.getDouble("version") < 1.7) ) {
 			Bukkit.getLogger().log(Level.WARNING, lang.getLog("oldFile", "config.yml"));
 			update();
 
@@ -42,18 +42,21 @@ public class Config {
 		this.rerollWorldGuard = config.getBoolean("rerollWorldGuard",true);
 		this.rerollGriefPrevention = config.getBoolean("rerollGriefPrevention",true);
 
-		this.teleportDelay = config.getInt("teleportDelay",2);
+		this.teleportDelay = 20*config.getInt("teleportDelay",2);
 		this.cancelDistance = config.getInt("cancelDistance",2);
 		this.teleportCooldown = config.getInt("teleportCooldown",300);
 		this.maxAttempts = config.getInt("maxAttempts",100);
 		this.queuePeriod = config.getInt("queuePeriod",30);
 		this.minTPS = config.getInt("minTPS",19);
+		this.price = config.getDouble("price", Double.MAX_VALUE);
+
+		int vd = config.getInt("viewDistance",10);
+		if(vd > Bukkit.getViewDistance()) vd = Bukkit.getViewDistance();
+		this.vd = vd;
 	}
 
 	private void update() {
 		FileStuff.renameFiles(plugin,"config");
-
-		plugin.saveResource("config.yml", false);
 		Map<String, Object> oldValues = this.config.getValues(false);
 		// Read default config to keep comments
 		ArrayList<String> linesInDefaultConfig = new ArrayList<>();
@@ -72,7 +75,7 @@ public class Config {
 		for (String line : linesInDefaultConfig) {
 			String newline = line;
 			if (line.startsWith("version:")) {
-				newline = "version: 1.5";
+				newline = "version: 1.7";
 			} else {
 				for (String node : oldValues.keySet()) {
 					if (line.startsWith(node + ":")) {

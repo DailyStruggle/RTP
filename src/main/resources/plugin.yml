@@ -37,6 +37,11 @@ commands:
     permission: rtp.setRegion
     usage: |
       /rtp setRegion
+  rtp fill:
+    description: start filling out region locations
+    permission: rtp.fill
+    usage: |
+      /rtp fill
 
 permissions:
   rtp.*:
@@ -64,8 +69,14 @@ permissions:
   rtp.use:
     description: allow player to use /rtp
     default: true
+  rtp.free:
+    description: use /rtp for free
+    default: op
   rtp.reload:
     description: allow player to use /rtp reload
+    default: op
+  rtp.fill:
+    description: allow player to start fill tasks
     default: op
   rtp.noDelay:
     description: skip the teleport delay

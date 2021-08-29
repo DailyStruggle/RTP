@@ -5,8 +5,9 @@ import leafcraft.rtp.commands.*;
 import leafcraft.rtp.events.*;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
-import leafcraft.rtp.tools.Metrics;
 import leafcraft.rtp.tools.TPS;
+import leafcraft.rtp.tools.softdepends.VaultChecker;
+import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -14,12 +15,11 @@ import org.bukkit.plugin.java.JavaPluginLoader;
 
 import java.io.File;
 
-
 public final class RTP extends JavaPlugin {
     private Configs configs;
     private Cache cache;
 
-    private OnChunkLoad onChunkLoad;
+//    private OnChunkLoad onChunkLoad;
 
     private Metrics metrics;
 
@@ -48,7 +48,7 @@ public final class RTP extends JavaPlugin {
         getCommand("rtp reload").setExecutor(new Reload(configs, cache));
         getCommand("rtp setRegion").setExecutor(new SetRegion(this,configs, cache));
         getCommand("rtp setWorld").setExecutor(new SetWorld(this,configs, cache));
-//        getCommand("rtp fill").setExecutor(new Fill(this,this.config));
+        getCommand("rtp fill").setExecutor(new Fill(this,configs, cache));
 
         getCommand("rtp").setTabCompleter(new TabComplete(this.configs));
         getCommand("wild").setTabCompleter(new TabComplete(this.configs));
@@ -60,17 +60,20 @@ public final class RTP extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new OnPlayerJoin(this,configs,cache),this);
         getServer().getPluginManager().registerEvents(new OnPlayerChangeWorld(this,configs,cache),this);
         getServer().getPluginManager().registerEvents(new OnPlayerQuit(cache),this);
-        getServer().getPluginManager().registerEvents(new OnChunkUnload(cache),this);
 
-        this.onChunkLoad = new OnChunkLoad(this,configs,cache);
-        getServer().getPluginManager().registerEvents(onChunkLoad,this);
+//        this.onChunkLoad = new OnChunkLoad(this,configs,cache);
+//        getServer().getPluginManager().registerEvents(onChunkLoad,this);
 
         Bukkit.getServer().getScheduler().scheduleSyncRepeatingTask(this, new TPS(), 100L, 1L);
+
+        VaultChecker.setupChat();
+        VaultChecker.setupEconomy();
+        VaultChecker.setupPermissions();
     }
 
     @Override
     public void onDisable() {
-        onChunkLoad.shutdown();
+//        onChunkLoad.shutdown();
         if(this.cache != null) {
             this.cache.shutdown();
         }

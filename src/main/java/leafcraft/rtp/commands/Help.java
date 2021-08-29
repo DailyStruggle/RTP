@@ -1,6 +1,7 @@
 package leafcraft.rtp.commands;
 
 import leafcraft.rtp.tools.Configuration.Configs;
+import leafcraft.rtp.tools.softdepends.PAPIChecker;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.ComponentBuilder;
 import net.md_5.bungee.api.chat.HoverEvent;
@@ -8,6 +9,7 @@ import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -21,12 +23,17 @@ public class Help implements CommandExecutor {
         this.perms.put("rtp","rtp.see");
         this.perms.put("help","rtp.see");
         this.perms.put("reload","rtp.reload");
+        this.perms.put("setWorld","rtp.setWorld");
+        this.perms.put("setRegion","rtp.setRegion");
+        this.perms.put("fill","rtp.fill");
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if(!sender.hasPermission("rtp.see")) {
-            sender.sendMessage(configs.lang.getLog("noPerms"));
+            String msg = configs.lang.getLog("noPerms");
+            if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
+            sender.sendMessage(msg);
             return true;
         }
 

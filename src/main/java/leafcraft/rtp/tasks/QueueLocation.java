@@ -41,7 +41,7 @@ public class QueueLocation extends BukkitRunnable {
 
     @Override
     public void run() {
-        if(player == null) {
+        if(player == null || !player.isOnline()) {
             if (location == null)
                 region.queueRandomLocation();
             else

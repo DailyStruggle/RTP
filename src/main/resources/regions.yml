@@ -33,5 +33,7 @@ default:
     #max length for the location queue per world, recommend 0 for unused regions
     # each location also queues a number of chunks to be loaded (async), based on view distance
     queueLen: 4
+    # vault price for player to use this region
+    price: 50.0
 
-version: 1.1
+version: 1.2

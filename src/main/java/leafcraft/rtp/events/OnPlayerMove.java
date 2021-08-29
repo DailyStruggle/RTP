@@ -34,6 +34,7 @@ public final class OnPlayerMove implements Listener {
 
         //if currently teleporting, stop that and clean up
         if (this.cache.todoTP.containsKey(player.getUniqueId())) {
+            cache.todoTP.remove(player.getUniqueId());
             stopTeleport(event);
         }
 
@@ -84,14 +85,11 @@ public final class OnPlayerMove implements Listener {
         RandomSelectParams rsParams = cache.regionKeys.get(player.getUniqueId());
         if (cache.permRegions.containsKey(rsParams)) {
             Location randomLocation = cache.todoTP.get(player.getUniqueId());
-            QueueLocation queueLocation =  new QueueLocation(cache.permRegions.get(rsParams), randomLocation, cache);
+            QueueLocation queueLocation = new QueueLocation(cache.permRegions.get(rsParams), randomLocation, cache);
             cache.queueLocationTasks.put(queueLocation.idx,queueLocation);
             queueLocation.runTaskLaterAsynchronously(plugin, 1);
         } else cache.tempRegions.remove(rsParams);
         cache.regionKeys.remove(player.getUniqueId());
-        cache.todoTP.remove(player.getUniqueId());
         cache.playerFromLocations.remove(player.getUniqueId());
-
-        player.sendMessage(configs.lang.getLog("teleportCancel"));
     }
 }

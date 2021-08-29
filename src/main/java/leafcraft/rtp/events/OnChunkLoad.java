@@ -48,8 +48,10 @@ public final class OnChunkLoad implements Listener {
         HashableChunk hashableChunk = new HashableChunk(chunk);
         if(checkChunkMap.containsKey(hashableChunk)) return;
         CheckChunk checkChunk = new CheckChunk(event.getWorld(),hashableChunk);
+        //todo: async checking
         checkChunkMap.put(hashableChunk,checkChunk);
-        checkChunk.runTaskAsynchronously(plugin);
+//        checkChunk.runTaskAsynchronously(plugin);
+        checkChunk.checkChunkNow();
     }
 
     public void shutdown() {
@@ -66,6 +68,7 @@ public final class OnChunkLoad implements Listener {
         private final boolean rerollLiquid = configs.config.rerollLiquid;
         private final boolean rerollWorldGuard = configs.config.rerollWorldGuard;
         private final boolean rerollGriefPrevention = configs.config.rerollGriefPrevention;
+        private boolean cancelled = false;
 
         public CheckChunk(World world, HashableChunk hashableChunk) {
             this.world = world;
@@ -76,10 +79,14 @@ public final class OnChunkLoad implements Listener {
 
         @Override
         public void run() {
+            checkChunkNow();
+        }
+
+        public void checkChunkNow() {
             //for each region in the world, check & add
             // todo: optimize
             for (Map.Entry<RandomSelectParams, TeleportRegion> entry : cache.permRegions.entrySet()) {
-                if(isCancelled()) return;
+                if (cancelled) return;
                 if (!entry.getKey().worldID.equals(world.getUID())) continue;
                 if (!entry.getValue().isInBounds(chunk.getX(),chunk.getZ())) continue;
                 if (entry.getValue().isKnownBad(chunk.getX(),chunk.getZ())) continue;
@@ -93,11 +100,17 @@ public final class OnChunkLoad implements Listener {
                         || (y >= entry.getKey().maxY)
                         || (rerollLiquid && b.isLiquid())
                         || (rerollWorldGuard && WorldGuardChecker.isInRegion(location))
-                        || (rerollGriefPrevention && GriefPreventionChecker.isInClaim(location))) {
+                        || (rerollGriefPrevention && GriefPreventionChecker.isInClaim(location))
+                        || (entry.getValue().requireSkyLight && b.getLightFromSky()<8)) {
                     entry.getValue().addBadLocation(chunk.getX(), chunk.getZ());
                 }
             }
-            checkChunkMap.put(hashableChunk,null);
+        }
+
+        @Override
+        public void cancel() {
+            cancelled = true;
+            super.cancel();
         }
     }
 }

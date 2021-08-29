@@ -4,7 +4,7 @@
 # placeholder: [time] - how long before teleporting
 delayMessage: "&e[rtp] Teleporting in [time]. Don't move"
 # placeholder: [numAttempts] - number of attempts
-teleportMessage: "&e[rtp] Teleported in [numAttempts] attempts"
+teleportMessage: "&e[rtp] Teleported in [numAttempts] attempts, in [time]"
 
 #if player moves
 teleportCancel: "&e[rtp] Teleport cancelled!"
@@ -15,13 +15,19 @@ unsafe: "&e[rtp] could not find a safe location within [numAttempts] attempts"
 # placeholder: [time] - how long before player is able to teleport again
 cooldownMessage: "&e[rtp] You can't teleport again for [time]"
 
+#if the region doesn't have any locations queued and the player doesn't have rtp.unqueued permission
 noLocationsQueued: "&e[rtp] no locations ready at this time"
+
+#if the player doesn't have enough money to teleport in the region
+# placeholder: [money] - how much money is required for the command
+notEnoughMoney: "&e[rtp] you need at least $[money] for that."
 
 # for time placeholders, what to call days, hours, minutes, seconds
 days: "d"
 hours: "h"
 minutes: "m"
 seconds: "s"
+millis: "ms"
 
 # a configuration file 'version' is lower than the latest
 # placeholder: [filename] - name of file, including file extension
@@ -60,9 +66,15 @@ invalidWorld: "&e[rtp] could not find world '[worldName]'"
 # when more than on user fails to specify region in updateRegion
 missingRegionParam: "&e[rtp] region parameter is required"
 
+startFill: "&e[rtp] starting fill task for region [region]"
+fillRunning: "&e[rtp] fill task already running for region [region]"
+
 #command descriptions
 rtp: "&b/rtp - teleport to a random location"
 help: "&b/rtp help - see this"
 reload: "&b/rtp reload - reload config files"
+setWorld: "&b/rtp setWorld - update world settings"
+setRegion: "&b/rtp setRegion - create or update region settings"
+fill: "&b/rtp fill - start a fill task for a region"
 
-version: 1.4
+version: 1.7

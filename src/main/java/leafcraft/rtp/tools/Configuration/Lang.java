@@ -26,7 +26,7 @@ public class Lang {
         }
         this.config = YamlConfiguration.loadConfiguration(f);
 
-        if( 	(this.config.getDouble("version") < 1.4) ) {
+        if( 	(this.config.getDouble("version") < 1.7) ) {
             Bukkit.getLogger().log(Level.WARNING, getLog("oldFile", "lang.yml"));
             update(plugin);
 
@@ -56,6 +56,9 @@ public class Lang {
             case "teleportMessage": replace = "[numAttempts]"; break;
             case "badArg":
             case "noPerms": replace = "[arg]"; break;
+            case "notEnoughMoney": replace = "[money]"; break;
+            case "startFill" :
+            case "fillRunning": replace = "[region]"; break;
             default: replace = "[placeholder]";
         }
 
@@ -83,7 +86,7 @@ public class Lang {
         for (String line : linesInDefaultConfig) {
             String newline = line;
             if (line.startsWith("version:")) {
-                newline = "version: 1.4";
+                newline = "version: 1.7";
             } else {
                 for (String node : oldValues.keySet()) {
                     if (line.startsWith(node + ":")) {

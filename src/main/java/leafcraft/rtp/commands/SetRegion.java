@@ -5,6 +5,7 @@ import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
+import leafcraft.rtp.tools.softdepends.PAPIChecker;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.command.Command;
@@ -46,12 +47,15 @@ public class SetRegion implements CommandExecutor {
         regionParams.add("uniquePlacements");
         regionParams.add("expand");
         regionParams.add("queueLen");
+        regionParams.add("price");
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if(!sender.hasPermission("rtp.setRegion")) {
-            sender.sendMessage(configs.lang.getLog("noPerms"));
+            String msg = configs.lang.getLog("noPerms");
+            if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
+            sender.sendMessage(msg);
             return true;
         }
 
@@ -69,7 +73,9 @@ public class SetRegion implements CommandExecutor {
             String worldName = regionArgs.get("world");
             worldName = configs.worlds.worldPlaceholder2Name(worldName);
             if(!configs.worlds.checkWorldExists(worldName)) {
-                sender.sendMessage(configs.lang.getLog("invalidWorld",worldName));
+                String msg = configs.lang.getLog("invalidWorld",worldName);
+                if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
+                sender.sendMessage(msg);
                 return true;
             }
             world = Bukkit.getWorld(worldName);
@@ -138,7 +144,9 @@ public class SetRegion implements CommandExecutor {
                             if(numStr.length()>0) res -= Integer.valueOf(numStr);
                         }
                         catch (NumberFormatException exception) {
-                            sender.sendMessage(configs.lang.getLog("badArg",entry.getKey()+":"+entry.getValue()));
+                            String msg = configs.lang.getLog("badArg",entry.getKey()+":"+entry.getValue());
+                            if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
+                            sender.sendMessage(msg);
                             continue;
                         }
                     }
@@ -148,7 +156,9 @@ public class SetRegion implements CommandExecutor {
                             if(numStr.length()>0) res += Integer.valueOf(numStr);
                         }
                         catch (NumberFormatException exception) {
-                            sender.sendMessage(configs.lang.getLog("badArg",entry.getKey()+":"+entry.getValue()));
+                            String msg = configs.lang.getLog("badArg",entry.getKey()+":"+entry.getValue());
+                            if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
+                            sender.sendMessage(msg);
                             continue;
                         }
                     }
@@ -180,28 +190,40 @@ public class SetRegion implements CommandExecutor {
                 cache.permRegions.remove(params);
             }
 
-            cache.permRegions.remove(params);
             TeleportRegion teleportRegion = new TeleportRegion(region,params.params,configs,cache);
             cache.permRegions.put(params, teleportRegion);
             teleportRegion.loadFile();
         }
         else {
-            sender.sendMessage(configs.lang.getLog("missingRegionParam"));
+            String msg = configs.lang.getLog("missingRegionParam");
+            if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
+            sender.sendMessage(msg);
             return true;
         }
 
         for(Map.Entry<String,String> entry : regionArgs.entrySet()) {
             if (entry.getKey().equals("region")) continue;
             Integer result = configs.regions.updateRegionSetting(regionArgs.get("region"), entry.getKey(), entry.getValue());
-            if (result < 0) sender.sendMessage(configs.lang.getLog("badArg", entry.getValue()));
+            if (result < 0) {
+                String msg = configs.lang.getLog("badArg", entry.getValue());
+                if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player) sender,msg);
+                sender.sendMessage(msg);
+            }
         }
 
         Bukkit.getLogger().log(Level.INFO,configs.lang.getLog("updatingRegions"));
-        if(sender instanceof Player)sender.sendMessage(configs.lang.getLog("updatingRegions"));
+        if(sender instanceof Player){
+            String msg = configs.lang.getLog("updatingRegions");
+            msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
+            sender.sendMessage(msg);
+        }
         configs.regions.update();
         Bukkit.getLogger().log(Level.INFO,configs.lang.getLog("updatedRegions"));
-        if(sender instanceof Player)sender.sendMessage(configs.lang.getLog("updatedRegions"));
-
+        if(sender instanceof Player){
+            String msg = configs.lang.getLog("updatedRegions");
+            msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
+            sender.sendMessage(msg);
+        }
         return true;
     }
 }
