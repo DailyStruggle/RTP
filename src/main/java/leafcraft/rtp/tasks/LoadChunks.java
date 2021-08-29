@@ -5,84 +5,70 @@ import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
+import leafcraft.rtp.tools.selection.TeleportRegion;
+import leafcraft.rtp.tools.softdepends.PAPIChecker;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
-import java.awt.print.Paper;
-import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 public class LoadChunks extends BukkitRunnable {
+    public final TeleportRegion.ChunkSet chunkSet;
     private final RTP plugin;
     private final Configs configs;
     private final CommandSender sender;
     private final Player player;
     private final Cache cache;
-    private final Integer totalTime;
+    private final Integer delay;
     private final Location location;
     private final RandomSelectParams rsParams;
-    private List<CompletableFuture<Chunk>> chunks = null;
+    private int i;
+    private int j;
     private Boolean cancelled = false;
 
-    public LoadChunks(RTP plugin, Configs configs, CommandSender sender, Player player, Cache cache, Integer totalTime, Location location) {
+    public LoadChunks(RTP plugin, Configs configs, CommandSender sender, Player player, Cache cache, Integer delay, Location location) {
         this.plugin = plugin;
         this.configs = configs;
         this.sender = sender;
         this.player = player;
         this.cache = cache;
-        this.totalTime = totalTime;
+        this.delay = delay;
         this.location = location;
         this.rsParams = cache.regionKeys.get(player.getUniqueId());
+        if (cache.permRegions.containsKey(rsParams))
+            chunkSet = cache.permRegions.get(rsParams).getChunks(location);
+        else chunkSet = cache.tempRegions.get(rsParams).getChunks(location);
+        int vd = configs.config.vd;
+        i = -vd;
+        j = -vd;
+    }
+
+    public LoadChunks(RTP plugin, Configs configs, CommandSender sender, Player player, Cache cache, Integer delay, Location location, int i, int j) {
+        this.plugin = plugin;
+        this.configs = configs;
+        this.sender = sender;
+        this.player = player;
+        this.cache = cache;
+        this.delay = delay;
+        this.location = location;
+        this.rsParams = cache.regionKeys.get(player.getUniqueId());
+        if (cache.permRegions.containsKey(rsParams))
+            chunkSet = cache.permRegions.get(rsParams).getChunks(location);
+        else chunkSet = cache.tempRegions.get(rsParams).getChunks(location);
+        this.i = i;
+        this.j = j;
     }
 
     @Override
     public void run() {
-        Long startTime = System.currentTimeMillis();
-
-        if(!sender.hasPermission("rtp.noDelay.chunks")) {
-            boolean unqueued = sender.hasPermission("rtp.unqueued");
-            if (cache.permRegions.containsKey(rsParams))
-                chunks = cache.permRegions.get(rsParams).getChunks(location);
-            else chunks = cache.tempRegions.get(rsParams).getChunks(location);
-
-            for (CompletableFuture<Chunk> chunk : chunks) {
-                if(isCancelled() || cancelled) break;
-                if(chunk.isDone()) continue;
-                if(!unqueued) {
-                    player.sendMessage(configs.lang.getLog("noLocationsQueued"));
-                    if(!sender.getName().equals(player.getName()))
-                        sender.sendMessage(configs.lang.getLog("noLocationsQueued"));
-                    cancel();
-                }
-                else {
-                    try {
-                        chunk.get();
-                    } catch (InterruptedException | CancellationException | StackOverflowError e) {
-                        cancel();
-                        break;
-                    } catch (ExecutionException e) {
-                        e.printStackTrace();
-                    }
-                }
-            }
-        }
-
-        if (!isCancelled() && !cancelled) {
-            long finTime = System.currentTimeMillis();
-            long remTime = totalTime - ((finTime - startTime) / 50);
-            if (remTime < 0) remTime = 0;
-
-            DoTeleport doTeleport = new DoTeleport(plugin,configs,sender,player,location,cache);
-            doTeleport.runTaskLater(plugin,remTime);
-            this.cache.doTeleports.put(this.player.getUniqueId(),doTeleport);
-        }
-        cache.loadChunks.remove(player.getUniqueId());
+        loadChunksNow(true);
     }
 
     @Override
@@ -97,10 +83,72 @@ public class LoadChunks extends BukkitRunnable {
             cache.doTeleports.remove(player.getUniqueId());
         }
         cancelled = true;
+        String msg = configs.lang.getLog("teleportCancel");
+        if(player.isOnline()) {
+            msg = PAPIChecker.fillPlaceholders(player, msg);
+            player.sendMessage(PAPIChecker.fillPlaceholders(player, msg));
+        }
+        if (!sender.getName().equals(player.getName()))
+            sender.sendMessage(msg);
         super.cancel();
     }
 
     public boolean isNoDelay() {
         return sender.hasPermission("rtp.noDelay");
+    }
+
+    public void loadChunksNow(boolean async) {
+        if(!sender.hasPermission("rtp.noDelay.chunks") && chunkSet.completed.get() < chunkSet.expectedSize) {
+            if (PaperLib.isPaper()) {
+                for (CompletableFuture<Chunk> chunk : chunkSet.chunks) {
+                    if (cancelled) break;
+                    if (chunk.isDone()) continue;
+                    else {
+                        try {
+                            chunk.get();
+                        } catch (InterruptedException | CancellationException e) {
+                            cancel();
+                            break;
+                        } catch (ExecutionException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            } else {
+                World world = Bukkit.getWorld(rsParams.worldID);
+                Chunk centerChunk = location.getChunk();
+                int vd = configs.config.vd;
+                int len = (2*vd+1)*(2*vd+1);
+                if(delay>0) len = 2*(len/delay);
+                for(; i < vd; i++) {
+                    if(j>=vd) j = 0;
+                    for(; j < vd; j++) {
+                        if(cancelled) return;
+                        if(world.isChunkLoaded(centerChunk.getX()+i,centerChunk.getZ()+j)) continue;
+                        PaperLib.getChunkAtAsyncUrgently(world, centerChunk.getX()+i,centerChunk.getZ()+j, true);
+                        chunkSet.completed.addAndGet(1);
+                        len--;
+                        if(len<=0) {
+                            cache.loadChunks.remove(player.getUniqueId());
+                            LoadChunks loadChunks = new LoadChunks(plugin, configs, sender, player, cache, delay, location, i, j);
+                            cache.loadChunks.put(player.getUniqueId(),loadChunks);
+                            loadChunks.runTaskAsynchronously(plugin);
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!cancelled) {
+            long remTime = 1 + delay - ((System.currentTimeMillis() - cache.lastTeleportTime.getOrDefault(player.getUniqueId(),0l)) / 50);
+            if (remTime < 0) remTime = 0;
+
+            DoTeleport doTeleport = new DoTeleport(plugin,configs,sender,player,location,cache);
+            cache.doTeleports.put(this.player.getUniqueId(),doTeleport);
+            if(async || remTime>0) doTeleport.runTaskLater(plugin,remTime);
+            else doTeleport.doTeleportNow();
+        }
+        cache.loadChunks.remove(player.getUniqueId());
     }
 }

@@ -34,6 +34,7 @@ public final class OnPlayerDeath implements Listener {
 
         //if currently teleporting, stop that and clean up
         if (cache.todoTP.containsKey(player.getUniqueId())) {
+            cache.todoTP.remove(player.getUniqueId());
             stopTeleport(event);
         }
 
@@ -69,10 +70,9 @@ public final class OnPlayerDeath implements Listener {
             QueueLocation queueLocation = new QueueLocation(region, randomLocation, cache);
             cache.queueLocationTasks.put(queueLocation.idx,queueLocation);
             queueLocation.runTaskLaterAsynchronously(plugin, 1);
-            region.recyclePlayerLocation(player);
+            region.recyclePlayerLocations(player);
         } else cache.tempRegions.remove(rsParams);
         cache.regionKeys.remove(player.getUniqueId());
-        cache.todoTP.remove(player.getUniqueId());
         cache.playerFromLocations.remove(player.getUniqueId());
     }
 }

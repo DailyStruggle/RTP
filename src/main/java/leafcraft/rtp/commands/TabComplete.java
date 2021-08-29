@@ -40,7 +40,7 @@ public class TabComplete implements TabCompleter {
     private final Configs configs;
 
     public TabComplete(Configs configs) {
-        //load OnePlayerSleep.commands and permission nodes into map
+        //load rtp commands and permission nodes into map
         subCommands.addSubParam("world","rtp.world");
         subCommands.addSubParam("region","rtp.region");
         subCommands.addSubParam("player","rtp.other");
@@ -59,6 +59,7 @@ public class TabComplete implements TabCompleter {
         subCommands.commands.put("reload",new SubCommand("rtp.reload"));
         subCommands.commands.put("setRegion",new SubCommand("rtp.setRegion"));
         subCommands.commands.put("setWorld",new SubCommand("rtp.setWorld"));
+        subCommands.commands.put("fill",new SubCommand("rtp.fill"));
 
         subCommands.commands.get("setRegion").addSubParam("region","rtp.setRegion");
         subCommands.commands.get("setRegion").addSubParam("world","rtp.setRegion");
@@ -76,15 +77,15 @@ public class TabComplete implements TabCompleter {
         subCommands.commands.get("setRegion").addSubParam("uniquePlacements","rtp.setRegion");
         subCommands.commands.get("setRegion").addSubParam("expand","rtp.setRegion");
         subCommands.commands.get("setRegion").addSubParam("queueLen","rtp.setRegion");
+        subCommands.commands.get("setRegion").addSubParam("price","rtp.setRegion");
 
         subCommands.commands.get("setWorld").addSubParam("world","rtp.setWorld");
         subCommands.commands.get("setWorld").addSubParam("name","rtp.setWorld");
         subCommands.commands.get("setWorld").addSubParam("region","rtp.setWorld");
         subCommands.commands.get("setWorld").addSubParam("override","rtp.setWorld");
 
-
-//        subCommands.commands.put("fill",new SubCommand("rtp.fill"));
-//        subCommands.commands.get("fill").addSubParam("world","rtp.fill");
+        subCommands.commands.put("fill",new SubCommand("rtp.fill"));
+        subCommands.commands.get("fill").addSubParam("region","rtp.fill");
 //        subCommands.commands.get("fill").commands.put("cancel",new SubCommand("rtp.fill"));
 //        subCommands.commands.get("fill").commands.get("cancel").addSubParam("world","rtp.fill");
 
@@ -157,7 +158,9 @@ public class TabComplete implements TabCompleter {
                     }
                     case "requireSkyLight":
                     case "requirePermission":
-                    case "worldBorderOverride": {
+                    case "worldBorderOverride":
+                    case "uniquePlacements":
+                    case "expand": {
                         res.add(arg+":true");
                         res.add(arg+":false");
                         break;

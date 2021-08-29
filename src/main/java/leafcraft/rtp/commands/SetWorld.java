@@ -4,6 +4,7 @@ import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
+import leafcraft.rtp.tools.softdepends.PAPIChecker;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.command.Command;
@@ -38,7 +39,9 @@ public class SetWorld implements CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if(!sender.hasPermission("rtp.setWorld")) {
-            sender.sendMessage(configs.lang.getLog("noPerms"));
+            String msg = configs.lang.getLog("noPerms");
+            if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player) sender,msg);
+            sender.sendMessage(msg);
             return true;
         }
 
@@ -56,7 +59,9 @@ public class SetWorld implements CommandExecutor {
             String worldName = worldArgs.get("world");
             worldName = configs.worlds.worldPlaceholder2Name(worldName);
             if(!configs.worlds.checkWorldExists(worldName)) {
-                sender.sendMessage(configs.lang.getLog("invalidWorld",worldName));
+                String msg = configs.lang.getLog("invalidWorld",worldName);
+                if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player) sender,msg);
+                sender.sendMessage(msg);
                 return true;
             }
             world = Bukkit.getWorld(worldName);
@@ -85,13 +90,25 @@ public class SetWorld implements CommandExecutor {
         for(Map.Entry<String,String> entry : worldArgs.entrySet()) {
             if(entry.getKey().equals("world")) continue;
             Integer result = configs.worlds.updateWorldSetting(world,entry.getKey(),entry.getValue());
-            if(result<0) sender.sendMessage(configs.lang.getLog("badArg",entry.getValue()));
+            if(result<0) {
+                String msg = configs.lang.getLog("badArg", entry.getValue());
+                if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player) sender,msg);
+                sender.sendMessage(msg);
+            }
         }
         Bukkit.getLogger().log(Level.INFO,configs.lang.getLog("updatingWorlds"));
-        if(sender instanceof Player)sender.sendMessage(configs.lang.getLog("updatingWorlds"));
+        if(sender instanceof Player){
+            String msg = configs.lang.getLog("updatingWorlds");
+            msg = PAPIChecker.fillPlaceholders((Player) sender,msg);
+            sender.sendMessage(msg);
+        }
         configs.worlds.update();
         Bukkit.getLogger().log(Level.INFO,configs.lang.getLog("updatedWorlds"));
-        if(sender instanceof Player)sender.sendMessage(configs.lang.getLog("updatedWorlds"));
+        if(sender instanceof Player) {
+            String msg = configs.lang.getLog("updatedWorlds");
+            msg = PAPIChecker.fillPlaceholders((Player) sender,msg);
+            sender.sendMessage(msg);
+        }
 
         return true;
     }

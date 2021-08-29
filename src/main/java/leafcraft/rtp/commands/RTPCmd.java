@@ -4,6 +4,7 @@ import leafcraft.rtp.tasks.SetupTeleport;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
+import leafcraft.rtp.tools.softdepends.PAPIChecker;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.command.Command;
@@ -31,12 +32,11 @@ public class RTPCmd implements CommandExecutor {
         this.perms.put("reload","rtp.reload");
         this.perms.put("setRegion","rtp.setRegion");
         this.perms.put("setWorld","rtp.setWorld");
-//        this.perms.put("fill","rtp.fill");
+        this.perms.put("fill","rtp.fill");
 
         this.rtpParams.put("player", "rtp.other");
         this.rtpParams.put("world", "rtp.world");
         this.rtpParams.put("region","rtp.region");
-
         this.rtpParams.put("shape","rtp.params");
         this.rtpParams.put("radius","rtp.params");
         this.rtpParams.put("centerRadius","rtp.params");
@@ -55,7 +55,9 @@ public class RTPCmd implements CommandExecutor {
 
         if(args.length > 0 && perms.containsKey(args[0])) {
             if(!sender.hasPermission(perms.get(args[0]))) {
-                sender.sendMessage(configs.lang.getLog("noPerms"));
+                String msg = configs.lang.getLog("noPerms");
+                if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
+                sender.sendMessage(msg);
             }
             else {
                 plugin.getCommand("rtp " + args[0]).execute(sender, label, Arrays.copyOfRange(args, 1, args.length));
@@ -64,7 +66,9 @@ public class RTPCmd implements CommandExecutor {
         }
 
         if(!sender.hasPermission("rtp.use")) {
-            sender.sendMessage(configs.lang.getLog("noPerms"));
+            String msg = configs.lang.getLog("noPerms");
+            if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
+            sender.sendMessage(msg);
             return true;
         }
 
@@ -84,7 +88,9 @@ public class RTPCmd implements CommandExecutor {
         if(sender.hasPermission("rtp.other") && rtpArgs.containsKey("player")) {
             player = Bukkit.getPlayer(rtpArgs.get("player"));
             if(player == null) {
-                sender.sendMessage(configs.lang.getLog("badArg", "player:"+rtpArgs.get("player")));
+                String msg = configs.lang.getLog("badArg", "player:"+rtpArgs.get("player"));
+                if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
+                sender.sendMessage(msg);
                 return true;
             }
         }
@@ -92,7 +98,9 @@ public class RTPCmd implements CommandExecutor {
             player = (Player) sender;
         }
         else {
-            sender.sendMessage(configs.lang.getLog("consoleCmdNotAllowed"));
+            String msg = configs.lang.getLog("consoleCmdNotAllowed");
+            if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
+            sender.sendMessage(msg);
             return true;
         }
 
@@ -105,11 +113,15 @@ public class RTPCmd implements CommandExecutor {
                     || worldName == ""
                     || (!sender.hasPermission("rtp.regions."+regionName)
                     && (Boolean)configs.worlds.getWorldSetting(worldName,"requirePermission",true))) {
-                sender.sendMessage(configs.lang.getLog("badArg", "region:" + regionName));
+                String msg = configs.lang.getLog("badArg", "region:" + regionName);
+                if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
+                sender.sendMessage(msg);
                 return true;
             }
             if (!configs.worlds.checkWorldExists(worldName) || !sender.hasPermission("rtp.worlds."+worldName)) {
-                sender.sendMessage(configs.lang.getLog("badArg", "world:" + worldName));
+                String msg = configs.lang.getLog("badArg", "world:" + worldName);
+                if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
+                sender.sendMessage(msg);
                 return true;
             }
             world = Bukkit.getWorld(worldName);
@@ -119,7 +131,9 @@ public class RTPCmd implements CommandExecutor {
                 String worldName = rtpArgs.get("world");
                 worldName = configs.worlds.worldPlaceholder2Name(worldName);
                 if (!configs.worlds.checkWorldExists(worldName)) {
-                    sender.sendMessage(configs.lang.getLog("badArg", "world:" + worldName));
+                    String msg = configs.lang.getLog("badArg", "world:" + worldName);
+                    if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
+                    sender.sendMessage(msg);
                     return true;
                 }
                 if(sender.hasPermission("rtp.worlds."+worldName) || !((Boolean)configs.worlds.getWorldSetting(worldName,"requirePermission",true)))
@@ -153,7 +167,9 @@ public class RTPCmd implements CommandExecutor {
             if(days>0 || hours>0) replacement += hours + configs.lang.getLog("hours") + " ";
             if(days>0 || hours>0 || minutes>0) replacement += minutes + configs.lang.getLog("minutes") + " ";
             replacement += seconds + configs.lang.getLog("seconds");
-            sender.sendMessage(configs.lang.getLog("cooldownMessage", replacement));
+            String msg = configs.lang.getLog("cooldownMessage", replacement);
+            if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
+            sender.sendMessage(msg);
             return true;
         }
 
@@ -161,11 +177,16 @@ public class RTPCmd implements CommandExecutor {
         RandomSelectParams rsParams = new RandomSelectParams(world,rtpArgs,configs);
 
         //prep teleportation
-        SetupTeleport setupTeleport = new SetupTeleport(plugin,sender,player,configs, cache, rsParams);
-        setupTeleport.runTaskAsynchronously(plugin);
-        cache.setupTeleports.put(player.getUniqueId(),setupTeleport);
         this.cache.lastTeleportTime.put(player.getUniqueId(), time);
         this.cache.playerFromLocations.put(player.getUniqueId(),player.getLocation());
+        SetupTeleport setupTeleport = new SetupTeleport(plugin,sender,player,configs, cache, rsParams);
+        cache.setupTeleports.put(player.getUniqueId(),setupTeleport);
+        if(cache.permRegions.containsKey(rsParams) && cache.permRegions.get(rsParams).hasQueuedLocation(player)) {
+            setupTeleport.setupTeleportNow(false);
+        }
+        else {
+            setupTeleport.runTaskAsynchronously(plugin);
+        }
 
         return true;
     }

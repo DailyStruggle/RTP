@@ -23,6 +23,7 @@ public final class OnPlayerQuit implements Listener {
         UUID playerId = event.getPlayer().getUniqueId();
         //if currently teleporting, stop that and clean up
         if (!this.cache.todoTP.containsKey(playerId)) return;
+        cache.todoTP.remove(playerId);
 
         if (cache.setupTeleports.containsKey(playerId)) {
             cache.setupTeleports.get(playerId).cancel();

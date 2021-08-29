@@ -1,15 +1,22 @@
 package leafcraft.rtp.tasks;
 
+import io.papermc.lib.PaperLib;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
+import leafcraft.rtp.tools.selection.TeleportRegion;
+import leafcraft.rtp.tools.softdepends.PAPIChecker;
 import org.bukkit.Bukkit;
+import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 //prep teleportation
@@ -18,10 +25,11 @@ public class SetupTeleport extends BukkitRunnable {
     private final CommandSender sender;
     private final Player player;
     private final Configs configs;
-    private final Cache cache;
-    private final RandomSelectParams rsParams;
+    private Cache cache;
+    private RandomSelectParams rsParams;
     private Location location = null;
     private boolean cancelled = false;
+    private TeleportRegion.ChunkSet chunkSet = null;
 
     public SetupTeleport(RTP plugin, CommandSender sender, Player player, Configs configs, Cache cache, RandomSelectParams rsParams) {
         this.sender = sender;
@@ -34,46 +42,7 @@ public class SetupTeleport extends BukkitRunnable {
 
     @Override
     public void run() {
-        //if already teleporting, don't do it again
-        if(cache.loadChunks.containsKey(player.getUniqueId()) || cache.todoTP.containsKey(player.getUniqueId())) {
-            //probably say something
-            return;
-        }
-
-        //get a random location according to the parameters
-        long start = System.currentTimeMillis();
-        location = cache.getRandomLocation(rsParams,true,sender, player);
-        if(location == null) return;
-
-        //get warmup delay
-        int delay = (sender.hasPermission("rtp.noDelay")) ? 0 : configs.config.teleportDelay;
-
-        //let player know if warmup delay > 0
-        if(delay>0) {
-            long days = TimeUnit.SECONDS.toDays(delay);
-            long hours = TimeUnit.SECONDS.toHours(delay)%24;
-            long minutes = TimeUnit.SECONDS.toMinutes(delay)%60;
-            long seconds = TimeUnit.SECONDS.toSeconds(delay)%60;
-            String replacement = "";
-            if(days>0) replacement += days + configs.lang.getLog("days") + " ";
-            if(hours>0) replacement += hours + configs.lang.getLog("hours") + " ";
-            if(minutes>0) replacement += minutes + configs.lang.getLog("minutes") + " ";
-            replacement += seconds%60 + configs.lang.getLog("seconds");
-            player.sendMessage(configs.lang.getLog("delayMessage", replacement));
-            if(!sender.getName().equals(player.getName()))
-                sender.sendMessage(configs.lang.getLog("delayMessage", replacement));
-        }
-
-        //set up task to load chunks then teleport
-        if(!this.isCancelled() && !cancelled){
-            cache.todoTP.put(player.getUniqueId(),location);
-            cache.regionKeys.put(player.getUniqueId(),rsParams);
-            long stop = System.currentTimeMillis();
-            LoadChunks loadChunks = new LoadChunks(plugin,configs,sender,player,cache,(int)((20*delay)-((stop-start)/50)),location);
-            loadChunks.runTaskAsynchronously(plugin);
-            cache.loadChunks.put(player.getUniqueId(), loadChunks);
-        }
-        cache.setupTeleports.remove(player.getUniqueId());
+        setupTeleportNow(true);
     }
 
     @Override
@@ -92,6 +61,9 @@ public class SetupTeleport extends BukkitRunnable {
             cache.doTeleports.remove(player.getUniqueId());
         }
         cancelled = true;
+        player.sendMessage(PAPIChecker.fillPlaceholders(player,configs.lang.getLog("teleportCancel")));
+        if(!sender.getName().equals(player.getName()))
+            sender.sendMessage(PAPIChecker.fillPlaceholders(player,configs.lang.getLog("teleportCancel")));
         super.cancel();
     }
 
@@ -99,5 +71,60 @@ public class SetupTeleport extends BukkitRunnable {
         return sender.hasPermission("rtp.noDelay");
     }
 
+    public void setupTeleportNow(boolean async) {
+        cache.setupTeleports.remove(player.getUniqueId());
+        //if already teleporting, don't do it again
+        if(cache.loadChunks.containsKey(player.getUniqueId()) || cache.todoTP.containsKey(player.getUniqueId())) {
+            //probably say something
+            return;
+        }
 
+        //get a random location according to the parameters
+        long start = System.currentTimeMillis();
+        location = cache.getRandomLocation(rsParams,true,sender, player);
+        if(location == null) return;
+
+        //get warmup delay
+        int delay = (sender.hasPermission("rtp.noDelay")) ? 0 : configs.config.teleportDelay;
+
+        //let player know if warmup delay > 0
+        if(delay>0) {
+            int time = delay/20;
+            long days = TimeUnit.SECONDS.toDays(time);
+            long hours = TimeUnit.SECONDS.toHours(time)%24;
+            long minutes = TimeUnit.SECONDS.toMinutes(time)%60;
+            long seconds = TimeUnit.SECONDS.toSeconds(time)%60;
+            String replacement = "";
+            if(days>0) replacement += days + configs.lang.getLog("days") + " ";
+            if(hours>0) replacement += hours + configs.lang.getLog("hours") + " ";
+            if(minutes>0) replacement += minutes + configs.lang.getLog("minutes") + " ";
+            if(seconds>0) replacement += seconds%60 + configs.lang.getLog("seconds");
+            String msg = configs.lang.getLog("delayMessage", replacement);
+            if(player.isOnline()) {
+                msg = PAPIChecker.fillPlaceholders(player, msg);
+                player.sendMessage(PAPIChecker.fillPlaceholders(player, msg));
+            }
+            if (!sender.getName().equals(player.getName()))
+                sender.sendMessage(msg);
+        }
+
+        //set up task to load chunks then teleport
+        if(!cancelled){
+            cache.todoTP.put(player.getUniqueId(),location);
+            cache.regionKeys.put(player.getUniqueId(),rsParams);
+            LoadChunks loadChunks = new LoadChunks(plugin,configs,sender,player,cache,delay,location);
+            long remTime = 1 + delay - ((System.currentTimeMillis() - cache.lastTeleportTime.getOrDefault(player.getUniqueId(),System.currentTimeMillis())) / 50);
+            if(sender.hasPermission("rtp.noDelay.chunks")
+                    || (loadChunks.chunkSet.completed.get()>=loadChunks.chunkSet.expectedSize-1)) {
+                DoTeleport doTeleport = new DoTeleport(plugin,configs,sender,player,location,cache);
+                cache.doTeleports.put(player.getUniqueId(),doTeleport);
+                if(async || remTime>0) doTeleport.runTaskLater(plugin,remTime);
+                else doTeleport.doTeleportNow();
+            }
+            else {
+                cache.loadChunks.put(player.getUniqueId(), loadChunks);
+                loadChunks.runTaskAsynchronously(plugin);
+            }
+        }
+    }
 }

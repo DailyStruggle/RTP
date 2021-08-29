@@ -2,6 +2,7 @@ package leafcraft.rtp.commands;
 
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
+import leafcraft.rtp.tools.softdepends.PAPIChecker;
 import me.clip.placeholderapi.PlaceholderAPI;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
@@ -20,14 +21,16 @@ public class Reload implements CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if(!sender.hasPermission("rtp.reload")) {
-            sender.sendMessage(configs.lang.getLog("noPerms"));
+            String msg = configs.lang.getLog("noPerms");
+            if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
+            sender.sendMessage(msg);
             return true;
         }
 
         String str = configs.lang.getLog("reloading");
         Bukkit.getConsoleSender().sendMessage(str);
         if(sender instanceof Player) {
-            if(Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) str = PlaceholderAPI.setPlaceholders((Player)sender, str);
+            PAPIChecker.fillPlaceholders((Player)sender,str);
             sender.sendMessage(str);
         }
 
@@ -37,7 +40,7 @@ public class Reload implements CommandExecutor {
         str = configs.lang.getLog("reloaded");
         Bukkit.getConsoleSender().sendMessage(str);
         if(sender instanceof Player) {
-            if(Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) str = PlaceholderAPI.setPlaceholders((Player)sender, str);
+            PAPIChecker.fillPlaceholders((Player)sender,str);
             sender.sendMessage(str);
         }
         return true;

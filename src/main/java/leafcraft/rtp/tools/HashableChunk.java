@@ -22,6 +22,7 @@ public class HashableChunk {
         this.worldUID = world.getUID();
         this.x = x;
         this.z = z;
+        this.chunk = null;
     }
 
     public Chunk getChunk() {

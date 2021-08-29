@@ -1,6 +1,5 @@
 package leafcraft.rtp.tools;
 
-import io.papermc.lib.PaperLib;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tasks.DoTeleport;
 import leafcraft.rtp.tasks.LoadChunks;
@@ -9,8 +8,10 @@ import leafcraft.rtp.tasks.SetupTeleport;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
+import leafcraft.rtp.tools.softdepends.PAPIChecker;
+import leafcraft.rtp.tools.softdepends.VaultChecker;
+import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
-import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.command.CommandSender;
@@ -43,28 +44,24 @@ public class Cache {
 
         Double i = 0d;
         Integer period = configs.config.queuePeriod;
-        Double increment = ((period.doubleValue())/permRegions.size())*20;
-        for(Map.Entry<RandomSelectParams,TeleportRegion> entry : permRegions.entrySet()) {
-            queueTimers.put(entry.getKey(),Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, ()->{
-                double tps = TPS.getTPS();
-                double minTps = (Double)configs.config.getConfigValue("minTPS",19.0);
-                if(tps < minTps) return;
-                QueueLocation queueLocation = new QueueLocation(entry.getValue(),this);
-                queueLocationTasks.put(queueLocation.idx,queueLocation);
-                queueLocation.runTaskAsynchronously(plugin);
-            },200+i.intValue(),period*20));
-            i+=increment;
+        if(period > 0) {
+            Double increment = ((period.doubleValue()) / permRegions.size()) * 20;
+            for (Map.Entry<RandomSelectParams, TeleportRegion> entry : permRegions.entrySet()) {
+                queueTimers.put(entry.getKey(), Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
+                    double tps = TPS.getTPS();
+                    double minTps = (Double) configs.config.getConfigValue("minTPS", 19.0);
+                    if (tps < minTps) return;
+                    QueueLocation queueLocation = new QueueLocation(entry.getValue(), this);
+                    queueLocationTasks.put(queueLocation.idx, queueLocation);
+                    queueLocation.runTaskAsynchronously(plugin);
+                }, 200 + i.intValue(), period * 20));
+                i += increment;
+            }
         }
     }
 
-    //keyed table of which chunks to keep alive, for quick checking
-    // key: chunk coordinate
-    // value: number of usages. if it gets to 0, the pair should be removed
-    public ConcurrentHashMap<HashableChunk,Long> keepChunks = new ConcurrentHashMap<>();
-
     //if we needed to force load a chunk to prevent unload, undo that on teleport.
     public ConcurrentHashMap<HashableChunk,Long> forceLoadedChunks = new ConcurrentHashMap<>();
-
 
     //table of which players are teleporting to what location
     // key: player name
@@ -123,8 +120,6 @@ public class Cache {
             region.storeFile();
         }
 
-        keepChunks.clear();
-
         for(Map.Entry<HashableChunk,Long> entry : forceLoadedChunks.entrySet()) {
             entry.getKey().getChunk().setForceLoaded(false);
         }
@@ -139,13 +134,40 @@ public class Cache {
 
     public Location getRandomLocation(RandomSelectParams rsParams, boolean urgent, CommandSender sender, Player player) {
         TeleportRegion region;
+        Double price = 0d;
         if(permRegions.containsKey(rsParams)) {
             region = permRegions.get(rsParams);
+            if(!sender.hasPermission("rtp.free")) {
+                price = (Double) configs.regions.getRegionSetting(region.name, "price", 0.0);
+            }
         }
         else {
             region = new TeleportRegion("temp", rsParams.params, configs, this);
+            if(!sender.hasPermission("rtp.free")) {
+                price = configs.config.price;
+            }
+            tempRegions.put(rsParams,region);
         }
-        return region.getLocation(urgent, sender, player);
+
+        Economy economy = VaultChecker.getEconomy();
+        if(price > 0 && sender instanceof Player && economy!=null) {
+            boolean canPay = economy.has((Player)sender,price);
+            if(canPay) {
+                economy.withdrawPlayer((Player)sender,price);
+            }
+            else {
+                String msg = configs.lang.getLog("notEnoughMoney", price.toString());
+                msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
+                sender.sendMessage(msg);
+                if(!sender.getName().equals(player.getName())) {
+                    player.sendMessage(msg);
+                }
+                return null;
+            }
+        }
+
+        Location res = region.getLocation(urgent, sender, player);
+        return res;
     }
 
     public void resetRegions() {
@@ -173,18 +195,20 @@ public class Cache {
         }
 
         Double i = 0d;
-        Integer period = (Integer)configs.config.getConfigValue("queuePeriod",30);
-        Double increment = ((period.doubleValue())/permRegions.size())*20;
-        for(Map.Entry<RandomSelectParams,TeleportRegion> entry : permRegions.entrySet()) {
-            queueTimers.put(entry.getKey(),Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, ()->{
-                double tps = TPS.getTPS();
-                double minTps = (Double)configs.config.getConfigValue("minTPS",19.0);
-                if(tps < minTps) return;
-                QueueLocation queueLocation = new QueueLocation(entry.getValue(),this);
-                queueLocationTasks.put(queueLocation.idx,queueLocation);
-                queueLocation.runTaskAsynchronously(plugin);
-            },200+i.intValue(),period*20));
-            i+=increment;
+        Integer period = configs.config.queuePeriod;
+        if(period > 0) {
+            Double increment = ((period.doubleValue()) / permRegions.size()) * 20;
+            for (Map.Entry<RandomSelectParams, TeleportRegion> entry : permRegions.entrySet()) {
+                queueTimers.put(entry.getKey(), Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
+                    double tps = TPS.getTPS();
+                    double minTps = (Double) configs.config.getConfigValue("minTPS", 19.0);
+                    if (tps < minTps) return;
+                    QueueLocation queueLocation = new QueueLocation(entry.getValue(), this);
+                    queueLocationTasks.put(queueLocation.idx, queueLocation);
+                    queueLocation.runTaskAsynchronously(plugin);
+                }, 40 + i.intValue(), period * 20));
+                i += increment;
+            }
         }
     }
 }

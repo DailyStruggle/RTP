@@ -10,4 +10,4 @@ default:
     #if no perm for this world, use this world
     override: "world"
 
-version: 1.5
+version: 1.6

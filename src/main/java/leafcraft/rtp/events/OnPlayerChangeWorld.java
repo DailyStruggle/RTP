@@ -35,7 +35,8 @@ public final class OnPlayerChangeWorld implements Listener {
     public void OnPlayerChangeWorld(PlayerChangedWorldEvent event) {
         Player player = event.getPlayer();
         //if currently teleporting, stop that and clean up
-        if (this.cache.todoTP.containsKey(player.getUniqueId())) {
+        if (cache.todoTP.containsKey(player.getUniqueId())) {
+            cache.todoTP.containsKey(player.getUniqueId());
             stopTeleport(event);
         }
 
@@ -62,7 +63,7 @@ public final class OnPlayerChangeWorld implements Listener {
             }
             RandomSelectParams fromParams = new RandomSelectParams(fromWorld, new HashMap<>(), configs);
             if (cache.permRegions.containsKey(fromParams)) {
-                cache.permRegions.get(fromParams).recyclePlayerLocation(player);
+                cache.permRegions.get(fromParams).recyclePlayerLocations(player);
             }
 
             World toWorld = event.getFrom();
@@ -113,7 +114,5 @@ public final class OnPlayerChangeWorld implements Listener {
         cache.regionKeys.remove(player.getUniqueId());
         cache.todoTP.remove(player.getUniqueId());
         cache.playerFromLocations.remove(player.getUniqueId());
-
-        player.sendMessage(configs.lang.getLog("teleportCancel"));
     }
 }

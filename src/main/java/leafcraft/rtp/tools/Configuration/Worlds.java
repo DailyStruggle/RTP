@@ -37,7 +37,7 @@ public class Worlds {
         }
         config = YamlConfiguration.loadConfiguration(f);
 
-        if( 	(config.getDouble("version") < 1.5) ) {
+        if( 	(config.getDouble("version") < 1.6) ) {
             Bukkit.getLogger().log(Level.WARNING, lang.getLog("oldFile", "worlds.yml"));
             FileStuff.renameFiles(plugin,"worlds");
             config = YamlConfiguration.loadConfiguration(f);

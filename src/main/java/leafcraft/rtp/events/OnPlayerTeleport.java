@@ -35,7 +35,8 @@ public final class OnPlayerTeleport implements Listener {
     public void OnPlayerTeleport(PlayerTeleportEvent event) {
         Player player = event.getPlayer();
         //if currently teleporting, stop that and clean up
-        if (this.cache.todoTP.containsKey(player.getUniqueId())) {
+        if (cache.todoTP.containsKey(player.getUniqueId())) {
+            cache.todoTP.containsKey(player.getUniqueId());
             stopTeleport(event);
         }
 
@@ -51,10 +52,9 @@ public final class OnPlayerTeleport implements Listener {
 
             //run command
             if (setupTeleport == null && loadChunks == null && doTeleport == null) {
-                //Bukkit.getScheduler().runTaskLater(plugin, ()-> Bukkit.dispatchCommand(player,"rtp"),2);
                 setupTeleport = new SetupTeleport(plugin, player, player, configs, cache, new RandomSelectParams(player.getWorld(), new HashMap<>(), configs));
                 this.cache.setupTeleports.put(player.getUniqueId(), setupTeleport);
-                setupTeleport.runTaskLaterAsynchronously(plugin, 2);
+                setupTeleport.runTaskAsynchronously(plugin);
             }
         }
     }
@@ -96,7 +96,5 @@ public final class OnPlayerTeleport implements Listener {
         cache.regionKeys.remove(player.getUniqueId());
         cache.todoTP.remove(player.getUniqueId());
         cache.playerFromLocations.remove(player.getUniqueId());
-
-        player.sendMessage(configs.lang.getLog("teleportCancel"));
     }
 }
