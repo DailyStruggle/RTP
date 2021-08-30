@@ -18,6 +18,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 public class LoadChunks extends BukkitRunnable {
     public final TeleportRegion.ChunkSet chunkSet;
@@ -141,7 +142,7 @@ public class LoadChunks extends BukkitRunnable {
         }
 
         if (!cancelled) {
-            long remTime = 1 + delay - ((System.currentTimeMillis() - cache.lastTeleportTime.getOrDefault(player.getUniqueId(),0l)) / 50);
+            long remTime = 1 + delay - TimeUnit.NANOSECONDS.toMicros((System.nanoTime() - cache.lastTeleportTime.getOrDefault(player.getUniqueId(), 0L)) / 50);
             if (remTime < 0) remTime = 0;
 
             DoTeleport doTeleport = new DoTeleport(plugin,configs,sender,player,location,cache);

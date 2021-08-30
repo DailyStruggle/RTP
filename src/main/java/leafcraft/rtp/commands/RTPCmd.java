@@ -53,6 +53,8 @@ public class RTPCmd implements CommandExecutor {
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if(!command.getName().equalsIgnoreCase("rtp") && !command.getName().equalsIgnoreCase("wild")) return true;
 
+        long start = System.nanoTime();
+
         if(args.length > 0 && perms.containsKey(args[0])) {
             if(!sender.hasPermission(perms.get(args[0]))) {
                 String msg = configs.lang.getLog("noPerms");
@@ -152,16 +154,15 @@ public class RTPCmd implements CommandExecutor {
         }
 
         //check time
-        long time = System.currentTimeMillis();
-        long lastTime = (sender instanceof Player) ? this.cache.lastTeleportTime.getOrDefault(sender.getName(),Long.valueOf(0)) : 0;
-        long cooldownTime = TimeUnit.SECONDS.toMillis(configs.config.teleportCooldown);
+        long lastTime = (sender instanceof Player) ? this.cache.lastTeleportTime.getOrDefault(((Player) sender).getUniqueId(),0L) : 0;
+        long cooldownTime = TimeUnit.SECONDS.toNanos(configs.config.teleportCooldown);
         if(!sender.hasPermission("rtp.noCooldown")
-                && time - lastTime < cooldownTime) {
-            long remaining = (lastTime+cooldownTime)-time;
-            long days = TimeUnit.MILLISECONDS.toDays(remaining);
-            long hours = TimeUnit.MILLISECONDS.toHours(remaining)%24;
-            long minutes = TimeUnit.MILLISECONDS.toMinutes(remaining)%60;
-            long seconds = TimeUnit.MILLISECONDS.toSeconds(remaining)%60;
+                && start - lastTime < cooldownTime) {
+            long remaining = (lastTime-start)+cooldownTime;
+            long days = TimeUnit.NANOSECONDS.toDays(remaining);
+            long hours = TimeUnit.NANOSECONDS.toHours(remaining)%24;
+            long minutes = TimeUnit.NANOSECONDS.toMinutes(remaining)%60;
+            long seconds = TimeUnit.NANOSECONDS.toSeconds(remaining)%60;
             String replacement = "";
             if(days>0) replacement += days + configs.lang.getLog("days") + " ";
             if(days>0 || hours>0) replacement += hours + configs.lang.getLog("hours") + " ";
@@ -177,7 +178,7 @@ public class RTPCmd implements CommandExecutor {
         RandomSelectParams rsParams = new RandomSelectParams(world,rtpArgs,configs);
 
         //prep teleportation
-        this.cache.lastTeleportTime.put(player.getUniqueId(), time);
+        this.cache.lastTeleportTime.put(player.getUniqueId(), start);
         this.cache.playerFromLocations.put(player.getUniqueId(),player.getLocation());
         SetupTeleport setupTeleport = new SetupTeleport(plugin,sender,player,configs, cache, rsParams);
         cache.setupTeleports.put(player.getUniqueId(),setupTeleport);
