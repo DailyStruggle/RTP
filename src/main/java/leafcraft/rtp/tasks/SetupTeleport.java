@@ -1,22 +1,16 @@
 package leafcraft.rtp.tasks;
 
-import io.papermc.lib.PaperLib;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import leafcraft.rtp.tools.softdepends.PAPIChecker;
-import org.bukkit.Bukkit;
-import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 //prep teleportation
@@ -80,7 +74,6 @@ public class SetupTeleport extends BukkitRunnable {
         }
 
         //get a random location according to the parameters
-        long start = System.currentTimeMillis();
         location = cache.getRandomLocation(rsParams,true,sender, player);
         if(location == null) return;
 
@@ -113,12 +106,14 @@ public class SetupTeleport extends BukkitRunnable {
             cache.todoTP.put(player.getUniqueId(),location);
             cache.regionKeys.put(player.getUniqueId(),rsParams);
             LoadChunks loadChunks = new LoadChunks(plugin,configs,sender,player,cache,delay,location);
-            long remTime = 1 + delay - ((System.currentTimeMillis() - cache.lastTeleportTime.getOrDefault(player.getUniqueId(),System.currentTimeMillis())) / 50);
             if(sender.hasPermission("rtp.noDelay.chunks")
                     || (loadChunks.chunkSet.completed.get()>=loadChunks.chunkSet.expectedSize-1)) {
                 DoTeleport doTeleport = new DoTeleport(plugin,configs,sender,player,location,cache);
                 cache.doTeleports.put(player.getUniqueId(),doTeleport);
-                if(async || remTime>0) doTeleport.runTaskLater(plugin,remTime);
+                long diffNanos = System.nanoTime() - cache.lastTeleportTime.getOrDefault(player.getUniqueId(), System.nanoTime());
+                long diffMicros = TimeUnit.NANOSECONDS.toMicros(diffNanos);
+                long diffTicks = (diffMicros / 50);
+                if(async || diffTicks < delay) doTeleport.runTaskLater(plugin, delay+2);
                 else doTeleport.doTeleportNow();
             }
             else {

@@ -50,23 +50,23 @@ public class DoTeleport extends BukkitRunnable {
         cache.todoTP.remove(player.getUniqueId());
 
         if(!cancelled) {
-            PaperLib.teleportAsync(player,location);
-//            player.teleport(location);
+//            PaperLib.teleportAsync(player,location);
+            player.teleport(location);
             String msg = configs.lang.getLog("teleportMessage", this.cache.numTeleportAttempts.getOrDefault(location,0).toString());
             msg = PAPIChecker.fillPlaceholders(player,msg);
 
-            long diff = System.currentTimeMillis()-cache.lastTeleportTime.get(player.getUniqueId());
-            long days = TimeUnit.MILLISECONDS.toDays(diff);
-            long hours = TimeUnit.MILLISECONDS.toHours(diff)%24;
-            long minutes = TimeUnit.MILLISECONDS.toMinutes(diff)%60;
-            long seconds = TimeUnit.MILLISECONDS.toSeconds(diff)%60;
-            long millis = diff%1000;
+            long diff = System.nanoTime()-cache.lastTeleportTime.get(player.getUniqueId());
+            long days = TimeUnit.NANOSECONDS.toDays(diff);
+            long hours = TimeUnit.NANOSECONDS.toHours(diff)%24;
+            long minutes = TimeUnit.NANOSECONDS.toMinutes(diff)%60;
+            long seconds = TimeUnit.NANOSECONDS.toSeconds(diff)%60;
+            double millis = ((double)(TimeUnit.NANOSECONDS.toMicros(diff)%1000000))/1000;
             String replacement = "";
             if(days>0) replacement += days + configs.lang.getLog("days") + " ";
             if(hours>0) replacement += hours + configs.lang.getLog("hours") + " ";
             if(minutes>0) replacement += minutes + configs.lang.getLog("minutes") + " ";
             if(seconds>0) replacement += seconds + configs.lang.getLog("seconds") + " ";
-            if((millis>0 || seconds<1)&&diff<2000) replacement += millis + configs.lang.getLog("millis");
+            if((millis>0 || seconds<1)&&diff<TimeUnit.SECONDS.toNanos(2)) replacement += millis + configs.lang.getLog("millis");
             msg = msg.replace("[time]",replacement);
             player.sendMessage(msg);
             if(sender.getName()!=player.getName()) sender.sendMessage(msg);

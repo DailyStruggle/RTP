@@ -145,7 +145,7 @@ public class TabComplete implements TabCompleter {
                     }
                     case "player" : {
                         for (Player player : Bukkit.getOnlinePlayers()) {
-                            res.add(arg + ":" + player.getUniqueId());
+                            res.add(arg + ":" + player.getName());
                         }
                         break;
                     }

@@ -182,6 +182,12 @@ public class Cache {
         }
         permRegions.clear();
 
+        for(Map.Entry<HashableChunk,Long> entry : forceLoadedChunks.entrySet()) {
+            entry.getKey().getChunk().setForceLoaded(false);
+            entry.getKey().getChunk().unload(true);
+        }
+        forceLoadedChunks.clear();
+
         for(String region : configs.regions.getRegionNames()) {
             String worldName = (String) configs.regions.getRegionSetting(region,"world","world");
             World world = Bukkit.getWorld(worldName);
