@@ -37,7 +37,7 @@ public class Worlds {
         }
         config = YamlConfiguration.loadConfiguration(f);
 
-        if( 	(config.getDouble("version") < 1.6) ) {
+        if( 	(config.getDouble("version") < 1.7) ) {
             Bukkit.getLogger().log(Level.WARNING, lang.getLog("oldFile", "worlds.yml"));
             FileStuff.renameFiles(plugin,"worlds");
             config = YamlConfiguration.loadConfiguration(f);
@@ -52,6 +52,11 @@ public class Worlds {
         String defaultRegion = config.getConfigurationSection("default").getString("region","default");
         Boolean defaultRequirePermission = config.getConfigurationSection("default").getBoolean("requirePermission",true);
         String defaultOverride = config.getConfigurationSection("default").getString("override","world");
+        String defaultNearShape = config.getConfigurationSection("default").getString("nearShape","CIRCLE");
+        Integer defaultNearRadius = config.getConfigurationSection("default").getInt("nearRadius",16);
+        Integer defaultNearCenterRadius = config.getConfigurationSection("default").getInt("nearCenterRadius",8);
+        Integer defaultNearMinY = config.getConfigurationSection("default").getInt("nearMinY",48);
+        Integer defaultNearMaxY = config.getConfigurationSection("default").getInt("nearMaxY",127);
 
         for(World w : Bukkit.getWorlds()) {
             String permName = "rtp.worlds." + w.getName();
@@ -86,6 +91,11 @@ public class Worlds {
                         linesInWorlds.add("    region: " + quotes + defaultRegion + quotes);
                         linesInWorlds.add("    requirePermission: " + defaultRequirePermission);
                         linesInWorlds.add("    override: " + quotes + defaultOverride + quotes);
+                        linesInWorlds.add("    nearShape: " + quotes + defaultNearShape + quotes);
+                        linesInWorlds.add("    nearRadius: " + defaultNearRadius);
+                        linesInWorlds.add("    nearCenterRadius: " + defaultNearCenterRadius);
+                        linesInWorlds.add("    nearMinY: " + defaultNearMinY);
+                        linesInWorlds.add("    nearMaxY: " + defaultNearMaxY);
                     }
                 }
                 else { //if not a blank line
@@ -97,6 +107,16 @@ public class Worlds {
                         s = "    requirePermission: " + config.getConfigurationSection(currWorldName).getBoolean("requirePermission",defaultRequirePermission);
                     else if(s.startsWith("    override:"))
                         s = "    override: " + quotes + config.getConfigurationSection(currWorldName).getString("override",defaultOverride) + quotes;
+                    else if(s.startsWith("    nearShape:"))
+                        s = "    nearShape: " + quotes + config.getConfigurationSection(currWorldName).getString("nearShape",defaultNearShape) + quotes;
+                    else if(s.startsWith("    nearRadius:"))
+                        s = "    nearRadius: " + config.getConfigurationSection(currWorldName).getInt("nearRadius",defaultNearRadius);
+                    else if(s.startsWith("    nearCenterRadius:"))
+                        s = "    nearCenterRadius: " + config.getConfigurationSection(currWorldName).getInt("nearCenterRadius",defaultNearCenterRadius);
+                    else if(s.startsWith("    nearMinY:"))
+                        s = "    nearMinY: " + config.getConfigurationSection(currWorldName).getInt("nearMinY",defaultNearMinY);
+                    else if(s.startsWith("    nearMaxY:"))
+                        s = "    nearMaxY: " + config.getConfigurationSection(currWorldName).getInt("nearMaxY",defaultNearMaxY);
                     else if(!s.startsWith("#") && !s.startsWith("  ") && !s.startsWith("version") && (s.matches(".*[a-z].*") || s.matches(".*[A-Z].*")))
                     {
                         currWorldName = s.replace(":","");

@@ -5,6 +5,8 @@ import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.softdepends.PAPIChecker;
+import leafcraft.rtp.tools.softdepends.VaultChecker;
+import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.command.Command;
@@ -13,12 +15,13 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 public class RTPCmd implements CommandExecutor {
     private final leafcraft.rtp.RTP plugin;
     private final Configs configs;
-    private final Map<String,String> perms = new HashMap<>();
+    private final Map<String,String> rtpCommands = new HashMap<>();
     private final Map<String,String> rtpParams = new HashMap<>();
 
     private final Cache cache;
@@ -28,11 +31,11 @@ public class RTPCmd implements CommandExecutor {
         this.configs = configs;
         this.cache = cache;
 
-        this.perms.put("help","rtp.use");
-        this.perms.put("reload","rtp.reload");
-        this.perms.put("setRegion","rtp.setRegion");
-        this.perms.put("setWorld","rtp.setWorld");
-        this.perms.put("fill","rtp.fill");
+        this.rtpCommands.put("help","rtp.use");
+        this.rtpCommands.put("reload","rtp.reload");
+        this.rtpCommands.put("setRegion","rtp.setRegion");
+        this.rtpCommands.put("setWorld","rtp.setWorld");
+        this.rtpCommands.put("fill","rtp.fill");
 
         this.rtpParams.put("player", "rtp.other");
         this.rtpParams.put("world", "rtp.world");
@@ -47,6 +50,7 @@ public class RTPCmd implements CommandExecutor {
         this.rtpParams.put("maxY","rtp.params");
         this.rtpParams.put("requireSkyLight","rtp.params");
         this.rtpParams.put("worldBorderOverride","rtp.params");
+        this.rtpParams.put("near","rtp.near");
     }
 
     @Override
@@ -55,8 +59,8 @@ public class RTPCmd implements CommandExecutor {
 
         long start = System.nanoTime();
 
-        if(args.length > 0 && perms.containsKey(args[0])) {
-            if(!sender.hasPermission(perms.get(args[0]))) {
+        if(args.length > 0 && rtpCommands.containsKey(args[0])) {
+            if(!sender.hasPermission(rtpCommands.get(args[0]))) {
                 String msg = configs.lang.getLog("noPerms");
                 if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
                 sender.sendMessage(msg);
@@ -83,6 +87,7 @@ public class RTPCmd implements CommandExecutor {
             if(this.rtpParams.containsKey(arg) && sender.hasPermission(rtpParams.get(arg)) && idx < args[i].length()-1) {
                 rtpArgs.putIfAbsent(arg,args[i].substring(idx+1)); //only use first instance
             }
+            if(args[i].equalsIgnoreCase("near:random")) rtpArgs.putIfAbsent("near","random");
         }
 
         //set up player parameter
@@ -172,6 +177,79 @@ public class RTPCmd implements CommandExecutor {
             if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
             sender.sendMessage(msg);
             return true;
+        }
+
+        if(rtpArgs.containsKey("near")) {
+            String playerName = rtpArgs.get("near");
+            Player targetPlayer = Bukkit.getPlayer(playerName);
+
+
+            int price = configs.config.nearSelfPrice;
+            Economy economy = VaultChecker.getEconomy();
+            boolean has = true;
+            if (economy != null && sender instanceof Player) has = economy.has((Player) sender, price);
+
+            if(playerName.equalsIgnoreCase("random") && sender.hasPermission("rtp.near.random")) {
+                Collection<? extends Player> players = Bukkit.getOnlinePlayers();
+                List<Player> validPlayers = new ArrayList<>(players.size());
+                for(Player player1 : players) {
+                    if(player1.getName().equals(sender.getName())) continue;
+                    if(player1.hasPermission("rtp.near.notme")) continue;
+                    validPlayers.add(player1);
+                }
+                if(validPlayers.size()>0) {
+                    int selection = ThreadLocalRandom.current().nextInt(validPlayers.size());
+                    targetPlayer = validPlayers.get(selection);
+                    playerName = targetPlayer.getName();
+                }
+                else {
+                    String msg = configs.lang.getLog("badArg", "near:" + playerName);
+                    if (sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player) sender, msg);
+                    sender.sendMessage(msg);
+                    return true;
+                }
+            }
+            else if (!playerName.equals(sender.getName()) && !sender.hasPermission("rtp.near.other")) {
+                String msg = configs.lang.getLog("noPerms");
+                if (sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player) sender, msg);
+                sender.sendMessage(msg);
+                return true;
+            }
+            else if (!sender.hasPermission("rtp.near")) {
+                String msg = configs.lang.getLog("noPerms");
+                if (sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player) sender, msg);
+                sender.sendMessage(msg);
+                return true;
+            }
+
+            if (targetPlayer == null) {
+                String msg = configs.lang.getLog("badArg", "near:" + playerName);
+                if (sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player) sender, msg);
+                sender.sendMessage(msg);
+                return true;
+            }
+
+            if(!has) {
+                String msg = configs.lang.getLog("notEnoughMoney",String.valueOf(price));
+                PAPIChecker.fillPlaceholders((Player)sender,msg);
+                sender.sendMessage(msg);
+                return true;
+            }
+
+            String shapeStr = (String) configs.worlds.getWorldSetting(worldName, "nearShape", "CIRCLE");
+            Integer radius = (Integer) configs.worlds.getWorldSetting(worldName, "nearRadius", 16);
+            Integer centerRadius = (Integer) configs.worlds.getWorldSetting(worldName, "nearCenterRadius", 8);
+            Integer minY = (Integer) configs.worlds.getWorldSetting(worldName, "nearMinY", 48);
+            Integer maxY = (Integer) configs.worlds.getWorldSetting(worldName, "nearMaxY", 127);
+            rtpArgs.putIfAbsent("shape", shapeStr);
+            rtpArgs.putIfAbsent("radius",radius.toString());
+            rtpArgs.putIfAbsent("centerRadius",centerRadius.toString());
+            rtpArgs.putIfAbsent("minY",minY.toString());
+            rtpArgs.putIfAbsent("maxY",maxY.toString());
+            rtpArgs.putIfAbsent("centerX", String.valueOf(targetPlayer.getLocation().getChunk().getX()));
+            rtpArgs.putIfAbsent("centerZ", String.valueOf(targetPlayer.getLocation().getChunk().getZ()));
+            world = targetPlayer.getWorld();
+            rtpArgs.putIfAbsent("world", world.getName());
         }
 
         //set up parameters for selection

@@ -6,7 +6,7 @@ default:
     #shape of bounds
     # CIRCLE, SQUARE - spiral curves
     shape: "CIRCLE"
-    #outer radius of selection in meters
+    #outer radius of selection in chunks
     radius: 256
     #donut hole in center, where players shouldn't land
     centerRadius: 64
