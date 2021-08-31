@@ -63,6 +63,9 @@ permissions:
       rtp.setWorld: true
       rtp.setRegion: true
       rtp.params: true
+      rtp.near: true
+      rtp.near.other: true
+      rtp.near.random: true
   rtp.see:
     description: allow player to tab for rtp commands
     default: true
@@ -149,3 +152,19 @@ permissions:
   rtp.onEvent.teleport:
     description: randomly teleport player on teleport, recursively
     default: false
+  rtp.near:
+    description: randomly teleport around your current position
+    default: op
+  rtp.near.random:
+    description: randomly teleport to a random player
+    default: op
+    children:
+      rtp.near: true
+  rtp.near.other:
+    description: randomly teleport around someone else
+    default: op
+    children:
+      rtp.near: true
+  rtp.near.notme:
+    description: don't let players teleport near me
+    default: op

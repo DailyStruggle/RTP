@@ -8,14 +8,12 @@ import leafcraft.rtp.tools.HashableChunk;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import leafcraft.rtp.tools.softdepends.PAPIChecker;
-import org.bukkit.Bukkit;
-import org.bukkit.Chunk;
-import org.bukkit.Location;
-import org.bukkit.World;
+import org.bukkit.*;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 public class DoTeleport extends BukkitRunnable {
@@ -100,6 +98,8 @@ public class DoTeleport extends BukkitRunnable {
             }
         }
         this.cache.lastTeleportTime.put(player.getUniqueId(), System.currentTimeMillis());
+
+        runCommands();
     }
 
     @Override
@@ -117,6 +117,22 @@ public class DoTeleport extends BukkitRunnable {
             sender.sendMessage(msg);
         cancelled = true;
         super.cancel();
+    }
+
+    private void runCommands() {
+        List<String> consoleCommands = configs.config.getConsoleCommands();
+        for(String command : consoleCommands) {
+            command = PAPIChecker.fillPlaceholders(player,command);
+            command = ChatColor.translateAlternateColorCodes('&',command);
+            Bukkit.dispatchCommand(Bukkit.getConsoleSender(),command);
+        }
+
+        List<String> playerCommands = configs.config.getPlayerCommands();
+        for(String command : playerCommands) {
+            command = PAPIChecker.fillPlaceholders(player,command);
+            command = ChatColor.translateAlternateColorCodes('&',command);
+            Bukkit.dispatchCommand(player,command);
+        }
     }
 
     public boolean isNoDelay() {

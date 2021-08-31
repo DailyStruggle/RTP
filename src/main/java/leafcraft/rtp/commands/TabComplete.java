@@ -1,5 +1,6 @@
 package leafcraft.rtp.commands;
 
+import com.comphenix.protocol.PacketType;
 import leafcraft.rtp.tools.Configuration.Configs;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
@@ -31,7 +32,8 @@ public class TabComplete implements TabCompleter {
         void addSubParam(String name, String perm) {
             subParams.put(name,perm);
             subParamsPermList.putIfAbsent(perm, new ArrayList<>());
-            subParamsPermList.get(perm).add(name+":");
+            if(name.contains(":")) subParamsPermList.get(perm).add(name);
+            else subParamsPermList.get(perm).add(name+":");
         }
     }
 
@@ -54,6 +56,7 @@ public class TabComplete implements TabCompleter {
         subCommands.addSubParam("maxY","rtp.params");
         subCommands.addSubParam("requireSkyLight","rtp.params");
         subCommands.addSubParam("worldBorderOverride","rtp.params");
+        subCommands.addSubParam("near","rtp.near");
         
         subCommands.commands.put("help",new SubCommand("rtp.see"));
         subCommands.commands.put("reload",new SubCommand("rtp.reload"));
@@ -86,8 +89,8 @@ public class TabComplete implements TabCompleter {
 
         subCommands.commands.put("fill",new SubCommand("rtp.fill"));
         subCommands.commands.get("fill").addSubParam("region","rtp.fill");
-//        subCommands.commands.get("fill").commands.put("cancel",new SubCommand("rtp.fill"));
-//        subCommands.commands.get("fill").commands.get("cancel").addSubParam("world","rtp.fill");
+        subCommands.commands.get("fill").commands.put("cancel",new SubCommand("rtp.fill"));
+        subCommands.commands.get("fill").commands.get("cancel").addSubParam("region","rtp.fill");
 
         this.configs = configs;
     }
@@ -112,7 +115,7 @@ public class TabComplete implements TabCompleter {
         String arg = idx > 0 ? args[i].substring(0, idx) : args[i];
         if(i == args.length-1) { //if last arg
             //if semicolon, maybe suggest
-            if (command.subParams.containsKey(arg) && !knownParams.contains(arg)) {
+            if ((command.subParams.containsKey(arg)) && !knownParams.contains(arg)) {
                 if(!sender.hasPermission(command.subParams.get(arg))){
                     return;
                 }
@@ -140,6 +143,34 @@ public class TabComplete implements TabCompleter {
                                     || sender.hasPermission("rtp.worlds." + world.getName())) {
                                 res.add(arg + ":" + configs.worlds.worldName2Placeholder(world.getName()));
                             }
+                        }
+                        break;
+                    }
+                    case "near" : {
+                        int numValidPlayers = 0;
+                        if(sender.hasPermission("rtp.near.other")) {
+                            for (Player player : Bukkit.getOnlinePlayers()) {
+                                if(player.getName().equals(sender.getName())) continue;
+                                if(player.hasPermission("rtp.near.notme")) continue;
+                                res.add(arg + ":" + player.getName());
+                                numValidPlayers++;
+                            }
+                        }
+
+                        if(sender.hasPermission("rtp.near.random")) {
+                            if(numValidPlayers == 0) {
+                                for (Player player : Bukkit.getOnlinePlayers()) {
+                                    if(player.getName().equals(sender.getName())) continue;
+                                    if(player.hasPermission("rtp.near.notme")) continue;
+                                    numValidPlayers++;
+                                }
+                            }
+                            if(numValidPlayers>0)
+                                res.add("near:random");
+                        }
+
+                        if( sender instanceof Player && sender.hasPermission("rtp.near")){
+                            res.add(arg + ":" + sender.getName());
                         }
                         break;
                     }
@@ -187,7 +218,7 @@ public class TabComplete implements TabCompleter {
             }
         }
         else {
-            //if current current argument is a parameter, add it to the list and go to next parameter
+            //if current argument is a parameter, add it to the list and go to next parameter
             if(command.subParams.containsKey(arg)) {
                 if(sender.hasPermission(command.subParams.get(arg)))
                     knownParams.add(arg);

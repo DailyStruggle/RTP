@@ -66,8 +66,11 @@ invalidWorld: "&e[rtp] could not find world '[worldName]'"
 # when more than on user fails to specify region in updateRegion
 missingRegionParam: "&e[rtp] region parameter is required"
 
-startFill: "&e[rtp] starting fill task for region [region]"
-fillRunning: "&e[rtp] fill task already running for region [region]"
+startFill: "&a[rtp] starting fill task for region [region]"
+fillRunning: "&c[rtp] fill task already running for region [region]"
+fillNotRunning: "&c[rtp] fill task not running for region [region]"
+fillStatus: "&a[rtp] completed [num] / [total] chunks for region [region]"
+fillCancel: "&e[rtp] fill task cancelled for region [region]"
 
 #command descriptions
 rtp: "&b/rtp - teleport to a random location"
@@ -77,4 +80,4 @@ setWorld: "&b/rtp setWorld - update world settings"
 setRegion: "&b/rtp setRegion - create or update region settings"
 fill: "&b/rtp fill - start a fill task for a region"
 
-version: 1.7
+version: 1.8

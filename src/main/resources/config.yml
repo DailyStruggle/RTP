@@ -32,5 +32,16 @@ minTPS: 19.0
 # if larger than bukkit view distance, uses bukkit view distance
 viewDistance: 10
 
+# price to use near command
+nearSelfPrice: 500
+nearOtherPrice: 2000
+
+#commands to run after any teleportation
+# e.g.
+#consoleCommands:
+#  - "say Someone Teleported!"
+consoleCommands:
+playerCommands:
+
 #DO NOT TOUCH VERSION NUMBER
-version: 1.7
+version: 1.8

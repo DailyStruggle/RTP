@@ -2,7 +2,6 @@ package leafcraft.rtp.tools.selection;
 
 import leafcraft.rtp.tools.Configuration.Configs;
 import org.bukkit.Bukkit;
-import org.bukkit.Chunk;
 import org.bukkit.World;
 
 import java.util.Map;
@@ -25,12 +24,10 @@ public class RandomSelectParams {
         String defaultRegion = (String)configs.worlds.getWorldSetting(world.getName(),"region","default");
         String regionName = params.getOrDefault("region",defaultRegion);
 
-        worldName = (String)configs.regions.getRegionSetting(regionName,"world",world.getName());
-        if(configs.worlds.checkWorldExists(worldName)) {
-            world = Bukkit.getWorld(worldName);
-        }
-        else {
-            worldName = world.getName();
+        String targetWorldName = (String)configs.regions.getRegionSetting(regionName,"world",world.getName());
+        if(configs.worlds.checkWorldExists(targetWorldName)) {
+            world = Bukkit.getWorld(targetWorldName);
+            worldName = targetWorldName;
         }
 
         this.params = params;
@@ -61,16 +58,16 @@ public class RandomSelectParams {
 
         worldID = world.getUID();
         shape = TeleportRegion.Shapes.valueOf(this.params.getOrDefault("shape","CIRCLE"));
-        r = Integer.valueOf(this.params.get("radius"));
-        cr = Integer.valueOf(this.params.get("centerRadius"));
-        cx = Integer.valueOf(this.params.get("centerX"));
-        cz = Integer.valueOf(this.params.get("centerZ"));
-        minY = Integer.valueOf(this.params.get("minY"));
-        maxY = Integer.valueOf(this.params.get("maxY"));
-        requireSkyLight = Boolean.valueOf(this.params.get("requireSkyLight"));
-        worldBorderOverride = Boolean.valueOf(this.params.get("worldBorderOverride"));
-        uniquePlacements = Boolean.valueOf(this.params.get("uniquePlacements"));
-        expand = Boolean.valueOf(this.params.get("expand"));
+        r = Integer.parseInt(this.params.get("radius"));
+        cr = Integer.parseInt(this.params.get("centerRadius"));
+        cx = Integer.parseInt(this.params.get("centerX"));
+        cz = Integer.parseInt(this.params.get("centerZ"));
+        minY = Integer.parseInt(this.params.get("minY"));
+        maxY = Integer.parseInt(this.params.get("maxY"));
+        requireSkyLight = Boolean.parseBoolean(this.params.get("requireSkyLight"));
+        worldBorderOverride = Boolean.parseBoolean(this.params.get("worldBorderOverride"));
+        uniquePlacements = Boolean.parseBoolean(this.params.get("uniquePlacements"));
+        expand = Boolean.parseBoolean(this.params.get("expand"));
 
 //        System.out.println("creating RandomSelectParams with params:");
 //        for(Map.Entry<String,String> entry : this.params.entrySet()) {

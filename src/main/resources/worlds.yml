@@ -9,5 +9,11 @@ default:
     requirePermission: true
     #if no perm for this world, use this world
     override: "world"
+    #default settings for teleporting around a player
+    nearShape: "CIRCLE"
+    nearRadius: 16
+    nearCenterRadius: 8
+    nearMinY: 48
+    nearMaxY: 127
 
-version: 1.6
+version: 1.7

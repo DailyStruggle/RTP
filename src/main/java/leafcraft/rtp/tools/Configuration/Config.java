@@ -1,6 +1,7 @@
 package leafcraft.rtp.tools.Configuration;
 
 import leafcraft.rtp.RTP;
+import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.*;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -20,6 +21,8 @@ public class Config {
 	public final double price;
 	public final boolean rerollLiquid, rerollWorldGuard, rerollGriefPrevention;
 
+	public final int nearSelfPrice, nearOtherPrice;
+
 	public Config(RTP plugin, Lang lang) {
 		this.plugin = plugin;
 
@@ -30,7 +33,7 @@ public class Config {
 		}
 		this.config = YamlConfiguration.loadConfiguration(f);
 
-		if( 	(this.config.getDouble("version") < 1.7) ) {
+		if( 	(this.config.getDouble("version") < 1.8) ) {
 			Bukkit.getLogger().log(Level.WARNING, lang.getLog("oldFile", "config.yml"));
 			update();
 
@@ -49,6 +52,9 @@ public class Config {
 		this.queuePeriod = config.getInt("queuePeriod",30);
 		this.minTPS = config.getInt("minTPS",19);
 		this.price = config.getDouble("price", Double.MAX_VALUE);
+
+		this.nearSelfPrice = config.getInt("nearSelfPrice", Integer.MAX_VALUE);
+		this.nearOtherPrice = config.getInt("nearOtherPrice", Integer.MAX_VALUE);
 
 		int vd = config.getInt("viewDistance",10);
 		if(vd > Bukkit.getViewDistance()) vd = Bukkit.getViewDistance();
@@ -75,14 +81,14 @@ public class Config {
 		for (String line : linesInDefaultConfig) {
 			String newline = line;
 			if (line.startsWith("version:")) {
-				newline = "version: 1.7";
+				newline = "version: 1.8";
 			} else {
 				for (String node : oldValues.keySet()) {
 					if (line.startsWith(node + ":")) {
-						String quotes = "";
-						newline = node + ": " + quotes + oldValues.get(node).toString() + quotes;
+						newline = node + ": " + oldValues.get(node).toString();
 						break;
 					}
+
 				}
 			}
 			newLines.add(newline);
@@ -103,5 +109,13 @@ public class Config {
 
 	public Object getConfigValue(String name, Object def) {
 		return this.config.get(name,def);
+	}
+
+	public List<String> getConsoleCommands() {
+		return config.getStringList("consoleCommands");
+	}
+
+	public List<String> getPlayerCommands() {
+		return config.getStringList("playerCommands");
 	}
 }

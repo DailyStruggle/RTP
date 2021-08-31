@@ -49,6 +49,37 @@ public class TeleportRegion {
         acceptableAir.add(Material.AIR);
         acceptableAir.add(Material.CAVE_AIR);
         acceptableAir.add(Material.VOID_AIR);
+        acceptableAir.add(Material.SNOW);
+        acceptableAir.add(Material.GRASS);
+        acceptableAir.add(Material.SUNFLOWER);
+        acceptableAir.add(Material.DANDELION);
+        acceptableAir.add(Material.DANDELION_YELLOW);
+        acceptableAir.add(Material.POPPY);
+        acceptableAir.add(Material.BLUE_ORCHID);
+        acceptableAir.add(Material.ALLIUM);
+        acceptableAir.add(Material.AZURE_BLUET);
+        acceptableAir.add(Material.RED_TULIP);
+        acceptableAir.add(Material.ORANGE_TULIP);
+        acceptableAir.add(Material.WHITE_TULIP);
+        acceptableAir.add(Material.PINK_TULIP);
+        acceptableAir.add(Material.OXEYE_DAISY);
+        acceptableAir.add(Material.LILAC);
+        acceptableAir.add(Material.ROSE_RED);
+        acceptableAir.add(Material.PEONY);
+        acceptableAir.add(Material.SUGAR_CANE);
+        acceptableAir.add(Material.VINE);
+        acceptableAir.add(Material.WHEAT);
+        acceptableAir.add(Material.CARROT);
+        acceptableAir.add(Material.CARROTS);
+        acceptableAir.add(Material.POTATO);
+        acceptableAir.add(Material.POTATOES);
+        acceptableAir.add(Material.BEETROOT);
+        acceptableAir.add(Material.BEETROOTS);
+        acceptableAir.add(Material.MELON_STEM);
+        acceptableAir.add(Material.PUMPKIN_STEM);
+        acceptableAir.add(Material.DEAD_BUSH);
+        acceptableAir.add(Material.LARGE_FERN);
+        acceptableAir.add(Material.FERN);
     }
 
     private class FillTask extends BukkitRunnable {
@@ -94,7 +125,7 @@ public class TeleportRegion {
                         Translate.circleLocationToXZ(cr,cx,cz,shiftedIt);
                 CompletableFuture<Chunk> cfChunk = PaperLib.getChunkAtAsync(world,xz[0],xz[1],true);
                 this.chunks.add(cfChunk);
-                long finalShiftedIt = shiftedIt;
+                final long finalShiftedIt = shiftedIt;
                 max.set((long)totalSpace);
 //                max.set((long) ((expand) ? totalSpace : totalSpace - badLocationSum.get()));
                 cfChunk.whenCompleteAsync((chunk, throwable) -> {
@@ -681,8 +712,9 @@ public class TeleportRegion {
     // true if it's a good placement
     public boolean checkLocation(Location location) {
         return !(acceptableAir.contains(location.getBlock().getType())
+                || (!location.getBlock().getType().isSolid())
                 || (location.getBlockY() >= maxY)
-                || (rerollLiquid && location.getBlock().isLiquid())
+                || (rerollLiquid && (location.getBlock().isLiquid()))
                 || (rerollWorldGuard && WorldGuardChecker.isInRegion(location))
                 || (rerollGriefPrevention && GriefPreventionChecker.isInClaim(location)));
     }
