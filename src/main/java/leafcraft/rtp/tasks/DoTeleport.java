@@ -97,7 +97,7 @@ public class DoTeleport extends BukkitRunnable {
                 queueLocation.runTaskAsynchronously(plugin);
             }
         }
-        this.cache.lastTeleportTime.put(player.getUniqueId(), System.currentTimeMillis());
+        this.cache.lastTeleportTime.put(player.getUniqueId(), System.nanoTime());
 
         runCommands();
     }

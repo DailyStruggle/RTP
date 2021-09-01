@@ -8,6 +8,7 @@ import leafcraft.rtp.tools.softdepends.PAPIChecker;
 import leafcraft.rtp.tools.softdepends.VaultChecker;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -111,6 +112,17 @@ public class RTPCmd implements CommandExecutor {
             return true;
         }
 
+        if(cache.setupTeleports.containsKey(player.getUniqueId())
+                || cache.loadChunks.containsKey(player.getUniqueId())
+                || cache.doTeleports.containsKey(player.getUniqueId())
+                || cache.todoTP.containsKey(player.getUniqueId()))
+        {
+            String msg = configs.lang.getLog("alreadyTeleporting");
+            PAPIChecker.fillPlaceholders(player,msg);
+            sender.sendMessage(msg);
+            return true;
+        }
+
         //set up world parameter
         World world;
         if(sender.hasPermission("rtp.region") && rtpArgs.containsKey("region")) {
@@ -162,7 +174,7 @@ public class RTPCmd implements CommandExecutor {
         long lastTime = (sender instanceof Player) ? this.cache.lastTeleportTime.getOrDefault(((Player) sender).getUniqueId(),0L) : 0;
         long cooldownTime = TimeUnit.SECONDS.toNanos(configs.config.teleportCooldown);
         if(!sender.hasPermission("rtp.noCooldown")
-                && start - lastTime < cooldownTime) {
+                && ((start - lastTime) < cooldownTime)) {
             long remaining = (lastTime-start)+cooldownTime;
             long days = TimeUnit.NANOSECONDS.toDays(remaining);
             long hours = TimeUnit.NANOSECONDS.toHours(remaining)%24;

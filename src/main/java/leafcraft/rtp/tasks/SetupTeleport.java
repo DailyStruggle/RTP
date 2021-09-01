@@ -6,6 +6,7 @@ import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import leafcraft.rtp.tools.softdepends.PAPIChecker;
+import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -66,13 +67,6 @@ public class SetupTeleport extends BukkitRunnable {
     }
 
     public void setupTeleportNow(boolean async) {
-        cache.setupTeleports.remove(player.getUniqueId());
-        //if already teleporting, don't do it again
-        if(cache.loadChunks.containsKey(player.getUniqueId()) || cache.todoTP.containsKey(player.getUniqueId())) {
-            //probably say something
-            return;
-        }
-
         //get a random location according to the parameters
         location = cache.getRandomLocation(rsParams,true,sender, player);
         if(location == null) return;
@@ -96,9 +90,9 @@ public class SetupTeleport extends BukkitRunnable {
             if(player.isOnline()) {
                 msg = PAPIChecker.fillPlaceholders(player, msg);
                 player.sendMessage(PAPIChecker.fillPlaceholders(player, msg));
+                if (!sender.getName().equals(player.getName()))
+                    sender.sendMessage(msg);
             }
-            if (!sender.getName().equals(player.getName()))
-                sender.sendMessage(msg);
         }
 
         //set up task to load chunks then teleport
@@ -121,5 +115,6 @@ public class SetupTeleport extends BukkitRunnable {
                 loadChunks.runTaskAsynchronously(plugin);
             }
         }
+        cache.setupTeleports.remove(player.getUniqueId());
     }
 }

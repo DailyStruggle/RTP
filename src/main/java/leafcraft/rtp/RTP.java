@@ -6,6 +6,7 @@ import leafcraft.rtp.events.*;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.TPS;
+import leafcraft.rtp.tools.softdepends.PAPI_expansion;
 import leafcraft.rtp.tools.softdepends.VaultChecker;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
@@ -69,6 +70,10 @@ public final class RTP extends JavaPlugin {
         VaultChecker.setupChat();
         VaultChecker.setupEconomy();
         VaultChecker.setupPermissions();
+
+        if(Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
+            new PAPI_expansion(this,configs,cache).register();
+        }
     }
 
     @Override

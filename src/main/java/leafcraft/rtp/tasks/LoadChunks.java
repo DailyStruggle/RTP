@@ -7,10 +7,7 @@ import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import leafcraft.rtp.tools.softdepends.PAPIChecker;
-import org.bukkit.Bukkit;
-import org.bukkit.Chunk;
-import org.bukkit.Location;
-import org.bukkit.World;
+import org.bukkit.*;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -32,6 +29,7 @@ public class LoadChunks extends BukkitRunnable {
     private final RandomSelectParams rsParams;
     private int i;
     private int j;
+    private final int vd;
     private Boolean cancelled = false;
 
     public LoadChunks(RTP plugin, Configs configs, CommandSender sender, Player player, Cache cache, Integer delay, Location location) {
@@ -49,6 +47,7 @@ public class LoadChunks extends BukkitRunnable {
         int vd = configs.config.vd;
         i = -vd;
         j = -vd;
+        this.vd = Bukkit.getViewDistance();
     }
 
     public LoadChunks(RTP plugin, Configs configs, CommandSender sender, Player player, Cache cache, Integer delay, Location location, int i, int j) {
@@ -65,6 +64,7 @@ public class LoadChunks extends BukkitRunnable {
         else chunkSet = cache.tempRegions.get(rsParams).getChunks(location);
         this.i = i;
         this.j = j;
+        this.vd = Bukkit.getViewDistance();
     }
 
     @Override
@@ -99,7 +99,15 @@ public class LoadChunks extends BukkitRunnable {
     }
 
     public void loadChunksNow(boolean async) {
-        if(!sender.hasPermission("rtp.noDelay.chunks") && chunkSet.completed.get() < chunkSet.expectedSize) {
+        if(chunkSet.completed.get() < chunkSet.expectedSize) {
+            if(sender.hasPermission("rtp.noDelay") && i==-vd && j==-vd) {
+                String msg = configs.lang.getLog("chunkLoading");
+                PAPIChecker.fillPlaceholders(player, msg);
+                player.sendMessage(msg);
+                if (!sender.getName().equals(player.getName()))
+                    sender.sendMessage(msg);
+            }
+
             if (PaperLib.isPaper()) {
                 for (CompletableFuture<Chunk> chunk : chunkSet.chunks) {
                     if (cancelled) break;
@@ -142,7 +150,7 @@ public class LoadChunks extends BukkitRunnable {
         }
 
         if (!cancelled) {
-            long remTime = 1 + delay - TimeUnit.NANOSECONDS.toMicros((System.nanoTime() - cache.lastTeleportTime.getOrDefault(player.getUniqueId(), 0L)) / 50);
+            long remTime = 2 + delay - (TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - cache.lastTeleportTime.getOrDefault(player.getUniqueId(), System.nanoTime())) / 50);
             if (remTime < 0) remTime = 0;
 
             DoTeleport doTeleport = new DoTeleport(plugin,configs,sender,player,location,cache);
