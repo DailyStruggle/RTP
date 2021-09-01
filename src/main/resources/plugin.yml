@@ -4,7 +4,7 @@ main: leafcraft.rtp.RTP
 api-version: 1.13
 authors: [ leaf26 ]
 description: an optimized RTP plugin
-softdepend: [WorldGuard, WorldEdit, GriefPrevention, ProtocolLib, Vault, PlaceholderAPI]
+softdepend: [WorldGuard, WorldEdit, GriefPrevention, ProtocolLib, Vault, PlaceholderAPI, HuskTowns]
 
 commands:
   rtp:

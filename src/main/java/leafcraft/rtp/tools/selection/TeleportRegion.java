@@ -6,6 +6,7 @@ import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.TPS;
 import leafcraft.rtp.tools.softdepends.GriefPreventionChecker;
+import leafcraft.rtp.tools.softdepends.HuskTownsChecker;
 import leafcraft.rtp.tools.softdepends.PAPIChecker;
 import leafcraft.rtp.tools.softdepends.WorldGuardChecker;
 import leafcraft.rtp.tools.HashableChunk;
@@ -211,7 +212,7 @@ public class TeleportRegion {
 
     public boolean requireSkyLight, uniquePlacements, expand;
 
-    public boolean rerollLiquid, rerollWorldGuard, rerollGriefPrevention;
+    public boolean rerollLiquid, rerollWorldGuard, rerollGriefPrevention, rerollHuskTowns;
 
     public int r, cr, cx, cz, minY, maxY;
 
@@ -267,6 +268,7 @@ public class TeleportRegion {
         rerollLiquid = configs.config.rerollLiquid;
         rerollWorldGuard = configs.config.rerollWorldGuard;
         rerollGriefPrevention = configs.config.rerollGriefPrevention;
+        rerollHuskTowns = configs.config.rerollHuskTowns;
     }
 
     public boolean isFilling() {
@@ -730,7 +732,8 @@ public class TeleportRegion {
                 || (location.getBlockY() >= maxY)
                 || (rerollLiquid && (location.getBlock().isLiquid()))
                 || (rerollWorldGuard && WorldGuardChecker.isInRegion(location))
-                || (rerollGriefPrevention && GriefPreventionChecker.isInClaim(location)));
+                || (rerollGriefPrevention && GriefPreventionChecker.isInClaim(location)))
+                || (rerollHuskTowns && HuskTownsChecker.isInClaim(location));
     }
 
     public void loadFile() {

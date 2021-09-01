@@ -19,7 +19,7 @@ public class Config {
 
 	public final int teleportDelay, cancelDistance, teleportCooldown, maxAttempts, queuePeriod, minTPS, vd;
 	public final double price;
-	public final boolean rerollLiquid, rerollWorldGuard, rerollGriefPrevention;
+	public final boolean rerollLiquid, rerollWorldGuard, rerollGriefPrevention, rerollHuskTowns;
 
 	public final int nearSelfPrice, nearOtherPrice;
 
@@ -44,6 +44,7 @@ public class Config {
 		this.rerollLiquid = config.getBoolean("rerollLiquid",true);
 		this.rerollWorldGuard = config.getBoolean("rerollWorldGuard",true);
 		this.rerollGriefPrevention = config.getBoolean("rerollGriefPrevention",true);
+		this.rerollHuskTowns = config.getBoolean("rerollHuskTowns",true);
 
 		this.teleportDelay = 20*config.getInt("teleportDelay",2);
 		this.cancelDistance = config.getInt("cancelDistance",2);
