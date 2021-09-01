@@ -26,7 +26,7 @@ public class Lang {
         }
         this.config = YamlConfiguration.loadConfiguration(f);
 
-        if( 	(this.config.getDouble("version") < 1.8) ) {
+        if( 	(this.config.getDouble("version") < 1.9) ) {
             Bukkit.getLogger().log(Level.WARNING, getLog("oldFile", "lang.yml"));
             update(plugin);
 
@@ -86,7 +86,7 @@ public class Lang {
         for (String line : linesInDefaultConfig) {
             String newline = line;
             if (line.startsWith("version:")) {
-                newline = "version: 1.8";
+                newline = "version: 1.9";
             } else {
                 for (String node : oldValues.keySet()) {
                     if (line.startsWith(node + ":")) {

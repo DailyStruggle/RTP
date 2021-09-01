@@ -290,6 +290,20 @@ public class TeleportRegion {
         return ( hasPlayerLocation || hasPublicLocation);
     }
 
+    public int getTotalQueueLength(Player player) {
+        return getPublicQueueLength() + getPlayerQueueLength(player);
+    }
+
+    public int getPublicQueueLength() {
+        return (locationQueue==null) ? 0 : locationQueue.size();
+    }
+
+    public int getPlayerQueueLength(Player player) {
+        return (perPlayerQueue==null) ? 0 :
+                (!perPlayerQueue.contains(player.getUniqueId())) ? 0 :
+                        perPlayerQueue.get(player).size();
+    }
+
     public void shutdown() {
         for(ChunkSet chunkSet : locAssChunks.values()) {
             chunkSet.shutDown();

@@ -1,10 +1,12 @@
 #logs and command responses
 
 #when teleporting, say this
+alreadyTeleporting: "&e[rtp] I'M WORKING ON IT!"
 # placeholder: [time] - how long before teleporting
 delayMessage: "&e[rtp] Teleporting in [time]. Don't move"
 # placeholder: [numAttempts] - number of attempts
 teleportMessage: "&e[rtp] Teleported in [numAttempts] attempts, in [time]"
+chunkLoading: "&e[rtp] Loading chunks! please wait..."
 
 #if player moves
 teleportCancel: "&e[rtp] Teleport cancelled!"
@@ -80,4 +82,11 @@ setWorld: "&b/rtp setWorld - update world settings"
 setRegion: "&b/rtp setRegion - create or update region settings"
 fill: "&b/rtp fill - start a fill task for a region"
 
-version: 1.8
+#player teleport status placeholders for PAPI
+PLAYER_AVAILABLE: "&aAVAILABLE"
+PLAYER_COOLDOWN: "&eON COOLDOWN"
+PLAYER_SETUP: "&bPICKING A LOCATION"
+PLAYER_LOADING: "&bLOADING CHUNKS"
+PLAYER_TELEPORTING: "&bTELEPORTING"
+
+version: 1.9
