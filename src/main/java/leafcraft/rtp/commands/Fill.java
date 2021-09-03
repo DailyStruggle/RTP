@@ -44,8 +44,8 @@ public class Fill implements CommandExecutor {
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
         if(!sender.hasPermission("rtp.fill")) {
             String msg = configs.lang.getLog("noPerms");
-            if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-            sender.sendMessage(msg);
+            if (sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player) sender, msg);
+            if(!msg.equals("")) sender.sendMessage(msg);
             return true;
         }
 
@@ -69,7 +69,8 @@ public class Fill implements CommandExecutor {
                         regionName = (String) configs.worlds.getWorldSetting(world.getName(),"region", "default");
                     }
                     else {
-                        sender.sendMessage(configs.lang.getLog("consoleCmdNotAllowed"));
+                        String msg = configs.lang.getLog("consoleCmdNotAllowed");
+                        if(!msg.equals("")) sender.sendMessage(msg);
                         return true;
                     }
                 }
@@ -79,14 +80,14 @@ public class Fill implements CommandExecutor {
                 if(worldName.equals("")) {
                     String msg = configs.lang.getLog("badArg","region:"+regionName);
                     if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-                    sender.sendMessage(msg);
+                    if(!msg.equals("")) sender.sendMessage(msg);
                     return true;
                 }
 
                 if(!configs.worlds.checkWorldExists(worldName)) {
                     String msg = configs.lang.getLog("invalidWorld",worldName);
                     if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-                    sender.sendMessage(msg);
+                    if(!msg.equals("")) sender.sendMessage(msg);
                     return true;
                 }
 
@@ -98,20 +99,20 @@ public class Fill implements CommandExecutor {
                 else {
                     String msg = configs.lang.getLog("badArg","region:"+regionName);
                     if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-                    sender.sendMessage(msg);
+                    if(!msg.equals("")) sender.sendMessage(msg);
                     return true;
                 }
 
                 if(!region.isFilling()) {
                     String msg = configs.lang.getLog("fillNotRunning", regionName);
                     if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-                    sender.sendMessage(msg);
+                    if(!msg.equals("")) sender.sendMessage(msg);
                     return true;
                 }
 
                 String msg = configs.lang.getLog("fillCancel", regionName);
                 if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-                sender.sendMessage(msg);
+                if(!msg.equals("")) sender.sendMessage(msg);
                 region.stopFill();
                 return true;
             }
@@ -135,7 +136,8 @@ public class Fill implements CommandExecutor {
                 regionName = (String) configs.worlds.getWorldSetting(world.getName(),"region", "default");
             }
             else {
-                sender.sendMessage(configs.lang.getLog("consoleCmdNotAllowed"));
+                String msg = configs.lang.getLog("consoleCmdNotAllowed");
+                if(!msg.equals("")) sender.sendMessage(msg);
                 return true;
             }
         }
@@ -145,14 +147,14 @@ public class Fill implements CommandExecutor {
         if(worldName.equals("")) {
             String msg = configs.lang.getLog("badArg","region:"+regionName);
             if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-            sender.sendMessage(msg);
+            if(!msg.equals("")) sender.sendMessage(msg);
             return true;
         }
 
         if(!configs.worlds.checkWorldExists(worldName)) {
             String msg = configs.lang.getLog("invalidWorld",worldName);
             if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-            sender.sendMessage(msg);
+            if(!msg.equals("")) sender.sendMessage(msg);
             return true;
         }
 
@@ -164,20 +166,20 @@ public class Fill implements CommandExecutor {
         else {
             String msg = configs.lang.getLog("badArg","region:"+regionName);
             if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-            sender.sendMessage(msg);
+            if(!msg.equals("")) sender.sendMessage(msg);
             return true;
         }
 
         if(region.isFilling()) {
             String msg = configs.lang.getLog("fillRunning", regionName);
             if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-            sender.sendMessage(msg);
+            if(!msg.equals("")) sender.sendMessage(msg);
             return true;
         }
 
         String msg = configs.lang.getLog("startFill", regionName);
         if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-        sender.sendMessage(msg);
+        if(!msg.equals("")) sender.sendMessage(msg);
         region.startFill(plugin);
         return true;
     }

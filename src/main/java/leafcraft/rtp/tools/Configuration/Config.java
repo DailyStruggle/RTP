@@ -2,6 +2,7 @@ package leafcraft.rtp.tools.Configuration;
 
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.selection.TeleportRegion;
+import net.md_5.bungee.api.ChatColor;
 import org.bukkit.*;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -23,6 +24,17 @@ public class Config {
 
 	public final int nearSelfPrice, nearOtherPrice;
 
+	public final int invulnerabilityTime;
+
+	public final int safetyRadius, platformRadius, platformAirHeight, platformDepth;
+
+	public final Set<Material> unsafeBlocks = new HashSet<>();
+
+	public final int blindnessDuration;
+
+	public final String title, subTitle;
+	public final int fadeIn, stay, fadeOut;
+
 	public Config(RTP plugin, Lang lang) {
 		this.plugin = plugin;
 
@@ -33,7 +45,7 @@ public class Config {
 		}
 		this.config = YamlConfiguration.loadConfiguration(f);
 
-		if( 	(this.config.getDouble("version") < 1.8) ) {
+		if( 	(this.config.getDouble("version") < 2.0) ) {
 			Bukkit.getLogger().log(Level.WARNING, lang.getLog("oldFile", "config.yml"));
 			update();
 
@@ -59,6 +71,33 @@ public class Config {
 		int vd = config.getInt("viewDistance",10);
 		if(vd > Bukkit.getViewDistance()) vd = Bukkit.getViewDistance();
 		this.vd = vd;
+
+		int invulnerabilityTime = config.getInt("invulnerabilityTime", 0);
+		if(invulnerabilityTime < 0) invulnerabilityTime = 0;
+		this.invulnerabilityTime = invulnerabilityTime;
+
+		int safetyRadius = config.getInt("safetyRadius", 0);
+		if(safetyRadius<0) safetyRadius = 0;
+		else if(safetyRadius>7) safetyRadius = 7;
+		this.safetyRadius = safetyRadius;
+
+		int platformRadius = config.getInt("platformRadius", 0);
+		if(platformRadius > 7) platformRadius = 7;
+		this.platformRadius = platformRadius;
+		this.platformAirHeight = config.getInt("platformAirHeight", 2);
+		this.platformDepth = config.getInt("platformDepth", 1);
+
+		for(String material : config.getStringList("unsafeBlocks")) {
+			unsafeBlocks.add(Material.getMaterial(material));
+		}
+
+		this.blindnessDuration = config.getInt("blindnessDuration",0);
+
+		this.title = ChatColor.translateAlternateColorCodes('&',config.getString("title",""));
+		this.subTitle = ChatColor.translateAlternateColorCodes('&',config.getString("subtitle",""));
+		this.fadeIn = config.getInt("stay",1);
+		this.stay = config.getInt("fadeIn",1);
+		this.fadeOut = config.getInt("fadeOut",1);
 	}
 
 	private void update() {
@@ -81,7 +120,7 @@ public class Config {
 		for (String line : linesInDefaultConfig) {
 			String newline = line;
 			if (line.startsWith("version:")) {
-				newline = "version: 1.8";
+				newline = "version: 2.0";
 			} else {
 				for (String node : oldValues.keySet()) {
 					if (line.startsWith(node + ":")) {

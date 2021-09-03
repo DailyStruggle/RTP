@@ -67,6 +67,7 @@ public class Cache {
     // key: player name
     // value: location they're going to, to be re-added to the queue on cancellation
     public ConcurrentHashMap<UUID,Location> todoTP = new ConcurrentHashMap<>();
+    public ConcurrentHashMap<UUID,Location> lastTP = new ConcurrentHashMap<>();
     public ConcurrentHashMap<UUID,RandomSelectParams> regionKeys = new ConcurrentHashMap<>();
 
     //Bukkit task list in case of cancellation
@@ -87,10 +88,13 @@ public class Cache {
     public ConcurrentHashMap<RandomSelectParams, TeleportRegion> tempRegions = new ConcurrentHashMap<>();
     public ConcurrentHashMap<RandomSelectParams, TeleportRegion> permRegions = new ConcurrentHashMap<>();
 
-    //Collection of chunks in each world and their coordinates, to reuse on reload
-    public ConcurrentHashMap<UUID,ConcurrentHashMap<HashableChunk,Long>> allBadChunks = new ConcurrentHashMap<>();
+    public ConcurrentHashMap<UUID,Player> invulnerablePlayers = new ConcurrentHashMap<>();
 
     public void shutdown() {
+        for(Player player : invulnerablePlayers.values()) {
+            player.setInvulnerable(false);
+        }
+
         for(ConcurrentHashMap.Entry<UUID,SetupTeleport> entry : setupTeleports.entrySet()) {
             entry.getValue().cancel();
         }
@@ -158,9 +162,9 @@ public class Cache {
             else {
                 String msg = configs.lang.getLog("notEnoughMoney", price.toString());
                 msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-                sender.sendMessage(msg);
+                if(!msg.equals("")) sender.sendMessage(msg);
                 if(!sender.getName().equals(player.getName())) {
-                    player.sendMessage(msg);
+                    if(!msg.equals("")) player.sendMessage(msg);
                 }
                 return null;
             }

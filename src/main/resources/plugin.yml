@@ -1,7 +1,7 @@
 name: RTP
 version: ${project.version}
 main: leafcraft.rtp.RTP
-api-version: 1.13
+api-version: 1.17
 authors: [ leaf26 ]
 description: an optimized RTP plugin
 softdepend: [WorldGuard, WorldEdit, GriefPrevention, ProtocolLib, Vault, PlaceholderAPI]
@@ -38,7 +38,7 @@ commands:
     usage: |
       /rtp setRegion
   rtp fill:
-    description: start filling out region locations
+    description: attempt each location in region once
     permission: rtp.fill
     usage: |
       /rtp fill

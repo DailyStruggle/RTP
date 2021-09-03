@@ -6,10 +6,7 @@ import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.OfflinePlayer;
-import org.bukkit.World;
+import org.bukkit.*;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
@@ -49,7 +46,7 @@ public class PAPI_expansion extends PlaceholderExpansion{
 
 	@Override
     public @NotNull String getVersion(){
-        return "1.1.17";
+        return "1.2.0";
     }
 
     @Override
@@ -100,7 +97,30 @@ public class PAPI_expansion extends PlaceholderExpansion{
             return String.valueOf(region.getPlayerQueueLength(player));
         }
 
+        if(identifier.equalsIgnoreCase("teleport_world")) {
+            Location location = getTeleportLocation(player);
+            String worldName = location.getWorld().getName();
+            worldName = configs.worlds.worldName2Placeholder(worldName);
+            return worldName;
+        }
+
+        if(identifier.equalsIgnoreCase("teleport_x")) {
+            return String.valueOf(getTeleportLocation(player).getBlockX());
+        }
+
+        if(identifier.equalsIgnoreCase("teleport_y")) {
+            return String.valueOf(getTeleportLocation(player).getBlockY());
+        }
+
+        if(identifier.equalsIgnoreCase("teleport_z")) {
+            return String.valueOf(getTeleportLocation(player).getBlockZ());
+        }
+
         return null;
+    }
+
+    private Location getTeleportLocation(Player player) {
+	    return cache.todoTP.getOrDefault(player.getUniqueId(), cache.lastTP.getOrDefault(player.getUniqueId(),new Location(player.getWorld(),0,0,0)));
     }
 
     private TeleportRegion getRegion(Player player) {
