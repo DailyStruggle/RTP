@@ -80,7 +80,7 @@ help: "&b/rtp help - see this"
 reload: "&b/rtp reload - reload config files"
 setWorld: "&b/rtp setWorld - update world settings"
 setRegion: "&b/rtp setRegion - create or update region settings"
-fill: "&b/rtp fill - start a fill task for a region"
+fill: "&b/rtp fill - attempt each location once in a region"
 
 #player teleport status placeholders for PAPI
 PLAYER_AVAILABLE: "&aAVAILABLE"

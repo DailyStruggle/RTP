@@ -33,7 +33,7 @@ public class Help implements CommandExecutor {
         if(!sender.hasPermission("rtp.see")) {
             String msg = configs.lang.getLog("noPerms");
             if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-            sender.sendMessage(msg);
+            if(!msg.equals("")) sender.sendMessage(msg);
             return true;
         }
 
@@ -45,8 +45,8 @@ public class Help implements CommandExecutor {
                 else arg = entry.getKey();
 
                 msg.setHoverEvent( new HoverEvent(HoverEvent.Action.SHOW_TEXT, new ComponentBuilder( "/rtp " + arg ).create()));
-                msg.setClickEvent( new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/rtp " + arg));
-                sender.spigot().sendMessage(msg);
+                msg.setClickEvent( new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, "/rtp " + arg));
+                if(!msg.getText().equals("")) sender.spigot().sendMessage(msg);
             }
         }
 

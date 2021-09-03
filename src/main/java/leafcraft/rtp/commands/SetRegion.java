@@ -55,7 +55,7 @@ public class SetRegion implements CommandExecutor {
         if(!sender.hasPermission("rtp.setRegion")) {
             String msg = configs.lang.getLog("noPerms");
             if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-            sender.sendMessage(msg);
+            if(!msg.equals("")) sender.sendMessage(msg);
             return true;
         }
 
@@ -75,7 +75,7 @@ public class SetRegion implements CommandExecutor {
             if(!configs.worlds.checkWorldExists(worldName)) {
                 String msg = configs.lang.getLog("invalidWorld",worldName);
                 if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-                sender.sendMessage(msg);
+                if(!msg.equals("")) sender.sendMessage(msg);
                 return true;
             }
             world = Bukkit.getWorld(worldName);
@@ -113,7 +113,8 @@ public class SetRegion implements CommandExecutor {
                 regionArgs.put("world",world.getName());
             }
             else {
-                sender.sendMessage(configs.lang.getLog("consoleCmdNotAllowed"));
+                String msg = configs.lang.getLog("consoleCmdNotAllowed");
+                if(!msg.equals("")) sender.sendMessage(msg);
                 return true;
             }
         }
@@ -129,7 +130,8 @@ public class SetRegion implements CommandExecutor {
                 Integer res = 0;
                 if(entry.getValue().startsWith("~")) {
                     if(!(sender instanceof Player)) {
-                        sender.sendMessage(configs.lang.getLog("consoleCmdNotAllowed"));
+                        String msg = configs.lang.getLog("consoleCmdNotAllowed");
+                        if(!msg.equals("")) sender.sendMessage(msg);
                         continue;
                     }
                     switch(isCoord) {
@@ -146,7 +148,7 @@ public class SetRegion implements CommandExecutor {
                         catch (NumberFormatException exception) {
                             String msg = configs.lang.getLog("badArg",entry.getKey()+":"+entry.getValue());
                             if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-                            sender.sendMessage(msg);
+                            if(!msg.equals("")) sender.sendMessage(msg);
                             continue;
                         }
                     }
@@ -158,7 +160,7 @@ public class SetRegion implements CommandExecutor {
                         catch (NumberFormatException exception) {
                             String msg = configs.lang.getLog("badArg",entry.getKey()+":"+entry.getValue());
                             if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-                            sender.sendMessage(msg);
+                            if(!msg.equals("")) sender.sendMessage(msg);
                             continue;
                         }
                     }
@@ -197,7 +199,7 @@ public class SetRegion implements CommandExecutor {
         else {
             String msg = configs.lang.getLog("missingRegionParam");
             if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-            sender.sendMessage(msg);
+            if(!msg.equals("")) sender.sendMessage(msg);
             return true;
         }
 
@@ -207,7 +209,7 @@ public class SetRegion implements CommandExecutor {
             if (result < 0) {
                 String msg = configs.lang.getLog("badArg", entry.getValue());
                 if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player) sender,msg);
-                sender.sendMessage(msg);
+                if(!msg.equals("")) sender.sendMessage(msg);
             }
         }
 
@@ -215,14 +217,14 @@ public class SetRegion implements CommandExecutor {
         if(sender instanceof Player){
             String msg = configs.lang.getLog("updatingRegions");
             msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-            sender.sendMessage(msg);
+            if(!msg.equals("")) sender.sendMessage(msg);
         }
         configs.regions.update();
         Bukkit.getLogger().log(Level.INFO,configs.lang.getLog("updatedRegions"));
         if(sender instanceof Player){
             String msg = configs.lang.getLog("updatedRegions");
             msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-            sender.sendMessage(msg);
+            if(!msg.equals("")) sender.sendMessage(msg);
         }
         return true;
     }

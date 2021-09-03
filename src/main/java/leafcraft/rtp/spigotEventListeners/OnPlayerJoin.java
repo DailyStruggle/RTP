@@ -1,4 +1,4 @@
-package leafcraft.rtp.events;
+package leafcraft.rtp.spigotEventListeners;
 
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tasks.DoTeleport;
@@ -8,7 +8,6 @@ import leafcraft.rtp.tasks.SetupTeleport;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
-import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
@@ -16,11 +15,8 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.scheduler.BukkitTask;
 
 import java.util.HashMap;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
 public final class OnPlayerJoin implements Listener {
     private final RTP plugin;
@@ -37,6 +33,10 @@ public final class OnPlayerJoin implements Listener {
     @EventHandler(priority = EventPriority.HIGH)
     public void OnPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
+
+//        if(player.isInvulnerable() && configs.config.invulnerabilityTime>0) {
+//            player.setInvulnerable(false);
+//        }
 
         if (player.hasPermission("rtp.onEvent.firstJoin") && !player.hasPlayedBefore()) {
             Bukkit.dispatchCommand(Bukkit.getConsoleSender(),

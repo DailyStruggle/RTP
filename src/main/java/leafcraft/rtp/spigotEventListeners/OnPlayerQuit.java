@@ -1,4 +1,4 @@
-package leafcraft.rtp.events;
+package leafcraft.rtp.spigotEventListeners;
 
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
@@ -8,7 +8,6 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
 
-import java.util.Objects;
 import java.util.UUID;
 
 public final class OnPlayerQuit implements Listener {
@@ -21,10 +20,13 @@ public final class OnPlayerQuit implements Listener {
     @EventHandler(priority = EventPriority.LOWEST)
     public void OnPlayerQuit(PlayerQuitEvent event) {
         UUID playerId = event.getPlayer().getUniqueId();
-        //if currently teleporting, stop that and clean up
-        if (!this.cache.todoTP.containsKey(playerId)) return;
-        cache.todoTP.remove(playerId);
 
+        if(cache.invulnerablePlayers.containsKey(playerId)) {
+            event.getPlayer().setInvulnerable(false);
+            cache.invulnerablePlayers.remove(playerId);
+        }
+
+        //if currently teleporting, stop that and clean up
         if (cache.setupTeleports.containsKey(playerId)) {
             cache.setupTeleports.get(playerId).cancel();
             cache.setupTeleports.remove(playerId);
@@ -37,6 +39,9 @@ public final class OnPlayerQuit implements Listener {
             cache.doTeleports.get(playerId).cancel();
             cache.doTeleports.remove(playerId);
         }
+
+        if (!this.cache.todoTP.containsKey(playerId)) return;
+        cache.todoTP.remove(playerId);
 
         RandomSelectParams rsParams = cache.regionKeys.get(playerId);
         if (cache.permRegions.containsKey(rsParams)) {

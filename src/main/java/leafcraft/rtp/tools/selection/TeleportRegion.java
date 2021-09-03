@@ -94,11 +94,12 @@ public class TeleportRegion {
 
         @Override
         public void run() {
-            if(Bukkit.getOnlinePlayers().size()>0 || TPS.getTPS()<configs.config.minTPS) {
+            if(TPS.getTPS()<configs.config.minTPS) {
                 fillTask = new FillTask(plugin);
                 fillTask.runTaskLaterAsynchronously(plugin,20);
                 return;
             }
+
             long it = fillIterator.get();
             AtomicInteger completion = new AtomicInteger(1000);
 //            AtomicLong max = new AtomicLong((long) ((expand) ? totalSpace : totalSpace - badLocationSum.get()));
@@ -115,7 +116,11 @@ public class TeleportRegion {
 //                }
 
                 if (it > max.get()) {
-                    Bukkit.getLogger().log(Level.INFO, "[rtp] completed " + (it-1) + "/" + max.get() + " chunks");
+                    String msg = "[rtp] completed " + (it-1) + "/" + max.get() + " chunks in region:"+name;
+                    Bukkit.getLogger().log(Level.INFO, msg);
+                    for(Player player : Bukkit.getOnlinePlayers()) {
+                        if(player.hasPermission("rtp.fill")) player.sendMessage(msg);
+                    }
                     fillTask = null;
                     return;
                 }
@@ -133,14 +138,18 @@ public class TeleportRegion {
                     int y = getFirstNonAir(chunkSnapshot);
                     y = getLastNonAir(chunkSnapshot,y);
 
-                    Location res = chunk.getBlock(7,y,7).getLocation();
-                    if(!checkLocation(res)) {
+                    if(!checkLocation(chunkSnapshot,y)) {
                         addBadLocation(finalShiftedIt);
                     }
                     fillIterator.incrementAndGet();
                     if(completion.decrementAndGet() == 0 && !cancelled && !completed.get()) {
                         completed.set(true);
-                        Bukkit.getLogger().log(Level.INFO, "[rtp] completed " + fillIterator.get() + "/" + max.get() + " chunks");
+                        String msg = "[rtp] completed " + fillIterator.get() + "/" + max.get() + " chunks in region:"+name;
+                        Bukkit.getLogger().log(Level.INFO, msg);
+                        for(Player player : Bukkit.getOnlinePlayers()) {
+                            if(player.hasPermission("rtp.fill")) player.sendMessage(msg);
+                        }
+
                         fillTask = new FillTask(plugin);
                         fillTask.runTaskLaterAsynchronously(plugin,5);
                     }
@@ -299,9 +308,7 @@ public class TeleportRegion {
     }
 
     public int getPlayerQueueLength(Player player) {
-        return (perPlayerQueue==null) ? 0 :
-                (!perPlayerQueue.contains(player.getUniqueId())) ? 0 :
-                        perPlayerQueue.get(player).size();
+        return (!perPlayerQueue.contains(player.getUniqueId())) ? 0 : perPlayerQueue.get(player).size();
     }
 
     public void shutdown() {
@@ -321,9 +328,8 @@ public class TeleportRegion {
         Location res = null;
 
         if(perPlayerQueue.containsKey(player.getUniqueId()) && perPlayerQueue.get(player.getUniqueId()).size()>0) {
-            Location location = perPlayerQueue.get(player.getUniqueId()).remove();
-            if(perPlayerQueue.get(player.getUniqueId()).size() <= 0) perPlayerQueue.remove(player.getUniqueId());
-            return location;
+            res = perPlayerQueue.get(player.getUniqueId()).remove();
+            return res;
         }
 
         try{
@@ -334,15 +340,19 @@ public class TeleportRegion {
                 res = getRandomLocation(urgent);
                 if(res == null) {
                     Integer maxAttempts = configs.config.maxAttempts;
-                    player.sendMessage(PAPIChecker.fillPlaceholders(player,configs.lang.getLog("unsafe",maxAttempts.toString())));
-                    if(!sender.getName().equals(player.getName()))
-                        sender.sendMessage(PAPIChecker.fillPlaceholders(player,configs.lang.getLog("unsafe",maxAttempts.toString())));
+                    String msg = PAPIChecker.fillPlaceholders(player,configs.lang.getLog("unsafe",maxAttempts.toString()));
+                    if(!msg.equals("")) {
+                        if(!msg.equals("")) player.sendMessage(msg);
+                        if (!sender.getName().equals(player.getName()))
+                            if(!msg.equals("")) sender.sendMessage(msg);
+                    }
                 }
             }
             else {
-                player.sendMessage(PAPIChecker.fillPlaceholders(player,configs.lang.getLog("noLocationsQueued")));
-                if(!sender.getName().equals(player.getName()))
-                    sender.sendMessage(PAPIChecker.fillPlaceholders(player,configs.lang.getLog("noLocationsQueued")));
+                String msg = PAPIChecker.fillPlaceholders(player,configs.lang.getLog("noLocationsQueued"));
+                if(!msg.equals("")) player.sendMessage(msg);
+                if (!sender.getName().equals(player.getName()))
+                    if(!msg.equals("")) sender.sendMessage(msg);
             }
         }
         return res;
@@ -546,15 +556,17 @@ public class TeleportRegion {
         HashableChunk hashableChunk = new HashableChunk(world,xzChunk[0],xzChunk[1]);
         currChunks.put(hashableChunk,cfChunk);
 
+        Chunk chunk;
         ChunkSnapshot chunkSnapshot;
         try {
-            chunkSnapshot = cfChunk.get().getChunkSnapshot(); //wait on chunk load/gen
+            chunk = cfChunk.get(); //wait on chunk load/gen
         } catch (ExecutionException e) {
             e.printStackTrace();
             return null;
         } catch (InterruptedException | CancellationException | StackOverflowError e) {
             return null;
         }
+        chunkSnapshot = chunk.getChunkSnapshot();
         currChunks.remove(hashableChunk);
 
         stop = System.currentTimeMillis();
@@ -570,7 +582,7 @@ public class TeleportRegion {
 
         Integer numAttempts = 1;
         Integer maxAttempts = configs.config.maxAttempts;
-        while(numAttempts < maxAttempts && !checkLocation(res)) {
+        while(numAttempts < maxAttempts && !checkLocation(chunkSnapshot,y)) {
             addBadLocation(location);
 
             start = System.currentTimeMillis();
@@ -723,14 +735,25 @@ public class TeleportRegion {
         return true;
     }
 
-    // true if it's a good placement
-    public boolean checkLocation(Location location) {
-        return !(acceptableAir.contains(location.getBlock().getType())
-                || (!location.getBlock().getType().isSolid())
-                || (location.getBlockY() >= maxY)
-                || (rerollLiquid && (location.getBlock().isLiquid()))
-                || (rerollWorldGuard && WorldGuardChecker.isInRegion(location))
-                || (rerollGriefPrevention && GriefPreventionChecker.isInClaim(location)));
+    public boolean checkLocation(ChunkSnapshot chunkSnapshot, int y) {
+        Material material = chunkSnapshot.getBlockType(7,y,7);
+        if(y >= maxY) return false;
+        if(!material.isSolid()) return false;
+        if(chunkSnapshot.getBlockType(7,y+1,7).isSolid()) return false;
+        if(configs.config.unsafeBlocks.contains(chunkSnapshot.getBlockType(7,y,7))) return false;
+        Location location = new Location(world, chunkSnapshot.getX()*16+7,y, chunkSnapshot.getZ()*16+7);
+        if(rerollWorldGuard && WorldGuardChecker.isInRegion(location)) return false;
+        if(rerollGriefPrevention && GriefPreventionChecker.isInClaim(location)) return false;
+
+        int safetyRadius = configs.config.safetyRadius;
+        Set<Material> unsafeBlocks = configs.config.unsafeBlocks;
+        for(int i = 7-safetyRadius; i <= 7+safetyRadius; i++) {
+            for(int j = 7-safetyRadius; j <= 7+safetyRadius; j++) {
+                if(unsafeBlocks.contains(chunkSnapshot.getBlockType(i,y,j))) return false;
+                if(unsafeBlocks.contains(chunkSnapshot.getBlockType(i,y+1,j))) return false;
+            }
+        }
+        return true;
     }
 
     public void loadFile() {

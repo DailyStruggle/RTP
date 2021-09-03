@@ -33,7 +33,8 @@ public class Regions {
         config = YamlConfiguration.loadConfiguration(f);
 
         if( 	(config.getDouble("version") < 1.2) ) {
-            Bukkit.getLogger().log(Level.WARNING, lang.getLog("oldFile", "regions.yml"));
+            String msg = lang.getLog("oldFile", "regions.yml");
+            if(!msg.equals("")) Bukkit.getLogger().log(Level.WARNING, msg);
             FileStuff.renameFiles(plugin,"regions");
             config = YamlConfiguration.loadConfiguration(f);
         }

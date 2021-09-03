@@ -1,4 +1,4 @@
-package leafcraft.rtp.events;
+package leafcraft.rtp.spigotEventListeners;
 
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tasks.QueueLocation;

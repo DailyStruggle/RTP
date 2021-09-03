@@ -11,10 +11,32 @@ teleportCooldown: 300
 #price for custom teleport parameters
 price: 1000000000.0
 
-#reroll location if player would land in a bad spot
-rerollLiquid: true
+#reroll location if player would land in a reserved location
 rerollWorldGuard: true
 rerollGriefPrevention: true
+
+#how long to give invincibility on teleport, in seconds
+invulnerabilityTime: 5
+
+#radius to check for safe and solid blocks
+# 0-7
+safetyRadius: 0
+
+#create a platform on random teleport
+# replaces non-solid and unsafe blocks with the center block
+# radius less than 0 will turn this off
+platformRadius: 0
+platformDepth: 1
+#break blocks above platform to make air (may cause lighting bugs)
+platformAirHeight: 2
+
+#what materials, according to the spigot 1.13 api, to avoid
+unsafeBlocks:
+  - "MAGMA_BLOCK"
+  - "TNT"
+  - "LAVA"
+  - "WATER"
+  - "FIRE"
 
 #how many rerolls before stopping
 maxAttempts: 100
@@ -43,5 +65,18 @@ nearOtherPrice: 2000
 consoleCommands:
 playerCommands:
 
+#how long to blind player on teleport, in ticks
+# set to 0 to disable
+blindnessDuration: 40
+
+#show title
+# set title to "" to disable
+# PlaceholderAPI is recommended for coordinates
+title: "&aTeleported!"
+subtitle: "&bhave fun!"
+fadeIn: 1
+stay: 1
+fadeout: 1
+
 #DO NOT TOUCH VERSION NUMBER
-version: 1.8
+version: 2.0

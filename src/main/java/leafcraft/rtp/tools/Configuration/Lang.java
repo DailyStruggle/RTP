@@ -36,7 +36,8 @@ public class Lang {
     }
 
     public String getLog(String key) {
-        String msg = this.config.getString(key);
+        String msg = this.config.getString(key,"");
+        if(msg == null) return "";
         msg = ChatColor.translateAlternateColorCodes('&',msg);
         return msg;
     }

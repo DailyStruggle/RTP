@@ -41,7 +41,7 @@ public class SetWorld implements CommandExecutor {
         if(!sender.hasPermission("rtp.setWorld")) {
             String msg = configs.lang.getLog("noPerms");
             if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player) sender,msg);
-            sender.sendMessage(msg);
+            if(!msg.equals("")) sender.sendMessage(msg);
             return true;
         }
 
@@ -61,7 +61,7 @@ public class SetWorld implements CommandExecutor {
             if(!configs.worlds.checkWorldExists(worldName)) {
                 String msg = configs.lang.getLog("invalidWorld",worldName);
                 if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player) sender,msg);
-                sender.sendMessage(msg);
+                if(!msg.equals("")) sender.sendMessage(msg);
                 return true;
             }
             world = Bukkit.getWorld(worldName);
@@ -72,7 +72,8 @@ public class SetWorld implements CommandExecutor {
                 worldArgs.put("world",world.getName());
             }
             else {
-                sender.sendMessage(configs.lang.getLog("consoleCmdNotAllowed"));
+                String msg = configs.lang.getLog("consoleCmdNotAllowed");
+                if(!msg.equals("")) sender.sendMessage(msg);
                 return true;
             }
         }
@@ -93,21 +94,21 @@ public class SetWorld implements CommandExecutor {
             if(result<0) {
                 String msg = configs.lang.getLog("badArg", entry.getValue());
                 if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player) sender,msg);
-                sender.sendMessage(msg);
+                if(!msg.equals("")) sender.sendMessage(msg);
             }
         }
         Bukkit.getLogger().log(Level.INFO,configs.lang.getLog("updatingWorlds"));
         if(sender instanceof Player){
             String msg = configs.lang.getLog("updatingWorlds");
             msg = PAPIChecker.fillPlaceholders((Player) sender,msg);
-            sender.sendMessage(msg);
+            if(!msg.equals("")) sender.sendMessage(msg);
         }
         configs.worlds.update();
         Bukkit.getLogger().log(Level.INFO,configs.lang.getLog("updatedWorlds"));
         if(sender instanceof Player) {
             String msg = configs.lang.getLog("updatedWorlds");
             msg = PAPIChecker.fillPlaceholders((Player) sender,msg);
-            sender.sendMessage(msg);
+            if(!msg.equals("")) sender.sendMessage(msg);
         }
 
         return true;

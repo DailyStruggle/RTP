@@ -56,9 +56,10 @@ public class SetupTeleport extends BukkitRunnable {
             cache.doTeleports.remove(player.getUniqueId());
         }
         cancelled = true;
-        player.sendMessage(PAPIChecker.fillPlaceholders(player,configs.lang.getLog("teleportCancel")));
+        String msg = PAPIChecker.fillPlaceholders(player,configs.lang.getLog("teleportCancel"));
+        if(!msg.equals("")) player.sendMessage(msg);
         if(!sender.getName().equals(player.getName()))
-            sender.sendMessage(PAPIChecker.fillPlaceholders(player,configs.lang.getLog("teleportCancel")));
+            if(!msg.equals("")) sender.sendMessage(msg);
         super.cancel();
     }
 
@@ -69,7 +70,11 @@ public class SetupTeleport extends BukkitRunnable {
     public void setupTeleportNow(boolean async) {
         //get a random location according to the parameters
         location = cache.getRandomLocation(rsParams,true,sender, player);
-        if(location == null) return;
+        if(location == null) {
+            cache.setupTeleports.remove(player.getUniqueId());
+            return;
+        }
+        cache.todoTP.put(player.getUniqueId(),location);
 
         //get warmup delay
         int delay = (sender.hasPermission("rtp.noDelay")) ? 0 : configs.config.teleportDelay;
@@ -89,15 +94,14 @@ public class SetupTeleport extends BukkitRunnable {
             String msg = configs.lang.getLog("delayMessage", replacement);
             if(player.isOnline()) {
                 msg = PAPIChecker.fillPlaceholders(player, msg);
-                player.sendMessage(PAPIChecker.fillPlaceholders(player, msg));
+                if(!msg.equals("")) player.sendMessage(msg);
                 if (!sender.getName().equals(player.getName()))
-                    sender.sendMessage(msg);
+                    if(!msg.equals("")) sender.sendMessage(msg);
             }
         }
 
         //set up task to load chunks then teleport
         if(!cancelled){
-            cache.todoTP.put(player.getUniqueId(),location);
             cache.regionKeys.put(player.getUniqueId(),rsParams);
             LoadChunks loadChunks = new LoadChunks(plugin,configs,sender,player,cache,delay,location);
             if(sender.hasPermission("rtp.noDelay.chunks")

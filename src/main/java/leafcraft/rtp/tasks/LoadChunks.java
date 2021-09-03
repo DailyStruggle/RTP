@@ -87,10 +87,10 @@ public class LoadChunks extends BukkitRunnable {
         String msg = configs.lang.getLog("teleportCancel");
         if(player.isOnline()) {
             msg = PAPIChecker.fillPlaceholders(player, msg);
-            player.sendMessage(PAPIChecker.fillPlaceholders(player, msg));
+            if(!msg.equals("")) player.sendMessage(msg);
         }
         if (!sender.getName().equals(player.getName()))
-            sender.sendMessage(msg);
+            if(!msg.equals("")) sender.sendMessage(msg);
         super.cancel();
     }
 
@@ -103,9 +103,9 @@ public class LoadChunks extends BukkitRunnable {
             if(sender.hasPermission("rtp.noDelay") && i==-vd && j==-vd) {
                 String msg = configs.lang.getLog("chunkLoading");
                 PAPIChecker.fillPlaceholders(player, msg);
-                player.sendMessage(msg);
+                if(!msg.equals("")) player.sendMessage(msg);
                 if (!sender.getName().equals(player.getName()))
-                    sender.sendMessage(msg);
+                    if(!msg.equals("")) sender.sendMessage(msg);
             }
 
             if (PaperLib.isPaper()) {
