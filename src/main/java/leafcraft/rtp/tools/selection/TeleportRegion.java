@@ -325,6 +325,24 @@ public class TeleportRegion {
         locationQueue.clear();
     }
 
+    public Location getQueuedLocation(CommandSender sender, Player player) {
+        Location res;
+        if(perPlayerQueue.containsKey(player.getUniqueId()) && perPlayerQueue.get(player.getUniqueId()).size()>0) {
+            res = perPlayerQueue.get(player.getUniqueId()).remove();
+        }
+        else {
+            try {
+                res = locationQueue.remove();
+            } catch (NoSuchElementException | NullPointerException exception) {
+                String msg = PAPIChecker.fillPlaceholders(player,configs.lang.getLog("noLocationsQueued"));
+                SendMessage.sendMessage(sender,player,msg);
+                return null;
+            }
+        }
+
+        return res;
+    }
+
     public Location getLocation(boolean urgent, CommandSender sender, Player player) {
         Location res = null;
 
