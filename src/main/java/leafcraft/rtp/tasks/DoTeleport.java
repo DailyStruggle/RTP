@@ -5,6 +5,7 @@ import leafcraft.rtp.customEvents.RandomTeleportEvent;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.HashableChunk;
+import leafcraft.rtp.tools.SendMessage;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import leafcraft.rtp.tools.softdepends.PAPIChecker;
@@ -46,23 +47,6 @@ public class DoTeleport extends BukkitRunnable {
         new ChunkCleanup(configs,location,cache).runTask(plugin);
     }
 
-    @Override
-    public void cancel() {
-        if(cache.regionKeys.containsKey(player.getUniqueId())) {
-            RandomSelectParams rsParams = cache.regionKeys.get(player.getUniqueId());
-            cache.permRegions.get(rsParams).queueLocation(location);
-        }
-        cache.todoTP.remove(player.getUniqueId());
-        String msg = configs.lang.getLog("teleportCancel");
-        if(player.isOnline()) {
-            msg = PAPIChecker.fillPlaceholders(player, msg);
-            if(!msg.equals("")) player.sendMessage(PAPIChecker.fillPlaceholders(player, msg));
-        }
-        if (!sender.getName().equals(player.getName()))
-            if(!msg.equals("")) sender.sendMessage(msg);
-        super.cancel();
-    }
-
     public boolean isNoDelay() {
         return sender.hasPermission("rtp.noDelay");
     }
@@ -71,7 +55,7 @@ public class DoTeleport extends BukkitRunnable {
         Chunk chunk = location.getChunk();
         if(!chunk.isLoaded()) chunk.load(true);
         Material solid = location.getBlock().getRelative(BlockFace.DOWN).getType();
-        Material air = location.getBlock().getType();
+//        Material air = location.getBlock().getType();
 
         for(int i = 7-configs.config.platformRadius; i <= 7+configs.config.platformRadius; i++) {
             for(int j = 7-configs.config.platformRadius; j <= 7+configs.config.platformRadius; j++) {

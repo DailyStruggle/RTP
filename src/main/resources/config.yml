@@ -49,6 +49,12 @@ queuePeriod: 30
 # must be a positive integer
 minTPS: 19.0
 
+#whether to do/don't run a queue task after each rtp in addition to the timer
+postTeleportQueueing: false
+
+#whether to refund price and cooldown on cancellation
+refundOnCancel: true
+
 #what radius, in chunks, around the destination to pre-load
 # number of chunks loaded is (1 + 2*viewDistance)^2
 # if larger than bukkit view distance, uses bukkit view distance
@@ -79,4 +85,4 @@ stay: 1
 fadeout: 1
 
 #DO NOT TOUCH VERSION NUMBER
-version: 2.0
+version: 2.2

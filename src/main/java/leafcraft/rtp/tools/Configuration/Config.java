@@ -1,7 +1,6 @@
 package leafcraft.rtp.tools.Configuration;
 
 import leafcraft.rtp.RTP;
-import leafcraft.rtp.tools.selection.TeleportRegion;
 import net.md_5.bungee.api.ChatColor;
 import org.bukkit.*;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -20,7 +19,7 @@ public class Config {
 
 	public final int teleportDelay, cancelDistance, teleportCooldown, maxAttempts, queuePeriod, minTPS, vd;
 	public final double price;
-	public final boolean rerollLiquid, rerollWorldGuard, rerollGriefPrevention;
+	public final boolean rerollLiquid, rerollWorldGuard, rerollGriefPrevention, postTeleportQueueing;
 
 	public final int nearSelfPrice, nearOtherPrice;
 
@@ -35,6 +34,8 @@ public class Config {
 	public final String title, subTitle;
 	public final int fadeIn, stay, fadeOut;
 
+	public final boolean refund;
+	
 	public Config(RTP plugin, Lang lang) {
 		this.plugin = plugin;
 
@@ -45,7 +46,7 @@ public class Config {
 		}
 		this.config = YamlConfiguration.loadConfiguration(f);
 
-		if( 	(this.config.getDouble("version") < 2.0) ) {
+		if( 	(this.config.getDouble("version") < 2.2) ) {
 			Bukkit.getLogger().log(Level.WARNING, lang.getLog("oldFile", "config.yml"));
 			update();
 
@@ -98,6 +99,10 @@ public class Config {
 		this.fadeIn = config.getInt("stay",1);
 		this.stay = config.getInt("fadeIn",1);
 		this.fadeOut = config.getInt("fadeOut",1);
+
+		this.postTeleportQueueing = config.getBoolean("postTeleportQueueing", false);
+
+		this.refund = config.getBoolean("refundOnCancel", false);
 	}
 
 	private void update() {
@@ -120,11 +125,19 @@ public class Config {
 		for (String line : linesInDefaultConfig) {
 			String newline = line;
 			if (line.startsWith("version:")) {
-				newline = "version: 2.0";
+				newline = "version: 2.2";
 			} else {
 				for (String node : oldValues.keySet()) {
 					if (line.startsWith(node + ":")) {
-						newline = node + ": " + oldValues.get(node).toString();
+						if(config.get(node) instanceof List) {
+							newline = node + ": ";
+							for(Object obj : Objects.requireNonNull(config.getList(node))) {
+								if(obj instanceof String) newline += "\n  - " + "\"" + obj + "\"";
+								else newline += "\n  - " + obj.toString();
+							}
+						}
+						else if(config.get(node) instanceof String) newline = node + ": \"" + oldValues.get(node).toString() + "\"";
+						else newline = node + ": " + oldValues.get(node).toString();
 						break;
 					}
 

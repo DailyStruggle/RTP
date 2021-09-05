@@ -1,6 +1,7 @@
 package leafcraft.rtp.spigotEventListeners;
 
 import leafcraft.rtp.RTP;
+import leafcraft.rtp.customEvents.TeleportCancelEvent;
 import leafcraft.rtp.tasks.DoTeleport;
 import leafcraft.rtp.tasks.LoadChunks;
 import leafcraft.rtp.tasks.QueueLocation;
@@ -10,11 +11,14 @@ import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerMoveEvent;
+
+import java.util.Objects;
 
 public final class OnPlayerMove implements Listener {
     private final RTP plugin;
@@ -34,7 +38,6 @@ public final class OnPlayerMove implements Listener {
 
         //if currently teleporting, stop that and clean up
         if (this.cache.todoTP.containsKey(player.getUniqueId())) {
-            cache.todoTP.remove(player.getUniqueId());
             stopTeleport(event);
         }
 
@@ -56,40 +59,16 @@ public final class OnPlayerMove implements Listener {
         Player player = event.getPlayer();
 
         Location originalLocation = cache.playerFromLocations.getOrDefault(player.getUniqueId(), player.getLocation());
-        if (originalLocation.distance(event.getTo()) < configs.config.cancelDistance) return;
+        if(originalLocation == null) return;
+        if (originalLocation.distance(Objects.requireNonNull(event.getTo())) < configs.config.cancelDistance) return;
 
-        //don't stop teleporting if there isn't supposed to be a delay
-        SetupTeleport setupTeleport = cache.setupTeleports.get(player.getUniqueId());
-        LoadChunks loadChunks = cache.loadChunks.get(player.getUniqueId());
-        DoTeleport doTeleport = cache.doTeleports.get(player.getUniqueId());
-        if (setupTeleport != null && setupTeleport.isNoDelay()) return;
-        if (loadChunks != null && loadChunks.isNoDelay()) return;
-        if (doTeleport != null && doTeleport.isNoDelay()) return;
+        CommandSender sender = cache.commandSenderLookup.get(player.getUniqueId());
+        if(sender == null) return;
 
-        Location location = cache.playerFromLocations.getOrDefault(player.getUniqueId(), player.getLocation());
-        if (location.distance(event.getTo()) < configs.config.cancelDistance) return;
+        Location to = cache.todoTP.get(player.getUniqueId());
+        if(to == null) return;
 
-        if (setupTeleport != null && !setupTeleport.isCancelled()) {
-            setupTeleport.cancel();
-            cache.loadChunks.remove(player.getUniqueId());
-        }
-        if (loadChunks != null && !loadChunks.isCancelled()) {
-            loadChunks.cancel();
-            cache.loadChunks.remove(player.getUniqueId());
-        }
-        if (doTeleport != null && !doTeleport.isCancelled()) {
-            doTeleport.cancel();
-            cache.doTeleports.remove(player.getUniqueId());
-        }
-
-        RandomSelectParams rsParams = cache.regionKeys.get(player.getUniqueId());
-        if (cache.permRegions.containsKey(rsParams)) {
-            Location randomLocation = cache.todoTP.get(player.getUniqueId());
-            QueueLocation queueLocation = new QueueLocation(cache.permRegions.get(rsParams), randomLocation, cache);
-            cache.queueLocationTasks.put(queueLocation.idx,queueLocation);
-            queueLocation.runTaskLaterAsynchronously(plugin, 1);
-        } else cache.tempRegions.remove(rsParams);
-        cache.regionKeys.remove(player.getUniqueId());
-        cache.playerFromLocations.remove(player.getUniqueId());
+        TeleportCancelEvent teleportCancelEvent = new TeleportCancelEvent(sender,player,to);
+        Bukkit.getPluginManager().callEvent(teleportCancelEvent);
     }
 }

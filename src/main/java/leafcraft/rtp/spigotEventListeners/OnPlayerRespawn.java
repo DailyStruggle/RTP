@@ -48,8 +48,8 @@ public final class OnPlayerRespawn implements Listener {
             RandomSelectParams toParams = new RandomSelectParams(toWorld, new HashMap<>(), configs);
             if (cache.permRegions.containsKey(toParams)) {
                 QueueLocation queueLocation = new QueueLocation(cache.permRegions.get(toParams), player, cache);
-                cache.queueLocationTasks.put(queueLocation.idx,queueLocation);
                 queueLocation.runTaskLaterAsynchronously(plugin, 1);
+                cache.queueLocationTasks.put(queueLocation.idx,queueLocation);
             }
         }
     }
