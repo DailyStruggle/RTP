@@ -4,9 +4,9 @@ import io.papermc.lib.PaperLib;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
+import leafcraft.rtp.tools.SendMessage;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
-import leafcraft.rtp.tools.softdepends.PAPIChecker;
 import org.bukkit.*;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -74,23 +74,7 @@ public class LoadChunks extends BukkitRunnable {
 
     @Override
     public void cancel() {
-        if(cache.permRegions.containsKey(rsParams)) {
-            cache.permRegions.get(rsParams).queueLocation(location);
-        }
-        cache.loadChunks.remove(player.getUniqueId());
-        cache.todoTP.remove(player.getUniqueId());
-        if(cache.doTeleports.containsKey(player.getUniqueId())) {
-            cache.doTeleports.get(player.getUniqueId()).cancel();
-            cache.doTeleports.remove(player.getUniqueId());
-        }
         cancelled = true;
-        String msg = configs.lang.getLog("teleportCancel");
-        if(player.isOnline()) {
-            msg = PAPIChecker.fillPlaceholders(player, msg);
-            if(!msg.equals("")) player.sendMessage(msg);
-        }
-        if (!sender.getName().equals(player.getName()))
-            if(!msg.equals("")) sender.sendMessage(msg);
         super.cancel();
     }
 
@@ -102,10 +86,7 @@ public class LoadChunks extends BukkitRunnable {
         if(chunkSet.completed.get() < chunkSet.expectedSize) {
             if(sender.hasPermission("rtp.noDelay") && i==-vd && j==-vd) {
                 String msg = configs.lang.getLog("chunkLoading");
-                PAPIChecker.fillPlaceholders(player, msg);
-                if(!msg.equals("")) player.sendMessage(msg);
-                if (!sender.getName().equals(player.getName()))
-                    if(!msg.equals("")) sender.sendMessage(msg);
+                SendMessage.sendMessage(sender,player,msg);
             }
 
             if (PaperLib.isPaper()) {
@@ -154,8 +135,10 @@ public class LoadChunks extends BukkitRunnable {
             if (remTime < 0) remTime = 0;
 
             DoTeleport doTeleport = new DoTeleport(plugin,configs,sender,player,location,cache);
-            cache.doTeleports.put(this.player.getUniqueId(),doTeleport);
-            if(async || remTime>0) doTeleport.runTaskLater(plugin,remTime);
+            if(async || remTime>0) {
+                doTeleport.runTaskLater(plugin,remTime);
+                cache.doTeleports.put(this.player.getUniqueId(),doTeleport);
+            }
             else doTeleport.doTeleportNow();
         }
         cache.loadChunks.remove(player.getUniqueId());

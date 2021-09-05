@@ -4,6 +4,7 @@ import io.papermc.lib.PaperLib;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
+import leafcraft.rtp.tools.SendMessage;
 import leafcraft.rtp.tools.TPS;
 import leafcraft.rtp.tools.softdepends.GriefPreventionChecker;
 import leafcraft.rtp.tools.softdepends.PAPIChecker;
@@ -119,7 +120,7 @@ public class TeleportRegion {
                     String msg = "[rtp] completed " + (it-1) + "/" + max.get() + " chunks in region:"+name;
                     Bukkit.getLogger().log(Level.INFO, msg);
                     for(Player player : Bukkit.getOnlinePlayers()) {
-                        if(player.hasPermission("rtp.fill")) player.sendMessage(msg);
+                        if(player.hasPermission("rtp.fill")) SendMessage.sendMessage(player,msg);
                     }
                     fillTask = null;
                     return;
@@ -147,7 +148,7 @@ public class TeleportRegion {
                         String msg = "[rtp] completed " + fillIterator.get() + "/" + max.get() + " chunks in region:"+name;
                         Bukkit.getLogger().log(Level.INFO, msg);
                         for(Player player : Bukkit.getOnlinePlayers()) {
-                            if(player.hasPermission("rtp.fill")) player.sendMessage(msg);
+                            if(player.hasPermission("rtp.fill")) SendMessage.sendMessage(player,msg);
                         }
 
                         fillTask = new FillTask(plugin);
@@ -341,18 +342,12 @@ public class TeleportRegion {
                 if(res == null) {
                     Integer maxAttempts = configs.config.maxAttempts;
                     String msg = PAPIChecker.fillPlaceholders(player,configs.lang.getLog("unsafe",maxAttempts.toString()));
-                    if(!msg.equals("")) {
-                        if(!msg.equals("")) player.sendMessage(msg);
-                        if (!sender.getName().equals(player.getName()))
-                            if(!msg.equals("")) sender.sendMessage(msg);
-                    }
+                    SendMessage.sendMessage(sender,player,msg);
                 }
             }
             else {
                 String msg = PAPIChecker.fillPlaceholders(player,configs.lang.getLog("noLocationsQueued"));
-                if(!msg.equals("")) player.sendMessage(msg);
-                if (!sender.getName().equals(player.getName()))
-                    if(!msg.equals("")) sender.sendMessage(msg);
+                SendMessage.sendMessage(sender,player,msg);
             }
         }
         return res;
@@ -367,6 +362,7 @@ public class TeleportRegion {
         int cz = (location.getBlockZ() > 0) ? location.getBlockZ() / 16 : location.getBlockZ() / 16 - 1;
         int idx = 0;
         Plugin plugin = Bukkit.getPluginManager().getPlugin("RTP");
+        if(plugin == null) return;
         for (int i = -vd; i <= vd; i++) {
             for (int j = -vd; j <= vd; j++) {
                 if(PaperLib.isPaper() || !urgent) {

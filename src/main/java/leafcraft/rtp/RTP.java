@@ -3,10 +3,13 @@ package leafcraft.rtp;
 import io.papermc.lib.PaperLib;
 import leafcraft.rtp.commands.*;
 import leafcraft.rtp.customEventListeners.OnRandomTeleport;
+import leafcraft.rtp.customEventListeners.OnTeleportCancel;
 import leafcraft.rtp.spigotEventListeners.*;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.TPS;
+import leafcraft.rtp.tools.selection.RandomSelectParams;
+import leafcraft.rtp.tools.selection.TeleportRegion;
 import leafcraft.rtp.tools.softdepends.PAPI_expansion;
 import leafcraft.rtp.tools.softdepends.VaultChecker;
 import org.bstats.bukkit.Metrics;
@@ -16,6 +19,8 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.plugin.java.JavaPluginLoader;
 
 import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
 
 public final class RTP extends JavaPlugin {
     private Configs configs;
@@ -63,6 +68,7 @@ public final class RTP extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new OnPlayerChangeWorld(this,configs,cache),this);
         getServer().getPluginManager().registerEvents(new OnPlayerQuit(cache),this);
         getServer().getPluginManager().registerEvents(new OnRandomTeleport(this,configs,cache),this);
+        getServer().getPluginManager().registerEvents(new OnTeleportCancel(this,configs,cache),this);
 
         Bukkit.getServer().getScheduler().scheduleSyncRepeatingTask(this, new TPS(), 100L, 1L);
 
@@ -83,5 +89,25 @@ public final class RTP extends JavaPlugin {
         }
 
         super.onDisable();
+    }
+
+    /*
+     * getRegion
+     *
+     * returns TeleportRegion by name
+     * returns null if region does not exist or if its world is bad
+     */
+    public TeleportRegion getRegion(String regionName) {
+        Map<String,String> params = new HashMap<>();
+        params.put("region",regionName);
+
+        String worldName = (String) configs.regions.getRegionSetting(regionName,"world","");
+        if (worldName == null || worldName == "" || !configs.worlds.checkWorldExists(worldName)) {
+            return null;
+        }
+
+        RandomSelectParams randomSelectParams = new RandomSelectParams(Bukkit.getWorld(worldName),params,configs);
+        if(!cache.permRegions.containsKey(randomSelectParams)) return null;
+        return cache.permRegions.get(randomSelectParams);
     }
 }

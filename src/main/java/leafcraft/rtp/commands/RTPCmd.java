@@ -3,6 +3,7 @@ package leafcraft.rtp.commands;
 import leafcraft.rtp.tasks.SetupTeleport;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
+import leafcraft.rtp.tools.SendMessage;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.softdepends.PAPIChecker;
 import leafcraft.rtp.tools.softdepends.VaultChecker;
@@ -63,8 +64,8 @@ public class RTPCmd implements CommandExecutor {
         if(args.length > 0 && rtpCommands.containsKey(args[0])) {
             if(!sender.hasPermission(rtpCommands.get(args[0]))) {
                 String msg = configs.lang.getLog("noPerms");
-                if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-                if(!msg.equals("")) sender.sendMessage(msg);
+                
+                SendMessage.sendMessage(sender,msg);
             }
             else {
                 plugin.getCommand("rtp " + args[0]).execute(sender, label, Arrays.copyOfRange(args, 1, args.length));
@@ -74,8 +75,8 @@ public class RTPCmd implements CommandExecutor {
 
         if(!sender.hasPermission("rtp.use")) {
             String msg = configs.lang.getLog("noPerms");
-            if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-            if(!msg.equals("")) sender.sendMessage(msg);
+            
+            SendMessage.sendMessage(sender,msg);
             return true;
         }
 
@@ -97,8 +98,7 @@ public class RTPCmd implements CommandExecutor {
             player = Bukkit.getPlayer(rtpArgs.get("player"));
             if(player == null) {
                 String msg = configs.lang.getLog("badArg", "player:"+rtpArgs.get("player"));
-                if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-                if(!msg.equals("")) sender.sendMessage(msg);
+                SendMessage.sendMessage(sender,msg);
                 return true;
             }
         }
@@ -107,8 +107,8 @@ public class RTPCmd implements CommandExecutor {
         }
         else {
             String msg = configs.lang.getLog("consoleCmdNotAllowed");
-            if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-            if(!msg.equals("")) sender.sendMessage(msg);
+            
+            SendMessage.sendMessage(sender,msg);
             return true;
         }
 
@@ -119,7 +119,7 @@ public class RTPCmd implements CommandExecutor {
         {
             String msg = configs.lang.getLog("alreadyTeleporting");
             PAPIChecker.fillPlaceholders(player,msg);
-            if(!msg.equals("")) sender.sendMessage(msg);
+            SendMessage.sendMessage(sender,msg);
             return true;
         }
 
@@ -133,14 +133,14 @@ public class RTPCmd implements CommandExecutor {
                     || (!sender.hasPermission("rtp.regions."+regionName)
                     && (Boolean)configs.worlds.getWorldSetting(worldName,"requirePermission",true))) {
                 String msg = configs.lang.getLog("badArg", "region:" + regionName);
-                if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-                if(!msg.equals("")) sender.sendMessage(msg);
+                
+                SendMessage.sendMessage(sender,msg);
                 return true;
             }
             if (!configs.worlds.checkWorldExists(worldName) || !sender.hasPermission("rtp.worlds."+worldName)) {
                 String msg = configs.lang.getLog("badArg", "world:" + worldName);
-                if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-                if(!msg.equals("")) sender.sendMessage(msg);
+                
+                SendMessage.sendMessage(sender,msg);
                 return true;
             }
             world = Bukkit.getWorld(worldName);
@@ -151,8 +151,7 @@ public class RTPCmd implements CommandExecutor {
                 worldName = configs.worlds.worldPlaceholder2Name(worldName);
                 if (!configs.worlds.checkWorldExists(worldName)) {
                     String msg = configs.lang.getLog("badArg", "world:" + worldName);
-                    if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-                    if(!msg.equals("")) sender.sendMessage(msg);
+                    SendMessage.sendMessage(sender,msg);
                     return true;
                 }
                 if(sender.hasPermission("rtp.worlds."+worldName) || !((Boolean)configs.worlds.getWorldSetting(worldName,"requirePermission",true)))
@@ -186,8 +185,8 @@ public class RTPCmd implements CommandExecutor {
             if(days>0 || hours>0 || minutes>0) replacement += minutes + configs.lang.getLog("minutes") + " ";
             replacement += seconds + configs.lang.getLog("seconds");
             String msg = configs.lang.getLog("cooldownMessage", replacement);
-            if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-            if(!msg.equals("")) sender.sendMessage(msg);
+            
+            SendMessage.sendMessage(sender,msg);
             return true;
         }
 
@@ -216,35 +215,35 @@ public class RTPCmd implements CommandExecutor {
                 }
                 else {
                     String msg = configs.lang.getLog("badArg", "near:" + playerName);
-                    if (sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player) sender, msg);
-                    if(!msg.equals("")) sender.sendMessage(msg);
+                    
+                    SendMessage.sendMessage(sender,msg);
                     return true;
                 }
             }
             else if (!playerName.equals(sender.getName()) && !sender.hasPermission("rtp.near.other")) {
                 String msg = configs.lang.getLog("noPerms");
-                if (sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player) sender, msg);
-                if(!msg.equals("")) sender.sendMessage(msg);
+                
+                SendMessage.sendMessage(sender,msg);
                 return true;
             }
             else if (!sender.hasPermission("rtp.near")) {
                 String msg = configs.lang.getLog("noPerms");
-                if (sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player) sender, msg);
-                if(!msg.equals("")) sender.sendMessage(msg);
+                
+                SendMessage.sendMessage(sender,msg);
                 return true;
             }
 
             if (targetPlayer == null) {
                 String msg = configs.lang.getLog("badArg", "near:" + playerName);
-                if (sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player) sender, msg);
-                if(!msg.equals("")) sender.sendMessage(msg);
+                
+                SendMessage.sendMessage(sender,msg);
                 return true;
             }
 
             if(!has) {
                 String msg = configs.lang.getLog("notEnoughMoney",String.valueOf(price));
                 PAPIChecker.fillPlaceholders((Player)sender,msg);
-                if(!msg.equals("")) sender.sendMessage(msg);
+                SendMessage.sendMessage(sender,msg);
                 return true;
             }
 
@@ -271,14 +270,17 @@ public class RTPCmd implements CommandExecutor {
         this.cache.lastTeleportTime.put(player.getUniqueId(), start);
         this.cache.playerFromLocations.put(player.getUniqueId(),player.getLocation());
         SetupTeleport setupTeleport = new SetupTeleport(plugin,sender,player,configs, cache, rsParams);
-        cache.setupTeleports.put(player.getUniqueId(),setupTeleport);
-        if(cache.permRegions.containsKey(rsParams) && cache.permRegions.get(rsParams).hasQueuedLocation(player)) {
+        if(cache.permRegions.containsKey(rsParams)
+                && cache.permRegions.get(rsParams).hasQueuedLocation(player)
+                && sender.hasPermission("rtp.noDelay")) {
             setupTeleport.setupTeleportNow(false);
         }
         else {
             setupTeleport.runTaskAsynchronously(plugin);
+            cache.setupTeleports.put(player.getUniqueId(),setupTeleport);
         }
 
+        cache.commandSenderLookup.put(player.getUniqueId(),sender);
         return true;
     }
 }

@@ -3,6 +3,7 @@ package leafcraft.rtp.tasks;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
+import leafcraft.rtp.tools.SendMessage;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import leafcraft.rtp.tools.softdepends.PAPIChecker;
@@ -42,24 +43,7 @@ public class SetupTeleport extends BukkitRunnable {
 
     @Override
     public void cancel() {
-        if(cache.permRegions.containsKey(rsParams) && location != null) {
-            cache.permRegions.get(rsParams).queueLocation(location);
-        }
-        cache.todoTP.remove(player.getUniqueId());
-        cache.setupTeleports.remove(player.getUniqueId());
-        if(cache.loadChunks.containsKey(player.getUniqueId())) {
-            cache.loadChunks.get(player.getUniqueId()).cancel();
-            cache.loadChunks.remove(player.getUniqueId());
-        }
-        if(cache.doTeleports.containsKey(player.getUniqueId())) {
-            cache.doTeleports.get(player.getUniqueId()).cancel();
-            cache.doTeleports.remove(player.getUniqueId());
-        }
         cancelled = true;
-        String msg = PAPIChecker.fillPlaceholders(player,configs.lang.getLog("teleportCancel"));
-        if(!msg.equals("")) player.sendMessage(msg);
-        if(!sender.getName().equals(player.getName()))
-            if(!msg.equals("")) sender.sendMessage(msg);
         super.cancel();
     }
 
@@ -92,12 +76,7 @@ public class SetupTeleport extends BukkitRunnable {
             if(minutes>0) replacement += minutes + configs.lang.getLog("minutes") + " ";
             if(seconds>0) replacement += seconds%60 + configs.lang.getLog("seconds");
             String msg = configs.lang.getLog("delayMessage", replacement);
-            if(player.isOnline()) {
-                msg = PAPIChecker.fillPlaceholders(player, msg);
-                if(!msg.equals("")) player.sendMessage(msg);
-                if (!sender.getName().equals(player.getName()))
-                    if(!msg.equals("")) sender.sendMessage(msg);
-            }
+            SendMessage.sendMessage(sender,player,msg);
         }
 
         //set up task to load chunks then teleport
@@ -107,16 +86,18 @@ public class SetupTeleport extends BukkitRunnable {
             if(sender.hasPermission("rtp.noDelay.chunks")
                     || (loadChunks.chunkSet.completed.get()>=loadChunks.chunkSet.expectedSize-1)) {
                 DoTeleport doTeleport = new DoTeleport(plugin,configs,sender,player,location,cache);
-                cache.doTeleports.put(player.getUniqueId(),doTeleport);
-                long diffNanos = System.nanoTime() - cache.lastTeleportTime.getOrDefault(player.getUniqueId(), System.nanoTime());
+                long diffNanos = System.nanoTime() - cache.lastTeleportTime.getOrDefault(player.getUniqueId(), 0L);
                 long diffMicros = TimeUnit.NANOSECONDS.toMicros(diffNanos);
                 long diffTicks = (diffMicros / 50);
-                if(async || diffTicks < delay) doTeleport.runTaskLater(plugin, delay+2);
+                if(async || diffTicks < delay) {
+                    doTeleport.runTaskLater(plugin, delay+2);
+                    cache.doTeleports.put(player.getUniqueId(),doTeleport);
+                }
                 else doTeleport.doTeleportNow();
             }
             else {
-                cache.loadChunks.put(player.getUniqueId(), loadChunks);
                 loadChunks.runTaskAsynchronously(plugin);
+                cache.loadChunks.put(player.getUniqueId(), loadChunks);
             }
         }
         cache.setupTeleports.remove(player.getUniqueId());

@@ -6,6 +6,7 @@ import leafcraft.rtp.customEvents.RandomTeleportEvent;
 import leafcraft.rtp.tasks.*;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
+import leafcraft.rtp.tools.SendMessage;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import leafcraft.rtp.tools.softdepends.PAPIChecker;
@@ -44,10 +45,10 @@ public final class OnRandomTeleport implements Listener {
 
         if(configs.config.blindnessDuration>0)
             player.addPotionEffect(PotionEffectType.BLINDNESS.createEffect(configs.config.blindnessDuration,100),false);
-        PaperLib.teleportAsync(player,event.getTo());
+        player.teleport(event.getTo());
         if(!configs.config.title.equals("")) {
-            String title = PAPIChecker.fillPlaceholders(player,configs.config.title);
-            String subtitle = PAPIChecker.fillPlaceholders(player,configs.config.subTitle);
+            String title = SendMessage.format(player,configs.config.title);
+            String subtitle = SendMessage.format(player,configs.config.subTitle);
             player.sendTitle(title,subtitle,configs.config.fadeIn * 20, configs.config.stay * 20, configs.config.fadeOut * 20);
         }
         String msg = configs.lang.getLog("teleportMessage", this.cache.numTeleportAttempts.getOrDefault(event.getTo(),0).toString());
@@ -67,22 +68,22 @@ public final class OnRandomTeleport implements Listener {
         if(seconds>0) replacement += seconds + configs.lang.getLog("seconds") + " ";
         if((millis>0 || seconds<1)&&diff<TimeUnit.SECONDS.toNanos(2)) replacement += millis + configs.lang.getLog("millis");
         msg = msg.replace("[time]",replacement);
-        if(!msg.equals("")) player.sendMessage(msg);
-        if(event.getSender().getName()!=player.getName())
-            if(!msg.equals("")) event.getSender().sendMessage(msg);
+        SendMessage.sendMessage(event.getSender(),player,msg);
         cache.lastTeleportTime.put(player.getUniqueId(), time);
 
         RandomSelectParams rsParams = cache.regionKeys.get(player.getUniqueId());
         if(rsParams!=null && cache.permRegions.containsKey(rsParams)) {
             TeleportRegion region = cache.permRegions.get(rsParams);
             region.removeChunks(event.getTo());
-            QueueLocation queueLocation;
+            QueueLocation queueLocation = null;
             if(player.hasPermission("rtp.personalQueue"))
                 queueLocation = new QueueLocation(region,player, cache);
-            else
+            else if(configs.config.postTeleportQueueing)
                 queueLocation = new QueueLocation(region, cache);
-            cache.queueLocationTasks.put(queueLocation.idx,queueLocation);
-            queueLocation.runTaskAsynchronously(plugin);
+            if(queueLocation!=null) {
+                cache.queueLocationTasks.put(queueLocation.idx,queueLocation);
+                queueLocation.runTaskAsynchronously(plugin);
+            }
         }
 
         if(!player.isInvulnerable() && configs.config.invulnerabilityTime>0) {
@@ -95,6 +96,10 @@ public final class OnRandomTeleport implements Listener {
         }
 
         runCommands(event.getPlayer());
+
+        if(event.getSender() instanceof Player) {
+            cache.currentTeleportCost.remove(((Player)event.getSender()).getUniqueId());
+        }
     }
 
     private void runCommands(Player player) {

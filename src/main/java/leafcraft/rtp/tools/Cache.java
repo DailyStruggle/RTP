@@ -15,9 +15,14 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -30,6 +35,9 @@ public class Cache {
     public Cache(RTP plugin, Configs configs) {
         this.plugin = plugin;
         this.configs = configs;
+
+        fetchPlayerData();
+
         for(String region : configs.regions.getRegionNames()) {
             String worldName = (String) configs.regions.getRegionSetting(region,"world","world");
             World world = Bukkit.getWorld(worldName);
@@ -66,6 +74,7 @@ public class Cache {
     //table of which players are teleporting to what location
     // key: player name
     // value: location they're going to, to be re-added to the queue on cancellation
+    public ConcurrentHashMap<UUID,CommandSender> commandSenderLookup = new ConcurrentHashMap<>();
     public ConcurrentHashMap<UUID,Location> todoTP = new ConcurrentHashMap<>();
     public ConcurrentHashMap<UUID,Location> lastTP = new ConcurrentHashMap<>();
     public ConcurrentHashMap<UUID,RandomSelectParams> regionKeys = new ConcurrentHashMap<>();
@@ -84,6 +93,7 @@ public class Cache {
 
     //store teleport command cooldown
     public ConcurrentHashMap<UUID,Long> lastTeleportTime = new ConcurrentHashMap<>();
+    public ConcurrentHashMap<UUID,Double> currentTeleportCost = new ConcurrentHashMap<>();
 
     public ConcurrentHashMap<RandomSelectParams, TeleportRegion> tempRegions = new ConcurrentHashMap<>();
     public ConcurrentHashMap<RandomSelectParams, TeleportRegion> permRegions = new ConcurrentHashMap<>();
@@ -133,6 +143,8 @@ public class Cache {
             entry.getValue().cancel();
             queueTimers.remove(entry);
         }
+
+        storePlayerData();
     }
 
 
@@ -158,14 +170,11 @@ public class Cache {
             boolean canPay = economy.has((Player)sender,price);
             if(canPay) {
                 economy.withdrawPlayer((Player)sender,price);
+                currentTeleportCost.put(((Player)sender).getUniqueId(),price);
             }
             else {
                 String msg = configs.lang.getLog("notEnoughMoney", price.toString());
-                msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-                if(!msg.equals("")) sender.sendMessage(msg);
-                if(!sender.getName().equals(player.getName())) {
-                    if(!msg.equals("")) player.sendMessage(msg);
-                }
+                SendMessage.sendMessage(sender,player,msg);
                 return null;
             }
         }
@@ -219,6 +228,39 @@ public class Cache {
                 }, 40 + i.intValue(), period * 20));
                 i += increment;
             }
+        }
+    }
+
+    public void fetchPlayerData() {
+        File playerFile = new File(plugin.getDataFolder(),"playerCooldowns.dat");
+        if(!playerFile.exists()) {
+            return;
+        }
+        long time = System.nanoTime();
+        FileConfiguration config = YamlConfiguration.loadConfiguration(playerFile);
+        for(String id : config.getKeys(false)) {
+            lastTeleportTime.put(UUID.fromString(id),time-TimeUnit.MILLISECONDS.toNanos(config.getLong(id)));
+        }
+    }
+
+    public void storePlayerData() {
+        File playerFile = new File(plugin.getDataFolder(),"playerCooldowns.dat");
+        if(!playerFile.exists()) {
+            try {
+                playerFile.createNewFile();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        FileConfiguration config = YamlConfiguration.loadConfiguration(playerFile);
+        long time = System.nanoTime();
+        for(Map.Entry<UUID,Long> entry : lastTeleportTime.entrySet()) {
+            config.set(entry.getKey().toString(),TimeUnit.NANOSECONDS.toMillis(time-entry.getValue()));
+        }
+        try {
+            config.save(playerFile);
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 }

@@ -1,6 +1,7 @@
 package leafcraft.rtp.commands;
 
 import leafcraft.rtp.tools.Configuration.Configs;
+import leafcraft.rtp.tools.SendMessage;
 import leafcraft.rtp.tools.softdepends.PAPIChecker;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.ComponentBuilder;
@@ -32,21 +33,21 @@ public class Help implements CommandExecutor {
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if(!sender.hasPermission("rtp.see")) {
             String msg = configs.lang.getLog("noPerms");
-            if(sender instanceof Player) msg = PAPIChecker.fillPlaceholders((Player)sender,msg);
-            if(!msg.equals("")) sender.sendMessage(msg);
+            SendMessage.sendMessage(sender,msg);
             return true;
         }
 
         for(Map.Entry<String,String> entry : perms.entrySet()) {
             if(sender.hasPermission(entry.getValue())){
-                TextComponent msg = new TextComponent(configs.lang.getLog(entry.getKey()));
                 String arg;
                 if(entry.getKey().equals("rtp")) arg = "";
                 else arg = entry.getKey();
 
-                msg.setHoverEvent( new HoverEvent(HoverEvent.Action.SHOW_TEXT, new ComponentBuilder( "/rtp " + arg ).create()));
-                msg.setClickEvent( new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, "/rtp " + arg));
-                if(!msg.getText().equals("")) sender.spigot().sendMessage(msg);
+                String msg = configs.lang.getLog(entry.getKey());
+                String hover = "/rtp " + arg;
+                String click = "/rtp " + arg;
+
+                SendMessage.sendMessage(sender,msg,hover,click);
             }
         }
 

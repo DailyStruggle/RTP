@@ -1,13 +1,18 @@
 package leafcraft.rtp.spigotEventListeners;
 
+import leafcraft.rtp.customEvents.TeleportCancelEvent;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
 
+import java.util.Objects;
 import java.util.UUID;
 
 public final class OnPlayerQuit implements Listener {
@@ -19,37 +24,21 @@ public final class OnPlayerQuit implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST)
     public void OnPlayerQuit(PlayerQuitEvent event) {
-        UUID playerId = event.getPlayer().getUniqueId();
+        Player player = event.getPlayer();
+        UUID playerId = player.getUniqueId();
 
         if(cache.invulnerablePlayers.containsKey(playerId)) {
             event.getPlayer().setInvulnerable(false);
             cache.invulnerablePlayers.remove(playerId);
         }
 
-        //if currently teleporting, stop that and clean up
-        if (cache.setupTeleports.containsKey(playerId)) {
-            cache.setupTeleports.get(playerId).cancel();
-            cache.setupTeleports.remove(playerId);
-        }
-        if (cache.loadChunks.containsKey(playerId)) {
-            cache.loadChunks.get(playerId).cancel();
-            cache.loadChunks.remove(playerId);
-        }
-        if (cache.doTeleports.containsKey(playerId)) {
-            cache.doTeleports.get(playerId).cancel();
-            cache.doTeleports.remove(playerId);
-        }
+        CommandSender sender = cache.commandSenderLookup.get(player.getUniqueId());
+        if(sender == null) return;
 
-        if (!this.cache.todoTP.containsKey(playerId)) return;
-        cache.todoTP.remove(playerId);
+        Location to = cache.todoTP.get(player.getUniqueId());
+        if(to == null) return;
 
-        RandomSelectParams rsParams = cache.regionKeys.get(playerId);
-        if (cache.permRegions.containsKey(rsParams)) {
-            Location randomLocation = cache.todoTP.get(playerId);
-            cache.permRegions.get(cache.regionKeys.get(playerId)).queueLocation(randomLocation);
-        } else cache.tempRegions.remove(rsParams);
-        cache.regionKeys.remove(playerId);
-        cache.todoTP.remove(playerId);
-        cache.playerFromLocations.remove(playerId);
+        TeleportCancelEvent teleportCancelEvent = new TeleportCancelEvent(sender,player,to);
+        Bukkit.getPluginManager().callEvent(teleportCancelEvent);
     }
 }
