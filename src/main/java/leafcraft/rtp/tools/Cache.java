@@ -147,6 +147,33 @@ public class Cache {
         storePlayerData();
     }
 
+    public Location getQueuedLocation(RandomSelectParams rsParams, CommandSender sender, Player player) {
+        TeleportRegion region;
+        Double price = 0d;
+        if(permRegions.containsKey(rsParams)) {
+            region = permRegions.get(rsParams);
+            if(!sender.hasPermission("rtp.free")) {
+                price = (Double) configs.regions.getRegionSetting(region.name, "price", 0.0);
+            }
+        }
+        else return null;
+
+        Economy economy = VaultChecker.getEconomy();
+        if(price > 0 && sender instanceof Player && economy!=null) {
+            boolean canPay = economy.has((Player)sender,price);
+            if(canPay) {
+                economy.withdrawPlayer((Player)sender,price);
+                currentTeleportCost.put(((Player)sender).getUniqueId(),price);
+            }
+            else {
+                String msg = configs.lang.getLog("notEnoughMoney", price.toString());
+                SendMessage.sendMessage(sender,player,msg);
+                return null;
+            }
+        }
+
+        return region.getQueuedLocation(sender, player);
+    }
 
     public Location getRandomLocation(RandomSelectParams rsParams, boolean urgent, CommandSender sender, Player player) {
         TeleportRegion region;

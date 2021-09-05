@@ -53,7 +53,8 @@ public class SetupTeleport extends BukkitRunnable {
 
     public void setupTeleportNow(boolean async) {
         //get a random location according to the parameters
-        location = cache.getRandomLocation(rsParams,true,sender, player);
+        if(async) location = cache.getRandomLocation(rsParams,true,sender, player);
+        else location = cache.getQueuedLocation(rsParams,sender,player);
         if(location == null) {
             cache.setupTeleports.remove(player.getUniqueId());
             return;

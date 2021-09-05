@@ -94,8 +94,8 @@ public class Config {
 
 		this.blindnessDuration = config.getInt("blindnessDuration",0);
 
-		this.title = ChatColor.translateAlternateColorCodes('&',config.getString("title",""));
-		this.subTitle = ChatColor.translateAlternateColorCodes('&',config.getString("subtitle",""));
+		this.title = ChatColor.translateAlternateColorCodes('&', Objects.requireNonNull(config.getString("title", "")));
+		this.subTitle = ChatColor.translateAlternateColorCodes('&', Objects.requireNonNull(config.getString("subtitle", "")));
 		this.fadeIn = config.getInt("stay",1);
 		this.stay = config.getInt("fadeIn",1);
 		this.fadeOut = config.getInt("fadeOut",1);
@@ -126,14 +126,20 @@ public class Config {
 			String newline = line;
 			if (line.startsWith("version:")) {
 				newline = "version: 2.2";
-			} else {
+			}
+			else if(newline.startsWith("  -")) continue;
+			else {
 				for (String node : oldValues.keySet()) {
 					if (line.startsWith(node + ":")) {
 						if(config.get(node) instanceof List) {
+							Set<Object> duplicateCheck = new HashSet<>();
 							newline = node + ": ";
 							for(Object obj : Objects.requireNonNull(config.getList(node))) {
+								if(duplicateCheck.contains(obj)) continue;
+								duplicateCheck.add(obj);
+								System.out.println(obj);
 								if(obj instanceof String) newline += "\n  - " + "\"" + obj + "\"";
-								else newline += "\n  - " + obj.toString();
+								else newline += "\n  - " + obj;
 							}
 						}
 						else if(config.get(node) instanceof String) newline = node + ": \"" + oldValues.get(node).toString() + "\"";
@@ -151,6 +157,7 @@ public class Config {
 		try {
 			fw = new FileWriter(plugin.getDataFolder().getAbsolutePath() + File.separator + "config.yml");
 			for (String s : linesArray) {
+				if(s==null) continue;
 				fw.write(s + "\n");
 			}
 			fw.close();

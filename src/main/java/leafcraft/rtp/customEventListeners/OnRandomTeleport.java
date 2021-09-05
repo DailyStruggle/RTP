@@ -36,7 +36,7 @@ public final class OnRandomTeleport implements Listener {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
-    public void OnRandomTeleport(RandomTeleportEvent event) {
+    public void onRandomTeleport(RandomTeleportEvent event) {
         Player player = event.getPlayer();
         cache.playerFromLocations.remove(player.getUniqueId());
         cache.doTeleports.remove(player.getUniqueId());
