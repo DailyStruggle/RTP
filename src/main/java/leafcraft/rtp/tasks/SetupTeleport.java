@@ -7,12 +7,15 @@ import leafcraft.rtp.tools.SendMessage;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import leafcraft.rtp.tools.softdepends.PAPIChecker;
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.permissions.PermissionAttachmentInfo;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 //prep teleportation
@@ -53,20 +56,44 @@ public class SetupTeleport extends BukkitRunnable {
 
     public void setupTeleportNow(boolean async) {
         //get a random location according to the parameters
-        if(async) location = cache.getRandomLocation(rsParams,true,sender, player);
-        else location = cache.getQueuedLocation(rsParams,sender,player);
-        if(location == null) {
+        if (async) location = cache.getRandomLocation(rsParams, true, sender, player);
+        else location = cache.getQueuedLocation(rsParams, sender, player);
+        if (location == null) {
             cache.setupTeleports.remove(player.getUniqueId());
             return;
         }
-        cache.todoTP.put(player.getUniqueId(),location);
+        cache.todoTP.put(player.getUniqueId(), location);
 
         //get warmup delay
-        int delay = (sender.hasPermission("rtp.noDelay")) ? 0 : configs.config.teleportDelay;
+        long delay = configs.config.teleportDelay;
+
+        Set<PermissionAttachmentInfo> perms = sender.getEffectivePermissions();
+
+        if (sender.hasPermission("rtp.noDelay")) {
+            delay = 0;
+        } else {
+            for (PermissionAttachmentInfo perm : perms) {
+                if(!perm.getValue()) continue;
+                String node = perm.getPermission();
+                if (node.startsWith("rtp.delay.")) {
+                    String[] val = node.split("\\.");
+                    if (val.length < 3 || val[2] == null || val[2].equals("")) continue;
+                    int number;
+                    try {
+                        number = Integer.parseInt(val[2]);
+                    } catch (NumberFormatException exception) {
+                        Bukkit.getLogger().warning("[rtp] invalid permission: " + node);
+                        continue;
+                    }
+                    delay = number*20L;
+                    break;
+                }
+            }
+        }
 
         //let player know if warmup delay > 0
         if(delay>0) {
-            int time = delay/20;
+            long time = delay/20;
             long days = TimeUnit.SECONDS.toDays(time);
             long hours = TimeUnit.SECONDS.toHours(time)%24;
             long minutes = TimeUnit.SECONDS.toMinutes(time)%60;

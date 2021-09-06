@@ -11,7 +11,6 @@ import org.bukkit.plugin.RegisteredServiceProvider;
 import java.util.logging.Logger;
 
 public class VaultChecker {
-    private static final Logger log = Logger.getLogger("Minecraft");
     private static Economy econ = null;
     private static Permission perms = null;
     private static Chat chat = null;

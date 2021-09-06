@@ -46,7 +46,7 @@ maxAttempts: 100
 queuePeriod: 30
 
 #minimum TPS requirement before trying to queue a new location
-# must be a positive integer
+# must be a positive number
 minTPS: 19.0
 
 #whether to do/don't run a queue task after each rtp in addition to the timer
