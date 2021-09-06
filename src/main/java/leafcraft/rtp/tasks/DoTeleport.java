@@ -4,11 +4,6 @@ import leafcraft.rtp.RTP;
 import leafcraft.rtp.customEvents.RandomTeleportEvent;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
-import leafcraft.rtp.tools.HashableChunk;
-import leafcraft.rtp.tools.SendMessage;
-import leafcraft.rtp.tools.selection.RandomSelectParams;
-import leafcraft.rtp.tools.selection.TeleportRegion;
-import leafcraft.rtp.tools.softdepends.PAPIChecker;
 import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
@@ -45,6 +40,7 @@ public class DoTeleport extends BukkitRunnable {
         RandomTeleportEvent randomTeleportEvent = new RandomTeleportEvent(sender, player, location);
         Bukkit.getPluginManager().callEvent(randomTeleportEvent);
         new ChunkCleanup(configs,location,cache).runTask(plugin);
+        cache.commandSenderLookup.remove(player.getUniqueId());
     }
 
     public boolean isNoDelay() {

@@ -24,7 +24,7 @@ public class LoadChunks extends BukkitRunnable {
     private final CommandSender sender;
     private final Player player;
     private final Cache cache;
-    private final Integer delay;
+    private final Long delay;
     private final Location location;
     private final RandomSelectParams rsParams;
     private int i;
@@ -32,7 +32,7 @@ public class LoadChunks extends BukkitRunnable {
     private final int vd;
     private Boolean cancelled = false;
 
-    public LoadChunks(RTP plugin, Configs configs, CommandSender sender, Player player, Cache cache, Integer delay, Location location) {
+    public LoadChunks(RTP plugin, Configs configs, CommandSender sender, Player player, Cache cache, Long delay, Location location) {
         this.plugin = plugin;
         this.configs = configs;
         this.sender = sender;
@@ -50,7 +50,7 @@ public class LoadChunks extends BukkitRunnable {
         this.vd = Bukkit.getViewDistance();
     }
 
-    public LoadChunks(RTP plugin, Configs configs, CommandSender sender, Player player, Cache cache, Integer delay, Location location, int i, int j) {
+    public LoadChunks(RTP plugin, Configs configs, CommandSender sender, Player player, Cache cache, Long delay, Location location, int i, int j) {
         this.plugin = plugin;
         this.configs = configs;
         this.sender = sender;
@@ -106,9 +106,10 @@ public class LoadChunks extends BukkitRunnable {
                 }
             } else {
                 World world = Bukkit.getWorld(rsParams.worldID);
+                if(world == null) return;
                 Chunk centerChunk = location.getChunk();
                 int vd = configs.config.vd;
-                int len = (2*vd+1)*(2*vd+1);
+                long len = (2L*vd+1)*(2L*vd+1);
                 if(delay>0) len = 2*(len/delay);
                 for(; i < vd; i++) {
                     if(j>=vd) j = 0;

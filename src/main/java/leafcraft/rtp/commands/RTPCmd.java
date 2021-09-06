@@ -8,6 +8,7 @@ import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.softdepends.PAPIChecker;
 import leafcraft.rtp.tools.softdepends.VaultChecker;
 import net.milkbowl.vault.economy.Economy;
+import net.milkbowl.vault.permission.Permission;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.World;
@@ -15,6 +16,7 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.permissions.PermissionAttachmentInfo;
 
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
@@ -170,24 +172,45 @@ public class RTPCmd implements CommandExecutor {
         }
 
         //check time
-        long lastTime = (sender instanceof Player) ? this.cache.lastTeleportTime.getOrDefault(((Player) sender).getUniqueId(),0L) : 0;
-        long cooldownTime = TimeUnit.SECONDS.toNanos(configs.config.teleportCooldown);
-        if(!sender.hasPermission("rtp.noCooldown")
-                && ((start - lastTime) < cooldownTime)) {
-            long remaining = (lastTime-start)+cooldownTime;
-            long days = TimeUnit.NANOSECONDS.toDays(remaining);
-            long hours = TimeUnit.NANOSECONDS.toHours(remaining)%24;
-            long minutes = TimeUnit.NANOSECONDS.toMinutes(remaining)%60;
-            long seconds = TimeUnit.NANOSECONDS.toSeconds(remaining)%60;
-            String replacement = "";
-            if(days>0) replacement += days + configs.lang.getLog("days") + " ";
-            if(days>0 || hours>0) replacement += hours + configs.lang.getLog("hours") + " ";
-            if(days>0 || hours>0 || minutes>0) replacement += minutes + configs.lang.getLog("minutes") + " ";
-            replacement += seconds + configs.lang.getLog("seconds");
-            String msg = configs.lang.getLog("cooldownMessage", replacement);
-            
-            SendMessage.sendMessage(sender,msg);
-            return true;
+        if(!sender.hasPermission("rtp.noCooldown")) {
+            long lastTime = (sender instanceof Player) ? this.cache.lastTeleportTime.getOrDefault(((Player) sender).getUniqueId(), 0L) : 0;
+            long cooldownTime = TimeUnit.SECONDS.toNanos(configs.config.teleportCooldown);
+            Set<PermissionAttachmentInfo> perms = sender.getEffectivePermissions();
+
+            for(PermissionAttachmentInfo perm : perms) {
+                if(!perm.getValue()) continue;
+                String node = perm.getPermission();
+                if(node.startsWith("rtp.cooldown.")) {
+                    String[] val = node.split("\\.");
+                    if(val.length<3 || val[2]==null || val[2].equals("")) continue;
+                    int number;
+                    try {
+                        number = Integer.parseInt(val[2]);
+                    } catch (NumberFormatException exception) {
+                        Bukkit.getLogger().warning("[rtp] invalid permission: " + node);
+                        continue;
+                    }
+                    cooldownTime = TimeUnit.SECONDS.toNanos(number);
+                    break;
+                }
+            }
+
+            if ((start - lastTime) < cooldownTime){
+                long remaining = (lastTime - start) + cooldownTime;
+                long days = TimeUnit.NANOSECONDS.toDays(remaining);
+                long hours = TimeUnit.NANOSECONDS.toHours(remaining) % 24;
+                long minutes = TimeUnit.NANOSECONDS.toMinutes(remaining) % 60;
+                long seconds = TimeUnit.NANOSECONDS.toSeconds(remaining) % 60;
+                String replacement = "";
+                if (days > 0) replacement += days + configs.lang.getLog("days") + " ";
+                if (days > 0 || hours > 0) replacement += hours + configs.lang.getLog("hours") + " ";
+                if (days > 0 || hours > 0 || minutes > 0) replacement += minutes + configs.lang.getLog("minutes") + " ";
+                replacement += seconds + configs.lang.getLog("seconds");
+                String msg = configs.lang.getLog("cooldownMessage", replacement);
+
+                SendMessage.sendMessage(sender, msg);
+                return true;
+            }
         }
 
         if(rtpArgs.containsKey("near")) {
@@ -269,6 +292,7 @@ public class RTPCmd implements CommandExecutor {
         //prep teleportation
         this.cache.lastTeleportTime.put(player.getUniqueId(), start);
         this.cache.playerFromLocations.put(player.getUniqueId(),player.getLocation());
+        cache.commandSenderLookup.put(player.getUniqueId(),sender);
         SetupTeleport setupTeleport = new SetupTeleport(plugin,sender,player,configs, cache, rsParams);
         if(cache.permRegions.containsKey(rsParams)
                 && cache.permRegions.get(rsParams).hasQueuedLocation(player)
@@ -280,7 +304,6 @@ public class RTPCmd implements CommandExecutor {
             cache.setupTeleports.put(player.getUniqueId(),setupTeleport);
         }
 
-        cache.commandSenderLookup.put(player.getUniqueId(),sender);
         return true;
     }
 }
