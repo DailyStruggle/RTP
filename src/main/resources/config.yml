@@ -60,9 +60,12 @@ refundOnCancel: true
 # if larger than bukkit view distance, uses bukkit view distance
 viewDistance: 10
 
-# price to use near command
-nearSelfPrice: 500
-nearOtherPrice: 2000
+#price to use near parameter
+nearSelfPrice: 500.0
+nearOtherPrice: 2000.0
+
+#price to use biome parameter
+biomePrice: 5000.0
 
 #commands to run after any teleportation
 # e.g.
@@ -85,4 +88,4 @@ stay: 1
 fadeout: 1
 
 #DO NOT TOUCH VERSION NUMBER
-version: 2.2
+version: 2.3

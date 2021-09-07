@@ -26,7 +26,7 @@ default:
     requirePermission: false
     #override shape, radius, center with vanilla worldborder settings
     worldBorderOverride: false
-    #prevent nearby placements by adding pre-loaded chunks to the region's list of bad chunks
+    #prevent nearby placements by adding selected chunks to the region's list of bad chunks
     uniquePlacements: false
     #expand region as locations are removed, keeping a constant number of possible placements
     expand: false

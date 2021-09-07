@@ -14,6 +14,7 @@ import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.block.Biome;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -150,9 +151,11 @@ public class Cache {
     public Location getQueuedLocation(RandomSelectParams rsParams, CommandSender sender, Player player) {
         TeleportRegion region;
         Double price = 0d;
+        boolean didWithdraw = (sender instanceof Player) && currentTeleportCost.containsKey(((Player)sender).getUniqueId());
         if(permRegions.containsKey(rsParams)) {
             region = permRegions.get(rsParams);
-            if(!sender.hasPermission("rtp.free")) {
+
+            if(!sender.hasPermission("rtp.free") && !didWithdraw) {
                 price = (Double) configs.regions.getRegionSetting(region.name, "price", 0.0);
             }
         }
@@ -178,15 +181,16 @@ public class Cache {
     public Location getRandomLocation(RandomSelectParams rsParams, boolean urgent, CommandSender sender, Player player) {
         TeleportRegion region;
         Double price = 0d;
+        boolean didWithdraw = (sender instanceof Player) && currentTeleportCost.containsKey(((Player)sender).getUniqueId());
         if(permRegions.containsKey(rsParams)) {
             region = permRegions.get(rsParams);
-            if(!sender.hasPermission("rtp.free")) {
+            if(!sender.hasPermission("rtp.free") && !didWithdraw) {
                 price = (Double) configs.regions.getRegionSetting(region.name, "price", 0.0);
             }
         }
         else {
             region = new TeleportRegion("temp", rsParams.params, configs, this);
-            if(!sender.hasPermission("rtp.free")) {
+            if(!sender.hasPermission("rtp.free") && !didWithdraw) {
                 price = configs.config.price;
             }
             tempRegions.put(rsParams,region);
@@ -206,7 +210,11 @@ public class Cache {
             }
         }
 
-        Location res = region.getLocation(urgent, sender, player);
+        Location res;
+        if(rsParams.params.containsKey("biome")) {
+            res = region.getLocation(sender,player,Biome.valueOf(rsParams.params.get("biome")));
+        }
+        else res = region.getLocation(urgent, sender, player);
         return res;
     }
 

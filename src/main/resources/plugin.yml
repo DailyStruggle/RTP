@@ -1,5 +1,5 @@
 name: RTP
-version: 1.2.4
+version: 1.2.5
 main: leafcraft.rtp.RTP
 api-version: 1.13
 authors: [ leaf26 ]
@@ -161,6 +161,9 @@ permissions:
   rtp.near:
     description: randomly teleport around your current position
     default: op
+  rtp.near.free:
+    description: use the near parameter for free
+    default: op
   rtp.near.random:
     description: randomly teleport to a random player
     default: op
@@ -174,3 +177,14 @@ permissions:
   rtp.near.notme:
     description: don't let players teleport near me
     default: op
+  rtp.biome:
+    description: teleport to any biome you have permission for
+    default: op
+  rtp.biome.free:
+    description: use the biome parameter for free
+    default: op
+  rtp.biome.*:
+    description: use any biome type
+    default: op
+    children:
+      rtp.biome: true

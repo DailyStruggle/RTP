@@ -21,7 +21,9 @@ public class Config {
 	public final double price;
 	public final boolean rerollLiquid, rerollWorldGuard, rerollGriefPrevention, postTeleportQueueing;
 
-	public final int nearSelfPrice, nearOtherPrice;
+	public final double nearSelfPrice, nearOtherPrice;
+
+	public final double biomePrice;
 
 	public final int invulnerabilityTime;
 
@@ -46,7 +48,7 @@ public class Config {
 		}
 		this.config = YamlConfiguration.loadConfiguration(f);
 
-		if( 	(this.config.getDouble("version") < 2.2) ) {
+		if( 	(this.config.getDouble("version") < 2.3) ) {
 			Bukkit.getLogger().log(Level.WARNING, lang.getLog("oldFile", "config.yml"));
 			update();
 
@@ -66,8 +68,10 @@ public class Config {
 		this.minTPS = config.getInt("minTPS",19);
 		this.price = config.getDouble("price", Double.MAX_VALUE);
 
-		this.nearSelfPrice = config.getInt("nearSelfPrice", Integer.MAX_VALUE);
-		this.nearOtherPrice = config.getInt("nearOtherPrice", Integer.MAX_VALUE);
+		this.nearSelfPrice = config.getDouble("nearSelfPrice", Double.MAX_VALUE);
+		this.nearOtherPrice = config.getDouble("nearOtherPrice", Double.MAX_VALUE);
+
+		this.biomePrice = config.getDouble("biomePrice", Double.MAX_VALUE);
 
 		int vd = config.getInt("viewDistance",10);
 		if(vd > Bukkit.getViewDistance()) vd = Bukkit.getViewDistance();
@@ -125,7 +129,7 @@ public class Config {
 		for (String line : linesInDefaultConfig) {
 			String newline = line;
 			if (line.startsWith("version:")) {
-				newline = "version: 2.2";
+				newline = "version: 2.3";
 			}
 			else if(newline.startsWith("  -")) continue;
 			else {
@@ -137,7 +141,6 @@ public class Config {
 							for(Object obj : Objects.requireNonNull(config.getList(node))) {
 								if(duplicateCheck.contains(obj)) continue;
 								duplicateCheck.add(obj);
-								System.out.println(obj);
 								if(obj instanceof String) newline += "\n  - " + "\"" + obj + "\"";
 								else newline += "\n  - " + obj;
 							}
