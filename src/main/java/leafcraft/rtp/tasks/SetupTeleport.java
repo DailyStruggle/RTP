@@ -10,6 +10,7 @@ import leafcraft.rtp.tools.softdepends.PAPIChecker;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
+import org.bukkit.block.Biome;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.permissions.PermissionAttachmentInfo;
@@ -55,6 +56,20 @@ public class SetupTeleport extends BukkitRunnable {
     }
 
     public void setupTeleportNow(boolean async) {
+        if(rsParams.params.containsKey("biome")) {
+            Biome biome;
+            try {
+                biome = Biome.valueOf(rsParams.params.get("biome"));
+            } catch (IllegalArgumentException | NullPointerException exception) {
+                biome = null;
+            }
+            if(biome == null) {
+                String msg = configs.lang.getLog("badArg", "biome:"+rsParams.params.get("biome"));
+                SendMessage.sendMessage(sender,msg);
+                return;
+            }
+        }
+
         //get a random location according to the parameters
         if (async) location = cache.getRandomLocation(rsParams, true, sender, player);
         else location = cache.getQueuedLocation(rsParams, sender, player);

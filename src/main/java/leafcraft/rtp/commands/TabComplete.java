@@ -4,6 +4,7 @@ import com.comphenix.protocol.PacketType;
 import leafcraft.rtp.tools.Configuration.Configs;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
+import org.bukkit.block.Biome;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
@@ -56,6 +57,7 @@ public class TabComplete implements TabCompleter {
         subCommands.addSubParam("maxY","rtp.params");
         subCommands.addSubParam("requireSkyLight","rtp.params");
         subCommands.addSubParam("worldBorderOverride","rtp.params");
+        subCommands.addSubParam("biome","rtp.biome");
         subCommands.addSubParam("near","rtp.near");
         
         subCommands.commands.put("help",new SubCommand("rtp.see"));
@@ -195,6 +197,12 @@ public class TabComplete implements TabCompleter {
                         res.add(arg+":true");
                         res.add(arg+":false");
                         break;
+                    }
+                    case "biome": {
+                        for(Biome biome : Biome.values()) {
+                            if(sender.hasPermission("rtp.biome.*") || sender.hasPermission("rtp.biome."+biome.name()))
+                                res.add(arg + ":" + biome.name());
+                        }
                     }
                     default: {
                         res.add(arg+":");

@@ -8,10 +8,9 @@ import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.softdepends.PAPIChecker;
 import leafcraft.rtp.tools.softdepends.VaultChecker;
 import net.milkbowl.vault.economy.Economy;
-import net.milkbowl.vault.permission.Permission;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.World;
+import org.bukkit.block.Biome;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -55,6 +54,7 @@ public class RTPCmd implements CommandExecutor {
         this.rtpParams.put("requireSkyLight","rtp.params");
         this.rtpParams.put("worldBorderOverride","rtp.params");
         this.rtpParams.put("near","rtp.near");
+        this.rtpParams.put("biome","rtp.biome");
     }
 
     @Override
@@ -218,10 +218,13 @@ public class RTPCmd implements CommandExecutor {
             Player targetPlayer = Bukkit.getPlayer(playerName);
 
 
-            int price = configs.config.nearSelfPrice;
+            double price = configs.config.nearSelfPrice;
             Economy economy = VaultChecker.getEconomy();
             boolean has = true;
-            if (economy != null && sender instanceof Player) has = economy.has((Player) sender, price);
+            if (economy != null
+                    && sender instanceof Player
+                    && !sender.hasPermission("rtp.near.free"))
+                has = economy.has((Player) sender, price);
 
             if(playerName.equalsIgnoreCase("random") && sender.hasPermission("rtp.near.random")) {
                 Collection<? extends Player> players = Bukkit.getOnlinePlayers();
@@ -270,6 +273,13 @@ public class RTPCmd implements CommandExecutor {
                 return true;
             }
 
+            if(sender instanceof Player
+                    && (economy != null)
+                    && !sender.hasPermission("rtp.near.free")) {
+                economy.withdrawPlayer((Player)sender,price);
+                cache.currentTeleportCost.put(((Player) sender).getUniqueId(), price);
+            }
+
             String shapeStr = (String) configs.worlds.getWorldSetting(worldName, "nearShape", "CIRCLE");
             Integer radius = (Integer) configs.worlds.getWorldSetting(worldName, "nearRadius", 16);
             Integer centerRadius = (Integer) configs.worlds.getWorldSetting(worldName, "nearCenterRadius", 8);
@@ -285,6 +295,45 @@ public class RTPCmd implements CommandExecutor {
             world = targetPlayer.getWorld();
             rtpArgs.putIfAbsent("world", world.getName());
         }
+        else if(rtpArgs.containsKey("biome")) {
+            Biome biome;
+            try {
+                biome = Biome.valueOf(rtpArgs.get("biome"));
+            } catch (IllegalArgumentException | NullPointerException exception) {
+                biome = null;
+            }
+            if(biome == null) {
+                String msg = configs.lang.getLog("badArg", "biome:"+rtpArgs.get("biome"));
+                SendMessage.sendMessage(sender,msg);
+                return true;
+            }
+
+            double price = configs.config.biomePrice;
+            Economy economy = VaultChecker.getEconomy();
+            boolean has = true;
+            if (economy != null
+                    && sender instanceof Player
+                    && !sender.hasPermission("rtp.biome.free"))
+                has = economy.has((Player) sender, price);
+
+            if (!sender.hasPermission("rtp.biome")) {
+                String msg = configs.lang.getLog("noPerms");
+                SendMessage.sendMessage(sender,msg);
+                return true;
+            }
+
+            if(!has) {
+                String msg = configs.lang.getLog("notEnoughMoney",String.valueOf(price));
+                PAPIChecker.fillPlaceholders((Player)sender,msg);
+                SendMessage.sendMessage(sender,msg);
+                return true;
+            }
+
+            if(sender instanceof Player && !sender.hasPermission("rtp.biome.free")) {
+                economy.withdrawPlayer((Player)sender,price);
+                cache.currentTeleportCost.put(((Player) sender).getUniqueId(), price);
+            }
+        }
 
         //set up parameters for selection
         RandomSelectParams rsParams = new RandomSelectParams(world,rtpArgs,configs);
@@ -296,7 +345,8 @@ public class RTPCmd implements CommandExecutor {
         SetupTeleport setupTeleport = new SetupTeleport(plugin,sender,player,configs, cache, rsParams);
         if(cache.permRegions.containsKey(rsParams)
                 && cache.permRegions.get(rsParams).hasQueuedLocation(player)
-                && sender.hasPermission("rtp.noDelay")) {
+                && sender.hasPermission("rtp.noDelay")
+                && !rsParams.params.containsKey("biome")) {
             setupTeleport.setupTeleportNow(false);
         }
         else {
