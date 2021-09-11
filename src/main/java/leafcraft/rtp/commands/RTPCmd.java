@@ -26,6 +26,7 @@ public class RTPCmd implements CommandExecutor {
     private final Configs configs;
     private final Map<String,String> rtpCommands = new HashMap<>();
     private final Map<String,String> rtpParams = new HashMap<>();
+    private final Map<String,CommandExecutor> commandHandles = new HashMap<>();
 
     private final Cache cache;
 
@@ -33,12 +34,6 @@ public class RTPCmd implements CommandExecutor {
         this.plugin = plugin;
         this.configs = configs;
         this.cache = cache;
-
-        this.rtpCommands.put("help","rtp.use");
-        this.rtpCommands.put("reload","rtp.reload");
-        this.rtpCommands.put("setRegion","rtp.setRegion");
-        this.rtpCommands.put("setWorld","rtp.setWorld");
-        this.rtpCommands.put("fill","rtp.fill");
 
         this.rtpParams.put("player", "rtp.other");
         this.rtpParams.put("world", "rtp.world");
@@ -57,6 +52,11 @@ public class RTPCmd implements CommandExecutor {
         this.rtpParams.put("biome","rtp.biome");
     }
 
+    public void addCommandHandle(String command, String perm, CommandExecutor handle) {
+        commandHandles.put(command,handle);
+        rtpCommands.put(command,perm);
+    }
+
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if(!command.getName().equalsIgnoreCase("rtp") && !command.getName().equalsIgnoreCase("wild")) return true;
@@ -66,11 +66,11 @@ public class RTPCmd implements CommandExecutor {
         if(args.length > 0 && rtpCommands.containsKey(args[0])) {
             if(!sender.hasPermission(rtpCommands.get(args[0]))) {
                 String msg = configs.lang.getLog("noPerms");
-                
                 SendMessage.sendMessage(sender,msg);
             }
             else {
-                plugin.getCommand("rtp " + args[0]).execute(sender, label, Arrays.copyOfRange(args, 1, args.length));
+                return commandHandles.get(args[0]).onCommand(sender,command,label,Arrays.copyOfRange(args, 1, args.length));
+//                plugin.getCommand("rtp " + args[0]).execute(sender, label, Arrays.copyOfRange(args, 1, args.length));
             }
             return true;
         }

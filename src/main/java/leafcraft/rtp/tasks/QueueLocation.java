@@ -9,7 +9,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 
 //BukkitTask container for queueing asynchronously
 public class QueueLocation extends BukkitRunnable {
-    private static long counter = 0l;
+    private static long counter = 0L;
     public final long idx;
     private final TeleportRegion region;
     private Player player = null;

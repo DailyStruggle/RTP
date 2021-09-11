@@ -44,6 +44,7 @@ public class RandomSelectParams {
         // fills in any missing values
         this.params.put("world",worldName);
         this.params.putIfAbsent("shape",(String)configs.regions.getRegionSetting(regionName,"shape","CIRCLE"));
+        this.params.putIfAbsent("mode",(String)configs.regions.getRegionSetting(regionName,"mode","ACCUMULATE"));
         this.params.putIfAbsent("radius", (configs.regions.getRegionSetting(regionName,"radius",4096)).toString());
         this.params.putIfAbsent("centerRadius", (configs.regions.getRegionSetting(regionName,"centerRadius",1024)).toString());
         this.params.putIfAbsent("centerX", (configs.regions.getRegionSetting(regionName,"centerX",0)).toString());

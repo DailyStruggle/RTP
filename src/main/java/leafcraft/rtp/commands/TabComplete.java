@@ -2,6 +2,7 @@ package leafcraft.rtp.commands;
 
 import com.comphenix.protocol.PacketType;
 import leafcraft.rtp.tools.Configuration.Configs;
+import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.block.Biome;
@@ -69,6 +70,7 @@ public class TabComplete implements TabCompleter {
         subCommands.commands.get("setRegion").addSubParam("region","rtp.setRegion");
         subCommands.commands.get("setRegion").addSubParam("world","rtp.setRegion");
         subCommands.commands.get("setRegion").addSubParam("shape","rtp.setRegion");
+        subCommands.commands.get("setRegion").addSubParam("mode","rtp.setRegion");
         subCommands.commands.get("setRegion").addSubParam("radius","rtp.setRegion");
         subCommands.commands.get("setRegion").addSubParam("centerRadius","rtp.setRegion");
         subCommands.commands.get("setRegion").addSubParam("centerX","rtp.setRegion");
@@ -123,8 +125,9 @@ public class TabComplete implements TabCompleter {
                 }
                 switch (arg) {
                     case "shape": {
-                        res.add(arg+":CIRCLE");
-                        res.add(arg+":SQUARE");
+                        for(TeleportRegion.Shapes shape : TeleportRegion.Shapes.values()) {
+                            res.add(arg+":"+shape.name());
+                        }
                         break;
                     }
                     case "region" : {
@@ -202,6 +205,11 @@ public class TabComplete implements TabCompleter {
                         for(Biome biome : Biome.values()) {
                             if(sender.hasPermission("rtp.biome.*") || sender.hasPermission("rtp.biome."+biome.name()))
                                 res.add(arg + ":" + biome.name());
+                        }
+                    }
+                    case "mode": {
+                        for(TeleportRegion.Modes mode : TeleportRegion.Modes.values()) {
+                            res.add(arg+":"+mode.name());
                         }
                     }
                     default: {
