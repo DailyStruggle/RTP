@@ -6,6 +6,12 @@ default:
     #shape of bounds
     # CIRCLE, SQUARE - spiral curves
     shape: "CIRCLE"
+    #what selection adjustment method to use
+    # ACCUMULATE - accumulate all bad sectors up to the initial selection (even distribution, slow at large radii)
+    # NEAREST - try nearest non-hit (possible clustering, but fast)
+    # REROLL - reroll early on a known hit (even distribution, non-deterministic time, but still fast)
+    # NONE - don't check if it's a known hit, just load and try (best for massive radii, >50k)
+    mode: "ACCUMULATE"
     #outer radius of selection in chunks
     radius: 256
     #donut hole in center, where players shouldn't land
@@ -36,4 +42,4 @@ default:
     # vault price for player to use this region
     price: 50.0
 
-version: 1.2
+version: 1.3

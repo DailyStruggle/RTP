@@ -14,10 +14,7 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.logging.Level;
 
 public class SetRegion implements CommandExecutor {
@@ -49,6 +46,7 @@ public class SetRegion implements CommandExecutor {
         regionParams.add("expand");
         regionParams.add("queueLen");
         regionParams.add("price");
+        regionParams.add("mode");
     }
 
     @Override
@@ -79,7 +77,7 @@ public class SetRegion implements CommandExecutor {
                 SendMessage.sendMessage(sender,msg);
                 return true;
             }
-            world = Bukkit.getWorld(worldName);
+            world = Objects.requireNonNull(Bukkit.getWorld(worldName));
             switch(world.getEnvironment()) {
                 case NETHER: {
                     regionArgs.putIfAbsent("requireSkyLight", "false");

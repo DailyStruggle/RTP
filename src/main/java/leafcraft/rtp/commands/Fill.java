@@ -172,9 +172,6 @@ public class Fill implements CommandExecutor {
             return true;
         }
 
-        String msg = configs.lang.getLog("startFill", regionName);
-        
-        SendMessage.sendMessage(sender,msg);
         region.startFill(plugin);
         return true;
     }

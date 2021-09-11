@@ -1,6 +1,7 @@
 package leafcraft.rtp.tools.Configuration;
 
 import leafcraft.rtp.RTP;
+import leafcraft.rtp.tools.SendMessage;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Bukkit;
@@ -32,9 +33,9 @@ public class Regions {
         }
         config = YamlConfiguration.loadConfiguration(f);
 
-        if( 	(config.getDouble("version") < 1.2) ) {
+        if( 	(config.getDouble("version") < 1.3) ) {
             String msg = lang.getLog("oldFile", "regions.yml");
-            if(!msg.equals("")) Bukkit.getLogger().log(Level.WARNING, msg);
+            SendMessage.sendMessage(Bukkit.getConsoleSender(),msg);
             FileStuff.renameFiles(plugin,"regions");
             config = YamlConfiguration.loadConfiguration(f);
         }
@@ -47,6 +48,7 @@ public class Regions {
         ConfigurationSection section = config.createSection(name);
         section.set("world","\""+worldName+"\"");
         section.set("shape","\""+params.shape.toString()+"\"");
+        section.set("mode",params.params.getOrDefault("mode",config.getConfigurationSection("default").getString("mode","ACCUMULATE")));
         section.set("radius",params.r);
         section.set("centerRadius",params.cr);
         section.set("centerX",params.cx);
@@ -69,17 +71,26 @@ public class Regions {
         }
 
         if(config.getConfigurationSection(regionName).isString(setting)) {
-            Boolean goodEnum = true;
+            boolean goodEnum = false;
             try {
                 TeleportRegion.Shapes.valueOf(value.toUpperCase(Locale.ROOT));
+                goodEnum = true;
             }
-            catch (IllegalArgumentException ex) {
-                goodEnum = false;
+            catch (IllegalArgumentException ignored) {
+
             }
 
-            if(!goodEnum && Bukkit.getWorld(value) == null)
-                return -2;
-            config.getConfigurationSection(regionName).set(setting,value);
+            try {
+                TeleportRegion.Modes.valueOf(value.toUpperCase(Locale.ROOT));
+                goodEnum = true;
+            }
+            catch (IllegalArgumentException ignored) {
+
+            }
+
+            if(goodEnum || (Bukkit.getWorld(value) != null))
+                config.getConfigurationSection(regionName).set(setting,value);
+            else return -2;
         }
         else if(config.getConfigurationSection(regionName).isInt(setting)) {
             Integer num;
@@ -121,6 +132,7 @@ public class Regions {
 
         String  defaultWorld = config.getConfigurationSection("default").getString("world", "world");
         String  defaultShape = config.getConfigurationSection("default").getString("shape", "SQUARE");
+        String  defaultMode = config.getConfigurationSection("default").getString("mode", "ACCUMULATE");
         Integer defaultRadius = config.getConfigurationSection("default").getInt("radius", 4096);
         Integer defaultCenterRadius = config.getConfigurationSection("default").getInt("centerRadius", 1024);
         Integer defaultCenterX = config.getConfigurationSection("default").getInt("centerX", 0);
@@ -157,6 +169,7 @@ public class Regions {
                         linesInRegions.add(regionName + ":");
                         linesInRegions.add("    world: \"" + regionSection.getString("world",defaultWorld) + "\"");
                         linesInRegions.add("    shape: \"" + regionSection.getString("shape",defaultShape) + "\"");
+                        linesInRegions.add("    mode: \"" + regionSection.getString("mode",defaultMode) + "\"");
                         linesInRegions.add("    radius: " + regionSection.getInt("radius",defaultRadius));
                         linesInRegions.add("    centerRadius: " + regionSection.getInt("centerRadius",defaultCenterRadius));
                         linesInRegions.add("    centerX: " + regionSection.getInt("centerX",defaultCenterX));
@@ -178,6 +191,8 @@ public class Regions {
                         s = "    world: " + quotes + config.getConfigurationSection(region).getString("world",defaultWorld) + quotes;
                     else if(s.startsWith("    shape:"))
                         s = "    shape: " + quotes + config.getConfigurationSection(region).getString("shape",defaultShape) + quotes;
+                    else if(s.startsWith("    mode:"))
+                        s = "    mode: " + quotes + config.getConfigurationSection(region).getString("mode",defaultMode) + quotes;
                     else if(s.startsWith("    radius:"))
                         s = "    radius: " + config.getConfigurationSection(region).getInt("radius",defaultRadius);
                     else if(s.startsWith("    centerRadius:"))

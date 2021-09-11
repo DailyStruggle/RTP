@@ -23,13 +23,13 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
 
 public class TeleportRegion {
     private static final Set<String> regionParams = new HashSet<>();
     static {
         regionParams.add("world");
         regionParams.add("shape");
+        regionParams.add("mode");
         regionParams.add("radius");
         regionParams.add("centerRadius");
         regionParams.add("centerX");
@@ -88,23 +88,35 @@ public class TeleportRegion {
 
         public FillTask(RTP plugin) {
             this.plugin = plugin;
-            this.chunks = new ArrayList<>(5000);
+            this.chunks = new ArrayList<>(2500);
         }
 
         @Override
         public void run() {
-//            if(TPS.getTPS()<configs.config.minTPS) {
-//                fillTask = new FillTask(plugin);
-//                fillTask.runTaskLaterAsynchronously(plugin,20);
-//                return;
-//            }
+            if(TPS.getTPS()<configs.config.minTPS) {
+                fillTask = new FillTask(plugin);
+                fillTask.runTaskLaterAsynchronously(plugin,20);
+                return;
+            }
 
             long it = fillIterator.get();
-            AtomicInteger completion = new AtomicInteger(5000);
+            AtomicInteger completion = new AtomicInteger(2500);
 //            AtomicLong max = new AtomicLong((long) ((expand) ? totalSpace : totalSpace - badLocationSum.get()));
             AtomicLong max = new AtomicLong((long) totalSpace);
             long itStop = it + completion.get();
             AtomicBoolean completed = new AtomicBoolean(false);
+
+            String msg = configs.lang.getLog("fillStatus");
+            msg = msg.replace("[num]", String.valueOf(it));
+            msg = msg.replace("[total]", String.valueOf(max.get()));
+            msg = msg.replace("[region]", name);
+
+            SendMessage.sendMessage(Bukkit.getConsoleSender(),msg);
+            for(Player player : Bukkit.getOnlinePlayers()) {
+                if (player.hasPermission("rtp.fill")) SendMessage.sendMessage(player, msg);
+            }
+
+
             for(; it < itStop; it++) {
                 if(cancelled) return;
                 long shiftedIt = it;
@@ -115,10 +127,14 @@ public class TeleportRegion {
 //                }
 
                 if (it > max.get()) {
-                    String msg = "[rtp] completed " + (it-1) + "/" + max.get() + " chunks in region:"+name;
-                    Bukkit.getLogger().log(Level.INFO, msg);
+                    msg = configs.lang.getLog("fillStatus");
+                    msg = msg.replace("[num]", String.valueOf(it-1));
+                    msg = msg.replace("[total]", String.valueOf(max.get()));
+                    msg = msg.replace("[region]", name);
+
+                    SendMessage.sendMessage(Bukkit.getConsoleSender(),msg);
                     for(Player player : Bukkit.getOnlinePlayers()) {
-                        if(player.hasPermission("rtp.fill")) SendMessage.sendMessage(player,msg);
+                        if (player.hasPermission("rtp.fill")) SendMessage.sendMessage(player, msg);
                     }
                     fillTask = null;
                     return;
@@ -134,26 +150,23 @@ public class TeleportRegion {
 //                max.set((long) ((expand) ? totalSpace : totalSpace - badLocationSum.get()));
 //                Bukkit.getLogger().warning("added chunk: " + finalShiftedIt);
                 cfChunk.whenCompleteAsync((chunk, throwable) -> {
-                    ChunkSnapshot chunkSnapshot = chunk.getChunkSnapshot(false,true,false);
-                    int y = getFirstNonAir(chunkSnapshot);
-                    y = getLastNonAir(chunkSnapshot,y);
+                    if(!mode.equals(Modes.NONE)) {
+                        ChunkSnapshot chunkSnapshot = chunk.getChunkSnapshot(false, true, false);
+                        int y = getFirstNonAir(chunkSnapshot);
+                        y = getLastNonAir(chunkSnapshot, y);
 
-                    if(!checkLocation(chunkSnapshot,y)) {
-                        addBadLocation(finalShiftedIt);
+                        if (!checkLocation(chunkSnapshot, y)) {
+                            addBadLocation(finalShiftedIt);
+                        } else {
+                            addBiomeLocation(finalShiftedIt, chunkSnapshot.getBiome(7, 7));
+                        }
                     }
-                    else {
-                        addBiomeLocation(finalShiftedIt, chunkSnapshot.getBiome(7,7));
-                    }
+
                     fillIterator.incrementAndGet();
                     if(completion.decrementAndGet() <3 && !cancelled && !completed.getAndSet(true)) {
-                        String msg = "[rtp] completed " + fillIterator.get() + "/" + max.get() + " chunks in region:"+name;
-                        Bukkit.getLogger().log(Level.INFO, msg);
-                        for(Player player : Bukkit.getOnlinePlayers()) {
-                            if(player.hasPermission("rtp.fill")) SendMessage.sendMessage(player,msg);
-                        }
-
                         fillTask = new FillTask(plugin);
-                        fillTask.runTaskLaterAsynchronously(plugin,5);
+                        fillTask.runTaskLaterAsynchronously(plugin,10);
+                        if(!mode.equals(Modes.NONE)) storeFile();
                     }
                 });
                 cfChunk.whenComplete((chunk, throwable) -> {
@@ -213,13 +226,16 @@ public class TeleportRegion {
 
     //list of bad chunks in this region to avoid retries
     private ConcurrentSkipListMap<Long,Long> badLocations = new ConcurrentSkipListMap<>();
-    private final AtomicLong badLocationSum = new AtomicLong(0l);
+    private final AtomicLong badLocationSum = new AtomicLong(0L);
 
     private final ConcurrentHashMap<Biome,ConcurrentSkipListMap<Long,Long>> biomeLocations = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Biome,AtomicLong> biomeLengths = new ConcurrentHashMap<>();
 
     public enum Shapes{SQUARE,CIRCLE}
     public Shapes shape;
+
+    public enum Modes{ACCUMULATE,NEAREST,REROLL,NONE}
+    public Modes mode;
 
     private final double weight;
 
@@ -242,6 +258,7 @@ public class TeleportRegion {
 
         String shapeStr =   params.get("shape");
         String rStr =       params.get("radius");
+        String modeStr =    params.get("mode");
         String crStr =      params.get("centerRadius");
         String cxStr =      params.get("centerX");
         String czStr =      params.get("centerZ");
@@ -265,10 +282,17 @@ public class TeleportRegion {
         expand = Boolean.parseBoolean(expandStr);
 
         try{
-            this.shape = TeleportRegion.Shapes.valueOf(shapeStr.toUpperCase(Locale.ENGLISH));
+            this.shape = Shapes.valueOf(shapeStr.toUpperCase(Locale.ENGLISH));
         }
         catch (IllegalArgumentException exception) {
-            this.shape = TeleportRegion.Shapes.CIRCLE;
+            this.shape = Shapes.CIRCLE;
+        }
+
+        try {
+            this.mode = Modes.valueOf(modeStr.toUpperCase(Locale.ENGLISH));
+        }
+        catch (IllegalArgumentException exception) {
+            this.mode = Modes.ACCUMULATE;
         }
 
         this.totalSpace = (r-cr)*(r+cr);
@@ -295,14 +319,26 @@ public class TeleportRegion {
         badLocationSum.set(0);
 
         //start filling
-        fillIterator = new AtomicLong(0l);
+        fillIterator = new AtomicLong(0L);
         fillTask = new FillTask(plugin);
         fillTask.runTaskAsynchronously(plugin);
+
+        String msg = configs.lang.getLog("startFill", name);
+        SendMessage.sendMessage(Bukkit.getConsoleSender(),msg);
+        for(Player player : Bukkit.getOnlinePlayers()) {
+            if (player.hasPermission("rtp.fill")) SendMessage.sendMessage(player, msg);
+        }
     }
 
     public void stopFill() {
         fillTask.cancel();
         fillTask = null;
+
+        String msg = configs.lang.getLog("fillCancel", name);
+        SendMessage.sendMessage(Bukkit.getConsoleSender(),msg);
+        for(Player player : Bukkit.getOnlinePlayers()) {
+            if (player.hasPermission("rtp.fill")) SendMessage.sendMessage(player, msg);
+        }
     }
 
     public boolean hasQueuedLocation(Player player) {
@@ -415,6 +451,7 @@ public class TeleportRegion {
                             Bukkit.getScheduler().runTask(plugin, () -> chunk.setForceLoaded(true));
                             cache.forceLoadedChunks.put(new HashableChunk(chunk),0L);
                         }
+                        addBiomeLocation(chunk.getX(),chunk.getZ(),world.getBiome(chunk.getX()*16+7,chunk.getZ()*16+7));
                     });
                 }
                 if (uniquePlacements) {
@@ -559,7 +596,7 @@ public class TeleportRegion {
         if(location > (totalSpace+(expand?badLocationSum.get():0))) return;
 
         biomeLocations.putIfAbsent(biome, new ConcurrentSkipListMap<>());
-        ConcurrentSkipListMap map = biomeLocations.get(biome);
+        ConcurrentSkipListMap<Long, Long> map = biomeLocations.get(biome);
 
         Map.Entry<Long,Long> lower = map.floorEntry(location);
         Map.Entry<Long,Long> upper = map.ceilingEntry(location);
@@ -594,7 +631,7 @@ public class TeleportRegion {
         if(location > (totalSpace+(expand?badLocationSum.get():0))) return;
 
         biomeLocations.putIfAbsent(biome, new ConcurrentSkipListMap<>());
-        ConcurrentSkipListMap map = biomeLocations.get(biome);
+        ConcurrentSkipListMap<Long, Long> map = biomeLocations.get(biome);
         biomeLengths.putIfAbsent(biome,new AtomicLong(0L));
         biomeLengths.get(biome).decrementAndGet();
         if(biomeLengths.get(biome).get()<0L) biomeLengths.get(biome).set(0L);
@@ -623,6 +660,7 @@ public class TeleportRegion {
     }
 
     private Location getRandomLocation(boolean urgent,Biome biome) {
+        long totalTimeStart = System.nanoTime();
         Location res = new Location(world,0,this.maxY,0);
 
         double selectTime = 0D;
@@ -636,14 +674,14 @@ public class TeleportRegion {
         boolean goodLocation = false;
         while(numAttempts < maxAttempts && !goodLocation) {
             numAttempts++;
-            long start = System.currentTimeMillis();
+            long start = System.nanoTime();
             long location = select();
 
             //if biome is available, try it
             if(biome != null && biomeLocations.containsKey(biome) && biomeLengths.get(biome).get()>0) {
                 //get nearest spot according to biome list
                 ConcurrentSkipListMap<Long,Long> map = biomeLocations.get(biome);
-                Map.Entry<Long, Long> lower = map.lowerEntry(location);
+                Map.Entry<Long, Long> lower = map.floorEntry(location);
                 Map.Entry<Long, Long> upper = map.ceilingEntry(location);
 
                 Map.Entry<Long, Long> idx;
@@ -653,7 +691,7 @@ public class TeleportRegion {
                 else if(lower == null) {
                     idx = upper;
                 }
-                else if(upper.getKey()==lower.getKey()) {
+                else if(upper.getKey().equals(lower.getKey())) {
                     idx = lower;
                 }
                 else {
@@ -672,24 +710,82 @@ public class TeleportRegion {
             }
 
             if(biome == null) {
-                Map.Entry<Long,Long> idx = badLocations.firstEntry();
-                while((idx!=null) && (location>=idx.getKey() || isKnownBad(location))) {
-                    location += idx.getValue();
-                    idx = badLocations.ceilingEntry(idx.getKey()+idx.getValue());
+                switch (mode) {
+                    case ACCUMULATE: {
+                        Map.Entry<Long, Long> idx = badLocations.firstEntry();
+                        while ((idx != null) && (location >= idx.getKey() || isKnownBad(location))) {
+                            location += idx.getValue();
+                            idx = badLocations.ceilingEntry(idx.getKey() + idx.getValue());
+                        }
+                    }
+                    case NEAREST: {
+                        ConcurrentSkipListMap<Long,Long> map = badLocations;
+                        Map.Entry<Long, Long> check = map.floorEntry(location);
+
+                        if(     (check!=null)
+                                && (location >= check.getKey())
+                                && (location < (check.getKey()+check.getValue()))) {
+                            Map.Entry<Long, Long> lower = map.floorEntry(check.getKey()-1);
+                            Map.Entry<Long, Long> upper = map.ceilingEntry(check.getKey()+check.getValue());
+
+                            if(upper == null) {
+                                if(lower == null) {
+                                    long cutout = check.getValue();
+                                    location = ThreadLocalRandom.current().nextLong((long) (totalSpace - cutout));
+                                    if (location >= check.getKey()) location += check.getValue();
+                                }
+                                else {
+                                    long len = check.getKey() - (lower.getKey()+lower.getValue());
+                                    location = (len <= 0) ? 0 : ThreadLocalRandom.current().nextLong(len);
+                                    location += lower.getKey() + lower.getValue();
+                                }
+                            }
+                            else if(lower == null) {
+                                long len = upper.getKey() - (check.getKey()+check.getValue());
+                                location = (len <= 0) ? 0 : ThreadLocalRandom.current().nextLong(len);
+                                location += check.getKey() + check.getValue();
+                            }
+                            else {
+                                long d1 = (upper.getKey()-location);
+                                long d2 = location - (lower.getKey()+lower.getValue());
+                                if(d2>d1) {
+                                    long len = check.getKey() - (lower.getKey()+lower.getValue());
+                                    location = (len <= 0) ? 0 : ThreadLocalRandom.current().nextLong(len);
+                                    location += lower.getKey() + lower.getValue();
+                                }
+                                else {
+                                    long len = upper.getKey() - (check.getKey()+check.getValue());
+                                    location = (len <= 0) ? 0 : ThreadLocalRandom.current().nextLong(len);
+                                    location += check.getKey() + check.getValue();
+                                }
+                            }
+                        }
+                    }
+                    case REROLL: {
+                        Map.Entry<Long, Long> check = badLocations.floorEntry(location);
+                        if(     (check!=null)
+                                && (location > check.getKey())
+                                && (location < check.getKey()+check.getValue())) {
+                            continue;
+                        }
+                    }
+                    default: {
+
+                    }
                 }
             }
 
-            int[] xzChunk = shape.equals(TeleportRegion.Shapes.SQUARE) ?
+            int[] xzChunk = shape.equals(Shapes.SQUARE) ?
                     (Translate.squareLocationToXZ(cr, cx, cz, location)) :
                     (Translate.circleLocationToXZ(cr, cx, cz, location));
 
             xz[0] = (xzChunk[0]*16)+7;
             xz[1] = (xzChunk[1]*16)+7;
 
-            long stop = System.currentTimeMillis();
+            long stop = System.nanoTime();
             selectTime += (stop-start);
 
-            start = System.currentTimeMillis();
+            start = System.nanoTime();
             CompletableFuture<Chunk> cfChunk = (urgent) ?
                     PaperLib.getChunkAtAsyncUrgently(world,xzChunk[0],xzChunk[1],true) :
                     PaperLib.getChunkAtAsync(world,xzChunk[0],xzChunk[1],true);
@@ -699,11 +795,11 @@ public class TeleportRegion {
             Chunk chunk;
             ChunkSnapshot chunkSnapshot;
             try {
-                chunk = cfChunk.get(); //wait on chunk load/gen
+                chunk = cfChunk.get(5,TimeUnit.SECONDS); //wait on chunk load/gen
             } catch (ExecutionException e) {
                 e.printStackTrace();
                 return null;
-            } catch (InterruptedException | CancellationException | StackOverflowError e) {
+            } catch (InterruptedException | CancellationException | StackOverflowError | TimeoutException e) {
                 return null;
             }
             currChunks.remove(hashableChunk);
@@ -713,19 +809,19 @@ public class TeleportRegion {
             }
             chunkSnapshot = chunk.getChunkSnapshot();
 
-            stop = System.currentTimeMillis();
+            stop = System.nanoTime();
             chunkTime += (stop-start);
 
-            start = System.currentTimeMillis();
+            start = System.nanoTime();
             int y = this.getFirstNonAir(chunkSnapshot);
             y = this.getLastNonAir(chunkSnapshot,y);
             res = new Location(world,xz[0],y,xz[1]);
-            stop = System.currentTimeMillis();
+            stop = System.nanoTime();
             yTime += (stop - start);
 
             goodLocation = checkLocation(chunkSnapshot,y);
             if(goodLocation) addBiomeLocation(location,currBiome);
-            else {
+            else if(!mode.equals(Modes.NONE)) {
                 addBadLocation(location);
                 removeBiomeLocation(location,currBiome);
             }
@@ -742,9 +838,10 @@ public class TeleportRegion {
         this.cache.numTeleportAttempts.put(res, numAttempts);
         addChunks(res, urgent);
 
-//        Bukkit.getLogger().warning(ChatColor.AQUA + "AVG TIME SPENT ON SELECTION: " + selectTime/numAttempts);
-//        Bukkit.getLogger().warning(ChatColor.LIGHT_PURPLE + "AVG TIME SPENT ON CHUNKS: " + chunkTime/numAttempts);
-//        Bukkit.getLogger().warning(ChatColor.GREEN + "AVG TIME SPENT ON BLOCKS: " + yTime/numAttempts);
+//        Bukkit.getLogger().warning(ChatColor.AQUA + "TOTAL TIME SPENT ON SELECTION: " + (selectTime)/1000000 + "ms");
+//        Bukkit.getLogger().warning(ChatColor.LIGHT_PURPLE + "TOTAL TIME SPENT ON CHUNKS: " + (chunkTime)/1000000 + "ms");
+//        Bukkit.getLogger().warning(ChatColor.GREEN + "TOTAL TIME SPENT ON BLOCKS: " + (yTime)/1000000 + "ms");
+//        Bukkit.getLogger().warning(ChatColor.WHITE + "TOTAL TIME IN SELECTION FUNCTION: " + (System.nanoTime()-totalTimeStart)/1000000 + "ms");
 
         return res;
     }

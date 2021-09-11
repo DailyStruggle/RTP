@@ -1,6 +1,7 @@
 package leafcraft.rtp.tools.Configuration;
 
 import leafcraft.rtp.RTP;
+import leafcraft.rtp.tools.SendMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -13,6 +14,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Scanner;
+import java.util.UUID;
 import java.util.logging.Level;
 
 public class Lang {
@@ -38,7 +40,7 @@ public class Lang {
     public String getLog(String key) {
         String msg = this.config.getString(key,"");
         if(msg == null) return "";
-        msg = ChatColor.translateAlternateColorCodes('&',msg);
+        msg = SendMessage.format(Bukkit.getOfflinePlayer(new UUID(0,0)).getPlayer(),msg);
         return msg;
     }
 
@@ -59,6 +61,9 @@ public class Lang {
             case "noPerms": replace = "[arg]"; break;
             case "notEnoughMoney": replace = "[money]"; break;
             case "startFill" :
+            case "fillCancel" :
+            case "fillNotRunning" :
+            case "fillStatus" :
             case "fillRunning": replace = "[region]"; break;
             default: replace = "[placeholder]";
         }

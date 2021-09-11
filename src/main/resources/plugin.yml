@@ -1,5 +1,5 @@
 name: RTP
-version: 1.2.5
+version: 1.2.6
 main: leafcraft.rtp.RTP
 api-version: 1.13
 authors: [ leaf26 ]
@@ -22,26 +22,26 @@ commands:
     permission: rtp.see
     usage: |
       /rtp help
-  rtp reload:
-    description: Reload the plugin configuration files
-    permission: rtp.reload
-    usage: |
-      /rtp reload
-  rtp setWorld:
-    description: update rtp world settings
-    permission: rtp.setWorld
-    usage: |
-      /rtp setWorld
-  rtp setRegion:
-    description: create or modify a rtp region
-    permission: rtp.setRegion
-    usage: |
-      /rtp setRegion
-  rtp fill:
-    description: attempt each location in region once
-    permission: rtp.fill
-    usage: |
-      /rtp fill
+#  rtp reload:
+#    description: Reload the plugin configuration files
+#    permission: rtp.reload
+#    usage: |
+#      /rtp reload
+#  rtp setWorld:
+#    description: update rtp world settings
+#    permission: rtp.setWorld
+#    usage: |
+#      /rtp setWorld
+#  rtp setRegion:
+#    description: create or modify a rtp region
+#    permission: rtp.setRegion
+#    usage: |
+#      /rtp setRegion
+#  rtp fill:
+#    description: attempt each location in region once
+#    permission: rtp.fill
+#    usage: |
+#      /rtp fill
 
 permissions:
   rtp.*:

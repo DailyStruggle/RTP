@@ -21,6 +21,7 @@ import org.bukkit.plugin.java.JavaPluginLoader;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 public final class RTP extends JavaPlugin {
     private Configs configs;
@@ -49,16 +50,38 @@ public final class RTP extends JavaPlugin {
         this.configs = new Configs(this);
         this.cache = new Cache(this,configs);
 
-        getCommand("wild").setExecutor(new RTPCmd(this, configs, cache));
-        getCommand("rtp").setExecutor(new RTPCmd(this, configs, cache));
-        getCommand("rtp help").setExecutor(new Help(configs));
-        getCommand("rtp reload").setExecutor(new Reload(configs, cache));
-        getCommand("rtp setRegion").setExecutor(new SetRegion(this,configs, cache));
-        getCommand("rtp setWorld").setExecutor(new SetWorld(this,configs, cache));
-        getCommand("rtp fill").setExecutor(new Fill(this,configs, cache));
+        RTPCmd rtpCmd = new RTPCmd(this,configs,cache);
+        Help help = new Help(configs);
+        Reload reload = new Reload(configs, cache);
+        SetRegion setRegion = new SetRegion(this,configs, cache);
+        SetWorld setWorld = new SetWorld(this,configs, cache);
+        Fill fill = new Fill(this,configs, cache);
 
-        getCommand("rtp").setTabCompleter(new TabComplete(this.configs));
-        getCommand("wild").setTabCompleter(new TabComplete(this.configs));
+        try {
+            Objects.requireNonNull(getCommand("wild")).setExecutor(rtpCmd);
+            Objects.requireNonNull(getCommand("rtp")).setExecutor(rtpCmd);
+        }
+        catch (NullPointerException ignored) { }
+
+        try {
+            Objects.requireNonNull(getCommand("rtp")).setTabCompleter(new TabComplete(this.configs));
+            Objects.requireNonNull(getCommand("wild")).setTabCompleter(new TabComplete(this.configs));
+        }
+        catch (NullPointerException ignored) { }
+
+        rtpCmd.addCommandHandle("help", "rtp.help", help);
+        rtpCmd.addCommandHandle("reload", "rtp.reload", reload);
+        rtpCmd.addCommandHandle("setRegion", "rtp.setRegion", setRegion);
+        rtpCmd.addCommandHandle("setWorld", "rtp.setWorld", setWorld);
+        rtpCmd.addCommandHandle("fill", "rtp.fill", fill);
+
+//        try {
+//            Objects.requireNonNull(getCommand("rtp help")).setExecutor(help);
+//            Objects.requireNonNull(getCommand("rtp reload")).setExecutor(reload);
+//            Objects.requireNonNull(getCommand("rtp setRegion")).setExecutor(setRegion);
+//            Objects.requireNonNull(getCommand("rtp setWorld")).setExecutor(setWorld);
+//            Objects.requireNonNull(getCommand("rtp fill")).setExecutor(fill);
+//        } catch (NullPointerException ignored) { }
 
         getServer().getPluginManager().registerEvents(new OnPlayerMove(this,configs,cache),this);
         getServer().getPluginManager().registerEvents(new OnPlayerTeleport(this,configs,cache),this);

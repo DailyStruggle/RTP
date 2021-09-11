@@ -5,7 +5,7 @@ public class TranslateTest {
 
     @Test
     public void translateTest() {
-        long len = 100l;
+        long len = 100L;
 
         int[] xz = {500,0};
         int[] xzRes;
