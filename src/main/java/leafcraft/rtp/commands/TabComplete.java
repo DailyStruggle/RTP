@@ -206,11 +206,13 @@ public class TabComplete implements TabCompleter {
                             if(sender.hasPermission("rtp.biome.*") || sender.hasPermission("rtp.biome."+biome.name()))
                                 res.add(arg + ":" + biome.name());
                         }
+                        break;
                     }
                     case "mode": {
                         for(TeleportRegion.Modes mode : TeleportRegion.Modes.values()) {
                             res.add(arg+":"+mode.name());
                         }
+                        break;
                     }
                     default: {
                         res.add(arg+":");
