@@ -58,7 +58,7 @@ public final class OnPlayerDeath implements Listener {
         Location to = cache.todoTP.get(player.getUniqueId());
         if(to == null) return;
 
-        TeleportCancelEvent teleportCancelEvent = new TeleportCancelEvent(sender,player,to);
+        TeleportCancelEvent teleportCancelEvent = new TeleportCancelEvent(sender,player,to,event.isAsynchronous());
         Bukkit.getPluginManager().callEvent(teleportCancelEvent);
 
     }

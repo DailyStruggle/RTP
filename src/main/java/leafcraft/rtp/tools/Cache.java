@@ -8,7 +8,6 @@ import leafcraft.rtp.tasks.SetupTeleport;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
-import leafcraft.rtp.tools.softdepends.PAPIChecker;
 import leafcraft.rtp.tools.softdepends.VaultChecker;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
@@ -16,7 +15,6 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.block.Biome;
 import org.bukkit.command.CommandSender;
-import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
@@ -46,7 +44,7 @@ public class Cache {
             Map<String,String> map = new HashMap<>();
             map.put("region",region);
             RandomSelectParams key = new RandomSelectParams(world,map,configs);
-            TeleportRegion teleportRegion = new TeleportRegion(region,key.params,configs,this);
+            TeleportRegion teleportRegion = new TeleportRegion(region,key.params, plugin, configs,this);
             permRegions.put(key, teleportRegion);
             teleportRegion.loadFile();
         }
@@ -189,7 +187,7 @@ public class Cache {
             }
         }
         else {
-            region = new TeleportRegion("temp", rsParams.params, configs, this);
+            region = new TeleportRegion("temp", rsParams.params, plugin, configs, this);
             if(!sender.hasPermission("rtp.free") && !didWithdraw) {
                 price = configs.config.price;
             }
@@ -243,7 +241,7 @@ public class Cache {
             Map<String,String> map = new HashMap<>();
             map.put("region",region);
             RandomSelectParams key = new RandomSelectParams(world,map,configs);
-            TeleportRegion teleportRegion = new TeleportRegion(region, key.params,configs,this);
+            TeleportRegion teleportRegion = new TeleportRegion(region, key.params, plugin, configs,this);
             permRegions.put(key, teleportRegion);
             teleportRegion.loadFile();
         }

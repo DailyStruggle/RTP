@@ -2,6 +2,10 @@ package leafcraft.rtp.tools.selection;
 
 import io.papermc.lib.PaperLib;
 import leafcraft.rtp.RTP;
+import leafcraft.rtp.customEvents.LoadChunksPlayerEvent;
+import leafcraft.rtp.customEvents.LoadChunksQueueEvent;
+import leafcraft.rtp.customEvents.RandomSelectPlayerEvent;
+import leafcraft.rtp.customEvents.RandomSelectQueueEvent;
 import leafcraft.rtp.tools.*;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.softdepends.GriefPreventionChecker;
@@ -119,12 +123,6 @@ public class TeleportRegion {
 
             for(; it < itStop; it++) {
                 if(cancelled) return;
-                long shiftedIt = it;
-//                Map.Entry<Long,Long> idx = badLocations.firstEntry();
-//                while((idx !=null) && (it >= idx.getKey())) {
-//                    shiftedIt += idx.getValue();
-//                    idx = badLocations.ceilingEntry(idx.getKey()+idx.getValue());
-//                }
 
                 if (it > max.get()) {
                     msg = configs.lang.getLog("fillStatus");
@@ -141,11 +139,12 @@ public class TeleportRegion {
                 }
 
                 int[] xz = (shape.equals(Shapes.SQUARE)) ?
-                        Translate.squareLocationToXZ(cr,cx,cz,shiftedIt) :
-                        Translate.circleLocationToXZ(cr,cx,cz,shiftedIt);
-                CompletableFuture<Chunk> cfChunk = PaperLib.getChunkAtAsync(world,xz[0],xz[1],true);
+                        Translate.squareLocationToXZ(cr,cx,cz, it) :
+                        Translate.circleLocationToXZ(cr,cx,cz, it);
+                if(cancelled) return;
+                CompletableFuture<Chunk> cfChunk = PaperLib.getChunkAtAsync(Objects.requireNonNull(world),xz[0],xz[1],true);
                 this.chunks.add(cfChunk);
-                final long finalShiftedIt = shiftedIt;
+                final long finalShiftedIt = it;
                 max.set((long)totalSpace);
 //                max.set((long) ((expand) ? totalSpace : totalSpace - badLocationSum.get()));
 //                Bukkit.getLogger().warning("added chunk: " + finalShiftedIt);
@@ -170,7 +169,8 @@ public class TeleportRegion {
                     }
                 });
                 cfChunk.whenComplete((chunk, throwable) -> {
-                    if(completion.get() == 0 || cancelled || fillIterator.get()==max.get()) {
+                    if(cancelled) return;
+                    if(completion.get() == 0 || fillIterator.get()==max.get()) {
                         world.save();
                     }
                 });
@@ -210,6 +210,7 @@ public class TeleportRegion {
 
     public String name;
 
+    private final RTP plugin;
     private final Configs configs;
     private final Cache cache;
 
@@ -248,8 +249,9 @@ public class TeleportRegion {
     private AtomicLong fillIterator;
     private FillTask fillTask = null;
 
-    public TeleportRegion(String name, Map<String,String> params, Configs configs, Cache cache) {
+    public TeleportRegion(String name, Map<String, String> params, RTP plugin, Configs configs, Cache cache) {
         this.name = name;
+        this.plugin = plugin;
         this.configs = configs;
         this.cache = cache;
         String worldName = params.getOrDefault("world","world");
@@ -332,7 +334,6 @@ public class TeleportRegion {
 
     public void stopFill() {
         fillTask.cancel();
-        fillTask = null;
 
         String msg = configs.lang.getLog("fillCancel", name);
         SendMessage.sendMessage(Bukkit.getConsoleSender(),msg);
@@ -419,6 +420,8 @@ public class TeleportRegion {
                     String msg = PAPIChecker.fillPlaceholders(player,configs.lang.getLog("unsafe",maxAttempts.toString()));
                     SendMessage.sendMessage(sender,player,msg);
                 }
+                RandomSelectPlayerEvent randomSelectPlayerEvent = new RandomSelectPlayerEvent(res);
+                Bukkit.getScheduler().runTask(plugin, () -> Bukkit.getPluginManager().callEvent(randomSelectPlayerEvent));
             }
             else {
                 String msg = PAPIChecker.fillPlaceholders(player,configs.lang.getLog("noLocationsQueued"));
@@ -482,10 +485,14 @@ public class TeleportRegion {
         if(locationQueue.size() >= queueLen) return;
 
         Location location = getRandomLocation(false);
+        RandomSelectQueueEvent randomSelectQueueEvent = new RandomSelectQueueEvent(location);
+        Bukkit.getScheduler().runTask(plugin, () -> Bukkit.getPluginManager().callEvent(randomSelectQueueEvent));
         if(location == null) {
             return;
         }
         ChunkSet chunkSet = getChunks(location);
+        LoadChunksQueueEvent loadChunksQueueEvent = new LoadChunksQueueEvent(location,chunkSet.chunks);
+        Bukkit.getPluginManager().callEvent(loadChunksQueueEvent);
         if(chunkSet.completed.get()>=chunkSet.expectedSize-1) {
             queueLocation(location);
         }
@@ -494,7 +501,6 @@ public class TeleportRegion {
             for (CompletableFuture<Chunk> cfChunk : chunkSet.chunks) {
                 cfChunk.whenCompleteAsync((chunk, throwable) -> {
                     if (chunkSet.completed.get() >= chunkSet.expectedSize-1 && !added.getAndSet(true)) {
-//                        Bukkit.getLogger().warning("adding public location");
                         queueLocation(location);
                     }
                 });

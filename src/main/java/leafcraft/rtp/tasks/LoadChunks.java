@@ -2,6 +2,7 @@ package leafcraft.rtp.tasks;
 
 import io.papermc.lib.PaperLib;
 import leafcraft.rtp.RTP;
+import leafcraft.rtp.customEvents.LoadChunksPlayerEvent;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.SendMessage;
@@ -84,16 +85,19 @@ public class LoadChunks extends BukkitRunnable {
 
     public void loadChunksNow(boolean async) {
         if(chunkSet.completed.get() < chunkSet.expectedSize) {
-            if(sender.hasPermission("rtp.noDelay") && i==-vd && j==-vd) {
-                String msg = configs.lang.getLog("chunkLoading");
-                SendMessage.sendMessage(sender,player,msg);
+            if(i==-vd && j==-vd) {
+                if(sender.hasPermission("rtp.noDelay")) {
+                    String msg = configs.lang.getLog("chunkLoading");
+                    SendMessage.sendMessage(sender, player, msg);
+                }
+                LoadChunksPlayerEvent loadChunksPlayerEvent = new LoadChunksPlayerEvent(location,chunkSet.chunks);
+                Bukkit.getPluginManager().callEvent(loadChunksPlayerEvent);
             }
 
             if (PaperLib.isPaper()) {
                 for (CompletableFuture<Chunk> chunk : chunkSet.chunks) {
                     if (cancelled) break;
-                    if (chunk.isDone()) continue;
-                    else {
+                    if (!chunk.isDone() && !chunk.isCancelled()) {
                         try {
                             chunk.get();
                         } catch (InterruptedException | CancellationException e) {
