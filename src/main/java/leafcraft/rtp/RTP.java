@@ -2,6 +2,7 @@ package leafcraft.rtp;
 
 import io.papermc.lib.PaperLib;
 import leafcraft.rtp.commands.*;
+import leafcraft.rtp.customEventListeners.OnRandomPreTeleport;
 import leafcraft.rtp.customEventListeners.OnRandomTeleport;
 import leafcraft.rtp.customEventListeners.OnTeleportCancel;
 import leafcraft.rtp.spigotEventListeners.*;
@@ -24,8 +25,8 @@ import java.util.Map;
 import java.util.Objects;
 
 public final class RTP extends JavaPlugin {
-    private Configs configs;
-    private Cache cache;
+    private static Configs configs;
+    private static Cache cache;
 
 //    private OnChunkLoad onChunkLoad;
 
@@ -47,8 +48,8 @@ public final class RTP extends JavaPlugin {
         PaperLib.suggestPaper(this);
 
         this.metrics = new Metrics(this, 12277);
-        this.configs = new Configs(this);
-        this.cache = new Cache(this,configs);
+        configs = new Configs(this);
+        cache = new Cache(this,configs);
 
         RTPCmd rtpCmd = new RTPCmd(this,configs,cache);
         Help help = new Help(configs);
@@ -64,8 +65,8 @@ public final class RTP extends JavaPlugin {
         catch (NullPointerException ignored) { }
 
         try {
-            Objects.requireNonNull(getCommand("rtp")).setTabCompleter(new TabComplete(this.configs));
-            Objects.requireNonNull(getCommand("wild")).setTabCompleter(new TabComplete(this.configs));
+            Objects.requireNonNull(getCommand("rtp")).setTabCompleter(new TabComplete(configs));
+            Objects.requireNonNull(getCommand("wild")).setTabCompleter(new TabComplete(configs));
         }
         catch (NullPointerException ignored) { }
 
@@ -90,6 +91,7 @@ public final class RTP extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new OnPlayerJoin(this,configs,cache),this);
         getServer().getPluginManager().registerEvents(new OnPlayerChangeWorld(this,configs,cache),this);
         getServer().getPluginManager().registerEvents(new OnPlayerQuit(cache),this);
+        getServer().getPluginManager().registerEvents(new OnRandomPreTeleport(this,configs,cache),this);
         getServer().getPluginManager().registerEvents(new OnRandomTeleport(this,configs,cache),this);
         getServer().getPluginManager().registerEvents(new OnTeleportCancel(this,configs,cache),this);
 
@@ -107,8 +109,8 @@ public final class RTP extends JavaPlugin {
     @Override
     public void onDisable() {
 //        onChunkLoad.shutdown();
-        if(this.cache != null) {
-            this.cache.shutdown();
+        if(cache != null) {
+            cache.shutdown();
         }
 
         super.onDisable();
@@ -120,16 +122,16 @@ public final class RTP extends JavaPlugin {
      * returns TeleportRegion by name
      * returns null if region does not exist or if its world is bad
      */
-    public TeleportRegion getRegion(String regionName) {
+    public static TeleportRegion getRegion(String regionName) {
         Map<String,String> params = new HashMap<>();
         params.put("region",regionName);
 
         String worldName = (String) configs.regions.getRegionSetting(regionName,"world","");
-        if (worldName == null || worldName == "" || !configs.worlds.checkWorldExists(worldName)) {
+        if (worldName == null || worldName.equals("") || !configs.worlds.checkWorldExists(worldName)) {
             return null;
         }
 
-        RandomSelectParams randomSelectParams = new RandomSelectParams(Bukkit.getWorld(worldName),params,configs);
+        RandomSelectParams randomSelectParams = new RandomSelectParams(Objects.requireNonNull(Bukkit.getWorld(worldName)),params,configs);
         if(!cache.permRegions.containsKey(randomSelectParams)) return null;
         return cache.permRegions.get(randomSelectParams);
     }

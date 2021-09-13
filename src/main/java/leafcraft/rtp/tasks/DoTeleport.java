@@ -1,6 +1,7 @@
 package leafcraft.rtp.tasks;
 
 import leafcraft.rtp.RTP;
+import leafcraft.rtp.customEvents.RandomPreTeleportEvent;
 import leafcraft.rtp.customEvents.RandomTeleportEvent;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
@@ -35,12 +36,21 @@ public class DoTeleport extends BukkitRunnable {
 
     public void doTeleportNow() {
         if(configs.config.platformRadius>0) {
-            Bukkit.getScheduler().runTask(plugin, ()->makePlatform());
+            Bukkit.getScheduler().runTask(plugin, this::makePlatform);
         }
-        RandomTeleportEvent randomTeleportEvent = new RandomTeleportEvent(sender, player, location);
-        Bukkit.getPluginManager().callEvent(randomTeleportEvent);
+        RandomPreTeleportEvent randomPreTeleportEvent = new RandomPreTeleportEvent(sender,player,location);
+        Bukkit.getPluginManager().callEvent(randomPreTeleportEvent);
         new ChunkCleanup(configs,location,cache).runTask(plugin);
         cache.commandSenderLookup.remove(player.getUniqueId());
+
+        if(sender instanceof Player) {
+            cache.currentTeleportCost.remove(((Player)sender).getUniqueId());
+        }
+
+        cache.playerFromLocations.remove(player.getUniqueId());
+        cache.doTeleports.remove(player.getUniqueId());
+        cache.todoTP.remove(player.getUniqueId());
+        cache.lastTP.put(player.getUniqueId(),location);
     }
 
     public boolean isNoDelay() {

@@ -6,7 +6,6 @@ import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.SendMessage;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
-import leafcraft.rtp.tools.softdepends.PAPIChecker;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.command.Command;
@@ -191,7 +190,7 @@ public class SetRegion implements CommandExecutor {
                 cache.permRegions.remove(params);
             }
 
-            TeleportRegion teleportRegion = new TeleportRegion(region,params.params,configs,cache);
+            TeleportRegion teleportRegion = new TeleportRegion(region,params.params, plugin, configs,cache);
             cache.permRegions.put(params, teleportRegion);
             teleportRegion.loadFile();
         }

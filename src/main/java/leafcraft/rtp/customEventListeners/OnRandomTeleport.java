@@ -35,23 +35,18 @@ public final class OnRandomTeleport implements Listener {
         this.cache = cache;
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST)
+    @EventHandler(priority = EventPriority.LOWEST)
     public void onRandomTeleport(RandomTeleportEvent event) {
         Player player = event.getPlayer();
-        cache.playerFromLocations.remove(player.getUniqueId());
-        cache.doTeleports.remove(player.getUniqueId());
-        cache.todoTP.remove(player.getUniqueId());
-        cache.lastTP.put(player.getUniqueId(),event.getTo());
 
         if(configs.config.blindnessDuration>0)
             player.addPotionEffect(PotionEffectType.BLINDNESS.createEffect(configs.config.blindnessDuration,100),false);
-        player.teleport(event.getTo());
         if(!configs.config.title.equals("")) {
             String title = SendMessage.format(player,configs.config.title);
             String subtitle = SendMessage.format(player,configs.config.subTitle);
             player.sendTitle(title,subtitle,configs.config.fadeIn * 20, configs.config.stay * 20, configs.config.fadeOut * 20);
         }
-        String msg = configs.lang.getLog("teleportMessage", this.cache.numTeleportAttempts.getOrDefault(event.getTo(),0).toString());
+        String msg = configs.lang.getLog("teleportMessage", String.valueOf(event.getTries()));
         msg = PAPIChecker.fillPlaceholders(player,msg);
 
         long time = System.nanoTime();
@@ -70,6 +65,8 @@ public final class OnRandomTeleport implements Listener {
         msg = msg.replace("[time]",replacement);
         SendMessage.sendMessage(event.getSender(),player,msg);
         cache.lastTeleportTime.put(player.getUniqueId(), time);
+
+        player.teleport(event.getTo());
 
         RandomSelectParams rsParams = cache.regionKeys.get(player.getUniqueId());
         if(rsParams!=null && cache.permRegions.containsKey(rsParams)) {
@@ -96,10 +93,6 @@ public final class OnRandomTeleport implements Listener {
         }
 
         runCommands(event.getPlayer());
-
-        if(event.getSender() instanceof Player) {
-            cache.currentTeleportCost.remove(((Player)event.getSender()).getUniqueId());
-        }
     }
 
     private void runCommands(Player player) {

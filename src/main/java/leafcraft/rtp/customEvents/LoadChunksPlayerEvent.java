@@ -1,27 +1,25 @@
 package leafcraft.rtp.customEvents;
 
+import org.bukkit.Chunk;
 import org.bukkit.Location;
-import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
-import org.jetbrains.annotations.NotNull;
 
-public class RandomTeleportEvent extends Event implements Cancellable {
-    private final CommandSender sender;
-    private final Player player;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+
+public class LoadChunksPlayerEvent extends Event implements Cancellable {
     private final Location to;
+    private final List<CompletableFuture<Chunk>> chunks;
     private static final HandlerList HANDLERS_LIST = new HandlerList();
     private boolean isCancelled;
-    private final int tries;
 
-    public RandomTeleportEvent(CommandSender sender, Player player, Location to, int tries) {
-        this.sender = sender;
-        this.player = player;
+    public LoadChunksPlayerEvent(Location to, List<CompletableFuture<Chunk>> chunks) {
+        super(true);
         this.to = to;
+        this.chunks = chunks;
         this.isCancelled = false;
-        this.tries = tries;
     }
 
     @Override
@@ -35,7 +33,7 @@ public class RandomTeleportEvent extends Event implements Cancellable {
     }
 
     @Override
-    public @NotNull HandlerList getHandlers() {
+    public HandlerList getHandlers() {
         return HANDLERS_LIST;
     }
 
@@ -43,19 +41,11 @@ public class RandomTeleportEvent extends Event implements Cancellable {
         return HANDLERS_LIST;
     }
 
-    public Player getPlayer() {
-        return player;
-    }
-
     public Location getTo() {
         return to;
     }
 
-    public int getTries() {
-        return tries;
-    }
-
-    public CommandSender getSender() {
-        return sender;
+    public List<CompletableFuture<Chunk>> getChunks() {
+        return chunks;
     }
 }

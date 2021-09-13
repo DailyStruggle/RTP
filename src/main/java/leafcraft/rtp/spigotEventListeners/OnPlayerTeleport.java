@@ -65,7 +65,9 @@ public final class OnPlayerTeleport implements Listener {
 
         //don't stop teleporting if there isn't supposed to be a delay
         Location location = this.cache.playerFromLocations.getOrDefault(player.getUniqueId(), player.getLocation());
-        if (location.distance(event.getTo()) < configs.config.cancelDistance) return;
+        double distance = (event.getTo().getWorld().getUID().equals(event.getFrom().getWorld().getUID()))
+                ? location.distance(event.getTo()) : Double.MAX_VALUE;
+        if (distance < (double) configs.config.cancelDistance) return;
 
         CommandSender sender = cache.commandSenderLookup.get(player.getUniqueId());
         if(sender == null) return;
@@ -73,7 +75,7 @@ public final class OnPlayerTeleport implements Listener {
         Location to = cache.todoTP.get(player.getUniqueId());
         if(to == null) return;
 
-        TeleportCancelEvent teleportCancelEvent = new TeleportCancelEvent(sender,player,to);
+        TeleportCancelEvent teleportCancelEvent = new TeleportCancelEvent(sender,player,to,event.isAsynchronous());
         Bukkit.getPluginManager().callEvent(teleportCancelEvent);
     }
 }

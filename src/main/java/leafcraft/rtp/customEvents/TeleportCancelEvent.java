@@ -14,7 +14,8 @@ public class TeleportCancelEvent extends Event implements Cancellable {
     private static final HandlerList HANDLERS_LIST = new HandlerList();
     private boolean isCancelled;
 
-    public TeleportCancelEvent(CommandSender sender, Player player, Location to) {
+    public TeleportCancelEvent(CommandSender sender, Player player, Location to, boolean async) {
+        super(async);
         this.sender = sender;
         this.player = player;
         this.to = to;
