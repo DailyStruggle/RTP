@@ -6,7 +6,7 @@ public class HuskTownsChecker {
     public static Boolean isInClaim(org.bukkit.Location location) {
         try {
             return !HuskTownsAPI.getInstance().isWilderness(location);
-        } catch (NoClassDefFoundError e) {
+        } catch (Error | Exception e) {
             return false;
         }
     }

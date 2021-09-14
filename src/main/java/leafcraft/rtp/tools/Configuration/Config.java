@@ -19,7 +19,7 @@ public class Config {
 
 	public final int teleportDelay, cancelDistance, teleportCooldown, maxAttempts, queuePeriod, minTPS, vd;
 	public final double price;
-	public final boolean rerollWorldGuard, rerollGriefPrevention, rerollHuskTowns, rerollSaberFactions;
+	public final boolean rerollWorldGuard, rerollGriefPrevention, rerollTownyAdvanced, rerollHuskTowns, rerollFactions;
 
 	public final boolean postTeleportQueueing;
 
@@ -60,8 +60,9 @@ public class Config {
 
 		this.rerollWorldGuard = config.getBoolean("rerollWorldGuard",true);
 		this.rerollGriefPrevention = config.getBoolean("rerollGriefPrevention",true);
+		this.rerollTownyAdvanced = config.getBoolean("rerollTownyAdvanced",true);
 		this.rerollHuskTowns = config.getBoolean("rerollHuskTowns",true);
-		this.rerollSaberFactions = config.getBoolean("rerollSaberFactions",true);
+		this.rerollFactions = config.getBoolean("rerollSaberFactions",true);
 
 		this.teleportDelay = 20*config.getInt("teleportDelay",2);
 		this.cancelDistance = config.getInt("cancelDistance",2);

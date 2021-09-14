@@ -7,9 +7,7 @@ import leafcraft.rtp.customEvents.RandomSelectPlayerEvent;
 import leafcraft.rtp.customEvents.RandomSelectQueueEvent;
 import leafcraft.rtp.tools.*;
 import leafcraft.rtp.tools.Configuration.Configs;
-import leafcraft.rtp.tools.softdepends.GriefPreventionChecker;
-import leafcraft.rtp.tools.softdepends.PAPIChecker;
-import leafcraft.rtp.tools.softdepends.WorldGuardChecker;
+import leafcraft.rtp.tools.softdepends.*;
 import org.bukkit.*;
 import org.bukkit.block.Biome;
 import org.bukkit.command.CommandSender;
@@ -454,11 +452,20 @@ public class TeleportRegion {
                             cache.forceLoadedChunks.put(new HashableChunk(chunk),0L);
                         }
                         if(isKnownBad(chunk.getX(),chunk.getZ())) return;
-                        ChunkSnapshot chunkSnapshot = chunk.getChunkSnapshot(false,true,false);
+                        Location point = chunk.getBlock(7,0,7).getLocation();
+                        Biome biome = world.getBiome(point.getBlockX(), point.getBlockZ());
+                        long curveLocation = (long) ((shape.equals(Shapes.SQUARE)) ?
+                                                        Translate.xzToSquareLocation(cr,chunk.getX(),chunk.getZ(),cx,cz) :
+                                                        Translate.xzToCircleLocation(cr,chunk.getX(),chunk.getZ(),cx,cz));
+                        Map.Entry<Long,Long> lower = biomeLocations.get(biome).lowerEntry(curveLocation);
+                        if(lower!=null && curveLocation < (lower.getKey()+lower.getValue())) return;
+
+                        ChunkSnapshot chunkSnapshot = chunk.getChunkSnapshot();
                         int y = getFirstNonAir(chunkSnapshot);
                         y= getLastNonAir(chunkSnapshot,y);
-                        if(checkLocation(chunkSnapshot,y))
-                            addBiomeLocation(chunk.getX(),chunk.getZ(),world.getBiome(chunk.getX()*16+7,chunk.getZ()*16+7));
+                        if(checkLocation(chunkSnapshot,y)) {
+                            addBiomeLocation(curveLocation, biome);
+                        }
                     });
                 }
                 if (uniquePlacements) {
@@ -945,8 +952,11 @@ public class TeleportRegion {
         if(configs.config.unsafeBlocks.contains(chunkSnapshot.getBlockType(7,y,7))) return false;
         if(configs.config.unsafeBlocks.contains(chunkSnapshot.getBlockType(7,y+1,7))) return false;
         Location location = new Location(world, chunkSnapshot.getX()*16+7,y, chunkSnapshot.getZ()*16+7);
-        if(rerollWorldGuard && WorldGuardChecker.isInRegion(location)) return false;
-        if(rerollGriefPrevention && GriefPreventionChecker.isInClaim(location)) return false;
+        if(configs.config.rerollWorldGuard && WorldGuardChecker.isInRegion(location)) return false;
+        if(configs.config.rerollGriefPrevention && GriefPreventionChecker.isInClaim(location)) return false;
+        if(configs.config.rerollTownyAdvanced && TownyAdvancedChecker.isInClaim(location)) return false;
+        if(configs.config.rerollHuskTowns && HuskTownsChecker.isInClaim(location)) return false;
+        if(configs.config.rerollFactions && FactionsChecker.isInClaim(location)) return false;
 
         int safetyRadius = configs.config.safetyRadius;
         Set<Material> unsafeBlocks = configs.config.unsafeBlocks;

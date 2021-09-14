@@ -12,7 +12,7 @@ public class GriefPreventionChecker {
         Plugin plugin = Bukkit.getServer().getPluginManager().getPlugin("GriefPrevention");
 
         // WorldGuard may not be loaded
-        if (plugin == null || !(plugin instanceof GriefPrevention)) {
+        if (!(plugin instanceof GriefPrevention)) {
             return null; // Maybe you want throw an exception instead
         }
         return (GriefPrevention) plugin;
