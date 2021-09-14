@@ -1,14 +1,12 @@
 package leafcraft.rtp.tools.softdepends;
 
-import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import net.milkbowl.vault.chat.Chat;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.permission.Permission;
 import org.bukkit.Bukkit;
-import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.RegisteredServiceProvider;
 
-import java.util.logging.Logger;
+import java.util.Objects;
 
 public class VaultChecker {
     private static Economy econ = null;
@@ -24,25 +22,23 @@ public class VaultChecker {
             return false;
         }
         econ = rsp.getProvider();
-        return econ != null;
+        return true;
     }
 
-    public static boolean setupChat() {
+    public static void setupChat() {
         if(Bukkit.getPluginManager().getPlugin("Vault") == null) {
-            return false;
+            return;
         }
         RegisteredServiceProvider<Chat> rsp = Bukkit.getServer().getServicesManager().getRegistration(Chat.class);
-        chat = rsp.getProvider();
-        return chat != null;
+        chat = Objects.requireNonNull(rsp).getProvider();
     }
 
-    public static boolean setupPermissions() {
+    public static void setupPermissions() {
         if(Bukkit.getPluginManager().getPlugin("Vault") == null) {
-            return false;
+            return;
         }
         RegisteredServiceProvider<Permission> rsp = Bukkit.getServer().getServicesManager().getRegistration(Permission.class);
-        perms = rsp.getProvider();
-        return perms != null;
+        perms = Objects.requireNonNull(rsp).getProvider();
     }
 
     public static Economy getEconomy() {

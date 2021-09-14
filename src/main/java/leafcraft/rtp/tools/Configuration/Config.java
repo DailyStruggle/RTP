@@ -19,7 +19,9 @@ public class Config {
 
 	public final int teleportDelay, cancelDistance, teleportCooldown, maxAttempts, queuePeriod, minTPS, vd;
 	public final double price;
-	public final boolean rerollLiquid, rerollWorldGuard, rerollGriefPrevention, postTeleportQueueing;
+	public final boolean rerollWorldGuard, rerollGriefPrevention, rerollHuskTowns, rerollSaberFactions;
+
+	public final boolean postTeleportQueueing;
 
 	public final double nearSelfPrice, nearOtherPrice;
 
@@ -48,7 +50,7 @@ public class Config {
 		}
 		this.config = YamlConfiguration.loadConfiguration(f);
 
-		if( 	(this.config.getDouble("version") < 2.3) ) {
+		if( 	(this.config.getDouble("version") < 2.4) ) {
 			Bukkit.getLogger().log(Level.WARNING, lang.getLog("oldFile", "config.yml"));
 			update();
 
@@ -56,9 +58,10 @@ public class Config {
 			this.config = YamlConfiguration.loadConfiguration(f);
 		}
 
-		this.rerollLiquid = config.getBoolean("rerollLiquid",true);
 		this.rerollWorldGuard = config.getBoolean("rerollWorldGuard",true);
 		this.rerollGriefPrevention = config.getBoolean("rerollGriefPrevention",true);
+		this.rerollHuskTowns = config.getBoolean("rerollHuskTowns",true);
+		this.rerollSaberFactions = config.getBoolean("rerollSaberFactions",true);
 
 		this.teleportDelay = 20*config.getInt("teleportDelay",2);
 		this.cancelDistance = config.getInt("cancelDistance",2);
@@ -129,7 +132,7 @@ public class Config {
 		for (String line : linesInDefaultConfig) {
 			String newline = line;
 			if (line.startsWith("version:")) {
-				newline = "version: 2.3";
+				newline = "version: 2.4";
 			}
 			else if(newline.startsWith("  -")) continue;
 			else {
