@@ -14,8 +14,9 @@ price: 1000000000.0
 #reroll location if player would land in a reserved location
 rerollWorldGuard: true
 rerollGriefPrevention: true
+rerollTownyAdvanced: true
 rerollHuskTowns: true
-rerollSaberFactions: true
+rerollFactions: true
 
 #how long to give invincibility on teleport, in seconds
 invulnerabilityTime: 5
