@@ -42,10 +42,10 @@ public class Regions {
         update();
     }
 
-    public void addRegion(String name, RandomSelectParams params) {
+    public void setRegion(String name, RandomSelectParams params) {
         String worldName = Bukkit.getWorld(params.worldID).getName();
 
-        ConfigurationSection section = config.createSection(name);
+        ConfigurationSection section = (config.contains(name)) ? config.getConfigurationSection(name) : config.createSection(name);
         section.set("world","\""+worldName+"\"");
         section.set("shape","\""+params.shape.toString()+"\"");
         section.set("mode",params.params.getOrDefault("mode",config.getConfigurationSection("default").getString("mode","ACCUMULATE")));

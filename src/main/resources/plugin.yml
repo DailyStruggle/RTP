@@ -1,5 +1,5 @@
 name: RTP
-version: 1.2.7
+version: 1.3.0
 main: leafcraft.rtp.RTP
 api-version: 1.13
 authors: [ leaf26 ]
