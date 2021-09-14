@@ -2,7 +2,6 @@ package leafcraft.rtp.tools.selection;
 
 import io.papermc.lib.PaperLib;
 import leafcraft.rtp.RTP;
-import leafcraft.rtp.customEvents.LoadChunksPlayerEvent;
 import leafcraft.rtp.customEvents.LoadChunksQueueEvent;
 import leafcraft.rtp.customEvents.RandomSelectPlayerEvent;
 import leafcraft.rtp.customEvents.RandomSelectQueueEvent;
@@ -120,7 +119,6 @@ public class TeleportRegion {
                 if (player.hasPermission("rtp.fill")) SendMessage.sendMessage(player, msg);
             }
 
-
             for(; it < itStop; it++) {
                 if(cancelled) return;
 
@@ -135,6 +133,7 @@ public class TeleportRegion {
                         if (player.hasPermission("rtp.fill")) SendMessage.sendMessage(player, msg);
                     }
                     fillTask = null;
+
                     return;
                 }
 
@@ -144,7 +143,7 @@ public class TeleportRegion {
                 if(cancelled) return;
                 CompletableFuture<Chunk> cfChunk = PaperLib.getChunkAtAsync(Objects.requireNonNull(world),xz[0],xz[1],true);
                 this.chunks.add(cfChunk);
-                final long finalShiftedIt = it;
+                final long finalIt = it;
                 max.set((long)totalSpace);
 //                max.set((long) ((expand) ? totalSpace : totalSpace - badLocationSum.get()));
 //                Bukkit.getLogger().warning("added chunk: " + finalShiftedIt);
@@ -154,10 +153,10 @@ public class TeleportRegion {
                         int y = getFirstNonAir(chunkSnapshot);
                         y = getLastNonAir(chunkSnapshot, y);
 
-                        if (!checkLocation(chunkSnapshot, y)) {
-                            addBadLocation(finalShiftedIt);
+                        if (checkLocation(chunkSnapshot, y)) {
+                            addBiomeLocation(finalIt, chunkSnapshot.getBiome(7,7));
                         } else {
-                            addBiomeLocation(finalShiftedIt, chunkSnapshot.getBiome(7, 7));
+                            addBadLocation(finalIt);
                         }
                     }
 
@@ -165,7 +164,7 @@ public class TeleportRegion {
                     if(completion.decrementAndGet() <3 && !cancelled && !completed.getAndSet(true)) {
                         fillTask = new FillTask(plugin);
                         fillTask.runTaskLaterAsynchronously(plugin,10);
-                        if(!mode.equals(Modes.NONE)) storeFile();
+                        storeFile();
                     }
                 });
                 cfChunk.whenComplete((chunk, throwable) -> {
@@ -454,7 +453,12 @@ public class TeleportRegion {
                             Bukkit.getScheduler().runTask(plugin, () -> chunk.setForceLoaded(true));
                             cache.forceLoadedChunks.put(new HashableChunk(chunk),0L);
                         }
-                        addBiomeLocation(chunk.getX(),chunk.getZ(),world.getBiome(chunk.getX()*16+7,chunk.getZ()*16+7));
+                        if(isKnownBad(chunk.getX(),chunk.getZ())) return;
+                        ChunkSnapshot chunkSnapshot = chunk.getChunkSnapshot(false,true,false);
+                        int y = getFirstNonAir(chunkSnapshot);
+                        y= getLastNonAir(chunkSnapshot,y);
+                        if(checkLocation(chunkSnapshot,y))
+                            addBiomeLocation(chunk.getX(),chunk.getZ(),world.getBiome(chunk.getX()*16+7,chunk.getZ()*16+7));
                     });
                 }
                 if (uniquePlacements) {
@@ -582,7 +586,7 @@ public class TeleportRegion {
         lower = badLocations.floorEntry(location);
 
         // if upper start meets position + length, merge its length and delete upper entry
-        if((upper!=null)&&(lower.getKey()+lower.getValue() >= upper.getKey())) {
+        if((upper!=null) && (lower.getKey()+lower.getValue() >= upper.getKey())) {
             badLocations.put(lower.getKey(),lower.getValue()+upper.getValue());
             badLocations.remove(upper.getKey());
         }
@@ -633,9 +637,6 @@ public class TeleportRegion {
     }
 
     private void removeBiomeLocation(Long location, Biome biome) {
-        if(location < 0) return;
-        if(location > (totalSpace+(expand?badLocationSum.get():0))) return;
-
         biomeLocations.putIfAbsent(biome, new ConcurrentSkipListMap<>());
         ConcurrentSkipListMap<Long, Long> map = biomeLocations.get(biome);
         biomeLengths.putIfAbsent(biome,new AtomicLong(0L));
@@ -660,7 +661,7 @@ public class TeleportRegion {
 
     private long select() {
         double space = totalSpace;
-        if(!expand) space -= badLocationSum.get();
+        if((!expand) && mode.equals(Modes.ACCUMULATE)) space -= badLocationSum.get();
         double res = (space) * Math.pow(ThreadLocalRandom.current().nextDouble(),weight);
         return (long)res;
     }
@@ -673,10 +674,9 @@ public class TeleportRegion {
         double chunkTime = 0D;
         double yTime = 0D;
 
-        int[] xz = new int[2];
-
         Integer numAttempts = 0;
         Integer maxAttempts = configs.config.maxAttempts;
+        if(biome!=null) maxAttempts = maxAttempts*10;
         boolean goodLocation = false;
         while(numAttempts < maxAttempts && !goodLocation) {
             numAttempts++;
@@ -690,32 +690,32 @@ public class TeleportRegion {
                 Map.Entry<Long, Long> lower = map.floorEntry(location);
                 Map.Entry<Long, Long> upper = map.ceilingEntry(location);
 
-                Map.Entry<Long, Long> idx;
-                if(upper == null) {
+                //select top or bottom
+                Map.Entry<Long, Long> idx = lower;
+                if (upper == null) {
                     idx = lower;
-                }
-                else if(lower == null) {
+                } else if (lower == null) {
                     idx = upper;
-                }
-                else if(upper.getKey().equals(lower.getKey())) {
+                } else if (upper.getKey().equals(lower.getKey())) {
                     idx = lower;
-                }
-                else {
-                    long d1 = (upper.getKey()-location);
-                    long d2 = ((lower.getKey()+lower.getValue())-location);
-                    if(d1>d2) idx = upper;
+                } else if(location >= lower.getKey()+lower.getValue()){
+                    long d1 = (upper.getKey() - location);
+                    long d2 = ((lower.getKey() + lower.getValue()) - location);
+                    if (d1 > d2) idx = upper;
                     else idx = lower;
                 }
 
-                long temp = (idx.getValue()>1) ? ThreadLocalRandom.current().nextLong(idx.getValue()-1) : 0;
+                long temp = ThreadLocalRandom.current().nextLong(idx.getValue());
                 long key = idx.getKey();
                 location = key + temp;
+
                 if(isKnownBad(location)) {
+                    removeBiomeLocation(location,biome);
+                    numAttempts--;
                     continue;
                 }
             }
-
-            if(biome == null) {
+            else {
                 switch (mode) {
                     case ACCUMULATE: {
                         Map.Entry<Long, Long> idx = badLocations.firstEntry();
@@ -725,6 +725,7 @@ public class TeleportRegion {
                         }
                     }
                     case NEAREST: {
+                        if(expand) location = (long) (location + ((badLocationSum.get() * location) / totalSpace));
                         ConcurrentSkipListMap<Long,Long> map = badLocations;
                         Map.Entry<Long, Long> check = map.floorEntry(location);
 
@@ -768,6 +769,7 @@ public class TeleportRegion {
                         }
                     }
                     case REROLL: {
+                        if(expand) location = (long) (location + ((badLocationSum.get() * location) / totalSpace));
                         Map.Entry<Long, Long> check = badLocations.floorEntry(location);
                         if(     (check!=null)
                                 && (location > check.getKey())
@@ -776,7 +778,7 @@ public class TeleportRegion {
                         }
                     }
                     default: {
-
+                        if(expand) location = (long) (location + ((badLocationSum.get() * location) / totalSpace));
                     }
                 }
             }
@@ -784,9 +786,6 @@ public class TeleportRegion {
             int[] xzChunk = shape.equals(Shapes.SQUARE) ?
                     (Translate.squareLocationToXZ(cr, cx, cz, location)) :
                     (Translate.circleLocationToXZ(cr, cx, cz, location));
-
-            xz[0] = (xzChunk[0]*16)+7;
-            xz[1] = (xzChunk[1]*16)+7;
 
             long stop = System.nanoTime();
             selectTime += (stop-start);
@@ -808,12 +807,15 @@ public class TeleportRegion {
             } catch (InterruptedException | CancellationException | StackOverflowError | TimeoutException e) {
                 return null;
             }
+            res = chunk.getBlock(7,0,7).getLocation();
+            chunkSnapshot = chunk.getChunkSnapshot(false, true, false);
             currChunks.remove(hashableChunk);
-            Biome currBiome = world.getBiome(xz[0],xz[1]);
+
+            Biome currBiome = chunkSnapshot.getBiome(7,7);
             if(biome!=null && !currBiome.equals(biome)) {
                 continue;
             }
-            chunkSnapshot = chunk.getChunkSnapshot();
+
 
             stop = System.nanoTime();
             chunkTime += (stop-start);
@@ -821,7 +823,7 @@ public class TeleportRegion {
             start = System.nanoTime();
             int y = this.getFirstNonAir(chunkSnapshot);
             y = this.getLastNonAir(chunkSnapshot,y);
-            res = new Location(world,xz[0],y,xz[1]);
+            res.setY(y);
             stop = System.nanoTime();
             yTime += (stop - start);
 
@@ -918,8 +920,10 @@ public class TeleportRegion {
 
     public boolean isKnownBad(long location) {
         Map.Entry<Long,Long> lower = badLocations.floorEntry(location);
-
-        return (lower != null) && (location < lower.getKey() + lower.getValue());
+        if(lower!=null) {
+            return (location < (lower.getKey() + lower.getValue()));
+        }
+        return false;
     }
 
     public boolean isInBounds(int x, int z) {
@@ -1022,15 +1026,15 @@ public class TeleportRegion {
             while(i<linesArray.size() && linesArray.get(i).startsWith("    -")) {
                 String val = linesArray.get(i).substring(5);
                 int delimiterIdx = val.indexOf(',');
-                Long location = Long.parseLong(val.substring(0,delimiterIdx));
+                Long start = Long.parseLong(val.substring(0,delimiterIdx));
                 Long length = Long.parseLong(val.substring(delimiterIdx+1));
 
-                Map.Entry<Long,Long> lower = map.floorEntry(location);
-                if(lower!=null && location == lower.getKey()+lower.getValue()) {
+                Map.Entry<Long,Long> lower = map.floorEntry(start);
+                if(lower!=null && start == lower.getKey()+lower.getValue()) {
                     map.put(lower.getKey(),lower.getValue()+length);
                     length+=lower.getValue();
                 }
-                else map.put(location,length);
+                else map.put(start,length);
                 biomeLengths.get(biome).addAndGet(length);
                 i++;
             }

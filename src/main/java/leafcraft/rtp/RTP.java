@@ -15,6 +15,7 @@ import leafcraft.rtp.tools.softdepends.PAPI_expansion;
 import leafcraft.rtp.tools.softdepends.VaultChecker;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
+import org.bukkit.World;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.plugin.java.JavaPluginLoader;
@@ -24,6 +25,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * A Random Teleportation Spigot plugin, optimized for operators
+ *
+ */
 public final class RTP extends JavaPlugin {
     private static Configs configs;
     private static Cache cache;
@@ -116,11 +121,10 @@ public final class RTP extends JavaPlugin {
         super.onDisable();
     }
 
-    /*
-     * getRegion
-     *
-     * returns TeleportRegion by name
-     * returns null if region does not exist or if its world is bad
+    /**
+     * get a region by name
+     * @param regionName - name of region
+     * @return region by that name, or null if none
      */
     public static TeleportRegion getRegion(String regionName) {
         Map<String,String> params = new HashMap<>();
@@ -134,5 +138,21 @@ public final class RTP extends JavaPlugin {
         RandomSelectParams randomSelectParams = new RandomSelectParams(Objects.requireNonNull(Bukkit.getWorld(worldName)),params,configs);
         if(!cache.permRegions.containsKey(randomSelectParams)) return null;
         return cache.permRegions.get(randomSelectParams);
+    }
+
+    public static TeleportRegion setRegion(String regionName, World world, Map<String,String> params) {
+        params.put("region",regionName);
+
+        String worldName = (String) configs.regions.getRegionSetting(regionName,"world","");
+        if (worldName == null || worldName.equals("") || !configs.worlds.checkWorldExists(worldName)) {
+            return null;
+        }
+
+        RandomSelectParams randomSelectParams = new RandomSelectParams(Objects.requireNonNull(Bukkit.getWorld(worldName)),params,configs);
+        if(cache.permRegions.containsKey(randomSelectParams)) {
+            cache.permRegions.get(randomSelectParams).shutdown();
+        }
+        return cache.permRegions.put(randomSelectParams,
+                new TeleportRegion(regionName,params, (RTP)Bukkit.getPluginManager().getPlugin("RTP"),configs,cache));
     }
 }
