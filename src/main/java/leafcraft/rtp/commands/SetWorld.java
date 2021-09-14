@@ -5,7 +5,6 @@ import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.SendMessage;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
-import leafcraft.rtp.tools.softdepends.PAPIChecker;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.command.Command;
@@ -85,7 +84,7 @@ public class SetWorld implements CommandExecutor {
             String probe = (String) configs.regions.getRegionSetting(region,"world","");
             if(probe.equals("")) {
                 RandomSelectParams params = new RandomSelectParams(world,new HashMap<>(),configs);
-                configs.regions.addRegion(region,params);
+                configs.regions.setRegion(region,params);
             }
         }
 

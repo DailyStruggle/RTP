@@ -15,7 +15,6 @@ import leafcraft.rtp.tools.softdepends.PAPI_expansion;
 import leafcraft.rtp.tools.softdepends.VaultChecker;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
-import org.bukkit.World;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.plugin.java.JavaPluginLoader;
@@ -140,7 +139,7 @@ public final class RTP extends JavaPlugin {
         return cache.permRegions.get(randomSelectParams);
     }
 
-    public static TeleportRegion setRegion(String regionName, World world, Map<String,String> params) {
+    public static TeleportRegion setRegion(String regionName, Map<String,String> params) {
         params.put("region",regionName);
 
         String worldName = (String) configs.regions.getRegionSetting(regionName,"world","");
@@ -152,6 +151,8 @@ public final class RTP extends JavaPlugin {
         if(cache.permRegions.containsKey(randomSelectParams)) {
             cache.permRegions.get(randomSelectParams).shutdown();
         }
+
+        configs.regions.setRegion(regionName,randomSelectParams);
         return cache.permRegions.put(randomSelectParams,
                 new TeleportRegion(regionName,params, (RTP)Bukkit.getPluginManager().getPlugin("RTP"),configs,cache));
     }

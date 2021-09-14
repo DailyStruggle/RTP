@@ -173,7 +173,7 @@ public class SetRegion implements CommandExecutor {
             String probe = (String) configs.regions.getRegionSetting(region,"world","");
             RandomSelectParams params = new RandomSelectParams(world,regionArgs,configs);
             if(probe.equals("")) {
-                configs.regions.addRegion(region,params);
+                configs.regions.setRegion(region,params);
             }
 
             for(Map.Entry<RandomSelectParams,TeleportRegion> entry : cache.permRegions.entrySet()) {
