@@ -947,9 +947,9 @@ public class TeleportRegion {
     }
 
     public boolean checkLocation(ChunkSnapshot chunkSnapshot, int y) {
-        Material material = chunkSnapshot.getBlockType(7,y,7);
+//        Material material = chunkSnapshot.getBlockType(7,y,7);
         if(y >= maxY) return false;
-        if(!material.isSolid()) return false;
+//        if(!material.isSolid()) return false;
         if(chunkSnapshot.getBlockType(7,y+1,7).isSolid()) return false;
         if(configs.config.unsafeBlocks.contains(chunkSnapshot.getBlockType(7,y,7))) return false;
         if(configs.config.unsafeBlocks.contains(chunkSnapshot.getBlockType(7,y+1,7))) return false;
