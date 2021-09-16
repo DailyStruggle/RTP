@@ -19,6 +19,9 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.lang.invoke.MethodHandle;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -340,7 +343,7 @@ public class TeleportRegion {
     }
 
     public boolean hasQueuedLocation(Player player) {
-        boolean hasPlayerLocation = perPlayerQueue.containsKey(player.getUniqueId());
+        boolean hasPlayerLocation = perPlayerQueue.containsKey(player.getUniqueId()) && perPlayerQueue.get(player.getUniqueId()).size()>0;
         boolean hasPublicLocation = locationQueue.size()>0;
         return ( hasPlayerLocation || hasPublicLocation);
     }
@@ -417,7 +420,7 @@ public class TeleportRegion {
                     String msg = PAPIChecker.fillPlaceholders(player,configs.lang.getLog("unsafe",maxAttempts.toString()));
                     SendMessage.sendMessage(sender,player,msg);
                 }
-                RandomSelectPlayerEvent randomSelectPlayerEvent = new RandomSelectPlayerEvent(res);
+                RandomSelectPlayerEvent randomSelectPlayerEvent = new RandomSelectPlayerEvent(res, player);
                 Bukkit.getScheduler().runTask(plugin, () -> Bukkit.getPluginManager().callEvent(randomSelectPlayerEvent));
             }
             else {
@@ -823,7 +826,6 @@ public class TeleportRegion {
                 continue;
             }
 
-
             stop = System.nanoTime();
             chunkTime += (stop-start);
 
@@ -832,9 +834,9 @@ public class TeleportRegion {
             y = this.getLastNonAir(chunkSnapshot,y);
             res.setY(y);
             stop = System.nanoTime();
+            goodLocation = checkLocation(chunkSnapshot,y);
             yTime += (stop - start);
 
-            goodLocation = checkLocation(chunkSnapshot,y);
             if(goodLocation) addBiomeLocation(location,currBiome);
             else if(!mode.equals(Modes.NONE)) {
                 addBadLocation(location);
@@ -853,9 +855,9 @@ public class TeleportRegion {
         this.cache.numTeleportAttempts.put(res, numAttempts);
         addChunks(res, urgent);
 
-//        Bukkit.getLogger().warning(ChatColor.AQUA + "TOTAL TIME SPENT ON SELECTION: " + (selectTime)/1000000 + "ms");
-//        Bukkit.getLogger().warning(ChatColor.LIGHT_PURPLE + "TOTAL TIME SPENT ON CHUNKS: " + (chunkTime)/1000000 + "ms");
-//        Bukkit.getLogger().warning(ChatColor.GREEN + "TOTAL TIME SPENT ON BLOCKS: " + (yTime)/1000000 + "ms");
+//        Bukkit.getLogger().warning(ChatColor.AQUA + "TOTAL TIME SPENT ON SELECTION FIXING: " + (selectTime)/1000000 + "ms");
+//        Bukkit.getLogger().warning(ChatColor.LIGHT_PURPLE + "TOTAL TIME SPENT WAITING ON CHUNKS: " + (chunkTime)/1000000 + "ms");
+//        Bukkit.getLogger().warning(ChatColor.GREEN + "TOTAL TIME SPENT ON PLACEMENT VALIDATION: " + (yTime)/1000000 + "ms");
 //        Bukkit.getLogger().warning(ChatColor.WHITE + "TOTAL TIME IN SELECTION FUNCTION: " + (System.nanoTime()-totalTimeStart)/1000000 + "ms");
 
         return res;
@@ -952,11 +954,20 @@ public class TeleportRegion {
         if(configs.config.unsafeBlocks.contains(chunkSnapshot.getBlockType(7,y,7))) return false;
         if(configs.config.unsafeBlocks.contains(chunkSnapshot.getBlockType(7,y+1,7))) return false;
         Location location = new Location(world, chunkSnapshot.getX()*16+7,y, chunkSnapshot.getZ()*16+7);
-        if(configs.config.rerollWorldGuard && WorldGuardChecker.isInRegion(location)) return false;
+        if(configs.config.rerollWorldGuard && WorldGuardChecker.isInClaim(location)) return false;
         if(configs.config.rerollGriefPrevention && GriefPreventionChecker.isInClaim(location)) return false;
         if(configs.config.rerollTownyAdvanced && TownyAdvancedChecker.isInClaim(location)) return false;
         if(configs.config.rerollHuskTowns && HuskTownsChecker.isInClaim(location)) return false;
         if(configs.config.rerollFactions && FactionsChecker.isInClaim(location)) return false;
+        if(configs.config.rerollGriefDefender && GriefDefenderChecker.isInClaim(location)) return false;
+        if(configs.config.rerollLands && LandsChecker.isInClaim(location)) return false;
+        for(MethodHandle methodHandle : configs.locationChecks) {
+            try {
+                if((boolean)methodHandle.invokeExact(location)) return false;
+            } catch (Throwable throwable) {
+                throwable.printStackTrace();
+            }
+        }
 
         int safetyRadius = configs.config.safetyRadius;
         Set<Material> unsafeBlocks = configs.config.unsafeBlocks;

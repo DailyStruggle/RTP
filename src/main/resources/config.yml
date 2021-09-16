@@ -12,11 +12,13 @@ teleportCooldown: 300
 price: 1000000000.0
 
 #reroll location if player would land in a reserved location
-rerollWorldGuard: true
-rerollGriefPrevention: true
-rerollTownyAdvanced: true
-rerollHuskTowns: true
 rerollFactions: true
+rerollGriefDefender: true
+rerollGriefPrevention: true
+rerollHuskTowns: true
+rerollLands: true
+rerollTownyAdvanced: true
+rerollWorldGuard: true
 
 #how long to give invincibility on teleport, in seconds
 invulnerabilityTime: 5
@@ -91,4 +93,4 @@ stay: 1
 fadeout: 1
 
 #DO NOT TOUCH VERSION NUMBER
-version: 2.4
+version: 2.5

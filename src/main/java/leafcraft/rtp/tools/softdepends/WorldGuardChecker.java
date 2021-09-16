@@ -23,7 +23,7 @@ public class WorldGuardChecker {
         return (WorldGuardPlugin) plugin;
     }
 
-    public static Boolean isInRegion(org.bukkit.Location location) {
+    public static Boolean isInClaim(org.bukkit.Location location) {
         if(getWorldGuard() == null) return false;
         World world = BukkitAdapter.adapt(Objects.requireNonNull(location.getWorld()));
         BlockVector3 pt = BukkitAdapter.asBlockVector(location);

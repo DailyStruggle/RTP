@@ -38,6 +38,12 @@ public class DoTeleport extends BukkitRunnable {
         if(configs.config.platformRadius>0) {
             Bukkit.getScheduler().runTask(plugin, this::makePlatform);
         }
+
+        cache.playerFromLocations.remove(player.getUniqueId());
+        cache.doTeleports.remove(player.getUniqueId());
+        cache.todoTP.remove(player.getUniqueId());
+        cache.lastTP.put(player.getUniqueId(),location);
+
         RandomPreTeleportEvent randomPreTeleportEvent = new RandomPreTeleportEvent(sender,player,location);
         Bukkit.getPluginManager().callEvent(randomPreTeleportEvent);
         new ChunkCleanup(configs,location,cache).runTask(plugin);
@@ -46,11 +52,6 @@ public class DoTeleport extends BukkitRunnable {
         if(sender instanceof Player) {
             cache.currentTeleportCost.remove(((Player)sender).getUniqueId());
         }
-
-        cache.playerFromLocations.remove(player.getUniqueId());
-        cache.doTeleports.remove(player.getUniqueId());
-        cache.todoTP.remove(player.getUniqueId());
-        cache.lastTP.put(player.getUniqueId(),location);
     }
 
     public boolean isNoDelay() {

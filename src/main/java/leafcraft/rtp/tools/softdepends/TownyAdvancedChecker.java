@@ -7,7 +7,7 @@ public class TownyAdvancedChecker {
     public static boolean isInClaim(Location location) {
         try {
             return !TownyAPI.getInstance().isWilderness(location);
-        } catch (Error | Exception e) {
+        } catch (NoClassDefFoundError | Exception e) {
             return false;
         }
     }
