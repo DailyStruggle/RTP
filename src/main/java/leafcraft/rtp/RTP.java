@@ -11,30 +11,29 @@ import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.TPS;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
+import leafcraft.rtp.tools.softdepends.LandsChecker;
 import leafcraft.rtp.tools.softdepends.PAPI_expansion;
 import leafcraft.rtp.tools.softdepends.VaultChecker;
-import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.plugin.java.JavaPluginLoader;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
+import java.lang.invoke.MethodHandle;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
 /**
- * A Random Teleportation Spigot plugin, optimized for operators
- *
+ * A Random Teleportation Spigot/Paper plugin, optimized for operators
  */
 public final class RTP extends JavaPlugin {
-    private static Configs configs;
-    private static Cache cache;
+    private static Configs configs = null;
+    private static Cache cache = null;
 
 //    private OnChunkLoad onChunkLoad;
-
-    private Metrics metrics;
 
     public RTP()
     {
@@ -50,8 +49,12 @@ public final class RTP extends JavaPlugin {
     @Override
     public void onEnable() {
         PaperLib.suggestPaper(this);
+//        try {
+//            PaperLib.suggestPaper(this);
+//        } catch (NoClassDefFoundError ignored) {
+//
+//        }
 
-        this.metrics = new Metrics(this, 12277);
         configs = new Configs(this);
         cache = new Cache(this,configs);
 
@@ -108,6 +111,8 @@ public final class RTP extends JavaPlugin {
         if(Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
             new PAPI_expansion(this,configs,cache).register();
         }
+
+        LandsChecker.landsSetup(this);
     }
 
     @Override
@@ -139,6 +144,12 @@ public final class RTP extends JavaPlugin {
         return cache.permRegions.get(randomSelectParams);
     }
 
+    /**
+     * add or update a region by name
+     * @param regionName - name of region
+     * @param params - mapped parameters, based on parameters in regions.yml
+     * @return the corresponding TeleportRegion
+     */
     public static TeleportRegion setRegion(String regionName, Map<String,String> params) {
         params.put("region",regionName);
 
@@ -155,5 +166,13 @@ public final class RTP extends JavaPlugin {
         configs.regions.setRegion(regionName,randomSelectParams);
         return cache.permRegions.put(randomSelectParams,
                 new TeleportRegion(regionName,params, (RTP)Bukkit.getPluginManager().getPlugin("RTP"),configs,cache));
+    }
+
+    /**
+     * add any location check, after plugin initialization
+     * @param methodHandle - a method that takes an org.bukkit.Location and returns a boolean
+     */
+    public static void addLocationCheck(@NotNull MethodHandle methodHandle) {
+        configs.addLocationCheck(methodHandle);
     }
 }

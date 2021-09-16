@@ -8,7 +8,7 @@ public class FactionsChecker {
         try {
             FLocation fLocation = new FLocation(location);
             return Board.getInstance().getFactionAt(fLocation).getOwnerList(fLocation).size()>0;
-        } catch (Error | Exception e) {
+        } catch (NoClassDefFoundError | NullPointerException e) {
             return false;
         }
     }

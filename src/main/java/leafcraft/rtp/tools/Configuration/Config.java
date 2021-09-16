@@ -19,7 +19,8 @@ public class Config {
 
 	public final int teleportDelay, cancelDistance, teleportCooldown, maxAttempts, queuePeriod, minTPS, vd;
 	public final double price;
-	public final boolean rerollWorldGuard, rerollGriefPrevention, rerollTownyAdvanced, rerollHuskTowns, rerollFactions;
+	public final boolean rerollWorldGuard, rerollGriefDefender, rerollGriefPrevention, rerollTownyAdvanced,
+			rerollHuskTowns, rerollFactions, rerollLands;
 
 	public final boolean postTeleportQueueing;
 
@@ -50,7 +51,7 @@ public class Config {
 		}
 		this.config = YamlConfiguration.loadConfiguration(f);
 
-		if( 	(this.config.getDouble("version") < 2.4) ) {
+		if( 	(this.config.getDouble("version") < 2.5) ) {
 			Bukkit.getLogger().log(Level.WARNING, lang.getLog("oldFile", "config.yml"));
 			update();
 
@@ -59,10 +60,12 @@ public class Config {
 		}
 
 		this.rerollWorldGuard = config.getBoolean("rerollWorldGuard",true);
+		this.rerollGriefDefender = config.getBoolean("rerollGriefDefender",true);
 		this.rerollGriefPrevention = config.getBoolean("rerollGriefPrevention",true);
 		this.rerollTownyAdvanced = config.getBoolean("rerollTownyAdvanced",true);
 		this.rerollHuskTowns = config.getBoolean("rerollHuskTowns",true);
-		this.rerollFactions = config.getBoolean("rerollSaberFactions",true);
+		this.rerollFactions = config.getBoolean("rerollFactions",true);
+		this.rerollLands = config.getBoolean("rerollLands",true);
 
 		this.teleportDelay = 20*config.getInt("teleportDelay",2);
 		this.cancelDistance = config.getInt("cancelDistance",2);
@@ -133,7 +136,7 @@ public class Config {
 		for (String line : linesInDefaultConfig) {
 			String newline = line;
 			if (line.startsWith("version:")) {
-				newline = "version: 2.4";
+				newline = "version: 2.5";
 			}
 			else if(newline.startsWith("  -")) continue;
 			else {

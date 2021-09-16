@@ -90,7 +90,7 @@ public class LoadChunks extends BukkitRunnable {
                     String msg = configs.lang.getLog("chunkLoading");
                     SendMessage.sendMessage(sender, player, msg);
                 }
-                LoadChunksPlayerEvent loadChunksPlayerEvent = new LoadChunksPlayerEvent(location,chunkSet.chunks);
+                LoadChunksPlayerEvent loadChunksPlayerEvent = new LoadChunksPlayerEvent(location, player, chunkSet.chunks);
                 Bukkit.getPluginManager().callEvent(loadChunksPlayerEvent);
             }
 

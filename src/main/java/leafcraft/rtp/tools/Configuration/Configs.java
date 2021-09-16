@@ -1,7 +1,11 @@
 package leafcraft.rtp.tools.Configuration;
 
 import leafcraft.rtp.RTP;
-import leafcraft.rtp.tools.softdepends.WorldGuardChecker;
+import org.jetbrains.annotations.NotNull;
+
+import java.lang.invoke.MethodHandle;
+import java.util.ArrayList;
+import java.util.List;
 
 //route for all config classes
 public class Configs {
@@ -11,24 +15,35 @@ public class Configs {
     public Regions regions;
     public Worlds worlds;
     public String version;
+    public List<MethodHandle> locationChecks;
 
     public Configs(RTP plugin) {
         this.plugin = plugin;
         String name = plugin.getServer().getClass().getPackage().getName();
-        this.version = name.substring(name.lastIndexOf('.')+1);
+        version = name.substring(name.indexOf('-')+1);
         lang = new Lang(plugin);
         config = new Config(plugin,lang);
         worlds = new Worlds(plugin,lang);
         regions = new Regions(plugin,lang);
+        locationChecks = new ArrayList<>();
     }
 
     public void refresh() {
         String name = plugin.getServer().getClass().getPackage().getName();
-        this.version = name.substring(name.lastIndexOf('.')+1);
+        version = name.substring(name.indexOf('-')+1);
         lang = new Lang(plugin);
         config = new Config(plugin,lang);
         worlds = new Worlds(plugin,lang);
         regions = new Regions(plugin,lang);
     }
 
+    /**
+     * Adds a reflective location check
+     * @param methodHandle - method to call,
+     *               method takes a org.bukkit.Location, returns true if it's a hit
+     *               e.g. boolean isInClaim(Location location)
+     */
+    public void addLocationCheck(@NotNull MethodHandle methodHandle) {
+        locationChecks.add(methodHandle);
+    }
 }

@@ -1,6 +1,7 @@
 package leafcraft.rtp.tasks;
 
 import leafcraft.rtp.RTP;
+import leafcraft.rtp.customEvents.TeleportCommandSuccessEvent;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
 import leafcraft.rtp.tools.SendMessage;
@@ -56,20 +57,6 @@ public class SetupTeleport extends BukkitRunnable {
     }
 
     public void setupTeleportNow(boolean async) {
-        if(rsParams.params.containsKey("biome")) {
-            Biome biome;
-            try {
-                biome = Biome.valueOf(rsParams.params.get("biome"));
-            } catch (IllegalArgumentException | NullPointerException exception) {
-                biome = null;
-            }
-            if(biome == null) {
-                String msg = configs.lang.getLog("badArg", "biome:"+rsParams.params.get("biome"));
-                SendMessage.sendMessage(sender,msg);
-                return;
-            }
-        }
-
         //get a random location according to the parameters
         if (async) location = cache.getRandomLocation(rsParams, true, sender, player);
         else location = cache.getQueuedLocation(rsParams, sender, player);

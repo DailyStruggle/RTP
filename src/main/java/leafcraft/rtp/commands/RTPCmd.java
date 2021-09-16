@@ -1,5 +1,6 @@
 package leafcraft.rtp.commands;
 
+import leafcraft.rtp.customEvents.TeleportCommandSuccessEvent;
 import leafcraft.rtp.tasks.SetupTeleport;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.Configuration.Configs;
@@ -338,13 +339,34 @@ public class RTPCmd implements CommandExecutor {
         //set up parameters for selection
         RandomSelectParams rsParams = new RandomSelectParams(world,rtpArgs,configs);
 
+        if(rsParams.params.containsKey("biome")) {
+            try {
+                Biome.valueOf(rsParams.params.get("biome"));
+            } catch (IllegalArgumentException | NullPointerException exception) {
+                String msg = configs.lang.getLog("badArg", "biome:"+rsParams.params.get("biome"));
+                SendMessage.sendMessage(sender,msg);
+                return true;
+            }
+        }
+
+        boolean hasQueued = cache.permRegions.get(rsParams).hasQueuedLocation(player);
+        if(!hasQueued && !sender.hasPermission("rtp.unqueued")) {
+            String msg = PAPIChecker.fillPlaceholders(player,configs.lang.getLog("noLocationsQueued"));
+            SendMessage.sendMessage(sender,player,msg);
+            return true;
+        }
+
+        //mark a successful command
+        Bukkit.getScheduler().runTaskAsynchronously(plugin,()->
+                Bukkit.getPluginManager().callEvent(new TeleportCommandSuccessEvent(sender,player)));
+
         //prep teleportation
         this.cache.lastTeleportTime.put(player.getUniqueId(), start);
         this.cache.playerFromLocations.put(player.getUniqueId(),player.getLocation());
         cache.commandSenderLookup.put(player.getUniqueId(),sender);
         SetupTeleport setupTeleport = new SetupTeleport(plugin,sender,player,configs, cache, rsParams);
         if(cache.permRegions.containsKey(rsParams)
-                && cache.permRegions.get(rsParams).hasQueuedLocation(player)
+                && hasQueued
                 && sender.hasPermission("rtp.noDelay")
                 && !rsParams.params.containsKey("biome")) {
             setupTeleport.setupTeleportNow(false);
