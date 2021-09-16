@@ -61,8 +61,8 @@ public class DoTeleport extends BukkitRunnable {
     private void makePlatform() {
         Chunk chunk = location.getChunk();
         if(!chunk.isLoaded()) chunk.load(true);
+        Material air = location.getBlock().getType();
         Material solid = location.getBlock().getRelative(BlockFace.DOWN).getType();
-//        Material air = location.getBlock().getType();
 
         for(int i = 7-configs.config.platformRadius; i <= 7+configs.config.platformRadius; i++) {
             for(int j = 7-configs.config.platformRadius; j <= 7+configs.config.platformRadius; j++) {
@@ -72,7 +72,9 @@ public class DoTeleport extends BukkitRunnable {
                         block.setType(solid,false);
                 }
                 for(int y = location.getBlockY()+configs.config.platformAirHeight-1; y >= location.getBlockY(); y--) {
-                    chunk.getBlock(i,y,j).breakNaturally();
+                    Block block = chunk.getBlock(i,y,j);
+                    block.breakNaturally();
+                    block.setType(air,false); //also clear liquids
                 }
             }
         }
