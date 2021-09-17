@@ -14,6 +14,7 @@ import leafcraft.rtp.tools.selection.TeleportRegion;
 import leafcraft.rtp.tools.softdepends.LandsChecker;
 import leafcraft.rtp.tools.softdepends.PAPI_expansion;
 import leafcraft.rtp.tools.softdepends.VaultChecker;
+import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -32,6 +33,7 @@ import java.util.Objects;
 public final class RTP extends JavaPlugin {
     private static Configs configs = null;
     private static Cache cache = null;
+    private static Metrics metrics;
 
 //    private OnChunkLoad onChunkLoad;
 
@@ -49,6 +51,7 @@ public final class RTP extends JavaPlugin {
     @Override
     public void onEnable() {
         PaperLib.suggestPaper(this);
+        metrics = new Metrics(this,12277);
 //        try {
 //            PaperLib.suggestPaper(this);
 //        } catch (NoClassDefFoundError ignored) {
@@ -121,6 +124,9 @@ public final class RTP extends JavaPlugin {
         if(cache != null) {
             cache.shutdown();
         }
+        cache = null;
+        configs = null;
+        metrics = null;
 
         super.onDisable();
     }
