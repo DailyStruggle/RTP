@@ -106,8 +106,6 @@ public class Fill implements CommandExecutor {
                     return true;
                 }
 
-                String msg = configs.lang.getLog("fillCancel", regionName);
-                SendMessage.sendMessage(sender,msg);
                 region.stopFill();
                 return true;
             }

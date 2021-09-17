@@ -176,18 +176,9 @@ public class SetRegion implements CommandExecutor {
                 configs.regions.setRegion(region,params);
             }
 
-            for(Map.Entry<RandomSelectParams,TeleportRegion> entry : cache.permRegions.entrySet()) {
-                if(entry.getValue().name.equals(region)) {
-                    entry.getValue().storeFile();
-                    entry.getValue().shutdown();
-                }
-                cache.permRegions.remove(entry);
-            }
-
             if(cache.permRegions.containsKey(params)){
                 cache.permRegions.get(params).storeFile();
                 cache.permRegions.get(params).shutdown();
-                cache.permRegions.remove(params);
             }
 
             TeleportRegion teleportRegion = new TeleportRegion(region,params.params, plugin, configs,cache);

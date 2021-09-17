@@ -32,6 +32,7 @@ public class Config {
 
 	public final int safetyRadius, platformRadius, platformAirHeight, platformDepth;
 
+	public final Material platformMaterial;
 	public final Set<Material> unsafeBlocks = new HashSet<>();
 
 	public final int blindnessDuration;
@@ -51,7 +52,7 @@ public class Config {
 		}
 		this.config = YamlConfiguration.loadConfiguration(f);
 
-		if( 	(this.config.getDouble("version") < 2.5) ) {
+		if( 	(this.config.getDouble("version") < 2.6) ) {
 			Bukkit.getLogger().log(Level.WARNING, lang.getLog("oldFile", "config.yml"));
 			update();
 
@@ -98,6 +99,7 @@ public class Config {
 		this.platformRadius = platformRadius;
 		this.platformAirHeight = config.getInt("platformAirHeight", 2);
 		this.platformDepth = config.getInt("platformDepth", 1);
+		this.platformMaterial = Material.getMaterial(Objects.requireNonNull(config.getString("platformMaterial", "SMOOTH_STONE")));
 
 		for(String material : config.getStringList("unsafeBlocks")) {
 			unsafeBlocks.add(Material.getMaterial(material));
@@ -134,32 +136,32 @@ public class Config {
 
 		ArrayList<String> newLines = new ArrayList<>();
 		for (String line : linesInDefaultConfig) {
-			String newline = line;
+			StringBuilder newline = new StringBuilder(line);
 			if (line.startsWith("version:")) {
-				newline = "version: 2.5";
+				newline = new StringBuilder("version: 2.6");
 			}
-			else if(newline.startsWith("  -")) continue;
+			else if(newline.toString().startsWith("  -")) continue;
 			else {
 				for (String node : oldValues.keySet()) {
 					if (line.startsWith(node + ":")) {
 						if(config.get(node) instanceof List) {
 							Set<Object> duplicateCheck = new HashSet<>();
-							newline = node + ": ";
+							newline = new StringBuilder(node + ": ");
 							for(Object obj : Objects.requireNonNull(config.getList(node))) {
 								if(duplicateCheck.contains(obj)) continue;
 								duplicateCheck.add(obj);
-								if(obj instanceof String) newline += "\n  - " + "\"" + obj + "\"";
-								else newline += "\n  - " + obj;
+								if(obj instanceof String) newline.append("\n  - " + "\"").append(obj).append("\"");
+								else newline.append("\n  - ").append(obj);
 							}
 						}
-						else if(config.get(node) instanceof String) newline = node + ": \"" + oldValues.get(node).toString() + "\"";
-						else newline = node + ": " + oldValues.get(node).toString();
+						else if(config.get(node) instanceof String) newline = new StringBuilder(node + ": \"" + oldValues.get(node).toString() + "\"");
+						else newline = new StringBuilder(node + ": " + oldValues.get(node).toString());
 						break;
 					}
 
 				}
 			}
-			newLines.add(newline);
+			newLines.add(newline.toString());
 		}
 
 		FileWriter fw;

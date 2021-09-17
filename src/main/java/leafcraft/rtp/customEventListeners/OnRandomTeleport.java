@@ -10,9 +10,9 @@ import leafcraft.rtp.tools.SendMessage;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import leafcraft.rtp.tools.softdepends.PAPIChecker;
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.Effect;
+import org.bukkit.*;
+import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -37,8 +37,11 @@ public final class OnRandomTeleport implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST)
     public void onRandomTeleport(RandomTeleportEvent event) {
-        Player player = event.getPlayer();
+        if(configs.config.platformRadius>=0) {
+            Bukkit.getScheduler().runTask(plugin, ()->makePlatform(event.getTo()));
+        }
 
+        Player player = event.getPlayer();
         if(configs.config.blindnessDuration>0)
             player.addPotionEffect(PotionEffectType.BLINDNESS.createEffect(configs.config.blindnessDuration,100),false);
         if(!configs.config.title.equals("")) {
@@ -108,6 +111,31 @@ public final class OnRandomTeleport implements Listener {
             command = PAPIChecker.fillPlaceholders(player,command);
             command = ChatColor.translateAlternateColorCodes('&',command);
             Bukkit.dispatchCommand(player,command);
+        }
+    }
+
+    private void makePlatform(Location location) {
+        Chunk chunk = location.getChunk();
+        if(!chunk.isLoaded()) chunk.load(true);
+        Block airBlock = location.getBlock();
+        airBlock.breakNaturally();
+        Material air = (airBlock.isLiquid()) ? Material.AIR : airBlock.getType();
+        Material solid = location.getBlock().getRelative(BlockFace.DOWN).getType();
+        if(!solid.isSolid()) solid = configs.config.platformMaterial;
+
+        for(int i = 7-configs.config.platformRadius; i <= 7+configs.config.platformRadius; i++) {
+            for(int j = 7-configs.config.platformRadius; j <= 7+configs.config.platformRadius; j++) {
+                for(int y = location.getBlockY()-1; y >= location.getBlockY()-configs.config.platformDepth; y--) {
+                    Block block = chunk.getBlock(i,y,j);
+                    if(!block.getType().isSolid() || configs.config.unsafeBlocks.contains(block.getType()))
+                        block.setType(solid,false);
+                }
+                for(int y = location.getBlockY()+configs.config.platformAirHeight-1; y >= location.getBlockY(); y--) {
+                    Block block = chunk.getBlock(i,y,j);
+                    block.breakNaturally();
+                    block.setType(air,false); //also clear liquids
+                }
+            }
         }
     }
 }

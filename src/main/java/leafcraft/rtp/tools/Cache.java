@@ -46,7 +46,7 @@ public class Cache {
             RandomSelectParams key = new RandomSelectParams(world,map,configs);
             TeleportRegion teleportRegion = new TeleportRegion(region,key.params, plugin, configs,this);
             permRegions.put(key, teleportRegion);
-            teleportRegion.loadFile();
+            Bukkit.getScheduler().runTaskAsynchronously(plugin, teleportRegion::loadFile);
         }
 
         Double i = 0d;

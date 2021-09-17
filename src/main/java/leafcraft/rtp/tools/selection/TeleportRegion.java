@@ -134,7 +134,7 @@ public class TeleportRegion {
                         if (player.hasPermission("rtp.fill")) SendMessage.sendMessage(player, msg);
                     }
                     fillTask = null;
-
+                    Bukkit.getScheduler().runTaskAsynchronously(plugin, TeleportRegion.this::storeFile);
                     return;
                 }
 
@@ -165,7 +165,6 @@ public class TeleportRegion {
                     if(completion.decrementAndGet() <3 && !cancelled && !completed.getAndSet(true)) {
                         fillTask = new FillTask(plugin);
                         fillTask.runTaskLaterAsynchronously(plugin,10);
-                        storeFile();
                     }
                 });
                 cfChunk.whenComplete((chunk, throwable) -> {
@@ -343,7 +342,7 @@ public class TeleportRegion {
     }
 
     public boolean hasQueuedLocation(Player player) {
-        boolean hasPlayerLocation = perPlayerQueue.containsKey(player.getUniqueId()) && perPlayerQueue.get(player.getUniqueId()).size()>0;
+        boolean hasPlayerLocation = perPlayerQueue.containsKey(player.getUniqueId()) && perPlayerQueue.get(player.getUniqueId()).size() > 0;
         boolean hasPublicLocation = locationQueue.size()>0;
         return ( hasPlayerLocation || hasPublicLocation);
     }
@@ -982,90 +981,100 @@ public class TeleportRegion {
 
     public void loadFile() {
         Plugin plugin = Bukkit.getPluginManager().getPlugin("RTP");
-        File f = new File(plugin.getDataFolder(), "regions"+File.separatorChar+name+".dat");
+        File f = new File(Objects.requireNonNull(plugin).getDataFolder(), "regions"+File.separatorChar+name+".dat");
         if(!f.exists()) return;
 
-        ArrayList<String> linesArray = new ArrayList<>();
+        Scanner scanner;
         try {
-            Scanner scanner = new Scanner(
+            scanner = new Scanner(
                     new File(f.getAbsolutePath()));
-            while (scanner.hasNextLine()) {
-                linesArray.add(scanner.nextLine() + "");
+            String name = scanner.nextLine().substring(5);
+            Shapes shape = Shapes.valueOf(scanner.nextLine().substring(6));
+            String worldName = scanner.nextLine().substring(6);
+            int cr = Integer.parseInt(scanner.nextLine().substring(3));
+            int cx = Integer.parseInt(scanner.nextLine().substring(3));
+            int cz = Integer.parseInt(scanner.nextLine().substring(3));
+            int minY = Integer.parseInt(scanner.nextLine().substring(5));
+            int maxY = Integer.parseInt(scanner.nextLine().substring(5));
+            boolean requireSkyLight = Boolean.parseBoolean(scanner.nextLine().substring(16));
+            boolean uniquePlacements = Boolean.parseBoolean(scanner.nextLine().substring(17));
+
+            if(!name.equals(this.name)) return;
+            if(!shape.equals(this.shape)) return;
+            if(!worldName.equals(this.world.getName())) return;
+            if(!(cr==this.cr)) return;
+            if(!(cx==this.cx)) return;
+            if(!(cz==this.cz)) return;
+            if(!(minY==this.minY)) return;
+            if(!(maxY==this.maxY)) return;
+            if(!(requireSkyLight==this.requireSkyLight)) return;
+            if(!(uniquePlacements==this.uniquePlacements)) return;
+
+            if(!scanner.hasNextLine()) {
+                scanner.close();
+                return;
+            }
+            scanner.nextLine();
+
+            String line = "";
+            while(scanner.hasNextLine()) {
+                line = scanner.nextLine();
+                if (!line.startsWith("  -")) break;
+                String val = line.substring(3);
+                int delimiterIdx = val.indexOf(',');
+                Long location = Long.parseLong(val.substring(0, delimiterIdx));
+                Long length = Long.parseLong(val.substring(delimiterIdx + 1));
+                Map.Entry<Long, Long> lower = badLocations.floorEntry(location);
+                if (lower != null && location == lower.getKey() + lower.getValue()) {
+                    badLocations.put(lower.getKey(), lower.getValue() + length);
+                    length += lower.getValue();
+                } else badLocations.put(location, length);
+                badLocationSum.addAndGet(length);
+            }
+
+            if(!scanner.hasNextLine()) {
+                scanner.close();
+                return;
+            }
+            scanner.nextLine();
+
+            while(scanner.hasNextLine()) {
+                line = scanner.nextLine();
+                if(!line.startsWith("  ")) break;
+                if(line.charAt(2) == ' ') continue;
+                Biome biome = Biome.valueOf(line.substring(2,line.length()-1));
+                biomeLocations.putIfAbsent(biome, new ConcurrentSkipListMap<>());
+                biomeLengths.putIfAbsent(biome,new AtomicLong());
+                ConcurrentSkipListMap<Long,Long> map = biomeLocations.get(biome);
+                if(!scanner.hasNextLine()) break;
+                scanner.nextLine();
+                while(scanner.hasNextLine()) {
+                    line = scanner.nextLine();
+                    if(!line.startsWith("    -")) break;
+                    String val = line.substring(5);
+                    int delimiterIdx = val.indexOf(',');
+                    Long start = Long.parseLong(val.substring(0,delimiterIdx));
+                    Long length = Long.parseLong(val.substring(delimiterIdx+1));
+
+                    Map.Entry<Long,Long> lower = map.floorEntry(start);
+                    if(lower!=null && start == lower.getKey()+lower.getValue()) {
+                        map.put(lower.getKey(),lower.getValue()+length);
+                        length+=lower.getValue();
+                    }
+                    else map.put(start,length);
+                    biomeLengths.get(biome).addAndGet(length);
+                }
             }
             scanner.close();
         } catch (FileNotFoundException e) {
             e.printStackTrace();
-        }
-
-        String name = linesArray.get(0).substring(5);
-        Shapes shape = Shapes.valueOf(linesArray.get(1).substring(6));
-        String worldName = linesArray.get(2).substring(6);
-        int cr = Integer.parseInt(linesArray.get(3).substring(3));
-        int cx = Integer.parseInt(linesArray.get(4).substring(3));
-        int cz = Integer.parseInt(linesArray.get(5).substring(3));
-        int minY = Integer.parseInt(linesArray.get(6).substring(5));
-        int maxY = Integer.parseInt(linesArray.get(7).substring(5));
-        boolean requireSkyLight = Boolean.parseBoolean(linesArray.get(8).substring(16));
-        boolean uniquePlacements = Boolean.parseBoolean(linesArray.get(9).substring(17));
-
-        if(!name.equals(this.name)) return;
-        if(!shape.equals(this.shape)) return;
-        if(!worldName.equals(this.world.getName())) return;
-        if(!(cr==this.cr)) return;
-        if(!(cx==this.cx)) return;
-        if(!(cz==this.cz)) return;
-        if(!(minY==this.minY)) return;
-        if(!(maxY==this.maxY)) return;
-        if(!(requireSkyLight==this.requireSkyLight)) return;
-        if(!(uniquePlacements==this.uniquePlacements)) return;
-
-        int i = 11;
-        while(i<linesArray.size() && linesArray.get(i).startsWith("  -")) {
-            String val = linesArray.get(i).substring(3);
-            int delimiterIdx = val.indexOf(',');
-            Long location = Long.parseLong(val.substring(0,delimiterIdx));
-            Long length = Long.parseLong(val.substring(delimiterIdx+1));
-            if(location<0) continue;
-            Map.Entry<Long,Long> lower = badLocations.floorEntry(location);
-            if(lower!=null && location == lower.getKey()+lower.getValue()) {
-                badLocations.put(lower.getKey(),lower.getValue()+length);
-                length+=lower.getValue();
-            }
-            else badLocations.put(location,length);
-            badLocationSum.addAndGet(length);
-            i++;
-        }
-
-        i++;
-        while(i<linesArray.size() && linesArray.get(i).startsWith("  ")) {
-            if(linesArray.get(i).charAt(2) == ' ') continue;
-            Biome biome = Biome.valueOf(linesArray.get(i).substring(2,linesArray.get(i).length()-1));
-            biomeLocations.putIfAbsent(biome, new ConcurrentSkipListMap<>());
-            biomeLengths.putIfAbsent(biome,new AtomicLong());
-            ConcurrentSkipListMap<Long,Long> map = biomeLocations.get(biome);
-            i++;
-            while(i<linesArray.size() && linesArray.get(i).startsWith("    -")) {
-                String val = linesArray.get(i).substring(5);
-                int delimiterIdx = val.indexOf(',');
-                Long start = Long.parseLong(val.substring(0,delimiterIdx));
-                Long length = Long.parseLong(val.substring(delimiterIdx+1));
-
-                Map.Entry<Long,Long> lower = map.floorEntry(start);
-                if(lower!=null && start == lower.getKey()+lower.getValue()) {
-                    map.put(lower.getKey(),lower.getValue()+length);
-                    length+=lower.getValue();
-                }
-                else map.put(start,length);
-                biomeLengths.get(biome).addAndGet(length);
-                i++;
-            }
         }
     }
 
     public void storeFile() {
         ArrayList<String> linesArray = new ArrayList<>();
         linesArray.add("name:"+name);
-        linesArray.add("shape:"+shape.toString());
+        linesArray.add("shape:"+shape.name());
         linesArray.add("world:"+world.getName());
         linesArray.add("cr:"+cr);
         linesArray.add("cx:"+cx);

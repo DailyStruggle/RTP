@@ -34,14 +34,15 @@ platformRadius: 0
 platformDepth: 1
 #break blocks above platform to make air (may cause lighting bugs)
 platformAirHeight: 2
+platformMaterial: SMOOTH_STONE
 
 #what materials, according to the spigot 1.13 api, to avoid
 unsafeBlocks:
-  - "MAGMA_BLOCK"
-  - "TNT"
-  - "LAVA"
-  - "WATER"
-  - "FIRE"
+  - MAGMA_BLOCK
+  - TNT
+  - LAVA
+  - WATER
+  - FIRE
 
 #how many rerolls before stopping
 maxAttempts: 100
@@ -93,4 +94,4 @@ stay: 1
 fadeout: 1
 
 #DO NOT TOUCH VERSION NUMBER
-version: 2.5
+version: 2.6

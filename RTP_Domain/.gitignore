@@ -96,6 +96,7 @@ $RECYCLE.BIN/
 *.lnk
 
 target/
+!target/RTP_Domain-1.0-SNAPSHOT.jar
 
 pom.xml.tag
 pom.xml.releaseBackup
