@@ -35,16 +35,12 @@ public class DoTeleport extends BukkitRunnable {
     }
 
     public void doTeleportNow() {
-        if(configs.config.platformRadius>0) {
-            Bukkit.getScheduler().runTask(plugin, this::makePlatform);
-        }
-
         cache.playerFromLocations.remove(player.getUniqueId());
         cache.doTeleports.remove(player.getUniqueId());
         cache.todoTP.remove(player.getUniqueId());
         cache.lastTP.put(player.getUniqueId(),location);
 
-        RandomPreTeleportEvent randomPreTeleportEvent = new RandomPreTeleportEvent(sender,player,location.clone());
+        RandomPreTeleportEvent randomPreTeleportEvent = new RandomPreTeleportEvent(sender,player,location);
         Bukkit.getPluginManager().callEvent(randomPreTeleportEvent);
         new ChunkCleanup(configs,location,cache).runTask(plugin);
         cache.commandSenderLookup.remove(player.getUniqueId());
@@ -56,27 +52,5 @@ public class DoTeleport extends BukkitRunnable {
 
     public boolean isNoDelay() {
         return sender.hasPermission("rtp.noDelay");
-    }
-
-    private void makePlatform() {
-        Chunk chunk = location.getChunk();
-        if(!chunk.isLoaded()) chunk.load(true);
-        Material air = location.getBlock().getType();
-        Material solid = location.getBlock().getRelative(BlockFace.DOWN).getType();
-
-        for(int i = 7-configs.config.platformRadius; i <= 7+configs.config.platformRadius; i++) {
-            for(int j = 7-configs.config.platformRadius; j <= 7+configs.config.platformRadius; j++) {
-                for(int y = location.getBlockY()-1; y >= location.getBlockY()-configs.config.platformDepth; y--) {
-                    Block block = chunk.getBlock(i,y,j);
-                    if(!block.getType().isSolid() || configs.config.unsafeBlocks.contains(block.getType()))
-                        block.setType(solid,false);
-                }
-                for(int y = location.getBlockY()+configs.config.platformAirHeight-1; y >= location.getBlockY(); y--) {
-                    Block block = chunk.getBlock(i,y,j);
-                    block.breakNaturally();
-                    block.setType(air,false); //also clear liquids
-                }
-            }
-        }
     }
 }

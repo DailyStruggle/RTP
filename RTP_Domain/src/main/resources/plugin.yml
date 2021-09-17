@@ -3,6 +3,6 @@ version: '${project.version}'
 main: io.github.dailystruggle.rtp_domain.RTP_Domain
 api-version: 1.17
 authors: [ leaf26 ]
-description: add Domain check to RTP
+description: Add Domain's location check to RTP
 website: https://github.com/DailyStruggle
 depend: [RTP,Domain]
