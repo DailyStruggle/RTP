@@ -342,9 +342,20 @@ public class TeleportRegion {
     }
 
     public boolean hasQueuedLocation(Player player) {
-        boolean hasPlayerLocation = perPlayerQueue.containsKey(player.getUniqueId()) && perPlayerQueue.get(player.getUniqueId()).size() > 0;
-        boolean hasPublicLocation = locationQueue.size()>0;
-        return ( hasPlayerLocation || hasPublicLocation);
+        UUID playerID = player.getUniqueId();
+        boolean hasPlayerLocation;
+        try {
+            hasPlayerLocation = perPlayerQueue.get(playerID).size() > 0;
+        } catch (NullPointerException e) {
+            return false;
+        }
+        boolean hasPublicLocation;
+        try {
+            hasPublicLocation = locationQueue.size()>0;
+        } catch (NullPointerException e) {
+            return false;
+        }
+        return ( hasPlayerLocation || hasPublicLocation );
     }
 
     public int getTotalQueueLength(Player player) {
@@ -356,7 +367,7 @@ public class TeleportRegion {
     }
 
     public int getPlayerQueueLength(Player player) {
-        return (!perPlayerQueue.contains(player.getUniqueId())) ? 0 : perPlayerQueue.get(player).size();
+        return (!perPlayerQueue.containsKey(player.getUniqueId())) ? 0 : perPlayerQueue.get(player).size();
     }
 
     public void shutdown() {
@@ -985,6 +996,7 @@ public class TeleportRegion {
         if(!f.exists()) return;
 
         Scanner scanner;
+        String line = "";
         try {
             scanner = new Scanner(
                     new File(f.getAbsolutePath()));
@@ -1016,7 +1028,6 @@ public class TeleportRegion {
             }
             scanner.nextLine();
 
-            String line = "";
             while(scanner.hasNextLine()) {
                 line = scanner.nextLine();
                 if (!line.startsWith("  -")) break;
@@ -1032,25 +1043,26 @@ public class TeleportRegion {
                 badLocationSum.addAndGet(length);
             }
 
-            if(!scanner.hasNextLine()) {
-                scanner.close();
-                return;
-            }
-            scanner.nextLine();
-
             while(scanner.hasNextLine()) {
                 line = scanner.nextLine();
                 if(!line.startsWith("  ")) break;
-                if(line.charAt(2) == ' ') continue;
+                if(line.startsWith("    -")) continue;
                 Biome biome = Biome.valueOf(line.substring(2,line.length()-1));
                 biomeLocations.putIfAbsent(biome, new ConcurrentSkipListMap<>());
                 biomeLengths.putIfAbsent(biome,new AtomicLong());
                 ConcurrentSkipListMap<Long,Long> map = biomeLocations.get(biome);
-                if(!scanner.hasNextLine()) break;
-                scanner.nextLine();
                 while(scanner.hasNextLine()) {
                     line = scanner.nextLine();
-                    if(!line.startsWith("    -")) break;
+                    if(!line.startsWith("    -")) {
+                        if(line.startsWith("  ")) {
+                            biome = Biome.valueOf(line.substring(2,line.length()-1));
+                            biomeLocations.putIfAbsent(biome, new ConcurrentSkipListMap<>());
+                            biomeLengths.putIfAbsent(biome,new AtomicLong());
+                            map = biomeLocations.get(biome);
+                        }
+                        else break;
+                        continue;
+                    }
                     String val = line.substring(5);
                     int delimiterIdx = val.indexOf(',');
                     Long start = Long.parseLong(val.substring(0,delimiterIdx));
