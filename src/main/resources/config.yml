@@ -34,6 +34,7 @@ platformRadius: 0
 platformDepth: 1
 #break blocks above platform to make air (may cause lighting bugs)
 platformAirHeight: 2
+#if no solid block under player, use this
 platformMaterial: SMOOTH_STONE
 
 #what materials, according to the spigot 1.13 api, to avoid
