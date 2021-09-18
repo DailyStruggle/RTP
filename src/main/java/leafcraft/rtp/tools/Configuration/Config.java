@@ -150,7 +150,11 @@ public class Config {
 							for(Object obj : Objects.requireNonNull(config.getList(node))) {
 								if(duplicateCheck.contains(obj)) continue;
 								duplicateCheck.add(obj);
-								if(obj instanceof String) newline.append("\n  - " + "\"").append(obj).append("\"");
+								if(obj instanceof String) {
+									boolean doQuotes = Material.getMaterial((String) obj) == null;
+									if(doQuotes)newline.append("\n  - " + "\"").append(obj).append("\"");
+									else newline.append("\n  - ").append(obj);
+								}
 								else newline.append("\n  - ").append(obj);
 							}
 						}

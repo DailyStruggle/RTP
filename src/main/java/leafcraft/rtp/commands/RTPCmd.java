@@ -349,7 +349,8 @@ public class RTPCmd implements CommandExecutor {
             }
         }
 
-        boolean hasQueued = cache.permRegions.get(rsParams).hasQueuedLocation(player);
+
+        boolean hasQueued = cache.permRegions.containsKey(rsParams) && cache.permRegions.get(rsParams).hasQueuedLocation(player);
         if(!hasQueued && !sender.hasPermission("rtp.unqueued")) {
             String msg = PAPIChecker.fillPlaceholders(player,configs.lang.getLog("noLocationsQueued"));
             SendMessage.sendMessage(sender,player,msg);

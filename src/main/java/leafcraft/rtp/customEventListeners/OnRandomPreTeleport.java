@@ -34,15 +34,10 @@ public final class OnRandomPreTeleport implements Listener {
         this.cache = cache;
     }
 
-    @EventHandler(priority = EventPriority.LOWEST)
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onRandomPreTeleport(RandomPreTeleportEvent event) {
         Player player = event.getPlayer();
-        CommandSender sender = event.getSender();
-        Location to = event.getTo();
-
         if(configs.config.blindnessDuration>0)
             player.addPotionEffect(PotionEffectType.BLINDNESS.createEffect(configs.config.blindnessDuration,100),false);
-        RandomTeleportEvent randomTeleportEvent = new RandomTeleportEvent(sender, player, to, cache.numTeleportAttempts.get(to));
-        Bukkit.getPluginManager().callEvent(randomTeleportEvent);
     }
 }

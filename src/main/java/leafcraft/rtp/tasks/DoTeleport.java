@@ -40,8 +40,13 @@ public class DoTeleport extends BukkitRunnable {
         cache.todoTP.remove(player.getUniqueId());
         cache.lastTP.put(player.getUniqueId(),location);
 
-        RandomPreTeleportEvent randomPreTeleportEvent = new RandomPreTeleportEvent(sender,player,location);
+        Location mutableLocation = location.clone();
+        Bukkit.getLogger().warning("initial y: " + mutableLocation.getY());
+        RandomPreTeleportEvent randomPreTeleportEvent = new RandomPreTeleportEvent(sender,player,mutableLocation);
         Bukkit.getPluginManager().callEvent(randomPreTeleportEvent);
+        RandomTeleportEvent randomTeleportEvent = new RandomTeleportEvent(sender, player, mutableLocation, cache.numTeleportAttempts.get(location));
+        Bukkit.getPluginManager().callEvent(randomTeleportEvent);
+        Bukkit.getLogger().warning("new y: " + mutableLocation.getY());
         new ChunkCleanup(configs,location,cache).runTask(plugin);
         cache.commandSenderLookup.remove(player.getUniqueId());
 
