@@ -7,7 +7,7 @@ import leafcraft.rtp.customEventListeners.OnRandomTeleport;
 import leafcraft.rtp.customEventListeners.OnTeleportCancel;
 import leafcraft.rtp.spigotEventListeners.*;
 import leafcraft.rtp.tools.Cache;
-import leafcraft.rtp.tools.Configuration.Configs;
+import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.TPS;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;

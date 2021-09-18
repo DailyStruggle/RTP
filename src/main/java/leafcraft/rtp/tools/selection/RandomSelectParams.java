@@ -1,6 +1,6 @@
 package leafcraft.rtp.tools.selection;
 
-import leafcraft.rtp.tools.Configuration.Configs;
+import leafcraft.rtp.tools.configuration.Configs;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 

@@ -12,6 +12,21 @@ commands:
     permission: glide.use
 
 permissions:
+  glide.*:
+    description: all glide perms
+    default: op
+    children:
+      glide.use: true
+      glide.use.other: true
+      glide.reload: true
   glide.use:
     description: allow player to use /glide
+    default: op
+  glide.use.other:
+    description: make other player glide
+    default: op
+    children:
+      glide.use: true
+  glide.reload:
+    description: reload the plugin configuration
     default: op

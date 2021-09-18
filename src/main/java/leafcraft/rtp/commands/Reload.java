@@ -1,9 +1,8 @@
 package leafcraft.rtp.commands;
 
 import leafcraft.rtp.tools.Cache;
-import leafcraft.rtp.tools.Configuration.Configs;
+import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.SendMessage;
-import leafcraft.rtp.tools.softdepends.PAPIChecker;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;

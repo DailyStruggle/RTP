@@ -2,7 +2,7 @@ package leafcraft.rtp.commands;
 
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
-import leafcraft.rtp.tools.Configuration.Configs;
+import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.SendMessage;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import org.bukkit.Bukkit;

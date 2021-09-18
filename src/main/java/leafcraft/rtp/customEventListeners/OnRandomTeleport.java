@@ -1,11 +1,10 @@
 package leafcraft.rtp.customEventListeners;
 
-import io.papermc.lib.PaperLib;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.customEvents.RandomTeleportEvent;
 import leafcraft.rtp.tasks.*;
 import leafcraft.rtp.tools.Cache;
-import leafcraft.rtp.tools.Configuration.Configs;
+import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.SendMessage;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
@@ -17,7 +16,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
 import java.util.List;

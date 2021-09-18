@@ -1,4 +1,4 @@
-package leafcraft.rtp.tools.Configuration;
+package leafcraft.rtp.tools.configuration;
 
 import leafcraft.rtp.RTP;
 import net.md_5.bungee.api.ChatColor;

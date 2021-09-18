@@ -1,8 +1,11 @@
 package io.github.dailystruggle.rtp_glide;
 
 import io.github.dailystruggle.rtp_glide.Commands.Glide;
+import io.github.dailystruggle.rtp_glide.Commands.Reload;
+import io.github.dailystruggle.rtp_glide.Commands.TabComplete;
 import io.github.dailystruggle.rtp_glide.Listeners.*;
 import io.github.dailystruggle.rtp_glide.Tasks.SetupGlide;
+import io.github.dailystruggle.rtp_glide.configuration.Configs;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Entity;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -13,14 +16,20 @@ import java.util.concurrent.ConcurrentSkipListSet;
 
 public final class RTP_Glide extends JavaPlugin {
     private static final ConcurrentSkipListSet<UUID> glidingPlayers = new ConcurrentSkipListSet<>();
+    private static Configs configs;
 
     @Override
     public void onEnable() {
+        configs = new Configs(this);
         // Plugin startup logic
-        Objects.requireNonNull(getCommand("glide")).setExecutor(new Glide(this));
+        Glide glide = new Glide(this, configs);
+        Objects.requireNonNull(getCommand("glide")).setExecutor(glide);
+        Objects.requireNonNull(getCommand("glide")).setTabCompleter(new TabComplete());
+
+        glide.addCommandHandle("reload","glide.reload",new Reload(configs));
 
         if(Bukkit.getPluginManager().getPlugin("RTP") != null)
-            getServer().getPluginManager().registerEvents(new OnRandomTeleport(this), this);
+            getServer().getPluginManager().registerEvents(new OnRandomTeleport(this, configs), this);
         getServer().getPluginManager().registerEvents(new OnGlideToggle(this),this);
 
         SetupGlide.setPlugin(this);
@@ -30,6 +39,7 @@ public final class RTP_Glide extends JavaPlugin {
     public void onDisable() {
         // Plugin shutdown logic
         glidingPlayers.clear();
+        configs = null;
     }
 
     public ConcurrentSkipListSet<UUID> getGlidingPlayers() {

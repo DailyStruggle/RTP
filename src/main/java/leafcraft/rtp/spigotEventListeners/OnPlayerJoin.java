@@ -6,7 +6,7 @@ import leafcraft.rtp.tasks.LoadChunks;
 import leafcraft.rtp.tasks.QueueLocation;
 import leafcraft.rtp.tasks.SetupTeleport;
 import leafcraft.rtp.tools.Cache;
-import leafcraft.rtp.tools.Configuration.Configs;
+import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import org.bukkit.Bukkit;
 import org.bukkit.World;

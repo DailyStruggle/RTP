@@ -1,4 +1,4 @@
-package leafcraft.rtp.tools.Configuration;
+package leafcraft.rtp.tools.configuration;
 
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.SendMessage;
@@ -14,8 +14,6 @@ import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.logging.Level;
 
 public class Regions {
     private final RTP plugin;
