@@ -1,0 +1,8 @@
+#autofilled per-world settings
+#world name according to bukkit
+default:
+    #name of world in commands
+    relative: 75
+    max: 320
+
+version: 1.0

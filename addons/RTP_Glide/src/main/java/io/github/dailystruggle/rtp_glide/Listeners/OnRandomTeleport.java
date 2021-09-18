@@ -2,6 +2,8 @@ package io.github.dailystruggle.rtp_glide.Listeners;
 
 import io.github.dailystruggle.rtp_glide.RTP_Glide;
 import io.github.dailystruggle.rtp_glide.Tasks.SetupGlide;
+import io.github.dailystruggle.rtp_glide.configuration.Configs;
+import io.github.dailystruggle.rtp_glide.customEvents.PlayerGlideEvent;
 import leafcraft.rtp.customEvents.RandomTeleportEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
@@ -13,9 +15,11 @@ import java.util.Objects;
 
 public final class OnRandomTeleport implements Listener {
     private final RTP_Glide plugin;
+    private final Configs configs;
 
-    public OnRandomTeleport(RTP_Glide plugin) {
+    public OnRandomTeleport(RTP_Glide plugin, Configs configs) {
         this.plugin = plugin;
+        this.configs = configs;
     }
 
     @EventHandler(priority = EventPriority.NORMAL)
@@ -23,9 +27,6 @@ public final class OnRandomTeleport implements Listener {
         if(Objects.requireNonNull(event.getTo().getWorld())
                 .getEnvironment().equals(World.Environment.NETHER))
             return;
-        event.getTo().add(0,100,0);
-        plugin.getGlidingPlayers().add(event.getPlayer().getUniqueId());
-        event.getPlayer().setFlying(false);
-        event.getPlayer().setGliding(true);
+        new SetupGlide(event.getPlayer(), configs).runTask(plugin);
     }
 }

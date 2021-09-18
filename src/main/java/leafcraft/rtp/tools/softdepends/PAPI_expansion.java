@@ -2,7 +2,7 @@ package leafcraft.rtp.tools.softdepends;
 
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
-import leafcraft.rtp.tools.Configuration.Configs;
+import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;

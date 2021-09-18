@@ -1,6 +1,9 @@
 package io.github.dailystruggle.rtp_glide.Listeners;
 
 import io.github.dailystruggle.rtp_glide.RTP_Glide;
+import io.github.dailystruggle.rtp_glide.customEvents.PlayerGlideEvent;
+import io.github.dailystruggle.rtp_glide.customEvents.PlayerLandEvent;
+import org.bukkit.Bukkit;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Player;
@@ -23,6 +26,7 @@ public class OnGlideToggle implements Listener {
         Block block = event.getEntity().getLocation().getBlock().getRelative(BlockFace.DOWN);
         if(block.getType().isSolid() || block.isLiquid() || ((Player) event.getEntity()).isFlying()) {
             plugin.getGlidingPlayers().remove(event.getEntity().getUniqueId());
+            Bukkit.getPluginManager().callEvent(new PlayerLandEvent((Player) event.getEntity()));
         }
         else event.setCancelled(true);
     }

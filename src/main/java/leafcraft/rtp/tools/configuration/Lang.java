@@ -1,9 +1,8 @@
-package leafcraft.rtp.tools.Configuration;
+package leafcraft.rtp.tools.configuration;
 
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.SendMessage;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 

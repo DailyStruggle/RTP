@@ -1,7 +1,6 @@
 package leafcraft.rtp.commands;
 
-import com.comphenix.protocol.PacketType;
-import leafcraft.rtp.tools.Configuration.Configs;
+import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Bukkit;
 import org.bukkit.World;

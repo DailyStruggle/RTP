@@ -4,7 +4,7 @@ import leafcraft.rtp.RTP;
 import leafcraft.rtp.customEvents.TeleportCancelEvent;
 import leafcraft.rtp.tasks.QueueLocation;
 import leafcraft.rtp.tools.Cache;
-import leafcraft.rtp.tools.Configuration.Configs;
+import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Bukkit;
