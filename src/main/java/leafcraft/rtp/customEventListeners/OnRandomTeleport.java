@@ -35,7 +35,7 @@ public final class OnRandomTeleport implements Listener {
         this.cache = cache;
     }
 
-    @EventHandler(priority = EventPriority.LOWEST)
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onRandomTeleport(RandomTeleportEvent event) {
         if(configs.config.platformRadius>=0) {
             Bukkit.getScheduler().runTask(plugin, ()->makePlatform(event.getTo()));
