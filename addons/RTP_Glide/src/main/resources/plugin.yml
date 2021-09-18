@@ -4,4 +4,14 @@ main: io.github.dailystruggle.rtp_glide.RTP_Glide
 api-version: 1.17
 authors: [ leaf26 ]
 description: place player up in the air and glide down
-depend: [ RTP ]
+softdepend: [ RTP ]
+
+commands:
+  glide:
+    description: teleport upward and glide until you hit the ground
+    permission: glide.use
+
+permissions:
+  glide.use:
+    description: allow player to use /glide
+    default: op

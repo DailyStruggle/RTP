@@ -1,10 +1,13 @@
 package io.github.dailystruggle.rtp_glide;
 
+import io.github.dailystruggle.rtp_glide.Commands.Glide;
 import io.github.dailystruggle.rtp_glide.Listeners.*;
+import io.github.dailystruggle.rtp_glide.Tasks.SetupGlide;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Entity;
-import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentSkipListSet;
 
@@ -14,8 +17,13 @@ public final class RTP_Glide extends JavaPlugin {
     @Override
     public void onEnable() {
         // Plugin startup logic
-        getServer().getPluginManager().registerEvents(new OnRandomTeleport(this),this);
+        Objects.requireNonNull(getCommand("glide")).setExecutor(new Glide(this));
+
+        if(Bukkit.getPluginManager().getPlugin("RTP") != null)
+            getServer().getPluginManager().registerEvents(new OnRandomTeleport(this), this);
         getServer().getPluginManager().registerEvents(new OnGlideToggle(this),this);
+
+        SetupGlide.setPlugin(this);
     }
 
     @Override
