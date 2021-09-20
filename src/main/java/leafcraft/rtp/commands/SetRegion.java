@@ -17,17 +17,10 @@ import java.util.*;
 import java.util.logging.Level;
 
 public class SetRegion implements CommandExecutor {
-    private final RTP plugin;
-    private final Configs configs;
-    private final Cache cache;
-
-    private final Set<String> regionParams = new HashSet<>();
-
-    public SetRegion(leafcraft.rtp.RTP plugin, Configs configs, Cache cache) {
-        this.plugin = plugin;
-        this.configs = configs;
-        this.cache = cache;
-
+    private static Configs configs = null;
+    private static Cache cache = null;
+    private static final Set<String> regionParams = new HashSet<>();
+    static {
         regionParams.add("region");
         regionParams.add("world");
         regionParams.add("shape");
@@ -52,10 +45,13 @@ public class SetRegion implements CommandExecutor {
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if(!sender.hasPermission("rtp.setRegion")) {
             String msg = configs.lang.getLog("noPerms");
-            
+
             SendMessage.sendMessage(sender,msg);
             return true;
         }
+
+        if(configs == null) configs = RTP.getConfigs();
+        if(cache == null) cache = RTP.getCache();
 
         Map<String,String> regionArgs = new HashMap<>();
         for(int i = 0; i < args.length; i++) {
@@ -72,7 +68,7 @@ public class SetRegion implements CommandExecutor {
             worldName = configs.worlds.worldPlaceholder2Name(worldName);
             if(!configs.worlds.checkWorldExists(worldName)) {
                 String msg = configs.lang.getLog("invalidWorld",worldName);
-                
+
                 SendMessage.sendMessage(sender,msg);
                 return true;
             }
@@ -145,7 +141,7 @@ public class SetRegion implements CommandExecutor {
                         }
                         catch (NumberFormatException exception) {
                             String msg = configs.lang.getLog("badArg",entry.getKey()+":"+entry.getValue());
-                            
+
                             SendMessage.sendMessage(sender,msg);
                             continue;
                         }
@@ -157,7 +153,7 @@ public class SetRegion implements CommandExecutor {
                         }
                         catch (NumberFormatException exception) {
                             String msg = configs.lang.getLog("badArg",entry.getKey()+":"+entry.getValue());
-                            
+
                             SendMessage.sendMessage(sender,msg);
                             continue;
                         }
@@ -181,7 +177,7 @@ public class SetRegion implements CommandExecutor {
                 cache.permRegions.get(params).shutdown();
             }
 
-            TeleportRegion teleportRegion = new TeleportRegion(region,params.params, plugin, configs,cache);
+            TeleportRegion teleportRegion = new TeleportRegion(region,params.params);
             cache.permRegions.put(params, teleportRegion);
             teleportRegion.loadFile();
         }

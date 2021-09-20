@@ -1,5 +1,6 @@
 package leafcraft.rtp.commands;
 
+import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.SendMessage;
 import org.bukkit.command.Command;
@@ -13,8 +14,8 @@ public class Help implements CommandExecutor {
     private final Configs configs;
     private final Map<String,String> perms = new HashMap<String,String>();
 
-    public Help(Configs configs) {
-        this.configs = configs;
+    public Help() {
+        this.configs = RTP.getConfigs();
         this.perms.put("rtp","rtp.see");
         this.perms.put("help","rtp.see");
         this.perms.put("reload","rtp.reload");

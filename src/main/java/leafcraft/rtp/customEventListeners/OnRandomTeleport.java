@@ -1,7 +1,7 @@
 package leafcraft.rtp.customEventListeners;
 
 import leafcraft.rtp.RTP;
-import leafcraft.rtp.customEvents.RandomTeleportEvent;
+import leafcraft.rtp.API.customEvents.RandomTeleportEvent;
 import leafcraft.rtp.tasks.*;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.configuration.Configs;
@@ -26,11 +26,10 @@ public final class OnRandomTeleport implements Listener {
     private final Configs configs;
     private final Cache cache;
 
-    public OnRandomTeleport(RTP plugin, Configs configs,
-                            Cache cache) {
-        this.plugin = plugin;
-        this.configs = configs;
-        this.cache = cache;
+    public OnRandomTeleport() {
+        this.plugin = RTP.getPlugin();
+        this.configs = RTP.getConfigs();
+        this.cache = RTP.getCache();
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)

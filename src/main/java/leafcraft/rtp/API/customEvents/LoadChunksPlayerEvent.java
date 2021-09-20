@@ -1,4 +1,4 @@
-package leafcraft.rtp.customEvents;
+package leafcraft.rtp.API.customEvents;
 
 import org.bukkit.Chunk;
 import org.bukkit.Location;

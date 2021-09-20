@@ -1,24 +1,20 @@
-package leafcraft.rtp.customEvents;
+package leafcraft.rtp.API.customEvents;
 
-import org.bukkit.Chunk;
 import org.bukkit.Location;
+import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
-
-public class LoadChunksQueueEvent extends Event implements Cancellable {
+public class RandomSelectPlayerEvent extends Event implements Cancellable {
     private final Location to;
-    private final List<CompletableFuture<Chunk>> chunks;
+    private final Player player;
     private static final HandlerList HANDLERS_LIST = new HandlerList();
     private boolean isCancelled;
 
-    public LoadChunksQueueEvent(Location to, List<CompletableFuture<Chunk>> chunks) {
-        super(true);
+    public RandomSelectPlayerEvent(Location to, Player player) {
         this.to = to;
-        this.chunks = chunks;
+        this.player = player;
         this.isCancelled = false;
     }
 
@@ -45,7 +41,7 @@ public class LoadChunksQueueEvent extends Event implements Cancellable {
         return to;
     }
 
-    public List<CompletableFuture<Chunk>> getChunks() {
-        return chunks;
+    public Player getPlayer() {
+        return player;
     }
 }

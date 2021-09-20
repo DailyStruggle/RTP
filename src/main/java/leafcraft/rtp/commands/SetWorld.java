@@ -19,25 +19,20 @@ import java.util.Set;
 import java.util.logging.Level;
 
 public class SetWorld implements CommandExecutor {
-    private final RTP plugin;
-    private final Configs configs;
-    private final Cache cache;
-
-    private final Set<String> worldParams = new HashSet<>();
-
-    public SetWorld(RTP plugin, Configs configs, Cache cache) {
-        this.plugin = plugin;
-        this.configs = configs;
-        this.cache = cache;
-
+    private static final Set<String> worldParams = new HashSet<>();
+    static {
         worldParams.add("world");
         worldParams.add("name");
         worldParams.add("region");
         worldParams.add("override");
     }
 
+    private static Configs configs = null;
+
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if(configs == null) configs = RTP.getConfigs();
+
         if(!sender.hasPermission("rtp.setWorld")) {
             String msg = configs.lang.getLog("noPerms");
             

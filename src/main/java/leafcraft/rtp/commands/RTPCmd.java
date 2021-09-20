@@ -1,6 +1,7 @@
 package leafcraft.rtp.commands;
 
-import leafcraft.rtp.customEvents.TeleportCommandSuccessEvent;
+import leafcraft.rtp.API.customEvents.TeleportCommandSuccessEvent;
+import leafcraft.rtp.RTP;
 import leafcraft.rtp.tasks.SetupTeleport;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.configuration.Configs;
@@ -23,18 +24,11 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 public class RTPCmd implements CommandExecutor {
-    private final leafcraft.rtp.RTP plugin;
-    private final Configs configs;
     private final Map<String,String> rtpCommands = new HashMap<>();
     private final Map<String,String> rtpParams = new HashMap<>();
     private final Map<String,CommandExecutor> commandHandles = new HashMap<>();
 
-    private final Cache cache;
-
-    public RTPCmd(leafcraft.rtp.RTP plugin, Configs configs, Cache cache) {
-        this.plugin = plugin;
-        this.configs = configs;
-        this.cache = cache;
+    public RTPCmd() {
 
         this.rtpParams.put("player", "rtp.other");
         this.rtpParams.put("world", "rtp.world");
@@ -61,6 +55,10 @@ public class RTPCmd implements CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if(!command.getName().equalsIgnoreCase("rtp") && !command.getName().equalsIgnoreCase("wild")) return true;
+
+        RTP plugin = RTP.getPlugin();
+        Configs configs = RTP.getConfigs();
+        Cache cache = RTP.getCache();
 
         long start = System.nanoTime();
 
@@ -174,7 +172,7 @@ public class RTPCmd implements CommandExecutor {
 
         //check time
         if(!sender.hasPermission("rtp.noCooldown")) {
-            long lastTime = (sender instanceof Player) ? this.cache.lastTeleportTime.getOrDefault(((Player) sender).getUniqueId(), 0L) : 0;
+            long lastTime = (sender instanceof Player) ? cache.lastTeleportTime.getOrDefault(((Player) sender).getUniqueId(), 0L) : 0;
             long cooldownTime = TimeUnit.SECONDS.toNanos(configs.config.teleportCooldown);
             Set<PermissionAttachmentInfo> perms = sender.getEffectivePermissions();
 
@@ -362,8 +360,8 @@ public class RTPCmd implements CommandExecutor {
                 Bukkit.getPluginManager().callEvent(new TeleportCommandSuccessEvent(sender,player)));
 
         //prep teleportation
-        this.cache.lastTeleportTime.put(player.getUniqueId(), start);
-        this.cache.playerFromLocations.put(player.getUniqueId(),player.getLocation());
+        cache.lastTeleportTime.put(player.getUniqueId(), start);
+        cache.playerFromLocations.put(player.getUniqueId(),player.getLocation());
         cache.commandSenderLookup.put(player.getUniqueId(),sender);
         SetupTeleport setupTeleport = new SetupTeleport(plugin,sender,player,configs, cache, rsParams);
         if(cache.permRegions.containsKey(rsParams)

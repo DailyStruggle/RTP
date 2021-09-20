@@ -1,7 +1,7 @@
 package leafcraft.rtp.spigotEventListeners;
 
 import leafcraft.rtp.RTP;
-import leafcraft.rtp.customEvents.TeleportCancelEvent;
+import leafcraft.rtp.API.customEvents.TeleportCancelEvent;
 import leafcraft.rtp.tasks.QueueLocation;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.configuration.Configs;
@@ -24,11 +24,10 @@ public final class OnPlayerDeath implements Listener {
     private final Configs configs;
     private final Cache cache;
 
-    public OnPlayerDeath(RTP plugin, Configs configs,
-                         Cache cache) {
-        this.plugin = plugin;
-        this.configs = configs;
-        this.cache = cache;
+    public OnPlayerDeath() {
+        this.plugin = RTP.getPlugin();
+        this.configs = RTP.getConfigs();
+        this.cache = RTP.getCache();
     }
 
     @EventHandler(priority = EventPriority.LOW)

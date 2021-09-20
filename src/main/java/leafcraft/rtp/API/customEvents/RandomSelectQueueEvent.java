@@ -1,20 +1,18 @@
-package leafcraft.rtp.customEvents;
+package leafcraft.rtp.API.customEvents;
 
 import org.bukkit.Location;
-import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 
-public class RandomSelectPlayerEvent extends Event implements Cancellable {
+public class RandomSelectQueueEvent extends Event implements Cancellable {
     private final Location to;
-    private final Player player;
     private static final HandlerList HANDLERS_LIST = new HandlerList();
     private boolean isCancelled;
 
-    public RandomSelectPlayerEvent(Location to, Player player) {
+    public RandomSelectQueueEvent(Location to) {
+
         this.to = to;
-        this.player = player;
         this.isCancelled = false;
     }
 
@@ -39,9 +37,5 @@ public class RandomSelectPlayerEvent extends Event implements Cancellable {
 
     public Location getTo() {
         return to;
-    }
-
-    public Player getPlayer() {
-        return player;
     }
 }

@@ -17,8 +17,8 @@ public class Configs {
     public String version;
     public List<MethodHandle> locationChecks;
 
-    public Configs(RTP plugin) {
-        this.plugin = plugin;
+    public Configs() {
+        this.plugin = RTP.getPlugin();
         String name = plugin.getServer().getClass().getPackage().getName();
         version = name.substring(name.indexOf('-')+1);
         lang = new Lang(plugin);

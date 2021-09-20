@@ -31,9 +31,9 @@ public class Cache {
 
     public ConcurrentHashMap<RandomSelectParams,BukkitTask> queueTimers = new ConcurrentHashMap<>();
 
-    public Cache(RTP plugin, Configs configs) {
-        this.plugin = plugin;
-        this.configs = configs;
+    public Cache() {
+        this.plugin = RTP.getPlugin();
+        this.configs = RTP.getConfigs();
 
         fetchPlayerData();
 
@@ -44,7 +44,7 @@ public class Cache {
             Map<String,String> map = new HashMap<>();
             map.put("region",region);
             RandomSelectParams key = new RandomSelectParams(world,map,configs);
-            TeleportRegion teleportRegion = new TeleportRegion(region,key.params, plugin, configs,this);
+            TeleportRegion teleportRegion = new TeleportRegion(region,key.params);
             permRegions.put(key, teleportRegion);
             Bukkit.getScheduler().runTaskAsynchronously(plugin, teleportRegion::loadFile);
         }
@@ -187,7 +187,7 @@ public class Cache {
             }
         }
         else {
-            region = new TeleportRegion("temp", rsParams.params, plugin, configs, this);
+            region = new TeleportRegion("temp", rsParams.params);
             if(!sender.hasPermission("rtp.free") && !didWithdraw) {
                 price = configs.config.price;
             }
@@ -210,7 +210,7 @@ public class Cache {
 
         Location res;
         if(rsParams.params.containsKey("biome")) {
-            res = region.getLocation(sender,player,Biome.valueOf(rsParams.params.get("biome")));
+            res = region.getLocation(true, sender,player,Biome.valueOf(rsParams.params.get("biome")));
         }
         else res = region.getLocation(urgent, sender, player);
         return res;
@@ -241,7 +241,7 @@ public class Cache {
             Map<String,String> map = new HashMap<>();
             map.put("region",region);
             RandomSelectParams key = new RandomSelectParams(world,map,configs);
-            TeleportRegion teleportRegion = new TeleportRegion(region, key.params, plugin, configs,this);
+            TeleportRegion teleportRegion = new TeleportRegion(region, key.params);
             permRegions.put(key, teleportRegion);
             teleportRegion.loadFile();
         }

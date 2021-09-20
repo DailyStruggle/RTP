@@ -1,5 +1,6 @@
 package leafcraft.rtp.commands;
 
+import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.SendMessage;
@@ -13,9 +14,9 @@ public class Reload implements CommandExecutor {
     private final Configs configs;
     private final Cache cache;
 
-    public Reload(Configs configs, Cache cache) {
-        this.configs = configs;
-        this.cache = cache;
+    public Reload() {
+        this.configs = RTP.getConfigs();
+        this.cache = RTP.getCache();
     }
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
