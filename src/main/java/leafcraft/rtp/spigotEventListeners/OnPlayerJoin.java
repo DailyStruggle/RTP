@@ -23,11 +23,10 @@ public final class OnPlayerJoin implements Listener {
     private final Configs configs;
     private final Cache cache;
 
-    public OnPlayerJoin(RTP plugin, Configs configs,
-                        Cache cache) {
-        this.plugin = plugin;
-        this.configs = configs;
-        this.cache = cache;
+    public OnPlayerJoin() {
+        this.plugin = RTP.getPlugin();
+        this.configs = RTP.getConfigs();
+        this.cache = RTP.getCache();
     }
 
     @EventHandler(priority = EventPriority.HIGH)

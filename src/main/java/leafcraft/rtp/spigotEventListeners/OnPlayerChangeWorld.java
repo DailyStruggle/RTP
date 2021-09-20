@@ -1,7 +1,7 @@
 package leafcraft.rtp.spigotEventListeners;
 
 import leafcraft.rtp.RTP;
-import leafcraft.rtp.customEvents.TeleportCancelEvent;
+import leafcraft.rtp.API.customEvents.TeleportCancelEvent;
 import leafcraft.rtp.tasks.DoTeleport;
 import leafcraft.rtp.tasks.LoadChunks;
 import leafcraft.rtp.tasks.QueueLocation;
@@ -26,11 +26,10 @@ public final class OnPlayerChangeWorld implements Listener {
     private final Configs configs;
     private final Cache cache;
 
-    public OnPlayerChangeWorld(RTP plugin, Configs configs,
-                               Cache cache) {
-        this.plugin = plugin;
-        this.configs = configs;
-        this.cache = cache;
+    public OnPlayerChangeWorld() {
+        this.plugin = RTP.getPlugin();
+        this.configs = RTP.getConfigs();
+        this.cache = RTP.getCache();
     }
 
     @EventHandler(priority = EventPriority.NORMAL)

@@ -33,6 +33,7 @@ import java.util.Objects;
 public final class RTP extends JavaPlugin {
     private static Configs configs = null;
     private static Cache cache = null;
+    private static RTP plugin = null;
     private static Metrics metrics;
 
 //    private OnChunkLoad onChunkLoad;
@@ -58,15 +59,16 @@ public final class RTP extends JavaPlugin {
 //
 //        }
 
-        configs = new Configs(this);
-        cache = new Cache(this,configs);
+        RTP.plugin = this;
+        RTP.configs = new Configs();
+        RTP.cache = new Cache();
 
-        RTPCmd rtpCmd = new RTPCmd(this,configs,cache);
-        Help help = new Help(configs);
-        Reload reload = new Reload(configs, cache);
-        SetRegion setRegion = new SetRegion(this,configs, cache);
-        SetWorld setWorld = new SetWorld(this,configs, cache);
-        Fill fill = new Fill(this,configs, cache);
+        RTPCmd rtpCmd = new RTPCmd();
+        Help help = new Help();
+        Reload reload = new Reload();
+        SetRegion setRegion = new SetRegion();
+        SetWorld setWorld = new SetWorld();
+        Fill fill = new Fill();
 
         try {
             Objects.requireNonNull(getCommand("wild")).setExecutor(rtpCmd);
@@ -75,8 +77,9 @@ public final class RTP extends JavaPlugin {
         catch (NullPointerException ignored) { }
 
         try {
-            Objects.requireNonNull(getCommand("rtp")).setTabCompleter(new TabComplete(configs));
-            Objects.requireNonNull(getCommand("wild")).setTabCompleter(new TabComplete(configs));
+            TabComplete tabComplete = new TabComplete();
+            Objects.requireNonNull(getCommand("rtp")).setTabCompleter(tabComplete);
+            Objects.requireNonNull(getCommand("wild")).setTabCompleter(tabComplete);
         }
         catch (NullPointerException ignored) { }
 
@@ -94,16 +97,16 @@ public final class RTP extends JavaPlugin {
 //            Objects.requireNonNull(getCommand("rtp fill")).setExecutor(fill);
 //        } catch (NullPointerException ignored) { }
 
-        getServer().getPluginManager().registerEvents(new OnPlayerMove(this,configs,cache),this);
-        getServer().getPluginManager().registerEvents(new OnPlayerTeleport(this,configs,cache),this);
-        getServer().getPluginManager().registerEvents(new OnPlayerDeath(this,configs,cache),this);
-        getServer().getPluginManager().registerEvents(new OnPlayerRespawn(this,configs,cache),this);
-        getServer().getPluginManager().registerEvents(new OnPlayerJoin(this,configs,cache),this);
-        getServer().getPluginManager().registerEvents(new OnPlayerChangeWorld(this,configs,cache),this);
-        getServer().getPluginManager().registerEvents(new OnPlayerQuit(cache),this);
-        getServer().getPluginManager().registerEvents(new OnRandomPreTeleport(this,configs,cache),this);
-        getServer().getPluginManager().registerEvents(new OnRandomTeleport(this,configs,cache),this);
-        getServer().getPluginManager().registerEvents(new OnTeleportCancel(this,configs,cache),this);
+        getServer().getPluginManager().registerEvents(new OnPlayerMove(),this);
+        getServer().getPluginManager().registerEvents(new OnPlayerTeleport(),this);
+        getServer().getPluginManager().registerEvents(new OnPlayerDeath(),this);
+        getServer().getPluginManager().registerEvents(new OnPlayerRespawn(),this);
+        getServer().getPluginManager().registerEvents(new OnPlayerJoin(),this);
+        getServer().getPluginManager().registerEvents(new OnPlayerChangeWorld(),this);
+        getServer().getPluginManager().registerEvents(new OnPlayerQuit(),this);
+        getServer().getPluginManager().registerEvents(new OnRandomPreTeleport(),this);
+        getServer().getPluginManager().registerEvents(new OnRandomTeleport(),this);
+        getServer().getPluginManager().registerEvents(new OnTeleportCancel(),this);
 
         Bukkit.getServer().getScheduler().scheduleSyncRepeatingTask(this, new TPS(), 100L, 1L);
 
@@ -171,7 +174,7 @@ public final class RTP extends JavaPlugin {
 
         configs.regions.setRegion(regionName,randomSelectParams);
         return cache.permRegions.put(randomSelectParams,
-                new TeleportRegion(regionName,params, (RTP)Bukkit.getPluginManager().getPlugin("RTP"),configs,cache));
+                new TeleportRegion(regionName,params));
     }
 
     /**
@@ -180,5 +183,20 @@ public final class RTP extends JavaPlugin {
      */
     public static void addLocationCheck(@NotNull MethodHandle methodHandle) {
         configs.addLocationCheck(methodHandle);
+    }
+
+    @NotNull
+    public static RTP getPlugin() {
+        return plugin;
+    }
+
+    @NotNull
+    public static Configs getConfigs() {
+        return configs;
+    }
+
+    @NotNull
+    public static Cache getCache() {
+        return cache;
     }
 }

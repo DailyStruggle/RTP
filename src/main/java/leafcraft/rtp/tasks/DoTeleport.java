@@ -1,8 +1,8 @@
 package leafcraft.rtp.tasks;
 
 import leafcraft.rtp.RTP;
-import leafcraft.rtp.customEvents.RandomPreTeleportEvent;
-import leafcraft.rtp.customEvents.RandomTeleportEvent;
+import leafcraft.rtp.API.customEvents.RandomPreTeleportEvent;
+import leafcraft.rtp.API.customEvents.RandomTeleportEvent;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.configuration.Configs;
 import org.bukkit.*;

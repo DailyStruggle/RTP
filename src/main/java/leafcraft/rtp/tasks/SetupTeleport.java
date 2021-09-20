@@ -4,6 +4,7 @@ import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.SendMessage;
+import leafcraft.rtp.tools.selection.ChunkSet;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Bukkit;
@@ -26,7 +27,6 @@ public class SetupTeleport extends BukkitRunnable {
     private RandomSelectParams rsParams;
     private Location location = null;
     private boolean cancelled = false;
-    private TeleportRegion.ChunkSet chunkSet = null;
 
     public SetupTeleport(RTP plugin, CommandSender sender, Player player, Configs configs, Cache cache, RandomSelectParams rsParams) {
         this.sender = sender;

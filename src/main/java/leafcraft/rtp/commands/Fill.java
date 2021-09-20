@@ -28,10 +28,10 @@ public class Fill implements CommandExecutor {
     private final Set<String> fillParams = new HashSet<>();
     private final Set<String> fillCancelParams = new HashSet<>();
 
-    public Fill(leafcraft.rtp.RTP plugin, Configs configs, Cache cache) {
-        this.plugin = plugin;
-        this.configs = configs;
-        this.cache = cache;
+    public Fill() {
+        this.plugin = RTP.getPlugin();
+        this.configs = RTP.getConfigs();
+        this.cache = RTP.getCache();
 
         fillParams.add("region");
 

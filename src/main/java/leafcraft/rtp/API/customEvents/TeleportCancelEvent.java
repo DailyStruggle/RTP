@@ -1,4 +1,4 @@
-package leafcraft.rtp.customEvents;
+package leafcraft.rtp.API.customEvents;
 
 import org.bukkit.Location;
 import org.bukkit.command.CommandSender;

@@ -1,11 +1,14 @@
 package leafcraft.rtp.tools.selection;
 
 import io.papermc.lib.PaperLib;
+import leafcraft.rtp.API.customEvents.LoadChunksQueueEvent;
+import leafcraft.rtp.API.customEvents.RandomSelectPlayerEvent;
+import leafcraft.rtp.API.customEvents.RandomSelectQueueEvent;
 import leafcraft.rtp.RTP;
-import leafcraft.rtp.customEvents.LoadChunksQueueEvent;
-import leafcraft.rtp.customEvents.RandomSelectPlayerEvent;
-import leafcraft.rtp.customEvents.RandomSelectQueueEvent;
-import leafcraft.rtp.tools.*;
+import leafcraft.rtp.tools.Cache;
+import leafcraft.rtp.tools.HashableChunk;
+import leafcraft.rtp.tools.SendMessage;
+import leafcraft.rtp.tools.TPS;
 import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.softdepends.*;
 import org.bukkit.*;
@@ -14,6 +17,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -26,25 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-public class TeleportRegion {
-    private static final Set<String> regionParams = new HashSet<>();
-    static {
-        regionParams.add("world");
-        regionParams.add("shape");
-        regionParams.add("mode");
-        regionParams.add("radius");
-        regionParams.add("centerRadius");
-        regionParams.add("centerX");
-        regionParams.add("centerZ");
-        regionParams.add("weight");
-        regionParams.add("minY");
-        regionParams.add("maxY");
-        regionParams.add("requireSkyLight");
-        regionParams.add("requirePermission");
-        regionParams.add("worldBorderOverride");
-        regionParams.add("uniquePlacements");
-    }
-
+public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegion {
     private static final Set<Material> acceptableAir = new HashSet<>();
     static {
         acceptableAir.add(Material.AIR);
@@ -95,6 +81,7 @@ public class TeleportRegion {
 
         @Override
         public void run() {
+            Configs configs = RTP.getConfigs();
             if(TPS.getTPS()<configs.config.minTPS) {
                 fillTask = new FillTask(plugin);
                 fillTask.runTaskLaterAsynchronously(plugin,20);
@@ -185,31 +172,7 @@ public class TeleportRegion {
         }
     }
 
-    public class ChunkSet {
-        public AtomicInteger completed;
-        public int expectedSize;
-        public ArrayList<CompletableFuture<Chunk>> chunks;
-
-        public ChunkSet() {
-            completed = new AtomicInteger(0);
-            int vd = configs.config.vd;
-            expectedSize = (vd*2+1)*(vd*2+1);
-            chunks = new ArrayList<>(expectedSize);
-        }
-
-        public void shutDown() {
-            if(fillTask!=null) fillTask.cancel();
-            for(CompletableFuture<Chunk> chunk : chunks) {
-                if(!chunk.isDone()) chunk.cancel(true);
-            }
-        }
-    }
-
     public String name;
-
-    private final RTP plugin;
-    private final Configs configs;
-    private final Cache cache;
 
     private final World world;
     private double totalSpace;
@@ -246,12 +209,10 @@ public class TeleportRegion {
     private AtomicLong fillIterator;
     private FillTask fillTask = null;
 
-    public TeleportRegion(String name, Map<String, String> params, RTP plugin, Configs configs, Cache cache) {
+    public TeleportRegion(String name, Map<String, String> params) {
         this.name = name;
-        this.plugin = plugin;
-        this.configs = configs;
-        this.cache = cache;
         String worldName = params.getOrDefault("world","world");
+        Configs configs = RTP.getConfigs();
         if(!configs.worlds.checkWorldExists(worldName)) worldName = "world";
         this.world = Bukkit.getWorld(worldName);
 
@@ -310,6 +271,7 @@ public class TeleportRegion {
     }
 
     public void startFill(RTP plugin) {
+        Configs configs = RTP.getConfigs();
         //clear learned data
         biomeLocations.clear();
         biomeLengths.clear();
@@ -330,6 +292,7 @@ public class TeleportRegion {
     }
 
     public void stopFill() {
+        Configs configs = RTP.getConfigs();
         fillTask.cancel();
 
         String msg = configs.lang.getLog("fillCancel", name);
@@ -339,11 +302,18 @@ public class TeleportRegion {
         }
     }
 
+    public boolean hasQueuedLocation(OfflinePlayer player) {
+        return hasQueuedLocation(player.getUniqueId());
+    }
+
     public boolean hasQueuedLocation(Player player) {
-        UUID playerID = player.getUniqueId();
+        return hasQueuedLocation(player.getUniqueId());
+    }
+
+    public boolean hasQueuedLocation(UUID uuid) {
         boolean hasPlayerLocation;
         try {
-            hasPlayerLocation = perPlayerQueue.get(playerID).size() > 0;
+            hasPlayerLocation = perPlayerQueue.get(uuid).size() > 0;
         } catch (NullPointerException e) {
             return false;
         }
@@ -356,6 +326,15 @@ public class TeleportRegion {
         return ( hasPlayerLocation || hasPublicLocation );
     }
 
+    public boolean hasQueuedLocation() {
+        return (locationQueue.size()>0);
+    }
+
+    @Override
+    public int getTotalQueueLength(OfflinePlayer player) {
+        return getPublicQueueLength() + getPlayerQueueLength(player);
+    }
+
     public int getTotalQueueLength(Player player) {
         return getPublicQueueLength() + getPlayerQueueLength(player);
     }
@@ -364,8 +343,16 @@ public class TeleportRegion {
         return (locationQueue==null) ? 0 : locationQueue.size();
     }
 
+    public int getPlayerQueueLength(OfflinePlayer player) {
+        return (getPlayerQueueLength(player.getUniqueId()));
+    }
+
     public int getPlayerQueueLength(Player player) {
-        return (!perPlayerQueue.containsKey(player.getUniqueId())) ? 0 : perPlayerQueue.get(player).size();
+        return (getPlayerQueueLength(player.getUniqueId()));
+    }
+
+    public int getPlayerQueueLength(UUID uuid) {
+        return (!perPlayerQueue.containsKey(uuid)) ? 0 : perPlayerQueue.get(uuid).size();
     }
 
     public void shutdown() {
@@ -382,6 +369,8 @@ public class TeleportRegion {
     }
 
     public Location getQueuedLocation(CommandSender sender, Player player) {
+        Configs configs = RTP.getConfigs();
+
         Location res;
         if(perPlayerQueue.containsKey(player.getUniqueId()) && perPlayerQueue.get(player.getUniqueId()).size()>0) {
             res = perPlayerQueue.get(player.getUniqueId()).remove();
@@ -399,17 +388,22 @@ public class TeleportRegion {
         return res;
     }
 
-    public Location getLocation(CommandSender sender, Player player, Biome biome) {
-        Location res = getRandomLocation(true, biome);
+    public Location getLocation(boolean urgent, CommandSender sender, Player player, Biome biome) {
+        Configs configs = RTP.getConfigs();
+
+        Location res = getRandomLocation(urgent, biome);
         if (res == null) {
-            Integer maxAttempts = configs.config.maxAttempts;
-            String msg = PAPIChecker.fillPlaceholders(player, configs.lang.getLog("unsafe", maxAttempts.toString()));
+            int maxAttempts = configs.config.maxAttempts;
+            String msg = PAPIChecker.fillPlaceholders(player, configs.lang.getLog("unsafe", String.valueOf(maxAttempts)));
             SendMessage.sendMessage(sender, player, msg);
         }
         return res;
     }
 
     public Location getLocation(boolean urgent, CommandSender sender, Player player) {
+        RTP plugin = RTP.getPlugin();
+        Configs configs = RTP.getConfigs();
+
         Location res = null;
 
         if(perPlayerQueue.containsKey(player.getUniqueId()) && perPlayerQueue.get(player.getUniqueId()).size()>0) {
@@ -424,8 +418,8 @@ public class TeleportRegion {
             if(sender.hasPermission("rtp.unqueued")) {
                 res = getRandomLocation(urgent);
                 if(res == null) {
-                    Integer maxAttempts = configs.config.maxAttempts;
-                    String msg = PAPIChecker.fillPlaceholders(player,configs.lang.getLog("unsafe",maxAttempts.toString()));
+                    int maxAttempts = configs.config.maxAttempts;
+                    String msg = PAPIChecker.fillPlaceholders(player,configs.lang.getLog("unsafe",String.valueOf(maxAttempts)));
                     SendMessage.sendMessage(sender,player,msg);
                 }
                 RandomSelectPlayerEvent randomSelectPlayerEvent = new RandomSelectPlayerEvent(res, player);
@@ -440,6 +434,9 @@ public class TeleportRegion {
     }
 
     private void addChunks(Location location, boolean urgent) {
+        Configs configs = RTP.getConfigs();
+        Cache cache = RTP.getCache();
+
         ChunkSet chunkSet = new ChunkSet();
         locAssChunks.put(location,chunkSet);
 
@@ -486,8 +483,9 @@ public class TeleportRegion {
         }
     }
 
+    @Nullable
     public ChunkSet getChunks(Location location) {
-        return locAssChunks.getOrDefault(location,new ChunkSet());
+        return locAssChunks.getOrDefault(location,null);
     }
 
     public void removeChunks(Location location) {
@@ -500,6 +498,9 @@ public class TeleportRegion {
     }
 
     public void queueRandomLocation() {
+        RTP plugin = RTP.getPlugin();
+        Configs configs = RTP.getConfigs();
+
         if(locationQueue == null) {
             locationQueue = new ConcurrentLinkedQueue<>();
         }
@@ -513,7 +514,7 @@ public class TeleportRegion {
             return;
         }
         ChunkSet chunkSet = getChunks(location);
-        LoadChunksQueueEvent loadChunksQueueEvent = new LoadChunksQueueEvent(location,chunkSet.chunks);
+        LoadChunksQueueEvent loadChunksQueueEvent = new LoadChunksQueueEvent(location, Objects.requireNonNull(chunkSet).chunks);
         Bukkit.getPluginManager().callEvent(loadChunksQueueEvent);
         if(chunkSet.completed.get()>=chunkSet.expectedSize-1) {
             queueLocation(location);
@@ -530,10 +531,20 @@ public class TeleportRegion {
         }
     }
 
+    public void queueRandomLocation(OfflinePlayer player) {
+        queueRandomLocation(player.getUniqueId());
+    }
+
     public void queueRandomLocation(Player player) {
+        queueRandomLocation(player.getUniqueId());
+    }
+
+    public void queueRandomLocation(UUID uuid) {
+        Configs configs = RTP.getConfigs();
+
         if(locationQueue.size() > 1 && locationQueue.size() >= (Integer)configs.regions.getRegionSetting(name,"queueLen",0)) {
-            perPlayerQueue.putIfAbsent(player.getUniqueId(),new ConcurrentLinkedQueue<>());
-            perPlayerQueue.get(player.getUniqueId()).add(locationQueue.remove());
+            perPlayerQueue.putIfAbsent(uuid,new ConcurrentLinkedQueue<>());
+            perPlayerQueue.get(uuid).add(locationQueue.remove());
             return;
         }
 
@@ -543,17 +554,17 @@ public class TeleportRegion {
         }
         ChunkSet chunkSet = getChunks(location);
         if(chunkSet.completed.get()>=chunkSet.expectedSize-1) {
-            perPlayerQueue.putIfAbsent(player.getUniqueId(),new ConcurrentLinkedQueue<>());
-            perPlayerQueue.get(player.getUniqueId()).add(location);
+            perPlayerQueue.putIfAbsent(uuid,new ConcurrentLinkedQueue<>());
+            perPlayerQueue.get(uuid).add(location);
         }
         else {
             AtomicBoolean added = new AtomicBoolean(false);
             for (CompletableFuture<Chunk> cfChunk : chunkSet.chunks) {
                 cfChunk.whenCompleteAsync((chunk, throwable) -> {
                     if (chunkSet.completed.get() >= chunkSet.expectedSize-1 && !added.getAndSet(true)) {
-                        if(player.isOnline()) {
-                            perPlayerQueue.putIfAbsent(player.getUniqueId(),new ConcurrentLinkedQueue<>());
-                            perPlayerQueue.get(player.getUniqueId()).offer(location);
+                        if(Bukkit.getOfflinePlayer(uuid).isOnline()) {
+                            perPlayerQueue.putIfAbsent(uuid,new ConcurrentLinkedQueue<>());
+                            perPlayerQueue.get(uuid).offer(location);
                         }
                         else {
                             locationQueue.add(location);
@@ -564,12 +575,20 @@ public class TeleportRegion {
         }
     }
 
+    public void recyclePlayerLocations(OfflinePlayer player) {
+        recyclePlayerLocations(player.getUniqueId());
+    }
+
     public void recyclePlayerLocations(Player player) {
-        if(!perPlayerQueue.containsKey(player.getUniqueId())) return;
-        while(perPlayerQueue.get(player.getUniqueId()).size()>0) {
-            queueLocation(perPlayerQueue.get(player.getUniqueId()).remove());
+        recyclePlayerLocations(player.getUniqueId());
+    }
+
+    public void recyclePlayerLocations(UUID uuid) {
+        if(!perPlayerQueue.containsKey(uuid)) return;
+        while(perPlayerQueue.get(uuid).size()>0) {
+            queueLocation(perPlayerQueue.get(uuid).remove());
         }
-        perPlayerQueue.remove(player.getUniqueId());
+        perPlayerQueue.remove(uuid);
     }
 
     public void addBadLocation(int chunkX, int chunkZ) {
@@ -579,7 +598,7 @@ public class TeleportRegion {
         addBadLocation((long)location);
     }
 
-    private void addBadLocation(Long location) {
+    public void addBadLocation(Long location) {
         if(location < 0) return;
         if(location > (totalSpace+(expand?badLocationSum.get():0))) return;
 
@@ -619,7 +638,7 @@ public class TeleportRegion {
         addBiomeLocation((long)location, biome);
     }
 
-    private void addBiomeLocation(Long location, Biome biome) {
+    public void addBiomeLocation(Long location, Biome biome) {
         if(location < 0) return;
         if(location > (totalSpace+(expand?badLocationSum.get():0))) return;
 
@@ -654,7 +673,14 @@ public class TeleportRegion {
         biomeLengths.get(biome).incrementAndGet();
     }
 
-    private void removeBiomeLocation(Long location, Biome biome) {
+    public void removeBiomeLocation(int chunkX, int chunkZ, Biome biome) {
+        double location = (shape.equals(Shapes.SQUARE)) ?
+                Translate.xzToSquareLocation(cr,chunkX,chunkZ,cx,cz) :
+                Translate.xzToCircleLocation(cr,chunkX,chunkZ,cx,cz);
+        removeBiomeLocation((long)location, biome);
+    }
+
+    public void removeBiomeLocation(Long location, Biome biome) {
         biomeLocations.putIfAbsent(biome, new ConcurrentSkipListMap<>());
         ConcurrentSkipListMap<Long, Long> map = biomeLocations.get(biome);
         biomeLengths.putIfAbsent(biome,new AtomicLong(0L));
@@ -684,7 +710,10 @@ public class TeleportRegion {
         return (long)res;
     }
 
-    private Location getRandomLocation(boolean urgent,Biome biome) {
+    public Location getRandomLocation(boolean urgent,Biome biome) {
+        Configs configs = RTP.getConfigs();
+        Cache cache = RTP.getCache();
+
         long totalTimeStart = System.nanoTime();
         Location res = new Location(world,0,this.maxY,0);
 
@@ -692,8 +721,8 @@ public class TeleportRegion {
         double chunkTime = 0D;
         double yTime = 0D;
 
-        Integer numAttempts = 0;
-        Integer maxAttempts = configs.config.maxAttempts;
+        int numAttempts = 0;
+        int maxAttempts = configs.config.maxAttempts;
         if(biome!=null) maxAttempts = maxAttempts*10;
         boolean goodLocation = false;
         while(numAttempts < maxAttempts && !goodLocation) {
@@ -710,17 +739,18 @@ public class TeleportRegion {
 
                 //select top or bottom
                 Map.Entry<Long, Long> idx = lower;
-                if (upper == null) {
-                    idx = lower;
-                } else if (lower == null) {
-                    idx = upper;
-                } else if (upper.getKey().equals(lower.getKey())) {
-                    idx = lower;
-                } else if(location >= lower.getKey()+lower.getValue()){
-                    long d1 = (upper.getKey() - location);
-                    long d2 = ((lower.getKey() + lower.getValue()) - location);
-                    if (d1 > d2) idx = upper;
-                    else idx = lower;
+                if (upper != null) {
+                    if (lower == null) {
+                        idx = upper;
+                    } else {
+                        if (!upper.getKey().equals(lower.getKey())) {
+                            if (location >= lower.getKey() + lower.getValue()) {
+                                long d1 = (upper.getKey() - location);
+                                long d2 = ((lower.getKey() + lower.getValue()) - location);
+                                if (d1 > d2) idx = upper;
+                            }
+                        }
+                    }
                 }
 
                 long temp = ThreadLocalRandom.current().nextLong(idx.getValue());
@@ -860,7 +890,8 @@ public class TeleportRegion {
             return null;
         }
 
-        this.cache.numTeleportAttempts.put(res, numAttempts);
+
+        cache.numTeleportAttempts.put(res, numAttempts);
         addChunks(res, urgent);
 
 //        Bukkit.getLogger().warning(ChatColor.AQUA + "TOTAL TIME SPENT ON SELECTION FIXING: " + (selectTime)/1000000 + "ms");
@@ -871,7 +902,7 @@ public class TeleportRegion {
         return res;
     }
 
-    private Location getRandomLocation(boolean urgent) {
+    public Location getRandomLocation(boolean urgent) {
         return getRandomLocation(urgent,null);
     }
 
@@ -889,9 +920,9 @@ public class TeleportRegion {
         return i;
     }
 
-    public int getLastNonAir(ChunkSnapshot chunk, int y) {
-        int oldY = y;
-        int minY = y;
+    public int getLastNonAir(ChunkSnapshot chunk, int start) {
+        int oldY = start;
+        int minY = start;
         int maxY = this.maxY;
 
         //iterate over a larger distance first, then fine-tune
@@ -955,6 +986,7 @@ public class TeleportRegion {
     }
 
     public boolean checkLocation(ChunkSnapshot chunkSnapshot, int y) {
+        Configs configs = RTP.getConfigs();
 //        Material material = chunkSnapshot.getBlockType(7,y,7);
         if(y >= maxY) return false;
 //        if(!material.isSolid()) return false;

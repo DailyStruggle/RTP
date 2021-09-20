@@ -2,12 +2,12 @@ package leafcraft.rtp.tasks;
 
 import io.papermc.lib.PaperLib;
 import leafcraft.rtp.RTP;
-import leafcraft.rtp.customEvents.LoadChunksPlayerEvent;
+import leafcraft.rtp.API.customEvents.LoadChunksPlayerEvent;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.SendMessage;
+import leafcraft.rtp.tools.selection.ChunkSet;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
-import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.*;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -19,7 +19,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 public class LoadChunks extends BukkitRunnable {
-    public final TeleportRegion.ChunkSet chunkSet;
+    public final ChunkSet chunkSet;
     private final RTP plugin;
     private final Configs configs;
     private final CommandSender sender;

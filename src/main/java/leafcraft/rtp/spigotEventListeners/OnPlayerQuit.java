@@ -1,8 +1,8 @@
 package leafcraft.rtp.spigotEventListeners;
 
-import leafcraft.rtp.customEvents.TeleportCancelEvent;
+import leafcraft.rtp.API.customEvents.TeleportCancelEvent;
+import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
-import leafcraft.rtp.tools.selection.RandomSelectParams;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
@@ -12,14 +12,13 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
 
-import java.util.Objects;
 import java.util.UUID;
 
 public final class OnPlayerQuit implements Listener {
     private final Cache cache;
 
-    public OnPlayerQuit(Cache cache) {
-        this.cache = cache;
+    public OnPlayerQuit() {
+        this.cache = RTP.getCache();
     }
 
     @EventHandler(priority = EventPriority.LOWEST)

@@ -1,5 +1,7 @@
 package leafcraft.rtp.commands;
 
+import leafcraft.rtp.RTP;
+import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Bukkit;
@@ -40,9 +42,11 @@ public class TabComplete implements TabCompleter {
 
     private final SubCommand subCommands = new SubCommand("rtp");
 
-    private final Configs configs;
+    private static RTP plugin = null;
+    private static Configs configs = null;
+    private static Cache cache = null;
 
-    public TabComplete(Configs configs) {
+    public TabComplete() {
         //load rtp commands and permission nodes into map
         subCommands.addSubParam("world","rtp.world");
         subCommands.addSubParam("region","rtp.region");
@@ -94,14 +98,16 @@ public class TabComplete implements TabCompleter {
         subCommands.commands.get("fill").addSubParam("region","rtp.fill");
         subCommands.commands.get("fill").commands.put("cancel",new SubCommand("rtp.fill"));
         subCommands.commands.get("fill").commands.get("cancel").addSubParam("region","rtp.fill");
-
-        this.configs = configs;
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command,
                                       String alias, String[] args) {
         if(!sender.hasPermission("rtp.see")) return null;
+
+        if(plugin == null) plugin = RTP.getPlugin();
+        if(configs == null) configs = RTP.getConfigs();
+        if(cache == null) cache = RTP.getCache();
 
         List<String> match = new ArrayList<>();
         Set<String> knownParams = new HashSet<>();
