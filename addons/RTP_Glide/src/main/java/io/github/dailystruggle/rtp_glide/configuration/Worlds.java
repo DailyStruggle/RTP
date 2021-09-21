@@ -45,16 +45,6 @@ public class Worlds {
         int defaultRelative = config.getConfigurationSection("default").getInt("relative",75);
         int defaultMax = config.getConfigurationSection("default").getInt("max",320);
 
-        for(World w : Bukkit.getWorlds()) {
-            String permName = "rtp.worlds." + w.getName();
-            if(Bukkit.getPluginManager().getPermission(permName) == null) {
-                Permission permission = new Permission(permName);
-                permission.setDefault(PermissionDefault.OP);
-                permission.addParent("rtp.worlds.*",true);
-                Bukkit.getPluginManager().addPermission(permission);
-            }
-        }
-
         try {
             Scanner scanner = new Scanner(
                     new File(plugin.getDataFolder().getAbsolutePath() + File.separator + "worlds.yml"));

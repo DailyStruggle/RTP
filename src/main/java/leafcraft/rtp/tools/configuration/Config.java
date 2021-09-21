@@ -41,6 +41,8 @@ public class Config {
 	public final int fadeIn, stay, fadeOut;
 
 	public final boolean refund;
+
+	public final int biomeCacheThreshold;
 	
 	public Config(RTP plugin, Lang lang) {
 		this.plugin = plugin;
@@ -52,7 +54,7 @@ public class Config {
 		}
 		this.config = YamlConfiguration.loadConfiguration(f);
 
-		if( 	(this.config.getDouble("version") < 2.6) ) {
+		if( 	(this.config.getDouble("version") < 2.7) ) {
 			Bukkit.getLogger().log(Level.WARNING, lang.getLog("oldFile", "config.yml"));
 			update();
 
@@ -116,6 +118,8 @@ public class Config {
 		this.postTeleportQueueing = config.getBoolean("postTeleportQueueing", false);
 
 		this.refund = config.getBoolean("refundOnCancel", false);
+
+		this.biomeCacheThreshold = config.getInt("biomeCacheThreshold",10);
 	}
 
 	private void update() {
@@ -138,7 +142,7 @@ public class Config {
 		for (String line : linesInDefaultConfig) {
 			StringBuilder newline = new StringBuilder(line);
 			if (line.startsWith("version:")) {
-				newline = new StringBuilder("version: 2.6");
+				newline = new StringBuilder("version: 2.7");
 			}
 			else if(newline.toString().startsWith("  -")) continue;
 			else {
