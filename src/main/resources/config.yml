@@ -74,9 +74,6 @@ nearOtherPrice: 2000.0
 #price to use biome parameter
 biomePrice: 5000.0
 
-#threshold of known biome locations before using cached locations.
-biomeCacheThreshold: 10
-
 #commands to run after any teleportation
 # e.g.
 #consoleCommands:
@@ -98,4 +95,4 @@ stay: 1
 fadeout: 1
 
 #DO NOT TOUCH VERSION NUMBER
-version: 2.7
+version: 2.6
