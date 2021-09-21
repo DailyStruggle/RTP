@@ -686,9 +686,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
             long location = select();
 
             //if biome is available, try it
-            if(biome != null && configs.config.biomeCacheThreshold>0
-                    && biomeLocations.containsKey(biome)
-                    && biomeLocations.get(biome).size()>=configs.config.biomeCacheThreshold) {
+            if(biome != null && biomeLocations.containsKey(biome) && biomeLocations.get(biome).size()>0) {
                 //get nearest spot according to biome list
                 ConcurrentSkipListMap<Long,Long> map = biomeLocations.get(biome);
                 Map.Entry<Long, Long> lower = map.floorEntry(location);
@@ -728,7 +726,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                         }
                     }
                     case NEAREST: {
-                        if(expand) location = (long) (location + ((badLocationSum.get() * location) / totalSpace));
+                        if(expand) location = location + ThreadLocalRandom.current().nextLong(badLocationSum.get());
                         ConcurrentSkipListMap<Long,Long> map = badLocations;
                         Map.Entry<Long, Long> check = map.floorEntry(location);
 
@@ -772,7 +770,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                         }
                     }
                     case REROLL: {
-                        if(expand) location = (long) (location + ((badLocationSum.get() * location) / totalSpace));
+                        if(expand) location = location + ThreadLocalRandom.current().nextLong(badLocationSum.get());
                         Map.Entry<Long, Long> check = badLocations.floorEntry(location);
                         if(     (check!=null)
                                 && (location > check.getKey())
@@ -792,6 +790,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
 
             Biome currBiome = world.getBiome(xzChunk[0]*16+7, xzChunk[1]*16+7);
             if(biome!=null && !currBiome.equals(biome)) {
+                removeBiomeLocation(location,biome);
                 continue;
             }
 
@@ -834,13 +833,6 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                 addBadLocation(location);
                 removeBiomeLocation(location,currBiome);
             }
-            Bukkit.getLogger().warning("----------------------------------------------------------------");
-            Bukkit.getLogger().warning("[rtp] computed chunk: " + xzChunk[0] + ", " + xzChunk[1]);
-            Bukkit.getLogger().warning("[rtp] computed location: " + (xzChunk[0]*16+7) + ", " + (xzChunk[1]*16+7));
-            Bukkit.getLogger().warning("[rtp] computed biome: " + currBiome);
-            Bukkit.getLogger().warning("[rtp] actual chunk: " + chunk.getX() + ", " + chunk.getZ());
-            Bukkit.getLogger().warning("[rtp] actual location: " + res.getBlockX() + ", " + res.getBlockZ());
-            Bukkit.getLogger().warning("[rtp] actual biome: " + world.getBiome(res.getBlockX(), res.getBlockZ()));
         }
 
         res.setY(res.getBlockY()+1);

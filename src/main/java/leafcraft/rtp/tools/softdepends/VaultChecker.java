@@ -14,7 +14,7 @@ public class VaultChecker {
     private static Chat chat = null;
 
     public static void setupEconomy() {
-        if (Bukkit.getServer().getPluginManager().getPlugin("Vault") == null) {
+        if(Bukkit.getServer().getPluginManager().getPlugin("Vault") == null) {
             return;
         }
         RegisteredServiceProvider<Economy> rsp = Bukkit.getServer().getServicesManager().getRegistration(Economy.class);
