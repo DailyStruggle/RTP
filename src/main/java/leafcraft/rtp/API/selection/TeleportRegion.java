@@ -1,6 +1,7 @@
 package leafcraft.rtp.API.selection;
 
 import leafcraft.rtp.tools.selection.ChunkSet;
+import org.bukkit.Chunk;
 import org.bukkit.ChunkSnapshot;
 import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
@@ -76,8 +77,8 @@ public interface TeleportRegion {
     @Nullable
     ChunkSet getChunks(Location location);
 
-    int getFirstNonAir(ChunkSnapshot chunk);
-    int getLastNonAir(ChunkSnapshot chunk, int start);
+    int getFirstNonAir(Chunk chunk);
+    int getLastNonAir(Chunk chunk, int start);
 
     boolean isKnownBad(int x, int z);
     boolean isKnownBad(long location);
@@ -85,7 +86,7 @@ public interface TeleportRegion {
     boolean isInBounds(int x, int z);
     boolean isInBounds(long location);
 
-    boolean checkLocation(ChunkSnapshot chunkSnapshot, int y);
+    boolean checkLocation(Chunk chunkSnapshot, int y);
 
     void loadFile();
     void storeFile();

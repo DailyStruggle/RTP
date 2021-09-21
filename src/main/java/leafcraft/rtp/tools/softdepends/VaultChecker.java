@@ -13,16 +13,13 @@ public class VaultChecker {
     private static Permission perms = null;
     private static Chat chat = null;
 
-    public static boolean setupEconomy() {
+    public static void setupEconomy() {
         if (Bukkit.getServer().getPluginManager().getPlugin("Vault") == null) {
-            return false;
+            return;
         }
         RegisteredServiceProvider<Economy> rsp = Bukkit.getServer().getServicesManager().getRegistration(Economy.class);
-        if (rsp == null) {
-            return false;
-        }
+        if (rsp == null) return;
         econ = rsp.getProvider();
-        return true;
     }
 
     public static void setupChat() {
@@ -30,6 +27,7 @@ public class VaultChecker {
             return;
         }
         RegisteredServiceProvider<Chat> rsp = Bukkit.getServer().getServicesManager().getRegistration(Chat.class);
+        if(rsp == null) return;
         chat = Objects.requireNonNull(rsp).getProvider();
     }
 
@@ -38,6 +36,7 @@ public class VaultChecker {
             return;
         }
         RegisteredServiceProvider<Permission> rsp = Bukkit.getServer().getServicesManager().getRegistration(Permission.class);
+        if(rsp == null) return;
         perms = Objects.requireNonNull(rsp).getProvider();
     }
 
