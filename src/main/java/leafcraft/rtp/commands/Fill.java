@@ -14,30 +14,25 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 public class Fill implements CommandExecutor {
-    private final RTP plugin;
     private final Configs configs;
     private final Cache cache;
 
     private final Set<String> fillCommands = new HashSet<>();
     private final Set<String> fillParams = new HashSet<>();
-    private final Set<String> fillCancelParams = new HashSet<>();
 
     public Fill() {
-        this.plugin = RTP.getPlugin();
         this.configs = RTP.getConfigs();
         this.cache = RTP.getCache();
 
         fillParams.add("region");
 
-        fillCancelParams.add("region");
-
+        fillCommands.add("start");
         fillCommands.add("cancel");
+        fillCommands.add("pause");
+        fillCommands.add("resume");
     }
 
     @Override
@@ -48,89 +43,115 @@ public class Fill implements CommandExecutor {
             return true;
         }
 
+        String regionName = null;
+        World world;
         if(args.length > 0 && fillCommands.contains(args[0])) {
-            if(args[0].equals("cancel")) {
-                Map<String,String> fillCancelArgs = new HashMap<>();
-                for(int i = 0; i < args.length; i++) {
-                    int idx = args[i].indexOf(':');
-                    String arg = idx>0 ? args[i].substring(0,idx) : args[i];
-                    if(this.fillCancelParams.contains(arg)) {
-                        fillCancelArgs.putIfAbsent(arg,args[i].substring(idx+1)); //only use first instance
-                    }
+            Map<String,String> fillCommandArgs = new HashMap<>();
+            for (String s : args) {
+                int idx = s.indexOf(':');
+                String arg = idx > 0 ? s.substring(0, idx) : s;
+                if (this.fillParams.contains(arg)) {
+                    fillCommandArgs.putIfAbsent(arg, s.substring(idx + 1)); //only use first instance
                 }
+            }
 
-                String regionName;
-                World world;
-                if(!fillCancelArgs.containsKey("region")) {
-                    if(sender instanceof Player) {
-                        world = ((Player)sender).getWorld();
-                        configs.worlds.checkWorldExists(world.getName());
-                        regionName = (String) configs.worlds.getWorldSetting(world.getName(),"region", "default");
-                    }
-                    else {
-                        String msg = configs.lang.getLog("consoleCmdNotAllowed");
+            if(!fillCommandArgs.containsKey("region")) {
+                if(sender instanceof Player) {
+                    world = ((Player)sender).getWorld();
+                    configs.worlds.checkWorldExists(world.getName());
+                    regionName = (String) configs.worlds.getWorldSetting(world.getName(),"region", "default");
+                }
+                else {
+                    regionName = "default";
+                }
+            }
+            else regionName = fillCommandArgs.get("region");
+
+            String worldName = (String) configs.regions.getRegionSetting(regionName,"world","");
+            if(worldName.equals("")) {
+                String msg = configs.lang.getLog("badArg","region:"+regionName);
+                SendMessage.sendMessage(sender,msg);
+                return true;
+            }
+
+            if(!configs.worlds.checkWorldExists(worldName)) {
+                String msg = configs.lang.getLog("invalidWorld",worldName);
+                SendMessage.sendMessage(sender,msg);
+                return true;
+            }
+
+            RandomSelectParams randomSelectParams = new RandomSelectParams(Objects.requireNonNull(Bukkit.getWorld(worldName)), fillCommandArgs);
+            TeleportRegion region;
+            if(cache.permRegions.containsKey(randomSelectParams)) {
+                region = cache.permRegions.get(randomSelectParams);
+            }
+            else {
+                String msg = configs.lang.getLog("badArg","region:"+regionName);
+                SendMessage.sendMessage(sender,msg);
+                return true;
+            }
+
+            switch (args[0]) {
+                case "start" : {
+                    if(region.isFilling()) {
+                        String msg = configs.lang.getLog("fillRunning", regionName);
                         SendMessage.sendMessage(sender,msg);
                         return true;
                     }
-                }
-                else regionName = fillCancelArgs.get("region");
 
-                String worldName = (String) configs.regions.getRegionSetting(regionName,"world","");
-                if(worldName.equals("")) {
-                    String msg = configs.lang.getLog("badArg","region:"+regionName);
-                    SendMessage.sendMessage(sender,msg);
+                    region.startFill();
                     return true;
                 }
+                case "cancel" : {
+                    if(!region.isFilling()) {
+                        String msg = configs.lang.getLog("fillNotRunning", regionName);
+                        SendMessage.sendMessage(sender,msg);
+                        return true;
+                    }
 
-                if(!configs.worlds.checkWorldExists(worldName)) {
-                    String msg = configs.lang.getLog("invalidWorld",worldName);
-                    SendMessage.sendMessage(sender,msg);
+                    region.stopFill();
                     return true;
                 }
+                case "pause" : {
+                    if(!region.isFilling()) {
+                        String msg = configs.lang.getLog("fillNotRunning", regionName);
+                        SendMessage.sendMessage(sender,msg);
+                        return true;
+                    }
 
-                RandomSelectParams randomSelectParams = new RandomSelectParams(Bukkit.getWorld(worldName),fillCancelArgs,configs);
-                TeleportRegion region;
-                if(cache.permRegions.containsKey(randomSelectParams)) {
-                    region = cache.permRegions.get(randomSelectParams);
-                }
-                else {
-                    String msg = configs.lang.getLog("badArg","region:"+regionName);
-                    SendMessage.sendMessage(sender,msg);
+                    region.pauseFill();
                     return true;
                 }
+                case "resume" : {
+                    if(region.isFilling()) {
+                        String msg = configs.lang.getLog("fillRunning", regionName);
+                        SendMessage.sendMessage(sender,msg);
+                        return true;
+                    }
 
-                if(!region.isFilling()) {
-                    String msg = configs.lang.getLog("fillNotRunning", regionName);
-                    SendMessage.sendMessage(sender,msg);
+                    region.resumeFill();
                     return true;
                 }
-
-                region.stopFill();
-                return true;
             }
         }
 
         Map<String,String> fillArgs = new HashMap<>();
-        for(int i = 0; i < args.length; i++) {
-            int idx = args[i].indexOf(':');
-            String arg = idx>0 ? args[i].substring(0,idx) : args[i];
-            if(this.fillParams.contains(arg)) {
-                fillArgs.putIfAbsent(arg,args[i].substring(idx+1)); //only use first instance
+        for (String s : args) {
+            int idx = s.indexOf(':');
+            String arg = idx > 0 ? s.substring(0, idx) : s;
+            if (this.fillParams.contains(arg)) {
+                fillArgs.putIfAbsent(arg, s.substring(idx + 1)); //only use first instance
             }
         }
 
-        String regionName;
-        World world;
-        if(!fillArgs.containsKey("region")) {
+        if(!fillArgs.containsKey("region") && regionName==null) {
             if(sender instanceof Player) {
                 world = ((Player)sender).getWorld();
                 configs.worlds.checkWorldExists(world.getName());
                 regionName = (String) configs.worlds.getWorldSetting(world.getName(),"region", "default");
             }
             else {
-                String msg = configs.lang.getLog("consoleCmdNotAllowed");
-                SendMessage.sendMessage(sender,msg);
-                return true;
+                regionName = "default";
             }
         }
         else regionName = fillArgs.get("region");
@@ -150,7 +171,7 @@ public class Fill implements CommandExecutor {
             return true;
         }
 
-        RandomSelectParams randomSelectParams = new RandomSelectParams(Bukkit.getWorld(worldName),fillArgs,configs);
+        RandomSelectParams randomSelectParams = new RandomSelectParams(Objects.requireNonNull(Bukkit.getWorld(worldName)),fillArgs);
         TeleportRegion region;
         if(cache.permRegions.containsKey(randomSelectParams)) {
             region = cache.permRegions.get(randomSelectParams);
@@ -169,7 +190,7 @@ public class Fill implements CommandExecutor {
             return true;
         }
 
-        region.startFill(plugin);
+        region.resumeFill();
         return true;
     }
 }

@@ -17,6 +17,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 
 import java.util.HashMap;
+import java.util.Objects;
 
 public final class OnPlayerJoin implements Listener {
     private final RTP plugin;
@@ -30,7 +31,7 @@ public final class OnPlayerJoin implements Listener {
     }
 
     @EventHandler(priority = EventPriority.HIGH)
-    public void OnPlayerJoin(PlayerJoinEvent event) {
+    public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
 
 //        if(player.isInvulnerable() && configs.config.invulnerabilityTime>0) {
@@ -60,7 +61,7 @@ public final class OnPlayerJoin implements Listener {
             if (!player.hasPermission("rtp.worlds." + toWorldName) && (Boolean) configs.worlds.getWorldSetting(toWorldName, "requirePermission", true)) {
                 toWorld = Bukkit.getWorld((String) configs.worlds.getWorldSetting(toWorldName, "override", "world"));
             }
-            RandomSelectParams toParams = new RandomSelectParams(toWorld, new HashMap<>(), configs);
+            RandomSelectParams toParams = new RandomSelectParams(Objects.requireNonNull(toWorld), null);
             if (cache.permRegions.containsKey(toParams)) {
                 QueueLocation queueLocation = new QueueLocation(cache.permRegions.get(toParams), player, cache);
                 cache.queueLocationTasks.put(queueLocation.idx, queueLocation);

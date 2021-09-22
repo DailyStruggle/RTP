@@ -68,11 +68,13 @@ invalidWorld: "&e[rtp] could not find world '[worldName]'"
 # when more than on user fails to specify region in updateRegion
 missingRegionParam: "&e[rtp] region parameter is required"
 
-startFill: "&a[rtp] starting fill task for region [region]"
+fillStart: "&a[rtp] fill task started for region [region]"
+fillCancel: "&e[rtp] fill task cancelled for region [region]"
+fillPause: "#A020F0[rtp] fill task paused for region [region]"
+fillResume: "#10A5F5[rtp] fill task resumed for region [region]"
 fillRunning: "&c[rtp] fill task already running for region [region]"
 fillNotRunning: "&c[rtp] fill task not running for region [region]"
 fillStatus: "&a[rtp] completed [num] / [total] chunks for region [region]"
-fillCancel: "&e[rtp] fill task cancelled for region [region]"
 
 #command descriptions
 rtp: "&b/rtp - teleport to a random location"
@@ -89,4 +91,4 @@ PLAYER_SETUP: "&bPICKING A LOCATION"
 PLAYER_LOADING: "&bLOADING CHUNKS"
 PLAYER_TELEPORTING: "&bTELEPORTING"
 
-version: 1.9
+version: 2.0

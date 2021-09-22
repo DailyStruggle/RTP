@@ -12,6 +12,7 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 import java.util.logging.Level;
@@ -42,7 +43,7 @@ public class SetRegion implements CommandExecutor {
     }
 
     @Override
-    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+    public boolean onCommand(CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
         if(!sender.hasPermission("rtp.setRegion")) {
             String msg = configs.lang.getLog("noPerms");
 
@@ -54,11 +55,11 @@ public class SetRegion implements CommandExecutor {
         if(cache == null) cache = RTP.getCache();
 
         Map<String,String> regionArgs = new HashMap<>();
-        for(int i = 0; i < args.length; i++) {
-            int idx = args[i].indexOf(':');
-            String arg = idx>0 ? args[i].substring(0,idx) : args[i];
-            if(this.regionParams.contains(arg)) {
-                regionArgs.putIfAbsent(arg,args[i].substring(idx+1)); //only use first instance
+        for (String s : args) {
+            int idx = s.indexOf(':');
+            String arg = idx > 0 ? s.substring(0, idx) : s;
+            if (regionParams.contains(arg)) {
+                regionArgs.putIfAbsent(arg, s.substring(idx + 1)); //only use first instance
             }
         }
 
@@ -100,7 +101,7 @@ public class SetRegion implements CommandExecutor {
                 }
                 regionArgs.putIfAbsent("world",worldName);
                 world = Bukkit.getWorld(regionArgs.get("world"));
-                if(!configs.worlds.checkWorldExists(world.getName())) world = Bukkit.getWorlds().get(0);
+                if(!configs.worlds.checkWorldExists(Objects.requireNonNull(world).getName())) world = Bukkit.getWorlds().get(0);
             }
             else if(sender instanceof Player) {
                 world = ((Player) sender).getWorld();
@@ -115,13 +116,13 @@ public class SetRegion implements CommandExecutor {
 
         for(Map.Entry<String,String> entry : regionArgs.entrySet()) {
             if(entry.getKey().equals("region")) continue;
-            Integer isCoord = 0;
+            int isCoord = 0;
             if(entry.getKey().endsWith("X")) isCoord = 1;
             else if(entry.getKey().endsWith("Y")) isCoord = 2;
             else if(entry.getKey().endsWith("Z")) isCoord = 3;
 
             if( isCoord>0 ) {
-                Integer res = 0;
+                int res = 0;
                 if(entry.getValue().startsWith("~")) {
                     if(!(sender instanceof Player)) {
                         String msg = configs.lang.getLog("consoleCmdNotAllowed");
@@ -137,7 +138,7 @@ public class SetRegion implements CommandExecutor {
                     if(entry.getValue().startsWith("~-")) {
                         numStr = entry.getValue().substring(2);
                         try{
-                            if(numStr.length()>0) res -= Integer.valueOf(numStr);
+                            if(numStr.length()>0) res -= Integer.parseInt(numStr);
                         }
                         catch (NumberFormatException exception) {
                             String msg = configs.lang.getLog("badArg",entry.getKey()+":"+entry.getValue());
@@ -149,7 +150,7 @@ public class SetRegion implements CommandExecutor {
                     else {
                         numStr = entry.getValue().substring(1);
                         try{
-                            if(numStr.length()>0) res += Integer.valueOf(numStr);
+                            if(numStr.length()>0) res += Integer.parseInt(numStr);
                         }
                         catch (NumberFormatException exception) {
                             String msg = configs.lang.getLog("badArg",entry.getKey()+":"+entry.getValue());
@@ -158,7 +159,7 @@ public class SetRegion implements CommandExecutor {
                             continue;
                         }
                     }
-                    entry.setValue(res.toString());
+                    entry.setValue(Integer.toString(res));
                 }
             }
         }
@@ -167,13 +168,12 @@ public class SetRegion implements CommandExecutor {
             String region = regionArgs.get("region");
             //check region exists
             String probe = (String) configs.regions.getRegionSetting(region,"world","");
-            RandomSelectParams params = new RandomSelectParams(world,regionArgs,configs);
+            RandomSelectParams params = new RandomSelectParams(world,regionArgs);
             if(probe.equals("")) {
                 configs.regions.setRegion(region,params);
             }
 
             if(cache.permRegions.containsKey(params)){
-                cache.permRegions.get(params).storeFile();
                 cache.permRegions.get(params).shutdown();
             }
 

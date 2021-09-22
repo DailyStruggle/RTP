@@ -20,6 +20,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 
 import java.util.HashMap;
+import java.util.Objects;
 
 public final class OnPlayerChangeWorld implements Listener {
     private final RTP plugin;
@@ -33,11 +34,10 @@ public final class OnPlayerChangeWorld implements Listener {
     }
 
     @EventHandler(priority = EventPriority.NORMAL)
-    public void OnPlayerChangeWorld(PlayerChangedWorldEvent event) {
+    public void onPlayerChangeWorld(PlayerChangedWorldEvent event) {
         Player player = event.getPlayer();
         //if currently teleporting, stop that and clean up
         if (cache.todoTP.containsKey(player.getUniqueId())) {
-            cache.todoTP.containsKey(player.getUniqueId());
             stopTeleport(event);
         }
 
@@ -62,7 +62,7 @@ public final class OnPlayerChangeWorld implements Listener {
             if (!player.hasPermission("rtp.worlds." + fromWorldName) && (Boolean) configs.worlds.getWorldSetting(fromWorldName, "requirePermission", true)) {
                 fromWorld = Bukkit.getWorld((String) configs.worlds.getWorldSetting(fromWorldName, "override", "world"));
             }
-            RandomSelectParams fromParams = new RandomSelectParams(fromWorld, new HashMap<>(), configs);
+            RandomSelectParams fromParams = new RandomSelectParams(Objects.requireNonNull(fromWorld), new HashMap<>());
             if (cache.permRegions.containsKey(fromParams)) {
                 cache.permRegions.get(fromParams).recyclePlayerLocations(player);
             }
@@ -72,7 +72,7 @@ public final class OnPlayerChangeWorld implements Listener {
             if (!player.hasPermission("rtp.worlds." + toWorldName) && (Boolean) configs.worlds.getWorldSetting(toWorldName, "requirePermission", true)) {
                 toWorld = Bukkit.getWorld((String) configs.worlds.getWorldSetting(toWorldName, "override", "world"));
             }
-            RandomSelectParams toParams = new RandomSelectParams(toWorld, new HashMap<>(), configs);
+            RandomSelectParams toParams = new RandomSelectParams(Objects.requireNonNull(toWorld), new HashMap<>());
             if (cache.permRegions.containsKey(toParams)) {
                 QueueLocation queueLocation = new QueueLocation(cache.permRegions.get(toParams), player, cache);
                 cache.queueLocationTasks.put(queueLocation.idx,queueLocation);

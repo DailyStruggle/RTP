@@ -42,9 +42,11 @@ public final class OnRandomTeleport implements Listener {
         if(configs.config.blindnessDuration>0)
             player.addPotionEffect(PotionEffectType.BLINDNESS.createEffect(configs.config.blindnessDuration,100),false);
         if(!configs.config.title.equals("")) {
-            String title = SendMessage.format(player,configs.config.title);
-            String subtitle = SendMessage.format(player,configs.config.subTitle);
-            player.sendTitle(title,subtitle,configs.config.fadeIn * 20, configs.config.stay * 20, configs.config.fadeOut * 20);
+            Bukkit.getScheduler().runTaskLater(plugin,()->{
+                String title = SendMessage.format(player,configs.config.title);
+                String subtitle = SendMessage.format(player,configs.config.subTitle);
+                player.sendTitle(title,subtitle,configs.config.fadeIn * 20, configs.config.stay * 20, configs.config.fadeOut * 20);
+            },2);
         }
         String msg = configs.lang.getLog("teleportMessage", String.valueOf(event.getTries()));
         msg = PAPIChecker.fillPlaceholders(player,msg);

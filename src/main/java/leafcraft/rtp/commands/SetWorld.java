@@ -1,7 +1,6 @@
 package leafcraft.rtp.commands;
 
 import leafcraft.rtp.RTP;
-import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.SendMessage;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
@@ -11,11 +10,9 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.jetbrains.annotations.NotNull;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.logging.Level;
 
 public class SetWorld implements CommandExecutor {
@@ -30,7 +27,7 @@ public class SetWorld implements CommandExecutor {
     private static Configs configs = null;
 
     @Override
-    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
         if(configs == null) configs = RTP.getConfigs();
 
         if(!sender.hasPermission("rtp.setWorld")) {
@@ -41,11 +38,11 @@ public class SetWorld implements CommandExecutor {
         }
 
         Map<String,String> worldArgs = new HashMap<>();
-        for(int i = 0; i < args.length; i++) {
-            int idx = args[i].indexOf(':');
-            String arg = idx>0 ? args[i].substring(0,idx) : args[i];
-            if(this.worldParams.contains(arg)) {
-                worldArgs.putIfAbsent(arg,args[i].substring(idx+1)); //only use first instance
+        for (String s : args) {
+            int idx = s.indexOf(':');
+            String arg = idx > 0 ? s.substring(0, idx) : s;
+            if (worldParams.contains(arg)) {
+                worldArgs.putIfAbsent(arg, s.substring(idx + 1)); //only use first instance
             }
         }
 
@@ -78,14 +75,14 @@ public class SetWorld implements CommandExecutor {
             //check region exists
             String probe = (String) configs.regions.getRegionSetting(region,"world","");
             if(probe.equals("")) {
-                RandomSelectParams params = new RandomSelectParams(world,new HashMap<>(),configs);
+                RandomSelectParams params = new RandomSelectParams(Objects.requireNonNull(world),null);
                 configs.regions.setRegion(region,params);
             }
         }
 
         for(Map.Entry<String,String> entry : worldArgs.entrySet()) {
             if(entry.getKey().equals("world")) continue;
-            Integer result = configs.worlds.updateWorldSetting(world,entry.getKey(),entry.getValue());
+            Integer result = configs.worlds.updateWorldSetting(Objects.requireNonNull(world),entry.getKey(),entry.getValue());
             if(result<0) {
                 String msg = configs.lang.getLog("badArg", entry.getValue());
                 SendMessage.sendMessage(sender,msg);
