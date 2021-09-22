@@ -2,7 +2,6 @@ package leafcraft.rtp.tasks;
 
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.selection.TeleportRegion;
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -14,7 +13,7 @@ public class QueueLocation extends BukkitRunnable {
     private final TeleportRegion region;
     private Player player = null;
     private Location location = null;
-    private Cache cache;
+    private final Cache cache;
 
     public QueueLocation(TeleportRegion region, Cache cache) {
         this.region = region;

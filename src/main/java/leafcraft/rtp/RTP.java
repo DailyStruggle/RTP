@@ -152,7 +152,7 @@ public final class RTP extends JavaPlugin {
             return null;
         }
 
-        RandomSelectParams randomSelectParams = new RandomSelectParams(Objects.requireNonNull(Bukkit.getWorld(worldName)),params,configs);
+        RandomSelectParams randomSelectParams = new RandomSelectParams(Objects.requireNonNull(Bukkit.getWorld(worldName)),params);
         if(!cache.permRegions.containsKey(randomSelectParams)) return null;
         return cache.permRegions.get(randomSelectParams);
     }
@@ -171,7 +171,7 @@ public final class RTP extends JavaPlugin {
             return null;
         }
 
-        RandomSelectParams randomSelectParams = new RandomSelectParams(Objects.requireNonNull(Bukkit.getWorld(worldName)),params,configs);
+        RandomSelectParams randomSelectParams = new RandomSelectParams(Objects.requireNonNull(Bukkit.getWorld(worldName)),params);
         if(cache.permRegions.containsKey(randomSelectParams)) {
             cache.permRegions.get(randomSelectParams).shutdown();
         }

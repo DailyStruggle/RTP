@@ -31,11 +31,10 @@ public final class OnPlayerTeleport implements Listener {
     }
 
     @EventHandler(priority = EventPriority.LOWEST)
-    public void OnPlayerTeleport(PlayerTeleportEvent event) {
+    public void onPlayerTeleport(PlayerTeleportEvent event) {
         Player player = event.getPlayer();
         //if currently teleporting, stop that and clean up
         if (cache.todoTP.containsKey(player.getUniqueId())) {
-            cache.todoTP.containsKey(player.getUniqueId());
             stopTeleport(event);
         }
 
@@ -51,7 +50,7 @@ public final class OnPlayerTeleport implements Listener {
 
             //run command
             if (setupTeleport == null && loadChunks == null && doTeleport == null) {
-                setupTeleport = new SetupTeleport(plugin, player, player, configs, cache, new RandomSelectParams(player.getWorld(), new HashMap<>(), configs));
+                setupTeleport = new SetupTeleport(plugin, player, player, configs, cache, new RandomSelectParams(player.getWorld(), null));
                 this.cache.setupTeleports.put(player.getUniqueId(), setupTeleport);
                 setupTeleport.runTaskAsynchronously(plugin);
             }

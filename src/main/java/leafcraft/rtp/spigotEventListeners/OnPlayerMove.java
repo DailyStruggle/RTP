@@ -18,12 +18,10 @@ import org.bukkit.event.player.PlayerMoveEvent;
 import java.util.Objects;
 
 public final class OnPlayerMove implements Listener {
-    private final RTP plugin;
     private final Configs configs;
     private final Cache cache;
 
     public OnPlayerMove() {
-        this.plugin = RTP.getPlugin();
         this.configs = RTP.getConfigs();
         this.cache = RTP.getCache();
     }
@@ -47,7 +45,9 @@ public final class OnPlayerMove implements Listener {
 
             //run command as console
             Bukkit.dispatchCommand(Bukkit.getConsoleSender(),
-                    "rtp player:" + player.getName() + " world:" + event.getTo().getWorld().getName());
+                    "rtp player:" + player.getName() + " world:" +
+                            Objects.requireNonNull(
+                                    Objects.requireNonNull(event.getTo()).getWorld()).getName());
         }
     }
 

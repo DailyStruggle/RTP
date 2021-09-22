@@ -10,7 +10,7 @@ import org.bukkit.*;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.HashMap;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 public class PAPI_expansion extends PlaceholderExpansion{
@@ -50,7 +50,7 @@ public class PAPI_expansion extends PlaceholderExpansion{
     }
 
     @Override
-    public String onRequest(OfflinePlayer player, String params) {
+    public String onRequest(OfflinePlayer player, @NotNull String params) {
         return onPlaceholderRequest(player.getPlayer(),params);
     }
 	
@@ -99,7 +99,7 @@ public class PAPI_expansion extends PlaceholderExpansion{
 
         if(identifier.equalsIgnoreCase("teleport_world")) {
             Location location = getTeleportLocation(player);
-            String worldName = location.getWorld().getName();
+            String worldName = Objects.requireNonNull(location.getWorld()).getName();
             worldName = configs.worlds.worldName2Placeholder(worldName);
             return worldName;
         }
@@ -132,7 +132,7 @@ public class PAPI_expansion extends PlaceholderExpansion{
             world = Bukkit.getWorld(worldName);
         }
 
-        RandomSelectParams randomSelectParams = new RandomSelectParams(world,new HashMap<>(),configs);
+        RandomSelectParams randomSelectParams = new RandomSelectParams(Objects.requireNonNull(world),null);
         return cache.permRegions.getOrDefault(randomSelectParams,null);
     }
 }

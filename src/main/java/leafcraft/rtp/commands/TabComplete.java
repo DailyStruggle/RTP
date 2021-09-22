@@ -96,8 +96,14 @@ public class TabComplete implements TabCompleter {
 
         subCommands.commands.put("fill",new SubCommand("rtp.fill"));
         subCommands.commands.get("fill").addSubParam("region","rtp.fill");
+        subCommands.commands.get("fill").commands.put("start",new SubCommand("rtp.fill"));
+        subCommands.commands.get("fill").commands.get("start").addSubParam("region","rtp.fill");
         subCommands.commands.get("fill").commands.put("cancel",new SubCommand("rtp.fill"));
         subCommands.commands.get("fill").commands.get("cancel").addSubParam("region","rtp.fill");
+        subCommands.commands.get("fill").commands.put("pause",new SubCommand("rtp.fill"));
+        subCommands.commands.get("fill").commands.get("pause").addSubParam("region","rtp.fill");
+        subCommands.commands.get("fill").commands.put("resume",new SubCommand("rtp.fill"));
+        subCommands.commands.get("fill").commands.get("resume").addSubParam("region","rtp.fill");
     }
 
     @Override

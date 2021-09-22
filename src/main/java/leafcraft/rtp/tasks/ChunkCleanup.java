@@ -7,6 +7,8 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.util.Objects;
+
 public class ChunkCleanup extends BukkitRunnable {
     private final Configs configs;
     private final Location location;
@@ -31,7 +33,7 @@ public class ChunkCleanup extends BukkitRunnable {
         World world = location.getWorld();
         for (int i = -vd; i < vd; i++) {
             for (int j = -vd; j < vd; j++) {
-                if (!world.isChunkForceLoaded(cx + i, cz + j)) continue;
+                if (!Objects.requireNonNull(world).isChunkForceLoaded(cx + i, cz + j)) continue;
                 HashableChunk hashableChunk = new HashableChunk(world, cx + i, cz + j);
                 if (cache.forceLoadedChunks.containsKey(hashableChunk)) {
                     world.setChunkForceLoaded(cx + i, cz + j, false);

@@ -43,16 +43,16 @@ public class Cache {
             if(world == null) world = Bukkit.getWorlds().get(0);
             Map<String,String> map = new HashMap<>();
             map.put("region",region);
-            RandomSelectParams key = new RandomSelectParams(world,map,configs);
+            RandomSelectParams key = new RandomSelectParams(world,map);
             TeleportRegion teleportRegion = new TeleportRegion(region,key.params);
             permRegions.put(key, teleportRegion);
             Bukkit.getScheduler().runTaskAsynchronously(plugin, teleportRegion::loadFile);
         }
 
-        Double i = 0d;
-        Integer period = configs.config.queuePeriod;
+        double i = 0d;
+        int period = configs.config.queuePeriod;
         if(period > 0) {
-            Double increment = ((period.doubleValue()) / permRegions.size()) * 20;
+            double increment = (((double) period) / permRegions.size()) * 20;
             for (Map.Entry<RandomSelectParams, TeleportRegion> entry : permRegions.entrySet()) {
                 queueTimers.put(entry.getKey(), Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
                     double tps = TPS.getTPS();
@@ -61,7 +61,7 @@ public class Cache {
                     QueueLocation queueLocation = new QueueLocation(entry.getValue(), this);
                     queueLocationTasks.put(queueLocation.idx, queueLocation);
                     queueLocation.runTaskAsynchronously(plugin);
-                }, 200 + i.intValue(), period * 20));
+                }, 200 + (long) i, period * 20L));
                 i += increment;
             }
         }
@@ -130,7 +130,6 @@ public class Cache {
 
         for(TeleportRegion region : permRegions.values()) {
             region.shutdown();
-            region.storeFile();
         }
 
         for(Map.Entry<HashableChunk,Long> entry : forceLoadedChunks.entrySet()) {
@@ -140,7 +139,7 @@ public class Cache {
 
         for(Map.Entry<RandomSelectParams,BukkitTask> entry : queueTimers.entrySet()) {
             entry.getValue().cancel();
-            queueTimers.remove(entry);
+            queueTimers.remove(entry.getKey());
         }
 
         storePlayerData();
@@ -223,7 +222,6 @@ public class Cache {
         tempRegions.clear();
 
         for(TeleportRegion region : permRegions.values()) {
-            region.storeFile();
             region.shutdown();
         }
         permRegions.clear();
@@ -240,16 +238,16 @@ public class Cache {
             if(world == null) world = Bukkit.getWorlds().get(0);
             Map<String,String> map = new HashMap<>();
             map.put("region",region);
-            RandomSelectParams key = new RandomSelectParams(world,map,configs);
+            RandomSelectParams key = new RandomSelectParams(world,map);
             TeleportRegion teleportRegion = new TeleportRegion(region, key.params);
             permRegions.put(key, teleportRegion);
             teleportRegion.loadFile();
         }
 
-        Double i = 0d;
-        Integer period = configs.config.queuePeriod;
+        double i = 0d;
+        int period = configs.config.queuePeriod;
         if(period > 0) {
-            Double increment = ((period.doubleValue()) / permRegions.size()) * 20;
+            double increment = (((double)period) / permRegions.size()) * 20;
             for (Map.Entry<RandomSelectParams, TeleportRegion> entry : permRegions.entrySet()) {
                 queueTimers.put(entry.getKey(), Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
                     double tps = TPS.getTPS();
@@ -258,7 +256,7 @@ public class Cache {
                     QueueLocation queueLocation = new QueueLocation(entry.getValue(), this);
                     queueLocationTasks.put(queueLocation.idx, queueLocation);
                     queueLocation.runTaskAsynchronously(plugin);
-                }, 40 + i.intValue(), period * 20));
+                }, 40 + (long)i, period * 20L));
                 i += increment;
             }
         }
@@ -280,7 +278,8 @@ public class Cache {
         File playerFile = new File(plugin.getDataFolder(),"playerCooldowns.dat");
         if(!playerFile.exists()) {
             try {
-                playerFile.createNewFile();
+                final boolean newFile = playerFile.createNewFile();
+                if(!newFile) throw new IOException("[RTP] unable to create playerCooldowns.dat");
             } catch (IOException e) {
                 e.printStackTrace();
             }

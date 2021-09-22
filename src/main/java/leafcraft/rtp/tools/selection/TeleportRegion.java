@@ -18,14 +18,15 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.scheduler.BukkitTask;
-import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.invoke.MethodHandle;
+import java.nio.file.DirectoryIteratorException;
+import java.nio.file.FileAlreadyExistsException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -98,6 +99,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
 //                max.set((long) ((expand) ? totalSpace : totalSpace - badLocationSum.get()));
 //                Bukkit.getLogger().warning("added chunk: " + finalShiftedIt);
                 cfChunk.whenCompleteAsync((chunk, throwable) -> {
+                    if(cancelled) return;
                     if(!mode.equals(Modes.NONE)) {
                         int y = getFirstNonAir(chunk);
                         y = getLastNonAir(chunk, y);
@@ -109,8 +111,9 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                         }
                     }
 
+                    if(cancelled) return;
                     fillIterator.incrementAndGet();
-                    if(completion.decrementAndGet() <3 && !cancelled && !completed.getAndSet(true)) {
+                    if(completion.decrementAndGet() <3 && !completed.getAndSet(true)) {
                         fillTask = new FillTask(plugin);
                         fillTask.runTaskLaterAsynchronously(plugin,10);
                     }
@@ -131,6 +134,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                 if(!cfChunk.isDone()) cfChunk.cancel(true);
             }
             fillTask = null;
+            storeFile();
             super.cancel();
         }
     }
@@ -168,7 +172,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
 
     public int r, cr, cx, cz, minY, maxY;
 
-    private AtomicLong fillIterator;
+    private final AtomicLong fillIterator = new AtomicLong(0L);
     private FillTask fillTask = null;
 
     public TeleportRegion(String name, Map<String, String> params) {
@@ -232,7 +236,8 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         return fillTask != null && !fillTask.cancelled;
     }
 
-    public void startFill(RTP plugin) {
+    public void startFill() {
+        RTP plugin = RTP.getPlugin();
         Configs configs = RTP.getConfigs();
         //clear learned data
         biomeLocations.clear();
@@ -241,11 +246,11 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         badLocationSum.set(0);
 
         //start filling
-        fillIterator = new AtomicLong(0L);
+        fillIterator.set(0L);
         fillTask = new FillTask(plugin);
-        fillTask.runTaskAsynchronously(plugin);
+        fillTask.runTaskLaterAsynchronously(plugin,10L);
 
-        String msg = configs.lang.getLog("startFill", name);
+        String msg = configs.lang.getLog("fillStart", name);
         SendMessage.sendMessage(Bukkit.getConsoleSender(),msg);
         for(Player player : Bukkit.getOnlinePlayers()) {
             if (player.hasPermission("rtp.fill")) SendMessage.sendMessage(player, msg);
@@ -261,7 +266,37 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         for(Player player : Bukkit.getOnlinePlayers()) {
             if (player.hasPermission("rtp.fill")) SendMessage.sendMessage(player, msg);
         }
+        fillIterator.set(0L);
     }
+
+    public void pauseFill() {
+        Configs configs = RTP.getConfigs();
+        fillTask.cancel();
+
+        long iter = fillIterator.get();
+        long remainder = iter%2500L;
+        fillIterator.set(iter-remainder);
+
+        String msg = configs.lang.getLog("fillPause", name);
+        SendMessage.sendMessage(Bukkit.getConsoleSender(),msg);
+        for(Player player : Bukkit.getOnlinePlayers()) {
+            if (player.hasPermission("rtp.fill")) SendMessage.sendMessage(player, msg);
+        }
+    }
+
+    public void resumeFill() {
+        RTP plugin = RTP.getPlugin();
+        Configs configs = RTP.getConfigs();
+        fillTask = new FillTask(plugin);
+        fillTask.runTaskLaterAsynchronously(plugin,10L);
+
+        String msg = (fillIterator.get()>0) ? configs.lang.getLog("fillResume", name) : configs.lang.getLog("fillStart", name);
+        SendMessage.sendMessage(Bukkit.getConsoleSender(),msg);
+        for(Player player : Bukkit.getOnlinePlayers()) {
+            if (player.hasPermission("rtp.fill")) SendMessage.sendMessage(player, msg);
+        }
+    }
+
 
     public boolean hasQueuedLocation(OfflinePlayer player) {
         return hasQueuedLocation(player.getUniqueId());
@@ -317,6 +352,8 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
     }
 
     public void shutdown() {
+        if(fillTask!=null && !fillTask.cancelled) pauseFill();
+        storeFile();
         for(ChunkSet chunkSet : locAssChunks.values()) {
             chunkSet.shutDown();
         }
@@ -444,7 +481,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         }
     }
 
-    @Nullable
+    @NotNull
     public ChunkSet getChunks(Location location) {
         return locAssChunks.getOrDefault(location,null);
     }
@@ -460,6 +497,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
 
     public void queueRandomLocation() {
         RTP plugin = RTP.getPlugin();
+        if(!plugin.isEnabled()) return;
         Configs configs = RTP.getConfigs();
 
         if(locationQueue == null) {
@@ -827,7 +865,6 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
             goodLocation = checkLocation(chunk,y);
             yTime += (stop - start);
 
-
             if(goodLocation) addBiomeLocation(location,currBiome);
             else if(!mode.equals(Modes.NONE)) {
                 addBadLocation(location);
@@ -985,7 +1022,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         if(!f.exists()) return;
 
         Scanner scanner;
-        String line = "";
+        String line;
         try {
             scanner = new Scanner(
                     new File(f.getAbsolutePath()));
@@ -1015,7 +1052,18 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                 scanner.close();
                 return;
             }
-            scanner.nextLine();
+            line = scanner.nextLine();
+            if(line.startsWith("iter")) {
+                fillIterator.set(Long.parseLong(line.substring(5)));
+            }
+
+            while (scanner.hasNextLine() && !line.startsWith("badLocations")){
+                line = scanner.nextLine();
+            }
+            if(!scanner.hasNextLine()) {
+                scanner.close();
+                return;
+            }
 
             while(scanner.hasNextLine()) {
                 line = scanner.nextLine();
@@ -1058,7 +1106,6 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                     Map.Entry<Long,Long> lower = map.floorEntry(start);
                     if(lower!=null && start == lower.getKey()+lower.getValue()) {
                         map.put(lower.getKey(),lower.getValue()+length);
-                        length+=lower.getValue();
                     }
                     else map.put(start,length);
                 }
@@ -1081,6 +1128,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         linesArray.add("maxY:"+maxY);
         linesArray.add("requireSkyLight:"+requireSkyLight);
         linesArray.add("uniquePlacements:"+uniquePlacements);
+        linesArray.add("iter:"+fillIterator.get());
         linesArray.add("badLocations:");
         for(Map.Entry<Long,Long> entry : badLocations.entrySet()) {
             linesArray.add("  -" + entry.getKey() + "," + entry.getValue());
@@ -1094,15 +1142,17 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
             }
         }
 
-        Plugin plugin = Bukkit.getPluginManager().getPlugin("RTP");
+        Plugin plugin = RTP.getPlugin();
         File f = new File(plugin.getDataFolder(), "regions"+File.separatorChar+name+".dat");
         File parentDir = f.getParentFile();
         if(!parentDir.exists()) {
-            parentDir.mkdirs();
+            boolean mkdirs = parentDir.mkdirs();
+            if(!mkdirs) throw new DirectoryIteratorException(new IOException("[rtp] failed to create regions directory"));
         }
         if(!f.exists()) {
             try {
-                f.createNewFile();
+                boolean newFile = f.createNewFile();
+                if(!newFile) throw new FileAlreadyExistsException("[rtp] failed to create " + f.getName());
             } catch (IOException e) {
                 e.printStackTrace();
                 return;
@@ -1118,7 +1168,6 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
             fw.close();
         } catch (IOException e) {
             e.printStackTrace();
-            return;
         }
     }
 }

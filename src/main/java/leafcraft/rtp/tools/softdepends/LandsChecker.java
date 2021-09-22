@@ -1,9 +1,6 @@
 package leafcraft.rtp.tools.softdepends;
 
 import me.angeschossen.lands.api.integration.LandsIntegration;
-import me.angeschossen.lands.api.land.Area;
-import org.bukkit.Bukkit;
-import org.bukkit.Location;
 import org.bukkit.plugin.Plugin;
 
 public class LandsChecker {

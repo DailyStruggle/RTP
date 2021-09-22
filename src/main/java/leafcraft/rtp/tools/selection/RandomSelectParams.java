@@ -1,9 +1,13 @@
 package leafcraft.rtp.tools.selection;
 
+import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.configuration.Configs;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -15,7 +19,9 @@ public class RandomSelectParams {
 
     public Map<String,String> params;
 
-    public RandomSelectParams(World world, Map<String,String> params, Configs configs) {
+    public RandomSelectParams(@NotNull World world, @Nullable Map<String,String> params) {
+        if(params == null) params = new HashMap<>();
+        Configs configs = RTP.getConfigs();
         String worldName = params.getOrDefault("world",world.getName());
         worldName = configs.worlds.worldPlaceholder2Name(worldName);
         if(!configs.worlds.checkWorldExists(worldName)) worldName = world.getName();

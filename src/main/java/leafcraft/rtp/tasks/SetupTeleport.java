@@ -4,9 +4,7 @@ import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.SendMessage;
-import leafcraft.rtp.tools.selection.ChunkSet;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
-import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
@@ -23,9 +21,8 @@ public class SetupTeleport extends BukkitRunnable {
     private final CommandSender sender;
     private final Player player;
     private final Configs configs;
-    private Cache cache;
-    private RandomSelectParams rsParams;
-    private Location location = null;
+    private final Cache cache;
+    private final RandomSelectParams rsParams;
     private boolean cancelled = false;
 
     public SetupTeleport(RTP plugin, CommandSender sender, Player player, Configs configs, Cache cache, RandomSelectParams rsParams) {
@@ -54,6 +51,7 @@ public class SetupTeleport extends BukkitRunnable {
 
     public void setupTeleportNow(boolean async) {
         //get a random location according to the parameters
+        Location location;
         if (async) location = cache.getRandomLocation(rsParams, true, sender, player);
         else location = cache.getQueuedLocation(rsParams, sender, player);
         if (location == null) {
@@ -108,10 +106,10 @@ public class SetupTeleport extends BukkitRunnable {
         //set up task to load chunks then teleport
         if(!cancelled){
             cache.regionKeys.put(player.getUniqueId(),rsParams);
-            LoadChunks loadChunks = new LoadChunks(plugin,configs,sender,player,cache,delay,location);
+            LoadChunks loadChunks = new LoadChunks(plugin,configs,sender,player,cache,delay, location);
             if(sender.hasPermission("rtp.noDelay.chunks")
                     || (loadChunks.chunkSet.completed.get()>=loadChunks.chunkSet.expectedSize-1)) {
-                DoTeleport doTeleport = new DoTeleport(plugin,configs,sender,player,location,cache);
+                DoTeleport doTeleport = new DoTeleport(plugin,configs,sender,player, location,cache);
                 long diffNanos = System.nanoTime() - cache.lastTeleportTime.getOrDefault(player.getUniqueId(), 0L);
                 long diffMicros = TimeUnit.NANOSECONDS.toMicros(diffNanos);
                 long diffTicks = (diffMicros / 50);

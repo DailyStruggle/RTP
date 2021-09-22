@@ -22,7 +22,7 @@ public final class OnPlayerQuit implements Listener {
     }
 
     @EventHandler(priority = EventPriority.LOWEST)
-    public void OnPlayerQuit(PlayerQuitEvent event) {
+    public void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
         UUID playerId = player.getUniqueId();
 

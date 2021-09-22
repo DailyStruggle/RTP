@@ -4,12 +4,13 @@ import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.World;
 
+import java.util.Objects;
 import java.util.UUID;
 
 public class HashableChunk {
     UUID worldUID;
     public final int x,z;
-    private Chunk chunk;
+    private final Chunk chunk;
 
     public HashableChunk(Chunk chunk) {
         this.chunk = chunk;
@@ -26,7 +27,7 @@ public class HashableChunk {
     }
 
     public Chunk getChunk() {
-        return (chunk != null) ? chunk : Bukkit.getWorld(worldUID).getChunkAt(x,z);
+        return (chunk != null) ? chunk : Objects.requireNonNull(Bukkit.getWorld(worldUID)).getChunkAt(x,z);
     }
 
     @Override

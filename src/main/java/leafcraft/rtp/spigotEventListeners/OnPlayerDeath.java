@@ -40,7 +40,7 @@ public final class OnPlayerDeath implements Listener {
         }
 
         if (player.hasPermission("rtp.onEvent.respawn")) {
-            RandomSelectParams rsParams = new RandomSelectParams(event.getEntity().getWorld(), new HashMap<>(), configs);
+            RandomSelectParams rsParams = new RandomSelectParams(event.getEntity().getWorld(), null);
             TeleportRegion region = cache.permRegions.get(rsParams);
             QueueLocation queueLocation = new QueueLocation(region, player, cache);
             cache.queueLocationTasks.put(queueLocation.idx,queueLocation);

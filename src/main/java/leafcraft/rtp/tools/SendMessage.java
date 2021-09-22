@@ -1,20 +1,19 @@
 package leafcraft.rtp.tools;
 
 import leafcraft.rtp.tools.softdepends.PAPIChecker;
-import me.clip.placeholderapi.PlaceholderAPI;
 import net.md_5.bungee.api.ChatColor;
 import net.md_5.bungee.api.chat.*;
 import org.bukkit.Bukkit;
-import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
+import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class SendMessage {
-    private static UUID serverId = new UUID(0,0);
+    private static final UUID serverId = new UUID(0,0);
 
     public static void sendMessage(CommandSender sender, Player player, String message) {
         if(message.equals("")) return;
@@ -72,7 +71,7 @@ public class SendMessage {
             }
         }
 
-        player.spigot().sendMessage(textComponents);
+        Objects.requireNonNull(player).spigot().sendMessage(textComponents);
     }
 
     public static String format(Player player,String text) {
@@ -90,7 +89,7 @@ public class SendMessage {
             hexColor = hexColor.replace("&", "");
             StringBuilder bukkitColorCode = new StringBuilder('\u00A7' + "x");
             for (int i = 1; i < hexColor.length(); i++) {
-                bukkitColorCode.append(String.valueOf('\u00A7') + hexColor.charAt(i));
+                bukkitColorCode.append('\u00A7').append(hexColor.charAt(i));
             }
             String bukkitColor = bukkitColorCode.toString().toLowerCase();
             text = text.replaceAll(hexColor, bukkitColor);

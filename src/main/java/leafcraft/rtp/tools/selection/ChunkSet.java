@@ -1,7 +1,6 @@
 package leafcraft.rtp.tools.selection;
 
 import leafcraft.rtp.RTP;
-import leafcraft.rtp.tools.configuration.Configs;
 import org.bukkit.Chunk;
 
 import java.util.ArrayList;

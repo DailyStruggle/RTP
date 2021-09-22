@@ -18,6 +18,7 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.permissions.PermissionAttachmentInfo;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
@@ -53,7 +54,7 @@ public class RTPCmd implements CommandExecutor {
     }
 
     @Override
-    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+    public boolean onCommand(@NotNull CommandSender sender, Command command, @NotNull String label, String[] args) {
         if(!command.getName().equalsIgnoreCase("rtp") && !command.getName().equalsIgnoreCase("wild")) return true;
 
         RTP plugin = RTP.getPlugin();
@@ -84,13 +85,13 @@ public class RTPCmd implements CommandExecutor {
         //--teleport logic--
         //check for args
         Map<String,String> rtpArgs = new HashMap<>();
-        for(int i = 0; i < args.length; i++) {
-            int idx = args[i].indexOf(':');
-            String arg = idx>0 ? args[i].substring(0,idx) : args[i];
-            if(this.rtpParams.containsKey(arg) && sender.hasPermission(rtpParams.get(arg)) && idx < args[i].length()-1) {
-                rtpArgs.putIfAbsent(arg,args[i].substring(idx+1)); //only use first instance
+        for (String s : args) {
+            int idx = s.indexOf(':');
+            String arg = idx > 0 ? s.substring(0, idx) : s;
+            if (this.rtpParams.containsKey(arg) && sender.hasPermission(rtpParams.get(arg)) && idx < s.length() - 1) {
+                rtpArgs.putIfAbsent(arg, s.substring(idx + 1)); //only use first instance
             }
-            if(args[i].equalsIgnoreCase("near:random")) rtpArgs.putIfAbsent("near","random");
+            if (s.equalsIgnoreCase("near:random")) rtpArgs.putIfAbsent("near", "random");
         }
 
         //set up player parameter
@@ -130,7 +131,7 @@ public class RTPCmd implements CommandExecutor {
             String regionName = rtpArgs.get("region");
             String worldName = (String) configs.regions.getRegionSetting(regionName,"world","");
             if (worldName == null
-                    || worldName == ""
+                    || worldName.equals("")
                     || (!sender.hasPermission("rtp.regions."+regionName)
                     && (Boolean)configs.worlds.getWorldSetting(worldName,"requirePermission",true))) {
                 String msg = configs.lang.getLog("badArg", "region:" + regionName);
@@ -165,7 +166,7 @@ public class RTPCmd implements CommandExecutor {
                 world = player.getWorld();
             }
         }
-        String worldName = world.getName();
+        String worldName = Objects.requireNonNull(world).getName();
         if (!sender.hasPermission("rtp.worlds." + worldName) && (Boolean) configs.worlds.getWorldSetting(worldName, "requirePermission", true)) {
             world = Bukkit.getWorld((String) configs.worlds.getWorldSetting(worldName,"override","world"));
         }
@@ -329,13 +330,13 @@ public class RTPCmd implements CommandExecutor {
             }
 
             if(sender instanceof Player && !sender.hasPermission("rtp.biome.free")) {
-                economy.withdrawPlayer((Player)sender,price);
+                Objects.requireNonNull(economy).withdrawPlayer((Player)sender,price);
                 cache.currentTeleportCost.put(((Player) sender).getUniqueId(), price);
             }
         }
 
         //set up parameters for selection
-        RandomSelectParams rsParams = new RandomSelectParams(world,rtpArgs,configs);
+        RandomSelectParams rsParams = new RandomSelectParams(Objects.requireNonNull(world),rtpArgs);
 
         if(rsParams.params.containsKey("biome")) {
             try {
