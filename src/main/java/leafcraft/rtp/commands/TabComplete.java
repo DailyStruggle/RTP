@@ -1,5 +1,6 @@
 package leafcraft.rtp.commands;
 
+import leafcraft.rtp.API.Commands.SubCommand;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.configuration.Configs;
@@ -18,92 +19,14 @@ import java.util.Set;
 
 
 public class TabComplete implements TabCompleter {
-    private class SubCommand {
-        String perm;
-
-        //parameter name,perm, for
-        Map<String,String> subParams = new HashMap<>();
-
-        //perm, list of params
-        Map<String,ArrayList<String>> subParamsPermList = new HashMap<>();
-
-        //command name, commands
-        Map<String,SubCommand> commands = new HashMap<>();
-
-        SubCommand(String perm) { this.perm = perm; }
-
-        void addSubParam(String name, String perm) {
-            subParams.put(name,perm);
-            subParamsPermList.putIfAbsent(perm, new ArrayList<>());
-            if(name.contains(":")) subParamsPermList.get(perm).add(name);
-            else subParamsPermList.get(perm).add(name+":");
-        }
-    }
-
-    private final SubCommand subCommands = new SubCommand("rtp");
+    private SubCommand subCommands;
 
     private static RTP plugin = null;
     private static Configs configs = null;
     private static Cache cache = null;
 
-    public TabComplete() {
-        //load rtp commands and permission nodes into map
-        subCommands.addSubParam("world","rtp.world");
-        subCommands.addSubParam("region","rtp.region");
-        subCommands.addSubParam("player","rtp.other");
-        subCommands.addSubParam("shape","rtp.params");
-        subCommands.addSubParam("radius","rtp.params");
-        subCommands.addSubParam("centerRadius","rtp.params");
-        subCommands.addSubParam("centerX","rtp.params");
-        subCommands.addSubParam("centerZ","rtp.params");
-        subCommands.addSubParam("weight","rtp.params");
-        subCommands.addSubParam("minY","rtp.params");
-        subCommands.addSubParam("maxY","rtp.params");
-        subCommands.addSubParam("requireSkyLight","rtp.params");
-        subCommands.addSubParam("worldBorderOverride","rtp.params");
-        subCommands.addSubParam("biome","rtp.biome");
-        subCommands.addSubParam("near","rtp.near");
-        
-        subCommands.commands.put("help",new SubCommand("rtp.see"));
-        subCommands.commands.put("reload",new SubCommand("rtp.reload"));
-        subCommands.commands.put("setRegion",new SubCommand("rtp.setRegion"));
-        subCommands.commands.put("setWorld",new SubCommand("rtp.setWorld"));
-        subCommands.commands.put("fill",new SubCommand("rtp.fill"));
-
-        subCommands.commands.get("setRegion").addSubParam("region","rtp.setRegion");
-        subCommands.commands.get("setRegion").addSubParam("world","rtp.setRegion");
-        subCommands.commands.get("setRegion").addSubParam("shape","rtp.setRegion");
-        subCommands.commands.get("setRegion").addSubParam("mode","rtp.setRegion");
-        subCommands.commands.get("setRegion").addSubParam("radius","rtp.setRegion");
-        subCommands.commands.get("setRegion").addSubParam("centerRadius","rtp.setRegion");
-        subCommands.commands.get("setRegion").addSubParam("centerX","rtp.setRegion");
-        subCommands.commands.get("setRegion").addSubParam("centerZ","rtp.setRegion");
-        subCommands.commands.get("setRegion").addSubParam("weight","rtp.setRegion");
-        subCommands.commands.get("setRegion").addSubParam("minY","rtp.setRegion");
-        subCommands.commands.get("setRegion").addSubParam("maxY","rtp.setRegion");
-        subCommands.commands.get("setRegion").addSubParam("requireSkyLight","rtp.setRegion");
-        subCommands.commands.get("setRegion").addSubParam("requirePermission","rtp.setRegion");
-        subCommands.commands.get("setRegion").addSubParam("worldBorderOverride","rtp.setRegion");
-        subCommands.commands.get("setRegion").addSubParam("uniquePlacements","rtp.setRegion");
-        subCommands.commands.get("setRegion").addSubParam("expand","rtp.setRegion");
-        subCommands.commands.get("setRegion").addSubParam("queueLen","rtp.setRegion");
-        subCommands.commands.get("setRegion").addSubParam("price","rtp.setRegion");
-
-        subCommands.commands.get("setWorld").addSubParam("world","rtp.setWorld");
-        subCommands.commands.get("setWorld").addSubParam("name","rtp.setWorld");
-        subCommands.commands.get("setWorld").addSubParam("region","rtp.setWorld");
-        subCommands.commands.get("setWorld").addSubParam("override","rtp.setWorld");
-
-        subCommands.commands.put("fill",new SubCommand("rtp.fill"));
-        subCommands.commands.get("fill").addSubParam("region","rtp.fill");
-        subCommands.commands.get("fill").commands.put("start",new SubCommand("rtp.fill"));
-        subCommands.commands.get("fill").commands.get("start").addSubParam("region","rtp.fill");
-        subCommands.commands.get("fill").commands.put("cancel",new SubCommand("rtp.fill"));
-        subCommands.commands.get("fill").commands.get("cancel").addSubParam("region","rtp.fill");
-        subCommands.commands.get("fill").commands.put("pause",new SubCommand("rtp.fill"));
-        subCommands.commands.get("fill").commands.get("pause").addSubParam("region","rtp.fill");
-        subCommands.commands.get("fill").commands.put("resume",new SubCommand("rtp.fill"));
-        subCommands.commands.get("fill").commands.get("resume").addSubParam("region","rtp.fill");
+    public TabComplete(SubCommand mainCommand) {
+        this.subCommands = mainCommand;
     }
 
     @Override
@@ -124,24 +47,26 @@ public class TabComplete implements TabCompleter {
         return res;
     }
 
-    public void getList(Set<String> knownParams,List<String> res, SubCommand command, String[] args, int i, CommandSender sender) {
+    public void getList(Set<String> knownParams, List<String> res, SubCommand command, String[] args, int i, CommandSender sender) {
         if(i>=args.length) return;
         int idx = args[i].indexOf(':');
         String arg = idx > 0 ? args[i].substring(0, idx) : args[i];
         if(i == args.length-1) { //if last arg
             //if semicolon, maybe suggest
-            if ((command.subParams.containsKey(arg)) && !knownParams.contains(arg)) {
-                if(!sender.hasPermission(command.subParams.get(arg))){
+            String perm = command.getSubParamPerm(arg);
+            if (perm!=null && !knownParams.contains(arg)) {
+                if(!sender.hasPermission(perm)){
                     return;
                 }
-                switch (arg) {
-                    case "shape": {
+                SubCommand.ParamType type = command.getSubParamType(arg);
+                switch (type) {
+                    case SHAPE: {
                         for(TeleportRegion.Shapes shape : TeleportRegion.Shapes.values()) {
                             res.add(arg+":"+shape.name());
                         }
                         break;
                     }
-                    case "region" : {
+                    case REGION: {
                         List<String> regions = configs.regions.getRegionNames();
                         for(String region : regions) {
                             if (!((Boolean)configs.regions.getRegionSetting(region,"requirePermission",true))
@@ -151,8 +76,7 @@ public class TabComplete implements TabCompleter {
                         }
                         break;
                     }
-                    case "world" :
-                    case "override" : {
+                    case WORLD: {
                         for (World world : Bukkit.getWorlds()) {
                             configs.worlds.checkWorldExists(world.getName());
                             if (!((Boolean)configs.worlds.getWorldSetting(world.getName(),"requirePermission",true))
@@ -162,84 +86,78 @@ public class TabComplete implements TabCompleter {
                         }
                         break;
                     }
-                    case "near" : {
-                        int numValidPlayers = 0;
-                        if(sender.hasPermission("rtp.near.other")) {
-                            for (Player player : Bukkit.getOnlinePlayers()) {
-                                if(player.getName().equals(sender.getName())) continue;
-                                if(player.hasPermission("rtp.near.notme")) continue;
-                                res.add(arg + ":" + player.getName());
-                                numValidPlayers++;
-                            }
-                        }
-
-                        if(sender.hasPermission("rtp.near.random")) {
-                            if(numValidPlayers == 0) {
-                                for (Player player : Bukkit.getOnlinePlayers()) {
-                                    if(player.getName().equals(sender.getName())) continue;
-                                    if(player.hasPermission("rtp.near.notme")) continue;
-                                    numValidPlayers++;
-                                }
-                            }
-                            if(numValidPlayers>0)
-                                res.add("near:random");
-                        }
-
-                        if( sender instanceof Player && sender.hasPermission("rtp.near")){
-                            res.add(arg + ":" + sender.getName());
-                        }
-                        break;
-                    }
-                    case "player" : {
+                    case PLAYER: {
                         for (Player player : Bukkit.getOnlinePlayers()) {
                             res.add(arg + ":" + player.getName());
                         }
                         break;
                     }
-                    case "minY":
-                    case "maxY":
-                    case "centerX":
-                    case "centerZ": {
+                    case COORDINATE: {
                         if(sender instanceof  Player) res.add(arg + ":" +"~");
                         break;
                     }
-                    case "requireSkyLight":
-                    case "requirePermission":
-                    case "worldBorderOverride":
-                    case "uniquePlacements":
-                    case "expand": {
+                    case BOOLEAN: {
                         res.add(arg+":true");
                         res.add(arg+":false");
                         break;
                     }
-                    case "biome": {
+                    case BIOME: {
                         for(Biome biome : Biome.values()) {
                             if(sender.hasPermission("rtp.biome.*") || sender.hasPermission("rtp.biome."+biome.name()))
                                 res.add(arg + ":" + biome.name());
                         }
                         break;
                     }
-                    case "mode": {
+                    case MODE: {
                         for(TeleportRegion.Modes mode : TeleportRegion.Modes.values()) {
                             res.add(arg+":"+mode.name());
                         }
                         break;
                     }
                     default: {
-                        res.add(arg+":");
+                        if(arg.equals("near")) {
+                            int numValidPlayers = 0;
+                            if (sender.hasPermission("rtp.near.other")) {
+                                for (Player player : Bukkit.getOnlinePlayers()) {
+                                    if (player.getName().equals(sender.getName())) continue;
+                                    if (player.hasPermission("rtp.near.notme")) continue;
+                                    res.add(arg + ":" + player.getName());
+                                    numValidPlayers++;
+                                }
+                            }
+
+                            if (sender.hasPermission("rtp.near.random")) {
+                                if (numValidPlayers == 0) {
+                                    for (Player player : Bukkit.getOnlinePlayers()) {
+                                        if (player.getName().equals(sender.getName())) continue;
+                                        if (player.hasPermission("rtp.near.notme")) continue;
+                                        numValidPlayers++;
+                                    }
+                                }
+                                if (numValidPlayers > 0)
+                                    res.add("near:random");
+                            }
+
+                            if (sender instanceof Player && sender.hasPermission("rtp.near")) {
+                                res.add(arg + ":" + sender.getName());
+                            }
+                        }
+                        else {
+                            res.add(arg+":");
+                        }
                     }
                 }
             }
             else { //if no semicolon add all sub-commands or sub-parameters
-                for(Map.Entry<String, ArrayList<String>> entry : command.subParamsPermList.entrySet()) {
+                for(Map.Entry<String, ArrayList<String>> entry : Objects.requireNonNull(command.getSubParams())) {
                     if(knownParams.contains(entry.getKey())) continue;
                     if(sender.hasPermission(entry.getKey())) {
                         res.addAll(entry.getValue());
                     }
                 }
                 if(knownParams.size() == 0) {
-                    for (Map.Entry<String, SubCommand> entry : command.commands.entrySet()) {
-                        if (sender.hasPermission(entry.getValue().perm)) {
+                    for (Map.Entry<String, SubCommand> entry : Objects.requireNonNull(command.getSubCommands()).entrySet()) {
+                        if (sender.hasPermission(entry.getValue().getPerm())) {
                             res.add(entry.getKey());
                         }
                     }
@@ -248,14 +166,15 @@ public class TabComplete implements TabCompleter {
         }
         else {
             //if current argument is a parameter, add it to the list and go to next parameter
-            if(command.subParams.containsKey(arg)) {
-                if(sender.hasPermission(command.subParams.get(arg)))
+            String paramPerm = command.getSubParamPerm(arg);
+            SubCommandImpl cmd = (SubCommandImpl) command.getSubCommand(args[i]);
+            if(paramPerm !=null) {
+                if(sender.hasPermission(paramPerm))
                     knownParams.add(arg);
             }
-            else if(command.commands.containsKey(args[i])) { //if argument is a command, use next layer
-                SubCommand subCommand = command.commands.get(args[i]);
-                if(sender.hasPermission(subCommand.perm))
-                    command = command.commands.get(args[i]);
+            else if(cmd!=null) { //if argument is a command, use next layer
+                if(sender.hasPermission(cmd.getPerm()))
+                    command = cmd;
             }
             getList(knownParams,res,command,args,i+1,sender);
         }

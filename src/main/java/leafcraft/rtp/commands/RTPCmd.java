@@ -1,5 +1,6 @@
 package leafcraft.rtp.commands;
 
+import leafcraft.rtp.API.Commands.SubCommand;
 import leafcraft.rtp.API.customEvents.TeleportCommandSuccessEvent;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tasks.SetupTeleport;
@@ -19,38 +20,27 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.permissions.PermissionAttachmentInfo;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 public class RTPCmd implements CommandExecutor {
-    private final Map<String,String> rtpCommands = new HashMap<>();
+    private Map<String, SubCommand> rtpCommands;
     private final Map<String,String> rtpParams = new HashMap<>();
-    private final Map<String,CommandExecutor> commandHandles = new HashMap<>();
 
-    public RTPCmd() {
-
-        this.rtpParams.put("player", "rtp.other");
-        this.rtpParams.put("world", "rtp.world");
-        this.rtpParams.put("region","rtp.region");
-        this.rtpParams.put("shape","rtp.params");
-        this.rtpParams.put("radius","rtp.params");
-        this.rtpParams.put("centerRadius","rtp.params");
-        this.rtpParams.put("centerX","rtp.params");
-        this.rtpParams.put("centerZ","rtp.params");
-        this.rtpParams.put("weight","rtp.params");
-        this.rtpParams.put("minY","rtp.params");
-        this.rtpParams.put("maxY","rtp.params");
-        this.rtpParams.put("requireSkyLight","rtp.params");
-        this.rtpParams.put("worldBorderOverride","rtp.params");
-        this.rtpParams.put("near","rtp.near");
-        this.rtpParams.put("biome","rtp.biome");
+    public RTPCmd(SubCommand command) {
+        for(Map.Entry<String, ArrayList<String>> entry : Objects.requireNonNull(command.getSubParams())) {
+            for(String param : entry.getValue()) {
+                this.rtpParams.put(param,entry.getKey());
+            }
+        }
+        rtpCommands = command.getSubCommands();
     }
 
-    public void addCommandHandle(String command, String perm, CommandExecutor handle) {
-        commandHandles.put(command,handle);
-        rtpCommands.put(command,perm);
+    public void setSubCommand(String name, SubCommand subCommand) {
+        rtpCommands.put(name,subCommand);
     }
 
     @Override
@@ -64,12 +54,13 @@ public class RTPCmd implements CommandExecutor {
         long start = System.nanoTime();
 
         if(args.length > 0 && rtpCommands.containsKey(args[0])) {
-            if(!sender.hasPermission(rtpCommands.get(args[0]))) {
+            if(!sender.hasPermission(rtpCommands.get(args[0]).getPerm())) {
                 String msg = configs.lang.getLog("noPerms");
                 SendMessage.sendMessage(sender,msg);
             }
             else {
-                return commandHandles.get(args[0]).onCommand(sender,command,label,Arrays.copyOfRange(args, 1, args.length));
+                return Objects.requireNonNull(rtpCommands.get(args[0]).getCommandExecutor())
+                        .onCommand(sender,command,label,Arrays.copyOfRange(args, 1, args.length));
 //                plugin.getCommand("rtp " + args[0]).execute(sender, label, Arrays.copyOfRange(args, 1, args.length));
             }
             return true;
@@ -348,8 +339,7 @@ public class RTPCmd implements CommandExecutor {
             }
         }
 
-
-        boolean hasQueued = cache.permRegions.containsKey(rsParams) && cache.permRegions.get(rsParams).hasQueuedLocation(player);
+        boolean hasQueued = cache.permRegions.containsKey(rsParams) && cache.permRegions.get(rsParams).hasQueuedLocation(player.getUniqueId());
         if(!hasQueued && !sender.hasPermission("rtp.unqueued")) {
             String msg = PAPIChecker.fillPlaceholders(player,configs.lang.getLog("noLocationsQueued"));
             SendMessage.sendMessage(sender,player,msg);
