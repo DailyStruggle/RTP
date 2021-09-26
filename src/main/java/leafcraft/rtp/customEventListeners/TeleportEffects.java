@@ -30,7 +30,7 @@ public class TeleportEffects implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onRandomPreTeleport(RandomTeleportEvent event) {
-        Bukkit.getScheduler().runTaskAsynchronously(RTP.getPlugin(), ()->applyEffects("rtp.effect.preTeleport.",event.getPlayer()));
+        Bukkit.getScheduler().runTaskAsynchronously(RTP.getPlugin(), ()->applyEffects("rtp.effect.preteleport.",event.getPlayer()));
     }
 
     private void applyEffects(String permission, Player player) {
