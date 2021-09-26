@@ -18,6 +18,7 @@ import leafcraft.rtp.tools.softdepends.PAPI_expansion;
 import leafcraft.rtp.tools.softdepends.VaultChecker;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
+import org.bukkit.FireworkEffect;
 import org.bukkit.Instrument;
 import org.bukkit.Particle;
 import org.bukkit.command.CommandExecutor;
@@ -262,9 +263,11 @@ public final class RTP extends JavaPlugin {
         Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.teleport.sound"));
         Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.preTeleport.sound"));
 
-        Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.command.firework"));
-        Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.teleport.firework"));
-        Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.preTeleport.firework"));
+        for(FireworkEffect.Type type : FireworkEffect.Type.values()) {
+            Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.command.firework." + type.name()));
+            Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.teleport.firework." + type.name()));
+            Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.preTeleport.firework." + type.name()));
+        }
 
         for(Instrument instrument : Instrument.values()) {
             Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.command.note." + instrument.name()));
