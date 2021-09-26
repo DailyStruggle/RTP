@@ -98,6 +98,16 @@ public class TeleportEffects implements Listener {
                     break;
                 }
                 case "note": {
+                    Instrument instrument = Instrument.PIANO;
+                    if (val.length > 4 && val[4] != null) {
+                        try {
+                            instrument = Instrument.valueOf(val[6]);
+                        } catch (IllegalArgumentException exception) {
+                            Bukkit.getLogger().warning("[rtp] invalid instrument: " + val[6]);
+                            continue;
+                        }
+                    }
+
                     Note note;
                     int tone = 0;
                     if (val.length > 5 && val[5] != null) {
@@ -105,16 +115,6 @@ public class TeleportEffects implements Listener {
                             tone = Integer.parseInt(val[5]);
                         } catch (NumberFormatException exception) {
                             Bukkit.getLogger().warning("[rtp] invalid tone setting: " + val[5]);
-                            continue;
-                        }
-                    }
-
-                    Instrument instrument = Instrument.PIANO;
-                    if (val.length > 6 && val[6] != null) {
-                        try {
-                            instrument = Instrument.valueOf(val[6]);
-                        } catch (IllegalArgumentException exception) {
-                            Bukkit.getLogger().warning("[rtp] invalid instrument: " + val[6]);
                             continue;
                         }
                     }
