@@ -258,33 +258,35 @@ public final class RTP extends JavaPlugin {
         Objects.requireNonNull(fill.getSubCommand("resume")).setSubParam("region","rtp.fill",SubCommand.ParamType.REGION);
 
 
-        //adding every sound takes too long at startup
-        Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.command.sound"));
-        Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.teleport.sound"));
-        Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.preTeleport.sound"));
+        Bukkit.getScheduler().runTaskAsynchronously(RTP.getPlugin(),()->{
+            //adding 600+ sounds takes too long at startup
+            Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.command.sound"));
+            Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.teleport.sound"));
+            Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.preTeleport.sound"));
 
-        for(FireworkEffect.Type type : FireworkEffect.Type.values()) {
-            Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.command.firework." + type.name()));
-            Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.teleport.firework." + type.name()));
-            Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.preTeleport.firework." + type.name()));
-        }
+            for(FireworkEffect.Type type : FireworkEffect.Type.values()) {
+                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.command.firework." + type.name()));
+                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.teleport.firework." + type.name()));
+                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.preTeleport.firework." + type.name()));
+            }
 
-        for(Instrument instrument : Instrument.values()) {
-            Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.command.note." + instrument.name()));
-            Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.teleport.note." + instrument.name()));
-            Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.preTeleport.note." + instrument.name()));
-        }
+            for(Instrument instrument : Instrument.values()) {
+                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.command.note." + instrument.name()));
+                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.teleport.note." + instrument.name()));
+                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.preTeleport.note." + instrument.name()));
+            }
 
-        for(Particle particle : Particle.values()) {
-            Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.command.particle." + particle.name()));
-            Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.teleport.particle." + particle.name()));
-            Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.preTeleport.particle." + particle.name()));
-        }
+            for(Particle particle : Particle.values()) {
+                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.command.particle." + particle.name()));
+                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.teleport.particle." + particle.name()));
+                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.preTeleport.particle." + particle.name()));
+            }
 
-        for(PotionEffectType effect : PotionEffectType.values()) {
-            Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.command.potion." + effect.getName()));
-            Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.teleport.potion." + effect.getName()));
-            Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.preTeleport.potion." + effect.getName()));
-        }
+            for(PotionEffectType effect : PotionEffectType.values()) {
+                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.command.potion." + effect.getName()));
+                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.teleport.potion." + effect.getName()));
+                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.preTeleport.potion." + effect.getName()));
+            }
+        });
     }
 }
