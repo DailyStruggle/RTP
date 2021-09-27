@@ -53,11 +53,28 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                 return;
             }
 
-            long it = fillIterator.get();
+            long it;
+            try {
+                fillIteratorGuard.acquire();
+                it = fillIterator.get();
+            } catch (InterruptedException ignored) {
+                return;
+            } finally {
+                fillIteratorGuard.release();
+            }
+            Semaphore completionGuard = new Semaphore(1);
             AtomicInteger completion = new AtomicInteger(2500);
 //            AtomicLong max = new AtomicLong((long) ((expand) ? totalSpace : totalSpace - badLocationSum.get()));
             AtomicLong max = new AtomicLong((long) totalSpace);
-            long itStop = it + completion.get();
+            long itStop;
+            try {
+                completionGuard.acquire();
+                itStop = it + completion.get();
+            } catch (InterruptedException e) {
+                return;
+            } finally {
+                completionGuard.release();
+            }
             AtomicBoolean completed = new AtomicBoolean(false);
 
             String msg = configs.lang.getLog("fillStatus");
@@ -97,8 +114,24 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                 if(configs.config.biomeWhitelist != configs.config.biomes.contains(currBiome)) {
                     addBadLocation(it);
                     removeBiomeLocation(it,currBiome);
-                    fillIterator.incrementAndGet();
-                    if(completion.decrementAndGet() <3 && !completed.getAndSet(true)) {
+                    try {
+                        fillIteratorGuard.acquire();
+                        fillIterator.incrementAndGet();
+                    } catch (InterruptedException ignored) {
+                        return;
+                    } finally {
+                        fillIteratorGuard.release();
+                    }
+                    int completionLocal;
+                    try {
+                        completionGuard.acquire();
+                        completionLocal = completion.decrementAndGet();
+                    } catch (InterruptedException e) {
+                        return;
+                    } finally {
+                        completionGuard.release();
+                    }
+                    if(completionLocal == 0 && !completed.getAndSet(true)) {
                         fillTask = new FillTask(plugin);
                         fillTask.runTaskLaterAsynchronously(plugin,1);
                     }
@@ -126,16 +159,48 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                     }
 
                     if(cancelled) return;
-                    fillIterator.incrementAndGet();
-                    if(completion.decrementAndGet() <3 && !completed.getAndSet(true)) {
+                    try {
+                        fillIteratorGuard.acquire();
+                        fillIterator.incrementAndGet();
+                    } catch (InterruptedException ignored) {
+                        return;
+                    } finally {
+                        fillIteratorGuard.release();
+                    }
+                    int completionLocal;
+                    try {
+                        completionGuard.acquire();
+                        completionLocal = completion.decrementAndGet();
+                    } catch (InterruptedException e) {
+                        return;
+                    } finally {
+                        completionGuard.release();
+                    }
+                    if(completionLocal == 0 && !completed.getAndSet(true)) {
                         fillTask = new FillTask(plugin);
                         fillTask.runTaskLaterAsynchronously(plugin,1);
                     }
                 });
                 cfChunk.whenComplete((chunk, throwable) -> {
                     if(cancelled) return;
-                    if(completion.get() == 0 || fillIterator.get()==max.get()) {
-                        world.save();
+                    try {
+                        fillIteratorGuard.acquire();
+                        int completionLocal;
+                        try {
+                            completionGuard.acquire();
+                            completionLocal = completion.get();
+                        } catch (InterruptedException e) {
+                            return;
+                        } finally {
+                            completionGuard.release();
+                        }
+                        if(completionLocal == 0 || fillIterator.get()==max.get()) {
+                            world.save();
+                        }
+                    } catch (InterruptedException ignored) {
+                        return;
+                    } finally {
+                        fillIteratorGuard.release();
                     }
                 });
             }
@@ -186,6 +251,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
 
     public int r, cr, cx, cz, minY, maxY;
 
+    private Semaphore fillIteratorGuard = new Semaphore(1);
     private final AtomicLong fillIterator = new AtomicLong(0L);
     private FillTask fillTask = null;
 
@@ -260,7 +326,14 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         badLocationSum.set(0);
 
         //start filling
-        fillIterator.set(0L);
+        try {
+            fillIteratorGuard.acquire();
+            fillIterator.set(0L);
+        } catch (InterruptedException ignored) {
+
+        } finally {
+            fillIteratorGuard.release();
+        }
         fillTask = new FillTask(plugin);
         fillTask.runTaskLaterAsynchronously(plugin,10L);
 
@@ -280,16 +353,30 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         for(Player player : Bukkit.getOnlinePlayers()) {
             if (player.hasPermission("rtp.fill")) SendMessage.sendMessage(player, msg);
         }
-        fillIterator.set(0L);
+        try {
+            fillIteratorGuard.acquire();
+            fillIterator.set(0L);
+        } catch (InterruptedException ignored) {
+
+        } finally {
+            fillIteratorGuard.release();
+        }
     }
 
     public void pauseFill() {
         Configs configs = RTP.getConfigs();
         fillTask.cancel();
 
-        long iter = fillIterator.get();
-        long remainder = iter%2500L;
-        fillIterator.set(iter-remainder);
+        try {
+            fillIteratorGuard.acquire();
+            long iter = fillIterator.get();
+            long remainder = iter%2500L;
+            fillIterator.set(iter-remainder);
+        } catch (InterruptedException ignored) {
+            return;
+        } finally {
+            fillIteratorGuard.release();
+        }
 
         String msg = configs.lang.getLog("fillPause", name);
         SendMessage.sendMessage(Bukkit.getConsoleSender(),msg);
@@ -304,7 +391,15 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         fillTask = new FillTask(plugin);
         fillTask.runTaskLaterAsynchronously(plugin,10L);
 
-        String msg = (fillIterator.get()>0) ? configs.lang.getLog("fillResume", name) : configs.lang.getLog("fillStart", name);
+        String msg;
+        try {
+            fillIteratorGuard.acquire();
+            msg = (fillIterator.get()>0) ? configs.lang.getLog("fillResume", name) : configs.lang.getLog("fillStart", name);
+        } catch (InterruptedException ignored) {
+            return;
+        } finally {
+            fillIteratorGuard.release();
+        }
         SendMessage.sendMessage(Bukkit.getConsoleSender(),msg);
         for(Player player : Bukkit.getOnlinePlayers()) {
             if (player.hasPermission("rtp.fill")) SendMessage.sendMessage(player, msg);
@@ -1080,7 +1175,14 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
             }
             line = scanner.nextLine();
             if(line.startsWith("iter")) {
-                fillIterator.set(Long.parseLong(line.substring(5)));
+                try {
+                    fillIteratorGuard.acquire();
+                    fillIterator.set(Long.parseLong(line.substring(5)));
+                } catch (InterruptedException ignored) {
+                    return;
+                } finally {
+                    fillIteratorGuard.release();
+                }
             }
 
             while (scanner.hasNextLine() && !line.startsWith("badLocations")){
@@ -1154,7 +1256,14 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         linesArray.add("maxY:"+maxY);
         linesArray.add("requireSkyLight:"+requireSkyLight);
         linesArray.add("uniquePlacements:"+uniquePlacements);
-        linesArray.add("iter:"+fillIterator.get());
+        try {
+            fillIteratorGuard.acquire();
+            linesArray.add("iter:"+fillIterator.get());
+        } catch (InterruptedException ignored) {
+            return;
+        } finally {
+            fillIteratorGuard.release();
+        }
         linesArray.add("badLocations:");
         for(Map.Entry<Long,Long> entry : badLocations.entrySet()) {
             linesArray.add("  -" + entry.getKey() + "," + entry.getValue());

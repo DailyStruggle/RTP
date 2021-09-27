@@ -14,7 +14,7 @@ import java.util.UUID;
 public interface TeleportRegion {
     /**
      * hasQueuedLocation(player): check whether the region has a location reserved for the player
-     * @param player
+     * @param player/uuid - who to check for
      * @return whether the region has a location reserved for the player
      */
     boolean hasQueuedLocation(OfflinePlayer player);
@@ -27,28 +27,57 @@ public interface TeleportRegion {
      */
     boolean hasQueuedLocation();
 
+    /**
+     * queue length checking functions
+     * @param player/uuid - who to check for
+     * @return how many locations are ready
+     */
     int getTotalQueueLength(OfflinePlayer player);
     int getPlayerQueueLength(OfflinePlayer player);
     int getPlayerQueueLength(Player player);
     int getPlayerQueueLength(UUID uuid);
     int getPublicQueueLength();
 
+    /**
+     * getQueuedLocation - if a
+     * @param sender - who to tell about a failure
+     * @param player - who to tell about a failure
+     * @return popped location, or null if no locations were ready
+     */
     Location getQueuedLocation(CommandSender sender, Player player);
 
+    /**
+     * getLocation
+     * @param urgent - whether to use getChunkAtAsyncUrgently instead of getChunkAtAsync
+     * @param sender - who to tell about a failure
+     * @param player - who to tell about a failure
+     * @param biome - what biome, or null
+     * @return popped location, generated location, or null if too many tries
+     */
     Location getLocation(boolean urgent, CommandSender sender, Player player, Biome biome);
     Location getLocation(boolean urgent, CommandSender sender, Player player);
 
+    /**
+     * queueRandomLocation - attempt to select and queue a location
+     */
     void queueRandomLocation();
 
+    /**
+     * queueRandomLocation - attempt to select and queue a location
+     * @param player/uuid - who to reserve the location for
+     */
     void queueRandomLocation(OfflinePlayer player);
-
     void queueRandomLocation(Player player);
-
     void queueRandomLocation(UUID uuid);
 
+    /**
+     * recyclePlayerLocations - dump any reserved locations back onto the public queue
+     * @param player/uuid - whose locations to recycle
+     */
     void recyclePlayerLocations(OfflinePlayer player);
     void recyclePlayerLocations(Player player);
     void recyclePlayerLocations(UUID uuid);
+
 
     void addBadLocation(int chunkX, int chunkZ);
     void addBadLocation(Long location);
