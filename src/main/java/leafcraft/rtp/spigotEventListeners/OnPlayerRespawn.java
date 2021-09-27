@@ -13,8 +13,10 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.permissions.PermissionAttachmentInfo;
 
 import java.util.Objects;
+import java.util.Set;
 
 //get queued location
 public final class OnPlayerRespawn implements Listener {
@@ -36,7 +38,16 @@ public final class OnPlayerRespawn implements Listener {
         if (!player.hasPermission("rtp.worlds." + toWorldName) && (Boolean) configs.worlds.getWorldSetting(toWorldName, "requirePermission", true)) {
             toWorld = Bukkit.getWorld((String) configs.worlds.getWorldSetting(toWorldName, "override", "world"));
         }
-        if (player.hasPermission("rtp.onEvent.respawn")) {
+
+        Set<PermissionAttachmentInfo> perms = player.getEffectivePermissions();
+        boolean hasPerm = false;
+        for(PermissionAttachmentInfo perm : perms) {
+            if(!perm.getValue()) continue;
+            if(!perm.getPermission().startsWith("rtp.onevent.")) continue;
+            if(perm.getPermission().equals("rtp.onevent.*") || perm.getPermission().equals("rtp.onevent.respawn"))
+                hasPerm = true;
+        }
+        if (hasPerm) {
             RandomSelectParams rsParams = new RandomSelectParams(player.getWorld(), null);
             SetupTeleport setupTeleport = new SetupTeleport(plugin, Bukkit.getConsoleSender(), player, configs, cache, rsParams);
             setupTeleport.runTaskAsynchronously(plugin);

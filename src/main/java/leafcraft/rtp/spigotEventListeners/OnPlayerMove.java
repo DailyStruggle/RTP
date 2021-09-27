@@ -14,10 +14,12 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.permissions.PermissionAttachmentInfo;
 
-import java.util.Objects;
+import java.util.*;
 
 public final class OnPlayerMove implements Listener {
+    private final Map<UUID,Double> playerMoveDistances = new HashMap<>();
     private final Configs configs;
     private final Cache cache;
 
@@ -28,6 +30,9 @@ public final class OnPlayerMove implements Listener {
 
     @EventHandler(priority = EventPriority.LOW)
     public void onPlayerMove(PlayerMoveEvent event) {
+        Location to = event.getTo();
+        if(to == null) return;
+        Location from = event.getFrom();
         Player player = event.getPlayer();
 
         //if currently teleporting, stop that and clean up
@@ -35,8 +40,22 @@ public final class OnPlayerMove implements Listener {
             stopTeleport(event);
         }
 
+        playerMoveDistances.putIfAbsent(player.getUniqueId(),0D);
+        playerMoveDistances.compute(player.getUniqueId(),(uuid, aDouble) -> aDouble+=from.distance(to));
+        Double distance = playerMoveDistances.get(player.getUniqueId());
+        if(distance < configs.config.cancelDistance) return;
+        playerMoveDistances.put(player.getUniqueId(),0D);
+
         //if has this perm, go again
-        if (player.hasPermission("rtp.onEvent.move")) {
+        Set<PermissionAttachmentInfo> perms = player.getEffectivePermissions();
+        boolean hasPerm = false;
+        for(PermissionAttachmentInfo perm : perms) {
+            if(!perm.getValue()) continue;
+            if(!perm.getPermission().startsWith("rtp.onevent.")) continue;
+            if(perm.getPermission().equals("rtp.onevent.*") || perm.getPermission().equals("rtp.onevent.move"))
+                hasPerm = true;
+        }
+        if (hasPerm) {
             //skip if already going
             LoadChunks loadChunks = this.cache.loadChunks.get(player.getUniqueId());
             DoTeleport doTeleport = this.cache.doTeleports.get(player.getUniqueId());
@@ -47,7 +66,7 @@ public final class OnPlayerMove implements Listener {
             Bukkit.dispatchCommand(Bukkit.getConsoleSender(),
                     "rtp player:" + player.getName() + " world:" +
                             Objects.requireNonNull(
-                                    Objects.requireNonNull(event.getTo()).getWorld()).getName());
+                                    Objects.requireNonNull(to).getWorld()).getName());
         }
     }
 

@@ -15,8 +15,10 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.permissions.PermissionAttachmentInfo;
 
 import java.util.HashMap;
+import java.util.Set;
 
 //set up a location for respawn event
 public final class OnPlayerDeath implements Listener {
@@ -39,7 +41,15 @@ public final class OnPlayerDeath implements Listener {
             stopTeleport(event);
         }
 
-        if (player.hasPermission("rtp.onEvent.respawn")) {
+        Set<PermissionAttachmentInfo> perms = player.getEffectivePermissions();
+        boolean hasPerm = false;
+        for(PermissionAttachmentInfo perm : perms) {
+            if(!perm.getValue()) continue;
+            if(!perm.getPermission().startsWith("rtp.onevent.")) continue;
+            if(perm.getPermission().equals("rtp.onevent.*") || perm.getPermission().equals("rtp.onevent.respawn"))
+                hasPerm = true;
+        }
+        if (hasPerm) {
             RandomSelectParams rsParams = new RandomSelectParams(event.getEntity().getWorld(), null);
             TeleportRegion region = cache.permRegions.get(rsParams);
             QueueLocation queueLocation = new QueueLocation(region, player, cache);
