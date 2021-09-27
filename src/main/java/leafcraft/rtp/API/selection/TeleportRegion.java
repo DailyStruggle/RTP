@@ -2,7 +2,6 @@ package leafcraft.rtp.API.selection;
 
 import leafcraft.rtp.tools.selection.ChunkSet;
 import org.bukkit.Chunk;
-import org.bukkit.ChunkSnapshot;
 import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.block.Biome;

@@ -1,6 +1,7 @@
 package leafcraft.rtp.tools.softdepends;
 
 import com.griefdefender.api.GriefDefender;
+
 import java.util.Objects;
 
 public class GriefDefenderChecker {

@@ -15,7 +15,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.util.StringUtil;
 
 import java.util.*;
-import java.util.Set;
 
 
 public class TabComplete implements TabCompleter {
