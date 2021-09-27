@@ -45,6 +45,10 @@ unsafeBlocks:
   - WATER
   - FIRE
 
+#switch between blacklist/whitelist
+biomeWhitelist: false
+biomes:
+
 #how many rerolls before stopping
 maxAttempts: 100
 
@@ -95,4 +99,4 @@ stay: 1
 fadeout: 1
 
 #DO NOT TOUCH VERSION NUMBER
-version: 2.6
+version: 2.7
