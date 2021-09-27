@@ -1,11 +1,11 @@
 package leafcraft.rtp.customEventListeners;
 
-import leafcraft.rtp.RTP;
 import leafcraft.rtp.API.customEvents.RandomTeleportEvent;
-import leafcraft.rtp.tasks.*;
+import leafcraft.rtp.RTP;
+import leafcraft.rtp.tasks.QueueLocation;
 import leafcraft.rtp.tools.Cache;
-import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.SendMessage;
+import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import leafcraft.rtp.tools.softdepends.PAPIChecker;

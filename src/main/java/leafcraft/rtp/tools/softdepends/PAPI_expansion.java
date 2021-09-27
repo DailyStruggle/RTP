@@ -6,7 +6,10 @@ import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
-import org.bukkit.*;
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.OfflinePlayer;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 

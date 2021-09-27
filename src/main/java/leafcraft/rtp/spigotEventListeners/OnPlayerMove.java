@@ -1,7 +1,7 @@
 package leafcraft.rtp.spigotEventListeners;
 
-import leafcraft.rtp.RTP;
 import leafcraft.rtp.API.customEvents.TeleportCancelEvent;
+import leafcraft.rtp.RTP;
 import leafcraft.rtp.tasks.DoTeleport;
 import leafcraft.rtp.tasks.LoadChunks;
 import leafcraft.rtp.tools.Cache;
@@ -46,7 +46,7 @@ public final class OnPlayerMove implements Listener {
         if(distance < configs.config.cancelDistance) return;
         playerMoveDistances.put(player.getUniqueId(),0D);
 
-        //if has this perm, go again
+        //if player has this perm, go again
         Set<PermissionAttachmentInfo> perms = player.getEffectivePermissions();
         boolean hasPerm = false;
         for(PermissionAttachmentInfo perm : perms) {

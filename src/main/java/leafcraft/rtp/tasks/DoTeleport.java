@@ -1,11 +1,12 @@
 package leafcraft.rtp.tasks;
 
-import leafcraft.rtp.RTP;
 import leafcraft.rtp.API.customEvents.RandomPreTeleportEvent;
 import leafcraft.rtp.API.customEvents.RandomTeleportEvent;
+import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.configuration.Configs;
-import org.bukkit.*;
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;

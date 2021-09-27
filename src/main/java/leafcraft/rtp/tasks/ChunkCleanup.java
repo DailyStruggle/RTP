@@ -1,8 +1,8 @@
 package leafcraft.rtp.tasks;
 
 import leafcraft.rtp.tools.Cache;
-import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.HashableChunk;
+import leafcraft.rtp.tools.configuration.Configs;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.scheduler.BukkitRunnable;

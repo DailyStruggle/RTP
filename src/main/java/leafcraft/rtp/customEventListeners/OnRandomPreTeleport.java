@@ -1,7 +1,7 @@
 package leafcraft.rtp.customEventListeners;
 
-import leafcraft.rtp.RTP;
 import leafcraft.rtp.API.customEvents.RandomPreTeleportEvent;
+import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.configuration.Configs;
 import org.bukkit.entity.Player;

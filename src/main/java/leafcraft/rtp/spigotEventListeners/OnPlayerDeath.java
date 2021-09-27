@@ -1,7 +1,7 @@
 package leafcraft.rtp.spigotEventListeners;
 
-import leafcraft.rtp.RTP;
 import leafcraft.rtp.API.customEvents.TeleportCancelEvent;
+import leafcraft.rtp.RTP;
 import leafcraft.rtp.tasks.QueueLocation;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.configuration.Configs;
@@ -17,7 +17,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.permissions.PermissionAttachmentInfo;
 
-import java.util.HashMap;
 import java.util.Set;
 
 //set up a location for respawn event

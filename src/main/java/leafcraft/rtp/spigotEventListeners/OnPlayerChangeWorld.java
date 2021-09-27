@@ -1,7 +1,7 @@
 package leafcraft.rtp.spigotEventListeners;
 
-import leafcraft.rtp.RTP;
 import leafcraft.rtp.API.customEvents.TeleportCancelEvent;
+import leafcraft.rtp.RTP;
 import leafcraft.rtp.tasks.DoTeleport;
 import leafcraft.rtp.tasks.LoadChunks;
 import leafcraft.rtp.tasks.QueueLocation;
@@ -18,7 +18,6 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
-import org.bukkit.permissions.Permission;
 import org.bukkit.permissions.PermissionAttachmentInfo;
 
 import java.util.HashMap;

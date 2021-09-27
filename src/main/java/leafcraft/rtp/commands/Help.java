@@ -1,8 +1,8 @@
 package leafcraft.rtp.commands;
 
 import leafcraft.rtp.RTP;
-import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.SendMessage;
+import leafcraft.rtp.tools.configuration.Configs;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
