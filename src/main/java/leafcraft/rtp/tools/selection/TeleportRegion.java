@@ -447,50 +447,56 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
     }
 
     private void addChunks(Location location, boolean urgent) {
-        Configs configs = RTP.getConfigs();
         Cache cache = RTP.getCache();
 
         ChunkSet chunkSet = new ChunkSet();
         locAssChunks.put(location,chunkSet);
 
-        int vd = configs.config.vd;
         int cx = (location.getBlockX() > 0) ? location.getBlockX() / 16 : location.getBlockX() / 16 - 1;
         int cz = (location.getBlockZ() > 0) ? location.getBlockZ() / 16 : location.getBlockZ() / 16 - 1;
         int idx = 0;
         Plugin plugin = Bukkit.getPluginManager().getPlugin("RTP");
         if(plugin == null) return;
-        for (int i = -vd; i <= vd; i++) {
-            for (int j = -vd; j <= vd; j++) {
-                if(PaperLib.isPaper() || !urgent) {
-                    CompletableFuture<Chunk> cfChunk;
-                    cfChunk = urgent ? PaperLib.getChunkAtAsyncUrgently(Objects.requireNonNull(location.getWorld()), cx + i, cz + j, true) :
-                            PaperLib.getChunkAtAsync(Objects.requireNonNull(location.getWorld()), cx + i, cz + j, true);
-                    chunkSet.chunks.add(idx, cfChunk);
-                    cfChunk.whenCompleteAsync((chunk, throwable) -> {
-                        chunkSet.completed.getAndAdd(1);
-                        if(!chunk.isForceLoaded()) {
-                            Bukkit.getScheduler().runTask(plugin, () -> chunk.setForceLoaded(true));
-                            cache.forceLoadedChunks.put(new HashableChunk(chunk),0L);
-                        }
-                        if(isKnownBad(chunk.getX(),chunk.getZ())) return;
-                        Location point = chunk.getBlock(7,0,7).getLocation();
-                        Biome biome = world.getBiome(point.getBlockX(), point.getBlockZ());
-                        long curveLocation = (long) ((shape.equals(Shapes.SQUARE)) ?
-                                                        Translate.xzToSquareLocation(cr,chunk.getX(),chunk.getZ(),cx,cz) :
-                                                        Translate.xzToCircleLocation(cr,chunk.getX(),chunk.getZ(),cx,cz));
-                        Map.Entry<Long,Long> lower = biomeLocations.get(biome).lowerEntry(curveLocation);
-                        if(lower!=null && curveLocation < (lower.getKey()+lower.getValue())) return;
+        int[] oldXZ;
+        int[] xz = Translate.squareLocationToXZ(0,cx,cz,0);
+        int inc = 0;
+        for (int i = 0; i < chunkSet.expectedSize; i++) {
+            if(PaperLib.isPaper() || !urgent) {
+                CompletableFuture<Chunk> cfChunk;
+                cfChunk = urgent ? PaperLib.getChunkAtAsyncUrgently(Objects.requireNonNull(location.getWorld()), xz[0], xz[1], true) :
+                        PaperLib.getChunkAtAsync(Objects.requireNonNull(location.getWorld()), xz[0], xz[1], true);
+                chunkSet.chunks.add(idx, cfChunk);
+                cfChunk.whenCompleteAsync((chunk, throwable) -> {
+                    chunkSet.completed.getAndAdd(1);
+                    if(!chunk.isForceLoaded()) {
+                        Bukkit.getScheduler().runTask(plugin, () -> chunk.setForceLoaded(true));
+                        cache.forceLoadedChunks.put(new HashableChunk(chunk),0L);
+                    }
+                    if(isKnownBad(chunk.getX(),chunk.getZ())) return;
+                    Location point = chunk.getBlock(7,0,7).getLocation();
+                    Biome biome = world.getBiome(point.getBlockX(), point.getBlockZ());
+                    long curveLocation = (long) ((shape.equals(Shapes.SQUARE)) ?
+                                                    Translate.xzToSquareLocation(cr,chunk.getX(),chunk.getZ(),cx,cz) :
+                                                    Translate.xzToCircleLocation(cr,chunk.getX(),chunk.getZ(),cx,cz));
+                    Map.Entry<Long,Long> lower = biomeLocations.get(biome).lowerEntry(curveLocation);
+                    if(lower!=null && curveLocation < (lower.getKey()+lower.getValue())) return;
 
-                        int y = getFirstNonAir(chunk);
-                        y= getLastNonAir(chunk,y);
-                        if(checkLocation(chunk,y)) {
-                            addBiomeLocation(curveLocation, biome);
-                        }
-                    });
-                }
-                if (uniquePlacements) {
-                    addBadLocation(cx + i, cz + j);
-                }
+                    int y = getFirstNonAir(chunk);
+                    y= getLastNonAir(chunk,y);
+                    if(checkLocation(chunk,y)) {
+                        addBiomeLocation(curveLocation, biome);
+                    }
+                });
+            }
+            if (uniquePlacements) {
+                addBadLocation(xz[0], xz[1]);
+            }
+
+            oldXZ = xz;
+            xz = Translate.squareLocationToXZ(0,cx,cz,i+inc);
+            while((xz[0] == oldXZ[0]) && (xz[1] == oldXZ[1])) {
+                inc++;
+                xz = Translate.squareLocationToXZ(0,cx,cz,i+inc);
             }
         }
     }

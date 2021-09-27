@@ -44,13 +44,13 @@ public class Translate {
     public static int[] squareLocationToXZ(long cr, long cx, long cz, double location) {
         int[] res;
         //get a distance from the center
-        Double radius = Math.sqrt(location + cr*cr*4)/2;
+        double radius = Math.sqrt(location + cr*cr*4)/2;
 
         //get how far to step around the square
-        Double theta = radius-radius.intValue();
+        double theta = radius- (int) radius;
         Double perimeterStep = 8*(radius*(theta));
 
-        radius = (double)radius.intValue();
+        radius = (int) radius;
 
         res = squareOct2Coords(radius,perimeterStep);
         res[0] += cx;
@@ -131,8 +131,7 @@ public class Translate {
         double radius;
         long ax = Math.abs(x);
         long az = Math.abs(z);
-        if(ax>az) radius = ax;
-        else radius = az;
+        radius = Math.max(ax, az);
 
         int perimeterStep = 0;
         if(theta<0.5) {

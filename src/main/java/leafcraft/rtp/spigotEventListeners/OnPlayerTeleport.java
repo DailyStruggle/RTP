@@ -16,8 +16,10 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.permissions.PermissionAttachmentInfo;
 
 import java.util.HashMap;
+import java.util.Set;
 
 public final class OnPlayerTeleport implements Listener {
     private final RTP plugin;
@@ -39,7 +41,15 @@ public final class OnPlayerTeleport implements Listener {
         }
 
         //if has this perm, go again
-        if (player.hasPermission("rtp.onEvent.teleport")) {
+        Set<PermissionAttachmentInfo> perms = player.getEffectivePermissions();
+        boolean hasPerm = false;
+        for(PermissionAttachmentInfo perm : perms) {
+            if(!perm.getValue()) continue;
+            if(!perm.getPermission().startsWith("rtp.onevent.")) continue;
+            if(perm.getPermission().equals("rtp.onevent.*") || perm.getPermission().equals("rtp.onevent.teleport"))
+                hasPerm = true;
+        }
+        if (hasPerm) {
             //skip if already going
             SetupTeleport setupTeleport = this.cache.setupTeleports.get(player.getUniqueId());
             LoadChunks loadChunks = this.cache.loadChunks.get(player.getUniqueId());

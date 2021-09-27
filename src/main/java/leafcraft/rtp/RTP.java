@@ -23,6 +23,7 @@ import org.bukkit.Instrument;
 import org.bukkit.Particle;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.permissions.Permission;
+import org.bukkit.permissions.PermissionDefault;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffectType;
 import org.jetbrains.annotations.NotNull;
