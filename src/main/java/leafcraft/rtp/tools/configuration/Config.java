@@ -3,6 +3,7 @@ package leafcraft.rtp.tools.configuration;
 import leafcraft.rtp.RTP;
 import net.md_5.bungee.api.ChatColor;
 import org.bukkit.*;
+import org.bukkit.block.Biome;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 
@@ -41,6 +42,9 @@ public class Config {
 	public final int fadeIn, stay, fadeOut;
 
 	public final boolean refund;
+
+	public final boolean biomeWhitelist;
+	public final Set<Biome> biomes;
 	
 	public Config(RTP plugin, Lang lang) {
 		this.plugin = plugin;
@@ -52,7 +56,7 @@ public class Config {
 		}
 		this.config = YamlConfiguration.loadConfiguration(f);
 
-		if( 	(this.config.getDouble("version") < 2.6) ) {
+		if( 	(this.config.getDouble("version") < 2.7) ) {
 			Bukkit.getLogger().log(Level.WARNING, lang.getLog("oldFile", "config.yml"));
 			update();
 
@@ -116,6 +120,18 @@ public class Config {
 		this.postTeleportQueueing = config.getBoolean("postTeleportQueueing", false);
 
 		this.refund = config.getBoolean("refundOnCancel", false);
+
+		this.biomeWhitelist = config.getBoolean("biomeWhitelist",false);
+		this.biomes = new HashSet<>();
+		List<String> biomeNames = config.getStringList("biomes");
+		for(String biomeName : biomeNames) {
+			try{
+				this.biomes.add(Biome.valueOf(biomeName.toUpperCase()));
+			}
+			catch (IllegalArgumentException exception) {
+				Bukkit.getLogger().warning("[rtp] unknown biome: " + biomeName);
+			}
+		}
 	}
 
 	private void update() {
@@ -138,7 +154,7 @@ public class Config {
 		for (String line : linesInDefaultConfig) {
 			StringBuilder newline = new StringBuilder(line);
 			if (line.startsWith("version:")) {
-				newline = new StringBuilder("version: 2.6");
+				newline = new StringBuilder("version: 2.7");
 			}
 			else if(newline.toString().startsWith("  -")) continue;
 			else {

@@ -101,7 +101,7 @@ public class TeleportEffects implements Listener {
                     Instrument instrument = Instrument.PIANO;
                     if (val.length > 4 && val[4] != null) {
                         try {
-                            instrument = Instrument.valueOf(val[4]);
+                            instrument = Instrument.valueOf(val[4].toUpperCase());
                         } catch (IllegalArgumentException exception) {
                             Bukkit.getLogger().warning("[rtp] invalid instrument: " + val[4]);
                             continue;

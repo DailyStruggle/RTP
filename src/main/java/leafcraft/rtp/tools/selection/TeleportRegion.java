@@ -92,6 +92,20 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                         Translate.squareLocationToXZ(cr,cx,cz, it) :
                         Translate.circleLocationToXZ(cr,cx,cz, it);
                 if(cancelled) return;
+
+                Biome currBiome = Objects.requireNonNull(world).getBiome(xz[0]*16+7,xz[1]*16+7);
+                if(configs.config.biomeWhitelist != configs.config.biomes.contains(currBiome)) {
+                    addBadLocation(it);
+                    removeBiomeLocation(it,currBiome);
+                    fillIterator.incrementAndGet();
+                    if(completion.decrementAndGet() <3 && !completed.getAndSet(true)) {
+                        fillTask = new FillTask(plugin);
+                        fillTask.runTaskLaterAsynchronously(plugin,1);
+                    }
+
+                    continue;
+                }
+
                 CompletableFuture<Chunk> cfChunk = PaperLib.getChunkAtAsync(Objects.requireNonNull(world),xz[0],xz[1],true);
                 this.chunks.add(cfChunk);
                 final long finalIt = it;
@@ -105,7 +119,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                         y = getLastNonAir(chunk, y);
 
                         if (checkLocation(chunk, y)) {
-                            addBiomeLocation(finalIt, world.getBiome(xz[0]*16+7,xz[1]*16+7));
+                            addBiomeLocation(finalIt, currBiome);
                         } else {
                             addBadLocation(finalIt);
                         }
@@ -115,7 +129,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                     fillIterator.incrementAndGet();
                     if(completion.decrementAndGet() <3 && !completed.getAndSet(true)) {
                         fillTask = new FillTask(plugin);
-                        fillTask.runTaskLaterAsynchronously(plugin,10);
+                        fillTask.runTaskLaterAsynchronously(plugin,1);
                     }
                 });
                 cfChunk.whenComplete((chunk, throwable) -> {
@@ -829,6 +843,12 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
             Biome currBiome = world.getBiome(xzChunk[0]*16+7, xzChunk[1]*16+7);
             if(biome!=null && !currBiome.equals(biome)) {
                 removeBiomeLocation(location,biome);
+                continue;
+            }
+
+            if(configs.config.biomeWhitelist != configs.config.biomes.contains(currBiome)) {
+                addBadLocation(location);
+                removeBiomeLocation(location,currBiome);
                 continue;
             }
 
