@@ -86,6 +86,7 @@ public final class RTP extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new OnRandomPreTeleport(),this);
         getServer().getPluginManager().registerEvents(new OnRandomTeleport(),this);
         getServer().getPluginManager().registerEvents(new OnTeleportCancel(),this);
+//        getServer().getPluginManager().registerEvents(new OnChunkLoad(),this);
         getServer().getPluginManager().registerEvents(new TeleportEffects(),this);
 
         Bukkit.getServer().getScheduler().scheduleSyncRepeatingTask(this, new TPS(), 100L, 1L);

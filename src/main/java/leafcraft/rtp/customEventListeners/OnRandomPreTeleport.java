@@ -4,6 +4,7 @@ import leafcraft.rtp.API.customEvents.RandomPreTeleportEvent;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.configuration.Configs;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -25,6 +26,6 @@ public final class OnRandomPreTeleport implements Listener {
     public void onRandomPreTeleport(RandomPreTeleportEvent event) {
         Player player = event.getPlayer();
         if(configs.config.blindnessDuration>0)
-            player.addPotionEffect(PotionEffectType.BLINDNESS.createEffect(configs.config.blindnessDuration,100),false);
+            player.addPotionEffect(PotionEffectType.BLINDNESS.createEffect(configs.config.blindnessDuration,100));
     }
 }

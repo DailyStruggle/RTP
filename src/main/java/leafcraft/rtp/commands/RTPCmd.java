@@ -207,7 +207,6 @@ public class RTPCmd implements CommandExecutor {
             String playerName = rtpArgs.get("near");
             Player targetPlayer = Bukkit.getPlayer(playerName);
 
-
             double price = configs.config.nearSelfPrice;
             Economy economy = VaultChecker.getEconomy();
             boolean has = true;

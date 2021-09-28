@@ -1,7 +1,6 @@
 package leafcraft.rtp.tools.configuration;
 
 import leafcraft.rtp.RTP;
-import leafcraft.rtp.tools.SendMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -13,7 +12,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Scanner;
-import java.util.UUID;
 import java.util.logging.Level;
 
 public class Lang {
@@ -37,37 +35,22 @@ public class Lang {
     }
 
     public String getLog(String key) {
-        String msg = this.config.getString(key,"");
-        if(msg == null) return "";
-        msg = SendMessage.format(Bukkit.getOfflinePlayer(new UUID(0,0)).getPlayer(),msg);
-        return msg;
+        return this.config.getString(key,"");
     }
 
     public String getLog(String key, String placeholder) {
         String msg = this.getLog(key);
 
-        String replace;
-        switch(key) {
-            case "oldFile": replace = "[filename]"; break;
-            case "newWorld":
-            case "invalidWorld":
-            case "noGlobalPerms": replace = "[worldName]"; break;
-            case "cooldownMessage" :
-            case "delayMessage": replace = "[time]"; break;
-            case "unsafe":
-            case "teleportMessage": replace = "[numAttempts]"; break;
-            case "badArg":
-            case "noPerms": replace = "[arg]"; break;
-            case "notEnoughMoney": replace = "[money]"; break;
-            case "fillStart" :
-            case "fillCancel" :
-            case "fillNotRunning" :
-            case "fillStatus" :
-            case "fillPause":
-            case "fillResume":
-            case "fillRunning": replace = "[region]"; break;
-            default: replace = "[placeholder]";
-        }
+        String replace = switch (key) {
+            case "oldFile" -> "[filename]";
+            case "newWorld", "invalidWorld", "noGlobalPerms" -> "[worldName]";
+            case "cooldownMessage", "delayMessage" -> "[time]";
+            case "unsafe", "teleportMessage" -> "[numAttempts]";
+            case "badArg", "noPerms" -> "[arg]";
+            case "notEnoughMoney" -> "[money]";
+            case "fillStart", "fillCancel", "fillNotRunning", "fillStatus", "fillPause", "fillResume", "fillRunning" -> "[region]";
+            default -> "[placeholder]";
+        };
 
         return msg.replace(replace, placeholder);
     }
