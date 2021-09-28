@@ -6,7 +6,9 @@ import net.md_5.bungee.api.chat.BaseComponent;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.HoverEvent;
 import net.md_5.bungee.api.chat.TextComponent;
+import net.md_5.bungee.api.chat.hover.content.Text;
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -21,23 +23,16 @@ public class SendMessage {
     public static void sendMessage(CommandSender sender, Player player, String message) {
         if(message.equals("")) return;
         sendMessage(player,message);
-        if(sender instanceof Player) {
-            if(!sender.getName().equals(player.getName())) {
-                sendMessage((Player) sender, message);
-            }
+        if(!sender.getName().equals(player.getName())) {
+            sendMessage(sender, message);
         }
-        else {
-            message = format(player,message);
-            sender.sendMessage(message);
-        }
-
     }
 
     public static void sendMessage(CommandSender sender, String message) {
         if(message.equals("")) return;
         if(sender instanceof Player) sendMessage((Player) sender,message);
         else {
-            message = format(Bukkit.getOfflinePlayer(serverId).getPlayer(),message);
+            message = format(Bukkit.getOfflinePlayer(serverId),message);
             sender.sendMessage(message);
         }
     }
@@ -61,7 +56,7 @@ public class SendMessage {
 
         if(!hover.equals("")) {
             BaseComponent[] hoverComponents = TextComponent.fromLegacyText(format(player,hover));
-            HoverEvent hoverEvent = new HoverEvent(HoverEvent.Action.SHOW_TEXT, hoverComponents);
+            HoverEvent hoverEvent = new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(hoverComponents));
             for(BaseComponent component : textComponents) {
                 component.setHoverEvent(hoverEvent);
             }
@@ -77,7 +72,7 @@ public class SendMessage {
         Objects.requireNonNull(player).spigot().sendMessage(textComponents);
     }
 
-    public static String format(Player player,String text) {
+    public static String format(OfflinePlayer player, String text) {
         text = PAPIChecker.fillPlaceholders(player,text);
         text = ChatColor.translateAlternateColorCodes('&',text);
         text = Hex2Color(text);

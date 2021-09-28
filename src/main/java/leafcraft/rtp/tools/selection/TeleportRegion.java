@@ -16,6 +16,8 @@ import org.bukkit.block.Biome;
 import org.bukkit.block.Block;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.generator.BiomeProvider;
+import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.jetbrains.annotations.NotNull;
@@ -110,7 +112,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                         Translate.circleLocationToXZ(cr,cx,cz, it);
                 if(cancelled) return;
 
-                Biome currBiome = Objects.requireNonNull(world).getBiome(xz[0]*16+7,xz[1]*16+7);
+                Biome currBiome = Objects.requireNonNull(world).getBiome(xz[0]*16+7, (maxY+minY)/2,xz[1]*16+7);
                 if(configs.config.biomeWhitelist != configs.config.biomes.contains(currBiome)) {
                     addBadLocation(it);
                     removeBiomeLocation(it,currBiome);
@@ -151,7 +153,8 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                         int y = getFirstNonAir(chunk);
                         y = getLastNonAir(chunk, y);
 
-                        if (checkLocation(chunk, y)) {
+                        Biome yBiome = Objects.requireNonNull(world).getBiome(chunk.getX()*16+7, y,chunk.getZ()*16+7);
+                        if (checkLocation(chunk, y) && configs.config.biomeWhitelist != configs.config.biomes.contains(yBiome)) {
                             addBiomeLocation(finalIt, currBiome);
                         } else {
                             addBadLocation(finalIt);
@@ -218,9 +221,9 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         }
     }
 
-    public String name;
+    public final String name;
 
-    private final World world;
+    public final World world;
     private double totalSpace;
 
     //location queue for this region and associated chunks
@@ -568,8 +571,8 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                         cache.forceLoadedChunks.put(new HashableChunk(chunk),0L);
                     }
                     if(isKnownBad(chunk.getX(),chunk.getZ())) return;
-                    Location point = chunk.getBlock(7,0,7).getLocation();
-                    Biome biome = world.getBiome(point.getBlockX(), point.getBlockZ());
+                    Location point = chunk.getBlock(7,(maxY+minY)/2,7).getLocation();
+                    Biome biome = world.getBiome(point.getBlockX(), point.getBlockY(), point.getBlockZ());
                     long curveLocation = (long) ((shape.equals(Shapes.SQUARE)) ?
                                                     Translate.xzToSquareLocation(cr,chunk.getX(),chunk.getZ(),cx,cz) :
                                                     Translate.xzToCircleLocation(cr,chunk.getX(),chunk.getZ(),cx,cz));

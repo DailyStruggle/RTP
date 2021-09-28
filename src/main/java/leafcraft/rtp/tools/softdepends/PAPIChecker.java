@@ -3,7 +3,7 @@ package leafcraft.rtp.tools.softdepends;
 import me.clip.placeholderapi.PlaceholderAPI;
 import me.clip.placeholderapi.PlaceholderAPIPlugin;
 import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.plugin.Plugin;
 
 public class PAPIChecker {
@@ -17,7 +17,7 @@ public class PAPIChecker {
         return (PlaceholderAPIPlugin) plugin;
     }
 
-    public static String fillPlaceholders(Player player, String input) {
+    public static String fillPlaceholders(OfflinePlayer player, String input) {
         PlaceholderAPIPlugin placeholderAPIPlugin = getPAPI();
         if(placeholderAPIPlugin==null) return input;
         if(!placeholderAPIPlugin.isEnabled()) return input;

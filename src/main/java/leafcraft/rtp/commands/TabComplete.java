@@ -12,13 +12,15 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
+import org.bukkit.generator.BiomeProvider;
 import org.bukkit.util.StringUtil;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 
 
 public class TabComplete implements TabCompleter {
-    private SubCommand subCommands;
+    private final SubCommand subCommands;
 
     private static RTP plugin = null;
     private static Configs configs = null;
@@ -29,8 +31,8 @@ public class TabComplete implements TabCompleter {
     }
 
     @Override
-    public List<String> onTabComplete(CommandSender sender, Command command,
-                                      String alias, String[] args) {
+    public List<String> onTabComplete(CommandSender sender, @NotNull Command command,
+                                      @NotNull String alias, String[] args) {
         if(!sender.hasPermission("rtp.see")) return null;
 
         if(plugin == null) plugin = RTP.getPlugin();
@@ -58,63 +60,64 @@ public class TabComplete implements TabCompleter {
                     return;
                 }
                 SubCommand.ParamType type = command.getSubParamType(arg);
-                switch (type) {
-                    case SHAPE: {
-                        for(TeleportRegion.Shapes shape : TeleportRegion.Shapes.values()) {
-                            res.add(arg+":"+shape.name());
+                switch (Objects.requireNonNull(type)) {
+                    case SHAPE -> {
+                        for (TeleportRegion.Shapes shape : TeleportRegion.Shapes.values()) {
+                            res.add(arg + ":" + shape.name());
                         }
-                        break;
                     }
-                    case REGION: {
+                    case REGION -> {
                         List<String> regions = configs.regions.getRegionNames();
-                        for(String region : regions) {
-                            if (!((Boolean)configs.regions.getRegionSetting(region,"requirePermission",true))
+                        for (String region : regions) {
+                            if (!((Boolean) configs.regions.getRegionSetting(region, "requirePermission", true))
                                     || sender.hasPermission("rtp.regions." + region)) {
                                 res.add(arg + ":" + region);
                             }
                         }
-                        break;
                     }
-                    case WORLD: {
+                    case WORLD -> {
                         for (World world : Bukkit.getWorlds()) {
                             configs.worlds.checkWorldExists(world.getName());
-                            if (!((Boolean)configs.worlds.getWorldSetting(world.getName(),"requirePermission",true))
+                            if (!((Boolean) configs.worlds.getWorldSetting(world.getName(), "requirePermission", true))
                                     || sender.hasPermission("rtp.worlds." + world.getName())) {
                                 res.add(arg + ":" + configs.worlds.worldName2Placeholder(world.getName()));
                             }
                         }
-                        break;
                     }
-                    case PLAYER: {
+                    case PLAYER -> {
                         for (Player player : Bukkit.getOnlinePlayers()) {
                             res.add(arg + ":" + player.getName());
                         }
-                        break;
                     }
-                    case COORDINATE: {
-                        if(sender instanceof  Player) res.add(arg + ":" +"~");
-                        break;
+                    case COORDINATE -> {
+                        if (sender instanceof Player) res.add(arg + ":" + "~");
                     }
-                    case BOOLEAN: {
-                        res.add(arg+":true");
-                        res.add(arg+":false");
-                        break;
+                    case BOOLEAN -> {
+                        res.add(arg + ":true");
+                        res.add(arg + ":false");
                     }
-                    case BIOME: {
-                        for(Biome biome : Biome.values()) {
-                            if(sender.hasPermission("rtp.biome.*") || sender.hasPermission("rtp.biome."+biome.name()))
+                    case BIOME -> {
+                        for (Biome biome : Biome.values()) {
+                            if (sender.hasPermission("rtp.biome.*") || sender.hasPermission("rtp.biome." + biome.name()))
                                 res.add(arg + ":" + biome.name());
                         }
-                        break;
-                    }
-                    case MODE: {
-                        for(TeleportRegion.Modes mode : TeleportRegion.Modes.values()) {
-                            res.add(arg+":"+mode.name());
+                        if (sender instanceof Player) {
+                            World world = ((Player) sender).getWorld();
+                            BiomeProvider provider = ((Player) sender).getWorld().getBiomeProvider();
+                            if (provider != null) {
+                                for (Biome biome : provider.getBiomes(world)) {
+                                    res.add(arg + ":" + biome.getKey().getNamespace() + "." + biome.getKey().getKey());
+                                }
+                            }
                         }
-                        break;
                     }
-                    default: {
-                        if(arg.equals("near")) {
+                    case MODE -> {
+                        for (TeleportRegion.Modes mode : TeleportRegion.Modes.values()) {
+                            res.add(arg + ":" + mode.name());
+                        }
+                    }
+                    default -> {
+                        if (arg.equals("near")) {
                             int numValidPlayers = 0;
                             if (sender.hasPermission("rtp.near.other")) {
                                 for (Player player : Bukkit.getOnlinePlayers()) {
@@ -140,9 +143,8 @@ public class TabComplete implements TabCompleter {
                             if (sender instanceof Player && sender.hasPermission("rtp.near")) {
                                 res.add(arg + ":" + sender.getName());
                             }
-                        }
-                        else {
-                            res.add(arg+":");
+                        } else {
+                            res.add(arg + ":");
                         }
                     }
                 }

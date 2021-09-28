@@ -39,8 +39,9 @@ public final class OnRandomTeleport implements Listener {
         }
 
         Player player = event.getPlayer();
+        player.teleport(event.getTo());
         if(configs.config.blindnessDuration>0)
-            player.addPotionEffect(PotionEffectType.BLINDNESS.createEffect(configs.config.blindnessDuration,100),false);
+            player.addPotionEffect(PotionEffectType.BLINDNESS.createEffect(configs.config.blindnessDuration,100));
         if(!configs.config.title.equals("")) {
             Bukkit.getScheduler().runTaskLater(plugin,()->{
                 String title = SendMessage.format(player,configs.config.title);
@@ -49,7 +50,6 @@ public final class OnRandomTeleport implements Listener {
             },2);
         }
         String msg = configs.lang.getLog("teleportMessage", String.valueOf(event.getTries()));
-        msg = PAPIChecker.fillPlaceholders(player,msg);
 
         long time = System.nanoTime();
         long diff = time-cache.lastTeleportTime.get(player.getUniqueId());
@@ -67,8 +67,6 @@ public final class OnRandomTeleport implements Listener {
         msg = msg.replace("[time]",replacement);
         SendMessage.sendMessage(event.getSender(),player,msg);
         cache.lastTeleportTime.put(player.getUniqueId(), time);
-
-        player.teleport(event.getTo());
 
         RandomSelectParams rsParams = cache.regionKeys.get(player.getUniqueId());
         if(rsParams!=null && cache.permRegions.containsKey(rsParams)) {
