@@ -6,13 +6,14 @@ import leafcraft.rtp.tools.configuration.Configs;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
 import java.util.Map;
 
 public class Help implements CommandExecutor {
     private final Configs configs;
-    private final Map<String,String> perms = new HashMap<String,String>();
+    private final Map<String,String> perms = new HashMap<>();
 
     public Help() {
         this.configs = RTP.getConfigs();
@@ -25,7 +26,7 @@ public class Help implements CommandExecutor {
     }
 
     @Override
-    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+    public boolean onCommand(CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
         if(!sender.hasPermission("rtp.see")) {
             String msg = configs.lang.getLog("noPerms");
             SendMessage.sendMessage(sender,msg);

@@ -2,6 +2,7 @@ package leafcraft.rtp.tools.configuration;
 
 import leafcraft.rtp.RTP;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 
@@ -9,9 +10,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.Scanner;
+import java.util.*;
 import java.util.logging.Level;
 
 public class Lang {
@@ -25,7 +24,7 @@ public class Lang {
         }
         this.config = YamlConfiguration.loadConfiguration(f);
 
-        if( 	(this.config.getDouble("version") < 2.0) ) {
+        if( 	(this.config.getDouble("version") < 2.1) ) {
             Bukkit.getLogger().log(Level.WARNING, getLog("oldFile", "lang.yml"));
             update(plugin);
 
@@ -41,18 +40,34 @@ public class Lang {
     public String getLog(String key, String placeholder) {
         String msg = this.getLog(key);
 
-        String replace = switch (key) {
-            case "oldFile" -> "[filename]";
-            case "newWorld", "invalidWorld", "noGlobalPerms" -> "[worldName]";
-            case "cooldownMessage", "delayMessage" -> "[time]";
-            case "unsafe", "teleportMessage" -> "[numAttempts]";
-            case "badArg", "noPerms" -> "[arg]";
-            case "notEnoughMoney" -> "[money]";
-            case "fillStart", "fillCancel", "fillNotRunning", "fillStatus", "fillPause", "fillResume", "fillRunning" -> "[region]";
-            default -> "[placeholder]";
-        };
+        String replace;
+        switch (key) {
+            case "oldFile": replace = "[filename]"; break;
+            case "newWorld":
+            case "invalidWorld":
+            case "noGlobalPerms": replace = "[worldName]"; break;
+            case "cooldownMessage":
+            case "delayMessage": replace = "[time]"; break;
+            case "unsafe":
+            case "teleportMessage": replace =  "[numAttempts]"; break;
+            case "badArg":
+            case "noPerms": replace = "[arg]"; break;
+            case "notEnoughMoney": replace = "[money]"; break;
+            case "fillStart":
+            case "fillCancel":
+            case "fillNotRunning":
+            case "fillStatus":
+            case "fillPause":
+            case "fillResume":
+            case "fillRunning": replace = "[region]"; break;
+            default: replace = "[placeholder]"; break;
+        }
 
         return msg.replace(replace, placeholder);
+    }
+
+    public List<String> getLogList(String key) {
+        return this.config.getStringList(key);
     }
 
     //update config files based on version number
@@ -74,19 +89,33 @@ public class Lang {
 
         ArrayList<String> newLines = new ArrayList<>();
         for (String line : linesInDefaultConfig) {
-            String newline = line;
+            StringBuilder newline = new StringBuilder(line);
             if (line.startsWith("version:")) {
-                newline = "version: 2.0";
+                newline = new StringBuilder("version: 2.1");
             } else {
                 for (String node : oldValues.keySet()) {
+                    if(config.get(node) instanceof List) {
+                        Set<Object> duplicateCheck = new HashSet<>();
+                        newline = new StringBuilder(node + ": ");
+                        for(Object obj : Objects.requireNonNull(config.getList(node))) {
+                            if(duplicateCheck.contains(obj)) continue;
+                            duplicateCheck.add(obj);
+                            if(obj instanceof String) {
+                                boolean doQuotes = Material.getMaterial((String) obj) == null;
+                                if(doQuotes) newline.append("\n  - " + "\"").append(obj).append("\"");
+                                else newline.append("\n  - ").append(obj);
+                            }
+                            else newline.append("\n  - ").append(obj);
+                        }
+                    }
                     if (line.startsWith(node + ":")) {
                         String quotes = "\"";
-                        newline = node + ": " + quotes + oldValues.get(node).toString() + quotes;
+                        newline = new StringBuilder(node + ": " + quotes + oldValues.get(node).toString() + quotes);
                         break;
                     }
                 }
             }
-            newLines.add(newline);
+            newLines.add(newline.toString());
         }
 
         FileWriter fw;

@@ -71,7 +71,6 @@ public final class OnRandomTeleport implements Listener {
         RandomSelectParams rsParams = cache.regionKeys.get(player.getUniqueId());
         if(rsParams!=null && cache.permRegions.containsKey(rsParams)) {
             TeleportRegion region = cache.permRegions.get(rsParams);
-            region.removeChunks(event.getTo());
             QueueLocation queueLocation = null;
             if(player.hasPermission("rtp.personalQueue"))
                 queueLocation = new QueueLocation(region,player, cache);

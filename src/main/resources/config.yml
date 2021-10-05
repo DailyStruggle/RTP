@@ -54,14 +54,14 @@ maxAttempts: 100
 
 #how often, in seconds, to queue a new location in each world
 # set to 0 or lower to turn off the timer
-queuePeriod: 30
+queuePeriod: 10
 
 #minimum TPS requirement before trying to queue a new location
 # must be a positive number
 minTPS: 19.0
 
 #whether to do/don't run a queue task after each rtp in addition to the timer
-postTeleportQueueing: false
+postTeleportQueueing: true
 
 #whether to refund price and cooldown on cancellation
 refundOnCancel: true
@@ -69,7 +69,8 @@ refundOnCancel: true
 #what radius, in chunks, around the destination to pre-load
 # number of chunks loaded is (1 + 2*viewDistance)^2
 # if larger than bukkit view distance, uses bukkit view distance
-viewDistance: 10
+# set lower to trade ux for shorter load times and lower memory usage
+viewDistance: 0
 
 #price to use near parameter
 nearSelfPrice: 500.0
@@ -98,5 +99,21 @@ fadeIn: 1
 stay: 1
 fadeout: 1
 
+#whether to use synchronous chunk loading on command for selection
+# not recommended for server performance, but it's good for testing
+syncLoading: false
+
+#on startup, whether to enable checking every loaded chunk for safety and biome
+# there's not much of a performance impact, but it's nonzero and unnecessary for filled regions.
+checkChunks: false
+
+#on startup, whether to enable permissions parsing for onEvent permissions
+# if no players need to teleport on event, this can be disabled
+onEventParsing: true
+
+#on startup, whether to enable permissions parsing for effect permissions
+# if you don't need effects or if you're using an addon to apply effects, this can be disabled
+effectParsing: true
+
 #DO NOT TOUCH VERSION NUMBER
-version: 2.7
+version: 2.8

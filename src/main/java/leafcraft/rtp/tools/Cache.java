@@ -1,5 +1,6 @@
 package leafcraft.rtp.tools;
 
+import leafcraft.rtp.API.selection.SyncState;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tasks.DoTeleport;
 import leafcraft.rtp.tasks.LoadChunks;
@@ -54,6 +55,11 @@ public class Cache {
 
         double i = 0d;
         int period = configs.config.queuePeriod;
+
+        for(Map.Entry<RandomSelectParams,BukkitTask> entry : queueTimers.entrySet()) {
+            entry.getValue().cancel();
+            queueTimers.remove(entry.getKey());
+        }
         if(period > 0) {
             double increment = (((double) period) / permRegions.size()) * 20;
             for (Map.Entry<RandomSelectParams, TeleportRegion> entry : permRegions.entrySet()) {
@@ -103,6 +109,8 @@ public class Cache {
     public ConcurrentHashMap<UUID,Player> invulnerablePlayers = new ConcurrentHashMap<>();
 
     public void shutdown() {
+
+
         for(Player player : invulnerablePlayers.values()) {
             player.setInvulnerable(false);
         }
@@ -178,7 +186,7 @@ public class Cache {
         return region.getQueuedLocation(sender, player);
     }
 
-    public Location getRandomLocation(RandomSelectParams rsParams, boolean urgent, CommandSender sender, Player player) {
+    public Location getRandomLocation(RandomSelectParams rsParams, SyncState state, CommandSender sender, Player player) {
         TeleportRegion region;
         Double price = 0d;
         boolean didWithdraw = (sender instanceof Player) && currentTeleportCost.containsKey(((Player)sender).getUniqueId());
@@ -212,10 +220,15 @@ public class Cache {
 
         Location res;
         if(rsParams.params.containsKey("biome")) {
-            res = region.getLocation(true, sender,player,Biome.valueOf(rsParams.params.get("biome")));
+            res = region.getLocation(state, sender,player,Biome.valueOf(rsParams.params.get("biome")));
         }
-        else res = region.getLocation(urgent, sender, player);
+        else res = region.getLocation(state, sender, player, null);
         return res;
+    }
+
+    public Location getRandomLocation(RandomSelectParams rsParams, boolean urgent, CommandSender sender, Player player) {
+        SyncState state = (urgent) ? SyncState.ASYNC_URGENT : SyncState.ASYNC;
+        return getRandomLocation(rsParams,state,sender,player);
     }
 
     public void resetRegions() {
@@ -249,6 +262,10 @@ public class Cache {
 
         double i = 0d;
         int period = configs.config.queuePeriod;
+        for(Map.Entry<RandomSelectParams,BukkitTask> entry : queueTimers.entrySet()) {
+            entry.getValue().cancel();
+            queueTimers.remove(entry.getKey());
+        }
         if(period > 0) {
             double increment = (((double)period) / permRegions.size()) * 20;
             for (Map.Entry<RandomSelectParams, TeleportRegion> entry : permRegions.entrySet()) {

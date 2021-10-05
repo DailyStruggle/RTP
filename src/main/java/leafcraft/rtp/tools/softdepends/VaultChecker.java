@@ -28,7 +28,7 @@ public class VaultChecker {
         }
         RegisteredServiceProvider<Chat> rsp = Bukkit.getServer().getServicesManager().getRegistration(Chat.class);
         if(rsp == null) return;
-        chat = Objects.requireNonNull(rsp).getProvider();
+        chat = rsp.getProvider();
     }
 
     public static void setupPermissions() {
@@ -37,7 +37,7 @@ public class VaultChecker {
         }
         RegisteredServiceProvider<Permission> rsp = Bukkit.getServer().getServicesManager().getRegistration(Permission.class);
         if(rsp == null) return;
-        perms = Objects.requireNonNull(rsp).getProvider();
+        perms = rsp.getProvider();
     }
 
     public static Economy getEconomy() {

@@ -6,13 +6,11 @@ import net.md_5.bungee.api.chat.BaseComponent;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.HoverEvent;
 import net.md_5.bungee.api.chat.TextComponent;
-import net.md_5.bungee.api.chat.hover.content.Text;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -47,7 +45,7 @@ public class SendMessage {
     public static void sendMessage(CommandSender sender, String message, String hover, String click) {
         if(message.equals("")) return;
 
-        Player player;
+        OfflinePlayer player;
         if(sender instanceof Player) player = (Player) sender;
         else player = Bukkit.getOfflinePlayer(serverId).getPlayer();
 
@@ -56,7 +54,7 @@ public class SendMessage {
 
         if(!hover.equals("")) {
             BaseComponent[] hoverComponents = TextComponent.fromLegacyText(format(player,hover));
-            HoverEvent hoverEvent = new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(hoverComponents));
+            HoverEvent hoverEvent = new HoverEvent(HoverEvent.Action.SHOW_TEXT, hoverComponents);
             for(BaseComponent component : textComponents) {
                 component.setHoverEvent(hoverEvent);
             }
@@ -69,7 +67,7 @@ public class SendMessage {
             }
         }
 
-        Objects.requireNonNull(player).spigot().sendMessage(textComponents);
+        sender.spigot().sendMessage(textComponents);
     }
 
     public static String format(OfflinePlayer player, String text) {

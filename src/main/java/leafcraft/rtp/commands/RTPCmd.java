@@ -2,6 +2,7 @@ package leafcraft.rtp.commands;
 
 import leafcraft.rtp.API.Commands.SubCommand;
 import leafcraft.rtp.API.customEvents.TeleportCommandSuccessEvent;
+import leafcraft.rtp.API.selection.SyncState;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tasks.SetupTeleport;
 import leafcraft.rtp.tools.Cache;
@@ -26,7 +27,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 public class RTPCmd implements CommandExecutor {
-    private Map<String, SubCommand> rtpCommands;
+    private final Map<String, SubCommand> rtpCommands;
     private final Map<String,String> rtpParams = new HashMap<>();
 
     public RTPCmd(SubCommand command) {
@@ -60,7 +61,6 @@ public class RTPCmd implements CommandExecutor {
             else {
                 return Objects.requireNonNull(rtpCommands.get(args[0]).getCommandExecutor())
                         .onCommand(sender,command,label,Arrays.copyOfRange(args, 1, args.length));
-//                plugin.getCommand("rtp " + args[0]).execute(sender, label, Arrays.copyOfRange(args, 1, args.length));
             }
             return true;
         }
@@ -339,7 +339,7 @@ public class RTPCmd implements CommandExecutor {
 
         boolean hasQueued = cache.permRegions.containsKey(rsParams) && cache.permRegions.get(rsParams).hasQueuedLocation(player.getUniqueId());
         if(!hasQueued && !sender.hasPermission("rtp.unqueued")) {
-            String msg = PAPIChecker.fillPlaceholders(player,configs.lang.getLog("noLocationsQueued"));
+            String msg = configs.lang.getLog("noLocationsQueued");
             SendMessage.sendMessage(sender,player,msg);
             return true;
         }
@@ -357,7 +357,10 @@ public class RTPCmd implements CommandExecutor {
                 && hasQueued
                 && sender.hasPermission("rtp.noDelay")
                 && !rsParams.params.containsKey("biome")) {
-            setupTeleport.setupTeleportNow(false);
+            setupTeleport.setupTeleportNow(SyncState.SYNC);
+        }
+        else if(configs.config.syncLoading) {
+            setupTeleport.setupTeleportNow(SyncState.SYNC);
         }
         else {
             setupTeleport.runTaskAsynchronously(plugin);

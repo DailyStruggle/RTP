@@ -1,7 +1,7 @@
 name: RTP
-version: 1.3.11
+version: 1.3.12
 main: leafcraft.rtp.RTP
-api-version: 1.17
+api-version: 1.13
 authors: [ leaf26 ]
 description: an optimized RTP plugin
 softdepend: [WorldGuard, WorldEdit, GriefDefender, GriefPrevention, ProtocolLib, Vault, PlaceholderAPI, TownyAdvanced, HuskTowns, Factions, Lands]
@@ -190,3 +190,6 @@ permissions:
     default: op
     children:
       rtp.biome: true
+  rtp.info:
+    description: see plugin info and settings
+    default: op

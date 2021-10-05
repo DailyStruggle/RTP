@@ -126,7 +126,7 @@ public class TeleportEffects implements Listener {
                         continue;
                     }
 
-                    notes.add(new Object[]{instrument,note});
+                    notes.add(new Object[]{instrument, note});
                     break;
                 }
                 case "sound": {
@@ -174,13 +174,11 @@ public class TeleportEffects implements Listener {
                             continue;
                         }
                     }
-
                     particles.add(new Object[]{particle, numParticles});
                     break;
                 }
                 case "firework": {
                     FireworkEffect.Type type = FireworkEffect.Type.BALL;
-
                     if (val.length > 4 && val[4] != null) {
                         try {
                             type = FireworkEffect.Type.valueOf(val[4].toUpperCase());
@@ -213,7 +211,7 @@ public class TeleportEffects implements Listener {
                     Color color = Color.WHITE;
                     if (val.length > 7 && val[7] != null) {
                         try {
-                            color = Color.fromRGB(Integer.parseInt(val[7],16));
+                            color = Color.fromRGB(Integer.parseInt(val[7], 16));
                         } catch (IllegalArgumentException ignored) {
                             Bukkit.getLogger().warning("[rtp] invalid particle color: " + val[7]);
                             continue;
@@ -223,7 +221,7 @@ public class TeleportEffects implements Listener {
                     Color fade = Color.WHITE;
                     if (val.length > 8 && val[8] != null) {
                         try {
-                            fade = Color.fromRGB(Integer.parseInt(val[8],16));
+                            fade = Color.fromRGB(Integer.parseInt(val[8], 16));
                         } catch (IllegalArgumentException ignored) {
                             Bukkit.getLogger().warning("[rtp] invalid particle color: " + val[8]);
                             continue;

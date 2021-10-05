@@ -1,5 +1,6 @@
 package leafcraft.rtp.tasks;
 
+import leafcraft.rtp.API.selection.SyncState;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.SendMessage;
@@ -39,7 +40,7 @@ public class SetupTeleport extends BukkitRunnable {
 
     @Override
     public void run() {
-        setupTeleportNow(true);
+        setupTeleportNow(SyncState.ASYNC_URGENT);
     }
 
     @Override
@@ -52,11 +53,10 @@ public class SetupTeleport extends BukkitRunnable {
         return sender.hasPermission("rtp.noDelay");
     }
 
-    public void setupTeleportNow(boolean async) {
+    public void setupTeleportNow(SyncState state) {
         //get a random location according to the parameters
         Location location;
-        if (async) location = cache.getRandomLocation(rsParams, true, sender, player);
-        else location = cache.getQueuedLocation(rsParams, sender, player);
+        location = cache.getRandomLocation(rsParams, state, sender, player);
         if (location == null) {
             cache.setupTeleports.remove(player.getUniqueId());
             return;
@@ -113,14 +113,18 @@ public class SetupTeleport extends BukkitRunnable {
             if(sender.hasPermission("rtp.noDelay.chunks")
                     || (loadChunks.chunkSet.completed.get()>=loadChunks.chunkSet.expectedSize-1)) {
                 DoTeleport doTeleport = new DoTeleport(plugin,configs,sender,player, location,cache);
+
                 long diffNanos = System.nanoTime() - cache.lastTeleportTime.getOrDefault(player.getUniqueId(), 0L);
                 long diffMicros = TimeUnit.NANOSECONDS.toMicros(diffNanos);
                 long diffTicks = (diffMicros / 50);
-                if(async || diffTicks < delay) {
+                if(state.equals(SyncState.SYNC) && diffTicks >= delay) {
+                    doTeleport.doTeleportNow();
+                }
+                else {
                     doTeleport.runTaskLater(plugin, delay+2);
                     cache.doTeleports.put(player.getUniqueId(),doTeleport);
                 }
-                else doTeleport.doTeleportNow();
+
             }
             else {
                 loadChunks.runTaskAsynchronously(plugin);

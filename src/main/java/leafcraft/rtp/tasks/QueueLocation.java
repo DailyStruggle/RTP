@@ -6,9 +6,12 @@ import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.util.concurrent.Semaphore;
+
 //BukkitTask container for queueing asynchronously
 public class QueueLocation extends BukkitRunnable {
     private static long counter = 0L;
+    private final Semaphore counterGuard = new Semaphore(1);
     public final long idx;
     private final TeleportRegion region;
     private Player player = null;
@@ -17,7 +20,14 @@ public class QueueLocation extends BukkitRunnable {
 
     public QueueLocation(TeleportRegion region, Cache cache) {
         this.region = region;
-        counter++;
+        try {
+            counterGuard.acquire();
+            counter++;
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            counterGuard.release();
+        }
         this.idx = counter;
         this.cache = cache;
     }
@@ -25,7 +35,14 @@ public class QueueLocation extends BukkitRunnable {
     public QueueLocation(TeleportRegion region, Location location, Cache cache) {
         this.region = region;
         this.location = location;
-        counter++;
+        try {
+            counterGuard.acquire();
+            counter++;
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            counterGuard.release();
+        }
         this.idx = counter;
         this.cache = cache;
     }
@@ -33,13 +50,21 @@ public class QueueLocation extends BukkitRunnable {
     public QueueLocation(TeleportRegion region, Player player, Cache cache) {
         this.region = region;
         this.player = player;
-        counter++;
+        try {
+            counterGuard.acquire();
+            counter++;
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            counterGuard.release();
+        }
         this.idx = counter;
         this.cache = cache;
     }
 
     @Override
     public void run() {
+        if(isCancelled()) return;
         if(player == null || !player.isOnline()) {
             if (location == null)
                 region.queueRandomLocation();

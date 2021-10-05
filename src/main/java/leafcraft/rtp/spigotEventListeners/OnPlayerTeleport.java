@@ -21,12 +21,10 @@ import org.bukkit.permissions.PermissionAttachmentInfo;
 import java.util.Set;
 
 public final class OnPlayerTeleport implements Listener {
-    private final RTP plugin;
     private final Configs configs;
     private final Cache cache;
 
     public OnPlayerTeleport() {
-        this.plugin = RTP.getPlugin();
         this.configs = RTP.getConfigs();
         this.cache = RTP.getCache();
     }
@@ -37,32 +35,6 @@ public final class OnPlayerTeleport implements Listener {
         //if currently teleporting, stop that and clean up
         if (cache.todoTP.containsKey(player.getUniqueId())) {
             stopTeleport(event);
-        }
-
-        //if has this perm, go again
-        Set<PermissionAttachmentInfo> perms = player.getEffectivePermissions();
-        boolean hasPerm = false;
-        for(PermissionAttachmentInfo perm : perms) {
-            if(!perm.getValue()) continue;
-            if(!perm.getPermission().startsWith("rtp.onevent.")) continue;
-            if(perm.getPermission().equals("rtp.onevent.*") || perm.getPermission().equals("rtp.onevent.teleport"))
-                hasPerm = true;
-        }
-        if (hasPerm) {
-            //skip if already going
-            SetupTeleport setupTeleport = this.cache.setupTeleports.get(player.getUniqueId());
-            LoadChunks loadChunks = this.cache.loadChunks.get(player.getUniqueId());
-            DoTeleport doTeleport = this.cache.doTeleports.get(player.getUniqueId());
-            if (setupTeleport != null && setupTeleport.isNoDelay()) return;
-            if (loadChunks != null && loadChunks.isNoDelay()) return;
-            if (doTeleport != null && doTeleport.isNoDelay()) return;
-
-            //run command
-            if (setupTeleport == null && loadChunks == null && doTeleport == null) {
-                setupTeleport = new SetupTeleport(plugin, player, player, configs, cache, new RandomSelectParams(player.getWorld(), null));
-                this.cache.setupTeleports.put(player.getUniqueId(), setupTeleport);
-                setupTeleport.runTaskAsynchronously(plugin);
-            }
         }
     }
 
