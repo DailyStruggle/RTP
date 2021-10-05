@@ -32,7 +32,7 @@ public final class OnPlayerDeath implements Listener {
     }
 
     @EventHandler(priority = EventPriority.LOW)
-    public void OnPlayerDeath(PlayerDeathEvent event) {
+    public void onPlayerDeath(PlayerDeathEvent event) {
         Player player = event.getEntity();
 
         //if currently teleporting, stop that and clean up

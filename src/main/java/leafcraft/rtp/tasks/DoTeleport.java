@@ -5,6 +5,8 @@ import leafcraft.rtp.API.customEvents.RandomTeleportEvent;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.configuration.Configs;
+import leafcraft.rtp.tools.selection.RandomSelectParams;
+import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
@@ -18,6 +20,7 @@ public class DoTeleport extends BukkitRunnable {
     private final Player player;
     private final Location location;
     private final Cache cache;
+    private final TeleportRegion region;
 
     public DoTeleport(RTP plugin, Configs configs, CommandSender sender, Player player, Location location, Cache cache) {
         this.plugin = plugin;
@@ -26,6 +29,9 @@ public class DoTeleport extends BukkitRunnable {
         this.player = player;
         this.location = location;
         this.cache = cache;
+        RandomSelectParams params = cache.regionKeys.get(player.getUniqueId());
+        this.region = cache.permRegions.containsKey(params) ?
+                cache.permRegions.get(params) : cache.tempRegions.get(params);
     }
 
     @Override
@@ -44,7 +50,7 @@ public class DoTeleport extends BukkitRunnable {
         Bukkit.getPluginManager().callEvent(randomPreTeleportEvent);
         RandomTeleportEvent randomTeleportEvent = new RandomTeleportEvent(sender, player, mutableLocation, cache.numTeleportAttempts.get(location));
         Bukkit.getPluginManager().callEvent(randomTeleportEvent);
-        new ChunkCleanup(configs,location,cache).runTask(plugin);
+        new ChunkCleanup(location,cache, region).runTask(plugin);
         cache.commandSenderLookup.remove(player.getUniqueId());
 
         if(sender instanceof Player) {

@@ -17,11 +17,11 @@ import leafcraft.rtp.tools.softdepends.LandsChecker;
 import leafcraft.rtp.tools.softdepends.PAPI_expansion;
 import leafcraft.rtp.tools.softdepends.VaultChecker;
 import org.bstats.bukkit.Metrics;
-import org.bukkit.Bukkit;
-import org.bukkit.FireworkEffect;
-import org.bukkit.Instrument;
-import org.bukkit.Particle;
+import org.bstats.charts.CustomChart;
+import org.bstats.charts.SimplePie;
+import org.bukkit.*;
 import org.bukkit.command.CommandExecutor;
+import org.bukkit.entity.Player;
 import org.bukkit.permissions.Permission;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffectType;
@@ -76,18 +76,28 @@ public final class RTP extends JavaPlugin {
         }
         catch (NullPointerException ignored) { }
 
-        getServer().getPluginManager().registerEvents(new OnPlayerMove(),this);
-        getServer().getPluginManager().registerEvents(new OnPlayerTeleport(),this);
+        if(configs.config.onEventParsing) {
+            getServer().getPluginManager().registerEvents(new OnEvent(),this);
+        }
+
+        if(configs.config.effectParsing) {
+            getServer().getPluginManager().registerEvents(new TeleportEffects(),this);
+        }
+
+        if(configs.config.checkChunks) {
+            getServer().getPluginManager().registerEvents(new OnChunkLoad(),this);
+        }
+
         getServer().getPluginManager().registerEvents(new OnPlayerDeath(),this);
         getServer().getPluginManager().registerEvents(new OnPlayerRespawn(),this);
         getServer().getPluginManager().registerEvents(new OnPlayerJoin(),this);
         getServer().getPluginManager().registerEvents(new OnPlayerChangeWorld(),this);
+        getServer().getPluginManager().registerEvents(new OnPlayerMove(),this);
+        getServer().getPluginManager().registerEvents(new OnPlayerTeleport(),this);
         getServer().getPluginManager().registerEvents(new OnPlayerQuit(),this);
         getServer().getPluginManager().registerEvents(new OnRandomPreTeleport(),this);
         getServer().getPluginManager().registerEvents(new OnRandomTeleport(),this);
         getServer().getPluginManager().registerEvents(new OnTeleportCancel(),this);
-//        getServer().getPluginManager().registerEvents(new OnChunkLoad(),this);
-        getServer().getPluginManager().registerEvents(new TeleportEffects(),this);
 
         Bukkit.getServer().getScheduler().scheduleSyncRepeatingTask(this, new TPS(), 100L, 1L);
 
@@ -219,6 +229,7 @@ public final class RTP extends JavaPlugin {
         subCommands.setSubCommand("setRegion",new SubCommandImpl("rtp.setRegion", new SetRegion()));
         subCommands.setSubCommand("setWorld",new SubCommandImpl("rtp.setWorld", new SetWorld()));
         subCommands.setSubCommand("fill",new SubCommandImpl("rtp.fill", new Fill()));
+        subCommands.setSubCommand("info",new SubCommandImpl("rtp.info", new Info()));
 
         SubCommandImpl setRegion = (SubCommandImpl) Objects.requireNonNull(subCommands.getSubCommand("setRegion"));
         setRegion.setSubParam("region","rtp.setRegion",SubCommand.ParamType.REGION);
@@ -257,6 +268,9 @@ public final class RTP extends JavaPlugin {
         fill.setSubCommand("resume",new SubCommandImpl("rtp.fill", null));
         Objects.requireNonNull(fill.getSubCommand("resume")).setSubParam("region","rtp.fill",SubCommand.ParamType.REGION);
 
+        SubCommandImpl info = (SubCommandImpl) Objects.requireNonNull(subCommands.getSubCommand("info"));
+        info.setSubParam("region","rtp.info",SubCommand.ParamType.REGION);
+        info.setSubParam("world","rtp.info",SubCommand.ParamType.WORLD);
 
         Bukkit.getScheduler().runTaskAsynchronously(RTP.getPlugin(),()->{
             //adding 600+ sounds takes too long at startup

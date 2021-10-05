@@ -2,10 +2,7 @@ package leafcraft.rtp.spigotEventListeners;
 
 import leafcraft.rtp.API.customEvents.TeleportCancelEvent;
 import leafcraft.rtp.RTP;
-import leafcraft.rtp.tasks.DoTeleport;
-import leafcraft.rtp.tasks.LoadChunks;
 import leafcraft.rtp.tasks.QueueLocation;
-import leafcraft.rtp.tasks.SetupTeleport;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
@@ -18,11 +15,9 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
-import org.bukkit.permissions.PermissionAttachmentInfo;
 
 import java.util.HashMap;
 import java.util.Objects;
-import java.util.Set;
 
 public final class OnPlayerChangeWorld implements Listener {
     private final RTP plugin;
@@ -41,29 +36,6 @@ public final class OnPlayerChangeWorld implements Listener {
         //if currently teleporting, stop that and clean up
         if (cache.todoTP.containsKey(player.getUniqueId())) {
             stopTeleport(event);
-        }
-
-        //if has this perm, go again
-        Set<PermissionAttachmentInfo> perms = player.getEffectivePermissions();
-        boolean hasPerm = false;
-        for(PermissionAttachmentInfo perm : perms) {
-            if(!perm.getValue()) continue;
-            if(!perm.getPermission().startsWith("rtp.onevent.")) continue;
-            if(perm.getPermission().equals("rtp.onevent.*") || perm.getPermission().equals("rtp.onevent.changeWorld"))
-                hasPerm = true;
-        }
-        if (hasPerm) {
-            //skip if already going
-            SetupTeleport setupTeleport = this.cache.setupTeleports.get(player.getUniqueId());
-            LoadChunks loadChunks = this.cache.loadChunks.get(player.getUniqueId());
-            DoTeleport doTeleport = this.cache.doTeleports.get(player.getUniqueId());
-            if (setupTeleport != null && setupTeleport.isNoDelay()) return;
-            if (loadChunks != null && loadChunks.isNoDelay()) return;
-            if (doTeleport != null && doTeleport.isNoDelay()) return;
-
-            //run command as console
-            Bukkit.dispatchCommand(Bukkit.getConsoleSender(),
-                    "rtp player:" + player.getName() + " world:" + player.getWorld().getName());
         }
 
         if(player.hasPermission("rtp.personalQueue")) {

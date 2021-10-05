@@ -36,34 +36,6 @@ public final class OnPlayerJoin implements Listener {
         Player player = event.getPlayer();
 
         Bukkit.getScheduler().runTaskAsynchronously(plugin,()->{
-            Set<PermissionAttachmentInfo> perms = player.getEffectivePermissions();
-            boolean hasFirstJoin = false;
-            boolean hasJoin = false;
-            for(PermissionAttachmentInfo perm : perms) {
-                if(!perm.getValue()) continue;
-                if(!perm.getPermission().startsWith("rtp.onevent.")) continue;
-                if(perm.getPermission().equals("rtp.onevent.*") || perm.getPermission().equals("rtp.onevent.respawn"))
-                    hasFirstJoin = true;
-                if(perm.getPermission().equals("rtp.onevent.*") || perm.getPermission().equals("rtp.onevent.respawn"))
-                    hasJoin = true;
-            }
-            if (hasFirstJoin && !player.hasPlayedBefore()) {
-                Bukkit.dispatchCommand(Bukkit.getConsoleSender(),
-                        "rtp player:" + player.getName() + " world:" + player.getWorld().getName());
-            } else if (hasJoin) {
-                //skip if already going
-                SetupTeleport setupTeleport = this.cache.setupTeleports.get(player.getUniqueId());
-                LoadChunks loadChunks = this.cache.loadChunks.get(player.getUniqueId());
-                DoTeleport doTeleport = this.cache.doTeleports.get(player.getUniqueId());
-                if (setupTeleport != null && setupTeleport.isNoDelay()) return;
-                if (loadChunks != null && loadChunks.isNoDelay()) return;
-                if (doTeleport != null && doTeleport.isNoDelay()) return;
-
-                //run command as console
-                Bukkit.dispatchCommand(Bukkit.getConsoleSender(),
-                        "rtp player:" + player.getName() + " world:" + player.getWorld().getName());
-            }
-
             if(player.hasPermission("rtp.personalQueue")) {
                 World toWorld = event.getPlayer().getWorld();
                 String toWorldName = toWorld.getName();

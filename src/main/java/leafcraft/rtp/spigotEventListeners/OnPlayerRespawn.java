@@ -38,22 +38,6 @@ public final class OnPlayerRespawn implements Listener {
         if (!player.hasPermission("rtp.worlds." + toWorldName) && (Boolean) configs.worlds.getWorldSetting(toWorldName, "requirePermission", true)) {
             toWorld = Bukkit.getWorld((String) configs.worlds.getWorldSetting(toWorldName, "override", "world"));
         }
-
-        Set<PermissionAttachmentInfo> perms = player.getEffectivePermissions();
-        boolean hasPerm = false;
-        for(PermissionAttachmentInfo perm : perms) {
-            if(!perm.getValue()) continue;
-            if(!perm.getPermission().startsWith("rtp.onevent.")) continue;
-            if(perm.getPermission().equals("rtp.onevent.*") || perm.getPermission().equals("rtp.onevent.respawn"))
-                hasPerm = true;
-        }
-        if (hasPerm) {
-            RandomSelectParams rsParams = new RandomSelectParams(player.getWorld(), null);
-            SetupTeleport setupTeleport = new SetupTeleport(plugin, Bukkit.getConsoleSender(), player, configs, cache, rsParams);
-            setupTeleport.runTaskAsynchronously(plugin);
-            cache.setupTeleports.put(player.getUniqueId(), setupTeleport);
-        }
-
         if(player.hasPermission("rtp.personalQueue")) {
             RandomSelectParams toParams = new RandomSelectParams(Objects.requireNonNull(toWorld), null);
             if (cache.permRegions.containsKey(toParams)) {

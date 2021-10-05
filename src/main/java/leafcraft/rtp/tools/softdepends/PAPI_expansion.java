@@ -49,7 +49,7 @@ public class PAPI_expansion extends PlaceholderExpansion{
 
 	@Override
     public @NotNull String getVersion(){
-        return "1.3.11";
+        return "1.3.12";
     }
 
     @Override

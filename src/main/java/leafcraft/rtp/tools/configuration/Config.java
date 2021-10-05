@@ -46,7 +46,15 @@ public class Config {
 
 	public final boolean biomeWhitelist;
 	public final Set<Biome> biomes;
-	
+
+	public final boolean syncLoading;
+
+	public final boolean checkChunks;
+
+	public final boolean onEventParsing;
+
+	public final boolean effectParsing;
+
 	public Config(RTP plugin, Lang lang) {
 		this.plugin = plugin;
 
@@ -57,7 +65,7 @@ public class Config {
 		}
 		this.config = YamlConfiguration.loadConfiguration(f);
 
-		if( 	(this.config.getDouble("version") < 2.7) ) {
+		if( 	(this.config.getDouble("version") < 2.8) ) {
 			Bukkit.getLogger().log(Level.WARNING, lang.getLog("oldFile", "config.yml"));
 			update();
 
@@ -133,6 +141,14 @@ public class Config {
 				Bukkit.getLogger().warning("[rtp] unknown biome: " + biomeName);
 			}
 		}
+
+		this.syncLoading = config.getBoolean("syncLoading",false);
+
+		this.checkChunks = config.getBoolean("checkChunks",false);
+
+		this.onEventParsing = config.getBoolean("onEventParsing",false);
+
+		this.effectParsing = config.getBoolean("effectParsing",false);
 	}
 
 	private void update() {
@@ -155,7 +171,7 @@ public class Config {
 		for (String line : linesInDefaultConfig) {
 			StringBuilder newline = new StringBuilder(line);
 			if (line.startsWith("version:")) {
-				newline = new StringBuilder("version: 2.7");
+				newline = new StringBuilder("version: 2.8");
 			}
 			else if(newline.toString().startsWith("  -")) continue;
 			else {

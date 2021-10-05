@@ -30,7 +30,7 @@ public final class OnTeleportCancel implements Listener {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
-    public void OnTeleportCancel(TeleportCancelEvent event) {
+    public void onTeleportCancel(TeleportCancelEvent event) {
         Player player = event.getPlayer();
 
         //don't stop teleporting if there isn't supposed to be a delay

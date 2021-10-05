@@ -83,6 +83,7 @@ reload: "&b/rtp reload - reload config files"
 setWorld: "&b/rtp setWorld - update world settings"
 setRegion: "&b/rtp setRegion - create or update region settings"
 fill: "&b/rtp fill - attempt each location once in a region"
+info: "&b/rtp info - see plugin and region info"
 
 #player teleport status placeholders for PAPI
 PLAYER_AVAILABLE: "&aAVAILABLE"
@@ -91,4 +92,45 @@ PLAYER_SETUP: "&bPICKING A LOCATION"
 PLAYER_LOADING: "&bLOADING CHUNKS"
 PLAYER_TELEPORTING: "&bTELEPORTING"
 
-version: 2.0
+#info command
+title: "&a======RTP Info======"
+chunks: "#D4AF37Chunks currently loaded by RTP: [chunks]"
+worldHeader: "#008080Worlds:"
+world: "  #21ADA8[world]"
+regionHeader: "#63C5DARegions:"
+region: "  #52B2BF[region]"
+
+#sub-info
+worldInfo:
+  - "#21ADA8[world]:"
+  - "#99EEBB  name: [name]"
+  - "#99EEBB  region: [region]"
+  - "#99EEBB  requirePermission: [requirePermission]"
+  - "#99EEBB  override: [override]"
+  - "#99EEBB  nearShape: [nearShape]"
+  - "#99EEBB  nearRadius: [nearRadius]"
+  - "#99EEBB  nearCenterRadius: [nearCenterRadius]"
+  - "#99EEBB  nearMinY: [nearMinY]"
+  - "#99EEBB  nearMaxY: [nearMaxY]"
+
+regionInfo:
+  - "#52B2BF[region]:"
+  - "#58CCED  world: [world]"
+  - "#58CCED  shape: [shape]"
+  - "#58CCED  mode: [mode]"
+  - "#58CCED  radius: [radius] chunks"
+  - "#58CCED  centerRadius: [centerRadius] chunks"
+  - "#58CCED  centerX: [centerX]"
+  - "#58CCED  centerZ: [centerZ]"
+  - "#58CCED  minY: [minY]"
+  - "#58CCED  maxY: [maxY]"
+  - "#58CCED  weight: [weight]"
+  - "#58CCED  requireSkyLight: [requireSkyLight]"
+  - "#58CCED  requirePermission: [requirePermission]"
+  - "#58CCED  worldBorderOverride: [worldBorderOverride]"
+  - "#58CCED  uniquePlacements: [uniquePlacements]"
+  - "#58CCED  expand: [expand]"
+  - "#58CCED  queueLen: [queueLen]"
+  - "#58CCED  queued: [queued]"
+
+version: 2.1

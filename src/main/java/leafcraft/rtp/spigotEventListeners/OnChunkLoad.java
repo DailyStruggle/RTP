@@ -13,12 +13,16 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.world.ChunkLoadEvent;
 
 public class OnChunkLoad implements Listener {
+
+
     @EventHandler(priority = EventPriority.HIGH)
     public void onChunkLoad(ChunkLoadEvent event) {
         Configs configs = RTP.getConfigs();
         World world = event.getWorld();
 
         Location location = event.getChunk().getBlock(7,96,7).getLocation();
+        Biome biome = world.getBiome(location.getBlockX(), location.getBlockZ());
+        if(configs.config.biomeWhitelist != configs.config.biomes.contains(biome)) return;
         for(TeleportRegion region : RTP.getCache().permRegions.values()) {
             if(!world.getUID().equals(region.world.getUID())) continue;
             long regionLocation = (long) ((region.shape.equals(TeleportRegion.Shapes.SQUARE)) ?
@@ -28,10 +32,7 @@ public class OnChunkLoad implements Listener {
             if(region.isKnownBad(regionLocation)) continue;
             int y = region.getFirstNonAir(event.getChunk());
             y = region.getLastNonAir(event.getChunk(),y);
-            location.setY(y);
-            Biome biome = world.getBiome(location);
-            world.getBiomeProvider().getBiome(world,location.getBlockX(),location.getBlockY(),location.getBlockZ());
-            if(configs.config.biomeWhitelist != configs.config.biomes.contains(biome)) continue;
+
             if(region.checkLocation(event.getChunk(),y)) {
                 region.addBiomeLocation(regionLocation,biome);
             }

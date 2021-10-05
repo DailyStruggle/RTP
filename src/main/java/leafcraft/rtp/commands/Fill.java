@@ -92,40 +92,40 @@ public class Fill implements CommandExecutor {
             }
 
             switch (args[0]) {
-                case "start" : {
-                    if(region.isFilling()) {
+                case "start": {
+                    if (region.isFilling()) {
                         String msg = configs.lang.getLog("fillRunning", regionName);
-                        SendMessage.sendMessage(sender,msg);
+                        SendMessage.sendMessage(sender, msg);
                         return true;
                     }
 
                     region.startFill();
                     return true;
                 }
-                case "cancel" : {
-                    if(!region.isFilling()) {
+                case "cancel": {
+                    if (!region.isFilling()) {
                         String msg = configs.lang.getLog("fillNotRunning", regionName);
-                        SendMessage.sendMessage(sender,msg);
+                        SendMessage.sendMessage(sender, msg);
                         return true;
                     }
 
                     region.stopFill();
                     return true;
                 }
-                case "pause" : {
-                    if(!region.isFilling()) {
+                case "pause": {
+                    if (!region.isFilling()) {
                         String msg = configs.lang.getLog("fillNotRunning", regionName);
-                        SendMessage.sendMessage(sender,msg);
+                        SendMessage.sendMessage(sender, msg);
                         return true;
                     }
 
                     region.pauseFill();
                     return true;
                 }
-                case "resume" : {
-                    if(region.isFilling()) {
+                case "resume": {
+                    if (region.isFilling()) {
                         String msg = configs.lang.getLog("fillRunning", regionName);
-                        SendMessage.sendMessage(sender,msg);
+                        SendMessage.sendMessage(sender, msg);
                         return true;
                     }
 
