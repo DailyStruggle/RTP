@@ -10,6 +10,7 @@ import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 public interface TeleportRegion {
     /**
@@ -97,6 +98,11 @@ public interface TeleportRegion {
     Location getRandomLocation(SyncState state, @Nullable Biome biome);
     Location getRandomLocation(boolean urgent, @Nullable Biome biome);
     Location getRandomLocation(boolean urgent);
+
+    /**
+     * @return queue of currently awaiting players
+     */
+    ConcurrentLinkedQueue<UUID> getPlayerQueue();
 
     /**
      * getChunks - after getting a location, get the mapped CompleteableFuture chunks and their completion status

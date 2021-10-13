@@ -8,7 +8,6 @@ import leafcraft.rtp.tools.SendMessage;
 import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.selection.ChunkSet;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
-import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
@@ -23,7 +22,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 public class LoadChunks extends BukkitRunnable {
-    public final ChunkSet chunkSet;
+    public ChunkSet chunkSet;
     private final RTP plugin;
     private final Configs configs;
     private final CommandSender sender;
@@ -37,12 +36,12 @@ public class LoadChunks extends BukkitRunnable {
     private final int vd;
     private Boolean cancelled = false;
 
-    public LoadChunks(RTP plugin, Configs configs, CommandSender sender, Player player, Cache cache, Long delay, Location location) {
-        this.plugin = plugin;
-        this.configs = configs;
+    public LoadChunks(CommandSender sender, Player player, Long delay, Location location) {
+        this.plugin = RTP.getPlugin();
+        this.configs = RTP.getConfigs();
         this.sender = sender;
         this.player = player;
-        this.cache = cache;
+        this.cache = RTP.getCache();
         this.delay = delay;
         this.location = location;
         this.rsParams = cache.regionKeys.get(player.getUniqueId());
@@ -143,7 +142,7 @@ public class LoadChunks extends BukkitRunnable {
             long remTime = 2 + delay - (TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - cache.lastTeleportTime.getOrDefault(player.getUniqueId(), System.nanoTime())) / 50);
             if (remTime < 0) remTime = 0;
 
-            DoTeleport doTeleport = new DoTeleport(plugin,configs,sender,player,location,cache);
+            DoTeleport doTeleport = new DoTeleport(sender,player,location, chunkSet);
             if(async || remTime>0) {
                 doTeleport.runTaskLater(plugin,remTime);
                 cache.doTeleports.put(this.player.getUniqueId(),doTeleport);

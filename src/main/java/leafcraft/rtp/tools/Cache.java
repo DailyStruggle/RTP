@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.TimeUnit;
 
 public class Cache {
@@ -67,9 +68,7 @@ public class Cache {
                     double tps = TPS.getTPS();
                     double minTps = (Double) configs.config.getConfigValue("minTPS", 19.0);
                     if (tps < minTps) return;
-                    QueueLocation queueLocation = new QueueLocation(entry.getValue(), this);
-                    queueLocationTasks.put(queueLocation.idx, queueLocation);
-                    queueLocation.runTaskAsynchronously(plugin);
+                    new QueueLocation(entry.getValue(), this).queueLocationNow();
                 }, 200 + (long) i, period * 20L));
                 i += increment;
             }
@@ -82,6 +81,7 @@ public class Cache {
     //table of which players are teleporting to what location
     // key: player name
     // value: location they're going to, to be re-added to the queue on cancellation
+    public ConcurrentSkipListSet<UUID> queuedPlayers = new ConcurrentSkipListSet<>();
     public ConcurrentHashMap<UUID,CommandSender> commandSenderLookup = new ConcurrentHashMap<>();
     public ConcurrentHashMap<UUID,Location> todoTP = new ConcurrentHashMap<>();
     public ConcurrentHashMap<UUID,Location> lastTP = new ConcurrentHashMap<>();
@@ -260,6 +260,8 @@ public class Cache {
             teleportRegion.loadFile();
         }
 
+        queuedPlayers.clear();
+
         double i = 0d;
         int period = configs.config.queuePeriod;
         for(Map.Entry<RandomSelectParams,BukkitTask> entry : queueTimers.entrySet()) {
@@ -273,9 +275,7 @@ public class Cache {
                     double tps = TPS.getTPS();
                     double minTps = (Double) configs.config.getConfigValue("minTPS", 19.0);
                     if (tps < minTps) return;
-                    QueueLocation queueLocation = new QueueLocation(entry.getValue(), this);
-                    queueLocationTasks.put(queueLocation.idx, queueLocation);
-                    queueLocation.runTaskAsynchronously(plugin);
+                    new QueueLocation(entry.getValue(), this).queueLocationNow();
                 }, 40 + (long)i, period * 20L));
                 i += increment;
             }

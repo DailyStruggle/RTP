@@ -1,7 +1,7 @@
 #logs and command responses
 
 #when teleporting, say this
-alreadyTeleporting: "&e[rtp] I'M WORKING ON IT!"
+alreadyTeleporting: "&e[rtp] you're already teleporting!"
 # placeholder: [time] - how long before teleporting
 delayMessage: "&e[rtp] Teleporting in [time]. Don't move"
 # placeholder: [numAttempts] - number of attempts
@@ -18,7 +18,10 @@ unsafe: "&e[rtp] could not find a safe location within [numAttempts] attempts"
 cooldownMessage: "&e[rtp] You can't teleport again for [time]"
 
 #if the region doesn't have any locations queued and the player doesn't have rtp.unqueued permission
-noLocationsQueued: "&e[rtp] no locations ready at this time"
+noLocationsQueued: "#f5eb73[rtp] no locations ready at this time"
+
+#when the line shifts
+queueUpdate: "#2636ef[rtp] your spot in line: [num]"
 
 #if the player doesn't have enough money to teleport in the region
 # placeholder: [money] - how much money is required for the command
@@ -133,4 +136,4 @@ regionInfo:
   - "#58CCED  queueLen: [queueLen]"
   - "#58CCED  queued: [queued]"
 
-version: 2.1
+version: 2.2

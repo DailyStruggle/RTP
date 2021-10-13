@@ -5,6 +5,7 @@ import leafcraft.rtp.API.customEvents.RandomTeleportEvent;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.configuration.Configs;
+import leafcraft.rtp.tools.selection.ChunkSet;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Bukkit;
@@ -13,6 +14,8 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.util.UUID;
+
 public class DoTeleport extends BukkitRunnable {
     private final RTP plugin;
     private final Configs configs;
@@ -20,18 +23,16 @@ public class DoTeleport extends BukkitRunnable {
     private final Player player;
     private final Location location;
     private final Cache cache;
-    private final TeleportRegion region;
+    private final ChunkSet chunkSet;
 
-    public DoTeleport(RTP plugin, Configs configs, CommandSender sender, Player player, Location location, Cache cache) {
-        this.plugin = plugin;
-        this.configs = configs;
+    public DoTeleport(CommandSender sender, Player player, Location location, ChunkSet chunkSet) {
+        this.chunkSet = chunkSet;
+        this.plugin = RTP.getPlugin();
+        this.configs = RTP.getConfigs();
         this.sender = sender;
         this.player = player;
         this.location = location;
-        this.cache = cache;
-        RandomSelectParams params = cache.regionKeys.get(player.getUniqueId());
-        this.region = cache.permRegions.containsKey(params) ?
-                cache.permRegions.get(params) : cache.tempRegions.get(params);
+        this.cache = RTP.getCache();
     }
 
     @Override
@@ -50,7 +51,7 @@ public class DoTeleport extends BukkitRunnable {
         Bukkit.getPluginManager().callEvent(randomPreTeleportEvent);
         RandomTeleportEvent randomTeleportEvent = new RandomTeleportEvent(sender, player, mutableLocation, cache.numTeleportAttempts.get(location));
         Bukkit.getPluginManager().callEvent(randomTeleportEvent);
-        new ChunkCleanup(location,cache, region).runTask(plugin);
+        new ChunkCleanup(location,cache, chunkSet).runTask(plugin);
         cache.commandSenderLookup.remove(player.getUniqueId());
 
         if(sender instanceof Player) {
