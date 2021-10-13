@@ -69,7 +69,7 @@ refundOnCancel: true
 #what radius, in chunks, around the destination to pre-load
 # number of chunks loaded is (1 + 2*viewDistance)^2
 # if larger than bukkit view distance, uses bukkit view distance
-# set lower to trade ux for shorter load times and lower memory usage
+# set higher to pre-load a larger radius
 viewDistance: 0
 
 #price to use near parameter
@@ -115,5 +115,8 @@ onEventParsing: true
 # if you don't need effects or if you're using an addon to apply effects, this can be disabled
 effectParsing: true
 
+#log selection timings (debug)
+timeit: false
+
 #DO NOT TOUCH VERSION NUMBER
-version: 2.8
+version: 2.9

@@ -2,6 +2,7 @@ package leafcraft.rtp.tasks;
 
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.selection.TeleportRegion;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -11,7 +12,7 @@ import java.util.concurrent.Semaphore;
 //BukkitTask container for queueing asynchronously
 public class QueueLocation extends BukkitRunnable {
     private static long counter = 0L;
-    private final Semaphore counterGuard = new Semaphore(1);
+    private static final Semaphore counterGuard = new Semaphore(1);
     public final long idx;
     private final TeleportRegion region;
     private Player player = null;
@@ -65,9 +66,14 @@ public class QueueLocation extends BukkitRunnable {
     @Override
     public void run() {
         if(isCancelled()) return;
+        queueLocationNow();
+    }
+
+    public void queueLocationNow() {
         if(player == null || !player.isOnline()) {
-            if (location == null)
+            if (location == null) {
                 region.queueRandomLocation();
+            }
             else
                 region.queueLocation(location);
         }

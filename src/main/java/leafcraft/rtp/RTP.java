@@ -3,10 +3,7 @@ package leafcraft.rtp;
 import io.papermc.lib.PaperLib;
 import leafcraft.rtp.API.Commands.SubCommand;
 import leafcraft.rtp.commands.*;
-import leafcraft.rtp.customEventListeners.OnRandomPreTeleport;
-import leafcraft.rtp.customEventListeners.OnRandomTeleport;
-import leafcraft.rtp.customEventListeners.OnTeleportCancel;
-import leafcraft.rtp.customEventListeners.TeleportEffects;
+import leafcraft.rtp.customEventListeners.*;
 import leafcraft.rtp.spigotEventListeners.*;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.TPS;
@@ -98,6 +95,7 @@ public final class RTP extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new OnRandomPreTeleport(),this);
         getServer().getPluginManager().registerEvents(new OnRandomTeleport(),this);
         getServer().getPluginManager().registerEvents(new OnTeleportCancel(),this);
+        getServer().getPluginManager().registerEvents(new PlayerQueueListener(),this);
 
         Bukkit.getServer().getScheduler().scheduleSyncRepeatingTask(this, new TPS(), 100L, 1L);
 

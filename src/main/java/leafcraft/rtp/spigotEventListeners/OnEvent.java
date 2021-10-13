@@ -20,7 +20,6 @@ import org.bukkit.event.player.*;
 import org.bukkit.permissions.PermissionAttachmentInfo;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 
 public class OnEvent implements Listener {
@@ -88,7 +87,7 @@ public class OnEvent implements Listener {
         Player player = event.getPlayer();
         if (respawningPlayers.contains(player.getUniqueId())) {
             RandomSelectParams rsParams = new RandomSelectParams(player.getWorld(), null);
-            SetupTeleport setupTeleport = new SetupTeleport(plugin, Bukkit.getConsoleSender(), player, configs, cache, rsParams);
+            SetupTeleport setupTeleport = new SetupTeleport(Bukkit.getConsoleSender(), player, rsParams);
             setupTeleport.runTaskAsynchronously(plugin);
             cache.setupTeleports.put(player.getUniqueId(), setupTeleport);
             respawningPlayers.remove(player.getUniqueId());
@@ -193,9 +192,7 @@ public class OnEvent implements Listener {
 
             //run command
             if (setupTeleport == null && loadChunks == null && doTeleport == null) {
-                setupTeleport = new SetupTeleport(plugin, player, player, RTP.getConfigs(), cache, new RandomSelectParams(player.getWorld(), null));
-                this.cache.setupTeleports.put(player.getUniqueId(), setupTeleport);
-                setupTeleport.runTaskAsynchronously(plugin);
+                Bukkit.getScheduler().runTaskLater(plugin,()->player.performCommand("rtp"),1);
             }
         }
     }

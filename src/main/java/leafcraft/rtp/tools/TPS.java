@@ -22,16 +22,6 @@ public class TPS implements Runnable{
             return ticks / (elapsed / 1000.0D);
         }
 
-        public static long getElapsed(int tickID)
-        {
-            if (TICK_COUNT- tickID >= TICKS.length)
-            {
-            }
-
-            long time = TICKS[(tickID % TICKS.length)];
-            return System.currentTimeMillis() - time;
-        }
-
         public void run()
         {
             TICKS[(TICK_COUNT% TICKS.length)] = System.currentTimeMillis();

@@ -5,6 +5,7 @@ import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.SendMessage;
 import leafcraft.rtp.tools.configuration.Configs;
+import leafcraft.rtp.tools.selection.ChunkSet;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -28,13 +29,13 @@ public class SetupTeleport extends BukkitRunnable {
     private final RandomSelectParams rsParams;
     private boolean cancelled = false;
 
-    public SetupTeleport(RTP plugin, CommandSender sender, Player player, Configs configs, Cache cache, RandomSelectParams rsParams) {
+    public SetupTeleport(CommandSender sender, Player player, RandomSelectParams rsParams) {
         this.sender = sender;
-        this.plugin = plugin;
+        this.plugin = RTP.getPlugin();
         this.player = player;
         this.playerId = player.getUniqueId();
-        this.configs = configs;
-        this.cache = cache;
+        this.configs = RTP.getConfigs();
+        this.cache = RTP.getCache();
         this.rsParams = rsParams;
     }
 
@@ -109,10 +110,11 @@ public class SetupTeleport extends BukkitRunnable {
         //set up task to load chunks then teleport
         if(!cancelled){
             cache.regionKeys.put(player.getUniqueId(),rsParams);
-            LoadChunks loadChunks = new LoadChunks(plugin,configs,sender,player,cache,delay, location);
+            LoadChunks loadChunks = new LoadChunks(sender,player, delay, location);
+            if(loadChunks.chunkSet == null) loadChunks.chunkSet = new ChunkSet();
             if(sender.hasPermission("rtp.noDelay.chunks")
                     || (loadChunks.chunkSet.completed.get()>=loadChunks.chunkSet.expectedSize-1)) {
-                DoTeleport doTeleport = new DoTeleport(plugin,configs,sender,player, location,cache);
+                DoTeleport doTeleport = new DoTeleport(sender,player, location, loadChunks.chunkSet);
 
                 long diffNanos = System.nanoTime() - cache.lastTeleportTime.getOrDefault(player.getUniqueId(), 0L);
                 long diffMicros = TimeUnit.NANOSECONDS.toMicros(diffNanos);

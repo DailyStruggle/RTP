@@ -1,11 +1,10 @@
 package leafcraft.rtp.tools.selection;
 
 import io.papermc.lib.PaperLib;
-import leafcraft.rtp.API.customEvents.LoadChunksQueueEvent;
-import leafcraft.rtp.API.customEvents.RandomSelectPlayerEvent;
-import leafcraft.rtp.API.customEvents.RandomSelectQueueEvent;
+import leafcraft.rtp.API.customEvents.*;
 import leafcraft.rtp.API.selection.SyncState;
 import leafcraft.rtp.RTP;
+import leafcraft.rtp.tasks.DoTeleport;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.HashableChunk;
 import leafcraft.rtp.tools.SendMessage;
@@ -20,7 +19,6 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
@@ -145,8 +143,6 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                 this.chunks.add(cfChunk);
                 final long finalIt = it;
                 max.set((long)totalSpace);
-//                max.set((long) ((expand) ? totalSpace : totalSpace - badLocationSum.get()));
-//                Bukkit.getLogger().warning("added chunk: " + finalShiftedIt);
                 cfChunk.whenCompleteAsync((chunk, throwable) -> {
                     if(cancelled) return;
                     if(!mode.equals(Modes.NONE)) {
@@ -226,12 +222,15 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
     private double totalSpace;
 
     //location queue for this region and associated chunks
-    private ConcurrentLinkedQueue<Location> locationQueue = new ConcurrentLinkedQueue<>();
+    private ConcurrentLinkedQueue<Location> locationQueue;
     private final ConcurrentHashMap<Location, ChunkSet> locAssChunks = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<HashableChunk, CompletableFuture<Chunk>> currChunks = new ConcurrentHashMap<>();
 
+    //player queue for future teleports
+    private final ConcurrentLinkedQueue<UUID> playerQueue = new ConcurrentLinkedQueue<>();
+
     //player reservation queue for reserving a spot on death
-    private final ConcurrentHashMap<UUID,ConcurrentLinkedQueue<Location>> perPlayerQueue = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID,ConcurrentLinkedQueue<Location>> perPlayerLocationQueue = new ConcurrentHashMap<>();
 
     //list of bad chunks in this region to avoid retries
     private ConcurrentSkipListMap<Long,Long> badLocations = new ConcurrentSkipListMap<>();
@@ -258,6 +257,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
     private FillTask fillTask = null;
 
     public TeleportRegion(String name, Map<String, String> params) {
+        this.locationQueue = new ConcurrentLinkedQueue<>();
         this.name = name;
         String worldName = params.getOrDefault("world","world");
         Configs configs = RTP.getConfigs();
@@ -420,7 +420,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
     public boolean hasQueuedLocation(UUID uuid) {
         boolean hasPlayerLocation;
         try {
-            hasPlayerLocation = perPlayerQueue.containsKey(uuid) && perPlayerQueue.get(uuid).size() > 0;
+            hasPlayerLocation = perPlayerLocationQueue.containsKey(uuid) && perPlayerLocationQueue.get(uuid).size() > 0;
         } catch (NullPointerException e) {
             return false;
         }
@@ -459,7 +459,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
     }
 
     public int getPlayerQueueLength(UUID uuid) {
-        return (!perPlayerQueue.containsKey(uuid)) ? 0 : perPlayerQueue.get(uuid).size();
+        return (!perPlayerLocationQueue.containsKey(uuid)) ? 0 : perPlayerLocationQueue.get(uuid).size();
     }
 
     public void shutdown() {
@@ -481,15 +481,14 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         Configs configs = RTP.getConfigs();
 
         Location res;
-        if(perPlayerQueue.containsKey(player.getUniqueId()) && perPlayerQueue.get(player.getUniqueId()).size()>0) {
-            res = perPlayerQueue.get(player.getUniqueId()).remove();
+        if(perPlayerLocationQueue.containsKey(player.getUniqueId()) && perPlayerLocationQueue.get(player.getUniqueId()).size()>0) {
+            res = perPlayerLocationQueue.get(player.getUniqueId()).remove();
         }
         else {
             try {
                 res = locationQueue.remove();
             } catch (NoSuchElementException | NullPointerException exception) {
-                String msg = PAPIChecker.fillPlaceholders(player,configs.lang.getLog("noLocationsQueued"));
-                SendMessage.sendMessage(sender,player,msg);
+                SendMessage.sendMessage(sender,player,configs.lang.getLog("noLocationsQueued"));
                 return null;
             }
         }
@@ -501,11 +500,10 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         Configs configs = RTP.getConfigs();
 
         Location res;
-        if(biome==null && hasQueuedLocation(player)) res = getQueuedLocation(sender,player);
+        if(biome==null) return getLocation(state,sender,player);
         else res = getRandomLocation(state, biome);
         if (res == null) {
-            int maxAttempts = configs.config.maxAttempts;
-            if(biome!=null) maxAttempts*=10;
+            int maxAttempts = configs.config.maxAttempts * 10;
             String msg = PAPIChecker.fillPlaceholders(player, configs.lang.getLog("unsafe", String.valueOf(maxAttempts)));
             SendMessage.sendMessage(sender, player, msg);
         }
@@ -523,15 +521,16 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
 
         Location res = null;
 
-        if(perPlayerQueue.containsKey(player.getUniqueId()) && perPlayerQueue.get(player.getUniqueId()).size()>0) {
-            res = perPlayerQueue.get(player.getUniqueId()).remove();
+        if(perPlayerLocationQueue.containsKey(player.getUniqueId()) && perPlayerLocationQueue.get(player.getUniqueId()).size()>0) {
+            res = perPlayerLocationQueue.get(player.getUniqueId()).remove();
             return res;
         }
 
+//        if(locationQueue == null) locationQueue = new ConcurrentLinkedQueue<>();
         try{
             res = locationQueue.remove();
         }
-        catch (NoSuchElementException | NullPointerException exception) {
+        catch (NoSuchElementException exception) {
             if(sender.hasPermission("rtp.unqueued")) {
                 res = getRandomLocation(state,null);
                 if(res == null) {
@@ -543,8 +542,9 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                 Bukkit.getScheduler().runTask(plugin, () -> Bukkit.getPluginManager().callEvent(randomSelectPlayerEvent));
             }
             else {
-                String msg = PAPIChecker.fillPlaceholders(player,configs.lang.getLog("noLocationsQueued"));
-                SendMessage.sendMessage(sender,player,msg);
+                RTP.getCache().queuedPlayers.add(player.getUniqueId());
+                playerQueue.offer(player.getUniqueId());
+                Bukkit.getPluginManager().callEvent(new PlayerQueuePushEvent(this, player.getUniqueId()));
             }
         }
         return res;
@@ -679,7 +679,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         }
     }
 
-    @NotNull
+    @Nullable
     public ChunkSet getChunks(Location location) {
         return locAssChunks.getOrDefault(location,null);
     }
@@ -690,7 +690,45 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
 
     public void queueLocation(Location location) {
         if(location == null) return;
-        locationQueue.offer(location);
+        if(!locAssChunks.containsKey(location)) {
+            addChunks(location,true);
+        }
+        ChunkSet chunkSet = locAssChunks.get(location);
+        if(chunkSet.completed.get() < chunkSet.expectedSize) {
+            for (CompletableFuture<Chunk> cfChunk : chunkSet.chunks) {
+                cfChunk.whenCompleteAsync((chunk, throwable) -> {
+                    int completed;
+                    try {
+                        chunkSet.completedGuard.acquire();
+                        completed = chunkSet.completed.get();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                        return;
+                    } finally {
+                        chunkSet.completedGuard.release();
+                    }
+
+                    if(completed == chunkSet.expectedSize-1) {
+                        queueLocation(location);
+                    }
+                });
+            }
+        }
+
+        boolean popped = false;
+        while(playerQueue.size()>0 && !popped) {
+            UUID playerId = playerQueue.remove();
+            Player player = Bukkit.getPlayer(playerId);
+            if(player == null || !player.isOnline()) continue;
+            DoTeleport doTeleport = new DoTeleport(Bukkit.getConsoleSender(), player, location, chunkSet);
+            doTeleport.runTask(RTP.getPlugin());
+            RTP.getCache().doTeleports.put(playerId,doTeleport);
+            popped = true;
+            RTP.getCache().queuedPlayers.remove(playerId);
+        }
+        if(!popped) {
+            locationQueue.offer(location);
+        }
     }
 
     public void queueRandomLocation() {
@@ -698,15 +736,12 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         if(!plugin.isEnabled()) return;
         Configs configs = RTP.getConfigs();
 
-        if(locationQueue == null) {
-            locationQueue = new ConcurrentLinkedQueue<>();
-        }
+        if(locationQueue == null) locationQueue = new ConcurrentLinkedQueue<>();
         Integer queueLen = (Integer)configs.regions.getRegionSetting(name,"queueLen",0);
         if(locationQueue.size() >= queueLen) return;
 
         Location location = getRandomLocation(false);
-        RandomSelectQueueEvent randomSelectQueueEvent = new RandomSelectQueueEvent(location);
-        Bukkit.getScheduler().runTask(plugin, () -> Bukkit.getPluginManager().callEvent(randomSelectQueueEvent));
+        Bukkit.getPluginManager().callEvent(new RandomSelectQueueEvent(location));
         if(location == null) {
             return;
         }
@@ -717,11 +752,18 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
             queueLocation(location);
         }
         else {
-            AtomicBoolean added = new AtomicBoolean(false);
             for (CompletableFuture<Chunk> cfChunk : chunkSet.chunks) {
                 cfChunk.whenCompleteAsync((chunk, throwable) -> {
-                    if (chunkSet.completed.get() >= chunkSet.expectedSize-1 && !added.getAndSet(true)) {
-                        queueLocation(location);
+                    try {
+                        chunkSet.completedGuard.acquire();
+                        if (chunkSet.completed.get() == chunkSet.expectedSize-1) {
+                            queueLocation(location);
+                        }
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    finally {
+                        chunkSet.completedGuard.release();
                     }
                 });
             }
@@ -740,8 +782,8 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         Configs configs = RTP.getConfigs();
 
         if(locationQueue.size() > 1 && locationQueue.size() >= (Integer)configs.regions.getRegionSetting(name,"queueLen",0)) {
-            perPlayerQueue.putIfAbsent(uuid,new ConcurrentLinkedQueue<>());
-            perPlayerQueue.get(uuid).add(locationQueue.remove());
+            perPlayerLocationQueue.putIfAbsent(uuid,new ConcurrentLinkedQueue<>());
+            perPlayerLocationQueue.get(uuid).add(locationQueue.remove());
             return;
         }
 
@@ -751,20 +793,30 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         }
         ChunkSet chunkSet = getChunks(location);
         if(chunkSet.completed.get()>=chunkSet.expectedSize-1) {
-            perPlayerQueue.putIfAbsent(uuid,new ConcurrentLinkedQueue<>());
-            perPlayerQueue.get(uuid).add(location);
+            perPlayerLocationQueue.putIfAbsent(uuid,new ConcurrentLinkedQueue<>());
+            perPlayerLocationQueue.get(uuid).offer(location);
         }
         else {
-            AtomicBoolean added = new AtomicBoolean(false);
             for (CompletableFuture<Chunk> cfChunk : chunkSet.chunks) {
                 cfChunk.whenCompleteAsync((chunk, throwable) -> {
-                    if (chunkSet.completed.get() >= chunkSet.expectedSize-1 && !added.getAndSet(true)) {
+                    int completed;
+                    try {
+                        chunkSet.completedGuard.acquire();
+                        completed = chunkSet.completed.get();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                        return;
+                    } finally {
+                        chunkSet.completedGuard.release();
+                    }
+
+                    if(completed == chunkSet.expectedSize-1) {
                         if(Bukkit.getOfflinePlayer(uuid).isOnline()) {
-                            perPlayerQueue.putIfAbsent(uuid,new ConcurrentLinkedQueue<>());
-                            perPlayerQueue.get(uuid).offer(location);
+                            perPlayerLocationQueue.putIfAbsent(uuid,new ConcurrentLinkedQueue<>());
+                            perPlayerLocationQueue.get(uuid).offer(location);
                         }
                         else {
-                            locationQueue.add(location);
+                            queueLocation(location);
                         }
                     }
                 });
@@ -781,11 +833,11 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
     }
 
     public void recyclePlayerLocations(UUID uuid) {
-        if(!perPlayerQueue.containsKey(uuid)) return;
-        while(perPlayerQueue.get(uuid).size()>0) {
-            queueLocation(perPlayerQueue.get(uuid).remove());
+        if(!perPlayerLocationQueue.containsKey(uuid)) return;
+        while(perPlayerLocationQueue.get(uuid).size()>0) {
+            queueLocation(perPlayerLocationQueue.get(uuid).remove());
         }
-        perPlayerQueue.remove(uuid);
+        perPlayerLocationQueue.remove(uuid);
     }
 
     public void addBadLocation(int chunkX, int chunkZ) {
@@ -924,7 +976,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
 
             //if biome is available, try it
             if(biome != null && biomeLocations.containsKey(biome) && biomeLocations.get(biome).size()>0) {
-                //get nearest spot according to biome list
+                //get the nearest spot according to biome list
                 ConcurrentSkipListMap<Long,Long> map = biomeLocations.get(biome);
                 Map.Entry<Long, Long> lower = map.floorEntry(location);
                 Map.Entry<Long, Long> upper = map.ceilingEntry(location);
@@ -1046,11 +1098,10 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
             Chunk chunk = null;
             switch (state) {
                 case SYNC: {
-                    if(!preCheckLocation(res)) {
-                        continue;
+                    if(preCheckLocation(res)) {
+                        res.getChunk();
                     }
-//                    Bukkit.getLogger().warning("getting chunk synchronously");
-//                    chunk = world.getChunkAt(xzChunk[0],xzChunk[1]);
+                    else continue;
                     break;
                 }
                 case ASYNC:
@@ -1121,11 +1172,12 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         cache.numTeleportAttempts.put(res, numAttempts);
         addChunks(res, urgent);
 
-//        Bukkit.getLogger().warning(ChatColor.AQUA + "TOTAL TIME SPENT ON SELECTION FIXING: " + (selectTime)/1000000 + "ms");
-//        Bukkit.getLogger().warning(ChatColor.LIGHT_PURPLE + "TOTAL TIME SPENT WAITING ON CHUNKS: " + (chunkTime)/1000000 + "ms");
-//        Bukkit.getLogger().warning(ChatColor.GREEN + "TOTAL TIME SPENT ON PLACEMENT VALIDATION: " + (yTime)/1000000 + "ms");
-//        Bukkit.getLogger().warning(ChatColor.WHITE + "TOTAL TIME IN SELECTION FUNCTION: " + (System.nanoTime()-totalTimeStart)/1000000 + "ms");
-
+        if(configs.config.timeit) {
+            Bukkit.getLogger().warning(ChatColor.AQUA + "TOTAL TIME SPENT ON SELECTION FIXING: " + (selectTime)/1000000 + "ms");
+            Bukkit.getLogger().warning(ChatColor.LIGHT_PURPLE + "TOTAL TIME SPENT WAITING ON CHUNKS: " + (chunkTime)/1000000 + "ms");
+            Bukkit.getLogger().warning(ChatColor.GREEN + "TOTAL TIME SPENT ON PLACEMENT VALIDATION: " + (yTime)/1000000 + "ms");
+            Bukkit.getLogger().warning(ChatColor.WHITE + "TOTAL TIME IN SELECTION FUNCTION: " + (System.nanoTime()-totalTimeStart)/1000000 + "ms");
+        }
         return res;
     }
 
@@ -1136,6 +1188,11 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
 
     public Location getRandomLocation(boolean urgent) {
         return getRandomLocation(urgent,null);
+    }
+
+    @Override
+    public ConcurrentLinkedQueue<UUID> getPlayerQueue() {
+        return playerQueue;
     }
 
     public int getFirstNonAir(Chunk chunk) {

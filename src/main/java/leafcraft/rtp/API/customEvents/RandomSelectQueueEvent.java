@@ -12,7 +12,7 @@ public class RandomSelectQueueEvent extends Event implements Cancellable {
     private boolean isCancelled;
 
     public RandomSelectQueueEvent(Location to) {
-
+        super(true);
         this.to = to;
         this.isCancelled = false;
     }

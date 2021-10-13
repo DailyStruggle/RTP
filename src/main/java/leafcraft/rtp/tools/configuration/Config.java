@@ -55,6 +55,8 @@ public class Config {
 
 	public final boolean effectParsing;
 
+	public final boolean timeit;
+
 	public Config(RTP plugin, Lang lang) {
 		this.plugin = plugin;
 
@@ -65,7 +67,7 @@ public class Config {
 		}
 		this.config = YamlConfiguration.loadConfiguration(f);
 
-		if( 	(this.config.getDouble("version") < 2.8) ) {
+		if( 	(this.config.getDouble("version") < 2.9) ) {
 			Bukkit.getLogger().log(Level.WARNING, lang.getLog("oldFile", "config.yml"));
 			update();
 
@@ -149,6 +151,8 @@ public class Config {
 		this.onEventParsing = config.getBoolean("onEventParsing",false);
 
 		this.effectParsing = config.getBoolean("effectParsing",false);
+
+		this.timeit = config.getBoolean("timeit",false);
 	}
 
 	private void update() {
@@ -171,7 +175,7 @@ public class Config {
 		for (String line : linesInDefaultConfig) {
 			StringBuilder newline = new StringBuilder(line);
 			if (line.startsWith("version:")) {
-				newline = new StringBuilder("version: 2.8");
+				newline = new StringBuilder("version: 2.9");
 			}
 			else if(newline.toString().startsWith("  -")) continue;
 			else {

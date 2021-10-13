@@ -107,7 +107,8 @@ public class RTPCmd implements CommandExecutor {
         if(cache.setupTeleports.containsKey(player.getUniqueId())
                 || cache.loadChunks.containsKey(player.getUniqueId())
                 || cache.doTeleports.containsKey(player.getUniqueId())
-                || cache.todoTP.containsKey(player.getUniqueId()))
+                || cache.todoTP.containsKey(player.getUniqueId())
+                || cache.queuedPlayers.contains(player.getUniqueId()))
         {
             String msg = configs.lang.getLog("alreadyTeleporting");
             PAPIChecker.fillPlaceholders(player,msg);
@@ -338,11 +339,11 @@ public class RTPCmd implements CommandExecutor {
         }
 
         boolean hasQueued = cache.permRegions.containsKey(rsParams) && cache.permRegions.get(rsParams).hasQueuedLocation(player.getUniqueId());
-        if(!hasQueued && !sender.hasPermission("rtp.unqueued")) {
-            String msg = configs.lang.getLog("noLocationsQueued");
-            SendMessage.sendMessage(sender,player,msg);
-            return true;
-        }
+//        if(!hasQueued && !sender.hasPermission("rtp.unqueued")) {
+//            String msg = configs.lang.getLog("noLocationsQueued");
+//            SendMessage.sendMessage(sender,player,msg);
+//            return true;
+//        }
 
         //mark a successful command
         Bukkit.getScheduler().runTaskAsynchronously(plugin,()->
@@ -352,7 +353,7 @@ public class RTPCmd implements CommandExecutor {
         cache.lastTeleportTime.put(player.getUniqueId(), start);
         cache.playerFromLocations.put(player.getUniqueId(),player.getLocation());
         cache.commandSenderLookup.put(player.getUniqueId(),sender);
-        SetupTeleport setupTeleport = new SetupTeleport(plugin,sender,player,configs, cache, rsParams);
+        SetupTeleport setupTeleport = new SetupTeleport(sender,player, rsParams);
         if(cache.permRegions.containsKey(rsParams)
                 && hasQueued
                 && sender.hasPermission("rtp.noDelay")
