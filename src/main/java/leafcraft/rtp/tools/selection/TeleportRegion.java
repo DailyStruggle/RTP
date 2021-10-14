@@ -729,7 +729,6 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         }
         if(!popped) {
             locationQueue.offer(location);
-            Bukkit.getLogger().warning("queued location: " + location);
         }
     }
 
@@ -751,7 +750,6 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         LoadChunksQueueEvent loadChunksQueueEvent = new LoadChunksQueueEvent(location, Objects.requireNonNull(chunkSet).chunks);
         Bukkit.getPluginManager().callEvent(loadChunksQueueEvent);
         if(chunkSet.completed.get()>=chunkSet.expectedSize-1) {
-            Bukkit.getLogger().warning("queueing location: " + location);
             queueLocation(location);
         }
         else {
