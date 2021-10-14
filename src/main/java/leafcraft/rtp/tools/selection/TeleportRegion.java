@@ -713,6 +713,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                     }
                 });
             }
+            return;
         }
 
         boolean popped = false;
@@ -720,7 +721,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
             UUID playerId = playerQueue.remove();
             Player player = Bukkit.getPlayer(playerId);
             if(player == null || !player.isOnline()) continue;
-            DoTeleport doTeleport = new DoTeleport(Bukkit.getConsoleSender(), player, location, chunkSet);
+            DoTeleport doTeleport = new DoTeleport(player, player, location, chunkSet);
             doTeleport.runTask(RTP.getPlugin());
             RTP.getCache().doTeleports.put(playerId,doTeleport);
             popped = true;
@@ -728,6 +729,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         }
         if(!popped) {
             locationQueue.offer(location);
+            Bukkit.getLogger().warning("queued location: " + location);
         }
     }
 
@@ -749,6 +751,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         LoadChunksQueueEvent loadChunksQueueEvent = new LoadChunksQueueEvent(location, Objects.requireNonNull(chunkSet).chunks);
         Bukkit.getPluginManager().callEvent(loadChunksQueueEvent);
         if(chunkSet.completed.get()>=chunkSet.expectedSize-1) {
+            Bukkit.getLogger().warning("queueing location: " + location);
             queueLocation(location);
         }
         else {
@@ -1095,11 +1098,11 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
             selectTime += (stop-start);
 
             start = System.nanoTime();
-            Chunk chunk = null;
+            Chunk chunk;
             switch (state) {
                 case SYNC: {
                     if(preCheckLocation(res)) {
-                        res.getChunk();
+                        chunk = res.getChunk();
                     }
                     else continue;
                     break;
@@ -1131,10 +1134,10 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                 default: throw new IllegalStateException("Unexpected value: " + state);
             }
 
-            int x = xzChunk[0] > 0 ? xzChunk[0]*16 : xzChunk[0]*16 - 1;
-            int z = xzChunk[1] > 0 ? xzChunk[1]*16 : xzChunk[1]*16 - 1;
-            if(chunk == null) res = new Location(world,x,minY,z);
-            else res = chunk.getBlock(7,0,7).getLocation();
+            res = chunk.getBlock(7,0,7).getLocation();
+
+            res.setX(res.getBlockX()+0.5);
+            res.setZ(res.getBlockZ()+0.5);
 
             stop = System.nanoTime();
             chunkTime += (stop-start);
@@ -1151,8 +1154,83 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
             }
             res.setY(y);
             stop = System.nanoTime();
-            goodLocation = (state.equals(SyncState.SYNC)) ? checkLocation(res) : checkLocation(chunk,y);
+            goodLocation = checkLocation(chunk,y);
             yTime += (stop - start);
+
+            //in case of trees, just check a few nearby locations within the chunk
+            // the chunk is already loaded so this is super cheap.
+
+            //try top left
+            if (!goodLocation) {
+                res = chunk.getBlock(2,minY,2).getLocation();
+                start = System.nanoTime();
+                if(state.equals(SyncState.SYNC)) {
+                    y = this.getFirstNonAir(res);
+                    y = this.getLastNonAir(res, y);
+                }
+                else {
+                    y = this.getFirstNonAir(chunk);
+                    y = this.getLastNonAir(chunk, y);
+                }
+                res.setY(y);
+                stop = System.nanoTime();
+                goodLocation = checkLocation(chunk,y);
+                yTime += (stop - start);
+            }
+
+            //try bottom right
+            if (!goodLocation) {
+                res = chunk.getBlock(13,minY,13).getLocation();
+                start = System.nanoTime();
+                if(state.equals(SyncState.SYNC)) {
+                    y = this.getFirstNonAir(res);
+                    y = this.getLastNonAir(res, y);
+                }
+                else {
+                    y = this.getFirstNonAir(chunk);
+                    y = this.getLastNonAir(chunk, y);
+                }
+                res.setY(y);
+                stop = System.nanoTime();
+                goodLocation = checkLocation(chunk,y);
+                yTime += (stop - start);
+            }
+
+            //try top right
+            if (!goodLocation) {
+                res = chunk.getBlock(13,minY,2).getLocation();
+                start = System.nanoTime();
+                if(state.equals(SyncState.SYNC)) {
+                    y = this.getFirstNonAir(res);
+                    y = this.getLastNonAir(res, y);
+                }
+                else {
+                    y = this.getFirstNonAir(chunk);
+                    y = this.getLastNonAir(chunk, y);
+                }
+                res.setY(y);
+                stop = System.nanoTime();
+                goodLocation = checkLocation(chunk,y);
+                yTime += (stop - start);
+            }
+
+            //try bottom left
+            if (!goodLocation) {
+                res = chunk.getBlock(2,minY,13).getLocation();
+                start = System.nanoTime();
+                if(state.equals(SyncState.SYNC)) {
+                    y = this.getFirstNonAir(res);
+                    y = this.getLastNonAir(res, y);
+                }
+                else {
+                    y = this.getFirstNonAir(chunk);
+                    y = this.getLastNonAir(chunk, y);
+                }
+                res.setY(y);
+                stop = System.nanoTime();
+                goodLocation = checkLocation(chunk,y);
+                yTime += (stop - start);
+            }
 
             if(goodLocation) addBiomeLocation(location,currBiome);
             else if(!mode.equals(Modes.NONE)) {
@@ -1162,8 +1240,6 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         }
 
         res.setY(res.getBlockY()+1);
-        res.setX(res.getBlockX()+0.5);
-        res.setZ(res.getBlockZ()+0.5);
 
         if(numAttempts >= maxAttempts) {
             return null;
