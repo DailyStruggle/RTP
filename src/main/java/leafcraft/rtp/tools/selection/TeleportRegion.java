@@ -5,6 +5,7 @@ import leafcraft.rtp.API.customEvents.*;
 import leafcraft.rtp.API.selection.SyncState;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tasks.DoTeleport;
+import leafcraft.rtp.tasks.LoadChunks;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.HashableChunk;
 import leafcraft.rtp.tools.SendMessage;
@@ -19,6 +20,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
@@ -579,7 +581,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                 cfChunk.whenCompleteAsync((chunk, throwable) -> {
                     try {
                         chunkSet.completedGuard.acquire();
-                        chunkSet.completed.getAndAdd(1);
+                        chunkSet.completed.incrementAndGet();
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                         return;
@@ -639,7 +641,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                     cfChunk.whenCompleteAsync((chunk, throwable) -> {
                         try {
                             chunkSet.completedGuard.acquire();
-                            chunkSet.completed.getAndAdd(1);
+                            chunkSet.completed.incrementAndGet();
                         } catch (InterruptedException e) {
                             e.printStackTrace();
                             return;
@@ -679,13 +681,12 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         }
     }
 
-    @Nullable
+    @NotNull
     public ChunkSet getChunks(Location location) {
-        return locAssChunks.getOrDefault(location,null);
-    }
-
-    public void removeChunks(Location location) {
-        locAssChunks.remove(location);
+        if(!locAssChunks.containsKey(location)) {
+            addChunks(location,true);
+        }
+        return locAssChunks.get(location);
     }
 
     public void queueLocation(Location location) {
@@ -694,34 +695,13 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
             addChunks(location,true);
         }
         ChunkSet chunkSet = locAssChunks.get(location);
-        if(chunkSet.completed.get() < chunkSet.expectedSize) {
-            for (CompletableFuture<Chunk> cfChunk : chunkSet.chunks) {
-                cfChunk.whenCompleteAsync((chunk, throwable) -> {
-                    int completed;
-                    try {
-                        chunkSet.completedGuard.acquire();
-                        completed = chunkSet.completed.get();
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                        return;
-                    } finally {
-                        chunkSet.completedGuard.release();
-                    }
-
-                    if(completed == chunkSet.expectedSize-1) {
-                        queueLocation(location);
-                    }
-                });
-            }
-            return;
-        }
 
         boolean popped = false;
         while(playerQueue.size()>0 && !popped) {
             UUID playerId = playerQueue.remove();
             Player player = Bukkit.getPlayer(playerId);
             if(player == null || !player.isOnline()) continue;
-            DoTeleport doTeleport = new DoTeleport(player, player, location, chunkSet);
+            DoTeleport doTeleport = new DoTeleport(player,player,location,chunkSet);
             doTeleport.runTask(RTP.getPlugin());
             RTP.getCache().doTeleports.put(playerId,doTeleport);
             popped = true;
@@ -749,26 +729,15 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         ChunkSet chunkSet = getChunks(location);
         LoadChunksQueueEvent loadChunksQueueEvent = new LoadChunksQueueEvent(location, Objects.requireNonNull(chunkSet).chunks);
         Bukkit.getPluginManager().callEvent(loadChunksQueueEvent);
-        if(chunkSet.completed.get()>=chunkSet.expectedSize-1) {
-            queueLocation(location);
-        }
-        else {
-            for (CompletableFuture<Chunk> cfChunk : chunkSet.chunks) {
-                cfChunk.whenCompleteAsync((chunk, throwable) -> {
-                    try {
-                        chunkSet.completedGuard.acquire();
-                        if (chunkSet.completed.get() == chunkSet.expectedSize-1) {
-                            queueLocation(location);
-                        }
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                    finally {
-                        chunkSet.completedGuard.release();
-                    }
-                });
+
+        for(CompletableFuture<Chunk> cfChunk : chunkSet.chunks) {
+            try {
+                cfChunk.get();
+            } catch (InterruptedException | ExecutionException e) {
+                e.printStackTrace();
             }
         }
+        queueLocation(location);
     }
 
     public void queueRandomLocation(OfflinePlayer player) {
@@ -1156,7 +1125,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
             yTime += (stop - start);
 
             //in case of trees, just check a few nearby locations within the chunk
-            // the chunk is already loaded so this is super cheap.
+            // it's already loaded so this is relatively cheap.
 
             //try top left
             if (!goodLocation) {
@@ -1464,44 +1433,6 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
             }
         }
 
-        return true;
-    }
-
-    public boolean checkLocation(Location location) {
-        Configs configs = RTP.getConfigs();
-        if(location.getBlockY() >= maxY) return false;
-//        if(!material.isSolid()) return false;
-        Material material1 = location.getBlock().getType();
-        Material material2 = location.getBlock().getRelative(BlockFace.UP).getType();
-        if(material2.isSolid()) return false;
-        if(configs.config.unsafeBlocks.contains(material1)) return false;
-        if(configs.config.unsafeBlocks.contains(material2)) return false;
-        if(configs.config.rerollWorldGuard && WorldGuardChecker.isInClaim(location)) return false;
-        if(configs.config.rerollGriefPrevention && GriefPreventionChecker.isInClaim(location)) return false;
-        if(configs.config.rerollTownyAdvanced && TownyAdvancedChecker.isInClaim(location)) return false;
-        if(configs.config.rerollHuskTowns && HuskTownsChecker.isInClaim(location)) return false;
-        if(configs.config.rerollFactions && FactionsChecker.isInClaim(location)) return false;
-        if(configs.config.rerollGriefDefender && GriefDefenderChecker.isInClaim(location)) return false;
-        if(configs.config.rerollLands && LandsChecker.isInClaim(location)) return false;
-        for(MethodHandle methodHandle : configs.locationChecks) {
-            try {
-                if((boolean)methodHandle.invokeExact(location)) return false;
-            } catch (Throwable throwable) {
-                throwable.printStackTrace();
-            }
-        }
-
-        int safetyRadius = configs.config.safetyRadius;
-        Set<Material> unsafeBlocks = configs.config.unsafeBlocks;
-        for(int i = -safetyRadius; i <= safetyRadius; i++) {
-            for(int j = -safetyRadius; j <= safetyRadius; j++) {
-                Location locationClone = location.clone().add(i,0,j);
-                material1 = locationClone.getBlock().getType();
-                material2 = locationClone.getBlock().getRelative(BlockFace.UP).getType();
-                if(unsafeBlocks.contains(material1)) return false;
-                if(unsafeBlocks.contains(material2)) return false;
-            }
-        }
         return true;
     }
 
