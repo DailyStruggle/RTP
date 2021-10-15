@@ -15,7 +15,6 @@ import org.bukkit.permissions.PermissionAttachmentInfo;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 //prep teleportation
@@ -23,7 +22,6 @@ public class SetupTeleport extends BukkitRunnable {
     private final RTP plugin;
     private final CommandSender sender;
     private final Player player;
-    private final UUID playerId;
     private final Configs configs;
     private final Cache cache;
     private final RandomSelectParams rsParams;
@@ -33,7 +31,6 @@ public class SetupTeleport extends BukkitRunnable {
         this.sender = sender;
         this.plugin = RTP.getPlugin();
         this.player = player;
-        this.playerId = player.getUniqueId();
         this.configs = RTP.getConfigs();
         this.cache = RTP.getCache();
         this.rsParams = rsParams;

@@ -124,7 +124,7 @@ public class Info implements CommandExecutor {
                 }
             }
         });
-        
+
         return true;
     }
 }

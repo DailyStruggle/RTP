@@ -2,12 +2,8 @@ package leafcraft.rtp.spigotEventListeners;
 
 import leafcraft.rtp.API.customEvents.TeleportCancelEvent;
 import leafcraft.rtp.RTP;
-import leafcraft.rtp.tasks.DoTeleport;
-import leafcraft.rtp.tasks.LoadChunks;
-import leafcraft.rtp.tasks.SetupTeleport;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.configuration.Configs;
-import leafcraft.rtp.tools.selection.RandomSelectParams;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
@@ -16,9 +12,6 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerTeleportEvent;
-import org.bukkit.permissions.PermissionAttachmentInfo;
-
-import java.util.Set;
 
 public final class OnPlayerTeleport implements Listener {
     private final Configs configs;

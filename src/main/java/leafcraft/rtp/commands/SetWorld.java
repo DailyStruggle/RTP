@@ -32,7 +32,7 @@ public class SetWorld implements CommandExecutor {
 
         if(!sender.hasPermission("rtp.setWorld")) {
             String msg = configs.lang.getLog("noPerms");
-            
+
             SendMessage.sendMessage(sender,msg);
             return true;
         }
@@ -52,7 +52,7 @@ public class SetWorld implements CommandExecutor {
             worldName = configs.worlds.worldPlaceholder2Name(worldName);
             if(!configs.worlds.checkWorldExists(worldName)) {
                 String msg = configs.lang.getLog("invalidWorld",worldName);
-                
+
                 SendMessage.sendMessage(sender,msg);
                 return true;
             }

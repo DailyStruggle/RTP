@@ -1,10 +1,7 @@
 package leafcraft.rtp.spigotEventListeners;
 
 import leafcraft.rtp.RTP;
-import leafcraft.rtp.tasks.DoTeleport;
-import leafcraft.rtp.tasks.LoadChunks;
 import leafcraft.rtp.tasks.QueueLocation;
-import leafcraft.rtp.tasks.SetupTeleport;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
@@ -15,10 +12,8 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.permissions.PermissionAttachmentInfo;
 
 import java.util.Objects;
-import java.util.Set;
 
 public final class OnPlayerJoin implements Listener {
     private final RTP plugin;

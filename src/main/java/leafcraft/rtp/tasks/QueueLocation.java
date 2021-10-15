@@ -2,7 +2,6 @@ package leafcraft.rtp.tasks;
 
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.selection.TeleportRegion;
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;

@@ -67,7 +67,7 @@ public class RTPCmd implements CommandExecutor {
 
         if(!sender.hasPermission("rtp.use")) {
             String msg = configs.lang.getLog("noPerms");
-            
+
             SendMessage.sendMessage(sender,msg);
             return true;
         }
@@ -99,7 +99,7 @@ public class RTPCmd implements CommandExecutor {
         }
         else {
             String msg = configs.lang.getLog("consoleCmdNotAllowed");
-            
+
             SendMessage.sendMessage(sender,msg);
             return true;
         }
@@ -126,13 +126,13 @@ public class RTPCmd implements CommandExecutor {
                     || (!sender.hasPermission("rtp.regions."+regionName)
                     && (Boolean)configs.worlds.getWorldSetting(worldName,"requirePermission",true))) {
                 String msg = configs.lang.getLog("badArg", "region:" + regionName);
-                
+
                 SendMessage.sendMessage(sender,msg);
                 return true;
             }
             if (!configs.worlds.checkWorldExists(worldName) || !sender.hasPermission("rtp.worlds."+worldName)) {
                 String msg = configs.lang.getLog("badArg", "world:" + worldName);
-                
+
                 SendMessage.sendMessage(sender,msg);
                 return true;
             }
@@ -231,27 +231,27 @@ public class RTPCmd implements CommandExecutor {
                 }
                 else {
                     String msg = configs.lang.getLog("badArg", "near:" + playerName);
-                    
+
                     SendMessage.sendMessage(sender,msg);
                     return true;
                 }
             }
             else if (!playerName.equals(sender.getName()) && !sender.hasPermission("rtp.near.other")) {
                 String msg = configs.lang.getLog("noPerms");
-                
+
                 SendMessage.sendMessage(sender,msg);
                 return true;
             }
             else if (!sender.hasPermission("rtp.near")) {
                 String msg = configs.lang.getLog("noPerms");
-                
+
                 SendMessage.sendMessage(sender,msg);
                 return true;
             }
 
             if (targetPlayer == null) {
                 String msg = configs.lang.getLog("badArg", "near:" + playerName);
-                
+
                 SendMessage.sendMessage(sender,msg);
                 return true;
             }

@@ -163,7 +163,7 @@ public class Regions {
                         if(regions.contains(regionName)) continue;
 
                         ConfigurationSection regionSection = config.getConfigurationSection(regionName);
-                        
+
                         linesInRegions.add(regionName + ":");
                         linesInRegions.add("    world: \"" + regionSection.getString("world",defaultWorld) + "\"");
                         linesInRegions.add("    shape: \"" + regionSection.getString("shape",defaultShape) + "\"");
