@@ -54,6 +54,22 @@ public class LoadChunks extends BukkitRunnable {
         this.vd = Bukkit.getViewDistance();
     }
 
+    public LoadChunks(CommandSender sender, Player player, Long delay, Location location, ChunkSet chunkSet) {
+        this.plugin = RTP.getPlugin();
+        this.configs = RTP.getConfigs();
+        this.sender = sender;
+        this.player = player;
+        this.cache = RTP.getCache();
+        this.delay = delay;
+        this.location = location;
+        this.rsParams = cache.regionKeys.get(player.getUniqueId());
+        this.chunkSet = chunkSet;
+        int vd = configs.config.vd;
+        i = -vd;
+        j = -vd;
+        this.vd = Bukkit.getViewDistance();
+    }
+
     public LoadChunks(RTP plugin, Configs configs, CommandSender sender, Player player, Cache cache, Long delay, Location location, int i, int j) {
         this.plugin = plugin;
         this.configs = configs;
@@ -83,7 +99,7 @@ public class LoadChunks extends BukkitRunnable {
     }
 
     public boolean isNoDelay() {
-        return sender.hasPermission("rtp.noDelay");
+        return sender.hasPermission("rtp.noDelay") || (delay == 0L);
     }
 
     public void loadChunksNow(boolean async) {
@@ -124,7 +140,7 @@ public class LoadChunks extends BukkitRunnable {
                         if(cancelled) return;
                         if(world.isChunkLoaded(centerChunk.getX()+i,centerChunk.getZ()+j)) continue;
                         PaperLib.getChunkAtAsyncUrgently(world, centerChunk.getX()+i,centerChunk.getZ()+j, true);
-                        chunkSet.completed.addAndGet(1);
+                        chunkSet.completed.incrementAndGet();
                         len--;
                         if(len<=0) {
                             cache.loadChunks.remove(player.getUniqueId());
