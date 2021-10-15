@@ -36,7 +36,7 @@ public class PAPI_expansion extends PlaceholderExpansion{
     public boolean canRegister(){
         return true;
     }
-	
+
 	@Override
 	public @NotNull String getAuthor() {
 		return plugin.getDescription().getAuthors().toString();
@@ -56,7 +56,7 @@ public class PAPI_expansion extends PlaceholderExpansion{
     public String onRequest(OfflinePlayer player, @NotNull String params) {
         return onPlaceholderRequest(player.getPlayer(),params);
     }
-	
+
 	@Override
     public String onPlaceholderRequest(Player player, @NotNull String identifier){
 		if(player == null){

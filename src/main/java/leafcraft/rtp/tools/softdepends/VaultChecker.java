@@ -6,8 +6,6 @@ import net.milkbowl.vault.permission.Permission;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.RegisteredServiceProvider;
 
-import java.util.Objects;
-
 public class VaultChecker {
     private static Economy econ = null;
     private static Permission perms = null;

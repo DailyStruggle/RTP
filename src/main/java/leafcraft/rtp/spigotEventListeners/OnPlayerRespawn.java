@@ -2,7 +2,6 @@ package leafcraft.rtp.spigotEventListeners;
 
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tasks.QueueLocation;
-import leafcraft.rtp.tasks.SetupTeleport;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
@@ -13,10 +12,8 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerRespawnEvent;
-import org.bukkit.permissions.PermissionAttachmentInfo;
 
 import java.util.Objects;
-import java.util.Set;
 
 //get queued location
 public final class OnPlayerRespawn implements Listener {

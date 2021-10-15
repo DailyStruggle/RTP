@@ -159,14 +159,14 @@ public class Fill implements CommandExecutor {
         String worldName = (String) configs.regions.getRegionSetting(regionName,"world","");
         if(worldName.equals("")) {
             String msg = configs.lang.getLog("badArg","region:"+regionName);
-            
+
             SendMessage.sendMessage(sender,msg);
             return true;
         }
 
         if(!configs.worlds.checkWorldExists(worldName)) {
             String msg = configs.lang.getLog("invalidWorld",worldName);
-            
+
             SendMessage.sendMessage(sender,msg);
             return true;
         }
@@ -178,14 +178,14 @@ public class Fill implements CommandExecutor {
         }
         else {
             String msg = configs.lang.getLog("badArg","region:"+regionName);
-            
+
             SendMessage.sendMessage(sender,msg);
             return true;
         }
 
         if(region.isFilling()) {
             String msg = configs.lang.getLog("fillRunning", regionName);
-            
+
             SendMessage.sendMessage(sender,msg);
             return true;
         }
