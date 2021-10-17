@@ -26,20 +26,15 @@ public final class OnPlayerQuit implements Listener {
         Player player = event.getPlayer();
         UUID playerId = player.getUniqueId();
 
-        Bukkit.getScheduler().runTaskAsynchronously(RTP.getPlugin(),()-> {
-            if (cache.invulnerablePlayers.containsKey(playerId)) {
-                event.getPlayer().setInvulnerable(false);
-                cache.invulnerablePlayers.remove(playerId);
-            }
+        cache.invulnerablePlayers.remove(playerId);
 
-            CommandSender sender = cache.commandSenderLookup.get(player.getUniqueId());
-            if (sender == null) return;
+        CommandSender sender = cache.commandSenderLookup.get(player.getUniqueId());
+        if (sender == null) return;
 
-            Location to = cache.todoTP.get(player.getUniqueId());
-            if (to == null) return;
+        Location to = cache.todoTP.get(player.getUniqueId());
+        if (to == null) return;
 
-            TeleportCancelEvent teleportCancelEvent = new TeleportCancelEvent(sender, player, to, event.isAsynchronous());
-            Bukkit.getPluginManager().callEvent(teleportCancelEvent);
-        });
+        TeleportCancelEvent teleportCancelEvent = new TeleportCancelEvent(sender, player, to, event.isAsynchronous());
+        Bukkit.getPluginManager().callEvent(teleportCancelEvent);
     }
 }

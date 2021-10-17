@@ -9,6 +9,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 public class RandomSelectParams {
@@ -63,7 +64,7 @@ public class RandomSelectParams {
         this.params.putIfAbsent("uniquePlacements", (configs.regions.getRegionSetting(regionName,"uniquePlacements",false)).toString());
         this.params.putIfAbsent("expand", (configs.regions.getRegionSetting(regionName,"expand",false)).toString());
 
-        worldID = world.getUID();
+        worldID = Objects.requireNonNull(world).getUID();
         shape = TeleportRegion.Shapes.valueOf(this.params.getOrDefault("shape","CIRCLE"));
         r = Integer.parseInt(this.params.get("radius"));
         cr = Integer.parseInt(this.params.get("centerRadius"));
@@ -75,11 +76,6 @@ public class RandomSelectParams {
         worldBorderOverride = Boolean.parseBoolean(this.params.get("worldBorderOverride"));
         uniquePlacements = Boolean.parseBoolean(this.params.get("uniquePlacements"));
         expand = Boolean.parseBoolean(this.params.get("expand"));
-
-//        System.out.println("creating RandomSelectParams with params:");
-//        for(Map.Entry<String,String> entry : this.params.entrySet()) {
-//            System.out.println("  " + entry.getKey() + ": " + entry.getValue());
-//        }
     }
 
     @Override

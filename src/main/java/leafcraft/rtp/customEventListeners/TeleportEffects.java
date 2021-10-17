@@ -288,9 +288,10 @@ public class TeleportEffects implements Listener {
                             if (player.isInvulnerable()) {
                                 f.detonate();
                             } else {
-                                player.setInvulnerable(true);
+                                RTP.getCache().invulnerablePlayers.add(player.getUniqueId());
                                 f.detonate();
-                                Bukkit.getScheduler().runTaskLater(RTP.getPlugin(), () -> player.setInvulnerable(false), 1);
+                                Bukkit.getScheduler().runTaskLater(RTP.getPlugin(), () ->
+                                        RTP.getCache().invulnerablePlayers.remove(player.getUniqueId()), 1);
                             }
                         }
                     }

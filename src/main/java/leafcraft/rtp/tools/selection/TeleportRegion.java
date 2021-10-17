@@ -254,6 +254,8 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
 
     public boolean rerollWorldGuard, rerollGriefPrevention;
 
+    public boolean worldBorderOverride;
+
     public int r, cr, cx, cz, minY, maxY;
 
     private final Semaphore fillIteratorGuard = new Semaphore(1);
@@ -266,7 +268,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         String worldName = params.getOrDefault("world","world");
         Configs configs = RTP.getConfigs();
         if(!configs.worlds.checkWorldExists(worldName)) worldName = "world";
-        this.world = Bukkit.getWorld(worldName);
+        this.world = Objects.requireNonNull(Bukkit.getWorld(worldName));
 
         String shapeStr =   params.get("shape");
         String rStr =       params.get("radius");
@@ -280,11 +282,36 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         String rslStr =     params.get("requireSkyLight");
         String upStr =      params.get("uniquePlacements");
         String expandStr =  params.get("expand");
+        String wboStr =     params.get("worldBorderOverride");
 
-        r = Integer.parseInt(rStr);
+        worldBorderOverride = Boolean.parseBoolean(wboStr);
+
         cr = Integer.parseInt(crStr);
-        cx = Integer.parseInt(cxStr);
-        cz = Integer.parseInt(czStr);
+
+        if(worldBorderOverride) {
+            r = (int)world.getWorldBorder().getSize() / 32;
+            cx = world.getWorldBorder().getCenter().getBlockX();
+            if(cx < 0) cx = (cx / 16) - 1;
+            else cx = cx / 16;
+
+            cz = world.getWorldBorder().getCenter().getBlockZ();
+            if(cz < 0) cz = (cz / 16) - 1;
+            else cz = cz / 16;
+
+            this.shape = Shapes.SQUARE;
+        }
+        else {
+            r = Integer.parseInt(rStr);
+            cx = Integer.parseInt(cxStr);
+            cz = Integer.parseInt(czStr);
+
+            try{
+                this.shape = Shapes.valueOf(shapeStr.toUpperCase(Locale.ENGLISH));
+            }
+            catch (IllegalArgumentException exception) {
+                this.shape = Shapes.CIRCLE;
+            }
+        }
 
         weight = Double.parseDouble(weightStr);
         minY = Integer.parseInt(minYStr);
@@ -292,13 +319,6 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         requireSkyLight = Boolean.parseBoolean(rslStr);
         uniquePlacements = Boolean.parseBoolean(upStr);
         expand = Boolean.parseBoolean(expandStr);
-
-        try{
-            this.shape = Shapes.valueOf(shapeStr.toUpperCase(Locale.ENGLISH));
-        }
-        catch (IllegalArgumentException exception) {
-            this.shape = Shapes.CIRCLE;
-        }
 
         try {
             this.mode = Modes.valueOf(modeStr.toUpperCase(Locale.ENGLISH));
@@ -820,8 +840,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
     }
 
     public void addBadLocation(Long location) {
-        if(location < 0) return;
-        if(location > (totalSpace+(expand?badLocationSum.get():0))) return;
+        if(!isInBounds(location)) return;
 
         if(badLocations == null) badLocations = new ConcurrentSkipListMap<>();
 
@@ -860,8 +879,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
     }
 
     public void addBiomeLocation(Long location, Biome biome) {
-        if(location < 0) return;
-        if(location > (totalSpace+(expand?badLocationSum.get():0))) return;
+        if(!isInBounds(location)) return;
 
         biomeLocations.putIfAbsent(biome, new ConcurrentSkipListMap<>());
         ConcurrentSkipListMap<Long, Long> map = biomeLocations.get(biome);
@@ -919,9 +937,30 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
     }
 
     private long select() {
+        if(worldBorderOverride) {
+            r = (int)world.getWorldBorder().getSize() / 32;
+            int cx = world.getWorldBorder().getCenter().getBlockX();
+            if(cx < 0) cx = (cx / 16) - 1;
+            else cx = cx / 16;
+
+            int cz = world.getWorldBorder().getCenter().getBlockZ();
+            if(cz < 0) cz = (cz / 16) - 1;
+            else cz = cz / 16;
+
+            if(cx != this.cx || cz != this.cz) {
+                badLocations.clear();
+                biomeLocations.clear();
+                this.cx = cx;
+                this.cz = cz;
+            }
+            totalSpace = (r-cr)*(r+cr);
+        }
+
         double space = totalSpace;
         if((!expand) && mode.equals(Modes.ACCUMULATE)) space -= badLocationSum.get();
+        else if(expand && !mode.equals(Modes.ACCUMULATE)) space += badLocationSum.get();
         double res = (space) * Math.pow(ThreadLocalRandom.current().nextDouble(),weight);
+
         return (long)res;
     }
 
@@ -987,7 +1026,6 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                         }
                     }
                     case NEAREST: {
-                        if(expand) location = location + ThreadLocalRandom.current().nextLong(badLocationSum.get());
                         ConcurrentSkipListMap<Long,Long> map = badLocations;
                         Map.Entry<Long, Long> check = map.floorEntry(location);
 
@@ -1031,7 +1069,6 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                         }
                     }
                     case REROLL: {
-                        if(expand) location = location + ThreadLocalRandom.current().nextLong(badLocationSum.get());
                         Map.Entry<Long, Long> check = badLocations.floorEntry(location);
                         if(     (check!=null)
                                 && (location > check.getKey())
@@ -1040,7 +1077,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                         }
                     }
                     default: {
-                        if(expand) location = (long) (location + ((badLocationSum.get() * location) / totalSpace));
+
                     }
                 }
             }
