@@ -83,12 +83,8 @@ public final class OnRandomTeleport implements Listener {
         }
 
         if(!player.isInvulnerable() && configs.config.invulnerabilityTime>0) {
-            player.setInvulnerable(true);
-            cache.invulnerablePlayers.put(player.getUniqueId(),player);
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                player.setInvulnerable(false);
-                cache.invulnerablePlayers.remove(player.getUniqueId());
-            },configs.config.invulnerabilityTime*20L);
+            cache.invulnerablePlayers.add(player.getUniqueId());
+            Bukkit.getScheduler().runTaskLater(plugin, () -> cache.invulnerablePlayers.remove(player.getUniqueId()),configs.config.invulnerabilityTime*20L);
         }
 
         runCommands(event.getPlayer());

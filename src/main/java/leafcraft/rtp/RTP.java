@@ -91,6 +91,7 @@ public final class RTP extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new OnPlayerChangeWorld(),this);
         getServer().getPluginManager().registerEvents(new OnPlayerMove(),this);
         getServer().getPluginManager().registerEvents(new OnPlayerTeleport(),this);
+        getServer().getPluginManager().registerEvents(new OnPlayerDamage(),this);
         getServer().getPluginManager().registerEvents(new OnPlayerQuit(),this);
         getServer().getPluginManager().registerEvents(new OnRandomPreTeleport(),this);
         getServer().getPluginManager().registerEvents(new OnRandomTeleport(),this);
@@ -165,7 +166,7 @@ public final class RTP extends JavaPlugin {
 
         configs.regions.setRegion(regionName,randomSelectParams);
         return cache.permRegions.put(randomSelectParams,
-                new TeleportRegion(regionName,params));
+                new TeleportRegion(regionName,randomSelectParams.params));
     }
 
     /**

@@ -106,15 +106,9 @@ public class Cache {
     public ConcurrentHashMap<RandomSelectParams, TeleportRegion> tempRegions = new ConcurrentHashMap<>();
     public ConcurrentHashMap<RandomSelectParams, TeleportRegion> permRegions = new ConcurrentHashMap<>();
 
-    public ConcurrentHashMap<UUID,Player> invulnerablePlayers = new ConcurrentHashMap<>();
+    public ConcurrentSkipListSet<UUID> invulnerablePlayers = new ConcurrentSkipListSet<>();
 
     public void shutdown() {
-
-
-        for(Player player : invulnerablePlayers.values()) {
-            player.setInvulnerable(false);
-        }
-
         for(ConcurrentHashMap.Entry<UUID,SetupTeleport> entry : setupTeleports.entrySet()) {
             entry.getValue().cancel();
         }
