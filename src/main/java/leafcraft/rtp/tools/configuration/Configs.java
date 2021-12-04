@@ -9,7 +9,6 @@ import java.util.List;
 
 //route for all config classes
 public class Configs {
-    private final RTP plugin;
     public Config config;
     public Lang lang;
     public Regions regions;
@@ -18,7 +17,7 @@ public class Configs {
     public List<MethodHandle> locationChecks;
 
     public Configs() {
-        this.plugin = RTP.getPlugin();
+        RTP plugin = RTP.getPlugin();
         String name = plugin.getServer().getClass().getPackage().getName();
         version = name.substring(name.indexOf('-')+1);
         lang = new Lang(plugin);
@@ -29,6 +28,7 @@ public class Configs {
     }
 
     public void refresh() {
+        RTP plugin = RTP.getPlugin();
         String name = plugin.getServer().getClass().getPackage().getName();
         version = name.substring(name.indexOf('-')+1);
         lang = new Lang(plugin);

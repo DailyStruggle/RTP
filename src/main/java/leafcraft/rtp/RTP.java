@@ -39,16 +39,12 @@ public final class RTP extends JavaPlugin {
     private static Cache cache = null;
     private static RTP plugin = null;
     private static Metrics metrics;
-    private static int bukkitVersion;
     private static RTPCmd rtpCmd;
 
 //    private OnChunkLoad onChunkLoad;
 
     @Override
     public void onEnable() {
-        String version = Bukkit.getServer().getBukkitVersion().split("-")[0];
-        version = version.substring(version.indexOf('.')+1,version.lastIndexOf('.'));
-        bukkitVersion = Integer.parseInt(version);
         PaperLib.suggestPaper(this);
         metrics = new Metrics(this,12277);
 
@@ -199,10 +195,6 @@ public final class RTP extends JavaPlugin {
     @NotNull
     public static Cache getCache() {
         return cache;
-    }
-
-    public static int getBukkitVersion() {
-        return bukkitVersion;
     }
 
     private static void initDefaultCommands() {

@@ -354,18 +354,15 @@ public class RTPCmd implements CommandExecutor {
         cache.playerFromLocations.put(player.getUniqueId(),player.getLocation());
         cache.commandSenderLookup.put(player.getUniqueId(),sender);
         SetupTeleport setupTeleport = new SetupTeleport(sender,player, rsParams);
-        if(cache.permRegions.containsKey(rsParams)
+        if ((cache.permRegions.containsKey(rsParams)
                 && hasQueued
                 && sender.hasPermission("rtp.noDelay")
-                && !rsParams.params.containsKey("biome")) {
+                && !rsParams.params.containsKey("biome"))
+                || configs.config.syncLoading) {
             setupTeleport.setupTeleportNow(SyncState.SYNC);
-        }
-        else if(configs.config.syncLoading) {
-            setupTeleport.setupTeleportNow(SyncState.SYNC);
-        }
-        else {
+        } else {
             setupTeleport.runTaskAsynchronously(plugin);
-            cache.setupTeleports.put(player.getUniqueId(),setupTeleport);
+            cache.setupTeleports.put(player.getUniqueId(), setupTeleport);
         }
 
         return true;
