@@ -167,7 +167,7 @@ public class TabComplete implements TabCompleter {
                 if(sender.hasPermission(cmd.getPerm()))
                     command = cmd;
             }
-            getList(knownParams,res,command,args,i+1,sender);
+            getList(knownParams,res,command,args,i+1,sender); //recursion simplifies this
         }
     }
 }
