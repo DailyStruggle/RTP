@@ -13,7 +13,7 @@
 
     <description>add Domain check to RTP</description>
     <properties>
-        <java.version>1.8</java.version>
+        <java.version>16</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
     <url>https://github.com/DailyStruggle</url>
@@ -75,7 +75,7 @@
         <dependency>
             <groupId>io.github.dailystruggle</groupId>
             <artifactId>RTP</artifactId>
-            <version>1.3.16</version>
+            <version>1.3.17</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
