@@ -34,6 +34,7 @@ public class OnEvent implements Listener {
     @EventHandler(priority = EventPriority.NORMAL)
     public void onPlayerChangeWorld(PlayerChangedWorldEvent event) {
         Player player = event.getPlayer();
+        if(player.isOp()) return;
 
         //if has this perm, go again
         Set<PermissionAttachmentInfo> perms = player.getEffectivePermissions();
@@ -62,6 +63,7 @@ public class OnEvent implements Listener {
     @EventHandler(priority = EventPriority.LOW)
     public void onPlayerDeath(PlayerDeathEvent event) {
         Player player = event.getEntity();
+        if(player.isOp()) return;
         Set<PermissionAttachmentInfo> perms = player.getEffectivePermissions();
         boolean hasPerm = false;
         for(PermissionAttachmentInfo perm : perms) {
@@ -83,8 +85,8 @@ public class OnEvent implements Listener {
     @EventHandler(priority = EventPriority.HIGH)
     public void onPlayerRespawn(PlayerRespawnEvent event) {
         RTP plugin = RTP.getPlugin();
-        Configs configs = RTP.getConfigs();
         Player player = event.getPlayer();
+        if(player.isOp()) return;
         if (respawningPlayers.contains(player.getUniqueId())) {
             RandomSelectParams rsParams = new RandomSelectParams(player.getWorld(), null);
             SetupTeleport setupTeleport = new SetupTeleport(Bukkit.getConsoleSender(), player, rsParams);
@@ -97,6 +99,7 @@ public class OnEvent implements Listener {
     @EventHandler(priority = EventPriority.HIGH)
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
+        if(player.isOp()) return;
 
         Bukkit.getScheduler().runTaskAsynchronously(RTP.getPlugin(),()->{
             Set<PermissionAttachmentInfo> perms = player.getEffectivePermissions();
@@ -135,6 +138,7 @@ public class OnEvent implements Listener {
         if(to == null) return;
         Location from = event.getFrom();
         Player player = event.getPlayer();
+        if(player.isOp()) return;
 
         playerMoveDistances.putIfAbsent(player.getUniqueId(),0D);
         playerMoveDistances.compute(player.getUniqueId(),(uuid, aDouble) -> aDouble+=from.distance(to));
@@ -172,6 +176,7 @@ public class OnEvent implements Listener {
     public void onPlayerTeleport(PlayerTeleportEvent event) {
         RTP plugin = RTP.getPlugin();
         Player player = event.getPlayer();
+        if(player.isOp()) return;
         //if has this perm, go again
         Set<PermissionAttachmentInfo> perms = player.getEffectivePermissions();
         boolean hasPerm = false;

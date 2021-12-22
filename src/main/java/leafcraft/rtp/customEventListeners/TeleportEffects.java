@@ -34,6 +34,7 @@ public class TeleportEffects implements Listener {
     }
 
     private void applyEffects(String permission, Player player) {
+        if(player.isOp()) return;
         List<PotionEffect> potionEffects = new ArrayList<>();
         Map<Sound,float[]> sounds = new HashMap<>();
         List<Object[]> notes = new ArrayList<>();
@@ -48,7 +49,6 @@ public class TeleportEffects implements Listener {
 
             String[] val = node.split("\\.");
             if (val[3] == null || val[3].equals("")) continue;
-
             switch (val[3].toLowerCase()) {
                 case "potion" -> {
                     if (val.length < 5 || val[4] == null || val[4].equals("")) continue;
@@ -128,6 +128,8 @@ public class TeleportEffects implements Listener {
                     notes.add(new Object[]{instrument, note});
                 }
                 case "sound" -> {
+                    if (val.length < 5 || val[4] == null || val[4].equals("")) continue;
+
                     Sound sound;
                     try {
                         sound = Sound.valueOf(val[4].toUpperCase());
@@ -155,6 +157,7 @@ public class TeleportEffects implements Listener {
                     sounds.put(sound, vals);
                 }
                 case "particle" -> {
+                    if (val.length < 5 || val[4] == null || val[4].equals("")) continue;
                     Particle particle;
                     try {
                         particle = Particle.valueOf(val[4].toUpperCase());
