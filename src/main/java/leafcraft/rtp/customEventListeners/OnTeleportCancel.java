@@ -66,8 +66,7 @@ public final class OnTeleportCancel implements Listener {
         cache.todoTP.remove(player.getUniqueId());
         cache.playerFromLocations.remove(player.getUniqueId());
 
-        if(configs.config.refund && event.getSender() instanceof Player) {
-            Player sourcePlayer = (Player) event.getSender();
+        if(configs.config.refund && event.getSender() instanceof Player sourcePlayer) {
             cache.lastTeleportTime.remove(sourcePlayer.getUniqueId());
             Economy economy = VaultChecker.getEconomy();
             if(economy!=null && economy.isEnabled()) {
