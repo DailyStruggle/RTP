@@ -75,17 +75,15 @@ public class SetRegion implements CommandExecutor {
             }
             world = Objects.requireNonNull(Bukkit.getWorld(worldName));
             switch (world.getEnvironment()) {
-                case NETHER: {
+                case NETHER -> {
                     regionArgs.putIfAbsent("requireSkyLight", "false");
                     regionArgs.putIfAbsent("maxY", "127");
                     regionArgs.putIfAbsent("minY", "32");
-                    break;
                 }
-                case THE_END: {
+                case THE_END -> {
                     regionArgs.putIfAbsent("requireSkyLight", "false");
                     regionArgs.putIfAbsent("maxY", "96");
                     regionArgs.putIfAbsent("minY", "48");
-                    break;
                 }
             }
         }
@@ -130,9 +128,9 @@ public class SetRegion implements CommandExecutor {
                         continue;
                     }
                     switch (isCoord) {
-                        case 1: res = ((Player) sender).getLocation().getBlockX(); break;
-                        case 2: res = ((Player) sender).getLocation().getBlockY(); break;
-                        case 3: res = ((Player) sender).getLocation().getBlockZ(); break;
+                        case 1 -> res = ((Player) sender).getLocation().getBlockX();
+                        case 2 -> res = ((Player) sender).getLocation().getBlockY();
+                        case 3 -> res = ((Player) sender).getLocation().getBlockZ();
                     }
                     String numStr;
                     if(entry.getValue().startsWith("~-")) {

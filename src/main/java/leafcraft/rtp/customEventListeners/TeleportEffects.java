@@ -50,7 +50,7 @@ public class TeleportEffects implements Listener {
             if (val[3] == null || val[3].equals("")) continue;
 
             switch (val[3].toLowerCase()) {
-                case "potion": {
+                case "potion" -> {
                     if (val.length < 5 || val[4] == null || val[4].equals("")) continue;
                     PotionEffectType potionEffectType = PotionEffectType.getByName(val[4]);
                     if (potionEffectType == null) continue;
@@ -95,9 +95,8 @@ public class TeleportEffects implements Listener {
                         }
                     }
                     potionEffects.add(new PotionEffect(potionEffectType, duration, amplifier, ambient, potionParticles, icon));
-                    break;
                 }
-                case "note": {
+                case "note" -> {
                     Instrument instrument = Instrument.PIANO;
                     if (val.length > 4 && val[4] != null) {
                         try {
@@ -127,9 +126,8 @@ public class TeleportEffects implements Listener {
                     }
 
                     notes.add(new Object[]{instrument, note});
-                    break;
                 }
-                case "sound": {
+                case "sound" -> {
                     Sound sound;
                     try {
                         sound = Sound.valueOf(val[4].toUpperCase());
@@ -155,9 +153,8 @@ public class TeleportEffects implements Listener {
                     }
                     float[] vals = {(((float) volume) / 100), (((float) pitch) / 100)};
                     sounds.put(sound, vals);
-                    break;
                 }
-                case "particle": {
+                case "particle" -> {
                     Particle particle;
                     try {
                         particle = Particle.valueOf(val[4].toUpperCase());
@@ -175,9 +172,8 @@ public class TeleportEffects implements Listener {
                         }
                     }
                     particles.add(new Object[]{particle, numParticles});
-                    break;
                 }
-                case "firework": {
+                case "firework" -> {
                     FireworkEffect.Type type = FireworkEffect.Type.BALL;
                     if (val.length > 4 && val[4] != null) {
                         try {
@@ -249,7 +245,6 @@ public class TeleportEffects implements Listener {
                     }
 
                     fireworks.add(new Object[]{type, numFireworks, power, color, fade, flicker, trail});
-                    break;
                 }
             }
         }

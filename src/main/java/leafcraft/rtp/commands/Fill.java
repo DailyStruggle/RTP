@@ -92,7 +92,7 @@ public class Fill implements CommandExecutor {
             }
 
             switch (args[0]) {
-                case "start": {
+                case "start" -> {
                     if (region.isFilling()) {
                         String msg = configs.lang.getLog("fillRunning", regionName);
                         SendMessage.sendMessage(sender, msg);
@@ -102,7 +102,7 @@ public class Fill implements CommandExecutor {
                     region.startFill();
                     return true;
                 }
-                case "cancel": {
+                case "cancel" -> {
                     if (!region.isFilling()) {
                         String msg = configs.lang.getLog("fillNotRunning", regionName);
                         SendMessage.sendMessage(sender, msg);
@@ -112,7 +112,7 @@ public class Fill implements CommandExecutor {
                     region.stopFill();
                     return true;
                 }
-                case "pause": {
+                case "pause" -> {
                     if (!region.isFilling()) {
                         String msg = configs.lang.getLog("fillNotRunning", regionName);
                         SendMessage.sendMessage(sender, msg);
@@ -122,7 +122,7 @@ public class Fill implements CommandExecutor {
                     region.pauseFill();
                     return true;
                 }
-                case "resume": {
+                case "resume" -> {
                     if (region.isFilling()) {
                         String msg = configs.lang.getLog("fillRunning", regionName);
                         SendMessage.sendMessage(sender, msg);

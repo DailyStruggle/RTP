@@ -11,14 +11,10 @@ import org.bukkit.event.Listener;
 import org.bukkit.potion.PotionEffectType;
 
 public final class OnRandomPreTeleport implements Listener {
-    private final RTP plugin;
     private final Configs configs;
-    private final Cache cache;
 
     public OnRandomPreTeleport() {
-        this.plugin = RTP.getPlugin();
         this.configs = RTP.getConfigs();
-        this.cache = RTP.getCache();
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)

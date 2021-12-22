@@ -43,6 +43,34 @@ public final class RTP extends JavaPlugin {
 
 //    private OnChunkLoad onChunkLoad;
 
+    private static String version = null;
+    private static Integer intVersion = null;
+
+    public static String getServerVersion() {
+        if(version == null) {
+            version = RTP.getPlugin().getServer().getClass().getPackage().getName();
+            version = version.replaceAll("[-+^.a-zA-Z]*","");
+        }
+
+        return version;
+    }
+
+    public static Integer getServerIntVersion() {
+        if(intVersion == null) {
+            String[] splitVersion = getServerVersion().split("_");
+            if(splitVersion.length == 0) {
+                intVersion = 0;
+            }
+            else if (splitVersion.length == 1) {
+                intVersion = Integer.valueOf(splitVersion[0]);
+            }
+            else {
+                intVersion = Integer.valueOf(splitVersion[1]);
+            }
+        }
+        return intVersion;
+    }
+
     @Override
     public void onEnable() {
         PaperLib.suggestPaper(this);
@@ -51,6 +79,8 @@ public final class RTP extends JavaPlugin {
         RTP.plugin = this;
         RTP.configs = new Configs();
         RTP.cache = new Cache();
+
+        getServerIntVersion();
 
         try {
             Objects.requireNonNull(getCommand("wild")).setExecutor(rtpCmd);
@@ -166,6 +196,7 @@ public final class RTP extends JavaPlugin {
     }
 
     /**
+     * addLocationCheck
      * add any location check, after plugin initialization
      * @param methodHandle - a method that takes an org.bukkit.Location and returns a boolean
      */
@@ -173,10 +204,23 @@ public final class RTP extends JavaPlugin {
         configs.addLocationCheck(methodHandle);
     }
 
+    /**
+     * setSubCommand
+     * set subommand such that /rtp [name] calls the command executor given by getCommandExecutor
+     * @param name - command name
+     * @param subCommand - container for command
+     */
     public static void setSubCommand(@NotNull String name, @NotNull SubCommand subCommand) {
         rtpCmd.setSubCommand(name,subCommand);
     }
 
+    /**
+     * setSubCommand
+     * set subommand such that /rtp [name] calls the command executor given, if the player has permission
+     * @param name - command name
+     * @param permission - command permission node
+     * @param commandExecutor - executor to call
+     */
     public static void setSubCommand(@NotNull String name, @NotNull String permission, @NotNull CommandExecutor commandExecutor) {
         SubCommand subCommand = new SubCommandImpl(permission,commandExecutor);
         rtpCmd.setSubCommand(name,subCommand);

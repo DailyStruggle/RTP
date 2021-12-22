@@ -115,7 +115,10 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                         Translate.circleLocationToXZ(cr,cx,cz, it);
                 if(cancelled) return;
 
-                Biome currBiome = Objects.requireNonNull(world).getBiome(xz[0]*16+7,xz[1]*16+7);
+                Objects.requireNonNull(world);
+                Biome currBiome = (RTP.getServerIntVersion()<17)
+                        ? world.getBiome(xz[0]*16+7,xz[1]*16+7)
+                        : world.getBiome(xz[0]*16+7,(minY+maxY)/2,xz[1]*16+7);
                 if(configs.config.biomeWhitelist != configs.config.biomes.contains(currBiome)) {
                     addBadLocation(it);
                     removeBiomeLocation(it,currBiome);
@@ -620,7 +623,9 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
 
                     if(isKnownBad(chunk.getX(),chunk.getZ())) return;
                     Location point = chunk.getBlock(7,(maxY+minY)/2,7).getLocation();
-                    Biome biome = world.getBiome(point.getBlockX(), point.getBlockZ());
+                    Biome biome = RTP.getServerIntVersion()<17
+                            ? world.getBiome(point.getBlockX(), point.getBlockZ())
+                            : world.getBiome(point);
                     long curveLocation = (long) ((shape.equals(Shapes.SQUARE)) ?
                             Translate.xzToSquareLocation(cr,chunk.getX(),chunk.getZ(),cx,cz) :
                             Translate.xzToCircleLocation(cr,chunk.getX(),chunk.getZ(),cx,cz));
@@ -680,7 +685,9 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
 
                         if(isKnownBad(chunk.getX(),chunk.getZ())) return;
                         Location point = chunk.getBlock(7,(maxY+minY)/2,7).getLocation();
-                        Biome biome = world.getBiome(point.getBlockX(), point.getBlockZ());
+                        Biome biome = (RTP.getServerIntVersion()<17)
+                                ? world.getBiome(point.getBlockX(), point.getBlockZ())
+                                : world.getBiome(point);
                         long curveLocation = (long) ((shape.equals(Shapes.SQUARE)) ?
                                 Translate.xzToSquareLocation(cr,chunk.getX(),chunk.getZ(),cx,cz) :
                                 Translate.xzToCircleLocation(cr,chunk.getX(),chunk.getZ(),cx,cz));
@@ -1088,7 +1095,9 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
 
             res = new Location(world,xzChunk[0]*16+7, ((float)(minY + maxY)) / 2, xzChunk[1]*16+7);
 
-            Biome currBiome = world.getBiome(res.getBlockX(),res.getBlockZ());
+            Biome currBiome = (RTP.getServerIntVersion() < 17)
+                    ? world.getBiome(res.getBlockX(),res.getBlockZ())
+                    : world.getBiome(res);
             if(biome!=null && !currBiome.equals(biome)) {
                 removeBiomeLocation(location,biome);
                 continue;

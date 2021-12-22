@@ -60,13 +60,12 @@ public class TabComplete implements TabCompleter {
                 }
                 SubCommand.ParamType type = command.getSubParamType(arg);
                 switch (Objects.requireNonNull(type)) {
-                    case SHAPE: {
+                    case SHAPE -> {
                         for (TeleportRegion.Shapes shape : TeleportRegion.Shapes.values()) {
                             res.add(arg + ":" + shape.name());
                         }
-                        break;
                     }
-                    case REGION: {
+                    case REGION -> {
                         List<String> regions = configs.regions.getRegionNames();
                         for (String region : regions) {
                             if (!((Boolean) configs.regions.getRegionSetting(region, "requirePermission", true))
@@ -74,9 +73,8 @@ public class TabComplete implements TabCompleter {
                                 res.add(arg + ":" + region);
                             }
                         }
-                        break;
                     }
-                    case WORLD: {
+                    case WORLD -> {
                         for (World world : Bukkit.getWorlds()) {
                             configs.worlds.checkWorldExists(world.getName());
                             if (!((Boolean) configs.worlds.getWorldSetting(world.getName(), "requirePermission", true))
@@ -84,37 +82,31 @@ public class TabComplete implements TabCompleter {
                                 res.add(arg + ":" + configs.worlds.worldName2Placeholder(world.getName()));
                             }
                         }
-                        break;
                     }
-                    case PLAYER: {
+                    case PLAYER -> {
                         for (Player player : Bukkit.getOnlinePlayers()) {
                             res.add(arg + ":" + player.getName());
                         }
-                        break;
                     }
-                    case COORDINATE: {
+                    case COORDINATE -> {
                         if (sender instanceof Player) res.add(arg + ":" + "~");
-                        break;
                     }
-                    case BOOLEAN: {
+                    case BOOLEAN -> {
                         res.add(arg + ":true");
                         res.add(arg + ":false");
-                        break;
                     }
-                    case BIOME: {
+                    case BIOME -> {
                         for (Biome biome : Biome.values()) {
                             if (sender.hasPermission("rtp.biome.*") || sender.hasPermission("rtp.biome." + biome.name()))
                                 res.add(arg + ":" + biome.name());
                         }
-                        break;
                     }
-                    case MODE: {
+                    case MODE -> {
                         for (TeleportRegion.Modes mode : TeleportRegion.Modes.values()) {
                             res.add(arg + ":" + mode.name());
                         }
-                        break;
                     }
-                    default: {
+                    default -> {
                         if (arg.equals("near")) {
                             int numValidPlayers = 0;
                             if (sender.hasPermission("rtp.near.other")) {

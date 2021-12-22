@@ -60,40 +60,40 @@ public class Info implements CommandExecutor {
                 String val = s.substring(idx+1);
 
                 switch (arg.toLowerCase()) {
-                    case "world": {
-                        Map<String,String> tokens = new HashMap<>();
-                        tokens.put("[world]",val);
-                        tokens.put("[name]", (String) configs.worlds.getWorldSetting(val,"name",""));
-                        tokens.put("[region]", (String) configs.worlds.getWorldSetting(val,"region",""));
-                        tokens.put("[requirePermission]", String.valueOf(configs.worlds.getWorldSetting(val,"requirePermission",false)));
-                        tokens.put("[override]", String.valueOf(configs.worlds.getWorldSetting(val,"override","")));
-                        tokens.put("[nearShape]", String.valueOf(configs.worlds.getWorldSetting(val,"nearShape","CIRCLE")));
-                        tokens.put("[nearRadius]", String.valueOf(configs.worlds.getWorldSetting(val,"nearRadius",-1)));
-                        tokens.put("[nearCenterRadius]", String.valueOf(configs.worlds.getWorldSetting(val,"override",-1)));
-                        tokens.put("[nearMinY]", String.valueOf(configs.worlds.getWorldSetting(val,"nearMinY", -1)));
-                        tokens.put("[nearMaxY]", String.valueOf(configs.worlds.getWorldSetting(val,"nearMaxY",-1)));
+                    case "world" -> {
+                        Map<String, String> tokens = new HashMap<>();
+                        tokens.put("[world]", val);
+                        tokens.put("[name]", (String) configs.worlds.getWorldSetting(val, "name", ""));
+                        tokens.put("[region]", (String) configs.worlds.getWorldSetting(val, "region", ""));
+                        tokens.put("[requirePermission]", String.valueOf(configs.worlds.getWorldSetting(val, "requirePermission", false)));
+                        tokens.put("[override]", String.valueOf(configs.worlds.getWorldSetting(val, "override", "")));
+                        tokens.put("[nearShape]", String.valueOf(configs.worlds.getWorldSetting(val, "nearShape", "CIRCLE")));
+                        tokens.put("[nearRadius]", String.valueOf(configs.worlds.getWorldSetting(val, "nearRadius", -1)));
+                        tokens.put("[nearCenterRadius]", String.valueOf(configs.worlds.getWorldSetting(val, "override", -1)));
+                        tokens.put("[nearMinY]", String.valueOf(configs.worlds.getWorldSetting(val, "nearMinY", -1)));
+                        tokens.put("[nearMaxY]", String.valueOf(configs.worlds.getWorldSetting(val, "nearMaxY", -1)));
 
                         List<String> msgList = configs.lang.getLogList("worldInfo");
-                        for(String msg : msgList) {
-                            for(Map.Entry<String,String> entry : tokens.entrySet()) {
-                                msg = msg.replace(entry.getKey(),entry.getValue());
+                        for (String msg : msgList) {
+                            for (Map.Entry<String, String> entry : tokens.entrySet()) {
+                                msg = msg.replace(entry.getKey(), entry.getValue());
                             }
-                            SendMessage.sendMessage(sender,msg);
+                            SendMessage.sendMessage(sender, msg);
                         }
                         break;
                     }
-                    case "region": {
+                    case "region" -> {
                         TeleportRegion region = null;
-                        for(TeleportRegion teleportRegion : RTP.getCache().permRegions.values()) {
-                            if(teleportRegion.name.equals(val)) {
+                        for (TeleportRegion teleportRegion : RTP.getCache().permRegions.values()) {
+                            if (teleportRegion.name.equals(val)) {
                                 region = teleportRegion;
                                 break;
                             }
                         }
-                        if(region == null) continue;
+                        if (region == null) continue;
 
-                        Map<String,String> tokens = new HashMap<>();
-                        tokens.put("[region]",val);
+                        Map<String, String> tokens = new HashMap<>();
+                        tokens.put("[region]", val);
                         tokens.put("[world]", Objects.requireNonNull(region.world).getName());
                         tokens.put("[shape]", region.shape.name());
                         tokens.put("[mode]", region.mode.name());
@@ -105,19 +105,19 @@ public class Info implements CommandExecutor {
                         tokens.put("[maxY]", String.valueOf(region.maxY));
                         tokens.put("[weight]", String.valueOf(region.weight));
                         tokens.put("[requireSkyLight]", String.valueOf(region.requireSkyLight));
-                        tokens.put("[requirePermission]", String.valueOf(configs.regions.getRegionSetting(val,"requirePermission",false)));
-                        tokens.put("[worldBorderOverride]", String.valueOf(configs.regions.getRegionSetting(val,"worldBorderOverride",false)));
+                        tokens.put("[requirePermission]", String.valueOf(configs.regions.getRegionSetting(val, "requirePermission", false)));
+                        tokens.put("[worldBorderOverride]", String.valueOf(configs.regions.getRegionSetting(val, "worldBorderOverride", false)));
                         tokens.put("[uniquePlacements]", String.valueOf(region.uniquePlacements));
                         tokens.put("[expand]", String.valueOf(region.expand));
-                        tokens.put("[queueLen]", String.valueOf(configs.regions.getRegionSetting(val,"queueLen",-1)));
+                        tokens.put("[queueLen]", String.valueOf(configs.regions.getRegionSetting(val, "queueLen", -1)));
                         tokens.put("[queued]", String.valueOf(region.getPublicQueueLength()));
 
                         List<String> msgList = configs.lang.getLogList("regionInfo");
-                        for(String msg : msgList) {
-                            for(Map.Entry<String,String> entry : tokens.entrySet()) {
-                                msg = msg.replace(entry.getKey(),entry.getValue());
+                        for (String msg : msgList) {
+                            for (Map.Entry<String, String> entry : tokens.entrySet()) {
+                                msg = msg.replace(entry.getKey(), entry.getValue());
                             }
-                            SendMessage.sendMessage(sender,msg);
+                            SendMessage.sendMessage(sender, msg);
                         }
                         break;
                     }
