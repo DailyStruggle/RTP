@@ -49,7 +49,7 @@ public class PAPI_expansion extends PlaceholderExpansion{
 
 	@Override
     public @NotNull String getVersion(){
-        return "1.3.16";
+        return "1.3.17";
     }
 
     @Override
@@ -119,9 +119,18 @@ public class PAPI_expansion extends PlaceholderExpansion{
             return String.valueOf(getTeleportLocation(player).getBlockZ());
         }
 
+        if(identifier.equalsIgnoreCase("teleport_biome")) {
+            Location location = getTeleportLocation(player);
+            return String.valueOf(
+                    Objects.requireNonNull(location.getWorld())
+                            .getBiome(location.getBlockX(), location.getBlockZ())
+            );
+        }
+
         return null;
     }
 
+    @NotNull
     private Location getTeleportLocation(Player player) {
 	    return cache.todoTP.getOrDefault(player.getUniqueId(), cache.lastTP.getOrDefault(player.getUniqueId(),new Location(player.getWorld(),0,0,0)));
     }
