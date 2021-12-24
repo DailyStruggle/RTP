@@ -5,6 +5,7 @@ import leafcraft.rtp.tools.SendMessage;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Bukkit;
+import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -253,7 +254,16 @@ public class Regions {
 
     public Object getRegionSetting(String region, String name, Object def) {
         if(!config.contains(region)) return def;
-        return this.config.getConfigurationSection(region).get(name,def);
+        Object res = config.getConfigurationSection(region).get(name,def);
+        //TODO: optimize search and replace
+        if(res instanceof String u && u.contains("[")) {
+            List<World> worlds = Bukkit.getWorlds();
+            for(int i = 0; i < worlds.size(); i++) {
+                u = u.replaceAll("["+ i +"]", worlds.get(i).getName());
+            }
+            res = u;
+        }
+        return res;
     }
 
     public List<String> getRegionNames() {
