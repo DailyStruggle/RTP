@@ -15,6 +15,7 @@ import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Scanner;
 import java.util.logging.Level;
 
@@ -157,7 +158,16 @@ public class Worlds {
 
     public Object getWorldSetting(String worldName, String name, Object def) {
         if(!config.contains(worldName)) return def;
-        return this.config.getConfigurationSection(worldName).get(name,def);
+        Object res = config.getConfigurationSection(worldName).get(name,def);
+        //TODO: optimize search and replace
+        if(res instanceof String u && u.contains("[")) {
+            List<World> worlds = Bukkit.getWorlds();
+            for(int i = 0; i < worlds.size(); i++) {
+                u = u.replaceAll("["+ i +"]", worlds.get(i).getName());
+            }
+            res = u;
+        }
+        return res;
     }
 
     public Boolean checkWorldExists(String worldName) {

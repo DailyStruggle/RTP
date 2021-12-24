@@ -132,7 +132,6 @@ public class RTPCmd implements CommandExecutor {
             }
             if (!configs.worlds.checkWorldExists(worldName) || !sender.hasPermission("rtp.worlds."+worldName)) {
                 String msg = configs.lang.getLog("badArg", "world:" + worldName);
-
                 SendMessage.sendMessage(sender,msg);
                 return true;
             }
@@ -159,7 +158,12 @@ public class RTPCmd implements CommandExecutor {
         }
         String worldName = Objects.requireNonNull(world).getName();
         if (!sender.hasPermission("rtp.worlds." + worldName) && (Boolean) configs.worlds.getWorldSetting(worldName, "requirePermission", true)) {
-            world = Bukkit.getWorld((String) configs.worlds.getWorldSetting(worldName,"override","world"));
+            world = Bukkit.getWorld((String) configs.worlds.getWorldSetting(worldName,"override","[0]"));
+            if(world == null || !configs.worlds.checkWorldExists(world.getName())) {
+                String msg = configs.lang.getLog("badArg", "world:" + worldName);
+                SendMessage.sendMessage(sender,msg);
+                return true;
+            }
         }
 
         //check time
@@ -339,11 +343,6 @@ public class RTPCmd implements CommandExecutor {
         }
 
         boolean hasQueued = cache.permRegions.containsKey(rsParams) && cache.permRegions.get(rsParams).hasQueuedLocation(player.getUniqueId());
-//        if(!hasQueued && !sender.hasPermission("rtp.unqueued")) {
-//            String msg = configs.lang.getLog("noLocationsQueued");
-//            SendMessage.sendMessage(sender,player,msg);
-//            return true;
-//        }
 
         //mark a successful command
         Bukkit.getScheduler().runTaskAsynchronously(plugin,()->
