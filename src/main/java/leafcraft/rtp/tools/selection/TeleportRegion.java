@@ -43,7 +43,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
     //arbitrary interface for world border information
     // initialized with a default implementation, supporting the vanilla world border
     // so that it be overridden later by WorldBorder or ChunkyBorder or the like
-    // opting not to do this per-region due to minimal demand and extra effort involved
+    // todo: interface functions for per-region worldborder types
     public static WorldBorderInterface worldBorderInterface = new VanillaWBHandler();
 
     /**
@@ -302,7 +302,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         cr = Integer.parseInt(crStr);
 
         if(worldBorderOverride) {
-            r = worldBorderInterface.getRadius(world)/16;
+            r = worldBorderInterface.getRadius(world)/16-1;
             if( r < cr ) cr = r/4;
             Location center = worldBorderInterface.getCenter(world);
             cx = center.getBlockX();
@@ -962,7 +962,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
 
     private long select() {
         if(worldBorderOverride) {
-            r = worldBorderInterface.getRadius(world)/16;
+            r = worldBorderInterface.getRadius(world)/16-1;
             if( r < cr ) cr = r/4;
             Location center = worldBorderInterface.getCenter(world);
             int cx = center.getBlockX();
@@ -973,11 +973,14 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
             if(cz < 0) cz = (cz / 16) - 1;
             else cz = cz / 16;
 
-            if(cx != this.cx || cz != this.cz) {
+            Shapes shape = worldBorderInterface.getShape(world);
+
+            if(cx != this.cx || cz != this.cz || shape != this.shape) {
                 badLocations.clear();
                 biomeLocations.clear();
                 this.cx = cx;
                 this.cz = cz;
+                this.shape = shape;
             }
             totalSpace = (r-cr)*(r+cr);
         }
