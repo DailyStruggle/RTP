@@ -259,7 +259,7 @@ public class Regions {
         if(res instanceof String u && u.contains("[")) {
             List<World> worlds = Bukkit.getWorlds();
             for(int i = 0; i < worlds.size(); i++) {
-                u = u.replaceAll("["+ i +"]", worlds.get(i).getName());
+                u = u.replaceAll("\\["+ i +"]", worlds.get(i).getName());
             }
             res = u;
         }

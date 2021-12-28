@@ -6,6 +6,7 @@ import leafcraft.rtp.API.customEvents.PlayerQueuePushEvent;
 import leafcraft.rtp.API.customEvents.RandomSelectPlayerEvent;
 import leafcraft.rtp.API.customEvents.RandomSelectQueueEvent;
 import leafcraft.rtp.API.selection.SyncState;
+import leafcraft.rtp.API.selection.WorldBorderInterface;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tasks.DoTeleport;
 import leafcraft.rtp.tools.Cache;
@@ -39,6 +40,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegion {
+    //arbitrary interface for world border information
+    // initialized with a default implementation, supporting the vanilla world border
+    // so that it be overridden later by WorldBorder or ChunkyBorder or the like
+    // opting not to do this per-region due to minimal demand and extra effort involved
+    public static WorldBorderInterface worldBorderInterface = new VanillaWBHandler();
+
+    /**
+     * per-region task for testing the waters for later recollection
+     */
     private class FillTask extends BukkitRunnable {
         private boolean cancelled = false;
         private final RTP plugin;
@@ -292,21 +302,27 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         cr = Integer.parseInt(crStr);
 
         if(worldBorderOverride) {
-            r = (int)world.getWorldBorder().getSize() / 32;
-            cx = world.getWorldBorder().getCenter().getBlockX();
+            r = worldBorderInterface.getRadius(world);
+            Location center = worldBorderInterface.getCenter(world);
+            cx = center.getBlockX();
             if(cx < 0) cx = (cx / 16) - 1;
             else cx = cx / 16;
 
-            cz = world.getWorldBorder().getCenter().getBlockZ();
+            cz = center.getBlockZ();
             if(cz < 0) cz = (cz / 16) - 1;
             else cz = cz / 16;
 
-            this.shape = Shapes.SQUARE;
+            this.shape = worldBorderInterface.getShape(world);
         }
         else {
             r = Integer.parseInt(rStr);
             cx = Integer.parseInt(cxStr);
             cz = Integer.parseInt(czStr);
+
+            if(cx < 0) cx = (cx / 16) - 1;
+            else cx = cx / 16;
+            if(cz < 0) cz = (cz / 16) - 1;
+            else cz = cz / 16;
 
             try{
                 this.shape = Shapes.valueOf(shapeStr.toUpperCase(Locale.ENGLISH));
@@ -976,6 +992,12 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         Cache cache = RTP.getCache();
         boolean urgent = !state.equals(SyncState.ASYNC);
 
+//        Bukkit.getLogger().warning(ChatColor.AQUA + "RTP getRandomLocation() - ");
+//        Bukkit.getLogger().warning(ChatColor.AQUA + "  radius - " + r);
+//        Bukkit.getLogger().warning(ChatColor.AQUA + "  centerX - " + cx);
+//        Bukkit.getLogger().warning(ChatColor.AQUA + "  centerZ - " + cz);
+
+
         long totalTimeStart = System.nanoTime();
         Location res = new Location(world,0,this.maxY,0);
 
@@ -1252,6 +1274,10 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                 addBadLocation(location);
                 removeBiomeLocation(location,currBiome);
             }
+
+//            Bukkit.getLogger().warning(ChatColor.AQUA + "  selection - " + location);
+//            Bukkit.getLogger().warning(ChatColor.AQUA + "  X - " + xzChunk[0]);
+//            Bukkit.getLogger().warning(ChatColor.AQUA + "  Z - " + xzChunk[1]);
         }
 
         res.setY(res.getBlockY()+1);
