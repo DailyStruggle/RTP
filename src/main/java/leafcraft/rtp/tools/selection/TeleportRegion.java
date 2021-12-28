@@ -302,7 +302,8 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         cr = Integer.parseInt(crStr);
 
         if(worldBorderOverride) {
-            r = worldBorderInterface.getRadius(world);
+            r = worldBorderInterface.getRadius(world)/16;
+            if( r < cr ) cr = r/4;
             Location center = worldBorderInterface.getCenter(world);
             cx = center.getBlockX();
             if(cx < 0) cx = (cx / 16) - 1;
@@ -961,12 +962,14 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
 
     private long select() {
         if(worldBorderOverride) {
-            r = (int)world.getWorldBorder().getSize() / 32;
-            int cx = world.getWorldBorder().getCenter().getBlockX();
+            r = worldBorderInterface.getRadius(world)/16;
+            if( r < cr ) cr = r/4;
+            Location center = worldBorderInterface.getCenter(world);
+            int cx = center.getBlockX();
             if(cx < 0) cx = (cx / 16) - 1;
             else cx = cx / 16;
 
-            int cz = world.getWorldBorder().getCenter().getBlockZ();
+            int cz = center.getBlockZ();
             if(cz < 0) cz = (cz / 16) - 1;
             else cz = cz / 16;
 
