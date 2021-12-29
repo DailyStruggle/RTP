@@ -6,7 +6,13 @@ import org.bukkit.World;
 
 public interface WorldBorderInterface {
     /**
-     * @param world - which world to use
+     * @param world - which world to check
+     * @return if the selection is within the worldborder
+     */
+    Boolean isInside(World world, Location location);
+
+    /**
+     * @param world - which world to check
      * @return radius, in blocks
      */
     Integer getRadius(World world);

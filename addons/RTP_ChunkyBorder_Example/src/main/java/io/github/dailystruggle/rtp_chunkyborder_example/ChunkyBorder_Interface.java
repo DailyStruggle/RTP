@@ -7,16 +7,28 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.popcraft.chunkyborder.BorderData;
 import org.popcraft.chunkyborder.ChunkyBorder;
-import org.popcraft.chunkyborder.ChunkyBorderBukkit;
 
 import java.util.Locale;
 import java.util.Optional;
 
 public class ChunkyBorder_Interface implements WorldBorderInterface {
-    private ChunkyBorder chunkyBorder;
+    private final ChunkyBorder chunkyBorder;
 
     public ChunkyBorder_Interface() {
         chunkyBorder = Bukkit.getServer().getServicesManager().load(ChunkyBorder.class);
+    }
+
+    @Override
+    public Boolean isInside(World world, Location location) {
+        boolean isInside = world.getWorldBorder().isInside(location);
+        Optional<BorderData> borderDataOptional = chunkyBorder.getBorder(world.getName());
+        if(borderDataOptional.isPresent() && isInside) {
+            BorderData borderData = borderDataOptional.get();
+            if (!borderData.getBorder().isBounding(location.getX(), location.getZ())) {
+                isInside = false;
+            }
+        }
+        return isInside;
     }
 
     @Override
@@ -24,9 +36,10 @@ public class ChunkyBorder_Interface implements WorldBorderInterface {
         int radius = (int)world.getWorldBorder().getSize()/2;
         Optional<BorderData> borderDataOptional = chunkyBorder.getBorder(world.getName());
         if(borderDataOptional.isPresent()) {
+            BorderData borderData = borderDataOptional.get();
             radius = Math.min(radius,(int)Math.min(
-                    borderDataOptional.get().getRadiusX(),
-                    borderDataOptional.get().getRadiusZ()
+                    borderData.getRadiusX(),
+                    borderData.getRadiusZ()
             ));
         }
         return radius;
@@ -54,6 +67,7 @@ public class ChunkyBorder_Interface implements WorldBorderInterface {
             BorderData borderData = borderDataOptional.get();
             switch (borderData.getShape().toUpperCase(Locale.ROOT)) {
                 case "CIRCLE" -> shape = TeleportRegion.Shapes.CIRCLE;
+                //todo: other chunkyBorder shapes
             }
         }
         return shape;
