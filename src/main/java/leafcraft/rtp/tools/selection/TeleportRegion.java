@@ -1137,6 +1137,14 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                 continue;
             }
 
+            if(!worldBorderInterface.isInside(world,res)) {
+                Bukkit.getLogger().warning("RTP - selection in region:" + name
+                        + " was not inside the world border. Retrying with worldBorderOverride. Please fix your configuration");
+                worldBorderOverride = true;
+                removeBiomeLocation(location,currBiome);
+                continue;
+            }
+
             long stop = System.nanoTime();
             selectTime += (stop-start);
 

@@ -85,5 +85,12 @@
             <scope>system</scope>
             <systemPath>${project.basedir}/ChunkyBorder-1.0.64.jar</systemPath>
         </dependency>
+        <dependency>
+            <groupId>org.popcraft</groupId>
+            <artifactId>Chunky</artifactId>
+            <version>1.2.164</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/Chunky-1.2.164.jar</systemPath>
+        </dependency>
     </dependencies>
 </project>

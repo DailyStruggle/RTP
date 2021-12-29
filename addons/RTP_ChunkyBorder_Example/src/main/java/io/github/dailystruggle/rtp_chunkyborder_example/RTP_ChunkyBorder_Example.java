@@ -8,8 +8,7 @@ public final class RTP_ChunkyBorder_Example extends JavaPlugin {
     @Override
     public void onEnable() {
         // Plugin startup logic
-        ChunkyBorder_Interface cbi = new ChunkyBorder_Interface();
-        TeleportRegion.worldBorderInterface = cbi;
+        TeleportRegion.worldBorderInterface = new ChunkyBorder_Interface();
     }
 
     @Override

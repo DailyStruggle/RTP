@@ -7,6 +7,11 @@ import org.bukkit.World;
 public class VanillaWBHandler implements WorldBorderInterface {
 
     @Override
+    public Boolean isInside(World world, Location location) {
+        return world.getWorldBorder().isInside(location);
+    }
+
+    @Override
     public Integer getRadius(World world) {
         return (int)(world.getWorldBorder().getSize()/2);
     }
