@@ -1,4 +1,5 @@
 # RTP
+
 A spigot plugin for random teleportation.
 https://www.spigotmc.org/resources/rtp.94812/
 
@@ -9,3 +10,5 @@ The goal of this plugin is function over form,
  * per-world and per-region configuration and teleport permissions
  * adjustment of region and world settings by command or by config file 
  * adjustment of all plugin messages in lang.yml
+
+I made this in a flow state and now I only understand how it works because I wrote down the math. I question my sanity.
