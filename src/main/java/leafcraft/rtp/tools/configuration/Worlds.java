@@ -5,6 +5,7 @@ import com.google.common.collect.HashBiMap;
 import leafcraft.rtp.RTP;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.permissions.Permission;
@@ -16,6 +17,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Scanner;
 import java.util.logging.Level;
 
@@ -50,15 +52,18 @@ public class Worlds {
     public void update() {
         final String quotes = "\"";
 
+        ConfigurationSection defaultSection = config.getConfigurationSection("default");
+        Objects.requireNonNull(defaultSection);
+
         ArrayList<String> linesInWorlds = new ArrayList<>();
-        String defaultRegion = config.getConfigurationSection("default").getString("region","default");
-        Boolean defaultRequirePermission = config.getConfigurationSection("default").getBoolean("requirePermission",true);
-        String defaultOverride = config.getConfigurationSection("default").getString("override","world");
-        String defaultNearShape = config.getConfigurationSection("default").getString("nearShape","CIRCLE");
-        Integer defaultNearRadius = config.getConfigurationSection("default").getInt("nearRadius",16);
-        Integer defaultNearCenterRadius = config.getConfigurationSection("default").getInt("nearCenterRadius",8);
-        Integer defaultNearMinY = config.getConfigurationSection("default").getInt("nearMinY",48);
-        Integer defaultNearMaxY = config.getConfigurationSection("default").getInt("nearMaxY",127);
+        String defaultRegion = defaultSection.getString("region","default");
+        boolean defaultRequirePermission = defaultSection.getBoolean("requirePermission",true);
+        String defaultOverride = defaultSection.getString("override","world");
+        String defaultNearShape = defaultSection.getString("nearShape","CIRCLE");
+        int defaultNearRadius = defaultSection.getInt("nearRadius",16);
+        int defaultNearCenterRadius = defaultSection.getInt("nearCenterRadius",8);
+        int defaultNearMinY = defaultSection.getInt("nearMinY",48);
+        int defaultNearMaxY = defaultSection.getInt("nearMaxY",127);
 
         for(World w : Bukkit.getWorlds()) {
             String permName = "rtp.worlds." + w.getName();
@@ -84,7 +89,7 @@ public class Worlds {
                     for(World w : Bukkit.getWorlds()) {
                         String worldName = w.getName();
                         if(config.contains(worldName)) continue;
-                        config.set(worldName, config.getConfigurationSection("default"));
+                        config.set(worldName, defaultSection);
 
                         if(linesInWorlds.get(linesInWorlds.size()-1).length() < 4)
                             linesInWorlds.set(linesInWorlds.size()-1,"    " + worldName + ":");
@@ -101,24 +106,26 @@ public class Worlds {
                     }
                 }
                 else { //if not a blank line
+                    ConfigurationSection worldSection = config.getConfigurationSection(currWorldName);
+                    Objects.requireNonNull(worldSection);
                     if(s.startsWith("    name:"))
-                        s = "    name: " + quotes + config.getConfigurationSection(currWorldName).getString("name",currWorldName) + quotes;
+                        s = "    name: " + quotes + worldSection.getString("name",currWorldName) + quotes;
                     else if(s.startsWith("    region:"))
-                        s = "    region: " + quotes + config.getConfigurationSection(currWorldName).getString("region",defaultRegion) + quotes;
+                        s = "    region: " + quotes + worldSection.getString("region",defaultRegion) + quotes;
                     else if(s.startsWith("    requirePermission:"))
-                        s = "    requirePermission: " + config.getConfigurationSection(currWorldName).getBoolean("requirePermission",defaultRequirePermission);
+                        s = "    requirePermission: " + worldSection.getBoolean("requirePermission",defaultRequirePermission);
                     else if(s.startsWith("    override:"))
-                        s = "    override: " + quotes + config.getConfigurationSection(currWorldName).getString("override",defaultOverride) + quotes;
+                        s = "    override: " + quotes + worldSection.getString("override",defaultOverride) + quotes;
                     else if(s.startsWith("    nearShape:"))
-                        s = "    nearShape: " + quotes + config.getConfigurationSection(currWorldName).getString("nearShape",defaultNearShape) + quotes;
+                        s = "    nearShape: " + quotes + worldSection.getString("nearShape",defaultNearShape) + quotes;
                     else if(s.startsWith("    nearRadius:"))
-                        s = "    nearRadius: " + config.getConfigurationSection(currWorldName).getInt("nearRadius",defaultNearRadius);
+                        s = "    nearRadius: " + worldSection.getInt("nearRadius",defaultNearRadius);
                     else if(s.startsWith("    nearCenterRadius:"))
-                        s = "    nearCenterRadius: " + config.getConfigurationSection(currWorldName).getInt("nearCenterRadius",defaultNearCenterRadius);
+                        s = "    nearCenterRadius: " + worldSection.getInt("nearCenterRadius",defaultNearCenterRadius);
                     else if(s.startsWith("    nearMinY:"))
-                        s = "    nearMinY: " + config.getConfigurationSection(currWorldName).getInt("nearMinY",defaultNearMinY);
+                        s = "    nearMinY: " + worldSection.getInt("nearMinY",defaultNearMinY);
                     else if(s.startsWith("    nearMaxY:"))
-                        s = "    nearMaxY: " + config.getConfigurationSection(currWorldName).getInt("nearMaxY",defaultNearMaxY);
+                        s = "    nearMaxY: " + worldSection.getInt("nearMaxY",defaultNearMaxY);
                     else if(!s.startsWith("#") && !s.startsWith("  ") && !s.startsWith("version") && (s.matches(".*[a-z].*") || s.matches(".*[A-Z].*")))
                     {
                         currWorldName = s.replace(":","");
@@ -134,7 +141,7 @@ public class Worlds {
         }
 
         FileWriter fw;
-        String[] linesArray = linesInWorlds.toArray(new String[linesInWorlds.size()]);
+        String[] linesArray = linesInWorlds.toArray(new String[0]);
         try {
             fw = new FileWriter(plugin.getDataFolder().getAbsolutePath() + File.separator + "worlds.yml");
             for (String s : linesArray) {
@@ -151,14 +158,18 @@ public class Worlds {
         this.worldNameLookup = HashBiMap.create();
         for(String worldName : config.getKeys(false)) {
             if(this.checkWorldExists(worldName)) {
-                this.worldNameLookup.put(worldName,config.getConfigurationSection(worldName).getString("name"));
+                ConfigurationSection worldSection = config.getConfigurationSection(worldName);
+                Objects.requireNonNull(worldSection);
+                this.worldNameLookup.put(worldName,worldSection.getString("name"));
             }
         }
     }
 
     public Object getWorldSetting(String worldName, String name, Object def) {
         if(!config.contains(worldName)) return def;
-        Object res = config.getConfigurationSection(worldName).get(name,def);
+        ConfigurationSection worldSection = config.getConfigurationSection(worldName);
+        Objects.requireNonNull(worldSection);
+        Object res = worldSection.get(name,def);
         //TODO: optimize search and replace
         if(res instanceof String u && u.contains("[")) {
             List<World> worlds = Bukkit.getWorlds();
@@ -172,8 +183,8 @@ public class Worlds {
 
     public Boolean checkWorldExists(String worldName) {
         if(worldName == null) return false;
-        Boolean bukkitWorldExists = Bukkit.getWorld(worldName)!=null;
-        Boolean worldKnown = this.config.contains(worldName);
+        boolean bukkitWorldExists = Bukkit.getWorld(worldName)!=null;
+        boolean worldKnown = this.config.contains(worldName);
         if( !bukkitWorldExists ) {
             return false;
         }
@@ -188,42 +199,44 @@ public class Worlds {
 
     public Integer updateWorldSetting(World world, String setting, String value){
         String worldName = world.getName();
-        if(!config.getConfigurationSection(worldName).contains(setting)) {
+        ConfigurationSection worldSection = config.getConfigurationSection(worldName);
+        Objects.requireNonNull(worldSection);
+        if(!worldSection.contains(setting)) {
             return -1;
         }
 
-        if(config.getConfigurationSection(worldName).isString(setting)) {
-            config.getConfigurationSection(worldName).set(setting,value);
+        if(worldSection.isString(setting)) {
+            worldSection.set(setting,value);
         }
-        else if(config.getConfigurationSection(worldName).isInt(setting)) {
-            Integer num;
+        else if(worldSection.isInt(setting)) {
+            int num;
             try {
-                num = Integer.valueOf(value);
+                num = Integer.parseInt(value);
             }
             catch (Exception exception) {
                 return -3;
             }
-            config.getConfigurationSection(worldName).set(setting,num);
+            worldSection.set(setting,num);
         }
-        else if(config.getConfigurationSection(worldName).isDouble(setting)) {
-            Double num;
+        else if(worldSection.isDouble(setting)) {
+            double num;
             try {
-                num = Double.valueOf(value);
+                num = Double.parseDouble(value);
             }
             catch (Exception exception) {
                 return -3;
             }
-            config.getConfigurationSection(worldName).set(setting,num);
+            worldSection.set(setting,num);
         }
-        else if(config.getConfigurationSection(worldName).isBoolean(setting)) {
-            Boolean num;
+        else if(worldSection.isBoolean(setting)) {
+            boolean num;
             try {
-                num = Boolean.valueOf(value);
+                num = Boolean.parseBoolean(value);
             }
             catch (Exception exception) {
                 return -3;
             }
-            config.getConfigurationSection(worldName).set(setting,num);
+            worldSection.set(setting,num);
         }
         return 0;
     }

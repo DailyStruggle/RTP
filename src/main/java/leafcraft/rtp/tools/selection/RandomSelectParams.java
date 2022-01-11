@@ -27,6 +27,7 @@ public class RandomSelectParams {
         worldName = configs.worlds.worldPlaceholder2Name(worldName);
         if(!configs.worlds.checkWorldExists(worldName)) worldName = world.getName();
         world = Bukkit.getWorld(worldName);
+        Objects.requireNonNull(world);
 
         String defaultRegion = (String)configs.worlds.getWorldSetting(world.getName(),"region","default");
         String regionName = params.getOrDefault("region",defaultRegion);
@@ -34,6 +35,7 @@ public class RandomSelectParams {
         String targetWorldName = (String)configs.regions.getRegionSetting(regionName,"world",world.getName());
         if(configs.worlds.checkWorldExists(targetWorldName)) {
             world = Bukkit.getWorld(targetWorldName);
+            Objects.requireNonNull(world);
             worldName = targetWorldName;
         }
 
@@ -42,7 +44,7 @@ public class RandomSelectParams {
         worldBorderOverride = Boolean.getBoolean(this.params.getOrDefault("worldBorderOverride","false"));
         if(worldBorderOverride) {
             this.params.put("shape", "SQUARE");
-            this.params.put("radius", String.valueOf((int)world.getWorldBorder().getSize()/16));
+            this.params.put("radius", String.valueOf((int)(world.getWorldBorder().getSize()/16)));
             this.params.put("centerX", String.valueOf(world.getWorldBorder().getCenter().getBlockX()));
             this.params.put("centerZ", String.valueOf(world.getWorldBorder().getCenter().getBlockZ()));
         }
@@ -82,8 +84,7 @@ public class RandomSelectParams {
     public boolean equals(Object o) {
         if(this == o) return true;
         if(o == null) return false;
-        if(o instanceof RandomSelectParams) {
-            RandomSelectParams that = (RandomSelectParams) o;
+        if(o instanceof RandomSelectParams that) {
             if(this.worldID != that.worldID) return false;
             if(this.shape != that.shape) return false;
             if(this.r != that.r) return false;
@@ -120,9 +121,11 @@ public class RandomSelectParams {
 
     @Override
     public String toString() {
+        World world = Bukkit.getWorld(worldID);
+        Objects.requireNonNull(world);
         return "RandomSelectParams{" +
                 "shape=" + shape +
-                ", world=" + Bukkit.getWorld(worldID).getName() +
+                ", world=" + world.getName() +
                 ", r=" + r +
                 ", cr=" + cr +
                 ", cx=" + cx +

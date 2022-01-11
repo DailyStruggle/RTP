@@ -4,7 +4,6 @@ import leafcraft.rtp.API.customEvents.TeleportCancelEvent;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tasks.QueueLocation;
 import leafcraft.rtp.tools.Cache;
-import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Bukkit;
@@ -22,12 +21,10 @@ import java.util.Set;
 //set up a location for respawn event
 public final class OnPlayerDeath implements Listener {
     private final RTP plugin;
-    private final Configs configs;
     private final Cache cache;
 
     public OnPlayerDeath() {
         this.plugin = RTP.getPlugin();
-        this.configs = RTP.getConfigs();
         this.cache = RTP.getCache();
     }
 

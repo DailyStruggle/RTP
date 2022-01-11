@@ -34,12 +34,10 @@ public class HashableChunk {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null) return false;
-        if(o instanceof Chunk) {
-            Chunk that = (Chunk) o;
+        if(o instanceof Chunk that) {
             return (x == that.getX()) && (z == that.getZ()) && (worldUID.equals(that.getWorld().getUID()));
         }
-        else if(o instanceof HashableChunk) {
-            HashableChunk that = (HashableChunk) o;
+        else if(o instanceof HashableChunk that) {
             return (x == that.x) && (z == that.z) && (worldUID.equals(that.worldUID));
         }
         return false;

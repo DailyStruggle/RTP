@@ -683,6 +683,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                             PaperLib.getChunkAtAsync(Objects.requireNonNull(location.getWorld()), xz[0], xz[1], true);
                     chunkSet.chunks.add(idx, cfChunk);
                     cfChunk.whenCompleteAsync((chunk, throwable) -> {
+                        if(chunk == null) return;
                         try {
                             chunkSet.completedGuard.acquire();
                             chunkSet.completed.incrementAndGet();
@@ -1151,28 +1152,25 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
             start = System.nanoTime();
             Chunk chunk;
             switch (state) {
-                case SYNC: {
-                    if(preCheckLocation(res)) {
+                case SYNC -> {
+                    if (preCheckLocation(res)) {
                         chunk = res.getChunk();
-                    }
-                    else continue;
-                    break;
+                    } else continue;
                 }
-                case ASYNC:
-                case ASYNC_URGENT:  {
+                case ASYNC, ASYNC_URGENT -> {
                     CompletableFuture<Chunk> cfChunk = (urgent) ?
-                            PaperLib.getChunkAtAsyncUrgently(world,xzChunk[0],xzChunk[1],true) :
-                            PaperLib.getChunkAtAsync(world,xzChunk[0],xzChunk[1],true);
-                    HashableChunk hashableChunk = new HashableChunk(world,xzChunk[0],xzChunk[1]);
-                    currChunks.put(hashableChunk,cfChunk);
+                            PaperLib.getChunkAtAsyncUrgently(world, xzChunk[0], xzChunk[1], true) :
+                            PaperLib.getChunkAtAsync(world, xzChunk[0], xzChunk[1], true);
+                    HashableChunk hashableChunk = new HashableChunk(world, xzChunk[0], xzChunk[1]);
+                    currChunks.put(hashableChunk, cfChunk);
 
-                    if(!preCheckLocation(res)) {
+                    if (!preCheckLocation(res)) {
                         cfChunk.cancel(true);
                         continue;
                     }
 
                     try {
-                        chunk = cfChunk.get(20,TimeUnit.SECONDS); //wait on chunk load/gen
+                        chunk = cfChunk.get(20, TimeUnit.SECONDS); //wait on chunk load/gen
                     } catch (ExecutionException e) {
                         e.printStackTrace();
                         return null;
@@ -1180,9 +1178,8 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                         return null;
                     }
                     currChunks.remove(hashableChunk);
-                    break;
                 }
-                default: throw new IllegalStateException("Unexpected value: " + state);
+                default -> throw new IllegalStateException("Unexpected value: " + state);
             }
 
             res = chunk.getBlock(7,0,7).getLocation();
@@ -1472,11 +1469,12 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         Configs configs = RTP.getConfigs();
         if(y >= maxY) return false;
 //        if(!material.isSolid()) return false;
-        Material material1 = chunk.getBlock(7,y,7).getType();
-        Material material2 = chunk.getBlock(7,y+1,7).getType();
+        Block block1 = chunk.getBlock(7,y,7);
+        Block block2 = chunk.getBlock(7,y+1,7);
+        Material material2 = block2.getType();
         if(material2.isSolid()) return false;
-        if(configs.config.unsafeBlocks.contains(material1)) return false;
-        if(configs.config.unsafeBlocks.contains(material2)) return false;
+        if(configs.config.isUnsafe(block1)) return false;
+        if(configs.config.isUnsafe(block2)) return false;
         Location location = new Location(world, chunk.getX()*16+7,y, chunk.getZ()*16+7);
         if(configs.config.rerollWorldGuard && WorldGuardChecker.isInClaim(location)) return false;
         if(configs.config.rerollGriefPrevention && GriefPreventionChecker.isInClaim(location)) return false;
@@ -1494,11 +1492,10 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         }
 
         int safetyRadius = configs.config.safetyRadius;
-        Set<Material> unsafeBlocks = configs.config.unsafeBlocks;
         for(int i = 7-safetyRadius; i <= 7+safetyRadius; i++) {
             for(int j = 7-safetyRadius; j <= 7+safetyRadius; j++) {
-                if(unsafeBlocks.contains(chunk.getBlock(7,y,7).getType())) return false;
-                if(unsafeBlocks.contains(chunk.getBlock(7,y+1,7).getType())) return false;
+                if(configs.config.isUnsafe(chunk.getBlock(7,y,7))) return false;
+                if(configs.config.isUnsafe(chunk.getBlock(7,y+1,7))) return false;
             }
         }
         return true;

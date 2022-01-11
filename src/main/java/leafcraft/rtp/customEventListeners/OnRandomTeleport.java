@@ -119,7 +119,7 @@ public final class OnRandomTeleport implements Listener {
             for(int j = 7-configs.config.platformRadius; j <= 7+configs.config.platformRadius; j++) {
                 for(int y = location.getBlockY()-1; y >= location.getBlockY()-configs.config.platformDepth; y--) {
                     Block block = chunk.getBlock(i,y,j);
-                    if(!block.getType().isSolid() || configs.config.unsafeBlocks.contains(block.getType()))
+                    if(!block.getType().isSolid() || configs.config.isUnsafe(block))
                         block.setType(solid,false);
                 }
                 for(int y = location.getBlockY()+configs.config.platformAirHeight-1; y >= location.getBlockY(); y--) {
