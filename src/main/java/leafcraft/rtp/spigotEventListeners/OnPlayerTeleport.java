@@ -13,6 +13,8 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerTeleportEvent;
 
+import java.util.Objects;
+
 public final class OnPlayerTeleport implements Listener {
     private final Configs configs;
     private final Cache cache;
@@ -36,7 +38,8 @@ public final class OnPlayerTeleport implements Listener {
 
         //don't stop teleporting if there isn't supposed to be a delay
         Location location = this.cache.playerFromLocations.getOrDefault(player.getUniqueId(), player.getLocation());
-        double distance = (event.getTo().getWorld().getUID().equals(event.getFrom().getWorld().getUID()))
+        double distance = (Objects.requireNonNull(Objects.requireNonNull(event.getTo()).getWorld()).getUID()
+                .equals(Objects.requireNonNull(event.getFrom().getWorld()).getUID()))
                 ? location.distance(event.getTo()) : Double.MAX_VALUE;
         if (distance < (double) configs.config.cancelDistance) return;
 

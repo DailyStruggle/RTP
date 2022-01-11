@@ -42,8 +42,12 @@ unsafeBlocks:
   - MAGMA_BLOCK
   - TNT
   - LAVA
-  - WATER
   - FIRE
+  - WATER
+  - SEAGRASS
+  - TALL_SEAGRASS
+  - BUBBLE_COLUMN
+  - WATERLOGGED
 
 #switch between blacklist/whitelist
 biomeWhitelist: false

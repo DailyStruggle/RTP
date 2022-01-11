@@ -4,7 +4,6 @@ import leafcraft.rtp.API.customEvents.RandomPreTeleportEvent;
 import leafcraft.rtp.API.customEvents.RandomTeleportEvent;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
-import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.selection.ChunkSet;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -14,7 +13,6 @@ import org.bukkit.scheduler.BukkitRunnable;
 
 public class DoTeleport extends BukkitRunnable {
     private final RTP plugin;
-    private final Configs configs;
     private final CommandSender sender;
     private final Player player;
     private final Location location;
@@ -24,7 +22,6 @@ public class DoTeleport extends BukkitRunnable {
     public DoTeleport(CommandSender sender, Player player, Location location, ChunkSet chunkSet) {
         this.chunkSet = chunkSet;
         this.plugin = RTP.getPlugin();
-        this.configs = RTP.getConfigs();
         this.sender = sender;
         this.player = player;
         this.location = location;

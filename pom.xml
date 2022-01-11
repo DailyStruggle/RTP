@@ -6,7 +6,7 @@
 
     <groupId>io.github.dailystruggle</groupId>
     <artifactId>RTP</artifactId>
-    <version>1.3.20</version>
+    <version>1.3.21</version>
     <packaging>jar</packaging>
 
     <name>RTP</name>

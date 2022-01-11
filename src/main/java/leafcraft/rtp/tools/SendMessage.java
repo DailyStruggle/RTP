@@ -31,7 +31,8 @@ public class SendMessage {
         if(sender instanceof Player) sendMessage((Player) sender,message);
         else {
             message = format(Bukkit.getOfflinePlayer(serverId),message);
-            sender.sendMessage(message);
+            BaseComponent[] components = TextComponent.fromLegacyText(message);
+            sender.spigot().sendMessage(components);
         }
     }
 

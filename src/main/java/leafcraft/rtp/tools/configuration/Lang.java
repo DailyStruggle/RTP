@@ -40,29 +40,17 @@ public class Lang {
     public String getLog(String key, String placeholder) {
         String msg = this.getLog(key);
 
-        String replace;
-        switch (key) {
-            case "oldFile": replace = "[filename]"; break;
-            case "newWorld":
-            case "invalidWorld":
-            case "noGlobalPerms": replace = "[worldName]"; break;
-            case "cooldownMessage":
-            case "delayMessage": replace = "[time]"; break;
-            case "unsafe":
-            case "teleportMessage": replace =  "[numAttempts]"; break;
-            case "badArg":
-            case "noPerms": replace = "[arg]"; break;
-            case "notEnoughMoney": replace = "[money]"; break;
-            case "fillStart":
-            case "fillCancel":
-            case "fillNotRunning":
-            case "fillStatus":
-            case "fillPause":
-            case "fillResume":
-            case "fillRunning": replace = "[region]"; break;
-            case "queueUpdate": replace = "[num]"; break;
-            default: replace = "[placeholder]"; break;
-        }
+        String replace = switch (key) {
+            case "oldFile" -> "[filename]";
+            case "newWorld", "invalidWorld", "noGlobalPerms" -> "[worldName]";
+            case "cooldownMessage", "delayMessage" -> "[time]";
+            case "unsafe", "teleportMessage" -> "[numAttempts]";
+            case "badArg", "noPerms" -> "[arg]";
+            case "notEnoughMoney" -> "[money]";
+            case "fillStart", "fillCancel", "fillNotRunning", "fillStatus", "fillPause", "fillResume", "fillRunning" -> "[region]";
+            case "queueUpdate" -> "[num]";
+            default -> "[placeholder]";
+        };
 
         return msg.replace(replace, placeholder);
     }

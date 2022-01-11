@@ -5,6 +5,9 @@ import net.md_5.bungee.api.ChatColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.block.Biome;
+import org.bukkit.block.Block;
+import org.bukkit.block.data.BlockData;
+import org.bukkit.block.data.Waterlogged;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 
@@ -35,7 +38,8 @@ public class Config {
 	public final int safetyRadius, platformRadius, platformAirHeight, platformDepth;
 
 	public final Material platformMaterial;
-	public final Set<Material> unsafeBlocks = new HashSet<>();
+	private final Set<Material> unsafeBlocks = new HashSet<>();
+	private boolean checkWaterlogged = false;
 
 	public final int blindnessDuration;
 
@@ -117,7 +121,8 @@ public class Config {
 		this.platformMaterial = Material.getMaterial(Objects.requireNonNull(config.getString("platformMaterial", "SMOOTH_STONE")));
 
 		for(String material : config.getStringList("unsafeBlocks")) {
-			unsafeBlocks.add(Material.getMaterial(material));
+			if(material.equalsIgnoreCase("WATERLOGGED")) checkWaterlogged = true;
+			else unsafeBlocks.add(Material.getMaterial(material));
 		}
 
 		this.blindnessDuration = config.getInt("blindnessDuration",0);
@@ -229,5 +234,15 @@ public class Config {
 
 	public List<String> getPlayerCommands() {
 		return config.getStringList("playerCommands");
+	}
+
+	public boolean isUnsafe(Block block) {
+		if(unsafeBlocks.contains(block.getType())) return true;
+		if(		checkWaterlogged
+				&& block.getBlockData() instanceof Waterlogged
+				&& ((Waterlogged) block.getBlockData()).isWaterlogged()){
+			return true;
+		}
+		return false;
 	}
 }

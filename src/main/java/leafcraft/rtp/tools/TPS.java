@@ -3,9 +3,8 @@ package leafcraft.rtp.tools;
 public class TPS implements Runnable{
         public static int TICK_COUNT= 0;
         public static long[] TICKS= new long[600];
-        public static long LAST_TICK= 0L;
 
-        public static double getTPS()
+    public static double getTPS()
         {
             return getTPS(100);
         }

@@ -126,7 +126,6 @@ public final class RTP extends JavaPlugin {
 
         Bukkit.getServer().getScheduler().scheduleSyncRepeatingTask(this, new TPS(), 100L, 1L);
 
-        VaultChecker.setupChat();
         VaultChecker.setupEconomy();
         VaultChecker.setupPermissions();
 
@@ -243,99 +242,101 @@ public final class RTP extends JavaPlugin {
 
     private static void initDefaultCommands() {
         //load rtp commands and permission nodes into map
-        subCommands.setSubParam("world","rtp.world", SubCommand.ParamType.WORLD);
-        subCommands.setSubParam("region","rtp.region", SubCommand.ParamType.REGION);
-        subCommands.setSubParam("player","rtp.other", SubCommand.ParamType.PLAYER);
-        subCommands.setSubParam("shape","rtp.world", SubCommand.ParamType.SHAPE);
-        subCommands.setSubParam("radius","rtp.params", SubCommand.ParamType.NONE);
-        subCommands.setSubParam("centerRadius","rtp.params", SubCommand.ParamType.NONE);
-        subCommands.setSubParam("centerX","rtp.params",SubCommand.ParamType.NONE);
-        subCommands.setSubParam("centerZ","rtp.params",SubCommand.ParamType.NONE);
-        subCommands.setSubParam("weight","rtp.params",SubCommand.ParamType.NONE);
-        subCommands.setSubParam("minY","rtp.params",SubCommand.ParamType.COORDINATE);
-        subCommands.setSubParam("maxY","rtp.params",SubCommand.ParamType.COORDINATE);
-        subCommands.setSubParam("requireSkyLight","rtp.params",SubCommand.ParamType.BOOLEAN);
-        subCommands.setSubParam("worldBorderOverride","rtp.params",SubCommand.ParamType.BOOLEAN);
-        subCommands.setSubParam("biome","rtp.biome",SubCommand.ParamType.BIOME);
-        subCommands.setSubParam("near","rtp.near",SubCommand.ParamType.PLAYER);
+        subCommands.setSubParam("world", "rtp.world", SubCommand.ParamType.WORLD);
+        subCommands.setSubParam("region", "rtp.region", SubCommand.ParamType.REGION);
+        subCommands.setSubParam("player", "rtp.other", SubCommand.ParamType.PLAYER);
+        subCommands.setSubParam("shape", "rtp.world", SubCommand.ParamType.SHAPE);
+        subCommands.setSubParam("radius", "rtp.params", SubCommand.ParamType.NONE);
+        subCommands.setSubParam("centerRadius", "rtp.params", SubCommand.ParamType.NONE);
+        subCommands.setSubParam("centerX", "rtp.params", SubCommand.ParamType.NONE);
+        subCommands.setSubParam("centerZ", "rtp.params", SubCommand.ParamType.NONE);
+        subCommands.setSubParam("weight", "rtp.params", SubCommand.ParamType.NONE);
+        subCommands.setSubParam("minY", "rtp.params", SubCommand.ParamType.COORDINATE);
+        subCommands.setSubParam("maxY", "rtp.params", SubCommand.ParamType.COORDINATE);
+        subCommands.setSubParam("requireSkyLight", "rtp.params", SubCommand.ParamType.BOOLEAN);
+        subCommands.setSubParam("worldBorderOverride", "rtp.params", SubCommand.ParamType.BOOLEAN);
+        subCommands.setSubParam("biome", "rtp.biome", SubCommand.ParamType.BIOME);
+        subCommands.setSubParam("near", "rtp.near", SubCommand.ParamType.PLAYER);
 
-        subCommands.setSubCommand("help",new SubCommandImpl("rtp.see", new Help()));
-        subCommands.setSubCommand("reload",new SubCommandImpl("rtp.reload", new Reload()));
-        subCommands.setSubCommand("setRegion",new SubCommandImpl("rtp.setRegion", new SetRegion()));
-        subCommands.setSubCommand("setWorld",new SubCommandImpl("rtp.setWorld", new SetWorld()));
-        subCommands.setSubCommand("fill",new SubCommandImpl("rtp.fill", new Fill()));
-        subCommands.setSubCommand("info",new SubCommandImpl("rtp.info", new Info()));
+        subCommands.setSubCommand("help", new SubCommandImpl("rtp.see", new Help()));
+        subCommands.setSubCommand("reload", new SubCommandImpl("rtp.reload", new Reload()));
+        subCommands.setSubCommand("setRegion", new SubCommandImpl("rtp.setRegion", new SetRegion()));
+        subCommands.setSubCommand("setWorld", new SubCommandImpl("rtp.setWorld", new SetWorld()));
+        subCommands.setSubCommand("fill", new SubCommandImpl("rtp.fill", new Fill()));
+        subCommands.setSubCommand("info", new SubCommandImpl("rtp.info", new Info()));
 
         SubCommandImpl setRegion = (SubCommandImpl) Objects.requireNonNull(subCommands.getSubCommand("setRegion"));
-        setRegion.setSubParam("region","rtp.setRegion",SubCommand.ParamType.REGION);
-        setRegion.setSubParam("world","rtp.setRegion",SubCommand.ParamType.WORLD);
-        setRegion.setSubParam("shape","rtp.setRegion",SubCommand.ParamType.SHAPE);
-        setRegion.setSubParam("mode","rtp.setRegion",SubCommand.ParamType.MODE);
-        setRegion.setSubParam("radius","rtp.setRegion",SubCommand.ParamType.NONE);
-        setRegion.setSubParam("centerRadius","rtp.setRegion",SubCommand.ParamType.NONE);
-        setRegion.setSubParam("centerX","rtp.setRegion",SubCommand.ParamType.COORDINATE);
-        setRegion.setSubParam("centerZ","rtp.setRegion",SubCommand.ParamType.COORDINATE);
-        setRegion.setSubParam("weight","rtp.setRegion",SubCommand.ParamType.NONE);
-        setRegion.setSubParam("minY","rtp.setRegion",SubCommand.ParamType.COORDINATE);
-        setRegion.setSubParam("maxY","rtp.setRegion",SubCommand.ParamType.COORDINATE);
-        setRegion.setSubParam("requireSkyLight","rtp.setRegion",SubCommand.ParamType.BOOLEAN);
-        setRegion.setSubParam("requirePermission","rtp.setRegion",SubCommand.ParamType.BOOLEAN);
-        setRegion.setSubParam("worldBorderOverride","rtp.setRegion",SubCommand.ParamType.BOOLEAN);
-        setRegion.setSubParam("uniquePlacements","rtp.setRegion",SubCommand.ParamType.BOOLEAN);
-        setRegion.setSubParam("expand","rtp.setRegion",SubCommand.ParamType.BOOLEAN);
-        setRegion.setSubParam("queueLen","rtp.setRegion",SubCommand.ParamType.NONE);
-        setRegion.setSubParam("price","rtp.setRegion",SubCommand.ParamType.NONE);
+        setRegion.setSubParam("region", "rtp.setRegion", SubCommand.ParamType.REGION);
+        setRegion.setSubParam("world", "rtp.setRegion", SubCommand.ParamType.WORLD);
+        setRegion.setSubParam("shape", "rtp.setRegion", SubCommand.ParamType.SHAPE);
+        setRegion.setSubParam("mode", "rtp.setRegion", SubCommand.ParamType.MODE);
+        setRegion.setSubParam("radius", "rtp.setRegion", SubCommand.ParamType.NONE);
+        setRegion.setSubParam("centerRadius", "rtp.setRegion", SubCommand.ParamType.NONE);
+        setRegion.setSubParam("centerX", "rtp.setRegion", SubCommand.ParamType.COORDINATE);
+        setRegion.setSubParam("centerZ", "rtp.setRegion", SubCommand.ParamType.COORDINATE);
+        setRegion.setSubParam("weight", "rtp.setRegion", SubCommand.ParamType.NONE);
+        setRegion.setSubParam("minY", "rtp.setRegion", SubCommand.ParamType.COORDINATE);
+        setRegion.setSubParam("maxY", "rtp.setRegion", SubCommand.ParamType.COORDINATE);
+        setRegion.setSubParam("requireSkyLight", "rtp.setRegion", SubCommand.ParamType.BOOLEAN);
+        setRegion.setSubParam("requirePermission", "rtp.setRegion", SubCommand.ParamType.BOOLEAN);
+        setRegion.setSubParam("worldBorderOverride", "rtp.setRegion", SubCommand.ParamType.BOOLEAN);
+        setRegion.setSubParam("uniquePlacements", "rtp.setRegion", SubCommand.ParamType.BOOLEAN);
+        setRegion.setSubParam("expand", "rtp.setRegion", SubCommand.ParamType.BOOLEAN);
+        setRegion.setSubParam("queueLen", "rtp.setRegion", SubCommand.ParamType.NONE);
+        setRegion.setSubParam("price", "rtp.setRegion", SubCommand.ParamType.NONE);
 
         SubCommandImpl setWorld = (SubCommandImpl) Objects.requireNonNull(subCommands.getSubCommand("setWorld"));
-        setWorld.setSubParam("world","rtp.setWorld", SubCommand.ParamType.WORLD);
-        setWorld.setSubParam("name","rtp.setWorld",SubCommand.ParamType.NONE);
-        setWorld.setSubParam("region","rtp.setWorld",SubCommand.ParamType.REGION);
-        setWorld.setSubParam("override","rtp.setWorld",SubCommand.ParamType.WORLD);
+        setWorld.setSubParam("world", "rtp.setWorld", SubCommand.ParamType.WORLD);
+        setWorld.setSubParam("name", "rtp.setWorld", SubCommand.ParamType.NONE);
+        setWorld.setSubParam("region", "rtp.setWorld", SubCommand.ParamType.REGION);
+        setWorld.setSubParam("override", "rtp.setWorld", SubCommand.ParamType.WORLD);
 
         SubCommandImpl fill = (SubCommandImpl) Objects.requireNonNull(subCommands.getSubCommand("fill"));
-        fill.setSubParam("region","rtp.fill",SubCommand.ParamType.REGION);
-        fill.setSubCommand("start",new SubCommandImpl("rtp.fill",null)); // null because this is handled by Fill
-        Objects.requireNonNull(fill.getSubCommand("start")).setSubParam("region","rtp.fill",SubCommand.ParamType.REGION);
-        fill.setSubCommand("cancel",new SubCommandImpl("rtp.fill", null));
-        Objects.requireNonNull(fill.getSubCommand("cancel")).setSubParam("region","rtp.fill",SubCommand.ParamType.REGION);
-        fill.setSubCommand("pause",new SubCommandImpl("rtp.fill", null));
-        Objects.requireNonNull(fill.getSubCommand("pause")).setSubParam("region","rtp.fill",SubCommand.ParamType.REGION);
-        fill.setSubCommand("resume",new SubCommandImpl("rtp.fill", null));
-        Objects.requireNonNull(fill.getSubCommand("resume")).setSubParam("region","rtp.fill",SubCommand.ParamType.REGION);
+        fill.setSubParam("region", "rtp.fill", SubCommand.ParamType.REGION);
+        fill.setSubCommand("start", new SubCommandImpl("rtp.fill", null)); // null because this is handled by Fill
+        Objects.requireNonNull(fill.getSubCommand("start")).setSubParam("region", "rtp.fill", SubCommand.ParamType.REGION);
+        fill.setSubCommand("cancel", new SubCommandImpl("rtp.fill", null));
+        Objects.requireNonNull(fill.getSubCommand("cancel")).setSubParam("region", "rtp.fill", SubCommand.ParamType.REGION);
+        fill.setSubCommand("pause", new SubCommandImpl("rtp.fill", null));
+        Objects.requireNonNull(fill.getSubCommand("pause")).setSubParam("region", "rtp.fill", SubCommand.ParamType.REGION);
+        fill.setSubCommand("resume", new SubCommandImpl("rtp.fill", null));
+        Objects.requireNonNull(fill.getSubCommand("resume")).setSubParam("region", "rtp.fill", SubCommand.ParamType.REGION);
 
         SubCommandImpl info = (SubCommandImpl) Objects.requireNonNull(subCommands.getSubCommand("info"));
-        info.setSubParam("region","rtp.info",SubCommand.ParamType.REGION);
-        info.setSubParam("world","rtp.info",SubCommand.ParamType.WORLD);
+        info.setSubParam("region", "rtp.info", SubCommand.ParamType.REGION);
+        info.setSubParam("world", "rtp.info", SubCommand.ParamType.WORLD);
 
-        Bukkit.getScheduler().runTaskAsynchronously(RTP.getPlugin(),()->{
-            //adding 600+ sounds takes too long at startup
-            Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.command.sound"));
-            Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.teleport.sound"));
-            Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.preTeleport.sound"));
+        if (configs.config.effectParsing) {
+            Bukkit.getScheduler().runTaskAsynchronously(RTP.getPlugin(), () -> {
+                //adding 600+ sounds takes too long at startup
+                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.command.sound"));
+                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.teleport.sound"));
+                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.preTeleport.sound"));
 
-            for(FireworkEffect.Type type : FireworkEffect.Type.values()) {
-                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.command.firework." + type.name()));
-                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.teleport.firework." + type.name()));
-                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.preTeleport.firework." + type.name()));
-            }
+                for (FireworkEffect.Type type : FireworkEffect.Type.values()) {
+                    Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.command.firework." + type.name()));
+                    Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.teleport.firework." + type.name()));
+                    Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.preTeleport.firework." + type.name()));
+                }
 
-            for(Instrument instrument : Instrument.values()) {
-                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.command.note." + instrument.name()));
-                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.teleport.note." + instrument.name()));
-                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.preTeleport.note." + instrument.name()));
-            }
+                for (Instrument instrument : Instrument.values()) {
+                    Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.command.note." + instrument.name()));
+                    Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.teleport.note." + instrument.name()));
+                    Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.preTeleport.note." + instrument.name()));
+                }
 
-            for(Particle particle : Particle.values()) {
-                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.command.particle." + particle.name()));
-                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.teleport.particle." + particle.name()));
-                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.preTeleport.particle." + particle.name()));
-            }
+                for (Particle particle : Particle.values()) {
+                    Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.command.particle." + particle.name()));
+                    Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.teleport.particle." + particle.name()));
+                    Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.preTeleport.particle." + particle.name()));
+                }
 
-            for(PotionEffectType effect : PotionEffectType.values()) {
-                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.command.potion." + effect.getName()));
-                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.teleport.potion." + effect.getName()));
-                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.preTeleport.potion." + effect.getName()));
-            }
-        });
+                for (PotionEffectType effect : PotionEffectType.values()) {
+                    Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.command.potion." + effect.getName()));
+                    Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.teleport.potion." + effect.getName()));
+                    Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.preTeleport.potion." + effect.getName()));
+                }
+            });
+        }
     }
 }

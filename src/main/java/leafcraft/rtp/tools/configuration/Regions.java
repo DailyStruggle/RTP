@@ -18,12 +18,10 @@ import java.util.*;
 
 public class Regions {
     private final RTP plugin;
-    private final Lang lang;
     private FileConfiguration config;
 
     public Regions(RTP plugin, Lang lang) {
         this.plugin = plugin;
-        this.lang = lang;
 
         File f = new File(plugin.getDataFolder(), "regions.yml");
         if(!f.exists())
@@ -42,34 +40,41 @@ public class Regions {
     }
 
     public void setRegion(String name, RandomSelectParams params) {
-        String worldName = Bukkit.getWorld(params.worldID).getName();
+        World world = Bukkit.getWorld(params.worldID);
+        String worldName = Objects.requireNonNull(world).getName();
 
         ConfigurationSection section = (config.contains(name)) ? config.getConfigurationSection(name) : config.createSection(name);
+        Objects.requireNonNull(section);
+
+        ConfigurationSection defaultSection = config.getConfigurationSection("default");
+        Objects.requireNonNull(defaultSection);
+
         section.set("world","\""+worldName+"\"");
         section.set("shape","\""+params.shape.toString()+"\"");
-        section.set("mode",params.params.getOrDefault("mode",config.getConfigurationSection("default").getString("mode","ACCUMULATE")));
+        section.set("mode",params.params.getOrDefault("mode",defaultSection.getString("mode","ACCUMULATE")));
         section.set("radius",params.r);
         section.set("centerRadius",params.cr);
         section.set("centerX",params.cx);
         section.set("centerZ",params.cz);
-        section.set("weight",Double.valueOf(params.params.getOrDefault("weight",Double.toString(config.getConfigurationSection("default").getDouble("weight",1.0)))));
+        section.set("weight",Double.valueOf(params.params.getOrDefault("weight",Double.toString(defaultSection.getDouble("weight",1.0)))));
         section.set("minY",params.minY);
         section.set("maxY",params.maxY);
         section.set("requireSkyLight",params.requireSkyLight);
-        section.set("requirePermission",Boolean.valueOf(params.params.getOrDefault("requirePermission",Boolean.toString(config.getConfigurationSection("default").getBoolean("requirePermission",true)))));
+        section.set("requirePermission",Boolean.valueOf(params.params.getOrDefault("requirePermission",Boolean.toString(defaultSection.getBoolean("requirePermission",true)))));
         section.set("worldBorderOverride",params.worldBorderOverride);
         section.set("uniquePlacements",params.uniquePlacements);
         section.set("expand",params.expand);
-        section.set("queueLen",Integer.valueOf(params.params.getOrDefault("queueLen",Integer.toString(config.getConfigurationSection("default").getInt("queueLen",0)))));
-        section.set("price",Double.valueOf(params.params.getOrDefault("price",Double.toString(config.getConfigurationSection("default").getDouble("price",0)))));
+        section.set("queueLen",Integer.valueOf(params.params.getOrDefault("queueLen",Integer.toString(defaultSection.getInt("queueLen",0)))));
+        section.set("price",Double.valueOf(params.params.getOrDefault("price",Double.toString(defaultSection.getDouble("price",0)))));
     }
 
     public Integer updateRegionSetting(String regionName, String setting, String value){
-        if(!config.getConfigurationSection(regionName).contains(setting)) {
+        ConfigurationSection regionSection = config.getConfigurationSection(regionName);
+        if(regionSection == null || !regionSection.contains(setting)) {
             return -1;
         }
 
-        if(config.getConfigurationSection(regionName).isString(setting)) {
+        if(regionSection.isString(setting)) {
             boolean goodEnum = false;
             try {
                 TeleportRegion.Shapes.valueOf(value.toUpperCase(Locale.ROOT));
@@ -88,38 +93,38 @@ public class Regions {
             }
 
             if(goodEnum || (Bukkit.getWorld(value) != null))
-                config.getConfigurationSection(regionName).set(setting,value);
+                regionSection.set(setting,value);
             else return -2;
         }
-        else if(config.getConfigurationSection(regionName).isInt(setting)) {
-            Integer num;
+        else if(regionSection.isInt(setting)) {
+            int num;
             try {
-                num = Integer.valueOf(value);
+                num = Integer.parseInt(value);
             }
             catch (Exception exception) {
                 return -3;
             }
-            config.getConfigurationSection(regionName).set(setting,num);
+            regionSection.set(setting,num);
         }
-        else if(config.getConfigurationSection(regionName).isDouble(setting)) {
-            Double num;
+        else if(regionSection.isDouble(setting)) {
+            double num;
             try {
-                num = Double.valueOf(value);
+                num = Double.parseDouble(value);
             }
             catch (Exception exception) {
                 return -3;
             }
-            config.getConfigurationSection(regionName).set(setting,num);
+            regionSection.set(setting,num);
         }
-        else if(config.getConfigurationSection(regionName).isBoolean(setting)) {
-            Boolean num;
+        else if(regionSection.isBoolean(setting)) {
+            boolean num;
             try {
-                num = Boolean.valueOf(value);
+                num = Boolean.parseBoolean(value);
             }
             catch (Exception exception) {
                 return -3;
             }
-            config.getConfigurationSection(regionName).set(setting,num);
+            regionSection.set(setting,num);
         }
         return 0;
     }
@@ -129,23 +134,27 @@ public class Regions {
 
         ArrayList<String> linesInRegions = new ArrayList<>();
 
-        String  defaultWorld = config.getConfigurationSection("default").getString("world", "world");
-        String  defaultShape = config.getConfigurationSection("default").getString("shape", "SQUARE");
-        String  defaultMode = config.getConfigurationSection("default").getString("mode", "ACCUMULATE");
-        Integer defaultRadius = config.getConfigurationSection("default").getInt("radius", 4096);
-        Integer defaultCenterRadius = config.getConfigurationSection("default").getInt("centerRadius", 1024);
-        Integer defaultCenterX = config.getConfigurationSection("default").getInt("centerX", 0);
-        Integer defaultCenterZ = config.getConfigurationSection("default").getInt("centerZ", 0);
-        Double  defaultWeight = config.getConfigurationSection("default").getDouble("weight", 1.0);
-        Integer defaultMinY = config.getConfigurationSection("default").getInt("minY", 48);
-        Integer defaultMaxY = config.getConfigurationSection("default").getInt("maxY", 96);
-        Boolean defaultRequireSkylight = config.getConfigurationSection("default").getBoolean("requireSkyLight", true);
-        Boolean defaultRequirePermission = config.getConfigurationSection("default").getBoolean("requirePermission",true);
-        Boolean defaultWorldBorderOverride = config.getConfigurationSection("default").getBoolean("worldBorderOverride",false);
-        Boolean defaultUniquePlacements = config.getConfigurationSection("default").getBoolean("uniquePlacements",true);
-        Boolean defaultExpand = config.getConfigurationSection("default").getBoolean("expand",false);
-        Integer defaultQueueLen = config.getConfigurationSection("default").getInt("queueLen", 10);
-        Double defaultPrice = config.getConfigurationSection("default").getDouble("price", 50.0);
+        ConfigurationSection defaultSection = config.getConfigurationSection("default");
+
+        Objects.requireNonNull(defaultSection);
+
+        String  defaultWorld = defaultSection.getString("world", "world");
+        String  defaultShape = defaultSection.getString("shape", "SQUARE");
+        String  defaultMode = defaultSection.getString("mode", "ACCUMULATE");
+        int defaultRadius = defaultSection.getInt("radius", 4096);
+        int defaultCenterRadius = defaultSection.getInt("centerRadius", 1024);
+        int defaultCenterX = defaultSection.getInt("centerX", 0);
+        int defaultCenterZ = defaultSection.getInt("centerZ", 0);
+        double defaultWeight = defaultSection.getDouble("weight", 1.0);
+        int defaultMinY = defaultSection.getInt("minY", 48);
+        int defaultMaxY = defaultSection.getInt("maxY", 96);
+        boolean defaultRequireSkylight = defaultSection.getBoolean("requireSkyLight", true);
+        boolean defaultRequirePermission = defaultSection.getBoolean("requirePermission",true);
+        boolean defaultWorldBorderOverride = defaultSection.getBoolean("worldBorderOverride",false);
+        boolean defaultUniquePlacements = defaultSection.getBoolean("uniquePlacements",true);
+        boolean defaultExpand = defaultSection.getBoolean("expand",false);
+        int defaultQueueLen = defaultSection.getInt("queueLen", 10);
+        double defaultPrice = defaultSection.getDouble("price", 50.0);
 
         try {
             Scanner scanner = new Scanner(
@@ -164,6 +173,7 @@ public class Regions {
                         if(regions.contains(regionName)) continue;
 
                         ConfigurationSection regionSection = config.getConfigurationSection(regionName);
+                        Objects.requireNonNull(regionSection);
 
                         linesInRegions.add(regionName + ":");
                         linesInRegions.add("    world: \"" + regionSection.getString("world",defaultWorld) + "\"");
@@ -186,40 +196,42 @@ public class Regions {
                     }
                 }
                 else { //if not a blank line
+                    ConfigurationSection regionSection = config.getConfigurationSection(region);
+                    Objects.requireNonNull(regionSection);
                     if(s.startsWith("    world:"))
-                        s = "    world: " + quotes + config.getConfigurationSection(region).getString("world",defaultWorld) + quotes;
+                        s = "    world: " + quotes + regionSection.getString("world",defaultWorld) + quotes;
                     else if(s.startsWith("    shape:"))
-                        s = "    shape: " + quotes + config.getConfigurationSection(region).getString("shape",defaultShape) + quotes;
+                        s = "    shape: " + quotes + regionSection.getString("shape",defaultShape) + quotes;
                     else if(s.startsWith("    mode:"))
-                        s = "    mode: " + quotes + config.getConfigurationSection(region).getString("mode",defaultMode) + quotes;
+                        s = "    mode: " + quotes + regionSection.getString("mode",defaultMode) + quotes;
                     else if(s.startsWith("    radius:"))
-                        s = "    radius: " + config.getConfigurationSection(region).getInt("radius",defaultRadius);
+                        s = "    radius: " + regionSection.getInt("radius",defaultRadius);
                     else if(s.startsWith("    centerRadius:"))
-                        s = "    centerRadius: " + config.getConfigurationSection(region).getInt("centerRadius",defaultCenterRadius);
+                        s = "    centerRadius: " + regionSection.getInt("centerRadius",defaultCenterRadius);
                     else if(s.startsWith("    centerX:"))
-                        s = "    centerX: " + config.getConfigurationSection(region).getInt("centerX",defaultCenterX);
+                        s = "    centerX: " + regionSection.getInt("centerX",defaultCenterX);
                     else if(s.startsWith("    centerZ:"))
-                        s = "    centerZ: " + config.getConfigurationSection(region).getInt("centerZ",defaultCenterZ);
+                        s = "    centerZ: " + regionSection.getInt("centerZ",defaultCenterZ);
                     else if(s.startsWith("    weight:"))
-                        s = "    weight: " + config.getConfigurationSection(region).getDouble("weight",defaultWeight);
+                        s = "    weight: " + regionSection.getDouble("weight",defaultWeight);
                     else if(s.startsWith("    minY:"))
-                        s = "    minY: " + config.getConfigurationSection(region).getInt("minY",defaultMinY);
+                        s = "    minY: " + regionSection.getInt("minY",defaultMinY);
                     else if(s.startsWith("    maxY:"))
-                        s = "    maxY: " + config.getConfigurationSection(region).getInt("maxY", defaultMaxY);
+                        s = "    maxY: " + regionSection.getInt("maxY", defaultMaxY);
                     else if(s.startsWith("    requireSkyLight:"))
-                        s = "    requireSkyLight: " + config.getConfigurationSection(region).getBoolean("requireSkyLight", defaultRequireSkylight);
+                        s = "    requireSkyLight: " + regionSection.getBoolean("requireSkyLight", defaultRequireSkylight);
                     else if(s.startsWith("    requirePermission:"))
-                        s = "    requirePermission: " + config.getConfigurationSection(region).getBoolean("requirePermission",defaultRequirePermission);
+                        s = "    requirePermission: " + regionSection.getBoolean("requirePermission",defaultRequirePermission);
                     else if(s.startsWith("    worldBorderOverride:"))
-                        s = "    worldBorderOverride: " + config.getConfigurationSection(region).getBoolean("worldBorderOverride",defaultWorldBorderOverride);
+                        s = "    worldBorderOverride: " + regionSection.getBoolean("worldBorderOverride",defaultWorldBorderOverride);
                     else if(s.startsWith("    uniquePlacements:"))
-                        s = "    uniquePlacements: " + config.getConfigurationSection(region).getBoolean("uniquePlacements",defaultRequirePermission);
+                        s = "    uniquePlacements: " + regionSection.getBoolean("uniquePlacements",defaultRequirePermission);
                     else if(s.startsWith("    expand:"))
-                        s = "    expand: " + config.getConfigurationSection(region).getBoolean("expand",defaultWorldBorderOverride);
+                        s = "    expand: " + regionSection.getBoolean("expand",defaultWorldBorderOverride);
                     else if(s.startsWith("    queueLen:"))
-                        s = "    queueLen: " + config.getConfigurationSection(region).getInt("queueLen",defaultQueueLen);
+                        s = "    queueLen: " + regionSection.getInt("queueLen",defaultQueueLen);
                     else if(s.startsWith("    price:"))
-                        s = "    price: " + config.getConfigurationSection(region).getDouble("price",defaultPrice);
+                        s = "    price: " + regionSection.getDouble("price",defaultPrice);
                     else if(!s.startsWith("#") && !s.startsWith("  ") && !s.startsWith("version") && (s.matches(".*[a-z].*") || s.matches(".*[A-Z].*")))
                     {
                         region = s.replace(":","");
@@ -236,7 +248,7 @@ public class Regions {
         }
 
         FileWriter fw;
-        String[] linesArray = linesInRegions.toArray(new String[linesInRegions.size()]);
+        String[] linesArray = linesInRegions.toArray(new String[0]);
         try {
             fw = new FileWriter(plugin.getDataFolder().getAbsolutePath() + File.separator + "regions.yml");
             for (String s : linesArray) {
@@ -254,7 +266,9 @@ public class Regions {
 
     public Object getRegionSetting(String region, String name, Object def) {
         if(!config.contains(region)) return def;
-        Object res = config.getConfigurationSection(region).get(name,def);
+        ConfigurationSection regionSection = config.getConfigurationSection(region);
+        Objects.requireNonNull(regionSection);
+        Object res = regionSection.get(name,def);
         //TODO: optimize search and replace
         if(res instanceof String u && u.contains("[")) {
             List<World> worlds = Bukkit.getWorlds();
