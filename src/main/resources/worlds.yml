@@ -6,7 +6,7 @@ default:
     #which region to use by default, when no region is specified
     region: default
     #check rtp.worlds.[world] node on command
-    requirePermission: true
+    requirePermission: false
     #if no perm for this world, use this world, by name
     # placeholder: [num] - world index according to bukkit, 0 is usually a main world
     override: [0]

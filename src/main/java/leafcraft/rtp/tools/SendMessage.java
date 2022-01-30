@@ -1,5 +1,6 @@
 package leafcraft.rtp.tools;
 
+import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.softdepends.PAPIChecker;
 import net.md_5.bungee.api.ChatColor;
 import net.md_5.bungee.api.chat.BaseComponent;
@@ -17,6 +18,9 @@ import java.util.regex.Pattern;
 
 public class SendMessage {
     private static final UUID serverId = new UUID(0,0);
+
+    private static Pattern hexColorPattern1 = Pattern.compile("(&?#[0-9a-fA-F]{6})");
+    private static Pattern hexColorPattern2 = Pattern.compile("(&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F])");
 
     public static void sendMessage(CommandSender sender, Player player, String message) {
         if(message.equals("")) return;
@@ -79,18 +83,31 @@ public class SendMessage {
     }
 
     private static String Hex2Color(String text) {
-        Pattern pattern = Pattern.compile("(&?#[0-9a-fA-F]{6})");
-        Matcher matcher = pattern.matcher(text);
-        while (matcher.find()) {
-            String hexColor = text.substring(matcher.start(), matcher.end());
-            hexColor = hexColor.replace("&", "");
-            StringBuilder bukkitColorCode = new StringBuilder('\u00A7' + "x");
-            for (int i = 1; i < hexColor.length(); i++) {
-                bukkitColorCode.append('\u00A7').append(hexColor.charAt(i));
+        //reduce patterns
+        Matcher matcher2 = hexColorPattern2.matcher(text);
+        while (matcher2.find()) {
+            String hexColor = text.substring(matcher2.start(), matcher2.end());
+            String shortColor = "#" + hexColor.replaceAll("&","");
+            text = text.replaceAll(hexColor, shortColor);
+        }
+
+        //colorize
+        Matcher matcher1 = hexColorPattern1.matcher(text);
+        while (matcher1.find()) {
+            String hexColor = text.substring(matcher1.start(), matcher1.end());
+            String bukkitColor;
+            if(RTP.getServerIntVersion() < 16) {
+                StringBuilder bukkitColorCode = new StringBuilder('\u00A7' + "x");
+                for (int i = hexColor.indexOf('#')+1; i < hexColor.length(); i++) {
+                    bukkitColorCode.append('\u00A7').append(hexColor.charAt(i));
+                }
+                bukkitColor = bukkitColorCode.toString().toLowerCase();
             }
-            String bukkitColor = bukkitColorCode.toString().toLowerCase();
+            else {
+                bukkitColor = ChatColor.of(hexColor.substring(hexColor.indexOf('#'))).toString();
+            }
             text = text.replaceAll(hexColor, bukkitColor);
-            matcher.reset(text);
+            matcher1.reset(text);
         }
         return text;
     }
