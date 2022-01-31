@@ -26,9 +26,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.invoke.MethodHandle;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
+import java.util.logging.Level;
 
 /**
  * A Random Teleportation Spigot/Paper plugin, optimized for operators
@@ -307,36 +306,56 @@ public final class RTP extends JavaPlugin {
         info.setSubParam("world", "rtp.info", SubCommand.ParamType.WORLD);
 
         if (configs.config.effectParsing) {
-            Bukkit.getScheduler().runTaskAsynchronously(RTP.getPlugin(), () -> {
+            Bukkit.getScheduler().runTaskLaterAsynchronously(RTP.getPlugin(), () -> {
+                List<Permission> permissionList = new ArrayList<>();
+                
                 //adding 600+ sounds takes too long at startup
-                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.command.sound"));
-                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.teleport.sound"));
-                Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.preTeleport.sound"));
+                try {
+                    permissionList.add(new Permission("rtp.effect.command.sound"));
+                    permissionList.add(new Permission("rtp.effect.teleport.sound"));
+                    permissionList.add(new Permission("rtp.effect.preTeleport.sound"));
 
-                for (FireworkEffect.Type type : FireworkEffect.Type.values()) {
-                    Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.command.firework." + type.name()));
-                    Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.teleport.firework." + type.name()));
-                    Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.preTeleport.firework." + type.name()));
+                    for (FireworkEffect.Type type : FireworkEffect.Type.values()) {
+                        permissionList.add(new Permission("rtp.effect.command.firework." + type.name()));
+                        permissionList.add(new Permission("rtp.effect.teleport.firework." + type.name()));
+                        permissionList.add(new Permission("rtp.effect.preTeleport.firework." + type.name()));
+                    }
+
+                    for (Instrument instrument : Instrument.values()) {
+                        permissionList.add(new Permission("rtp.effect.command.note." + instrument.name()));
+                        permissionList.add(new Permission("rtp.effect.teleport.note." + instrument.name()));
+                        permissionList.add(new Permission("rtp.effect.preTeleport.note." + instrument.name()));
+                    }
+
+                    for (Particle particle : Particle.values()) {
+                        permissionList.add(new Permission("rtp.effect.command.particle." + particle.name()));
+                        permissionList.add(new Permission("rtp.effect.teleport.particle." + particle.name()));
+                        permissionList.add(new Permission("rtp.effect.preTeleport.particle." + particle.name()));
+                    }
+
+                    for (PotionEffectType effect : PotionEffectType.values()) {
+                        permissionList.add(new Permission("rtp.effect.command.potion." + effect.getName()));
+                        permissionList.add(new Permission("rtp.effect.teleport.potion." + effect.getName()));
+                        permissionList.add(new Permission("rtp.effect.preTeleport.potion." + effect.getName()));
+                    }
+                }
+                catch (NullPointerException | IllegalArgumentException permissionException) {
+                    Bukkit.getLogger().log(Level.WARNING,"[RTP] - failed to initialize effect permissions. This will not affect gameplay.");
+                    return;
                 }
 
-                for (Instrument instrument : Instrument.values()) {
-                    Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.command.note." + instrument.name()));
-                    Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.teleport.note." + instrument.name()));
-                    Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.preTeleport.note." + instrument.name()));
+                try {
+                    for(Permission permission : permissionList) {
+                        Bukkit.getPluginManager().addPermission(permission);
+                    }
+                }
+                catch (NullPointerException | IllegalArgumentException  permissionException) {
+                    Bukkit.getLogger().log(Level.WARNING,"[RTP] - failed to initialize effect permissions. This will not affect gameplay.");
+                    return;
                 }
 
-                for (Particle particle : Particle.values()) {
-                    Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.command.particle." + particle.name()));
-                    Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.teleport.particle." + particle.name()));
-                    Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.preTeleport.particle." + particle.name()));
-                }
-
-                for (PotionEffectType effect : PotionEffectType.values()) {
-                    Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.command.potion." + effect.getName()));
-                    Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.teleport.potion." + effect.getName()));
-                    Bukkit.getPluginManager().addPermission(new Permission("rtp.effect.preTeleport.potion." + effect.getName()));
-                }
-            });
+                permissionList.clear();
+            },40);
         }
     }
 }
