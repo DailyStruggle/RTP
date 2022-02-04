@@ -1,5 +1,6 @@
 package leafcraft.rtp.tasks;
 
+import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Location;
@@ -17,6 +18,7 @@ public class QueueLocation extends BukkitRunnable {
     private Player player = null;
     private Location location = null;
     private final Cache cache;
+    private boolean cancelled;
 
     public QueueLocation(TeleportRegion region, Cache cache) {
         this.region = region;
@@ -80,5 +82,15 @@ public class QueueLocation extends BukkitRunnable {
             region.queueRandomLocation(player);
         }
         this.cache.queueLocationTasks.remove(idx);
+    }
+
+    @Override
+    public void cancel() {
+        cancelled = true;
+    }
+
+    @Override
+    public boolean isCancelled() {
+        return cancelled;
     }
 }

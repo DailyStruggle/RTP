@@ -65,15 +65,18 @@ public class Worlds {
         int defaultNearMinY = defaultSection.getInt("nearMinY",48);
         int defaultNearMaxY = defaultSection.getInt("nearMaxY",127);
 
-        for(World w : Bukkit.getWorlds()) {
-            String permName = "rtp.worlds." + w.getName();
-            if(Bukkit.getPluginManager().getPermission(permName) == null) {
-                Permission permission = new Permission(permName);
-                permission.setDefault(PermissionDefault.OP);
-                permission.addParent("rtp.worlds.*",true);
-                Bukkit.getPluginManager().addPermission(permission);
+        Bukkit.getScheduler().runTaskLater(RTP.getPlugin(),()->{
+            for(World w : Bukkit.getWorlds()) {
+                String permName = "rtp.worlds." + w.getName();
+                if(Bukkit.getPluginManager().getPermission(permName) == null) {
+                    Permission permission = new Permission(permName);
+                    permission.setDefault(PermissionDefault.OP);
+                    permission.addParent("rtp.worlds.*",true);
+                    Bukkit.getPluginManager().addPermission(permission);
+                }
             }
-        }
+        },1000);
+
 
         try {
             Scanner scanner = new Scanner(

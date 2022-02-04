@@ -37,7 +37,7 @@ public class Config {
 
 	public final int safetyRadius, platformRadius, platformAirHeight, platformDepth;
 
-	public final Material platformMaterial;
+	public Material platformMaterial;
 	private final Set<Material> unsafeBlocks = new HashSet<>();
 	private boolean checkWaterlogged = false;
 
@@ -119,6 +119,7 @@ public class Config {
 		this.platformAirHeight = config.getInt("platformAirHeight", 2);
 		this.platformDepth = config.getInt("platformDepth", 1);
 		this.platformMaterial = Material.getMaterial(Objects.requireNonNull(config.getString("platformMaterial", "SMOOTH_STONE")));
+		if(this.platformMaterial == null) this.platformMaterial = Material.getMaterial("COBBLESTONE");
 
 		for(String material : config.getStringList("unsafeBlocks")) {
 			if(material.equalsIgnoreCase("WATERLOGGED")) checkWaterlogged = true;
@@ -238,9 +239,10 @@ public class Config {
 
 	public boolean isUnsafe(Block block) {
 		if(unsafeBlocks.contains(block.getType())) return true;
-		if(		checkWaterlogged
+		if (checkWaterlogged
+				&& RTP.getServerIntVersion() > 12
 				&& block.getBlockData() instanceof Waterlogged
-				&& ((Waterlogged) block.getBlockData()).isWaterlogged()){
+				&& ((Waterlogged) block.getBlockData()).isWaterlogged()) {
 			return true;
 		}
 		return false;
