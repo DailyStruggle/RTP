@@ -1158,26 +1158,50 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                     } else continue;
                 }
                 case ASYNC, ASYNC_URGENT -> {
-                    CompletableFuture<Chunk> cfChunk = (urgent) ?
-                            PaperLib.getChunkAtAsyncUrgently(world, xzChunk[0], xzChunk[1], true) :
-                            PaperLib.getChunkAtAsync(world, xzChunk[0], xzChunk[1], true);
-                    HashableChunk hashableChunk = new HashableChunk(world, xzChunk[0], xzChunk[1]);
-                    currChunks.put(hashableChunk, cfChunk);
+                    if(RTP.getServerIntVersion() > 8) {
+                        CompletableFuture<Chunk>cfChunk = (urgent) ?
+                                PaperLib.getChunkAtAsyncUrgently(world, xzChunk[0], xzChunk[1], true) :
+                                PaperLib.getChunkAtAsync(world, xzChunk[0], xzChunk[1], true);
 
-                    if (!preCheckLocation(res)) {
-                        cfChunk.cancel(true);
-                        continue;
-                    }
+                        HashableChunk hashableChunk = new HashableChunk(world, xzChunk[0], xzChunk[1]);
+                        currChunks.put(hashableChunk, cfChunk);
 
-                    try {
-                        chunk = cfChunk.get(20, TimeUnit.SECONDS); //wait on chunk load/gen
-                    } catch (ExecutionException e) {
-                        e.printStackTrace();
-                        return null;
-                    } catch (InterruptedException | CancellationException | StackOverflowError | TimeoutException e) {
-                        return null;
+                        if (!preCheckLocation(res)) {
+                            cfChunk.cancel(true);
+                            continue;
+                        }
+
+                        try {
+                            chunk = cfChunk.get(20, TimeUnit.SECONDS); //wait on chunk load/gen
+                        } catch (ExecutionException e) {
+                            e.printStackTrace();
+                            return null;
+                        } catch (InterruptedException | CancellationException | StackOverflowError | TimeoutException e) {
+                            return null;
+                        }
+                        currChunks.remove(hashableChunk);
                     }
-                    currChunks.remove(hashableChunk);
+                    else {
+                        Location finalRes = res;
+                        Future<Chunk> fChunk = Bukkit.getScheduler().callSyncMethod(RTP.getPlugin(),()-> finalRes.getChunk());
+
+                        HashableChunk hashableChunk = new HashableChunk(world, xzChunk[0], xzChunk[1]);
+
+                        if (!preCheckLocation(res)) {
+                            fChunk.cancel(true);
+                            continue;
+                        }
+
+                        try {
+                            chunk = fChunk.get(20, TimeUnit.SECONDS); //wait on chunk load/gen
+                        } catch (ExecutionException e) {
+                            e.printStackTrace();
+                            return null;
+                        } catch (InterruptedException | CancellationException | StackOverflowError | TimeoutException e) {
+                            return null;
+                        }
+                        currChunks.remove(hashableChunk);
+                    }
                 }
                 default -> throw new IllegalStateException("Unexpected value: " + state);
             }

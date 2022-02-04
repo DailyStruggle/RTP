@@ -203,10 +203,15 @@ public class OnEvent implements Listener {
         cache.lastTeleportTime.put(player.getUniqueId(),System.nanoTime());
         setupTeleport = new SetupTeleport(player, player, new RandomSelectParams(player.getWorld(),null));
 
-        switch (syncState) {
-            case SYNC -> setupTeleport.setupTeleportNow(SyncState.SYNC);
-            case ASYNC -> setupTeleport.runTaskLaterAsynchronously(RTP.getPlugin(),1);
-            case ASYNC_URGENT -> setupTeleport.runTaskAsynchronously(RTP.getPlugin());
+        if(RTP.getServerIntVersion()>8) {
+            switch (syncState) {
+                case SYNC -> setupTeleport.setupTeleportNow(SyncState.SYNC);
+                case ASYNC -> setupTeleport.runTaskLaterAsynchronously(RTP.getPlugin(), 1);
+                case ASYNC_URGENT -> setupTeleport.runTaskAsynchronously(RTP.getPlugin());
+            }
+        }
+        else {
+            setupTeleport.setupTeleportNow(SyncState.SYNC);
         }
     }
 }

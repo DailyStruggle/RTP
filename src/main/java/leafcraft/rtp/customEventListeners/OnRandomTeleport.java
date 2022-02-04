@@ -42,7 +42,7 @@ public final class OnRandomTeleport implements Listener {
         player.teleport(event.getTo());
         if(configs.config.blindnessDuration>0)
             player.addPotionEffect(PotionEffectType.BLINDNESS.createEffect(configs.config.blindnessDuration,100));
-        if(!configs.config.title.equals("")) {
+        if(RTP.getServerIntVersion()>=11 && !configs.config.title.equals("")) {
             Bukkit.getScheduler().runTaskLater(plugin,()->{
                 String title = SendMessage.format(player,configs.config.title);
                 String subtitle = SendMessage.format(player,configs.config.subTitle);
@@ -82,7 +82,7 @@ public final class OnRandomTeleport implements Listener {
             }
         }
 
-        if(!player.isInvulnerable() && configs.config.invulnerabilityTime>0) {
+        if(configs.config.invulnerabilityTime>0) {
             cache.invulnerablePlayers.add(player.getUniqueId());
             Bukkit.getScheduler().runTaskLater(plugin, () -> cache.invulnerablePlayers.remove(player.getUniqueId()),configs.config.invulnerabilityTime*20L);
         }
@@ -119,8 +119,18 @@ public final class OnRandomTeleport implements Listener {
             for(int j = 7-configs.config.platformRadius; j <= 7+configs.config.platformRadius; j++) {
                 for(int y = location.getBlockY()-1; y >= location.getBlockY()-configs.config.platformDepth; y--) {
                     Block block = chunk.getBlock(i,y,j);
-                    if(!block.getType().isSolid() || configs.config.isUnsafe(block))
-                        block.setType(solid,false);
+
+                    boolean isSolid;
+                    try {
+                        isSolid = block.getType().isSolid();
+                    }
+                    catch (NullPointerException exception) {
+                        isSolid = false;
+                    }
+
+                    if(!isSolid || configs.config.isUnsafe(block)) {
+                        block.setType(solid, false);
+                    }
                 }
                 for(int y = location.getBlockY()+configs.config.platformAirHeight-1; y >= location.getBlockY(); y--) {
                     Block block = chunk.getBlock(i,y,j);

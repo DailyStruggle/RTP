@@ -283,7 +283,7 @@ public class TeleportEffects implements Listener {
                         fwm.setPower((int)firework[2]);
                         f.setFireworkMeta(fwm);
                         if(fwm.getPower() == 0) {
-                            if (player.isInvulnerable()) {
+                            if (RTP.getCache().invulnerablePlayers.contains(player.getUniqueId())) {
                                 f.detonate();
                             } else {
                                 RTP.getCache().invulnerablePlayers.add(player.getUniqueId());

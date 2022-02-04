@@ -327,10 +327,12 @@ public final class RTP extends JavaPlugin {
                         permissionList.add(new Permission("rtp.effect.preTeleport.note." + instrument.name()));
                     }
 
-                    for (Particle particle : Particle.values()) {
-                        permissionList.add(new Permission("rtp.effect.command.particle." + particle.name()));
-                        permissionList.add(new Permission("rtp.effect.teleport.particle." + particle.name()));
-                        permissionList.add(new Permission("rtp.effect.preTeleport.particle." + particle.name()));
+                    if(RTP.getServerIntVersion() > 8) {
+                        for (Particle particle : Particle.values()) {
+                            permissionList.add(new Permission("rtp.effect.command.particle." + particle.name()));
+                            permissionList.add(new Permission("rtp.effect.teleport.particle." + particle.name()));
+                            permissionList.add(new Permission("rtp.effect.preTeleport.particle." + particle.name()));
+                        }
                     }
 
                     for (PotionEffectType effect : PotionEffectType.values()) {

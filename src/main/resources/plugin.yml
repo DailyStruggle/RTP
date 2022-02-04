@@ -44,30 +44,6 @@ commands:
 #      /rtp fill
 
 permissions:
-  rtp.*:
-    description: access all rtp subcommands
-    default: op
-    children:
-      rtp.see: true
-      rtp.use: true
-      rtp.reload: true
-      rtp.noCooldown: true
-      rtp.noDelay: true
-      rtp.noDelay.chunks: true
-      rtp.other: true
-      rtp.notme: true
-      rtp.world: true
-      rtp.worlds.*: true
-      rtp.region: true
-      rtp.regions.*: true
-      rtp.setWorld: true
-      rtp.setRegion: true
-      rtp.params: true
-      rtp.near: true
-      rtp.near.other: true
-      rtp.near.random: true
-      rtp.biome: true
-      rtp.biome.*: true
   rtp.see:
     description: allow player to tab for rtp commands
     default: true
@@ -110,38 +86,33 @@ permissions:
   rtp.worlds.*:
     description: allow player to teleport to any world from any world
     default: op
+    children:
+      rtp.world: true
   rtp.region:
     description: allow player to specify any region they have permission for
     default: op
   rtp.regions.*:
     description: allow player to teleport to any region
     default: op
+    children:
+      rtp.region: true
   rtp.setWorld:
     description: allow player to update rtp settings for each world
     default: op
   rtp.setRegion:
     description: allow player to update rtp settings for each region
     default: op
+  rtp.unqueued:
+    description: if no locations are queued, generate a new location
+    default: op
   rtp.params:
     description: allow player to use custom parameters for their teleport
     default: op
     children:
       rtp.unqueued: true
-  rtp.unqueued:
-    description: if no locations are queued, generate a new location
-    default: op
   rtp.personalQueue:
     description: reserve a next location for this player
     default: false
-  rtp.onevent.*:
-    description: inescapable chaos
-    default: false
-    children:
-      rtp.onevent.join: true
-      rtp.onevent.respawn: true
-      rtp.onevent.changeWorld: true
-      rtp.onevent.move: true
-      rtp.onevent.teleport: true
   rtp.onevent.join:
     description: randomly teleport player on every join
     default: false
@@ -160,6 +131,15 @@ permissions:
   rtp.onevent.teleport:
     description: randomly teleport player on teleport, recursively
     default: false
+  rtp.onevent.*:
+    description: inescapable chaos
+    default: false
+    children:
+      rtp.onevent.join: true
+      rtp.onevent.respawn: true
+      rtp.onevent.changeWorld: true
+      rtp.onevent.move: true
+      rtp.onevent.teleport: true
   rtp.near:
     description: randomly teleport around your current position
     default: op
@@ -193,3 +173,27 @@ permissions:
   rtp.info:
     description: see plugin info and settings
     default: op
+  rtp.*:
+    description: access all rtp subcommands
+    default: op
+    children:
+      rtp.see: true
+      rtp.use: true
+      rtp.reload: true
+      rtp.noCooldown: true
+      rtp.noDelay: true
+      rtp.noDelay.chunks: true
+      rtp.other: true
+      rtp.notme: true
+      rtp.world: true
+      rtp.worlds.*: true
+      rtp.region: true
+      rtp.regions.*: true
+      rtp.setWorld: true
+      rtp.setRegion: true
+      rtp.params: true
+      rtp.near: true
+      rtp.near.other: true
+      rtp.near.random: true
+      rtp.biome: true
+      rtp.biome.*: true

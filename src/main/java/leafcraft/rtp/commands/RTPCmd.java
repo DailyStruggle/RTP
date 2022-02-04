@@ -357,7 +357,8 @@ public class RTPCmd implements CommandExecutor {
                 && hasQueued
                 && sender.hasPermission("rtp.noDelay")
                 && !rsParams.params.containsKey("biome"))
-                || configs.config.syncLoading) {
+                || configs.config.syncLoading
+                || RTP.getServerIntVersion()<=8) {
             setupTeleport.setupTeleportNow(SyncState.SYNC);
         } else {
             setupTeleport.runTaskAsynchronously(plugin);
