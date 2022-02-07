@@ -13,7 +13,6 @@ import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
-import java.util.logging.Level;
 
 public class SetWorld implements CommandExecutor {
     private static final Set<String> worldParams = new HashSet<>();
@@ -88,13 +87,13 @@ public class SetWorld implements CommandExecutor {
                 SendMessage.sendMessage(sender,msg);
             }
         }
-        Bukkit.getLogger().log(Level.INFO,configs.lang.getLog("updatingWorlds"));
+        SendMessage.sendMessage(Bukkit.getConsoleSender(),configs.lang.getLog("updatingWorlds"));
         if(sender instanceof Player){
             String msg = configs.lang.getLog("updatingWorlds");
             SendMessage.sendMessage(sender,msg);
         }
         configs.worlds.update();
-        Bukkit.getLogger().log(Level.INFO,configs.lang.getLog("updatedWorlds"));
+        SendMessage.sendMessage(Bukkit.getConsoleSender(),configs.lang.getLog("updatedWorlds"));
         if(sender instanceof Player) {
             String msg = configs.lang.getLog("updatedWorlds");
             SendMessage.sendMessage(sender,msg);

@@ -1,6 +1,5 @@
 package leafcraft.rtp.tasks;
 
-import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Location;

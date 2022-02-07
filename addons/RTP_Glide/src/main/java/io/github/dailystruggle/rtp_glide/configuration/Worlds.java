@@ -33,7 +33,7 @@ public class Worlds {
         config = YamlConfiguration.loadConfiguration(f);
 
         if( 	(config.getDouble("version") < 1.0) ) {
-            Bukkit.getLogger().log(Level.WARNING, "[rtp_glide] old worlds.yml detected. Updating");
+            SendMessage.sendMessage(Bukkit.getConsoleSender(), "[rtp_glide] old worlds.yml detected. Updating");
             FileStuff.renameFiles(plugin,"worlds");
             config = YamlConfiguration.loadConfiguration(f);
         }
@@ -116,10 +116,10 @@ public class Worlds {
             return false;
         }
         else if( !worldKnown ) {
-            Bukkit.getLogger().log(Level.INFO,"[rtp_glide] detected a new world '" + worldName + "'");
-            Bukkit.getLogger().log(Level.INFO,"[rtp_glide] updating worlds configuration...");
+            SendMessage.sendMessage(Bukkit.getConsoleSender(),"[rtp_glide] detected a new world '" + worldName + "'");
+            SendMessage.sendMessage(Bukkit.getConsoleSender(),"[rtp_glide] updating worlds configuration...");
             update(); //not optimal but it works
-            Bukkit.getLogger().log(Level.INFO,"[rtp_glide] updated worlds configuration!");
+            SendMessage.sendMessage(Bukkit.getConsoleSender(),"[rtp_glide] updated worlds configuration!");
         }
         return true;
     }

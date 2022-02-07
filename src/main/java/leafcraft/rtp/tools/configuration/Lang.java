@@ -1,6 +1,7 @@
 package leafcraft.rtp.tools.configuration;
 
 import leafcraft.rtp.RTP;
+import leafcraft.rtp.tools.SendMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -11,7 +12,6 @@ import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.*;
-import java.util.logging.Level;
 
 public class Lang {
     private FileConfiguration config;
@@ -25,7 +25,7 @@ public class Lang {
         this.config = YamlConfiguration.loadConfiguration(f);
 
         if( 	(this.config.getDouble("version") < 2.2) ) {
-            Bukkit.getLogger().log(Level.WARNING, getLog("oldFile", "lang.yml"));
+            SendMessage.sendMessage(Bukkit.getConsoleSender(),getLog("oldFile", "lang.yml"));
             update(plugin);
 
             f = new File(plugin.getDataFolder(), "lang.yml");

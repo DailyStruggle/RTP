@@ -1,12 +1,12 @@
 package leafcraft.rtp.tools.configuration;
 
 import leafcraft.rtp.RTP;
+import leafcraft.rtp.tools.SendMessage;
 import net.md_5.bungee.api.ChatColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.block.Biome;
 import org.bukkit.block.Block;
-import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.Waterlogged;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -16,7 +16,6 @@ import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.*;
-import java.util.logging.Level;
 
 public class Config {
 	private final RTP plugin;
@@ -25,7 +24,7 @@ public class Config {
 	public final int teleportDelay, cancelDistance, teleportCooldown, maxAttempts, queuePeriod, minTPS, vd;
 	public final double price;
 	public final boolean rerollWorldGuard, rerollGriefDefender, rerollGriefPrevention, rerollTownyAdvanced,
-			rerollHuskTowns, rerollFactions, rerollLands;
+			rerollHuskTowns, rerollFactions, rerollLands, rerollRedProtect;
 
 	public final boolean postTeleportQueueing;
 
@@ -71,8 +70,14 @@ public class Config {
 		}
 		this.config = YamlConfiguration.loadConfiguration(f);
 
-		if( 	(this.config.getDouble("version") < 2.9) ) {
-			Bukkit.getLogger().log(Level.WARNING, lang.getLog("oldFile", "config.yml"));
+		String versionStr = this.config.getString("version");
+
+		String[] versionArr = Objects.requireNonNull(versionStr).split("\\.");
+		int version1 = Integer.parseInt(versionArr[0]);
+		int version2 = Integer.parseInt(versionArr[1]);
+
+		if( (version1 < 2) || (version1==2 && version2 < 10) ) {
+			SendMessage.sendMessage(Bukkit.getConsoleSender(), lang.getLog("oldFile", "config.yml"));
 			update();
 
 			f = new File(this.plugin.getDataFolder(), "config.yml");
@@ -86,6 +91,7 @@ public class Config {
 		this.rerollHuskTowns = config.getBoolean("rerollHuskTowns",true);
 		this.rerollFactions = config.getBoolean("rerollFactions",true);
 		this.rerollLands = config.getBoolean("rerollLands",true);
+		this.rerollRedProtect = config.getBoolean("rerollRedProtect",true);
 
 		this.teleportDelay = 20*config.getInt("teleportDelay",2);
 		this.cancelDistance = config.getInt("cancelDistance",2);
@@ -181,7 +187,7 @@ public class Config {
 		for (String line : linesInDefaultConfig) {
 			StringBuilder newline = new StringBuilder(line);
 			if (line.startsWith("version:")) {
-				newline = new StringBuilder("version: 2.9");
+				newline = new StringBuilder("version: \"2.10\"");
 			}
 			else if(newline.toString().startsWith("  -")) continue;
 			else {
@@ -239,12 +245,9 @@ public class Config {
 
 	public boolean isUnsafe(Block block) {
 		if(unsafeBlocks.contains(block.getType())) return true;
-		if (checkWaterlogged
+		return checkWaterlogged
 				&& RTP.getServerIntVersion() > 12
 				&& block.getBlockData() instanceof Waterlogged
-				&& ((Waterlogged) block.getBlockData()).isWaterlogged()) {
-			return true;
-		}
-		return false;
+				&& ((Waterlogged) block.getBlockData()).isWaterlogged();
 	}
 }

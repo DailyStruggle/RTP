@@ -17,6 +17,7 @@ rerollGriefDefender: true
 rerollGriefPrevention: true
 rerollHuskTowns: true
 rerollLands: true
+rerollRedProtect: true
 rerollTownyAdvanced: true
 rerollWorldGuard: true
 
@@ -123,4 +124,4 @@ effectParsing: true
 timeit: false
 
 #DO NOT TOUCH VERSION NUMBER
-version: 2.9
+version: "2.10"

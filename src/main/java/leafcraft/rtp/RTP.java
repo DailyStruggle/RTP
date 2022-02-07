@@ -6,6 +6,7 @@ import leafcraft.rtp.commands.*;
 import leafcraft.rtp.customEventListeners.*;
 import leafcraft.rtp.spigotEventListeners.*;
 import leafcraft.rtp.tools.Cache;
+import leafcraft.rtp.tools.SendMessage;
 import leafcraft.rtp.tools.TPS;
 import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
@@ -27,7 +28,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.lang.invoke.MethodHandle;
 import java.util.*;
-import java.util.logging.Level;
 
 /**
  * A Random Teleportation Spigot/Paper plugin, optimized for operators
@@ -342,7 +342,7 @@ public final class RTP extends JavaPlugin {
                     }
                 }
                 catch (NullPointerException | IllegalArgumentException permissionException) {
-                    Bukkit.getLogger().log(Level.WARNING,"[RTP] - failed to initialize effect permissions. This will not affect gameplay.");
+                    SendMessage.sendMessage(Bukkit.getConsoleSender(),"[RTP] - failed to initialize effect permissions. This will not affect gameplay.");
                     return;
                 }
 
@@ -352,7 +352,7 @@ public final class RTP extends JavaPlugin {
                     }
                 }
                 catch (NullPointerException | IllegalArgumentException  permissionException) {
-                    Bukkit.getLogger().log(Level.WARNING,"[RTP] - failed to initialize effect permissions. This will not affect gameplay.");
+                    SendMessage.sendMessage(Bukkit.getConsoleSender(),"[RTP] - failed to initialize effect permissions. This will not affect gameplay.");
                     return;
                 }
 

@@ -5,6 +5,7 @@ import leafcraft.rtp.tools.HashableChunk;
 import org.bukkit.Chunk;
 
 import java.util.ArrayList;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -28,7 +29,14 @@ public class ChunkSet {
 
     public void shutDown() {
         for(CompletableFuture<Chunk> chunk : chunks) {
-            if(!chunk.isDone()) chunk.cancel(true);
+            if(!chunk.isDone()) {
+                try {
+                    chunk.cancel(true);
+                }
+                catch (CancellationException ignored) {
+
+                }
+            }
         }
     }
 }

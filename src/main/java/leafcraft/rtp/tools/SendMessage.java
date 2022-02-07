@@ -17,10 +17,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class SendMessage {
-    private static final UUID serverId = new UUID(0,0);
+    public static final UUID serverId = new UUID(0,0);
 
-    private static Pattern hexColorPattern1 = Pattern.compile("(&?#[0-9a-fA-F]{6})");
-    private static Pattern hexColorPattern2 = Pattern.compile("(&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F])");
+    private static final Pattern hexColorPattern1 = Pattern.compile("(&?#[0-9a-fA-F]{6})");
+    private static final Pattern hexColorPattern2 = Pattern.compile("(&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F])");
 
     public static void sendMessage(CommandSender sender, Player player, String message) {
         if(message.equals("")) return;
@@ -35,16 +35,22 @@ public class SendMessage {
         if(sender instanceof Player) sendMessage((Player) sender,message);
         else {
             message = format(Bukkit.getOfflinePlayer(serverId),message);
-            BaseComponent[] components = TextComponent.fromLegacyText(message);
-            sender.spigot().sendMessage(components);
+            if(RTP.getServerIntVersion() >=12) {
+                BaseComponent[] components = TextComponent.fromLegacyText(message);
+                sender.spigot().sendMessage(components);
+            }
+            else sender.sendMessage(message);
         }
     }
 
     public static void sendMessage(Player player, String message) {
         if(message.equals("")) return;
         message = format(player,message);
-        BaseComponent[] components = TextComponent.fromLegacyText(message);
-        player.spigot().sendMessage(components);
+        if(RTP.getServerIntVersion() >=12) {
+            BaseComponent[] components = TextComponent.fromLegacyText(message);
+            player.spigot().sendMessage(components);
+        }
+        else player.sendMessage(message);
     }
 
     public static void sendMessage(CommandSender sender, String message, String hover, String click) {
@@ -55,24 +61,28 @@ public class SendMessage {
         else player = Bukkit.getOfflinePlayer(serverId).getPlayer();
 
         message = format(player,message);
-        BaseComponent[] textComponents = TextComponent.fromLegacyText(message);
 
-        if(!hover.equals("")) {
-            BaseComponent[] hoverComponents = TextComponent.fromLegacyText(format(player,hover));
-            HoverEvent hoverEvent = new HoverEvent(HoverEvent.Action.SHOW_TEXT, hoverComponents);
-            for(BaseComponent component : textComponents) {
-                component.setHoverEvent(hoverEvent);
+        if(RTP.getServerIntVersion() >=12) {
+            BaseComponent[] textComponents = TextComponent.fromLegacyText(message);
+
+            if (!hover.equals("")) {
+                BaseComponent[] hoverComponents = TextComponent.fromLegacyText(format(player, hover));
+                HoverEvent hoverEvent = new HoverEvent(HoverEvent.Action.SHOW_TEXT, hoverComponents);
+                for (BaseComponent component : textComponents) {
+                    component.setHoverEvent(hoverEvent);
+                }
             }
-        }
 
-        if(!click.equals("") ) {
-            ClickEvent clickEvent = new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, click);
-            for(BaseComponent component : textComponents) {
-                component.setClickEvent(clickEvent);
+            if (!click.equals("")) {
+                ClickEvent clickEvent = new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, click);
+                for (BaseComponent component : textComponents) {
+                    component.setClickEvent(clickEvent);
+                }
             }
-        }
 
-        sender.spigot().sendMessage(textComponents);
+            sender.spigot().sendMessage(textComponents);
+        }
+        else sender.sendMessage(message);
     }
 
     public static String format(OfflinePlayer player, String text) {

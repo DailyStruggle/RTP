@@ -74,9 +74,9 @@
         <dependency>
             <groupId>io.github.dailystruggle</groupId>
             <artifactId>RTP</artifactId>
-            <version>1.3.21</version>
+            <version>1.3.23</version>
             <scope>system</scope>
-            <systemPath>${project.basedir}/../../target/RTP-1.3.21.jar</systemPath>
+            <systemPath>${project.basedir}/../../target/RTP-1.3.23.jar</systemPath>
         </dependency>
         <dependency>
             <groupId>org.popcraft</groupId>

@@ -3,6 +3,7 @@ package leafcraft.rtp.tools.configuration;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import leafcraft.rtp.RTP;
+import leafcraft.rtp.tools.SendMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
@@ -19,7 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Scanner;
-import java.util.logging.Level;
 
 public class Worlds {
     private final RTP plugin;
@@ -42,7 +42,7 @@ public class Worlds {
         config = YamlConfiguration.loadConfiguration(f);
 
         if( 	(config.getDouble("version") < 1.7) ) {
-            Bukkit.getLogger().log(Level.WARNING, lang.getLog("oldFile", "worlds.yml"));
+            SendMessage.sendMessage(Bukkit.getConsoleSender(), lang.getLog("oldFile", "worlds.yml"));
             FileStuff.renameFiles(plugin,"worlds");
             config = YamlConfiguration.loadConfiguration(f);
         }
@@ -192,10 +192,10 @@ public class Worlds {
             return false;
         }
         else if( !worldKnown ) {
-            Bukkit.getLogger().log(Level.INFO,lang.getLog("newWorld",worldName));
-            Bukkit.getLogger().log(Level.INFO,lang.getLog("updatingWorlds"));
+            SendMessage.sendMessage(Bukkit.getConsoleSender(),lang.getLog("newWorld",worldName));
+            SendMessage.sendMessage(Bukkit.getConsoleSender(),lang.getLog("updatingWorlds"));
             update(); //not optimal but it works
-            Bukkit.getLogger().log(Level.INFO,lang.getLog("updatedWorlds"));
+            SendMessage.sendMessage(Bukkit.getConsoleSender(),lang.getLog("updatedWorlds"));
         }
         return true;
     }
