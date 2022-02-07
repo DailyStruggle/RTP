@@ -1,13 +1,13 @@
 package leafcraft.rtp.tools.configuration;
 
 import leafcraft.rtp.RTP;
+import leafcraft.rtp.tools.SendMessage;
 import org.bukkit.Bukkit;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
-import java.util.logging.Level;
 
 public class FileStuff {
 
@@ -19,7 +19,7 @@ public class FileStuff {
             if(!file.exists()) break;
             toRename.add(file);
         }
-        //rename them top-down
+        //rename them top-down so as not to overwrite
         for(int i = toRename.size()-1; i >= 0; i--) {
             File oldFile = toRename.get(i);
             String fileName = oldFile.getName();
@@ -33,9 +33,11 @@ public class FileStuff {
                 e.printStackTrace();
             }
             boolean b = oldFile.getAbsoluteFile().renameTo(newFile.getAbsoluteFile());
-            if(!b) Bukkit.getLogger().log(Level.WARNING,
+            if(!b) SendMessage.sendMessage(Bukkit.getConsoleSender(),
                     "RTP - unable to rename file:" + oldFile.getAbsoluteFile());
         }
+
+        //rename the last one
         File oldFile = new File(plugin.getDataFolder().getAbsolutePath() + File.separator + name + ".yml");
         File newFile = new File(plugin.getDataFolder().getAbsolutePath() + File.separator + name + ".old1.yml");
         try {
@@ -44,7 +46,7 @@ public class FileStuff {
             e.printStackTrace();
         }
         boolean b = oldFile.getAbsoluteFile().renameTo(newFile.getAbsoluteFile());
-        if(!b) Bukkit.getLogger().log(Level.WARNING,
+        if(!b) SendMessage.sendMessage(Bukkit.getConsoleSender(),
                 "RTP - unable to rename file:" + oldFile.getAbsoluteFile());
 
         plugin.saveResource(name + ".yml", true);

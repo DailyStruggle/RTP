@@ -15,7 +15,6 @@ import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
-import java.util.logging.Level;
 
 public class SetRegion implements CommandExecutor {
     private static Configs configs = null;
@@ -194,13 +193,13 @@ public class SetRegion implements CommandExecutor {
             }
         }
 
-        Bukkit.getLogger().log(Level.INFO,configs.lang.getLog("updatingRegions"));
+        SendMessage.sendMessage(Bukkit.getConsoleSender(),configs.lang.getLog("updatingRegions"));
         if(sender instanceof Player){
             String msg = configs.lang.getLog("updatingRegions");
             SendMessage.sendMessage(sender,msg);
         }
         configs.regions.update();
-        Bukkit.getLogger().log(Level.INFO,configs.lang.getLog("updatedRegions"));
+        SendMessage.sendMessage(Bukkit.getConsoleSender(),configs.lang.getLog("updatedRegions"));
         if(sender instanceof Player){
             String msg = configs.lang.getLog("updatedRegions");
             SendMessage.sendMessage(sender,msg);

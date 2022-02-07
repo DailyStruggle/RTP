@@ -225,7 +225,14 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         public void cancel() {
             cancelled = true;
             for(CompletableFuture<Chunk> cfChunk : chunks) {
-                if(!cfChunk.isDone()) cfChunk.cancel(true);
+                if(!cfChunk.isDone()) {
+                    try {
+                        cfChunk.cancel(true);
+                    }
+                    catch (CancellationException ignored) {
+
+                    }
+                }
             }
             fillTask = null;
             storeFile();
@@ -514,7 +521,12 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         }
         for(CompletableFuture<Chunk> chunk : currChunks.values()) {
             if(!chunk.isDone()) {
-                chunk.cancel(true);
+                try {
+                    chunk.cancel(true);
+                }
+                catch (CancellationException ignored) {
+
+                }
             }
         }
         locAssChunks.clear();
@@ -1167,7 +1179,12 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                         currChunks.put(hashableChunk, cfChunk);
 
                         if (!preCheckLocation(res)) {
-                            cfChunk.cancel(true);
+                            try {
+                                cfChunk.cancel(true);
+                            }
+                            catch (CancellationException ignored) {
+
+                            }
                             continue;
                         }
 
@@ -1182,13 +1199,17 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                         currChunks.remove(hashableChunk);
                     }
                     else {
-                        Location finalRes = res;
-                        Future<Chunk> fChunk = Bukkit.getScheduler().callSyncMethod(RTP.getPlugin(),()-> finalRes.getChunk());
+                        Future<Chunk> fChunk = Bukkit.getScheduler().callSyncMethod(RTP.getPlugin(), res::getChunk);
 
                         HashableChunk hashableChunk = new HashableChunk(world, xzChunk[0], xzChunk[1]);
 
                         if (!preCheckLocation(res)) {
-                            fChunk.cancel(true);
+                            try {
+                                fChunk.cancel(true);
+                            }
+                            catch (CancellationException ignored) {
+
+                            }
                             continue;
                         }
 
@@ -1507,6 +1528,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         if(configs.config.rerollFactions && FactionsChecker.isInClaim(location)) return false;
         if(configs.config.rerollGriefDefender && GriefDefenderChecker.isInClaim(location)) return false;
         if(configs.config.rerollLands && LandsChecker.isInClaim(location)) return false;
+        if(configs.config.rerollRedProtect && RedProtectChecker.isInClaim(location)) return false;
         for(MethodHandle methodHandle : configs.locationChecks) {
             try {
                 if((boolean)methodHandle.invokeExact(location)) return false;
@@ -1534,6 +1556,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         if(configs.config.rerollFactions && FactionsChecker.isInClaim(location)) return false;
         if(configs.config.rerollGriefDefender && GriefDefenderChecker.isInClaim(location)) return false;
         if(configs.config.rerollLands && LandsChecker.isInClaim(location)) return false;
+        if(configs.config.rerollRedProtect && RedProtectChecker.isInClaim(location)) return false;
         for(MethodHandle methodHandle : configs.locationChecks) {
             try {
                 if((boolean)methodHandle.invokeExact(location)) return false;
