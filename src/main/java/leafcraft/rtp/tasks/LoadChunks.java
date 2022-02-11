@@ -21,6 +21,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
+@SuppressWarnings("unused")
 public class LoadChunks extends BukkitRunnable {
     public ChunkSet chunkSet;
     private final RTP plugin;

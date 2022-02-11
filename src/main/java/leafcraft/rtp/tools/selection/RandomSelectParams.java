@@ -13,12 +13,20 @@ import java.util.Objects;
 import java.util.UUID;
 
 public class RandomSelectParams {
-    public TeleportRegion.Shapes shape;
-    public UUID worldID;
-    public int r, cr, cx, cz, minY, maxY;
-    public boolean requireSkyLight,worldBorderOverride,uniquePlacements,expand;
+    public final TeleportRegion.Shapes shape;
+    public final UUID worldID;
+    public final int r;
+    public final int cr;
+    public final int cx;
+    public final int cz;
+    public final int minY;
+    public final int maxY;
+    public final boolean requireSkyLight;
+    public boolean worldBorderOverride;
+    public final boolean uniquePlacements;
+    public final boolean expand;
 
-    public Map<String,String> params;
+    public final Map<String,String> params;
 
     public RandomSelectParams(@NotNull World world, @Nullable Map<String,String> params) {
         if(params == null) params = new HashMap<>();

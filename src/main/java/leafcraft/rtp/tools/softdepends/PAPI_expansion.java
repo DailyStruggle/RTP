@@ -122,6 +122,7 @@ public class PAPI_expansion extends PlaceholderExpansion{
         if(identifier.equalsIgnoreCase("teleport_biome")) {
             Location location = getTeleportLocation(player);
             World world = Objects.requireNonNull(location.getWorld());
+            //noinspection deprecation
             return String.valueOf(
                     (RTP.getServerIntVersion() < 17)
                             ? world.getBiome(location.getBlockX(), location.getBlockZ())

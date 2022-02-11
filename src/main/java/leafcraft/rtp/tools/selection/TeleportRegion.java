@@ -44,7 +44,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
     // initialized with a default implementation, supporting the vanilla world border
     // so that it be overridden later by WorldBorder or ChunkyBorder or the like
     // todo: interface functions for per-region worldborder types
-    public static WorldBorderInterface worldBorderInterface = new VanillaWBHandler();
+    public static final WorldBorderInterface worldBorderInterface = new VanillaWBHandler();
 
     /**
      * per-region task for testing the waters for later recollection
@@ -126,6 +126,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                 if(cancelled) return;
 
                 Objects.requireNonNull(world);
+                //noinspection deprecation
                 Biome currBiome = (RTP.getServerIntVersion()<17)
                         ? world.getBiome(xz[0]*16+7,xz[1]*16+7)
                         : world.getBiome(xz[0]*16+7,(minY+maxY)/2,xz[1]*16+7);
@@ -270,13 +271,21 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
 
     public final double weight;
 
-    public boolean requireSkyLight, uniquePlacements, expand;
+    public final boolean requireSkyLight;
+    public final boolean uniquePlacements;
+    public final boolean expand;
 
-    public boolean rerollWorldGuard, rerollGriefPrevention;
+    public final boolean rerollWorldGuard;
+    public final boolean rerollGriefPrevention;
 
     public boolean worldBorderOverride;
 
-    public int r, cr, cx, cz, minY, maxY;
+    public int r;
+    public int cr;
+    public int cx;
+    public int cz;
+    public final int minY;
+    public final int maxY;
 
     private final Semaphore fillIteratorGuard = new Semaphore(1);
     private final AtomicLong fillIterator = new AtomicLong(0L);
@@ -652,6 +661,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
 
                     if(isKnownBad(chunk.getX(),chunk.getZ())) return;
                     Location point = chunk.getBlock(7,(maxY+minY)/2,7).getLocation();
+                    //noinspection deprecation
                     Biome biome = RTP.getServerIntVersion()<17
                             ? world.getBiome(point.getBlockX(), point.getBlockZ())
                             : world.getBiome(point);
@@ -715,6 +725,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
 
                         if(isKnownBad(chunk.getX(),chunk.getZ())) return;
                         Location point = chunk.getBlock(7,(maxY+minY)/2,7).getLocation();
+                        //noinspection deprecation
                         Biome biome = (RTP.getServerIntVersion()<17)
                                 ? world.getBiome(point.getBlockX(), point.getBlockZ())
                                 : world.getBiome(point);
@@ -1011,12 +1022,6 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         Cache cache = RTP.getCache();
         boolean urgent = !state.equals(SyncState.ASYNC);
 
-//        Bukkit.getLogger().warning(ChatColor.AQUA + "RTP getRandomLocation() - ");
-//        Bukkit.getLogger().warning(ChatColor.AQUA + "  radius - " + r);
-//        Bukkit.getLogger().warning(ChatColor.AQUA + "  centerX - " + cx);
-//        Bukkit.getLogger().warning(ChatColor.AQUA + "  centerZ - " + cz);
-
-
         long totalTimeStart = System.nanoTime();
         Location res = new Location(world,0,this.maxY,0);
 
@@ -1136,6 +1141,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
 
             res = new Location(world,xzChunk[0]*16+7, ((float)(minY + maxY)) / 2, xzChunk[1]*16+7);
 
+            //noinspection deprecation
             Biome currBiome = (RTP.getServerIntVersion() < 17)
                     ? world.getBiome(res.getBlockX(),res.getBlockZ())
                     : world.getBiome(res);
@@ -1330,10 +1336,6 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                 addBadLocation(location);
                 removeBiomeLocation(location,currBiome);
             }
-
-//            Bukkit.getLogger().warning(ChatColor.AQUA + "  selection - " + location);
-//            Bukkit.getLogger().warning(ChatColor.AQUA + "  X - " + xzChunk[0]);
-//            Bukkit.getLogger().warning(ChatColor.AQUA + "  Z - " + xzChunk[1]);
         }
 
         res.setY(res.getBlockY()+1);

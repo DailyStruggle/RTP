@@ -23,9 +23,6 @@ public interface WorldBorderInterface {
      */
     Location getCenter(World world);
 
-    /**
-     * @param world
-     * @return
-     */
+    @SuppressWarnings("SameReturnValue")
     TeleportRegion.Shapes getShape(World world);
 }

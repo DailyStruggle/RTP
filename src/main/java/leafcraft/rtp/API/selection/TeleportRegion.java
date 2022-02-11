@@ -106,7 +106,6 @@ public interface TeleportRegion {
 
     /**
      * getChunks - after getting a location, get the mapped CompleteableFuture chunks and their completion status
-     * @param location
      * @return ChunkSet that's mapped to the location, or null if none exists
      */
     @Nullable

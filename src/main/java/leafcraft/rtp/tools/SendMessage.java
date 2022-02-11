@@ -7,6 +7,7 @@ import net.md_5.bungee.api.chat.BaseComponent;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.HoverEvent;
 import net.md_5.bungee.api.chat.TextComponent;
+import net.md_5.bungee.api.chat.hover.content.Text;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
@@ -67,7 +68,10 @@ public class SendMessage {
 
             if (!hover.equals("")) {
                 BaseComponent[] hoverComponents = TextComponent.fromLegacyText(format(player, hover));
-                HoverEvent hoverEvent = new HoverEvent(HoverEvent.Action.SHOW_TEXT, hoverComponents);
+                //noinspection deprecation
+                HoverEvent hoverEvent = (RTP.getServerIntVersion()>=16)
+                        ? new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(hoverComponents))
+                        : new HoverEvent(HoverEvent.Action.SHOW_TEXT, hoverComponents);
                 for (BaseComponent component : textComponents) {
                     component.setHoverEvent(hoverEvent);
                 }

@@ -11,12 +11,12 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class ChunkSet {
-    public Semaphore completedGuard;
-    public AtomicInteger completed;
+    public final Semaphore completedGuard;
+    public final AtomicInteger completed;
 
-    public int expectedSize;
-    public ArrayList<CompletableFuture<Chunk>> chunks;
-    public ArrayList<HashableChunk> hashableChunks;
+    public final int expectedSize;
+    public final ArrayList<CompletableFuture<Chunk>> chunks;
+    public final ArrayList<HashableChunk> hashableChunks;
 
     public ChunkSet() {
         completed = new AtomicInteger(0);
