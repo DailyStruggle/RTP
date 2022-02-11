@@ -80,7 +80,6 @@ public class Info implements CommandExecutor {
                             }
                             SendMessage.sendMessage(sender, msg);
                         }
-                        break;
                     }
                     case "region" -> {
                         TeleportRegion region = null;
@@ -119,7 +118,6 @@ public class Info implements CommandExecutor {
                             }
                             SendMessage.sendMessage(sender, msg);
                         }
-                        break;
                     }
                 }
             }

@@ -13,7 +13,7 @@ public class Configs {
     public Lang lang;
     public Regions regions;
     public Worlds worlds;
-    public List<MethodHandle> locationChecks;
+    public final List<MethodHandle> locationChecks;
 
     public Configs() {
         RTP plugin = RTP.getPlugin();

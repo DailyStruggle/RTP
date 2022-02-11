@@ -32,6 +32,7 @@ import java.util.*;
 /**
  * A Random Teleportation Spigot/Paper plugin, optimized for operators
  */
+@SuppressWarnings("unused")
 public final class RTP extends JavaPlugin {
     private static final SubCommand subCommands = new SubCommandImpl("rtp.use", null);
     private static Configs configs = null;

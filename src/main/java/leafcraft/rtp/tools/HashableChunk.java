@@ -8,7 +8,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 public class HashableChunk {
-    UUID worldUID;
+    final UUID worldUID;
     public final int x,z;
     private final Chunk chunk;
 

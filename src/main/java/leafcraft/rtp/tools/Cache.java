@@ -30,11 +30,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.TimeUnit;
 
+@SuppressWarnings("unused")
 public class Cache {
     private final RTP plugin;
     private final Configs configs;
 
-    public ConcurrentHashMap<RandomSelectParams,BukkitTask> queueTimers = new ConcurrentHashMap<>();
+    public final ConcurrentHashMap<RandomSelectParams,BukkitTask> queueTimers = new ConcurrentHashMap<>();
 
     public Cache() {
         this.plugin = RTP.getPlugin();
@@ -76,37 +77,37 @@ public class Cache {
     }
 
     //if we needed to force load a chunk to prevent unload, undo that on teleport.
-    public ConcurrentHashMap<HashableChunk,Long> forceLoadedChunks = new ConcurrentHashMap<>();
+    public final ConcurrentHashMap<HashableChunk,Long> forceLoadedChunks = new ConcurrentHashMap<>();
 
     //table of which players are teleporting to what location
     // key: player name
     // value: location they're going to, to be re-added to the queue on cancellation
-    public ConcurrentSkipListSet<UUID> queuedPlayers = new ConcurrentSkipListSet<>();
-    public ConcurrentHashMap<UUID,CommandSender> commandSenderLookup = new ConcurrentHashMap<>();
-    public ConcurrentHashMap<UUID,Location> todoTP = new ConcurrentHashMap<>();
-    public ConcurrentHashMap<UUID,Location> lastTP = new ConcurrentHashMap<>();
-    public ConcurrentHashMap<UUID,RandomSelectParams> regionKeys = new ConcurrentHashMap<>();
+    public final ConcurrentSkipListSet<UUID> queuedPlayers = new ConcurrentSkipListSet<>();
+    public final ConcurrentHashMap<UUID,CommandSender> commandSenderLookup = new ConcurrentHashMap<>();
+    public final ConcurrentHashMap<UUID,Location> todoTP = new ConcurrentHashMap<>();
+    public final ConcurrentHashMap<UUID,Location> lastTP = new ConcurrentHashMap<>();
+    public final ConcurrentHashMap<UUID,RandomSelectParams> regionKeys = new ConcurrentHashMap<>();
 
     //Bukkit task list in case of cancellation
-    public ConcurrentHashMap<UUID, SetupTeleport> setupTeleports = new ConcurrentHashMap<>();
-    public ConcurrentHashMap<UUID, LoadChunks> loadChunks = new ConcurrentHashMap<>();
-    public ConcurrentHashMap<UUID, DoTeleport> doTeleports = new ConcurrentHashMap<>();
-    public ConcurrentHashMap<Long, QueueLocation> queueLocationTasks = new ConcurrentHashMap<>();
+    public final ConcurrentHashMap<UUID, SetupTeleport> setupTeleports = new ConcurrentHashMap<>();
+    public final ConcurrentHashMap<UUID, LoadChunks> loadChunks = new ConcurrentHashMap<>();
+    public final ConcurrentHashMap<UUID, DoTeleport> doTeleports = new ConcurrentHashMap<>();
+    public final ConcurrentHashMap<Long, QueueLocation> queueLocationTasks = new ConcurrentHashMap<>();
 
     //pre-teleport location info for checking distance from command location
-    public ConcurrentHashMap<UUID, Location> playerFromLocations = new ConcurrentHashMap<>();
+    public final ConcurrentHashMap<UUID, Location> playerFromLocations = new ConcurrentHashMap<>();
 
     //info on number of attempts on last rtp command
-    public ConcurrentHashMap<Location, Integer> numTeleportAttempts = new ConcurrentHashMap<>();
+    public final ConcurrentHashMap<Location, Integer> numTeleportAttempts = new ConcurrentHashMap<>();
 
     //store teleport command cooldown
-    public ConcurrentHashMap<UUID,Long> lastTeleportTime = new ConcurrentHashMap<>();
-    public ConcurrentHashMap<UUID,Double> currentTeleportCost = new ConcurrentHashMap<>();
+    public final ConcurrentHashMap<UUID,Long> lastTeleportTime = new ConcurrentHashMap<>();
+    public final ConcurrentHashMap<UUID,Double> currentTeleportCost = new ConcurrentHashMap<>();
 
-    public ConcurrentHashMap<RandomSelectParams, TeleportRegion> tempRegions = new ConcurrentHashMap<>();
-    public ConcurrentHashMap<RandomSelectParams, TeleportRegion> permRegions = new ConcurrentHashMap<>();
+    public final ConcurrentHashMap<RandomSelectParams, TeleportRegion> tempRegions = new ConcurrentHashMap<>();
+    public final ConcurrentHashMap<RandomSelectParams, TeleportRegion> permRegions = new ConcurrentHashMap<>();
 
-    public ConcurrentSkipListSet<UUID> invulnerablePlayers = new ConcurrentSkipListSet<>();
+    public final ConcurrentSkipListSet<UUID> invulnerablePlayers = new ConcurrentSkipListSet<>();
 
     public void shutdown() {
         for(ConcurrentHashMap.Entry<UUID,SetupTeleport> entry : setupTeleports.entrySet()) {
