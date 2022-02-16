@@ -246,7 +246,7 @@ public class Config {
 	public boolean isUnsafe(Block block) {
 		if(unsafeBlocks.contains(block.getType())) return true;
 		return checkWaterlogged
-				&& RTP.getServerIntVersion() > 12
+				&& RTPAPI.getServerIntVersion() > 12
 				&& block.getBlockData() instanceof Waterlogged
 				&& ((Waterlogged) block.getBlockData()).isWaterlogged();
 	}

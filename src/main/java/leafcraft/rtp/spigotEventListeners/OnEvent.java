@@ -1,6 +1,7 @@
 package leafcraft.rtp.spigotEventListeners;
 
-import leafcraft.rtp.API.selection.SyncState;
+import leafcraft.rtp.API.RTPAPI;
+import leafcraft.rtp.API.selection.SelectionAPI;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tasks.DoTeleport;
 import leafcraft.rtp.tasks.LoadChunks;
@@ -51,7 +52,7 @@ public class OnEvent implements Listener {
                 hasPerm = true;
         }
         if (hasPerm) {
-            teleportAction(player,SyncState.SYNC);
+            teleportAction(player, SelectionAPI.SyncState.SYNC);
         }
     }
 
@@ -82,7 +83,7 @@ public class OnEvent implements Listener {
         Player player = event.getPlayer();
         
         if (respawningPlayers.contains(player.getUniqueId())) {
-            teleportAction(player, SyncState.SYNC);
+            teleportAction(player, SelectionAPI.SyncState.SYNC);
             respawningPlayers.remove(player.getUniqueId());
         }
     }
@@ -143,7 +144,7 @@ public class OnEvent implements Listener {
                 SendMessage.sendMessage(player, msg);
                 return;
             }
-            teleportAction(player, SyncState.SYNC);
+            teleportAction(player, SelectionAPI.SyncState.SYNC);
         }
     }
 
@@ -171,7 +172,7 @@ public class OnEvent implements Listener {
                 hasPerm = true;
         }
         if (hasPerm) {
-            teleportAction(player, SyncState.ASYNC);
+            teleportAction(player, SelectionAPI.SyncState.ASYNC);
         }
     }
 
@@ -189,11 +190,11 @@ public class OnEvent implements Listener {
                 hasPerm = true;
         }
         if (hasPerm) {
-            teleportAction(player, SyncState.ASYNC);
+            teleportAction(player, SelectionAPI.SyncState.ASYNC);
         }
     }
 
-    private static void teleportAction(Player player, SyncState syncState){
+    private static void teleportAction(Player player, SelectionAPI.SyncState syncState){
         Cache cache = RTP.getCache();
 
         SetupTeleport setupTeleport = cache.setupTeleports.get(player.getUniqueId());
@@ -206,15 +207,15 @@ public class OnEvent implements Listener {
         cache.lastTeleportTime.put(player.getUniqueId(),System.nanoTime());
         setupTeleport = new SetupTeleport(player, player, new RandomSelectParams(player.getWorld(),null));
 
-        if(RTP.getServerIntVersion()>8) {
+        if(RTPAPI.getServerIntVersion()>8) {
             switch (syncState) {
-                case SYNC -> setupTeleport.setupTeleportNow(SyncState.SYNC);
+                case SYNC -> setupTeleport.setupTeleportNow(SelectionAPI.SyncState.SYNC);
                 case ASYNC -> setupTeleport.runTaskLaterAsynchronously(RTP.getPlugin(), 1);
                 case ASYNC_URGENT -> setupTeleport.runTaskAsynchronously(RTP.getPlugin());
             }
         }
         else {
-            setupTeleport.setupTeleportNow(SyncState.SYNC);
+            setupTeleport.setupTeleportNow(SelectionAPI.SyncState.SYNC);
         }
     }
 }

@@ -1,6 +1,6 @@
 package leafcraft.rtp.tools;
 
-import leafcraft.rtp.API.selection.SyncState;
+import leafcraft.rtp.API.selection.SelectionAPI;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tasks.DoTeleport;
 import leafcraft.rtp.tasks.LoadChunks;
@@ -181,7 +181,7 @@ public class Cache {
         return region.getQueuedLocation(sender, player);
     }
 
-    public Location getRandomLocation(RandomSelectParams rsParams, SyncState state, CommandSender sender, Player player) {
+    public Location getRandomLocation(RandomSelectParams rsParams, SelectionAPI.SyncState state, CommandSender sender, Player player) {
         TeleportRegion region;
         Double price = 0d;
         boolean didWithdraw = (sender instanceof Player) && currentTeleportCost.containsKey(((Player)sender).getUniqueId());
@@ -222,7 +222,7 @@ public class Cache {
     }
 
     public Location getRandomLocation(RandomSelectParams rsParams, boolean urgent, CommandSender sender, Player player) {
-        SyncState state = (urgent) ? SyncState.ASYNC_URGENT : SyncState.ASYNC;
+        SelectionAPI.SyncState state = (urgent) ? SelectionAPI.SyncState.ASYNC_URGENT : SelectionAPI.SyncState.ASYNC;
         return getRandomLocation(rsParams,state,sender,player);
     }
 

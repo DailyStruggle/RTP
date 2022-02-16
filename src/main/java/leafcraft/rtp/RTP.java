@@ -2,6 +2,8 @@ package leafcraft.rtp;
 
 import io.papermc.lib.PaperLib;
 import leafcraft.rtp.API.Commands.SubCommand;
+import leafcraft.rtp.API.RTPAPI;
+import leafcraft.rtp.API.selection.SelectionAPI;
 import leafcraft.rtp.commands.*;
 import leafcraft.rtp.customEventListeners.*;
 import leafcraft.rtp.spigotEventListeners.*;
@@ -11,14 +13,12 @@ import leafcraft.rtp.tools.TPS;
 import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
+import leafcraft.rtp.tools.softdepends.FactionsChecker;
 import leafcraft.rtp.tools.softdepends.LandsChecker;
 import leafcraft.rtp.tools.softdepends.PAPI_expansion;
 import leafcraft.rtp.tools.softdepends.VaultChecker;
 import org.bstats.bukkit.Metrics;
-import org.bukkit.Bukkit;
-import org.bukkit.FireworkEffect;
-import org.bukkit.Instrument;
-import org.bukkit.Particle;
+import org.bukkit.*;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.permissions.Permission;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -27,6 +27,9 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
+import java.lang.invoke.MutableCallSite;
 import java.util.*;
 
 /**
@@ -34,42 +37,12 @@ import java.util.*;
  */
 @SuppressWarnings("unused")
 public final class RTP extends JavaPlugin {
+    private static RTPCmd rtpCmd;
     private static final SubCommand subCommands = new SubCommandImpl("rtp.use", null);
     private static Configs configs = null;
     private static Cache cache = null;
     private static RTP plugin = null;
     private static Metrics metrics;
-    private static RTPCmd rtpCmd;
-
-//    private OnChunkLoad onChunkLoad;
-
-    private static String version = null;
-    private static Integer intVersion = null;
-
-    public static String getServerVersion() {
-        if(version == null) {
-            version = RTP.getPlugin().getServer().getClass().getPackage().getName();
-            version = version.replaceAll("[-+^.a-zA-Z]*","");
-        }
-
-        return version;
-    }
-
-    public static Integer getServerIntVersion() {
-        if(intVersion == null) {
-            String[] splitVersion = getServerVersion().split("_");
-            if(splitVersion.length == 0) {
-                intVersion = 0;
-            }
-            else if (splitVersion.length == 1) {
-                intVersion = Integer.valueOf(splitVersion[0]);
-            }
-            else {
-                intVersion = Integer.valueOf(splitVersion[1]);
-            }
-        }
-        return intVersion;
-    }
 
     @Override
     public void onEnable() {
@@ -80,7 +53,8 @@ public final class RTP extends JavaPlugin {
         RTP.configs = new Configs();
         RTP.cache = new Cache();
 
-        getServerIntVersion();
+        //initialize server version
+        RTPAPI.getServerIntVersion();
 
         try {
             Objects.requireNonNull(getCommand("wild")).setExecutor(rtpCmd);
@@ -328,7 +302,7 @@ public final class RTP extends JavaPlugin {
                         permissionList.add(new Permission("rtp.effect.preTeleport.note." + instrument.name()));
                     }
 
-                    if(RTP.getServerIntVersion() > 8) {
+                    if(RTPAPI.getServerIntVersion() > 8) {
                         for (Particle particle : Particle.values()) {
                             permissionList.add(new Permission("rtp.effect.command.particle." + particle.name()));
                             permissionList.add(new Permission("rtp.effect.teleport.particle." + particle.name()));

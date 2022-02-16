@@ -1,4 +1,4 @@
-package leafcraft.rtp.API.selection;
+package leafcraft.rtp.API.selection.region;
 
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Location;
@@ -13,16 +13,7 @@ public interface WorldBorderInterface {
 
     /**
      * @param world - which world to check
-     * @return radius, in blocks
+     * @return parameters, namely center and radius
      */
-    Integer getRadius(World world);
-
-    /**
-     * @param world - which world to check
-     * @return center point
-     */
-    Location getCenter(World world);
-
-    @SuppressWarnings("SameReturnValue")
-    TeleportRegion.Shapes getShape(World world);
+    WorldBorderParameters getParameters(World world);
 }

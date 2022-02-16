@@ -1,5 +1,6 @@
 package leafcraft.rtp.tools.softdepends;
 
+import leafcraft.rtp.API.RTPAPI;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.configuration.Configs;
@@ -124,7 +125,7 @@ public class PAPI_expansion extends PlaceholderExpansion{
             World world = Objects.requireNonNull(location.getWorld());
             //noinspection deprecation
             return String.valueOf(
-                    (RTP.getServerIntVersion() < 17)
+                    (RTPAPI.getServerIntVersion() < 17)
                             ? world.getBiome(location.getBlockX(), location.getBlockZ())
                             : world.getBiome(location)
             );
