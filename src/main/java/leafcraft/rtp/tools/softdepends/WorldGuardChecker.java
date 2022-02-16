@@ -23,12 +23,12 @@ public class WorldGuardChecker {
         return (WorldGuardPlugin) plugin;
     }
 
-    public static Boolean isInClaim(org.bukkit.Location location) {
-        if(getWorldGuard() == null) return false;
+    public static boolean isInClaim(org.bukkit.Location location) {
+        if(getWorldGuard() == null) return true;
         World world = BukkitAdapter.adapt(Objects.requireNonNull(location.getWorld()));
         BlockVector3 pt = BukkitAdapter.asBlockVector(location);
         RegionManager regionManager = WorldGuard.getInstance().getPlatform().getRegionContainer().get(world);
         ApplicableRegionSet set = Objects.requireNonNull(regionManager).getApplicableRegions(pt);
-        return set.size()>0;
+        return set.size()==0;
     }
 }

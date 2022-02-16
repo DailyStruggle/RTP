@@ -42,7 +42,7 @@ public final class OnRandomTeleport implements Listener {
         player.teleport(event.getTo());
         if(configs.config.blindnessDuration>0)
             player.addPotionEffect(PotionEffectType.BLINDNESS.createEffect(configs.config.blindnessDuration,100));
-        if(RTP.getServerIntVersion()>=11 && !configs.config.title.equals("")) {
+        if(RTPAPI.getServerIntVersion()>=11 && !configs.config.title.equals("")) {
             Bukkit.getScheduler().runTaskLater(plugin,()->{
                 String title = SendMessage.format(player,configs.config.title);
                 String subtitle = SendMessage.format(player,configs.config.subTitle);

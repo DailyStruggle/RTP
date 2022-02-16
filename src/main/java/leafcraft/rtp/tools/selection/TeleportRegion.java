@@ -1,12 +1,14 @@
 package leafcraft.rtp.tools.selection;
 
 import io.papermc.lib.PaperLib;
+import leafcraft.rtp.API.RTPAPI;
 import leafcraft.rtp.API.customEvents.LoadChunksQueueEvent;
 import leafcraft.rtp.API.customEvents.PlayerQueuePushEvent;
 import leafcraft.rtp.API.customEvents.RandomSelectPlayerEvent;
 import leafcraft.rtp.API.customEvents.RandomSelectQueueEvent;
-import leafcraft.rtp.API.selection.SyncState;
-import leafcraft.rtp.API.selection.WorldBorderInterface;
+import leafcraft.rtp.API.selection.SelectionAPI;
+import leafcraft.rtp.API.selection.region.TeleportRegionInterface;
+import leafcraft.rtp.API.selection.region.WorldBorderInterface;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tasks.DoTeleport;
 import leafcraft.rtp.tools.Cache;
@@ -39,12 +41,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegion {
+public class TeleportRegion implements TeleportRegionInterface {
     //arbitrary interface for world border information
     // initialized with a default implementation, supporting the vanilla world border
     // so that it be overridden later by WorldBorder or ChunkyBorder or the like
     // todo: interface functions for per-region worldborder types
-    public static final WorldBorderInterface worldBorderInterface = new VanillaWBHandler();
 
     /**
      * per-region task for testing the waters for later recollection
@@ -127,7 +128,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
 
                 Objects.requireNonNull(world);
                 //noinspection deprecation
-                Biome currBiome = (RTP.getServerIntVersion()<17)
+                Biome currBiome = (RTPAPI.getServerIntVersion()<17)
                         ? world.getBiome(xz[0]*16+7,xz[1]*16+7)
                         : world.getBiome(xz[0]*16+7,(minY+maxY)/2,xz[1]*16+7);
                 if(configs.config.biomeWhitelist != configs.config.biomes.contains(currBiome)) {
@@ -561,7 +562,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         return res;
     }
 
-    public Location getLocation(SyncState state, CommandSender sender, Player player, Biome biome) {
+    public Location getLocation(SelectionAPI.SyncState state, CommandSender sender, Player player, Biome biome) {
         Configs configs = RTP.getConfigs();
 
         Location res;
@@ -576,11 +577,11 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
     }
 
     public Location getLocation(boolean urgent, CommandSender sender, Player player, Biome biome) {
-        SyncState state = (urgent) ? SyncState.ASYNC_URGENT : SyncState.ASYNC;
+        SelectionAPI.SyncState state = (urgent) ? SelectionAPI.SyncState.ASYNC_URGENT : SelectionAPI.SyncState.ASYNC;
         return getLocation(state,sender,player,biome);
     }
 
-    public Location getLocation(SyncState state, CommandSender sender, Player player) {
+    public Location getLocation(SelectionAPI.SyncState state, CommandSender sender, Player player) {
         RTP plugin = RTP.getPlugin();
         Configs configs = RTP.getConfigs();
 
@@ -616,7 +617,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
     }
 
     public Location getLocation(boolean urgent, CommandSender sender, Player player) {
-        SyncState state = (urgent) ? SyncState.ASYNC_URGENT : SyncState.ASYNC;
+        SelectionAPI.SyncState state = (urgent) ? SelectionAPI.SyncState.ASYNC_URGENT : SelectionAPI.SyncState.ASYNC;
         return getLocation(state,sender,player);
     }
 
@@ -662,7 +663,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                     if(isKnownBad(chunk.getX(),chunk.getZ())) return;
                     Location point = chunk.getBlock(7,(maxY+minY)/2,7).getLocation();
                     //noinspection deprecation
-                    Biome biome = RTP.getServerIntVersion()<17
+                    Biome biome = RTPAPI.getServerIntVersion()<17
                             ? world.getBiome(point.getBlockX(), point.getBlockZ())
                             : world.getBiome(point);
                     long curveLocation = (long) ((shape.equals(Shapes.SQUARE)) ?
@@ -726,7 +727,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                         if(isKnownBad(chunk.getX(),chunk.getZ())) return;
                         Location point = chunk.getBlock(7,(maxY+minY)/2,7).getLocation();
                         //noinspection deprecation
-                        Biome biome = (RTP.getServerIntVersion()<17)
+                        Biome biome = (RTPAPI.getServerIntVersion()<17)
                                 ? world.getBiome(point.getBlockX(), point.getBlockZ())
                                 : world.getBiome(point);
                         long curveLocation = (long) ((shape.equals(Shapes.SQUARE)) ?
@@ -1017,10 +1018,10 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         return (long)res;
     }
 
-    public Location getRandomLocation(SyncState state, @Nullable Biome biome) {
+    public Location getRandomLocation(SelectionAPI.SyncState state, @Nullable Biome biome) {
         Configs configs = RTP.getConfigs();
         Cache cache = RTP.getCache();
-        boolean urgent = !state.equals(SyncState.ASYNC);
+        boolean urgent = !state.equals(SelectionAPI.SyncState.ASYNC);
 
         long totalTimeStart = System.nanoTime();
         Location res = new Location(world,0,this.maxY,0);
@@ -1142,7 +1143,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
             res = new Location(world,xzChunk[0]*16+7, ((float)(minY + maxY)) / 2, xzChunk[1]*16+7);
 
             //noinspection deprecation
-            Biome currBiome = (RTP.getServerIntVersion() < 17)
+            Biome currBiome = (RTPAPI.getServerIntVersion() < 17)
                     ? world.getBiome(res.getBlockX(),res.getBlockZ())
                     : world.getBiome(res);
             if(biome!=null && !currBiome.equals(biome)) {
@@ -1150,7 +1151,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                 continue;
             }
 
-            if(configs.config.biomeWhitelist != configs.config.biomes.contains(currBiome)) {
+            if(Configs.config.biomeWhitelist != Configs.config.biomes.contains(currBiome)) {
                 addBadLocation(location);
                 removeBiomeLocation(location,currBiome);
                 continue;
@@ -1171,12 +1172,12 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
             Chunk chunk;
             switch (state) {
                 case SYNC -> {
-                    if (preCheckLocation(res)) {
+                    if (SelectionAPI.checkGlobalRegionVerifiers(res)) {
                         chunk = res.getChunk();
                     } else continue;
                 }
                 case ASYNC, ASYNC_URGENT -> {
-                    if(RTP.getServerIntVersion() > 8) {
+                    if(RTPAPI.getServerIntVersion() > 8) {
                         CompletableFuture<Chunk>cfChunk = (urgent) ?
                                 PaperLib.getChunkAtAsyncUrgently(world, xzChunk[0], xzChunk[1], true) :
                                 PaperLib.getChunkAtAsync(world, xzChunk[0], xzChunk[1], true);
@@ -1184,7 +1185,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                         HashableChunk hashableChunk = new HashableChunk(world, xzChunk[0], xzChunk[1]);
                         currChunks.put(hashableChunk, cfChunk);
 
-                        if (!preCheckLocation(res)) {
+                        if (!SelectionAPI.checkGlobalRegionVerifiers(res)) {
                             try {
                                 cfChunk.cancel(true);
                             }
@@ -1209,7 +1210,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
 
                         HashableChunk hashableChunk = new HashableChunk(world, xzChunk[0], xzChunk[1]);
 
-                        if (!preCheckLocation(res)) {
+                        if (!SelectionAPI.checkGlobalRegionVerifiers(res)) {
                             try {
                                 fChunk.cancel(true);
                             }
@@ -1243,7 +1244,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
 
             start = System.nanoTime();
             int y;
-            if(state.equals(SyncState.SYNC)) {
+            if(state.equals(SelectionAPI.SyncState.SYNC)) {
                 y = this.getFirstNonAir(res);
                 y = this.getLastNonAir(res, y);
             }
@@ -1263,7 +1264,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
             if (!goodLocation) {
                 res = chunk.getBlock(2,minY,2).getLocation();
                 start = System.nanoTime();
-                if(state.equals(SyncState.SYNC)) {
+                if(state.equals(SelectionAPI.SyncState.SYNC)) {
                     y = this.getFirstNonAir(res);
                     y = this.getLastNonAir(res, y);
                 }
@@ -1281,7 +1282,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
             if (!goodLocation) {
                 res = chunk.getBlock(13,minY,13).getLocation();
                 start = System.nanoTime();
-                if(state.equals(SyncState.SYNC)) {
+                if(state.equals(SelectionAPI.SyncState.SYNC)) {
                     y = this.getFirstNonAir(res);
                     y = this.getLastNonAir(res, y);
                 }
@@ -1299,7 +1300,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
             if (!goodLocation) {
                 res = chunk.getBlock(13,minY,2).getLocation();
                 start = System.nanoTime();
-                if(state.equals(SyncState.SYNC)) {
+                if(state.equals(SelectionAPI.SyncState.SYNC)) {
                     y = this.getFirstNonAir(res);
                     y = this.getLastNonAir(res, y);
                 }
@@ -1317,7 +1318,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
             if (!goodLocation) {
                 res = chunk.getBlock(2,minY,13).getLocation();
                 start = System.nanoTime();
-                if(state.equals(SyncState.SYNC)) {
+                if(state.equals(SelectionAPI.SyncState.SYNC)) {
                     y = this.getFirstNonAir(res);
                     y = this.getLastNonAir(res, y);
                 }
@@ -1347,7 +1348,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         cache.numTeleportAttempts.put(res, numAttempts);
         addChunks(res, urgent);
 
-        if(configs.config.timeit) {
+        if(Configs.config.timeit) {
             Bukkit.getLogger().warning(ChatColor.AQUA + "TOTAL TIME SPENT ON SELECTION FIXING: " + (selectTime)/1000000 + "ms");
             Bukkit.getLogger().warning(ChatColor.LIGHT_PURPLE + "TOTAL TIME SPENT WAITING ON CHUNKS: " + (chunkTime)/1000000 + "ms");
             Bukkit.getLogger().warning(ChatColor.GREEN + "TOTAL TIME SPENT ON PLACEMENT VALIDATION: " + (yTime)/1000000 + "ms");
@@ -1357,7 +1358,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
     }
 
     public Location getRandomLocation(boolean urgent,Biome biome) {
-        SyncState syncState = urgent ? SyncState.ASYNC_URGENT : SyncState.ASYNC;
+        SelectionAPI.SyncState syncState = urgent ? SelectionAPI.SyncState.ASYNC_URGENT : SelectionAPI.SyncState.ASYNC;
         return getRandomLocation(syncState,biome);
     }
 
@@ -1513,60 +1514,23 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
     }
 
     public boolean checkLocation(Chunk chunk, int y) {
-        Configs configs = RTP.getConfigs();
         if(y >= maxY) return false;
 //        if(!material.isSolid()) return false;
         Block block1 = chunk.getBlock(7,y,7);
         Block block2 = chunk.getBlock(7,y+1,7);
         Material material2 = block2.getType();
         if(material2.isSolid()) return false;
-        if(configs.config.isUnsafe(block1)) return false;
-        if(configs.config.isUnsafe(block2)) return false;
-        Location location = new Location(world, chunk.getX()*16+7,y, chunk.getZ()*16+7);
-        if(configs.config.rerollWorldGuard && WorldGuardChecker.isInClaim(location)) return false;
-        if(configs.config.rerollGriefPrevention && GriefPreventionChecker.isInClaim(location)) return false;
-        if(configs.config.rerollTownyAdvanced && TownyAdvancedChecker.isInClaim(location)) return false;
-        if(configs.config.rerollHuskTowns && HuskTownsChecker.isInClaim(location)) return false;
-        if(configs.config.rerollFactions && FactionsChecker.isInClaim(location)) return false;
-        if(configs.config.rerollGriefDefender && GriefDefenderChecker.isInClaim(location)) return false;
-        if(configs.config.rerollLands && LandsChecker.isInClaim(location)) return false;
-        if(configs.config.rerollRedProtect && RedProtectChecker.isInClaim(location)) return false;
-        for(MethodHandle methodHandle : configs.locationChecks) {
-            try {
-                if((boolean)methodHandle.invokeExact(location)) return false;
-            } catch (Throwable throwable) {
-                throwable.printStackTrace();
-            }
-        }
+        if(Configs.config.isUnsafe(block1)) return false;
+        if(Configs.config.isUnsafe(block2)) return false;;
+        if(!SelectionAPI.checkGlobalRegionVerifiers(block1.getLocation())) return false;
 
-        int safetyRadius = configs.config.safetyRadius;
+        int safetyRadius = Configs.config.safetyRadius;
         for(int i = 7-safetyRadius; i <= 7+safetyRadius; i++) {
             for(int j = 7-safetyRadius; j <= 7+safetyRadius; j++) {
-                if(configs.config.isUnsafe(chunk.getBlock(7,y,7))) return false;
-                if(configs.config.isUnsafe(chunk.getBlock(7,y+1,7))) return false;
+                if(Configs.config.isUnsafe(chunk.getBlock(7,y,7))) return false;
+                if(Configs.config.isUnsafe(chunk.getBlock(7,y+1,7))) return false;
             }
         }
-        return true;
-    }
-
-    public boolean preCheckLocation(Location location) {
-        Configs configs = RTP.getConfigs();
-        if(configs.config.rerollWorldGuard && WorldGuardChecker.isInClaim(location)) return false;
-        if(configs.config.rerollGriefPrevention && GriefPreventionChecker.isInClaim(location)) return false;
-        if(configs.config.rerollTownyAdvanced && TownyAdvancedChecker.isInClaim(location)) return false;
-        if(configs.config.rerollHuskTowns && HuskTownsChecker.isInClaim(location)) return false;
-        if(configs.config.rerollFactions && FactionsChecker.isInClaim(location)) return false;
-        if(configs.config.rerollGriefDefender && GriefDefenderChecker.isInClaim(location)) return false;
-        if(configs.config.rerollLands && LandsChecker.isInClaim(location)) return false;
-        if(configs.config.rerollRedProtect && RedProtectChecker.isInClaim(location)) return false;
-        for(MethodHandle methodHandle : configs.locationChecks) {
-            try {
-                if((boolean)methodHandle.invokeExact(location)) return false;
-            } catch (Throwable throwable) {
-                throwable.printStackTrace();
-            }
-        }
-
         return true;
     }
 

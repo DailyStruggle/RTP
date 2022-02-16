@@ -1,6 +1,6 @@
 package leafcraft.rtp.API.customEvents;
 
-import leafcraft.rtp.API.selection.TeleportRegion;
+import leafcraft.rtp.API.selection.region.TeleportRegionInterface;
 import org.bukkit.Location;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
@@ -9,13 +9,13 @@ import org.jetbrains.annotations.NotNull;
 import java.util.UUID;
 
 public class PlayerQueuePopEvent extends Event {
-    private final TeleportRegion region;
+    private final TeleportRegionInterface region;
     private final UUID playerId;
     private final Location location;
 
     private static final HandlerList HANDLERS_LIST = new HandlerList();
 
-    public PlayerQueuePopEvent(TeleportRegion region, UUID playerId, Location location) {
+    public PlayerQueuePopEvent(TeleportRegionInterface region, UUID playerId, Location location) {
         super(true);
         this.region = region;
         this.playerId = playerId;
@@ -40,7 +40,7 @@ public class PlayerQueuePopEvent extends Event {
         return location;
     }
 
-    public TeleportRegion getRegion() {
+    public TeleportRegionInterface getRegion() {
         return region;
     }
 }

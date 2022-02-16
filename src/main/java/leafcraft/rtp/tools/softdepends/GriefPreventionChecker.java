@@ -18,11 +18,11 @@ public class GriefPreventionChecker {
         return (GriefPrevention) plugin;
     }
 
-    public static Boolean isInClaim(org.bukkit.Location location) {
-        if(getGriefPrevention() == null) return false;
+    public static boolean isInClaim(org.bukkit.Location location) {
+        if(getGriefPrevention() == null) return true;
         int chunkX = (location.getBlockX() >= 0 || (location.getBlockX()%16==0)) ? (location.getBlockX() / 16) : (location.getBlockX() / 16) - 1;
         int chunkZ = (location.getBlockZ() >= 0 || (location.getBlockZ()%16==0)) ? (location.getBlockZ() / 16) : (location.getBlockZ() / 16) - 1;
         Collection<Claim> claims = GriefPrevention.instance.dataStore.getClaims(chunkX,chunkZ);
-        return claims.size()>0;
+        return claims.size()==0;
     }
 }

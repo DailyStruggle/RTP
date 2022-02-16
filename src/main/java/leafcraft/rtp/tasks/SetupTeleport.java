@@ -1,6 +1,6 @@
 package leafcraft.rtp.tasks;
 
-import leafcraft.rtp.API.selection.SyncState;
+import leafcraft.rtp.API.selection.SelectionAPI;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.SendMessage;
@@ -38,7 +38,7 @@ public class SetupTeleport extends BukkitRunnable {
 
     @Override
     public void run() {
-        setupTeleportNow(SyncState.ASYNC_URGENT);
+        setupTeleportNow(SelectionAPI.SyncState.ASYNC_URGENT);
     }
 
     @Override
@@ -51,7 +51,7 @@ public class SetupTeleport extends BukkitRunnable {
         return sender.hasPermission("rtp.noDelay");
     }
 
-    public void setupTeleportNow(SyncState state) {
+    public void setupTeleportNow(SelectionAPI.SyncState state) {
         //get a random location according to the parameters
         Location location;
         location = cache.getRandomLocation(rsParams, state, sender, player);
@@ -116,7 +116,7 @@ public class SetupTeleport extends BukkitRunnable {
                 long diffNanos = System.nanoTime() - cache.lastTeleportTime.getOrDefault(player.getUniqueId(), 0L);
                 long diffMicros = TimeUnit.NANOSECONDS.toMicros(diffNanos);
                 long diffTicks = (diffMicros / 50);
-                if(state.equals(SyncState.SYNC) && diffTicks >= delay) {
+                if(state.equals(SelectionAPI.SyncState.SYNC) && diffTicks >= delay) {
                     doTeleport.doTeleportNow();
                 }
                 else {

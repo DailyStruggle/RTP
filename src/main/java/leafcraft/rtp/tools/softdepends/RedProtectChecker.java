@@ -6,9 +6,9 @@ import org.bukkit.Location;
 public class RedProtectChecker {
     public static boolean isInClaim(Location location) {
         try {
-            return RedProtect.get().getAPI().getRegion(location)!=null;
+            return RedProtect.get().getAPI().getRegion(location)==null;
         } catch (NoClassDefFoundError | Exception e) {
-            return false;
+            return true;
         }
     }
 }

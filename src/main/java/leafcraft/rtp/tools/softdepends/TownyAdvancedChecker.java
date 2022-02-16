@@ -6,9 +6,9 @@ import org.bukkit.Location;
 public class TownyAdvancedChecker {
     public static boolean isInClaim(Location location) {
         try {
-            return !TownyAPI.getInstance().isWilderness(location);
+            return TownyAPI.getInstance().isWilderness(location);
         } catch (NoClassDefFoundError | Exception e) {
-            return false;
+            return true;
         }
     }
 }

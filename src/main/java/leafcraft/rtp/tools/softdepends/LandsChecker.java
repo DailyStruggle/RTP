@@ -15,12 +15,12 @@ public class LandsChecker {
         }
     }
 
-    public static Boolean isInClaim(org.bukkit.Location location) {
+    public static boolean isInClaim(org.bukkit.Location location) {
         try {
-            return landsIntegration.isClaimed(location);
+            return !landsIntegration.isClaimed(location);
         }
         catch (NullPointerException | NoClassDefFoundError e) {
-            return false;
+            return true;
         }
     }
 }

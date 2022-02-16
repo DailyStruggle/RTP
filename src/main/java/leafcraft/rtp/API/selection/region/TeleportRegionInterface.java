@@ -1,5 +1,6 @@
-package leafcraft.rtp.API.selection;
+package leafcraft.rtp.API.selection.region;
 
+import leafcraft.rtp.API.selection.SelectionAPI;
 import leafcraft.rtp.tools.selection.ChunkSet;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
@@ -12,7 +13,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-public interface TeleportRegion {
+public interface TeleportRegionInterface {
     /**
      * hasQueuedLocation(player): check whether the region has a location reserved for the player
      * @param player/uuid - who to check for
@@ -55,7 +56,7 @@ public interface TeleportRegion {
      * @param biome - what biome, or null
      * @return popped location, generated location, or null if too many tries
      */
-    Location getLocation(SyncState urgent, CommandSender sender, Player player, Biome biome);
+    Location getLocation(SelectionAPI.SyncState urgent, CommandSender sender, Player player, Biome biome);
     Location getLocation(boolean urgent, CommandSender sender, Player player, Biome biome);
     Location getLocation(boolean urgent, CommandSender sender, Player player);
 
@@ -95,7 +96,7 @@ public interface TeleportRegion {
      * @param biome - what biome to look for, or null for any biome
      * @return a corresponding location, or null on failure
      */
-    Location getRandomLocation(SyncState state, @Nullable Biome biome);
+    Location getRandomLocation(SelectionAPI.SyncState state, @Nullable Biome biome);
     Location getRandomLocation(boolean urgent, @Nullable Biome biome);
     Location getRandomLocation(boolean urgent);
 
