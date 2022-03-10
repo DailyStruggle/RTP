@@ -12,3 +12,5 @@ The goal of this plugin is function over form,
  * adjustment of all plugin messages in lang.yml
 
 I made this in a flow state and now I only understand how it works because I wrote down the math. I question my sanity.
+
+current task: make the API touch _everything_.
