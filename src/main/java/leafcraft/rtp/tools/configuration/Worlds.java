@@ -65,7 +65,7 @@ public class Worlds {
         int defaultNearMinY = defaultSection.getInt("nearMinY",48);
         int defaultNearMaxY = defaultSection.getInt("nearMaxY",127);
 
-        Bukkit.getScheduler().runTaskLater(RTP.getPlugin(),()->{
+        Bukkit.getScheduler().runTaskLater(RTP.getInstance(),()->{
             for(World w : Bukkit.getWorlds()) {
                 String permName = "rtp.worlds." + w.getName();
                 if(Bukkit.getPluginManager().getPermission(permName) == null) {

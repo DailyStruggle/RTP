@@ -4,7 +4,7 @@ import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.SendMessage;
 import leafcraft.rtp.tools.configuration.Configs;
-import leafcraft.rtp.tools.selection.RandomSelectParams;
+import leafcraft.rtp.API.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
@@ -17,7 +17,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.*;
 
 public class SetRegion implements CommandExecutor {
-    private static Configs configs = null;
+    private static Configs Configs = null;
     private static Cache cache = null;
     private static final Set<String> regionParams = new HashSet<>();
     static {
@@ -44,13 +44,13 @@ public class SetRegion implements CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
         if(!sender.hasPermission("rtp.setRegion")) {
-            String msg = configs.lang.getLog("noPerms");
+            String msg = Configs.lang.getLog("noPerms");
 
             SendMessage.sendMessage(sender,msg);
             return true;
         }
 
-        if(configs == null) configs = RTP.getConfigs();
+        if(Configs == null) Configs = RTP.getConfigs();
         if(cache == null) cache = RTP.getCache();
 
         Map<String,String> regionArgs = new HashMap<>();
@@ -65,9 +65,9 @@ public class SetRegion implements CommandExecutor {
         World world;
         if(regionArgs.containsKey("world")) {
             String worldName = regionArgs.get("world");
-            worldName = configs.worlds.worldPlaceholder2Name(worldName);
-            if(!configs.worlds.checkWorldExists(worldName)) {
-                String msg = configs.lang.getLog("invalidWorld",worldName);
+            worldName = Configs.worlds.worldPlaceholder2Name(worldName);
+            if(!Configs.worlds.checkWorldExists(worldName)) {
+                String msg = Configs.lang.getLog("invalidWorld",worldName);
 
                 SendMessage.sendMessage(sender,msg);
                 return true;
@@ -88,24 +88,24 @@ public class SetRegion implements CommandExecutor {
         }
         else {
             if(regionArgs.containsKey("region")) {
-                String probe = (String) configs.regions.getRegionSetting(regionArgs.get("region"),"world","");
+                String probe = (String) Configs.regions.getRegionSetting(regionArgs.get("region"),"world","");
                 String worldName;
                 if(probe.equals("")) {
-                    worldName = (String) configs.regions.getRegionSetting("default", "world", Bukkit.getWorlds().get(0).getName());
+                    worldName = (String) Configs.regions.getRegionSetting("default", "world", Bukkit.getWorlds().get(0).getName());
                 }
                 else {
-                    worldName = (String) configs.regions.getRegionSetting(regionArgs.get("region"), "world", Bukkit.getWorlds().get(0).getName());
+                    worldName = (String) Configs.regions.getRegionSetting(regionArgs.get("region"), "world", Bukkit.getWorlds().get(0).getName());
                 }
                 regionArgs.putIfAbsent("world",worldName);
                 world = Bukkit.getWorld(regionArgs.get("world"));
-                if(!configs.worlds.checkWorldExists(Objects.requireNonNull(world).getName())) world = Bukkit.getWorlds().get(0);
+                if(!Configs.worlds.checkWorldExists(Objects.requireNonNull(world).getName())) world = Bukkit.getWorlds().get(0);
             }
             else if(sender instanceof Player) {
                 world = ((Player) sender).getWorld();
                 regionArgs.put("world",world.getName());
             }
             else {
-                String msg = configs.lang.getLog("consoleCmdNotAllowed");
+                String msg = Configs.lang.getLog("consoleCmdNotAllowed");
                 SendMessage.sendMessage(sender,msg);
                 return true;
             }
@@ -122,7 +122,7 @@ public class SetRegion implements CommandExecutor {
                 int res = 0;
                 if(entry.getValue().startsWith("~")) {
                     if(!(sender instanceof Player)) {
-                        String msg = configs.lang.getLog("consoleCmdNotAllowed");
+                        String msg = Configs.lang.getLog("consoleCmdNotAllowed");
                         SendMessage.sendMessage(sender,msg);
                         continue;
                     }
@@ -138,7 +138,7 @@ public class SetRegion implements CommandExecutor {
                             if(numStr.length()>0) res -= Integer.parseInt(numStr);
                         }
                         catch (NumberFormatException exception) {
-                            String msg = configs.lang.getLog("badArg",entry.getKey()+":"+entry.getValue());
+                            String msg = Configs.lang.getLog("badArg",entry.getKey()+":"+entry.getValue());
 
                             SendMessage.sendMessage(sender,msg);
                             continue;
@@ -150,7 +150,7 @@ public class SetRegion implements CommandExecutor {
                             if(numStr.length()>0) res += Integer.parseInt(numStr);
                         }
                         catch (NumberFormatException exception) {
-                            String msg = configs.lang.getLog("badArg",entry.getKey()+":"+entry.getValue());
+                            String msg = Configs.lang.getLog("badArg",entry.getKey()+":"+entry.getValue());
 
                             SendMessage.sendMessage(sender,msg);
                             continue;
@@ -164,10 +164,10 @@ public class SetRegion implements CommandExecutor {
         if(regionArgs.containsKey("region")) {
             String region = regionArgs.get("region");
             //check region exists
-            String probe = (String) configs.regions.getRegionSetting(region,"world","");
+            String probe = (String) Configs.regions.getRegionSetting(region,"world","");
             RandomSelectParams params = new RandomSelectParams(world,regionArgs);
             if(probe.equals("")) {
-                configs.regions.setRegion(region,params);
+                Configs.regions.setRegion(region,params);
             }
 
             if(cache.permRegions.containsKey(params)){
@@ -179,29 +179,29 @@ public class SetRegion implements CommandExecutor {
             teleportRegion.loadFile();
         }
         else {
-            String msg = configs.lang.getLog("missingRegionParam");
+            String msg = Configs.lang.getLog("missingRegionParam");
             SendMessage.sendMessage(sender,msg);
             return true;
         }
 
         for(Map.Entry<String,String> entry : regionArgs.entrySet()) {
             if (entry.getKey().equals("region")) continue;
-            Integer result = configs.regions.updateRegionSetting(regionArgs.get("region"), entry.getKey(), entry.getValue());
+            Integer result = Configs.regions.updateRegionSetting(regionArgs.get("region"), entry.getKey(), entry.getValue());
             if (result < 0) {
-                String msg = configs.lang.getLog("badArg", entry.getValue());
+                String msg = Configs.lang.getLog("badArg", entry.getValue());
                 SendMessage.sendMessage(sender,msg);
             }
         }
 
-        SendMessage.sendMessage(Bukkit.getConsoleSender(),configs.lang.getLog("updatingRegions"));
+        SendMessage.sendMessage(Bukkit.getConsoleSender(),Configs.lang.getLog("updatingRegions"));
         if(sender instanceof Player){
-            String msg = configs.lang.getLog("updatingRegions");
+            String msg = Configs.lang.getLog("updatingRegions");
             SendMessage.sendMessage(sender,msg);
         }
-        configs.regions.update();
-        SendMessage.sendMessage(Bukkit.getConsoleSender(),configs.lang.getLog("updatedRegions"));
+        Configs.regions.update();
+        SendMessage.sendMessage(Bukkit.getConsoleSender(),Configs.lang.getLog("updatedRegions"));
         if(sender instanceof Player){
-            String msg = configs.lang.getLog("updatedRegions");
+            String msg = Configs.lang.getLog("updatedRegions");
             SendMessage.sendMessage(sender,msg);
         }
         return true;

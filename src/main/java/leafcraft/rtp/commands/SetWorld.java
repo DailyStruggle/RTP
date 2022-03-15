@@ -3,7 +3,7 @@ package leafcraft.rtp.commands;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.SendMessage;
 import leafcraft.rtp.tools.configuration.Configs;
-import leafcraft.rtp.tools.selection.RandomSelectParams;
+import leafcraft.rtp.API.selection.RandomSelectParams;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.command.Command;
@@ -23,14 +23,14 @@ public class SetWorld implements CommandExecutor {
         worldParams.add("override");
     }
 
-    private static Configs configs = null;
+    private static Configs Configs = null;
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
-        if(configs == null) configs = RTP.getConfigs();
+        if(Configs == null) Configs = RTP.getConfigs();
 
         if(!sender.hasPermission("rtp.setWorld")) {
-            String msg = configs.lang.getLog("noPerms");
+            String msg = Configs.lang.getLog("noPerms");
 
             SendMessage.sendMessage(sender,msg);
             return true;
@@ -48,9 +48,9 @@ public class SetWorld implements CommandExecutor {
         World world;
         if(worldArgs.containsKey("world")) {
             String worldName = worldArgs.get("world");
-            worldName = configs.worlds.worldPlaceholder2Name(worldName);
-            if(!configs.worlds.checkWorldExists(worldName)) {
-                String msg = configs.lang.getLog("invalidWorld",worldName);
+            worldName = Configs.worlds.worldPlaceholder2Name(worldName);
+            if(!Configs.worlds.checkWorldExists(worldName)) {
+                String msg = Configs.lang.getLog("invalidWorld",worldName);
 
                 SendMessage.sendMessage(sender,msg);
                 return true;
@@ -63,7 +63,7 @@ public class SetWorld implements CommandExecutor {
                 worldArgs.put("world",world.getName());
             }
             else {
-                String msg = configs.lang.getLog("consoleCmdNotAllowed");
+                String msg = Configs.lang.getLog("consoleCmdNotAllowed");
                 SendMessage.sendMessage(sender,msg);
                 return true;
             }
@@ -72,30 +72,30 @@ public class SetWorld implements CommandExecutor {
         if(worldArgs.containsKey("region")) {
             String region = worldArgs.get("region");
             //check region exists
-            String probe = (String) configs.regions.getRegionSetting(region,"world","");
+            String probe = (String) Configs.regions.getRegionSetting(region,"world","");
             if(probe.equals("")) {
                 RandomSelectParams params = new RandomSelectParams(Objects.requireNonNull(world),null);
-                configs.regions.setRegion(region,params);
+                Configs.regions.setRegion(region,params);
             }
         }
 
         for(Map.Entry<String,String> entry : worldArgs.entrySet()) {
             if(entry.getKey().equals("world")) continue;
-            Integer result = configs.worlds.updateWorldSetting(Objects.requireNonNull(world),entry.getKey(),entry.getValue());
+            Integer result = Configs.worlds.updateWorldSetting(Objects.requireNonNull(world),entry.getKey(),entry.getValue());
             if(result<0) {
-                String msg = configs.lang.getLog("badArg", entry.getValue());
+                String msg = Configs.lang.getLog("badArg", entry.getValue());
                 SendMessage.sendMessage(sender,msg);
             }
         }
-        SendMessage.sendMessage(Bukkit.getConsoleSender(),configs.lang.getLog("updatingWorlds"));
+        SendMessage.sendMessage(Bukkit.getConsoleSender(),Configs.lang.getLog("updatingWorlds"));
         if(sender instanceof Player){
-            String msg = configs.lang.getLog("updatingWorlds");
+            String msg = Configs.lang.getLog("updatingWorlds");
             SendMessage.sendMessage(sender,msg);
         }
-        configs.worlds.update();
-        SendMessage.sendMessage(Bukkit.getConsoleSender(),configs.lang.getLog("updatedWorlds"));
+        Configs.worlds.update();
+        SendMessage.sendMessage(Bukkit.getConsoleSender(),Configs.lang.getLog("updatedWorlds"));
         if(sender instanceof Player) {
-            String msg = configs.lang.getLog("updatedWorlds");
+            String msg = Configs.lang.getLog("updatedWorlds");
             SendMessage.sendMessage(sender,msg);
         }
 

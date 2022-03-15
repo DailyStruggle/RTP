@@ -10,16 +10,16 @@ import org.bukkit.event.Listener;
 import org.bukkit.potion.PotionEffectType;
 
 public final class OnRandomPreTeleport implements Listener {
-    private final Configs configs;
+    private final Configs Configs;
 
     public OnRandomPreTeleport() {
-        this.configs = RTP.getConfigs();
+        this.Configs = RTP.getConfigs();
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onRandomPreTeleport(RandomPreTeleportEvent event) {
         Player player = event.getPlayer();
-        if(configs.config.blindnessDuration>0)
-            player.addPotionEffect(PotionEffectType.BLINDNESS.createEffect(configs.config.blindnessDuration,100));
+        if(Configs.config.blindnessDuration>0)
+            player.addPotionEffect(PotionEffectType.BLINDNESS.createEffect(Configs.config.blindnessDuration,100));
     }
 }

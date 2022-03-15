@@ -2,7 +2,7 @@ package leafcraft.rtp.tools.configuration;
 
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.SendMessage;
-import leafcraft.rtp.tools.selection.RandomSelectParams;
+import leafcraft.rtp.API.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Bukkit;
 import org.bukkit.World;

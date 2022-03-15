@@ -4,7 +4,7 @@ import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.SendMessage;
 import leafcraft.rtp.tools.configuration.Configs;
-import leafcraft.rtp.tools.selection.RandomSelectParams;
+import leafcraft.rtp.API.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
@@ -17,14 +17,14 @@ import org.jetbrains.annotations.NotNull;
 import java.util.*;
 
 public class Fill implements CommandExecutor {
-    private final Configs configs;
+    private final Configs Configs;
     private final Cache cache;
 
     private final Set<String> fillCommands = new HashSet<>();
     private final Set<String> fillParams = new HashSet<>();
 
     public Fill() {
-        this.configs = RTP.getConfigs();
+        this.Configs = RTP.getConfigs();
         this.cache = RTP.getCache();
 
         fillParams.add("region");
@@ -38,7 +38,7 @@ public class Fill implements CommandExecutor {
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
         if(!sender.hasPermission("rtp.fill")) {
-            String msg = configs.lang.getLog("noPerms");
+            String msg = Configs.lang.getLog("noPerms");
             SendMessage.sendMessage(sender,msg);
             return true;
         }
@@ -58,8 +58,8 @@ public class Fill implements CommandExecutor {
             if(!fillCommandArgs.containsKey("region")) {
                 if(sender instanceof Player) {
                     world = ((Player)sender).getWorld();
-                    configs.worlds.checkWorldExists(world.getName());
-                    regionName = (String) configs.worlds.getWorldSetting(world.getName(),"region", "default");
+                    Configs.worlds.checkWorldExists(world.getName());
+                    regionName = (String) Configs.worlds.getWorldSetting(world.getName(),"region", "default");
                 }
                 else {
                     regionName = "default";
@@ -67,15 +67,15 @@ public class Fill implements CommandExecutor {
             }
             else regionName = fillCommandArgs.get("region");
 
-            String worldName = (String) configs.regions.getRegionSetting(regionName,"world","");
+            String worldName = (String) Configs.regions.getRegionSetting(regionName,"world","");
             if(worldName.equals("")) {
-                String msg = configs.lang.getLog("badArg","region:"+regionName);
+                String msg = Configs.lang.getLog("badArg","region:"+regionName);
                 SendMessage.sendMessage(sender,msg);
                 return true;
             }
 
-            if(!configs.worlds.checkWorldExists(worldName)) {
-                String msg = configs.lang.getLog("invalidWorld",worldName);
+            if(!Configs.worlds.checkWorldExists(worldName)) {
+                String msg = Configs.lang.getLog("invalidWorld",worldName);
                 SendMessage.sendMessage(sender,msg);
                 return true;
             }
@@ -86,7 +86,7 @@ public class Fill implements CommandExecutor {
                 region = cache.permRegions.get(randomSelectParams);
             }
             else {
-                String msg = configs.lang.getLog("badArg","region:"+regionName);
+                String msg = Configs.lang.getLog("badArg","region:"+regionName);
                 SendMessage.sendMessage(sender,msg);
                 return true;
             }
@@ -94,7 +94,7 @@ public class Fill implements CommandExecutor {
             switch (args[0]) {
                 case "start" -> {
                     if (region.isFilling()) {
-                        String msg = configs.lang.getLog("fillRunning", regionName);
+                        String msg = Configs.lang.getLog("fillRunning", regionName);
                         SendMessage.sendMessage(sender, msg);
                         return true;
                     }
@@ -104,7 +104,7 @@ public class Fill implements CommandExecutor {
                 }
                 case "cancel" -> {
                     if (!region.isFilling()) {
-                        String msg = configs.lang.getLog("fillNotRunning", regionName);
+                        String msg = Configs.lang.getLog("fillNotRunning", regionName);
                         SendMessage.sendMessage(sender, msg);
                         return true;
                     }
@@ -114,7 +114,7 @@ public class Fill implements CommandExecutor {
                 }
                 case "pause" -> {
                     if (!region.isFilling()) {
-                        String msg = configs.lang.getLog("fillNotRunning", regionName);
+                        String msg = Configs.lang.getLog("fillNotRunning", regionName);
                         SendMessage.sendMessage(sender, msg);
                         return true;
                     }
@@ -124,7 +124,7 @@ public class Fill implements CommandExecutor {
                 }
                 case "resume" -> {
                     if (region.isFilling()) {
-                        String msg = configs.lang.getLog("fillRunning", regionName);
+                        String msg = Configs.lang.getLog("fillRunning", regionName);
                         SendMessage.sendMessage(sender, msg);
                         return true;
                     }
@@ -147,8 +147,8 @@ public class Fill implements CommandExecutor {
         if(!fillArgs.containsKey("region") && regionName==null) {
             if(sender instanceof Player) {
                 world = ((Player)sender).getWorld();
-                configs.worlds.checkWorldExists(world.getName());
-                regionName = (String) configs.worlds.getWorldSetting(world.getName(),"region", "default");
+                Configs.worlds.checkWorldExists(world.getName());
+                regionName = (String) Configs.worlds.getWorldSetting(world.getName(),"region", "default");
             }
             else {
                 regionName = "default";
@@ -156,16 +156,16 @@ public class Fill implements CommandExecutor {
         }
         else regionName = fillArgs.get("region");
 
-        String worldName = (String) configs.regions.getRegionSetting(regionName,"world","");
+        String worldName = (String) Configs.regions.getRegionSetting(regionName,"world","");
         if(worldName.equals("")) {
-            String msg = configs.lang.getLog("badArg","region:"+regionName);
+            String msg = Configs.lang.getLog("badArg","region:"+regionName);
 
             SendMessage.sendMessage(sender,msg);
             return true;
         }
 
-        if(!configs.worlds.checkWorldExists(worldName)) {
-            String msg = configs.lang.getLog("invalidWorld",worldName);
+        if(!Configs.worlds.checkWorldExists(worldName)) {
+            String msg = Configs.lang.getLog("invalidWorld",worldName);
 
             SendMessage.sendMessage(sender,msg);
             return true;
@@ -177,14 +177,14 @@ public class Fill implements CommandExecutor {
             region = cache.permRegions.get(randomSelectParams);
         }
         else {
-            String msg = configs.lang.getLog("badArg","region:"+regionName);
+            String msg = Configs.lang.getLog("badArg","region:"+regionName);
 
             SendMessage.sendMessage(sender,msg);
             return true;
         }
 
         if(region.isFilling()) {
-            String msg = configs.lang.getLog("fillRunning", regionName);
+            String msg = Configs.lang.getLog("fillRunning", regionName);
 
             SendMessage.sendMessage(sender,msg);
             return true;

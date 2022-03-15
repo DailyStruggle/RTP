@@ -17,7 +17,7 @@ public class OnChunkLoad implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH)
     public void onChunkLoad(ChunkLoadEvent event) {
-        Configs configs = RTP.getConfigs();
+        Configs Configs = RTP.getConfigs();
         World world = event.getWorld();
 
 
@@ -26,7 +26,7 @@ public class OnChunkLoad implements Listener {
         if(RTPAPI.getServerIntVersion() < 17) {
             //noinspection deprecation
             biome = world.getBiome(location.getBlockX(), location.getBlockZ());
-            if(configs.config.biomeWhitelist != configs.config.biomes.contains(biome)) return;
+            if(Configs.config.biomeWhitelist != Configs.config.biomes.contains(biome)) return;
         }
 
         for(TeleportRegion region : RTP.getCache().permRegions.values()) {
@@ -34,7 +34,7 @@ public class OnChunkLoad implements Listener {
             if(RTPAPI.getServerIntVersion() >= 17) {
                 int midpoint = (region.minY + region.maxY)/2;
                 biome = world.getBiome(location.getBlockX(), midpoint, location.getBlockZ());
-                if(configs.config.biomeWhitelist != configs.config.biomes.contains(biome)) continue;
+                if(Configs.config.biomeWhitelist != Configs.config.biomes.contains(biome)) continue;
             }
 
             long regionLocation = (long) ((region.shape.equals(TeleportRegion.Shapes.SQUARE)) ?

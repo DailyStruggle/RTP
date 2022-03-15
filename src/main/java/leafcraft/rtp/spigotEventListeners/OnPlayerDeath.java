@@ -4,7 +4,7 @@ import leafcraft.rtp.API.customEvents.TeleportCancelEvent;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tasks.QueueLocation;
 import leafcraft.rtp.tools.Cache;
-import leafcraft.rtp.tools.selection.RandomSelectParams;
+import leafcraft.rtp.API.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -24,7 +24,7 @@ public final class OnPlayerDeath implements Listener {
     private final Cache cache;
 
     public OnPlayerDeath() {
-        this.plugin = RTP.getPlugin();
+        this.plugin = RTP.getInstance();
         this.cache = RTP.getCache();
     }
 
@@ -33,7 +33,7 @@ public final class OnPlayerDeath implements Listener {
         Player player = event.getEntity();
 
         //if currently teleporting, stop that and clean up
-        if (cache.todoTP.containsKey(player.getUniqueId())) {
+        if (RTP.getInstance().todoTP.containsKey(player.getUniqueId())) {
             stopTeleport(event);
         }
 
@@ -60,7 +60,7 @@ public final class OnPlayerDeath implements Listener {
         CommandSender sender = cache.commandSenderLookup.get(player.getUniqueId());
         if(sender == null) return;
 
-        Location to = cache.todoTP.get(player.getUniqueId());
+        Location to = RTP.getInstance().todoTP.get(player.getUniqueId());
         if(to == null) return;
 
         TeleportCancelEvent teleportCancelEvent = new TeleportCancelEvent(sender,player,to,event.isAsynchronous());

@@ -12,33 +12,33 @@ import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
 public class Reload implements CommandExecutor {
-    private final Configs configs;
+    private final Configs Configs;
     private final Cache cache;
 
     public Reload() {
-        this.configs = RTP.getConfigs();
+        this.Configs = RTP.getConfigs();
         this.cache = RTP.getCache();
     }
     @Override
     public boolean onCommand(CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
         if(!sender.hasPermission("rtp.reload")) {
-            String msg = configs.lang.getLog("noPerms");
+            String msg = Configs.lang.getLog("noPerms");
             SendMessage.sendMessage(sender,msg);
             return true;
         }
 
-        String msg = configs.lang.getLog("reloading");
+        String msg = Configs.lang.getLog("reloading");
         SendMessage.sendMessage(Bukkit.getConsoleSender(),msg);
         if(sender instanceof Player) {
             SendMessage.sendMessage(sender,msg);
         }
 
-        configs.refresh();
+        Configs.refresh();
         cache.resetRegions();
 
         cache.storePlayerData();
 
-        msg = configs.lang.getLog("reloaded");
+        msg = Configs.lang.getLog("reloaded");
         SendMessage.sendMessage(Bukkit.getConsoleSender(),msg);
         if(sender instanceof Player) SendMessage.sendMessage(sender,msg);
         return true;

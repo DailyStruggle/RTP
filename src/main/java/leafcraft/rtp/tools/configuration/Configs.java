@@ -22,7 +22,7 @@ public class Configs {
     }
 
     public void refresh() {
-        RTP plugin = RTP.getPlugin();
+        RTP plugin = RTP.getInstance();
         lang = new Lang(plugin);
         config = new Config(plugin,lang);
         worlds = new Worlds(plugin,lang);

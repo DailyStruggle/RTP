@@ -8,7 +8,6 @@ import leafcraft.rtp.API.customEvents.RandomSelectPlayerEvent;
 import leafcraft.rtp.API.customEvents.RandomSelectQueueEvent;
 import leafcraft.rtp.API.selection.SelectionAPI;
 import leafcraft.rtp.API.selection.region.TeleportRegionInterface;
-import leafcraft.rtp.API.selection.region.WorldBorderInterface;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tasks.DoTeleport;
 import leafcraft.rtp.tools.Cache;
@@ -26,13 +25,11 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.lang.invoke.MethodHandle;
 import java.nio.file.DirectoryIteratorException;
 import java.nio.file.FileAlreadyExistsException;
 import java.util.*;
@@ -62,8 +59,8 @@ public class TeleportRegion implements TeleportRegionInterface {
 
         @Override
         public void run() {
-            Configs configs = RTP.getConfigs();
-            if(TPS.getTPS()<configs.config.minTPS) {
+            Configs Configs = RTP.getConfigs();
+            if(TPS.getTPS()<Configs.config.minTPS) {
                 fillTask = new FillTask(plugin);
                 fillTask.runTaskLaterAsynchronously(plugin,20);
                 return;
@@ -93,7 +90,7 @@ public class TeleportRegion implements TeleportRegionInterface {
             }
             AtomicBoolean completed = new AtomicBoolean(false);
 
-            String msg = configs.lang.getLog("fillStatus");
+            String msg = Configs.lang.getLog("fillStatus");
             msg = msg.replace("[num]", String.valueOf(it));
             msg = msg.replace("[total]", String.valueOf(max.get()));
             msg = msg.replace("[region]", name);
@@ -107,7 +104,7 @@ public class TeleportRegion implements TeleportRegionInterface {
                 if(cancelled) return;
 
                 if (it > max.get()) {
-                    msg = configs.lang.getLog("fillStatus");
+                    msg = Configs.lang.getLog("fillStatus");
                     msg = msg.replace("[num]", String.valueOf(it-1));
                     msg = msg.replace("[total]", String.valueOf(max.get()));
                     msg = msg.replace("[region]", name);
@@ -131,7 +128,7 @@ public class TeleportRegion implements TeleportRegionInterface {
                 Biome currBiome = (RTPAPI.getServerIntVersion()<17)
                         ? world.getBiome(xz[0]*16+7,xz[1]*16+7)
                         : world.getBiome(xz[0]*16+7,(minY+maxY)/2,xz[1]*16+7);
-                if(configs.config.biomeWhitelist != configs.config.biomes.contains(currBiome)) {
+                if(Configs.config.biomeWhitelist != Configs.config.biomes.contains(currBiome)) {
                     addBadLocation(it);
                     removeBiomeLocation(it,currBiome);
                     try {
@@ -296,8 +293,8 @@ public class TeleportRegion implements TeleportRegionInterface {
         this.locationQueue = new ConcurrentLinkedQueue<>();
         this.name = name;
         String worldName = params.getOrDefault("world","world");
-        Configs configs = RTP.getConfigs();
-        if(!configs.worlds.checkWorldExists(worldName)) worldName = "world";
+        Configs Configs = RTP.getConfigs();
+        if(!Configs.worlds.checkWorldExists(worldName)) worldName = "world";
         this.world = Objects.requireNonNull(Bukkit.getWorld(worldName));
 
         String shapeStr =   params.get("shape");
@@ -371,8 +368,8 @@ public class TeleportRegion implements TeleportRegionInterface {
             this.totalSpace = totalSpace * Math.PI;
         }
 
-        rerollWorldGuard = configs.config.rerollWorldGuard;
-        rerollGriefPrevention = configs.config.rerollGriefPrevention;
+        rerollWorldGuard = Configs.config.rerollWorldGuard;
+        rerollGriefPrevention = Configs.config.rerollGriefPrevention;
     }
 
     public boolean isFilling() {
@@ -380,8 +377,8 @@ public class TeleportRegion implements TeleportRegionInterface {
     }
 
     public void startFill() {
-        RTP plugin = RTP.getPlugin();
-        Configs configs = RTP.getConfigs();
+        RTP plugin = RTP.getInstance();
+        Configs Configs = RTP.getConfigs();
         //clear learned data
         biomeLocations.clear();
 
@@ -400,7 +397,7 @@ public class TeleportRegion implements TeleportRegionInterface {
         fillTask = new FillTask(plugin);
         fillTask.runTaskLaterAsynchronously(plugin,10L);
 
-        String msg = configs.lang.getLog("fillStart", name);
+        String msg = Configs.lang.getLog("fillStart", name);
         SendMessage.sendMessage(Bukkit.getConsoleSender(),msg);
         for(Player player : Bukkit.getOnlinePlayers()) {
             if (player.hasPermission("rtp.fill")) SendMessage.sendMessage(player, msg);
@@ -408,10 +405,10 @@ public class TeleportRegion implements TeleportRegionInterface {
     }
 
     public void stopFill() {
-        Configs configs = RTP.getConfigs();
+        Configs Configs = RTP.getConfigs();
         fillTask.cancel();
 
-        String msg = configs.lang.getLog("fillCancel", name);
+        String msg = Configs.lang.getLog("fillCancel", name);
         SendMessage.sendMessage(Bukkit.getConsoleSender(),msg);
         for(Player player : Bukkit.getOnlinePlayers()) {
             if (player.hasPermission("rtp.fill")) SendMessage.sendMessage(player, msg);
@@ -427,7 +424,7 @@ public class TeleportRegion implements TeleportRegionInterface {
     }
 
     public void pauseFill() {
-        Configs configs = RTP.getConfigs();
+        Configs Configs = RTP.getConfigs();
         fillTask.cancel();
 
         try {
@@ -441,7 +438,7 @@ public class TeleportRegion implements TeleportRegionInterface {
             fillIteratorGuard.release();
         }
 
-        String msg = configs.lang.getLog("fillPause", name);
+        String msg = Configs.lang.getLog("fillPause", name);
         SendMessage.sendMessage(Bukkit.getConsoleSender(),msg);
         for(Player player : Bukkit.getOnlinePlayers()) {
             if (player.hasPermission("rtp.fill")) SendMessage.sendMessage(player, msg);
@@ -449,15 +446,15 @@ public class TeleportRegion implements TeleportRegionInterface {
     }
 
     public void resumeFill() {
-        RTP plugin = RTP.getPlugin();
-        Configs configs = RTP.getConfigs();
+        RTP plugin = RTP.getInstance();
+        Configs Configs = RTP.getConfigs();
         fillTask = new FillTask(plugin);
         fillTask.runTaskLaterAsynchronously(plugin,10L);
 
         String msg;
         try {
             fillIteratorGuard.acquire();
-            msg = (fillIterator.get()>0) ? configs.lang.getLog("fillResume", name) : configs.lang.getLog("fillStart", name);
+            msg = (fillIterator.get()>0) ? Configs.lang.getLog("fillResume", name) : Configs.lang.getLog("fillStart", name);
         } catch (InterruptedException ignored) {
             return;
         } finally {
@@ -544,7 +541,7 @@ public class TeleportRegion implements TeleportRegionInterface {
     }
 
     public Location getQueuedLocation(CommandSender sender, Player player) {
-        Configs configs = RTP.getConfigs();
+        Configs Configs = RTP.getConfigs();
 
         Location res;
         if(perPlayerLocationQueue.containsKey(player.getUniqueId()) && perPlayerLocationQueue.get(player.getUniqueId()).size()>0) {
@@ -554,7 +551,7 @@ public class TeleportRegion implements TeleportRegionInterface {
             try {
                 res = locationQueue.remove();
             } catch (NoSuchElementException | NullPointerException exception) {
-                SendMessage.sendMessage(sender,player,configs.lang.getLog("noLocationsQueued"));
+                SendMessage.sendMessage(sender,player,Configs.lang.getLog("noLocationsQueued"));
                 return null;
             }
         }
@@ -563,14 +560,14 @@ public class TeleportRegion implements TeleportRegionInterface {
     }
 
     public Location getLocation(SelectionAPI.SyncState state, CommandSender sender, Player player, Biome biome) {
-        Configs configs = RTP.getConfigs();
+        Configs Configs = RTP.getConfigs();
 
         Location res;
         if(biome==null) return getLocation(state,sender,player);
-        else res = getRandomLocation(state, biome);
+        else res = getRandomLocation(biome);
         if (res == null) {
-            int maxAttempts = configs.config.maxAttempts * 10;
-            String msg = PAPIChecker.fillPlaceholders(player, configs.lang.getLog("unsafe", String.valueOf(maxAttempts)));
+            int maxAttempts = Configs.config.maxAttempts * 10;
+            String msg = PAPIChecker.fillPlaceholders(player, Configs.lang.getLog("unsafe", String.valueOf(maxAttempts)));
             SendMessage.sendMessage(sender, player, msg);
         }
         return res;
@@ -582,8 +579,8 @@ public class TeleportRegion implements TeleportRegionInterface {
     }
 
     public Location getLocation(SelectionAPI.SyncState state, CommandSender sender, Player player) {
-        RTP plugin = RTP.getPlugin();
-        Configs configs = RTP.getConfigs();
+        RTP plugin = RTP.getInstance();
+        Configs Configs = RTP.getConfigs();
 
         Location res = null;
 
@@ -598,10 +595,10 @@ public class TeleportRegion implements TeleportRegionInterface {
         }
         catch (NoSuchElementException exception) {
             if(sender.hasPermission("rtp.unqueued")) {
-                res = getRandomLocation(state,null);
+                res = getRandomLocation(null);
                 if(res == null) {
-                    int maxAttempts = configs.config.maxAttempts;
-                    String msg = PAPIChecker.fillPlaceholders(player,configs.lang.getLog("unsafe",String.valueOf(maxAttempts)));
+                    int maxAttempts = Configs.config.maxAttempts;
+                    String msg = PAPIChecker.fillPlaceholders(player,Configs.lang.getLog("unsafe",String.valueOf(maxAttempts)));
                     SendMessage.sendMessage(sender,player,msg);
                 }
                 RandomSelectPlayerEvent randomSelectPlayerEvent = new RandomSelectPlayerEvent(res, player);
@@ -773,7 +770,7 @@ public class TeleportRegion implements TeleportRegionInterface {
             Player player = Bukkit.getPlayer(playerId);
             if(player == null || !player.isOnline()) continue;
             DoTeleport doTeleport = new DoTeleport(player,player,location,chunkSet);
-            doTeleport.runTask(RTP.getPlugin());
+            doTeleport.runTask(RTP.getInstance());
             RTP.getCache().doTeleports.put(playerId,doTeleport);
             popped = true;
             RTP.getCache().queuedPlayers.remove(playerId);
@@ -784,12 +781,11 @@ public class TeleportRegion implements TeleportRegionInterface {
     }
 
     public void queueRandomLocation() {
-        RTP plugin = RTP.getPlugin();
+        RTP plugin = RTP.getInstance();
         if(!plugin.isEnabled()) return;
-        Configs configs = RTP.getConfigs();
 
         if(locationQueue == null) locationQueue = new ConcurrentLinkedQueue<>();
-        Integer queueLen = (Integer)configs.regions.getRegionSetting(name,"queueLen",0);
+        Integer queueLen = (Integer)Configs.regions.getRegionSetting(name,"queueLen",0);
         if(locationQueue.size() >= queueLen) return;
 
         Location location = getRandomLocation(false);
@@ -820,9 +816,9 @@ public class TeleportRegion implements TeleportRegionInterface {
     }
 
     public void queueRandomLocation(UUID uuid) {
-        Configs configs = RTP.getConfigs();
+        Configs Configs = RTP.getConfigs();
 
-        if(locationQueue.size() > 1 && locationQueue.size() >= (Integer)configs.regions.getRegionSetting(name,"queueLen",0)) {
+        if(locationQueue.size() > 1 && locationQueue.size() >= (Integer)Configs.regions.getRegionSetting(name,"queueLen",0)) {
             perPlayerLocationQueue.putIfAbsent(uuid,new ConcurrentLinkedQueue<>());
             perPlayerLocationQueue.get(uuid).add(locationQueue.remove());
             return;
@@ -1018,8 +1014,8 @@ public class TeleportRegion implements TeleportRegionInterface {
         return (long)res;
     }
 
-    public Location getRandomLocation(SelectionAPI.SyncState state, @Nullable Biome biome) {
-        Configs configs = RTP.getConfigs();
+    public Location getRandomLocation(Set<Biome> biome) {
+        Configs Configs = RTP.getConfigs();
         Cache cache = RTP.getCache();
         boolean urgent = !state.equals(SelectionAPI.SyncState.ASYNC);
 
@@ -1031,7 +1027,7 @@ public class TeleportRegion implements TeleportRegionInterface {
         double yTime = 0D;
 
         int numAttempts = 0;
-        int maxAttempts = configs.config.maxAttempts;
+        int maxAttempts = Configs.config.maxAttempts;
         if(biome!=null) maxAttempts = maxAttempts*10;
         boolean goodLocation = false;
         while(numAttempts < maxAttempts && !goodLocation) {
@@ -1206,7 +1202,7 @@ public class TeleportRegion implements TeleportRegionInterface {
                         currChunks.remove(hashableChunk);
                     }
                     else {
-                        Future<Chunk> fChunk = Bukkit.getScheduler().callSyncMethod(RTP.getPlugin(), res::getChunk);
+                        Future<Chunk> fChunk = Bukkit.getScheduler().callSyncMethod(RTP.getInstance(), res::getChunk);
 
                         HashableChunk hashableChunk = new HashableChunk(world, xzChunk[0], xzChunk[1]);
 
@@ -1359,7 +1355,7 @@ public class TeleportRegion implements TeleportRegionInterface {
 
     public Location getRandomLocation(boolean urgent,Biome biome) {
         SelectionAPI.SyncState syncState = urgent ? SelectionAPI.SyncState.ASYNC_URGENT : SelectionAPI.SyncState.ASYNC;
-        return getRandomLocation(syncState,biome);
+        return getRandomLocation(biome);
     }
 
     public Location getRandomLocation(boolean urgent) {
@@ -1674,7 +1670,7 @@ public class TeleportRegion implements TeleportRegionInterface {
             }
         }
 
-        Plugin plugin = RTP.getPlugin();
+        Plugin plugin = RTP.getInstance();
         File f = new File(plugin.getDataFolder(), "regions"+File.separatorChar+name+".dat");
         File parentDir = f.getParentFile();
         if(!parentDir.exists()) {

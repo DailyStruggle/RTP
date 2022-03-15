@@ -12,11 +12,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class Help implements CommandExecutor {
-    private final Configs configs;
+    private final Configs Configs;
     private final Map<String,String> perms = new HashMap<>();
 
     public Help() {
-        this.configs = RTP.getConfigs();
+        this.Configs = RTP.getConfigs();
         this.perms.put("rtp","rtp.see");
         this.perms.put("help","rtp.see");
         this.perms.put("reload","rtp.reload");
@@ -28,7 +28,7 @@ public class Help implements CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
         if(!sender.hasPermission("rtp.see")) {
-            String msg = configs.lang.getLog("noPerms");
+            String msg = Configs.lang.getLog("noPerms");
             SendMessage.sendMessage(sender,msg);
             return true;
         }
@@ -39,7 +39,7 @@ public class Help implements CommandExecutor {
                 if(entry.getKey().equals("rtp")) arg = "";
                 else arg = entry.getKey();
 
-                String msg = configs.lang.getLog(entry.getKey());
+                String msg = Configs.lang.getLog(entry.getKey());
                 String hover = "/rtp " + arg;
                 String click = "/rtp " + arg;
 

@@ -1,6 +1,7 @@
 package leafcraft.rtp.commands;
 
-import leafcraft.rtp.API.Commands.SubCommand;
+import leafcraft.rtp.API.commands.CommandAPI;
+import leafcraft.rtp.API.commands.SubCommand;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.configuration.Configs;
@@ -21,10 +22,6 @@ import java.util.*;
 public class TabComplete implements TabCompleter {
     private final SubCommand subCommands;
 
-    private static RTP plugin = null;
-    private static Configs configs = null;
-    private static Cache cache = null;
-
     public TabComplete(SubCommand mainCommand) {
         this.subCommands = mainCommand;
     }
@@ -33,10 +30,6 @@ public class TabComplete implements TabCompleter {
     public List<String> onTabComplete(CommandSender sender, @NotNull Command command,
                                       @NotNull String alias, String[] args) {
         if(!sender.hasPermission("rtp.see")) return null;
-
-        if(plugin == null) plugin = RTP.getPlugin();
-        if(configs == null) configs = RTP.getConfigs();
-        if(cache == null) cache = RTP.getCache();
 
         List<String> match = new ArrayList<>();
         Set<String> knownParams = new HashSet<>();
@@ -58,7 +51,7 @@ public class TabComplete implements TabCompleter {
                 if(!sender.hasPermission(perm)){
                     return;
                 }
-                SubCommand.ParamType type = command.getSubParamType(arg);
+                CommandAPI.ParamType type = command.getSubParamType(arg);
                 switch (Objects.requireNonNull(type)) {
                     case SHAPE -> {
                         for (TeleportRegion.Shapes shape : TeleportRegion.Shapes.values()) {
@@ -66,9 +59,9 @@ public class TabComplete implements TabCompleter {
                         }
                     }
                     case REGION -> {
-                        List<String> regions = configs.regions.getRegionNames();
+                        List<String> regions = Configs.regions.getRegionNames();
                         for (String region : regions) {
-                            if (!((Boolean) configs.regions.getRegionSetting(region, "requirePermission", true))
+                            if (!((Boolean) Configs.regions.getRegionSetting(region, "requirePermission", true))
                                     || sender.hasPermission("rtp.regions." + region)) {
                                 res.add(arg + ":" + region);
                             }
@@ -76,10 +69,10 @@ public class TabComplete implements TabCompleter {
                     }
                     case WORLD -> {
                         for (World world : Bukkit.getWorlds()) {
-                            configs.worlds.checkWorldExists(world.getName());
-                            if (!((Boolean) configs.worlds.getWorldSetting(world.getName(), "requirePermission", true))
+                            Configs.worlds.checkWorldExists(world.getName());
+                            if (!((Boolean) Configs.worlds.getWorldSetting(world.getName(), "requirePermission", true))
                                     || sender.hasPermission("rtp.worlds." + world.getName())) {
-                                res.add(arg + ":" + configs.worlds.worldName2Placeholder(world.getName()));
+                                res.add(arg + ":" + Configs.worlds.worldName2Placeholder(world.getName()));
                             }
                         }
                     }
@@ -158,7 +151,7 @@ public class TabComplete implements TabCompleter {
         else {
             //if current argument is a parameter, add it to the list and go to next parameter
             String paramPerm = command.getSubParamPerm(arg);
-            SubCommandImpl cmd = (SubCommandImpl) command.getSubCommand(args[i]);
+            SubCommand cmd = command.getSubCommand(args[i]);
             if(paramPerm !=null) {
                 if(sender.hasPermission(paramPerm))
                     knownParams.add(arg);

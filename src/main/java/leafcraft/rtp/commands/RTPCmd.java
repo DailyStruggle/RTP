@@ -1,15 +1,14 @@
 package leafcraft.rtp.commands;
 
-import leafcraft.rtp.API.Commands.SubCommand;
+import leafcraft.rtp.API.commands.SubCommand;
 import leafcraft.rtp.API.RTPAPI;
 import leafcraft.rtp.API.customEvents.TeleportCommandSuccessEvent;
 import leafcraft.rtp.API.selection.SelectionAPI;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tasks.SetupTeleport;
-import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.SendMessage;
 import leafcraft.rtp.tools.configuration.Configs;
-import leafcraft.rtp.tools.selection.RandomSelectParams;
+import leafcraft.rtp.API.selection.RandomSelectParams;
 import leafcraft.rtp.tools.softdepends.PAPIChecker;
 import leafcraft.rtp.tools.softdepends.VaultChecker;
 import net.milkbowl.vault.economy.Economy;
@@ -48,15 +47,13 @@ public class RTPCmd implements CommandExecutor {
     public boolean onCommand(@NotNull CommandSender sender, Command command, @NotNull String label, String[] args) {
         if(!command.getName().equalsIgnoreCase("rtp") && !command.getName().equalsIgnoreCase("wild")) return true;
 
-        RTP plugin = RTP.getPlugin();
-        Configs configs = RTP.getConfigs();
-        Cache cache = RTP.getCache();
+        RTP plugin = RTP.getInstance();
 
         long start = System.nanoTime();
 
         if(args.length > 0 && rtpCommands.containsKey(args[0])) {
             if(!sender.hasPermission(rtpCommands.get(args[0]).getPerm())) {
-                String msg = configs.lang.getLog("noPerms");
+                String msg = Configs.lang.getLog("noPerms");
                 SendMessage.sendMessage(sender,msg);
             }
             else {
@@ -67,7 +64,7 @@ public class RTPCmd implements CommandExecutor {
         }
 
         if(!sender.hasPermission("rtp.use")) {
-            String msg = configs.lang.getLog("noPerms");
+            String msg = Configs.lang.getLog("noPerms");
 
             SendMessage.sendMessage(sender,msg);
             return true;
@@ -90,7 +87,7 @@ public class RTPCmd implements CommandExecutor {
         if(sender.hasPermission("rtp.other") && rtpArgs.containsKey("player")) {
             player = Bukkit.getPlayer(rtpArgs.get("player"));
             if(player == null) {
-                String msg = configs.lang.getLog("badArg", "player:"+rtpArgs.get("player"));
+                String msg = Configs.lang.getLog("badArg", "player:"+rtpArgs.get("player"));
                 SendMessage.sendMessage(sender,msg);
                 return true;
             }
@@ -99,7 +96,7 @@ public class RTPCmd implements CommandExecutor {
             player = (Player) sender;
         }
         else {
-            String msg = configs.lang.getLog("consoleCmdNotAllowed");
+            String msg = Configs.lang.getLog("consoleCmdNotAllowed");
 
             SendMessage.sendMessage(sender,msg);
             return true;
@@ -108,10 +105,10 @@ public class RTPCmd implements CommandExecutor {
         if(cache.setupTeleports.containsKey(player.getUniqueId())
                 || cache.loadChunks.containsKey(player.getUniqueId())
                 || cache.doTeleports.containsKey(player.getUniqueId())
-                || cache.todoTP.containsKey(player.getUniqueId())
+                || RTP.getInstance().todoTP.containsKey(player.getUniqueId())
                 || cache.queuedPlayers.contains(player.getUniqueId()))
         {
-            String msg = configs.lang.getLog("alreadyTeleporting");
+            String msg = Configs.lang.getLog("alreadyTeleporting");
             PAPIChecker.fillPlaceholders(player,msg);
             SendMessage.sendMessage(sender,msg);
             return true;
@@ -121,18 +118,18 @@ public class RTPCmd implements CommandExecutor {
         World world;
         if(sender.hasPermission("rtp.region") && rtpArgs.containsKey("region")) {
             String regionName = rtpArgs.get("region");
-            String worldName = (String) configs.regions.getRegionSetting(regionName,"world","");
+            String worldName = (String) Configs.regions.getRegionSetting(regionName,"world","");
             if (worldName == null
                     || worldName.equals("")
                     || (!sender.hasPermission("rtp.regions."+regionName)
-                    && (Boolean)configs.worlds.getWorldSetting(worldName,"requirePermission",true))) {
-                String msg = configs.lang.getLog("badArg", "region:" + regionName);
+                    && (Boolean)Configs.worlds.getWorldSetting(worldName,"requirePermission",true))) {
+                String msg = Configs.lang.getLog("badArg", "region:" + regionName);
 
                 SendMessage.sendMessage(sender,msg);
                 return true;
             }
-            if (!configs.worlds.checkWorldExists(worldName) || !sender.hasPermission("rtp.worlds."+worldName)) {
-                String msg = configs.lang.getLog("badArg", "world:" + worldName);
+            if (!Configs.worlds.checkWorldExists(worldName) || !sender.hasPermission("rtp.worlds."+worldName)) {
+                String msg = Configs.lang.getLog("badArg", "world:" + worldName);
                 SendMessage.sendMessage(sender,msg);
                 return true;
             }
@@ -141,13 +138,13 @@ public class RTPCmd implements CommandExecutor {
         else {
             if (rtpArgs.containsKey("world") && sender.hasPermission("rtp.world")) {
                 String worldName = rtpArgs.get("world");
-                worldName = configs.worlds.worldPlaceholder2Name(worldName);
-                if (!configs.worlds.checkWorldExists(worldName)) {
-                    String msg = configs.lang.getLog("badArg", "world:" + worldName);
+                worldName = Configs.worlds.worldPlaceholder2Name(worldName);
+                if (!Configs.worlds.checkWorldExists(worldName)) {
+                    String msg = Configs.lang.getLog("badArg", "world:" + worldName);
                     SendMessage.sendMessage(sender,msg);
                     return true;
                 }
-                if(sender.hasPermission("rtp.worlds."+worldName) || !((Boolean)configs.worlds.getWorldSetting(worldName,"requirePermission",true)))
+                if(sender.hasPermission("rtp.worlds."+worldName) || !((Boolean)Configs.worlds.getWorldSetting(worldName,"requirePermission",true)))
                     world = Bukkit.getWorld(rtpArgs.get("world"));
                 else {
                     world = player.getWorld();
@@ -158,10 +155,10 @@ public class RTPCmd implements CommandExecutor {
             }
         }
         String worldName = Objects.requireNonNull(world).getName();
-        if (!sender.hasPermission("rtp.worlds." + worldName) && (Boolean) configs.worlds.getWorldSetting(worldName, "requirePermission", true)) {
-            world = Bukkit.getWorld((String) configs.worlds.getWorldSetting(worldName,"override","[0]"));
-            if(world == null || !configs.worlds.checkWorldExists(world.getName())) {
-                String msg = configs.lang.getLog("badArg", "world:" + worldName);
+        if (!sender.hasPermission("rtp.worlds." + worldName) && (Boolean) Configs.worlds.getWorldSetting(worldName, "requirePermission", true)) {
+            world = Bukkit.getWorld((String) Configs.worlds.getWorldSetting(worldName,"override","[0]"));
+            if(world == null || !Configs.worlds.checkWorldExists(world.getName())) {
+                String msg = Configs.lang.getLog("badArg", "world:" + worldName);
                 SendMessage.sendMessage(sender,msg);
                 return true;
             }
@@ -170,7 +167,7 @@ public class RTPCmd implements CommandExecutor {
         //check time
         if(!sender.hasPermission("rtp.noCooldown")) {
             long lastTime = (sender instanceof Player) ? cache.lastTeleportTime.getOrDefault(((Player) sender).getUniqueId(), 0L) : 0;
-            long cooldownTime = TimeUnit.SECONDS.toNanos(configs.config.teleportCooldown);
+            long cooldownTime = TimeUnit.SECONDS.toNanos(Configs.config.teleportCooldown);
             Set<PermissionAttachmentInfo> perms = sender.getEffectivePermissions();
 
             for(PermissionAttachmentInfo perm : perms) {
@@ -198,11 +195,11 @@ public class RTPCmd implements CommandExecutor {
                 long minutes = TimeUnit.NANOSECONDS.toMinutes(remaining) % 60;
                 long seconds = TimeUnit.NANOSECONDS.toSeconds(remaining) % 60;
                 String replacement = "";
-                if (days > 0) replacement += days + configs.lang.getLog("days") + " ";
-                if (days > 0 || hours > 0) replacement += hours + configs.lang.getLog("hours") + " ";
-                if (days > 0 || hours > 0 || minutes > 0) replacement += minutes + configs.lang.getLog("minutes") + " ";
-                replacement += seconds + configs.lang.getLog("seconds");
-                String msg = configs.lang.getLog("cooldownMessage", replacement);
+                if (days > 0) replacement += days + Configs.lang.getLog("days") + " ";
+                if (days > 0 || hours > 0) replacement += hours + Configs.lang.getLog("hours") + " ";
+                if (days > 0 || hours > 0 || minutes > 0) replacement += minutes + Configs.lang.getLog("minutes") + " ";
+                replacement += seconds + Configs.lang.getLog("seconds");
+                String msg = Configs.lang.getLog("cooldownMessage", replacement);
 
                 SendMessage.sendMessage(sender, msg);
                 return true;
@@ -213,7 +210,7 @@ public class RTPCmd implements CommandExecutor {
             String playerName = rtpArgs.get("near");
             Player targetPlayer = Bukkit.getPlayer(playerName);
 
-            double price = configs.config.nearSelfPrice;
+            double price = Configs.config.nearSelfPrice;
             Economy economy = VaultChecker.getEconomy();
             boolean has = true;
             if (economy != null
@@ -235,34 +232,34 @@ public class RTPCmd implements CommandExecutor {
                     playerName = targetPlayer.getName();
                 }
                 else {
-                    String msg = configs.lang.getLog("badArg", "near:" + playerName);
+                    String msg = Configs.lang.getLog("badArg", "near:" + playerName);
 
                     SendMessage.sendMessage(sender,msg);
                     return true;
                 }
             }
             else if (!playerName.equals(sender.getName()) && !sender.hasPermission("rtp.near.other")) {
-                String msg = configs.lang.getLog("noPerms");
+                String msg = Configs.lang.getLog("noPerms");
 
                 SendMessage.sendMessage(sender,msg);
                 return true;
             }
             else if (!sender.hasPermission("rtp.near")) {
-                String msg = configs.lang.getLog("noPerms");
+                String msg = Configs.lang.getLog("noPerms");
 
                 SendMessage.sendMessage(sender,msg);
                 return true;
             }
 
             if (targetPlayer == null) {
-                String msg = configs.lang.getLog("badArg", "near:" + playerName);
+                String msg = Configs.lang.getLog("badArg", "near:" + playerName);
 
                 SendMessage.sendMessage(sender,msg);
                 return true;
             }
 
             if(!has) {
-                String msg = configs.lang.getLog("notEnoughMoney",String.valueOf(price));
+                String msg = Configs.lang.getLog("notEnoughMoney",String.valueOf(price));
                 PAPIChecker.fillPlaceholders((Player)sender,msg);
                 SendMessage.sendMessage(sender,msg);
                 return true;
@@ -275,11 +272,11 @@ public class RTPCmd implements CommandExecutor {
                 cache.currentTeleportCost.put(((Player) sender).getUniqueId(), price);
             }
 
-            String shapeStr = (String) configs.worlds.getWorldSetting(worldName, "nearShape", "CIRCLE");
-            Integer radius = (Integer) configs.worlds.getWorldSetting(worldName, "nearRadius", 16);
-            Integer centerRadius = (Integer) configs.worlds.getWorldSetting(worldName, "nearCenterRadius", 8);
-            Integer minY = (Integer) configs.worlds.getWorldSetting(worldName, "nearMinY", 48);
-            Integer maxY = (Integer) configs.worlds.getWorldSetting(worldName, "nearMaxY", 127);
+            String shapeStr = (String) Configs.worlds.getWorldSetting(worldName, "nearShape", "CIRCLE");
+            Integer radius = (Integer) Configs.worlds.getWorldSetting(worldName, "nearRadius", 16);
+            Integer centerRadius = (Integer) Configs.worlds.getWorldSetting(worldName, "nearCenterRadius", 8);
+            Integer minY = (Integer) Configs.worlds.getWorldSetting(worldName, "nearMinY", 48);
+            Integer maxY = (Integer) Configs.worlds.getWorldSetting(worldName, "nearMaxY", 127);
             rtpArgs.putIfAbsent("shape", shapeStr);
             rtpArgs.putIfAbsent("radius",radius.toString());
             rtpArgs.putIfAbsent("centerRadius",centerRadius.toString());
@@ -298,12 +295,12 @@ public class RTPCmd implements CommandExecutor {
                 biome = null;
             }
             if(biome == null) {
-                String msg = configs.lang.getLog("badArg", "biome:"+rtpArgs.get("biome"));
+                String msg = Configs.lang.getLog("badArg", "biome:"+rtpArgs.get("biome"));
                 SendMessage.sendMessage(sender,msg);
                 return true;
             }
 
-            double price = configs.config.biomePrice;
+            double price = Configs.config.biomePrice;
             Economy economy = VaultChecker.getEconomy();
             boolean has = true;
             if (economy != null
@@ -312,13 +309,13 @@ public class RTPCmd implements CommandExecutor {
                 has = economy.has((Player) sender, price);
 
             if (!sender.hasPermission("rtp.biome")) {
-                String msg = configs.lang.getLog("noPerms");
+                String msg = Configs.lang.getLog("noPerms");
                 SendMessage.sendMessage(sender,msg);
                 return true;
             }
 
             if(!has) {
-                String msg = configs.lang.getLog("notEnoughMoney",String.valueOf(price));
+                String msg = Configs.lang.getLog("notEnoughMoney",String.valueOf(price));
                 PAPIChecker.fillPlaceholders((Player)sender,msg);
                 SendMessage.sendMessage(sender,msg);
                 return true;
@@ -337,7 +334,7 @@ public class RTPCmd implements CommandExecutor {
             try {
                 Biome.valueOf(rsParams.params.get("biome"));
             } catch (IllegalArgumentException | NullPointerException exception) {
-                String msg = configs.lang.getLog("badArg", "biome:"+rsParams.params.get("biome"));
+                String msg = Configs.lang.getLog("badArg", "biome:"+rsParams.params.get("biome"));
                 SendMessage.sendMessage(sender,msg);
                 return true;
             }
@@ -358,7 +355,7 @@ public class RTPCmd implements CommandExecutor {
                 && hasQueued
                 && sender.hasPermission("rtp.noDelay")
                 && !rsParams.params.containsKey("biome"))
-                || configs.config.syncLoading
+                || Configs.config.syncLoading
                 || RTPAPI.getServerIntVersion()<=8) {
             setupTeleport.setupTeleportNow(SelectionAPI.SyncState.SYNC);
         } else {

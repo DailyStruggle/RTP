@@ -16,20 +16,20 @@ import java.util.concurrent.ConcurrentSkipListSet;
 
 public final class RTP_Glide extends JavaPlugin {
     private static final ConcurrentSkipListSet<UUID> glidingPlayers = new ConcurrentSkipListSet<>();
-    private static Configs configs;
+    private static Configs Configs;
 
     @Override
     public void onEnable() {
-        configs = new Configs(this);
+        Configs = new Configs(this);
         // Plugin startup logic
-        Glide glide = new Glide(this, configs);
+        Glide glide = new Glide(this, Configs);
         Objects.requireNonNull(getCommand("glide")).setExecutor(glide);
         Objects.requireNonNull(getCommand("glide")).setTabCompleter(new TabComplete());
 
-        glide.addCommandHandle("reload","glide.reload",new Reload(configs));
+        glide.addCommandHandle("reload","glide.reload",new Reload(Configs));
 
         if(Bukkit.getPluginManager().getPlugin("RTP") != null)
-            getServer().getPluginManager().registerEvents(new OnRandomTeleport(this, configs), this);
+            getServer().getPluginManager().registerEvents(new OnRandomTeleport(this, Configs), this);
         getServer().getPluginManager().registerEvents(new OnGlideToggle(this),this);
 
         SetupGlide.setPlugin(this);
@@ -39,7 +39,7 @@ public final class RTP_Glide extends JavaPlugin {
     public void onDisable() {
         // Plugin shutdown logic
         glidingPlayers.clear();
-        configs = null;
+        Configs = null;
     }
 
     public ConcurrentSkipListSet<UUID> getGlidingPlayers() {

@@ -6,7 +6,7 @@ import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.SendMessage;
 import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.selection.ChunkSet;
-import leafcraft.rtp.tools.selection.RandomSelectParams;
+import leafcraft.rtp.API.selection.RandomSelectParams;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
@@ -22,16 +22,16 @@ public class SetupTeleport extends BukkitRunnable {
     private final RTP plugin;
     private final CommandSender sender;
     private final Player player;
-    private final Configs configs;
+    private final Configs Configs;
     private final Cache cache;
     private final RandomSelectParams rsParams;
     private boolean cancelled = false;
 
     public SetupTeleport(CommandSender sender, Player player, RandomSelectParams rsParams) {
         this.sender = sender;
-        this.plugin = RTP.getPlugin();
+        this.plugin = RTP.getInstance();
         this.player = player;
-        this.configs = RTP.getConfigs();
+        this.Configs = RTP.getConfigs();
         this.cache = RTP.getCache();
         this.rsParams = rsParams;
     }
@@ -59,10 +59,10 @@ public class SetupTeleport extends BukkitRunnable {
             cache.setupTeleports.remove(player.getUniqueId());
             return;
         }
-        cache.todoTP.put(player.getUniqueId(), location);
+        RTP.getInstance().todoTP.put(player.getUniqueId(), location);
 
         //get warmup delay
-        long delay = configs.config.teleportDelay;
+        long delay = Configs.config.teleportDelay;
 
         Set<PermissionAttachmentInfo> perms = sender.getEffectivePermissions();
 
@@ -96,11 +96,11 @@ public class SetupTeleport extends BukkitRunnable {
             long minutes = TimeUnit.SECONDS.toMinutes(time)%60;
             long seconds = TimeUnit.SECONDS.toSeconds(time)%60;
             String replacement = "";
-            if(days>0) replacement += days + configs.lang.getLog("days") + " ";
-            if(hours>0) replacement += hours + configs.lang.getLog("hours") + " ";
-            if(minutes>0) replacement += minutes + configs.lang.getLog("minutes") + " ";
-            if(seconds>0) replacement += seconds%60 + configs.lang.getLog("seconds");
-            String msg = configs.lang.getLog("delayMessage", replacement);
+            if(days>0) replacement += days + Configs.lang.getLog("days") + " ";
+            if(hours>0) replacement += hours + Configs.lang.getLog("hours") + " ";
+            if(minutes>0) replacement += minutes + Configs.lang.getLog("minutes") + " ";
+            if(seconds>0) replacement += seconds%60 + Configs.lang.getLog("seconds");
+            String msg = Configs.lang.getLog("delayMessage", replacement);
             SendMessage.sendMessage(sender,player,msg);
         }
 
