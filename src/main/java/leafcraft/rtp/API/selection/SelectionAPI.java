@@ -1,23 +1,21 @@
 package leafcraft.rtp.API.selection;
 
-import leafcraft.rtp.API.selection.region.WorldBorderInterface;
-import leafcraft.rtp.API.selection.region.WorldBorderParameters;
+import leafcraft.rtp.API.selection.worldborder.WorldBorder;
+import leafcraft.rtp.tools.configuration.Configs;
+import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
-import org.bukkit.WorldBorder;
+import org.jetbrains.annotations.Nullable;
 
 import java.lang.invoke.MethodHandle;
-import java.util.ArrayList;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 
 public class SelectionAPI {
-    //todo: replace with simple main thread check
-    public enum SyncState {
-        SYNC,
-        ASYNC,
-        ASYNC_URGENT,
-    }
+    private static final ConcurrentHashMap<RandomSelectParams, TeleportRegion> tempRegions = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<RandomSelectParams, TeleportRegion> permRegions = new ConcurrentHashMap<>();
 
     //semaphore needed in case of async usage
     //storage for region verifiers to use for ALL regions
@@ -26,7 +24,7 @@ public class SelectionAPI {
 
     //storage for worldborder stuff to use for ALL regions
     private static final Semaphore wbLock = new Semaphore(1);
-    private static final ArrayList<WorldBorderInterface> wbCheckers = new ArrayList<>();
+    private static final List<WorldBorder> wbCheckers = new ArrayList<WorldBorder>();
 
     /**
      * addGlobalRegionVerifier - add a region verifier to use for ALL regions
@@ -79,51 +77,86 @@ public class SelectionAPI {
 
     /**
      * addWBInterface - add a world border verifier to use for ALL regions
-     * @param worldBorderInterface world border stuff to reference.
+     * @param worldBorder world border stuff to reference.
      */
-    public static void addWBInterface(WorldBorderInterface worldBorderInterface) {
+    public static void addWorldBorder(WorldBorder worldBorder) {
         try {
             wbLock.acquire();
         } catch (InterruptedException e) {
             wbLock.release();
             return;
         }
-        wbCheckers.add(worldBorderInterface);
+        wbCheckers.add(worldBorder);
         wbLock.release();
     }
 
-    public static void clearWBInterfaces() {
-        try {
-            wbLock.acquire();
-        } catch (InterruptedException e) {
-            wbLock.release();
-            return;
-        }
-        wbCheckers.clear();
-        wbLock.release();
-    }
-
-    public static WorldBorderParameters getWBParameters(Location location) {
+    public static WorldBorder getWorldBorder(Location location) {
         if(wbCheckers.size() == 0) {
-            WorldBorder wb = Bukkit.getWorlds().get(0).getWorldBorder();
-            return new WorldBorderParameters((int)wb.getSize()/2,wb.getCenter());
+            return new WorldBorder(
+                    world -> (long)world.getWorldBorder().getSize()/2,
+                    world -> world.getWorldBorder().getCenter(),
+                    world -> "Square"
+            );
         }
 
         World world = location.getWorld();
         long radius = Bukkit.getMaxWorldSize();
-        WorldBorderParameters params = wbCheckers.get(0).getParameters(world);
+
+        WorldBorder selection = wbCheckers.get(0);
 
         //use center of most restricted worldborder
-        for(WorldBorderInterface worldBorderInterface : wbCheckers) {
-            WorldBorderParameters cmpParams = worldBorderInterface.getParameters(world);
-            long cmpRadius = cmpParams.radius();
+        for(WorldBorder worldBorder : wbCheckers) {
+            long cmpRadius = worldBorder.getRadius(world);
             if(cmpRadius < radius) {
-                params = worldBorderInterface.getParameters(world);
                 radius = cmpRadius;
+                selection = worldBorder;
             }
         }
-        return params;
+        return selection;
     }
 
+    /**
+     * get a region by name
+     * @param regionName - name of region
+     * @return region by that name, or null if none
+     */
+    @Nullable
+    public static TeleportRegion getRegion(String regionName) {
+        Map<String,String> params = new HashMap<>();
+        params.put("region",regionName);
 
+        String worldName = (String) Configs.regions.getRegionSetting(regionName,"world","");
+        if (worldName == null || worldName.equals("") || !Configs.worlds.checkWorldExists(worldName)) {
+            return null;
+        }
+
+        RandomSelectParams randomSelectParams = new RandomSelectParams(Objects.requireNonNull(Bukkit.getWorld(worldName)),params);
+        if(!permRegions.containsKey(randomSelectParams)) return null;
+        return permRegions.get(randomSelectParams);
+    }
+
+    /**
+     * add or update a region by name
+     * @param regionName - name of region
+     * @param params - mapped parameters, based on parameters in regions.yml
+     * @return the corresponding TeleportRegion
+     */
+    @Nullable
+    public static TeleportRegion setRegion(String regionName, Map<String,String> params) {
+        params.put("region",regionName);
+
+        String worldName = (String) Configs.regions.getRegionSetting(regionName,"world","");
+        if (worldName == null || worldName.equals("") || !Configs.worlds.checkWorldExists(worldName)) {
+            return null;
+        }
+
+        RandomSelectParams randomSelectParams = new RandomSelectParams(Objects.requireNonNull(Bukkit.getWorld(worldName)),params);
+        if(permRegions.containsKey(randomSelectParams)) {
+            permRegions.get(randomSelectParams).shutdown();
+        }
+
+        Configs.regions.setRegion(regionName,randomSelectParams);
+        return permRegions.put(randomSelectParams,
+                new TeleportRegion(regionName,randomSelectParams.params));
+    }
 }

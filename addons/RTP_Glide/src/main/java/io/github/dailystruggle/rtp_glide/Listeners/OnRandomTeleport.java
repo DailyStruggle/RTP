@@ -15,11 +15,11 @@ import java.util.Objects;
 
 public final class OnRandomTeleport implements Listener {
     private final RTP_Glide plugin;
-    private final Configs configs;
+    private final Configs Configs;
 
-    public OnRandomTeleport(RTP_Glide plugin, Configs configs) {
+    public OnRandomTeleport(RTP_Glide plugin, Configs Configs) {
         this.plugin = plugin;
-        this.configs = configs;
+        this.Configs = Configs;
     }
 
     @EventHandler(priority = EventPriority.NORMAL)
@@ -27,6 +27,6 @@ public final class OnRandomTeleport implements Listener {
         if(Objects.requireNonNull(event.getTo().getWorld())
                 .getEnvironment().equals(World.Environment.NETHER))
             return;
-        new SetupGlide(event.getPlayer(), configs).runTask(plugin);
+        new SetupGlide(event.getPlayer(), Configs).runTask(plugin);
     }
 }

@@ -1,7 +1,7 @@
-package leafcraft.rtp.tools.selection;
+package leafcraft.rtp.API.selection;
 
-import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.configuration.Configs;
+import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.jetbrains.annotations.NotNull;
@@ -30,18 +30,17 @@ public class RandomSelectParams {
 
     public RandomSelectParams(@NotNull World world, @Nullable Map<String,String> params) {
         if(params == null) params = new HashMap<>();
-        Configs configs = RTP.getConfigs();
         String worldName = params.getOrDefault("world",world.getName());
-        worldName = configs.worlds.worldPlaceholder2Name(worldName);
-        if(!configs.worlds.checkWorldExists(worldName)) worldName = world.getName();
+        worldName = Configs.worlds.worldPlaceholder2Name(worldName);
+        if(!Configs.worlds.checkWorldExists(worldName)) worldName = world.getName();
         world = Bukkit.getWorld(worldName);
         Objects.requireNonNull(world);
 
-        String defaultRegion = (String)configs.worlds.getWorldSetting(world.getName(),"region","default");
+        String defaultRegion = (String)Configs.worlds.getWorldSetting(world.getName(),"region","default");
         String regionName = params.getOrDefault("region",defaultRegion);
 
-        String targetWorldName = (String)configs.regions.getRegionSetting(regionName,"world",world.getName());
-        if(configs.worlds.checkWorldExists(targetWorldName)) {
+        String targetWorldName = (String)Configs.regions.getRegionSetting(regionName,"world",world.getName());
+        if(Configs.worlds.checkWorldExists(targetWorldName)) {
             world = Bukkit.getWorld(targetWorldName);
             Objects.requireNonNull(world);
             worldName = targetWorldName;
@@ -60,19 +59,19 @@ public class RandomSelectParams {
         //ugh string parsing, but at least it's short and clean
         // fills in any missing values
         this.params.put("world",worldName);
-        this.params.putIfAbsent("shape",(String)configs.regions.getRegionSetting(regionName,"shape","CIRCLE"));
-        this.params.putIfAbsent("mode",(String)configs.regions.getRegionSetting(regionName,"mode","ACCUMULATE"));
-        this.params.putIfAbsent("radius", (configs.regions.getRegionSetting(regionName,"radius",4096)).toString());
-        this.params.putIfAbsent("centerRadius", (configs.regions.getRegionSetting(regionName,"centerRadius",1024)).toString());
-        this.params.putIfAbsent("centerX", (configs.regions.getRegionSetting(regionName,"centerX",0)).toString());
-        this.params.putIfAbsent("centerZ", (configs.regions.getRegionSetting(regionName,"centerZ",0)).toString());
-        this.params.putIfAbsent("weight", (configs.regions.getRegionSetting(regionName,"weight",1.0)).toString());
-        this.params.putIfAbsent("minY", (configs.regions.getRegionSetting(regionName,"minY",0)).toString());
-        this.params.putIfAbsent("maxY", (configs.regions.getRegionSetting(regionName,"maxY",128)).toString());
-        this.params.putIfAbsent("requireSkyLight", (configs.regions.getRegionSetting(regionName,"requireSkyLight",true)).toString());
-        this.params.putIfAbsent("worldBorderOverride", (configs.regions.getRegionSetting(regionName,"worldBorderOverride",false)).toString());
-        this.params.putIfAbsent("uniquePlacements", (configs.regions.getRegionSetting(regionName,"uniquePlacements",false)).toString());
-        this.params.putIfAbsent("expand", (configs.regions.getRegionSetting(regionName,"expand",false)).toString());
+        this.params.putIfAbsent("shape",(String)Configs.regions.getRegionSetting(regionName,"shape","CIRCLE"));
+        this.params.putIfAbsent("mode",(String)Configs.regions.getRegionSetting(regionName,"mode","ACCUMULATE"));
+        this.params.putIfAbsent("radius", (Configs.regions.getRegionSetting(regionName,"radius",4096)).toString());
+        this.params.putIfAbsent("centerRadius", (Configs.regions.getRegionSetting(regionName,"centerRadius",1024)).toString());
+        this.params.putIfAbsent("centerX", (Configs.regions.getRegionSetting(regionName,"centerX",0)).toString());
+        this.params.putIfAbsent("centerZ", (Configs.regions.getRegionSetting(regionName,"centerZ",0)).toString());
+        this.params.putIfAbsent("weight", (Configs.regions.getRegionSetting(regionName,"weight",1.0)).toString());
+        this.params.putIfAbsent("minY", (Configs.regions.getRegionSetting(regionName,"minY",0)).toString());
+        this.params.putIfAbsent("maxY", (Configs.regions.getRegionSetting(regionName,"maxY",128)).toString());
+        this.params.putIfAbsent("requireSkyLight", (Configs.regions.getRegionSetting(regionName,"requireSkyLight",true)).toString());
+        this.params.putIfAbsent("worldBorderOverride", (Configs.regions.getRegionSetting(regionName,"worldBorderOverride",false)).toString());
+        this.params.putIfAbsent("uniquePlacements", (Configs.regions.getRegionSetting(regionName,"uniquePlacements",false)).toString());
+        this.params.putIfAbsent("expand", (Configs.regions.getRegionSetting(regionName,"expand",false)).toString());
 
         worldID = Objects.requireNonNull(world).getUID();
         shape = TeleportRegion.Shapes.valueOf(this.params.getOrDefault("shape","CIRCLE"));

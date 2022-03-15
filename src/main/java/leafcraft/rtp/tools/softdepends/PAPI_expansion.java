@@ -4,7 +4,7 @@ import leafcraft.rtp.API.RTPAPI;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.configuration.Configs;
-import leafcraft.rtp.tools.selection.RandomSelectParams;
+import leafcraft.rtp.API.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
 import org.bukkit.Bukkit;
@@ -20,12 +20,12 @@ import java.util.concurrent.TimeUnit;
 public class PAPI_expansion extends PlaceholderExpansion{
 	private final RTP plugin;
 	private final Cache cache;
-	private final Configs configs;
+	private final Configs Configs;
 
-	public PAPI_expansion(RTP plugin, Configs configs, Cache cache){
+	public PAPI_expansion(RTP plugin, Configs Configs, Cache cache){
 	    this.plugin = plugin;
         this.cache = cache;
-        this.configs = configs;
+        this.Configs = Configs;
     }
 
     @Override
@@ -67,20 +67,20 @@ public class PAPI_expansion extends PlaceholderExpansion{
         // %rtp_player_status%
         if(identifier.equalsIgnoreCase("player_status")){
             if(cache.doTeleports.containsKey(player.getUniqueId())) {
-                return configs.lang.getLog("PLAYER_TELEPORTING");
+                return Configs.lang.getLog("PLAYER_TELEPORTING");
             }
             else if(cache.setupTeleports.containsKey(player.getUniqueId())) {
-                return configs.lang.getLog("PLAYER_SETUP");
+                return Configs.lang.getLog("PLAYER_SETUP");
             }
             else if(cache.loadChunks.containsKey(player.getUniqueId())) {
-                return configs.lang.getLog("PLAYER_LOADING");
+                return Configs.lang.getLog("PLAYER_LOADING");
             }
             else if(!player.hasPermission("rtp.noCooldown")
-                    && (cache.lastTeleportTime.get(player.getUniqueId()) - System.nanoTime()) < TimeUnit.SECONDS.toNanos(configs.config.teleportCooldown)) {
-                return configs.lang.getLog("PLAYER_COOLDOWN");
+                    && (cache.lastTeleportTime.get(player.getUniqueId()) - System.nanoTime()) < TimeUnit.SECONDS.toNanos(Configs.config.teleportCooldown)) {
+                return Configs.lang.getLog("PLAYER_COOLDOWN");
             }
 
-            return configs.lang.getLog("PLAYER_AVAILABLE");
+            return Configs.lang.getLog("PLAYER_AVAILABLE");
         }
 
         if(identifier.equalsIgnoreCase("total_queue_length")) {
@@ -104,7 +104,7 @@ public class PAPI_expansion extends PlaceholderExpansion{
         if(identifier.equalsIgnoreCase("teleport_world")) {
             Location location = getTeleportLocation(player);
             String worldName = Objects.requireNonNull(location.getWorld()).getName();
-            worldName = configs.worlds.worldName2Placeholder(worldName);
+            worldName = Configs.worlds.worldName2Placeholder(worldName);
             return worldName;
         }
 
@@ -136,15 +136,15 @@ public class PAPI_expansion extends PlaceholderExpansion{
 
     @NotNull
     private Location getTeleportLocation(Player player) {
-	    return cache.todoTP.getOrDefault(player.getUniqueId(), cache.lastTP.getOrDefault(player.getUniqueId(),new Location(player.getWorld(),0,0,0)));
+	    return RTP.getInstance().todoTP.getOrDefault(player.getUniqueId(), RTP.getInstance().lastTP.getOrDefault(player.getUniqueId(),new Location(player.getWorld(),0,0,0)));
     }
 
     private TeleportRegion getRegion(Player player) {
 	    World world = player.getWorld();
         String worldName = world.getName();
-        if (!player.hasPermission("rtp.worlds." + worldName) && (Boolean) configs.worlds.getWorldSetting(worldName, "requirePermission", true)) {
-            worldName = (String)configs.worlds.getWorldSetting(worldName,"override","world");
-            if(!configs.worlds.checkWorldExists(worldName)) return null;
+        if (!player.hasPermission("rtp.worlds." + worldName) && (Boolean) Configs.worlds.getWorldSetting(worldName, "requirePermission", true)) {
+            worldName = (String)Configs.worlds.getWorldSetting(worldName,"override","world");
+            if(!Configs.worlds.checkWorldExists(worldName)) return null;
             world = Bukkit.getWorld(worldName);
         }
 

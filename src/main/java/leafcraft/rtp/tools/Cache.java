@@ -7,7 +7,7 @@ import leafcraft.rtp.tasks.LoadChunks;
 import leafcraft.rtp.tasks.QueueLocation;
 import leafcraft.rtp.tasks.SetupTeleport;
 import leafcraft.rtp.tools.configuration.Configs;
-import leafcraft.rtp.tools.selection.RandomSelectParams;
+import leafcraft.rtp.API.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import leafcraft.rtp.tools.softdepends.VaultChecker;
 import net.milkbowl.vault.economy.Economy;
@@ -33,47 +33,45 @@ import java.util.concurrent.TimeUnit;
 @SuppressWarnings("unused")
 public class Cache {
     private final RTP plugin;
-    private final Configs configs;
 
     public final ConcurrentHashMap<RandomSelectParams,BukkitTask> queueTimers = new ConcurrentHashMap<>();
 
     public Cache() {
-        this.plugin = RTP.getPlugin();
-        this.configs = RTP.getConfigs();
+        this.plugin = RTP.getInstance();
 
         fetchPlayerData();
 
-        for(String region : configs.regions.getRegionNames()) {
-            String worldName = (String) configs.regions.getRegionSetting(region,"world","world");
-            World world = Bukkit.getWorld(worldName);
-            if(world == null) world = Bukkit.getWorlds().get(0);
-            Map<String,String> map = new HashMap<>();
-            map.put("region",region);
-            RandomSelectParams key = new RandomSelectParams(world,map);
-            TeleportRegion teleportRegion = new TeleportRegion(region,key.params);
-            permRegions.put(key, teleportRegion);
-            Bukkit.getScheduler().runTaskAsynchronously(plugin, teleportRegion::loadFile);
-        }
-
-        double i = 0d;
-        int period = configs.config.queuePeriod;
-
-        for(Map.Entry<RandomSelectParams,BukkitTask> entry : queueTimers.entrySet()) {
-            entry.getValue().cancel();
-            queueTimers.remove(entry.getKey());
-        }
-        if(period > 0) {
-            double increment = (((double) period) / permRegions.size()) * 20;
-            for (Map.Entry<RandomSelectParams, TeleportRegion> entry : permRegions.entrySet()) {
-                queueTimers.put(entry.getKey(), Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
-                    double tps = TPS.getTPS();
-                    double minTps = (Double) configs.config.getConfigValue("minTPS", 19.0);
-                    if (tps < minTps) return;
-                    new QueueLocation(entry.getValue(), this).queueLocationNow();
-                }, 200 + (long) i, period * 20L));
-                i += increment;
-            }
-        }
+//        for(String region : Configs.regions.getRegionNames()) {
+//            String worldName = (String) Configs.regions.getRegionSetting(region,"world","world");
+//            World world = Bukkit.getWorld(worldName);
+//            if(world == null) world = Bukkit.getWorlds().get(0);
+//            Map<String,String> map = new HashMap<>();
+//            map.put("region",region);
+//            RandomSelectParams key = new RandomSelectParams(world,map);
+//            TeleportRegion teleportRegion = new TeleportRegion(region,key.params);
+//            permRegions.put(key, teleportRegion);
+//            Bukkit.getScheduler().runTaskAsynchronously(plugin, teleportRegion::loadFile);
+//        }
+//
+//        double i = 0d;
+//        int period = Configs.config.queuePeriod;
+//
+//        for(Map.Entry<RandomSelectParams,BukkitTask> entry : queueTimers.entrySet()) {
+//            entry.getValue().cancel();
+//            queueTimers.remove(entry.getKey());
+//        }
+//        if(period > 0) {
+//            double increment = (((double) period) / permRegions.size()) * 20;
+//            for (Map.Entry<RandomSelectParams, TeleportRegion> entry : permRegions.entrySet()) {
+//                queueTimers.put(entry.getKey(), Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
+//                    double tps = TPS.getTPS();
+//                    double minTps = (Double) Configs.config.getConfigValue("minTPS", 19.0);
+//                    if (tps < minTps) return;
+//                    new QueueLocation(entry.getValue(), this).queueLocationNow();
+//                }, 200 + (long) i, period * 20L));
+//                i += increment;
+//            }
+//        }
     }
 
     //if we needed to force load a chunk to prevent unload, undo that on teleport.
@@ -84,8 +82,6 @@ public class Cache {
     // value: location they're going to, to be re-added to the queue on cancellation
     public final ConcurrentSkipListSet<UUID> queuedPlayers = new ConcurrentSkipListSet<>();
     public final ConcurrentHashMap<UUID,CommandSender> commandSenderLookup = new ConcurrentHashMap<>();
-    public final ConcurrentHashMap<UUID,Location> todoTP = new ConcurrentHashMap<>();
-    public final ConcurrentHashMap<UUID,Location> lastTP = new ConcurrentHashMap<>();
     public final ConcurrentHashMap<UUID,RandomSelectParams> regionKeys = new ConcurrentHashMap<>();
 
     //Bukkit task list in case of cancellation
@@ -103,9 +99,6 @@ public class Cache {
     //store teleport command cooldown
     public final ConcurrentHashMap<UUID,Long> lastTeleportTime = new ConcurrentHashMap<>();
     public final ConcurrentHashMap<UUID,Double> currentTeleportCost = new ConcurrentHashMap<>();
-
-    public final ConcurrentHashMap<RandomSelectParams, TeleportRegion> tempRegions = new ConcurrentHashMap<>();
-    public final ConcurrentHashMap<RandomSelectParams, TeleportRegion> permRegions = new ConcurrentHashMap<>();
 
     public final ConcurrentSkipListSet<UUID> invulnerablePlayers = new ConcurrentSkipListSet<>();
 
@@ -159,7 +152,7 @@ public class Cache {
             region = permRegions.get(rsParams);
 
             if(!sender.hasPermission("rtp.free") && !didWithdraw) {
-                price = (Double) configs.regions.getRegionSetting(region.name, "price", 0.0);
+                price = (Double) Configs.regions.getRegionSetting(region.name, "price", 0.0);
             }
         }
         else return null;
@@ -172,7 +165,7 @@ public class Cache {
                 currentTeleportCost.put(((Player)sender).getUniqueId(),price);
             }
             else {
-                String msg = configs.lang.getLog("notEnoughMoney", price.toString());
+                String msg = Configs.lang.getLog("notEnoughMoney", price.toString());
                 SendMessage.sendMessage(sender,player,msg);
                 return null;
             }
@@ -188,13 +181,13 @@ public class Cache {
         if(permRegions.containsKey(rsParams)) {
             region = permRegions.get(rsParams);
             if(!sender.hasPermission("rtp.free") && !didWithdraw) {
-                price = (Double) configs.regions.getRegionSetting(region.name, "price", 0.0);
+                price = (Double) Configs.regions.getRegionSetting(region.name, "price", 0.0);
             }
         }
         else {
             region = new TeleportRegion("temp", rsParams.params);
             if(!sender.hasPermission("rtp.free") && !didWithdraw) {
-                price = configs.config.price;
+                price = Configs.config.price;
             }
             tempRegions.put(rsParams,region);
         }
@@ -207,7 +200,7 @@ public class Cache {
                 currentTeleportCost.put(((Player)sender).getUniqueId(),price);
             }
             else {
-                String msg = configs.lang.getLog("notEnoughMoney", price.toString());
+                String msg = Configs.lang.getLog("notEnoughMoney", price.toString());
                 SendMessage.sendMessage(sender,player,msg);
                 return null;
             }
@@ -243,8 +236,8 @@ public class Cache {
         }
         forceLoadedChunks.clear();
 
-        for(String region : configs.regions.getRegionNames()) {
-            String worldName = (String) configs.regions.getRegionSetting(region,"world","world");
+        for(String region : Configs.regions.getRegionNames()) {
+            String worldName = (String) Configs.regions.getRegionSetting(region,"world","world");
             World world = Bukkit.getWorld(worldName);
             if(world == null) world = Bukkit.getWorlds().get(0);
             Map<String,String> map = new HashMap<>();
@@ -258,7 +251,7 @@ public class Cache {
         queuedPlayers.clear();
 
         double i = 0d;
-        int period = configs.config.queuePeriod;
+        int period = Configs.config.queuePeriod;
         for(Map.Entry<RandomSelectParams,BukkitTask> entry : queueTimers.entrySet()) {
             entry.getValue().cancel();
             queueTimers.remove(entry.getKey());
@@ -268,7 +261,7 @@ public class Cache {
             for (Map.Entry<RandomSelectParams, TeleportRegion> entry : permRegions.entrySet()) {
                 queueTimers.put(entry.getKey(), Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
                     double tps = TPS.getTPS();
-                    double minTps = (Double) configs.config.getConfigValue("minTPS", 19.0);
+                    double minTps = (Double) Configs.config.getConfigValue("minTPS", 19.0);
                     if (tps < minTps) return;
                     new QueueLocation(entry.getValue(), this).queueLocationNow();
                 }, 40 + (long)i, period * 20L));

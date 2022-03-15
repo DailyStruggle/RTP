@@ -23,27 +23,27 @@ public class Info implements CommandExecutor {
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
-        Configs configs = RTP.getConfigs();
+        Configs Configs = RTP.getConfigs();
         if(!sender.hasPermission("rtp.info")) {
-            SendMessage.sendMessage(sender, configs.lang.getLog("noPerms"));
+            SendMessage.sendMessage(sender, Configs.lang.getLog("noPerms"));
             return true;
         }
 
         if(args.length == 0) {
-            Bukkit.getScheduler().runTaskAsynchronously(RTP.getPlugin(),()-> {
-                SendMessage.sendMessage(sender,configs.lang.getLog("title"));
-                SendMessage.sendMessage(sender,configs.lang.getLog("chunks")
+            Bukkit.getScheduler().runTaskAsynchronously(RTP.getInstance(),()-> {
+                SendMessage.sendMessage(sender,Configs.lang.getLog("title"));
+                SendMessage.sendMessage(sender,Configs.lang.getLog("chunks")
                         .replace("[chunks]",String.valueOf(RTP.getCache().forceLoadedChunks.size())));
-                SendMessage.sendMessage(sender,configs.lang.getLog("worldHeader"));
+                SendMessage.sendMessage(sender,Configs.lang.getLog("worldHeader"));
                 for(World world : Bukkit.getWorlds()) {
-                    String msg = configs.lang.getLog("world").replace("[world]", world.getName());
+                    String msg = Configs.lang.getLog("world").replace("[world]", world.getName());
                     String hover = "/rtp info world:" + world.getName();
                     String click = "/rtp info world:" + world.getName();
                     SendMessage.sendMessage(sender,msg,hover,click);
                 }
-                SendMessage.sendMessage(sender,configs.lang.getLog("regionHeader"));
+                SendMessage.sendMessage(sender,Configs.lang.getLog("regionHeader"));
                 for(TeleportRegion region : RTP.getCache().permRegions.values()) {
-                    String msg = configs.lang.getLog("region").replace("[region]",region.name);
+                    String msg = Configs.lang.getLog("region").replace("[region]",region.name);
                     String hover = "/rtp info region:" + region.name;
                     String click = "/rtp info region:" + region.name;
                     SendMessage.sendMessage(sender,msg,hover,click);
@@ -52,7 +52,7 @@ public class Info implements CommandExecutor {
             return true;
         }
 
-        Bukkit.getScheduler().runTaskAsynchronously(RTP.getPlugin(),()-> {
+        Bukkit.getScheduler().runTaskAsynchronously(RTP.getInstance(),()-> {
             for (String s : args) {
                 int idx = s.indexOf(':');
                 String arg = idx > 0 ? s.substring(0, idx) : s;
@@ -63,17 +63,17 @@ public class Info implements CommandExecutor {
                     case "world" -> {
                         Map<String, String> tokens = new HashMap<>();
                         tokens.put("[world]", val);
-                        tokens.put("[name]", (String) configs.worlds.getWorldSetting(val, "name", ""));
-                        tokens.put("[region]", (String) configs.worlds.getWorldSetting(val, "region", ""));
-                        tokens.put("[requirePermission]", String.valueOf(configs.worlds.getWorldSetting(val, "requirePermission", false)));
-                        tokens.put("[override]", String.valueOf(configs.worlds.getWorldSetting(val, "override", "")));
-                        tokens.put("[nearShape]", String.valueOf(configs.worlds.getWorldSetting(val, "nearShape", "CIRCLE")));
-                        tokens.put("[nearRadius]", String.valueOf(configs.worlds.getWorldSetting(val, "nearRadius", -1)));
-                        tokens.put("[nearCenterRadius]", String.valueOf(configs.worlds.getWorldSetting(val, "override", -1)));
-                        tokens.put("[nearMinY]", String.valueOf(configs.worlds.getWorldSetting(val, "nearMinY", -1)));
-                        tokens.put("[nearMaxY]", String.valueOf(configs.worlds.getWorldSetting(val, "nearMaxY", -1)));
+                        tokens.put("[name]", (String) Configs.worlds.getWorldSetting(val, "name", ""));
+                        tokens.put("[region]", (String) Configs.worlds.getWorldSetting(val, "region", ""));
+                        tokens.put("[requirePermission]", String.valueOf(Configs.worlds.getWorldSetting(val, "requirePermission", false)));
+                        tokens.put("[override]", String.valueOf(Configs.worlds.getWorldSetting(val, "override", "")));
+                        tokens.put("[nearShape]", String.valueOf(Configs.worlds.getWorldSetting(val, "nearShape", "CIRCLE")));
+                        tokens.put("[nearRadius]", String.valueOf(Configs.worlds.getWorldSetting(val, "nearRadius", -1)));
+                        tokens.put("[nearCenterRadius]", String.valueOf(Configs.worlds.getWorldSetting(val, "override", -1)));
+                        tokens.put("[nearMinY]", String.valueOf(Configs.worlds.getWorldSetting(val, "nearMinY", -1)));
+                        tokens.put("[nearMaxY]", String.valueOf(Configs.worlds.getWorldSetting(val, "nearMaxY", -1)));
 
-                        List<String> msgList = configs.lang.getLogList("worldInfo");
+                        List<String> msgList = Configs.lang.getLogList("worldInfo");
                         for (String msg : msgList) {
                             for (Map.Entry<String, String> entry : tokens.entrySet()) {
                                 msg = msg.replace(entry.getKey(), entry.getValue());
@@ -104,14 +104,14 @@ public class Info implements CommandExecutor {
                         tokens.put("[maxY]", String.valueOf(region.maxY));
                         tokens.put("[weight]", String.valueOf(region.weight));
                         tokens.put("[requireSkyLight]", String.valueOf(region.requireSkyLight));
-                        tokens.put("[requirePermission]", String.valueOf(configs.regions.getRegionSetting(val, "requirePermission", false)));
-                        tokens.put("[worldBorderOverride]", String.valueOf(configs.regions.getRegionSetting(val, "worldBorderOverride", false)));
+                        tokens.put("[requirePermission]", String.valueOf(Configs.regions.getRegionSetting(val, "requirePermission", false)));
+                        tokens.put("[worldBorderOverride]", String.valueOf(Configs.regions.getRegionSetting(val, "worldBorderOverride", false)));
                         tokens.put("[uniquePlacements]", String.valueOf(region.uniquePlacements));
                         tokens.put("[expand]", String.valueOf(region.expand));
-                        tokens.put("[queueLen]", String.valueOf(configs.regions.getRegionSetting(val, "queueLen", -1)));
+                        tokens.put("[queueLen]", String.valueOf(Configs.regions.getRegionSetting(val, "queueLen", -1)));
                         tokens.put("[queued]", String.valueOf(region.getPublicQueueLength()));
 
-                        List<String> msgList = configs.lang.getLogList("regionInfo");
+                        List<String> msgList = Configs.lang.getLogList("regionInfo");
                         for (String msg : msgList) {
                             for (Map.Entry<String, String> entry : tokens.entrySet()) {
                                 msg = msg.replace(entry.getKey(), entry.getValue());

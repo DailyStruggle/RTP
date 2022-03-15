@@ -16,11 +16,11 @@ import org.bukkit.event.player.PlayerTeleportEvent;
 import java.util.Objects;
 
 public final class OnPlayerTeleport implements Listener {
-    private final Configs configs;
+    private final Configs Configs;
     private final Cache cache;
 
     public OnPlayerTeleport() {
-        this.configs = RTP.getConfigs();
+        this.Configs = RTP.getConfigs();
         this.cache = RTP.getCache();
     }
 
@@ -28,7 +28,7 @@ public final class OnPlayerTeleport implements Listener {
     public void onPlayerTeleport(PlayerTeleportEvent event) {
         Player player = event.getPlayer();
         //if currently teleporting, stop that and clean up
-        if (cache.todoTP.containsKey(player.getUniqueId())) {
+        if (RTP.getInstance().todoTP.containsKey(player.getUniqueId())) {
             stopTeleport(event);
         }
     }
@@ -41,12 +41,12 @@ public final class OnPlayerTeleport implements Listener {
         double distance = (Objects.requireNonNull(Objects.requireNonNull(event.getTo()).getWorld()).getUID()
                 .equals(Objects.requireNonNull(event.getFrom().getWorld()).getUID()))
                 ? location.distance(event.getTo()) : Double.MAX_VALUE;
-        if (distance < (double) configs.config.cancelDistance) return;
+        if (distance < (double) Configs.config.cancelDistance) return;
 
         CommandSender sender = cache.commandSenderLookup.get(player.getUniqueId());
         if(sender == null) return;
 
-        Location to = cache.todoTP.get(player.getUniqueId());
+        Location to = RTP.getInstance().todoTP.get(player.getUniqueId());
         if(to == null) return;
 
         TeleportCancelEvent teleportCancelEvent = new TeleportCancelEvent(sender,player,to,event.isAsynchronous());

@@ -21,7 +21,7 @@ public class DoTeleport extends BukkitRunnable {
 
     public DoTeleport(CommandSender sender, Player player, Location location, ChunkSet chunkSet) {
         this.chunkSet = chunkSet;
-        this.plugin = RTP.getPlugin();
+        this.plugin = RTP.getInstance();
         this.sender = sender;
         this.player = player;
         this.location = location;
@@ -36,8 +36,8 @@ public class DoTeleport extends BukkitRunnable {
     public void doTeleportNow() {
         cache.playerFromLocations.remove(player.getUniqueId());
         cache.doTeleports.remove(player.getUniqueId());
-        cache.todoTP.remove(player.getUniqueId());
-        cache.lastTP.put(player.getUniqueId(),location);
+        RTP.getInstance().todoTP.remove(player.getUniqueId());
+        RTP.getInstance().lastTP.put(player.getUniqueId(),location);
 
         Location mutableLocation = location.clone();
         RandomPreTeleportEvent randomPreTeleportEvent = new RandomPreTeleportEvent(sender,player,mutableLocation);

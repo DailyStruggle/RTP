@@ -15,15 +15,15 @@ import java.util.Map;
 
 public class Glide implements CommandExecutor {
     private final RTP_Glide plugin;
-    private final Configs configs;
+    private final Configs Configs;
 
     private final Map<String,String> glideCommands = new HashMap<>();
     private final Map<String,String> glideParams = new HashMap<>();
     private final Map<String,CommandExecutor> commandHandles = new HashMap<>();
 
-    public Glide(RTP_Glide plugin, Configs configs) {
+    public Glide(RTP_Glide plugin, Configs Configs) {
         this.plugin = plugin;
-        this.configs = configs;
+        this.Configs = Configs;
 
         this.glideParams.put("player", "rtp.other");
     }
@@ -72,7 +72,7 @@ public class Glide implements CommandExecutor {
             return true;
         }
 
-        new SetupGlide(player, configs).runTask(plugin);
+        new SetupGlide(player, Configs).runTask(plugin);
 
         return true;
     }

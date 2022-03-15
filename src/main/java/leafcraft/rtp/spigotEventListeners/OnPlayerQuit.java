@@ -31,7 +31,7 @@ public final class OnPlayerQuit implements Listener {
         CommandSender sender = cache.commandSenderLookup.get(player.getUniqueId());
         if (sender == null) return;
 
-        Location to = cache.todoTP.get(player.getUniqueId());
+        Location to = RTP.getInstance().todoTP.get(player.getUniqueId());
         if (to == null) return;
 
         TeleportCancelEvent teleportCancelEvent = new TeleportCancelEvent(sender, player, to, event.isAsynchronous());

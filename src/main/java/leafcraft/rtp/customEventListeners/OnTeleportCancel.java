@@ -9,7 +9,7 @@ import leafcraft.rtp.tasks.SetupTeleport;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.SendMessage;
 import leafcraft.rtp.tools.configuration.Configs;
-import leafcraft.rtp.tools.selection.RandomSelectParams;
+import leafcraft.rtp.API.selection.RandomSelectParams;
 import leafcraft.rtp.tools.softdepends.VaultChecker;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Location;
@@ -20,12 +20,12 @@ import org.bukkit.event.Listener;
 
 public final class OnTeleportCancel implements Listener {
     private final RTP plugin;
-    private final Configs configs;
+    private final Configs Configs;
     private final Cache cache;
 
     public OnTeleportCancel() {
-        this.plugin = RTP.getPlugin();
-        this.configs = RTP.getConfigs();
+        this.plugin = RTP.getInstance();
+        this.Configs = RTP.getConfigs();
         this.cache = RTP.getCache();
     }
 
@@ -56,17 +56,17 @@ public final class OnTeleportCancel implements Listener {
 
         RandomSelectParams rsParams = cache.regionKeys.get(player.getUniqueId());
         if (cache.permRegions.containsKey(rsParams)) {
-            Location randomLocation = cache.todoTP.get(player.getUniqueId());
+            Location randomLocation = RTP.getInstance().todoTP.get(player.getUniqueId());
             QueueLocation queueLocation = new QueueLocation(cache.permRegions.get(rsParams), randomLocation, cache);
             cache.queueLocationTasks.put(queueLocation.idx,queueLocation);
             queueLocation.runTaskLaterAsynchronously(plugin, 1);
         } else cache.tempRegions.remove(rsParams);
 
         cache.regionKeys.remove(player.getUniqueId());
-        cache.todoTP.remove(player.getUniqueId());
+        RTP.getInstance().todoTP.remove(player.getUniqueId());
         cache.playerFromLocations.remove(player.getUniqueId());
 
-        if(configs.config.refund && event.getSender() instanceof Player sourcePlayer) {
+        if(Configs.config.refund && event.getSender() instanceof Player sourcePlayer) {
             cache.lastTeleportTime.remove(sourcePlayer.getUniqueId());
             Economy economy = VaultChecker.getEconomy();
             if(economy!=null && economy.isEnabled()) {
@@ -75,7 +75,7 @@ public final class OnTeleportCancel implements Listener {
             }
         }
 
-        String msg = configs.lang.getLog("teleportCancel");
+        String msg = Configs.lang.getLog("teleportCancel");
         SendMessage.sendMessage(event.getSender(),event.getPlayer(),msg);
     }
 }

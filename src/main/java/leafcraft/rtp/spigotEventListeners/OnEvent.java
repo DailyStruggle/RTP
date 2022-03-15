@@ -10,7 +10,7 @@ import leafcraft.rtp.tasks.SetupTeleport;
 import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.SendMessage;
 import leafcraft.rtp.tools.configuration.Configs;
-import leafcraft.rtp.tools.selection.RandomSelectParams;
+import leafcraft.rtp.API.selection.RandomSelectParams;
 import leafcraft.rtp.tools.selection.TeleportRegion;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -73,7 +73,7 @@ public class OnEvent implements Listener {
             TeleportRegion region = cache.permRegions.get(rsParams);
             QueueLocation queueLocation = new QueueLocation(region, player, cache);
             cache.queueLocationTasks.put(queueLocation.idx,queueLocation);
-            queueLocation.runTaskAsynchronously(RTP.getPlugin());
+            queueLocation.runTaskAsynchronously(RTP.getInstance());
             respawningPlayers.add(player.getUniqueId());
         }
     }
@@ -91,7 +91,7 @@ public class OnEvent implements Listener {
     @EventHandler(priority = EventPriority.HIGH)
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        Configs configs = RTP.getConfigs();
+        Configs Configs = RTP.getConfigs();
 
         Set<PermissionAttachmentInfo> perms = player.getEffectivePermissions();
         boolean hasFirstJoin = false;
@@ -135,11 +135,11 @@ public class OnEvent implements Listener {
                 long minutes = TimeUnit.NANOSECONDS.toMinutes(remaining) % 60;
                 long seconds = TimeUnit.NANOSECONDS.toSeconds(remaining) % 60;
                 String replacement = "";
-                if (days > 0) replacement += days + configs.lang.getLog("days") + " ";
-                if (days > 0 || hours > 0) replacement += hours + configs.lang.getLog("hours") + " ";
-                if (days > 0 || hours > 0 || minutes > 0) replacement += minutes + configs.lang.getLog("minutes") + " ";
-                replacement += seconds + configs.lang.getLog("seconds");
-                String msg = configs.lang.getLog("cooldownMessage", replacement);
+                if (days > 0) replacement += days + Configs.lang.getLog("days") + " ";
+                if (days > 0 || hours > 0) replacement += hours + Configs.lang.getLog("hours") + " ";
+                if (days > 0 || hours > 0 || minutes > 0) replacement += minutes + Configs.lang.getLog("minutes") + " ";
+                replacement += seconds + Configs.lang.getLog("seconds");
+                String msg = Configs.lang.getLog("cooldownMessage", replacement);
 
                 SendMessage.sendMessage(player, msg);
                 return;
@@ -210,8 +210,8 @@ public class OnEvent implements Listener {
         if(RTPAPI.getServerIntVersion()>8) {
             switch (syncState) {
                 case SYNC -> setupTeleport.setupTeleportNow(SelectionAPI.SyncState.SYNC);
-                case ASYNC -> setupTeleport.runTaskLaterAsynchronously(RTP.getPlugin(), 1);
-                case ASYNC_URGENT -> setupTeleport.runTaskAsynchronously(RTP.getPlugin());
+                case ASYNC -> setupTeleport.runTaskLaterAsynchronously(RTP.getInstance(), 1);
+                case ASYNC_URGENT -> setupTeleport.runTaskAsynchronously(RTP.getInstance());
             }
         }
         else {

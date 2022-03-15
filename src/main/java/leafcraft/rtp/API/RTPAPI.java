@@ -1,11 +1,12 @@
 package leafcraft.rtp.API;
 
-import leafcraft.rtp.API.selection.region.SelectorInterface;
+import leafcraft.rtp.API.selection.region.selectors.SelectorInterface;
 import leafcraft.rtp.RTP;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.ConcurrentHashMap;
 
+//class to hold relevant functions
 public class RTPAPI {
     //all available region selectors and a default
     private static SelectorInterface defaultSelector = null;
@@ -31,7 +32,7 @@ public class RTPAPI {
 
     public static String getServerVersion() {
         if(version == null) {
-            version = RTP.getPlugin().getServer().getClass().getPackage().getName();
+            version = RTP.getInstance().getServer().getClass().getPackage().getName();
             version = version.replaceAll("[-+^.a-zA-Z]*","");
         }
 

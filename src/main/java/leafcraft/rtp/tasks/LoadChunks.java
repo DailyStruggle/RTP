@@ -7,7 +7,7 @@ import leafcraft.rtp.tools.Cache;
 import leafcraft.rtp.tools.SendMessage;
 import leafcraft.rtp.tools.configuration.Configs;
 import leafcraft.rtp.tools.selection.ChunkSet;
-import leafcraft.rtp.tools.selection.RandomSelectParams;
+import leafcraft.rtp.API.selection.RandomSelectParams;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit;
 public class LoadChunks extends BukkitRunnable {
     public ChunkSet chunkSet;
     private final RTP plugin;
-    private final Configs configs;
+    private final Configs Configs;
     private final CommandSender sender;
     private final Player player;
     private final Cache cache;
@@ -38,8 +38,8 @@ public class LoadChunks extends BukkitRunnable {
     private Boolean cancelled = false;
 
     public LoadChunks(CommandSender sender, Player player, Long delay, Location location) {
-        this.plugin = RTP.getPlugin();
-        this.configs = RTP.getConfigs();
+        this.plugin = RTP.getInstance();
+        this.Configs = RTP.getConfigs();
         this.sender = sender;
         this.player = player;
         this.cache = RTP.getCache();
@@ -49,15 +49,15 @@ public class LoadChunks extends BukkitRunnable {
         if (cache.permRegions.containsKey(rsParams))
             chunkSet = cache.permRegions.get(rsParams).getChunks(location);
         else chunkSet = cache.tempRegions.get(rsParams).getChunks(location);
-        int vd = configs.config.vd;
+        int vd = Configs.config.vd;
         i = -vd;
         j = -vd;
         this.vd = Bukkit.getViewDistance();
     }
 
     public LoadChunks(CommandSender sender, Player player, Long delay, Location location, ChunkSet chunkSet) {
-        this.plugin = RTP.getPlugin();
-        this.configs = RTP.getConfigs();
+        this.plugin = RTP.getInstance();
+        this.Configs = RTP.getConfigs();
         this.sender = sender;
         this.player = player;
         this.cache = RTP.getCache();
@@ -65,15 +65,15 @@ public class LoadChunks extends BukkitRunnable {
         this.location = location;
         this.rsParams = cache.regionKeys.get(player.getUniqueId());
         this.chunkSet = chunkSet;
-        int vd = configs.config.vd;
+        int vd = Configs.config.vd;
         i = -vd;
         j = -vd;
         this.vd = Bukkit.getViewDistance();
     }
 
-    public LoadChunks(RTP plugin, Configs configs, CommandSender sender, Player player, Cache cache, Long delay, Location location, int i, int j) {
+    public LoadChunks(RTP plugin, Configs Configs, CommandSender sender, Player player, Cache cache, Long delay, Location location, int i, int j) {
         this.plugin = plugin;
-        this.configs = configs;
+        this.Configs = Configs;
         this.sender = sender;
         this.player = player;
         this.cache = cache;
@@ -107,7 +107,7 @@ public class LoadChunks extends BukkitRunnable {
         if(chunkSet.completed.get() < chunkSet.expectedSize) {
             if(i==-vd && j==-vd) {
                 if(sender.hasPermission("rtp.noDelay")) {
-                    String msg = configs.lang.getLog("chunkLoading");
+                    String msg = Configs.lang.getLog("chunkLoading");
                     SendMessage.sendMessage(sender, player, msg);
                 }
                 LoadChunksPlayerEvent loadChunksPlayerEvent = new LoadChunksPlayerEvent(location, player, chunkSet.chunks);
@@ -132,7 +132,7 @@ public class LoadChunks extends BukkitRunnable {
                 World world = Bukkit.getWorld(rsParams.worldID);
                 if(world == null) return;
                 Chunk centerChunk = location.getChunk();
-                int vd = configs.config.vd;
+                int vd = Configs.config.vd;
                 long len = (2L*vd+1)*(2L*vd+1);
                 if(delay>0) len = 2*(len/delay);
                 for(; i < vd; i++) {
@@ -145,7 +145,7 @@ public class LoadChunks extends BukkitRunnable {
                         len--;
                         if(len<=0) {
                             cache.loadChunks.remove(player.getUniqueId());
-                            LoadChunks loadChunks = new LoadChunks(plugin, configs, sender, player, cache, delay, location, i, j);
+                            LoadChunks loadChunks = new LoadChunks(plugin, Configs, sender, player, cache, delay, location, i, j);
                             cache.loadChunks.put(player.getUniqueId(),loadChunks);
                             loadChunks.runTaskAsynchronously(plugin);
                             return;
