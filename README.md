@@ -13,7 +13,7 @@ The goal of this plugin is function over form,
 
 I made this in a flow state and now I only understand how it works because I wrote down the math. I question my sanity.
 
-V1 is primarily focused on stting up a functional implementation with various plugin integrations.
+V1 is primarily focused on setting up a functional implementation with various plugin integrations.
 
 V2 is planned to focus on pushing main functions into a server-independent API and on supplying developers with additional options.
 
