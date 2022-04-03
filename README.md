@@ -15,7 +15,7 @@ I made this in a flow state and now I only understand how it works because I wro
 
 V1 is primarily focused on setting up a functional implementation with various plugin integrations.
 
-V2 is planned to focus on pushing main functions into a server-independent API and on supplying developers with additional options.
+V2 is planned to focus on pushing main functions into a server-independent API and on supplying developers with additional methods, particularly for adding shapes and distributions.
 
 V2 will take an unknown amount of time for the following reasons: 
  - V1 already involves some multi-dimensional thinking, so it's hard to conceptualize the entire thing and how to redefine it.
