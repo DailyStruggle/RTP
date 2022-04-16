@@ -1,4 +1,14 @@
 #logs and command responses
+#todo: update keys according to code updates
+
+#show title
+# set title to "" to disable
+# PlaceholderAPI is recommended for coordinates
+title: "&aTeleported!"
+subtitle: "&bhave fun!"
+fadeIn: 1
+stay: 1
+fadeOut: 1
 
 #when teleporting, say this
 alreadyTeleporting: "&e[rtp] you're already teleporting!"
@@ -39,8 +49,8 @@ millis: "ms"
 oldFile: "&b[rtp] old [filename] detected. Updating"
 
 # detected a bukkit world that isn't in the config file
-# placeholder: [worldName] - the world detected
-newWorld: "&b[rtp] detected a new world '[worldName]'"
+# placeholder: [world] - the world detected
+newWorld: "&b[rtp] detected a new world '[world]'"
 
 updatingWorlds: "&b[rtp] updating worlds configuration..."
 updatedWorlds: "&b[rtp] updated worlds configuration!"
@@ -62,11 +72,11 @@ consoleCmdNotAllowed: "&cYou can't do this from console. Try adding a player or 
 noPerms: "&eI'm sorry, but you do not have permission to perform this command. Please contact the server administrators if you believe that this is in error."
 
 # user tried to wake a world that doesn't send messages to their location, without perms
-# placeholder: [worldName] - the world attempted in the command
-noGlobalPerms: "&eYou don't have permission to teleport to [worldName] from your location"
+# placeholder: [world] - the world attempted in the command
+noGlobalPerms: "&eYou don't have permission to teleport to [world] from your location"
 
 # world doesn't exist in bukkit
-invalidWorld: "&e[rtp] could not find world '[worldName]'"
+invalidWorld: "&e[rtp] could not find world '[world]'"
 
 # when more than on user fails to specify region in updateRegion
 missingRegionParam: "&e[rtp] region parameter is required"
@@ -96,7 +106,7 @@ PLAYER_LOADING: "&bLOADING CHUNKS"
 PLAYER_TELEPORTING: "&bTELEPORTING"
 
 #info command
-title: "&a======RTP Info======"
+infoHeader: "&a======RTP Info======"
 chunks: "#D4AF37Chunks currently loaded by RTP: [chunks]"
 worldHeader: "#008080Worlds:"
 world: "  #21ADA8[world]"

@@ -25,15 +25,15 @@ public class Worlds {
     public Worlds(RTP_Glide plugin) {
         this.plugin = plugin;
 
-        File f = new File(plugin.getDataFolder(), "worlds.yml");
+        File f = new File(plugin.getDataFolder(), "worlds/default.yml");
         if(!f.exists())
         {
-            plugin.saveResource("worlds.yml", false);
+            plugin.saveResource("worlds/default.yml", false);
         }
         config = YamlConfiguration.loadConfiguration(f);
 
         if( 	(config.getDouble("version") < 1.0) ) {
-            SendMessage.sendMessage(Bukkit.getConsoleSender(), "[rtp_glide] old worlds.yml detected. Updating");
+            SendMessage.sendMessage(Bukkit.getConsoleSender(), "[rtp_glide] old default.yml detected. Updating");
             FileStuff.renameFiles(plugin,"worlds");
             config = YamlConfiguration.loadConfiguration(f);
         }
@@ -47,7 +47,7 @@ public class Worlds {
 
         try {
             Scanner scanner = new Scanner(
-                    new File(plugin.getDataFolder().getAbsolutePath() + File.separator + "worlds.yml"));
+                    new File(plugin.getDataFolder().getAbsolutePath() + File.separator + "worlds/default.yml"));
             //for each line in original messages file
             String currWorldName = "default";
             while (scanner.hasNextLine()) {
@@ -90,7 +90,7 @@ public class Worlds {
         FileWriter fw;
         String[] linesArray = linesInWorlds.toArray(new String[linesInWorlds.size()]);
         try {
-            fw = new FileWriter(plugin.getDataFolder().getAbsolutePath() + File.separator + "worlds.yml");
+            fw = new FileWriter(plugin.getDataFolder().getAbsolutePath() + File.separator + "worlds/default.yml");
             for (String s : linesArray) {
                 fw.write(s + "\n");
             }
@@ -100,7 +100,7 @@ public class Worlds {
         }
 
         //-------------UPDATE INTERNAL VERSION ACCORDINGLY-------------
-        config = YamlConfiguration.loadConfiguration(new File(plugin.getDataFolder(), "worlds.yml"));
+        config = YamlConfiguration.loadConfiguration(new File(plugin.getDataFolder(), "worlds/default.yml"));
     }
 
     public Object getWorldSetting(String worldName, String name, Object def) {

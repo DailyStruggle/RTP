@@ -1,20 +1,20 @@
 name: RTP
-version: 1.3.23
-main: leafcraft.rtp.RTP
+version: '${project.version}'
+main: leafcraft.rtp.bukkit.RTPBukkitPlugin
 api-version: 1.13
 authors: [ leaf26 ]
-description: an optimized RTP plugin
+description: 'an optimized RTP plugin'
 softdepend: [WorldGuard, WorldEdit, GriefDefender, GriefPrevention, ProtocolLib, Vault, PlaceholderAPI, TownyAdvanced, HuskTowns, Factions, Lands, RedProtect]
 
 commands:
   rtp:
     description: Teleport randomly
-    permission: rtp.see
+    permission: rtp.use
     usage: |
       /rtp
   wild:
     description: Teleport randomly
-    permission: rtp.see
+    permission: rtp.use
     usage: |
       /wild
   rtp help:

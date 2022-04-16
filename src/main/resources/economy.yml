@@ -1,0 +1,14 @@
+#whether to refund price and cooldown on cancellation
+refundOnCancel: true
+
+#price for custom teleport parameters
+paramsPrice: 1000000000.0
+
+#price to use near parameter
+nearSelfPrice: 500.0
+nearOtherPrice: 2000.0
+
+#price to use biome parameter
+biomePrice: 5000.0
+
+version: "1.0"

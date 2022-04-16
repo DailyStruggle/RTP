@@ -4,7 +4,7 @@ import io.github.dailystruggle.rtp_glide.RTP_Glide;
 import io.github.dailystruggle.rtp_glide.Tasks.SetupGlide;
 import io.github.dailystruggle.rtp_glide.configuration.Configs;
 import io.github.dailystruggle.rtp_glide.customEvents.PlayerGlideEvent;
-import leafcraft.rtp.API.customEvents.RandomTeleportEvent;
+import leafcraft.rtp.bukkit.customBukkitEvents.RandomTeleportEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.event.EventHandler;
