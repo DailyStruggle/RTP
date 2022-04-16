@@ -8,7 +8,7 @@ import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
-public class SetupGlide extends BukkitRunnable {
+public class SetupGlide extends RTPBukkitRunnable {
     private static RTP_Glide plugin = null;
     private final Player player;
     private final Configs Configs;

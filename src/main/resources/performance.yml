@@ -1,0 +1,36 @@
+#how many rerolls before stopping
+maxAttempts: 100
+
+#what radius, in chunks, around the destination to pre-load
+# number of chunks loaded is (1 + 2*viewDistance)^2
+# set higher to pre-load a larger radius
+viewDistanceSelect: 0
+viewDistanceTeleport: 0
+
+#time, in seconds, between searching for a new location in each region and processing player queues
+# set to 0 or lower to stop the timer.
+period: 10
+
+#minimum TPS requirement before trying to queue a new location
+# must be a positive number
+minTPS: 19.0
+
+#whether to do/don't run a queue task after each rtp in addition to the timer
+postTeleportQueueing: true
+
+#whether to use synchronous chunk loading on command for selection
+# not recommended for server performance, but it's good for testing
+syncLoading: false
+
+#on startup, whether to enable permissions parsing for onEvent permissions
+# if no players need to teleport on event, this can be disabled
+onEventParsing: true
+
+#on startup, whether to enable permissions parsing for effect permissions
+# if you don't need effects or if you're using an addon to apply effects, this can be disabled
+effectParsing: true
+
+#log selection timings (debug)
+timeit: false
+
+version: "1.0"

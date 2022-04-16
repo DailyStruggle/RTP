@@ -13,7 +13,7 @@ public class FileStuff {
         //load up a list of files to rename
         ArrayList<File> toRename = new ArrayList<>();
         for(int i = 1; i < 1000; i++) {
-            File file = new File(plugin.getDataFolder().getAbsolutePath() + File.separator + name + ".old"+i+".yml");
+            File file = new File(plugin.getDataFolder().getAbsolutePath() + File.separator + name + ".old"+i);
             if(!file.exists()) break;
             toRename.add(file);
         }
@@ -32,8 +32,8 @@ public class FileStuff {
             }
             oldFile.getAbsoluteFile().renameTo(newFile.getAbsoluteFile());
         }
-        File oldFile = new File(plugin.getDataFolder().getAbsolutePath() + File.separator + name + ".yml");
-        File newFile = new File(plugin.getDataFolder().getAbsolutePath() + File.separator + name + ".old1.yml");
+        File oldFile = new File(plugin.getDataFolder().getAbsolutePath() + File.separator + name);
+        File newFile = new File(plugin.getDataFolder().getAbsolutePath() + File.separator + name + ".old1");
         try {
             Files.deleteIfExists(newFile.toPath());
         } catch (IOException e) {
@@ -41,6 +41,6 @@ public class FileStuff {
         }
         oldFile.getAbsoluteFile().renameTo(newFile.getAbsoluteFile());
 
-        plugin.saveResource(name + ".yml", true);
+        plugin.saveResource(name, true);
     }
 }

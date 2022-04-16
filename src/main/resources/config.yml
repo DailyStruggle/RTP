@@ -1,88 +1,12 @@
 #time, in seconds, to delay teleportation
-# allows server time to preload the chunks
+# allows server some time to preload the chunks
 teleportDelay: 2
 
 #how far a player can move before teleportation cancels, in meters/blocks
 cancelDistance: 2
 
-#sleep attempt cooldown, in seconds, to prevent spam
+#attempt cooldown, in seconds, to prevent spam
 teleportCooldown: 300
-
-#price for custom teleport parameters
-price: 1000000000.0
-
-#reroll location if player would land in a reserved location
-rerollFactions: true
-rerollGriefDefender: true
-rerollGriefPrevention: true
-rerollHuskTowns: true
-rerollLands: true
-rerollRedProtect: true
-rerollTownyAdvanced: true
-rerollWorldGuard: true
-
-#how long to give invincibility on teleport, in seconds
-invulnerabilityTime: 5
-
-#radius, in blocks, to check for safe blocks
-# 0-7
-safetyRadius: 0
-
-#create a platform on random teleport
-# replaces non-solid and unsafe blocks with the center block
-# radius less than 0 will turn this off
-platformRadius: 0
-platformDepth: 1
-#break blocks above platform to make air (may cause lighting bugs)
-platformAirHeight: 2
-#if no solid block under player, use this
-platformMaterial: SMOOTH_STONE
-
-#what materials, according to the bukkit api, to avoid
-unsafeBlocks:
-  - MAGMA_BLOCK
-  - TNT
-  - LAVA
-  - FIRE
-  - WATER
-  - SEAGRASS
-  - TALL_SEAGRASS
-  - BUBBLE_COLUMN
-  - WATERLOGGED
-
-#switch between blacklist/whitelist
-biomeWhitelist: false
-biomes:
-
-#how many rerolls before stopping
-maxAttempts: 100
-
-#how often, in seconds, to queue a new location in each world
-# set to 0 or lower to turn off the timer
-queuePeriod: 10
-
-#minimum TPS requirement before trying to queue a new location
-# must be a positive number
-minTPS: 19.0
-
-#whether to do/don't run a queue task after each rtp in addition to the timer
-postTeleportQueueing: true
-
-#whether to refund price and cooldown on cancellation
-refundOnCancel: true
-
-#what radius, in chunks, around the destination to pre-load
-# number of chunks loaded is (1 + 2*viewDistance)^2
-# if larger than bukkit view distance, uses bukkit view distance
-# set higher to pre-load a larger radius
-viewDistance: 0
-
-#price to use near parameter
-nearSelfPrice: 500.0
-nearOtherPrice: 2000.0
-
-#price to use biome parameter
-biomePrice: 5000.0
 
 #commands to run after any teleportation
 # e.g.
@@ -91,37 +15,5 @@ biomePrice: 5000.0
 consoleCommands:
 playerCommands:
 
-#how long to blind player on teleport, in ticks
-# set to 0 to disable
-blindnessDuration: 40
-
-#show title
-# set title to "" to disable
-# PlaceholderAPI is recommended for coordinates
-title: "&aTeleported!"
-subtitle: "&bhave fun!"
-fadeIn: 1
-stay: 1
-fadeout: 1
-
-#whether to use synchronous chunk loading on command for selection
-# not recommended for server performance, but it's good for testing
-syncLoading: false
-
-#on startup, whether to enable checking every loaded chunk for safety and biome
-# there's not much of a performance impact, but it's nonzero and unnecessary for filled regions.
-checkChunks: false
-
-#on startup, whether to enable permissions parsing for onEvent permissions
-# if no players need to teleport on event, this can be disabled
-onEventParsing: true
-
-#on startup, whether to enable permissions parsing for effect permissions
-# if you don't need effects or if you're using an addon to apply effects, this can be disabled
-effectParsing: true
-
-#log selection timings (debug)
-timeit: false
-
 #DO NOT TOUCH VERSION NUMBER
-version: "2.10"
+version: "1.0"

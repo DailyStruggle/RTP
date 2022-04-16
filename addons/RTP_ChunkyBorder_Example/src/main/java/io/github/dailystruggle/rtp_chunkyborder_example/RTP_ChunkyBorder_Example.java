@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp_chunkyborder_example;
 
-import leafcraft.rtp.tools.selection.TeleportRegion;
+import leafcraft.rtp.bukkit.tools.selection.TeleportRegion;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class RTP_ChunkyBorder_Example extends JavaPlugin {
