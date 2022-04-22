@@ -1,5 +1,7 @@
 package leafcraft.rtp.api.selection.region;
 
+import leafcraft.rtp.api.RTPAPI;
+import leafcraft.rtp.api.factory.Factory;
 import leafcraft.rtp.api.selection.SelectionAPI;
 import leafcraft.rtp.api.selection.region.selectors.cache.ChunkSet;
 import leafcraft.rtp.api.selection.region.selectors.memory.shapes.Square;
@@ -26,8 +28,9 @@ public abstract class Region {
 
 
     public Region(String shapeName, Map<String,String> shapeParams) {
-        if(!SelectionAPI.shapeFactory.contains(shapeName)) return;
-        Shape<? extends Enum<?>> shape = (Shape<? extends Enum<?>>) SelectionAPI.shapeFactory.construct(shapeName);
+        Factory<?> shapeFactory = RTPAPI.getInstance().factoryMap.get(RTPAPI.factoryNames.shape);
+        if(!shapeFactory.contains(shapeName)) return;
+        Shape<? extends Enum<?>> shape = (Shape<? extends Enum<?>>) shapeFactory.construct(shapeName);
         assert shape != null;
         EnumMap<? extends Enum<?>, Object> data = shape.getData();
         for(var entry : data.entrySet()) {

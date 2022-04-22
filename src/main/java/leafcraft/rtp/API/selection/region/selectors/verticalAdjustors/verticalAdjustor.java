@@ -1,5 +1,7 @@
 package leafcraft.rtp.api.selection.region.selectors.verticalAdjustors;
 
+import leafcraft.rtp.api.RTPAPI;
+import leafcraft.rtp.api.factory.Factory;
 import leafcraft.rtp.api.factory.FactoryValue;
 import leafcraft.rtp.api.selection.SelectionAPI;
 import leafcraft.rtp.api.substitutions.RTPBlock;
@@ -19,8 +21,9 @@ public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E
         super(eClass);
         this.verifiers = verifiers;
         setData(def);
-        if(!SelectionAPI.vertAdjustorFactory.contains(name))
-            SelectionAPI.vertAdjustorFactory.add(name,this);
+        Factory<VerticalAdjustor<?>> vertAdjustorFactory = (Factory<VerticalAdjustor<?>>) RTPAPI.getInstance().factoryMap.get(RTPAPI.factoryNames.vertAdjustor);
+        if(!vertAdjustorFactory.contains(name))
+            vertAdjustorFactory.add(name,this);
     }
 
     public abstract @Nullable RTPLocation adjust(@NotNull RTPChunk input);

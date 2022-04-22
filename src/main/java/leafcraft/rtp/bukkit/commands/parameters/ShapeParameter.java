@@ -1,6 +1,8 @@
 package leafcraft.rtp.bukkit.commands.parameters;
 
 import io.github.dailystruggle.commandsapi.bukkit.BukkitParameter;
+import leafcraft.rtp.api.RTPAPI;
+import leafcraft.rtp.api.factory.Factory;
 import leafcraft.rtp.api.selection.SelectionAPI;
 import org.bukkit.command.CommandSender;
 
@@ -16,7 +18,8 @@ public class ShapeParameter extends BukkitParameter {
 
     @Override
     public Collection<String> values() {
-        Enumeration<String> listEnum = SelectionAPI.getShapeFactory().list();
+        Factory<?> shapeFactory = RTPAPI.getInstance().factoryMap.get(RTPAPI.factoryNames.shape);
+        Enumeration<String> listEnum = shapeFactory.list();
         Collection<String> res = new ArrayList<>();
         while (listEnum.hasMoreElements()) {
             res.add(listEnum.nextElement());

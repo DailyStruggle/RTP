@@ -1,7 +1,6 @@
 package leafcraft.rtp.bukkit.commands.commands.reload;
 
 import leafcraft.rtp.bukkit.tools.SendMessage;
-import leafcraft.rtp.bukkit.tools.configuration.Configs;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -17,27 +16,27 @@ public class ReloadCmd implements CommandExecutor {
     }
     @Override
     public boolean onCommand(CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
-        if(!sender.hasPermission("rtp.reload")) {
-            String msg = Configs.lang.getLog("noPerms");
-            SendMessage.sendMessage(sender,msg);
-            return true;
-        }
-
-        String msg = Configs.lang.getLog("reloading");
-        SendMessage.sendMessage(Bukkit.getConsoleSender(),msg);
-        if(sender instanceof Player) {
-            SendMessage.sendMessage(sender,msg);
-        }
-
-        Configs.refresh();
-        //todo
-//        cache.resetRegions();
+//        if(!sender.hasPermission("rtp.reload")) {
+//            String msg = Configs.lang.getLog("noPerms");
+//            SendMessage.sendMessage(sender,msg);
+//            return true;
+//        }
 //
-//        cache.storePlayerData();
-
-        msg = Configs.lang.getLog("reloaded");
-        SendMessage.sendMessage(Bukkit.getConsoleSender(),msg);
-        if(sender instanceof Player) SendMessage.sendMessage(sender,msg);
+//        String msg = Configs.lang.getLog("reloading");
+//        SendMessage.sendMessage(Bukkit.getConsoleSender(),msg);
+//        if(sender instanceof Player) {
+//            SendMessage.sendMessage(sender,msg);
+//        }
+//
+//        Configs.refresh();
+//        //todo
+////        cache.resetRegions();
+////
+////        cache.storePlayerData();
+//
+//        msg = Configs.lang.getLog("reloaded");
+//        SendMessage.sendMessage(Bukkit.getConsoleSender(),msg);
+//        if(sender instanceof Player) SendMessage.sendMessage(sender,msg);
         return true;
     }
 }

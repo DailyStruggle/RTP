@@ -146,4 +146,4 @@ regionInfo:
   - "#58CCED  queueLen: [queueLen]"
   - "#58CCED  queued: [queued]"
 
-version: 2.2
+version: "1.0"

@@ -167,7 +167,7 @@ public class SelectionAPI {
             region = tempRegions.get(rsParams);
         }
 
-        Set<String> biomes = null;
+        Set<String> biomes = new HashSet<>();
         if(rsParams.params.containsKey("biome")) {
             String[] biomesStr = rsParams.params.get("biome").split(String.valueOf(CommandsAPI.multiParameterDelimiter));
             biomes = Arrays.stream(biomesStr).collect(Collectors.toSet());

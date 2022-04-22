@@ -38,10 +38,13 @@ public class RTPAPI {
      */
     private static RTPAPI instance;
 
-    public RTPAPI(@NotNull Configs configs, @NotNull RTPServerAccessor serverAccessor, @NotNull BiConsumer<Level,String> logMethod) {
+    public RTPAPI(@NotNull Configs configs,
+                  @NotNull RTPServerAccessor serverAccessor,
+                  @NotNull BiConsumer<Level,String> logMethod) {
         RTPAPI.logMethod = logMethod;
         this.configs = configs;
         this.serverAccessor = serverAccessor;
+        instance = this;
     }
 
     public static RTPAPI getInstance() {
