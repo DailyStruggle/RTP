@@ -22,29 +22,42 @@ public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
     public Map<String,String> language_mapping = new HashMap<>();
     public Map<String,String> reverse_language_mapping = new HashMap<>();
 
+    public ConfigParser(Class<E> eClass, final String name, final String version, final File pluginDirectory, final ConfigParser<LangKeys> lang, File langFile) {
+        super(eClass);
+        check(name,version,pluginDirectory,lang, langFile);
+    }
+
     public ConfigParser(Class<E> eClass, final String name, final String version, final File pluginDirectory, final ConfigParser<LangKeys> lang) {
         super(eClass);
+        check(name,version,pluginDirectory,lang, null);
+    }
 
+    protected void check(final String name, final String version, final File pluginDirectory, final ConfigParser<LangKeys> lang, @Nullable File langFile) {
         //construct language file from enum vals
         //todo: apply translation to loads and saves
-        String langDirStr = pluginDirectory.getAbsolutePath() + File.separator
-                + "lang" + File.separator;
-        File langDir = new File(langDirStr);
-        if(!langDir.exists()) langDir.mkdir();
+        if(langFile == null) {
+            String langDirStr = pluginDirectory.getAbsolutePath() + File.separator
+                    + "lang" + File.separator;
+            File langDir = new File(langDirStr);
+            if(!langDir.exists()) {
+                boolean mkdir = langDir.mkdirs();
+                if(!mkdir) throw new IllegalStateException();
+            }
 
-        String mapFileName = pluginDirectory.getAbsolutePath() + File.separator
-                + "lang" + File.separator
-                    + name.replace(".yml","") + "_mapping.yml";
-        File mapFile = new File(mapFileName);
+            String mapFileName = langDir + File.separator
+                    + name.replace(".yml", ".lang.yml");
+            langFile = new File(mapFileName);
+        }
 
-        if(!mapFile.exists()) {
+
+        if(!langFile.exists()) {
             StringBuilder mapFileLines = new StringBuilder();
             for (String key : keys()) {
-                mapFileLines.append(key).append(": \"").append(key).append("\"\n");
+                mapFileLines.append(key).append(":\"").append(key).append("\"\n");
             }
 
             try {
-                Files.writeString(mapFile.toPath(), mapFileLines);
+                Files.writeString(langFile.toPath(), mapFileLines);
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -52,15 +65,15 @@ public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
 
         List<String> lines;
         try {
-            lines = Files.readAllLines(mapFile.toPath());
+            lines = Files.readAllLines(langFile.toPath());
         } catch (IOException e) {
             e.printStackTrace();
             return;
         }
 
         for(String line : lines) {
+            if(line.isBlank()) continue;
             String[] split = line.split(":");
-            split[1] = split[1].replaceAll(" ","");
             language_mapping.put(split[0],split[1]);
             reverse_language_mapping.put(split[1],split[0]);
         }
@@ -69,7 +82,7 @@ public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
         this.name = (name.endsWith(".yml")) ? name : name + ".yml";
         this.version = version;
         this.pluginDirectory = pluginDirectory;
-        File f = new File(pluginDirectory, name);
+        File f = new File(pluginDirectory + File.separator + this.name);
         if(!f.exists())
         {
             saveResource(this.name,true);
@@ -85,7 +98,6 @@ public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
         List<Integer> parsedVersion = Arrays.stream(split).map(Integer::parseUnsignedInt).collect(Collectors.toList());
 
         if(versionArr.length!=parsedVersion.size()) {
-            RTPAPI.log(Level.WARNING,"A");
             update = true;
         }
 
@@ -93,8 +105,7 @@ public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
             for (int i = 0; i < versionArr.length; i++) {
                 int v = Integer.parseInt(versionArr[i]);
                 int cv = parsedVersion.get(i);
-                if(v < cv) {
-                    RTPAPI.log(Level.WARNING,"B");
+                if(v != cv) {
                     update = true;
                     break;
                 }
@@ -102,9 +113,7 @@ public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
         }
 
         if(update) {
-            RTPAPI.log(Level.INFO, "updating " + this.name);
             update();
-
             f = new File(pluginDirectory, this.name);
             loadResource(f);
         }
@@ -154,7 +163,7 @@ public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
         if(!b) RTPAPI.log(Level.WARNING,
                 "RTP - unable to rename file:" + oldFile.getAbsoluteFile());
 
-        saveResource(name, true);
+        saveResource(this.name, true);
     }
 
     public Object getConfigValue(E key, Object def) {
@@ -188,37 +197,53 @@ public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
 
         List<String> newLines = new ArrayList<>();
         for (String line : linesInDefaultConfig) {
-            StringBuilder newline = new StringBuilder(line);
+            StringBuilder newline;
             if (line.startsWith("version:")) {
                 newline = new StringBuilder("version: \""+ version + "\"");
             }
-            else if(newline.toString().startsWith("  -")) continue;
+            else if(line.startsWith("  ")) {
+                newline = new StringBuilder(line);
+            }
             else {
-                for (String node : oldValues.keySet().stream().map(Enum::name).collect(Collectors.toSet())) {
-                    if (line.startsWith(node + ":")) {
-                        Object fromString = getFromString(node, null);
-                        if(fromString instanceof Map map) {
-                            newline = new StringBuilder();
-                            mapToStringRecursive(node, map, 0, newline);
-                        }
-                        if(fromString instanceof List) {
-                            Set<Object> duplicateCheck = new HashSet<>();
-                            newline = new StringBuilder(node + ": ");
-                            for(Object obj : (List<?>)fromString) {
-                                if(duplicateCheck.contains(obj)) continue;
-                                duplicateCheck.add(obj);
-                                if(obj instanceof String) {
-                                    newline.append("\n  - " + "\"").append(obj).append("\"");
-                                }
-                                else newline.append("\n  - ").append(obj);
-                            }
-                        }
-                        else if(fromString instanceof String) newline = new StringBuilder(node + ": \"" + oldValues.get(node).toString() + "\"");
-                        else newline = new StringBuilder(node + ": " + oldValues.get(node).toString());
-                        break;
-                    }
-
+                String[] split = line.split(":");
+                if(split.length<2) {
+                    newLines.add(split[0]);
+                    continue;
                 }
+                String node = split[0];
+                E e;
+                try {
+                    e = Enum.valueOf(myClass,node);
+                }
+                catch (IllegalArgumentException ignored) {
+                    //todo: find out if it would be removed here?
+                    //continue;
+                    e = null;
+                }
+
+                Object fromString = getFromString(node, null); //todo: check this
+                if(fromString == null) {
+                    newline = new StringBuilder();
+                }
+                else if(fromString instanceof Map map) {
+                    newline = new StringBuilder(node + ":\n");
+                    mapToStringRecursive(node, map, 0, newline);
+                }
+                else if(fromString instanceof List) {
+                    Set<Object> duplicateCheck = new HashSet<>();
+                    newline = new StringBuilder(node + ":");
+                    for(Object obj : (List<?>)fromString) {
+                        if(duplicateCheck.contains(obj)) continue;
+                        duplicateCheck.add(obj);
+                        if(obj instanceof String) {
+                            newline.append("\n  - " + "\"").append(obj).append("\"");
+                        }
+                        else newline.append("\n  - ").append(obj);
+                    }
+                    newline.deleteCharAt(0);
+                }
+                else if(fromString instanceof String) newline = new StringBuilder(node + ": \"" + oldValues.get(e).toString() + "\"");
+                else newline = new StringBuilder(node + ": " + oldValues.get(e).toString());
             }
             newLines.add(newline.toString());
         }

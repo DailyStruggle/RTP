@@ -1,5 +1,6 @@
 package leafcraft.rtp.bukkit.api.config;
 
+import leafcraft.rtp.api.RTPAPI;
 import leafcraft.rtp.api.configuration.ConfigParser;
 import leafcraft.rtp.api.configuration.enums.LangKeys;
 import leafcraft.rtp.api.substitutions.RTPLocation;
@@ -15,6 +16,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.util.*;
+import java.util.logging.Level;
 
 public class BukkitConfigParser<E extends Enum<E>> extends ConfigParser<E> {
     private YamlConfiguration configuration;
@@ -23,15 +25,27 @@ public class BukkitConfigParser<E extends Enum<E>> extends ConfigParser<E> {
         super(eClass, name, version, pluginDirectory, lang);
     }
 
+    public BukkitConfigParser(Class<E> eClass, String name, String version, File pluginDirectory, ConfigParser<LangKeys> lang, File langFile) {
+        super(eClass, name, version, pluginDirectory, lang, langFile);
+    }
+
     @Override
     public void saveResource(String name, boolean overwrite) {
-        if(pluginDirectory.getAbsolutePath().equals(RTPBukkitPlugin.getInstance().getDataFolder().getAbsolutePath())) {
+        String myDirectory = pluginDirectory.getAbsolutePath();
+        String pDirectory = RTPBukkitPlugin.getInstance().getDataFolder().getAbsolutePath();
+        if(myDirectory.equals(pDirectory)) {
             RTPBukkitPlugin.getInstance().saveResource(name,overwrite);
         }
         else {
-            File source = new File(pluginDirectory.getAbsolutePath() + File.separator + "default.yml");
-            File target = new File(pluginDirectory.getAbsolutePath() + File.separator + name);
-            FileUtil.copy(source,target);
+            String diff = myDirectory.substring(pDirectory.length()+1);
+            if(name.equals("default.yml")) {
+                RTPBukkitPlugin.getInstance().saveResource(diff + File.separator + name, false);
+            }
+            else {
+                File source = new File(myDirectory + File.separator + "default.yml");
+                File target = new File(myDirectory + File.separator + name);
+                FileUtil.copy(source, target);
+            }
         }
     }
 
@@ -49,6 +63,7 @@ public class BukkitConfigParser<E extends Enum<E>> extends ConfigParser<E> {
     protected Object getFromString(String val, @Nullable Object def) {
         Object res;
         Object o = configuration.get(val, def);
+
         if(o instanceof ConfigurationSection section) {
             res = getSectionRecursive(section);
         } else if(o instanceof Location location) {

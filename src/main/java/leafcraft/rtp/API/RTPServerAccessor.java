@@ -1,6 +1,7 @@
 package leafcraft.rtp.api;
 
 import leafcraft.rtp.api.substitutions.RTPWorld;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
 
@@ -17,6 +18,7 @@ public interface RTPServerAccessor {
      * @param name name of world
      * @return world
      */
+    @Nullable
     RTPWorld getRTPWorld(String name);
 
     /**

@@ -2,8 +2,9 @@ package leafcraft.rtp.bukkit.commands.commands.help;
 
 import io.github.dailystruggle.commandsapi.bukkit.localCommands.BukkitTreeCommand;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
+import leafcraft.rtp.api.RTPAPI;
+import leafcraft.rtp.api.configuration.enums.LangKeys;
 import leafcraft.rtp.bukkit.tools.SendMessage;
-import leafcraft.rtp.bukkit.tools.configuration.Configs;
 import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.Plugin;
 
@@ -28,7 +29,7 @@ public class HelpCmd extends BukkitTreeCommand {
     @Override
     public boolean onCommand(CommandSender sender, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
         if(!sender.hasPermission("rtp.see")) {
-            String msg = Configs.lang.getLog("noPerms");
+            String msg = String.valueOf(RTPAPI.getInstance().configs.lang.getConfigValue(LangKeys.noPerms,""));
             SendMessage.sendMessage(sender,msg);
             return true;
         }
@@ -39,7 +40,7 @@ public class HelpCmd extends BukkitTreeCommand {
                 if(entry.getKey().equals("rtp")) arg = "";
                 else arg = entry.getKey();
 
-                String msg = Configs.lang.getLog(entry.getKey());
+                String msg = String.valueOf(RTPAPI.getInstance().configs.lang.getConfigValue(LangKeys.valueOf(entry.getKey()),""));
                 String hover = "/rtp " + arg;
                 String click = "/rtp " + arg;
 

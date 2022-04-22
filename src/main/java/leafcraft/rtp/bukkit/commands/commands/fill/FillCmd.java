@@ -11,8 +11,6 @@ import leafcraft.rtp.bukkit.commands.commands.fill.subcommands.Resume;
 import leafcraft.rtp.bukkit.commands.commands.fill.subcommands.Start;
 import leafcraft.rtp.bukkit.commands.parameters.RegionParameter;
 import leafcraft.rtp.bukkit.api.substitutions.BukkitRTPWorld;
-import leafcraft.rtp.bukkit.tools.SendMessage;
-import leafcraft.rtp.bukkit.tools.configuration.Configs;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.command.CommandSender;
@@ -71,56 +69,56 @@ public class FillCmd extends BukkitTreeCommand {
                              Predicate<Region> checkRunning,
                              String failMessageLookup,
                              Consumer<Region> action) {
-        List<String> regionNames = parameterValues.get("region");
-        if(regionNames == null) regionNames = new ArrayList<>(1);
-        if(regionNames.size() == 0) {
-            String regionName;
-            World world;
-            if(sender instanceof Player) {
-                world = ((Player)sender).getWorld();
-                Configs.worlds.checkWorldExists(world.getName());
-                regionName = (String) Configs.worlds.getWorldSetting(world.getName(),"region", "default");
-            }
-            else {
-                regionName = "default";
-            }
-
-            regionNames.add(regionName);
-        }
-
-        for(String regionName : regionNames) {
-            Map<String, String> fillCommandArgs = new HashMap<>();
-            fillCommandArgs.put("region", regionName);
-
-            String worldName = (String) Configs.regions.getRegionSetting(regionName, "world", "");
-            if (worldName.equals("")) {
-                String msg = Configs.lang.getLog("badArg", "region:" + regionName);
-                SendMessage.sendMessage(sender, msg);
-                return;
-            }
-
-            RegionParams regionParams = new RegionParams(new BukkitRTPWorld(Objects.requireNonNull(Bukkit.getWorld(worldName))), fillCommandArgs);
-            Region region = null;
-            if (RTPAPI.getInstance().selectionAPI.permRegions.containsKey(regionParams)) {
-                Region foundRegion = RTPAPI.getInstance().selectionAPI.permRegions.get(regionParams);
-                if(foundRegion == null) {
-                    String msg = Configs.lang.getLog("badArg", "region:" + regionName);
-                    SendMessage.sendMessage(sender, msg);
-                    return;
-                }
-            } else {
-                String msg = Configs.lang.getLog("badArg", "region:" + regionName);
-                SendMessage.sendMessage(sender, msg);
-                return;
-            }
-
-            if (checkRunning.test(region)) {
-                String msg = Configs.lang.getLog(failMessageLookup, regionName);
-                SendMessage.sendMessage(sender, msg);
-                return;
-            }
-
-            action.accept(region);
-        }
+//        List<String> regionNames = parameterValues.get("region");
+//        if(regionNames == null) regionNames = new ArrayList<>(1);
+//        if(regionNames.size() == 0) {
+//            String regionName;
+//            World world;
+//            if(sender instanceof Player) {
+//                world = ((Player)sender).getWorld();
+//                Configs.worlds.checkWorldExists(world.getName());
+//                regionName = (String) Configs.worlds.getWorldSetting(world.getName(),"region", "default");
+//            }
+//            else {
+//                regionName = "default";
+//            }
+//
+//            regionNames.add(regionName);
+//        }
+//
+//        for(String regionName : regionNames) {
+//            Map<String, String> fillCommandArgs = new HashMap<>();
+//            fillCommandArgs.put("region", regionName);
+//
+//            String worldName = (String) Configs.regions.getRegionSetting(regionName, "world", "");
+//            if (worldName.equals("")) {
+//                String msg = Configs.lang.getLog("badArg", "region:" + regionName);
+//                SendMessage.sendMessage(sender, msg);
+//                return;
+//            }
+//
+//            RegionParams regionParams = new RegionParams(new BukkitRTPWorld(Objects.requireNonNull(Bukkit.getWorld(worldName))), fillCommandArgs);
+//            Region region = null;
+//            if (RTPAPI.getInstance().selectionAPI.permRegions.containsKey(regionParams)) {
+//                Region foundRegion = RTPAPI.getInstance().selectionAPI.permRegions.get(regionParams);
+//                if(foundRegion == null) {
+//                    String msg = Configs.lang.getLog("badArg", "region:" + regionName);
+//                    SendMessage.sendMessage(sender, msg);
+//                    return;
+//                }
+//            } else {
+//                String msg = Configs.lang.getLog("badArg", "region:" + regionName);
+//                SendMessage.sendMessage(sender, msg);
+//                return;
+//            }
+//
+//            if (checkRunning.test(region)) {
+//                String msg = Configs.lang.getLog(failMessageLookup, regionName);
+//                SendMessage.sendMessage(sender, msg);
+//                return;
+//            }
+//
+//            action.accept(region);
+//        }
     }
 }

@@ -1,10 +1,13 @@
 package leafcraft.rtp.bukkit.commands.commands.info;
 
 import leafcraft.rtp.api.RTPAPI;
+import leafcraft.rtp.api.configuration.ConfigParser;
+import leafcraft.rtp.api.configuration.MultiConfigParser;
+import leafcraft.rtp.api.configuration.enums.LangKeys;
+import leafcraft.rtp.api.configuration.enums.WorldKeys;
 import leafcraft.rtp.api.selection.region.Region;
 import leafcraft.rtp.bukkit.RTPBukkitPlugin;
 import leafcraft.rtp.bukkit.tools.SendMessage;
-import leafcraft.rtp.bukkit.tools.configuration.Configs;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.command.Command;
@@ -24,26 +27,27 @@ public class InfoCmd implements CommandExecutor {
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
+        ConfigParser<LangKeys> lang = RTPAPI.getInstance().configs.lang;
         if(!sender.hasPermission("rtp.info")) {
-            SendMessage.sendMessage(sender, Configs.lang.getLog("noPerms"));
+            SendMessage.sendMessage(sender, (String) lang.getConfigValue(LangKeys.noPerms,""));
             return true;
         }
 
         if(args.length == 0) {
             Bukkit.getScheduler().runTaskAsynchronously(RTPBukkitPlugin.getInstance(),()-> {
-                SendMessage.sendMessage(sender,Configs.lang.getLog("title"));
-                SendMessage.sendMessage(sender,Configs.lang.getLog("chunks")
-                        .replace("[chunks]","")); //todo: loaded chunk count
-                SendMessage.sendMessage(sender,Configs.lang.getLog("worldHeader"));
+                SendMessage.sendMessage(sender, (String) lang.getConfigValue(LangKeys.title,""));
+                SendMessage.sendMessage(sender, ((String) lang.getConfigValue(LangKeys.chunks,""))
+                        .replace("[chunks]",""));
+                SendMessage.sendMessage(sender, (String) lang.getConfigValue(LangKeys.worldHeader,""));
                 for(World world : Bukkit.getWorlds()) {
-                    String msg = Configs.lang.getLog("world").replace("[world]", world.getName());
+                    String msg = ((String)lang.getConfigValue(LangKeys.world,"")).replace("[world]", world.getName());
                     String hover = "/rtp info world:" + world.getName();
                     String click = "/rtp info world:" + world.getName();
                     SendMessage.sendMessage(sender,msg,hover,click);
                 }
-                SendMessage.sendMessage(sender,Configs.lang.getLog("regionHeader"));
+                SendMessage.sendMessage(sender, (String) lang.getConfigValue(LangKeys.regionHeader,""));
                 for(Region region : RTPAPI.getInstance().selectionAPI.permRegions.values()) {
-                    String msg = Configs.lang.getLog("region").replace("[region]",region.name());
+                    String msg = ((String)lang.getConfigValue(LangKeys.region,"")).replace("[region]", region.name());
                     String hover = "/rtp info region:" + region.name();
                     String click = "/rtp info region:" + region.name();
                     SendMessage.sendMessage(sender,msg,hover,click);
@@ -59,21 +63,21 @@ public class InfoCmd implements CommandExecutor {
                 if (!infoParams.contains(arg)) continue;
                 String val = s.substring(idx+1);
 
+                MultiConfigParser<WorldKeys> worlds = RTPAPI.getInstance().configs.worlds;
+
                 switch (arg.toLowerCase()) {
                     case "world" -> {
+                        ConfigParser<WorldKeys> worldsParser = worlds.getParser(val);
+                        if(worldsParser == null) return;
                         Map<String, String> tokens = new HashMap<>();
                         tokens.put("[world]", val);
-                        tokens.put("[name]", (String) Configs.worlds.getWorldSetting(val, "name", ""));
-                        tokens.put("[region]", (String) Configs.worlds.getWorldSetting(val, "region", ""));
-                        tokens.put("[requirePermission]", String.valueOf(Configs.worlds.getWorldSetting(val, "requirePermission", false)));
-                        tokens.put("[override]", String.valueOf(Configs.worlds.getWorldSetting(val, "override", "")));
-                        tokens.put("[nearShape]", String.valueOf(Configs.worlds.getWorldSetting(val, "nearShape", "CIRCLE")));
-                        tokens.put("[nearRadius]", String.valueOf(Configs.worlds.getWorldSetting(val, "nearRadius", -1)));
-                        tokens.put("[nearCenterRadius]", String.valueOf(Configs.worlds.getWorldSetting(val, "override", -1)));
-                        tokens.put("[nearMinY]", String.valueOf(Configs.worlds.getWorldSetting(val, "nearMinY", -1)));
-                        tokens.put("[nearMaxY]", String.valueOf(Configs.worlds.getWorldSetting(val, "nearMaxY", -1)));
+                        tokens.put("[name]", val);
+                        tokens.put("[region]", String.valueOf(worldsParser.getConfigValue(WorldKeys.region, "")));
+                        tokens.put("[requirePermission]", String.valueOf(worldsParser.getConfigValue( WorldKeys.requirePermission, false)));
+                        tokens.put("[override]", String.valueOf(worldsParser.getConfigValue( WorldKeys.override, "")));
+                        tokens.put("[nearShape]", String.valueOf(worldsParser.getConfigValue( WorldKeys.nearShape, "CIRCLE")));
 
-                        List<String> msgList = Configs.lang.getLogList("worldInfo");
+                        List<String> msgList = (List<String>) lang.getConfigValue(LangKeys.worldInfo, new ArrayList<>());
                         for (String msg : msgList) {
                             for (Map.Entry<String, String> entry : tokens.entrySet()) {
                                 msg = msg.replace(entry.getKey(), entry.getValue());
@@ -112,13 +116,13 @@ public class InfoCmd implements CommandExecutor {
 //                        tokens.put("[queueLen]", String.valueOf(Configs.regions.getRegionSetting(val, "queueLen", -1)));
 //                        tokens.put("[queued]", String.valueOf(region.getPublicQueueLength()));
 
-                        List<String> msgList = Configs.lang.getLogList("regionInfo");
-                        for (String msg : msgList) {
-                            for (Map.Entry<String, String> entry : tokens.entrySet()) {
-                                msg = msg.replace(entry.getKey(), entry.getValue());
-                            }
-                            SendMessage.sendMessage(sender, msg);
-                        }
+//                        List<String> msgList = Configs.lang.getLogList("regionInfo");
+//                        for (String msg : msgList) {
+//                            for (Map.Entry<String, String> entry : tokens.entrySet()) {
+//                                msg = msg.replace(entry.getKey(), entry.getValue());
+//                            }
+//                            SendMessage.sendMessage(sender, msg);
+//                        }
                     }
                 }
             }

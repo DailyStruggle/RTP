@@ -2,18 +2,18 @@
 #autofilled per-world settings
 #world name according to bukkit
 #which region to use by default, when in this world
-region: default
+region: "default"
 #check rtp.worlds.[world] node on command
 requirePermission: false
 #if no perm for this world, attempt this world instead
 # placeholder: [num] - world index according to bukkit, 0 is usually a main world
-override: [0]
+override: "[0]"
 #default settings for "near" parameter
-nearShapeName: CIRCLE
+nearShapeName: "CIRCLE"
 nearShape:
-    nearRadius: 16
-    nearCenterRadius: 8
-    nearMinY: 48
-    nearMaxY: 127
+  nearRadius: 16
+  nearCenterRadius: 8
+  nearMinY: 48
+  nearMaxY: 127
 
-version: 1.7
+version: "1.0"

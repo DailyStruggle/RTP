@@ -28,7 +28,7 @@ public class RegionParams extends FactoryValue<RegionKeys> {
 //    public boolean uniquePlacements;
 //    public boolean expand;
 
-//    public Map<String,String> params;
+    public Map<String,String> params;
 
     public RegionParams() {
         super(RegionKeys.class);
@@ -46,6 +46,7 @@ public class RegionParams extends FactoryValue<RegionKeys> {
      */
     public void setParams(@Nullable RTPWorld world, @Nullable Map<String, String> params) {
         if(params == null) params = new HashMap<>();
+        this.params = params;
 
         RTPAPI rtpapi = RTPAPI.getInstance();
 
