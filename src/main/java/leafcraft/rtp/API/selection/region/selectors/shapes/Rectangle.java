@@ -2,6 +2,7 @@ package leafcraft.rtp.api.selection.region.selectors.shapes;
 
 import leafcraft.rtp.api.selection.region.selectors.shapes.enums.GenericShapeParams;
 import leafcraft.rtp.api.selection.region.selectors.shapes.enums.RectangleParams;
+import leafcraft.rtp.api.substitutions.RTPChunk;
 import leafcraft.rtp.api.substitutions.RTPLocation;
 import org.jetbrains.annotations.Nullable;
 
@@ -15,7 +16,7 @@ public class Rectangle extends Shape<RectangleParams> {
     }
 
 //    @Override
-//    public RTPLocation select() {
+//    public RTPChunk select() {
 //        long w = (long) data.get(RectangleParams.WIDTH);
 //        long h = (long) data.get(RectangleParams.HEIGHT);
 //        long cx = (long) data.get(RectangleParams.CX);
@@ -28,7 +29,7 @@ public class Rectangle extends Shape<RectangleParams> {
 //    }
 
     @Override
-    public RTPLocation select(@Nullable Set<String> biomes) {
+    public RTPChunk select(@Nullable Set<String> biomes) {
         return null;
     }
 }

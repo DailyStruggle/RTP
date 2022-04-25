@@ -1,8 +1,6 @@
 package leafcraft.rtp.bukkit.api.config;
 
-import leafcraft.rtp.api.RTPAPI;
 import leafcraft.rtp.api.configuration.ConfigParser;
-import leafcraft.rtp.api.configuration.enums.LangKeys;
 import leafcraft.rtp.api.substitutions.RTPLocation;
 import leafcraft.rtp.bukkit.RTPBukkitPlugin;
 import leafcraft.rtp.bukkit.api.substitutions.BukkitRTPWorld;
@@ -16,17 +14,16 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.util.*;
-import java.util.logging.Level;
 
 public class BukkitConfigParser<E extends Enum<E>> extends ConfigParser<E> {
     private YamlConfiguration configuration;
 
-    public BukkitConfigParser(Class<E> eClass, String name, String version, File pluginDirectory, ConfigParser<LangKeys> lang) {
-        super(eClass, name, version, pluginDirectory, lang);
+    public BukkitConfigParser(Class<E> eClass, String name, String version, File pluginDirectory) {
+        super(eClass, name, version, pluginDirectory);
     }
 
-    public BukkitConfigParser(Class<E> eClass, String name, String version, File pluginDirectory, ConfigParser<LangKeys> lang, File langFile) {
-        super(eClass, name, version, pluginDirectory, lang, langFile);
+    public BukkitConfigParser(Class<E> eClass, String name, String version, File pluginDirectory, File langFile) {
+        super(eClass, name, version, pluginDirectory, langFile);
     }
 
     @Override
@@ -111,9 +108,8 @@ public class BukkitConfigParser<E extends Enum<E>> extends ConfigParser<E> {
         return res;
     }
 
-    //todo: clone function
+    //todo: clone function??
 
-    //todo: fix update check
     //todo: write resultant updates?
     //todo: for factory types, map name key to correct factory
     //          + construct from given name and try the values

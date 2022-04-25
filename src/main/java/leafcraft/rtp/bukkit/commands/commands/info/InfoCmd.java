@@ -47,9 +47,9 @@ public class InfoCmd implements CommandExecutor {
                 }
                 SendMessage.sendMessage(sender, (String) lang.getConfigValue(LangKeys.regionHeader,""));
                 for(Region region : RTPAPI.getInstance().selectionAPI.permRegions.values()) {
-                    String msg = ((String)lang.getConfigValue(LangKeys.region,"")).replace("[region]", region.name());
-                    String hover = "/rtp info region:" + region.name();
-                    String click = "/rtp info region:" + region.name();
+                    String msg = ((String)lang.getConfigValue(LangKeys.region,"")).replace("[region]", region.name);
+                    String hover = "/rtp info region:" + region.name;
+                    String click = "/rtp info region:" + region.name;
                     SendMessage.sendMessage(sender,msg,hover,click);
                 }
             });
@@ -88,7 +88,7 @@ public class InfoCmd implements CommandExecutor {
                     case "region" -> {
                         Region region = null;
                         for (Region teleportRegion : RTPAPI.getInstance().selectionAPI.permRegions.values()) {
-                            if (teleportRegion.name().equals(val)) {
+                            if (teleportRegion.name.equals(val)) {
                                 region = teleportRegion;
                                 break;
                             }

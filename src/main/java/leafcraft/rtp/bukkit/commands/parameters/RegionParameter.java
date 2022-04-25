@@ -5,6 +5,7 @@ import leafcraft.rtp.api.RTPAPI;
 import org.bukkit.command.CommandSender;
 
 import java.util.Collection;
+import java.util.Set;
 import java.util.function.BiFunction;
 
 public class RegionParameter extends BukkitParameter {
@@ -13,7 +14,7 @@ public class RegionParameter extends BukkitParameter {
     }
 
     @Override
-    public Collection<String> values() {
+    public Set<String> values() {
         return RTPAPI.getInstance().selectionAPI.regionNames();
     }
 }

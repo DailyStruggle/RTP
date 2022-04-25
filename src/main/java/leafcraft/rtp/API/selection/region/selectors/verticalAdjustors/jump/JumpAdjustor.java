@@ -13,8 +13,16 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
-    protected JumpAdjustor(List<Predicate<RTPBlock>> verifiers, EnumMap<JumpAdjustorKeys, Object> def) {
-        super(JumpAdjustorKeys.class,"jump",verifiers, def);
+    private static final EnumMap<JumpAdjustorKeys,Object> defaults = new EnumMap<>(JumpAdjustorKeys.class);
+    static {
+        defaults.put(JumpAdjustorKeys.maxY, 127);
+        defaults.put(JumpAdjustorKeys.minY,32);
+        defaults.put(JumpAdjustorKeys.step, 0);
+        defaults.put(JumpAdjustorKeys.requireSkyLight,true);
+    }
+
+    public JumpAdjustor(List<Predicate<RTPBlock>> verifiers) {
+        super(JumpAdjustorKeys.class,"jump",verifiers, defaults);
     }
 
     List<String> keys = Arrays.stream(GenericVerticalAdjustorKeys.values()).map(Enum::name).collect(Collectors.toList());

@@ -3,6 +3,7 @@ package leafcraft.rtp.api.selection.region.selectors.shapes;
 import leafcraft.rtp.api.RTPAPI;
 import leafcraft.rtp.api.factory.Factory;
 import leafcraft.rtp.api.factory.FactoryValue;
+import leafcraft.rtp.api.substitutions.RTPChunk;
 import leafcraft.rtp.api.substitutions.RTPLocation;
 import org.jetbrains.annotations.Nullable;
 
@@ -35,5 +36,5 @@ public abstract class Shape<E extends Enum<E>> extends FactoryValue<E> {
         return data.clone();
     }
 
-    public abstract RTPLocation select(@Nullable Set<String> biomes); //todo
+    public abstract RTPChunk select(@Nullable Set<String> biomes); //todo
 }

@@ -21,7 +21,7 @@ public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E
         super(eClass);
         this.verifiers = verifiers;
         setData(def);
-        Factory<VerticalAdjustor<?>> vertAdjustorFactory = (Factory<VerticalAdjustor<?>>) RTPAPI.getInstance().factoryMap.get(RTPAPI.factoryNames.vertAdjustor);
+        Factory<VerticalAdjustor<?>> vertAdjustorFactory = (Factory<VerticalAdjustor<?>>) RTPAPI.getInstance().factoryMap.get(RTPAPI.factoryNames.vert);
         if(!vertAdjustorFactory.contains(name))
             vertAdjustorFactory.add(name,this);
     }

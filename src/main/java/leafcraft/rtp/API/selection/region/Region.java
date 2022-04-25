@@ -1,9 +1,9 @@
 package leafcraft.rtp.api.selection.region;
 
 import leafcraft.rtp.api.RTPAPI;
+import leafcraft.rtp.api.configuration.enums.RegionKeys;
 import leafcraft.rtp.api.factory.Factory;
-import leafcraft.rtp.api.selection.SelectionAPI;
-import leafcraft.rtp.api.selection.region.selectors.cache.ChunkSet;
+import leafcraft.rtp.api.factory.FactoryValue;
 import leafcraft.rtp.api.selection.region.selectors.memory.shapes.Square;
 import leafcraft.rtp.api.selection.region.selectors.shapes.Shape;
 import leafcraft.rtp.api.substitutions.RTPLocation;
@@ -16,9 +16,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-public abstract class Region {
-    public abstract String name();
-    public Shape<?> shape = new Square();
+public abstract class Region extends FactoryValue<RegionKeys> {
+    public String name;
 
     protected ConcurrentLinkedQueue<RTPLocation> locationQueue = new ConcurrentLinkedQueue<>();
     protected final ConcurrentHashMap<RTPLocation, ChunkSet> locAssChunks = new ConcurrentHashMap<>();
@@ -26,21 +25,10 @@ public abstract class Region {
 
     protected final ConcurrentHashMap<UUID, ConcurrentLinkedQueue<RTPLocation>> perPlayerLocationQueue = new ConcurrentHashMap<>();
 
-
-    public Region(String shapeName, Map<String,String> shapeParams) {
-        Factory<?> shapeFactory = RTPAPI.getInstance().factoryMap.get(RTPAPI.factoryNames.shape);
-        if(!shapeFactory.contains(shapeName)) return;
-        Shape<? extends Enum<?>> shape = (Shape<? extends Enum<?>>) shapeFactory.construct(shapeName);
-        assert shape != null;
-        EnumMap<? extends Enum<?>, Object> data = shape.getData();
-        for(var entry : data.entrySet()) {
-            String name = entry.getKey().name();
-            if(shapeParams.containsKey(name)) {
-                entry.setValue(shapeParams.get(name));
-            }
-        }
-        shape.setData(data);
-        this.shape = shape;
+    public Region(String name, EnumMap<RegionKeys,Object> params) {
+        super(RegionKeys.class);
+        this.name = name;
+        setData(params);
     }
 
     @Nullable
