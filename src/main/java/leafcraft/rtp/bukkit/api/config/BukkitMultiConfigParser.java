@@ -11,8 +11,8 @@ import java.io.File;
 import java.util.logging.Level;
 
 public class BukkitMultiConfigParser<E extends Enum<E>> extends MultiConfigParser<E> {
-    public BukkitMultiConfigParser(Class<E> eClass, String name, String version, File pluginDirectory, ConfigParser<LangKeys> lang) {
-        super(eClass, name, pluginDirectory, lang);
+    public BukkitMultiConfigParser(Class<E> eClass, String name, String version, File pluginDirectory) {
+        super(eClass, name, pluginDirectory);
         Plugin plugin = RTPBukkitPlugin.getInstance();
 
         File d = new File(myDirectory.getAbsolutePath() + File.separator + "default.yml");
@@ -32,7 +32,7 @@ public class BukkitMultiConfigParser<E extends Enum<E>> extends MultiConfigParse
             fileName = fileName.replace(".yml","");
 
             BukkitConfigParser<E> parser = new BukkitConfigParser<>(
-                    eClass,fileName,version,myDirectory,lang,langMap);
+                    eClass,fileName,version,myDirectory,langMap);
             addParser(parser);
         }
     }

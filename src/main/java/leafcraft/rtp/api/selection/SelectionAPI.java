@@ -6,10 +6,10 @@ import leafcraft.rtp.api.RTPServerAccessor;
 import leafcraft.rtp.api.configuration.ConfigParser;
 import leafcraft.rtp.api.configuration.Configs;
 import leafcraft.rtp.api.configuration.enums.RegionKeys;
+import leafcraft.rtp.api.selection.region.selectors.shapes.Shape;
 import leafcraft.rtp.api.selection.worldborder.WorldBorder;
 import leafcraft.rtp.api.selection.region.Region;
 import leafcraft.rtp.api.substitutions.RTPLocation;
-import leafcraft.rtp.api.tasks.RTPTask;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
@@ -17,6 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Semaphore;
 import java.util.function.BiPredicate;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 public class SelectionAPI {
@@ -25,16 +26,18 @@ public class SelectionAPI {
      * will be done in the order given, trying urgent tasks first
      * A failed selection will go to the back of the line.
      */
-    public final ConcurrentLinkedQueue<RTPTask> selectionPipeline = new ConcurrentLinkedQueue<>();
-    public final ConcurrentLinkedQueue<RTPTask> selectionPipelineUrgent = new ConcurrentLinkedQueue<>();
+    public final ConcurrentLinkedQueue<Runnable> selectionPipeline = new ConcurrentLinkedQueue<>();
+    public final ConcurrentLinkedQueue<Runnable> selectionPipelineUrgent = new ConcurrentLinkedQueue<>();
 
     public final ConcurrentHashMap<RegionParams, Region> tempRegions = new ConcurrentHashMap<>();
     public final ConcurrentHashMap<RegionParams, Region> permRegions = new ConcurrentHashMap<>();
 
+    public final ConcurrentHashMap<String, Region> permRegionLookup = new ConcurrentHashMap<>();
+
     //semaphore needed in case of async usage
     //storage for region verifiers to use for ALL regions
     private final Semaphore regionVerifiersLock = new Semaphore(1);
-    private final List<BiPredicate<String, int[]>> regionVerifiers = new ArrayList<>();
+    private final List<Predicate<RTPLocation>> regionVerifiers = new ArrayList<>();
 
     //storage for worldborder stuff to use for ALL regions
     public WorldBorder worldBorder;
@@ -45,7 +48,7 @@ public class SelectionAPI {
      *                 param: world name, 3D point
      *                 return: boolean - true on good location, false on bad location
      */
-    public void addGlobalRegionVerifier(BiPredicate<String, int[]> locationCheck) {
+    public void addGlobalRegionVerifier(Predicate<RTPLocation> locationCheck) {
         try {
             regionVerifiersLock.acquire();
         } catch (InterruptedException e) {
@@ -67,7 +70,7 @@ public class SelectionAPI {
         regionVerifiersLock.release();
     }
 
-    public boolean checkGlobalRegionVerifiers(String worldName, int[] point) {
+    public boolean checkGlobalRegionVerifiers(RTPLocation location) {
         try {
             regionVerifiersLock.acquire();
         } catch (InterruptedException e) {
@@ -75,11 +78,11 @@ public class SelectionAPI {
             return false;
         }
 
-        for(BiPredicate<String, int[]> verifier : regionVerifiers) {
+        for(Predicate<RTPLocation> verifier : regionVerifiers) {
             try {
                 //if invalid placement, stop and return invalid
                 //clone location to prevent methods from messing with the data
-                if(!verifier.test(worldName,point)) return false;
+                if(!verifier.test(location)) return false;
             } catch (Throwable throwable) {
                 throwable.printStackTrace();
             }
@@ -95,17 +98,7 @@ public class SelectionAPI {
      */
     @Nullable
     public Region getRegion(String regionName) {
-        Map<String,String> params = new HashMap<>();
-        params.put("region",regionName);
-
-        Configs configs = RTPAPI.getInstance().configs;
-        ConfigParser<RegionKeys> regionsParser = configs.regions.getParser(regionName);
-        if(regionsParser == null) return null;
-        String worldName = (String) regionsParser.getConfigValue(RegionKeys.world, RTPAPI.getInstance().serverAccessor.getDefaultRTPWorld().name());
-
-        RegionParams regionParams = new RegionParams(RTPAPI.getInstance().serverAccessor.getRTPWorld(worldName), params);
-        if(!permRegions.containsKey(regionParams)) return null;
-        return permRegions.get(regionParams);
+        return permRegionLookup.get(regionName);
     }
 
     /**
@@ -135,8 +128,8 @@ public class SelectionAPI {
 //                new Region(regionName,randomSelectParams.params));
     }
 
-    public Collection<String> regionNames() {
-        return permRegions.values().stream().map(Region::name).collect(Collectors.toSet());
+    public Set<String> regionNames() {
+        return permRegions.values().stream().map(region -> region.name).collect(Collectors.toSet());
     }
 
     public void compute() {
@@ -146,13 +139,13 @@ public class SelectionAPI {
 
         while(selectionPipelineUrgent.size() > 0 && (serverAccessor.overTime()<0 || req>0)) {
             if(selectionPipelineUrgent.size()>0)
-                selectionPipelineUrgent.poll().compute();
+                selectionPipelineUrgent.poll().run();
             req--;
         }
 
         while(selectionPipeline.size() > 0 && (serverAccessor.overTime()<0 || req>0)) {
             if(selectionPipeline.size()>0)
-                selectionPipeline.poll().compute();
+                selectionPipeline.poll().run();
             req--;
         }
     }

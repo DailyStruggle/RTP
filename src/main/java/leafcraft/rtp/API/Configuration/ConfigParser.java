@@ -13,7 +13,6 @@ import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
-    protected ConfigParser<LangKeys> lang;
     public String name;
     public String version;
     protected File pluginDirectory;
@@ -22,17 +21,17 @@ public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
     public Map<String,String> language_mapping = new HashMap<>();
     public Map<String,String> reverse_language_mapping = new HashMap<>();
 
-    public ConfigParser(Class<E> eClass, final String name, final String version, final File pluginDirectory, final ConfigParser<LangKeys> lang, File langFile) {
+    public ConfigParser(Class<E> eClass, final String name, final String version, final File pluginDirectory, File langFile) {
         super(eClass);
-        check(name,version,pluginDirectory,lang, langFile);
+        check(name,version,pluginDirectory, langFile);
     }
 
-    public ConfigParser(Class<E> eClass, final String name, final String version, final File pluginDirectory, final ConfigParser<LangKeys> lang) {
+    public ConfigParser(Class<E> eClass, final String name, final String version, final File pluginDirectory) {
         super(eClass);
-        check(name,version,pluginDirectory,lang, null);
+        check(name,version,pluginDirectory, null);
     }
 
-    protected void check(final String name, final String version, final File pluginDirectory, final ConfigParser<LangKeys> lang, @Nullable File langFile) {
+    protected void check(final String name, final String version, final File pluginDirectory, @Nullable File langFile) {
         //construct language file from enum vals
         //todo: apply translation to loads and saves
         if(langFile == null) {
@@ -78,7 +77,6 @@ public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
             reverse_language_mapping.put(split[1],split[0]);
         }
 
-        this.lang = lang;
         this.name = (name.endsWith(".yml")) ? name : name + ".yml";
         this.version = version;
         this.pluginDirectory = pluginDirectory;
@@ -293,7 +291,6 @@ public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
         ConfigParser<E> clone = (ConfigParser<E>) super.clone();
         clone.language_mapping = this.language_mapping;
         clone.reverse_language_mapping = this.reverse_language_mapping;
-        clone.lang = lang;
         clone.name = name;
         clone.version = version;
         clone.pluginDirectory = pluginDirectory;

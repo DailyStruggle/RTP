@@ -1,14 +1,15 @@
 #DO NOT DELETE default.yml
-#case-sensitive name of world this region is in
-# placeholder: [num] - world index according to bukkit, 0 is usually a main world
-world: "[0]"
 #override shape, radius, center with vanilla worldborder settings
 worldBorderOverride: false
-#shape of bounds
-# each shape may use different input parameters
-# CIRCLE, SQUARE - spiral curves, same input parameters
-shapeName: "CIRCLE"
 shape:
+  #shape of bounds
+  # each shape may use different input parameters
+  # CIRCLE, SQUARE - spiral curves, same input parameters
+  name: "CIRCLE"
+  #case-sensitive name of world this region is in
+  # placeholder: [num] - world index according to bukkit, 0 is usually a main world
+  world: "[0]"
+  worldBorderOverride: false
   #what selection adjustment method to use
   # ACCUMULATE - accumulate all bad sectors up to the initial selection (even distribution, slow at large radii)
   # NEAREST - try nearest non-hit (possible clustering, but fast)
@@ -30,8 +31,8 @@ shape:
   uniquePlacements: false
   #expand region as locations are removed, keeping a constant number of possible placements
   expand: false
-vertAdjustorName: "jump"
-vertAdjustor:
+vert:
+  name: "JUMP"
   #height range for placement, set lower for more caves and ravines
   minY: 32
   maxY: 127

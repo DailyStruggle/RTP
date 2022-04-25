@@ -8,7 +8,7 @@ import leafcraft.rtp.bukkit.api.BukkitServerAccessor;
 import leafcraft.rtp.bukkit.api.config.BukkitConfigs;
 import leafcraft.rtp.bukkit.commands.commands.RTPCmd;
 import leafcraft.rtp.bukkit.tools.SendMessage;
-import leafcraft.rtp.bukkit.tools.TPS;
+import leafcraft.rtp.api.tasks.TPS;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.*;
 import org.bukkit.plugin.java.JavaPlugin;

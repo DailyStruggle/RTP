@@ -1,12 +1,20 @@
 package leafcraft.rtp.api;
 
+import leafcraft.rtp.api.configuration.ConfigParser;
 import leafcraft.rtp.api.configuration.Configs;
+import leafcraft.rtp.api.configuration.MultiConfigParser;
 import leafcraft.rtp.api.factory.Factory;
 import leafcraft.rtp.api.playerData.TeleportData;
 import leafcraft.rtp.api.selection.SelectionAPI;
-import leafcraft.rtp.api.tasks.RTPTask;
+import leafcraft.rtp.api.selection.region.selectors.memory.shapes.Circle;
+import leafcraft.rtp.api.selection.region.selectors.memory.shapes.Square;
+import leafcraft.rtp.api.selection.region.selectors.shapes.Shape;
+import leafcraft.rtp.api.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
+import leafcraft.rtp.api.selection.region.selectors.verticalAdjustors.jump.JumpAdjustor;
+import leafcraft.rtp.api.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -21,9 +29,11 @@ import java.util.logging.Level;
 public class RTPAPI {
     public enum factoryNames {
         shape,
-        vertAdjustor,
+        vert,
+        singleConfig,
+        multiConfig
     }
-    public EnumMap<factoryNames, Factory<?>> factoryMap = new EnumMap<>(factoryNames.class);
+    public EnumMap<factoryNames, Factory<?>> factoryMap;
 
     /**
      * minimum number of teleportations to execute per gametick, to prevent bottlenecking during lag spikes
@@ -41,10 +51,25 @@ public class RTPAPI {
     public RTPAPI(@NotNull Configs configs,
                   @NotNull RTPServerAccessor serverAccessor,
                   @NotNull BiConsumer<Level,String> logMethod) {
+        instance = this;
         RTPAPI.logMethod = logMethod;
         this.configs = configs;
         this.serverAccessor = serverAccessor;
-        instance = this;
+
+        factoryMap = new EnumMap<>(factoryNames.class);
+
+        Factory<Shape<?>> shapeFactory = new Factory<>();
+        factoryMap.put(factoryNames.shape, shapeFactory);
+        new Circle();
+        new Square();
+
+        Factory<VerticalAdjustor<?>> verticalAdjustorFactory = new Factory<>();
+        factoryMap.put(factoryNames.vert, verticalAdjustorFactory);
+        new LinearAdjustor(new ArrayList<>());
+        new JumpAdjustor(new ArrayList<>());
+
+        factoryMap.put(factoryNames.singleConfig, new Factory<ConfigParser<?>>());
+        factoryMap.put(factoryNames.multiConfig, new Factory<MultiConfigParser<?>>());
     }
 
     public static RTPAPI getInstance() {
@@ -64,8 +89,10 @@ public class RTPAPI {
     public final ConcurrentHashMap<UUID, TeleportData> latestTeleportData = new ConcurrentHashMap<>();
     public final ConcurrentSkipListSet<UUID> queuedPlayers = new ConcurrentSkipListSet<>();
 
-    public final ConcurrentLinkedQueue<RTPTask> setupTeleportPipeline = new ConcurrentLinkedQueue<>();
-    public final ConcurrentLinkedQueue<RTPTask> loadChunksPipeline = new ConcurrentLinkedQueue<>();
-    public final ConcurrentLinkedQueue<RTPTask> teleportPipeline = new ConcurrentLinkedQueue<>();
+    public final ConcurrentLinkedQueue<Runnable> setupTeleportPipeline = new ConcurrentLinkedQueue<>();
+    public final ConcurrentLinkedQueue<Runnable> loadChunksPipeline = new ConcurrentLinkedQueue<>();
+    public final ConcurrentLinkedQueue<Runnable> teleportPipeline = new ConcurrentLinkedQueue<>();
 
+    //todo: set up regions on config init
+    //todo: get region by name and parameters
 }

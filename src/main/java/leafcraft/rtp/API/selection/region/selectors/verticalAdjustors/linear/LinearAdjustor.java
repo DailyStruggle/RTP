@@ -1,5 +1,8 @@
 package leafcraft.rtp.api.selection.region.selectors.verticalAdjustors.linear;
 
+import leafcraft.rtp.api.RTPAPI;
+import leafcraft.rtp.api.selection.region.selectors.memory.Mode;
+import leafcraft.rtp.api.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import leafcraft.rtp.api.selection.region.selectors.verticalAdjustors.GenericVerticalAdjustorKeys;
 import leafcraft.rtp.api.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import leafcraft.rtp.api.substitutions.RTPBlock;
@@ -13,8 +16,16 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys> {
-    protected LinearAdjustor(List<Predicate<RTPBlock>> verifiers, EnumMap<GenericVerticalAdjustorKeys, Object> def) {
-        super(GenericVerticalAdjustorKeys.class, "linear", verifiers, def);
+    private static final EnumMap<GenericVerticalAdjustorKeys,Object> defaults = new EnumMap<>(GenericVerticalAdjustorKeys.class);
+    static {
+        defaults.put(GenericVerticalAdjustorKeys.maxY, 127);
+        defaults.put(GenericVerticalAdjustorKeys.minY,32);
+        defaults.put(GenericVerticalAdjustorKeys.direction, 0);
+        defaults.put(GenericVerticalAdjustorKeys.requireSkyLight,true);
+    }
+
+    public LinearAdjustor(List<Predicate<RTPBlock>> verifiers) {
+        super(GenericVerticalAdjustorKeys.class, "linear", verifiers, defaults);
     }
 
     List<String> keys = Arrays.stream(GenericVerticalAdjustorKeys.values()).map(Enum::name).collect(Collectors.toList());

@@ -1,9 +1,8 @@
 package leafcraft.rtp.api.configuration.enums;
 
 public enum RegionKeys {
-    world,
     shape,
-    vertAdjustor,
+    vert,
     requirePermission,
     cacheCap,
     price,

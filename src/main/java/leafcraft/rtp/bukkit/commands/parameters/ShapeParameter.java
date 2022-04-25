@@ -6,9 +6,7 @@ import leafcraft.rtp.api.factory.Factory;
 import leafcraft.rtp.api.selection.SelectionAPI;
 import org.bukkit.command.CommandSender;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Enumeration;
+import java.util.*;
 import java.util.function.BiFunction;
 
 public class ShapeParameter extends BukkitParameter {
@@ -17,10 +15,10 @@ public class ShapeParameter extends BukkitParameter {
     }
 
     @Override
-    public Collection<String> values() {
+    public Set<String> values() {
         Factory<?> shapeFactory = RTPAPI.getInstance().factoryMap.get(RTPAPI.factoryNames.shape);
         Enumeration<String> listEnum = shapeFactory.list();
-        Collection<String> res = new ArrayList<>();
+        Set<String> res = new HashSet<>();
         while (listEnum.hasMoreElements()) {
             res.add(listEnum.nextElement());
         }

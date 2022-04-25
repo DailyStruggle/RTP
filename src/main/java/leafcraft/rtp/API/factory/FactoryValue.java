@@ -1,7 +1,6 @@
 package leafcraft.rtp.api.factory;
 
 import com.google.common.base.Function;
-import leafcraft.rtp.api.configuration.RTPConfigurable;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -11,7 +10,7 @@ import java.util.stream.Collectors;
  * rather than calling a constructor, the factory value will be copied from a value in the factory
  * @param <E> enum of available parameters
  */
-public abstract class FactoryValue<E extends Enum<E>> implements Cloneable, RTPConfigurable {
+public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     //hacky way just to do Enum.valueOf on the correct enum
     protected final Class<E> myClass;
 
@@ -82,7 +81,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable, RTPC
         numberParsers.put(Byte.class,Byte::parseByte);
     }
 
-    protected Number getNumber(E key, Number def) throws NumberFormatException {
+    public Number getNumber(E key, Number def) throws NumberFormatException {
         Number res = def;
 
         Object resObj = data.getOrDefault(key,def);
@@ -99,7 +98,6 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable, RTPC
     }
 
     private Set<String> keys = null;
-    @Override
     public Collection<String> keys() {
         if(keys == null) keys = Arrays.stream(myClass.getEnumConstants()).map(Enum::name).collect(Collectors.toSet());
         return keys;

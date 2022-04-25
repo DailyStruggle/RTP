@@ -1,7 +1,9 @@
 package leafcraft.rtp.api.selection.region.selectors.memory.shapes;
 
 import leafcraft.rtp.api.RTPAPI;
+import leafcraft.rtp.api.selection.region.selectors.memory.Mode;
 import leafcraft.rtp.api.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+import leafcraft.rtp.api.substitutions.RTPChunk;
 import leafcraft.rtp.api.substitutions.RTPLocation;
 import org.jetbrains.annotations.Nullable;
 
@@ -12,14 +14,16 @@ public final class Square extends MemoryShape<GenericMemoryShapeParams> {
     private static final List<String> keys = Arrays.stream(GenericMemoryShapeParams.values()).map(Enum::name).collect(Collectors.toList());
     private static final EnumMap<GenericMemoryShapeParams,Object> defaults = new EnumMap<>(GenericMemoryShapeParams.class);
     static {
-        defaults.put(GenericMemoryShapeParams.WORLD, RTPAPI.getInstance().serverAccessor.getDefaultRTPWorld().name());
-        defaults.put(GenericMemoryShapeParams.CR,64);
-        defaults.put(GenericMemoryShapeParams.CX,0);
-        defaults.put(GenericMemoryShapeParams.CZ,0);
-        defaults.put(GenericMemoryShapeParams.EXPAND,false);
-        defaults.put(GenericMemoryShapeParams.RADIUS,256);
-        defaults.put(GenericMemoryShapeParams.WORLDBORDEROVERRIDE,false);
-        defaults.put(GenericMemoryShapeParams.UNIQUE,false);
+        defaults.put(GenericMemoryShapeParams.world, RTPAPI.getInstance().serverAccessor.getDefaultRTPWorld().name());
+        defaults.put(GenericMemoryShapeParams.worldBorderOverride,false);
+        defaults.put(GenericMemoryShapeParams.mode, Mode.ACCUMULATE);
+        defaults.put(GenericMemoryShapeParams.radius,256);
+        defaults.put(GenericMemoryShapeParams.centerRadius,64);
+        defaults.put(GenericMemoryShapeParams.centerX,0);
+        defaults.put(GenericMemoryShapeParams.centerZ,0);
+        defaults.put(GenericMemoryShapeParams.weight,1.0);
+        defaults.put(GenericMemoryShapeParams.expand,false);
+        defaults.put(GenericMemoryShapeParams.uniquePlacements,false);
     }
 
     public Square() {
@@ -28,15 +32,15 @@ public final class Square extends MemoryShape<GenericMemoryShapeParams> {
 
     @Override
     public double getRange(long radius) {
-        long cr = getNumber(GenericMemoryShapeParams.CR,64L).longValue();
+        long cr = getNumber(GenericMemoryShapeParams.centerRadius,64L).longValue();
         return (radius-cr)*(radius+cr)*4;
     }
 
     @Override
     public double xzToLocation(long x, long z) {
-        long cr = getNumber(GenericMemoryShapeParams.CR,64L).longValue();
-        long cx = getNumber(GenericMemoryShapeParams.CX,0L).longValue();
-        long cz = getNumber(GenericMemoryShapeParams.CZ,0L).longValue();
+        long cr = getNumber(GenericMemoryShapeParams.centerRadius,64L).longValue();
+        long cx = getNumber(GenericMemoryShapeParams.centerX,0L).longValue();
+        long cz = getNumber(GenericMemoryShapeParams.centerZ,0L).longValue();
 
         x = x - cx;
         z = z - cz;
@@ -99,9 +103,9 @@ public final class Square extends MemoryShape<GenericMemoryShapeParams> {
 
     @Override
     public long[] locationToXZ(long location) {
-        long cr = getNumber(GenericMemoryShapeParams.CR,64L).longValue();
-        long cx = getNumber(GenericMemoryShapeParams.CX,0L).longValue();
-        long cz = getNumber(GenericMemoryShapeParams.CZ,0L).longValue();
+        long cr = getNumber(GenericMemoryShapeParams.centerRadius,64L).longValue();
+        long cx = getNumber(GenericMemoryShapeParams.centerX,0L).longValue();
+        long cz = getNumber(GenericMemoryShapeParams.centerZ,0L).longValue();
 
         long[] res;
         //getFromString a distance from the center
@@ -167,12 +171,8 @@ public final class Square extends MemoryShape<GenericMemoryShapeParams> {
     }
 
     @Override
-    public RTPLocation select(@Nullable Set<String> biomes) {
-        long r = getNumber(GenericMemoryShapeParams.RADIUS,256L).longValue();
-        long cr = getNumber(GenericMemoryShapeParams.CR,64L).longValue();
-        long cx = getNumber(GenericMemoryShapeParams.CX,0L).longValue();
-        long cz = getNumber(GenericMemoryShapeParams.CZ,0L).longValue();
-
+    public RTPChunk select(@Nullable Set<String> biomes) {
+        //todo
         return null;
     }
 
