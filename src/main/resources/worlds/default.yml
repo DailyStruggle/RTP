@@ -8,12 +8,5 @@ requirePermission: false
 #if no perm for this world, attempt this world instead
 # placeholder: [num] - world index according to bukkit, 0 is usually a main world
 override: "[0]"
-#default settings for "near" parameter
-nearShape:
-  name: "CIRCLE"
-  nearRadius: 16
-  nearCenterRadius: 8
-  nearMinY: 48
-  nearMaxY: 127
 
 version: "1.0"

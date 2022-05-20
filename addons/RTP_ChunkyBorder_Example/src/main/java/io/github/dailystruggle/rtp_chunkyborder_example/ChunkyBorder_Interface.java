@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp_chunkyborder_example;
 
-import leafcraft.rtp.api.selection.WorldBorderInterface;
+import leafcraft.rtp.common.selection.WorldBorderInterface;
 import leafcraft.rtp.bukkit.tools.selection.TeleportRegion;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;

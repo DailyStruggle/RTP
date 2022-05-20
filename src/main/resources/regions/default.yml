@@ -1,15 +1,15 @@
 #DO NOT DELETE default.yml
-#override shape, radius, center with vanilla worldborder settings
+#case-sensitive name of world this region is in
+# placeholder: [num] - world index according to bukkit, 0 is usually a main world
+world: "[0]"
+#override shape with vanilla worldborder settings
 worldBorderOverride: false
 shape:
   #shape of bounds
-  # each shape may use different input parameters
-  # CIRCLE, SQUARE - spiral curves, same input parameters
+  # each shape may use different optional input parameters, so update accordingly
+  #todo: update by command
+  #todo: write according to type in region map
   name: "CIRCLE"
-  #case-sensitive name of world this region is in
-  # placeholder: [num] - world index according to bukkit, 0 is usually a main world
-  world: "[0]"
-  worldBorderOverride: false
   #what selection adjustment method to use
   # ACCUMULATE - accumulate all bad sectors up to the initial selection (even distribution, slow at large radii)
   # NEAREST - try nearest non-hit (possible clustering, but fast)
@@ -42,7 +42,7 @@ vert:
   requireSkyLight: true
 #check rtp.regions.[region] node on command
 requirePermission: false
-#max length for the location queue per world, recommend 0 for unused regions
+#max length for the location queue per world, 0 disables normal region processing
 cacheCap: 10
 # vault price for player to use this region
 price: 0.0

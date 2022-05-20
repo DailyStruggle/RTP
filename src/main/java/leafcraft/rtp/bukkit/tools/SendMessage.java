@@ -1,6 +1,6 @@
 package leafcraft.rtp.bukkit.tools;
 
-import leafcraft.rtp.api.RTPAPI;
+import leafcraft.rtp.common.RTP;
 import leafcraft.rtp.bukkit.tools.softdepends.PAPIChecker;
 import net.md_5.bungee.api.ChatColor;
 import net.md_5.bungee.api.chat.BaseComponent;
@@ -37,7 +37,7 @@ public class SendMessage {
         if(sender instanceof Player) sendMessage((Player) sender,message);
         else {
             message = format(Bukkit.getOfflinePlayer(serverId),message);
-            if(RTPAPI.getInstance().serverAccessor.getServerIntVersion() >=12) {
+            if(RTP.getInstance().serverAccessor.getServerIntVersion() >=12) {
                 BaseComponent[] components = TextComponent.fromLegacyText(message);
                 sender.spigot().sendMessage(components);
             }
@@ -48,7 +48,7 @@ public class SendMessage {
     public static void sendMessage(Player player, String message) {
         if(message.equals("")) return;
         message = format(player,message);
-        if(RTPAPI.getInstance().serverAccessor.getServerIntVersion() >=12) {
+        if(RTP.getInstance().serverAccessor.getServerIntVersion() >=12) {
             BaseComponent[] components = TextComponent.fromLegacyText(message);
             player.spigot().sendMessage(components);
         }
@@ -64,13 +64,13 @@ public class SendMessage {
 
         message = format(player,message);
 
-        if(RTPAPI.getInstance().serverAccessor.getServerIntVersion() >=12) {
+        if(RTP.getInstance().serverAccessor.getServerIntVersion() >=12) {
             BaseComponent[] textComponents = TextComponent.fromLegacyText(message);
 
             if (!hover.equals("")) {
                 BaseComponent[] hoverComponents = TextComponent.fromLegacyText(format(player, hover));
                 //noinspection deprecation
-                HoverEvent hoverEvent = (RTPAPI.getInstance().serverAccessor.getServerIntVersion()>=16)
+                HoverEvent hoverEvent = (RTP.getInstance().serverAccessor.getServerIntVersion()>=16)
                         ? new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(hoverComponents))
                         : new HoverEvent(HoverEvent.Action.SHOW_TEXT, hoverComponents);
                 for (BaseComponent component : textComponents) {
@@ -111,7 +111,7 @@ public class SendMessage {
         while (matcher1.find()) {
             String hexColor = text.substring(matcher1.start(), matcher1.end());
             String bukkitColor;
-            if(RTPAPI.getInstance().serverAccessor.getServerIntVersion() < 16) {
+            if(RTP.getInstance().serverAccessor.getServerIntVersion() < 16) {
                 StringBuilder bukkitColorCode = new StringBuilder('\u00A7' + "x");
                 for (int i = hexColor.indexOf('#')+1; i < hexColor.length(); i++) {
                     bukkitColorCode.append('\u00A7').append(hexColor.charAt(i));

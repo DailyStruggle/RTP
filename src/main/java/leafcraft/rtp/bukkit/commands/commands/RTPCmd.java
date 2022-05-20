@@ -4,30 +4,35 @@ import io.github.dailystruggle.commandsapi.bukkit.LocalParameters.*;
 import io.github.dailystruggle.commandsapi.bukkit.localCommands.BukkitTreeCommand;
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import leafcraft.rtp.api.RTPAPI;
-import leafcraft.rtp.api.configuration.ConfigParser;
-import leafcraft.rtp.api.configuration.enums.ConfigKeys;
-import leafcraft.rtp.api.configuration.enums.LangKeys;
-import leafcraft.rtp.api.configuration.enums.RegionKeys;
-import leafcraft.rtp.api.configuration.enums.WorldKeys;
-import leafcraft.rtp.api.playerData.TeleportData;
-import leafcraft.rtp.api.selection.RegionParams;
+import leafcraft.rtp.common.RTP;
+import leafcraft.rtp.common.configuration.ConfigParser;
+import leafcraft.rtp.common.configuration.MultiConfigParser;
+import leafcraft.rtp.common.configuration.enums.ConfigKeys;
+import leafcraft.rtp.common.configuration.enums.LangKeys;
+import leafcraft.rtp.common.configuration.enums.RegionKeys;
+import leafcraft.rtp.common.configuration.enums.WorldKeys;
+import leafcraft.rtp.common.factory.Factory;
+import leafcraft.rtp.common.playerData.TeleportData;
+import leafcraft.rtp.common.selection.SelectionAPI;
+import leafcraft.rtp.common.selection.region.Region;
+import leafcraft.rtp.common.selection.region.selectors.shapes.Shape;
 import leafcraft.rtp.bukkit.commands.parameters.RegionParameter;
-import leafcraft.rtp.bukkit.api.substitutions.BukkitRTPWorld;
 import leafcraft.rtp.bukkit.RTPBukkitPlugin;
+import leafcraft.rtp.bukkit.commands.parameters.ShapeParameter;
 import leafcraft.rtp.bukkit.tools.SendMessage;
-import leafcraft.rtp.bukkit.tools.softdepends.PAPIChecker;
-import leafcraft.rtp.bukkit.tools.softdepends.VaultChecker;
-import net.milkbowl.vault.economy.Economy;
+import leafcraft.rtp.common.substitutions.RTPWorld;
+import leafcraft.rtp.common.tasks.SetupTeleport;
 import org.bukkit.Bukkit;
-import org.bukkit.World;
-import org.bukkit.block.Biome;
+import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.permissions.PermissionAttachmentInfo;
 import org.bukkit.plugin.Plugin;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
@@ -35,77 +40,92 @@ import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public class RTPCmd extends BukkitTreeCommand {
+    //for optimizing parameters,
+    private final Factory<Shape<?>> shapeFactory
+            = (Factory<Shape<?>>) RTP.getInstance().factoryMap.get(RTP.factoryNames.shape);
+
+    private final SelectionAPI selectionAPI = RTP.getInstance().selectionAPI;
+
+    private final Semaphore senderChecksGuard = new Semaphore(1);
+    private final List<Predicate<CommandSender>> senderChecks = new ArrayList<>();
+
+    public void addSenderCheck(Predicate<CommandSender> senderCheck) {
+        try {
+            senderChecksGuard.acquire();
+            senderChecks.add(senderCheck);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        finally {
+            senderChecksGuard.release();
+        }
+    }
 
     public RTPCmd(Plugin plugin) {
         super(plugin, null);
-        addParameter("world", new WorldParameter(
-                "rtp.world",
-                "select a world to teleport to",
-                (sender, s) -> sender.hasPermission("rtp.world") && sender.hasPermission("rtp.worlds."+s)));
+
+        //region name parameter
+        // filter by region exists and sender permission
         addParameter("region", new RegionParameter(
                 "rtp.region",
                 "select a region to teleport to",
-                (sender, s) -> sender.hasPermission("rtp.region") && sender.hasPermission("rtp.regions."+s)));
+                (sender, s) -> RTP.getInstance().selectionAPI.regionNames().contains(s) && sender.hasPermission("rtp.regions."+s)));
+
+        //target player parameter
+        // filter by player exists and player permission
         addParameter("player", new OnlinePlayerParameter(
                 "rtp.other",
                 "teleport someone else",
-                (sender, s) -> Bukkit.getPlayer(s)!=null && !Bukkit.getPlayer(s).hasPermission("rtp.notme")));
-        addParameter("shape", new RegionParameter(
-                "rtp.params",
-                "",
-                (sender, s) -> sender.hasPermission("rtp.params")));
-        addParameter("radius", new IntegerParameter(
-                "rtp.params",
-                "",
-                (sender, s) -> sender.hasPermission("rtp.params"), 64,128,256,512,1024,2048,4096,8192));
-        addParameter("centerRadius", new IntegerParameter(
-                "rtp.params",
-                "",
-                (sender, s) -> sender.hasPermission("rtp.params"), 16,32,64,128,256,512,1024,2048));
-        addParameter("centerX", new IntegerParameter(
-                "rtp.params",
-                "",
-                (sender, s) -> sender.hasPermission("rtp.params"),"~","~-",0));
-        addParameter("centerZ", new IntegerParameter(
-                "rtp.params",
-                "",
-                (sender, s) -> sender.hasPermission("rtp.params"),"~","~-",0));
-        addParameter("weight", new FloatParameter(
-                "rtp.params",
-                "",
-                (sender, s) -> sender.hasPermission("rtp.params"), 0.01,0.5,0.99));
-        addParameter("minY", new IntegerParameter(
-                "rtp.params",
-                "",
-                (sender, s) -> sender.hasPermission("rtp.params"),"~","~-",32));
-        addParameter("maxY", new IntegerParameter(
-                "rtp.params",
-                "",
-                (sender, s) -> sender.hasPermission("rtp.params"),"~","~-",127));
-        addParameter("requireSkyLight", new BooleanParameter(
-                "rtp.params",
-                "",
-                (sender, s) -> sender.hasPermission("rtp.params")));
+                (sender, s) -> {
+                    Player player = Bukkit.getPlayer(s);
+                    return player != null && !player.hasPermission("rtp.notme");
+                }));
+
+        //world name parameter
+        // filter by world exists and sender permission
+        addParameter("world", new WorldParameter(
+                "rtp.world",
+                "select a world to teleport to",
+                (sender, s) -> Bukkit.getWorld(s)!=null && sender.hasPermission("rtp.worlds." + s)));
+
+        //wbo parameter
         addParameter("worldBorderOverride", new RegionParameter(
                 "rtp.params",
-                "",
-                (sender, s) -> sender.hasPermission("rtp.params")));
+                "override shape with worldborder",
+                (sender, s) -> true));
+        ShapeParameter shapeParameter = new ShapeParameter(
+                "rtp.params",
+                "adjust shape of target region",
+                (sender, s) -> this.shapeFactory.contains(s));
+        addParameter("shape", shapeParameter);
+        Bukkit.getScheduler().runTaskAsynchronously(RTPBukkitPlugin.getInstance(),()->{
+            Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.getInstance().factoryMap.get(RTP.factoryNames.shape);
+            for(var e : factory.map.entrySet()) {
+                shapeParameter.putShape(e.getKey(),e.getValue().getParameters());
+            }
+        });
     }
 
+    //synchronous command component
     @Override
-    public boolean onCommand(CommandSender sender, Map<String, List<String>> rtpArgs, CommandsAPICommand nextCommand) {
-        //check command processing times for optimization
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         long start = System.nanoTime();
 
-        RTPBukkitPlugin plugin = RTPBukkitPlugin.getInstance();
-        RTPAPI api = RTPAPI.getInstance();
+        RTP api = RTP.getInstance();
 
+        ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) api.configs.getParser(ConfigKeys.class);
+        ConfigParser<LangKeys> langParser = (ConfigParser<LangKeys>) api.configs.getParser(LangKeys.class);
+
+        //--------------------------------------------------------------------------------------------------------------
+        //guard command perms with custom message
         if(!sender.hasPermission("rtp.use")) {
-            String msg = (String) api.configs.lang.getConfigValue(LangKeys.noPerms, "");
+            String msg = (String) langParser.getConfigValue(LangKeys.noPerms, "");
             SendMessage.sendMessage(sender,msg);
             return true;
         }
 
+        //--------------------------------------------------------------------------------------------------------------
+        //guard last teleport time synchronously to prevent spam
         TeleportData senderData = (sender instanceof  Player)
                 ? api.latestTeleportData.getOrDefault(((Player) sender).getUniqueId(), new TeleportData())
                 : new TeleportData();
@@ -113,366 +133,209 @@ public class RTPCmd extends BukkitTreeCommand {
             senderData.sender = CommandsAPI.serverId;
         }
 
-        //todo: if no player parameter, use sender as a player
-        //todo: world per player parameter
-        //todo: region per player parameter
-        //todo: parse region parameters
+        ConcurrentHashMap<UUID, TeleportData> latestTeleportData = RTP.getInstance().latestTeleportData;
+        UUID uuid = (sender instanceof Player) ? ((Player) sender).getUniqueId() : CommandsAPI.serverId;
+        if(!latestTeleportData.containsKey(uuid)) {
+            TeleportData teleportData = new TeleportData();
+            teleportData.time = 0;
+            latestTeleportData.put(uuid,teleportData);
+        }
 
-        //set up player parameter
-        List<Player> players;
-        Map<UUID,TeleportData> newTeleportDataMap = new HashMap<>();
-        if(sender.hasPermission("rtp.other") && rtpArgs.containsKey("player")) {
-            List<String> playerNames = rtpArgs.get("player");
-            if(playerNames != null && playerNames.size()>0) {
-                players = new ArrayList<>(playerNames.size());
-                for (String playerName : playerNames) {
-                    Player p = Bukkit.getPlayer(playerName);
-                    if (p == null) {
-                        String msg = (String) api.configs.lang.getConfigValue(LangKeys.badArg, "player:" + rtpArgs.get("player"));
-                        SendMessage.sendMessage(sender, msg);
+        if(!sender.hasPermission("rtp.noCooldown")) {
+            long lastTime;
+
+            TeleportData teleportData = latestTeleportData.get(uuid);
+            lastTime = teleportData.time;
+
+            long cooldownTime = TimeUnit.SECONDS.toNanos((Long) configParser.getConfigValue(ConfigKeys.teleportCooldown,0));
+            Set<PermissionAttachmentInfo> perms = sender.getEffectivePermissions();
+
+            for(PermissionAttachmentInfo perm : perms) {
+                if(!perm.getValue()) continue;
+                String node = perm.getPermission();
+                if(node.startsWith("rtp.cooldown.")) {
+                    String[] val = node.split("\\.");
+                    if(val.length<3 || val[2]==null || val[2].equals("")) continue;
+                    int number;
+                    try {
+                        number = Integer.parseInt(val[2]);
+                    } catch (NumberFormatException exception) {
+                        Bukkit.getLogger().warning("[rtp] invalid permission: " + node);
                         continue;
                     }
+                    cooldownTime = TimeUnit.SECONDS.toNanos(number);
+                    break;
+                }
+            }
 
-                    TeleportData lastTeleportData = api.latestTeleportData.get(p.getUniqueId());
-                    if(lastTeleportData != null && !lastTeleportData.completed) {
-                        String msg = (String) api.configs.lang.getConfigValue(LangKeys.alreadyTeleporting,"");
+            if ((start - lastTime) < cooldownTime){
+                long remaining = (lastTime - start) + cooldownTime;
+                long days = TimeUnit.NANOSECONDS.toDays(remaining);
+                long hours = TimeUnit.NANOSECONDS.toHours(remaining) % 24;
+                long minutes = TimeUnit.NANOSECONDS.toMinutes(remaining) % 60;
+                long seconds = TimeUnit.NANOSECONDS.toSeconds(remaining) % 60;
+                String replacement = "";
+                if (days > 0) replacement += days + (String) langParser.getConfigValue(LangKeys.days, 0) + " ";
+                if (days > 0 || hours > 0) replacement += hours + (String) langParser.getConfigValue(LangKeys.hours, 0) + " ";
+                if (days > 0 || hours > 0 || minutes > 0) replacement += minutes + (String) langParser.getConfigValue(LangKeys.minutes, 0) + " ";
+                replacement += seconds + (String) langParser.getConfigValue(LangKeys.seconds, 0);
+                String msg = (String) langParser.getConfigValue(LangKeys.cooldownMessage, replacement);
+
+                SendMessage.sendMessage(sender, msg);
+                return true;
+            }
+
+            teleportData.priorTime = teleportData.time;
+            teleportData.time = start;
+        }
+
+        boolean validSender = true;
+        try {
+            senderChecksGuard.acquire();
+            for(var a : senderChecks) {
+                validSender &= a.test(sender);
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            senderChecksGuard.release();
+        }
+
+        if(!validSender) {
+            return true;
+        }
+
+        return super.onCommand(sender, command, label, args);
+    }
+
+    //async command component
+    @Override
+    public boolean onCommand(CommandSender sender, Map<String, List<String>> rtpArgs, CommandsAPICommand nextCommand) {
+        long start = System.nanoTime();
+        RTPBukkitPlugin plugin = RTPBukkitPlugin.getInstance();
+        RTP api = RTP.getInstance();
+        int numBaseArgs = 0;
+
+        ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) api.configs.getParser(ConfigKeys.class);
+        ConfigParser<LangKeys> langParser = (ConfigParser<LangKeys>) api.configs.getParser(LangKeys.class);
+
+        MultiConfigParser<WorldKeys> worldsParser = (MultiConfigParser<WorldKeys>) api.configs.getParser(WorldKeys.class);
+        MultiConfigParser<RegionKeys> regionsParser = (MultiConfigParser<RegionKeys>) api.configs.getParser(RegionKeys.class);
+
+        //--------------------------------------------------------------------------------------------------------------
+        //collect target players to teleport
+        List<Player> players = new ArrayList<>();
+        if(rtpArgs.containsKey("player")) { //if players are listed, use those.
+            List<String> playerNames = rtpArgs.get("player");
+            for (String playerName : playerNames) {
+                //double check the player is still valid by the time we get here
+                Player p = Bukkit.getPlayer(playerName);
+                if (p == null) {
+                    String msg = (String) langParser.getConfigValue(LangKeys.badArg, "player:" + rtpArgs.get("player"));
+                    SendMessage.sendMessage(sender, msg);
+                    continue;
+                }
+
+                //get their data
+                TeleportData lastTeleportData = api.latestTeleportData.get(p.getUniqueId());
+                //if player has an incomplete teleport
+                if(lastTeleportData != null) {
+                    if(!lastTeleportData.completed) {
+                        String msg = (String) langParser.getConfigValue(LangKeys.alreadyTeleporting, "");
                         SendMessage.sendMessage(sender, p, msg);
                         continue;
                     }
-                    players.add(p);
-                    TeleportData newTeleportData = new TeleportData();
-                    newTeleportData.completed = false;
-                    newTeleportData.time = start;
-                    newTeleportDataMap.put(p.getUniqueId(),newTeleportData);
+
+                    lastTeleportData.priorTime = lastTeleportData.time;
                 }
-            } else if(sender instanceof Player) {
-                players = new ArrayList<>(1);
-                players.add((Player) sender);
-            }
-            else {
-                String msg = (String) api.configs.lang.getConfigValue(LangKeys.consoleCmdNotAllowed,"");
-                SendMessage.sendMessage(sender,msg);
-                return true;
+                else {
+                    lastTeleportData = new TeleportData();
+                    api.latestTeleportData.put(p.getUniqueId(),lastTeleportData);
+                }
+
+                players.add(p);
+
+                lastTeleportData.time = start;
+                lastTeleportData.completed = false;
             }
         }
-        else if(sender instanceof Player) {
+        else if(sender instanceof Player) { //if no players but sender is a player, use sender's location
             players = new ArrayList<>(1);
             players.add((Player) sender);
         }
-        else {
-            String msg = (String) api.configs.lang.getConfigValue(LangKeys.consoleCmdNotAllowed,"");
+        else { //if no players and sender isn't a player, idk who to send
+            String msg = (String) langParser.getConfigValue(LangKeys.consoleCmdNotAllowed,"");
             SendMessage.sendMessage(sender,msg);
             return true;
         }
 
-        //set up world parameter, one for each player
-        List<World> worlds = new ArrayList<>(players.size());
-        if(rtpArgs.containsKey("region")) {
-            List<String> regionNames = rtpArgs.get("region");
-            if(regionNames.size()==0) {
-                String msg = (String) api.configs.lang.getConfigValue(LangKeys.badArg, "region:");
-                SendMessage.sendMessage(sender,msg);
-                return true;
-            }
-
-            for(int i = 0; i < players.size(); i++) {
-                int select = ThreadLocalRandom.current().nextInt(regionNames.size());
-                String regionName = regionNames.get(select);
-                ConfigParser<RegionKeys> regionsParser = api.configs.regions.getParser(regionName);
-                Objects.requireNonNull(regionsParser);
-                Object shapeMap = regionsParser.getConfigValue(RegionKeys.shape, null);
-                RTPAPI.log(Level.WARNING,shapeMap.toString());
-
-                Map<String,Object> shapeParams =
-                        (Map<String, Object>) regionsParser.getConfigValue(RegionKeys.shape,null);
-                Objects.requireNonNull(shapeParams);
-                String worldName = (String) shapeParams.get("world");
-                ConfigParser<WorldKeys> worldsParser = api.configs.worlds.getParser(worldName);
-                if(!api.configs.worlds.configParserFactory.contains(worldName))
-                    api.configs.worlds.addParser(worldsParser);
-                Objects.requireNonNull(worldsParser);
-                if (((Boolean) worldsParser.getConfigValue(WorldKeys.requirePermission, true))) {
-                    String msg = (String) api.configs.lang.getConfigValue(LangKeys.badArg, "region:" + regionName);
-                    SendMessage.sendMessage(sender, msg);
-                    return true;
-                }
-                if (!api.configs.checkWorldExists(worldName) || !sender.hasPermission("rtp.worlds." + worldName)) {
-                    String msg = (String) api.configs.lang.getConfigValue(LangKeys.badArg, "world:" + worldName);
-                    SendMessage.sendMessage(sender, msg);
-
-                    return true;
-                }
-                worlds.add(Bukkit.getWorld(worldName));
-            }
-        }
-        else {
-            if (rtpArgs.containsKey("world")) {
-                List<String> worldNames = rtpArgs.get("world");
-                if(worldNames.size()==0) {
-                    String msg = (String) api.configs.lang.getConfigValue(LangKeys.badArg, "world:");
-                    SendMessage.sendMessage(sender,msg);
-                    return true;
-                }
-
-                for (Player player : players) {
-                    String worldName;
-                    World world;
-                    int select = ThreadLocalRandom.current().nextInt(worldNames.size());
-                    worldName = worldNames.get(select);
-                    if (!api.configs.checkWorldExists(worldName)) {
-                        String msg = (String) api.configs.lang.getConfigValue(LangKeys.badArg, "world:" + worldName);
-                        SendMessage.sendMessage(sender, msg);
-                        return true;
-                    }
-                    if (sender.hasPermission("rtp.worlds." + worldName) ||
-                            !((Boolean) api.configs.worlds.getParser(worldName).getConfigValue( WorldKeys.requirePermission, true)))
-                        world = Bukkit.getWorld(worldName);
-                    else {
-                        world = player.getWorld();
-                    }
-                    worlds.add(world);
-                }
+        for(int i = 0; i < players.size(); i++) {
+            Player player = players.get(i);
+            String regionName;
+            if(rtpArgs.containsKey("region")) {
+                //todo: get one region from the list
+                regionName = pickOne(rtpArgs.get("region"),"default");
             }
             else {
-                for (Player player : players) {
-                    World world = player.getWorld();
-                    worlds.add(world);
+                String worldName;
+                //get region parameter from world options
+                if(rtpArgs.containsKey("world")) {
+                    //get one world from the list
+                    worldName = pickOne(rtpArgs.get("world"),"default");
+                }
+                else {
+                    //use player's world
+                    worldName = player.getWorld().getName();
+                }
+
+                //todo: validate world parser exists
+
+                //todo: world to region
+                ConfigParser<WorldKeys> worldParser = api.configs.getWorldParser(worldName);
+                if(worldParser == null) {
+                    //todo: message world not exist
+                    return true;
+                }
+                regionName = worldParser.getConfigValue(WorldKeys.region, "default").toString();
+            }
+
+            SelectionAPI selectionAPI = api.selectionAPI;
+
+            Region region = selectionAPI.getRegionOrDefault(regionName);
+            String worldName = (String) region.getData().get(RegionKeys.world);
+            RTPWorld rtpWorld = api.serverAccessor.getRTPWorld(worldName);
+            Objects.requireNonNull(rtpWorld);
+
+            SendMessage.sendMessage(sender,"C");
+
+            //check for wbo
+            if(rtpArgs.containsKey("worldBorderOverride")) {
+                boolean doWBO;
+                List<String> WBOVals = rtpArgs.get("worldBorderOverride");
+                if(WBOVals.size() > i) doWBO = Boolean.parseBoolean(WBOVals.get(i));
+                else doWBO = Boolean.parseBoolean(WBOVals.get(0));
+
+                if(doWBO) {
+                    region = region.clone();
+                    region.set(RegionKeys.shape, api.serverAccessor.getShape(worldName));
                 }
             }
-        }
-//
-//        for(World world : worlds) {
-//            String worldName = Objects.requireNonNull(world).getName();
-//            if (!sender.hasPermission("rtp.worlds." + worldName) && (Boolean) api.configs.worlds.getParser(worldName).getConfigValue( WorldKeys.requirePermission, true)) {
-//                world = Bukkit.getWorld((String) api.configs.worlds.getParser(worldName).getConfigValue( WorldKeys.override, "[0]"));
-//                if (world == null || !api.configs.checkWorldExists(world.getName())) {
-//                    String msg = (String) api.configs.lang.getConfigValue(LangKeys.badArg, "world:" + worldName);
-//                    SendMessage.sendMessage(sender, msg);
-//                    return true;
-//                }
-//            }
-//        }
-//
-//        //check time
-//        if(!sender.hasPermission("rtp.noCooldown")) {
-//            long lastTime;
-//            if(sender instanceof Player) {
-//                TeleportData teleportData = RTPAPI.getInstance().latestTeleportData.get(((Player)sender).getUniqueId());
-//                if(teleportData != null) {
-//                    lastTime = teleportData.time;
-//                }
-//                else lastTime = 0;
-//            }
-//            else lastTime = 0;
-//
-//            long cooldownTime = TimeUnit.SECONDS.toNanos((Long) api.configs.config.getConfigValue(ConfigKeys.teleportCooldown,0));
-//            Set<PermissionAttachmentInfo> perms = sender.getEffectivePermissions();
-//
-//            for(PermissionAttachmentInfo perm : perms) {
-//                if(!perm.getValue()) continue;
-//                String node = perm.getPermission();
-//                if(node.startsWith("rtp.cooldown.")) {
-//                    String[] val = node.split("\\.");
-//                    if(val.length<3 || val[2]==null || val[2].equals("")) continue;
-//                    int number;
-//                    try {
-//                        number = Integer.parseInt(val[2]);
-//                    } catch (NumberFormatException exception) {
-//                        Bukkit.getLogger().warning("[rtp] invalid permission: " + node);
-//                        continue;
-//                    }
-//                    cooldownTime = TimeUnit.SECONDS.toNanos(number);
-//                    break;
-//                }
-//            }
-//
-//            if ((start - lastTime) < cooldownTime){
-//                long remaining = (lastTime - start) + cooldownTime;
-//                long days = TimeUnit.NANOSECONDS.toDays(remaining);
-//                long hours = TimeUnit.NANOSECONDS.toHours(remaining) % 24;
-//                long minutes = TimeUnit.NANOSECONDS.toMinutes(remaining) % 60;
-//                long seconds = TimeUnit.NANOSECONDS.toSeconds(remaining) % 60;
-//                String replacement = "";
-//                if (days > 0) replacement += days + (String) api.configs.lang.getConfigValue(LangKeys.days, 0) + " ";
-//                if (days > 0 || hours > 0) replacement += hours + (String) api.configs.lang.getConfigValue(LangKeys.hours, 0) + " ";
-//                if (days > 0 || hours > 0 || minutes > 0) replacement += minutes + (String) api.configs.lang.getConfigValue(LangKeys.minutes, 0) + " ";
-//                replacement += seconds + (String) api.configs.lang.getConfigValue(LangKeys.seconds, 0);
-//                String msg = (String) api.configs.lang.getConfigValue(LangKeys.cooldownMessage, replacement);
-//
-//                SendMessage.sendMessage(sender, msg);
-//                return true;
-//            }
-//        }
-//
-//        if(rtpArgs.containsKey("near")) {
-//            //select from one of these
-//            List<String> playerNames = rtpArgs.get("near");
-//            if(playerNames.size()==0) {
-//                String msg = (String) api.configs.lang.getConfigValue(LangKeys.badArg, "near:");
-//                SendMessage.sendMessage(sender,msg);
-//                return true;
-//            }
-//
-//            String playerName = playerNames.get(ThreadLocalRandom.current().nextInt(playerNames.size()));
-//            Player targetPlayer = Bukkit.getPlayer(playerName);
-//
-//            //todo: get price
-//            double price = 0.0; // api.configs.config.getConfigValue(ConfigKeys.nearSelfPrice);
-//            Economy economy = VaultChecker.getEconomy();
-//            boolean has = true;
-//            if (economy != null
-//                    && sender instanceof Player
-//                    && !sender.hasPermission("rtp.near.free"))
-//                has = economy.has((Player) sender, price);
-//
-//            if(playerName.equalsIgnoreCase("random") && sender.hasPermission("rtp.near.random")) {
-//                Collection<? extends Player> randomPlayers = Bukkit.getOnlinePlayers();
-//                List<Player> validPlayers = new ArrayList<>(randomPlayers.size());
-//                for(Player player1 : randomPlayers) {
-//                    if(player1.getName().equals(sender.getName())) continue;
-//                    if(player1.hasPermission("rtp.near.notme")) continue;
-//                    validPlayers.add(player1);
-//                }
-//                if(validPlayers.size()>0) {
-//                    int selection = ThreadLocalRandom.current().nextInt(validPlayers.size());
-//                    targetPlayer = validPlayers.get(selection);
-//                    playerName = targetPlayer.getName();
-//                }
-//                else {
-//                    String msg = (String) api.configs.lang.getConfigValue(LangKeys.badArg, "near:" + playerName);
-//
-//                    SendMessage.sendMessage(sender,msg);
-//                    return true;
-//                }
-//            }
-//            else if (!playerName.equals(sender.getName()) && !sender.hasPermission("rtp.near.other")) {
-//                String msg = (String) api.configs.lang.getConfigValue(LangKeys.noPerms,"");
-//
-//                SendMessage.sendMessage(sender,msg);
-//                return true;
-//            }
-//            else if (!sender.hasPermission("rtp.near")) {
-//                String msg = (String) api.configs.lang.getConfigValue(LangKeys.noPerms,"");
-//
-//                SendMessage.sendMessage(sender,msg);
-//                return true;
-//            }
-//
-//            if (targetPlayer == null) {
-//                String msg = (String) api.configs.lang.getConfigValue(LangKeys.badArg, "near:" + playerName);
-//
-//                SendMessage.sendMessage(sender,msg);
-//                return true;
-//            }
-//
-//            if(!has) {
-//                String msg = (String) api.configs.lang.getConfigValue(LangKeys.notEnoughMoney,String.valueOf(price));
-//                PAPIChecker.fillPlaceholders((Player)sender,msg);
-//                SendMessage.sendMessage(sender,msg);
-//                return true;
-//            }
-//
-//            if(sender instanceof Player
-//                    && (economy != null)
-//                    && !sender.hasPermission("rtp.near.free")) {
-//                economy.withdrawPlayer((Player)sender,price);
-//                senderData.cost = price;
-//            }
-//
-//            //todo
-//            for (int i = 0; i < players.size(); i++) {
-//                Player p = players.get(i);
-//                TeleportData teleportData = newTeleportDataMap.getOrDefault(p.getUniqueId(), new TeleportData());
-//                RegionParams regionParams;
-//                Map<String,String> newParams;
-//                newParams = new HashMap<>();
-//                worlds.set(i,targetPlayer.getWorld());
-//                newParams.putIfAbsent("world", targetPlayer.getWorld().getName());
-//                regionParams = new RegionParams(new BukkitRTPWorld(targetPlayer.getWorld()), newParams);
-//                teleportData.givenParams = regionParams;
-//                newTeleportDataMap.put(p.getUniqueId(),teleportData);
-//            }
-//        }
-//
-//        List<Biome> biomes = new ArrayList<>(players.size());
-//        if(rtpArgs.containsKey("biome")) {
-//            List<String> biomeNames = rtpArgs.get("biome");
-//            if(biomeNames.size()==0) {
-//                String msg = (String) api.configs.lang.getConfigValue(LangKeys.badArg, "biome:");
-//                SendMessage.sendMessage(sender,msg);
-//                return true;
-//            }
-//
-//            String biomeName = biomeNames.get(ThreadLocalRandom.current().nextInt(biomeNames.size()));
-//
-//            Biome biome;
-//            try {
-//                biome = Biome.valueOf(biomeName.toUpperCase());
-//            } catch (IllegalArgumentException | NullPointerException exception) {
-//                biome = null;
-//            }
-//            if(biome == null) {
-//                String msg = (String) api.configs.lang.getConfigValue(LangKeys.badArg, "biome:"+rtpArgs.get("biome"));
-//                SendMessage.sendMessage(sender,msg);
-//                return true;
-//            }
-//
-//            //todo
-//            double price = 0.0; // api.configs.config.biomePrice;
-//            Economy economy = VaultChecker.getEconomy();
-//            boolean has = true;
-//            if (economy != null
-//                    && sender instanceof Player
-//                    && !sender.hasPermission("rtp.biome.free"))
-//                has = economy.has((Player) sender, price);
-//
-//            if (!sender.hasPermission("rtp.biome")) {
-//                String msg = (String) api.configs.lang.getConfigValue(LangKeys.noPerms,"");
-//                SendMessage.sendMessage(sender,msg);
-//                return true;
-//            }
-//
-//            if(!has) {
-//                String msg = (String) api.configs.lang.getConfigValue(LangKeys.notEnoughMoney,String.valueOf(price));
-//                PAPIChecker.fillPlaceholders((Player)sender,msg);
-//                SendMessage.sendMessage(sender,msg);
-//                return true;
-//            }
-//
-//            if(sender instanceof Player && !sender.hasPermission("rtp.biome.free")) {
-//                Objects.requireNonNull(economy).withdrawPlayer((Player)sender,price);
-//                senderData.cost = price;
-//            }
-//        }
-//
-//        //set up parameters for selection
-//        List<RegionParams> paramsList = new ArrayList<>(players.size());
-//        for (World world : worlds) {
-//            //todo: fill out params to feed in
-//            paramsList.add(new RegionParams());
-//        }
-//
-//        StringBuilder biomeConsolidator = new StringBuilder();
-//        if(rtpArgs.containsKey("biome")) {
-//            List<String> biomeNamesInput = rtpArgs.get("biome");
-//            for(String biomeName : biomeNamesInput) {
-//                try{
-//                    Biome.valueOf(biomeName.toUpperCase());
-//                    biomeConsolidator.append(biomeName).append(',');
-//                }
-//                catch (IllegalArgumentException e) {
-//                    SendMessage.sendMessage(sender,(String) api.configs.lang.getConfigValue(LangKeys.badArg,"biome:"+biomeName));
-//                }
-//            }
-//        }
-//
-//        //todo: command parameters
-        //mark a successful command
 
-        SendMessage.sendMessage(sender,"available regions - " +
-                RTPAPI.getInstance().selectionAPI.permRegionLookup.values().stream()
-                        .map(region -> region.name).collect(Collectors.toList()));
-        //todo: give player list
+            //todo: shape params
+            //todo: vert params
+            //todo: biomes
+
+            if(region.hasLocation(player.getUniqueId())) {
+                //todo: initiate teleport action if here
+            }
+
+            UUID senderId = (sender instanceof Player) ? ((Player) sender).getUniqueId() : CommandsAPI.serverId;
+
+            //todo: default case, setupTeleport
+            SetupTeleport setupTeleport = new SetupTeleport(senderId, player.getUniqueId(), region, null);
+            api.setupTeleportPipeline.add(setupTeleport);
+        }
+        //todo
 //        Bukkit.getScheduler().runTaskAsynchronously(plugin,()->
 //                Bukkit.getPluginManager().callEvent(new TeleportCommandSuccessEvent(sender,players.getFromString(0))));
 //
@@ -498,7 +361,7 @@ public class RTPCmd extends BukkitTreeCommand {
 //                    && sender.hasPermission("rtp.noDelay")
 //                    && !rsParams.params.containsKey("biome"))
 //                    || api.configs.config.syncLoading
-//                    || RTPAPI.getInstance().getServerIntVersion()<=8) {
+//                    || RTP.getInstance().getServerIntVersion()<=8) {
 //                setupTeleport.setupTeleportNow(); //todo: go down this rabbit hole
 //            } else {
 //                setupTeleport.runTaskAsynchronously(plugin);
@@ -523,10 +386,8 @@ public class RTPCmd extends BukkitTreeCommand {
         return "teleport randomly";
     }
 
-    private static String pickOne(List<String> param, Predicate<? super String> validator, String d) {
+    private static String pickOne(List<String> param, String d) {
         if(param == null || param.size()==0) return d;
-        List<String> validSelections = param.stream().filter(validator).collect(Collectors.toList());
-        if(validSelections.size() == 0) return d;
         int sel = ThreadLocalRandom.current().nextInt(param.size());
         return param.get(sel);
     }
