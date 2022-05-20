@@ -1,11 +1,11 @@
 package leafcraft.rtp.bukkit.commands.commands.info;
 
-import leafcraft.rtp.api.RTPAPI;
-import leafcraft.rtp.api.configuration.ConfigParser;
-import leafcraft.rtp.api.configuration.MultiConfigParser;
-import leafcraft.rtp.api.configuration.enums.LangKeys;
-import leafcraft.rtp.api.configuration.enums.WorldKeys;
-import leafcraft.rtp.api.selection.region.Region;
+import leafcraft.rtp.common.RTP;
+import leafcraft.rtp.common.configuration.ConfigParser;
+import leafcraft.rtp.common.configuration.MultiConfigParser;
+import leafcraft.rtp.common.configuration.enums.LangKeys;
+import leafcraft.rtp.common.configuration.enums.WorldKeys;
+import leafcraft.rtp.common.selection.region.Region;
 import leafcraft.rtp.bukkit.RTPBukkitPlugin;
 import leafcraft.rtp.bukkit.tools.SendMessage;
 import org.bukkit.Bukkit;
@@ -27,7 +27,7 @@ public class InfoCmd implements CommandExecutor {
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
-        ConfigParser<LangKeys> lang = RTPAPI.getInstance().configs.lang;
+        ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
         if(!sender.hasPermission("rtp.info")) {
             SendMessage.sendMessage(sender, (String) lang.getConfigValue(LangKeys.noPerms,""));
             return true;
@@ -46,7 +46,7 @@ public class InfoCmd implements CommandExecutor {
                     SendMessage.sendMessage(sender,msg,hover,click);
                 }
                 SendMessage.sendMessage(sender, (String) lang.getConfigValue(LangKeys.regionHeader,""));
-                for(Region region : RTPAPI.getInstance().selectionAPI.permRegions.values()) {
+                for(Region region : RTP.getInstance().selectionAPI.permRegionLookup.values()) {
                     String msg = ((String)lang.getConfigValue(LangKeys.region,"")).replace("[region]", region.name);
                     String hover = "/rtp info region:" + region.name;
                     String click = "/rtp info region:" + region.name;
@@ -63,7 +63,7 @@ public class InfoCmd implements CommandExecutor {
                 if (!infoParams.contains(arg)) continue;
                 String val = s.substring(idx+1);
 
-                MultiConfigParser<WorldKeys> worlds = RTPAPI.getInstance().configs.worlds;
+                MultiConfigParser<WorldKeys> worlds = (MultiConfigParser<WorldKeys>) RTP.getInstance().configs.getParser(WorldKeys.class);
 
                 switch (arg.toLowerCase()) {
                     case "world" -> {
@@ -75,7 +75,6 @@ public class InfoCmd implements CommandExecutor {
                         tokens.put("[region]", String.valueOf(worldsParser.getConfigValue(WorldKeys.region, "")));
                         tokens.put("[requirePermission]", String.valueOf(worldsParser.getConfigValue( WorldKeys.requirePermission, false)));
                         tokens.put("[override]", String.valueOf(worldsParser.getConfigValue( WorldKeys.override, "")));
-                        tokens.put("[nearShape]", String.valueOf(worldsParser.getConfigValue( WorldKeys.nearShape, "CIRCLE")));
 
                         List<String> msgList = (List<String>) lang.getConfigValue(LangKeys.worldInfo, new ArrayList<>());
                         for (String msg : msgList) {
@@ -87,7 +86,7 @@ public class InfoCmd implements CommandExecutor {
                     }
                     case "region" -> {
                         Region region = null;
-                        for (Region teleportRegion : RTPAPI.getInstance().selectionAPI.permRegions.values()) {
+                        for (Region teleportRegion : RTP.getInstance().selectionAPI.permRegionLookup.values()) {
                             if (teleportRegion.name.equals(val)) {
                                 region = teleportRegion;
                                 break;

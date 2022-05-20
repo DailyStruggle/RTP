@@ -2,19 +2,13 @@ package leafcraft.rtp.bukkit.commands.commands.fill;
 
 import io.github.dailystruggle.commandsapi.bukkit.localCommands.BukkitTreeCommand;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import leafcraft.rtp.api.RTPAPI;
-import leafcraft.rtp.api.selection.RegionParams;
-import leafcraft.rtp.api.selection.region.Region;
+import leafcraft.rtp.common.selection.region.Region;
 import leafcraft.rtp.bukkit.commands.commands.fill.subcommands.Cancel;
 import leafcraft.rtp.bukkit.commands.commands.fill.subcommands.Pause;
 import leafcraft.rtp.bukkit.commands.commands.fill.subcommands.Resume;
 import leafcraft.rtp.bukkit.commands.commands.fill.subcommands.Start;
 import leafcraft.rtp.bukkit.commands.parameters.RegionParameter;
-import leafcraft.rtp.bukkit.api.substitutions.BukkitRTPWorld;
-import org.bukkit.Bukkit;
-import org.bukkit.World;
 import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
 import java.util.*;
@@ -99,8 +93,8 @@ public class FillCmd extends BukkitTreeCommand {
 //
 //            RegionParams regionParams = new RegionParams(new BukkitRTPWorld(Objects.requireNonNull(Bukkit.getWorld(worldName))), fillCommandArgs);
 //            Region region = null;
-//            if (RTPAPI.getInstance().selectionAPI.permRegions.containsKey(regionParams)) {
-//                Region foundRegion = RTPAPI.getInstance().selectionAPI.permRegions.get(regionParams);
+//            if (RTP.getInstance().selectionAPI.permRegions.containsKey(regionParams)) {
+//                Region foundRegion = RTP.getInstance().selectionAPI.permRegions.get(regionParams);
 //                if(foundRegion == null) {
 //                    String msg = Configs.lang.getLog("badArg", "region:" + regionName);
 //                    SendMessage.sendMessage(sender, msg);

@@ -362,17 +362,19 @@
             <artifactId>RedProtect-Spigot</artifactId>
             <version>LATEST</version>
             <classifier>javadoc</classifier>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>io.github.dailystruggle</groupId>
             <artifactId>CommandsAPI</artifactId>
-            <version>1.0-ALPHA37</version>
+            <version>1.0-ALPHA43</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.yaml</groupId>
             <artifactId>snakeyaml</artifactId>
             <version>1.29</version>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 </project>
