@@ -16,13 +16,13 @@ public class TabComplete implements TabCompleter {
         String perm;
 
         //parameter name,perm, for
-        Map<String,String> subParams = new HashMap<>();
+        Map<String,String> subParams = new ConcurrentHashMap<>();
 
         //perm, list of params
-        Map<String,ArrayList<String>> subParamsPermList = new HashMap<>();
+        Map<String,ArrayList<String>> subParamsPermList = new ConcurrentHashMap<>();
 
         //command name, commands
-        Map<String,SubCommand> commands = new HashMap<>();
+        Map<String,SubCommand> commands = new ConcurrentHashMap<>();
 
         SubCommand(String perm) { this.perm = perm; }
 

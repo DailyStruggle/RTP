@@ -1,6 +1,6 @@
 name: RTP
 version: '${project.version}'
-main: leafcraft.rtp.bukkit.RTPBukkitPlugin
+main: io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin
 api-version: 1.13
 authors: [ leaf26 ]
 description: 'an optimized RTP plugin'

@@ -10,16 +10,16 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
 
 public class Glide implements CommandExecutor {
     private final RTP_Glide plugin;
     private final Configs Configs;
 
-    private final Map<String,String> glideCommands = new HashMap<>();
-    private final Map<String,String> glideParams = new HashMap<>();
-    private final Map<String,CommandExecutor> commandHandles = new HashMap<>();
+    private final Map<String,String> glideCommands = new ConcurrentHashMap<>();
+    private final Map<String,String> glideParams = new ConcurrentHashMap<>();
+    private final Map<String,CommandExecutor> commandHandles = new ConcurrentHashMap<>();
 
     public Glide(RTP_Glide plugin, Configs Configs) {
         this.plugin = plugin;
@@ -48,7 +48,7 @@ public class Glide implements CommandExecutor {
 
         if(!sender.hasPermission("glide.use")) return false;
 
-        Map<String,String> glideArgs = new HashMap<>();
+        Map<String,String> glideArgs = new ConcurrentHashMap<>();
         for(int i = 0; i < args.length; i++) {
             int idx = args[i].indexOf(':');
             String arg = idx>0 ? args[i].substring(0,idx) : args[i];

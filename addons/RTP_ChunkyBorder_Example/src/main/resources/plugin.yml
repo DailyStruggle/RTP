@@ -1,6 +1,6 @@
 name: RTP_ChunkyBorder_Example
 version: '${project.version}'
-main: io.github.dailystruggle.rtp_chunkyborder_example.RTP_ChunkyBorder_Example
+main: io.io.github.dailystruggle.rtp_chunkyborder_example.RTP_ChunkyBorder_Example
 api-version: 1.18
 authors: [ leaf26 ]
 description: example integration, making RTP worldborder use ChunkyBorder

@@ -1,6 +1,6 @@
 name: RTP_Glide
 version: '${project.version}'
-main: io.github.dailystruggle.rtp_glide.RTP_Glide
+main: io.io.github.dailystruggle.rtp_glide.RTP_Glide
 api-version: 1.17
 authors: [ leaf26 ]
 description: place player up in the air and glide down
