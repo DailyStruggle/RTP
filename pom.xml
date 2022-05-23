@@ -159,15 +159,15 @@
                     <relocations>
                         <relocation>
                             <pattern>org.bstats</pattern>
-                            <shadedPattern>io.github.dailystruggle.rtp.bstats</shadedPattern>
+                            <shadedPattern>io.io.github.dailystruggle.rtp.bstats</shadedPattern>
                         </relocation>
                         <relocation>
                             <pattern>io.papermc.lib</pattern>
-                            <shadedPattern>io.github.dailystruggle.rtp.paperlib</shadedPattern> <!-- Replace this -->
+                            <shadedPattern>io.io.github.dailystruggle.rtp.paperlib</shadedPattern> <!-- Replace this -->
                         </relocation>
                         <relocation>
-                            <pattern>io.github.dailystruggle.commandsapi</pattern>
-                            <shadedPattern>io.github.dailystruggle.rtp.commandsapi</shadedPattern> <!-- Replace this -->
+                            <pattern>io.io.github.dailystruggle.commandsapi</pattern>
+                            <shadedPattern>io.io.github.dailystruggle.rtp.commandsapi</shadedPattern> <!-- Replace this -->
                         </relocation>
                     </relocations>
                     <filters>
@@ -179,7 +179,7 @@
                             </excludes>
                         </filter>
                         <filter>
-                            <artifact>io.github.dailystruggle.commandsapi:*</artifact>
+                            <artifact>io.io.github.dailystruggle.commandsapi:*</artifact>
                             <excludes>
                                 <exclude>*.yml</exclude>
                                 <exclude>META-INF/*.MF</exclude>
