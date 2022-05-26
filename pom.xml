@@ -258,7 +258,7 @@
         <dependency>
             <groupId>io.github.dailystruggle</groupId>
             <artifactId>EffectsAPI</artifactId>
-            <version>1.0-ALPHA02</version>
+            <version>1.0-ALPHA04</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -367,7 +367,7 @@
         <dependency>
             <groupId>io.github.dailystruggle</groupId>
             <artifactId>CommandsAPI</artifactId>
-            <version>1.0-ALPHA43</version>
+            <version>1.0-ALPHA44</version>
             <scope>compile</scope>
         </dependency>
         <dependency>

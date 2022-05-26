@@ -1,21 +1,23 @@
 package io.github.dailystruggle.rtp.bukkit.commands.commands.fill;
 
-import io.github.dailystruggle.rtp.bukkit.commands.commands.fill.subcommands.Resume;
-import io.github.dailystruggle.rtp.bukkit.commands.parameters.RegionParameter;
 import io.github.dailystruggle.commandsapi.bukkit.localCommands.BukkitTreeCommand;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.bukkit.commands.commands.BaseRTPCmd;
 import io.github.dailystruggle.rtp.bukkit.commands.commands.fill.subcommands.Cancel;
 import io.github.dailystruggle.rtp.bukkit.commands.commands.fill.subcommands.Pause;
+import io.github.dailystruggle.rtp.bukkit.commands.commands.fill.subcommands.Resume;
 import io.github.dailystruggle.rtp.bukkit.commands.commands.fill.subcommands.Start;
+import io.github.dailystruggle.rtp.bukkit.commands.parameters.RegionParameter;
+import io.github.dailystruggle.rtp.common.selection.region.Region;
 import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.Plugin;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-public class FillCmd extends BukkitTreeCommand {
+public class FillCmd extends BaseRTPCmd {
     public FillCmd(Plugin plugin, CommandsAPICommand parent) {
         super(plugin, parent);
 

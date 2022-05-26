@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.jump;
 
-import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.GenericVerticalAdjustorKeys;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.substitutions.RTPBlock;
 import io.github.dailystruggle.rtp.common.substitutions.RTPChunk;
@@ -8,7 +7,10 @@ import io.github.dailystruggle.rtp.common.substitutions.RTPLocation;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.EnumMap;
+import java.util.List;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 

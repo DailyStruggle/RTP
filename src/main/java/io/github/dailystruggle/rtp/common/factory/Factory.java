@@ -3,7 +3,9 @@ package io.github.dailystruggle.rtp.common.factory;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.*;
+import java.util.EnumMap;
+import java.util.Enumeration;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**

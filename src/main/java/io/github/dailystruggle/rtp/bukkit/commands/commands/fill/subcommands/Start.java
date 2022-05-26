@@ -1,14 +1,14 @@
 package io.github.dailystruggle.rtp.bukkit.commands.commands.fill.subcommands;
 
-import io.github.dailystruggle.commandsapi.bukkit.localCommands.BukkitTreeCommand;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
+import io.github.dailystruggle.rtp.bukkit.commands.commands.BaseRTPCmd;
 import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.Plugin;
 
 import java.util.List;
 import java.util.Map;
 
-public class Start extends BukkitTreeCommand {
+public class Start extends BaseRTPCmd {
     public Start(Plugin plugin, CommandsAPICommand parent) {
         super(plugin, parent);
     }

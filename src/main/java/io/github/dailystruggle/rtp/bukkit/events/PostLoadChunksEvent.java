@@ -1,15 +1,12 @@
 package io.github.dailystruggle.rtp.bukkit.events;
 
-import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.tasks.LoadChunks;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.UUID;
-
-public class PlayerQueuePushEvent extends Event {
-    private final Region region;
-    private final UUID playerId;
+public class PostLoadChunksEvent extends Event {
+    private final LoadChunks loadChunks;
     private static final HandlerList HANDLERS_LIST = new HandlerList();
 
     @Override
@@ -21,17 +18,12 @@ public class PlayerQueuePushEvent extends Event {
         return HANDLERS_LIST;
     }
 
-    public PlayerQueuePushEvent(Region region, UUID playerId) {
+    public PostLoadChunksEvent(LoadChunks loadChunks) {
         super(true);
-        this.region = region;
-        this.playerId = playerId;
+        this.loadChunks = loadChunks;
     }
 
-    public Region getRegion() {
-        return region;
-    }
-
-    public UUID getPlayerId() {
-        return playerId;
+    public LoadChunks getLoadChunks() {
+        return loadChunks;
     }
 }

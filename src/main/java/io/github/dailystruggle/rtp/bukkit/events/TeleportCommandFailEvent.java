@@ -1,14 +1,13 @@
 package io.github.dailystruggle.rtp.bukkit.events;
 
 import io.github.dailystruggle.rtp.common.substitutions.RTPCommandSender;
-import io.github.dailystruggle.rtp.common.substitutions.RTPPlayer;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
 
 public class TeleportCommandFailEvent extends Event {
     private final RTPCommandSender sender;
-    private final RTPPlayer player;
+    private String failMsg;
     private static final HandlerList HANDLERS_LIST = new HandlerList();
 
     @Override
@@ -20,19 +19,22 @@ public class TeleportCommandFailEvent extends Event {
         return HANDLERS_LIST;
     }
 
-    public TeleportCommandFailEvent(RTPCommandSender sender, RTPPlayer player) {
+    public TeleportCommandFailEvent(RTPCommandSender sender, String failMsg) {
         super(true);
         this.sender = sender;
-        this.player = player;
-    }
-
-    public RTPPlayer getPlayer() {
-        return player;
+        this.failMsg = failMsg;
     }
 
     public RTPCommandSender getSender() {
         return sender;
     }
 
-    
+
+    public String getFailMsg() {
+        return failMsg;
+    }
+
+    public void setFailMsg(String failMsg) {
+        this.failMsg = failMsg;
+    }
 }

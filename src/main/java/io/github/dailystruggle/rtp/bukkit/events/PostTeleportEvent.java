@@ -1,16 +1,13 @@
 package io.github.dailystruggle.rtp.bukkit.events;
 
-import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.tasks.DoTeleport;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.UUID;
-
-public class PlayerQueuePushEvent extends Event {
-    private final Region region;
-    private final UUID playerId;
+public class PostTeleportEvent extends Event {
     private static final HandlerList HANDLERS_LIST = new HandlerList();
+    private final DoTeleport doTeleport;
 
     @Override
     public @NotNull HandlerList getHandlers() {
@@ -21,17 +18,12 @@ public class PlayerQueuePushEvent extends Event {
         return HANDLERS_LIST;
     }
 
-    public PlayerQueuePushEvent(Region region, UUID playerId) {
+    public PostTeleportEvent(DoTeleport doTeleport) {
         super(true);
-        this.region = region;
-        this.playerId = playerId;
+        this.doTeleport = doTeleport;
     }
 
-    public Region getRegion() {
-        return region;
-    }
-
-    public UUID getPlayerId() {
-        return playerId;
+    public DoTeleport getDoTeleport() {
+        return doTeleport;
     }
 }

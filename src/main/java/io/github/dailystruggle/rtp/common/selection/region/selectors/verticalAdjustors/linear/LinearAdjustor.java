@@ -2,7 +2,6 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAd
 
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.GenericVerticalAdjustorKeys;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.jump.JumpAdjustorKeys;
 import io.github.dailystruggle.rtp.common.substitutions.RTPBlock;
 import io.github.dailystruggle.rtp.common.substitutions.RTPChunk;
 import io.github.dailystruggle.rtp.common.substitutions.RTPLocation;

@@ -7,7 +7,10 @@ import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import org.bukkit.command.CommandSender;
 
-import java.util.*;
+import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.logging.Level;
@@ -38,11 +41,8 @@ public class ShapeParameter extends BukkitParameter {
             return subParams.get(parameter);
         }
         if(shapeFactory.contains(parameter)) {
-            RTP.log(Level.WARNING, "factory contains");
             Shape<?> shape = (Shape<?>) shapeFactory.getOrDefault(parameter);
-            RTP.log(Level.WARNING, "shape = " + shape.name);
             Map<String,CommandParameter> res = shape.getParameters();
-            RTP.log(Level.WARNING, "parameters = " + shape.getParameters());
             putShape(parameter,res);
             return res;
         }

@@ -1,13 +1,14 @@
 package io.github.dailystruggle.rtp.common;
 
-import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.substitutions.RTPPlayer;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.substitutions.RTPWorld;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 
@@ -44,7 +45,7 @@ public interface RTPServerAccessor {
     @Nullable
     Shape<?> getShape(String name);
 
-    RTPWorld getDefaultRTPWorld();
+    List<RTPWorld> getRTPWorlds();
 
     RTPPlayer getPlayer(UUID uuid);
 
@@ -61,4 +62,6 @@ public interface RTPServerAccessor {
     void sendMessage(UUID target, String message);
 
     void sendMessage(UUID sender, UUID target, String message);
+
+    Set<String> allBiomes();
 }

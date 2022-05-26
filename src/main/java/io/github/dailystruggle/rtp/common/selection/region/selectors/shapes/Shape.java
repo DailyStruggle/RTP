@@ -1,9 +1,9 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.shapes;
 
+import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
-import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.rtp.common.substitutions.RTPLocation;
 import org.jetbrains.annotations.NotNull;
 import org.yaml.snakeyaml.Yaml;
