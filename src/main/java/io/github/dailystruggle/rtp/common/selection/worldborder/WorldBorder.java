@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.worldborder;
 
-import java.util.function.*;
+import java.util.function.Function;
 
 public record WorldBorder(Function<String, Long> getRadius,
                           Function<String, long[]> getCenter,

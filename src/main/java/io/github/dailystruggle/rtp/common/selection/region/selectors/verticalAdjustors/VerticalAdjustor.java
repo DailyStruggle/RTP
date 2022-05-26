@@ -1,10 +1,10 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors;
 
-import io.github.dailystruggle.rtp.common.substitutions.RTPBlock;
-import io.github.dailystruggle.rtp.common.substitutions.RTPChunk;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
+import io.github.dailystruggle.rtp.common.substitutions.RTPBlock;
+import io.github.dailystruggle.rtp.common.substitutions.RTPChunk;
 import io.github.dailystruggle.rtp.common.substitutions.RTPLocation;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -12,9 +12,9 @@ import org.yaml.snakeyaml.Yaml;
 
 import java.io.*;
 import java.util.EnumMap;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 
 public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E> {

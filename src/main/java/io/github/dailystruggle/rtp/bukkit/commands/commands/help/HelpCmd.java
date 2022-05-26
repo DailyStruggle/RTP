@@ -2,18 +2,19 @@ package io.github.dailystruggle.rtp.bukkit.commands.commands.help;
 
 import io.github.dailystruggle.commandsapi.bukkit.localCommands.BukkitTreeCommand;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
+import io.github.dailystruggle.rtp.bukkit.commands.commands.BaseRTPCmd;
+import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
-import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.Plugin;
 
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
-public class HelpCmd extends BukkitTreeCommand {
+public class HelpCmd extends BaseRTPCmd {
     private final Map<String,String> perms = new ConcurrentHashMap<>();
 
     public HelpCmd(Plugin plugin, CommandsAPICommand parent) {

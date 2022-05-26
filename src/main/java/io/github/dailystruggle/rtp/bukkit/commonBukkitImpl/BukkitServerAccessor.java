@@ -1,6 +1,9 @@
 package io.github.dailystruggle.rtp.bukkit.commonBukkitImpl;
 
+import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
+import io.github.dailystruggle.rtp.bukkit.commonBukkitImpl.substitutions.BukkitRTPCommandSender;
+import io.github.dailystruggle.rtp.bukkit.commonBukkitImpl.substitutions.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.commonBukkitImpl.substitutions.BukkitRTPWorld;
 import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -9,18 +12,20 @@ import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.substitutions.RTPPlayer;
-import io.github.dailystruggle.commandsapi.common.CommandsAPI;
-import io.github.dailystruggle.rtp.bukkit.commonBukkitImpl.substitutions.BukkitRTPCommandSender;
-import io.github.dailystruggle.rtp.bukkit.commonBukkitImpl.substitutions.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.common.substitutions.RTPWorld;
 import org.bukkit.Bukkit;
+import org.bukkit.block.Biome;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public class BukkitServerAccessor implements RTPServerAccessor {
     private String version = null;
@@ -75,8 +80,8 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     }
 
     @Override
-    public RTPWorld getDefaultRTPWorld() {
-        return new BukkitRTPWorld(Bukkit.getWorlds().get(0));
+    public List<RTPWorld> getRTPWorlds() {
+        return Bukkit.getWorlds().stream().map(BukkitRTPWorld::new).collect(Collectors.toList());
     }
 
     @Override
@@ -118,5 +123,10 @@ public class BukkitServerAccessor implements RTPServerAccessor {
                 : Bukkit.getPlayer(target1);
         Player player = Bukkit.getPlayer(target2);
         if(sender!=null && player!=null) SendMessage.sendMessage(sender,player,message);
+    }
+
+    @Override
+    public Set<String> allBiomes() {
+        return Arrays.stream(Biome.values()).map(Enum::name).collect(Collectors.toSet());
     }
 }

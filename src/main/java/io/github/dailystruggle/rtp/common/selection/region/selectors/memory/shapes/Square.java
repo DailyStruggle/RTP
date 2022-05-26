@@ -1,9 +1,9 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes;
 
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.commandsapi.bukkit.LocalParameters.*;
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -251,6 +251,15 @@ public final class Square extends MemoryShape<GenericMemoryShapeParams> {
 
             }
         }
+
+        Object unique = data.getOrDefault(GenericMemoryShapeParams.uniquePlacements,false);
+        boolean u;
+        if(unique instanceof Boolean b) u = b;
+        else {
+            u = Boolean.parseBoolean(String.valueOf(unique));
+            data.put(GenericMemoryShapeParams.uniquePlacements,u);
+        }
+        if(u) addBadLocation(location);
 
         return locationToXZ(location);
     }

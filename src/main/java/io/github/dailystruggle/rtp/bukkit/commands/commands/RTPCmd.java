@@ -1,28 +1,30 @@
 package io.github.dailystruggle.rtp.bukkit.commands.commands;
 
-import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
-import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
-import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
-import io.github.dailystruggle.rtp.common.playerData.TeleportData;
-import io.github.dailystruggle.commandsapi.bukkit.LocalParameters.*;
+import io.github.dailystruggle.commandsapi.bukkit.LocalParameters.OnlinePlayerParameter;
+import io.github.dailystruggle.commandsapi.bukkit.LocalParameters.WorldParameter;
 import io.github.dailystruggle.commandsapi.bukkit.localCommands.BukkitTreeCommand;
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
+import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
+import io.github.dailystruggle.rtp.bukkit.commands.parameters.RegionParameter;
+import io.github.dailystruggle.rtp.bukkit.commands.parameters.ShapeParameter;
 import io.github.dailystruggle.rtp.bukkit.commonBukkitImpl.substitutions.BukkitRTPCommandSender;
 import io.github.dailystruggle.rtp.bukkit.commonBukkitImpl.substitutions.BukkitRTPPlayer;
+import io.github.dailystruggle.rtp.bukkit.events.TeleportCommandFailEvent;
 import io.github.dailystruggle.rtp.bukkit.events.TeleportCommandSuccessEvent;
+import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
-import io.github.dailystruggle.rtp.bukkit.commands.parameters.RegionParameter;
-import io.github.dailystruggle.rtp.bukkit.commands.parameters.ShapeParameter;
-import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.SetupTeleport;
 import org.bukkit.Bukkit;
@@ -39,7 +41,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 
-public class RTPCmd extends BukkitTreeCommand {
+public class RTPCmd extends BaseRTPCmd {
     //for optimizing parameters,
     private final Factory<Shape<?>> shapeFactory
             = (Factory<Shape<?>>) RTP.getInstance().factoryMap.get(RTP.factoryNames.shape);
@@ -135,17 +137,12 @@ public class RTPCmd extends BukkitTreeCommand {
 
         ConcurrentHashMap<UUID, TeleportData> latestTeleportData = RTP.getInstance().latestTeleportData;
         UUID uuid = (sender instanceof Player) ? ((Player) sender).getUniqueId() : CommandsAPI.serverId;
-        if(!latestTeleportData.containsKey(uuid)) {
-            TeleportData teleportData = new TeleportData();
-            teleportData.time = 0;
-            latestTeleportData.put(uuid,teleportData);
-        }
 
         if(!sender.hasPermission("rtp.noCooldown")) {
             long lastTime;
 
             TeleportData teleportData = latestTeleportData.get(uuid);
-            lastTime = teleportData.time;
+            lastTime = (teleportData != null) ? teleportData.time : 0;
 
             long cooldownTime = TimeUnit.SECONDS.toNanos((Long) configParser.getConfigValue(ConfigKeys.teleportCooldown,0));
             Set<PermissionAttachmentInfo> perms = sender.getEffectivePermissions();
@@ -184,9 +181,6 @@ public class RTPCmd extends BukkitTreeCommand {
                 SendMessage.sendMessage(sender, msg);
                 return true;
             }
-
-            teleportData.priorTime = teleportData.time;
-            teleportData.time = start;
         }
 
         boolean validSender = true;
@@ -268,7 +262,9 @@ public class RTPCmd extends BukkitTreeCommand {
         }
         else { //if no players and sender isn't a player, idk who to send
             String msg = (String) langParser.getConfigValue(LangKeys.consoleCmdNotAllowed,"");
-            SendMessage.sendMessage(sender,msg);
+            TeleportCommandFailEvent event = new TeleportCommandFailEvent(new BukkitRTPCommandSender(sender),msg);
+            Bukkit.getPluginManager().callEvent(event);
+            SendMessage.sendMessage(sender,event.getFailMsg());
             return true;
         }
 
@@ -329,45 +325,10 @@ public class RTPCmd extends BukkitTreeCommand {
                 //todo: initiate teleport action if here
             }
 
-            UUID senderId = (sender instanceof Player) ? ((Player) sender).getUniqueId() : CommandsAPI.serverId;
-
             //todo: default case, setupTeleport
             SetupTeleport setupTeleport = new SetupTeleport(new BukkitRTPCommandSender(sender), new BukkitRTPPlayer(player), region, null);
             api.setupTeleportPipeline.add(setupTeleport);
         }
-        //todo
-//        Bukkit.getScheduler().runTaskAsynchronously(plugin,()->
-//                Bukkit.getPluginManager().callEvent(new TeleportCommandSuccessEvent(sender,players.getFromString(0))));
-//
-//        for (int i = 0; i < players.size(); i++) {
-//            Player p = players.getFromString(i);
-//            World w = worlds.getFromString(i);
-//            RegionParams rsParams = paramsList.getFromString(i);
-//
-//            ConcurrentHashMap<RegionParams, Region> permRegions = api.selectionAPI.permRegions;
-//
-//            boolean hasQueued = permRegions.containsKey(rsParams)
-//                    && permRegions.getFromString(rsParams).hasQueuedLocation(p.getUniqueId());
-//
-//            //prep teleportation
-//            TeleportData teleportData = new TeleportData();
-//            teleportData.time = start;
-//            teleportData.originalLocation = new long[]{p.getLocation().getBlockX(),p.getLocation().getBlockY(),p.getLocation().getBlockZ()};
-//            teleportData.sender = senderData.sender;
-//
-//            SetupTeleport setupTeleport = new SetupTeleport(sender,p, rsParams);
-//            if ((permRegions.containsKey(rsParams)
-//                    && hasQueued
-//                    && sender.hasPermission("rtp.noDelay")
-//                    && !rsParams.params.containsKey("biome"))
-//                    || api.configs.config.syncLoading
-//                    || RTP.getInstance().getServerIntVersion()<=8) {
-//                setupTeleport.setupTeleportNow(); //todo: go down this rabbit hole
-//            } else {
-//                setupTeleport.runTaskAsynchronously(plugin);
-//            }
-//        }
-
         return true;
     }
 

@@ -1,31 +1,39 @@
 package io.github.dailystruggle.rtp.common.tasks;
 
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
-import io.github.dailystruggle.rtp.common.selection.region.ChunkSet;
-import io.github.dailystruggle.rtp.common.substitutions.RTPCommandSender;
-import io.github.dailystruggle.rtp.common.substitutions.RTPPlayer;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.substitutions.RTPLocation;
+import io.github.dailystruggle.rtp.common.substitutions.RTPPlayer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 
-public record SetupTeleport(RTPCommandSender sender,
-                            RTPPlayer player,
-                            @NotNull Region region,
-                            @Nullable Set<String> biomes) implements Runnable {
+public final class SetupTeleport extends RTPRunnable {
     public static final List<Consumer<SetupTeleport>> preActions = new ArrayList<>();
     public static final List<Consumer<SetupTeleport>> postActions = new ArrayList<>();
+    private final RTPCommandSender sender;
+    private final RTPPlayer player;
+    private final @NotNull Region region;
+    private final @Nullable Set<String> biomes;
+    private LoadChunks loadChunks = null;
+
+    public SetupTeleport(RTPCommandSender sender,
+                         RTPPlayer player,
+                         @NotNull Region region,
+                         @Nullable Set<String> biomes) {
+        this.sender = sender;
+        this.player = player;
+        this.region = region;
+        this.biomes = biomes;
+    }
 
     @Override
     public void run() {
@@ -33,30 +41,67 @@ public record SetupTeleport(RTPCommandSender sender,
 
         RTP rtp = RTP.getInstance();
 
-        RTP.log(Level.WARNING,"[RTP] at setupTeleport");
-        player.sendMessage("[RTP] at setupTeleport");
-
         TeleportData teleportData = RTP.getInstance().latestTeleportData.get(sender.uuid());
 
         teleportData.targetRegion = this.region;
 
-        teleportData.time = 0; //temporary refund for command purposes
-
-        if(this.region.hasLocation(player.uuid())) {
-            teleportData.originalLocation = player.getLocation();
-
-            RTPLocation location = this.region.getLocation(sender.uuid(), player.uuid(), null);
-
-            rtp.loadChunksPipeline.add(new LoadChunks(this.sender,this.player,location,this.region));
+        teleportData.originalLocation = player.getLocation();
+        RTPLocation location = this.region.getLocation(sender, player, null);
+        if (location!=null) {
+            LoadChunks loadChunks = new LoadChunks(this.sender, this.player, location, this.region);
+            this.loadChunks = loadChunks;
+            rtp.loadChunksPipeline.add(loadChunks);
             postActions.forEach(consumer -> consumer.accept(this));
             return;
         }
 
-        teleportData.time = teleportData.priorTime;
-        sender.sendMessage("did not teleport, no spots identified");
-
         postActions.forEach(consumer -> consumer.accept(this));
 
         //todo: append player queue or load chunks
+    }
+
+    public RTPCommandSender sender() {
+        return sender;
+    }
+
+    public RTPPlayer player() {
+        return player;
+    }
+
+    public @NotNull Region region() {
+        return region;
+    }
+
+    public @Nullable Set<String> biomes() {
+        return biomes;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == this) return true;
+        if (obj == null || obj.getClass() != this.getClass()) return false;
+        var that = (SetupTeleport) obj;
+        return Objects.equals(this.sender, that.sender) &&
+                Objects.equals(this.player, that.player) &&
+                Objects.equals(this.region, that.region) &&
+                Objects.equals(this.biomes, that.biomes);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(sender, player, region, biomes);
+    }
+
+    @Override
+    public String toString() {
+        return "SetupTeleport[" +
+                "sender=" + sender + ", " +
+                "player=" + player + ", " +
+                "region=" + region + ", " +
+                "biomes=" + biomes + ']';
+    }
+
+    public LoadChunks loadChunks() {
+        return loadChunks;
     }
 }

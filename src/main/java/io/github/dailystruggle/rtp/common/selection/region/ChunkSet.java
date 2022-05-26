@@ -24,7 +24,6 @@ public record ChunkSet(
             try {
                 countAccess.acquire();
                 long i = count.incrementAndGet();
-                RTP.log(Level.WARNING,"i=="+i+",  max=="+chunks.size());
                 if (i == chunks.size()) {
                     this.complete.complete(true);
                 }
@@ -38,8 +37,7 @@ public record ChunkSet(
 
     public void keep(boolean keep) {
         chunks.forEach(chunk -> {
-            if(!chunk.isDone()) chunk.cancel(true);
-            else {
+            if(chunk.isDone()) {
                 try {
                     RTPChunk rtpChunk = chunk.get();
                     rtpChunk.keep(keep);
@@ -47,11 +45,13 @@ public record ChunkSet(
                     e.printStackTrace();
                 }
             }
+            else {
+                chunk.whenComplete((chunk1, throwable) -> chunk1.keep(keep));
+            }
         });
     }
 
     public void whenComplete(Consumer<Boolean> consumer) {
-        RTP.log(Level.WARNING,"checking boolean done - " + complete.isDone());
         if(complete.isDone()) {
             try {
                 consumer.accept(complete.get());

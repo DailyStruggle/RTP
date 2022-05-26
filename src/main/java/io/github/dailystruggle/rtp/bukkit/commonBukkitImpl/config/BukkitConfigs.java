@@ -1,16 +1,15 @@
 package io.github.dailystruggle.rtp.bukkit.commonBukkitImpl.config;
 
 import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
+import io.github.dailystruggle.rtp.bukkit.commonBukkitImpl.substitutions.BukkitRTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.Configs;
+import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.*;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
-import io.github.dailystruggle.rtp.bukkit.commonBukkitImpl.substitutions.BukkitRTPWorld;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.Configs;
-import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
-import io.github.dailystruggle.rtp.bukkit.commonBukkitImpl.region.BukkitRegion;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.substitutions.RTPWorld;
 import org.bukkit.Bukkit;
@@ -25,8 +24,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 
 public class BukkitConfigs extends Configs {
-    File worldLangMap;
-
     public BukkitConfigs(File pluginDirectory) {
         super(pluginDirectory);
     }
@@ -63,9 +60,7 @@ public class BukkitConfigs extends Configs {
         BukkitMultiConfigParser<WorldKeys> worlds = new BukkitMultiConfigParser<>(WorldKeys.class, "worlds", "1.0", pluginDirectory);
 
         for(World world : Bukkit.getWorlds()) {
-            if(worlds.getParser(world.getName()) == null) {
-                worlds.addParser(new BukkitConfigParser<>(WorldKeys.class, world.getName(),"1.0", worlds.myDirectory, worldLangMap));
-            }
+            worlds.getParser(world.getName());
         }
 
         putParser(lang);
@@ -144,25 +139,8 @@ public class BukkitConfigs extends Configs {
             RTP.log(Level.WARNING, vertObj.toString());
             RTP.log(Level.CONFIG, data.get(RegionKeys.vert).toString());
 
-            Region region = new BukkitRegion(regionConfig.name.replace(".yml",""), data);
+            Region region = new Region(regionConfig.name.replace(".yml",""), data);
             RTP.getInstance().selectionAPI.permRegionLookup.put(region.name,region);
         }
-    }
-
-    @Override
-    @Nullable
-    public ConfigParser<WorldKeys> getWorldParser(String worldName) {
-        MultiConfigParser<WorldKeys> multiConfigParser = (MultiConfigParser<WorldKeys>) multiConfigParserMap.get(WorldKeys.class);
-        Objects.requireNonNull(multiConfigParser);
-
-        if(Bukkit.getWorld(worldName) == null) {
-            return null;
-        }
-
-        if(!multiConfigParser.configParserFactory.contains(worldName)) {
-            multiConfigParser.addParser(new BukkitConfigParser<>(WorldKeys.class, worldName,"1.0", multiConfigParser.myDirectory, worldLangMap));
-        }
-
-        return multiConfigParser.getParser(worldName);
     }
 }
