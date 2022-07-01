@@ -6,12 +6,12 @@ import io.github.dailystruggle.commandsapi.bukkit.localCommands.BukkitTreeComman
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
+import io.github.dailystruggle.rtp.bukkit.commands.commands.reload.ReloadCmd;
 import io.github.dailystruggle.rtp.bukkit.commands.parameters.RegionParameter;
 import io.github.dailystruggle.rtp.bukkit.commands.parameters.ShapeParameter;
 import io.github.dailystruggle.rtp.bukkit.commonBukkitImpl.substitutions.BukkitRTPCommandSender;
 import io.github.dailystruggle.rtp.bukkit.commonBukkitImpl.substitutions.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.events.TeleportCommandFailEvent;
-import io.github.dailystruggle.rtp.bukkit.events.TeleportCommandSuccessEvent;
 import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -40,6 +40,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
+import java.util.logging.Level;
 
 public class RTPCmd extends BaseRTPCmd {
     //for optimizing parameters,
@@ -106,14 +107,23 @@ public class RTPCmd extends BaseRTPCmd {
                 shapeParameter.putShape(e.getKey(),e.getValue().getParameters());
             }
         });
+
+        addSubCommand(new ReloadCmd(plugin,this));
     }
 
     //synchronous command component
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        long start = System.nanoTime();
+        boolean res = super.onCommand(sender, command, label, args);
 
         RTP api = RTP.getInstance();
+        UUID senderId = (sender instanceof Player player) ? player.getUniqueId() : CommandsAPI.serverId;
+        if(api.processingPlayers.contains(senderId)) {
+            api.serverAccessor.sendMessage(senderId,LangKeys.alreadyTeleporting);
+        }
+        api.processingPlayers.add(senderId);
+
+        long start = System.nanoTime();
 
         ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) api.configs.getParser(ConfigKeys.class);
         ConfigParser<LangKeys> langParser = (ConfigParser<LangKeys>) api.configs.getParser(LangKeys.class);
@@ -121,8 +131,7 @@ public class RTPCmd extends BaseRTPCmd {
         //--------------------------------------------------------------------------------------------------------------
         //guard command perms with custom message
         if(!sender.hasPermission("rtp.use")) {
-            String msg = (String) langParser.getConfigValue(LangKeys.noPerms, "");
-            SendMessage.sendMessage(sender,msg);
+            api.serverAccessor.sendMessage(senderId, LangKeys.noPerms);
             return true;
         }
 
@@ -157,6 +166,7 @@ public class RTPCmd extends BaseRTPCmd {
                     try {
                         number = Integer.parseInt(val[2]);
                     } catch (NumberFormatException exception) {
+
                         Bukkit.getLogger().warning("[rtp] invalid permission: " + node);
                         continue;
                     }
@@ -166,19 +176,10 @@ public class RTPCmd extends BaseRTPCmd {
             }
 
             if ((start - lastTime) < cooldownTime){
-                long remaining = (lastTime - start) + cooldownTime;
-                long days = TimeUnit.NANOSECONDS.toDays(remaining);
-                long hours = TimeUnit.NANOSECONDS.toHours(remaining) % 24;
-                long minutes = TimeUnit.NANOSECONDS.toMinutes(remaining) % 60;
-                long seconds = TimeUnit.NANOSECONDS.toSeconds(remaining) % 60;
-                String replacement = "";
-                if (days > 0) replacement += days + (String) langParser.getConfigValue(LangKeys.days, 0) + " ";
-                if (days > 0 || hours > 0) replacement += hours + (String) langParser.getConfigValue(LangKeys.hours, 0) + " ";
-                if (days > 0 || hours > 0 || minutes > 0) replacement += minutes + (String) langParser.getConfigValue(LangKeys.minutes, 0) + " ";
-                replacement += seconds + (String) langParser.getConfigValue(LangKeys.seconds, 0);
-                String msg = (String) langParser.getConfigValue(LangKeys.cooldownMessage, replacement);
 
-                SendMessage.sendMessage(sender, msg);
+                String msg = (String) langParser.getConfigValue(LangKeys.cooldownMessage, "");
+
+                api.serverAccessor.sendMessage(senderId, msg);
                 return true;
             }
         }
@@ -199,16 +200,18 @@ public class RTPCmd extends BaseRTPCmd {
             return true;
         }
 
-        return super.onCommand(sender, command, label, args);
+        return res;
     }
 
     //async command component
     @Override
     public boolean onCommand(CommandSender sender, Map<String, List<String>> rtpArgs, CommandsAPICommand nextCommand) {
-        long start = System.nanoTime();
-        RTPBukkitPlugin plugin = RTPBukkitPlugin.getInstance();
+        if(nextCommand!=null) {
+            Bukkit.getLogger().log(Level.WARNING,"nextCommand="+nextCommand.name());
+            return true;
+        }
+        Bukkit.getLogger().log(Level.WARNING,"nextCommand=null");
         RTP api = RTP.getInstance();
-        int numBaseArgs = 0;
 
         ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) api.configs.getParser(ConfigKeys.class);
         ConfigParser<LangKeys> langParser = (ConfigParser<LangKeys>) api.configs.getParser(LangKeys.class);
@@ -230,35 +233,12 @@ public class RTPCmd extends BaseRTPCmd {
                     continue;
                 }
 
-                //get their data
-                TeleportData lastTeleportData = api.latestTeleportData.get(p.getUniqueId());
-                //if player has an incomplete teleport
-                if(lastTeleportData != null) {
-                    if(!lastTeleportData.completed) {
-                        String msg = (String) langParser.getConfigValue(LangKeys.alreadyTeleporting, "");
-                        SendMessage.sendMessage(sender, p, msg);
-                        continue;
-                    }
-
-                    lastTeleportData.priorTime = lastTeleportData.time;
-                }
-                else {
-                    lastTeleportData = new TeleportData();
-                    api.latestTeleportData.put(p.getUniqueId(),lastTeleportData);
-                }
-
                 players.add(p);
-
-                lastTeleportData.time = start;
-                lastTeleportData.completed = false;
-
-                TeleportCommandSuccessEvent event = new TeleportCommandSuccessEvent(new BukkitRTPCommandSender(sender), new BukkitRTPPlayer(p));
-                Bukkit.getPluginManager().callEvent(event);
             }
         }
-        else if(sender instanceof Player) { //if no players but sender is a player, use sender's location
+        else if(sender instanceof Player p) { //if no players but sender is a player, use sender's location
             players = new ArrayList<>(1);
-            players.add((Player) sender);
+            players.add(p);
         }
         else { //if no players and sender isn't a player, idk who to send
             String msg = (String) langParser.getConfigValue(LangKeys.consoleCmdNotAllowed,"");
@@ -269,7 +249,25 @@ public class RTPCmd extends BaseRTPCmd {
         }
 
         for(int i = 0; i < players.size(); i++) {
-            Player player = players.get(i);
+            Player p = players.get(i);
+
+            //get their data
+            TeleportData lastTeleportData = api.latestTeleportData.get(p.getUniqueId());
+            //if p has an incomplete teleport
+            if(lastTeleportData != null) {
+                if(!lastTeleportData.completed) {
+                    String msg = (String) langParser.getConfigValue(LangKeys.alreadyTeleporting, "");
+                    SendMessage.sendMessage(sender, p, msg);
+                    TeleportCommandFailEvent event = new TeleportCommandFailEvent(new BukkitRTPCommandSender(sender),msg);
+                    Bukkit.getPluginManager().callEvent(event);
+                    continue;
+                }
+
+                api.priorTeleportData.put(p.getUniqueId(),lastTeleportData);
+            }
+            lastTeleportData = new TeleportData();
+            api.latestTeleportData.put(p.getUniqueId(),lastTeleportData);
+
             String regionName;
             if(rtpArgs.containsKey("region")) {
                 //todo: get one region from the list
@@ -283,8 +281,8 @@ public class RTPCmd extends BaseRTPCmd {
                     worldName = pickOne(rtpArgs.get("world"),"default");
                 }
                 else {
-                    //use player's world
-                    worldName = player.getWorld().getName();
+                    //use p's world
+                    worldName = p.getWorld().getName();
                 }
 
                 //todo: validate world parser exists
@@ -321,12 +319,12 @@ public class RTPCmd extends BaseRTPCmd {
             //todo: vert params
             //todo: biomes
 
-            if(region.hasLocation(player.getUniqueId())) {
+            if(region.hasLocation(p.getUniqueId())) {
                 //todo: initiate teleport action if here
             }
 
             //todo: default case, setupTeleport
-            SetupTeleport setupTeleport = new SetupTeleport(new BukkitRTPCommandSender(sender), new BukkitRTPPlayer(player), region, null);
+            SetupTeleport setupTeleport = new SetupTeleport(new BukkitRTPCommandSender(sender), new BukkitRTPPlayer(p), region, null);
             api.setupTeleportPipeline.add(setupTeleport);
         }
         return true;

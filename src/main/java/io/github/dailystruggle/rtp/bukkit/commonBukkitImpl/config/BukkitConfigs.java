@@ -33,7 +33,7 @@ public class BukkitConfigs extends Configs {
         CompletableFuture<Boolean> res = new CompletableFuture<>();
 
         //ensure async to protect server timings
-        Bukkit.getScheduler().runTaskAsynchronously(RTPBukkitPlugin.getInstance(), () -> {
+        Bukkit.getScheduler().runTaskLater(RTPBukkitPlugin.getInstance(), () -> {
             try {
                 reloadAction();
                 res.complete(true);
@@ -41,7 +41,7 @@ public class BukkitConfigs extends Configs {
                 res.complete(false);
                 throw e;
             }
-        });
+        },1);
         return res;
     }
 
@@ -53,8 +53,6 @@ public class BukkitConfigs extends Configs {
         BukkitConfigParser<IntegrationsKeys> integrations = new BukkitConfigParser<>(IntegrationsKeys.class, "integrations.yml", "1.0", pluginDirectory);
         BukkitConfigParser<PerformanceKeys> performance = new BukkitConfigParser<>(PerformanceKeys.class, "performance.yml", "1.0", pluginDirectory);
         BukkitConfigParser<SafetyKeys> safety = new BukkitConfigParser<>(SafetyKeys.class, "safety", "1.0", pluginDirectory);
-
-        worldLangMap = new File(pluginDirectory + File.separator + "lang" + File.separator + "worlds.lang.yml");
 
         BukkitMultiConfigParser<RegionKeys> regions = new BukkitMultiConfigParser<>(RegionKeys.class, "regions", "1.0", pluginDirectory);
         BukkitMultiConfigParser<WorldKeys> worlds = new BukkitMultiConfigParser<>(WorldKeys.class, "worlds", "1.0", pluginDirectory);

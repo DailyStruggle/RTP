@@ -28,7 +28,8 @@ public class InfoCmd implements CommandExecutor {
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
-        ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+        RTP instance = RTP.getInstance();
+        ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) instance.configs.getParser(LangKeys.class);
         if(!sender.hasPermission("rtp.info")) {
             SendMessage.sendMessage(sender, (String) lang.getConfigValue(LangKeys.noPerms,""));
             return true;
@@ -38,7 +39,7 @@ public class InfoCmd implements CommandExecutor {
             Bukkit.getScheduler().runTaskAsynchronously(RTPBukkitPlugin.getInstance(),()-> {
                 SendMessage.sendMessage(sender, (String) lang.getConfigValue(LangKeys.title,""));
                 SendMessage.sendMessage(sender, ((String) lang.getConfigValue(LangKeys.chunks,""))
-                        .replace("[chunks]",""));
+                        .replace("[chunks]",String.valueOf(instance.forceLoads.size())));
                 SendMessage.sendMessage(sender, (String) lang.getConfigValue(LangKeys.worldHeader,""));
                 for(World world : Bukkit.getWorlds()) {
                     String msg = ((String)lang.getConfigValue(LangKeys.world,"")).replace("[world]", world.getName());
@@ -47,7 +48,7 @@ public class InfoCmd implements CommandExecutor {
                     SendMessage.sendMessage(sender,msg,hover,click);
                 }
                 SendMessage.sendMessage(sender, (String) lang.getConfigValue(LangKeys.regionHeader,""));
-                for(Region region : RTP.getInstance().selectionAPI.permRegionLookup.values()) {
+                for(Region region : instance.selectionAPI.permRegionLookup.values()) {
                     String msg = ((String)lang.getConfigValue(LangKeys.region,"")).replace("[region]", region.name);
                     String hover = "/rtp info region:" + region.name;
                     String click = "/rtp info region:" + region.name;
@@ -64,7 +65,7 @@ public class InfoCmd implements CommandExecutor {
                 if (!infoParams.contains(arg)) continue;
                 String val = s.substring(idx+1);
 
-                MultiConfigParser<WorldKeys> worlds = (MultiConfigParser<WorldKeys>) RTP.getInstance().configs.getParser(WorldKeys.class);
+                MultiConfigParser<WorldKeys> worlds = (MultiConfigParser<WorldKeys>) instance.configs.getParser(WorldKeys.class);
 
                 switch (arg.toLowerCase()) {
                     case "world" -> {
@@ -87,7 +88,7 @@ public class InfoCmd implements CommandExecutor {
                     }
                     case "region" -> {
                         Region region = null;
-                        for (Region teleportRegion : RTP.getInstance().selectionAPI.permRegionLookup.values()) {
+                        for (Region teleportRegion : instance.selectionAPI.permRegionLookup.values()) {
                             if (teleportRegion.name.equals(val)) {
                                 region = teleportRegion;
                                 break;

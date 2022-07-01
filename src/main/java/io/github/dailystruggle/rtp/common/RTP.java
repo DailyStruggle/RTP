@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.common;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
@@ -20,8 +21,10 @@ import org.jetbrains.annotations.NotNull;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.Executors;
 import java.util.function.BiConsumer;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * class to hold relevant API functions, outside of Bukkit functionality
@@ -50,10 +53,8 @@ public class RTP {
     private static RTP instance;
 
     public RTP(@NotNull Configs configs,
-               @NotNull RTPServerAccessor serverAccessor,
-               @NotNull BiConsumer<Level,String> logMethod) {
+               @NotNull RTPServerAccessor serverAccessor) {
         instance = this;
-        RTP.logMethod = logMethod;
         this.configs = configs;
         this.serverAccessor = serverAccessor;
 
@@ -77,31 +78,24 @@ public class RTP {
         return instance;
     }
 
-    private static BiConsumer<Level,String> logMethod;
     public static void log(Level level, String str) {
-        logMethod.accept(level, str);
+        getInstance().serverAccessor.log(level, str);
+    }
+
+    public static void log(Level level, String str, Exception exception) {
+        getInstance().serverAccessor.log(level, str);
     }
 
     public final SelectionAPI selectionAPI = new SelectionAPI();
 
     public final ConcurrentHashMap<UUID, TeleportData> priorTeleportData = new ConcurrentHashMap<>();
     public final ConcurrentHashMap<UUID, TeleportData> latestTeleportData = new ConcurrentHashMap<>();
-    public final ConcurrentSkipListSet<UUID> queuedPlayers = new ConcurrentSkipListSet<>();
+    public final ConcurrentSkipListSet<UUID> processingPlayers = new ConcurrentSkipListSet<>();
 
     public final RTPTaskPipe setupTeleportPipeline = new RTPTaskPipe();
     public final RTPTaskPipe loadChunksPipeline = new RTPTaskPipe();
     public final RTPTaskPipe teleportPipeline = new RTPTaskPipe();
     public final RTPTaskPipe chunkCleanupPipeline = new RTPTaskPipe();
-
-    public long timeSinceLastTeleport(UUID player) {
-        long lastTime;
-
-        TeleportData teleportData = latestTeleportData.get(player);
-        if(teleportData != null) lastTime = teleportData.time;
-        else lastTime = 0;
-
-        return System.nanoTime() - lastTime;
-    }
 
     /**
      * @param availableTime when to stop, in nanos
@@ -138,8 +132,6 @@ public class RTP {
      * @param availableTime when to stop, in nanos
      */
     public void executeSyncTasks(long availableTime) {
-        //todo: loadChunks
-        //todo: teleport
         long start = System.nanoTime();
 
         chunkCleanupPipeline.execute(availableTime);
@@ -148,6 +140,29 @@ public class RTP {
 
     public Map<int[], RTPChunk> forceLoads = new ConcurrentHashMap<>();
 
-    //todo: set up regions on config init
-    //todo: get region by name and parameters
+    public void cancelTeleport(UUID uuid) {
+        if(!latestTeleportData.containsKey(uuid)) return;
+        TeleportData teleportData = latestTeleportData.get(uuid);
+        if(!teleportData.nextTask.isCancelled())
+            teleportData.nextTask.setCancelled(true);
+        teleportData.completed = true;
+
+        ConfigParser<EconomyKeys> eco = (ConfigParser<EconomyKeys>) configs.configParserMap.get(EconomyKeys.class);
+        boolean refund;
+        Object refundObj = eco.getConfigValue(EconomyKeys.refundOnCancel, true);
+        if(refundObj instanceof Boolean b) refund = b;
+        else {
+            refund = Boolean.parseBoolean(String.valueOf(refundObj));
+        }
+
+        TeleportData priorData = priorTeleportData.getOrDefault(uuid, new TeleportData());
+        priorData.completed = true;
+        if(!refund) {
+            priorData.time = teleportData.time;
+            priorData.cost = teleportData.cost;
+        }
+        latestTeleportData.put(uuid, priorData);
+
+
+    }
 }

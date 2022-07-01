@@ -10,12 +10,14 @@ import java.util.EnumMap;
 
 public class MultiConfigParser<E extends Enum<E>>  extends FactoryValue<E> {
     public Factory<ConfigParser<E>> configParserFactory = new Factory<>();
+    public final File pluginDirectory;
     public final File myDirectory;
     public final String name;
     protected final File langMap;
 
     public MultiConfigParser(Class<E> eClass, String name, File pluginDirectory) {
         super(eClass);
+        this.pluginDirectory = pluginDirectory;
         this.name = name;
         this.myDirectory = new File(pluginDirectory.getAbsolutePath() + File.separator + name);
         this.langMap = new File(pluginDirectory.getAbsolutePath() + File.separator

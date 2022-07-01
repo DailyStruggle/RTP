@@ -90,12 +90,29 @@ public class SelectionAPI {
 
     /**
      * getFromString a region by name
-     * @param regionName - name of region
-     * @return region by that name, or null if none
+     * @param regionName - name of region, case-insensitive
+     * @return region object by that name, or null on bad lookup
      */
     @Nullable
     public Region getRegion(String regionName) {
-        return permRegionLookup.get(regionName);
+        String regionNameCaps = regionName.toUpperCase();
+        Region res = permRegionLookup.get(regionName);
+        //todo: exception version
+        return res;
+    }
+
+
+    /**
+     * getFromString a region by name
+     * @param regionName - name of region, case-insensitive
+     * @return region object by that name, or null on bad lookup
+     */
+    @NotNull
+    public Region getRegionExceptionally(String regionName) {
+        String regionNameCaps = regionName.toUpperCase();
+        Region res = permRegionLookup.get(regionName);
+        if(res == null) throw new IllegalStateException("region:" + regionName + " does not exist");
+        return res;
     }
 
     /**
@@ -105,10 +122,20 @@ public class SelectionAPI {
      */
     @NotNull
     public Region getRegionOrDefault(String regionName) {
+        return getRegionOrDefault(regionName,"DEFAULT");
+    }
+
+    /**
+     * getFromString a region by name
+     * @param regionName - name of region
+     * @return region by that name, or null if none
+     */
+    @NotNull
+    public Region getRegionOrDefault(String regionName, String defaultName) {
         regionName = regionName.toUpperCase();
-        Region region = (permRegionLookup.containsKey(regionName))
-                ? permRegionLookup.get(regionName)
-                : permRegionLookup.get("default");
+        defaultName = defaultName.toUpperCase();
+        Region region = permRegionLookup.getOrDefault(regionName, permRegionLookup.get(defaultName));
+        if(region == null) throw new IllegalStateException("neither '" + regionName + "' nor '" + defaultName + "' are known regions");
         return Objects.requireNonNull(region);
     }
 

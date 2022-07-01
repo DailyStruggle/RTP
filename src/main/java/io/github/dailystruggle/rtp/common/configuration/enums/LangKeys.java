@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.configuration.enums;
 
 public enum LangKeys {
+    plugin,
     title,
     subtitle,
     fadeIn,

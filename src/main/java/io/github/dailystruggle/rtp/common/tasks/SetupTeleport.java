@@ -41,7 +41,7 @@ public final class SetupTeleport extends RTPRunnable {
 
         RTP rtp = RTP.getInstance();
 
-        TeleportData teleportData = RTP.getInstance().latestTeleportData.get(sender.uuid());
+        TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.uuid());
 
         teleportData.targetRegion = this.region;
 

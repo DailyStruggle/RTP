@@ -15,7 +15,6 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.substitutions.*;
 import io.github.dailystruggle.rtp.common.tasks.LoadChunks;
-import org.bukkit.block.Biome;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
@@ -24,11 +23,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.function.BiConsumer;
-import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public class Region extends FactoryValue<RegionKeys> {
-    protected Set<String> defaultBiomes;
+    public static Set<String> defaultBiomes;
     public static final List<BiConsumer<Region,UUID>> onPlayerQueuePush = new ArrayList<>();
     public static final List<BiConsumer<Region,UUID>> onPlayerQueuePop = new ArrayList<>();
 
@@ -36,10 +34,10 @@ public class Region extends FactoryValue<RegionKeys> {
     public String name;
 
     protected ConcurrentLinkedQueue<RTPLocation> locationQueue = new ConcurrentLinkedQueue<>();
-    protected ConcurrentHashMap<RTPLocation, ChunkSet> locAssChunks = new ConcurrentHashMap<>();
+    public ConcurrentHashMap<RTPLocation, ChunkSet> locAssChunks = new ConcurrentHashMap<>();
     protected ConcurrentLinkedQueue<UUID> playerQueue = new ConcurrentLinkedQueue<>();
 
-    protected ConcurrentHashMap<UUID, ConcurrentLinkedQueue<RTPLocation>> perPlayerLocationQueue = new ConcurrentHashMap<>();
+    public ConcurrentHashMap<UUID, ConcurrentLinkedQueue<RTPLocation>> perPlayerLocationQueue = new ConcurrentHashMap<>();
 
     protected class Cache implements Runnable {
         @Override
@@ -88,7 +86,7 @@ public class Region extends FactoryValue<RegionKeys> {
             TeleportData teleportData = instance.latestTeleportData.get(playerId);
             if(teleportData == null) {
                 teleportData = new TeleportData();
-                teleportData.sender = CommandsAPI.serverId;
+                teleportData.sender = RTP.getInstance().serverAccessor.getSender(CommandsAPI.serverId);
                 teleportData.targetRegion = this;
                 teleportData.completed = true;
             }
@@ -141,10 +139,10 @@ public class Region extends FactoryValue<RegionKeys> {
 
             defaultBiomes = whitelist
                     ? collect
-                    : RTP.getInstance().serverAccessor.allBiomes().stream().filter(s -> !collect.contains(s)).collect(Collectors.toSet());
+                    : RTP.getInstance().serverAccessor.getBiomes().stream().filter(s -> !collect.contains(s)).collect(Collectors.toSet());
         }
-        else defaultBiomes = RTP.getInstance().serverAccessor.allBiomes();
-        this.defaultBiomes = defaultBiomes;
+        else defaultBiomes = RTP.getInstance().serverAccessor.getBiomes();
+        Region.defaultBiomes = defaultBiomes;
     }
 
     public boolean hasLocation(@Nullable UUID uuid) {

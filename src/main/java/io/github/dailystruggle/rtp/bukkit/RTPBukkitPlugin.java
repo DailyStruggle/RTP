@@ -9,7 +9,6 @@ import io.github.dailystruggle.rtp.bukkit.commonBukkitImpl.BukkitServerAccessor;
 import io.github.dailystruggle.rtp.bukkit.commonBukkitImpl.config.BukkitConfigs;
 import io.github.dailystruggle.rtp.bukkit.commonBukkitImpl.substitutions.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.events.*;
-import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.DoTeleport;
@@ -22,13 +21,11 @@ import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
-import org.bukkit.permissions.PermissionAttachmentInfo;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
@@ -51,9 +48,11 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     public final ConcurrentHashMap<UUID,Location> todoTP = new ConcurrentHashMap<>();
     public final ConcurrentHashMap<UUID,Location> lastTP = new ConcurrentHashMap<>();
 
-    private BukkitTask commandProcessing = null;
-    private BukkitTask asyncTeleportProcessing = null;
-    private BukkitTask syncTeleportProcessing = null;
+    public BukkitTask commandTimer = null;
+    public BukkitTask commandProcessing = null;
+    public BukkitTask teleportTimer = null;
+    public BukkitTask asyncTeleportProcessing = null;
+    public BukkitTask syncTeleportProcessing = null;
 
     public Map<int[],CompletableFuture<Chunk>> chunkLoads = new ConcurrentHashMap<>();
 
@@ -63,7 +62,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         metrics = new Metrics(this,12277);
 
         instance = this;
-        new RTP(new BukkitConfigs(getDataFolder()), new BukkitServerAccessor(), SendMessage::log); //constructor updates API instance
+        new RTP(new BukkitConfigs(getDataFolder()), new BukkitServerAccessor()); //constructor updates API instance
 
         BukkitTreeCommand mainCommand = new RTPCmd(this);
         Objects.requireNonNull(getCommand("rtp")).setExecutor(mainCommand);
@@ -71,7 +70,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         Objects.requireNonNull(getCommand("wild")).setExecutor(mainCommand);
         Objects.requireNonNull(getCommand("wild")).setTabCompleter(mainCommand);
 
-        Bukkit.getScheduler().runTaskTimer(this, () -> {
+        commandTimer = Bukkit.getScheduler().runTaskTimer(this, () -> {
             long avgTime = TPS.timeSinceTick(20) / 20;
             long currTime = TPS.timeSinceTick(1);
 
@@ -86,7 +85,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             }
         }, 40, 1);
 
-        Bukkit.getScheduler().runTaskTimer(this, () -> {
+        teleportTimer = Bukkit.getScheduler().runTaskTimer(this, () -> {
             long avgTime = TPS.timeSinceTick(20) / 20;
             long currTime = TPS.timeSinceTick(1);
 
@@ -121,7 +120,22 @@ public final class RTPBukkitPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if(commandTimer!=null) commandTimer.cancel();
+        try {
+            TimeUnit.MILLISECONDS.sleep(20);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         if(commandProcessing!=null) commandProcessing.cancel();
+        if(teleportTimer!=null) teleportTimer.cancel();
+        try {
+            TimeUnit.MILLISECONDS.sleep(20);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        if(asyncTeleportProcessing!=null) asyncTeleportProcessing.cancel();
+        if(syncTeleportProcessing!=null) syncTeleportProcessing.cancel();
+
 //        onChunkLoad.shutdown();
         metrics = null;
 

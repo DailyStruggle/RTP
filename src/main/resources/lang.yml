@@ -1,6 +1,8 @@
 #logs and command responses
 #todo: update keys according to code updates
 
+plugin: "[plugin]"
+
 #show title
 # set title to "" to disable
 # PlaceholderAPI is recommended for coordinates
@@ -11,31 +13,31 @@ stay: 1
 fadeOut: 1
 
 #when teleporting, say this
-alreadyTeleporting: "&e[rtp] you're already teleporting!"
+alreadyTeleporting: "&e[plugin] you're already teleporting!"
 # placeholder: [time] - how long before teleporting
-delayMessage: "&e[rtp] Teleporting in [time]. Don't move"
+delayMessage: "&e[plugin] Teleporting in [time]. Don't move"
 # placeholder: [numAttempts] - number of attempts
-teleportMessage: "&e[rtp] Teleported in [numAttempts] attempts, in [time]"
-chunkLoading: "&e[rtp] Loading chunks! please wait..."
+teleportMessage: "&e[plugin] Teleported in [numAttempts] attempts, in [time]"
+chunkLoading: "&e[plugin] Loading chunks! please wait..."
 
 #if player moves
-teleportCancel: "&e[rtp] Teleport cancelled!"
+teleportCancel: "&e[plugin] Teleport cancelled!"
 
 #if no safe places after reaching max attempts
-unsafe: "&e[rtp] could not find a safe location within [numAttempts] attempts"
+unsafe: "&e[plugin] could not find a safe location within [numAttempts] attempts"
 
 # placeholder: [time] - how long before player is able to teleport again
-cooldownMessage: "&e[rtp] You can't teleport again for [time]"
+cooldownMessage: "&e[plugin] You can't teleport again for [time]"
 
 #if the region doesn't have any locations queued and the player doesn't have rtp.unqueued permission
-noLocationsQueued: "#f5eb73[rtp] no locations ready at this time"
+noLocationsQueued: "#f5eb73[plugin] no locations ready at this time"
 
 #when the line shifts
-queueUpdate: "#2636ef[rtp] your spot in line: [num]"
+queueUpdate: "#2636ef[plugin] your spot in line: [num]"
 
 #if the player doesn't have enough money to teleport in the region
 # placeholder: [money] - how much money is required for the command
-notEnoughMoney: "&e[rtp] you need at least $[money] for that."
+notEnoughMoney: "&e[plugin] you need at least $[money] for that."
 
 # for time placeholders, what to call days, hours, minutes, seconds
 days: "d"
@@ -46,25 +48,25 @@ millis: "ms"
 
 # a configuration file 'version' is lower than the latest
 # placeholder: [filename] - name of file, including file extension
-oldFile: "&b[rtp] old [filename] detected. Updating"
+oldFile: "&b[plugin] old [filename] detected. Updating"
 
 # detected a bukkit world that isn't in the config file
 # placeholder: [world] - the world detected
-newWorld: "&b[rtp] detected a new world '[world]'"
+newWorld: "&b[plugin] detected a new world '[world]'"
 
-updatingWorlds: "&b[rtp] updating worlds configuration..."
-updatedWorlds: "&b[rtp] updated worlds configuration!"
+updatingWorlds: "&b[plugin] updating worlds configuration..."
+updatedWorlds: "&b[plugin] updated worlds configuration!"
 
-updatingRegions: "&b[rtp] updating regions configuration..."
-updatedRegions: "&b[rtp] updated regions configuration!"
+updatingRegions: "&b[plugin] updating regions configuration..."
+updatedRegions: "&b[plugin] updated regions configuration!"
 
 # plugin reload text
-reloading: "&b[rtp] reloading..."
-reloaded: "&b[rtp] successfully reloaded."
+reloading: "&b[plugin] reloading..."
+reloaded: "&b[plugin] successfully reloaded."
 
 # plugin doesn't have the command the user requested
 # placeholder: [arg] - the argument attempted
-badArg: "&c[rtp] invalid command argument [arg]"
+badArg: "&c[plugin] invalid command argument [arg]"
 
 consoleCmdNotAllowed: "&cYou can't do this from console. Try adding a player or world argument or not using '~'."
 
@@ -76,18 +78,18 @@ noPerms: "&eI'm sorry, but you do not have permission to perform this command. P
 noGlobalPerms: "&eYou don't have permission to teleport to [world] from your location"
 
 # world doesn't exist in bukkit
-invalidWorld: "&e[rtp] could not find world '[world]'"
+invalidWorld: "&e[plugin] could not find world '[world]'"
 
 # when more than on user fails to specify region in updateRegion
-missingRegionParam: "&e[rtp] region parameter is required"
+missingRegionParam: "&e[plugin] region parameter is required"
 
-fillStart: "&a[rtp] fill task started for region [region]"
-fillCancel: "&e[rtp] fill task cancelled for region [region]"
-fillPause: "#A020F0[rtp] fill task paused for region [region]"
-fillResume: "#10A5F5[rtp] fill task resumed for region [region]"
-fillRunning: "&c[rtp] fill task already running for region [region]"
-fillNotRunning: "&c[rtp] fill task not running for region [region]"
-fillStatus: "&a[rtp] completed [num] / [total] chunks for region [region]"
+fillStart: "&a[plugin] fill task started for region [region]"
+fillCancel: "&e[plugin] fill task cancelled for region [region]"
+fillPause: "#A020F0[plugin] fill task paused for region [region]"
+fillResume: "#10A5F5[plugin] fill task resumed for region [region]"
+fillRunning: "&c[plugin] fill task already running for region [region]"
+fillNotRunning: "&c[plugin] fill task not running for region [region]"
+fillStatus: "&a[plugin] completed [num] / [total] chunks for region [region]"
 
 #command descriptions
 rtp: "&b/rtp - teleport to a random location"
