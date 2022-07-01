@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
+import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import org.jetbrains.annotations.NotNull;
@@ -7,6 +8,8 @@ import org.jetbrains.annotations.Nullable;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.*;
+import java.net.URL;
+import java.net.URLConnection;
 import java.nio.file.Files;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -14,9 +17,10 @@ import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
+    private final ClassLoader classLoader = this.getClass().getClassLoader();
     public String name;
     public String version;
-    protected File pluginDirectory;
+    public File pluginDirectory;
 
     public ConfigParser(Class<E> eClass, final String name, final String version, final File pluginDirectory, File langFile) {
         super(eClass);
@@ -79,7 +83,7 @@ public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
         }
     }
 
-    protected void check(final String version, final File pluginDirectory, @Nullable File langFile) {
+    public void check(final String version, final File pluginDirectory, @Nullable File langFile) {
         //construct language file from enum vals
         //todo: apply translation to loads and saves
         loadLangFile(langFile);
@@ -91,7 +95,7 @@ public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
         }
         loadResource(f);
 
-        String versionStr = this.getFromString("version", "0.0").toString();
+        String versionStr = getFromString("version", "0.0").toString();
 
         String[] versionArr = Objects.requireNonNull(versionStr).split("\\.");
 
@@ -165,7 +169,7 @@ public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
         if(!b) RTP.log(Level.WARNING,
                 "RTP - unable to rename file:" + oldFile.getAbsoluteFile());
 
-        saveResource(this.name, true);
+        saveResourceFromJar(this.name, true);
     }
 
     public Object getConfigValue(E key, Object def) {
@@ -177,9 +181,50 @@ public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
      * @param name file name, e.g. "config.yml"
      * @param overwrite whether to overwrite an existing file with that name
      */
-    public abstract void saveResource(String name, boolean overwrite);
+    public void saveResource(String name, boolean overwrite) {
+        String myDirectory = pluginDirectory.getAbsolutePath();
+        String pDirectory = RTPBukkitPlugin.getInstance().getDataFolder().getAbsolutePath();
+        if(myDirectory.equals(pDirectory)) {
+            saveResourceFromJar(name,overwrite);
+        }
+        else {
+            String diff = myDirectory.substring(pDirectory.length()+1);
+            if(name.equals("default.yml")) {
+                saveResourceFromJar(diff + File.separator + name, overwrite);
+            }
+            else {
+                File source = new File(myDirectory + File.separator + "default.yml");
+                File target = new File(myDirectory + File.separator + name);
+                FileUtil.copy(source, target);
+            }
+        }
+    }
 
-    public abstract void loadResource(File f);
+    public void loadResource(File f) {
+        Yaml yaml = new Yaml();
+
+        Map<String,Object> dataMap;
+        if(f.exists()) {
+            InputStream inputStream;
+            try {
+                inputStream = new FileInputStream(f);
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+                return;
+            }
+            dataMap = yaml.load(inputStream);
+        }
+        else {
+            return;
+        }
+
+        for(var e : myClass.getEnumConstants()) {
+            String name = e.name();
+            if(dataMap.containsKey(name)) {
+                data.put(e,dataMap.get(name));
+            }
+        }
+    }
 
     public void update() {
         renameFiles();
@@ -321,16 +366,27 @@ public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
         }
     }
 
-    protected abstract Object getFromString(String val, @Nullable Object def);
+    protected Object getFromString(String val, @Nullable Object def) {
+        E e;
+        try {
+            e = Enum.valueOf(myClass, val);
+        }
+        catch (IllegalArgumentException exception) {
+            return def;
+        }
+        return data.getOrDefault(e,def);
+    }
 
     @Override
     public ConfigParser<E> clone() {
         ConfigParser<E> clone = (ConfigParser<E>) super.clone();
+
         clone.language_mapping = this.language_mapping;
         clone.reverse_language_mapping = this.reverse_language_mapping;
         clone.name = name;
         clone.version = version;
         clone.pluginDirectory = pluginDirectory;
+        clone.check(version,pluginDirectory,null);
         return clone;
     }
 
@@ -338,5 +394,53 @@ public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
         data.put(key,o);
     }
 
-    //todo: write runtime updates to file
+    @Nullable
+    public InputStream getResourceFromJar(@NotNull String filename) {
+        try {
+            URL url = classLoader.getResource(filename);
+
+            if (url == null) {
+                return null;
+            }
+
+            URLConnection connection = url.openConnection();
+            connection.setUseCaches(false);
+            return connection.getInputStream();
+        } catch (IOException ex) {
+            return null;
+        }
+    }
+
+    public void saveResourceFromJar(@NotNull String resourcePath, boolean replace) {
+        resourcePath = resourcePath.replace('\\', '/');
+        InputStream in = getResourceFromJar(resourcePath);
+        if (in == null) {
+            throw new IllegalArgumentException("The embedded resource '" + resourcePath + "' cannot be found in RTP");
+        }
+
+        File outFile = new File(pluginDirectory, resourcePath);
+        int lastIndex = resourcePath.lastIndexOf('/');
+        File outDir = new File(pluginDirectory, resourcePath.substring(0, lastIndex >= 0 ? lastIndex : 0));
+
+        if (!outDir.exists()) {
+            outDir.mkdirs();
+        }
+
+        try {
+            if (!outFile.exists() || replace) {
+                OutputStream out = new FileOutputStream(outFile);
+                byte[] buf = new byte[1024];
+                int len;
+                while ((len = in.read(buf)) > 0) {
+                    out.write(buf, 0, len);
+                }
+                out.close();
+                in.close();
+            } else {
+                RTP.log(Level.WARNING, "Could not save " + outFile.getName() + " to " + outFile + " because " + outFile.getName() + " already exists.");
+            }
+        } catch (IOException ex) {
+            RTP.log(Level.SEVERE, "Could not save " + outFile.getName() + " to " + outFile, ex);
+        }
+    }
 }

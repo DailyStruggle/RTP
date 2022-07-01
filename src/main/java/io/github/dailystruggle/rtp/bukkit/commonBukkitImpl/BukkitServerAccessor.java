@@ -8,28 +8,35 @@ import io.github.dailystruggle.rtp.bukkit.commonBukkitImpl.substitutions.BukkitR
 import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.RTPServerAccessor;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.substitutions.RTPPlayer;
 import io.github.dailystruggle.rtp.common.substitutions.RTPWorld;
 import org.bukkit.Bukkit;
-import org.bukkit.block.Biome;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.Function;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public class BukkitServerAccessor implements RTPServerAccessor {
     private String version = null;
     private Integer intVersion = null;
+
+
+    public BukkitServerAccessor() {
+        //run later to ensure RTP instance exists
+        // configs are initialized in tick 1, so reference them at 2 or later
+        // command processing timer is delayed to ensure this is set up before it's used
+
+    }
 
     @Override
     public String getServerVersion() {
@@ -109,6 +116,22 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     }
 
     @Override
+    public void sendMessage(UUID target, LangKeys msgType) {
+        ConfigParser<LangKeys> parser = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+        String msg = String.valueOf(parser.getConfigValue(msgType,""));
+        if(msg == null || msg.isBlank()) return;
+        sendMessage(target, msg);
+    }
+
+    @Override
+    public void sendMessage(UUID target1, UUID target2, LangKeys msgType) {
+        ConfigParser<LangKeys> parser = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+        String msg = String.valueOf(parser.getConfigValue(msgType,""));
+        if(msg == null || msg.isBlank()) return;
+        sendMessage(target1,target2,msg);
+    }
+
+    @Override
     public void sendMessage(UUID target, String message) {
         CommandSender sender = (target.equals(CommandsAPI.serverId))
                 ? Bukkit.getConsoleSender()
@@ -121,12 +144,25 @@ public class BukkitServerAccessor implements RTPServerAccessor {
         CommandSender sender = (target1.equals(CommandsAPI.serverId))
                 ? Bukkit.getConsoleSender()
                 : Bukkit.getPlayer(target1);
-        Player player = Bukkit.getPlayer(target2);
+        CommandSender player = (target2.equals(CommandsAPI.serverId))
+                ? Bukkit.getConsoleSender()
+                : Bukkit.getPlayer(target2);
+
         if(sender!=null && player!=null) SendMessage.sendMessage(sender,player,message);
     }
 
     @Override
-    public Set<String> allBiomes() {
-        return Arrays.stream(Biome.values()).map(Enum::name).collect(Collectors.toSet());
+    public void log(Level level, String msg) {
+        SendMessage.log(level,msg);
+    }
+
+    @Override
+    public void log(Level level, String msg, Exception exception) {
+        SendMessage.log(level,msg,exception);
+    }
+
+    @Override
+    public Set<String> getBiomes() {
+        return BukkitRTPWorld.getBiomes();
     }
 }

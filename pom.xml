@@ -367,7 +367,7 @@
         <dependency>
             <groupId>io.github.dailystruggle</groupId>
             <artifactId>CommandsAPI</artifactId>
-            <version>1.0-ALPHA44</version>
+            <version>1.0-ALPHA50</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -375,6 +375,11 @@
             <artifactId>snakeyaml</artifactId>
             <version>1.29</version>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>3.12.0</version>
         </dependency>
     </dependencies>
 </project>

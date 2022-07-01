@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.bukkit.commonBukkitImpl.config;
 
-import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import io.github.dailystruggle.rtp.bukkit.commonBukkitImpl.substitutions.BukkitRTPWorld;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.substitutions.RTPLocation;
@@ -8,7 +7,6 @@ import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.util.FileUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -27,26 +25,6 @@ public class BukkitConfigParser<E extends Enum<E>> extends ConfigParser<E> {
 
     public BukkitConfigParser(Class<E> eClass, String name, String version, File pluginDirectory, File langFile) {
         super(eClass, name, version, pluginDirectory, langFile);
-    }
-
-    @Override
-    public void saveResource(String name, boolean overwrite) {
-        String myDirectory = pluginDirectory.getAbsolutePath();
-        String pDirectory = RTPBukkitPlugin.getInstance().getDataFolder().getAbsolutePath();
-        if(myDirectory.equals(pDirectory)) {
-            RTPBukkitPlugin.getInstance().saveResource(name,overwrite);
-        }
-        else {
-            String diff = myDirectory.substring(pDirectory.length()+1);
-            if(name.equals("default.yml")) {
-                RTPBukkitPlugin.getInstance().saveResource(diff + File.separator + name, overwrite);
-            }
-            else {
-                File source = new File(myDirectory + File.separator + "default.yml");
-                File target = new File(myDirectory + File.separator + name);
-                FileUtil.copy(source, target);
-            }
-        }
     }
 
     @Override

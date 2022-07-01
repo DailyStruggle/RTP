@@ -7,12 +7,40 @@ import io.github.dailystruggle.rtp.common.substitutions.RTPWorld;
 import io.papermc.lib.PaperLib;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
+import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.block.Biome;
+import org.jetbrains.annotations.NotNull;
 
+import java.util.Arrays;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 public record BukkitRTPWorld(World world) implements RTPWorld {
+    private static Function<Location,String> getBiome = location -> {
+        World world = Objects.requireNonNull(location.getWorld());
+        int x = location.getBlockX();
+        int y = location.getBlockY();
+        int z = location.getBlockZ();
+        return (RTP.getInstance().serverAccessor.getServerIntVersion() < 17)
+                ? world.getBiome(x,y).name()
+                : world.getBiome(x,y,z).name();
+    };
+    private static Supplier<Set<String>> getBiomes
+            = ()->Arrays.stream(Biome.values()).map(Enum::name).collect(Collectors.toSet());
+
+    public static void setBiomeGetter(@NotNull Function<Location, String> getBiome) {
+        BukkitRTPWorld.getBiome = getBiome;
+    }
+
+    public static void setBiomesGetter(@NotNull Supplier<Set<String>> getBiomes) {
+        BukkitRTPWorld.getBiomes = getBiomes;
+    }
 
     @Override
     public String name() {
@@ -47,9 +75,11 @@ public record BukkitRTPWorld(World world) implements RTPWorld {
 
     @Override
     public String getBiome(int x, int y, int z) {
-        return (RTP.getInstance().serverAccessor.getServerIntVersion() < 17)
-                ? world.getBiome(x,y).name()
-                : world.getBiome(x,y,z).name();
+        return getBiome.apply(new Location(world,x,y,z));
+    }
+
+    public static Set<String> getBiomes() {
+        return getBiomes.get();
     }
 
     @Override

@@ -22,11 +22,11 @@ commands:
     permission: rtp.see
     usage: |
       /rtp help
-#  rtp reload:
-#    description: Reload the plugin configuration files
-#    permission: rtp.reload
-#    usage: |
-#      /rtp reload
+  rtp reload:
+    description: Reload the plugin configuration files
+    permission: rtp.reload
+    usage: |
+      /rtp reload
 #  rtp setWorld:
 #    description: update rtp world settings
 #    permission: rtp.setWorld

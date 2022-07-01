@@ -46,4 +46,8 @@ public class RTPTaskPipe {
     public void add(Runnable runnable) {
         runnables.add(runnable);
     }
+
+    public void clear() {
+        runnables.clear();
+    }
 }

@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.bukkit.commands.commands.help;
 
-import io.github.dailystruggle.commandsapi.bukkit.localCommands.BukkitTreeCommand;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.bukkit.commands.commands.BaseRTPCmd;
 import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
