@@ -5,16 +5,17 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.effectsapi.EffectFactory;
 import io.github.dailystruggle.effectsapi.EffectsAPI;
 import io.github.dailystruggle.rtp.bukkit.commands.commands.RTPCmd;
-import io.github.dailystruggle.rtp.bukkit.commonBukkitImpl.BukkitServerAccessor;
-import io.github.dailystruggle.rtp.bukkit.commonBukkitImpl.config.BukkitConfigs;
-import io.github.dailystruggle.rtp.bukkit.commonBukkitImpl.substitutions.BukkitRTPPlayer;
+import io.github.dailystruggle.rtp.bukkit.server.BukkitServerAccessor;
+import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.events.*;
+import io.github.dailystruggle.rtp.bukkit.spigotListeners.*;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.tasks.DoTeleport;
-import io.github.dailystruggle.rtp.common.tasks.LoadChunks;
-import io.github.dailystruggle.rtp.common.tasks.SetupTeleport;
-import io.github.dailystruggle.rtp.common.tasks.TPS;
+import io.github.dailystruggle.rtp.common.tasks.*;
 import io.papermc.lib.PaperLib;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
@@ -24,9 +25,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
-import java.util.Map;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -62,7 +61,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         metrics = new Metrics(this,12277);
 
         instance = this;
-        new RTP(new BukkitConfigs(getDataFolder()), new BukkitServerAccessor()); //constructor updates API instance
+        new RTP(new BukkitServerAccessor()); //constructor updates API instance
 
         BukkitTreeCommand mainCommand = new RTPCmd(this);
         Objects.requireNonNull(getCommand("rtp")).setExecutor(mainCommand);
@@ -199,6 +198,13 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             }
         });
 
+        RTPTeleportCancel.postActions.add(rtpTeleportCancel -> {
+            if(Bukkit.isPrimaryThread())
+                Bukkit.getPluginManager().callEvent(new TeleportCancelEvent(rtpTeleportCancel.getPlayerId()));
+            else
+                Bukkit.getPluginManager().callEvent(new TeleportCancelEvent(rtpTeleportCancel.getPlayerId(),true));
+        });
+
         Region.onPlayerQueuePush.add((region, uuid) -> {
             PlayerQueuePushEvent playerQueuePushEvent = new PlayerQueuePushEvent(region, uuid);
             Bukkit.getPluginManager().callEvent(playerQueuePushEvent);
@@ -209,9 +215,53 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             Bukkit.getPluginManager().callEvent(playerQueuePopEvent);
         });
 
+        Bukkit.getPluginManager().registerEvents(new OnEventTeleports(), this);
+        Bukkit.getPluginManager().registerEvents(new OnPlayerChangeWorld(), this);
+        Bukkit.getPluginManager().registerEvents(new OnPlayerDamage(), this);
+        Bukkit.getPluginManager().registerEvents(new OnPlayerJoin(), this);
+        Bukkit.getPluginManager().registerEvents(new OnPlayerMove(), this);
+        Bukkit.getPluginManager().registerEvents(new OnPlayerQuit(), this);
+        Bukkit.getPluginManager().registerEvents(new OnPlayerRespawn(), this);
+        Bukkit.getPluginManager().registerEvents(new OnPlayerTeleport(), this);
+
         if(effectsAPI == null) effectsAPI = EffectsAPI.getInstance();
         if(effectsAPI == null) {
             effectsAPI = new EffectsAPI(this);
         }
+    }
+
+    public static Region getRegion(Player player) {
+        //get region from world name, check for overrides
+        Set<String> worldsAttempted = new HashSet<>();
+        Set<String> regionsAttempted = new HashSet<>();
+
+        String worldName = player.getWorld().getName();
+        MultiConfigParser<WorldKeys> worldParsers = (MultiConfigParser<WorldKeys>) RTP.getInstance().configs.multiConfigParserMap.get(WorldKeys.class);
+        ConfigParser<WorldKeys> worldParser = worldParsers.getParser(worldName);
+        boolean requirePermission = Boolean.parseBoolean(worldParser.getConfigValue(WorldKeys.requirePermission,false).toString());
+
+        while(requirePermission && !player.hasPermission("rtp.worlds."+worldName)) {
+            if(worldsAttempted.contains(worldName)) throw new IllegalStateException("infinite override loop detected at world - " + worldName);
+            worldsAttempted.add(worldName);
+
+            worldName = String.valueOf(worldParser.getConfigValue(WorldKeys.override,"default"));
+            worldParser = worldParsers.getParser(worldName);
+            requirePermission = Boolean.parseBoolean(worldParser.getConfigValue(WorldKeys.requirePermission,false).toString());
+        }
+
+        String regionName = String.valueOf(worldParser.getConfigValue(WorldKeys.region, "default"));
+        MultiConfigParser<RegionKeys> regionParsers = (MultiConfigParser<RegionKeys>) RTP.getInstance().configs.multiConfigParserMap.get(RegionKeys.class);
+        ConfigParser<RegionKeys> regionParser = regionParsers.getParser(regionName);
+        requirePermission = Boolean.parseBoolean(regionParser.getConfigValue(RegionKeys.requirePermission,false).toString());
+
+        while(requirePermission && !player.hasPermission("rtp.regions."+regionName)) {
+            if(regionsAttempted.contains(regionName)) throw new IllegalStateException("infinite override loop detected at region - " + regionName);
+            regionsAttempted.add(regionName);
+
+            regionName = String.valueOf(regionParser.getConfigValue(RegionKeys.override,"default"));
+            regionParser = regionParsers.getParser(regionName);
+            requirePermission = Boolean.parseBoolean(regionParser.getConfigValue(RegionKeys.requirePermission,false).toString());
+        }
+        return RTP.getInstance().selectionAPI.permRegionLookup.get(regionName);
     }
 }

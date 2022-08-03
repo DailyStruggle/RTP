@@ -12,7 +12,9 @@ import java.util.stream.Collectors;
  * rather than calling a constructor, the factory value will be copied from a value in the factory
  * @param <E> enum of available parameters
  */
+@SuppressWarnings("unchecked")
 public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
+
     //hacky way just to do Enum.valueOf on the correct enum
     public final Class<E> myClass;
 
@@ -20,11 +22,15 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
      * data - container for arbitrary data values
      *      mapped enum value to object to stay organized
      */
-    protected EnumMap<E,Object> data;
+    public String name;
+    protected final EnumMap<E,Object> data;
+    protected final EnumMap<E,String[]> desc;
 
-    protected FactoryValue(Class<E> myClass) {
+    protected FactoryValue(Class<E> myClass, String name) {
         this.myClass = myClass;
         data = new EnumMap<>(myClass);
+        desc = new EnumMap<>(myClass);
+        this.name = name;
     }
 
     /**
@@ -41,6 +47,8 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
      */
     public void setData(final EnumMap<? extends Enum<?>,?> data) throws IllegalArgumentException {
         data.forEach((key, value) -> {
+            if(key == null) throw new IllegalArgumentException("null key");
+            if(value == null) throw new IllegalArgumentException("null value");
             if (!myClass.isAssignableFrom(key.getClass())) {
                 throw new IllegalArgumentException("invalid assignment"
                         + "\nexpected:" + myClass.getSimpleName()
@@ -51,13 +59,15 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
         });
     }
 
-    public void set(E key, Object value) throws IllegalArgumentException {
-        if (!myClass.isAssignableFrom(key.getClass())) {
-            throw new IllegalArgumentException("invalid assignment"
-                    + "\nexpected:" + myClass.getSimpleName()
-                    + "\nreceived:" + key.getClass().getSimpleName()
-            );
-        }
+    public void setDesc(@NotNull E key, @NotNull String[] desc) throws IllegalArgumentException {
+        if(key == null) throw new IllegalArgumentException("null key");
+        if(desc == null) throw new IllegalArgumentException("null desc");
+        this.desc.put(key,desc.clone());
+    }
+
+    public void set(@NotNull E key, @NotNull Object value) throws IllegalArgumentException {
+        if(key == null) throw new IllegalArgumentException("null key");
+        if(value == null) throw new IllegalArgumentException("null value");
         this.data.put(key, value);
     }
 
@@ -66,9 +76,15 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
      * @param data - data to apply. key is case-sensitive
      */
     public void setData(final Map<String,Object> data) throws IllegalArgumentException {
-        data.forEach((key1, value) -> {
-            E key = Enum.valueOf(myClass, key1);
-            this.data.put(key, value);
+        data.forEach((keyStr, value) -> {
+            if(keyStr == null) return;
+            if(value == null) return;
+            try {
+                E key = Enum.valueOf(myClass, keyStr);
+                this.data.put(key, value);
+            } catch (IllegalArgumentException ignored) {
+
+            }
         });
     }
 
@@ -114,5 +130,44 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     public Collection<String> keys() {
         if(keys == null) keys = Arrays.stream(myClass.getEnumConstants()).map(Enum::name).collect(Collectors.toSet());
         return keys;
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder builder = new StringBuilder();
+        data.forEach((e, o) -> builder.append("\n").append(e).append(": ").append(o.toString()));
+        return builder.toString();
+    }
+
+    public String toYAML() {
+        StringBuilder res = new StringBuilder();
+        for(var e : data.entrySet()) {
+            String[] desc = this.desc.get(e.getKey());
+            if(desc!=null) {
+                for(String d : desc) {
+                    res.append(d).append("\n");
+                }
+            }
+
+            res.append(e.getKey().name()).append(": ");
+
+            Object value = e.getValue();
+            if(value instanceof FactoryValue<?> factoryValue) {
+                res.append("\n");
+                String s = factoryValue.toYAML();
+                s = s.replaceAll("\n","  \n");
+                res.append(s);
+            }
+            else if(value instanceof Map map) {
+                map.forEach((o, o2) -> res.append("\n").append(o.toString()).append(": ").append(o2.toString()));
+            }
+            else if(value instanceof List list) {
+                list.forEach(o -> res.append("\n").append(o.toString()));
+            }
+            else {
+                res.append(value.toString());
+            }
+        }
+        return res.toString();
     }
 }

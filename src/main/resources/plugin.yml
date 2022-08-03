@@ -65,6 +65,9 @@ permissions:
   rtp.noDelay.chunks:
     description: skip chunk loading
     default: op
+  rtp.noCancel:
+    description: skip teleport cancellation tasks
+    default: op
   rtp.noCooldown:
     description: skip the teleport cooldown
     default: op
@@ -183,6 +186,7 @@ permissions:
       rtp.noCooldown: true
       rtp.noDelay: true
       rtp.noDelay.chunks: true
+      rtp.noCancel: true
       rtp.other: true
       rtp.notme: true
       rtp.world: true

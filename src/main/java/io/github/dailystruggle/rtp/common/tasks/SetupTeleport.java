@@ -3,9 +3,9 @@ package io.github.dailystruggle.rtp.common.tasks;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.substitutions.RTPCommandSender;
-import io.github.dailystruggle.rtp.common.substitutions.RTPLocation;
-import io.github.dailystruggle.rtp.common.substitutions.RTPPlayer;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
-import java.util.logging.Level;
 
 public final class SetupTeleport extends RTPRunnable {
     public static final List<Consumer<SetupTeleport>> preActions = new ArrayList<>();
@@ -99,9 +98,5 @@ public final class SetupTeleport extends RTPRunnable {
                 "player=" + player + ", " +
                 "region=" + region + ", " +
                 "biomes=" + biomes + ']';
-    }
-
-    public LoadChunks loadChunks() {
-        return loadChunks;
     }
 }

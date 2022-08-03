@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
-import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.substitutions.RTPChunk;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPChunk;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -9,7 +8,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
-import java.util.logging.Level;
 
 public record ChunkSet(
         List<CompletableFuture<RTPChunk>> chunks,

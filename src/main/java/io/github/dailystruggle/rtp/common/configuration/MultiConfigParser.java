@@ -1,28 +1,52 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
+import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.File;
+import java.io.*;
 import java.util.EnumMap;
 
-public class MultiConfigParser<E extends Enum<E>>  extends FactoryValue<E> {
+public class MultiConfigParser<E extends Enum<E>>  extends FactoryValue<E> implements ConfigLoader {
     public Factory<ConfigParser<E>> configParserFactory = new Factory<>();
     public final File pluginDirectory;
     public final File myDirectory;
     public final String name;
     protected final File langMap;
 
-    public MultiConfigParser(Class<E> eClass, String name, File pluginDirectory) {
-        super(eClass);
+    public MultiConfigParser(Class<E> eClass, String name, String version, File pluginDirectory) {
+        super(eClass, name);
         this.pluginDirectory = pluginDirectory;
         this.name = name;
         this.myDirectory = new File(pluginDirectory.getAbsolutePath() + File.separator + name);
         this.langMap = new File(pluginDirectory.getAbsolutePath() + File.separator
                 + "lang" + File.separator + name + ".lang.yml");
         if(!this.myDirectory.exists() && !myDirectory.mkdir()) return;
+
+        File d = new File(myDirectory.getAbsolutePath() + File.separator + "default.yml");
+        System.out.println(d.getAbsolutePath());
+        if(!d.exists()) {
+            saveResourceFromJar(name + File.separator + "default.yml",true);
+        }
+
+        File langMap = new File(RTP.getInstance().serverAccessor.getPluginDirectory() + File.separator + "lang" + File.separator + name + ".lang.yml");
+
+        File[] files = myDirectory.listFiles();
+        if(files == null) return;
+        for(File file : files) {
+            String fileName = file.getName();
+            if(!fileName.endsWith(".yml")) continue;
+            if(fileName.contains("old")) continue;
+
+            fileName = fileName.replace(".yml","");
+
+            ConfigParser<E> parser = new ConfigParser<>(
+                    eClass,fileName,version,myDirectory,langMap);
+            addParser(parser);
+        }
     }
 
     @NotNull
@@ -56,5 +80,10 @@ public class MultiConfigParser<E extends Enum<E>>  extends FactoryValue<E> {
             ConfigParser<?> value = getParser(key);
             addParser(name,null);
         }
+    }
+
+    @Override
+    public File getMainDirectory() {
+        return pluginDirectory;
     }
 }

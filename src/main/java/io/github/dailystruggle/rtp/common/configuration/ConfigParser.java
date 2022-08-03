@@ -1,29 +1,32 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
-import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.yaml.snakeyaml.Yaml;
+import org.simpleyaml.configuration.ConfigurationSection;
+import org.simpleyaml.configuration.MemorySection;
+import org.simpleyaml.configuration.file.YamlFile;
 
 import java.io.*;
-import java.net.URL;
-import java.net.URLConnection;
 import java.nio.file.Files;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 
-public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
-    private final ClassLoader classLoader = this.getClass().getClassLoader();
-    public String name;
+public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements ConfigLoader {
+    public YamlFile yamlFile;
+
     public String version;
     public File pluginDirectory;
 
+    public Map<String, Object> language_mapping = new ConcurrentHashMap<String, Object>();
+    public Map<String,String> reverse_language_mapping = new ConcurrentHashMap<>();
+
     public ConfigParser(Class<E> eClass, final String name, final String version, final File pluginDirectory, File langFile) {
-        super(eClass);
+        super(eClass, name);
         this.name = (name.endsWith(".yml")) ? name : name + ".yml";
         this.version = version;
         this.pluginDirectory = pluginDirectory;
@@ -31,17 +34,14 @@ public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
     }
 
     public ConfigParser(Class<E> eClass, final String name, final String version, final File pluginDirectory) {
-        super(eClass);
+        super(eClass, name);
         this.name = (name.endsWith(".yml")) ? name : name + ".yml";
         this.version = version;
         this.pluginDirectory = pluginDirectory;
         check(version,pluginDirectory, null);
     }
 
-    public Map<String,String> language_mapping = new ConcurrentHashMap<>();
-    public Map<String,String> reverse_language_mapping = new ConcurrentHashMap<>();
-
-    protected void loadLangFile(@Nullable File langFile) {
+    protected void loadLangFile(@Nullable File langFile) throws IOException {
         if(langFile == null) {
             String langDirStr = pluginDirectory.getAbsolutePath() + File.separator
                     + "lang" + File.separator;
@@ -56,46 +56,49 @@ public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
             langFile = new File(mapFileName);
         }
 
-        Yaml langYaml = new Yaml();
+        YamlFile langYaml = new YamlFile(langFile.getPath());
         for (String key : keys()) { //default data, to guard exceptions
             language_mapping.put(key,key);
             reverse_language_mapping.put(key,key);
         }
         if(langFile.exists()) {
-            InputStream inputStream;
-            try {
-                inputStream = new FileInputStream(langFile);
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-                return;
-            }
-            language_mapping = langYaml.load(inputStream);
+            langYaml.loadWithComments();
+            language_mapping = langYaml.getMapValues(true);
         }
         else {
-            PrintWriter writer;
-            try {
-                writer = new PrintWriter(langFile);
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-                return;
+            for(var e : language_mapping.entrySet()) {
+                langYaml.set(e.getKey(),e.getValue());
             }
-            langYaml.dump(language_mapping,writer);
+            langYaml.save();
+        }
+        for(var e : language_mapping.entrySet()) {
+            reverse_language_mapping.put(e.getValue().toString(),e.getKey());
         }
     }
 
     public void check(final String version, final File pluginDirectory, @Nullable File langFile) {
         //construct language file from enum vals
         //todo: apply translation to loads and saves
-        loadLangFile(langFile);
+        try {
+            loadLangFile(langFile);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return;
+        }
 
         File f = new File(pluginDirectory + File.separator + this.name);
         if(!f.exists())
         {
-            saveResource(this.name,true);
+            try {
+                saveResource(this.name,true);
+            } catch (IOException e) {
+                e.printStackTrace();
+                return;
+            }
         }
         loadResource(f);
 
-        String versionStr = getFromString("version", "0.0").toString();
+        String versionStr = yamlFile.getMapValues(false).getOrDefault("version", "1.0").toString();
 
         String[] versionArr = Objects.requireNonNull(versionStr).split("\\.");
 
@@ -106,8 +109,7 @@ public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
         if(versionArr.length!=parsedVersion.size()) {
             update = true;
         }
-
-        if(!update) {
+        else {
             for (int i = 0; i < versionArr.length; i++) {
                 int v = Integer.parseInt(versionArr[i]);
                 int cv = parsedVersion.get(i);
@@ -126,8 +128,10 @@ public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
 
         data.clear();
         for(var v : myClass.getEnumConstants()) {
-            Object fromString = getFromString(v.name(), null);
-            data.put(v, fromString);
+            Object fromString = yamlFile.get(v.name());
+            if(fromString!=null) {
+                data.put(v, fromString);
+            }
         }
     }
 
@@ -154,7 +158,7 @@ public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
             }
             boolean b = oldFile.getAbsoluteFile().renameTo(newFile.getAbsoluteFile());
             if(!b) RTP.log(Level.WARNING,
-                    "RTP - unable to rename file:" + oldFile.getAbsoluteFile());
+                    "RTP - unable to rename file:" + oldFile.getName() + " to: " + newFile.getName());
         }
 
         //rename the last one
@@ -181,9 +185,10 @@ public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
      * @param name file name, e.g. "config.yml"
      * @param overwrite whether to overwrite an existing file with that name
      */
-    public void saveResource(String name, boolean overwrite) {
+    public void saveResource(String name, boolean overwrite) throws IOException {
         String myDirectory = pluginDirectory.getAbsolutePath();
-        String pDirectory = RTPBukkitPlugin.getInstance().getDataFolder().getAbsolutePath();
+
+        String pDirectory = RTP.getInstance().serverAccessor.getPluginDirectory().getAbsolutePath();
         if(myDirectory.equals(pDirectory)) {
             saveResourceFromJar(name,overwrite);
         }
@@ -195,33 +200,32 @@ public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
             else {
                 File source = new File(myDirectory + File.separator + "default.yml");
                 File target = new File(myDirectory + File.separator + name);
-                FileUtil.copy(source, target);
+                Files.copy(source.toPath(),new FileOutputStream(target.getPath()));
             }
         }
     }
 
     public void loadResource(File f) {
-        Yaml yaml = new Yaml();
-
-        Map<String,Object> dataMap;
+        Map<String,Object> yamlMap;
         if(f.exists()) {
-            InputStream inputStream;
+            yamlFile = new YamlFile(f.getPath());
             try {
-                inputStream = new FileInputStream(f);
-            } catch (FileNotFoundException e) {
+                yamlFile.loadWithComments();
+            } catch (IOException e) {
                 e.printStackTrace();
                 return;
             }
-            dataMap = yaml.load(inputStream);
+            yamlMap = yamlFile.getMapValues(false);
         }
         else {
+            new FileNotFoundException(f.getAbsolutePath()).printStackTrace();
             return;
         }
 
         for(var e : myClass.getEnumConstants()) {
             String name = e.name();
-            if(dataMap.containsKey(name)) {
-                data.put(e,dataMap.get(name));
+            if(yamlMap.containsKey(name)) {
+                data.put(e,yamlMap.get(name));
             }
         }
     }
@@ -243,6 +247,7 @@ public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
         }
 
         List<String> newLines = new ArrayList<>();
+        final Map<String, Object> yamlMap = yamlFile.getMapValues(false);
         for (int i = 0; i < linesInDefaultConfig.size(); i++) {
             String line = linesInDefaultConfig.get(i);
             StringBuilder newline;
@@ -270,7 +275,7 @@ public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
             //key without a value denotes a list or map
             if (split.length < 2) {
                 //check for a local value
-                Object value = getFromString(split[0],null);
+                Object value = yamlMap.getOrDefault(split[0],null);
                 if(value == null) continue;
 
                 //if it's a map
@@ -298,11 +303,11 @@ public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
                 e = null;
             }
 
-            Object fromString = getFromString(node, null); //todo: check this
+            Object fromString = yamlMap.get(node); //todo: check this?
             if(fromString == null) {
-                String altName = language_mapping.get(node);
+                Object altName = language_mapping.get(node);
                 if(altName!=null) {
-                    fromString = getFromString(altName,null);
+                    fromString = yamlMap.get(altName);
                 }
             }
 
@@ -366,17 +371,6 @@ public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
         }
     }
 
-    protected Object getFromString(String val, @Nullable Object def) {
-        E e;
-        try {
-            e = Enum.valueOf(myClass, val);
-        }
-        catch (IllegalArgumentException exception) {
-            return def;
-        }
-        return data.getOrDefault(e,def);
-    }
-
     @Override
     public ConfigParser<E> clone() {
         ConfigParser<E> clone = (ConfigParser<E>) super.clone();
@@ -390,57 +384,58 @@ public abstract class ConfigParser<E extends Enum<E>> extends FactoryValue<E> {
         return clone;
     }
 
-    public void set(@NotNull E key, @NotNull Object o) {
-        data.put(key,o);
-    }
-
-    @Nullable
-    public InputStream getResourceFromJar(@NotNull String filename) {
-        try {
-            URL url = classLoader.getResource(filename);
-
-            if (url == null) {
-                return null;
+    @Override
+    public void set(@NotNull E key, @NotNull Object value) throws IllegalArgumentException {
+        super.set(key,value);
+        Object o = yamlFile.get(key.name());
+        if(o instanceof ConfigurationSection section) {
+            if(value instanceof FactoryValue<?> factoryValue) {
+                EnumMap<?, Object> data = factoryValue.getData();
+                Map<String,Object> map = new HashMap<>();
+                for(var d : data.entrySet()) map.put(d.getKey().name(),d.getValue());
+                setSection(section,map);
             }
-
-            URLConnection connection = url.openConnection();
-            connection.setUseCaches(false);
-            return connection.getInputStream();
-        } catch (IOException ex) {
-            return null;
+            else if(value instanceof Map map) {
+                setSection(section,map);
+            }
+            else throw new IllegalArgumentException();
+            yamlFile.set(key.name(),section);
+        }
+        else {
+            yamlFile.set(key.name(),value);
         }
     }
 
-    public void saveResourceFromJar(@NotNull String resourcePath, boolean replace) {
-        resourcePath = resourcePath.replace('\\', '/');
-        InputStream in = getResourceFromJar(resourcePath);
-        if (in == null) {
-            throw new IllegalArgumentException("The embedded resource '" + resourcePath + "' cannot be found in RTP");
-        }
+    private static void setSection(ConfigurationSection section, Map<String,Object> map) {
+        Map<String, Object> mapValues = section.getMapValues(false);
 
-        File outFile = new File(pluginDirectory, resourcePath);
-        int lastIndex = resourcePath.lastIndexOf('/');
-        File outDir = new File(pluginDirectory, resourcePath.substring(0, lastIndex >= 0 ? lastIndex : 0));
-
-        if (!outDir.exists()) {
-            outDir.mkdirs();
-        }
-
-        try {
-            if (!outFile.exists() || replace) {
-                OutputStream out = new FileOutputStream(outFile);
-                byte[] buf = new byte[1024];
-                int len;
-                while ((len = in.read(buf)) > 0) {
-                    out.write(buf, 0, len);
+        for(var e : mapValues.entrySet()) {
+            Object o = e.getValue();
+            if(!map.containsKey(e.getKey())) continue;
+            Object value = map.get(e.getKey());
+            if(o instanceof ConfigurationSection subSection) {
+                if(value instanceof FactoryValue<?> factoryValue) {
+                    EnumMap<?, Object> data = factoryValue.getData();
+                    Map<String,Object> subMap = new HashMap<>();
+                    for(var d : data.entrySet()) subMap.put(d.getKey().name(),d.getValue());
+                    setSection(subSection,subMap);
                 }
-                out.close();
-                in.close();
-            } else {
-                RTP.log(Level.WARNING, "Could not save " + outFile.getName() + " to " + outFile + " because " + outFile.getName() + " already exists.");
+                else if(value instanceof Map subMap) {
+                    setSection(subSection,subMap);
+                }
+                else throw new IllegalArgumentException();
             }
-        } catch (IOException ex) {
-            RTP.log(Level.SEVERE, "Could not save " + outFile.getName() + " to " + outFile, ex);
+            else section.set(e.getKey(),o);
         }
+    }
+
+    public void save() throws IOException {
+        yamlFile.save(new File(pluginDirectory.getAbsolutePath()+File.separator+name));
+        yamlFile.loadWithComments();
+    }
+
+    @Override
+    public File getMainDirectory() {
+        return pluginDirectory;
     }
 }

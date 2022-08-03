@@ -21,4 +21,5 @@ V2 will take an unknown amount of time for the following reasons:
  - V1 already involves some multi-dimensional thinking, so it's hard to conceptualize the entire thing and how to redefine it.
  - Several classes in V1 currently rely on supplied methods from the bukkit/spigot server, so I want to replace a lot of those supplied methods to enforce platform-independence in the new API.
  - Java is fickle in ways I didn't expect, so there is a lot of nuance involved in implementing the new API design.
- - I want to implement a bunch of system-level changes in a single pass to ease the burden on operators.
+   - e.g. runtime factories and generics where I want to add modularity for addons.
+ - I want to implement a bunch of system-level changes in a single pass to ease the burden on operators and developers

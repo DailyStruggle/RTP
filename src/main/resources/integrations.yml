@@ -8,4 +8,7 @@ rerollRedProtect: true
 rerollTownyAdvanced: true
 rerollWorldGuard: true
 
+#additional
+useWorldGuardFlag: true
+
 version: "1.0"

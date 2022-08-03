@@ -2,8 +2,9 @@ package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.RTPServerAccessor;
-import io.github.dailystruggle.rtp.common.RTPTaskPipe;
+import io.github.dailystruggle.rtp.common.serverSide.RTPServerAccessor;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.*;
+import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
@@ -13,7 +14,6 @@ import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
-import io.github.dailystruggle.rtp.common.substitutions.*;
 import io.github.dailystruggle.rtp.common.tasks.LoadChunks;
 import org.jetbrains.annotations.Nullable;
 
@@ -31,15 +31,37 @@ public class Region extends FactoryValue<RegionKeys> {
     public static final List<BiConsumer<Region,UUID>> onPlayerQueuePop = new ArrayList<>();
 
     public static int maxBiomeChecksPerGen = 100;
-    public String name;
 
-    protected ConcurrentLinkedQueue<RTPLocation> locationQueue = new ConcurrentLinkedQueue<>();
+    /**
+     * public/shared cache for this region
+     */
+    public ConcurrentLinkedQueue<RTPLocation> locationQueue = new ConcurrentLinkedQueue<>();
     public ConcurrentHashMap<RTPLocation, ChunkSet> locAssChunks = new ConcurrentHashMap<>();
     protected ConcurrentLinkedQueue<UUID> playerQueue = new ConcurrentLinkedQueue<>();
 
+    /**
+     * When reserving/recycling locations for specific players,
+     * I want to guard against
+     */
     public ConcurrentHashMap<UUID, ConcurrentLinkedQueue<RTPLocation>> perPlayerLocationQueue = new ConcurrentHashMap<>();
 
+    /**
+     *
+     */
+    public ConcurrentHashMap<UUID, CompletableFuture<RTPLocation>> fastLocations = new ConcurrentHashMap<>();
+
+    //localized generic task for
     protected class Cache implements Runnable {
+        private UUID playerId;
+
+        public Cache() {
+            playerId = null;
+        }
+
+        public Cache(UUID playerId) {
+            this.playerId = playerId;
+        }
+
         @Override
         public void run() {
             RTPLocation location = getLocation(defaultBiomes);
@@ -51,8 +73,17 @@ public class Region extends FactoryValue<RegionKeys> {
 
                 chunkSet.whenComplete(aBoolean -> {
                     if(aBoolean) {
-                        locationQueue.add(location);
-                        locAssChunks.put(location,chunkSet);
+                        if(playerId == null) {
+                            locationQueue.add(location);
+                            locAssChunks.put(location, chunkSet);
+                        }
+                        else if(fastLocations.containsKey(playerId) && !fastLocations.get(playerId).isDone()) {
+                            fastLocations.get(playerId).complete(location);
+                        }
+                        else {
+                            perPlayerLocationQueue.putIfAbsent(playerId,new ConcurrentLinkedQueue<>());
+                            perPlayerLocationQueue.get(playerId).add(location);
+                        }
                     }
                     else chunkSet.keep(false);
                 });
@@ -62,15 +93,20 @@ public class Region extends FactoryValue<RegionKeys> {
     }
 
     public RTPTaskPipe cachePipeline = new RTPTaskPipe();
+    public RTPTaskPipe miscPipeline = new RTPTaskPipe();
 
     public void execute(long availableTime) {
+        long start = System.nanoTime();
+
+        miscPipeline.execute(availableTime);
+
         RTP instance = RTP.getInstance();
         long cacheCap = getNumber(RegionKeys.cacheCap,10L).longValue();
         cacheCap = Math.max(cacheCap,playerQueue.size());
         if(locationQueue.size()>=cacheCap) return;
         while(cachePipeline.size()<cacheCap)
             cachePipeline.add(new Cache());
-        cachePipeline.execute(availableTime);
+        cachePipeline.execute(availableTime - (System.nanoTime()-start));
 
         while (locationQueue.size() > 0 && playerQueue.size() > 0) {
             UUID playerId = playerQueue.poll();
@@ -106,9 +142,9 @@ public class Region extends FactoryValue<RegionKeys> {
     }
 
     public Region(String name, EnumMap<RegionKeys,Object> params) {
-        super(RegionKeys.class);
+        super(RegionKeys.class, name);
         this.name = name;
-        this.data = params;
+        this.data.putAll(params);
 
         Object shape = params.get(RegionKeys.shape);
         Object world = params.get(RegionKeys.world);
@@ -368,5 +404,18 @@ public class Region extends FactoryValue<RegionKeys> {
         ChunkSet chunkSet = locAssChunks.get(location);
         chunkSet.keep(false);
         locAssChunks.remove(location);
+    }
+
+    public CompletableFuture<RTPLocation> fastQueue(UUID id) {
+        if(fastLocations.containsKey(id)) return fastLocations.get(id);
+        CompletableFuture<RTPLocation> res = new CompletableFuture<>();
+        fastLocations.put(id,res);
+        miscPipeline.add(new Cache(id));
+        return res;
+    }
+
+    public void queue(UUID id) {
+        perPlayerLocationQueue.putIfAbsent(id,new ConcurrentLinkedQueue<>());
+        miscPipeline.add(new Cache(id));
     }
 }

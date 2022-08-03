@@ -11,4 +11,7 @@ nearOtherPrice: 2000.0
 #price to use biome parameter
 biomePrice: 5000.0
 
+#disallow balances below this number
+balanceFloor: 0.0
+
 version: "1.0"

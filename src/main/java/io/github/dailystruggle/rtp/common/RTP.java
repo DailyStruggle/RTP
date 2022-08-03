@@ -15,16 +15,16 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.jump.JumpAdjustor;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
-import io.github.dailystruggle.rtp.common.substitutions.RTPChunk;
+import io.github.dailystruggle.rtp.common.serverSide.RTPServerAccessor;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPChunk;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPEconomy;
+import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.concurrent.Executors;
-import java.util.function.BiConsumer;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * class to hold relevant API functions, outside of Bukkit functionality
@@ -45,17 +45,19 @@ public class RTP {
     public static int minRTPExecutions = 1;
 
     public final Configs configs;
-    public final RTPServerAccessor serverAccessor;
+    public RTPServerAccessor serverAccessor;
+    public RTPEconomy economy = null;
 
     /**
      * only one instance will exist at a time, reset on plugin load
      */
     private static RTP instance;
 
-    public RTP(@NotNull Configs configs,
-               @NotNull RTPServerAccessor serverAccessor) {
+    public RTP(@NotNull RTPServerAccessor serverAccessor) {
+        if(serverAccessor == null) throw new IllegalStateException("null serverAccessor");
+
         instance = this;
-        this.configs = configs;
+        this.configs = new Configs(serverAccessor.getPluginDirectory());
         this.serverAccessor = serverAccessor;
 
         factoryMap = new EnumMap<>(factoryNames.class);
@@ -83,7 +85,7 @@ public class RTP {
     }
 
     public static void log(Level level, String str, Exception exception) {
-        getInstance().serverAccessor.log(level, str);
+        getInstance().serverAccessor.log(level, str, exception);
     }
 
     public final SelectionAPI selectionAPI = new SelectionAPI();
@@ -97,14 +99,23 @@ public class RTP {
     public final RTPTaskPipe teleportPipeline = new RTPTaskPipe();
     public final RTPTaskPipe chunkCleanupPipeline = new RTPTaskPipe();
 
+    public final RTPTaskPipe miscSyncTasks = new RTPTaskPipe();
+    public final RTPTaskPipe miscAsyncTasks = new RTPTaskPipe();
+
+    public final RTPTaskPipe cancelTasks = new RTPTaskPipe();
+
+    public final ConcurrentSkipListSet<UUID> invulnerablePlayers = new ConcurrentSkipListSet<>();
+
     /**
      * @param availableTime when to stop, in nanos
      */
     public void executeAsyncTasks(long availableTime) {
         long start = System.nanoTime();
 
-        loadChunksPipeline.execute(availableTime);
+        cancelTasks.execute(Long.MAX_VALUE);
+        loadChunksPipeline.execute(availableTime-(start-System.nanoTime()));
         setupTeleportPipeline.execute(availableTime-(start-System.nanoTime()));
+        miscAsyncTasks.execute(availableTime-(start-System.nanoTime()));
 
         ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) configs.getParser(PerformanceKeys.class);
 
@@ -134,8 +145,10 @@ public class RTP {
     public void executeSyncTasks(long availableTime) {
         long start = System.nanoTime();
 
+        cancelTasks.execute(Long.MAX_VALUE);
         chunkCleanupPipeline.execute(availableTime);
         teleportPipeline.execute(availableTime-(start-System.nanoTime()));
+        miscSyncTasks.execute(availableTime-(start-System.nanoTime()));
     }
 
     public Map<int[], RTPChunk> forceLoads = new ConcurrentHashMap<>();
@@ -164,5 +177,9 @@ public class RTP {
         latestTeleportData.put(uuid, priorData);
 
 
+    }
+
+    public static void teleportAction(UUID playerId){
+        getInstance().serverAccessor.sendMessage(playerId,"todo: teleportAction");
     }
 }

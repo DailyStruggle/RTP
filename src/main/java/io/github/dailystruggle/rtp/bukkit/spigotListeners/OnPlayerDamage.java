@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.bukkit.spigotListeners;
 
-import leafcraft.rtp.RTP;
+import io.github.dailystruggle.rtp.common.RTP;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -13,7 +13,7 @@ public class OnPlayerDamage implements Listener {
     public void onPlayerDamage(EntityDamageEvent event) {
         Entity entity = event.getEntity();
         if(!(entity instanceof Player)) return;
-        if(!RTP.getCache().invulnerablePlayers.contains(entity.getUniqueId())) return;
+        if(!RTP.getInstance().invulnerablePlayers.contains(entity.getUniqueId())) return;
         event.setCancelled(true);
     }
 }
