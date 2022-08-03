@@ -5,8 +5,7 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import io.github.dailystruggle.rtp.bukkit.commands.commands.BaseRTPCmd;
-import io.github.dailystruggle.rtp.bukkit.commonBukkitImpl.config.BukkitMultiConfigParser;
-import io.github.dailystruggle.rtp.bukkit.commonBukkitImpl.substitutions.BukkitRTPWorld;
+import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
 import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -18,7 +17,7 @@ import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
-import io.github.dailystruggle.rtp.common.substitutions.RTPWorld;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.TPS;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
@@ -29,7 +28,6 @@ import org.jetbrains.annotations.Nullable;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
@@ -65,7 +63,7 @@ public class ReloadCmd extends BaseRTPCmd {
                     SendMessage.sendMessage(sender,name());
                     ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
                     String configValue = String.valueOf(lang.getConfigValue(LangKeys.reloading, ""));
-                    Bukkit.getLogger().log(Level.WARNING,configValue);
+                    RTP.log(Level.CONFIG,configValue);
                     SendMessage.sendMessage(sender,configValue);
                     value.check(value.version, value.pluginDirectory, null);
                     configValue = String.valueOf(lang.getConfigValue(LangKeys.reloaded, ""));
@@ -92,7 +90,6 @@ public class ReloadCmd extends BaseRTPCmd {
 
         for (Map.Entry<Class<?>, MultiConfigParser<?>> e : RTP.getInstance().configs.multiConfigParserMap.entrySet()) {
             MultiConfigParser<? extends Enum<?>> value = e.getValue();
-            Bukkit.getLogger().log(Level.WARNING,value.name);
             if(getCommandLookup().containsKey(value.name)) continue;
             addSubCommand(new BaseRTPCmd(plugin,this) {
                 @Override
@@ -134,7 +131,7 @@ public class ReloadCmd extends BaseRTPCmd {
                     instance.forceLoads.forEach((ints, chunk) -> chunk.keep(false));
                     instance.forceLoads.clear();
 
-                    BukkitMultiConfigParser<?> newParser = new BukkitMultiConfigParser<>(value.myClass, value.name, "1.0", value.pluginDirectory);
+                    MultiConfigParser<?> newParser = new MultiConfigParser<>(value.myClass, value.name, "1.0", value.pluginDirectory);
                     if(value.myClass.equals(RegionKeys.class)) {
                         for(ConfigParser<?> regionConfig : newParser.configParserFactory.map.values()) {
                             EnumMap<RegionKeys, Object> data = (EnumMap<RegionKeys, Object>) regionConfig.getData();
@@ -174,9 +171,6 @@ public class ReloadCmd extends BaseRTPCmd {
                                 data.put(RegionKeys.shape,shape);
                             }
                             else throw new IllegalArgumentException();
-                            RTP.log(Level.WARNING, shapeObj.toString());
-                            RTP.log(Level.CONFIG, data.get(RegionKeys.shape).toString());
-
 
                             Object vertObj = data.get(RegionKeys.vert);
                             if(vertObj instanceof Map vertMap) {
@@ -200,8 +194,6 @@ public class ReloadCmd extends BaseRTPCmd {
                                 data.put(RegionKeys.vert, vert);
                             }
                             else throw new IllegalArgumentException();
-                            RTP.log(Level.WARNING, vertObj.toString());
-                            RTP.log(Level.CONFIG, data.get(RegionKeys.vert).toString());
 
                             Region region = new Region(regionConfig.name.replace(".yml",""), data);
                             RTP.getInstance().selectionAPI.permRegionLookup.put(region.name,region);

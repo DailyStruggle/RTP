@@ -3,9 +3,9 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAd
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
-import io.github.dailystruggle.rtp.common.substitutions.RTPBlock;
-import io.github.dailystruggle.rtp.common.substitutions.RTPChunk;
-import io.github.dailystruggle.rtp.common.substitutions.RTPLocation;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPBlock;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPChunk;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.yaml.snakeyaml.Yaml;
@@ -23,7 +23,7 @@ public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E
     public String name;
 
     protected VerticalAdjustor(Class<E> eClass, String name, List<Predicate<RTPBlock>> verifiers, EnumMap<E,Object> def) {
-        super(eClass);
+        super(eClass, name);
         this.verifiers = verifiers;
         setData(def);
         Factory<VerticalAdjustor<?>> vertAdjustorFactory = (Factory<VerticalAdjustor<?>>) RTP.getInstance().factoryMap.get(RTP.factoryNames.vert);

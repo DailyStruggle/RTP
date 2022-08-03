@@ -1,12 +1,17 @@
 package io.github.dailystruggle.rtp.common.selection;
 
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.RTPServerAccessor;
+import io.github.dailystruggle.rtp.common.serverSide.RTPServerAccessor;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
-import io.github.dailystruggle.rtp.common.substitutions.RTPLocation;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -201,8 +206,52 @@ public class SelectionAPI {
 
         //todo: fill in factory values
 
-        Region clone = (Region) baseRegion.clone();
+        Region clone = baseRegion.clone();
         clone.setData(data);
         return clone;
+    }
+
+    public Region getRegion(RTPPlayer player) {
+        //get region from world name, check for overrides
+        Set<String> worldsAttempted = new HashSet<>();
+        Set<String> regionsAttempted = new HashSet<>();
+
+        String worldName = player.getLocation().world().name();
+        MultiConfigParser<WorldKeys> worldParsers = (MultiConfigParser<WorldKeys>) RTP.getInstance().configs.multiConfigParserMap.get(WorldKeys.class);
+        ConfigParser<WorldKeys> worldParser = worldParsers.getParser(worldName);
+        boolean requirePermission = Boolean.parseBoolean(worldParser.getConfigValue(WorldKeys.requirePermission,false).toString());
+
+        while(requirePermission && !player.hasPermission("rtp.worlds."+worldName)) {
+            if(worldsAttempted.contains(worldName)) throw new IllegalStateException("infinite override loop detected at world - " + worldName);
+            worldsAttempted.add(worldName);
+
+            worldName = String.valueOf(worldParser.getConfigValue(WorldKeys.override,"default"));
+            worldParser = worldParsers.getParser(worldName);
+            requirePermission = Boolean.parseBoolean(worldParser.getConfigValue(WorldKeys.requirePermission,false).toString());
+        }
+
+        String regionName = String.valueOf(worldParser.getConfigValue(WorldKeys.region, "default"));
+        MultiConfigParser<RegionKeys> regionParsers = (MultiConfigParser<RegionKeys>) RTP.getInstance().configs.multiConfigParserMap.get(RegionKeys.class);
+        ConfigParser<RegionKeys> regionParser = regionParsers.getParser(regionName);
+        requirePermission = Boolean.parseBoolean(regionParser.getConfigValue(RegionKeys.requirePermission,false).toString());
+
+        while(requirePermission && !player.hasPermission("rtp.regions."+regionName)) {
+            if(regionsAttempted.contains(regionName)) throw new IllegalStateException("infinite override loop detected at region - " + regionName);
+            regionsAttempted.add(regionName);
+
+            regionName = String.valueOf(regionParser.getConfigValue(RegionKeys.override,"default"));
+            regionParser = regionParsers.getParser(regionName);
+            requirePermission = Boolean.parseBoolean(regionParser.getConfigValue(RegionKeys.requirePermission,false).toString());
+        }
+        return permRegionLookup.get(regionName);
+    }
+
+    public Region getRegion(RTPWorld world) {
+        //get region from world name, check for overrides
+        String worldName = world.name();
+        MultiConfigParser<WorldKeys> worldParsers = (MultiConfigParser<WorldKeys>) RTP.getInstance().configs.multiConfigParserMap.get(WorldKeys.class);
+        ConfigParser<WorldKeys> worldParser = worldParsers.getParser(worldName);
+        String regionName = String.valueOf(worldParser.getConfigValue(WorldKeys.region, "default"));
+        return permRegionLookup.get(regionName);
     }
 }

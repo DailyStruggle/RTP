@@ -2,15 +2,14 @@ package io.github.dailystruggle.rtp.bukkit.commands.commands;
 
 import io.github.dailystruggle.commandsapi.bukkit.LocalParameters.OnlinePlayerParameter;
 import io.github.dailystruggle.commandsapi.bukkit.LocalParameters.WorldParameter;
-import io.github.dailystruggle.commandsapi.bukkit.localCommands.BukkitTreeCommand;
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import io.github.dailystruggle.rtp.bukkit.commands.commands.reload.ReloadCmd;
 import io.github.dailystruggle.rtp.bukkit.commands.parameters.RegionParameter;
 import io.github.dailystruggle.rtp.bukkit.commands.parameters.ShapeParameter;
-import io.github.dailystruggle.rtp.bukkit.commonBukkitImpl.substitutions.BukkitRTPCommandSender;
-import io.github.dailystruggle.rtp.bukkit.commonBukkitImpl.substitutions.BukkitRTPPlayer;
+import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPCommandSender;
+import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.events.TeleportCommandFailEvent;
 import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -25,7 +24,7 @@ import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
-import io.github.dailystruggle.rtp.common.substitutions.RTPWorld;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.SetupTeleport;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
@@ -40,7 +39,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
-import java.util.logging.Level;
 
 public class RTPCmd extends BaseRTPCmd {
     //for optimizing parameters,
@@ -141,7 +139,7 @@ public class RTPCmd extends BaseRTPCmd {
                 ? api.latestTeleportData.getOrDefault(((Player) sender).getUniqueId(), new TeleportData())
                 : new TeleportData();
         if(senderData.sender == null) {
-            senderData.sender = CommandsAPI.serverId;
+            senderData.sender = new BukkitRTPCommandSender(sender);
         }
 
         ConcurrentHashMap<UUID, TeleportData> latestTeleportData = RTP.getInstance().latestTeleportData;
@@ -207,10 +205,8 @@ public class RTPCmd extends BaseRTPCmd {
     @Override
     public boolean onCommand(CommandSender sender, Map<String, List<String>> rtpArgs, CommandsAPICommand nextCommand) {
         if(nextCommand!=null) {
-            Bukkit.getLogger().log(Level.WARNING,"nextCommand="+nextCommand.name());
             return true;
         }
-        Bukkit.getLogger().log(Level.WARNING,"nextCommand=null");
         RTP api = RTP.getInstance();
 
         ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) api.configs.getParser(ConfigKeys.class);

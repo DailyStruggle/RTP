@@ -42,6 +42,8 @@ vert:
   requireSkyLight: true
 #check rtp.regions.[region] node on command
 requirePermission: false
+#if no perms, try this one
+override: "default"
 #max length for the location queue per world, 0 disables normal region processing
 cacheCap: 10
 # vault price for player to use this region

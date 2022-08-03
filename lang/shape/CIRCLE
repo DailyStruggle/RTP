@@ -1,0 +1,2 @@
+{mode: mode, expand: expand, centerZ: centerZ, centerX: centerX, centerRadius: centerRadius,
+  weight: weight, radius: radius, uniquePlacements: uniquePlacements}

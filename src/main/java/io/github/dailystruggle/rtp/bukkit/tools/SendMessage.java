@@ -2,14 +2,14 @@ package io.github.dailystruggle.rtp.bukkit.tools;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
-import io.github.dailystruggle.rtp.bukkit.commonBukkitImpl.substitutions.BukkitRTPPlayer;
+import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.PAPIChecker;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
-import io.github.dailystruggle.rtp.common.substitutions.RTPCommandSender;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 import net.md_5.bungee.api.ChatColor;
 import net.md_5.bungee.api.chat.BaseComponent;
 import net.md_5.bungee.api.chat.ClickEvent;
@@ -160,7 +160,10 @@ public class SendMessage {
             if(teleportData == null) return "0";
             return String.valueOf(teleportData.queueLocation);
         });
-        placeholders.put("chunks",uuid -> String.valueOf(rtp.forceLoads.size()));
+        placeholders.put("chunks",uuid -> {
+            if(rtp == null) return "0";
+            return String.valueOf(rtp.forceLoads.size());
+        });
 
     }
 

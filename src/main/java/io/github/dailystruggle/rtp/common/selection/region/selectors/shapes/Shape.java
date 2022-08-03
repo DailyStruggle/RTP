@@ -4,7 +4,7 @@ import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
-import io.github.dailystruggle.rtp.common.substitutions.RTPLocation;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import org.jetbrains.annotations.NotNull;
 import org.yaml.snakeyaml.Yaml;
 
@@ -23,9 +23,9 @@ public abstract class Shape<E extends Enum<E>> extends FactoryValue<E> {
      * @param name - unique name of shape
      */
     public Shape(Class<E> eClass, String name, EnumMap<E,Object> data) throws IllegalArgumentException {
-        super(eClass);
+        super(eClass, name);
         this.name = name;
-        this.data = data;
+        this.data.putAll(data);
         for (E val : myClass.getEnumConstants()) {
             if(!data.containsKey(val)) throw new IllegalArgumentException(
                     "All values must be filled out on shape instantiation");

@@ -1,13 +1,11 @@
 package io.github.dailystruggle.rtp.common.playerData;
 
-import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.substitutions.RTPCommandSender;
-import io.github.dailystruggle.rtp.common.substitutions.RTPLocation;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 
 import java.util.Set;
-import java.util.UUID;
 
 public class TeleportData {
     public RTPCommandSender sender;
