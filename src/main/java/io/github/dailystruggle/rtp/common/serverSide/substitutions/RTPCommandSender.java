@@ -6,4 +6,7 @@ public interface RTPCommandSender {
     UUID uuid();
     boolean hasPermission(String permission);
     void sendMessage(String message);
+
+    long cooldown();
+    long delay();
 }

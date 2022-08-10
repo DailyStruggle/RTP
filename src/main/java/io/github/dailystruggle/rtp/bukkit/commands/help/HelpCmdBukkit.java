@@ -1,7 +1,7 @@
-package io.github.dailystruggle.rtp.bukkit.commands.commands.help;
+package io.github.dailystruggle.rtp.bukkit.commands.help;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.bukkit.commands.commands.BaseRTPCmd;
+import io.github.dailystruggle.rtp.bukkit.commands.BukkitBaseRTPCmd;
 import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -13,10 +13,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class HelpCmd extends BaseRTPCmd {
+public class HelpCmdBukkit extends BukkitBaseRTPCmd {
     private final Map<String,String> perms = new ConcurrentHashMap<>();
 
-    public HelpCmd(Plugin plugin, CommandsAPICommand parent) {
+    public HelpCmdBukkit(Plugin plugin, CommandsAPICommand parent) {
         super(plugin, parent);
 
         this.perms.put("rtp","rtp.see");

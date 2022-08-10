@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
+import io.github.dailystruggle.commandsapi.common.CommandsAPI;
+import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.*;
 import io.github.dailystruggle.rtp.common.factory.Factory;
@@ -9,6 +11,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
+import org.bukkit.Bukkit;
 import org.jetbrains.annotations.Nullable;
 import org.simpleyaml.configuration.MemorySection;
 
@@ -18,6 +21,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
 
 
 public class Configs {
@@ -54,22 +59,27 @@ public class Configs {
 
     @Nullable
     public ConfigParser<WorldKeys> getWorldParser(String worldName) {
-        MultiConfigParser<WorldKeys> multiConfigParser = (MultiConfigParser<WorldKeys>) multiConfigParserMap.get(WorldKeys.class);
-        Objects.requireNonNull(multiConfigParser);
-
         if(RTP.getInstance().serverAccessor.getRTPWorld(worldName) == null) {
             return null;
         }
+
+        MultiConfigParser<WorldKeys> multiConfigParser = (MultiConfigParser<WorldKeys>) multiConfigParserMap.get(WorldKeys.class);
+
+        Objects.requireNonNull(multiConfigParser);
 
         if(!multiConfigParser.configParserFactory.contains(worldName)) {
             multiConfigParser.addParser(new ConfigParser<>(WorldKeys.class, worldName,"1.0", multiConfigParser.myDirectory, worldLangMap));
         }
 
-        return multiConfigParser.getParser(worldName);
+        ConfigParser<WorldKeys> parser = multiConfigParser.getParser(worldName);
+
+        return parser;
     }
 
     public CompletableFuture<Boolean> reload() {
         CompletableFuture<Boolean> res = new CompletableFuture<>();
+
+        if(getParser(LangKeys.class)!=null) RTP.getInstance().serverAccessor.sendMessage(CommandsAPI.serverId,LangKeys.reloading);
 
         //ensure async to protect server timings
         RTP.getInstance().miscAsyncTasks.add(new RTPRunnable(0) {
@@ -77,6 +87,7 @@ public class Configs {
             public void run() {
                 try {
                     reloadAction();
+                    RTP.getInstance().serverAccessor.sendMessage(CommandsAPI.serverId,LangKeys.reloaded);
                     res.complete(true);
                 } catch (Exception e) { //on any code failure, complete false
                     res.complete(false);
@@ -143,7 +154,7 @@ public class Configs {
                         e.setValue(shapeMap.get(name));
                     }
                     else {
-                        String altName = shape.language_mapping.get(name);
+                        Object altName = shape.language_mapping.get(name);
                         if(altName!=null && shapeMap.containsKey(altName)) {
                             e.setValue(shapeMap.get(altName));
                         }
@@ -180,7 +191,7 @@ public class Configs {
             else throw new IllegalArgumentException();
 
             Region region = new Region(regionConfig.name.replace(".yml",""), data);
-            RTP.getInstance().selectionAPI.permRegionLookup.put(region.name,region);
+            RTP.getInstance().selectionAPI.permRegionLookup.put(region.name.toUpperCase(),region);
         }
     }
 

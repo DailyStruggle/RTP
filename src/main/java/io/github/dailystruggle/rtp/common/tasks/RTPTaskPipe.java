@@ -1,11 +1,8 @@
 package io.github.dailystruggle.rtp.common.tasks;
 
-import io.github.dailystruggle.rtp.common.tasks.RTPCancellable;
-import io.github.dailystruggle.rtp.common.tasks.RTPDelayable;
-
-import java.util.Objects;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.logging.Level;
 
 public class RTPTaskPipe {
     protected long avgTime = 0;
@@ -16,18 +13,29 @@ public class RTPTaskPipe {
         long dt = 0;
         long start = System.nanoTime();
 
-        do {
-            Runnable runnable = Objects.requireNonNull(runnables.poll());
+        List<Runnable> delayedRunnables = new ArrayList<>(runnables.size());
+
+        for(Runnable runnable : runnables) {
             if(runnable instanceof RTPDelayable RTPDelayable) {
                 long d = RTPDelayable.getDelay();
                 if(d>0) {
                     RTPDelayable.setDelay(d-1);
-                    runnables.add(runnable);
+                }
+            }
+        }
+
+        do {
+            Runnable runnable = runnables.poll();
+            if(runnable == null) continue;
+            if(runnable instanceof RTPDelayable RTPDelayable) {
+                long d = RTPDelayable.getDelay();
+                if(d>0) {
+                    delayedRunnables.add(runnable);
                     continue;
                 }
             }
 
-            if(runnable instanceof RTPCancellable RTPCancellable && RTPCancellable.isCancelled()) continue;
+            if(runnable instanceof RTPCancellable rtpCancellable && rtpCancellable.isCancelled()) continue;
 
             long localStart = System.nanoTime();
             runnable.run();
@@ -40,9 +48,9 @@ public class RTPTaskPipe {
 
             if(localStop < start) start = -(Long.MAX_VALUE-start); //overflow correction
             dt = localStop -start;
-        } while (runnables.size()>0 && dt+avgTime< availableTime);
+        } while (runnables.size()>0 && dt+avgTime<availableTime);
 
-
+        runnables.addAll(delayedRunnables);
     }
 
     public long size() {

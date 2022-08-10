@@ -10,4 +10,6 @@ public interface RTPWorld {
     CompletableFuture<RTPChunk> getChunkAt(long chunkX, long chunkZ);
 
     String getBiome(int x, int y, int z);
+
+    void platform(RTPLocation location);
 }

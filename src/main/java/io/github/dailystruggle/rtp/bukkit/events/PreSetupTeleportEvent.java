@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.bukkit.events;
 
 import io.github.dailystruggle.rtp.common.tasks.SetupTeleport;
+import org.bukkit.Bukkit;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
@@ -21,7 +22,7 @@ public class PreSetupTeleportEvent extends Event implements Cancellable {
     }
 
     public PreSetupTeleportEvent(SetupTeleport setupTeleport) {
-        super(true);
+        super(!Bukkit.isPrimaryThread());
         this.setupTeleport = setupTeleport;
     }
 

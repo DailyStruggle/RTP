@@ -1,4 +1,4 @@
-package io.github.dailystruggle.rtp.bukkit.commands.commands.info;
+package io.github.dailystruggle.rtp.bukkit.commands.info;
 
 import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;

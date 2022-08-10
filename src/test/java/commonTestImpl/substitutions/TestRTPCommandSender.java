@@ -23,4 +23,14 @@ public class TestRTPCommandSender implements RTPCommandSender {
     public void sendMessage(String message) {
         RTP.log(Level.INFO, "received: " + message);
     }
+
+    @Override
+    public long cooldown() {
+        return 0;
+    }
+
+    @Override
+    public long delay() {
+        return 0;
+    }
 }

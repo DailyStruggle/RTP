@@ -1,32 +1,32 @@
-package io.github.dailystruggle.rtp.bukkit.commands.commands.fill.subcommands;
+package io.github.dailystruggle.rtp.bukkit.commands.fill.subcommands;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.bukkit.commands.commands.BaseRTPCmd;
+import io.github.dailystruggle.rtp.bukkit.commands.BukkitBaseRTPCmd;
 import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.Plugin;
 
 import java.util.List;
 import java.util.Map;
 
-public class Start extends BaseRTPCmd {
-    public Start(Plugin plugin, CommandsAPICommand parent) {
+public class Cancel extends BukkitBaseRTPCmd {
+    public Cancel(Plugin plugin, CommandsAPICommand parent) {
         super(plugin, parent);
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
-//        FillCmd.apply(sender,parameterValues, MemoryRegion::isFilling, "fillRunning", MemoryRegion::startFill);
+//        FillCmdBukkit.apply(sender,parameterValues, teleportRegion -> !teleportRegion.isFilling(), "fillNotRunning", MemoryRegion::stopFill);
         return true;
     }
 
     @Override
     public String name() {
-        return "start";
+        return null;
     }
 
     @Override
     public String permission() {
-        return "rtp.fill";
+        return null;
     }
 
     @Override

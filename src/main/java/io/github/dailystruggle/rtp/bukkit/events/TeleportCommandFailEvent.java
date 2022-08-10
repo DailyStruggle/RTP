@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.bukkit.events;
 
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
+import org.bukkit.Bukkit;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
@@ -20,7 +21,7 @@ public class TeleportCommandFailEvent extends Event {
     }
 
     public TeleportCommandFailEvent(RTPCommandSender sender, String failMsg) {
-        super(true);
+        super(!Bukkit.isPrimaryThread());
         this.sender = sender;
         this.failMsg = failMsg;
     }

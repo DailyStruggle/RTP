@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.bukkit.events;
 
 import io.github.dailystruggle.rtp.common.tasks.LoadChunks;
+import org.bukkit.Bukkit;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
@@ -21,7 +22,7 @@ public class PreLoadChunksEvent extends Event implements Cancellable {
     }
 
     public PreLoadChunksEvent(LoadChunks loadChunks) {
-        super(true);
+        super(!Bukkit.isPrimaryThread());
         this.loadChunks = loadChunks;
     }
 

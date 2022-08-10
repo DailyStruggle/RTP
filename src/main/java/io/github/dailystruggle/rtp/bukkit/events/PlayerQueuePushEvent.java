@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.bukkit.events;
 
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import org.bukkit.Bukkit;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
@@ -22,7 +23,7 @@ public class PlayerQueuePushEvent extends Event {
     }
 
     public PlayerQueuePushEvent(Region region, UUID playerId) {
-        super(true);
+        super(!Bukkit.isPrimaryThread());
         this.region = region;
         this.playerId = playerId;
     }

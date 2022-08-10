@@ -9,4 +9,5 @@ public interface RTPBlock {
     int z();
     RTPWorld world();
     int skyLight();
+    String getMaterial();
 }

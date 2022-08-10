@@ -22,7 +22,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.logging.Level;
-import java.util.stream.Collectors;
 
 public class TestRTPServerAccessor implements RTPServerAccessor {
     private String version = null;
@@ -105,6 +104,11 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
     }
 
     @Override
+    public RTPPlayer getPlayer(String name) {
+        return new TestRTPPlayer();
+    }
+
+    @Override
     public RTPCommandSender getSender(UUID uuid) {
         return new TestRTPPlayer();
     }
@@ -164,5 +168,10 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
     @Override
     public Set<String> getBiomes() {
         return TestRTPWorld.getBiomes();
+    }
+
+    @Override
+    public boolean isPrimaryThread() {
+        return false;
     }
 }

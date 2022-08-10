@@ -1,11 +1,15 @@
 package io.github.dailystruggle.rtp.common.tasks;
 
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
+import org.apache.commons.lang3.tuple.Pair;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -13,16 +17,18 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.logging.Level;
 
 public final class SetupTeleport extends RTPRunnable {
     public static final List<Consumer<SetupTeleport>> preActions = new ArrayList<>();
     public static final List<Consumer<SetupTeleport>> postActions = new ArrayList<>();
+
     private final RTPCommandSender sender;
     private final RTPPlayer player;
     private final @NotNull Region region;
     private final @Nullable Set<String> biomes;
-    private LoadChunks loadChunks = null;
 
     public SetupTeleport(RTPCommandSender sender,
                          RTPPlayer player,
@@ -36,27 +42,58 @@ public final class SetupTeleport extends RTPRunnable {
 
     @Override
     public void run() {
+        isRunning = true;
         preActions.forEach(consumer -> consumer.accept(this));
+
+        ConfigParser<LangKeys> langParser = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+
+        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.getInstance().configs.getParser(PerformanceKeys.class);
+        boolean syncLoading = false;
+        Object configValue = perf.getConfigValue(PerformanceKeys.syncLoading, false);
+        if(configValue instanceof String s) {
+            configValue = Boolean.parseBoolean(s);
+        }
+        if(configValue instanceof Boolean b) syncLoading = b;
 
         RTP rtp = RTP.getInstance();
 
         TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.uuid());
+        if(teleportData == null) {
+            teleportData = new TeleportData();
+            teleportData.sender = sender;
+            teleportData.originalLocation = player.getLocation();
+            teleportData.time = System.nanoTime();
+            teleportData.nextTask = this;
+            teleportData.targetRegion = region;
+            teleportData.delay = sender.delay();
+            RTP.getInstance().latestTeleportData.put(player.uuid(),teleportData);
+        }
 
         teleportData.targetRegion = this.region;
 
         teleportData.originalLocation = player.getLocation();
-        RTPLocation location = this.region.getLocation(sender, player, null);
-        if (location!=null) {
-            LoadChunks loadChunks = new LoadChunks(this.sender, this.player, location, this.region);
-            this.loadChunks = loadChunks;
-            rtp.loadChunksPipeline.add(loadChunks);
+        Pair<RTPLocation, Long> pair = this.region.getLocation(sender, player, biomes);
+        if(pair == null) {
+            String msg = langParser.getConfigValue(LangKeys.unsafe,"").toString();
+            rtp.serverAccessor.sendMessage(sender.uuid(),player.uuid(),msg);
             postActions.forEach(consumer -> consumer.accept(this));
+            isRunning = false;
             return;
         }
 
-        postActions.forEach(consumer -> consumer.accept(this));
+        if(isCancelled()) return;
+        LoadChunks loadChunks = new LoadChunks(this.sender, this.player, pair.getLeft(), this.region);
+        teleportData.nextTask = loadChunks;
 
-        //todo: append player queue or load chunks
+        if(syncLoading) {
+            loadChunks.run();
+        }
+        else {
+            rtp.loadChunksPipeline.add(loadChunks);
+        }
+
+        postActions.forEach(consumer -> consumer.accept(this));
+        isRunning = false;
     }
 
     public RTPCommandSender sender() {

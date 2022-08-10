@@ -16,15 +16,15 @@ fadeOut: 1
 alreadyTeleporting: "&e[plugin] you're already teleporting!"
 # placeholder: [time] - how long before teleporting
 delayMessage: "&e[plugin] Teleporting in [time]. Don't move"
-# placeholder: [numAttempts] - number of attempts
-teleportMessage: "&e[plugin] Teleported in [numAttempts] attempts, in [time]"
+# placeholder: [attempts] - number of attempts
+teleportMessage: "&e[plugin] Teleported in [attempts] attempts, in [time]"
 chunkLoading: "&e[plugin] Loading chunks! please wait..."
 
 #if player moves
 teleportCancel: "&e[plugin] Teleport cancelled!"
 
 #if no safe places after reaching max attempts
-unsafe: "&e[plugin] could not find a safe location within [numAttempts] attempts"
+unsafe: "&e[plugin] could not find a safe location within [attempts] attempts"
 
 # placeholder: [time] - how long before player is able to teleport again
 cooldownMessage: "&e[plugin] You can't teleport again for [time]"

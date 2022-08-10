@@ -2,9 +2,6 @@ package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.serverSide.RTPServerAccessor;
-import io.github.dailystruggle.rtp.common.serverSide.substitutions.*;
-import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
@@ -14,7 +11,12 @@ import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
+import io.github.dailystruggle.rtp.common.serverSide.RTPServerAccessor;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.*;
 import io.github.dailystruggle.rtp.common.tasks.LoadChunks;
+import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
@@ -35,7 +37,7 @@ public class Region extends FactoryValue<RegionKeys> {
     /**
      * public/shared cache for this region
      */
-    public ConcurrentLinkedQueue<RTPLocation> locationQueue = new ConcurrentLinkedQueue<>();
+    public ConcurrentLinkedQueue<Pair<RTPLocation,Long>> locationQueue = new ConcurrentLinkedQueue<>();
     public ConcurrentHashMap<RTPLocation, ChunkSet> locAssChunks = new ConcurrentHashMap<>();
     protected ConcurrentLinkedQueue<UUID> playerQueue = new ConcurrentLinkedQueue<>();
 
@@ -43,16 +45,17 @@ public class Region extends FactoryValue<RegionKeys> {
      * When reserving/recycling locations for specific players,
      * I want to guard against
      */
-    public ConcurrentHashMap<UUID, ConcurrentLinkedQueue<RTPLocation>> perPlayerLocationQueue = new ConcurrentHashMap<>();
+    public ConcurrentHashMap<UUID, ConcurrentLinkedQueue<Pair<RTPLocation,Long>>> perPlayerLocationQueue = new ConcurrentHashMap<>();
 
     /**
      *
      */
-    public ConcurrentHashMap<UUID, CompletableFuture<RTPLocation>> fastLocations = new ConcurrentHashMap<>();
+    public ConcurrentHashMap<UUID, CompletableFuture<Pair<RTPLocation,Long>>> fastLocations = new ConcurrentHashMap<>();
 
     //localized generic task for
     protected class Cache implements Runnable {
-        private UUID playerId;
+        private static final long lastUpdate = 0;
+        private final UUID playerId;
 
         public Cache() {
             playerId = null;
@@ -64,8 +67,14 @@ public class Region extends FactoryValue<RegionKeys> {
 
         @Override
         public void run() {
-            RTPLocation location = getLocation(defaultBiomes);
-            if(location != null) {
+            Pair<RTPLocation, Long> pair = getLocation(null);
+            if(pair != null) {
+                RTPLocation location = pair.getLeft();
+                if(location == null) {
+                    cachePipeline.add(new Cache());
+                    return;
+                }
+
                 ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.getInstance().configs.getParser(PerformanceKeys.class);
                 long radius = perf.getNumber(PerformanceKeys.viewDistanceSelect,0L).longValue();
 
@@ -74,15 +83,15 @@ public class Region extends FactoryValue<RegionKeys> {
                 chunkSet.whenComplete(aBoolean -> {
                     if(aBoolean) {
                         if(playerId == null) {
-                            locationQueue.add(location);
-                            locAssChunks.put(location, chunkSet);
+                            locationQueue.add(pair);
+                            locAssChunks.put(pair.getLeft(), chunkSet);
                         }
                         else if(fastLocations.containsKey(playerId) && !fastLocations.get(playerId).isDone()) {
-                            fastLocations.get(playerId).complete(location);
+                            fastLocations.get(playerId).complete(pair);
                         }
                         else {
                             perPlayerLocationQueue.putIfAbsent(playerId,new ConcurrentLinkedQueue<>());
-                            perPlayerLocationQueue.get(playerId).add(location);
+                            perPlayerLocationQueue.get(playerId).add(pair);
                         }
                     }
                     else chunkSet.keep(false);
@@ -113,27 +122,23 @@ public class Region extends FactoryValue<RegionKeys> {
             RTPServerAccessor serverAccessor = instance.serverAccessor;
             RTPPlayer player = serverAccessor.getPlayer(playerId);
             if(player == null) continue;
-            RTPLocation location = locationQueue.poll();
-            if(location == null) {
+            Pair<RTPLocation, Long> pair = locationQueue.poll();
+            if(pair == null) {
                 playerQueue.add(playerId);
                 continue;
             }
 
             TeleportData teleportData = instance.latestTeleportData.get(playerId);
-            if(teleportData == null) {
-                teleportData = new TeleportData();
-                teleportData.sender = RTP.getInstance().serverAccessor.getSender(CommandsAPI.serverId);
-                teleportData.targetRegion = this;
-                teleportData.completed = true;
-            }
-
-            if(teleportData.completed) {
+            if (teleportData != null) {
                 instance.priorTeleportData.put(playerId,teleportData);
-                teleportData = new TeleportData();
             }
+            teleportData = new TeleportData();
+            teleportData.sender = RTP.getInstance().serverAccessor.getSender(CommandsAPI.serverId);
+            teleportData.targetRegion = this;
+            teleportData.attempts = pair.getRight();
 
             RTPCommandSender sender = serverAccessor.getSender(CommandsAPI.serverId);
-            LoadChunks loadChunks = new LoadChunks(sender,player,location,this);
+            LoadChunks loadChunks = new LoadChunks(sender,player,pair.getLeft(),this);
             teleportData.nextTask = loadChunks;
             instance.latestTeleportData.put(playerId,teleportData);
             instance.loadChunksPipeline.add(loadChunks);
@@ -187,43 +192,95 @@ public class Region extends FactoryValue<RegionKeys> {
         return res;
     }
 
-    @Nullable
-    public RTPLocation getLocation(RTPCommandSender sender, RTPPlayer player, @Nullable Set<String> biomeNames) {
-        RTPLocation location = null;
+    public Pair<RTPLocation, Long> getLocation(RTPCommandSender sender, RTPPlayer player, @Nullable Set<String> biomeNames) {
+        Pair<RTPLocation, Long> pair = null;
 
         UUID playerId = player.uuid();
 
         if(perPlayerLocationQueue.containsKey(playerId)) {
-            ConcurrentLinkedQueue<RTPLocation> playerLocationQueue = perPlayerLocationQueue.get(playerId);
+            ConcurrentLinkedQueue<Pair<RTPLocation, Long>> playerLocationQueue = perPlayerLocationQueue.get(playerId);
             while(playerLocationQueue.size()>0) {
-                location = playerLocationQueue.poll();
-                boolean pass = location != null;
-                pass &= RTP.getInstance().selectionAPI.checkGlobalRegionVerifiers(location);
-                if(pass) return location;
+                pair = playerLocationQueue.poll();
+                if(pair == null || pair.getLeft() == null) continue;
+                RTPLocation left = pair.getLeft();
+                boolean pass = true;
+
+                int cx = (left.x() > 0) ? left.x()/16 : left.x()/16-1;
+                int cz = (left.z() > 0) ? left.z()/16 : left.z()/16-1;
+                CompletableFuture<RTPChunk> chunkAt = left.world().getChunkAt(cx, cz);
+                RTPChunk rtpChunk;
+                try {
+                    rtpChunk = chunkAt.get();
+                } catch (InterruptedException | ExecutionException e) {
+                    e.printStackTrace();
+                    continue;
+                }
+
+                ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.getInstance().configs.getParser(SafetyKeys.class);
+                Set<String> unsafeBlocks = safety.yamlFile.getStringList("unsafeBlocks")
+                        .stream().map(String::toUpperCase).collect(Collectors.toSet());
+
+                int safetyRadius = safety.yamlFile.getInt("safetyRadius", 0);
+                safetyRadius = Math.max(safetyRadius,7);
+
+                //todo: waterlogged check
+                RTPBlock block;
+                boolean fail = false;
+                for(int x = left.x()-safetyRadius; x < left.x()+safetyRadius && !fail; x++) {
+                    for(int z = left.z()-safetyRadius; z < left.z()+safetyRadius && !fail; z++) {
+                        for(int y = left.y()-safetyRadius; y < left.y()+safetyRadius && !fail; y++) {
+                            block = rtpChunk.getBlockAt(x,y,z);
+                            if(unsafeBlocks.contains(block.getMaterial())) fail = true;
+                        }
+                    }
+                }
+
+                pass &= RTP.getInstance().selectionAPI.checkGlobalRegionVerifiers(left);
+                if(pass) return pair;
             }
         }
 
         if(locationQueue.size()>0) {
-            location = locationQueue.poll();
-            boolean pass = location != null;
-            pass &= RTP.getInstance().selectionAPI.checkGlobalRegionVerifiers(location);
-            if(pass) return location;
+            pair = locationQueue.poll();
+            if(pair == null || pair.getLeft() == null) return null;
+            RTPLocation left = pair.getLeft();
+            boolean pass = RTP.getInstance().selectionAPI.checkGlobalRegionVerifiers(left);
+            if(pass) return pair;
         }
 
         if(sender.hasPermission("rtp.unqueued")) {
-            location = getLocation(biomeNames);
+            pair = getLocation(biomeNames);
+            long attempts = pair.getRight();
+            TeleportData data = RTP.getInstance().latestTeleportData.get(playerId);
+            if(data!=null && !data.completed) {
+                data.attempts = attempts;
+            }
         }
         else {
             onPlayerQueuePush.forEach(consumer -> consumer.accept(this,playerId));
             playerQueue.add(playerId);
         }
-        return location;
+        return pair;
     }
 
     @Nullable
-    public RTPLocation getLocation(@Nullable Set<String> biomeNames) {
-        if(biomeNames == null) {
-            biomeNames = defaultBiomes;
+    public Pair<RTPLocation, Long> getLocation(@Nullable Set<String> biomeNames) {
+        boolean defaultBiomes = false;
+        if(biomeNames == null || biomeNames.size()==0) {
+            defaultBiomes = true;
+            ConfigParser<SafetyKeys> parser = (ConfigParser<SafetyKeys>) RTP.getInstance().configs.getParser(SafetyKeys.class);
+            boolean whitelist = parser.yamlFile.getBoolean("biomeWhitelist", false);
+            List<String> biomeList = parser.yamlFile.getStringList("biomes");
+            Set<String> biomeSet = (biomeList==null) ? new HashSet<>() : new HashSet<>(biomeList);
+            biomeSet = biomeSet.stream().map(String::toUpperCase).collect(Collectors.toSet());
+            if(whitelist) {
+                Set<String> finalBiomeSet = biomeSet;
+                biomeNames = RTP.getInstance().serverAccessor.getBiomes().stream().filter(
+                        s -> !finalBiomeSet.contains(s.toUpperCase())).collect(Collectors.toSet());
+            }
+            else {
+                biomeNames = biomeSet;
+            }
         }
 
         Shape<?> shape = (Shape<?>) data.get(RegionKeys.shape);
@@ -242,7 +299,8 @@ public class Region extends FactoryValue<RegionKeys> {
         RTPWorld world = (RTPWorld) data.getOrDefault(RegionKeys.world,RTP.getInstance().serverAccessor.getRTPWorlds().get(0));
 
         RTPLocation location = null;
-        for(long i = 0; i < maxAttempts; i++) {
+        long i = 0;
+        for(; i < maxAttempts; i++) {
             int[] select = shape.select();
             String currBiome = world.getBiome(select[0], (vert.maxY()+vert.minY())/2, select[1]);
 
@@ -250,7 +308,17 @@ public class Region extends FactoryValue<RegionKeys> {
                 select = shape.select();
                 currBiome = world.getBiome(select[0], (vert.maxY()+vert.minY())/2, select[1]);
             }
-            if(biomeChecks>=maxBiomeChecks) return null;
+            if(biomeChecks>=maxBiomeChecks) return new ImmutablePair<>(null,i);
+
+            if(!biomeNames.contains(currBiome)) {
+                biomeChecks++;
+                if(shape instanceof MemoryShape<?> memoryShape && defaultBiomes) {
+                    long idx = (long) memoryShape.xzToLocation(select[0], select[1]);
+                    memoryShape.removeBiomeLocation(idx,currBiome);
+                    memoryShape.addBadLocation(idx);
+                }
+                continue;
+            }
 
             CompletableFuture<RTPChunk> cfChunk = world.getChunkAt(select[0], select[1]);
 
@@ -260,10 +328,30 @@ public class Region extends FactoryValue<RegionKeys> {
                 chunk = cfChunk.get();
             } catch (InterruptedException | ExecutionException e) {
                 e.printStackTrace();
-                return null;
+                return new ImmutablePair<>(null,i);
             }
 
             location = vert.adjust(chunk);
+            if(location == null) {
+                if(shape instanceof MemoryShape<?> memoryShape) {
+                    long l = (long) memoryShape.xzToLocation(select[0], select[1]);
+                    memoryShape.addBadLocation(l);
+                    memoryShape.removeBiomeLocation(l,currBiome);
+                }
+                continue;
+            }
+
+            currBiome = world.getBiome(location.x(), location.y(), location.z());
+
+            if(!biomeNames.contains(currBiome)) {
+                biomeChecks++;
+                if(shape instanceof MemoryShape<?> memoryShape && defaultBiomes) {
+                    long idx = (long) memoryShape.xzToLocation(select[0], select[1]);
+                    memoryShape.removeBiomeLocation(idx,currBiome);
+                    memoryShape.addBadLocation(idx);
+                }
+                continue;
+            }
 
             boolean pass = location != null;
             pass &= RTP.getInstance().selectionAPI.checkGlobalRegionVerifiers(location);
@@ -284,7 +372,7 @@ public class Region extends FactoryValue<RegionKeys> {
             }
         }
 
-        return location;
+        return new ImmutablePair<>(location,i);
     }
 
     public void shutDown() {
@@ -406,9 +494,9 @@ public class Region extends FactoryValue<RegionKeys> {
         locAssChunks.remove(location);
     }
 
-    public CompletableFuture<RTPLocation> fastQueue(UUID id) {
+    public CompletableFuture<Pair<RTPLocation, Long>> fastQueue(UUID id) {
         if(fastLocations.containsKey(id)) return fastLocations.get(id);
-        CompletableFuture<RTPLocation> res = new CompletableFuture<>();
+        CompletableFuture<Pair<RTPLocation, Long>> res = new CompletableFuture<>();
         fastLocations.put(id,res);
         miscPipeline.add(new Cache(id));
         return res;

@@ -1,31 +1,24 @@
-package io.github.dailystruggle.rtp.bukkit.commands.commands.fill;
+package io.github.dailystruggle.rtp.bukkit.commands.fill;
 
 import io.github.dailystruggle.commandsapi.bukkit.localCommands.BukkitTreeCommand;
-import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.bukkit.commands.commands.BaseRTPCmd;
-import io.github.dailystruggle.rtp.bukkit.commands.commands.fill.subcommands.Cancel;
-import io.github.dailystruggle.rtp.bukkit.commands.commands.fill.subcommands.Pause;
-import io.github.dailystruggle.rtp.bukkit.commands.commands.fill.subcommands.Resume;
-import io.github.dailystruggle.rtp.bukkit.commands.commands.fill.subcommands.Start;
-import io.github.dailystruggle.rtp.bukkit.commands.parameters.RegionParameter;
-import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
-import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.bukkit.commands.BukkitBaseRTPCmd;
+import io.github.dailystruggle.rtp.bukkit.commands.fill.subcommands.Cancel;
+import io.github.dailystruggle.rtp.bukkit.commands.fill.subcommands.Pause;
+import io.github.dailystruggle.rtp.bukkit.commands.fill.subcommands.Resume;
+import io.github.dailystruggle.rtp.bukkit.commands.fill.subcommands.Start;
+import io.github.dailystruggle.rtp.common.commands.parameters.RegionParameter;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.Plugin;
 
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-public class FillCmd extends BaseRTPCmd {
-    public FillCmd(Plugin plugin, CommandsAPICommand parent) {
+public class FillCmdBukkit extends BukkitBaseRTPCmd {
+    public FillCmdBukkit(Plugin plugin, CommandsAPICommand parent) {
         super(plugin, parent);
 
         addSubCommand(new Start(plugin,this));

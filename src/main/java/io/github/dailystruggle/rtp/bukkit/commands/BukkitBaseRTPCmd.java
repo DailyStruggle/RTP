@@ -1,4 +1,4 @@
-package io.github.dailystruggle.rtp.bukkit.commands.commands;
+package io.github.dailystruggle.rtp.bukkit.commands;
 
 import io.github.dailystruggle.commandsapi.bukkit.localCommands.BukkitTreeCommand;
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
@@ -14,8 +14,8 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
 
-public abstract class BaseRTPCmd extends BukkitTreeCommand {
-    public BaseRTPCmd(Plugin plugin, @Nullable CommandsAPICommand parent) {
+public abstract class BukkitBaseRTPCmd extends BukkitTreeCommand implements io.github.dailystruggle.rtp.common.commands.BaseRTPCmd {
+    public BukkitBaseRTPCmd(Plugin plugin, @Nullable CommandsAPICommand parent) {
         super(plugin, parent);
     }
 

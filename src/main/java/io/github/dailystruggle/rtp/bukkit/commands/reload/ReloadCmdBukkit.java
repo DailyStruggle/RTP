@@ -1,10 +1,10 @@
-package io.github.dailystruggle.rtp.bukkit.commands.commands.reload;
+package io.github.dailystruggle.rtp.bukkit.commands.reload;
 
 import io.github.dailystruggle.commandsapi.bukkit.localCommands.BukkitTreeCommand;
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
-import io.github.dailystruggle.rtp.bukkit.commands.commands.BaseRTPCmd;
+import io.github.dailystruggle.rtp.bukkit.commands.BukkitBaseRTPCmd;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
 import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -17,13 +17,16 @@ import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
+import io.github.dailystruggle.rtp.common.serverSide.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.TPS;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.Nullable;
+import org.simpleyaml.configuration.MemorySection;
 
 import java.util.EnumMap;
 import java.util.List;
@@ -31,8 +34,8 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
-public class ReloadCmd extends BaseRTPCmd {
-    public ReloadCmd(Plugin plugin, @Nullable CommandsAPICommand parent) {
+public class ReloadCmdBukkit extends BukkitBaseRTPCmd {
+    public ReloadCmdBukkit(Plugin plugin, @Nullable CommandsAPICommand parent) {
         super(plugin, parent);
         Bukkit.getScheduler().runTaskLater(plugin, this::addCommands,10);
     }
@@ -54,20 +57,18 @@ public class ReloadCmd extends BaseRTPCmd {
     }
 
     void addCommands() {
+        final RTPServerAccessor serverAccessor = RTP.getInstance().serverAccessor;
         for (ConfigParser<?> value : RTP.getInstance().configs.configParserMap.values()) {
             String name = value.name.replace(".yml","");
             if(getCommandLookup().containsKey(name)) continue;
-            addSubCommand(new BaseRTPCmd(plugin, this) {
+            addSubCommand(new BukkitBaseRTPCmd(plugin, this) {
                 @Override
                 public boolean onCommand(CommandSender sender, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
-                    SendMessage.sendMessage(sender,name());
-                    ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
-                    String configValue = String.valueOf(lang.getConfigValue(LangKeys.reloading, ""));
-                    RTP.log(Level.CONFIG,configValue);
-                    SendMessage.sendMessage(sender,configValue);
+                    serverAccessor.sendMessage(CommandsAPI.serverId,LangKeys.reloading);
+                    if(sender instanceof Player player) serverAccessor.sendMessage(player.getUniqueId(),LangKeys.reloading);
                     value.check(value.version, value.pluginDirectory, null);
-                    configValue = String.valueOf(lang.getConfigValue(LangKeys.reloaded, ""));
-                    SendMessage.sendMessage(sender,configValue);
+                    serverAccessor.sendMessage(CommandsAPI.serverId,LangKeys.reloaded);
+                    if(sender instanceof Player player) serverAccessor.sendMessage(player.getUniqueId(),LangKeys.reloaded);
                     return true;
                 }
 
@@ -91,13 +92,11 @@ public class ReloadCmd extends BaseRTPCmd {
         for (Map.Entry<Class<?>, MultiConfigParser<?>> e : RTP.getInstance().configs.multiConfigParserMap.entrySet()) {
             MultiConfigParser<? extends Enum<?>> value = e.getValue();
             if(getCommandLookup().containsKey(value.name)) continue;
-            addSubCommand(new BaseRTPCmd(plugin,this) {
+            addSubCommand(new BukkitBaseRTPCmd(plugin,this) {
                 @Override
                 public boolean onCommand(CommandSender sender, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
-                    SendMessage.sendMessage(sender,name());
-                    ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
-                    String configValue = String.valueOf(lang.getConfigValue(LangKeys.reloading, ""));
-                    SendMessage.sendMessage(sender,configValue);
+                    serverAccessor.sendMessage(CommandsAPI.serverId,LangKeys.reloading);
+                    if(sender instanceof Player player) serverAccessor.sendMessage(player.getUniqueId(),LangKeys.reloading);
 
                     final RTP instance = RTP.getInstance();
                     final RTPBukkitPlugin bukkitPlugin = RTPBukkitPlugin.getInstance();
@@ -142,7 +141,7 @@ public class ReloadCmd extends BaseRTPCmd {
                                 int num = Integer.parseInt(worldName.substring(1,worldName.length()-1));
                                 world = new BukkitRTPWorld(Bukkit.getWorlds().get(num));
                             }
-                            else world = RTP.getInstance().serverAccessor.getRTPWorld(worldName);
+                            else world = serverAccessor.getRTPWorld(worldName);
                             if(world == null) {
                                 new IllegalArgumentException("world not found - " + worldName).printStackTrace(); //don't need to throw
                                 continue;
@@ -150,10 +149,12 @@ public class ReloadCmd extends BaseRTPCmd {
                             data.put(RegionKeys.world,world);
 
                             Object shapeObj = data.get(RegionKeys.shape);
-                            if(shapeObj instanceof Map shapeMap) {
+                            Shape<?> shape;
+                            if(shapeObj instanceof MemorySection shapeSection) {
+                                final Map<String, Object> shapeMap = shapeSection.getMapValues(true);
                                 String shapeName = String.valueOf(shapeMap.get("name"));
                                 Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.getInstance().factoryMap.get(RTP.factoryNames.shape);
-                                Shape<?> shape = (Shape<?>) factory.getOrDefault(shapeName);
+                                shape = (Shape<?>) factory.getOrDefault(shapeName);
                                 EnumMap<?, Object> shapeData = shape.getData();
                                 for(var e : shapeData.entrySet()) {
                                     String name = e.getKey().name();
@@ -161,7 +162,7 @@ public class ReloadCmd extends BaseRTPCmd {
                                         e.setValue(shapeMap.get(name));
                                     }
                                     else {
-                                        String altName = shape.language_mapping.get(name);
+                                        String altName = shape.language_mapping.get(name).toString();
                                         if(altName!=null && shapeMap.containsKey(altName)) {
                                             e.setValue(shapeMap.get(altName));
                                         }
@@ -170,10 +171,12 @@ public class ReloadCmd extends BaseRTPCmd {
                                 shape.setData(shapeData);
                                 data.put(RegionKeys.shape,shape);
                             }
-                            else throw new IllegalArgumentException();
+                            else throw new IllegalArgumentException("shape was not a section\n" + shapeObj);
+
 
                             Object vertObj = data.get(RegionKeys.vert);
-                            if(vertObj instanceof Map vertMap) {
+                            if(vertObj instanceof MemorySection vertSection) {
+                                final Map<String, Object> vertMap = vertSection.getMapValues(true);
                                 String shapeName = String.valueOf(vertMap.get("name"));
                                 Factory<VerticalAdjustor<?>> factory = (Factory<VerticalAdjustor<?>>) RTP.getInstance().factoryMap.get(RTP.factoryNames.vert);
                                 VerticalAdjustor<?> vert = (VerticalAdjustor<?>) factory.getOrDefault(shapeName);
@@ -251,8 +254,9 @@ public class ReloadCmd extends BaseRTPCmd {
                         }
                     }, 80, 1);
 
-                    configValue = String.valueOf(lang.getConfigValue(LangKeys.reloaded, ""));
-                    SendMessage.sendMessage(sender,configValue);
+                    serverAccessor.sendMessage(CommandsAPI.serverId,LangKeys.reloaded);
+                    if(sender instanceof Player player) serverAccessor.sendMessage(player.getUniqueId(),LangKeys.reloaded);
+
 
                     return true;
                 }
