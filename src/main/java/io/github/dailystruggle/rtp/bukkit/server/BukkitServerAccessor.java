@@ -7,34 +7,41 @@ import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
 import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
-import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
-import io.github.dailystruggle.rtp.common.serverSide.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
-import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
+import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
+import io.github.dailystruggle.rtp.common.serverSide.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public class BukkitServerAccessor implements RTPServerAccessor {
+    private long t = System.nanoTime();
+
     private String version = null;
     private Integer intVersion = null;
 
     Function<String,Shape<?>> shapeFunction;
+
+    private final Map<UUID,RTPWorld> worlds = new ConcurrentHashMap<>(Bukkit.getWorlds().size());
 
     public BukkitServerAccessor() {
         //run later to ensure RTP instance exists
@@ -126,9 +133,17 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     }
 
     @Override
+    public RTPPlayer getPlayer(String name) {
+        Player player = Bukkit.getPlayer(name);
+        if(player == null) return null;
+        return new BukkitRTPPlayer(player);
+    }
+
+    @Override
     public RTPCommandSender getSender(UUID uuid) {
         CommandSender commandSender = (uuid == CommandsAPI.serverId) ? Bukkit.getConsoleSender() : Bukkit.getPlayer(uuid);
         if(commandSender == null) return null;
+        if(commandSender instanceof Player player) return new BukkitRTPPlayer(player);
         return new BukkitRTPCommandSender(commandSender);
     }
 
@@ -145,6 +160,7 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     @Override
     public void sendMessage(UUID target, LangKeys msgType) {
         ConfigParser<LangKeys> parser = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+        if(parser == null) return;
         String msg = String.valueOf(parser.getConfigValue(msgType,""));
         if(msg == null || msg.isBlank()) return;
         sendMessage(target, msg);
@@ -191,5 +207,10 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     @Override
     public Set<String> getBiomes() {
         return BukkitRTPWorld.getBiomes();
+    }
+
+    @Override
+    public boolean isPrimaryThread() {
+        return Bukkit.isPrimaryThread();
     }
 }

@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.bukkit.events;
 
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
+import org.bukkit.Bukkit;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
@@ -21,7 +22,7 @@ public class TeleportCommandSuccessEvent extends Event {
     }
 
     public TeleportCommandSuccessEvent(RTPCommandSender sender, RTPPlayer player) {
-        super(true);
+        super(!Bukkit.isPrimaryThread());
         this.sender = sender;
         this.player = player;
     }

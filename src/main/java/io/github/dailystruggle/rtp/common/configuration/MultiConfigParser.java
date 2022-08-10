@@ -1,13 +1,12 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
-import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.*;
+import java.io.File;
 import java.util.EnumMap;
 
 public class MultiConfigParser<E extends Enum<E>>  extends FactoryValue<E> implements ConfigLoader {
@@ -27,7 +26,6 @@ public class MultiConfigParser<E extends Enum<E>>  extends FactoryValue<E> imple
         if(!this.myDirectory.exists() && !myDirectory.mkdir()) return;
 
         File d = new File(myDirectory.getAbsolutePath() + File.separator + "default.yml");
-        System.out.println(d.getAbsolutePath());
         if(!d.exists()) {
             saveResourceFromJar(name + File.separator + "default.yml",true);
         }
@@ -52,6 +50,7 @@ public class MultiConfigParser<E extends Enum<E>>  extends FactoryValue<E> imple
     @NotNull
     public ConfigParser<E> getParser(String name) {
         name = name.toUpperCase();
+        if(!name.endsWith(".YML")) name = name + ".YML";
         //todo: check for additional file
         //todo: in worlds parser, check for additional worlds
         ConfigParser<E> parser;
@@ -67,6 +66,8 @@ public class MultiConfigParser<E extends Enum<E>>  extends FactoryValue<E> imple
     }
 
     public void addParser(String name, @Nullable EnumMap<E,Object> data) {
+        name = name.toUpperCase();
+        if(!name.endsWith(".YML")) name = name + ".YML";
         ConfigParser<E> value = (ConfigParser<E>) configParserFactory.construct(name, data);
         configParserFactory.add(name, value);
     }

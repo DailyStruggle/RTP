@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.factory;
 
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -24,12 +25,15 @@ public class Factory<T extends FactoryValue<?>> {
     }
 
     public boolean contains(String name) {
-        return map.containsKey(name.toUpperCase());
+        name = name.toUpperCase();
+        if(!name.endsWith(".YML")) name = name + ".YML";
+        return map.containsKey(name);
     }
 
     @Nullable
     public FactoryValue<?> construct(String name, EnumMap<? extends Enum<?>,Object> data) {
         name = name.toUpperCase();
+        if(!name.endsWith(".YML")) name = name + ".YML";
         //guard constructor
         T value = map.get(name);
         if(value == null) {
@@ -52,12 +56,20 @@ public class Factory<T extends FactoryValue<?>> {
     @Nullable
     public FactoryValue<?> construct(String name) {
         name = name.toUpperCase();
+        if(!name.endsWith(".YML")) name = name + ".YML";
         //guard constructor
         T value = map.get(name);
         if(value == null) {
-            if(map.containsKey("default")) {
-                value = (T) construct("default");
-                map.put(name, value);
+            if(map.containsKey("DEFAULT.YML")) {
+                value = map.get("DEFAULT.YML");
+                T clone = (T) value.clone();
+                clone.name=name;
+
+                if(clone instanceof ConfigParser configParser) {
+                    configParser.check(configParser.version,configParser.pluginDirectory,null);
+                }
+
+                map.put(name, clone);
             }
             else return null;
         }

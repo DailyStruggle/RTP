@@ -60,7 +60,7 @@ public class Glide implements CommandExecutor {
         String playerName;
         if(!glideArgs.containsKey("player")) {
             if(!(sender instanceof Player)) {
-                Bukkit.getLogger().warning("glide needs a player argument");
+                RTP.log(Level.WARNING, "glide needs a player argument");
                 return true;
             }
             else playerName = sender.getName();

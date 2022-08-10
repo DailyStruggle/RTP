@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.bukkit.events;
 
+import org.bukkit.Bukkit;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
@@ -11,12 +12,7 @@ public class TeleportCancelEvent extends Event {
     private static final HandlerList HANDLERS_LIST = new HandlerList();
 
     public TeleportCancelEvent(UUID playerId) {
-        super(false);
-        this.playerId = playerId;
-    }
-
-    public TeleportCancelEvent(UUID playerId, boolean isAsync) {
-        super(isAsync);
+        super(!Bukkit.isPrimaryThread());
         this.playerId = playerId;
     }
 

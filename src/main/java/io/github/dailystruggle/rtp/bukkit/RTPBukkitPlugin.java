@@ -4,17 +4,21 @@ import io.github.dailystruggle.commandsapi.bukkit.localCommands.BukkitTreeComman
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.effectsapi.EffectFactory;
 import io.github.dailystruggle.effectsapi.EffectsAPI;
-import io.github.dailystruggle.rtp.bukkit.commands.commands.RTPCmd;
+import io.github.dailystruggle.rtp.bukkit.commands.RTPCmdBukkit;
+import io.github.dailystruggle.rtp.bukkit.events.*;
 import io.github.dailystruggle.rtp.bukkit.server.BukkitServerAccessor;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
-import io.github.dailystruggle.rtp.bukkit.events.*;
+import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
 import io.github.dailystruggle.rtp.bukkit.spigotListeners.*;
+import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.tasks.*;
 import io.papermc.lib.PaperLib;
 import org.bstats.bukkit.Metrics;
@@ -38,7 +42,7 @@ import java.util.concurrent.TimeUnit;
 public final class RTPBukkitPlugin extends JavaPlugin {
     private static RTPBukkitPlugin instance = null;
     private static Metrics metrics;
-    private static EffectsAPI effectsAPI = null;
+    private static final EffectsAPI effectsAPI = null;
 
     public static RTPBukkitPlugin getInstance() {
         return instance;
@@ -63,25 +67,16 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         instance = this;
         new RTP(new BukkitServerAccessor()); //constructor updates API instance
 
-        BukkitTreeCommand mainCommand = new RTPCmd(this);
+        BukkitTreeCommand mainCommand = new RTPCmdBukkit(this);
         Objects.requireNonNull(getCommand("rtp")).setExecutor(mainCommand);
         Objects.requireNonNull(getCommand("rtp")).setTabCompleter(mainCommand);
         Objects.requireNonNull(getCommand("wild")).setExecutor(mainCommand);
         Objects.requireNonNull(getCommand("wild")).setTabCompleter(mainCommand);
 
-        commandTimer = Bukkit.getScheduler().runTaskTimer(this, () -> {
+        commandTimer = Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
             long avgTime = TPS.timeSinceTick(20) / 20;
             long currTime = TPS.timeSinceTick(1);
-
-            if(commandProcessing == null) {
-                commandProcessing = Bukkit.getScheduler().runTaskAsynchronously(
-                        RTPBukkitPlugin.getInstance(),
-                        () -> {
-                            CommandsAPI.execute(avgTime - currTime);
-                            RTPBukkitPlugin.getInstance().commandProcessing = null;
-                        }
-                );
-            }
+            CommandsAPI.execute(avgTime - currTime);
         }, 40, 1);
 
         teleportTimer = Bukkit.getScheduler().runTaskTimer(this, () -> {
@@ -114,7 +109,18 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             }
         }, 80, 1);
 
+        setupBukkitEvents();
+
         Bukkit.getScheduler().runTaskTimer(this, new TPS(),0,1);
+
+        RTP.getInstance().executeSyncTasks(Long.MAX_VALUE);
+        RTP.getInstance().executeAsyncTasks(Long.MAX_VALUE);
+
+        SendMessage.sendMessage(null,null);
+        Bukkit.getScheduler().runTask(this,() -> {
+            BukkitRTPWorld bukkitRTPWorld = new BukkitRTPWorld(Bukkit.getWorlds().get(0));
+            bukkitRTPWorld.platform(new RTPLocation(bukkitRTPWorld,0,0,0));
+        });
     }
 
     @Override
@@ -199,10 +205,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         });
 
         RTPTeleportCancel.postActions.add(rtpTeleportCancel -> {
-            if(Bukkit.isPrimaryThread())
-                Bukkit.getPluginManager().callEvent(new TeleportCancelEvent(rtpTeleportCancel.getPlayerId()));
-            else
-                Bukkit.getPluginManager().callEvent(new TeleportCancelEvent(rtpTeleportCancel.getPlayerId(),true));
+            Bukkit.getPluginManager().callEvent(new TeleportCancelEvent(rtpTeleportCancel.getPlayerId()));
         });
 
         Region.onPlayerQueuePush.add((region, uuid) -> {
@@ -224,10 +227,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new OnPlayerRespawn(), this);
         Bukkit.getPluginManager().registerEvents(new OnPlayerTeleport(), this);
 
-        if(effectsAPI == null) effectsAPI = EffectsAPI.getInstance();
-        if(effectsAPI == null) {
-            effectsAPI = new EffectsAPI(this);
-        }
+        EffectsAPI.init(this);
     }
 
     public static Region getRegion(Player player) {

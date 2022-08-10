@@ -2,17 +2,10 @@ import commonTestImpl.TestRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
-import io.github.dailystruggle.rtp.common.factory.FactoryValue;
-import org.junit.Assert;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.simpleyaml.configuration.file.YamlFile;
 
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
 public class TestConfig {
     @Test

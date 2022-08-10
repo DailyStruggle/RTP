@@ -3,8 +3,10 @@ package io.github.dailystruggle.rtp.common.tasks;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,10 +26,15 @@ public final class RTPTeleportCancel extends RTPRunnable {
     public void run() {
         preActions.forEach(rtpTeleportCancelConsumer -> rtpTeleportCancelConsumer.accept(this));
 
+        ConfigParser<EconomyKeys> eco = (ConfigParser<EconomyKeys>) RTP.getInstance().configs.configParserMap.get(EconomyKeys.class);
+        Object configValue = eco.getConfigValue(EconomyKeys.refundOnCancel, true);
+        boolean refund = Boolean.getBoolean(configValue.toString());
+
         //check if teleporting
         TeleportData data = RTP.getInstance().latestTeleportData.get(playerId);
         if(data == null) return;
         if(data.completed) return;
+        if(data.nextTask == null) return;
 
         //check no-cancel permission
         RTPPlayer player = RTP.getInstance().serverAccessor.getPlayer(playerId);
@@ -36,7 +43,7 @@ public final class RTPTeleportCancel extends RTPRunnable {
         data.nextTask.setCancelled(true);
 
         //dump location back onto the pile
-        data.targetRegion.locationQueue.add(data.selectedLocation);
+        if(data.selectedLocation!=null) data.targetRegion.locationQueue.add(new ImmutablePair<>(data.selectedLocation,data.attempts));
 
         //reset player data
         TeleportData repData = RTP.getInstance().priorTeleportData.get(playerId);
@@ -47,13 +54,16 @@ public final class RTPTeleportCancel extends RTPRunnable {
             RTP.getInstance().latestTeleportData.remove(playerId);
 
         if(RTP.getInstance().economy!=null && data.cost != 0.0) {
-            ConfigParser<EconomyKeys> eco = (ConfigParser<EconomyKeys>) RTP.getInstance().configs.configParserMap.get(EconomyKeys.class);
-            Object configValue = eco.getConfigValue(EconomyKeys.refundOnCancel, true);
-            boolean refund = Boolean.getBoolean(configValue.toString());
             if (refund && data.sender instanceof RTPPlayer player1) {
                 RTP.getInstance().economy.give(player1.uuid(),data.cost);
             }
         }
+
+        RTP.getInstance().processingPlayers.remove(playerId);
+
+        ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+        String msg = lang.getConfigValue(LangKeys.teleportCancel,"").toString();
+        RTP.getInstance().serverAccessor.sendMessage(playerId,msg);
 
         postActions.forEach(rtpTeleportCancelConsumer -> rtpTeleportCancelConsumer.accept(this));
     }

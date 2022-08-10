@@ -30,6 +30,16 @@ public record BukkitRTPPlayer(Player player) implements RTPPlayer {
     }
 
     @Override
+    public long cooldown() {
+        return new BukkitRTPCommandSender(player).cooldown();
+    }
+
+    @Override
+    public long delay() {
+        return new BukkitRTPCommandSender(player).delay();
+    }
+
+    @Override
     public CompletableFuture<Boolean> setLocation(RTPLocation to) {
         World world = ((BukkitRTPWorld)to.world()).world();
         if(Bukkit.isPrimaryThread()) {

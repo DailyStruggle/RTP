@@ -6,7 +6,6 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import org.bukkit.block.Block;
 
 public record BukkitRTPBlock(Block block) implements RTPBlock {
-
     @Override
     public RTPLocation getLocation() {
         return new RTPLocation(new BukkitRTPWorld(block.getWorld()), block.getX(), block.getY(), block.getZ());
@@ -14,7 +13,7 @@ public record BukkitRTPBlock(Block block) implements RTPBlock {
 
     @Override
     public boolean isAir() {
-        return !(block.isLiquid() || block.getType().isSolid());
+        return block.isEmpty();
     }
 
     @Override
@@ -40,5 +39,10 @@ public record BukkitRTPBlock(Block block) implements RTPBlock {
     @Override
     public int skyLight() {
         return block.getLightFromSky();
+    }
+
+    @Override
+    public String getMaterial() {
+        return block.getType().name();
     }
 }

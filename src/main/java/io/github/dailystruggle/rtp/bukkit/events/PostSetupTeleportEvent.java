@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.bukkit.events;
 
 import io.github.dailystruggle.rtp.common.tasks.SetupTeleport;
+import org.bukkit.Bukkit;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
@@ -19,7 +20,7 @@ public class PostSetupTeleportEvent extends Event {
     }
 
     public PostSetupTeleportEvent(SetupTeleport setupTeleport) {
-        super(true);
+        super(!Bukkit.isPrimaryThread());
         this.setupTeleport = setupTeleport;
     }
 

@@ -6,9 +6,10 @@ import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import org.jetbrains.annotations.NotNull;
-import org.yaml.snakeyaml.Yaml;
+import org.simpleyaml.configuration.file.YamlFile;
 
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiPredicate;
@@ -32,7 +33,11 @@ public abstract class Shape<E extends Enum<E>> extends FactoryValue<E> {
         }
         Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.getInstance().factoryMap.get(RTP.factoryNames.shape);
         if (!factory.contains(name)) factory.add(name,this);
-        loadLangFile();
+        try {
+            loadLangFile();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -51,10 +56,12 @@ public abstract class Shape<E extends Enum<E>> extends FactoryValue<E> {
         return (Shape<E>) super.clone();
     }
 
-    public Map<String,String> language_mapping = new ConcurrentHashMap<>();
+    public Map<String, Object> language_mapping = new ConcurrentHashMap<>();
     public Map<String,String> reverse_language_mapping = new ConcurrentHashMap<>();
 
-    protected void loadLangFile() {
+    protected void loadLangFile() throws IOException {
+        String name = this.name;
+        if(!name.endsWith(".yml")) name = name + ".yml";
         File langFile;
         String langDirStr = RTP.getInstance().serverAccessor.getPluginDirectory().getAbsolutePath()
                 + File.separator
@@ -71,30 +78,16 @@ public abstract class Shape<E extends Enum<E>> extends FactoryValue<E> {
                 + name.replace(".yml", ".lang.yml");
         langFile = new File(mapFileName);
 
-        Yaml langYaml = new Yaml();
+        YamlFile langYaml = new YamlFile(langFile);
         for (String key : keys()) { //default data, to guard exceptions
             language_mapping.put(key,key);
             reverse_language_mapping.put(key,key);
         }
         if(langFile.exists()) {
-            InputStream inputStream;
-            try {
-                inputStream = new FileInputStream(langFile);
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-                return;
-            }
-            language_mapping = langYaml.load(inputStream);
+            langYaml.loadWithComments();
         }
         else {
-            PrintWriter writer;
-            try {
-                writer = new PrintWriter(langFile);
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-                return;
-            }
-            langYaml.dump(language_mapping,writer);
+            langYaml.save(langFile);
         }
     }
 }

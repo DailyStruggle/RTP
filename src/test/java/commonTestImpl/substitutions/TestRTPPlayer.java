@@ -3,7 +3,6 @@ package commonTestImpl.substitutions;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 public class TestRTPPlayer extends TestRTPCommandSender implements RTPPlayer {

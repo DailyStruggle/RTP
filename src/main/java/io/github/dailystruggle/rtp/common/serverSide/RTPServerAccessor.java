@@ -51,6 +51,7 @@ public interface RTPServerAccessor {
     List<RTPWorld> getRTPWorlds();
 
     RTPPlayer getPlayer(UUID uuid);
+    RTPPlayer getPlayer(String name);
 
     RTPCommandSender getSender(UUID uuid);
 
@@ -74,4 +75,6 @@ public interface RTPServerAccessor {
     void log(Level level, String msg, Exception exception);
 
     Set<String> getBiomes();
+
+    boolean isPrimaryThread();
 }

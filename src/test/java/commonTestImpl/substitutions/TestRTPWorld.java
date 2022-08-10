@@ -1,6 +1,7 @@
 package commonTestImpl.substitutions;
 
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPChunk;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 
 import java.util.HashSet;
@@ -9,7 +10,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 public class TestRTPWorld implements RTPWorld {
-    private static UUID id = UUID.randomUUID();
+    private static final UUID id = UUID.randomUUID();
 
     @Override
     public String name() {
@@ -29,6 +30,11 @@ public class TestRTPWorld implements RTPWorld {
     @Override
     public String getBiome(int x, int y, int z) {
         return null;
+    }
+
+    @Override
+    public void platform(RTPLocation location) {
+
     }
 
     public static Set<String> getBiomes() {

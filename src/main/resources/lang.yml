@@ -1,7 +1,7 @@
 #logs and command responses
 #todo: split this
 
-plugin: "[plugin]"
+plugin: "[RTP]"
 
 #show title
 # set title to "" to disable
@@ -14,10 +14,8 @@ fadeOut: 1
 
 #when teleporting, say this
 alreadyTeleporting: "&e[plugin] you're already teleporting!"
-# placeholder: [time] - how long before teleporting
-delayMessage: "&e[plugin] Teleporting in [time]. Don't move"
-# placeholder: [numAttempts] - number of attempts
-teleportMessage: "&e[plugin] Teleported in [numAttempts] attempts, in [time]"
+delayMessage: "&e[plugin] Teleporting in [delay]. Don't move"
+teleportMessage: "&e[plugin] Teleported in [attempts] attempts, in [processingTime]"
 chunkLoading: "&e[plugin] Loading chunks! please wait..."
 
 #if player moves
@@ -27,7 +25,7 @@ teleportCancel: "&e[plugin] Teleport cancelled!"
 unsafe: "&e[plugin] could not find a safe location within [numAttempts] attempts"
 
 # placeholder: [time] - how long before player is able to teleport again
-cooldownMessage: "&e[plugin] You can't teleport again for [time]"
+cooldownMessage: "&e[plugin] You can't teleport again for [remainingCooldown]"
 
 #if the region doesn't have any locations queued and the player doesn't have rtp.unqueued permission
 noLocationsQueued: "#f5eb73[plugin] no locations ready at this time"

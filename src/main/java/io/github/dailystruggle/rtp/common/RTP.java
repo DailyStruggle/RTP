@@ -175,8 +175,6 @@ public class RTP {
             priorData.cost = teleportData.cost;
         }
         latestTeleportData.put(uuid, priorData);
-
-
     }
 
     public static void teleportAction(UUID playerId){

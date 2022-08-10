@@ -28,7 +28,9 @@ public class TeleportData {
 
     public RTPRunnable nextTask = null;
 
-    public long numAttempts = 0;
+    public long attempts = 0;
 
     public long queueLocation = 0;
+
+    public long processingTime = 0;
 }

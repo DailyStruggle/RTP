@@ -4,6 +4,8 @@ public abstract class RTPRunnable implements Runnable, RTPCancellable, RTPDelaya
     private boolean cancelled;
     private long delay = 0;
 
+    protected boolean isRunning = false;
+
     public RTPRunnable() {
 
     }
@@ -30,5 +32,9 @@ public abstract class RTPRunnable implements Runnable, RTPCancellable, RTPDelaya
     @Override
     public long getDelay() {
         return delay;
+    }
+
+    public boolean isRunning() {
+        return isRunning;
     }
 }

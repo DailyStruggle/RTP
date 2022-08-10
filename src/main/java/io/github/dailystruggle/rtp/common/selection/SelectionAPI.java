@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection;
 
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.serverSide.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
@@ -9,6 +8,7 @@ import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
+import io.github.dailystruggle.rtp.common.serverSide.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
@@ -100,10 +100,7 @@ public class SelectionAPI {
      */
     @Nullable
     public Region getRegion(String regionName) {
-        String regionNameCaps = regionName.toUpperCase();
-        Region res = permRegionLookup.get(regionName);
-        //todo: exception version
-        return res;
+        return permRegionLookup.get(regionName.toUpperCase());
     }
 
 
@@ -140,7 +137,7 @@ public class SelectionAPI {
         regionName = regionName.toUpperCase();
         defaultName = defaultName.toUpperCase();
         Region region = permRegionLookup.getOrDefault(regionName, permRegionLookup.get(defaultName));
-        if(region == null) throw new IllegalStateException("neither '" + regionName + "' nor '" + defaultName + "' are known regions");
+        if(region == null) throw new IllegalStateException("neither '" + regionName + "' nor '" + defaultName + "' are known regions\n" + permRegionLookup);
         return Objects.requireNonNull(region);
     }
 
@@ -243,7 +240,7 @@ public class SelectionAPI {
             regionParser = regionParsers.getParser(regionName);
             requirePermission = Boolean.parseBoolean(regionParser.getConfigValue(RegionKeys.requirePermission,false).toString());
         }
-        return permRegionLookup.get(regionName);
+        return getRegion(regionName);
     }
 
     public Region getRegion(RTPWorld world) {

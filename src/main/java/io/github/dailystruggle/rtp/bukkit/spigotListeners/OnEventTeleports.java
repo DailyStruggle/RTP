@@ -14,6 +14,7 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tasks.SetupTeleport;
+import org.apache.commons.lang3.tuple.Pair;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
@@ -24,7 +25,10 @@ import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.*;
 import org.bukkit.permissions.PermissionAttachmentInfo;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.logging.Level;
 
@@ -72,7 +76,7 @@ public class OnEventTeleports implements Listener {
         //I don't know how this can happen, but in case player dies twice, don't reprocess
         if(region.fastLocations.containsKey(id)) return;
 
-        CompletableFuture<RTPLocation> future = new CompletableFuture<>();
+        CompletableFuture<Pair<RTPLocation,Long>> future = new CompletableFuture<>();
         region.fastLocations.put(id, future);
 
         if(RTP.getInstance().latestTeleportData.containsKey(id)) {
@@ -83,7 +87,7 @@ public class OnEventTeleports implements Listener {
         TeleportData data = new TeleportData();
         RTP.getInstance().latestTeleportData.put(id, data);
         region.miscPipeline.add(() -> {
-            RTPLocation location = null;
+            Pair<RTPLocation, Long> location = null;
             int i = 0;
             for(; location==null && i<10;i++) {
                 location = region.getLocation(
@@ -92,9 +96,18 @@ public class OnEventTeleports implements Listener {
                         null);
             }
             if(location == null) {
-                RTP.log(Level.WARNING, "[RTP] failed to generate respawn location within 10 attempts. \n region - " + region);
+                RTP.log(Level.WARNING, "[plugin] failed to generate respawn location");
+                return;
             }
-            data.selectedLocation = location;
+
+            if(location.getLeft() == null) {
+                RTP.log(Level.WARNING, "[plugin] failed to generate respawn location within " + location.getRight() + " attempts.");
+                return;
+            }
+
+            data.selectedLocation = location.getLeft();
+            data.attempts = location.getRight();
+
             future.complete(location);
         });
     }
@@ -107,27 +120,37 @@ public class OnEventTeleports implements Listener {
         respawningPlayers.remove(player.getUniqueId());
 
         Region region = RTP.getInstance().selectionAPI.getRegion(new BukkitRTPPlayer(player));
-        ConcurrentHashMap<UUID, CompletableFuture<RTPLocation>> respawnLocations = region.fastLocations;
+        ConcurrentHashMap<UUID, CompletableFuture<Pair<RTPLocation,Long>>> respawnLocations = region.fastLocations;
         if(!respawnLocations.containsKey(player.getUniqueId())) return;
 
-        CompletableFuture<RTPLocation> future = respawnLocations.get(player.getUniqueId());
+        CompletableFuture<Pair<RTPLocation, Long>> future = respawnLocations.get(player.getUniqueId());
         region.fastLocations.remove(player.getUniqueId());
 
         TeleportData data = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
         data.completed = true;
 
         if(future.isDone()) {
-            RTPLocation rtpLocation;
+            Pair<RTPLocation, Long> location;
             try {
-                rtpLocation = future.get();
+                location = future.get();
             } catch (InterruptedException | ExecutionException e) {
                 e.printStackTrace();
                 return;
             }
 
+            if(location == null) {
+                return;
+            }
+
+            if(location.getLeft() == null) {
+                return;
+            }
+
+            RTPLocation rtpLocation = location.getLeft();
+
             RTPWorld rtpWorld = rtpLocation.world();
             if(rtpWorld instanceof BukkitRTPWorld bukkitRTPWorld) {
-                event.setRespawnLocation(new Location(bukkitRTPWorld.world(),rtpLocation.x(),rtpLocation.y(),rtpLocation.z()));
+                event.setRespawnLocation(new Location(bukkitRTPWorld.world(), rtpLocation.x(), rtpLocation.y(), rtpLocation.z()));
             }
             else throw new IllegalStateException("expected bukkit world");
             return;
@@ -157,9 +180,6 @@ public class OnEventTeleports implements Listener {
 
         long start = System.nanoTime();
 
-        TeleportData data = rtp.latestTeleportData.get(player.getUniqueId());
-        if(data == null) return;
-
         ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) rtp.configs.configParserMap.get(ConfigKeys.class);
 
         //handle both integer and floating point inputs
@@ -185,7 +205,7 @@ public class OnEventTeleports implements Listener {
                 try {
                     number = Integer.parseInt(val[2]);
                 } catch (NumberFormatException exception) {
-                    Bukkit.getLogger().warning("[rtp] invalid permission: " + node);
+                    RTP.log(Level.WARNING, "[rtp] invalid permission: " + node);
                     continue;
                 }
                 cooldownTime = TimeUnit.SECONDS.toNanos(number);
@@ -193,23 +213,15 @@ public class OnEventTeleports implements Listener {
             }
         }
 
-
-        if (hasJoin || (hasFirstJoin && !player.hasPlayedBefore())) {
-            if (!player.hasPermission("rtp.nocooldown") && (start - data.time) < cooldownTime){
+        if(hasFirstJoin && !player.hasPlayedBefore()) {
+            teleportAction(player);
+        }
+        else if (hasJoin) {
+            TeleportData data = rtp.latestTeleportData.get(player.getUniqueId());
+            long time = (data == null) ? 0 : data.time;
+            if (!player.hasPermission("rtp.nocooldown") && (start - time) < cooldownTime){
                 ConfigParser<LangKeys> langParser = (ConfigParser<LangKeys>) rtp.configs.configParserMap.get(LangKeys.class);
-
-                long remaining = (data.time - start) + cooldownTime;
-                long days = TimeUnit.NANOSECONDS.toDays(remaining);
-                long hours = TimeUnit.NANOSECONDS.toHours(remaining) % 24;
-                long minutes = TimeUnit.NANOSECONDS.toMinutes(remaining) % 60;
-                long seconds = TimeUnit.NANOSECONDS.toSeconds(remaining) % 60;
-                String replacement = "";
-                if (days > 0) replacement += days + langParser.getConfigValue(LangKeys.days,"d").toString() + " ";
-                if (days > 0 || hours > 0) replacement += hours + langParser.getConfigValue(LangKeys.hours,"h").toString() + " ";
-                if (days > 0 || hours > 0 || minutes > 0) replacement += minutes + langParser.getConfigValue(LangKeys.minutes,"m").toString() + " ";
-                replacement += seconds + langParser.getConfigValue(LangKeys.seconds,"s").toString();
                 String msg = langParser.getConfigValue(LangKeys.cooldownMessage,"").toString();
-                msg = msg.replaceAll("[time]",replacement);
                 SendMessage.sendMessage(player, msg);
                 return;
             }
