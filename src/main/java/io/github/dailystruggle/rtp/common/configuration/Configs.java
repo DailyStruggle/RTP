@@ -59,7 +59,7 @@ public class Configs {
 
     @Nullable
     public ConfigParser<WorldKeys> getWorldParser(String worldName) {
-        if(RTP.getInstance().serverAccessor.getRTPWorld(worldName) == null) {
+        if(RTP.serverAccessor.getRTPWorld(worldName) == null) {
             return null;
         }
 
@@ -79,7 +79,7 @@ public class Configs {
     public CompletableFuture<Boolean> reload() {
         CompletableFuture<Boolean> res = new CompletableFuture<>();
 
-        if(getParser(LangKeys.class)!=null) RTP.getInstance().serverAccessor.sendMessage(CommandsAPI.serverId,LangKeys.reloading);
+        if(getParser(LangKeys.class)!=null) RTP.serverAccessor.sendMessage(CommandsAPI.serverId,LangKeys.reloading);
 
         //ensure async to protect server timings
         RTP.getInstance().miscAsyncTasks.add(new RTPRunnable(0) {
@@ -87,7 +87,7 @@ public class Configs {
             public void run() {
                 try {
                     reloadAction();
-                    RTP.getInstance().serverAccessor.sendMessage(CommandsAPI.serverId,LangKeys.reloaded);
+                    RTP.serverAccessor.sendMessage(CommandsAPI.serverId,LangKeys.reloaded);
                     res.complete(true);
                 } catch (Exception e) { //on any code failure, complete false
                     res.complete(false);
@@ -111,7 +111,7 @@ public class Configs {
         MultiConfigParser<RegionKeys> regions = new MultiConfigParser<>(RegionKeys.class, "regions", "1.0", pluginDirectory);
         MultiConfigParser<WorldKeys> worlds = new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", pluginDirectory);
 
-        for(var world : RTP.getInstance().serverAccessor.getRTPWorlds()) {
+        for(var world : RTP.serverAccessor.getRTPWorlds()) {
             worlds.getParser(world.name());
         }
 
@@ -131,9 +131,9 @@ public class Configs {
             RTPWorld world;
             if(worldName.startsWith("[") && worldName.endsWith("]")) {
                 int num = Integer.parseInt(worldName.substring(1,worldName.length()-1));
-                world = RTP.getInstance().serverAccessor.getRTPWorlds().get(num);
+                world = RTP.serverAccessor.getRTPWorlds().get(num);
             }
-            else world = RTP.getInstance().serverAccessor.getRTPWorld(worldName);
+            else world = RTP.serverAccessor.getRTPWorld(worldName);
             if(world == null) {
                 new IllegalArgumentException("world not found - " + worldName).printStackTrace(); //don't need to throw
                 continue;
@@ -145,8 +145,8 @@ public class Configs {
             if(shapeObj instanceof MemorySection shapeSection) {
                 final Map<String, Object> shapeMap = shapeSection.getMapValues(true);
                 String shapeName = String.valueOf(shapeMap.get("name"));
-                Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.getInstance().factoryMap.get(RTP.factoryNames.shape);
-                shape = (Shape<?>) factory.getOrDefault(shapeName);
+                Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+                shape = (Shape<?>) factory.get(shapeName);
                 EnumMap<?, Object> shapeData = shape.getData();
                 for(var e : shapeData.entrySet()) {
                     String name = e.getKey().name();
@@ -170,7 +170,7 @@ public class Configs {
             if(vertObj instanceof MemorySection vertSection) {
                 final Map<String, Object> vertMap = vertSection.getMapValues(true);
                 String shapeName = String.valueOf(vertMap.get("name"));
-                Factory<VerticalAdjustor<?>> factory = (Factory<VerticalAdjustor<?>>) RTP.getInstance().factoryMap.get(RTP.factoryNames.vert);
+                Factory<VerticalAdjustor<?>> factory = (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
                 VerticalAdjustor<?> vert = (VerticalAdjustor<?>) factory.getOrDefault(shapeName);
                 EnumMap<?, Object> vertData = vert.getData();
                 for(var e : vertData.entrySet()) {

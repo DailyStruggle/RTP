@@ -18,7 +18,7 @@ public class ShapeParameter extends CommandParameter {
 
     @Override
     public Set<String> values() {
-        Factory<?> shapeFactory = RTP.getInstance().factoryMap.get(RTP.factoryNames.shape);
+        Factory<?> shapeFactory = RTP.factoryMap.get(RTP.factoryNames.shape);
         Enumeration<String> listEnum = shapeFactory.list();
         Set<String> res = new HashSet<>();
         while (listEnum.hasMoreElements()) {
@@ -30,7 +30,7 @@ public class ShapeParameter extends CommandParameter {
     @Override
     public Map<String, CommandParameter> subParams(String parameter) {
         parameter = parameter.toUpperCase();
-        Factory<?> shapeFactory = RTP.getInstance().factoryMap.get(RTP.factoryNames.shape);
+        Factory<?> shapeFactory = RTP.factoryMap.get(RTP.factoryNames.shape);
         if(subParams.containsKey(parameter)) {
             return subParams.get(parameter);
         }

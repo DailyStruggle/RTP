@@ -1,14 +1,10 @@
 package io.github.dailystruggle.rtp.common.commands;
 
+import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
-import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
-import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.*;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
@@ -18,99 +14,80 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.SetupTeleport;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.function.Predicate;
 
-public abstract class RTPCmd implements BaseRTPCmd {
-    private final Semaphore senderChecksGuard = new Semaphore(1);
-    private final List<Predicate<RTPCommandSender>> senderChecks = new ArrayList<>();
-
-    public void addSenderCheck(Predicate<RTPCommandSender> senderCheck) {
-        try {
-            senderChecksGuard.acquire();
-            senderChecks.add(senderCheck);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        finally {
-            senderChecksGuard.release();
-        }
+public interface RTPCmd extends BaseRTPCmd {
+    default void init() {
+        
     }
 
+
     //synchronous command component
-    protected boolean onCommandSync(UUID senderId) {
-        RTP api = RTP.getInstance();
+    default boolean onCommand(RTPCommandSender sender, CommandsAPICommand command, String label, String[] args) {
+        RTP rtp = RTP.getInstance();
 
-        RTPCommandSender sender = RTP.getInstance().serverAccessor.getSender(senderId);
+        long timingsStart = System.nanoTime();
 
-        if(api.processingPlayers.contains(senderId)) {
-            api.serverAccessor.sendMessage(senderId,LangKeys.alreadyTeleporting);
+        UUID senderId = sender.uuid();
+        if(rtp.processingPlayers.contains(senderId)) {
+            RTP.serverAccessor.sendMessage(senderId,LangKeys.alreadyTeleporting);
+            return true;
         }
-        api.processingPlayers.add(senderId);
-
-        long start = System.nanoTime();
-
-        ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) api.configs.getParser(ConfigKeys.class);
-        ConfigParser<LangKeys> langParser = (ConfigParser<LangKeys>) api.configs.getParser(LangKeys.class);
 
         //--------------------------------------------------------------------------------------------------------------
         //guard command perms with custom message
         if(!sender.hasPermission("rtp.use")) {
-            api.serverAccessor.sendMessage(senderId, LangKeys.noPerms);
+            RTP.serverAccessor.sendMessage(senderId, LangKeys.noPerms);
             return true;
         }
 
         //--------------------------------------------------------------------------------------------------------------
         //guard last teleport time synchronously to prevent spam
-        TeleportData senderData = (sender instanceof RTPPlayer)
-                ? api.latestTeleportData.getOrDefault(sender.uuid(), new TeleportData())
-                : new TeleportData();
+        TeleportData senderData = rtp.latestTeleportData.getOrDefault(senderId, new TeleportData());
         if(senderData.sender == null) {
             senderData.sender = sender;
         }
 
-        ConcurrentHashMap<UUID, TeleportData> latestTeleportData = RTP.getInstance().latestTeleportData;
+        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) rtp.configs.getParser(PerformanceKeys.class);
+        boolean syncLoading = false;
+        Object configValue = perf.getConfigValue(PerformanceKeys.syncLoading, false);
+        if(configValue instanceof String s) {
+            configValue = Boolean.parseBoolean(s);
+        }
+        if(configValue instanceof Boolean b) syncLoading = b;
 
-        if(!sender.hasPermission("rtp.noCooldown")) {
-            long lastTime;
+        if(!senderId.equals(CommandsAPI.serverId)) rtp.processingPlayers.add(senderId);
+        boolean res = onCommand(senderId,sender::hasPermission,sender::sendMessage,args);
 
-            TeleportData teleportData = latestTeleportData.get(senderId);
-            lastTime = (teleportData != null) ? teleportData.time : 0;
-
-            long cooldownTime = sender.cooldown();
-
-            if ((start - lastTime) < cooldownTime){
-                String msg = (String) langParser.getConfigValue(LangKeys.cooldownMessage, "");
-                api.serverAccessor.sendMessage(senderId, msg);
-                return true;
-            }
+        if(syncLoading) {
+            CommandsAPI.execute(Long.MAX_VALUE);
         }
 
-        boolean validSender = true;
-        try {
-            senderChecksGuard.acquire();
-            for(var a : senderChecks) {
-                validSender &= a.test(sender);
-            }
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        } finally {
-            senderChecksGuard.release();
-        }
-
-        return validSender;
+        return res;
     }
 
-    public boolean onCommandAsync(RTPCommandSender sender, Map<String, List<String>> rtpArgs, CommandsAPICommand nextCommand) {
-        RTP api = RTP.getInstance();
+    //async command component
+    default boolean compute(UUID senderId, Map<String, List<String>> rtpArgs, CommandsAPICommand nextCommand) {
+        long timingsStart = System.nanoTime();
 
-        ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) api.configs.getParser(ConfigKeys.class);
-        ConfigParser<LangKeys> langParser = (ConfigParser<LangKeys>) api.configs.getParser(LangKeys.class);
+        RTPCommandSender sender = RTP.serverAccessor.getSender(senderId);
 
-        MultiConfigParser<WorldKeys> worldsParser = (MultiConfigParser<WorldKeys>) api.configs.getParser(WorldKeys.class);
-        MultiConfigParser<RegionKeys> regionsParser = (MultiConfigParser<RegionKeys>) api.configs.getParser(RegionKeys.class);
+        RTP rtp = RTP.getInstance();
+        if(nextCommand!=null) {
+            rtp.processingPlayers.remove(senderId);
+            return true;
+        }
+
+        ConfigParser<LangKeys> langParser = (ConfigParser<LangKeys>) rtp.configs.getParser(LangKeys.class);
+
+        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) rtp.configs.getParser(PerformanceKeys.class);
+        boolean syncLoading = false;
+        Object configValue = perf.getConfigValue(PerformanceKeys.syncLoading, false);
+        if(configValue instanceof String s) {
+            configValue = Boolean.parseBoolean(s);
+            perf.set(PerformanceKeys.syncLoading,configValue);
+        }
+        if(configValue instanceof Boolean b) syncLoading = b;
 
         //--------------------------------------------------------------------------------------------------------------
         //collect target players to teleport
@@ -119,10 +96,10 @@ public abstract class RTPCmd implements BaseRTPCmd {
             List<String> playerNames = rtpArgs.get("player");
             for (String playerName : playerNames) {
                 //double check the player is still valid by the time we get here
-                RTPPlayer p = RTP.getInstance().serverAccessor.getPlayer(playerName);
+                RTPPlayer p = RTP.serverAccessor.getPlayer(playerName);
                 if (p == null) {
                     String msg = (String) langParser.getConfigValue(LangKeys.badArg, "player:" + rtpArgs.get("player"));
-                    sender.sendMessage(msg);
+                    RTP.serverAccessor.sendMessage(senderId, msg);
                     continue;
                 }
 
@@ -135,8 +112,8 @@ public abstract class RTPCmd implements BaseRTPCmd {
         }
         else { //if no players and sender isn't a player, idk who to send
             String msg = (String) langParser.getConfigValue(LangKeys.consoleCmdNotAllowed,"");
-            triggerFailEvent(sender);
-            sender.sendMessage(msg);
+            failEvent(sender,msg);
+            rtp.processingPlayers.remove(senderId);
             return true;
         }
 
@@ -144,21 +121,21 @@ public abstract class RTPCmd implements BaseRTPCmd {
             RTPPlayer p = players.get(i);
 
             //get their data
-            TeleportData lastTeleportData = api.latestTeleportData.get(p.uuid());
+            TeleportData lastTeleportData = rtp.latestTeleportData.get(p.uuid());
             //if p has an incomplete teleport
             if(lastTeleportData != null) {
                 if(!lastTeleportData.completed) {
                     String msg = (String) langParser.getConfigValue(LangKeys.alreadyTeleporting, "");
-                    sender.sendMessage(msg);
-                    if(!sender.uuid().equals(p.uuid())) p.sendMessage(msg);
-                    triggerFailEvent(sender);
+                    RTP.serverAccessor.sendMessage(senderId, p.uuid(), msg);
+                    failEvent(sender,msg);
                     continue;
                 }
 
-                api.priorTeleportData.put(p.uuid(),lastTeleportData);
+                rtp.priorTeleportData.put(p.uuid(),lastTeleportData);
             }
             lastTeleportData = new TeleportData();
-            api.latestTeleportData.put(p.uuid(),lastTeleportData);
+            lastTeleportData.time = timingsStart;
+            rtp.latestTeleportData.put(p.uuid(),lastTeleportData);
 
             String regionName;
             if(rtpArgs.containsKey("region")) {
@@ -177,18 +154,18 @@ public abstract class RTPCmd implements BaseRTPCmd {
                     worldName = p.getLocation().world().name();
                 }
 
-                //todo: validate world parser exists
+                ConfigParser<WorldKeys> worldParser = rtp.configs.getWorldParser(worldName);
 
-                //todo: world to region
-                ConfigParser<WorldKeys> worldParser = api.configs.getWorldParser(worldName);
                 if(worldParser == null) {
                     //todo: message world not exist
+                    rtp.processingPlayers.remove(senderId);
                     return true;
                 }
+
                 regionName = worldParser.getConfigValue(WorldKeys.region, "default").toString();
             }
 
-            SelectionAPI selectionAPI = api.selectionAPI;
+            SelectionAPI selectionAPI = rtp.selectionAPI;
 
             Region region = selectionAPI.getRegionOrDefault(regionName);
             RTPWorld rtpWorld = (RTPWorld) region.getData().get(RegionKeys.world);
@@ -203,41 +180,56 @@ public abstract class RTPCmd implements BaseRTPCmd {
 
                 if(doWBO) {
                     region = region.clone();
-                    region.set(RegionKeys.shape, api.serverAccessor.getShape(rtpWorld.name()));
+                    region.set(RegionKeys.shape, rtp.serverAccessor.getShape(rtpWorld.name()));
                 }
             }
+
+            List<String> biomeList = rtpArgs.get("biome");
+            Set<String> biomes = null;
+            if(biomeList!=null) biomes = new HashSet<>(biomeList);
 
             //todo: shape params
             //todo: vert params
             //todo: biomes
 
-            if(region.hasLocation(p.uuid())) {
-                //todo: initiate teleport action if here
+            SetupTeleport setupTeleport = new SetupTeleport(sender, p, region, biomes);
+            lastTeleportData.nextTask = setupTeleport;
+
+            long delay = sender.delay();
+            lastTeleportData.delay = delay;
+            if(delay>0) {
+                String msg = langParser.getConfigValue(LangKeys.delayMessage,"").toString();
+                RTP.serverAccessor.sendMessage(senderId,p.uuid(),msg);
             }
 
-            //todo: default case, setupTeleport
-            SetupTeleport setupTeleport = new SetupTeleport(sender, p, region, null);
-            api.setupTeleportPipeline.add(setupTeleport);
+            if(region.hasLocation(p.uuid()) && syncLoading && delay<=0) {
+                setupTeleport.run();
+            }
+            else {
+                rtp.setupTeleportPipeline.add(setupTeleport);
+            }
         }
+
         return true;
     }
 
-    public abstract void triggerFailEvent(RTPCommandSender player);
-
     @Override
-    public String name() {
+    default String name() {
         return "rtp";
     }
 
     @Override
-    public String permission() {
+    default String permission() {
         return "rtp.use";
     }
 
     @Override
-    public String description() {
+    default String description() {
         return "teleport randomly";
     }
+
+    void successEvent(RTPCommandSender sender, RTPPlayer player);
+    void failEvent(RTPCommandSender sender,String msg);
 
     private static String pickOne(List<String> param, String d) {
         if(param == null || param.size()==0) return d;

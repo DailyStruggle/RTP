@@ -14,6 +14,6 @@ public interface BaseRTPCmd extends TreeCommand {
 
         String msg = String.valueOf(lang.getConfigValue(LangKeys.badArg,""));
         msg = msg.replace("[arg]",parameterName + ":" + parameterValue);
-        RTP.getInstance().serverAccessor.sendMessage(callerId,msg);
+        RTP.serverAccessor.sendMessage(callerId,msg);
     }
 }

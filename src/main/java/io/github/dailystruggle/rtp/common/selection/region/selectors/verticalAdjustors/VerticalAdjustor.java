@@ -26,7 +26,7 @@ public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E
         super(eClass, name);
         this.verifiers = verifiers;
         setData(def);
-        Factory<VerticalAdjustor<?>> vertAdjustorFactory = (Factory<VerticalAdjustor<?>>) RTP.getInstance().factoryMap.get(RTP.factoryNames.vert);
+        Factory<VerticalAdjustor<?>> vertAdjustorFactory = (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
         this.name = name;
         if(!vertAdjustorFactory.contains(name))
             vertAdjustorFactory.add(name,this);
@@ -45,7 +45,7 @@ public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E
     
     protected void loadLangFile() {
         File langFile;
-        String langDirStr = RTP.getInstance().serverAccessor.getPluginDirectory().getAbsolutePath()
+        String langDirStr = RTP.serverAccessor.getPluginDirectory().getAbsolutePath()
                 + File.separator
                 + "lang"
                 + File.separator

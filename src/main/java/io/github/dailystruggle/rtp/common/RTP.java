@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common;
 
+import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
@@ -37,7 +38,17 @@ public class RTP {
         singleConfig,
         multiConfig
     }
-    public EnumMap<factoryNames, Factory<?>> factoryMap;
+    public static EnumMap<factoryNames, Factory<?>> factoryMap = new EnumMap<>(factoryNames.class);
+    static {
+        Factory<Shape<?>> shapeFactory = new Factory<>();
+        factoryMap.put(factoryNames.shape, shapeFactory);
+
+        Factory<VerticalAdjustor<?>> verticalAdjustorFactory = new Factory<>();
+        factoryMap.put(factoryNames.vert, verticalAdjustorFactory);
+        factoryMap.put(factoryNames.singleConfig, new Factory<ConfigParser<?>>());
+        factoryMap.put(factoryNames.multiConfig, new Factory<MultiConfigParser<?>>());
+    }
+
 
     /**
      * minimum number of teleportations to executeAsyncTasks per gametick, to prevent bottlenecking during lag spikes
@@ -45,35 +56,26 @@ public class RTP {
     public static int minRTPExecutions = 1;
 
     public final Configs configs;
-    public RTPServerAccessor serverAccessor;
-    public RTPEconomy economy = null;
+    public static RTPServerAccessor serverAccessor;
+    public static RTPEconomy economy = null;
+
+    public static CommandsAPICommand baseCommand;
 
     /**
      * only one instance will exist at a time, reset on plugin load
      */
     private static RTP instance;
 
-    public RTP(@NotNull RTPServerAccessor serverAccessor) {
+    public RTP() {
         if(serverAccessor == null) throw new IllegalStateException("null serverAccessor");
 
-        instance = this;
-        this.configs = new Configs(serverAccessor.getPluginDirectory());
-        this.serverAccessor = serverAccessor;
-
-        factoryMap = new EnumMap<>(factoryNames.class);
-
-        Factory<Shape<?>> shapeFactory = new Factory<>();
-        factoryMap.put(factoryNames.shape, shapeFactory);
         new Circle();
         new Square();
-
-        Factory<VerticalAdjustor<?>> verticalAdjustorFactory = new Factory<>();
-        factoryMap.put(factoryNames.vert, verticalAdjustorFactory);
         new LinearAdjustor(new ArrayList<>());
         new JumpAdjustor(new ArrayList<>());
 
-        factoryMap.put(factoryNames.singleConfig, new Factory<ConfigParser<?>>());
-        factoryMap.put(factoryNames.multiConfig, new Factory<MultiConfigParser<?>>());
+        instance = this;
+        this.configs = new Configs(serverAccessor.getPluginDirectory());
     }
 
     public static RTP getInstance() {
@@ -81,11 +83,11 @@ public class RTP {
     }
 
     public static void log(Level level, String str) {
-        getInstance().serverAccessor.log(level, str);
+        serverAccessor.log(level, str);
     }
 
     public static void log(Level level, String str, Exception exception) {
-        getInstance().serverAccessor.log(level, str, exception);
+        serverAccessor.log(level, str, exception);
     }
 
     public final SelectionAPI selectionAPI = new SelectionAPI();
@@ -178,6 +180,6 @@ public class RTP {
     }
 
     public static void teleportAction(UUID playerId){
-        getInstance().serverAccessor.sendMessage(playerId,"todo: teleportAction");
+        serverAccessor.sendMessage(playerId,"todo: teleportAction");
     }
 }

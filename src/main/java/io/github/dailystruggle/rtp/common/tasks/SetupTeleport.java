@@ -75,7 +75,7 @@ public final class SetupTeleport extends RTPRunnable {
         Pair<RTPLocation, Long> pair = this.region.getLocation(sender, player, biomes);
         if(pair == null) {
             String msg = langParser.getConfigValue(LangKeys.unsafe,"").toString();
-            rtp.serverAccessor.sendMessage(sender.uuid(),player.uuid(),msg);
+            RTP.serverAccessor.sendMessage(sender.uuid(),player.uuid(),msg);
             postActions.forEach(consumer -> consumer.accept(this));
             isRunning = false;
             return;
@@ -84,6 +84,7 @@ public final class SetupTeleport extends RTPRunnable {
         if(isCancelled()) return;
         LoadChunks loadChunks = new LoadChunks(this.sender, this.player, pair.getLeft(), this.region);
         teleportData.nextTask = loadChunks;
+        teleportData.attempts = pair.getRight();
 
         if(syncLoading) {
             loadChunks.run();

@@ -77,6 +77,11 @@ public class Factory<T extends FactoryValue<?>> {
     }
 
     @NotNull
+    public FactoryValue<?> get(String name) {
+        return map.get(name.toUpperCase());
+    }
+
+    @NotNull
     public FactoryValue<?> getOrDefault(String name) {
         name = name.toUpperCase();
         //guard constructor

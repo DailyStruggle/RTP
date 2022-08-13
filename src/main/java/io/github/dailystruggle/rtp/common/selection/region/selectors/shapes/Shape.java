@@ -31,7 +31,8 @@ public abstract class Shape<E extends Enum<E>> extends FactoryValue<E> {
             if(!data.containsKey(val)) throw new IllegalArgumentException(
                     "All values must be filled out on shape instantiation");
         }
-        Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.getInstance().factoryMap.get(RTP.factoryNames.shape);
+        Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+        if(factory == null) throw new IllegalStateException("shape factory doesn't exist");
         if (!factory.contains(name)) factory.add(name,this);
         try {
             loadLangFile();
@@ -63,7 +64,7 @@ public abstract class Shape<E extends Enum<E>> extends FactoryValue<E> {
         String name = this.name;
         if(!name.endsWith(".yml")) name = name + ".yml";
         File langFile;
-        String langDirStr = RTP.getInstance().serverAccessor.getPluginDirectory().getAbsolutePath()
+        String langDirStr = RTP.serverAccessor.getPluginDirectory().getAbsolutePath()
                 + File.separator
                 + "lang"
                 + File.separator

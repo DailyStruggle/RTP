@@ -37,7 +37,7 @@ public final class RTPTeleportCancel extends RTPRunnable {
         if(data.nextTask == null) return;
 
         //check no-cancel permission
-        RTPPlayer player = RTP.getInstance().serverAccessor.getPlayer(playerId);
+        RTPPlayer player = RTP.serverAccessor.getPlayer(playerId);
         if(player!=null && player.isOnline() && player.hasPermission("rtp.noCancel")) return;
 
         data.nextTask.setCancelled(true);
@@ -63,7 +63,7 @@ public final class RTPTeleportCancel extends RTPRunnable {
 
         ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
         String msg = lang.getConfigValue(LangKeys.teleportCancel,"").toString();
-        RTP.getInstance().serverAccessor.sendMessage(playerId,msg);
+        RTP.serverAccessor.sendMessage(playerId,msg);
 
         postActions.forEach(rtpTeleportCancelConsumer -> rtpTeleportCancelConsumer.accept(this));
     }

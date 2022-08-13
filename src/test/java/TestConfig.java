@@ -1,4 +1,5 @@
 import commonTestImpl.TestRTPServerAccessor;
+import commonTestImpl.commands.BaseCommand;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
@@ -10,8 +11,9 @@ import java.io.IOException;
 public class TestConfig {
     @Test
     void TestConfigSave() {
+        RTP.serverAccessor = new TestRTPServerAccessor();
         //initialize to create config files
-        RTP rtp = new RTP(new TestRTPServerAccessor());
+        RTP rtp = new RTP();
 
         rtp.executeSyncTasks(Long.MAX_VALUE);
         rtp.executeAsyncTasks(Long.MAX_VALUE);

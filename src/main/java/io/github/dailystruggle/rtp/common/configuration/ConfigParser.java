@@ -186,7 +186,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     public void saveResource(String name, boolean overwrite) throws IOException {
         String myDirectory = pluginDirectory.getAbsolutePath();
 
-        String pDirectory = RTP.getInstance().serverAccessor.getPluginDirectory().getAbsolutePath();
+        String pDirectory = RTP.serverAccessor.getPluginDirectory().getAbsolutePath();
         if(myDirectory.equals(pDirectory)) {
             saveResourceFromJar(name,overwrite);
         }

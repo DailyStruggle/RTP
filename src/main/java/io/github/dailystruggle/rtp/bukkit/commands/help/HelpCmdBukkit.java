@@ -21,10 +21,6 @@ public class HelpCmdBukkit extends BukkitBaseRTPCmd {
 
         this.perms.put("rtp","rtp.see");
         this.perms.put("help","rtp.see");
-        this.perms.put("reload","rtp.reload");
-        this.perms.put("setWorld","rtp.setWorld");
-        this.perms.put("setRegion","rtp.setRegion");
-        this.perms.put("fill","rtp.fill");
     }
 
     @Override
@@ -59,11 +55,11 @@ public class HelpCmdBukkit extends BukkitBaseRTPCmd {
 
     @Override
     public String permission() {
-        return null;
+        return "rtp.see";
     }
 
     @Override
     public String description() {
-        return null;
+        return "see this";
     }
 }
