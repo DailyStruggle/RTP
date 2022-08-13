@@ -47,9 +47,7 @@ public class ReloadCmdBukkit extends BukkitBaseRTPCmd {
         if(nextCommand!=null) return true;
 
         for(var v : commandLookup.values()) {
-            SendMessage.sendMessage(sender,v.name());
             if(v instanceof BukkitTreeCommand cmd) {
-                SendMessage.sendMessage(sender,cmd.name());
                 cmd.onCommand(sender,parameterValues,null);
             }
         }
@@ -139,7 +137,7 @@ public class ReloadCmdBukkit extends BukkitBaseRTPCmd {
                             RTPWorld world;
                             if(worldName.startsWith("[") && worldName.endsWith("]")) {
                                 int num = Integer.parseInt(worldName.substring(1,worldName.length()-1));
-                                world = new BukkitRTPWorld(Bukkit.getWorlds().get(num));
+                                world = RTP.serverAccessor.getRTPWorlds().get(num);
                             }
                             else world = serverAccessor.getRTPWorld(worldName);
                             if(world == null) {

@@ -275,12 +275,12 @@ public class Region extends FactoryValue<RegionKeys> {
             Set<String> biomeSet = (biomeList==null) ? new HashSet<>() : new HashSet<>(biomeList);
             biomeSet = biomeSet.stream().map(String::toUpperCase).collect(Collectors.toSet());
             if(whitelist) {
+                biomeNames = biomeSet;
+            }
+            else {
                 Set<String> finalBiomeSet = biomeSet;
                 biomeNames = RTP.serverAccessor.getBiomes().stream().filter(
                         s -> !finalBiomeSet.contains(s.toUpperCase())).collect(Collectors.toSet());
-            }
-            else {
-                biomeNames = biomeSet;
             }
         }
 
@@ -300,10 +300,11 @@ public class Region extends FactoryValue<RegionKeys> {
         RTPWorld world = (RTPWorld) data.getOrDefault(RegionKeys.world,RTP.serverAccessor.getRTPWorlds().get(0));
 
         RTPLocation location = null;
-        long i = 0;
-        for(; i < maxAttempts; i++) {
+        String currBiome = "";
+        long i = 1;
+        for(; i <= maxAttempts; i++) {
             int[] select = shape.select();
-            String currBiome = world.getBiome(select[0], (vert.maxY()+vert.minY())/2, select[1]);
+            currBiome = world.getBiome(select[0], (vert.maxY()+vert.minY())/2, select[1]);
 
             for(; biomeChecks < maxBiomeChecks && !biomeNames.contains(currBiome); biomeChecks++) {
                 select = shape.select();
@@ -433,7 +434,6 @@ public class Region extends FactoryValue<RegionKeys> {
         if(locAssChunks.containsKey(location)) {
             ChunkSet chunkSet = locAssChunks.get(location);
             if(chunkSet.chunks().size()>=sz) return chunkSet;
-
             chunkSet.keep(false);
         }
 
@@ -455,7 +455,7 @@ public class Region extends FactoryValue<RegionKeys> {
 
         for(long i = -radius; i <= radius; i++) {
             for(long j = -radius; j <= radius; j++) {
-                CompletableFuture<RTPChunk> cfChunk = location.world().getChunkAt(cx + i, cz + j);
+                CompletableFuture<RTPChunk> cfChunk = location.world().getChunkAt((int)(cx + i), (int)(cz + j));
                 if(shape instanceof MemoryShape<?> memoryShape) {
                     long finalJ = j;
                     long finalI = i;
@@ -485,7 +485,10 @@ public class Region extends FactoryValue<RegionKeys> {
             }
         }
 
-        return new ChunkSet(chunks,new CompletableFuture<>());
+        ChunkSet chunkSet = new ChunkSet(chunks, new CompletableFuture<>());
+        chunkSet.keep(true);
+        locAssChunks.put(location,chunkSet);
+        return chunkSet;
     }
 
     public void removeChunks(RTPLocation location) {

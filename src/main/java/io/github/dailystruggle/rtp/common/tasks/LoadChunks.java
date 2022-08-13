@@ -36,7 +36,7 @@ public final class LoadChunks extends RTPRunnable {
     private final RTPLocation location;
     private final Region region;
     private ChunkSet chunkSet;
-    private boolean modified = false;
+    public boolean modified = false;
 
     public LoadChunks(RTPCommandSender sender,
                       RTPPlayer player,
@@ -111,11 +111,6 @@ public final class LoadChunks extends RTPRunnable {
 
         if(toTicks<1 && Bukkit.isPrimaryThread()) doTeleport.run();
         else RTP.getInstance().teleportPipeline.add(doTeleport);
-
-        long dt = System.nanoTime() - start;
-        double millis = ((double)(TimeUnit.NANOSECONDS.toMicros(dt)%1000000))/1000;
-        String timeStr = millis + "ms";
-        RTP.log(Level.WARNING, "LOADCHUNKS: " + timeStr);
 
         postActions.forEach(consumer -> consumer.accept(this));
     }

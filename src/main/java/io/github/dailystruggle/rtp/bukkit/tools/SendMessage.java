@@ -52,8 +52,8 @@ public class SendMessage {
         });
         placeholders.put("delay",uuid -> {
             if(rtp == null) return "0";
-            if(rtp.serverAccessor==null) return "0";
-            RTPCommandSender commandSender = rtp.serverAccessor.getSender(uuid);
+            if(RTP.serverAccessor==null) return "0";
+            RTPCommandSender commandSender = RTP.serverAccessor.getSender(uuid);
             if(commandSender instanceof BukkitRTPPlayer rtpPlayer) {
                 Set<PermissionAttachmentInfo> perms = rtpPlayer.player().getEffectivePermissions();
                 Number n = rtp.configs.getParser(ConfigKeys.class).getNumber(ConfigKeys.teleportDelay,0);
@@ -94,8 +94,8 @@ public class SendMessage {
         });
         placeholders.put("cooldown",uuid -> {
             if(rtp == null) return "0";
-            if(rtp.serverAccessor==null) return "0";
-            RTPCommandSender commandSender = rtp.serverAccessor.getSender(uuid);
+            if(RTP.serverAccessor==null) return "0";
+            RTPCommandSender commandSender = RTP.serverAccessor.getSender(uuid);
             if(commandSender instanceof BukkitRTPPlayer rtpPlayer) {
                 Set<PermissionAttachmentInfo> perms = rtpPlayer.player().getEffectivePermissions();
                 Number n = rtp.configs.getParser(ConfigKeys.class).getNumber(ConfigKeys.teleportCooldown,0);
@@ -136,7 +136,7 @@ public class SendMessage {
         });
         placeholders.put("remainingCooldown",uuid -> {
             if(rtp == null) return "0";
-            if(rtp.serverAccessor==null) return "0";
+            if(RTP.serverAccessor==null) return "0";
 
             long start = System.nanoTime();
 

@@ -15,6 +15,8 @@ import io.github.dailystruggle.rtp.common.tasks.SetupTeleport;
 
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
 
 public interface RTPCmd extends BaseRTPCmd {
     default void init() {
@@ -69,6 +71,7 @@ public interface RTPCmd extends BaseRTPCmd {
     //async command component
     default boolean compute(UUID senderId, Map<String, List<String>> rtpArgs, CommandsAPICommand nextCommand) {
         long timingsStart = System.nanoTime();
+        long start = timingsStart;
 
         RTPCommandSender sender = RTP.serverAccessor.getSender(senderId);
 
@@ -180,7 +183,7 @@ public interface RTPCmd extends BaseRTPCmd {
 
                 if(doWBO) {
                     region = region.clone();
-                    region.set(RegionKeys.shape, rtp.serverAccessor.getShape(rtpWorld.name()));
+                    region.set(RegionKeys.shape, RTP.serverAccessor.getShape(rtpWorld.name()));
                 }
             }
 
@@ -202,7 +205,13 @@ public interface RTPCmd extends BaseRTPCmd {
                 RTP.serverAccessor.sendMessage(senderId,p.uuid(),msg);
             }
 
-            if(region.hasLocation(p.uuid()) && syncLoading && delay<=0) {
+            if(!syncLoading) {
+                syncLoading = biomes == null
+                        && region.hasLocation(p.uuid())
+                        && delay<=0;
+            }
+
+            if(syncLoading) {
                 setupTeleport.run();
             }
             else {

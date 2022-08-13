@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPBlock;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPChunk;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 
@@ -33,9 +34,13 @@ public record BukkitRTPChunk(Chunk chunk) implements RTPChunk {
 
     @Override
     public void keep(boolean keep) {
-        if(keep) RTP.getInstance().forceLoads.put(new int[]{x(),z()},this);
-        else RTP.getInstance().forceLoads.remove(new int[]{x(),z()});
-        if(Bukkit.isPrimaryThread()) chunk.setForceLoaded(keep);
-        else Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(), () -> chunk.setForceLoaded(keep));
+        RTPWorld rtpWorld = RTP.serverAccessor.getRTPWorld(chunk.getWorld().getUID());
+
+        if(keep) {
+            rtpWorld.keepChunkAt(x(),z());
+        }
+        else {
+            rtpWorld.forgetChunkAt(x(),z());
+        }
     }
 }

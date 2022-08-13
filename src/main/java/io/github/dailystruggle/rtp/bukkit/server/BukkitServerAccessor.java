@@ -34,6 +34,9 @@ import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public class BukkitServerAccessor implements RTPServerAccessor {
+    private final Map<UUID,RTPWorld> worldMap = new ConcurrentHashMap<>();
+    private final Map<String,RTPWorld> worldMapStr = new ConcurrentHashMap<>();
+
     private long t = System.nanoTime();
 
     private String version = null;
@@ -51,7 +54,7 @@ public class BukkitServerAccessor implements RTPServerAccessor {
         shapeFunction = s -> {
             World world = Bukkit.getWorld(s);
             if(world == null) return null;
-            Region region = RTP.getInstance().selectionAPI.getRegion(new BukkitRTPWorld(world));
+            Region region = RTP.getInstance().selectionAPI.getRegion(getRTPWorld(world.getUID()));
             if(region == null) throw new IllegalStateException();
             Object o = region.getData().get(RegionKeys.shape);
             if(!(o instanceof Shape<?>)) throw new IllegalStateException();
@@ -88,12 +91,24 @@ public class BukkitServerAccessor implements RTPServerAccessor {
 
     @Override
     public RTPWorld getRTPWorld(String name) {
-        return new BukkitRTPWorld(Bukkit.getWorld(name));
+        RTPWorld world = worldMapStr.get(name);
+        if(world == null) {
+            world = new BukkitRTPWorld(Bukkit.getWorld(name));
+            if(world == null) return null;
+            worldMapStr.put(name,world);
+        }
+        return world;
     }
 
     @Override
     public RTPWorld getRTPWorld(UUID id) {
-        return new BukkitRTPWorld(Bukkit.getWorld(id));
+        RTPWorld world = worldMap.get(id);
+        if(world == null) {
+            world = new BukkitRTPWorld(Bukkit.getWorld(id));
+            if(world == null) return null;
+            worldMap.put(id,world);
+        }
+        return world;
     }
 
     @Override
@@ -122,7 +137,7 @@ public class BukkitServerAccessor implements RTPServerAccessor {
 
     @Override
     public List<RTPWorld> getRTPWorlds() {
-        return Bukkit.getWorlds().stream().map(BukkitRTPWorld::new).collect(Collectors.toList());
+        return Bukkit.getWorlds().stream().map(world -> getRTPWorld(world.getUID())).collect(Collectors.toList());
     }
 
     @Override

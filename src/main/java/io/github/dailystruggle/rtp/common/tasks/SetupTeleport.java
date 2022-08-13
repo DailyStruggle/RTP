@@ -86,7 +86,14 @@ public final class SetupTeleport extends RTPRunnable {
         teleportData.nextTask = loadChunks;
         teleportData.attempts = pair.getRight();
 
-        if(syncLoading) {
+        boolean sync = syncLoading;
+        if(!syncLoading) {
+            sync = teleportData.delay<=0
+                    && (biomes == null || biomes.size()==0)
+                    && !loadChunks.modified;
+        }
+
+        if(sync) {
             loadChunks.run();
         }
         else {

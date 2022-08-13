@@ -2,8 +2,10 @@ package io.github.dailystruggle.rtp.bukkit.server.substitutions;
 
 import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.papermc.lib.PaperLib;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -42,15 +44,18 @@ public record BukkitRTPPlayer(Player player) implements RTPPlayer {
     @Override
     public CompletableFuture<Boolean> setLocation(RTPLocation to) {
         World world = ((BukkitRTPWorld)to.world()).world();
+        double x = to.x() + 0.5;
+        double y = to.y();
+        double z = to.z() + 0.5;
+
         if(Bukkit.isPrimaryThread()) {
-            return PaperLib.teleportAsync(player, new Location(world, to.x(), to.y(), to.z()));
+            return PaperLib.teleportAsync(player, new Location(world,x,y,z));
         }
 
         CompletableFuture<Boolean> res = new CompletableFuture<>();
-        Bukkit.getScheduler().callSyncMethod(RTPBukkitPlugin.getInstance(),() -> {
-            CompletableFuture<Boolean> pass = PaperLib.teleportAsync(player, new Location(world, to.x(), to.y(), to.z()));
+        Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),() -> {
+            CompletableFuture<Boolean> pass = PaperLib.teleportAsync(player, new Location(world,x,y,z));
             pass.whenComplete((aBoolean, throwable) -> res.complete(aBoolean));
-            return pass;
         });
         return res;
     }
@@ -59,7 +64,7 @@ public record BukkitRTPPlayer(Player player) implements RTPPlayer {
     public RTPLocation getLocation() {
         Location location = player.getLocation();
         return new RTPLocation(
-                new BukkitRTPWorld(player.getWorld()),
+                RTP.serverAccessor.getRTPWorld(player.getWorld().getUID()),
                 location.getBlockX(),location.getBlockY(), location.getBlockZ());
     }
 

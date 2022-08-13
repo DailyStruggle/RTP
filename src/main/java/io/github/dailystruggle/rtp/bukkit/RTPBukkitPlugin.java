@@ -56,7 +56,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     public BukkitTask asyncTeleportProcessing = null;
     public BukkitTask syncTeleportProcessing = null;
 
-    public Map<int[],CompletableFuture<Chunk>> chunkLoads = new ConcurrentHashMap<>();
+    public Map<List<Integer>,CompletableFuture<Chunk>> chunkLoads = new ConcurrentHashMap<>();
 
     @Override
     public void onEnable() {
@@ -118,10 +118,6 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         RTP.getInstance().executeAsyncTasks(Long.MAX_VALUE);
 
         SendMessage.sendMessage(null,null);
-        Bukkit.getScheduler().runTask(this,() -> {
-            BukkitRTPWorld bukkitRTPWorld = new BukkitRTPWorld(Bukkit.getWorlds().get(0));
-            bukkitRTPWorld.platform(new RTPLocation(bukkitRTPWorld,0,0,0));
-        });
     }
 
     @Override
