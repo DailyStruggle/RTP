@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.function.BiConsumer;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public class Region extends FactoryValue<RegionKeys> {
@@ -133,7 +134,7 @@ public class Region extends FactoryValue<RegionKeys> {
                 instance.priorTeleportData.put(playerId,teleportData);
             }
             teleportData = new TeleportData();
-            teleportData.sender = RTP.getInstance().serverAccessor.getSender(CommandsAPI.serverId);
+            teleportData.sender = RTP.serverAccessor.getSender(CommandsAPI.serverId);
             teleportData.targetRegion = this;
             teleportData.attempts = pair.getRight();
 
@@ -180,9 +181,9 @@ public class Region extends FactoryValue<RegionKeys> {
 
             defaultBiomes = whitelist
                     ? collect
-                    : RTP.getInstance().serverAccessor.getBiomes().stream().filter(s -> !collect.contains(s)).collect(Collectors.toSet());
+                    : RTP.serverAccessor.getBiomes().stream().filter(s -> !collect.contains(s)).collect(Collectors.toSet());
         }
-        else defaultBiomes = RTP.getInstance().serverAccessor.getBiomes();
+        else defaultBiomes = RTP.serverAccessor.getBiomes();
         Region.defaultBiomes = defaultBiomes;
     }
 
@@ -275,7 +276,7 @@ public class Region extends FactoryValue<RegionKeys> {
             biomeSet = biomeSet.stream().map(String::toUpperCase).collect(Collectors.toSet());
             if(whitelist) {
                 Set<String> finalBiomeSet = biomeSet;
-                biomeNames = RTP.getInstance().serverAccessor.getBiomes().stream().filter(
+                biomeNames = RTP.serverAccessor.getBiomes().stream().filter(
                         s -> !finalBiomeSet.contains(s.toUpperCase())).collect(Collectors.toSet());
             }
             else {
@@ -296,7 +297,7 @@ public class Region extends FactoryValue<RegionKeys> {
         long maxBiomeChecks = maxBiomeChecksPerGen*maxAttempts;
         long biomeChecks = 0L;
 
-        RTPWorld world = (RTPWorld) data.getOrDefault(RegionKeys.world,RTP.getInstance().serverAccessor.getRTPWorlds().get(0));
+        RTPWorld world = (RTPWorld) data.getOrDefault(RegionKeys.world,RTP.serverAccessor.getRTPWorlds().get(0));
 
         RTPLocation location = null;
         long i = 0;

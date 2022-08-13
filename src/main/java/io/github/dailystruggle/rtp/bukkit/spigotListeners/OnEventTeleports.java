@@ -101,7 +101,6 @@ public class OnEventTeleports implements Listener {
             }
 
             if(location.getLeft() == null) {
-                RTP.log(Level.WARNING, "[plugin] failed to generate respawn location within " + location.getRight() + " attempts.");
                 return;
             }
 
@@ -277,6 +276,6 @@ public class OnEventTeleports implements Listener {
     }
 
     private static void teleportAction(Player player){
-        RTP.getInstance().serverAccessor.sendMessage(player.getUniqueId(),"todo: teleportAction");
+        RTP.serverAccessor.sendMessage(player.getUniqueId(),"todo: teleportAction");
     }
 }

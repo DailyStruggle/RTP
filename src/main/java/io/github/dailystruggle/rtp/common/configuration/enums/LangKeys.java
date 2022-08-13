@@ -30,6 +30,8 @@ public enum LangKeys {
     updatedRegions,
     reloading,
     reloaded,
+    updating,
+    updated,
     badArg,
     consoleCmdNotAllowed,
     noPerms,

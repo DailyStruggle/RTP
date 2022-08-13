@@ -3,15 +3,6 @@
 
 plugin: "[RTP]"
 
-#show title
-# set title to "" to disable
-# PlaceholderAPI is recommended for coordinates
-title: "&aTeleported!"
-subtitle: "&bhave fun!"
-fadeIn: 1
-stay: 1
-fadeOut: 1
-
 #when teleporting, say this
 alreadyTeleporting: "&e[plugin] you're already teleporting!"
 delayMessage: "&e[plugin] Teleporting in [delay]. Don't move"
@@ -59,8 +50,10 @@ updatingRegions: "&b[plugin] updating regions configuration..."
 updatedRegions: "&b[plugin] updated regions configuration!"
 
 # plugin reload text
-reloading: "&b[plugin] reloading..."
-reloaded: "&b[plugin] successfully reloaded."
+reloading: "&b[plugin] loading [filename]..."
+reloaded: "&b[plugin] successfully loaded [filename]"
+updating: "&a[plugin] updating [filename]..."
+updated: "&a[plugin] successfully updated [filename]"
 
 # plugin doesn't have the command the user requested
 # placeholder: [arg] - the argument attempted
@@ -81,22 +74,10 @@ invalidWorld: "&e[plugin] could not find world '[world]'"
 # when more than on user fails to specify region in updateRegion
 missingRegionParam: "&e[plugin] region parameter is required"
 
-fillStart: "&a[plugin] fill task started for region [region]"
-fillCancel: "&e[plugin] fill task cancelled for region [region]"
-fillPause: "#A020F0[plugin] fill task paused for region [region]"
-fillResume: "#10A5F5[plugin] fill task resumed for region [region]"
-fillRunning: "&c[plugin] fill task already running for region [region]"
-fillNotRunning: "&c[plugin] fill task not running for region [region]"
-fillStatus: "&a[plugin] completed [num] / [total] chunks for region [region]"
-
 #command descriptions
 rtp: "&b/rtp - teleport to a random location"
 help: "&b/rtp help - see this"
 reload: "&b/rtp reload - reload config files"
-setWorld: "&b/rtp setWorld - update world settings"
-setRegion: "&b/rtp setRegion - create or update region settings"
-fill: "&b/rtp fill - attempt each location once in a region"
-info: "&b/rtp info - see plugin and region info"
 
 #player teleport status placeholders for PAPI
 PLAYER_AVAILABLE: "&aAVAILABLE"
@@ -104,46 +85,5 @@ PLAYER_COOLDOWN: "&eON COOLDOWN"
 PLAYER_SETUP: "&bPICKING A LOCATION"
 PLAYER_LOADING: "&bLOADING CHUNKS"
 PLAYER_TELEPORTING: "&bTELEPORTING"
-
-#info command
-infoHeader: "&a======RTP Info======"
-chunks: "#D4AF37Chunks currently loaded by RTP: [chunks]"
-worldHeader: "#008080Worlds:"
-world: "  #21ADA8[world]"
-regionHeader: "#63C5DARegions:"
-region: "  #52B2BF[region]"
-
-#sub-info
-worldInfo:
-  - "#21ADA8[world]:"
-  - "#99EEBB  name: [name]"
-  - "#99EEBB  region: [region]"
-  - "#99EEBB  requirePermission: [requirePermission]"
-  - "#99EEBB  override: [override]"
-  - "#99EEBB  nearShape: [nearShape]"
-  - "#99EEBB  nearRadius: [nearRadius]"
-  - "#99EEBB  nearCenterRadius: [nearCenterRadius]"
-  - "#99EEBB  nearMinY: [nearMinY]"
-  - "#99EEBB  nearMaxY: [nearMaxY]"
-
-regionInfo:
-  - "#52B2BF[region]:"
-  - "#58CCED  world: [world]"
-  - "#58CCED  shape: [shape]"
-  - "#58CCED  mode: [mode]"
-  - "#58CCED  radius: [radius] chunks"
-  - "#58CCED  centerRadius: [centerRadius] chunks"
-  - "#58CCED  centerX: [centerX]"
-  - "#58CCED  centerZ: [centerZ]"
-  - "#58CCED  minY: [minY]"
-  - "#58CCED  maxY: [maxY]"
-  - "#58CCED  weight: [weight]"
-  - "#58CCED  requireSkyLight: [requireSkyLight]"
-  - "#58CCED  requirePermission: [requirePermission]"
-  - "#58CCED  worldBorderOverride: [worldBorderOverride]"
-  - "#58CCED  uniquePlacements: [uniquePlacements]"
-  - "#58CCED  expand: [expand]"
-  - "#58CCED  queueLen: [queueLen]"
-  - "#58CCED  queued: [queued]"
 
 version: "1.0"

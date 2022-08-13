@@ -249,7 +249,7 @@ public class SendMessage {
         if(sender instanceof Player) sendMessage((Player) sender,message);
         else {
             message = format(Bukkit.getOfflinePlayer(CommandsAPI.serverId),message);
-            if(RTP.getInstance().serverAccessor.getServerIntVersion() >=12) {
+            if(RTP.serverAccessor.getServerIntVersion() >=12) {
                 BaseComponent[] components = TextComponent.fromLegacyText(message);
                 sender.spigot().sendMessage(components);
             }
@@ -260,7 +260,7 @@ public class SendMessage {
     public static void sendMessage(Player player, String message) {
         if(message == null || message.isBlank()) return;
         message = format(player,message);
-        if(RTP.getInstance().serverAccessor.getServerIntVersion() >=12) {
+        if(RTP.serverAccessor.getServerIntVersion() >=12) {
             BaseComponent[] components = TextComponent.fromLegacyText(message);
             player.spigot().sendMessage(components);
         }
@@ -276,13 +276,13 @@ public class SendMessage {
 
         message = format(player,message);
 
-        if(RTP.getInstance().serverAccessor.getServerIntVersion() >=12) {
+        if(RTP.serverAccessor.getServerIntVersion() >=12) {
             BaseComponent[] textComponents = TextComponent.fromLegacyText(message);
 
             if (!hover.equals("")) {
                 BaseComponent[] hoverComponents = TextComponent.fromLegacyText(format(player, hover));
                 //noinspection deprecation
-                HoverEvent hoverEvent = (RTP.getInstance().serverAccessor.getServerIntVersion()>=16)
+                HoverEvent hoverEvent = (RTP.serverAccessor.getServerIntVersion()>=16)
                         ? new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(hoverComponents))
                         : new HoverEvent(HoverEvent.Action.SHOW_TEXT, hoverComponents);
                 for (BaseComponent component : textComponents) {
@@ -349,7 +349,7 @@ public class SendMessage {
         while (matcher1.find()) {
             String hexColor = text.substring(matcher1.start(), matcher1.end());
             String bukkitColor;
-            if(RTP.getInstance().serverAccessor.getServerIntVersion() < 16) {
+            if(RTP.serverAccessor.getServerIntVersion() < 16) {
                 StringBuilder bukkitColorCode = new StringBuilder('\u00A7' + "x");
                 for (int i = hexColor.indexOf('#')+1; i < hexColor.length(); i++) {
                     bukkitColorCode.append('\u00A7').append(hexColor.charAt(i));
@@ -381,7 +381,7 @@ public class SendMessage {
         Bukkit.getLogger().log(level,message,exception);
     }
 
-    private static Set<String> keywords(String input) {
+    public static Set<String> keywords(String input) {
         Set<String> res = new HashSet<>();
         StringBuilder builder = null;
         for(int i = 0; i < input.length(); i++) {

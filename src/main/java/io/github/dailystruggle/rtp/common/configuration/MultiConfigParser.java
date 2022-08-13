@@ -30,7 +30,7 @@ public class MultiConfigParser<E extends Enum<E>>  extends FactoryValue<E> imple
             saveResourceFromJar(name + File.separator + "default.yml",true);
         }
 
-        File langMap = new File(RTP.getInstance().serverAccessor.getPluginDirectory() + File.separator + "lang" + File.separator + name + ".lang.yml");
+        File langMap = new File(RTP.serverAccessor.getPluginDirectory() + File.separator + "lang" + File.separator + name + ".lang.yml");
 
         File[] files = myDirectory.listFiles();
         if(files == null) return;

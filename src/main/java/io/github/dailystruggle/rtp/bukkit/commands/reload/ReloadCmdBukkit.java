@@ -57,7 +57,7 @@ public class ReloadCmdBukkit extends BukkitBaseRTPCmd {
     }
 
     void addCommands() {
-        final RTPServerAccessor serverAccessor = RTP.getInstance().serverAccessor;
+        final RTPServerAccessor serverAccessor = RTP.serverAccessor;
         for (ConfigParser<?> value : RTP.getInstance().configs.configParserMap.values()) {
             String name = value.name.replace(".yml","");
             if(getCommandLookup().containsKey(name)) continue;
@@ -153,7 +153,7 @@ public class ReloadCmdBukkit extends BukkitBaseRTPCmd {
                             if(shapeObj instanceof MemorySection shapeSection) {
                                 final Map<String, Object> shapeMap = shapeSection.getMapValues(true);
                                 String shapeName = String.valueOf(shapeMap.get("name"));
-                                Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.getInstance().factoryMap.get(RTP.factoryNames.shape);
+                                Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
                                 shape = (Shape<?>) factory.getOrDefault(shapeName);
                                 EnumMap<?, Object> shapeData = shape.getData();
                                 for(var e : shapeData.entrySet()) {
@@ -178,7 +178,7 @@ public class ReloadCmdBukkit extends BukkitBaseRTPCmd {
                             if(vertObj instanceof MemorySection vertSection) {
                                 final Map<String, Object> vertMap = vertSection.getMapValues(true);
                                 String shapeName = String.valueOf(vertMap.get("name"));
-                                Factory<VerticalAdjustor<?>> factory = (Factory<VerticalAdjustor<?>>) RTP.getInstance().factoryMap.get(RTP.factoryNames.vert);
+                                Factory<VerticalAdjustor<?>> factory = (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
                                 VerticalAdjustor<?> vert = (VerticalAdjustor<?>) factory.getOrDefault(shapeName);
                                 EnumMap<?, Object> vertData = vert.getData();
                                 for(var e : vertData.entrySet()) {

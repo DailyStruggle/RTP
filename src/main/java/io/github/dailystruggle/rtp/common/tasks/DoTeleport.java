@@ -45,6 +45,7 @@ public final class DoTeleport extends RTPRunnable {
 
         TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.uuid());
         if(teleportData == null) {
+            RTP.log(Level.SEVERE,"new teleport data");
             teleportData = new TeleportData();
             teleportData.sender = sender;
             teleportData.originalLocation = player.getLocation();
@@ -56,6 +57,7 @@ public final class DoTeleport extends RTPRunnable {
             RTP.getInstance().latestTeleportData.put(player.uuid(),teleportData);
         }
         teleportData.completed = true;
+        RTP.log(Level.SEVERE,"attempts:" + teleportData.attempts);
 
         RTP.getInstance().chunkCleanupPipeline.add(new ChunkCleanup(location, region));
 
@@ -65,7 +67,7 @@ public final class DoTeleport extends RTPRunnable {
 
         ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
         String msg = lang.getConfigValue(LangKeys.teleportMessage, "").toString();
-        RTP.getInstance().serverAccessor.sendMessage(player.uuid(),msg);
+        RTP.serverAccessor.sendMessage(player.uuid(),msg);
 
         postActions.forEach(consumer -> consumer.accept(this));
 

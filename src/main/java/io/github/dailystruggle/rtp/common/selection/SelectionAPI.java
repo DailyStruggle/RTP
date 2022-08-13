@@ -170,7 +170,7 @@ public class SelectionAPI {
     }
 
     public void compute() {
-        RTPServerAccessor serverAccessor = RTP.getInstance().serverAccessor;
+        RTPServerAccessor serverAccessor = RTP.serverAccessor;
 
         int req = RTP.minRTPExecutions;
 

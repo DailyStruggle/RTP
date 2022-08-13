@@ -14,7 +14,6 @@ import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
@@ -65,9 +64,11 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         metrics = new Metrics(this,12277);
 
         instance = this;
-        new RTP(new BukkitServerAccessor()); //constructor updates API instance
-
         BukkitTreeCommand mainCommand = new RTPCmdBukkit(this);
+        RTP.serverAccessor = new BukkitServerAccessor();
+        RTP.baseCommand = mainCommand;
+        new RTP(); //constructor updates API instance
+
         Objects.requireNonNull(getCommand("rtp")).setExecutor(mainCommand);
         Objects.requireNonNull(getCommand("rtp")).setTabCompleter(mainCommand);
         Objects.requireNonNull(getCommand("wild")).setExecutor(mainCommand);

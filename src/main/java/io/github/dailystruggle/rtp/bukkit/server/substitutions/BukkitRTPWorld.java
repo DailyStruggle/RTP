@@ -30,7 +30,7 @@ public record BukkitRTPWorld(World world) implements RTPWorld {
         int x = location.getBlockX();
         int y = location.getBlockY();
         int z = location.getBlockZ();
-        return (RTP.getInstance().serverAccessor.getServerIntVersion() < 17)
+        return (RTP.serverAccessor.getServerIntVersion() < 17)
                 ? world.getBiome(x,y).name()
                 : world.getBiome(x,y,z).name();
     };
@@ -83,7 +83,7 @@ public record BukkitRTPWorld(World world) implements RTPWorld {
 
     @Override
     public void platform(RTPLocation rtpLocation) {
-        int version = RTP.getInstance().serverAccessor.getServerIntVersion();
+        int version = RTP.serverAccessor.getServerIntVersion();
 
         Location location = new Location(
                 Bukkit.getWorld(rtpLocation.world().name()),
