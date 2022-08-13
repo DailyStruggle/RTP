@@ -47,7 +47,7 @@ public final class OnPlayerTeleport implements Listener {
         Location eventTo = event.getTo();
         if(eventTo == null) return;
         RTPLocation location = teleportData.selectedLocation;
-        RTPLocation to = new RTPLocation(new BukkitRTPWorld(eventTo.getWorld()), eventTo.getBlockX(), eventTo.getBlockY(), eventTo.getBlockZ());
+        RTPLocation to = new RTPLocation(RTP.serverAccessor.getRTPWorld(eventTo.getWorld().getUID()), eventTo.getBlockX(), eventTo.getBlockY(), eventTo.getBlockZ());
         double distanceSquared = (Objects.requireNonNull(Objects.requireNonNull(eventTo).getWorld()).getUID()
                 .equals(Objects.requireNonNull(event.getFrom().getWorld()).getUID()))
                 ? location.distanceSquared(to) : Double.MAX_VALUE;

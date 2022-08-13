@@ -7,7 +7,10 @@ public interface RTPWorld {
     String name();
     UUID id();
 
-    CompletableFuture<RTPChunk> getChunkAt(long chunkX, long chunkZ);
+    CompletableFuture<RTPChunk> getChunkAt(int chunkX, int chunkZ);
+
+    void keepChunkAt(int chunkX, int chunkZ);
+    void forgetChunkAt(int chunkX, int chunkZ);
 
     String getBiome(int x, int y, int z);
 

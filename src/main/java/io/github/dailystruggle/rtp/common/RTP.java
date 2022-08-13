@@ -153,7 +153,7 @@ public class RTP {
         miscSyncTasks.execute(availableTime-(start-System.nanoTime()));
     }
 
-    public Map<int[], RTPChunk> forceLoads = new ConcurrentHashMap<>();
+    public Map<List<Integer>, RTPChunk> forceLoads = new ConcurrentHashMap<>();
 
     public void cancelTeleport(UUID uuid) {
         if(!latestTeleportData.containsKey(uuid)) return;

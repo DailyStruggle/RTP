@@ -21,12 +21,14 @@ public record RTPLocation(RTPWorld world, int x, int y, int z) implements Clonea
 
     @Override
     public RTPLocation clone() {
+        RTPLocation clone;
         try {
-            RTPLocation clone = (RTPLocation) super.clone();
+            clone = (RTPLocation) super.clone();
         } catch (CloneNotSupportedException e) {
             e.printStackTrace();
+            return null;
         }
-        return new RTPLocation(world,x,y,z);
+        return clone;
     }
 
     public CompletableFuture<RTPBlock> getBlock() {

@@ -23,8 +23,18 @@ public class TestRTPWorld implements RTPWorld {
     }
 
     @Override
-    public CompletableFuture<RTPChunk> getChunkAt(long chunkX, long chunkZ) {
+    public CompletableFuture<RTPChunk> getChunkAt(int chunkX, int chunkZ) {
         return null;
+    }
+
+    @Override
+    public void keepChunkAt(int chunkX, int chunkZ) {
+
+    }
+
+    @Override
+    public void forgetChunkAt(int chunkX, int chunkZ) {
+
     }
 
     @Override
