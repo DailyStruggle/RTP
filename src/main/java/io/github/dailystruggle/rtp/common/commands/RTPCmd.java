@@ -58,14 +58,6 @@ public interface RTPCmd extends BaseRTPCmd {
             return true;
         }
 
-        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) rtp.configs.getParser(PerformanceKeys.class);
-        boolean syncLoading = false;
-        Object configValue = perf.getConfigValue(PerformanceKeys.syncLoading, false);
-        if(configValue instanceof String s) {
-            configValue = Boolean.parseBoolean(s);
-        }
-        if(configValue instanceof Boolean b) syncLoading = b;
-
         if(!senderId.equals(CommandsAPI.serverId)) rtp.processingPlayers.add(senderId);
 
         return onCommand(senderId,sender::hasPermission,sender::sendMessage,args);
@@ -74,7 +66,6 @@ public interface RTPCmd extends BaseRTPCmd {
     //async command component
     default boolean compute(UUID senderId, Map<String, List<String>> rtpArgs, CommandsAPICommand nextCommand) {
         long timingsStart = System.nanoTime();
-        long start = timingsStart;
 
         RTPCommandSender sender = RTP.serverAccessor.getSender(senderId);
 

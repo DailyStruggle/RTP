@@ -18,12 +18,13 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 
 public final class SetupTeleport extends RTPRunnable {
     public static final List<Consumer<SetupTeleport>> preActions = new ArrayList<>();
-    public static final List<Consumer<SetupTeleport>> postActions = new ArrayList<>();
+    public static final List<BiConsumer<SetupTeleport,Boolean>> postActions = new ArrayList<>();
 
     private final RTPCommandSender sender;
     private final RTPPlayer player;
@@ -72,12 +73,25 @@ public final class SetupTeleport extends RTPRunnable {
         teleportData.targetRegion = this.region;
 
         teleportData.originalLocation = player.getLocation();
+
+        RTP.getInstance().latestTeleportData.put(player.uuid(),teleportData);
+
         Pair<RTPLocation, Long> pair = this.region.getLocation(sender, player, biomes);
         if(pair == null) {
             String msg = langParser.getConfigValue(LangKeys.unsafe,"").toString();
             RTP.serverAccessor.sendMessage(sender.uuid(),player.uuid(),msg);
-            postActions.forEach(consumer -> consumer.accept(this));
+            postActions.forEach(consumer -> consumer.accept(this, false));
             isRunning = false;
+            RTPTeleportCancel.refund(player.uuid());
+            return;
+        }
+        else if(pair.getLeft() == null) {
+            teleportData.attempts = pair.getRight();
+            String msg = langParser.getConfigValue(LangKeys.unsafe,"").toString();
+            RTP.serverAccessor.sendMessage(sender.uuid(),player.uuid(),msg);
+            postActions.forEach(consumer -> consumer.accept(this, false));
+            isRunning = false;
+            RTPTeleportCancel.refund(player.uuid());
             return;
         }
 
@@ -100,7 +114,7 @@ public final class SetupTeleport extends RTPRunnable {
             rtp.loadChunksPipeline.add(loadChunks);
         }
 
-        postActions.forEach(consumer -> consumer.accept(this));
+        postActions.forEach(consumer -> consumer.accept(this, true));
         isRunning = false;
     }
 
