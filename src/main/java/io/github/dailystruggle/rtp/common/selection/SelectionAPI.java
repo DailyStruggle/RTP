@@ -210,9 +210,8 @@ public class SelectionAPI {
 
     public Region getRegion(RTPPlayer player) {
         //get region from world name, check for overrides
-        Set<String> worldsAttempted = new HashSet<>();
-        Set<String> regionsAttempted = new HashSet<>();
 
+        Set<String> worldsAttempted = new HashSet<>();
         String worldName = player.getLocation().world().name();
         MultiConfigParser<WorldKeys> worldParsers = (MultiConfigParser<WorldKeys>) RTP.getInstance().configs.multiConfigParserMap.get(WorldKeys.class);
         ConfigParser<WorldKeys> worldParser = worldParsers.getParser(worldName);
@@ -232,6 +231,7 @@ public class SelectionAPI {
         ConfigParser<RegionKeys> regionParser = regionParsers.getParser(regionName);
         requirePermission = Boolean.parseBoolean(regionParser.getConfigValue(RegionKeys.requirePermission,false).toString());
 
+        Set<String> regionsAttempted = new HashSet<>();
         while(requirePermission && !player.hasPermission("rtp.regions."+regionName)) {
             if(regionsAttempted.contains(regionName)) throw new IllegalStateException("infinite override loop detected at region - " + regionName);
             regionsAttempted.add(regionName);

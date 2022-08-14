@@ -510,4 +510,24 @@ public class Region extends FactoryValue<RegionKeys> {
         perPlayerLocationQueue.putIfAbsent(id,new ConcurrentLinkedQueue<>());
         miscPipeline.add(new Cache(id));
     }
+
+    public long getTotalQueueLength(UUID uuid) {
+        long res = locationQueue.size();
+        ConcurrentLinkedQueue<Pair<RTPLocation, Long>> queue = perPlayerLocationQueue.get(uuid);
+        if(queue!=null) res+= queue.size();
+        if(fastLocations.containsKey(uuid)) res++;
+        return res;
+    }
+
+    public long getPublicQueueLength() {
+        return locationQueue.size();
+    }
+
+    public long getPersonalQueueLength(UUID uuid) {
+        long res = 0;
+        ConcurrentLinkedQueue<Pair<RTPLocation, Long>> queue = perPlayerLocationQueue.get(uuid);
+        if(queue!=null) res += queue.size();
+        if(fastLocations.containsKey(uuid)) res++;
+        return res;
+    }
 }

@@ -182,8 +182,7 @@ public class OnEventTeleports implements Listener {
         ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) rtp.configs.configParserMap.get(ConfigKeys.class);
 
         //handle both integer and floating point inputs
-        Number cooldownConfig = configParser.getNumber(ConfigKeys.teleportCooldown, 2);
-        long cooldownTime = TimeUnit.MILLISECONDS.toNanos((long) (cooldownConfig.doubleValue()*1000));
+        long cooldownTime = new BukkitRTPCommandSender(event.getPlayer()).cooldown();
 
         for(PermissionAttachmentInfo perm : perms) {
             if(!perm.getValue()) continue;

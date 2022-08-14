@@ -1,11 +1,28 @@
 package io.github.dailystruggle.rtp.bukkit.tools.softdepends;
 
 import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
+import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPCommandSender;
+import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
+import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
+import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.factory.FactoryValue;
+import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
+import io.github.dailystruggle.rtp.common.tasks.DoTeleport;
+import io.github.dailystruggle.rtp.common.tasks.LoadChunks;
+import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
+import io.github.dailystruggle.rtp.common.tasks.SetupTeleport;
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
 import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.concurrent.TimeUnit;
 
 public class PAPI_expansion extends PlaceholderExpansion{
 	@Override
@@ -44,78 +61,74 @@ public class PAPI_expansion extends PlaceholderExpansion{
             return "";
         }
 
-//        // %rtp_player_status%
-//        if(identifier.equalsIgnoreCase("player_status")){
-//            if(cache.doTeleports.containsKey(player.getUniqueId())) {
-//                return configs.lang.getLog("PLAYER_TELEPORTING");
-//            }
-//            else if(cache.setupTeleports.containsKey(player.getUniqueId())) {
-//                return configs.lang.getLog("PLAYER_SETUP");
-//            }
-//            else if(cache.loadChunks.containsKey(player.getUniqueId())) {
-//                return configs.lang.getLog("PLAYER_LOADING");
-//            }
-//            else if(!player.hasPermission("rtp.noCooldown")
-//                    && (cache.lastTeleportTime.get(player.getUniqueId()) - System.nanoTime()) < TimeUnit.SECONDS.toNanos(configs.config.teleportCooldown)) {
-//                return configs.lang.getLog("PLAYER_COOLDOWN");
-//            }
-//
-//            return configs.lang.getLog("PLAYER_AVAILABLE");
-//        }
-//
-//        if(identifier.equalsIgnoreCase("total_queue_length")) {
-//            TeleportRegion region = getRegion(player);
-//            if(region==null) return "0";
-//            return String.valueOf(region.getTotalQueueLength(player));
-//        }
-//
-//        if(identifier.equalsIgnoreCase("public_queue_length")) {
-//            TeleportRegion region = getRegion(player);
-//            if(region==null) return "0";
-//            return String.valueOf(region.getPublicQueueLength());
-//        }
-//
-//        if(identifier.equalsIgnoreCase("personal_queue_length")) {
-//            TeleportRegion region = getRegion(player);
-//            if(region==null) return "0";
-//            return String.valueOf(region.getPlayerQueueLength(player));
-//        }
-//
-//        if(identifier.equalsIgnoreCase("teleport_world")) {
-//            Location location = getTeleportLocation(player);
-//            String worldName = Objects.requireNonNull(location.getWorld()).getName();
-//            worldName = configs.worlds.worldName2Placeholder(worldName);
-//            return worldName;
-//        }
-//
-//        if(identifier.equalsIgnoreCase("teleport_x")) {
-//            return String.valueOf(getTeleportLocation(player).getBlockX());
-//        }
-//
-//        if(identifier.equalsIgnoreCase("teleport_y")) {
-//            return String.valueOf(getTeleportLocation(player).getBlockY());
-//        }
-//
-//        if(identifier.equalsIgnoreCase("teleport_z")) {
-//            return String.valueOf(getTeleportLocation(player).getBlockZ());
-//        }
-//
-//        if(identifier.equalsIgnoreCase("teleport_biome")) {
-//            Location location = getTeleportLocation(player);
-//            World world = Objects.requireNonNull(location.getWorld());
-//            //noinspection deprecation
-//            return String.valueOf(
-//                    (RTP.getServerIntVersion() < 17)
-//                            ? world.getBiome(location.getBlockX(), location.getBlockZ())
-//                            : world.getBiome(location)
-//            );
-//        }
+        TeleportData data = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
+        ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
 
-        return null;
-    }
+        // %rtp_player_status%
+        if(identifier.equalsIgnoreCase("player_status")){
+            if(data == null) return SendMessage.formatDry(player, lang.getConfigValue(LangKeys.PLAYER_AVAILABLE, "").toString());;
+            if(data.completed) {
+                BukkitRTPCommandSender sender = new BukkitRTPCommandSender(player);
+                long dt = System.nanoTime()-data.time;
+                if(dt < 0) dt = Long.MAX_VALUE+dt;
+                if(dt < sender.cooldown()) {
+                    return SendMessage.formatDry(player, lang.getConfigValue(LangKeys.PLAYER_COOLDOWN, "").toString());
+                }
 
-    @NotNull
-    private Location getTeleportLocation(Player player) {
-	    return new Location(player.getWorld(),0,0,0); //cache.todoTP.getOrDefault(player.getUniqueId(), cache.lastTP.getOrDefault(player.getUniqueId(),new Location(player.getWorld(),0,0,0)));
+                return SendMessage.formatDry(player, lang.getConfigValue(LangKeys.PLAYER_AVAILABLE, "").toString());
+            }
+
+            RTPRunnable nextTask = data.nextTask;
+            if(nextTask instanceof DoTeleport)
+                return SendMessage.formatDry(player, lang.getConfigValue(LangKeys.PLAYER_TELEPORTING, "").toString());
+            if(nextTask instanceof LoadChunks)
+                return SendMessage.formatDry(player, lang.getConfigValue(LangKeys.PLAYER_LOADING, "").toString());
+            if(nextTask instanceof SetupTeleport)
+                return SendMessage.formatDry(player, lang.getConfigValue(LangKeys.PLAYER_SETUP, "").toString());
+        }
+
+        if(identifier.equalsIgnoreCase("total_queue_length")) {
+            Region region = RTP.getInstance().selectionAPI.getRegion(new BukkitRTPPlayer(player));
+            if(region==null) return "0";
+            return String.valueOf(region.getTotalQueueLength(player.getUniqueId()));
+        }
+
+        if(identifier.equalsIgnoreCase("public_queue_length")) {
+            Region region = RTP.getInstance().selectionAPI.getRegion(new BukkitRTPPlayer(player));
+            if(region==null) return "0";
+            return String.valueOf(region.getPublicQueueLength());
+        }
+
+        if(identifier.equalsIgnoreCase("personal_queue_length")) {
+            Region region = RTP.getInstance().selectionAPI.getRegion(new BukkitRTPPlayer(player));
+            if(region==null) return "0";
+            return String.valueOf(region.getPersonalQueueLength(player.getUniqueId()));
+        }
+
+        if(identifier.equalsIgnoreCase("teleport_world")) {
+            return data.selectedLocation.world().name();
+        }
+
+        if(identifier.equalsIgnoreCase("teleport_x")) {
+            return String.valueOf(data.selectedLocation.x());
+        }
+
+        if(identifier.equalsIgnoreCase("teleport_y")) {
+            return String.valueOf(data.selectedLocation.y());
+        }
+
+        if(identifier.equalsIgnoreCase("teleport_z")) {
+            return String.valueOf(data.selectedLocation.z());
+        }
+
+        if(identifier.equalsIgnoreCase("teleport_biome")) {
+            return data.selectedLocation.world().getBiome(
+                    data.selectedLocation.x(),
+                    data.selectedLocation.y(),
+                    data.selectedLocation.z()
+            );
+        }
+
+        return "";
     }
 }
