@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
@@ -19,6 +20,8 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdj
 import io.github.dailystruggle.rtp.common.serverSide.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPChunk;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPEconomy;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import org.jetbrains.annotations.NotNull;
 
@@ -155,31 +158,24 @@ public class RTP {
 
     public Map<List<Integer>, RTPChunk> forceLoads = new ConcurrentHashMap<>();
 
-    public void cancelTeleport(UUID uuid) {
-        if(!latestTeleportData.containsKey(uuid)) return;
-        TeleportData teleportData = latestTeleportData.get(uuid);
-        if(!teleportData.nextTask.isCancelled())
-            teleportData.nextTask.setCancelled(true);
-        teleportData.completed = true;
 
-        ConfigParser<EconomyKeys> eco = (ConfigParser<EconomyKeys>) configs.configParserMap.get(EconomyKeys.class);
-        boolean refund;
-        Object refundObj = eco.getConfigValue(EconomyKeys.refundOnCancel, true);
-        if(refundObj instanceof Boolean b) refund = b;
-        else {
-            refund = Boolean.parseBoolean(String.valueOf(refundObj));
+    public static RTPWorld getWorld(RTPPlayer player) {
+        //get region from world name, check for overrides
+        Set<String> worldsAttempted = new HashSet<>();
+        String worldName = player.getLocation().world().name();
+        MultiConfigParser<WorldKeys> worldParsers = (MultiConfigParser<WorldKeys>) RTP.getInstance().configs.multiConfigParserMap.get(WorldKeys.class);
+        ConfigParser<WorldKeys> worldParser = worldParsers.getParser(worldName);
+        boolean requirePermission = Boolean.parseBoolean(worldParser.getConfigValue(WorldKeys.requirePermission,false).toString());
+
+        while(requirePermission && !player.hasPermission("rtp.worlds."+worldName)) {
+            if(worldsAttempted.contains(worldName)) throw new IllegalStateException("infinite override loop detected at world - " + worldName);
+            worldsAttempted.add(worldName);
+
+            worldName = String.valueOf(worldParser.getConfigValue(WorldKeys.override,"default"));
+            worldParser = worldParsers.getParser(worldName);
+            requirePermission = Boolean.parseBoolean(worldParser.getConfigValue(WorldKeys.requirePermission,false).toString());
         }
 
-        TeleportData priorData = priorTeleportData.getOrDefault(uuid, new TeleportData());
-        priorData.completed = true;
-        if(!refund) {
-            priorData.time = teleportData.time;
-            priorData.cost = teleportData.cost;
-        }
-        latestTeleportData.put(uuid, priorData);
-    }
-
-    public static void teleportAction(UUID playerId){
-        serverAccessor.sendMessage(playerId,"todo: teleportAction");
+        return serverAccessor.getRTPWorld(worldName);
     }
 }

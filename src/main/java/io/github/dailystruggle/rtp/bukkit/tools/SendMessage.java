@@ -334,6 +334,37 @@ public class SendMessage {
         return text;
     }
 
+    public static String formatDry(@Nullable OfflinePlayer player, @Nullable String text) {
+        if(text == null) return "";
+
+        //get uuid to be referenced by placeholder getters
+        UUID uuid = (player!=null) ? player.getUniqueId() : CommandsAPI.serverId;
+
+        //create a container for placeholder getter results
+        // initialize with the same size as the placeholder getter map to skip reallocation
+        Map<String,String> placeholders = new HashMap<>(SendMessage.placeholders.size());
+
+        Set<String> keywords = keywords(text);
+        //for each placeholder getter, add placeholder and result to container
+        SendMessage.placeholders.forEach((s, uuidStringFunction) -> {
+            if(!keywords.contains(s)) return;
+            placeholders.put(s,uuidStringFunction.apply(uuid));
+        });
+
+        //set up substitutor with the new placeholder results array
+        // using [x] format to detect my local placeholders.
+        StrSubstitutor sub = new StrSubstitutor(placeholders,"[","]");
+
+        //replace all placeholders with their respective string function results
+        text = sub.replace(text);
+
+        //check PAPI exists and fill remaining PAPI placeholders
+        //todo: if a null player doesn't work with another PAPI import, blame that import for not verifying its inputs.
+        text = ChatColor.translateAlternateColorCodes('&',text);
+        text = Hex2Color(text);
+        return text;
+    }
+
     private static String Hex2Color(String text) {
         //reduce patterns
         if(text == null) return "";

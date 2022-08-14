@@ -46,8 +46,16 @@ public interface RTPCmd extends BaseRTPCmd {
         //--------------------------------------------------------------------------------------------------------------
         //guard last teleport time synchronously to prevent spam
         TeleportData senderData = rtp.latestTeleportData.getOrDefault(senderId, new TeleportData());
+
         if(senderData.sender == null) {
             senderData.sender = sender;
+        }
+
+        long dt = System.nanoTime()-senderData.time;
+        if(dt < 0) dt = Long.MAX_VALUE+dt;
+        if(dt < sender.cooldown()) {
+            RTP.serverAccessor.sendMessage(senderId,LangKeys.cooldownMessage);
+            return true;
         }
 
         ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) rtp.configs.getParser(PerformanceKeys.class);
@@ -59,13 +67,8 @@ public interface RTPCmd extends BaseRTPCmd {
         if(configValue instanceof Boolean b) syncLoading = b;
 
         if(!senderId.equals(CommandsAPI.serverId)) rtp.processingPlayers.add(senderId);
-        boolean res = onCommand(senderId,sender::hasPermission,sender::sendMessage,args);
 
-        if(syncLoading) {
-            CommandsAPI.execute(Long.MAX_VALUE);
-        }
-
-        return res;
+        return onCommand(senderId,sender::hasPermission,sender::sendMessage,args);
     }
 
     //async command component
