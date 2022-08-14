@@ -11,7 +11,6 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSen
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import org.bukkit.Bukkit;
-import org.stringtemplate.v4.ST;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -83,7 +82,15 @@ public final class LoadChunks extends RTPRunnable {
         DoTeleport doTeleport = new DoTeleport(sender, player, location, region);
         teleportData.nextTask = doTeleport;
 
-        if(sender.hasPermission("rtp.noDelay.chunks") || chunkSet.complete().isDone()) {
+        long lastTime = teleportData.time;
+
+        long delay = sender.delay();
+        long dT = (start - lastTime);
+        long remainingTime = delay - dT;
+        long toTicks = (TimeUnit.NANOSECONDS.toMillis(remainingTime)/50);
+
+        if(     toTicks<1 &&
+                (sender.hasPermission("rtp.noDelay.chunks") || chunkSet.complete().isDone())) {
             if(Bukkit.isPrimaryThread()) doTeleport.run();
             else RTP.getInstance().teleportPipeline.add(doTeleport);
             postActions.forEach(consumer -> consumer.accept(this));
@@ -100,13 +107,7 @@ public final class LoadChunks extends RTPRunnable {
             }
         }
 
-        long lastTime = teleportData.time;
 
-        long cooldownTime = sender.delay();
-        long dT = (start - lastTime);
-        long remainingTime = cooldownTime - dT;
-
-        long toTicks = (TimeUnit.NANOSECONDS.toMillis(remainingTime)/50)-1;
         doTeleport.setDelay(toTicks);
 
         if(toTicks<1 && Bukkit.isPrimaryThread()) doTeleport.run();
