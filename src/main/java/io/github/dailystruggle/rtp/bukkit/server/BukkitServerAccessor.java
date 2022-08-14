@@ -122,6 +122,7 @@ public class BukkitServerAccessor implements RTPServerAccessor {
         for(World world : Bukkit.getWorlds()) {
             try {
                 Shape<?> shape = shapeFunction.apply(world.getName());
+                shape.select();
             }
             catch (Exception exception) {
                 works = false;

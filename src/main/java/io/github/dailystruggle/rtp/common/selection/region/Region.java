@@ -198,7 +198,9 @@ public class Region extends FactoryValue<RegionKeys> {
 
         UUID playerId = player.uuid();
 
-        if(perPlayerLocationQueue.containsKey(playerId)) {
+        boolean custom = biomeNames != null && biomeNames.size() > 0;
+
+        if(!custom && perPlayerLocationQueue.containsKey(playerId)) {
             ConcurrentLinkedQueue<Pair<RTPLocation, Long>> playerLocationQueue = perPlayerLocationQueue.get(playerId);
             while(playerLocationQueue.size()>0) {
                 pair = playerLocationQueue.poll();
@@ -226,30 +228,30 @@ public class Region extends FactoryValue<RegionKeys> {
 
                 //todo: waterlogged check
                 RTPBlock block;
-                boolean fail = false;
-                for(int x = left.x()-safetyRadius; x < left.x()+safetyRadius && !fail; x++) {
-                    for(int z = left.z()-safetyRadius; z < left.z()+safetyRadius && !fail; z++) {
-                        for(int y = left.y()-safetyRadius; y < left.y()+safetyRadius && !fail; y++) {
+                for(int x = left.x()-safetyRadius; x < left.x()+safetyRadius && pass; x++) {
+                    for(int z = left.z()-safetyRadius; z < left.z()+safetyRadius && pass; z++) {
+                        for(int y = left.y()-safetyRadius; y < left.y()+safetyRadius && pass; y++) {
                             block = rtpChunk.getBlockAt(x,y,z);
-                            if(unsafeBlocks.contains(block.getMaterial())) fail = true;
+                            if(unsafeBlocks.contains(block.getMaterial())) pass = true;
                         }
                     }
                 }
 
-                pass &= RTP.getInstance().selectionAPI.checkGlobalRegionVerifiers(left);
+                if(pass) pass &= RTP.getInstance().selectionAPI.checkGlobalRegionVerifiers(left);
                 if(pass) return pair;
             }
         }
 
-        if(locationQueue.size()>0) {
+        if(!custom && locationQueue.size()>0) {
             pair = locationQueue.poll();
-            if(pair == null || pair.getLeft() == null) return null;
+            if(pair == null) return null;
             RTPLocation left = pair.getLeft();
+            if(left == null) return pair;
             boolean pass = RTP.getInstance().selectionAPI.checkGlobalRegionVerifiers(left);
             if(pass) return pair;
         }
 
-        if(sender.hasPermission("rtp.unqueued")) {
+        if(custom || sender.hasPermission("rtp.unqueued")) {
             pair = getLocation(biomeNames);
             long attempts = pair.getRight();
             TeleportData data = RTP.getInstance().latestTeleportData.get(playerId);
@@ -306,7 +308,7 @@ public class Region extends FactoryValue<RegionKeys> {
             int[] select = shape.select();
             currBiome = world.getBiome(select[0], (vert.maxY()+vert.minY())/2, select[1]);
 
-            for(; biomeChecks < maxBiomeChecks && !biomeNames.contains(currBiome); biomeChecks++) {
+            for(; biomeChecks < maxBiomeChecks && !biomeNames.contains(currBiome); biomeChecks++, maxAttempts++, i++) {
                 select = shape.select();
                 currBiome = world.getBiome(select[0], (vert.maxY()+vert.minY())/2, select[1]);
             }

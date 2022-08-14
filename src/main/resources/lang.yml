@@ -59,8 +59,6 @@ updated: "&a[plugin] successfully updated [filename]"
 # placeholder: [arg] - the argument attempted
 badArg: "&c[plugin] invalid command argument [arg]"
 
-consoleCmdNotAllowed: "&cYou can't do this from console. Try adding a player or world argument or not using '~'."
-
 # user doesn't have permission for the command requested
 noPerms: "&eI'm sorry, but you do not have permission to perform this command. Please contact the server administrators if you believe that this is in error."
 
