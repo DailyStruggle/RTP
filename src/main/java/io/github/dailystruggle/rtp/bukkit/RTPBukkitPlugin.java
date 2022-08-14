@@ -163,9 +163,11 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             if(preSetupTeleportEvent.isCancelled()) setupTeleport.setCancelled(true);
         });
 
-        SetupTeleport.postActions.add(setupTeleport -> {
-            PostSetupTeleportEvent postSetupTeleportEvent = new PostSetupTeleportEvent(setupTeleport);
-            Bukkit.getPluginManager().callEvent(postSetupTeleportEvent);
+        SetupTeleport.postActions.add((setupTeleport, aBoolean) -> {
+            if(aBoolean) {
+                PostSetupTeleportEvent postSetupTeleportEvent = new PostSetupTeleportEvent(setupTeleport);
+                Bukkit.getPluginManager().callEvent(postSetupTeleportEvent);
+            }
         });
 
         LoadChunks.preActions.add(loadChunks -> {
