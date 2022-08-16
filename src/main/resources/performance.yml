@@ -7,9 +7,8 @@ maxAttempts: 100
 viewDistanceSelect: 0
 viewDistanceTeleport: 0
 
-#time, in seconds, between searching for a new location in each region and processing player queues
-# set to 0 or lower to stop the timer.
-period: 10
+#number of gameticks between searching for a new location in each region
+period: 20
 
 #minimum TPS requirement before trying to queue a new location
 # must be a positive number
@@ -29,8 +28,5 @@ onEventParsing: true
 #on startup, whether to enable permissions parsing for effect permissions
 # if you don't need effects or if you're using an addon to apply effects, this can be disabled
 effectParsing: true
-
-#log selection timings (debug)
-timeit: false
 
 version: "1.0"

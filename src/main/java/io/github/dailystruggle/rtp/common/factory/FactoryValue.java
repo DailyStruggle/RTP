@@ -1,8 +1,12 @@
 package io.github.dailystruggle.rtp.common.factory;
 
 import com.google.common.base.Function;
+import io.github.dailystruggle.rtp.common.RTP;
 import org.jetbrains.annotations.NotNull;
+import org.simpleyaml.configuration.file.YamlFile;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -79,6 +83,9 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
         data.forEach((keyStr, value) -> {
             if(keyStr == null) return;
             if(value == null) return;
+
+            if(language_mapping.containsKey(keyStr)) keyStr = language_mapping.get(keyStr).toString();
+
             try {
                 E key = Enum.valueOf(myClass, keyStr);
                 this.data.put(key, value);
@@ -169,5 +176,45 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
             }
         }
         return res.toString();
+    }
+
+    public Map<String, Object> language_mapping = new ConcurrentHashMap<>();
+    public Map<String,String> reverse_language_mapping = new ConcurrentHashMap<>();
+
+    protected void loadLangFile(String subDir) throws IOException {
+        String name = this.name;
+        if(!name.endsWith(".yml")) name = name + ".yml";
+        File langFile;
+        String langDirStr = RTP.serverAccessor.getPluginDirectory().getAbsolutePath()
+                + File.separator
+                + "lang"
+                + File.separator
+                + subDir;
+        File langDir = new File(langDirStr);
+        if(!langDir.exists()) {
+            boolean mkdir = langDir.mkdirs();
+            if(!mkdir) throw new IllegalStateException();
+        }
+
+        String mapFileName = langDir + File.separator
+                + name.replace(".yml", ".lang.yml");
+        langFile = new File(mapFileName);
+
+        YamlFile langYaml = new YamlFile(langFile);
+        if(!langFile.exists()) {
+            for (String key : keys()) { //default data, to guard exceptions
+                langYaml.set(key,key);
+            }
+            langYaml.save(langFile);
+        }
+
+        langYaml.loadWithComments();
+        Map<String, Object> map = langYaml.getMapValues(true);
+        language_mapping.clear();
+        language_mapping.putAll(map);
+        reverse_language_mapping.clear();
+        for(var e : language_mapping.entrySet()) {
+            reverse_language_mapping.put(e.getValue().toString(),e.getKey());
+        }
     }
 }

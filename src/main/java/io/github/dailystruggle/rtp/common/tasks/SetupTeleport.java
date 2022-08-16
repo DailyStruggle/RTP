@@ -77,12 +77,7 @@ public final class SetupTeleport extends RTPRunnable {
         RTP.getInstance().latestTeleportData.put(player.uuid(),teleportData);
 
         Pair<RTPLocation, Long> pair = this.region.getLocation(sender, player, biomes);
-        if(pair == null) {
-            String msg = langParser.getConfigValue(LangKeys.unsafe,"").toString();
-            RTP.serverAccessor.sendMessage(sender.uuid(),player.uuid(),msg);
-            postActions.forEach(consumer -> consumer.accept(this, false));
-            isRunning = false;
-            RTPTeleportCancel.refund(player.uuid());
+        if(pair == null) { //player gets put on region queue
             return;
         }
         else if(pair.getLeft() == null) {

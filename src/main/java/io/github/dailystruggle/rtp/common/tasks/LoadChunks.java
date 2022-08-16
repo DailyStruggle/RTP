@@ -34,7 +34,6 @@ public final class LoadChunks extends RTPRunnable {
     private final RTPPlayer player;
     private final RTPLocation location;
     private final Region region;
-    private ChunkSet chunkSet;
     public boolean modified = false;
 
     public LoadChunks(RTPCommandSender sender,
@@ -50,7 +49,7 @@ public final class LoadChunks extends RTPRunnable {
         long radius2 = perf.getNumber(PerformanceKeys.viewDistanceTeleport, 0L).longValue();
         long max = (radius2 * radius2 * 4) + (4 * radius2) + 1;
 
-        chunkSet = this.region.chunks(location, radius2);
+        ChunkSet chunkSet = this.region.chunks(location, radius2);
 
         TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.uuid());
         if(teleportData == null) {
@@ -88,6 +87,8 @@ public final class LoadChunks extends RTPRunnable {
         long dT = (start - lastTime);
         long remainingTime = delay - dT;
         long toTicks = (TimeUnit.NANOSECONDS.toMillis(remainingTime)/50);
+
+        ChunkSet chunkSet = this.region.locAssChunks.get(location);
 
         if(     toTicks<1 &&
                 (sender.hasPermission("rtp.noDelay.chunks") || chunkSet.complete().isDone())) {
@@ -155,9 +156,5 @@ public final class LoadChunks extends RTPRunnable {
                 "player=" + player + ", " +
                 "location=" + location + ", " +
                 "region=" + region + ']';
-    }
-
-    public ChunkSet chunkSet() {
-        return chunkSet;
     }
 }

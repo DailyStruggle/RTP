@@ -4,9 +4,12 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.selection.region.ChunkSet;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.MutablePair;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -58,7 +61,10 @@ public final class RTPTeleportCancel extends RTPRunnable {
         TeleportData data = RTP.getInstance().latestTeleportData.get(playerId);
         if(data == null) return;
         if(data.completed) return;
-        if(data.nextTask == null) return;
+
+        if(data.selectedLocation!=null && data.targetRegion!=null && (data.biomes==null || data.biomes.size()==0)) {
+            data.targetRegion.locationQueue.add(new MutablePair<>(data.selectedLocation, data.attempts));
+        }
 
         //reset player data
         TeleportData repData = RTP.getInstance().priorTeleportData.get(playerId);

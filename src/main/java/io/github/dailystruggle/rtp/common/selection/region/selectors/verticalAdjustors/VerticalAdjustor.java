@@ -8,6 +8,7 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPChunk;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.simpleyaml.configuration.file.YamlFile;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.*;
@@ -30,7 +31,11 @@ public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E
         this.name = name;
         if(!vertAdjustorFactory.contains(name))
             vertAdjustorFactory.add(name,this);
-        loadLangFile();
+        try {
+            loadLangFile("vert");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public abstract @Nullable
@@ -39,51 +44,4 @@ public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E
 
     public abstract int minY();
     public abstract int maxY();
-
-    public Map<String,String> language_mapping = new ConcurrentHashMap<>();
-    public Map<String,String> reverse_language_mapping = new ConcurrentHashMap<>();
-    
-    protected void loadLangFile() {
-        File langFile;
-        String langDirStr = RTP.serverAccessor.getPluginDirectory().getAbsolutePath()
-                + File.separator
-                + "lang"
-                + File.separator
-                + "vert";
-        File langDir = new File(langDirStr);
-        if(!langDir.exists()) {
-            boolean mkdir = langDir.mkdirs();
-            if(!mkdir) throw new IllegalStateException();
-        }
-
-        String mapFileName = langDir + File.separator
-                + name.replace(".yml", ".lang.yml");
-        langFile = new File(mapFileName);
-
-        Yaml langYaml = new Yaml();
-        for (String key : keys()) { //default data, to guard exceptions
-            language_mapping.put(key,key);
-            reverse_language_mapping.put(key,key);
-        }
-        if(langFile.exists()) {
-            InputStream inputStream;
-            try {
-                inputStream = new FileInputStream(langFile);
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-                return;
-            }
-            language_mapping = langYaml.load(inputStream);
-        }
-        else {
-            PrintWriter writer;
-            try {
-                writer = new PrintWriter(langFile);
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-                return;
-            }
-            langYaml.dump(language_mapping,writer);
-        }
-    }
 }

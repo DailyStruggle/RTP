@@ -59,15 +59,23 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     public Map<List<Integer>,CompletableFuture<Chunk>> chunkLoads = new ConcurrentHashMap<>();
 
     @Override
+    public void onLoad() {
+        instance = this;
+        RTP.serverAccessor = new BukkitServerAccessor();
+
+        new RTP(); //constructor updates API instance
+    }
+
+    @Override
     public void onEnable() {
         PaperLib.suggestPaper(this);
         metrics = new Metrics(this,12277);
 
-        instance = this;
+        RTP.getInstance().miscSyncTasks.execute(Long.MAX_VALUE);
+        RTP.getInstance().miscAsyncTasks.execute(Long.MAX_VALUE);
+
         BukkitTreeCommand mainCommand = new RTPCmdBukkit(this);
-        RTP.serverAccessor = new BukkitServerAccessor();
         RTP.baseCommand = mainCommand;
-        new RTP(); //constructor updates API instance
 
         Objects.requireNonNull(getCommand("rtp")).setExecutor(mainCommand);
         Objects.requireNonNull(getCommand("rtp")).setTabCompleter(mainCommand);
@@ -149,9 +157,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             }
         }
 
-        for(var r : RTP.getInstance().selectionAPI.permRegionLookup.values()) {
-            r.shutDown();
-        }
+        RTP.stop();
 
         super.onDisable();
     }

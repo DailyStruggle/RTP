@@ -110,7 +110,7 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
                 "adjust shape of target region",
                 (sender, s) -> this.shapeFactory.contains(s));
         addParameter("shape", shapeParameter);
-        Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),()->{
+        RTP.getInstance().miscAsyncTasks.add(()->{
             Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
             for(var e : factory.map.entrySet()) {
                 shapeParameter.putShape(e.getKey(),e.getValue().getParameters());

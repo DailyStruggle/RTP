@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiPredicate;
+import java.util.stream.Collectors;
 
 
 public abstract class Shape<E extends Enum<E>> extends FactoryValue<E> {
@@ -35,7 +36,7 @@ public abstract class Shape<E extends Enum<E>> extends FactoryValue<E> {
         if(factory == null) throw new IllegalStateException("shape factory doesn't exist");
         if (!factory.contains(name)) factory.add(name,this);
         try {
-            loadLangFile();
+            loadLangFile("shape");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -55,40 +56,5 @@ public abstract class Shape<E extends Enum<E>> extends FactoryValue<E> {
     @Override
     public Shape<E> clone() {
         return (Shape<E>) super.clone();
-    }
-
-    public Map<String, Object> language_mapping = new ConcurrentHashMap<>();
-    public Map<String,String> reverse_language_mapping = new ConcurrentHashMap<>();
-
-    protected void loadLangFile() throws IOException {
-        String name = this.name;
-        if(!name.endsWith(".yml")) name = name + ".yml";
-        File langFile;
-        String langDirStr = RTP.serverAccessor.getPluginDirectory().getAbsolutePath()
-                + File.separator
-                + "lang"
-                + File.separator
-                + "shape";
-        File langDir = new File(langDirStr);
-        if(!langDir.exists()) {
-            boolean mkdir = langDir.mkdirs();
-            if(!mkdir) throw new IllegalStateException();
-        }
-
-        String mapFileName = langDir + File.separator
-                + name.replace(".yml", ".lang.yml");
-        langFile = new File(mapFileName);
-
-        YamlFile langYaml = new YamlFile(langFile);
-        for (String key : keys()) { //default data, to guard exceptions
-            language_mapping.put(key,key);
-            reverse_language_mapping.put(key,key);
-        }
-        if(langFile.exists()) {
-            langYaml.loadWithComments();
-        }
-        else {
-            langYaml.save(langFile);
-        }
     }
 }

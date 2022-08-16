@@ -6,9 +6,11 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class RTPTaskPipe {
     protected long avgTime = 0;
+    private boolean stop = false;
     private final ConcurrentLinkedQueue<Runnable> runnables = new ConcurrentLinkedQueue<>();
 
     public void execute(long availableTime) {
+        if(stop) return;
         if(runnables.size() == 0) return;
         long dt = 0;
         long start = System.nanoTime();
@@ -16,6 +18,7 @@ public class RTPTaskPipe {
         List<Runnable> delayedRunnables = new ArrayList<>(runnables.size());
 
         for(Runnable runnable : runnables) {
+            if(stop) return;
             if(runnable instanceof RTPDelayable RTPDelayable) {
                 long d = RTPDelayable.getDelay();
                 if(d>0) {
@@ -25,6 +28,7 @@ public class RTPTaskPipe {
         }
 
         do {
+            if(stop) return;
             Runnable runnable = runnables.poll();
             if(runnable == null) continue;
             if(runnable instanceof RTPDelayable RTPDelayable) {
@@ -67,5 +71,9 @@ public class RTPTaskPipe {
 
     public void clear() {
         runnables.clear();
+    }
+
+    public void stop() {
+        stop = true;
     }
 }

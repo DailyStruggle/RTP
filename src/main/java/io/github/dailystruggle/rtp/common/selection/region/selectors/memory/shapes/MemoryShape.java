@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
 
 /**
  * @param <E> enum for configuration values
@@ -129,7 +130,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
             try {
                 Long k = Long.parseLong(key);
-                Long v = Long.parseLong(val);
+                long v = Long.parseLong(val);
 
                 this.badLocations.put(k,v);
                 this.badLocationSum.addAndGet(v);
