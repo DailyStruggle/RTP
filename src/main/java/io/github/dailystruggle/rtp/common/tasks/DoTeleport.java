@@ -12,6 +12,7 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.logging.Level;
@@ -41,7 +42,7 @@ public final class DoTeleport extends RTPRunnable {
         //todo: safety checks
         location.world().platform(location);
 
-        player.setLocation(location);
+        CompletableFuture<Boolean> setLocation = player.setLocation(location);
 
         TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.uuid());
         if(teleportData == null) {
@@ -61,11 +62,14 @@ public final class DoTeleport extends RTPRunnable {
 
         RTP.getInstance().processingPlayers.remove(player.uuid());
 
-        teleportData.processingTime = System.nanoTime() - teleportData.time;
-
-        ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
-        String msg = lang.getConfigValue(LangKeys.teleportMessage, "").toString();
-        RTP.serverAccessor.sendMessage(player.uuid(),msg);
+        TeleportData finalTeleportData = teleportData;
+        setLocation.whenComplete((aBoolean, throwable) -> {
+            if(aBoolean) {
+                finalTeleportData.processingTime = System.nanoTime() - finalTeleportData.time;
+                RTP.getInstance().latestTeleportData.put(player.uuid(),finalTeleportData);
+                RTP.serverAccessor.sendMessage(player.uuid(),LangKeys.teleportMessage);
+            }
+        });
 
         postActions.forEach(consumer -> consumer.accept(this));
     }

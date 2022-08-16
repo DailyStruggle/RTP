@@ -23,6 +23,7 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPEconomy;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
+import io.github.dailystruggle.rtp.common.tasks.RTPTeleportCancel;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
@@ -58,7 +59,7 @@ public class RTP {
      */
     public static int minRTPExecutions = 1;
 
-    public final Configs configs;
+    public Configs configs;
     public static RTPServerAccessor serverAccessor;
     public static RTPEconomy economy = null;
 
@@ -71,14 +72,14 @@ public class RTP {
 
     public RTP() {
         if(serverAccessor == null) throw new IllegalStateException("null serverAccessor");
+        instance = this;
 
         new Circle();
         new Square();
         new LinearAdjustor(new ArrayList<>());
         new JumpAdjustor(new ArrayList<>());
 
-        instance = this;
-        this.configs = new Configs(serverAccessor.getPluginDirectory());
+        miscSyncTasks.add(() -> configs = new Configs(serverAccessor.getPluginDirectory()));
     }
 
     public static RTP getInstance() {
@@ -124,23 +125,22 @@ public class RTP {
 
         ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) configs.getParser(PerformanceKeys.class);
 
-        long period = perf.getNumber(PerformanceKeys.period,10).longValue();
+        long period = perf.getNumber(PerformanceKeys.period,0).longValue();
         List<Region> regions = new ArrayList<>(selectionAPI.permRegionLookup.values());
-        if(period>1) {
-            //step computation according to period
-            double increment = ((double) period)/regions.size();
-            long location = (long) (increment*step);
-            for( int i = 0; i < regions.size(); i++) {
-                long l = (long) (((double)i)*increment);
-                if(l == location) regions.get(i).execute(availableTime - (start - System.nanoTime()));
-            }
-            step = (step+1)%period;
-        }
-        else {
-            for( int i = 0; i < regions.size(); i++) {
+        if(period<=0) period = regions.size();
+        if(period<=0) return;
+
+        //step computation according to period
+        double increment = ((double) period)/regions.size();
+        long location = (long) (increment*step);
+        for( int i = 0; i < regions.size(); i++) {
+            long l = (long) (((double)i)*increment);
+
+            if(l == location) {
                 regions.get(i).execute(availableTime - (start - System.nanoTime()));
             }
         }
+        step = (step+1)%period;
     }
 
 
@@ -177,5 +177,30 @@ public class RTP {
         }
 
         return serverAccessor.getRTPWorld(worldName);
+    }
+
+    public static void stop() {
+        RTP instance = RTP.instance;
+        if(instance == null) return;
+
+        for(var e : instance.latestTeleportData.entrySet()) {
+            TeleportData data = e.getValue();
+            if(data == null || data.completed) continue;
+            new RTPTeleportCancel(e.getKey()).run();
+        }
+
+        instance.chunkCleanupPipeline.execute(Long.MAX_VALUE);
+
+        instance.miscAsyncTasks.stop();
+        instance.miscSyncTasks.stop();
+        instance.setupTeleportPipeline.stop();
+        instance.loadChunksPipeline.stop();
+        instance.teleportPipeline.stop();
+
+        for(var r : instance.selectionAPI.permRegionLookup.values()) {
+            r.shutDown();
+        }
+
+        RTP.instance = null;
     }
 }

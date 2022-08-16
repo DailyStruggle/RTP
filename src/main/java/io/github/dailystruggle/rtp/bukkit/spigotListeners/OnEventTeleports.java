@@ -275,6 +275,14 @@ public class OnEventTeleports implements Listener {
     }
 
     private static void teleportAction(Player player){
-        RTP.serverAccessor.sendMessage(player.getUniqueId(),"todo: teleportAction");
+        BukkitRTPPlayer rtpPlayer = new BukkitRTPPlayer(player);
+        RTP.getInstance().miscAsyncTasks.add(() -> {
+            TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
+            if(teleportData == null) return;
+            RTP.getInstance().priorTeleportData.put(player.getUniqueId(),teleportData);
+            RTP.getInstance().latestTeleportData.remove(player.getUniqueId());
+        });
+        RTP.getInstance().miscAsyncTasks.add(
+                new SetupTeleport(rtpPlayer,rtpPlayer,RTP.getInstance().selectionAPI.getRegion(rtpPlayer), null));
     }
 }

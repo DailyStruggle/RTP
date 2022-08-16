@@ -234,6 +234,14 @@ public class SendMessage {
                 }
             return replacement;
         });
+        placeholders.put("spot",uuid -> {
+            if(rtp == null) return "0";
+            TeleportData teleportData = rtp.latestTeleportData.get(uuid);
+            if(teleportData == null) return "0";
+
+            long spot = teleportData.queueLocation;
+            return String.valueOf(spot);
+        });
     }
 
     public static void sendMessage(CommandSender target1, CommandSender target2, String message) {

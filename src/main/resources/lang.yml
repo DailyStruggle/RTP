@@ -13,16 +13,16 @@ chunkLoading: "&e[plugin] Loading chunks! please wait..."
 teleportCancel: "&e[plugin] Teleport cancelled!"
 
 #if no safe places after reaching max attempts
-unsafe: "&e[plugin] could not find a safe location within [numAttempts] attempts"
+unsafe: "&e[plugin] could not find a safe location within [attempts] attempts"
 
-# placeholder: [time] - how long before player is able to teleport again
+# when the player is on cooldown
 cooldownMessage: "&e[plugin] You can't teleport again for [remainingCooldown]"
 
 #if the region doesn't have any locations queued and the player doesn't have rtp.unqueued permission
 noLocationsQueued: "#f5eb73[plugin] no locations ready at this time"
 
 #when the line shifts
-queueUpdate: "#2636ef[plugin] your spot in line: [num]"
+queueUpdate: "#2636ef[plugin] your spot in line: [spot]"
 
 #if the player doesn't have enough money to teleport in the region
 # placeholder: [money] - how much money is required for the command

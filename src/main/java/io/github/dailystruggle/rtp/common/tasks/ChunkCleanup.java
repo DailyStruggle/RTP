@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.tasks;
 
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 
@@ -7,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.logging.Level;
 
 public final class ChunkCleanup extends RTPRunnable {
     public static final List<Consumer<ChunkCleanup>> preActions = new ArrayList<>();

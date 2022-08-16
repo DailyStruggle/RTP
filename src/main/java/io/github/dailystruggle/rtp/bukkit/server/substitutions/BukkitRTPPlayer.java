@@ -11,6 +11,8 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
+import org.bukkit.event.player.PlayerTeleportEvent;
+import org.checkerframework.checker.units.qual.C;
 
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -48,15 +50,11 @@ public record BukkitRTPPlayer(Player player) implements RTPPlayer {
         double y = to.y();
         double z = to.z() + 0.5;
 
-        if(Bukkit.isPrimaryThread()) {
-            return PaperLib.teleportAsync(player, new Location(world,x,y,z));
-        }
-
         CompletableFuture<Boolean> res = new CompletableFuture<>();
-        Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),() -> {
-            CompletableFuture<Boolean> pass = PaperLib.teleportAsync(player, new Location(world,x,y,z));
-            pass.whenComplete((aBoolean, throwable) -> res.complete(aBoolean));
-        });
+
+        if(Bukkit.isPrimaryThread()) res.complete(player.teleport(new Location(world, x, y, z)));
+        else Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),
+                () -> res.complete(player.teleport(new Location(world, x, y, z))));
         return res;
     }
 

@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 
 import io.github.dailystruggle.commandsapi.bukkit.LocalParameters.*;
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 
@@ -9,6 +10,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public final class Circle extends MemoryShape<GenericMemoryShapeParams> {
@@ -56,20 +58,23 @@ public final class Circle extends MemoryShape<GenericMemoryShapeParams> {
         long cx = getNumber(GenericMemoryShapeParams.centerX,0L).longValue();
         long cz = getNumber(GenericMemoryShapeParams.centerZ,0L).longValue();
 
-        x = x - cx;
-        z = z - cz;
+        x = x-cx;
+        z = z-cz;
 
-        double rotation = ((Math.atan(((double) z) / x) / (2 * Math.PI)) + 1) % 0.25;
+        double rotation = ((Math.atan(((double)z)/x)/(2*Math.PI))+1) % 0.25;
 
-        if ((z < 0) && (x < 0)) {
+        if((z<0) && (x<0)) {
             rotation += 0.5;
-        } else if (z < 0) {
+        }
+        else if(z<0) {
             rotation += 0.75;
-        } else if (x < 0) {
+        }
+        else if(x<0) {
             rotation += 0.25;
         }
 
-        double radius = ((long) (Math.sqrt(x * x + z * z)));
+        double radius = ((long)(Math.sqrt(x*x+z*z)));
+
         return (radius * radius - cr * cr) * Math.PI + rotation * (2 * radius * Math.PI);
     }
 
@@ -81,19 +86,19 @@ public final class Circle extends MemoryShape<GenericMemoryShapeParams> {
 
         int[] res = new int[2];
 
-        //getFromString a distance from the center
-        double radius = Math.sqrt(location / Math.PI + cr * cr);
+        //get a distance from the center
+        double radius = Math.sqrt(location/Math.PI + cr*cr);
 
-        //getFromString a % around the curve, convert to radians
-        double rotation = (radius - (int) radius + 0.000069) * 2 * Math.PI;
+        //get a % around the curve, convert to radians
+        double rotation = (radius - (int)radius + 0.000069)*2*Math.PI;
         //rotation = ((0.875)*2*Math.PI);
 
         double cosRes = Math.cos(rotation);
         double sinRes = Math.sin(rotation);
 
         //polar to cartesian
-        res[0] = (int) ((radius * cosRes) + cx + 0.5);
-        res[1] = (int) ((radius * sinRes) + cz + 0.5);
+        res[0] = (int)((radius * cosRes)+cx+0.5);
+        res[1] = (int)((radius * sinRes)+cz+0.5);
 
         return res;
     }
@@ -110,12 +115,22 @@ public final class Circle extends MemoryShape<GenericMemoryShapeParams> {
 
     @Override
     public int[] select() {
-        String mode = String.valueOf(data.getOrDefault(GenericMemoryShapeParams.mode,"ACCUMULATE")).toUpperCase();
+        return locationToXZ(rand());
+    }
 
+    @Override
+    public long rand() {
         double range = getRange();
+        boolean expand = (boolean) data.getOrDefault(GenericMemoryShapeParams.expand,false);
+        String mode = data.getOrDefault(GenericMemoryShapeParams.mode,"ACCUMULATE").toString().toUpperCase();
 
-        long location = rand();
+        double space = getRange();
+        if((!expand) && mode.equalsIgnoreCase("ACCUMULATE")) space -= badLocationSum.get();
+        else if(expand && !mode.equals("ACCUMULATE")) space += badLocationSum.get();
 
+        double res = (space) * (ThreadLocalRandom.current().nextDouble());
+
+        long location = (long) res;
         switch (mode) {
             case "ACCUMULATE": {
                 Map.Entry<Long, Long> idx = badLocations.firstEntry();
@@ -172,7 +187,7 @@ public final class Circle extends MemoryShape<GenericMemoryShapeParams> {
                 if(     (check!=null)
                         && (location > check.getKey())
                         && (location < check.getKey()+check.getValue())) {
-                    return null;
+                    return -1;
                 }
             }
             default: {
@@ -189,19 +204,6 @@ public final class Circle extends MemoryShape<GenericMemoryShapeParams> {
         }
         if(u) addBadLocation(location);
 
-        return locationToXZ(location);
-    }
-
-    @Override
-    public long rand() {
-        boolean expand = (boolean) data.getOrDefault(GenericMemoryShapeParams.expand,false);
-        String mode = data.getOrDefault(GenericMemoryShapeParams.mode,"ACCUMULATE").toString();
-
-        double space = getRange();
-        if((!expand) && mode.equalsIgnoreCase("ACCUMULATE")) space -= badLocationSum.get();
-        else if(expand && !mode.equals("ACCUMULATE")) space += badLocationSum.get();
-
-        double res = (space) * (ThreadLocalRandom.current().nextDouble());
-        return (long) res;
+        return location;
     }
 }

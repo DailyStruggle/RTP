@@ -19,6 +19,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.serverSide.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
+import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.TPS;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
@@ -37,7 +38,7 @@ import java.util.logging.Level;
 public class ReloadCmdBukkit extends BukkitBaseRTPCmd {
     public ReloadCmdBukkit(Plugin plugin, @Nullable CommandsAPICommand parent) {
         super(plugin, parent);
-        Bukkit.getScheduler().runTaskLater(plugin, this::addCommands,10);
+        RTP.getInstance().miscSyncTasks.add(this::addCommands);
     }
 
     @Override
@@ -185,7 +186,7 @@ public class ReloadCmdBukkit extends BukkitBaseRTPCmd {
                                         e.setValue(vertMap.get(name));
                                     }
                                     else {
-                                        String altName = vert.language_mapping.get(name);
+                                        String altName = vert.language_mapping.get(name).toString();
                                         if(altName!=null && vertMap.containsKey(altName)) {
                                             e.setValue(vertMap.get(altName));
                                         }

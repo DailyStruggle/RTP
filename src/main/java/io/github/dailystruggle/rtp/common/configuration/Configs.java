@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
-import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.*;
 import io.github.dailystruggle.rtp.common.factory.Factory;
@@ -10,8 +9,6 @@ import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
-import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
-import org.bukkit.Bukkit;
 import org.jetbrains.annotations.Nullable;
 import org.simpleyaml.configuration.MemorySection;
 
@@ -21,9 +18,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-
 
 public class Configs {
     protected File worldLangMap;
@@ -71,9 +65,7 @@ public class Configs {
             multiConfigParser.addParser(new ConfigParser<>(WorldKeys.class, worldName,"1.0", multiConfigParser.myDirectory, worldLangMap));
         }
 
-        ConfigParser<WorldKeys> parser = multiConfigParser.getParser(worldName);
-
-        return parser;
+        return multiConfigParser.getParser(worldName);
     }
 
     public CompletableFuture<Boolean> reload() {
@@ -82,17 +74,14 @@ public class Configs {
         if(getParser(LangKeys.class)!=null) RTP.serverAccessor.sendMessage(CommandsAPI.serverId,LangKeys.reloading);
 
         //ensure async to protect server timings
-        RTP.getInstance().miscAsyncTasks.add(new RTPRunnable(0) {
-            @Override
-            public void run() {
-                try {
-                    reloadAction();
-                    RTP.serverAccessor.sendMessage(CommandsAPI.serverId,LangKeys.reloaded);
-                    res.complete(true);
-                } catch (Exception e) { //on any code failure, complete false
-                    res.complete(false);
-                    throw e;
-                }
+        RTP.getInstance().miscAsyncTasks.add(() -> {
+            try {
+                reloadAction();
+                RTP.serverAccessor.sendMessage(CommandsAPI.serverId,LangKeys.reloaded);
+                res.complete(true);
+            } catch (Exception e) { //on any code failure, complete false
+                res.complete(false);
+                throw e;
             }
         });
         return res;
@@ -179,7 +168,7 @@ public class Configs {
                         e.setValue(vertMap.get(name));
                     }
                     else {
-                        String altName = vert.language_mapping.get(name);
+                        String altName = vert.language_mapping.get(name).toString();
                         if(altName!=null && vertMap.containsKey(altName)) {
                             e.setValue(vertMap.get(altName));
                         }
