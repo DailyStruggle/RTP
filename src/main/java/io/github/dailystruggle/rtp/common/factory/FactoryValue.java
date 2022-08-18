@@ -30,8 +30,15 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     protected final EnumMap<E,Object> data;
     protected final EnumMap<E,String[]> desc;
 
+    protected final Map<String,E> enumLookup;
+
     protected FactoryValue(Class<E> myClass, String name) {
         this.myClass = myClass;
+        enumLookup = new ConcurrentHashMap<>();
+        E[] enumConstants = myClass.getEnumConstants();
+        for(E constant : enumConstants) {
+            enumLookup.put(constant.name().toLowerCase(),constant);
+        }
         data = new EnumMap<>(myClass);
         desc = new EnumMap<>(myClass);
         this.name = name;

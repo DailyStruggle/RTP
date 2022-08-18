@@ -51,9 +51,9 @@ updatedRegions: "&b[plugin] updated regions configuration!"
 
 # plugin reload text
 reloading: "&b[plugin] loading [filename]..."
-reloaded: "&b[plugin] successfully loaded [filename]"
+reloaded: "&b[plugin] successfully loaded [filename]."
 updating: "&a[plugin] updating [filename]..."
-updated: "&a[plugin] successfully updated [filename]"
+updated: "&a[plugin] successfully updated [filename]."
 
 # plugin doesn't have the command the user requested
 # placeholder: [arg] - the argument attempted

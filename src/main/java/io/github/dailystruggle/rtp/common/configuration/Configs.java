@@ -9,6 +9,7 @@ import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
+import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
 import org.simpleyaml.configuration.MemorySection;
 
@@ -21,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class Configs {
     protected File worldLangMap;
-    protected final File pluginDirectory;
+    public final File pluginDirectory;
 
     public Map<Class<?>,ConfigParser<?>> configParserMap = new ConcurrentHashMap<>();
     public Map<Class<?>,MultiConfigParser<?>> multiConfigParserMap = new ConcurrentHashMap<>();
@@ -77,7 +78,11 @@ public class Configs {
         RTP.getInstance().miscAsyncTasks.add(() -> {
             try {
                 reloadAction();
-                RTP.serverAccessor.sendMessage(CommandsAPI.serverId,LangKeys.reloaded);
+                ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+                if(lang == null) return;
+                String msg = String.valueOf(lang.getConfigValue(LangKeys.reloaded,""));
+                if(msg!=null) msg = StringUtils.replace(msg,"[filename]", "configs");
+                RTP.serverAccessor.sendMessage(CommandsAPI.serverId,msg);
                 res.complete(true);
             } catch (Exception e) { //on any code failure, complete false
                 res.complete(false);

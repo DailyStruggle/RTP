@@ -14,8 +14,11 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.checkerframework.checker.units.qual.C;
 
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 public record BukkitRTPPlayer(Player player) implements RTPPlayer {
     @Override
@@ -41,6 +44,14 @@ public record BukkitRTPPlayer(Player player) implements RTPPlayer {
     @Override
     public long delay() {
         return new BukkitRTPCommandSender(player).delay();
+    }
+
+    @Override
+    public Set<String> getEffectivePermissions() {
+        return player.getEffectivePermissions().stream().map(permissionAttachmentInfo -> {
+            if(permissionAttachmentInfo.getValue()) return permissionAttachmentInfo.getPermission().toLowerCase();
+            else return null;
+        }).filter(Objects::nonNull).collect(Collectors.toSet());
     }
 
     @Override

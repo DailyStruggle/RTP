@@ -12,6 +12,7 @@ import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
 import io.github.dailystruggle.rtp.bukkit.spigotListeners.*;
 import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.commands.RTPCmd;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
@@ -74,7 +75,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         RTP.getInstance().miscSyncTasks.execute(Long.MAX_VALUE);
         RTP.getInstance().miscAsyncTasks.execute(Long.MAX_VALUE);
 
-        BukkitTreeCommand mainCommand = new RTPCmdBukkit(this);
+        RTPCmdBukkit mainCommand = new RTPCmdBukkit(this);
         RTP.baseCommand = mainCommand;
 
         Objects.requireNonNull(getCommand("rtp")).setExecutor(mainCommand);

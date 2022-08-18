@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.bukkit.tools;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
+import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPCommandSender;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.PAPIChecker;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -10,6 +11,7 @@ import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
+import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
 import net.md_5.bungee.api.ChatColor;
 import net.md_5.bungee.api.chat.BaseComponent;
 import net.md_5.bungee.api.chat.ClickEvent;
@@ -17,12 +19,10 @@ import net.md_5.bungee.api.chat.HoverEvent;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.chat.hover.content.Text;
 import org.apache.commons.lang.text.StrSubstitutor;
-import org.apache.commons.lang3.StringUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.bukkit.permissions.PermissionAttachmentInfo;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
@@ -54,85 +54,47 @@ public class SendMessage {
             if(rtp == null) return "0";
             if(RTP.serverAccessor==null) return "0";
             RTPCommandSender commandSender = RTP.serverAccessor.getSender(uuid);
-            if(commandSender instanceof BukkitRTPPlayer rtpPlayer) {
-                Set<PermissionAttachmentInfo> perms = rtpPlayer.player().getEffectivePermissions();
-                Number n = rtp.configs.getParser(ConfigKeys.class).getNumber(ConfigKeys.teleportDelay,0);
-                for(PermissionAttachmentInfo perm : perms) {
-                    if(!perm.getValue()) continue;
-                    String node = perm.getPermission();
-                    if(node.startsWith("rtp.delay.")) {
-                        String[] val = node.split("\\.");
-                        if(val.length<3 || val[2]==null || val[2].equals("")) continue;
-                        int number;
-                        try {
-                            number = Integer.parseInt(val[2]);
-                        } catch (NumberFormatException exception) {
-                            RTP.log(Level.WARNING, "[rtp] invalid permission: " + node);
-                            continue;
-                        }
-                        n = number;
-                        break;
-                    }
-                }
-                if(n.longValue() == 0) return "0";
+            Number n = rtp.configs.getParser(ConfigKeys.class).getNumber(ConfigKeys.teleportDelay,0);
+            int n2 = ParsePermissions.getInt(commandSender,"rtp.delay.");
+            if(n2>=0) n = n2;
+            if(n.longValue() == 0) return "0";
 
-                long time = n.longValue();
-                ConfigParser<LangKeys> langParser = (ConfigParser<LangKeys>) rtp.configs.getParser(LangKeys.class);
-                long days = TimeUnit.SECONDS.toDays(time);
-                long hours = TimeUnit.SECONDS.toHours(time)%24;
-                long minutes = TimeUnit.SECONDS.toMinutes(time)%60;
-                long seconds = time%60;
+            long time = n.longValue();
+            ConfigParser<LangKeys> langParser = (ConfigParser<LangKeys>) rtp.configs.getParser(LangKeys.class);
+            long days = TimeUnit.SECONDS.toDays(time);
+            long hours = TimeUnit.SECONDS.toHours(time)%24;
+            long minutes = TimeUnit.SECONDS.toMinutes(time)%60;
+            long seconds = time%60;
 
-                String replacement = "";
-                if(days>0) replacement += days + langParser.getConfigValue(LangKeys.days,"").toString() + " ";
-                if(hours>0) replacement += hours + langParser.getConfigValue(LangKeys.hours,"").toString() + " ";
-                if(minutes>0) replacement += minutes + langParser.getConfigValue(LangKeys.minutes,"").toString() + " ";
-                if(seconds>0) replacement += seconds + langParser.getConfigValue(LangKeys.seconds,"").toString();
-                return replacement;
-            }
-            return "0";
+            String replacement = "";
+            if(days>0) replacement += days + langParser.getConfigValue(LangKeys.days,"").toString() + " ";
+            if(hours>0) replacement += hours + langParser.getConfigValue(LangKeys.hours,"").toString() + " ";
+            if(minutes>0) replacement += minutes + langParser.getConfigValue(LangKeys.minutes,"").toString() + " ";
+            if(seconds>0) replacement += seconds + langParser.getConfigValue(LangKeys.seconds,"").toString();
+            return replacement;
         });
         placeholders.put("cooldown",uuid -> {
             if(rtp == null) return "0";
             if(RTP.serverAccessor==null) return "0";
             RTPCommandSender commandSender = RTP.serverAccessor.getSender(uuid);
-            if(commandSender instanceof BukkitRTPPlayer rtpPlayer) {
-                Set<PermissionAttachmentInfo> perms = rtpPlayer.player().getEffectivePermissions();
-                Number n = rtp.configs.getParser(ConfigKeys.class).getNumber(ConfigKeys.teleportCooldown,0);
-                for(PermissionAttachmentInfo perm : perms) {
-                    if(!perm.getValue()) continue;
-                    String node = perm.getPermission();
-                    if(node.startsWith("rtp.cooldown.")) {
-                        String[] val = node.split("\\.");
-                        if(val.length<3 || val[2]==null || val[2].equals("")) continue;
-                        int number;
-                        try {
-                            number = Integer.parseInt(val[2]);
-                        } catch (NumberFormatException exception) {
-                            RTP.log(Level.WARNING, "[rtp] invalid permission: " + node);
-                            continue;
-                        }
-                        n = number;
-                        break;
-                    }
-                }
+            Number n = rtp.configs.getParser(ConfigKeys.class).getNumber(ConfigKeys.teleportCooldown,0);
+            int n2 = ParsePermissions.getInt(commandSender,"rtp.cooldown.");
+            if(n2>=0) n = n2;
 
-                long time = n.longValue();
-                if(time <= 0) return "0";
-                ConfigParser<LangKeys> langParser = (ConfigParser<LangKeys>) rtp.configs.getParser(LangKeys.class);
-                long days = TimeUnit.SECONDS.toDays(time);
-                long hours = TimeUnit.SECONDS.toHours(time)%24;
-                long minutes = TimeUnit.SECONDS.toMinutes(time)%60;
-                long seconds = time%60;
+            long time = n.longValue();
+            if(time <= 0) return "0";
+            ConfigParser<LangKeys> langParser = (ConfigParser<LangKeys>) rtp.configs.getParser(LangKeys.class);
+            long days = TimeUnit.SECONDS.toDays(time);
+            long hours = TimeUnit.SECONDS.toHours(time)%24;
+            long minutes = TimeUnit.SECONDS.toMinutes(time)%60;
+            long seconds = time%60;
 
-                String replacement = "";
-                if(days>0) replacement += days + langParser.getConfigValue(LangKeys.days,"").toString() + " ";
-                if(hours>0) replacement += hours + langParser.getConfigValue(LangKeys.hours,"").toString() + " ";
-                if(minutes>0) replacement += minutes + langParser.getConfigValue(LangKeys.minutes,"").toString() + " ";
-                if(seconds>0) replacement += seconds + langParser.getConfigValue(LangKeys.seconds,"").toString();
-                return replacement;
-            }
-            return "0";
+            String replacement = "";
+            if(days>0) replacement += days + langParser.getConfigValue(LangKeys.days,"").toString() + " ";
+            if(hours>0) replacement += hours + langParser.getConfigValue(LangKeys.hours,"").toString() + " ";
+            if(minutes>0) replacement += minutes + langParser.getConfigValue(LangKeys.minutes,"").toString() + " ";
+            if(seconds>0) replacement += seconds + langParser.getConfigValue(LangKeys.seconds,"").toString();
+            return replacement;
         });
         placeholders.put("remainingCooldown",uuid -> {
             if(rtp == null) return "0";
@@ -142,31 +104,16 @@ public class SendMessage {
 
             Player player = Bukkit.getPlayer(uuid);
             if(player!=null && player.isOnline()) {
-                Set<PermissionAttachmentInfo> perms = player.getEffectivePermissions();
                 TeleportData teleportData = rtp.latestTeleportData.get(uuid);
                 if(teleportData==null) return "0";
                 long lastTime = teleportData.time;
 
-                Number cooldownTime = rtp.configs.getParser(ConfigKeys.class).getNumber(ConfigKeys.teleportCooldown,0);
-                for(PermissionAttachmentInfo perm : perms) {
-                    if(!perm.getValue()) continue;
-                    String node = perm.getPermission();
-                    if(node.startsWith("rtp.cooldown.")) {
-                        String[] val = node.split("\\.");
-                        if(val.length<3 || val[2]==null || val[2].equals("")) continue;
-                        int number;
-                        try {
-                            number = Integer.parseInt(val[2]);
-                        } catch (NumberFormatException exception) {
-                            continue;
-                        }
-                        cooldownTime = number;
-                        break;
-                    }
-                }
+                Number n = rtp.configs.getParser(ConfigKeys.class).getNumber(ConfigKeys.teleportCooldown,0);
+                int n2 = ParsePermissions.getInt(RTP.serverAccessor.getSender(player.getUniqueId()),"rtp.delay.");
+                if(n2>=0) n = n2;
 
                 long currTime = (start - lastTime);
-                long remainingTime = cooldownTime.longValue()-currTime;
+                long remainingTime = n.longValue()-currTime;
                 if(remainingTime < 0) remainingTime = Long.MAX_VALUE+remainingTime;
 
                 ConfigParser<LangKeys> langParser = (ConfigParser<LangKeys>) rtp.configs.getParser(LangKeys.class);
@@ -275,7 +222,7 @@ public class SendMessage {
         else player.sendMessage(message);
     }
 
-    public static void sendMessage(CommandSender sender, String message, String hover, String click) {
+    public static void sendMessage(RTPCommandSender sender, String message, String hover, String click) {
         if(message.equals("")) return;
 
         OfflinePlayer player;
@@ -305,7 +252,8 @@ public class SendMessage {
                 }
             }
 
-            sender.spigot().sendMessage(textComponents);
+            if(sender instanceof BukkitRTPCommandSender rtpCommandSender) rtpCommandSender.sender().spigot().sendMessage(textComponents);
+            else if(sender instanceof BukkitRTPPlayer rtpCommandSender) rtpCommandSender.player().spigot().sendMessage(textComponents);
         }
         else sender.sendMessage(message);
     }

@@ -1,13 +1,17 @@
 package io.github.dailystruggle.rtp.common.commands;
 
+import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.*;
+import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
@@ -17,6 +21,7 @@ import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
+import java.util.stream.Collectors;
 
 public interface RTPCmd extends BaseRTPCmd {
     default void init() {
@@ -135,9 +140,10 @@ public interface RTPCmd extends BaseRTPCmd {
             rtp.latestTeleportData.put(p.uuid(),lastTeleportData);
 
             String regionName;
+            List<String> regionNames = rtpArgs.get("region");
             if(rtpArgs.containsKey("region")) {
                 //todo: get one region from the list
-                regionName = pickOne(rtpArgs.get("region"),"default");
+                regionName = pickOne(regionNames,"default");
             }
             else {
                 String worldName;
@@ -164,7 +170,14 @@ public interface RTPCmd extends BaseRTPCmd {
 
             SelectionAPI selectionAPI = rtp.selectionAPI;
 
-            Region region = selectionAPI.getRegionOrDefault(regionName);
+            Region region;
+            try {
+                region = selectionAPI.getRegionOrDefault(regionName);
+            } catch (IllegalArgumentException | IllegalStateException exception) {
+                rtp.processingPlayers.remove(senderId);
+                rtp.latestTeleportData.remove(senderId);
+                return true;
+            }
             RTPWorld rtpWorld = (RTPWorld) region.getData().get(RegionKeys.world);
             Objects.requireNonNull(rtpWorld);
 
@@ -185,9 +198,69 @@ public interface RTPCmd extends BaseRTPCmd {
             Set<String> biomes = null;
             if(biomeList!=null) biomes = new HashSet<>(biomeList);
 
-            //todo: shape params
+            List<String> shapeNames = rtpArgs.get("shape");
+            for(int j = 0; j<1 && shapeNames!=null && shapeNames.size()>0; j++) {
+                Object o = region.getData().get(RegionKeys.shape);
+
+                Shape<?> originalShape;
+                if(!(o instanceof Shape<?> shape1)) break;
+                originalShape = shape1;
+
+                region = region.clone();
+                rtp.selectionAPI.tempRegions.put(senderId,region);
+                String shapeName = pickOne(shapeNames,"CIRCLE");
+                Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+                Shape<?> shape = (Shape<?>) factory.get(shapeName);
+
+                EnumMap<?, Object> originalShapeData = originalShape.getData();
+                for(var entry : shape.getData().entrySet()) {
+                    String name = entry.getKey().name();
+                    if(name.equalsIgnoreCase("name")) continue;
+                    if(name.equalsIgnoreCase("version")) continue;
+                    if(rtpArgs.containsKey(name)) {
+                        String string = pickOne(rtpArgs.get(name), "");
+
+                        Object value;
+                        if(string.equalsIgnoreCase("true")) {
+                            value = true;
+                        }
+                        else if(string.equalsIgnoreCase("false")) {
+                            value = false;
+                        }
+                        else {
+                            try {
+                                value = Long.parseLong(string);
+                            } catch (IllegalArgumentException ignored) {
+                                try {
+                                    value = Double.parseDouble(string);
+                                } catch (IllegalArgumentException ignored2) {
+                                    try {
+                                        value = Boolean.valueOf(string);
+                                    } catch (IllegalArgumentException ignored3) {
+                                        value = string;
+                                    }
+                                }
+                            }
+                        }
+
+                        entry.setValue(value);
+                    }
+
+                    Enum<?> e;
+                    try {
+                        e = Enum.valueOf(originalShape.myClass, name);
+                    }catch (IllegalArgumentException ignored) {
+                        continue;
+                    }
+
+                    Object o1 = originalShapeData.get(e);
+                    if((o1 instanceof Number) || entry.getValue().getClass().isAssignableFrom(o1.getClass()))
+                        entry.setValue(o1);
+                }
+                region.set(RegionKeys.shape, shape);
+            }
+
             //todo: vert params
-            //todo: biomes
 
             SetupTeleport setupTeleport = new SetupTeleport(sender, p, region, biomes);
             lastTeleportData.nextTask = setupTeleport;

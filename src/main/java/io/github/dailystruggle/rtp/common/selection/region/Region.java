@@ -23,11 +23,9 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.*;
 import java.util.function.BiConsumer;
+import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 
@@ -55,6 +53,63 @@ public class Region extends FactoryValue<RegionKeys> {
      *
      */
     public ConcurrentHashMap<UUID, CompletableFuture<Pair<RTPLocation,Long>>> fastLocations = new ConcurrentHashMap<>();
+
+    //semaphore needed in case of async usage
+    //storage for region verifiers to use for ALL regions
+    private static final Semaphore regionVerifiersLock = new Semaphore(1);
+    private static final List<Predicate<RTPLocation>> regionVerifiers = new ArrayList<>();
+
+    /**
+     * addGlobalRegionVerifier - add a region verifier to use for ALL regions
+     * @param locationCheck verifier method to reference.
+     *                 param: world name, 3D point
+     *                 return: boolean - true on good location, false on bad location
+     */
+    public static void addGlobalRegionVerifier(Predicate<RTPLocation> locationCheck) {
+        try {
+            regionVerifiersLock.acquire();
+        } catch (InterruptedException e) {
+            regionVerifiersLock.release();
+            return;
+        }
+        regionVerifiers.add(locationCheck);
+        regionVerifiersLock.release();
+    }
+
+    public static void clearGlobalRegionVerifiers() {
+        try {
+            regionVerifiersLock.acquire();
+        } catch (InterruptedException e) {
+            regionVerifiersLock.release();
+            return;
+        }
+        regionVerifiers.clear();
+        regionVerifiersLock.release();
+    }
+
+    public static boolean checkGlobalRegionVerifiers(RTPLocation location) {
+        try {
+            regionVerifiersLock.acquire();
+        } catch (InterruptedException e) {
+            regionVerifiersLock.release();
+            return false;
+        }
+
+        for(Predicate<RTPLocation> verifier : regionVerifiers) {
+            try {
+                //if invalid placement, stop and return invalid
+                //clone location to prevent methods from messing with the data
+                if(!verifier.test(location)) {
+                    regionVerifiersLock.release();
+                    return false;
+                }
+            } catch (Throwable throwable) {
+                throwable.printStackTrace();
+            }
+        }
+        regionVerifiersLock.release();
+        return true;
+    }
 
     //localized generic task for
     protected class Cache implements Runnable {
@@ -256,12 +311,12 @@ public class Region extends FactoryValue<RegionKeys> {
                     for(int z = left.z()-safetyRadius; z < left.z()+safetyRadius && pass; z++) {
                         for(int y = left.y()-safetyRadius; y < left.y()+safetyRadius && pass; y++) {
                             block = rtpChunk.getBlockAt(x,y,z);
-                            if(unsafeBlocks.contains(block.getMaterial())) pass = true;
+                            if(unsafeBlocks.contains(block.getMaterial())) pass = false;
                         }
                     }
                 }
 
-                if(pass) pass &= RTP.getInstance().selectionAPI.checkGlobalRegionVerifiers(left);
+                if(pass) pass = checkGlobalRegionVerifiers(left);
                 if(pass) return pair;
             }
         }
@@ -271,7 +326,7 @@ public class Region extends FactoryValue<RegionKeys> {
             if(pair == null) return null;
             RTPLocation left = pair.getLeft();
             if(left == null) return pair;
-            boolean pass = RTP.getInstance().selectionAPI.checkGlobalRegionVerifiers(left);
+            boolean pass = checkGlobalRegionVerifiers(left);
             if(pass) return pair;
         }
 
@@ -330,6 +385,13 @@ public class Region extends FactoryValue<RegionKeys> {
         if(vert == null) return null;
 
         ConfigParser<PerformanceKeys> performance = (ConfigParser<PerformanceKeys>) RTP.getInstance().configs.getParser(PerformanceKeys.class);
+        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.getInstance().configs.getParser(SafetyKeys.class);
+
+        Set<String> unsafeBlocks = safety.yamlFile.getStringList("unsafeBlocks")
+                .stream().map(String::toUpperCase).collect(Collectors.toSet());
+
+        int safetyRadius = safety.yamlFile.getInt("safetyRadius", 0);
+        safetyRadius = Math.max(safetyRadius,7);
 
         long maxAttempts = performance.getNumber(PerformanceKeys.maxAttempts, 20).longValue();
         maxAttempts = Math.max(maxAttempts,1);
@@ -399,7 +461,20 @@ public class Region extends FactoryValue<RegionKeys> {
             }
 
             boolean pass = location != null;
-            pass &= RTP.getInstance().selectionAPI.checkGlobalRegionVerifiers(location);
+
+            //todo: waterlogged check
+            RTPBlock block;
+            for(int x = location.x()-safetyRadius; x < location.x()+safetyRadius && pass; x++) {
+                for(int z = location.z()-safetyRadius; z < location.z()+safetyRadius && pass; z++) {
+                    for(int y = location.y()-safetyRadius; y < location.y()+safetyRadius && pass; y++) {
+                        block = chunk.getBlockAt(x,y,z);
+                        if(unsafeBlocks.contains(block.getMaterial())) pass = false;
+                    }
+                }
+            }
+
+
+            if(pass) pass = checkGlobalRegionVerifiers(location);
 
             if(pass) {
                 if(shape instanceof MemoryShape memoryShape) {
@@ -429,6 +504,13 @@ public class Region extends FactoryValue<RegionKeys> {
         if(shape instanceof MemoryShape<?> memoryShape) {
             memoryShape.save(this.name + ".yml", world.name());
         }
+
+        playerQueue.clear();
+        perPlayerLocationQueue.clear();
+        fastLocations.clear();
+        locationQueue.clear();
+        locAssChunks.forEach((rtpLocation, chunkSet) -> chunkSet.keep(false));
+        locAssChunks.clear();
     }
 
     @Override
@@ -438,6 +520,7 @@ public class Region extends FactoryValue<RegionKeys> {
         clone.locAssChunks = new ConcurrentHashMap<>();
         clone.playerQueue = new ConcurrentLinkedQueue<>();
         clone.perPlayerLocationQueue = new ConcurrentHashMap<>();
+        clone.fastLocations = new ConcurrentHashMap<>();
         return clone;
     }
 
@@ -511,7 +594,7 @@ public class Region extends FactoryValue<RegionKeys> {
                         if (rtpLocation == null) {
                             pass = false;
                         } else {
-                            pass = RTP.getInstance().selectionAPI.checkGlobalRegionVerifiers(rtpLocation);
+                            pass = checkGlobalRegionVerifiers(rtpLocation);
                         }
 
                         if (pass) {

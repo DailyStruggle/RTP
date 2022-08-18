@@ -28,6 +28,8 @@ import java.util.stream.Collectors;
 
 public final class BukkitRTPWorld implements RTPWorld {
     private final Map<List<Integer>, Pair<Chunk,Long>> chunkMap = new ConcurrentHashMap<>();
+    private final UUID id;
+    private final String name;
 
     private static Function<Location, String> getBiome = location -> {
         World world = Objects.requireNonNull(location.getWorld());
@@ -44,6 +46,13 @@ public final class BukkitRTPWorld implements RTPWorld {
 
     public BukkitRTPWorld(World world) {
         this.world = world;
+        if(world == null) {
+            this.id = null;
+            this.name = null;
+            return;
+        }
+        this.id = world.getUID();
+        this.name = world.getName();
     }
 
     public static void setBiomeGetter(@NotNull Function<Location, String> getBiome) {
@@ -56,12 +65,12 @@ public final class BukkitRTPWorld implements RTPWorld {
 
     @Override
     public String name() {
-        return world.getName();
+        return name;
     }
 
     @Override
     public UUID id() {
-        return world.getUID();
+        return id;
     }
 
     @Override
@@ -215,6 +224,11 @@ public final class BukkitRTPWorld implements RTPWorld {
                 }
             }
         }
+    }
+
+    @Override
+    public boolean isActive() {
+        return Bukkit.getWorld(id)!=null;
     }
 
     public static Set<String> getBiomes() {

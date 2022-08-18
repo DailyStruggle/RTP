@@ -1,13 +1,24 @@
 package io.github.dailystruggle.rtp.common.tasks;
 
-public abstract class RTPRunnable implements Runnable, RTPCancellable, RTPDelayable {
+public class RTPRunnable implements Runnable, RTPCancellable, RTPDelayable {
     private boolean cancelled;
     private long delay = 0;
 
     protected boolean isRunning = false;
 
-    public RTPRunnable() {
+    private Runnable runnable;
 
+    public RTPRunnable() {
+        runnable = null;
+    }
+
+    public RTPRunnable(Runnable runnable) {
+        this.runnable = runnable;
+    }
+
+    public RTPRunnable(Runnable runnable, long delay) {
+        this.runnable = runnable;
+        this.delay = delay;
     }
 
     public RTPRunnable(int delay) {
@@ -36,5 +47,10 @@ public abstract class RTPRunnable implements Runnable, RTPCancellable, RTPDelaya
 
     public boolean isRunning() {
         return isRunning;
+    }
+
+    @Override
+    public void run() {
+        if(runnable!=null) runnable.run();
     }
 }

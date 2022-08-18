@@ -15,4 +15,6 @@ public interface RTPWorld {
     String getBiome(int x, int y, int z);
 
     void platform(RTPLocation location);
+
+    boolean isActive();
 }

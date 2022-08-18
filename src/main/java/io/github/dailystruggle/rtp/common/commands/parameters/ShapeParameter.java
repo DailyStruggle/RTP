@@ -8,37 +8,39 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shap
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
+import java.util.logging.Level;
 
 public class ShapeParameter extends CommandParameter {
     public ShapeParameter(String permission, String description, BiFunction<UUID, String, Boolean> isRelevant) {
         super(permission,description, isRelevant);
+        Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+        factory.map.forEach((s, shape1) -> putShape(shape1.name, shape1.getParameters()));
     }
 
     private final Map<String,Map<String,CommandParameter>> subParams = new ConcurrentHashMap<>();
 
     @Override
     public Set<String> values() {
-        Factory<?> shapeFactory = RTP.factoryMap.get(RTP.factoryNames.shape);
-        Enumeration<String> listEnum = shapeFactory.list();
-        Set<String> res = new HashSet<>();
-        while (listEnum.hasMoreElements()) {
-            res.add(listEnum.nextElement());
-        }
-        return res;
+        Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+        factory.map.forEach((s, shape1) -> {
+            if(!subParams.containsKey(s.toUpperCase())) putShape(shape1.name, shape1.getParameters());
+        });
+        return RTP.factoryMap.get(RTP.factoryNames.shape).map.keySet();
     }
 
     @Override
     public Map<String, CommandParameter> subParams(String parameter) {
         parameter = parameter.toUpperCase();
         Factory<?> shapeFactory = RTP.factoryMap.get(RTP.factoryNames.shape);
-        if(subParams.containsKey(parameter)) {
-            return subParams.get(parameter);
+        Map<String, CommandParameter> map = subParams.get(parameter);
+        if(map!=null) {
+            return map;
         }
-        if(shapeFactory.contains(parameter)) {
-            Shape<?> shape = (Shape<?>) shapeFactory.getOrDefault(parameter);
-            Map<String,CommandParameter> res = shape.getParameters();
-            putShape(parameter,res);
-            return res;
+        Shape<?> shape = (Shape<?>) shapeFactory.get(parameter);
+        if(shape!=null) {
+            map = shape.getParameters();
+            subParams.put(parameter, map);
+            return map;
         }
         return new ConcurrentHashMap<>();
     }

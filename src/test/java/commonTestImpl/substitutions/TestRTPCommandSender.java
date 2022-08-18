@@ -3,6 +3,8 @@ package commonTestImpl.substitutions;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Level;
 
@@ -32,5 +34,10 @@ public class TestRTPCommandSender implements RTPCommandSender {
     @Override
     public long delay() {
         return 0;
+    }
+
+    @Override
+    public Set<String> getEffectivePermissions() {
+        return new HashSet<>();
     }
 }

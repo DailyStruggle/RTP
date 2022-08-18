@@ -3,7 +3,7 @@ version: '${project.version}'
 main: io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin
 api-version: 1.13
 authors: [ leaf26 ]
-description: 'an optimized RTP plugin'
+description: 'a fast and flexible random teleportation plugin'
 softdepend: [WorldGuard, WorldEdit, GriefDefender, GriefPrevention, ProtocolLib, Vault, PlaceholderAPI, TownyAdvanced, HuskTowns, Factions, Lands, RedProtect]
 
 commands:
@@ -17,31 +17,6 @@ commands:
     permission: rtp.use
     usage: |
       /wild
-  rtp help:
-    description: rtp command help
-    permission: rtp.see
-    usage: |
-      /rtp help
-  rtp reload:
-    description: Reload the plugin configuration files
-    permission: rtp.reload
-    usage: |
-      /rtp reload
-#  rtp setWorld:
-#    description: update rtp world settings
-#    permission: rtp.setWorld
-#    usage: |
-#      /rtp setWorld
-#  rtp setRegion:
-#    description: create or modify a rtp region
-#    permission: rtp.setRegion
-#    usage: |
-#      /rtp setRegion
-#  rtp fill:
-#    description: attempt each location in region once
-#    permission: rtp.fill
-#    usage: |
-#      /rtp fill
 
 permissions:
   rtp.see:
@@ -55,6 +30,9 @@ permissions:
     default: op
   rtp.reload:
     description: allow player to use /rtp reload
+    default: op
+  rtp.update:
+    description: allow player to use /rtp update
     default: op
   rtp.fill:
     description: allow player to start fill tasks
@@ -99,12 +77,6 @@ permissions:
     default: op
     children:
       rtp.region: true
-  rtp.setWorld:
-    description: allow player to update rtp settings for each world
-    default: op
-  rtp.setRegion:
-    description: allow player to update rtp settings for each region
-    default: op
   rtp.unqueued:
     description: if no locations are queued, generate a new location
     default: op
@@ -183,6 +155,7 @@ permissions:
       rtp.see: true
       rtp.use: true
       rtp.reload: true
+      rtp.update: true
       rtp.noCooldown: true
       rtp.noDelay: true
       rtp.noDelay.chunks: true
@@ -193,11 +166,6 @@ permissions:
       rtp.worlds.*: true
       rtp.region: true
       rtp.regions.*: true
-      rtp.setWorld: true
-      rtp.setRegion: true
       rtp.params: true
-      rtp.near: true
-      rtp.near.other: true
-      rtp.near.random: true
       rtp.biome: true
       rtp.biome.*: true

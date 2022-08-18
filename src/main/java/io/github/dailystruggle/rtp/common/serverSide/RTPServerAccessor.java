@@ -1,7 +1,9 @@
 package io.github.dailystruggle.rtp.common.serverSide;
 
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
+import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
@@ -77,4 +79,10 @@ public interface RTPServerAccessor {
     Set<String> getBiomes();
 
     boolean isPrimaryThread();
+
+    void reset();
+
+    WorldBorder getWorldBorder(String worldName);
+
+    void setWorldBorderFunction(Function<String,WorldBorder> function);
 }
