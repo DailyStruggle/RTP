@@ -24,6 +24,8 @@ public record BukkitRTPChunk(Chunk chunk) implements RTPChunk {
     public RTPBlock getBlockAt(int x, int y, int z) {
         x = x%16;
         z = z%16;
+        if(x<0) x+=16;
+        if(z<0) z+=16;
         return new BukkitRTPBlock(chunk.getBlock(x, y, z));
     }
 

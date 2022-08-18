@@ -36,63 +36,6 @@ public class SelectionAPI {
 
     public final ConcurrentHashMap<String, Region> permRegionLookup = new ConcurrentHashMap<>();
 
-    //semaphore needed in case of async usage
-    //storage for region verifiers to use for ALL regions
-    private final Semaphore regionVerifiersLock = new Semaphore(1);
-    private final List<Predicate<RTPLocation>> regionVerifiers = new ArrayList<>();
-
-    //storage for worldborder stuff to use for ALL regions
-    public WorldBorder worldBorder;
-
-    /**
-     * addGlobalRegionVerifier - add a region verifier to use for ALL regions
-     * @param locationCheck verifier method to reference.
-     *                 param: world name, 3D point
-     *                 return: boolean - true on good location, false on bad location
-     */
-    public void addGlobalRegionVerifier(Predicate<RTPLocation> locationCheck) {
-        try {
-            regionVerifiersLock.acquire();
-        } catch (InterruptedException e) {
-            regionVerifiersLock.release();
-            return;
-        }
-        regionVerifiers.add(locationCheck);
-        regionVerifiersLock.release();
-    }
-
-    public void clearGlobalRegionVerifiers() {
-        try {
-            regionVerifiersLock.acquire();
-        } catch (InterruptedException e) {
-            regionVerifiersLock.release();
-            return;
-        }
-        regionVerifiers.clear();
-        regionVerifiersLock.release();
-    }
-
-    public boolean checkGlobalRegionVerifiers(RTPLocation location) {
-        try {
-            regionVerifiersLock.acquire();
-        } catch (InterruptedException e) {
-            regionVerifiersLock.release();
-            return false;
-        }
-
-        for(Predicate<RTPLocation> verifier : regionVerifiers) {
-            try {
-                //if invalid placement, stop and return invalid
-                //clone location to prevent methods from messing with the data
-                if(!verifier.test(location)) return false;
-            } catch (Throwable throwable) {
-                throwable.printStackTrace();
-            }
-        }
-        regionVerifiersLock.release();
-        return true;
-    }
-
     /**
      * getFromString a region by name
      * @param regionName - name of region, case-insensitive

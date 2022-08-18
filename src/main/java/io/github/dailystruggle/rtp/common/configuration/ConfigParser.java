@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.configuration;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
+import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.simpleyaml.configuration.ConfigurationSection;
@@ -55,23 +56,20 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
         }
 
         YamlFile langYaml = new YamlFile(langFile.getPath());
-        for (String key : keys()) { //default data, to guard exceptions
-            language_mapping.put(key,key);
-            reverse_language_mapping.put(key,key);
-        }
-        if(langFile.exists()) {
-            langYaml.loadWithComments();
-            language_mapping = langYaml.getMapValues(true);
-        }
-        else {
-            for(var e : language_mapping.entrySet()) {
-                langYaml.set(e.getKey(),e.getValue());
+        language_mapping.clear();
+        reverse_language_mapping.clear();
+        if (!langFile.exists()) {
+            for (String key : keys()) { //default data, to guard exceptions
+                langYaml.set(key,key);
+                language_mapping.put(key,key);
+                reverse_language_mapping.put(key,key);
             }
             langYaml.save();
         }
-        for(var e : language_mapping.entrySet()) {
-            reverse_language_mapping.put(e.getValue().toString(),e.getKey());
-        }
+
+        langYaml.loadWithComments();
+        language_mapping = langYaml.getMapValues(true);
+        language_mapping.forEach((s, o) -> reverse_language_mapping.put(o.toString(),s));
     }
 
     public void check(final String version, final File pluginDirectory, @Nullable File langFile) {
@@ -402,6 +400,16 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
         else {
             yamlFile.set(key.name(),value);
         }
+    }
+
+    public void set(String key, Object value) {
+        String translate = reverse_language_mapping.get(key);
+        if(translate!=null) key = translate;
+
+        E k = enumLookup.get(key.toLowerCase());
+        if(k == null) return;
+
+        set(k,value);
     }
 
     private static void setSection(ConfigurationSection section, Map<String,Object> map) {

@@ -3,47 +3,30 @@ package io.github.dailystruggle.rtp.bukkit.commands;
 import io.github.dailystruggle.commandsapi.bukkit.LocalParameters.EnumParameter;
 import io.github.dailystruggle.commandsapi.bukkit.LocalParameters.OnlinePlayerParameter;
 import io.github.dailystruggle.commandsapi.bukkit.LocalParameters.WorldParameter;
-import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
-import io.github.dailystruggle.rtp.bukkit.commands.help.HelpCmdBukkit;
-import io.github.dailystruggle.rtp.bukkit.commands.reload.ReloadCmdBukkit;
 import io.github.dailystruggle.rtp.bukkit.events.TeleportCommandFailEvent;
 import io.github.dailystruggle.rtp.bukkit.events.TeleportCommandSuccessEvent;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPCommandSender;
-import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
-import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.RTPCmd;
+import io.github.dailystruggle.rtp.common.commands.help.HelpCmd;
 import io.github.dailystruggle.rtp.common.commands.parameters.RegionParameter;
 import io.github.dailystruggle.rtp.common.commands.parameters.ShapeParameter;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
-import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
-import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
-import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
+import io.github.dailystruggle.rtp.common.commands.reload.ReloadCmd;
+import io.github.dailystruggle.rtp.common.commands.update.UpdateCmd;
 import io.github.dailystruggle.rtp.common.factory.Factory;
-import io.github.dailystruggle.rtp.common.playerData.TeleportData;
-import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
-import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
-import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
-import io.github.dailystruggle.rtp.common.tasks.SetupTeleport;
 import org.bukkit.Bukkit;
 import org.bukkit.block.Biome;
-import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
 import java.util.*;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
-import java.util.logging.Level;
 
 public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
     //for optimizing parameters,
@@ -66,7 +49,7 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
     }
 
     public RTPCmdBukkit(Plugin plugin) {
-        super(plugin, null);
+        super(plugin,null);
 
         //region name parameter
         // filter by region exists and sender permission
@@ -83,7 +66,8 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
                 (sender, s) -> {
                     Player player = Bukkit.getPlayer(s);
                     return player != null && !player.hasPermission("rtp.notme");
-                }));
+                })
+        );
 
         //world name parameter
         // filter by world exists and sender permission
@@ -97,7 +81,14 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
         addParameter("biome", new EnumParameter<>(
                 "rtp.biome",
                 "select a world to teleport to",
-                (sender, s) -> Biome.valueOf(s.toUpperCase())!=null && sender.hasPermission("rtp.biome." + s),
+                (sender, s) -> {
+                    try {
+                        Biome.valueOf(s.toUpperCase());
+                    } catch (IllegalArgumentException badBiome) {
+                        return false;
+                    }
+                    return sender.hasPermission("rtp.biome." + s);
+                },
                 Biome.class));
 
         //wbo parameter
@@ -105,26 +96,25 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
                 "rtp.params",
                 "override shape with worldborder",
                 (sender, s) -> true));
-        ShapeParameter shapeParameter = new ShapeParameter(
-                "rtp.params",
-                "adjust shape of target region",
-                (sender, s) -> this.shapeFactory.contains(s));
-        addParameter("shape", shapeParameter);
-        RTP.getInstance().miscAsyncTasks.add(()->{
-            Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
-            for(var e : factory.map.entrySet()) {
-                shapeParameter.putShape(e.getKey(),e.getValue().getParameters());
-            }
-        });
+        for(var e : shapeFactory.map.entrySet()) {
+            ShapeParameter shapeParameter = new ShapeParameter(
+                    "rtp.params",
+                    "adjust shape of target region",
+                    (sender, s) -> true);
+            addParameter("shape", shapeParameter);
+            RTP.getInstance().miscAsyncTasks.add(
+                    ()-> shapeParameter.putShape(e.getKey(),e.getValue().getParameters()));
+        }
 
-        addSubCommand(new ReloadCmdBukkit(plugin,this));
-        addSubCommand(new HelpCmdBukkit(plugin,this));
+
+        addSubCommand(new ReloadCmd(this));
+        addSubCommand(new HelpCmd(this));
+        addSubCommand(new UpdateCmd(this));
     }
 
-    //async command component
     @Override
-    public boolean onCommand(CommandSender sender, Map<String, List<String>> rtpArgs, CommandsAPICommand nextCommand) {
-        return compute(new BukkitRTPCommandSender(sender).uuid(),rtpArgs,nextCommand);
+    public boolean onCommand(CommandSender sender, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
+        return compute(new BukkitRTPCommandSender(sender).uuid(), parameterValues, nextCommand);
     }
 
     @Override

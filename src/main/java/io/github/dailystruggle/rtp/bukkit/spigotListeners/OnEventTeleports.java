@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.bukkit.spigotListeners;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPCommandSender;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
-import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
+import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
@@ -23,11 +23,9 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.*;
-import org.bukkit.permissions.PermissionAttachmentInfo;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.logging.Level;
@@ -37,18 +35,7 @@ public class OnEventTeleports implements Listener {
     private final Map<UUID,Double> playerMoveDistances = new HashMap<>();
 
     private static boolean checkPerms(Player player, String... permissions) {
-        Set<PermissionAttachmentInfo> perms = player.getEffectivePermissions();
-        boolean hasPerm = false;
-        for(PermissionAttachmentInfo perm : perms) {
-            if(!perm.getValue()) continue;
-            String s = perm.getPermission().toLowerCase();
-            if(!s.startsWith("rtp.onevent.")) continue;
-            if(s.equals("rtp.onevent.*")) return true;
-            for(String permission : permissions) {
-                if(s.equals("rtp.onevent." + permission.toLowerCase())) return true;
-            }
-        }
-        return hasPerm;
+        return ParsePermissions.hasPerm(new BukkitRTPCommandSender(player),"rtp.onEvent.",permissions);
     }
 
     @EventHandler(priority = EventPriority.NORMAL)
@@ -173,43 +160,13 @@ public class OnEventTeleports implements Listener {
 
         RTP rtp = RTP.getInstance();
 
-        Set<PermissionAttachmentInfo> perms = player.getEffectivePermissions();
-        boolean hasFirstJoin = false;
-        boolean hasJoin = false;
-
         long start = System.nanoTime();
 
-        ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) rtp.configs.configParserMap.get(ConfigKeys.class);
+        BukkitRTPCommandSender sender = new BukkitRTPCommandSender(player);
+        boolean hasFirstJoin = ParsePermissions.hasPerm(sender,"rtp.onevent.", "firstjoin");
+        boolean hasJoin = ParsePermissions.hasPerm(sender,"rtp.onevent.", "join");
 
-        //handle both integer and floating point inputs
         long cooldownTime = new BukkitRTPCommandSender(event.getPlayer()).cooldown();
-
-        for(PermissionAttachmentInfo perm : perms) {
-            if(!perm.getValue()) continue;
-            String node = perm.getPermission();
-            if(!node.startsWith("rtp.onevent.")) continue;
-            if(node.equals("rtp.onevent.*")) {
-                hasFirstJoin = true;
-                hasJoin = true;
-            }
-            else if(perm.getPermission().equals("rtp.onevent.firstjoin"))
-                hasFirstJoin = true;
-            else if(perm.getPermission().equals("rtp.onevent.join"))
-                hasJoin = true;
-            else if(node.startsWith("rtp.cooldown.")) {
-                String[] val = node.split("\\.");
-                if(val.length<3 || val[2]==null || val[2].equals("")) continue;
-                int number;
-                try {
-                    number = Integer.parseInt(val[2]);
-                } catch (NumberFormatException exception) {
-                    RTP.log(Level.WARNING, "[rtp] invalid permission: " + node);
-                    continue;
-                }
-                cooldownTime = TimeUnit.SECONDS.toNanos(number);
-                break;
-            }
-        }
 
         if(hasFirstJoin && !player.hasPlayedBefore()) {
             teleportAction(player);
@@ -218,9 +175,7 @@ public class OnEventTeleports implements Listener {
             TeleportData data = rtp.latestTeleportData.get(player.getUniqueId());
             long time = (data == null) ? 0 : data.time;
             if (!player.hasPermission("rtp.nocooldown") && (start - time) < cooldownTime){
-                ConfigParser<LangKeys> langParser = (ConfigParser<LangKeys>) rtp.configs.configParserMap.get(LangKeys.class);
-                String msg = langParser.getConfigValue(LangKeys.cooldownMessage,"").toString();
-                SendMessage.sendMessage(player, msg);
+                RTP.serverAccessor.sendMessage(player.getUniqueId(),LangKeys.cooldownMessage);
                 return;
             }
             teleportAction(player);
@@ -238,40 +193,19 @@ public class OnEventTeleports implements Listener {
 
         playerMoveDistances.putIfAbsent(player.getUniqueId(),0D);
         playerMoveDistances.compute(player.getUniqueId(),(uuid, aDouble) -> aDouble+=from.distance(to));
-        Double distance = playerMoveDistances.get(player.getUniqueId());
-        if(distance < 1.0) return;
+        double distance = playerMoveDistances.get(player.getUniqueId());
+        if(distance < configParser.getNumber(ConfigKeys.cancelDistance,Double.MAX_VALUE).doubleValue()) return;
         playerMoveDistances.put(player.getUniqueId(),0D);
 
-        //if player has this perm, go again
-        Set<PermissionAttachmentInfo> perms = player.getEffectivePermissions();
-        boolean hasPerm = false;
-        for(PermissionAttachmentInfo perm : perms) {
-            if(!perm.getValue()) continue;
-            if(!perm.getPermission().startsWith("rtp.onevent.")) continue;
-            if(perm.getPermission().equals("rtp.onevent.*") || perm.getPermission().equals("rtp.onevent.move"))
-                hasPerm = true;
-        }
-        if (hasPerm) {
+        if(checkPerms(player,"move"))
             teleportAction(player);
-        }
     }
 
     @EventHandler(priority = EventPriority.LOWEST)
     public void onPlayerTeleport(PlayerTeleportEvent event) {
         Player player = event.getPlayer();
-        
-        //if has this perm, go again
-        Set<PermissionAttachmentInfo> perms = player.getEffectivePermissions();
-        boolean hasPerm = false;
-        for(PermissionAttachmentInfo perm : perms) {
-            if(!perm.getValue()) continue;
-            if(!perm.getPermission().startsWith("rtp.onevent.")) continue;
-            if(perm.getPermission().equals("rtp.onevent.*") || perm.getPermission().equals("rtp.onevent.teleport"))
-                hasPerm = true;
-        }
-        if (hasPerm) {
+        if (checkPerms(player,"teleport"))
             teleportAction(player);
-        }
     }
 
     private static void teleportAction(Player player){

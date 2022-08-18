@@ -8,6 +8,7 @@ import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
+import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.common.serverSide.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
@@ -173,5 +174,20 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
     @Override
     public boolean isPrimaryThread() {
         return false;
+    }
+
+    @Override
+    public void reset() {
+
+    }
+
+    @Override
+    public WorldBorder getWorldBorder(String worldName) {
+        return null;
+    }
+
+    @Override
+    public void setWorldBorderFunction(Function<String, WorldBorder> function) {
+
     }
 }

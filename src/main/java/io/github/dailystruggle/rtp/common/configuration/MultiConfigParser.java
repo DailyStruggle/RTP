@@ -14,12 +14,14 @@ public class MultiConfigParser<E extends Enum<E>>  extends FactoryValue<E> imple
     public final File pluginDirectory;
     public final File myDirectory;
     public final String name;
+    public final String version;
     protected final File langMap;
 
     public MultiConfigParser(Class<E> eClass, String name, String version, File pluginDirectory) {
         super(eClass, name);
         this.pluginDirectory = pluginDirectory;
         this.name = name;
+        this.version = version;
         this.myDirectory = new File(pluginDirectory.getAbsolutePath() + File.separator + name);
         this.langMap = new File(pluginDirectory.getAbsolutePath() + File.separator
                 + "lang" + File.separator + name + ".lang.yml");

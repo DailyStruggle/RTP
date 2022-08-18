@@ -16,8 +16,8 @@ import java.util.Map;
 
 public class RTPAPI {
     public static boolean addSubCommand(CommandsAPICommand command) {
-        if(RTP.getInstance().baseCommand instanceof TreeCommand treeCommand) {
-            treeCommand.addSubCommand(command);
+        if(RTP.baseCommand != null) {
+            RTP.baseCommand.addSubCommand(command);
             return true;
         }
         return false;

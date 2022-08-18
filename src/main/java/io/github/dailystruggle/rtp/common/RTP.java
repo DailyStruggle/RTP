@@ -1,6 +1,8 @@
 package io.github.dailystruggle.rtp.common;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
+import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
+import io.github.dailystruggle.rtp.common.commands.RTPCmd;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
@@ -63,7 +65,7 @@ public class RTP {
     public static RTPServerAccessor serverAccessor;
     public static RTPEconomy economy = null;
 
-    public static CommandsAPICommand baseCommand;
+    public static TreeCommand baseCommand;
 
     /**
      * only one instance will exist at a time, reset on plugin load
