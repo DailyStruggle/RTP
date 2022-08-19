@@ -85,4 +85,6 @@ public interface RTPServerAccessor {
     WorldBorder getWorldBorder(String worldName);
 
     void setWorldBorderFunction(Function<String,WorldBorder> function);
+
+    Set<String> materials();
 }

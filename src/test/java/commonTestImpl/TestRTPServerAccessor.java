@@ -190,4 +190,9 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
     public void setWorldBorderFunction(Function<String, WorldBorder> function) {
 
     }
+
+    @Override
+    public Set<String> materials() {
+        return null;
+    }
 }

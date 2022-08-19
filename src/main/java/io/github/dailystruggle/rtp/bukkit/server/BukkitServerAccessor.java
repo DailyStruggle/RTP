@@ -330,4 +330,9 @@ public class BukkitServerAccessor implements RTPServerAccessor {
         }
 
     }
+
+    @Override
+    public Set<String> materials() {
+        return Arrays.stream(Material.values()).map(Enum::name).collect(Collectors.toSet());
+    }
 }
