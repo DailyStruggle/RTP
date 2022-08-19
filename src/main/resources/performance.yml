@@ -22,11 +22,9 @@ postTeleportQueueing: true
 syncLoading: false
 
 #on startup, whether to enable permissions parsing for onEvent permissions
-# if no players need to teleport on event, this can be disabled
-onEventParsing: true
+onEventParsing: false
 
 #on startup, whether to enable permissions parsing for effect permissions
-# if you don't need effects or if you're using an addon to apply effects, this can be disabled
-effectParsing: true
+effectParsing: false
 
 version: "1.0"
