@@ -254,12 +254,6 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>io.github.dailystruggle</groupId>
-            <artifactId>EffectsAPI</artifactId>
-            <version>LATEST</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
             <groupId>org.bstats</groupId>
             <artifactId>bstats-bukkit</artifactId>
             <version>2.2.1</version>
@@ -365,7 +359,13 @@
         <dependency>
             <groupId>io.github.dailystruggle</groupId>
             <artifactId>CommandsAPI</artifactId>
-            <version>1.0-ALPHA62</version>
+            <version>1.0-ALPHA63</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.github.dailystruggle</groupId>
+            <artifactId>EffectsAPI</artifactId>
+            <version>1.0-ALPHA21</version>
             <scope>compile</scope>
         </dependency>
         <dependency>

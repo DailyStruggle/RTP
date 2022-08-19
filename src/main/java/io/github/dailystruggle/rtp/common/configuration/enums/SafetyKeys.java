@@ -7,6 +7,7 @@ public enum SafetyKeys {
     platformAirHeight,
     platformDepth,
     platformMaterial,
+    airBlocks,
     unsafeBlocks,
     biomeWhitelist,
     biomes,
