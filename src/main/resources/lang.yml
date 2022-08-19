@@ -1,6 +1,4 @@
 #logs and command responses
-#todo: split this
-
 plugin: "[RTP]"
 
 #when teleporting, say this
@@ -43,6 +41,10 @@ oldFile: "&b[plugin] old [filename] detected. Updating"
 # placeholder: [world] - the world detected
 newWorld: "&b[plugin] detected a new world '[world]'"
 
+# world doesn't exist in bukkit
+invalidWorld: "&e[plugin] could not find world '[world]'"
+
+#configuration updates
 updatingWorlds: "&b[plugin] updating worlds configuration..."
 updatedWorlds: "&b[plugin] updated worlds configuration!"
 
@@ -65,12 +67,6 @@ noPerms: "&eI'm sorry, but you do not have permission to perform this command. P
 # user tried to wake a world that doesn't send messages to their location, without perms
 # placeholder: [world] - the world attempted in the command
 noGlobalPerms: "&eYou don't have permission to teleport to [world] from your location"
-
-# world doesn't exist in bukkit
-invalidWorld: "&e[plugin] could not find world '[world]'"
-
-# when more than on user fails to specify region in updateRegion
-missingRegionParam: "&e[plugin] region parameter is required"
 
 #command descriptions
 rtp: "&b/rtp - teleport to a random location"

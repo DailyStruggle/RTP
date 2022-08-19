@@ -4,37 +4,40 @@ import io.github.dailystruggle.commandsapi.bukkit.LocalParameters.BooleanParamet
 import io.github.dailystruggle.commandsapi.bukkit.LocalParameters.FloatParameter;
 import io.github.dailystruggle.commandsapi.bukkit.LocalParameters.IntegerParameter;
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
+import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.parameters.RegionParameter;
 import io.github.dailystruggle.rtp.common.commands.parameters.ShapeParameter;
 import io.github.dailystruggle.rtp.common.commands.parameters.VertParameter;
+import io.github.dailystruggle.rtp.common.commands.update.list.ListCmd;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
+import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
+import org.simpleyaml.configuration.MemorySection;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 
-public class SubUpdateCmd <T extends Enum<T>> extends BaseRTPCmdImpl {
+public class SubUpdateCmd extends BaseRTPCmdImpl {
 
 
     private final String name;
-    private final String permission;
-    private final String description;
-    private final Class<T> configClass;
+    private final FactoryValue<?> factoryValue;
 
-    public SubUpdateCmd(@Nullable CommandsAPICommand parent, String name, String permission, String description, Class<T> configClass) {
+    public SubUpdateCmd(@Nullable CommandsAPICommand parent, String name, FactoryValue<?> factoryValue) {
         super(parent);
         this.name = name;
-        this.permission = permission;
-        this.description = description;
-        this.configClass = configClass;
+        this.factoryValue = factoryValue;
         addParameters();
     }
 
@@ -46,25 +49,32 @@ public class SubUpdateCmd <T extends Enum<T>> extends BaseRTPCmdImpl {
 
     @Override
     public String permission() {
-        return permission;
+        return "rtp.update";
     }
 
     @Override
     public String description() {
-        return description;
+        return "update sections of this configuration";
     }
 
     @Override
     public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
         if(nextCommand!=null) return true;
 
-        FactoryValue<?> factoryValue = RTP.getInstance().configs.getParser(configClass);
         if(factoryValue instanceof ConfigParser configParser) {
+            ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+            String msg = String.valueOf(lang.getConfigValue(LangKeys.updating,""));
+            if(msg!=null) msg = StringUtils.replaceIgnoreCase(msg,"[filename]", configParser.name);
+            RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId,msg);
+
             for(var e : parameterValues.entrySet()) {
                 String key = e.getKey();
                 String value = e.getValue().get(0);
 
                 if(key == null || value == null) continue;
+
+                //todo: shape and vert updates
+                //todo: update internal data accordingly. maybe auto reload after update?
 
                 configParser.set(key,value);
             }
@@ -74,6 +84,10 @@ public class SubUpdateCmd <T extends Enum<T>> extends BaseRTPCmdImpl {
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
+
+            msg = String.valueOf(lang.getConfigValue(LangKeys.updated,""));
+            if(msg!=null) msg = StringUtils.replaceIgnoreCase(msg,"[filename]", configParser.name);
+            RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId,msg);
         }
         else return true;
 
@@ -83,9 +97,9 @@ public class SubUpdateCmd <T extends Enum<T>> extends BaseRTPCmdImpl {
     }
 
     public void addParameters() {
-        FactoryValue<?> value = RTP.getInstance().configs.getParser(configClass);
+        if(factoryValue == null) return;
 
-        if(value instanceof ConfigParser configParser) {
+        if(factoryValue instanceof ConfigParser configParser) {
             EnumMap<?,?> data = configParser.getData();
 
             for (var e : data.entrySet()) {
@@ -93,8 +107,6 @@ public class SubUpdateCmd <T extends Enum<T>> extends BaseRTPCmdImpl {
                 if(name.equalsIgnoreCase("version")) continue;
                 String s = configParser.language_mapping.get(name).toString();
                 Object o = e.getValue();
-
-
 
                 if (o instanceof String) {
                     addParameter(s, new CommandParameter("rtp.update", "", (uuid, s1) -> true) {
@@ -115,6 +127,26 @@ public class SubUpdateCmd <T extends Enum<T>> extends BaseRTPCmdImpl {
                     addParameter(s, new VertParameter("rtp.update", "", (uuid, s1) -> true));
                 } else if (o instanceof Region) {
                     addParameter(s, new RegionParameter("rtp.update", "", (uuid, s1) -> true));
+                } else if (o instanceof MemorySection) {
+                    if(s.equalsIgnoreCase("shape")) addParameter(s, new ShapeParameter("rtp.update", "", (uuid, s1) -> true));
+                    else if(s.equalsIgnoreCase("vert")) addParameter(s, new VertParameter("rtp.update", "", (uuid, s1) -> true));
+                } else if (o instanceof List) {
+                    Supplier<Set<String>> values = HashSet::new;
+                    if(StringUtils.containsIgnoreCase(name,"block")) {
+                        values = () -> RTP.serverAccessor.materials();
+                    }
+                    else if(StringUtils.containsIgnoreCase(name,"biome")) {
+                        values = () -> RTP.serverAccessor.getBiomes();
+                    }
+                    addSubCommand(new ListCmd(name,this,values,configParser.yamlFile,s));
+                }
+            }
+        }
+        else if(factoryValue instanceof MultiConfigParser parser) {
+            for(var e : parser.configParserFactory.map.entrySet()) {
+                if(e instanceof Map.Entry entry) {
+                    if(entry.getValue() instanceof FactoryValue factoryValue)
+                        addSubCommand(new SubUpdateCmd(this, entry.getKey().toString(),factoryValue));
                 }
             }
         }

@@ -80,17 +80,6 @@ noGlobalPerms: "&eYou don't have permission to teleport to [world] from your loc
 # world doesn't exist in bukkit
 invalidWorld: "&e[plugin] could not find world '[world]'"
 
-# when more than on user fails to specify region in updateRegion
-missingRegionParam: "&e[plugin] region parameter is required"
-
-fillStart: "&a[plugin] fill task started for region [region]"
-fillCancel: "&e[plugin] fill task cancelled for region [region]"
-fillPause: "#A020F0[plugin] fill task paused for region [region]"
-fillResume: "#10A5F5[plugin] fill task resumed for region [region]"
-fillRunning: "&c[plugin] fill task already running for region [region]"
-fillNotRunning: "&c[plugin] fill task not running for region [region]"
-fillStatus: "&a[plugin] completed [num] / [total] chunks for region [region]"
-
 #command descriptions
 rtp: "&b/rtp - teleport to a random location"
 help: "&b/rtp help - see this"

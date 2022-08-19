@@ -2,9 +2,7 @@ package io.github.dailystruggle.rtp.common.commands.update;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmd;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
-import io.github.dailystruggle.rtp.common.commands.reload.SubReloadCmd;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
@@ -39,7 +37,6 @@ public class UpdateCmd extends BaseRTPCmdImpl {
 
     @Override
     public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
-        addCommands();
         return true;
     }
 
@@ -48,13 +45,13 @@ public class UpdateCmd extends BaseRTPCmdImpl {
         for (ConfigParser<?> value : configs.configParserMap.values()) {
             String name = value.name.replace(".yml","");
             if(getCommandLookup().containsKey(name)) continue;
-            addSubCommand(new SubUpdateCmd<>(this,value.name,"rtp.update","update only " + value.name, value.myClass));
+            addSubCommand(new SubUpdateCmd(this,value.name, value));
         }
 
         for (Map.Entry<Class<?>, MultiConfigParser<?>> e : configs.multiConfigParserMap.entrySet()) {
             MultiConfigParser<? extends Enum<?>> value = e.getValue();
             if(getCommandLookup().containsKey(value.name)) continue;
-            addSubCommand(new SubUpdateCmd<>(this,value.name,"rtp.update","update only " + value.name, value.myClass));
+            addSubCommand(new SubUpdateCmd(this,value.name, value));
         }
     }
 }
