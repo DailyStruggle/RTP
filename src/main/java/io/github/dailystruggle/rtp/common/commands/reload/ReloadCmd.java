@@ -106,11 +106,6 @@ public class ReloadCmd extends BaseRTPCmdImpl {
 
         RTP.getInstance().configs.reload();
 
-        lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
-        String msg = String.valueOf(lang.getConfigValue(LangKeys.reloaded,""));
-        if(msg!=null) msg = StringUtils.replace(msg,"[filename]", "configs");
-        RTP.serverAccessor.sendMessage(CommandsAPI.serverId, senderId,msg);
-
         return true;
     }
 }

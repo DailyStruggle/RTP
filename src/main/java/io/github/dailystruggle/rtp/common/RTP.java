@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
+import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.commands.RTPCmd;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
@@ -24,6 +25,7 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPChunk;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPEconomy;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
+import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.common.tasks.RTPTeleportCancel;
 import org.jetbrains.annotations.NotNull;
@@ -78,12 +80,12 @@ public class RTP {
         if(serverAccessor == null) throw new IllegalStateException("null serverAccessor");
         instance = this;
 
-        new Circle();
-        new Square();
+        RTPAPI.addShape(new Circle());
+        RTPAPI.addShape(new Square());
         new LinearAdjustor(new ArrayList<>());
         new JumpAdjustor(new ArrayList<>());
 
-        miscSyncTasks.add(() -> configs = new Configs(serverAccessor.getPluginDirectory()));
+        startupTasks.add(() -> configs = new Configs(serverAccessor.getPluginDirectory()));
     }
 
     public static RTP getInstance() {
@@ -111,8 +113,11 @@ public class RTP {
 
     public final RTPTaskPipe miscSyncTasks = new RTPTaskPipe();
     public final RTPTaskPipe miscAsyncTasks = new RTPTaskPipe();
+    public final RTPTaskPipe startupTasks = new RTPTaskPipe();
 
     public final RTPTaskPipe cancelTasks = new RTPTaskPipe();
+
+    public final Map<String,RTPTaskPipe> fillTasks = new ConcurrentHashMap<>();
 
     public final ConcurrentSkipListSet<UUID> invulnerablePlayers = new ConcurrentSkipListSet<>();
 
@@ -127,9 +132,12 @@ public class RTP {
         setupTeleportPipeline.execute(availableTime-(start-System.nanoTime()));
         miscAsyncTasks.execute(availableTime-(start-System.nanoTime()));
 
-        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) configs.getParser(PerformanceKeys.class);
+        long period = 0;
+        if(configs!=null) {
+            ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) configs.getParser(PerformanceKeys.class);
+            if(perf!=null) period = perf.getNumber(PerformanceKeys.period,0).longValue();
+        }
 
-        long period = perf.getNumber(PerformanceKeys.period,0).longValue();
         List<Region> regions = new ArrayList<>(selectionAPI.permRegionLookup.values());
         if(period<=0) period = regions.size();
         if(period<=0) return;

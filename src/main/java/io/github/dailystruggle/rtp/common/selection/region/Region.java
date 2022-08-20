@@ -7,20 +7,20 @@ import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
-import io.github.dailystruggle.rtp.common.serverSide.RTPServerAccessor;
+import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.*;
 import io.github.dailystruggle.rtp.common.tasks.LoadChunks;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.MutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.jetbrains.annotations.Nullable;
+import org.simpleyaml.configuration.MemorySection;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -231,7 +231,7 @@ public class Region extends FactoryValue<RegionKeys> {
         this.name = name;
         this.data.putAll(params);
 
-        Object shape = params.get(RegionKeys.shape);
+        Object shape = getShape();
         Object world = params.get(RegionKeys.world);
         String worldName;
         if(world instanceof RTPWorld rtpWorld) worldName = rtpWorld.name();
@@ -378,10 +378,10 @@ public class Region extends FactoryValue<RegionKeys> {
             }
         }
 
-        Shape<?> shape = (Shape<?>) data.get(RegionKeys.shape);
+        Shape<?> shape = getShape();
         if(shape == null) return null;
 
-        VerticalAdjustor<?> vert = (VerticalAdjustor<?>) data.get(RegionKeys.vert);
+        VerticalAdjustor<?> vert = getVert();
         if(vert == null) return null;
 
         ConfigParser<PerformanceKeys> performance = (ConfigParser<PerformanceKeys>) RTP.getInstance().configs.getParser(PerformanceKeys.class);
@@ -397,6 +397,7 @@ public class Region extends FactoryValue<RegionKeys> {
         maxAttempts = Math.max(maxAttempts,1);
         long maxBiomeChecks = maxBiomeChecksPerGen*maxAttempts;
         long biomeChecks = 0L;
+        long worldBorderFails = 0L;
 
         RTPWorld world = (RTPWorld) data.getOrDefault(RegionKeys.world,RTP.serverAccessor.getRTPWorlds().get(0));
 
@@ -429,6 +430,18 @@ public class Region extends FactoryValue<RegionKeys> {
                 currBiome = world.getBiome(select[0], (vert.maxY()+vert.minY())/2, select[1]);
             }
             if(biomeChecks>=maxBiomeChecks) return new ImmutablePair<>(null,i);
+
+
+            WorldBorder border = RTP.serverAccessor.getWorldBorder(world.name());
+            if(!border.isInside().apply(new RTPLocation(world,select[0]*16, (vert.maxY()-vert.minY())/2+vert.minY(), select[1]*16))) {
+                maxAttempts++;
+                worldBorderFails++;
+                if(worldBorderFails>10000) {
+                    new IllegalStateException("10000 worldborder checks failed. region/selection is likely outside the worldborder").printStackTrace();
+                    return new ImmutablePair<>(null,i);
+                }
+                continue;
+            }
 
             CompletableFuture<RTPChunk> cfChunk = world.getChunkAt(select[0], select[1]);
 
@@ -495,7 +508,7 @@ public class Region extends FactoryValue<RegionKeys> {
     }
 
     public void shutDown() {
-        Shape<?> shape = (Shape<?>) data.get(RegionKeys.shape);
+        Shape<?> shape = getShape();
         if(shape == null) return;
 
         RTPWorld world = (RTPWorld) data.get(RegionKeys.world);
@@ -569,10 +582,10 @@ public class Region extends FactoryValue<RegionKeys> {
 
         List<CompletableFuture<RTPChunk>> chunks = new ArrayList<>();
 
-        Shape<?> shape = (Shape<?>) data.get(RegionKeys.shape);
+        Shape<?> shape = getShape();
         if(shape == null) return null;
 
-        VerticalAdjustor<?> vert = (VerticalAdjustor<?>) data.get(RegionKeys.vert);
+        VerticalAdjustor<?> vert = getVert();
         if(vert == null) return null;
 
         RTPWorld rtpWorld = (RTPWorld) data.get(RegionKeys.world);
@@ -654,5 +667,99 @@ public class Region extends FactoryValue<RegionKeys> {
         if(queue!=null) res += queue.size();
         if(fastLocations.containsKey(uuid)) res++;
         return res;
+    }
+
+    protected Shape<?> getShape() {
+        boolean wbo = false;
+        Object o = data.getOrDefault(RegionKeys.worldBorderOverride,false);
+        if(o instanceof Boolean b) wbo = b;
+        else if(o instanceof String s) {
+            wbo = Boolean.parseBoolean(s);
+            data.put(RegionKeys.worldBorderOverride,wbo);
+        }
+
+        RTPWorld world;
+        o = data.getOrDefault(RegionKeys.world, null);
+        if(o instanceof RTPWorld rtpWorld) world = rtpWorld;
+        else if(o instanceof String s) {
+            world = RTP.serverAccessor.getRTPWorld(s);
+        }
+        else world = null;
+        if(world == null) world = RTP.serverAccessor.getRTPWorlds().get(0);
+
+        Object shapeObj = data.get(RegionKeys.shape);
+        Shape<?> shape;
+        if (shapeObj instanceof Shape shape1) {
+            shape = shape1;
+        }
+        else if(shapeObj instanceof MemorySection shapeSection) {
+            final Map<String, Object> shapeMap = shapeSection.getMapValues(true);
+            String shapeName = String.valueOf(shapeMap.get("name"));
+            Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+            shape = (Shape<?>) factory.get(shapeName);
+            EnumMap<?, Object> shapeData = shape.getData();
+            for(var e : shapeData.entrySet()) {
+                String name = e.getKey().name();
+                if(shapeMap.containsKey(name)) {
+                    e.setValue(shapeMap.get(name));
+                }
+                else {
+                    Object altName = shape.language_mapping.get(name);
+                    if(altName!=null && shapeMap.containsKey(altName.toString())) {
+                        e.setValue(shapeMap.get(altName.toString()));
+                    }
+                }
+            }
+            shape.setData(shapeData);
+            data.put(RegionKeys.shape,shape);
+        }
+        else throw new IllegalArgumentException("invalid shape\n" + shapeObj);
+
+        if(wbo) {
+            Shape<?> worldShape;
+            try {
+                worldShape = RTP.serverAccessor.getWorldBorder(world.name()).getShape().get();
+            } catch (IllegalStateException ignored) {
+                return shape;
+            }
+            if(!worldShape.equals(shape)) {
+                shape = worldShape;
+                data.put(RegionKeys.shape,shape);
+            }
+        }
+
+        return shape;
+    }
+
+    protected VerticalAdjustor<?> getVert() {
+        Object vertObj = data.get(RegionKeys.vert);
+        VerticalAdjustor<?> vert;
+        if (vertObj instanceof VerticalAdjustor verticalAdjustor) {
+            vert = verticalAdjustor;
+        }
+        else if(vertObj instanceof MemorySection shapeSection) {
+            final Map<String, Object> vertMap = shapeSection.getMapValues(true);
+            String shapeName = String.valueOf(vertMap.get("name"));
+            Factory<VerticalAdjustor<?>> factory = (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
+            vert = (VerticalAdjustor<?>) factory.get(shapeName);
+            EnumMap<?, Object> vertData = vert.getData();
+            for(var e : vertData.entrySet()) {
+                String name = e.getKey().name();
+                if(vertMap.containsKey(name)) {
+                    e.setValue(vertMap.get(name));
+                }
+                else {
+                    Object altName = vert.language_mapping.get(name);
+                    if(altName!=null && vertMap.containsKey(altName.toString())) {
+                        e.setValue(vertMap.get(altName.toString()));
+                    }
+                }
+            }
+            vert.setData(vertData);
+            data.put(RegionKeys.vert,vert);
+        }
+        else throw new IllegalArgumentException("invalid shape\n" + vertObj);
+
+        return vert;
     }
 }

@@ -76,21 +76,26 @@
             <artifactId>RTP</artifactId>
             <version>1.3.23</version>
             <scope>system</scope>
-            <systemPath>${project.basedir}/../../target/RTP-1.3.23.jar</systemPath>
+            <systemPath>${project.basedir}/../../target/original-RTP-2.0.0-BETA01.jar</systemPath>
         </dependency>
         <dependency>
             <groupId>org.popcraft</groupId>
             <artifactId>ChunkyBorder</artifactId>
-            <version>1.0.64</version>
+            <version>1.0.70</version>
             <scope>system</scope>
-            <systemPath>${project.basedir}/ChunkyBorder-1.0.64.jar</systemPath>
+            <systemPath>${project.basedir}/dependencies/ChunkyBorder-1.0.70.jar</systemPath>
         </dependency>
         <dependency>
             <groupId>org.popcraft</groupId>
             <artifactId>Chunky</artifactId>
-            <version>1.2.164</version>
+            <version>1.2.217</version>
             <scope>system</scope>
-            <systemPath>${project.basedir}/Chunky-1.2.164.jar</systemPath>
+            <systemPath>${project.basedir}/dependencies/Chunky-1.2.217.jar</systemPath>
+        </dependency>
+        <dependency>
+            <groupId>io.github.dailystruggle</groupId>
+            <artifactId>CommandsAPI</artifactId>
+            <version>1.0-ALPHA62</version>
         </dependency>
     </dependencies>
 </project>

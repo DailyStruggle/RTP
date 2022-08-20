@@ -188,7 +188,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     public Map<String, Object> language_mapping = new ConcurrentHashMap<>();
     public Map<String,String> reverse_language_mapping = new ConcurrentHashMap<>();
 
-    protected void loadLangFile(String subDir) throws IOException {
+    public void loadLangFile(String subDir) throws IOException {
         String name = this.name;
         if(!name.endsWith(".yml")) name = name + ".yml";
         File langFile;
@@ -223,5 +223,22 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
         for(var e : language_mapping.entrySet()) {
             reverse_language_mapping.put(e.getValue().toString(),e.getKey());
         }
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        if(!(other instanceof FactoryValue factoryValue)) return false;
+        if(!(this.getClass().isAssignableFrom(other.getClass()))) return false;
+        if(!(factoryValue.myClass.equals(myClass))) return false;
+        EnumMap<E,Object> data = factoryValue.getData();
+        for (var e : this.data.entrySet()) {
+            Object mine = e.getValue();
+            Object theirs = data.get(e.getKey());
+            if(mine.getClass().equals(theirs.getClass())) {
+                if(!mine.equals(theirs)) return false;
+            }
+            else if(!mine.toString().equalsIgnoreCase(theirs.toString())) return false;
+        }
+        return true;
     }
 }

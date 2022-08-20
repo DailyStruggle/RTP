@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.shapes;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
+import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
@@ -32,9 +33,6 @@ public abstract class Shape<E extends Enum<E>> extends FactoryValue<E> {
             if(!data.containsKey(val)) throw new IllegalArgumentException(
                     "All values must be filled out on shape instantiation");
         }
-        Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
-        if(factory == null) throw new IllegalStateException("shape factory doesn't exist");
-        if (!factory.contains(name)) factory.add(name,this);
         try {
             loadLangFile("shape");
         } catch (IOException e) {
