@@ -27,10 +27,13 @@ import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
+import java.security.Provider;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 
@@ -44,8 +47,6 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     private Integer intVersion = null;
 
     Function<String,Shape<?>> shapeFunction;
-
-    private final Map<UUID,RTPWorld> worlds = new ConcurrentHashMap<>(Bukkit.getWorlds().size());
 
     public BukkitServerAccessor() {
         //run later to ensure RTP instance exists
@@ -61,8 +62,6 @@ public class BukkitServerAccessor implements RTPServerAccessor {
             if(!(o instanceof Shape<?>)) throw new IllegalStateException();
             return (Shape<?>) o;
         };
-
-        Region.addGlobalRegionVerifier(rtpLocation -> getWorldBorder(rtpLocation.world().name()).isInside().apply(rtpLocation));
     }
 
     @Override
@@ -96,7 +95,9 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     public RTPWorld getRTPWorld(String name) {
         RTPWorld world = worldMapStr.get(name);
         if(world == null) {
-            world = new BukkitRTPWorld(Bukkit.getWorld(name));
+            World bukkitWorld = Bukkit.getWorld(name);
+            if(bukkitWorld==null) return null;
+            world = new BukkitRTPWorld(bukkitWorld);
             if(world == null) return null;
             worldMapStr.put(name,world);
         }
@@ -228,9 +229,20 @@ public class BukkitServerAccessor implements RTPServerAccessor {
         SendMessage.log(level,msg,exception);
     }
 
+    private Supplier<Set<String>> biomes = BukkitRTPWorld::getBiomes;
+    public void setBiomes(Supplier<Set<String>> biomes) {
+        try {
+            biomes.get();
+        } catch (Exception exception) {
+            exception.printStackTrace();
+            return;
+        }
+        this.biomes = biomes;
+    }
+
     @Override
     public Set<String> getBiomes() {
-        return BukkitRTPWorld.getBiomes();
+        return biomes.get();
     }
 
     @Override
@@ -309,7 +321,7 @@ public class BukkitServerAccessor implements RTPServerAccessor {
             World world = bukkitRTPWorld.world();
             org.bukkit.WorldBorder worldBorder = world.getWorldBorder();
             return new WorldBorder(
-                    s1 -> (Shape<?>) RTP.factoryMap.get(RTP.factoryNames.shape).get("SQUARE"),
+                    () -> (Shape<?>) RTP.factoryMap.get(RTP.factoryNames.shape).get("SQUARE"),
                     rtpLocation -> worldBorder.isInside(new Location(world,rtpLocation.x(),rtpLocation.y(),rtpLocation.z())));
         }
         return null;

@@ -11,10 +11,10 @@ import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
-public final class Square extends MemoryShape<GenericMemoryShapeParams> {
-    private static final Map<String, CommandParameter> subParameters = new ConcurrentHashMap<>();
-    private static final List<String> keys = Arrays.stream(GenericMemoryShapeParams.values()).map(Enum::name).collect(Collectors.toList());
-    private static final EnumMap<GenericMemoryShapeParams,Object> defaults = new EnumMap<>(GenericMemoryShapeParams.class);
+public class Square extends MemoryShape<GenericMemoryShapeParams> {
+    protected static final Map<String, CommandParameter> subParameters = new ConcurrentHashMap<>();
+    protected static final List<String> keys = Arrays.stream(GenericMemoryShapeParams.values()).map(Enum::name).collect(Collectors.toList());
+    protected static final EnumMap<GenericMemoryShapeParams,Object> defaults = new EnumMap<>(GenericMemoryShapeParams.class);
     static {
         defaults.put(GenericMemoryShapeParams.mode, Mode.ACCUMULATE);
         defaults.put(GenericMemoryShapeParams.radius,256);
@@ -37,6 +37,10 @@ public final class Square extends MemoryShape<GenericMemoryShapeParams> {
 
     public Square() {
         super(GenericMemoryShapeParams.class,"SQUARE",defaults);
+    }
+
+    public Square(String newName) {
+        super(GenericMemoryShapeParams.class,newName,defaults);
     }
 
     @Override

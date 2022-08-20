@@ -27,4 +27,10 @@ onEventParsing: false
 #on startup, whether to enable permissions parsing for effect permissions
 effectParsing: false
 
+#reuse biome locations when biome is specified
+biomeRecall: true
+
+#have each region check all in-range chunks on chunk load
+checkOnChunkLoads: false
+
 version: "1.0"

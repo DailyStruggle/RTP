@@ -10,6 +10,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import org.apache.commons.lang3.StringUtils;
+import org.bukkit.Bukkit;
 import org.jetbrains.annotations.Nullable;
 import org.simpleyaml.configuration.MemorySection;
 
@@ -72,10 +73,7 @@ public class Configs {
     public CompletableFuture<Boolean> reload() {
         CompletableFuture<Boolean> res = new CompletableFuture<>();
 
-        if(getParser(LangKeys.class)!=null) RTP.serverAccessor.sendMessage(CommandsAPI.serverId,LangKeys.reloading);
-
-        //ensure async to protect server timings
-        RTP.getInstance().miscAsyncTasks.add(() -> {
+        RTP.getInstance().startupTasks.add(() -> {
             try {
                 reloadAction();
                 ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
@@ -118,8 +116,8 @@ public class Configs {
         putParser(regions);
         putParser(worlds);
 
-        for(ConfigParser<?> regionConfig : regions.configParserFactory.map.values()) {
-            EnumMap<RegionKeys, Object> data = (EnumMap<RegionKeys, Object>) regionConfig.getData();
+        for(ConfigParser<RegionKeys> regionConfig : regions.configParserFactory.map.values()) {
+            EnumMap<RegionKeys, Object> data = regionConfig.getData();
 
             String worldName = String.valueOf(data.get(RegionKeys.world));
             RTPWorld world;
@@ -133,56 +131,6 @@ public class Configs {
                 continue;
             }
             data.put(RegionKeys.world,world);
-
-            Object shapeObj = data.get(RegionKeys.shape);
-            Shape<?> shape;
-            if(shapeObj instanceof MemorySection shapeSection) {
-                final Map<String, Object> shapeMap = shapeSection.getMapValues(true);
-                String shapeName = String.valueOf(shapeMap.get("name"));
-                Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
-                shape = (Shape<?>) factory.get(shapeName);
-                EnumMap<?, Object> shapeData = shape.getData();
-                for(var e : shapeData.entrySet()) {
-                    String name = e.getKey().name();
-                    if(shapeMap.containsKey(name)) {
-                        e.setValue(shapeMap.get(name));
-                    }
-                    else {
-                        Object altName = shape.language_mapping.get(name);
-                        if(altName!=null && shapeMap.containsKey(altName)) {
-                            e.setValue(shapeMap.get(altName));
-                        }
-                    }
-                }
-                shape.setData(shapeData);
-                data.put(RegionKeys.shape,shape);
-            }
-            else throw new IllegalArgumentException("shape was not a section\n" + shapeObj);
-
-
-            Object vertObj = data.get(RegionKeys.vert);
-            if(vertObj instanceof MemorySection vertSection) {
-                final Map<String, Object> vertMap = vertSection.getMapValues(true);
-                String shapeName = String.valueOf(vertMap.get("name"));
-                Factory<VerticalAdjustor<?>> factory = (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
-                VerticalAdjustor<?> vert = (VerticalAdjustor<?>) factory.getOrDefault(shapeName);
-                EnumMap<?, Object> vertData = vert.getData();
-                for(var e : vertData.entrySet()) {
-                    String name = e.getKey().name();
-                    if(vertMap.containsKey(name)) {
-                        e.setValue(vertMap.get(name));
-                    }
-                    else {
-                        String altName = vert.language_mapping.get(name).toString();
-                        if(altName!=null && vertMap.containsKey(altName)) {
-                            e.setValue(vertMap.get(altName));
-                        }
-                    }
-                }
-                vert.setData(vertData);
-                data.put(RegionKeys.vert, vert);
-            }
-            else throw new IllegalArgumentException();
 
             Region region = new Region(regionConfig.name.replace(".yml",""), data);
             RTP.getInstance().selectionAPI.permRegionLookup.put(region.name.toUpperCase(),region);

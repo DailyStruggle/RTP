@@ -15,8 +15,12 @@ public class TestConfig {
         //initialize to create config files
         RTP rtp = new RTP();
 
-        rtp.executeSyncTasks(Long.MAX_VALUE);
-        rtp.executeAsyncTasks(Long.MAX_VALUE);
+        int i = 0;
+        while (rtp.startupTasks.size()>0) {
+            rtp.startupTasks.execute(Long.MAX_VALUE);
+            i++;
+            if(i>50) return;
+        }
 
         //modify values
         ConfigParser<ConfigKeys> parser = (ConfigParser<ConfigKeys>) rtp.configs.getParser(ConfigKeys.class);

@@ -13,10 +13,10 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 
-public final class Circle extends MemoryShape<GenericMemoryShapeParams> {
-    private static final EnumMap<GenericMemoryShapeParams,Object> defaults = new EnumMap<>(GenericMemoryShapeParams.class);
-    private static final Map<String,CommandParameter> subParameters = new ConcurrentHashMap<>();
-    private static final List<String> keys = Arrays.stream(GenericMemoryShapeParams.values()).map(Enum::name).collect(Collectors.toList());
+public class Circle extends MemoryShape<GenericMemoryShapeParams> {
+    protected static final EnumMap<GenericMemoryShapeParams,Object> defaults = new EnumMap<>(GenericMemoryShapeParams.class);
+    protected static final Map<String,CommandParameter> subParameters = new ConcurrentHashMap<>();
+    protected static final List<String> keys = Arrays.stream(GenericMemoryShapeParams.values()).map(Enum::name).collect(Collectors.toList());
     static {
         try {
             defaults.put(GenericMemoryShapeParams.mode, Mode.ACCUMULATE);
@@ -43,6 +43,10 @@ public final class Circle extends MemoryShape<GenericMemoryShapeParams> {
 
     public Circle() throws IllegalArgumentException {
         super(GenericMemoryShapeParams.class,"CIRCLE", defaults);
+    }
+
+    public Circle(String newName) throws IllegalArgumentException {
+        super(GenericMemoryShapeParams.class,newName, defaults);
     }
 
     @Override
