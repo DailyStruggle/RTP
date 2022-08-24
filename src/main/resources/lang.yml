@@ -76,6 +76,31 @@ fillRunning: "&c[rtp] fill task already running for region [region]"
 fillNotRunning: "&c[rtp] fill task not running for region [region]"
 fillStatus: "&a[rtp] completed [chunks] / [totalChunks] chunks for region [region]. [cps] cps. ETA: [eta]"
 
+#info command
+infoTitle: "&a======RTP Info======"
+infoChunks: "#D4AF37Chunks currently loaded by RTP: [chunks]"
+infoWorldHeader: "#008080Worlds:"
+infoWorld: "  #21ADA8[world]"
+infoRegionHeader: "#63C5DARegions:"
+infoRegion: "  #52B2BF[region]"
+
+#sub-info
+worldInfo:
+  - "#21ADA8[world]:"
+  - "#99EEBB  name: [name]"
+  - "#99EEBB  region: [region]"
+  - "#99EEBB  requirePermission: [requirePermission]"
+  - "#99EEBB  override: [override]"
+
+regionInfo:
+  - "#52B2BF[region]:"
+  - "#58CCED  world: [world]"
+  - "#58CCED  shape: [shape]"
+  - "#58CCED  requirePermission: [requirePermission]"
+  - "#58CCED  worldBorderOverride: [worldBorderOverride]"
+  - "#58CCED  queueLen: [queueLen]"
+  - "#58CCED  queued: [queued]"
+
 #command descriptions
 rtp: "&b/rtp - teleport to a random location"
 help: "&b/rtp help - see this"

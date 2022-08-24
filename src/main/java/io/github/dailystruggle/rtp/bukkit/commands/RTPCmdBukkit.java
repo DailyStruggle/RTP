@@ -11,6 +11,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.RTPCmd;
 import io.github.dailystruggle.rtp.common.commands.fill.FillCmd;
 import io.github.dailystruggle.rtp.common.commands.help.HelpCmd;
+import io.github.dailystruggle.rtp.common.commands.info.InfoCmd;
 import io.github.dailystruggle.rtp.common.commands.parameters.RegionParameter;
 import io.github.dailystruggle.rtp.common.commands.parameters.ShapeParameter;
 import io.github.dailystruggle.rtp.common.commands.reload.ReloadCmd;
@@ -112,6 +113,7 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
         addSubCommand(new HelpCmd(this));
         addSubCommand(new UpdateCmd(this));
         addSubCommand(new FillCmd(this));
+        addSubCommand(new InfoCmd(this));
     }
 
     @Override

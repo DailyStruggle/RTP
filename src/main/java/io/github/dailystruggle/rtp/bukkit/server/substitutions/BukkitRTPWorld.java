@@ -115,7 +115,6 @@ public final class BukkitRTPWorld implements RTPWorld {
             if(Bukkit.isPrimaryThread()) chunkLongPair.getLeft().setForceLoaded(true);
             else Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),()->chunkLongPair.getLeft().setForceLoaded(true));
             chunkLongPair.setValue(chunkLongPair.getValue()+1);
-            RTP.getInstance().forceLoads.putIfAbsent(xz,new BukkitRTPChunk(chunkLongPair.getLeft()));
         }
         else {
             CompletableFuture<RTPChunk> chunkAt = getChunkAt(cx, cz);
@@ -125,13 +124,11 @@ public final class BukkitRTPWorld implements RTPWorld {
                     if(Bukkit.isPrimaryThread()) chunkLongPair.getLeft().setForceLoaded(true);
                     else Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),()->chunkLongPair.getLeft().setForceLoaded(true));
                     chunkLongPair.setValue(chunkLongPair.getValue()+1);
-                    RTP.getInstance().forceLoads.putIfAbsent(xz,new BukkitRTPChunk(chunkLongPair.getLeft()));
                 }
                 else if(rtpChunk instanceof BukkitRTPChunk bukkitRTPChunk) {
                     Pair<Chunk,Long> pair = new MutablePair<>(bukkitRTPChunk.chunk(), 1L);
                     if(Bukkit.isPrimaryThread()) bukkitRTPChunk.chunk().setForceLoaded(true);
                     else Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),()->bukkitRTPChunk.chunk().setForceLoaded(true));
-                    RTP.getInstance().forceLoads.putIfAbsent(xz,new BukkitRTPChunk(bukkitRTPChunk.chunk()));
                     chunkMap.put(xz,pair);
                 }
                 else throw new IllegalStateException();
@@ -150,9 +147,14 @@ public final class BukkitRTPWorld implements RTPWorld {
             chunkMap.remove(xz);
             if(Bukkit.isPrimaryThread()) chunkLongPair.getLeft().setForceLoaded(false);
             else Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),()->chunkLongPair.getLeft().setForceLoaded(false));
-            RTP.getInstance().forceLoads.remove(xz);
         }
         else chunkLongPair.setValue(i);
+    }
+
+    @Override
+    public void forgetChunks() {
+        chunkMap.forEach((integers, chunkLongPair) -> chunkLongPair.getLeft().setForceLoaded(false));
+        chunkMap.clear();
     }
 
     @Override

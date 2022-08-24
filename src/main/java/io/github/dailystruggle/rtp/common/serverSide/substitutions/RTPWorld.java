@@ -11,6 +11,7 @@ public interface RTPWorld {
 
     void keepChunkAt(int chunkX, int chunkZ);
     void forgetChunkAt(int chunkX, int chunkZ);
+    void forgetChunks();
 
     String getBiome(int x, int y, int z);
 

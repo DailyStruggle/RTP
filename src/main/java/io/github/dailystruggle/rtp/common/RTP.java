@@ -121,8 +121,6 @@ public class RTP {
 
     public final ConcurrentSkipListSet<UUID> invulnerablePlayers = new ConcurrentSkipListSet<>();
 
-    public Map<List<Integer>, RTPChunk> forceLoads = new ConcurrentHashMap<>();
-
 
     public static RTPWorld getWorld(RTPPlayer player) {
         //get region from world name, check for overrides
