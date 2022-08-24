@@ -74,13 +74,13 @@ fillPause: "#A020F0[rtp] fill task paused for region [region]"
 fillResume: "#10A5F5[rtp] fill task resumed for region [region]"
 fillRunning: "&c[rtp] fill task already running for region [region]"
 fillNotRunning: "&c[rtp] fill task not running for region [region]"
-fillStatus: "&a[rtp] completed [num] / [total] chunks for region [region]"
+fillStatus: "&a[rtp] completed [chunks] / [totalChunks] chunks for region [region]. [cps] cps. ETA: [eta]"
 
 #command descriptions
 rtp: "&b/rtp - teleport to a random location"
 help: "&b/rtp help - see this"
 reload: "&b/rtp reload - reload config files"
-fill: "&b/rtp fill - try all possible region placements to complete a dataset"
+fill: "&b/rtp fill - try all possible region placements to improve load times"
 
 #player teleport status placeholders for PAPI
 PLAYER_AVAILABLE: "&aAVAILABLE"

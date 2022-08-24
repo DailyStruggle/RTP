@@ -25,6 +25,7 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPChunk;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPEconomy;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
+import io.github.dailystruggle.rtp.common.tasks.FillTask;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.common.tasks.RTPTeleportCancel;
@@ -41,7 +42,6 @@ import java.util.logging.Level;
  * class to hold relevant API functions, outside of Bukkit functionality
  */
 public class RTP {
-    long step = 0;
     public enum factoryNames {
         shape,
         vert,
@@ -117,56 +117,9 @@ public class RTP {
 
     public final RTPTaskPipe cancelTasks = new RTPTaskPipe();
 
-    public final Map<String,RTPTaskPipe> fillTasks = new ConcurrentHashMap<>();
+    public final Map<String, FillTask> fillTasks = new ConcurrentHashMap<>();
 
     public final ConcurrentSkipListSet<UUID> invulnerablePlayers = new ConcurrentSkipListSet<>();
-
-    /**
-     * @param availableTime when to stop, in nanos
-     */
-    public void executeAsyncTasks(long availableTime) {
-        long start = System.nanoTime();
-
-        cancelTasks.execute(Long.MAX_VALUE);
-        loadChunksPipeline.execute(availableTime-(start-System.nanoTime()));
-        setupTeleportPipeline.execute(availableTime-(start-System.nanoTime()));
-        miscAsyncTasks.execute(availableTime-(start-System.nanoTime()));
-
-        long period = 0;
-        if(configs!=null) {
-            ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) configs.getParser(PerformanceKeys.class);
-            if(perf!=null) period = perf.getNumber(PerformanceKeys.period,0).longValue();
-        }
-
-        List<Region> regions = new ArrayList<>(selectionAPI.permRegionLookup.values());
-        if(period<=0) period = regions.size();
-        if(period<=0) return;
-
-        //step computation according to period
-        double increment = ((double) period)/regions.size();
-        long location = (long) (increment*step);
-        for( int i = 0; i < regions.size(); i++) {
-            long l = (long) (((double)i)*increment);
-
-            if(l == location) {
-                regions.get(i).execute(availableTime - (start - System.nanoTime()));
-            }
-        }
-        step = (step+1)%period;
-    }
-
-
-    /**
-     * @param availableTime when to stop, in nanos
-     */
-    public void executeSyncTasks(long availableTime) {
-        long start = System.nanoTime();
-
-        cancelTasks.execute(Long.MAX_VALUE);
-        chunkCleanupPipeline.execute(availableTime);
-        teleportPipeline.execute(availableTime-(start-System.nanoTime()));
-        miscSyncTasks.execute(availableTime-(start-System.nanoTime()));
-    }
 
     public Map<List<Integer>, RTPChunk> forceLoads = new ConcurrentHashMap<>();
 
@@ -201,8 +154,7 @@ public class RTP {
             new RTPTeleportCancel(e.getKey()).run();
         }
 
-        instance.chunkCleanupPipeline.execute(Long.MAX_VALUE);
-
+        instance.chunkCleanupPipeline.stop();
         instance.miscAsyncTasks.stop();
         instance.miscSyncTasks.stop();
         instance.setupTeleportPipeline.stop();
@@ -213,6 +165,9 @@ public class RTP {
             r.shutDown();
         }
 
-        RTP.instance = null;
+
+        FillTask.kill();
+
+        serverAccessor.stop();
     }
 }

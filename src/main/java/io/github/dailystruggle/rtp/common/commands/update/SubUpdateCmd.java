@@ -61,6 +61,7 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
     public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
         if(nextCommand!=null) return true;
 
+        addParameters();
         if(factoryValue instanceof ConfigParser configParser) {
             ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
             String msg = String.valueOf(lang.getConfigValue(LangKeys.updating,""));
@@ -105,7 +106,9 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
             for (var e : data.entrySet()) {
                 String name = e.getKey().name();
                 if(name.equalsIgnoreCase("version")) continue;
-                String s = configParser.language_mapping.get(name).toString();
+                String s = name;
+                Object nameObj = configParser.language_mapping.get(name);
+                if(nameObj!=null) s = nameObj.toString();
                 Object o = e.getValue();
 
                 if (o instanceof String) {
