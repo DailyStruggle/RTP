@@ -20,16 +20,17 @@ import org.jetbrains.annotations.NotNull;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public final class BukkitRTPWorld implements RTPWorld {
-    private final Map<List<Integer>, Pair<Chunk,Long>> chunkMap = new ConcurrentHashMap<>();
     private final UUID id;
     private final String name;
+
+    public final Map<List<Integer>, Pair<Chunk,Long>> chunkMap = new ConcurrentHashMap<>();
+    public final Map<List<Integer>,List<CompletableFuture<Chunk>>> chunkLoads = new ConcurrentHashMap<>();
 
     private static Function<Location, String> getBiome = location -> {
         World world = Objects.requireNonNull(location.getWorld());
@@ -75,10 +76,11 @@ public final class BukkitRTPWorld implements RTPWorld {
 
     @Override
     public CompletableFuture<RTPChunk> getChunkAt(int cx, int cz) {
+        if(!RTPBukkitPlugin.getInstance().isEnabled()) throw new IllegalStateException("asked for chunk after disabled");
         List<Integer> xz = Arrays.asList(cx,cz);
         CompletableFuture<RTPChunk> res = new CompletableFuture<>();
-        if(chunkMap.containsKey(xz)) {
-            Pair<Chunk, Long> chunkLongPair = chunkMap.get(xz);
+        Pair<Chunk, Long> chunkLongPair = chunkMap.get(xz);
+        if(chunkLongPair!=null && chunkLongPair.getLeft()!=null) {
             Chunk chunk = chunkLongPair.getLeft();
             res.complete(new BukkitRTPChunk(chunk));
             return res;
@@ -89,14 +91,17 @@ public final class BukkitRTPWorld implements RTPWorld {
             BukkitRTPChunk rtpChunk = new BukkitRTPChunk(chunk);
             res.complete(rtpChunk);
         } else {
-            CompletableFuture<Chunk> chunkAtAsyncUrgently;
-            chunkAtAsyncUrgently = PaperLib.getChunkAtAsyncUrgently(world, cx, cz, true);
+            CompletableFuture<Chunk> chunkAtAsyncUrgently = PaperLib.getChunkAtAsyncUrgently(world, cx, cz, true);
 
-            RTPBukkitPlugin plugin = RTPBukkitPlugin.getInstance();
-            plugin.chunkLoads.put(xz, chunkAtAsyncUrgently);
+            List<CompletableFuture<Chunk>> list = chunkLoads.get(xz);
+            if(list == null) list = new ArrayList<>();
+            list.add(chunkAtAsyncUrgently);
+            chunkLoads.put(xz,list);
+
             chunkAtAsyncUrgently.whenComplete((chunk, throwable) -> {
                 res.complete(new BukkitRTPChunk(chunk));
-                plugin.chunkLoads.remove(xz);
+                chunkLoads.remove(xz);
+                if(!RTPBukkitPlugin.getInstance().isEnabled()) throw new IllegalStateException("completed chunk after plugin disabled");
             });
         }
         return res;

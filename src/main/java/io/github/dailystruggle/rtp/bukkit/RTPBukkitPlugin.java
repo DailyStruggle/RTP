@@ -5,10 +5,11 @@ import io.github.dailystruggle.effectsapi.EffectFactory;
 import io.github.dailystruggle.effectsapi.EffectsAPI;
 import io.github.dailystruggle.rtp.bukkit.commands.RTPCmdBukkit;
 import io.github.dailystruggle.rtp.bukkit.events.*;
+import io.github.dailystruggle.rtp.bukkit.server.AsyncTeleportProcessing;
 import io.github.dailystruggle.rtp.bukkit.server.BukkitServerAccessor;
+import io.github.dailystruggle.rtp.bukkit.server.SyncTeleportProcessing;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.spigotListeners.*;
-import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
@@ -19,20 +20,18 @@ import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.*;
-import io.papermc.lib.PaperLib;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
-import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.*;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.stream.Collectors;
 
 /**
  * A Random Teleportation Spigot/Paper plugin, optimized for operators
@@ -52,11 +51,8 @@ public final class RTPBukkitPlugin extends JavaPlugin {
 
     public BukkitTask commandTimer = null;
     public BukkitTask commandProcessing = null;
-    public BukkitTask teleportTimer = null;
-    public BukkitTask asyncTeleportProcessing = null;
-    public BukkitTask syncTeleportProcessing = null;
-
-    public Map<List<Integer>,CompletableFuture<Chunk>> chunkLoads = new ConcurrentHashMap<>();
+    public BukkitTask asyncTimer = null;
+    public BukkitTask syncTimer = null;
 
     @Override
     public void onLoad() {
@@ -86,35 +82,8 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             CommandsAPI.execute(avgTime - currTime);
         }, 40, 1);
 
-        teleportTimer = Bukkit.getScheduler().runTaskTimer(this, () -> {
-            long avgTime = TPS.timeSinceTick(20) / 20;
-            long currTime = TPS.timeSinceTick(1);
-
-            long availableTime = avgTime - currTime;
-            availableTime = TimeUnit.MICROSECONDS.toNanos(availableTime);
-
-            if(asyncTeleportProcessing == null) {
-                long finalAvailableTime = availableTime;
-                asyncTeleportProcessing = Bukkit.getScheduler().runTaskAsynchronously(
-                        RTPBukkitPlugin.getInstance(),
-                        () -> {
-                            RTP.getInstance().executeAsyncTasks(finalAvailableTime);
-                            RTPBukkitPlugin.getInstance().asyncTeleportProcessing = null;
-                        }
-                );
-            }
-
-            if(syncTeleportProcessing == null) {
-                long finalAvailableTime = availableTime;
-                syncTeleportProcessing = Bukkit.getScheduler().runTask(
-                        RTPBukkitPlugin.getInstance(),
-                        () -> {
-                            RTP.getInstance().executeSyncTasks(finalAvailableTime);
-                            RTPBukkitPlugin.getInstance().syncTeleportProcessing = null;
-                        }
-                );
-            }
-        }, 80, 1);
+        syncTimer = new SyncTeleportProcessing().runTaskTimer(this,80,1);
+        asyncTimer = new AsyncTeleportProcessing().runTaskTimerAsynchronously(this,80,1);
 
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,() -> {
             while (RTP.getInstance().startupTasks.size()>0) {
@@ -130,33 +99,24 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         if(commandTimer!=null) commandTimer.cancel();
-        try {
-            TimeUnit.MILLISECONDS.sleep(20);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
         if(commandProcessing!=null) commandProcessing.cancel();
-        if(teleportTimer!=null) teleportTimer.cancel();
-        try {
-            TimeUnit.MILLISECONDS.sleep(20);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        if(asyncTeleportProcessing!=null) asyncTeleportProcessing.cancel();
-        if(syncTeleportProcessing!=null) syncTeleportProcessing.cancel();
+
+        AsyncTeleportProcessing.kill();
+        SyncTeleportProcessing.kill();
+
+        syncTimer.cancel();
+        asyncTimer.cancel();
+
+
 
 //        onChunkLoad.shutdown();
         metrics = null;
 
-        for(CompletableFuture<Chunk> chunk : chunkLoads.values()) {
-            try {
-                chunk.cancel(true);
-            } catch (CancellationException ignored) {
-
-            }
-        }
-
         RTP.stop();
+
+        List<BukkitTask> pendingTasks = Bukkit.getScheduler().getPendingTasks().stream().filter(
+                b -> b.getOwner().getName().equalsIgnoreCase("RTP") && !b.isSync() && !b.isCancelled()).collect(Collectors.toList());
+        pendingTasks.forEach(BukkitTask::cancel);
 
         super.onDisable();
     }
@@ -198,7 +158,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             if(task.player() instanceof BukkitRTPPlayer rtpPlayer) {
                 if(!Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) return;
                 Player player = rtpPlayer.player();
-                Bukkit.getScheduler().runTaskAsynchronously(RTPBukkitPlugin.getInstance(),() -> {
+                RTP.getInstance().miscAsyncTasks.add(() -> {
                     EffectFactory.buildEffects("rtp.effect.presetup", player.getEffectivePermissions()).forEach(effect -> {
                         effect.setTarget(player);
                         effect.run();
@@ -214,7 +174,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             if(task.player() instanceof BukkitRTPPlayer rtpPlayer) {
                 if(!Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) return;
                 Player player = rtpPlayer.player();
-                Bukkit.getScheduler().runTaskAsynchronously(RTPBukkitPlugin.getInstance(),() -> {
+                RTP.getInstance().miscAsyncTasks.add(() -> {
                     EffectFactory.buildEffects("rtp.effect.postSetup", player.getEffectivePermissions()).forEach(effect -> {
                         effect.setTarget(player);
                         effect.run();
@@ -230,7 +190,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             if(task.player() instanceof BukkitRTPPlayer rtpPlayer) {
                 if(!Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) return;
                 Player player = rtpPlayer.player();
-                Bukkit.getScheduler().runTaskAsynchronously(RTPBukkitPlugin.getInstance(),() -> {
+                RTP.getInstance().miscAsyncTasks.add(() -> {
                     EffectFactory.buildEffects("rtp.effect.presetup", player.getEffectivePermissions()).forEach(effect -> {
                         effect.setTarget(player);
                         effect.run();
@@ -246,7 +206,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             if(task.player() instanceof BukkitRTPPlayer rtpPlayer) {
                 if(!Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) return;
                 Player player = rtpPlayer.player();
-                Bukkit.getScheduler().runTaskAsynchronously(RTPBukkitPlugin.getInstance(),() -> {
+                RTP.getInstance().miscAsyncTasks.add(() -> {
                     EffectFactory.buildEffects("rtp.effect.postload", player.getEffectivePermissions()).forEach(effect -> {
                         effect.setTarget(player);
                         effect.run();
@@ -262,7 +222,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             if(task.player() instanceof BukkitRTPPlayer rtpPlayer) {
                 if(!Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) return;
                 Player player = rtpPlayer.player();
-                Bukkit.getScheduler().runTaskAsynchronously(RTPBukkitPlugin.getInstance(),() -> {
+                RTP.getInstance().miscAsyncTasks.add(() -> {
                     EffectFactory.buildEffects("rtp.effect.preteleport", player.getEffectivePermissions()).forEach(effect -> {
                         effect.setTarget(player);
                         effect.run();
@@ -278,7 +238,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             if(task.player() instanceof BukkitRTPPlayer rtpPlayer) {
                 if(!Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) return;
                 Player player = rtpPlayer.player();
-                Bukkit.getScheduler().runTaskAsynchronously(RTPBukkitPlugin.getInstance(),() -> {
+                RTP.getInstance().miscAsyncTasks.add(() -> {
                     EffectFactory.buildEffects("rtp.effect.postteleport", player.getEffectivePermissions()).forEach(effect -> {
                         effect.setTarget(player);
                         effect.run();
@@ -296,7 +256,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             TeleportCancelEvent event = new TeleportCancelEvent(uuid);
             Bukkit.getPluginManager().callEvent(event);
 
-            Bukkit.getScheduler().runTaskAsynchronously(RTPBukkitPlugin.getInstance(),() -> {
+            RTP.getInstance().miscAsyncTasks.add(() -> {
                 if(!Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) return;
                 EffectFactory.buildEffects("rtp.effect.cancel", player.getEffectivePermissions()).forEach(effect -> {
                     effect.setTarget(player);
@@ -312,7 +272,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             PlayerQueuePushEvent event = new PlayerQueuePushEvent(region,uuid);
             Bukkit.getPluginManager().callEvent(event);
 
-            Bukkit.getScheduler().runTaskAsynchronously(RTPBukkitPlugin.getInstance(),() -> {
+            RTP.getInstance().miscAsyncTasks.add(() -> {
                 if(!Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) return;
                 EffectFactory.buildEffects("rtp.effect.queuepush", player.getEffectivePermissions()).forEach(effect -> {
                     effect.setTarget(player);
@@ -328,7 +288,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             PlayerQueuePopEvent event = new PlayerQueuePopEvent(region,uuid);
             Bukkit.getPluginManager().callEvent(event);
 
-            Bukkit.getScheduler().runTaskAsynchronously(RTPBukkitPlugin.getInstance(),() -> {
+            RTP.getInstance().miscAsyncTasks.add(() -> {
                 if(!Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) return;
                 EffectFactory.buildEffects("rtp.effect.queuepop", player.getEffectivePermissions()).forEach(effect -> {
                     effect.setTarget(player);

@@ -31,6 +31,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     public abstract double getRange();
     public abstract double xzToLocation(long x, long z);
     public abstract int[] locationToXZ(long location);
+    public final AtomicLong fillIter = new AtomicLong(0L);
 
     public boolean isKnownBad(int x, int z) {
         return isKnownBad((long)xzToLocation(x,z));
@@ -82,6 +83,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
         params.put("badLocations",badLocations);
         params.put("biomeLocations",biomeLocations);
+        params.put("fillIter", fillIter.get());
 
         fileYAML.dump(params,writer);
     }
@@ -166,6 +168,17 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
                 }
             }
             this.biomeLocations.put(biome,locations);
+        }
+
+        Object fillIterObj = resultMap.get("fillIter");
+        if(fillIterObj instanceof Number n) fillIter.set(n.longValue());
+        else if(fillIterObj instanceof String s) {
+            try {
+                fillIter.set(Long.parseLong(s));
+            }
+            catch (IllegalArgumentException exception) {
+                fillIter.set(0L);
+            }
         }
     }
 
