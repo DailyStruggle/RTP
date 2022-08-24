@@ -1,7 +1,10 @@
 import commonTestImpl.TestRTPServerAccessor;
-import commonTestImpl.commands.BaseCommand;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.tasks.AsyncTaskProcessing;
+import io.github.dailystruggle.rtp.common.tasks.SyncTaskProcessing;
 import org.junit.jupiter.api.Test;
+
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class InitTest {
 
@@ -9,8 +12,5 @@ public class InitTest {
     void TestStartup() {
         RTP.serverAccessor = new TestRTPServerAccessor();
         RTP rtp = new RTP();
-
-        rtp.executeSyncTasks(Long.MAX_VALUE);
-        rtp.executeAsyncTasks(Long.MAX_VALUE);
     }
 }

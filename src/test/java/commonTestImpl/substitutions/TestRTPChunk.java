@@ -30,4 +30,9 @@ public class TestRTPChunk implements RTPChunk {
     public void keep(boolean keep) {
 
     }
+
+    @Override
+    public void unload() {
+
+    }
 }

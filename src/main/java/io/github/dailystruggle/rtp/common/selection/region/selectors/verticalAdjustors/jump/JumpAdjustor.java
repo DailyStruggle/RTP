@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.jump;
 
+import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPBlock;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPChunk;
@@ -35,6 +36,8 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
     @Override
     public @Nullable
     RTPLocation adjust(@NotNull RTPChunk chunk) {
+        if(chunk==null) return null;
+
         int maxY = getNumber(JumpAdjustorKeys.maxY, 320L).intValue();
         int minY = getNumber(JumpAdjustorKeys.minY, 0L).intValue();
         int step = getNumber(JumpAdjustorKeys.step, 0).intValue();
@@ -50,7 +53,12 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
             int i = minY;
             for(; i < maxY; i+= it_len) {
                 int skylight = 15;
-                RTPBlock block1 = chunk.getBlockAt(7, i, 7);
+                RTPBlock block1;
+                try {
+                    block1 = chunk.getBlockAt(7, i, 7);
+                } catch (NullPointerException exception) {
+                    return null;
+                }
                 RTPBlock block2 = chunk.getBlockAt(7, i+1, 7);
                 if(requireSkyLight) skylight = block2.skyLight();
                 if(block1.isAir() && block2.isAir() && skylight > 7) {

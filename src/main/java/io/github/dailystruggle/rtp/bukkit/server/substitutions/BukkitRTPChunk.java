@@ -45,4 +45,10 @@ public record BukkitRTPChunk(Chunk chunk) implements RTPChunk {
             rtpWorld.forgetChunkAt(x(),z());
         }
     }
+
+    @Override
+    public void unload() {
+        if(Bukkit.isPrimaryThread()) chunk.unload(false);
+        else Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),()->chunk.unload(false));
+    }
 }

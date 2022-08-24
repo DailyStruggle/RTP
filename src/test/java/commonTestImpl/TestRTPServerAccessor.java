@@ -167,6 +167,26 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
     }
 
     @Override
+    public void announce(LangKeys key) {
+
+    }
+
+    @Override
+    public void announce(LangKeys key, String permission) {
+
+    }
+
+    @Override
+    public void announce(String msg) {
+
+    }
+
+    @Override
+    public void announce(String msg, String permission) {
+
+    }
+
+    @Override
     public Set<String> getBiomes() {
         return TestRTPWorld.getBiomes();
     }
@@ -194,5 +214,15 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
     @Override
     public Set<String> materials() {
         return null;
+    }
+
+    @Override
+    public long numAsyncTasks() {
+        return 1;
+    }
+
+    @Override
+    public void stop() {
+
     }
 }

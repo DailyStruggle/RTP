@@ -11,6 +11,7 @@ public enum PerformanceKeys {
     checkChunks,
     onEventParsing,
     effectParsing,
+    biomeRecall,
     timeit,
     version
 }

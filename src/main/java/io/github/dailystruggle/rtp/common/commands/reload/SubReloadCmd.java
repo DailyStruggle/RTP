@@ -118,7 +118,6 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
         MultiConfigParser<?> newParser = new MultiConfigParser<>(parser.myClass, parser.name, "1.0", parser.pluginDirectory);
         if(parser.myClass.equals(RegionKeys.class)) {
             RTP.getInstance().selectionAPI.permRegionLookup.clear();
-            RTP.log(Level.WARNING, "regions:" + newParser.configParserFactory.map.keySet());
             for(ConfigParser<?> regionConfig : newParser.configParserFactory.map.values()) {
                 EnumMap<RegionKeys, Object> data = (EnumMap<RegionKeys, Object>) regionConfig.getData();
 
@@ -186,7 +185,6 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
                 else throw new IllegalArgumentException();
 
                 Region region = new Region(regionConfig.name.replace(".yml",""), data);
-                RTP.log(Level.WARNING, "region:" + region.name);
                 RTP.getInstance().miscAsyncTasks.add(new RTPRunnable(
                         ()->RTP.getInstance().selectionAPI.permRegionLookup.put(region.name,region), 5));
             }
