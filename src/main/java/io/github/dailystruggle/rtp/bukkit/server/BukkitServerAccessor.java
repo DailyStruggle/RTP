@@ -18,20 +18,17 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSen
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.TPS;
-import org.bukkit.Bukkit;
-import org.bukkit.Location;
-import org.bukkit.Material;
-import org.bukkit.World;
+import org.bukkit.*;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
-import java.security.Provider;
 import java.util.*;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.logging.Level;
@@ -100,6 +97,12 @@ public class BukkitServerAccessor implements RTPServerAccessor {
             world = new BukkitRTPWorld(bukkitWorld);
             if(world == null) return null;
             worldMapStr.put(name,world);
+            worldMap.put(world.id(),world);
+        }
+        else if(!world.isActive()) {
+            worldMap.remove(world.id());
+            worldMapStr.remove(world.name());
+            return null;
         }
         return world;
     }
@@ -111,6 +114,7 @@ public class BukkitServerAccessor implements RTPServerAccessor {
             world = new BukkitRTPWorld(Bukkit.getWorld(id));
             if(world == null) return null;
             worldMap.put(id,world);
+            worldMapStr.put(world.name(),world);
         }
         else if(!world.isActive()) {
             worldMap.remove(world.id());
@@ -229,6 +233,37 @@ public class BukkitServerAccessor implements RTPServerAccessor {
         SendMessage.log(level,msg,exception);
     }
 
+    @Override
+    public void announce(LangKeys key) {
+        ConfigParser<LangKeys> parser = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+        if(parser == null) return;
+        String msg = String.valueOf(parser.getConfigValue(key,""));
+        if(msg == null || msg.isBlank()) return;
+        announce(msg);
+    }
+
+    @Override
+    public void announce(LangKeys key, String permission) {
+        ConfigParser<LangKeys> parser = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+        if(parser == null) return;
+        String msg = String.valueOf(parser.getConfigValue(key,""));
+        if(msg == null || msg.isBlank()) return;
+        announce(msg,permission);
+    }
+
+    @Override
+    public void announce(String msg) {
+        announce(msg,"rtp.see");
+    }
+
+    @Override
+    public void announce(String msg, String permission) {
+        SendMessage.sendMessage(Bukkit.getConsoleSender(), msg);
+        for(Player p : Bukkit.getOnlinePlayers().stream().filter(player -> player.hasPermission(permission)).collect(Collectors.toSet())) {
+            SendMessage.sendMessage(p, msg);
+        }
+    }
+
     private Supplier<Set<String>> biomes = BukkitRTPWorld::getBiomes;
     public void setBiomes(Supplier<Set<String>> biomes) {
         try {
@@ -255,19 +290,10 @@ public class BukkitServerAccessor implements RTPServerAccessor {
         final RTPBukkitPlugin bukkitPlugin = RTPBukkitPlugin.getInstance();
 
         bukkitPlugin.commandTimer.cancel();
-        bukkitPlugin.teleportTimer.cancel();
 
-        if(bukkitPlugin.commandProcessing!=null) {
-            bukkitPlugin.commandProcessing.cancel();
-        }
-        if(bukkitPlugin.syncTeleportProcessing!=null) {
-            bukkitPlugin.syncTeleportProcessing.cancel();
-            bukkitPlugin.syncTeleportProcessing = null;
-        }
-        if(bukkitPlugin.asyncTeleportProcessing!=null) {
-            bukkitPlugin.asyncTeleportProcessing.cancel();
-            bukkitPlugin.asyncTeleportProcessing = null;
-        }
+        bukkitPlugin.commandProcessing.cancel();
+        bukkitPlugin.syncTimer.cancel();
+        bukkitPlugin.asyncTimer.cancel();
 
         bukkitPlugin.commandTimer = Bukkit.getScheduler().runTaskTimer(bukkitPlugin, () -> {
             long avgTime = TPS.timeSinceTick(20) / 20;
@@ -284,35 +310,14 @@ public class BukkitServerAccessor implements RTPServerAccessor {
             }
         }, 40, 1);
 
-        bukkitPlugin.teleportTimer = Bukkit.getScheduler().runTaskTimer(bukkitPlugin, () -> {
-            long avgTime = TPS.timeSinceTick(20) / 20;
-            long currTime = TPS.timeSinceTick(1);
+        bukkitPlugin.syncTimer = Bukkit.getScheduler().runTaskTimer(bukkitPlugin, SyncTeleportProcessing::new,80,1);
+        bukkitPlugin.asyncTimer = Bukkit.getScheduler().runTaskTimer(bukkitPlugin, AsyncTeleportProcessing::new,80,1);
 
-            long availableTime = avgTime - currTime;
-            availableTime = TimeUnit.MICROSECONDS.toNanos(availableTime);
-
-            if(bukkitPlugin.asyncTeleportProcessing == null) {
-                long finalAvailableTime = availableTime;
-                bukkitPlugin.asyncTeleportProcessing = Bukkit.getScheduler().runTaskAsynchronously(
-                        RTPBukkitPlugin.getInstance(),
-                        () -> {
-                            RTP.getInstance().executeAsyncTasks(finalAvailableTime);
-                            RTPBukkitPlugin.getInstance().asyncTeleportProcessing = null;
-                        }
-                );
+        Bukkit.getScheduler().scheduleSyncDelayedTask(bukkitPlugin,() -> {
+            while (RTP.getInstance().startupTasks.size()>0) {
+                RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
             }
-
-            if(bukkitPlugin.syncTeleportProcessing == null) {
-                long finalAvailableTime = availableTime;
-                bukkitPlugin.syncTeleportProcessing = Bukkit.getScheduler().runTask(
-                        RTPBukkitPlugin.getInstance(),
-                        () -> {
-                            RTP.getInstance().executeSyncTasks(finalAvailableTime);
-                            RTPBukkitPlugin.getInstance().syncTeleportProcessing = null;
-                        }
-                );
-            }
-        }, 80, 1);
+        });
     }
 
     private Function<String,WorldBorder> worldBorderFunction = s -> {
@@ -346,5 +351,37 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     @Override
     public Set<String> materials() {
         return Arrays.stream(Material.values()).map(Enum::name).collect(Collectors.toSet());
+    }
+
+    @Override
+    public long numAsyncTasks() {
+        return Bukkit.getScheduler().getPendingTasks().stream().filter(bukkitTask -> !bukkitTask.isSync()).count();
+    }
+
+    @Override
+    public void stop() {
+        worldMap.forEach((s, world) -> {
+            if(world instanceof BukkitRTPWorld rtpWorld) {
+                rtpWorld.chunkLoads.forEach((integers, list) -> {
+                    for (CompletableFuture<Chunk> chunkCompletableFuture : list) {
+                        try {
+                            chunkCompletableFuture.cancel(true);
+                        }
+                        catch (CancellationException | CompletionException ignored) {
+
+                        }
+                    }
+                });
+                rtpWorld.chunkMap.forEach((integers, chunkLongPair) -> {
+                    Chunk left = chunkLongPair.getLeft();
+                    if(left == null) return;
+                    if(Bukkit.isPrimaryThread()) left.setForceLoaded(false);
+                    else Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),()->left.setForceLoaded(false));
+                });
+                rtpWorld.chunkMap.clear();
+            }
+        });
+
+
     }
 }

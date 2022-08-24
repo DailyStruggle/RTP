@@ -15,7 +15,9 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.*;
+import io.github.dailystruggle.rtp.common.tasks.FillTask;
 import io.github.dailystruggle.rtp.common.tasks.LoadChunks;
+import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
@@ -112,7 +114,7 @@ public class Region extends FactoryValue<RegionKeys> {
     }
 
     //localized generic task for
-    protected class Cache implements Runnable {
+    protected class Cache extends RTPRunnable {
         private static final long lastUpdate = 0;
         private final UUID playerId;
 
@@ -240,6 +242,8 @@ public class Region extends FactoryValue<RegionKeys> {
         }
         if(shape instanceof MemoryShape<?> memoryShape) {
             memoryShape.load(name + ".yml",worldName);
+            long iter = memoryShape.fillIter.get();
+            if(iter>0 && iter<Double.valueOf(memoryShape.getRange()).longValue()) RTP.getInstance().fillTasks.put(name,new FillTask(this,iter));
         }
 
         long cacheCap = getNumber(RegionKeys.cacheCap,10L).longValue();
@@ -397,9 +401,15 @@ public class Region extends FactoryValue<RegionKeys> {
         maxAttempts = Math.max(maxAttempts,1);
         long maxBiomeChecks = maxBiomeChecksPerGen*maxAttempts;
         long biomeChecks = 0L;
-        long worldBorderFails = 0L;
+
 
         RTPWorld world = (RTPWorld) data.getOrDefault(RegionKeys.world,RTP.serverAccessor.getRTPWorlds().get(0));
+
+        long biomeFails = 0;
+        long worldBorderFails = 0L;
+        long vertFails = 0L;
+        long safetyFails = 0L;
+        long miscFails = 0L;
 
         RTPLocation location = null;
         long i = 1;
@@ -428,6 +438,7 @@ public class Region extends FactoryValue<RegionKeys> {
                     select = shape.select();
                 }
                 currBiome = world.getBiome(select[0], (vert.maxY()+vert.minY())/2, select[1]);
+                biomeFails++;
             }
             if(biomeChecks>=maxBiomeChecks) return new ImmutablePair<>(null,i);
 
@@ -459,6 +470,7 @@ public class Region extends FactoryValue<RegionKeys> {
                 if(defaultBiomes && shape instanceof MemoryShape memoryShape) {
                     memoryShape.addBadLocation(l);
                 }
+                vertFails++;
                 continue;
             }
 
@@ -470,6 +482,7 @@ public class Region extends FactoryValue<RegionKeys> {
                 if(defaultBiomes && shape instanceof MemoryShape memoryShape) {
                     memoryShape.addBadLocation(l);
                 }
+                biomeFails++;
                 continue;
             }
 
@@ -481,13 +494,19 @@ public class Region extends FactoryValue<RegionKeys> {
                 for(int z = location.z()-safetyRadius; z < location.z()+safetyRadius && pass; z++) {
                     for(int y = location.y()-safetyRadius; y < location.y()+safetyRadius && pass; y++) {
                         block = chunk.getBlockAt(x,y,z);
-                        if(unsafeBlocks.contains(block.getMaterial())) pass = false;
+                        if(unsafeBlocks.contains(block.getMaterial())) {
+                            pass = false;
+                            safetyFails++;
+                        }
                     }
                 }
             }
 
 
-            if(pass) pass = checkGlobalRegionVerifiers(location);
+            if(pass) {
+                pass = checkGlobalRegionVerifiers(location);
+                if(!pass) miscFails++;
+            }
 
             if(pass) {
                 if(shape instanceof MemoryShape memoryShape) {
@@ -511,12 +530,15 @@ public class Region extends FactoryValue<RegionKeys> {
         Shape<?> shape = getShape();
         if(shape == null) return;
 
-        RTPWorld world = (RTPWorld) data.get(RegionKeys.world);
+        RTPWorld world = getWorld();
         if(world == null) return;
 
         if(shape instanceof MemoryShape<?> memoryShape) {
             memoryShape.save(this.name + ".yml", world.name());
         }
+
+        cachePipeline.stop();
+        cachePipeline.clear();
 
         playerQueue.clear();
         perPlayerLocationQueue.clear();
@@ -588,7 +610,7 @@ public class Region extends FactoryValue<RegionKeys> {
         VerticalAdjustor<?> vert = getVert();
         if(vert == null) return null;
 
-        RTPWorld rtpWorld = (RTPWorld) data.get(RegionKeys.world);
+        RTPWorld rtpWorld = getWorld();
         if(rtpWorld == null) return null;
 
         for(long i = -radius; i <= radius; i++) {
@@ -669,7 +691,7 @@ public class Region extends FactoryValue<RegionKeys> {
         return res;
     }
 
-    protected Shape<?> getShape() {
+    public Shape<?> getShape() {
         boolean wbo = false;
         Object o = data.getOrDefault(RegionKeys.worldBorderOverride,false);
         if(o instanceof Boolean b) wbo = b;
@@ -731,7 +753,7 @@ public class Region extends FactoryValue<RegionKeys> {
         return shape;
     }
 
-    protected VerticalAdjustor<?> getVert() {
+    public VerticalAdjustor<?> getVert() {
         Object vertObj = data.get(RegionKeys.vert);
         VerticalAdjustor<?> vert;
         if (vertObj instanceof VerticalAdjustor verticalAdjustor) {
@@ -761,5 +783,16 @@ public class Region extends FactoryValue<RegionKeys> {
         else throw new IllegalArgumentException("invalid shape\n" + vertObj);
 
         return vert;
+    }
+
+    public RTPWorld getWorld() {
+        Object world = data.get(RegionKeys.world);
+        if(world instanceof RTPWorld rtpWorld) return rtpWorld;
+        else {
+            String worldName = String.valueOf(world);
+            RTPWorld rtpWorld = RTP.serverAccessor.getRTPWorld(worldName);
+            if(rtpWorld == null) rtpWorld = RTP.serverAccessor.getRTPWorlds().get(0);
+            return rtpWorld;
+        }
     }
 }

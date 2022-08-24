@@ -1,8 +1,12 @@
 package io.github.dailystruggle.rtp.common.tasks;
 
+import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
+import io.github.dailystruggle.rtp.common.RTP;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.logging.Level;
 
 public class RTPTaskPipe {
     protected long avgTime = 0;
@@ -74,6 +78,9 @@ public class RTPTaskPipe {
     }
 
     public void stop() {
+        runnables.forEach(runnable -> {
+            if(runnable instanceof RTPRunnable rtpRunnable) rtpRunnable.setCancelled(true);
+        });
         stop = true;
     }
 }

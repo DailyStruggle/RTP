@@ -76,6 +76,11 @@ public interface RTPServerAccessor {
 
     void log(Level level, String msg, Exception exception);
 
+    void announce(LangKeys key);
+    void announce(LangKeys key, String permission);
+    void announce(String msg);
+    void announce(String msg, String permission);
+
     Set<String> getBiomes();
 
     boolean isPrimaryThread();
@@ -87,4 +92,8 @@ public interface RTPServerAccessor {
     void setWorldBorderFunction(Function<String,WorldBorder> function);
 
     Set<String> materials();
+
+    long numAsyncTasks();
+
+    void stop();
 }
