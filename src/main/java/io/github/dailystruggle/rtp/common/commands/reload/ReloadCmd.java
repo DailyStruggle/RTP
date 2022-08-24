@@ -93,7 +93,8 @@ public class ReloadCmd extends BaseRTPCmdImpl {
             if(!data.completed) new RTPTeleportCancel(uuid).run();
         });
         instance.processingPlayers.clear();
-        while(instance.forceLoads.size()>0) instance.forceLoads.forEach((ints, chunk) -> chunk.keep(false));
+
+        RTP.serverAccessor.getRTPWorlds().forEach(RTPWorld::forgetChunks);
 
         if(nextCommand!=null) return true;
 

@@ -38,6 +38,11 @@ public class TestRTPWorld implements RTPWorld {
     }
 
     @Override
+    public void forgetChunks() {
+
+    }
+
+    @Override
     public String getBiome(int x, int y, int z) {
         return null;
     }
