@@ -70,6 +70,8 @@ public interface RTPServerAccessor {
 
     void sendMessage(UUID target, String message);
 
+    void sendMessageAndSuggest(UUID target, String message, String suggestion);
+
     void sendMessage(UUID sender, UUID target, String message);
 
     void log(Level level, String msg);
