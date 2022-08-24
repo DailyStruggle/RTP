@@ -32,6 +32,7 @@ import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public class Region extends FactoryValue<RegionKeys> {
+    private Semaphore cacheGuard = new Semaphore(1);
     public static Set<String> defaultBiomes;
     public static final List<BiConsumer<Region,UUID>> onPlayerQueuePush = new ArrayList<>();
     public static final List<BiConsumer<Region,UUID>> onPlayerQueuePop = new ArrayList<>();
@@ -128,11 +129,13 @@ public class Region extends FactoryValue<RegionKeys> {
 
         @Override
         public void run() {
+            long cacheCap = getNumber(RegionKeys.cacheCap,10L).longValue();
+            cacheCap = Math.max(cacheCap,playerQueue.size());
             Pair<RTPLocation, Long> pair = getLocation(null);
             if(pair != null) {
                 RTPLocation location = pair.getLeft();
                 if(location == null) {
-                    cachePipeline.add(new Cache());
+                    if(cachePipeline.size()+locationQueue.size()<cacheCap+playerQueue.size()) cachePipeline.add(new Cache());
                     return;
                 }
 
@@ -158,7 +161,7 @@ public class Region extends FactoryValue<RegionKeys> {
                     else chunkSet.keep(false);
                 });
             }
-            cachePipeline.add(new Cache());
+            if(cachePipeline.size()+locationQueue.size()<cacheCap+playerQueue.size()) cachePipeline.add(new Cache());
         }
     }
 
@@ -173,10 +176,17 @@ public class Region extends FactoryValue<RegionKeys> {
         RTP instance = RTP.getInstance();
         long cacheCap = getNumber(RegionKeys.cacheCap,10L).longValue();
         cacheCap = Math.max(cacheCap,playerQueue.size());
-        if(locationQueue.size()>=cacheCap) return;
-        while(cachePipeline.size()<cacheCap)
-            cachePipeline.add(new Cache());
-        cachePipeline.execute(availableTime - (System.nanoTime()-start));
+        try {
+            cacheGuard.acquire();
+            if(locationQueue.size()>=cacheCap) return;
+            while(cachePipeline.size()+locationQueue.size()<cacheCap+playerQueue.size())
+                cachePipeline.add(new Cache());
+            cachePipeline.execute(availableTime - (System.nanoTime()-start));
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            cacheGuard.release();
+        }
 
         while (locationQueue.size() > 0 && playerQueue.size() > 0) {
             UUID playerId = playerQueue.poll();

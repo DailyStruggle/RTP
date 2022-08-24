@@ -115,25 +115,6 @@ permissions:
       rtp.onevent.changeWorld: true
       rtp.onevent.move: true
       rtp.onevent.teleport: true
-  rtp.near:
-    description: randomly teleport around your current position
-    default: op
-  rtp.near.free:
-    description: use the near parameter for free
-    default: op
-  rtp.near.random:
-    description: randomly teleport to a random player
-    default: op
-    children:
-      rtp.near: true
-  rtp.near.other:
-    description: randomly teleport around someone else
-    default: op
-    children:
-      rtp.near: true
-  rtp.near.notme:
-    description: don't let players teleport near me
-    default: op
   rtp.biome:
     description: teleport to any biome you have permission for
     default: op

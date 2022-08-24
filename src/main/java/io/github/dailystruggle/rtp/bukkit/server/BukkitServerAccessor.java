@@ -212,6 +212,11 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     }
 
     @Override
+    public void sendMessageAndSuggest(UUID target, String message, String suggestion) {
+        SendMessage.sendMessage(getSender(target),message,suggestion,suggestion);
+    }
+
+    @Override
     public void sendMessage(UUID target1, UUID target2, String message) {
         CommandSender sender = (target1.equals(CommandsAPI.serverId))
                 ? Bukkit.getConsoleSender()

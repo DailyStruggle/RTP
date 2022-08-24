@@ -4,6 +4,7 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPCommandSender;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
+import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.PAPIChecker;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -12,6 +13,7 @@ import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
+import io.github.dailystruggle.rtp.common.tools.ParseString;
 import net.md_5.bungee.api.ChatColor;
 import net.md_5.bungee.api.chat.BaseComponent;
 import net.md_5.bungee.api.chat.ClickEvent;
@@ -28,6 +30,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.regex.Matcher;
@@ -147,7 +150,12 @@ public class SendMessage {
         });
         placeholders.put("chunks",uuid -> {
             if(rtp == null) return "0";
-            return String.valueOf(rtp.forceLoads.size());
+            AtomicInteger c = new AtomicInteger();
+            RTP.serverAccessor.getRTPWorlds().forEach(world -> {
+                if(!(world instanceof BukkitRTPWorld rtpWorld)) return;
+                c.addAndGet(rtpWorld.chunkMap.size());
+            });
+            return String.valueOf(c.get());
         });
         placeholders.put("attempts",uuid -> {
             if(rtp == null) return "A";
@@ -268,7 +276,7 @@ public class SendMessage {
         // initialize with the same size as the placeholder getter map to skip reallocation
         Map<String,String> placeholders = new HashMap<>(SendMessage.placeholders.size());
 
-        Set<String> keywords = keywords(text);
+        Set<String> keywords = ParseString.keywords(text,SendMessage.placeholders.keySet());
         //for each placeholder getter, add placeholder and result to container
         SendMessage.placeholders.forEach((s, uuidStringFunction) -> {
             if(!keywords.contains(s)) return;
@@ -300,7 +308,7 @@ public class SendMessage {
         // initialize with the same size as the placeholder getter map to skip reallocation
         Map<String,String> placeholders = new HashMap<>(SendMessage.placeholders.size());
 
-        Set<String> keywords = keywords(text);
+        Set<String> keywords = ParseString.keywords(text,SendMessage.placeholders.keySet());
         //for each placeholder getter, add placeholder and result to container
         SendMessage.placeholders.forEach((s, uuidStringFunction) -> {
             if(!keywords.contains(s)) return;
@@ -366,27 +374,5 @@ public class SendMessage {
         message = format(null,message);
 
         Bukkit.getLogger().log(level,message,exception);
-    }
-
-    public static Set<String> keywords(String input) {
-        Set<String> res = new HashSet<>();
-        StringBuilder builder = null;
-        for(int i = 0; i < input.length(); i++) {
-            char c = input.charAt(i);
-            if(builder != null) {
-                if(c == ']') {
-                    String s = builder.toString();
-                    builder = null;
-                    if(placeholders.containsKey(s)) res.add(s);
-                }
-                else {
-                    builder.append(c);
-                }
-            }
-            else if(c == '[') {
-                builder = new StringBuilder();
-            }
-        }
-        return res;
     }
 }
