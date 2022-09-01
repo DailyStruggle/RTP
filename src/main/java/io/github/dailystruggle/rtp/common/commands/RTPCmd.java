@@ -1,27 +1,24 @@
 package io.github.dailystruggle.rtp.common.commands;
 
-import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.*;
 import io.github.dailystruggle.rtp.common.factory.Factory;
-import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPEconomy;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.SetupTeleport;
 
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
-import java.util.stream.Collectors;
 
 public interface RTPCmd extends BaseRTPCmd {
     default void init() {
@@ -81,7 +78,7 @@ public interface RTPCmd extends BaseRTPCmd {
         }
 
         ConfigParser<LangKeys> langParser = (ConfigParser<LangKeys>) rtp.configs.getParser(LangKeys.class);
-
+        ConfigParser<EconomyKeys> eco = (ConfigParser<EconomyKeys>) rtp.configs.getParser(EconomyKeys.class);
         ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) rtp.configs.getParser(PerformanceKeys.class);
         boolean syncLoading = false;
         Object configValue = perf.getConfigValue(PerformanceKeys.syncLoading, false);
@@ -119,25 +116,46 @@ public interface RTPCmd extends BaseRTPCmd {
             return true;
         }
 
+        List<String> biomeList = rtpArgs.get("biome");
+        List<String> shapeNames = rtpArgs.get("shape");
+        double price = 0.0;
+        RTPEconomy economy = RTP.economy;
+        if(economy!=null && !senderId.equals(CommandsAPI.serverId)) {
+            for (RTPPlayer player : players) {
+                if(player.uuid().equals(senderId)) price+=eco.getNumber(EconomyKeys.price, 0.0).doubleValue();
+                else if(player.hasPermission("rtp.notme")) continue;
+                else price+=eco.getNumber(EconomyKeys.otherPrice, 0.0).doubleValue();
+                if (shapeNames != null) price += eco.getNumber(EconomyKeys.paramsPrice, 0.0).doubleValue();
+                if (biomeList != null) price += eco.getNumber(EconomyKeys.biomePrice, 0.0).doubleValue();
+            }
+        }
+        double bal = economy.bal(senderId);
+        double floor = eco.getNumber(EconomyKeys.balanceFloor, 0.0).doubleValue();
+        if(bal-price<floor) {
+            RTP.serverAccessor.sendMessage(senderId,LangKeys.notEnoughMoney);
+            return true;
+        }
+
+
         for(int i = 0; i < players.size(); i++) {
-            RTPPlayer p = players.get(i);
+            RTPPlayer player = players.get(i);
 
             //get their data
-            TeleportData lastTeleportData = rtp.latestTeleportData.get(p.uuid());
-            //if p has an incomplete teleport
-            if(lastTeleportData != null) {
-                if(!lastTeleportData.completed) {
+            TeleportData data = rtp.latestTeleportData.get(player.uuid());
+            //if player has an incomplete teleport
+            if(data != null) {
+                if(!data.completed) {
                     String msg = (String) langParser.getConfigValue(LangKeys.alreadyTeleporting, "");
-                    RTP.serverAccessor.sendMessage(senderId, p.uuid(), msg);
+                    RTP.serverAccessor.sendMessage(senderId, player.uuid(), msg);
                     failEvent(sender,msg);
                     continue;
                 }
 
-                rtp.priorTeleportData.put(p.uuid(),lastTeleportData);
+                rtp.priorTeleportData.put(player.uuid(), data);
             }
-            lastTeleportData = new TeleportData();
-            lastTeleportData.time = timingsStart;
-            rtp.latestTeleportData.put(p.uuid(),lastTeleportData);
+            data = new TeleportData();
+            data.time = timingsStart;
+            rtp.latestTeleportData.put(player.uuid(), data);
 
             String regionName;
             List<String> regionNames = rtpArgs.get("region");
@@ -153,8 +171,8 @@ public interface RTPCmd extends BaseRTPCmd {
                     worldName = pickOne(rtpArgs.get("world"),"default");
                 }
                 else {
-                    //use p's world
-                    worldName = p.getLocation().world().name();
+                    //use player's world
+                    worldName = player.getLocation().world().name();
                 }
 
                 ConfigParser<WorldKeys> worldParser = rtp.configs.getWorldParser(worldName);
@@ -182,8 +200,8 @@ public interface RTPCmd extends BaseRTPCmd {
             Objects.requireNonNull(rtpWorld);
 
             //check for wbo
+            boolean doWBO = false;
             if(rtpArgs.containsKey("worldBorderOverride")) {
-                boolean doWBO;
                 List<String> WBOVals = rtpArgs.get("worldBorderOverride");
                 if(WBOVals.size() > i) doWBO = Boolean.parseBoolean(WBOVals.get(i));
                 else doWBO = Boolean.parseBoolean(WBOVals.get(0));
@@ -194,11 +212,30 @@ public interface RTPCmd extends BaseRTPCmd {
                 }
             }
 
-            List<String> biomeList = rtpArgs.get("biome");
+            if(economy!=null) {
+                RTP.log(Level.WARNING, "economy exists");
+                if (player.uuid().equals(senderId)) data.cost += eco.getNumber(EconomyKeys.price, 0.0).doubleValue();
+                else if (player.hasPermission("rtp.notme")) continue;
+                else data.cost += eco.getNumber(EconomyKeys.otherPrice, 0.0).doubleValue();
+                if (shapeNames != null || doWBO) data.cost += eco.getNumber(EconomyKeys.paramsPrice, 0.0).doubleValue();
+                if (biomeList != null) data.cost += eco.getNumber(EconomyKeys.biomePrice, 0.0).doubleValue();
+
+                if(economy.bal(senderId)-data.cost<floor) {
+                    RTP.serverAccessor.sendMessage(senderId, LangKeys.notEnoughMoney);
+                    return true;
+                }
+
+                boolean take = economy.take(senderId, data.cost);
+                RTP.log(Level.WARNING, "cost: " + data.cost);
+                if (!take) {
+                    RTP.serverAccessor.sendMessage(senderId, LangKeys.notEnoughMoney);
+                    return true;
+                }
+            }
+
             Set<String> biomes = null;
             if(biomeList!=null) biomes = new HashSet<>(biomeList);
 
-            List<String> shapeNames = rtpArgs.get("shape");
             for(int j = 0; j<1 && shapeNames!=null && shapeNames.size()>0; j++) {
                 Object o = region.getData().get(RegionKeys.shape);
 
@@ -262,19 +299,19 @@ public interface RTPCmd extends BaseRTPCmd {
 
             //todo: vert params
 
-            SetupTeleport setupTeleport = new SetupTeleport(sender, p, region, biomes);
-            lastTeleportData.nextTask = setupTeleport;
+            SetupTeleport setupTeleport = new SetupTeleport(sender, player, region, biomes);
+            data.nextTask = setupTeleport;
 
             long delay = sender.delay();
-            lastTeleportData.delay = delay;
+            data.delay = delay;
             if(delay>0) {
                 String msg = langParser.getConfigValue(LangKeys.delayMessage,"").toString();
-                RTP.serverAccessor.sendMessage(senderId,p.uuid(),msg);
+                RTP.serverAccessor.sendMessage(senderId, player.uuid(),msg);
             }
 
             if(!syncLoading) {
                 syncLoading = biomes == null
-                        && region.hasLocation(p.uuid())
+                        && region.hasLocation(player.uuid())
                         && delay<=0;
             }
 

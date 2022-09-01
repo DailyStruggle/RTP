@@ -1,11 +1,18 @@
 package io.github.dailystruggle.rtp.bukkit.tools.softdepends;
 
+import io.github.dailystruggle.commandsapi.common.CommandsAPI;
+import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPEconomy;
 import net.milkbowl.vault.economy.Economy;
+import net.milkbowl.vault.economy.EconomyResponse;
 import net.milkbowl.vault.permission.Permission;
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.plugin.RegisteredServiceProvider;
 
-public class VaultChecker {
+import java.util.UUID;
+
+public class VaultChecker implements RTPEconomy {
     private static Economy econ = null;
     private static Permission perms = null;
 
@@ -33,5 +40,44 @@ public class VaultChecker {
 
     public static Permission getPermissions() {
         return perms;
+    }
+
+    @Override
+    public boolean give(UUID playerId, double money) {
+        if(playerId.equals(CommandsAPI.serverId)) return true;
+        if(econ==null) {
+            RTP.economy = null;
+            return true;
+        }
+        OfflinePlayer player = Bukkit.getOfflinePlayer(playerId);
+        if(!player.isOnline()) return false;
+        EconomyResponse economyResponse = econ.depositPlayer(player, money);
+        return economyResponse.transactionSuccess();
+    }
+
+    @Override
+    public boolean take(UUID playerId, double money) {
+        if(playerId.equals(CommandsAPI.serverId)) return true;
+
+        if(econ==null) {
+            RTP.economy = null;
+            return true;
+        }
+        OfflinePlayer player = Bukkit.getOfflinePlayer(playerId);
+        if(!player.isOnline()) return false;
+        EconomyResponse economyResponse = econ.withdrawPlayer(player, money);
+        return economyResponse.transactionSuccess();
+    }
+
+    @Override
+    public double bal(UUID playerId) {
+        if(playerId.equals(CommandsAPI.serverId)) return Double.MAX_VALUE;
+        if(econ==null) {
+            RTP.economy = null;
+            return 0;
+        }
+        OfflinePlayer player = Bukkit.getOfflinePlayer(playerId);
+        if(!player.isOnline()) return 0;
+        return econ.getBalance(player);
     }
 }
