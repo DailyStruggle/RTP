@@ -359,7 +359,7 @@
         <dependency>
             <groupId>io.github.dailystruggle</groupId>
             <artifactId>CommandsAPI</artifactId>
-            <version>1.0-ALPHA63</version>
+            <version>1.0-ALPHA64</version>
             <scope>compile</scope>
         </dependency>
         <dependency>

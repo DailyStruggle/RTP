@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPCommandS
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
 import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
+import io.github.dailystruggle.rtp.bukkit.tools.softdepends.VaultChecker;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
@@ -300,23 +301,23 @@ public class BukkitServerAccessor implements RTPServerAccessor {
         bukkitPlugin.syncTimer.cancel();
         bukkitPlugin.asyncTimer.cancel();
 
-        bukkitPlugin.commandTimer = Bukkit.getScheduler().runTaskTimer(bukkitPlugin, () -> {
+        RTP.getInstance().miscAsyncTasks.add(() -> {
+            if(RTP.economy == null)  {
+                VaultChecker.setupEconomy();
+                VaultChecker.setupPermissions();
+                if(VaultChecker.getEconomy()!=null) RTP.economy = new VaultChecker();
+                else RTP.economy = null;
+            }
+        });
+
+        bukkitPlugin.commandTimer = Bukkit.getScheduler().runTaskTimerAsynchronously(bukkitPlugin, () -> {
             long avgTime = TPS.timeSinceTick(20) / 20;
             long currTime = TPS.timeSinceTick(1);
-
-            if(bukkitPlugin.commandProcessing == null) {
-                bukkitPlugin.commandProcessing = Bukkit.getScheduler().runTaskAsynchronously(
-                        RTPBukkitPlugin.getInstance(),
-                        () -> {
-                            CommandsAPI.execute(avgTime - currTime);
-                            RTPBukkitPlugin.getInstance().commandProcessing = null;
-                        }
-                );
-            }
+            CommandsAPI.execute(avgTime - currTime);
         }, 40, 1);
 
-        bukkitPlugin.syncTimer = Bukkit.getScheduler().runTaskTimer(bukkitPlugin, SyncTeleportProcessing::new,80,1);
-        bukkitPlugin.asyncTimer = Bukkit.getScheduler().runTaskTimer(bukkitPlugin, AsyncTeleportProcessing::new,80,1);
+        bukkitPlugin.syncTimer = new SyncTeleportProcessing().runTaskTimer(bukkitPlugin,80,1);
+        bukkitPlugin.asyncTimer = new AsyncTeleportProcessing().runTaskTimerAsynchronously(bukkitPlugin,80,1);
 
         Bukkit.getScheduler().scheduleSyncDelayedTask(bukkitPlugin,() -> {
             while (RTP.getInstance().startupTasks.size()>0) {

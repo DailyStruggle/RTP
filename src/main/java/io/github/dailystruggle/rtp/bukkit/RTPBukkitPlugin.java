@@ -9,20 +9,25 @@ import io.github.dailystruggle.rtp.bukkit.server.AsyncTeleportProcessing;
 import io.github.dailystruggle.rtp.bukkit.server.BukkitServerAccessor;
 import io.github.dailystruggle.rtp.bukkit.server.SyncTeleportProcessing;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
+import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
 import io.github.dailystruggle.rtp.bukkit.spigotListeners.*;
+import io.github.dailystruggle.rtp.bukkit.tools.softdepends.*;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.IntegrationsKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.*;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
@@ -92,8 +97,10 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         });
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupBukkitEvents);
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupEffects);
+        Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupIntegrations);
 
         Bukkit.getScheduler().runTaskTimer(this, new TPS(),0,1);
+
     }
 
     @Override
@@ -307,6 +314,61 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             EffectFactory.addPermissions("rtp.effect.cancel");
             EffectFactory.addPermissions("rtp.effect.queuePush");
         }
+    }
+
+    private void setupIntegrations() {
+        if(RTP.economy == null && Bukkit.getServer().getPluginManager().getPlugin("Vault") != null) {
+            VaultChecker.setupEconomy();
+            VaultChecker.setupPermissions();
+            if(VaultChecker.getEconomy()!=null) RTP.economy = new VaultChecker();
+            else RTP.economy = null;
+        }
+
+        ConfigParser<IntegrationsKeys> configParser = (ConfigParser<IntegrationsKeys>) RTP.getInstance().configs.getParser(IntegrationsKeys.class);
+
+        Region.addGlobalRegionVerifier(rtpLocation -> {
+            RTPWorld rtpWorld = rtpLocation.world();
+            if(!(rtpWorld instanceof BukkitRTPWorld bukkitRTPWorld)) return false;
+            if(!rtpWorld.isActive()) return false;
+            World world = bukkitRTPWorld.world();
+            Location location = new Location(world, rtpLocation.x(), rtpLocation.y(), rtpLocation.z());
+
+            boolean res = true;
+
+            if(res && Boolean.parseBoolean(configParser.getConfigValue(IntegrationsKeys.rerollFactions, false).toString())) {
+                res &= !FactionsChecker.isInClaim(location);
+            }
+
+            if(res && Boolean.parseBoolean(configParser.getConfigValue(IntegrationsKeys.rerollGriefDefender, false).toString())) {
+                res &= !GriefDefenderChecker.isInClaim(location);
+            }
+
+            if(res && Boolean.parseBoolean(configParser.getConfigValue(IntegrationsKeys.rerollGriefPrevention, false).toString())) {
+                res &= !GriefPreventionChecker.isInClaim(location);
+            }
+
+            if(res && Boolean.parseBoolean(configParser.getConfigValue(IntegrationsKeys.rerollLands, false).toString())) {
+                res &= !LandsChecker.isInClaim(location);
+            }
+
+            if(res && Boolean.parseBoolean(configParser.getConfigValue(IntegrationsKeys.rerollHuskTowns, false).toString())) {
+                res &= !HuskTownsChecker.isInClaim(location);
+            }
+
+            if(res && Boolean.parseBoolean(configParser.getConfigValue(IntegrationsKeys.rerollRedProtect, false).toString())) {
+                res &= !RedProtectChecker.isInClaim(location);
+            }
+
+            if(res && Boolean.parseBoolean(configParser.getConfigValue(IntegrationsKeys.rerollTownyAdvanced, false).toString())) {
+                res &= !TownyAdvancedChecker.isInClaim(location);
+            }
+
+            if(res && Boolean.parseBoolean(configParser.getConfigValue(IntegrationsKeys.rerollWorldGuard, false).toString())) {
+                res &= !WorldGuardChecker.isInClaim(location);
+            }
+
+            return res;
+        });
     }
 
     public static Region getRegion(Player player) {
