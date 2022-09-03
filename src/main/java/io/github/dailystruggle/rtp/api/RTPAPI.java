@@ -1,20 +1,14 @@
 package io.github.dailystruggle.rtp.api;
 
-import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
-import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
-import org.simpleyaml.configuration.MemorySection;
 
-import java.util.Collection;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -44,7 +38,7 @@ public class RTPAPI {
         RTP rtp = RTP.getInstance();
         if(rtp == null) return false;
 
-        Factory<Shape<?>> factory = (Factory<Shape<?>>) rtp.factoryMap.get(RTP.factoryNames.shape);
+        Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
         if(factory == null) return false;
 
         if(factory.contains(shape.name)) return true;

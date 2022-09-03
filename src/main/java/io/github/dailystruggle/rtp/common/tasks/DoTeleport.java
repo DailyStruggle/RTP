@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.common.tasks;
 
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
@@ -13,9 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import java.util.logging.Level;
 
 public final class DoTeleport extends RTPRunnable {
     public static final List<Consumer<DoTeleport>> preActions = new ArrayList<>();
@@ -94,7 +91,7 @@ public final class DoTeleport extends RTPRunnable {
     public boolean equals(Object obj) {
         if (obj == this) return true;
         if (obj == null || obj.getClass() != this.getClass()) return false;
-        var that = (DoTeleport) obj;
+        DoTeleport that = (DoTeleport) obj;
         return Objects.equals(this.sender, that.sender) &&
                 Objects.equals(this.player, that.player) &&
                 Objects.equals(this.location, that.location) &&

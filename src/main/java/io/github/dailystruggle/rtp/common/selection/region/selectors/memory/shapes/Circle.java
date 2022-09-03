@@ -2,7 +2,6 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 
 import io.github.dailystruggle.commandsapi.bukkit.LocalParameters.*;
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 
@@ -10,7 +9,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public class Circle extends MemoryShape<GenericMemoryShapeParams> {
@@ -201,7 +199,7 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
 
         Object unique = data.getOrDefault(GenericMemoryShapeParams.uniquePlacements,false);
         boolean u;
-        if(unique instanceof Boolean b) u = b;
+        if(unique instanceof Boolean) u = (Boolean) unique;
         else {
             u = Boolean.parseBoolean(String.valueOf(unique));
             data.put(GenericMemoryShapeParams.uniquePlacements,u);

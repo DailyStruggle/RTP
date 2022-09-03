@@ -9,9 +9,10 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
-public record ChunkSet(
-        List<CompletableFuture<RTPChunk>> chunks,
-        CompletableFuture<Boolean> complete) {
+public final class ChunkSet {
+    public final List<CompletableFuture<RTPChunk>> chunks;
+    public final CompletableFuture<Boolean> complete;
+
     public ChunkSet(List<CompletableFuture<RTPChunk>> chunks, CompletableFuture<Boolean> complete) {
         this.chunks = chunks;
         this.complete = complete;

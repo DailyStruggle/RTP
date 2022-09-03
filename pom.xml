@@ -13,9 +13,9 @@
     <description>a random teleport plugin</description>
     <url>http://maven.apache.org</url>
     <properties>
-        <maven.compiler.source>16</maven.compiler.source>
-        <maven.compiler.target>16</maven.compiler.target>
-        <java.version>16</java.version>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <java.version>1.8</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
@@ -91,7 +91,7 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
                 <configuration>
-                    <javadocExecutable>${java.home}/bin</javadocExecutable>
+                    <javadocExecutable>${java.home}/../bin</javadocExecutable>
                     <additionalparam>-Xdoclint:none</additionalparam>
                 </configuration>
                 <version>2.9.1</version>
@@ -130,8 +130,8 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.8.1</version>
                 <configuration>
-                    <source>16</source>
-                    <target>16</target>
+                    <source>1.8</source>
+                    <target>1.8</target>
                 </configuration>
             </plugin>
             <plugin>
@@ -164,8 +164,24 @@
                             <shadedPattern>io.io.github.dailystruggle.rtp.paperlib</shadedPattern> <!-- Replace this -->
                         </relocation>
                         <relocation>
-                            <pattern>io.io.github.dailystruggle.commandsapi</pattern>
-                            <shadedPattern>io.io.github.dailystruggle.rtp.commandsapi</shadedPattern> <!-- Replace this -->
+                            <pattern>io.github.dailystruggle.commandsapi</pattern>
+                            <shadedPattern>io.github.dailystruggle.rtp.commandsapi</shadedPattern> <!-- Replace this -->
+                        </relocation>
+                        <relocation>
+                            <pattern>io.github.dailystruggle.effectsapi</pattern>
+                            <shadedPattern>io.github.dailystruggle.rtp.effectsapi</shadedPattern> <!-- Replace this -->
+                        </relocation>
+                        <relocation>
+                            <pattern>io.github.dailystruggle.effectsapi</pattern>
+                            <shadedPattern>io.github.dailystruggle.rtp.effectsapi</shadedPattern> <!-- Replace this -->
+                        </relocation>
+                        <relocation>
+                            <pattern>org.yaml.snakeyaml</pattern>
+                            <shadedPattern>io.github.dailystruggle.rtp.snakeyaml</shadedPattern> <!-- Replace this -->
+                        </relocation>
+                        <relocation>
+                            <pattern>me.carleslc.Simple-YAML</pattern>
+                            <shadedPattern>io.github.dailystruggle.rtp.Simple-Yaml</shadedPattern> <!-- Replace this -->
                         </relocation>
                     </relocations>
                     <filters>
@@ -194,6 +210,16 @@
                         </goals>
                         <configuration>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
                         </configuration>
                     </execution>
                 </executions>
@@ -248,10 +274,28 @@
 
     <dependencies>
         <dependency>
+            <groupId>org.yaml</groupId>
+            <artifactId>snakeyaml</artifactId>
+            <version>1.30</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>me.carleslc.Simple-YAML</groupId>
+            <artifactId>Simple-Yaml</artifactId>
+            <version>1.8.1</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
             <groupId>org.spigotmc</groupId>
             <artifactId>spigot-api</artifactId>
             <version>1.17.1-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.yaml</groupId>
+                    <artifactId>snakeyaml</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.bstats</groupId>
@@ -269,18 +313,6 @@
             <groupId>me.clip</groupId>
             <artifactId>placeholderapi</artifactId>
             <version>2.11.0</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.sk89q.worldguard</groupId>
-            <artifactId>worldguard-bukkit</artifactId>
-            <version>7.0.6</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.github.TechFortress</groupId>
-            <artifactId>GriefPrevention</artifactId>
-            <version>16.17.1</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -308,83 +340,27 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>com.github.WiIIiam278</groupId>
-            <artifactId>HuskTowns</artifactId>
-            <version>1.6.2</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.github.LlmDl</groupId>
-            <artifactId>Towny</artifactId>
-            <version>0.97.5.0</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.massivecraft</groupId>
-            <artifactId>Factions</artifactId>
-            <version>1.6.9.5-U0.6.9</version>
-            <scope>provided</scope>
-        </dependency>
-            <dependency>
-            <groupId>com.griefdefender</groupId>
-            <artifactId>api</artifactId>
-            <version>LATEST</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.github.angeschossen</groupId>
-            <artifactId>LandsAPI</artifactId>
-            <version>LATEST</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>br.net.fabiozumbi12.RedProtect</groupId>
-            <artifactId>RedProtect-Core</artifactId>
-            <version>LATEST</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>br.net.fabiozumbi12.RedProtect</groupId>
-            <artifactId>RedProtect-Spigot</artifactId>
-            <version>LATEST</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>br.net.fabiozumbi12.RedProtect</groupId>
-            <artifactId>RedProtect-Spigot</artifactId>
-            <version>LATEST</version>
-            <classifier>javadoc</classifier>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
             <groupId>io.github.dailystruggle</groupId>
             <artifactId>CommandsAPI</artifactId>
-            <version>1.0-ALPHA63</version>
+            <version>1.0-ALPHA65</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>io.github.dailystruggle</groupId>
             <artifactId>EffectsAPI</artifactId>
-            <version>1.0-ALPHA21</version>
+            <version>1.0-ALPHA22</version>
             <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>me.carleslc.Simple-YAML</groupId>
-            <artifactId>Simple-Yaml</artifactId>
-            <version>1.8.1</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.yaml</groupId>
-            <artifactId>snakeyaml</artifactId>
-            <version>1.30</version>
-            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
             <version>3.12.0</version>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.google.inject</groupId>
+            <artifactId>guice</artifactId>
+            <version>4.2.3</version>
         </dependency>
     </dependencies>
 </project>

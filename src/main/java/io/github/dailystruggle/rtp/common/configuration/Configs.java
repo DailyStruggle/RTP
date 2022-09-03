@@ -3,16 +3,11 @@ package io.github.dailystruggle.rtp.common.configuration;
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.*;
-import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import org.apache.commons.lang3.StringUtils;
-import org.bukkit.Bukkit;
 import org.jetbrains.annotations.Nullable;
-import org.simpleyaml.configuration.MemorySection;
 
 import java.io.File;
 import java.util.EnumMap;
@@ -37,10 +32,10 @@ public class Configs {
         if(instance == null)
             throw new NullPointerException("instance is null");
 
-        if(instance instanceof ConfigParser<?> configParser)
-            configParserMap.put(configParser.myClass, configParser);
-        else if(instance instanceof MultiConfigParser<?> multiConfigParser)
-            multiConfigParserMap.put(multiConfigParser.myClass, multiConfigParser);
+        if(instance instanceof ConfigParser<?>)
+            configParserMap.put(((ConfigParser<?>) instance).myClass, (ConfigParser<?>) instance);
+        else if(instance instanceof MultiConfigParser<?>)
+            multiConfigParserMap.put(((MultiConfigParser<?>) instance).myClass, (MultiConfigParser<?>) instance);
         else
             throw new IllegalArgumentException("invalid type:" + instance.getClass().getSimpleName() + ", expected a config parser");
     }
@@ -96,21 +91,19 @@ public class Configs {
 
         ConfigParser<ConfigKeys> config = new ConfigParser<>(ConfigKeys.class, "config.yml", "1.0", pluginDirectory);
         ConfigParser<EconomyKeys> economy = new ConfigParser<>(EconomyKeys.class, "economy.yml", "1.0", pluginDirectory);
-        ConfigParser<IntegrationsKeys> integrations = new ConfigParser<>(IntegrationsKeys.class, "integrations.yml", "1.0", pluginDirectory);
         ConfigParser<PerformanceKeys> performance = new ConfigParser<>(PerformanceKeys.class, "performance.yml", "1.0", pluginDirectory);
         ConfigParser<SafetyKeys> safety = new ConfigParser<>(SafetyKeys.class, "safety", "1.0", pluginDirectory);
 
         MultiConfigParser<RegionKeys> regions = new MultiConfigParser<>(RegionKeys.class, "regions", "1.0", pluginDirectory);
         MultiConfigParser<WorldKeys> worlds = new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", pluginDirectory);
 
-        for(var world : RTP.serverAccessor.getRTPWorlds()) {
+        for(RTPWorld world : RTP.serverAccessor.getRTPWorlds()) {
             worlds.getParser(world.name());
         }
 
         putParser(lang);
         putParser(config);
         putParser(economy);
-        putParser(integrations);
         putParser(performance);
         putParser(safety);
         putParser(regions);

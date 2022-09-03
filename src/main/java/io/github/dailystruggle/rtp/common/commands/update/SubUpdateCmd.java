@@ -26,7 +26,6 @@ import org.simpleyaml.configuration.MemorySection;
 import java.io.IOException;
 import java.util.*;
 import java.util.function.Supplier;
-import java.util.logging.Level;
 
 public class SubUpdateCmd extends BaseRTPCmdImpl {
 
@@ -62,13 +61,14 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
         if(nextCommand!=null) return true;
 
         addParameters();
-        if(factoryValue instanceof ConfigParser configParser) {
+        if(factoryValue instanceof ConfigParser) {
+            ConfigParser<?> configParser = (ConfigParser<?>) factoryValue;
             ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
             String msg = String.valueOf(lang.getConfigValue(LangKeys.updating,""));
-            if(msg!=null) msg = StringUtils.replaceIgnoreCase(msg,"[filename]", configParser.name);
+            if(msg!=null) msg = StringUtils.replaceIgnoreCase(msg,"[filename]", factoryValue.name);
             RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId,msg);
 
-            for(var e : parameterValues.entrySet()) {
+            for(Map.Entry<String,List<String>> e : parameterValues.entrySet()) {
                 String key = e.getKey();
                 String value = e.getValue().get(0);
 
@@ -100,10 +100,10 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
     public void addParameters() {
         if(factoryValue == null) return;
 
-        if(factoryValue instanceof ConfigParser configParser) {
+        if(factoryValue instanceof ConfigParser) {
+            ConfigParser<?> configParser = (ConfigParser<?>) this.factoryValue;
             EnumMap<?,?> data = configParser.getData();
-
-            for (var e : data.entrySet()) {
+            for (Map.Entry<? extends Enum<?>,?> e : data.entrySet()) {
                 String name = e.getKey().name();
                 if(name.equalsIgnoreCase("version")) continue;
                 String s = name;
@@ -145,11 +145,14 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
                 }
             }
         }
-        else if(factoryValue instanceof MultiConfigParser parser) {
-            for(var e : parser.configParserFactory.map.entrySet()) {
-                if(e instanceof Map.Entry entry) {
-                    if(entry.getValue() instanceof FactoryValue factoryValue)
-                        addSubCommand(new SubUpdateCmd(this, entry.getKey().toString(),factoryValue));
+        else if(factoryValue instanceof MultiConfigParser) {
+            MultiConfigParser parser = (MultiConfigParser) factoryValue;
+            for(Object e : parser.configParserFactory.map.entrySet()) {
+                if(e instanceof Map.Entry) {
+                    Map.Entry<?,?> entry = (Map.Entry<?, ?>) e;
+                    Object entryValue = entry.getValue();
+                    if(entryValue instanceof FactoryValue)
+                        addSubCommand(new SubUpdateCmd(this, entry.getKey().toString(), (FactoryValue<?>) entryValue));
                 }
             }
         }

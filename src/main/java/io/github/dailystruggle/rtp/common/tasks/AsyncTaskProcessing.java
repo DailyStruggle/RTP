@@ -3,23 +3,11 @@ package io.github.dailystruggle.rtp.common.tasks;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
-import io.github.dailystruggle.rtp.common.playerData.TeleportData;
-import io.github.dailystruggle.rtp.common.selection.region.ChunkSet;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPChunk;
-import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
-import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
-import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
-import org.bukkit.Bukkit;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
-import java.util.logging.Level;
+import java.util.Map;
 
 public final class AsyncTaskProcessing extends RTPRunnable {
     long step = 0;
@@ -45,7 +33,7 @@ public final class AsyncTaskProcessing extends RTPRunnable {
         instance.miscAsyncTasks.execute(availableTime-(start-System.nanoTime()));
         if(isCancelled()) return;
 
-        for(var e : instance.fillTasks.entrySet()) {
+        for(Map.Entry<String, FillTask> e : instance.fillTasks.entrySet()) {
             if(e.getValue().isRunning()) continue;
             e.getValue().run();
             if(isCancelled()) return;

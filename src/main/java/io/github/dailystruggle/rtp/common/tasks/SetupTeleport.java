@@ -17,10 +17,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.logging.Level;
 
 public final class SetupTeleport extends RTPRunnable {
     public static final List<Consumer<SetupTeleport>> preActions = new ArrayList<>();
@@ -51,10 +49,10 @@ public final class SetupTeleport extends RTPRunnable {
         ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.getInstance().configs.getParser(PerformanceKeys.class);
         boolean syncLoading = false;
         Object configValue = perf.getConfigValue(PerformanceKeys.syncLoading, false);
-        if(configValue instanceof String s) {
-            configValue = Boolean.parseBoolean(s);
+        if(configValue instanceof String) {
+            configValue = Boolean.parseBoolean((String) configValue);
         }
-        if(configValue instanceof Boolean b) syncLoading = b;
+        if(configValue instanceof Boolean) syncLoading = (Boolean) configValue;
 
         RTP rtp = RTP.getInstance();
 
@@ -133,7 +131,7 @@ public final class SetupTeleport extends RTPRunnable {
     public boolean equals(Object obj) {
         if (obj == this) return true;
         if (obj == null || obj.getClass() != this.getClass()) return false;
-        var that = (SetupTeleport) obj;
+        SetupTeleport that = (SetupTeleport) obj;
         return Objects.equals(this.sender, that.sender) &&
                 Objects.equals(this.player, that.player) &&
                 Objects.equals(this.region, that.region) &&

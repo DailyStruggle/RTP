@@ -8,14 +8,19 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import org.bukkit.block.Block;
 
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.logging.Level;
 import java.util.stream.Collectors;
 
-public record BukkitRTPBlock(Block block) implements RTPBlock {
+public final class BukkitRTPBlock implements RTPBlock {
     private static Set<String> airBlocks = new ConcurrentSkipListSet<>();
     private static long lastUpdate = 0;
+    private final Block block;
+
+    public BukkitRTPBlock(Block block) {
+        this.block = block;
+    }
 
     static {
         airBlocks.add("AIR");
@@ -29,12 +34,12 @@ public record BukkitRTPBlock(Block block) implements RTPBlock {
     @Override
     public boolean isAir() {
         long t = System.currentTimeMillis();
-        long dt = t-lastUpdate;
-        if(dt>5000 || dt<0) {
+        long dt = t - lastUpdate;
+        if (dt > 5000 || dt < 0) {
             ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.getInstance().configs.getParser(SafetyKeys.class);
             airBlocks = safety.yamlFile.getStringList("airBlocks")
                     .stream().map(String::toUpperCase).collect(Collectors.toSet());
-            if(airBlocks.size()<1) airBlocks.add("AIR");
+            if (airBlocks.size() < 1) airBlocks.add("AIR");
             lastUpdate = t;
         }
 
@@ -72,4 +77,28 @@ public record BukkitRTPBlock(Block block) implements RTPBlock {
     public String getMaterial() {
         return block.getType().name().toUpperCase();
     }
+
+    public Block block() {
+        return block;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == this) return true;
+        if (obj == null || obj.getClass() != this.getClass()) return false;
+        BukkitRTPBlock that = (BukkitRTPBlock) obj;
+        return Objects.equals(this.block, that.block);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(block);
+    }
+
+    @Override
+    public String toString() {
+        return "BukkitRTPBlock[" +
+                "block=" + block + ']';
+    }
+
 }

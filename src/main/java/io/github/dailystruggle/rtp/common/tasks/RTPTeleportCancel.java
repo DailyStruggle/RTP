@@ -4,9 +4,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
-import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
-import io.github.dailystruggle.rtp.common.selection.region.ChunkSet;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.MutablePair;
@@ -15,7 +13,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
-import java.util.logging.Level;
 
 public final class RTPTeleportCancel extends RTPRunnable {
     public static final List<Consumer<RTPTeleportCancel>> preActions = new ArrayList<>();
@@ -75,8 +72,8 @@ public final class RTPTeleportCancel extends RTPRunnable {
             RTP.getInstance().latestTeleportData.remove(playerId);
 
         if(RTP.economy !=null && data.cost != 0.0) {
-            if (refund && data.sender instanceof RTPPlayer player1) {
-                RTP.economy.give(player1.uuid(),data.cost);
+            if (refund && data.sender instanceof RTPPlayer) {
+                RTP.economy.give(data.sender.uuid(),data.cost);
             }
         }
 

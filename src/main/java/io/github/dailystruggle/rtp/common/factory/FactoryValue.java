@@ -4,6 +4,7 @@ import com.google.common.base.Function;
 import io.github.dailystruggle.rtp.common.RTP;
 import org.jetbrains.annotations.NotNull;
 import org.simpleyaml.configuration.file.YamlFile;
+import org.yaml.snakeyaml.Yaml;
 
 import java.io.File;
 import java.io.IOException;
@@ -155,7 +156,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
 
     public String toYAML() {
         StringBuilder res = new StringBuilder();
-        for(var e : data.entrySet()) {
+        for(Map.Entry<? extends Enum<?>, Object> e : data.entrySet()) {
             String[] desc = this.desc.get(e.getKey());
             if(desc!=null) {
                 for(String d : desc) {
@@ -166,17 +167,17 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
             res.append(e.getKey().name()).append(": ");
 
             Object value = e.getValue();
-            if(value instanceof FactoryValue<?> factoryValue) {
+            if(value instanceof FactoryValue<?>) {
                 res.append("\n");
-                String s = factoryValue.toYAML();
+                String s = ((FactoryValue<?>) value).toYAML();
                 s = s.replaceAll("\n","  \n");
                 res.append(s);
             }
-            else if(value instanceof Map map) {
-                map.forEach((o, o2) -> res.append("\n").append(o.toString()).append(": ").append(o2.toString()));
+            else if(value instanceof Map) {
+                ((Map<?, ?>) value).forEach((o, o2) -> res.append("\n").append(o.toString()).append(": ").append(o2.toString()));
             }
-            else if(value instanceof List list) {
-                list.forEach(o -> res.append("\n").append(o.toString()));
+            else if(value instanceof List) {
+                ((List<?>) value).forEach(o -> res.append("\n").append(o.toString()));
             }
             else {
                 res.append(value.toString());
@@ -208,9 +209,9 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
         langFile = new File(mapFileName);
 
         YamlFile langYaml = new YamlFile(langFile);
-        if(!langFile.exists()) {
+        if (!langFile.exists()) {
             for (String key : keys()) { //default data, to guard exceptions
-                langYaml.set(key,key);
+                langYaml.set(key, key);
             }
             langYaml.save(langFile);
         }
@@ -220,18 +221,18 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
         language_mapping.clear();
         language_mapping.putAll(map);
         reverse_language_mapping.clear();
-        for(var e : language_mapping.entrySet()) {
-            reverse_language_mapping.put(e.getValue().toString(),e.getKey());
+        for (Map.Entry<String, Object> e : language_mapping.entrySet()) {
+            reverse_language_mapping.put(e.getValue().toString(), e.getKey());
         }
     }
 
     @Override
     public boolean equals(Object other) {
-        if(!(other instanceof FactoryValue factoryValue)) return false;
+        if(!(other instanceof FactoryValue)) return false;
         if(!(this.getClass().isAssignableFrom(other.getClass()))) return false;
-        if(!(factoryValue.myClass.equals(myClass))) return false;
-        EnumMap<E,Object> data = factoryValue.getData();
-        for (var e : this.data.entrySet()) {
+        if(!(((FactoryValue<?>) other).myClass.equals(myClass))) return false;
+        EnumMap<E,Object> data = (EnumMap<E, Object>) ((FactoryValue<?>) other).getData();
+        for (Map.Entry<? extends Enum<?>, Object> e : this.data.entrySet()) {
             Object mine = e.getValue();
             Object theirs = data.get(e.getKey());
             if(mine.getClass().equals(theirs.getClass())) {
