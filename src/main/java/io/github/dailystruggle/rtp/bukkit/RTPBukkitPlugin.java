@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.bukkit;
 
+import com.google.inject.Injector;
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.effectsapi.EffectFactory;
 import io.github.dailystruggle.effectsapi.EffectsAPI;
@@ -9,32 +10,28 @@ import io.github.dailystruggle.rtp.bukkit.server.AsyncTeleportProcessing;
 import io.github.dailystruggle.rtp.bukkit.server.BukkitServerAccessor;
 import io.github.dailystruggle.rtp.bukkit.server.SyncTeleportProcessing;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
-import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
 import io.github.dailystruggle.rtp.bukkit.spigotListeners.*;
-import io.github.dailystruggle.rtp.bukkit.tools.softdepends.*;
+import io.github.dailystruggle.rtp.bukkit.tools.SimpleBinderModule;
+import io.github.dailystruggle.rtp.bukkit.tools.softdepends.VaultChecker;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.IntegrationsKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.*;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 
@@ -69,6 +66,10 @@ public final class RTPBukkitPlugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        SimpleBinderModule module = new SimpleBinderModule(this);
+        Injector injector = module.createInjector();
+        injector.injectMembers(this);
+
         metrics = new Metrics(this,12277);
 
         RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
@@ -90,11 +91,19 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         syncTimer = new SyncTeleportProcessing().runTaskTimer(this,80,1);
         asyncTimer = new AsyncTeleportProcessing().runTaskTimerAsynchronously(this,80,1);
 
+        while (RTP.getInstance().startupTasks.size()>0) {
+            Bukkit.getLogger().log(Level.SEVERE,"B1");
+            RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
+        }
+
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,() -> {
+            Bukkit.getLogger().log(Level.SEVERE,"B2");
             while (RTP.getInstance().startupTasks.size()>0) {
+                Bukkit.getLogger().log(Level.SEVERE,"B3");
                 RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
             }
         });
+
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupBukkitEvents);
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupEffects);
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupIntegrations);
@@ -137,6 +146,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new OnPlayerQuit(), this);
         Bukkit.getPluginManager().registerEvents(new OnPlayerRespawn(), this);
         Bukkit.getPluginManager().registerEvents(new OnPlayerTeleport(), this);
+        if(RTP.serverAccessor.getServerIntVersion()<13) Bukkit.getPluginManager().registerEvents(new OnChunkUnload(), this);
 
         EffectsAPI.init(this);
     }
@@ -162,9 +172,9 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             PreSetupTeleportEvent event = new PreSetupTeleportEvent(task);
             Bukkit.getPluginManager().callEvent(event);
             if(event.isCancelled()) task.setCancelled(true);
-            if(task.player() instanceof BukkitRTPPlayer rtpPlayer) {
+            if(task.player() instanceof BukkitRTPPlayer) {
                 if(!Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) return;
-                Player player = rtpPlayer.player();
+                Player player = ((BukkitRTPPlayer) task.player()).player();
                 RTP.getInstance().miscAsyncTasks.add(() -> {
                     EffectFactory.buildEffects("rtp.effect.presetup", player.getEffectivePermissions()).forEach(effect -> {
                         effect.setTarget(player);
@@ -178,9 +188,9 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             if(!aBoolean) return;
             PostSetupTeleportEvent event = new PostSetupTeleportEvent(task);
             Bukkit.getPluginManager().callEvent(event);
-            if(task.player() instanceof BukkitRTPPlayer rtpPlayer) {
+            if(task.player() instanceof BukkitRTPPlayer) {
                 if(!Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) return;
-                Player player = rtpPlayer.player();
+                Player player = ((BukkitRTPPlayer) task.player()).player();
                 RTP.getInstance().miscAsyncTasks.add(() -> {
                     EffectFactory.buildEffects("rtp.effect.postSetup", player.getEffectivePermissions()).forEach(effect -> {
                         effect.setTarget(player);
@@ -194,9 +204,9 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             PreLoadChunksEvent event = new PreLoadChunksEvent(task);
             Bukkit.getPluginManager().callEvent(event);
 
-            if(task.player() instanceof BukkitRTPPlayer rtpPlayer) {
+            if(task.player() instanceof BukkitRTPPlayer) {
                 if(!Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) return;
-                Player player = rtpPlayer.player();
+                Player player = ((BukkitRTPPlayer) task.player()).player();
                 RTP.getInstance().miscAsyncTasks.add(() -> {
                     EffectFactory.buildEffects("rtp.effect.presetup", player.getEffectivePermissions()).forEach(effect -> {
                         effect.setTarget(player);
@@ -210,9 +220,9 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             PostLoadChunksEvent event = new PostLoadChunksEvent(task);
             Bukkit.getPluginManager().callEvent(event);
 
-            if(task.player() instanceof BukkitRTPPlayer rtpPlayer) {
+            if(task.player() instanceof BukkitRTPPlayer) {
                 if(!Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) return;
-                Player player = rtpPlayer.player();
+                Player player = ((BukkitRTPPlayer) task.player()).player();
                 RTP.getInstance().miscAsyncTasks.add(() -> {
                     EffectFactory.buildEffects("rtp.effect.postload", player.getEffectivePermissions()).forEach(effect -> {
                         effect.setTarget(player);
@@ -226,9 +236,9 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             PreTeleportEvent event = new PreTeleportEvent(task);
             Bukkit.getPluginManager().callEvent(event);
 
-            if(task.player() instanceof BukkitRTPPlayer rtpPlayer) {
+            if(task.player() instanceof BukkitRTPPlayer) {
                 if(!Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) return;
-                Player player = rtpPlayer.player();
+                Player player = ((BukkitRTPPlayer) task.player()).player();
                 RTP.getInstance().miscAsyncTasks.add(() -> {
                     EffectFactory.buildEffects("rtp.effect.preteleport", player.getEffectivePermissions()).forEach(effect -> {
                         effect.setTarget(player);
@@ -242,9 +252,9 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             PostTeleportEvent event = new PostTeleportEvent(task);
             Bukkit.getPluginManager().callEvent(event);
 
-            if(task.player() instanceof BukkitRTPPlayer rtpPlayer) {
+            if(task.player() instanceof BukkitRTPPlayer) {
                 if(!Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) return;
-                Player player = rtpPlayer.player();
+                Player player = ((BukkitRTPPlayer) task.player()).player();
                 RTP.getInstance().miscAsyncTasks.add(() -> {
                     EffectFactory.buildEffects("rtp.effect.postteleport", player.getEffectivePermissions()).forEach(effect -> {
                         effect.setTarget(player);
@@ -316,59 +326,13 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         }
     }
 
-    private void setupIntegrations() {
+    public void setupIntegrations() {
         if(RTP.economy == null && Bukkit.getServer().getPluginManager().getPlugin("Vault") != null) {
             VaultChecker.setupEconomy();
             VaultChecker.setupPermissions();
             if(VaultChecker.getEconomy()!=null) RTP.economy = new VaultChecker();
             else RTP.economy = null;
         }
-
-        ConfigParser<IntegrationsKeys> configParser = (ConfigParser<IntegrationsKeys>) RTP.getInstance().configs.getParser(IntegrationsKeys.class);
-
-        Region.addGlobalRegionVerifier(rtpLocation -> {
-            RTPWorld rtpWorld = rtpLocation.world();
-            if(!(rtpWorld instanceof BukkitRTPWorld bukkitRTPWorld)) return false;
-            if(!rtpWorld.isActive()) return false;
-            World world = bukkitRTPWorld.world();
-            Location location = new Location(world, rtpLocation.x(), rtpLocation.y(), rtpLocation.z());
-
-            boolean res = true;
-
-            if(res && Boolean.parseBoolean(configParser.getConfigValue(IntegrationsKeys.rerollFactions, false).toString())) {
-                res &= !FactionsChecker.isInClaim(location);
-            }
-
-            if(res && Boolean.parseBoolean(configParser.getConfigValue(IntegrationsKeys.rerollGriefDefender, false).toString())) {
-                res &= !GriefDefenderChecker.isInClaim(location);
-            }
-
-            if(res && Boolean.parseBoolean(configParser.getConfigValue(IntegrationsKeys.rerollGriefPrevention, false).toString())) {
-                res &= !GriefPreventionChecker.isInClaim(location);
-            }
-
-            if(res && Boolean.parseBoolean(configParser.getConfigValue(IntegrationsKeys.rerollLands, false).toString())) {
-                res &= !LandsChecker.isInClaim(location);
-            }
-
-            if(res && Boolean.parseBoolean(configParser.getConfigValue(IntegrationsKeys.rerollHuskTowns, false).toString())) {
-                res &= !HuskTownsChecker.isInClaim(location);
-            }
-
-            if(res && Boolean.parseBoolean(configParser.getConfigValue(IntegrationsKeys.rerollRedProtect, false).toString())) {
-                res &= !RedProtectChecker.isInClaim(location);
-            }
-
-            if(res && Boolean.parseBoolean(configParser.getConfigValue(IntegrationsKeys.rerollTownyAdvanced, false).toString())) {
-                res &= !TownyAdvancedChecker.isInClaim(location);
-            }
-
-            if(res && Boolean.parseBoolean(configParser.getConfigValue(IntegrationsKeys.rerollWorldGuard, false).toString())) {
-                res &= !WorldGuardChecker.isInClaim(location);
-            }
-
-            return res;
-        });
     }
 
     public static Region getRegion(Player player) {

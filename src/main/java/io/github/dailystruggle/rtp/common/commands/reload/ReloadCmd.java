@@ -1,51 +1,33 @@
 package io.github.dailystruggle.rtp.common.commands.reload;
 
-import io.github.dailystruggle.commandsapi.bukkit.localCommands.BukkitTreeCommand;
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
-import io.github.dailystruggle.rtp.bukkit.commands.BukkitBaseRTPCmd;
-import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPCommandSender;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmd;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
-import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
-import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
-import io.github.dailystruggle.rtp.common.factory.Factory;
-import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
-import io.github.dailystruggle.rtp.common.serverSide.RTPServerAccessor;
-import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.RTPTeleportCancel;
 import org.apache.commons.lang3.StringUtils;
-import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
-import org.simpleyaml.configuration.MemorySection;
 
-import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.logging.Level;
 
 public class ReloadCmd extends BaseRTPCmdImpl {
 
     public ReloadCmd(@Nullable CommandsAPICommand parent) {
         super(parent);
 
-        RTP.getInstance().miscAsyncTasks.add(new RTPRunnable(this::addCommands,5));
+        RTP.getInstance().miscAsyncTasks.add(new RTPRunnable(this::addCommands,20));
     }
 
-    void addCommands() {
+    public void addCommands() {
         final Configs configs = RTP.getInstance().configs;
         for (ConfigParser<?> value : configs.configParserMap.values()) {
             String name = value.name.replace(".yml","");

@@ -82,11 +82,11 @@ public interface RTPCmd extends BaseRTPCmd {
         ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) rtp.configs.getParser(PerformanceKeys.class);
         boolean syncLoading = false;
         Object configValue = perf.getConfigValue(PerformanceKeys.syncLoading, false);
-        if(configValue instanceof String s) {
-            configValue = Boolean.parseBoolean(s);
+        if(configValue instanceof String) {
+            configValue = Boolean.parseBoolean((String) configValue);
             perf.set(PerformanceKeys.syncLoading,configValue);
         }
-        if(configValue instanceof Boolean b) syncLoading = b;
+        if(configValue instanceof Boolean) syncLoading = (Boolean) configValue;
 
         //--------------------------------------------------------------------------------------------------------------
         //collect target players to teleport
@@ -105,9 +105,9 @@ public interface RTPCmd extends BaseRTPCmd {
                 players.add(p);
             }
         }
-        else if(sender instanceof RTPPlayer p) { //if no players but sender is a player, use sender's location
+        else if(sender instanceof RTPPlayer) { //if no players but sender is a player, use sender's location
             players = new ArrayList<>(1);
-            players.add(p);
+            players.add((RTPPlayer) sender);
         }
         else { //if no players and sender isn't a player, idk who to send
             String msg = (String) langParser.getConfigValue(LangKeys.consoleCmdNotAllowed,"");
@@ -119,21 +119,24 @@ public interface RTPCmd extends BaseRTPCmd {
         List<String> biomeList = rtpArgs.get("biome");
         List<String> shapeNames = rtpArgs.get("shape");
         double price = 0.0;
+        double floor = 0.0;
         RTPEconomy economy = RTP.economy;
-        if(economy!=null && !senderId.equals(CommandsAPI.serverId)) {
-            for (RTPPlayer player : players) {
-                if(player.uuid().equals(senderId)) price+=eco.getNumber(EconomyKeys.price, 0.0).doubleValue();
-                else if(player.hasPermission("rtp.notme")) continue;
-                else price+=eco.getNumber(EconomyKeys.otherPrice, 0.0).doubleValue();
-                if (shapeNames != null) price += eco.getNumber(EconomyKeys.paramsPrice, 0.0).doubleValue();
-                if (biomeList != null) price += eco.getNumber(EconomyKeys.biomePrice, 0.0).doubleValue();
+        if (economy != null) {
+            if (!senderId.equals(CommandsAPI.serverId)) {
+                for (RTPPlayer player : players) {
+                    if (player.uuid().equals(senderId)) price += eco.getNumber(EconomyKeys.price, 0.0).doubleValue();
+                    else if (player.hasPermission("rtp.notme")) continue;
+                    else price += eco.getNumber(EconomyKeys.otherPrice, 0.0).doubleValue();
+                    if (shapeNames != null) price += eco.getNumber(EconomyKeys.paramsPrice, 0.0).doubleValue();
+                    if (biomeList != null) price += eco.getNumber(EconomyKeys.biomePrice, 0.0).doubleValue();
+                }
             }
-        }
-        double bal = economy.bal(senderId);
-        double floor = eco.getNumber(EconomyKeys.balanceFloor, 0.0).doubleValue();
-        if(bal-price<floor) {
-            RTP.serverAccessor.sendMessage(senderId,LangKeys.notEnoughMoney);
-            return true;
+            double bal = economy.bal(senderId);
+            floor = eco.getNumber(EconomyKeys.balanceFloor, 0.0).doubleValue();
+            if(bal-price<floor) {
+                RTP.serverAccessor.sendMessage(senderId,LangKeys.notEnoughMoney);
+                return true;
+            }
         }
 
 
@@ -213,7 +216,6 @@ public interface RTPCmd extends BaseRTPCmd {
             }
 
             if(economy!=null) {
-                RTP.log(Level.WARNING, "economy exists");
                 if (player.uuid().equals(senderId)) data.cost += eco.getNumber(EconomyKeys.price, 0.0).doubleValue();
                 else if (player.hasPermission("rtp.notme")) continue;
                 else data.cost += eco.getNumber(EconomyKeys.otherPrice, 0.0).doubleValue();
@@ -226,7 +228,6 @@ public interface RTPCmd extends BaseRTPCmd {
                 }
 
                 boolean take = economy.take(senderId, data.cost);
-                RTP.log(Level.WARNING, "cost: " + data.cost);
                 if (!take) {
                     RTP.serverAccessor.sendMessage(senderId, LangKeys.notEnoughMoney);
                     return true;
@@ -240,8 +241,8 @@ public interface RTPCmd extends BaseRTPCmd {
                 Object o = region.getData().get(RegionKeys.shape);
 
                 Shape<?> originalShape;
-                if(!(o instanceof Shape<?> shape1)) break;
-                originalShape = shape1;
+                if(!(o instanceof Shape<?>)) break;
+                originalShape = (Shape<?>) o;
 
                 region = region.clone();
                 rtp.selectionAPI.tempRegions.put(senderId,region);
@@ -250,7 +251,7 @@ public interface RTPCmd extends BaseRTPCmd {
                 Shape<?> shape = (Shape<?>) factory.get(shapeName);
 
                 EnumMap<?, Object> originalShapeData = originalShape.getData();
-                for(var entry : shape.getData().entrySet()) {
+                for(Map.Entry<? extends Enum<?>,Object> entry : shape.getData().entrySet()) {
                     String name = entry.getKey().name();
                     if(name.equalsIgnoreCase("name")) continue;
                     if(name.equalsIgnoreCase("version")) continue;
@@ -344,7 +345,7 @@ public interface RTPCmd extends BaseRTPCmd {
     void successEvent(RTPCommandSender sender, RTPPlayer player);
     void failEvent(RTPCommandSender sender,String msg);
 
-    private static String pickOne(List<String> param, String d) {
+    static String pickOne(List<String> param, String d) {
         if(param == null || param.size()==0) return d;
         int sel = ThreadLocalRandom.current().nextInt(param.size());
         return param.get(sel);

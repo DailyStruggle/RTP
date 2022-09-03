@@ -134,7 +134,7 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
     public void sendMessage(UUID target, LangKeys msgType) {
         ConfigParser<LangKeys> parser = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
         String msg = String.valueOf(parser.getConfigValue(msgType,""));
-        if(msg == null || msg.isBlank()) return;
+        if(msg == null || msg.isEmpty()) return;
         sendMessage(target, msg);
     }
 
@@ -142,7 +142,7 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
     public void sendMessage(UUID target1, UUID target2, LangKeys msgType) {
         ConfigParser<LangKeys> parser = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
         String msg = String.valueOf(parser.getConfigValue(msgType,""));
-        if(msg == null || msg.isBlank()) return;
+        if(msg == null || msg.isEmpty()) return;
         sendMessage(target1,target2,msg);
     }
 

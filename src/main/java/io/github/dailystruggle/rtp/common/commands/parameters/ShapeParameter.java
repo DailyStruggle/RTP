@@ -5,10 +5,11 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 
-import java.util.*;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
-import java.util.logging.Level;
 
 public class ShapeParameter extends CommandParameter {
     public ShapeParameter(String permission, String description, BiFunction<UUID, String, Boolean> isRelevant) {

@@ -1,12 +1,8 @@
 package io.github.dailystruggle.rtp.common.tasks;
 
-import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
-import io.github.dailystruggle.rtp.common.RTP;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.logging.Level;
 
 public class RTPTaskPipe {
     protected long avgTime = 0;
@@ -23,10 +19,10 @@ public class RTPTaskPipe {
 
         for(Runnable runnable : runnables) {
             if(stop) return;
-            if(runnable instanceof RTPDelayable RTPDelayable) {
-                long d = RTPDelayable.getDelay();
+            if(runnable instanceof RTPDelayable) {
+                long d = ((RTPDelayable) runnable).getDelay();
                 if(d>0) {
-                    RTPDelayable.setDelay(d-1);
+                    ((RTPDelayable) runnable).setDelay(d-1);
                 }
             }
         }
@@ -35,15 +31,15 @@ public class RTPTaskPipe {
             if(stop) return;
             Runnable runnable = runnables.poll();
             if(runnable == null) continue;
-            if(runnable instanceof RTPDelayable RTPDelayable) {
-                long d = RTPDelayable.getDelay();
+            if(runnable instanceof RTPDelayable) {
+                long d = ((RTPDelayable) runnable).getDelay();
                 if(d>0) {
                     delayedRunnables.add(runnable);
                     continue;
                 }
             }
 
-            if(runnable instanceof RTPCancellable rtpCancellable && rtpCancellable.isCancelled()) continue;
+            if(runnable instanceof RTPCancellable && ((RTPCancellable) runnable).isCancelled()) continue;
 
             long localStart = System.nanoTime();
             runnable.run();
@@ -79,7 +75,7 @@ public class RTPTaskPipe {
 
     public void stop() {
         runnables.forEach(runnable -> {
-            if(runnable instanceof RTPRunnable rtpRunnable) rtpRunnable.setCancelled(true);
+            if(runnable instanceof RTPRunnable) ((RTPRunnable) runnable).setCancelled(true);
         });
         stop = true;
     }

@@ -40,19 +40,21 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
         int dir = getNumber(GenericVerticalAdjustorKeys.direction, 0).intValue();
 
         switch(dir) {
-            case 0 -> { //bottom up
+            case 0: { //bottom up
                 for (int i = minY; i < maxY; i++) {
                     resBlock = input.getBlockAt(7,i,7);
                     if(testPlacement(resBlock)) return resBlock.getLocation();
                 }
+                break;
             }
-            case 1 -> { //top down
+            case 1: { //top down
                 for (int i = maxY; i > minY; i--) {
                     resBlock = input.getBlockAt(7,i,7);
                     if(testPlacement(resBlock)) return resBlock.getLocation();
                 }
+                break;
             }
-            case 2 -> { //middle out
+            case 2: { //middle out
                 int maxDistance = (maxY - minY)/2; //dividing distance is more overflow-safe than simple average
                 int middle = minY + maxDistance;
                 for (int i = 0; i <= maxDistance; i++) {
@@ -64,8 +66,9 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
                     resBlock = input.getBlockAt(7,middle-i,7);
                     if(testPlacement(resBlock)) return resBlock.getLocation();
                 }
+                break;
             }
-            case 3 -> { //edges in
+            case 3: { //edges in
                 int maxDistance = (maxY - minY)/2; //dividing distance is more overflow-safe than simple average
                 int middle = minY + maxDistance;
                 for (int i = maxDistance; i >= 0; i--) {
@@ -77,8 +80,9 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
                     resBlock = input.getBlockAt(7,middle-i,7);
                     if(testPlacement(resBlock)) return resBlock.getLocation();
                 }
+                break;
             }
-            default -> { //random order
+            default: { //random order
                 //load up a list of possible vertical indices
                 List<Integer> trials = new ArrayList<>(maxY-minY+1);
                 for (int i = minY; i < maxY; i++) {
