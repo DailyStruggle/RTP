@@ -2,7 +2,6 @@ package io.github.dailystruggle.rtp.common.commands.fill;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
@@ -11,9 +10,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shap
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import io.github.dailystruggle.rtp.common.tasks.FillTask;
-import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import org.apache.commons.lang3.StringUtils;
-import org.bukkit.Bukkit;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -47,7 +44,7 @@ public class FillStartCmd extends FillSubCmd {
             if(fillTask!=null) {
                 if(parser == null) continue;
                 String msg = String.valueOf(parser.getConfigValue(LangKeys.fillRunning,""));
-                if(msg == null || msg.isBlank()) continue;
+                if(msg == null || msg.isEmpty()) continue;
                 msg = StringUtils.replaceIgnoreCase(msg, "[region]", region.name);
                 RTP.serverAccessor.announce(msg,"rtp.fill");
                 continue;
@@ -55,13 +52,13 @@ public class FillStartCmd extends FillSubCmd {
 
             Shape<?> shapeObj = region.getShape();
             MemoryShape<?> shape;
-            if(shapeObj instanceof MemoryShape memoryShape) {
-                shape = memoryShape;
+            if(shapeObj instanceof MemoryShape) {
+                shape = (MemoryShape<?>) shapeObj;
             }
             else {
                 if(parser == null) continue;
                 String msg = String.valueOf(parser.getConfigValue(LangKeys.badArg,""));
-                if(msg == null || msg.isBlank()) continue;
+                if(msg == null || msg.isEmpty()) continue;
                 msg = StringUtils.replaceIgnoreCase(msg, "[arg]", "region:"+region.name);
                 RTP.serverAccessor.sendMessage(callerId,msg);
                 continue;
@@ -74,7 +71,7 @@ public class FillStartCmd extends FillSubCmd {
             RTP.getInstance().fillTasks.put(region.name,new FillTask(region,0L));
             if(parser == null) continue;
             String msg = String.valueOf(parser.getConfigValue(LangKeys.fillStart,""));
-            if(msg == null || msg.isBlank()) continue;
+            if(msg == null || msg.isEmpty()) continue;
             msg = StringUtils.replaceIgnoreCase(msg, "[region]", region.name);
             RTP.serverAccessor.announce(msg,"rtp.fill");
         }
@@ -88,7 +85,7 @@ public class FillStartCmd extends FillSubCmd {
         if(regionParameter!=null) {
             for(String name : regionParameter) regions.add(RTP.getInstance().selectionAPI.getRegion(name));
         }
-        else if(sender instanceof RTPPlayer player) regions.add(RTP.getInstance().selectionAPI.getRegion(player));
+        else if(sender instanceof RTPPlayer) regions.add(RTP.getInstance().selectionAPI.getRegion((RTPPlayer) sender));
         else regions.add(RTP.getInstance().selectionAPI.getRegion("default"));
         return regions;
     }

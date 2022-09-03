@@ -3,7 +3,6 @@ package io.github.dailystruggle.rtp.common.commands.info;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
-import io.github.dailystruggle.rtp.common.commands.fill.FillResumeCmd;
 import io.github.dailystruggle.rtp.common.commands.parameters.RegionParameter;
 import io.github.dailystruggle.rtp.common.commands.parameters.WorldParameter;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -49,9 +48,9 @@ public class InfoCmd extends BaseRTPCmdImpl {
             boolean wbo = false;
             EnumMap<RegionKeys, Object> data = region.getData();
             Object o = data.getOrDefault(RegionKeys.worldBorderOverride,false);
-            if(o instanceof Boolean b) wbo = b;
-            else if(o instanceof String s) {
-                wbo = Boolean.parseBoolean(s);
+            if(o instanceof Boolean) wbo = (Boolean) o;
+            else if(o instanceof String) {
+                wbo = Boolean.parseBoolean((String) o);
                 data.put(RegionKeys.worldBorderOverride,wbo);
             }
             return String.valueOf(wbo);
@@ -60,9 +59,9 @@ public class InfoCmd extends BaseRTPCmdImpl {
             boolean req = false;
             EnumMap<RegionKeys, Object> data = region.getData();
             Object o = data.getOrDefault(RegionKeys.requirePermission,false);
-            if(o instanceof Boolean b) req = b;
-            else if(o instanceof String s) {
-                req = Boolean.parseBoolean(s);
+            if(o instanceof Boolean) req = (Boolean) o;
+            else if(o instanceof String) {
+                req = Boolean.parseBoolean((String) o);
                 data.put(RegionKeys.requirePermission, req);
             }
             return String.valueOf(req);
@@ -121,8 +120,8 @@ public class InfoCmd extends BaseRTPCmdImpl {
         List<String> worldNames = parameterValues.get("world");
         if(worldNames!=null) {
             Object worldInfoObj = lang.getConfigValue(LangKeys.worldInfo, "");
-            if(!(worldInfoObj instanceof List worldInfoList)) return true;
-            List<String> worldInfo = (List<String>) worldInfoList.stream().map(String::valueOf).collect(Collectors.toList());
+            if(!(worldInfoObj instanceof List)) return true;
+            List<String> worldInfo = ((List<?>) worldInfoObj).stream().map(String::valueOf).collect(Collectors.toList());
             for(String worldName : worldNames) {
                 RTPWorld rtpWorld = RTP.serverAccessor.getRTPWorld(worldName);
                 if(rtpWorld==null || !rtpWorld.isActive()) continue;
@@ -144,8 +143,8 @@ public class InfoCmd extends BaseRTPCmdImpl {
         List<String> regionNames = parameterValues.get("region");
         if(regionNames!=null) {
             Object regionInfoObj = lang.getConfigValue(LangKeys.regionInfo, "");
-            if(!(regionInfoObj instanceof List regionInfoList)) return true;
-            List<String> regionInfo = (List<String>) regionInfoList.stream().map(String::valueOf).collect(Collectors.toList());
+            if(!(regionInfoObj instanceof List)) return true;
+            List<String> regionInfo = ((List<?>) regionInfoObj).stream().map(String::valueOf).collect(Collectors.toList());
             for(String regionName : regionNames) {
                 Region region = RTP.getInstance().selectionAPI.getRegion(regionName);
                 if(region ==null) continue;

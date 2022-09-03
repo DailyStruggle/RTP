@@ -2,8 +2,6 @@ package io.github.dailystruggle.rtp.common.tools;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
-import org.bukkit.command.CommandSender;
-import org.bukkit.permissions.PermissionAttachmentInfo;
 
 import java.util.Set;
 import java.util.UUID;

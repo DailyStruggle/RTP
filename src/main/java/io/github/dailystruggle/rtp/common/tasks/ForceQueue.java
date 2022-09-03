@@ -16,7 +16,7 @@ public final class ForceQueue extends RTPRunnable {
     public static final List<Consumer<ForceQueue>> preActions = new ArrayList<>();
     public static final List<Consumer<ForceQueue>> postActions = new ArrayList<>();
     private final RTPCommandSender sender;
-    private Collection<Region> regions;
+    private final Collection<Region> regions;
 
     public ForceQueue() {
         sender = RTP.serverAccessor.getSender(CommandsAPI.serverId);
@@ -58,7 +58,7 @@ public final class ForceQueue extends RTPRunnable {
     public boolean equals(Object obj) {
         if (obj == this) return true;
         if (obj == null || obj.getClass() != this.getClass()) return false;
-        var that = (ForceQueue) obj;
+        ForceQueue that = (ForceQueue) obj;
         return Objects.equals(this.sender, that.sender) &&
                 Objects.equals(this.regions, that.regions);
     }

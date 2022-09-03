@@ -1,11 +1,7 @@
 package io.github.dailystruggle.rtp.common.tools;
 
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 
 public class ParseString {
     public static Set<String> keywords(String input, Set<String> placeholders) {

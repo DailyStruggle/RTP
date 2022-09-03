@@ -1,12 +1,6 @@
 package io.github.dailystruggle.rtp.common.tasks;
 
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
-import io.github.dailystruggle.rtp.common.selection.region.Region;
-
-import java.util.ArrayList;
-import java.util.List;
 
 public final class SyncTaskProcessing extends RTPRunnable {
     long step = 0;

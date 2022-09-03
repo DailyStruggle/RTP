@@ -18,4 +18,6 @@ public interface RTPWorld {
     void platform(RTPLocation location);
 
     boolean isActive();
+
+    boolean isForceLoaded(int cx, int cz);
 }

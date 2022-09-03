@@ -15,7 +15,9 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import org.apache.commons.lang3.StringUtils;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -116,7 +118,7 @@ public class FillTask extends RTPRunnable {
 
             ConfigParser<LangKeys> langParser = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
             String msg = langParser.getConfigValue(LangKeys.fillStatus, "").toString();
-            if(msg!=null && !msg.isBlank()) {
+            if(msg!=null && !msg.isEmpty()) {
                 long days = TimeUnit.SECONDS.toDays(estRemaining);
                 long hours = TimeUnit.SECONDS.toHours(estRemaining) % 24;
                 long minutes = TimeUnit.SECONDS.toMinutes(estRemaining) % 60;

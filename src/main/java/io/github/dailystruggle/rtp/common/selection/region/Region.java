@@ -28,11 +28,10 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.BiConsumer;
 import java.util.function.Predicate;
-import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public class Region extends FactoryValue<RegionKeys> {
-    private Semaphore cacheGuard = new Semaphore(1);
+    private final Semaphore cacheGuard = new Semaphore(1);
     public static Set<String> defaultBiomes;
     public static final List<BiConsumer<Region,UUID>> onPlayerQueuePush = new ArrayList<>();
     public static final List<BiConsumer<Region,UUID>> onPlayerQueuePop = new ArrayList<>();
@@ -246,14 +245,14 @@ public class Region extends FactoryValue<RegionKeys> {
         Object shape = getShape();
         Object world = params.get(RegionKeys.world);
         String worldName;
-        if(world instanceof RTPWorld rtpWorld) worldName = rtpWorld.name();
+        if(world instanceof RTPWorld) worldName = ((RTPWorld) world).name();
         else {
             worldName = String.valueOf(world);
         }
-        if(shape instanceof MemoryShape<?> memoryShape) {
-            memoryShape.load(name + ".yml",worldName);
-            long iter = memoryShape.fillIter.get();
-            if(iter>0 && iter<Double.valueOf(memoryShape.getRange()).longValue()) RTP.getInstance().fillTasks.put(name,new FillTask(this,iter));
+        if(shape instanceof MemoryShape<?>) {
+            ((MemoryShape<?>) shape).load(name + ".yml",worldName);
+            long iter = ((MemoryShape<?>) shape).fillIter.get();
+            if(iter>0 && iter<Double.valueOf(((MemoryShape<?>) shape).getRange()).longValue()) RTP.getInstance().fillTasks.put(name,new FillTask(this,iter));
         }
 
         long cacheCap = getNumber(RegionKeys.cacheCap,10L).longValue();
@@ -264,13 +263,13 @@ public class Region extends FactoryValue<RegionKeys> {
         Set<String> defaultBiomes;
         ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.getInstance().configs.getParser(SafetyKeys.class);
         Object configBiomes = safety.getConfigValue(SafetyKeys.biomes,null);
-        if(configBiomes instanceof Collection collection) {
+        if(configBiomes instanceof Collection) {
             boolean whitelist;
             Object configValue = safety.getConfigValue(SafetyKeys.biomeWhitelist, false);
-            if(configValue instanceof Boolean b) whitelist = b;
+            if(configValue instanceof Boolean) whitelist = (Boolean) configValue;
             else whitelist = Boolean.parseBoolean(configValue.toString());
 
-            Set<String> collect = (Set<String>) collection.stream().map(Object::toString).collect(Collectors.toSet());
+            Set<String> collect = ((Collection<?>) configBiomes).stream().map(Object::toString).collect(Collectors.toSet());
 
             defaultBiomes = whitelist
                     ? collect
@@ -426,9 +425,9 @@ public class Region extends FactoryValue<RegionKeys> {
         for(; i <= maxAttempts; i++) {
             long l = -1;
             int[] select;
-            if(shape instanceof MemoryShape memoryShape) {
-                l = memoryShape.rand();
-                select = memoryShape.locationToXZ(l);
+            if(shape instanceof MemoryShape) {
+                l = shape.rand();
+                select = ((MemoryShape<?>) shape).locationToXZ(l);
             }
             else {
                 select = shape.select();
@@ -437,12 +436,12 @@ public class Region extends FactoryValue<RegionKeys> {
             String currBiome = world.getBiome(select[0], (vert.maxY() + vert.minY()) / 2, select[1]);
 
             for(; biomeChecks < maxBiomeChecks && !biomeNames.contains(currBiome); biomeChecks++, maxAttempts++, i++) {
-                if(shape instanceof MemoryShape memoryShape) {
+                if(shape instanceof MemoryShape) {
                     if (defaultBiomes) {
-                        memoryShape.addBadLocation(l);
+                        ((MemoryShape<?>) shape).addBadLocation(l);
                     }
-                    l = memoryShape.rand();
-                    select = memoryShape.locationToXZ(l);
+                    l = shape.rand();
+                    select = ((MemoryShape<?>) shape).locationToXZ(l);
                 }
                 else {
                     select = shape.select();
@@ -477,8 +476,8 @@ public class Region extends FactoryValue<RegionKeys> {
 
             location = vert.adjust(chunk);
             if(location == null) {
-                if(defaultBiomes && shape instanceof MemoryShape memoryShape) {
-                    memoryShape.addBadLocation(l);
+                if(defaultBiomes && shape instanceof MemoryShape) {
+                    ((MemoryShape<?>) shape).addBadLocation(l);
                 }
                 vertFails++;
                 continue;
@@ -489,8 +488,8 @@ public class Region extends FactoryValue<RegionKeys> {
             if(!biomeNames.contains(currBiome)) {
                 biomeChecks++;
                 maxAttempts++;
-                if(defaultBiomes && shape instanceof MemoryShape memoryShape) {
-                    memoryShape.addBadLocation(l);
+                if(defaultBiomes && shape instanceof MemoryShape) {
+                    ((MemoryShape<?>) shape).addBadLocation(l);
                 }
                 biomeFails++;
                 continue;
@@ -519,15 +518,15 @@ public class Region extends FactoryValue<RegionKeys> {
             }
 
             if(pass) {
-                if(shape instanceof MemoryShape memoryShape) {
-                    memoryShape.addBiomeLocation(l,currBiome);
+                if(shape instanceof MemoryShape) {
+                    ((MemoryShape<?>) shape).addBiomeLocation(l,currBiome);
                 }
                 break;
             }
             else {
-                if(shape instanceof MemoryShape memoryShape) {
-                    memoryShape.addBadLocation(l);
-                    memoryShape.removeBiomeLocation(l,currBiome);
+                if(shape instanceof MemoryShape) {
+                    ((MemoryShape<?>) shape).addBadLocation(l);
+                    ((MemoryShape<?>) shape).removeBiomeLocation(l,currBiome);
                 }
                 location = null;
             }
@@ -543,8 +542,8 @@ public class Region extends FactoryValue<RegionKeys> {
         RTPWorld world = getWorld();
         if(world == null) return;
 
-        if(shape instanceof MemoryShape<?> memoryShape) {
-            memoryShape.save(this.name + ".yml", world.name());
+        if(shape instanceof MemoryShape<?>) {
+            ((MemoryShape<?>) shape).save(this.name + ".yml", world.name());
         }
 
         cachePipeline.stop();
@@ -571,27 +570,27 @@ public class Region extends FactoryValue<RegionKeys> {
 
     public Map<String,String> params() {
         Map<String,String> res = new ConcurrentHashMap<>();
-        for(var e : data.entrySet()) {
+        for(Map.Entry<? extends Enum<?>,?> e : data.entrySet()) {
             Object value = e.getValue();
-            if(value instanceof RTPWorld world) {
-                res.put("world",world.name());
+            if(value instanceof RTPWorld) {
+                res.put("world",((RTPWorld) value).name());
             }
-            else if(value instanceof Shape shape) {
-                res.put("shape", shape.name);
-                EnumMap<? extends Enum<?>,Object> data = shape.getData();
-                for(var dataEntry : data.entrySet()) {
+            else if(value instanceof Shape) {
+                res.put("shape", ((Shape<?>) value).name);
+                EnumMap<? extends Enum<?>,Object> data = ((Shape<?>) value).getData();
+                for(Map.Entry<? extends Enum<?>,?> dataEntry : data.entrySet()) {
                     res.put(dataEntry.getKey().name(),dataEntry.getValue().toString());
                 }
             }
-            else if(value instanceof VerticalAdjustor verticalAdjustor) {
-                res.put("vert", verticalAdjustor.name);
-                EnumMap<? extends Enum<?>,Object> data = verticalAdjustor.getData();
-                for(var dataEntry : data.entrySet()) {
+            else if(value instanceof VerticalAdjustor) {
+                res.put("vert", ((VerticalAdjustor<?>) value).name);
+                EnumMap<? extends Enum<?>,Object> data = ((VerticalAdjustor<?>) value).getData();
+                for(Map.Entry<? extends Enum<?>,?> dataEntry : data.entrySet()) {
                     res.put(dataEntry.getKey().name(),dataEntry.getValue().toString());
                 }
             }
-            else if(value instanceof String str)
-                res.put(e.getKey().name(),str);
+            else if(value instanceof String)
+                res.put(e.getKey().name(), (String) value);
             else {
                 res.put(e.getKey().name(),value.toString());
             }
@@ -603,7 +602,7 @@ public class Region extends FactoryValue<RegionKeys> {
         long sz = (radius*2+1)*(radius*2+1);
         if(locAssChunks.containsKey(location)) {
             ChunkSet chunkSet = locAssChunks.get(location);
-            if(chunkSet.chunks().size()>=sz) return chunkSet;
+            if(chunkSet.chunks.size()>=sz) return chunkSet;
             chunkSet.keep(false);
         }
 
@@ -626,7 +625,7 @@ public class Region extends FactoryValue<RegionKeys> {
         for(long i = -radius; i <= radius; i++) {
             for(long j = -radius; j <= radius; j++) {
                 CompletableFuture<RTPChunk> cfChunk = location.world().getChunkAt((int)(cx + i), (int)(cz + j));
-                if(shape instanceof MemoryShape<?> memoryShape) {
+                if(shape instanceof MemoryShape<?>) {
                     long finalJ = j;
                     long finalI = i;
                     cfChunk.whenComplete((chunk, throwable) -> {
@@ -643,11 +642,11 @@ public class Region extends FactoryValue<RegionKeys> {
                         }
 
                         if (pass) {
-                            memoryShape.addBiomeLocation((long) memoryShape.xzToLocation(finalI, finalJ), currBiome);
+                            ((MemoryShape<?>) shape).addBiomeLocation((long) ((MemoryShape<?>) shape).xzToLocation(finalI, finalJ), currBiome);
                         } else {
-                            long l = (long) memoryShape.xzToLocation(finalI, finalJ);
-                            memoryShape.addBadLocation(l);
-                            memoryShape.removeBiomeLocation(l, currBiome);
+                            long l = (long) ((MemoryShape<?>) shape).xzToLocation(finalI, finalJ);
+                            ((MemoryShape<?>) shape).addBadLocation(l);
+                            ((MemoryShape<?>) shape).removeBiomeLocation(l, currBiome);
                         }
                     });
                 }
@@ -704,33 +703,33 @@ public class Region extends FactoryValue<RegionKeys> {
     public Shape<?> getShape() {
         boolean wbo = false;
         Object o = data.getOrDefault(RegionKeys.worldBorderOverride,false);
-        if(o instanceof Boolean b) wbo = b;
-        else if(o instanceof String s) {
-            wbo = Boolean.parseBoolean(s);
+        if(o instanceof Boolean) wbo = (Boolean) o;
+        else if(o instanceof String) {
+            wbo = Boolean.parseBoolean((String) o);
             data.put(RegionKeys.worldBorderOverride,wbo);
         }
 
         RTPWorld world;
         o = data.getOrDefault(RegionKeys.world, null);
-        if(o instanceof RTPWorld rtpWorld) world = rtpWorld;
-        else if(o instanceof String s) {
-            world = RTP.serverAccessor.getRTPWorld(s);
+        if(o instanceof RTPWorld) world = (RTPWorld) o;
+        else if(o instanceof String) {
+            world = RTP.serverAccessor.getRTPWorld((String) o);
         }
         else world = null;
         if(world == null) world = RTP.serverAccessor.getRTPWorlds().get(0);
 
         Object shapeObj = data.get(RegionKeys.shape);
         Shape<?> shape;
-        if (shapeObj instanceof Shape shape1) {
-            shape = shape1;
+        if (shapeObj instanceof Shape) {
+            shape = (Shape<?>) shapeObj;
         }
-        else if(shapeObj instanceof MemorySection shapeSection) {
-            final Map<String, Object> shapeMap = shapeSection.getMapValues(true);
+        else if(shapeObj instanceof MemorySection) {
+            final Map<String, Object> shapeMap = ((MemorySection) shapeObj).getMapValues(true);
             String shapeName = String.valueOf(shapeMap.get("name"));
             Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
             shape = (Shape<?>) factory.get(shapeName);
             EnumMap<?, Object> shapeData = shape.getData();
-            for(var e : shapeData.entrySet()) {
+            for(Map.Entry<? extends Enum<?>,Object> e : shapeData.entrySet()) {
                 String name = e.getKey().name();
                 if(shapeMap.containsKey(name)) {
                     e.setValue(shapeMap.get(name));
@@ -766,16 +765,16 @@ public class Region extends FactoryValue<RegionKeys> {
     public VerticalAdjustor<?> getVert() {
         Object vertObj = data.get(RegionKeys.vert);
         VerticalAdjustor<?> vert;
-        if (vertObj instanceof VerticalAdjustor verticalAdjustor) {
-            vert = verticalAdjustor;
+        if (vertObj instanceof VerticalAdjustor) {
+            vert = (VerticalAdjustor<?>) vertObj;
         }
-        else if(vertObj instanceof MemorySection shapeSection) {
-            final Map<String, Object> vertMap = shapeSection.getMapValues(true);
+        else if(vertObj instanceof MemorySection) {
+            final Map<String, Object> vertMap = ((MemorySection) vertObj).getMapValues(true);
             String shapeName = String.valueOf(vertMap.get("name"));
             Factory<VerticalAdjustor<?>> factory = (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
             vert = (VerticalAdjustor<?>) factory.get(shapeName);
             EnumMap<?, Object> vertData = vert.getData();
-            for(var e : vertData.entrySet()) {
+            for(Map.Entry<? extends Enum<?>,Object> e : vertData.entrySet()) {
                 String name = e.getKey().name();
                 if(vertMap.containsKey(name)) {
                     e.setValue(vertMap.get(name));
@@ -797,7 +796,7 @@ public class Region extends FactoryValue<RegionKeys> {
 
     public RTPWorld getWorld() {
         Object world = data.get(RegionKeys.world);
-        if(world instanceof RTPWorld rtpWorld) return rtpWorld;
+        if(world instanceof RTPWorld) return (RTPWorld) world;
         else {
             String worldName = String.valueOf(world);
             RTPWorld rtpWorld = RTP.serverAccessor.getRTPWorld(worldName);

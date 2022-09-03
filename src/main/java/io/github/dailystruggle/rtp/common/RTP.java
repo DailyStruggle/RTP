@@ -1,14 +1,10 @@
 package io.github.dailystruggle.rtp.common;
 
-import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.common.commands.RTPCmd;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys;
-import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
@@ -21,21 +17,16 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdj
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.jump.JumpAdjustor;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
 import io.github.dailystruggle.rtp.common.serverSide.RTPServerAccessor;
-import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPChunk;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPEconomy;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.FillTask;
-import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.common.tasks.RTPTeleportCancel;
-import org.jetbrains.annotations.NotNull;
 
-import java.io.File;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.jar.JarFile;
 import java.util.logging.Level;
 
 /**
@@ -85,7 +76,8 @@ public class RTP {
         new LinearAdjustor(new ArrayList<>());
         new JumpAdjustor(new ArrayList<>());
 
-        startupTasks.add(() -> configs = new Configs(serverAccessor.getPluginDirectory()));
+        System.out.println("A");
+        configs = new Configs(serverAccessor.getPluginDirectory());
     }
 
     public static RTP getInstance() {
@@ -146,7 +138,7 @@ public class RTP {
         RTP instance = RTP.instance;
         if(instance == null) return;
 
-        for(var e : instance.latestTeleportData.entrySet()) {
+        for(Map.Entry<UUID, TeleportData> e : instance.latestTeleportData.entrySet()) {
             TeleportData data = e.getValue();
             if(data == null || data.completed) continue;
             new RTPTeleportCancel(e.getKey()).run();
@@ -159,7 +151,7 @@ public class RTP {
         instance.loadChunksPipeline.stop();
         instance.teleportPipeline.stop();
 
-        for(var r : instance.selectionAPI.permRegionLookup.values()) {
+        for(Region r : instance.selectionAPI.permRegionLookup.values()) {
             r.shutDown();
         }
 

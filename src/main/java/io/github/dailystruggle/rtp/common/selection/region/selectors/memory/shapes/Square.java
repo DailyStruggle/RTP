@@ -258,7 +258,7 @@ public class Square extends MemoryShape<GenericMemoryShapeParams> {
 
         Object unique = data.getOrDefault(GenericMemoryShapeParams.uniquePlacements,false);
         boolean u;
-        if(unique instanceof Boolean b) u = b;
+        if(unique instanceof Boolean) u = (Boolean) unique;
         else {
             u = Boolean.parseBoolean(String.valueOf(unique));
             data.put(GenericMemoryShapeParams.uniquePlacements,u);

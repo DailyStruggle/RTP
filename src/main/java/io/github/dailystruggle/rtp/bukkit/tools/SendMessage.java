@@ -27,7 +27,10 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -152,8 +155,8 @@ public class SendMessage {
             if(rtp == null) return "0";
             AtomicInteger c = new AtomicInteger();
             RTP.serverAccessor.getRTPWorlds().forEach(world -> {
-                if(!(world instanceof BukkitRTPWorld rtpWorld)) return;
-                c.addAndGet(rtpWorld.chunkMap.size());
+                if(!(world instanceof BukkitRTPWorld)) return;
+                c.addAndGet(((BukkitRTPWorld) world).chunkMap.size());
             });
             return String.valueOf(c.get());
         });
@@ -200,7 +203,7 @@ public class SendMessage {
     }
 
     public static void sendMessage(CommandSender target1, CommandSender target2, String message) {
-        if(message == null || message.isBlank()) return;
+        if(message == null || message.isEmpty()) return;
         sendMessage(target1,message);
         if(!target1.getName().equals(target2.getName())) {
             sendMessage(target2, message);
@@ -208,7 +211,7 @@ public class SendMessage {
     }
 
     public static void sendMessage(CommandSender sender, String message) {
-        if(message == null || message.isBlank()) return;
+        if(message == null || message.isEmpty()) return;
         if(sender instanceof Player) sendMessage((Player) sender,message);
         else {
             message = format(Bukkit.getOfflinePlayer(CommandsAPI.serverId),message);
@@ -221,7 +224,7 @@ public class SendMessage {
     }
 
     public static void sendMessage(Player player, String message) {
-        if(message == null || message.isBlank()) return;
+        if(message == null || message.isEmpty()) return;
         message = format(player,message);
         if(RTP.serverAccessor.getServerIntVersion() >=12) {
             BaseComponent[] components = TextComponent.fromLegacyText(message);
@@ -234,7 +237,7 @@ public class SendMessage {
         if(message.equals("")) return;
 
         OfflinePlayer player;
-        if(sender instanceof Player p) player = p;
+        if(sender instanceof Player) player = (OfflinePlayer) sender;
         else player = Bukkit.getOfflinePlayer(CommandsAPI.serverId).getPlayer();
 
         message = format(player,message);
@@ -260,8 +263,8 @@ public class SendMessage {
                 }
             }
 
-            if(sender instanceof BukkitRTPCommandSender rtpCommandSender) rtpCommandSender.sender().spigot().sendMessage(textComponents);
-            else if(sender instanceof BukkitRTPPlayer rtpCommandSender) rtpCommandSender.player().spigot().sendMessage(textComponents);
+            if(sender instanceof BukkitRTPCommandSender) ((BukkitRTPCommandSender) sender).sender().spigot().sendMessage(textComponents);
+            else if(sender instanceof BukkitRTPPlayer) ((BukkitRTPPlayer) sender).player().spigot().sendMessage(textComponents);
         }
         else sender.sendMessage(message);
     }
@@ -361,7 +364,7 @@ public class SendMessage {
     }
 
     public static void log(Level level, String message) {
-        if(message.isBlank()) return;
+        if(message.isEmpty()) return;
 
         message = format(null,message);
 
@@ -369,7 +372,7 @@ public class SendMessage {
     }
 
     public static void log(Level level, String message, Exception exception) {
-        if(message.isBlank()) return;
+        if(message.isEmpty()) return;
 
         message = format(null,message);
 
