@@ -3,7 +3,6 @@ package io.github.dailystruggle.rtp.bukkit.spigotListeners;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPCommandSender;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
-import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
@@ -14,6 +13,7 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tasks.SetupTeleport;
+import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
 import org.apache.commons.lang3.tuple.Pair;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -27,7 +27,10 @@ import org.bukkit.event.player.*;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 
 public class OnEventTeleports implements Listener {
@@ -135,8 +138,8 @@ public class OnEventTeleports implements Listener {
             RTPLocation rtpLocation = location.getLeft();
 
             RTPWorld rtpWorld = rtpLocation.world();
-            if(rtpWorld instanceof BukkitRTPWorld bukkitRTPWorld) {
-                event.setRespawnLocation(new Location(bukkitRTPWorld.world(), rtpLocation.x(), rtpLocation.y(), rtpLocation.z()));
+            if(rtpWorld instanceof BukkitRTPWorld) {
+                event.setRespawnLocation(new Location(((BukkitRTPWorld) rtpWorld).world(), rtpLocation.x(), rtpLocation.y(), rtpLocation.z()));
             }
             else throw new IllegalStateException("expected bukkit world");
             return;

@@ -7,9 +7,7 @@ import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.common.serverSide.RTPServerAccessor;
-import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import org.jetbrains.annotations.NotNull;
@@ -18,8 +16,6 @@ import org.jetbrains.annotations.Nullable;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.Semaphore;
-import java.util.function.Predicate;
 
 public class SelectionAPI {
     private final Factory<Region> regionFactory = new Factory<>();
@@ -132,7 +128,7 @@ public class SelectionAPI {
 
     public Region tempRegion(Map<String,String> regionParams,
                              @Nullable String baseRegionName) {
-        if(baseRegionName == null || baseRegionName.isBlank() || !permRegionLookup.containsKey(baseRegionName.toUpperCase()))
+        if(baseRegionName == null || baseRegionName.isEmpty() || !permRegionLookup.containsKey(baseRegionName.toUpperCase()))
             baseRegionName = "default";
         baseRegionName = baseRegionName.toUpperCase();
         Region baseRegion = Objects.requireNonNull(permRegionLookup.get(baseRegionName));

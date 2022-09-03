@@ -17,8 +17,8 @@ public class PAPIChecker {
     private static void getPAPI() {
         Plugin plugin = Bukkit.getServer().getPluginManager().getPlugin("PlaceholderAPI");
 
-        if(plugin instanceof PlaceholderAPIPlugin papiPlugin && plugin.isEnabled()) {
-            placeholderAPIPlugin = papiPlugin;
+        if(plugin instanceof PlaceholderAPIPlugin && plugin.isEnabled()) {
+            placeholderAPIPlugin = (PlaceholderAPIPlugin) plugin;
         }
         else placeholderAPIPlugin = null;
     }

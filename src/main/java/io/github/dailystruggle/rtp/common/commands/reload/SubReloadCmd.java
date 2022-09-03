@@ -1,10 +1,8 @@
 package io.github.dailystruggle.rtp.common.commands.reload;
 
-import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmd;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
@@ -29,7 +27,6 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.logging.Level;
 
 public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
 
@@ -69,11 +66,11 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
     }
 
     public boolean subReload(UUID senderID, FactoryValue<?> factoryValue) {
-        if(factoryValue instanceof MultiConfigParser multiConfigParser) {
-            return subReloadMulti(senderID,multiConfigParser);
+        if(factoryValue instanceof MultiConfigParser) {
+            return subReloadMulti(senderID, (MultiConfigParser<?>) factoryValue);
         }
-        else if(factoryValue instanceof ConfigParser configParser) {
-            return subReloadSingle(senderID,configParser);
+        else if(factoryValue instanceof ConfigParser) {
+            return subReloadSingle(senderID, (ConfigParser<?>) factoryValue);
         }
         return false;
     }
@@ -136,13 +133,13 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
 
                 Object shapeObj = data.get(RegionKeys.shape);
                 Shape<?> shape;
-                if(shapeObj instanceof MemorySection shapeSection) {
-                    final Map<String, Object> shapeMap = shapeSection.getMapValues(true);
+                if(shapeObj instanceof MemorySection) {
+                    final Map<String, Object> shapeMap = ((MemorySection) shapeObj).getMapValues(true);
                     String shapeName = String.valueOf(shapeMap.get("name"));
                     Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
                     shape = (Shape<?>) factory.getOrDefault(shapeName);
                     EnumMap<?, Object> shapeData = shape.getData();
-                    for(var e : shapeData.entrySet()) {
+                    for(Map.Entry<? extends Enum<?>, Object> e : shapeData.entrySet()) {
                         String name = e.getKey().name();
                         if(shapeMap.containsKey(name)) {
                             e.setValue(shapeMap.get(name));
@@ -161,13 +158,13 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
 
 
                 Object vertObj = data.get(RegionKeys.vert);
-                if(vertObj instanceof MemorySection vertSection) {
-                    final Map<String, Object> vertMap = vertSection.getMapValues(true);
+                if(vertObj instanceof MemorySection) {
+                    final Map<String, Object> vertMap = ((MemorySection) vertObj).getMapValues(true);
                     String shapeName = String.valueOf(vertMap.get("name"));
                     Factory<VerticalAdjustor<?>> factory = (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
                     VerticalAdjustor<?> vert = (VerticalAdjustor<?>) factory.getOrDefault(shapeName);
                     EnumMap<?, Object> vertData = vert.getData();
-                    for(var e : vertData.entrySet()) {
+                    for(Map.Entry<? extends Enum<?>, Object> e : vertData.entrySet()) {
                         String name = e.getKey().name();
                         if(vertMap.containsKey(name)) {
                             e.setValue(vertMap.get(name));

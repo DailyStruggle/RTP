@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPCommandS
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
 import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
+import io.github.dailystruggle.rtp.bukkit.tools.softdepends.VaultChecker;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
@@ -38,7 +39,7 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     private final Map<UUID,RTPWorld> worldMap = new ConcurrentHashMap<>();
     private final Map<String,RTPWorld> worldMapStr = new ConcurrentHashMap<>();
 
-    private long t = System.nanoTime();
+    private final long t = System.nanoTime();
 
     private String version = null;
     private Integer intVersion = null;
@@ -172,7 +173,7 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     public RTPCommandSender getSender(UUID uuid) {
         CommandSender commandSender = (uuid == CommandsAPI.serverId) ? Bukkit.getConsoleSender() : Bukkit.getPlayer(uuid);
         if(commandSender == null) return null;
-        if(commandSender instanceof Player player) return new BukkitRTPPlayer(player);
+        if(commandSender instanceof Player) return new BukkitRTPPlayer((Player) commandSender);
         return new BukkitRTPCommandSender(commandSender);
     }
 
@@ -191,7 +192,7 @@ public class BukkitServerAccessor implements RTPServerAccessor {
         ConfigParser<LangKeys> parser = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
         if(parser == null) return;
         String msg = String.valueOf(parser.getConfigValue(msgType,""));
-        if(msg == null || msg.isBlank()) return;
+        if(msg == null || msg.isEmpty()) return;
         sendMessage(target, msg);
     }
 
@@ -199,7 +200,7 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     public void sendMessage(UUID target1, UUID target2, LangKeys msgType) {
         ConfigParser<LangKeys> parser = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
         String msg = String.valueOf(parser.getConfigValue(msgType,""));
-        if(msg == null || msg.isBlank()) return;
+        if(msg == null || msg.isEmpty()) return;
         sendMessage(target1,target2,msg);
     }
 
@@ -243,7 +244,7 @@ public class BukkitServerAccessor implements RTPServerAccessor {
         ConfigParser<LangKeys> parser = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
         if(parser == null) return;
         String msg = String.valueOf(parser.getConfigValue(key,""));
-        if(msg == null || msg.isBlank()) return;
+        if(msg == null || msg.isEmpty()) return;
         announce(msg);
     }
 
@@ -252,7 +253,7 @@ public class BukkitServerAccessor implements RTPServerAccessor {
         ConfigParser<LangKeys> parser = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
         if(parser == null) return;
         String msg = String.valueOf(parser.getConfigValue(key,""));
-        if(msg == null || msg.isBlank()) return;
+        if(msg == null || msg.isEmpty()) return;
         announce(msg,permission);
     }
 
@@ -300,25 +301,25 @@ public class BukkitServerAccessor implements RTPServerAccessor {
         bukkitPlugin.syncTimer.cancel();
         bukkitPlugin.asyncTimer.cancel();
 
-        bukkitPlugin.commandTimer = Bukkit.getScheduler().runTaskTimer(bukkitPlugin, () -> {
+        RTP.getInstance().miscAsyncTasks.add(() -> {
+            if(RTP.economy == null)  {
+                VaultChecker.setupEconomy();
+                VaultChecker.setupPermissions();
+                if(VaultChecker.getEconomy()!=null) RTP.economy = new VaultChecker();
+                else RTP.economy = null;
+            }
+        });
+
+        bukkitPlugin.commandTimer = Bukkit.getScheduler().runTaskTimerAsynchronously(bukkitPlugin, () -> {
             long avgTime = TPS.timeSinceTick(20) / 20;
             long currTime = TPS.timeSinceTick(1);
-
-            if(bukkitPlugin.commandProcessing == null) {
-                bukkitPlugin.commandProcessing = Bukkit.getScheduler().runTaskAsynchronously(
-                        RTPBukkitPlugin.getInstance(),
-                        () -> {
-                            CommandsAPI.execute(avgTime - currTime);
-                            RTPBukkitPlugin.getInstance().commandProcessing = null;
-                        }
-                );
-            }
+            CommandsAPI.execute(avgTime - currTime);
         }, 40, 1);
 
-        bukkitPlugin.syncTimer = Bukkit.getScheduler().runTaskTimer(bukkitPlugin, SyncTeleportProcessing::new,80,1);
-        bukkitPlugin.asyncTimer = Bukkit.getScheduler().runTaskTimer(bukkitPlugin, AsyncTeleportProcessing::new,80,1);
+        bukkitPlugin.syncTimer = new SyncTeleportProcessing().runTaskTimer(bukkitPlugin,80,1);
+        bukkitPlugin.asyncTimer = new AsyncTeleportProcessing().runTaskTimerAsynchronously(bukkitPlugin,80,1);
 
-        Bukkit.getScheduler().scheduleSyncDelayedTask(bukkitPlugin,() -> {
+        Bukkit.getScheduler().runTask(bukkitPlugin,() -> {
             while (RTP.getInstance().startupTasks.size()>0) {
                 RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
             }
@@ -327,8 +328,8 @@ public class BukkitServerAccessor implements RTPServerAccessor {
 
     private Function<String,WorldBorder> worldBorderFunction = s -> {
         RTPWorld rtpWorld = getRTPWorld(s);
-        if(rtpWorld instanceof BukkitRTPWorld bukkitRTPWorld) {
-            World world = bukkitRTPWorld.world();
+        if(rtpWorld instanceof BukkitRTPWorld) {
+            World world = ((BukkitRTPWorld) rtpWorld).world();
             org.bukkit.WorldBorder worldBorder = world.getWorldBorder();
             return new WorldBorder(
                     () -> (Shape<?>) RTP.factoryMap.get(RTP.factoryNames.shape).get("SQUARE"),
@@ -366,8 +367,8 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     @Override
     public void stop() {
         worldMap.forEach((s, world) -> {
-            if(world instanceof BukkitRTPWorld rtpWorld) {
-                rtpWorld.chunkLoads.forEach((integers, list) -> {
+            if(world instanceof BukkitRTPWorld) {
+                ((BukkitRTPWorld) world).chunkLoads.forEach((integers, list) -> {
                     for (CompletableFuture<Chunk> chunkCompletableFuture : list) {
                         try {
                             chunkCompletableFuture.cancel(true);
@@ -377,13 +378,12 @@ public class BukkitServerAccessor implements RTPServerAccessor {
                         }
                     }
                 });
-                rtpWorld.chunkMap.forEach((integers, chunkLongPair) -> {
+                ((BukkitRTPWorld) world).chunkMap.forEach((integers, chunkLongPair) -> {
                     Chunk left = chunkLongPair.getLeft();
                     if(left == null) return;
-                    if(Bukkit.isPrimaryThread()) left.setForceLoaded(false);
-                    else Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),()->left.setForceLoaded(false));
+                    ((BukkitRTPWorld) world).setChunkForceLoaded(integers.get(0),integers.get(1),true);
                 });
-                rtpWorld.chunkMap.clear();
+                ((BukkitRTPWorld) world).chunkMap.clear();
             }
         });
 

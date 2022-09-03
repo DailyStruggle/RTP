@@ -26,7 +26,9 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Semaphore;
 import java.util.function.Predicate;
 
@@ -98,7 +100,7 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
                 "rtp.params",
                 "override shape with worldborder",
                 (sender, s) -> true));
-        for(var e : shapeFactory.map.entrySet()) {
+        for(Map.Entry<String, Shape<?>> e : shapeFactory.map.entrySet()) {
             ShapeParameter shapeParameter = new ShapeParameter(
                     "rtp.params",
                     "adjust shape of target region",

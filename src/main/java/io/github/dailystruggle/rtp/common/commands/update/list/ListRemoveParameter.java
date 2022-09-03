@@ -6,7 +6,6 @@ import org.simpleyaml.configuration.file.YamlFile;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 public class ListRemoveParameter extends CommandParameter {
     private final Supplier<Set<String>> values;

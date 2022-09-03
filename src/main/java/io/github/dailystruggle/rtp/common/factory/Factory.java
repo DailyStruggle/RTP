@@ -4,6 +4,7 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.Enumeration;
 import java.util.Objects;
@@ -65,7 +66,8 @@ public class Factory<T extends FactoryValue<?>> {
                 T clone = (T) value.clone();
                 clone.name=name;
 
-                if(clone instanceof ConfigParser configParser) {
+                if(clone instanceof ConfigParser) {
+                    ConfigParser<?> configParser = (ConfigParser<?>) clone;
                     configParser.check(configParser.version,configParser.pluginDirectory,null);
                 }
 
@@ -91,7 +93,7 @@ public class Factory<T extends FactoryValue<?>> {
                 value = (T) construct("default");
                 map.put(name, value);
             }
-            else return map.values().stream().toList().get(0);
+            else return new ArrayList<>(map.values()).get(0);
         }
         return value;
     }

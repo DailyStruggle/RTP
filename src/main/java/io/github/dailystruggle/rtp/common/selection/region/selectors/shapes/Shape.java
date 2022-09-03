@@ -1,20 +1,13 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.shapes;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
-import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import org.jetbrains.annotations.NotNull;
-import org.simpleyaml.configuration.file.YamlFile;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiPredicate;
-import java.util.stream.Collectors;
 
 
 public abstract class Shape<E extends Enum<E>> extends FactoryValue<E> {
