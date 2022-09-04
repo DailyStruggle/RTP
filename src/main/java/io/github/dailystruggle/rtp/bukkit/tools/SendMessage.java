@@ -6,15 +6,22 @@ import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPCommandS
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.PAPIChecker;
+import io.github.dailystruggle.rtp.bukkit.tools.softdepends.PAPI_expansion;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
+import io.github.dailystruggle.rtp.common.tasks.DoTeleport;
+import io.github.dailystruggle.rtp.common.tasks.LoadChunks;
+import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
+import io.github.dailystruggle.rtp.common.tasks.SetupTeleport;
 import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
 import io.github.dailystruggle.rtp.common.tools.ParseString;
 import net.md_5.bungee.api.ChatColor;
+import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.BaseComponent;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.HoverEvent;
@@ -26,11 +33,9 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
+import xyz.tozymc.spigot.api.title.TitleApi;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -43,7 +48,7 @@ public class SendMessage {
     private static final Pattern hexColorPattern1 = Pattern.compile("(&?#[0-9a-fA-F]{6})");
     private static final Pattern hexColorPattern2 = Pattern.compile("(&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F])");
 
-    private static final Map<String, Function<UUID,String>> placeholders = new ConcurrentHashMap<>();
+    public static final Map<String, Function<UUID,String>> placeholders = new ConcurrentHashMap<>();
     private static RTP rtp = null;
     private static ConfigParser<LangKeys> lang = null;
     static {
@@ -200,6 +205,124 @@ public class SendMessage {
             long spot = teleportData.queueLocation;
             return String.valueOf(spot);
         });
+
+        placeholders.put("player_status",uuid -> {
+            Player player = Bukkit.getPlayer(uuid);
+            if(player == null){
+                return "";
+            }
+
+            TeleportData data = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
+            ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);;
+
+            if(data == null) return SendMessage.formatDry(player, lang.getConfigValue(LangKeys.PLAYER_AVAILABLE, "").toString());
+            if(data.completed) {
+                BukkitRTPCommandSender sender = new BukkitRTPCommandSender(player);
+                long dt = System.nanoTime()-data.time;
+                if(dt < 0) dt = Long.MAX_VALUE+dt;
+                if(dt < sender.cooldown()) {
+                    return SendMessage.formatDry(player, lang.getConfigValue(LangKeys.PLAYER_COOLDOWN, "").toString());
+                }
+
+                return SendMessage.formatDry(player, lang.getConfigValue(LangKeys.PLAYER_AVAILABLE, "").toString());
+            }
+
+            RTPRunnable nextTask = data.nextTask;
+            if(nextTask instanceof DoTeleport)
+                return SendMessage.formatDry(player, lang.getConfigValue(LangKeys.PLAYER_TELEPORTING, "").toString());
+            if(nextTask instanceof LoadChunks)
+                return SendMessage.formatDry(player, lang.getConfigValue(LangKeys.PLAYER_LOADING, "").toString());
+            if(nextTask instanceof SetupTeleport)
+                return SendMessage.formatDry(player, lang.getConfigValue(LangKeys.PLAYER_SETUP, "").toString());
+            return "";
+        });
+
+        placeholders.put("total_queue_length",uuid -> {
+            Player player = Bukkit.getPlayer(uuid);
+            if(player == null){
+                return "";
+            }
+
+            Region region = RTP.getInstance().selectionAPI.getRegion(new BukkitRTPPlayer(player));
+            if(region==null) return "0";
+            return String.valueOf(region.getTotalQueueLength(player.getUniqueId()));
+        });
+
+        placeholders.put("public_queue_length",uuid -> {
+            Player player = Bukkit.getPlayer(uuid);
+            if(player == null){
+                return "";
+            }
+
+            Region region = RTP.getInstance().selectionAPI.getRegion(new BukkitRTPPlayer(player));
+            if(region==null) return "0";
+            return String.valueOf(region.getPublicQueueLength());
+        });
+
+        placeholders.put("personal_queue_length",uuid -> {
+            Player player = Bukkit.getPlayer(uuid);
+            if(player == null){
+                return "";
+            }
+
+            Region region = RTP.getInstance().selectionAPI.getRegion(new BukkitRTPPlayer(player));
+            if(region==null) return "0";
+            return String.valueOf(region.getPersonalQueueLength(player.getUniqueId()));
+        });
+
+        placeholders.put("teleport_world",uuid -> {
+            Player player = Bukkit.getPlayer(uuid);
+            if(player == null){
+                return "";
+            }
+
+            TeleportData data = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
+            return data.selectedLocation.world().name();
+        });
+
+        placeholders.put("teleport_x",uuid -> {
+            Player player = Bukkit.getPlayer(uuid);
+            if(player == null){
+                return "";
+            }
+
+            TeleportData data = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
+            return String.valueOf(data.selectedLocation.x());
+        });
+
+        placeholders.put("teleport_y",uuid -> {
+            Player player = Bukkit.getPlayer(uuid);
+            if(player == null){
+                return "";
+            }
+
+            TeleportData data = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
+            return String.valueOf(data.selectedLocation.y());
+        });
+
+        placeholders.put("teleport_z",uuid -> {
+            Player player = Bukkit.getPlayer(uuid);
+            if(player == null){
+                return "";
+            }
+
+            TeleportData data = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
+            return String.valueOf(data.selectedLocation.z());
+        });
+
+        placeholders.put("teleport_biome",uuid -> {
+            Player player = Bukkit.getPlayer(uuid);
+            if(player == null){
+                return "";
+            }
+
+            TeleportData data = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
+            return data.selectedLocation.world().getBiome(
+                    data.selectedLocation.x(),
+                    data.selectedLocation.y(),
+                    data.selectedLocation.z()
+            );
+        });
     }
 
     public static void sendMessage(CommandSender target1, CommandSender target2, String message) {
@@ -279,7 +402,7 @@ public class SendMessage {
         // initialize with the same size as the placeholder getter map to skip reallocation
         Map<String,String> placeholders = new HashMap<>(SendMessage.placeholders.size());
 
-        Set<String> keywords = ParseString.keywords(text,SendMessage.placeholders.keySet());
+        Set<String> keywords = ParseString.keywords(text,SendMessage.placeholders.keySet(), new HashSet<>(Arrays.asList('[','%')), new HashSet<>(Arrays.asList(']','%')));
         //for each placeholder getter, add placeholder and result to container
         SendMessage.placeholders.forEach((s, uuidStringFunction) -> {
             if(!keywords.contains(s)) return;
@@ -293,9 +416,12 @@ public class SendMessage {
         //replace all placeholders with their respective string function results
         text = sub.replace(text);
 
+
         //check PAPI exists and fill remaining PAPI placeholders
         //todo: if a null player doesn't work with another PAPI import, blame that import for not verifying its inputs.
         text = PAPIChecker.fillPlaceholders(player,text);
+        
+
         text = ChatColor.translateAlternateColorCodes('&',text);
         text = Hex2Color(text);
         return text;
@@ -311,7 +437,7 @@ public class SendMessage {
         // initialize with the same size as the placeholder getter map to skip reallocation
         Map<String,String> placeholders = new HashMap<>(SendMessage.placeholders.size());
 
-        Set<String> keywords = ParseString.keywords(text,SendMessage.placeholders.keySet());
+        Set<String> keywords = ParseString.keywords(text,SendMessage.placeholders.keySet(), new HashSet<>(Arrays.asList('[','%')), new HashSet<>(Arrays.asList(']','%')));
         //for each placeholder getter, add placeholder and result to container
         SendMessage.placeholders.forEach((s, uuidStringFunction) -> {
             if(!keywords.contains(s)) return;
@@ -377,5 +503,28 @@ public class SendMessage {
         message = format(null,message);
 
         Bukkit.getLogger().log(level,message,exception);
+    }
+
+    public static void title(Player player, String title, String subtitle, int in, int stay, int out) {
+        boolean noTitle = title == null || title.isEmpty();
+        boolean noSubtitle = subtitle == null || subtitle.isEmpty();
+
+        if(noTitle && noSubtitle) return;
+
+        if(title!=null) title = Hex2Color(ChatColor.translateAlternateColorCodes('&',title));
+        if(subtitle!=null) subtitle = Hex2Color(ChatColor.translateAlternateColorCodes('&',subtitle));
+
+        if(RTP.serverAccessor.getServerIntVersion()<18) TitleApi.sendTitle(player,title,subtitle,in,stay,out);
+        else player.sendTitle(title,subtitle,in,stay,out);
+    }
+
+    public static void actionbar(Player player, String bar) {
+        if(bar == null || bar.isEmpty()) return;
+        bar = Hex2Color(ChatColor.translateAlternateColorCodes('&',bar));
+        if(RTP.serverAccessor.getServerIntVersion()<18) TitleApi.sendActionbar(player,bar);
+        else {
+            BaseComponent[] components = TextComponent.fromLegacyText(bar);
+            player.spigot().sendMessage(ChatMessageType.ACTION_BAR, components);
+        }
     }
 }

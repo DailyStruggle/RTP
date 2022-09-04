@@ -172,10 +172,6 @@
                             <shadedPattern>io.github.dailystruggle.rtp.effectsapi</shadedPattern> <!-- Replace this -->
                         </relocation>
                         <relocation>
-                            <pattern>io.github.dailystruggle.effectsapi</pattern>
-                            <shadedPattern>io.github.dailystruggle.rtp.effectsapi</shadedPattern> <!-- Replace this -->
-                        </relocation>
-                        <relocation>
                             <pattern>org.yaml.snakeyaml</pattern>
                             <shadedPattern>io.github.dailystruggle.rtp.snakeyaml</shadedPattern> <!-- Replace this -->
                         </relocation>
@@ -348,7 +344,7 @@
         <dependency>
             <groupId>io.github.dailystruggle</groupId>
             <artifactId>EffectsAPI</artifactId>
-            <version>1.0-ALPHA22</version>
+            <version>1.0-ALPHA23</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -356,6 +352,11 @@
             <artifactId>commons-lang3</artifactId>
             <version>3.12.0</version>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>xyz.tozymc.spigot</groupId>
+            <artifactId>title-api</artifactId>
+            <version>1.0</version>
         </dependency>
     </dependencies>
 </project>
