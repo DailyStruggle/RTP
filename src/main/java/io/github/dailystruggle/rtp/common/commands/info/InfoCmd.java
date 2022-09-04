@@ -117,6 +117,9 @@ public class InfoCmd extends BaseRTPCmdImpl {
             return true;
         }
 
+        Set<Character> front = new HashSet<>(Arrays.asList('[','%'));
+        Set<Character> back = new HashSet<>(Arrays.asList(']','%'));
+
         List<String> worldNames = parameterValues.get("world");
         if(worldNames!=null) {
             Object worldInfoObj = lang.getConfigValue(LangKeys.worldInfo, "");
@@ -127,14 +130,15 @@ public class InfoCmd extends BaseRTPCmdImpl {
                 if(rtpWorld==null || !rtpWorld.isActive()) continue;
                 ArrayList<String> worldInfoCopy = new ArrayList<>(worldInfo);
                 List<String> strings = worldInfoCopy.stream().map(s -> {
-                    Set<String> keywords = ParseString.keywords(s, worldDataLookup.keySet());
+                    Set<String> keywords = ParseString.keywords(s, worldDataLookup.keySet(), front, back);
                     Map<String, String> placeholders = new HashMap<>();
                     worldDataLookup.forEach((s1, rtpWorldStringFunction) -> {
                         if (!keywords.contains(s1)) return;
                         placeholders.put(s1, rtpWorldStringFunction.apply(rtpWorld));
                     });
                     StrSubstitutor sub = new StrSubstitutor(placeholders, "[", "]");
-                    return sub.replace(s);
+                    StrSubstitutor sub2 = new StrSubstitutor(placeholders, "%", "%");
+                    return sub2.replace(sub.replace(s));
                 }).collect(Collectors.toList());
                 strings.forEach(s -> RTP.serverAccessor.sendMessage(callerId,s));
             }
@@ -150,14 +154,15 @@ public class InfoCmd extends BaseRTPCmdImpl {
                 if(region ==null) continue;
                 ArrayList<String> regionInfoCopy = new ArrayList<>(regionInfo);
                 List<String> strings = regionInfoCopy.stream().map(s -> {
-                    Set<String> keywords = ParseString.keywords(s, regionDataLookup.keySet());
+                    Set<String> keywords = ParseString.keywords(s, regionDataLookup.keySet(), front, back);
                     Map<String, String> placeholders = new HashMap<>();
                     regionDataLookup.forEach((s1, rtpRegionStringFunction) -> {
                         if (!keywords.contains(s1)) return;
                         placeholders.put(s1, rtpRegionStringFunction.apply(region));
                     });
                     StrSubstitutor sub = new StrSubstitutor(placeholders, "[", "]");
-                    return sub.replace(s);
+                    StrSubstitutor sub2 = new StrSubstitutor(placeholders, "%", "%");
+                    return sub2.replace(sub.replace(s));
                 }).collect(Collectors.toList());
                 strings.forEach(s -> RTP.serverAccessor.sendMessage(callerId,s));
             }

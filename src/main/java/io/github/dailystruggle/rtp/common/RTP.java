@@ -76,7 +76,6 @@ public class RTP {
         new LinearAdjustor(new ArrayList<>());
         new JumpAdjustor(new ArrayList<>());
 
-        System.out.println("A");
         configs = new Configs(serverAccessor.getPluginDirectory());
     }
 

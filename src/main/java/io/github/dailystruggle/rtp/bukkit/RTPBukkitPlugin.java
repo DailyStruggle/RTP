@@ -10,11 +10,13 @@ import io.github.dailystruggle.rtp.bukkit.server.BukkitServerAccessor;
 import io.github.dailystruggle.rtp.bukkit.server.SyncTeleportProcessing;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.spigotListeners.*;
+import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.VaultChecker;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
@@ -30,7 +32,6 @@ import org.bukkit.scheduler.BukkitTask;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 /**
@@ -85,15 +86,8 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         syncTimer = new SyncTeleportProcessing().runTaskTimer(this,80,1);
         asyncTimer = new AsyncTeleportProcessing().runTaskTimerAsynchronously(this,80,1);
 
-        while (RTP.getInstance().startupTasks.size()>0) {
-            Bukkit.getLogger().log(Level.SEVERE,"B1");
-            RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
-        }
-
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,() -> {
-            Bukkit.getLogger().log(Level.SEVERE,"B2");
             while (RTP.getInstance().startupTasks.size()>0) {
-                Bukkit.getLogger().log(Level.SEVERE,"B3");
                 RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
             }
         });
@@ -255,6 +249,25 @@ public final class RTPBukkitPlugin extends JavaPlugin {
                         effect.run();
                     });
                 });
+            }
+        });
+
+        DoTeleport.postActions.add(task -> {
+            ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+
+            if(task.player() instanceof BukkitRTPPlayer) {
+                Player player = ((BukkitRTPPlayer) task.player()).player();
+                String title = lang.getConfigValue(LangKeys.title, "").toString();
+                String subtitle = lang.getConfigValue(LangKeys.subtitle, "").toString();
+
+                int fadeIn = lang.getNumber(LangKeys.fadeIn,0).intValue();
+                int stay = lang.getNumber(LangKeys.stay,0).intValue();
+                int fadeOut = lang.getNumber(LangKeys.fadeOut,0).intValue();
+
+                SendMessage.title(player,title,subtitle,fadeIn,stay,fadeOut);
+
+                String actionbar = lang.getConfigValue(LangKeys.actionbar, "").toString();
+                SendMessage.actionbar(player,actionbar);
             }
         });
 

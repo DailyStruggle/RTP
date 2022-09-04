@@ -114,4 +114,15 @@ PLAYER_SETUP: "&bPICKING A LOCATION"
 PLAYER_LOADING: "&bLOADING CHUNKS"
 PLAYER_TELEPORTING: "&bTELEPORTING"
 
+#show title
+# remove or set title to "" to disable
+# PlaceholderAPI is recommended for coordinates
+title: "&aTeleported!"
+subtitle: "&bhave fun!"
+fadeIn: 20
+stay: 20
+fadeOut: 20
+
+actionbar: ""
+
 version: "1.0"
