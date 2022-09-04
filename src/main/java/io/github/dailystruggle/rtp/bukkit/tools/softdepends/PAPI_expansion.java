@@ -14,6 +14,7 @@ import io.github.dailystruggle.rtp.common.tasks.LoadChunks;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.SetupTeleport;
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
+import org.apache.commons.lang3.StringUtils;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
@@ -58,8 +59,6 @@ public class PAPI_expansion extends PlaceholderExpansion{
 		if(player == null){
             return "";
         }
-
-        identifier = identifier.toLowerCase();
 
         if(SendMessage.placeholders.containsKey(identifier)) return SendMessage.placeholders.get(identifier).apply(player.getUniqueId());
 
