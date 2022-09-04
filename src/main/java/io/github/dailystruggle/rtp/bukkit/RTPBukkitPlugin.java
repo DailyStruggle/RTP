@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.bukkit;
 
-import com.google.inject.Injector;
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.effectsapi.EffectFactory;
 import io.github.dailystruggle.effectsapi.EffectsAPI;
@@ -11,7 +10,6 @@ import io.github.dailystruggle.rtp.bukkit.server.BukkitServerAccessor;
 import io.github.dailystruggle.rtp.bukkit.server.SyncTeleportProcessing;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.spigotListeners.*;
-import io.github.dailystruggle.rtp.bukkit.tools.SimpleBinderModule;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.VaultChecker;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -66,10 +64,6 @@ public final class RTPBukkitPlugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
-        SimpleBinderModule module = new SimpleBinderModule(this);
-        Injector injector = module.createInjector();
-        injector.injectMembers(this);
-
         metrics = new Metrics(this,12277);
 
         RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
