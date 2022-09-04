@@ -172,10 +172,6 @@
                             <shadedPattern>io.github.dailystruggle.rtp.effectsapi</shadedPattern> <!-- Replace this -->
                         </relocation>
                         <relocation>
-                            <pattern>io.github.dailystruggle.effectsapi</pattern>
-                            <shadedPattern>io.github.dailystruggle.rtp.effectsapi</shadedPattern> <!-- Replace this -->
-                        </relocation>
-                        <relocation>
                             <pattern>org.yaml.snakeyaml</pattern>
                             <shadedPattern>io.github.dailystruggle.rtp.snakeyaml</shadedPattern> <!-- Replace this -->
                         </relocation>
@@ -235,10 +231,6 @@
 
     <repositories>
         <repository>
-            <id>jitpack.io</id>
-            <url>https://jitpack.io</url>
-        </repository>
-        <repository>
             <id>spigot-repo</id>
             <url>https://hub.spigotmc.org/nexus/content/repositories/snapshots/</url>
         </repository>
@@ -251,24 +243,8 @@
             <url>https://papermc.io/repo/repository/maven-public/</url>
         </repository>
         <repository>
-            <id>sk89q-repo</id>
-            <url>https://maven.enginehub.org/repo/</url>
-        </repository>
-        <repository>
-            <id>dmulloy2-repo</id>
-            <url>https://repo.dmulloy2.net/repository/public/</url>
-        </repository>
-        <repository>
-            <id>massivecraft</id>
-            <url>https://ci.ender.zone/plugin/repository/everything/</url>
-        </repository>
-        <repository>
-            <id>glaremasters</id>
-            <url>https://repo.glaremasters.me/repository/bloodshot/</url>
-        </repository>
-        <repository>
-            <id>redprotect-repo</id>
-            <url>https://raw.githubusercontent.com/FabioZumbi12/RedProtect/mvn-repo/</url>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
         </repository>
     </repositories>
 
@@ -322,12 +298,6 @@
             <scope>compile</scope>
         </dependency>
         <dependency>
-            <groupId>com.comphenix.protocol</groupId>
-            <artifactId>ProtocolLib</artifactId>
-            <version>4.7.0</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
             <version>5.8.2</version>
@@ -348,7 +318,7 @@
         <dependency>
             <groupId>io.github.dailystruggle</groupId>
             <artifactId>EffectsAPI</artifactId>
-            <version>1.0-ALPHA22</version>
+            <version>1.0-ALPHA23</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -358,9 +328,9 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>com.google.inject</groupId>
-            <artifactId>guice</artifactId>
-            <version>4.2.3</version>
+            <groupId>xyz.tozymc.spigot</groupId>
+            <artifactId>title-api</artifactId>
+            <version>1.0</version>
         </dependency>
     </dependencies>
 </project>

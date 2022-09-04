@@ -64,7 +64,6 @@ public final class BukkitRTPWorld implements RTPWorld {
 
     @Override
     public CompletableFuture<RTPChunk> getChunkAt(int cx, int cz) {
-        if(!RTPBukkitPlugin.getInstance().isEnabled()) throw new IllegalStateException("asked for chunk after disabled");
         List<Integer> xz = Arrays.asList(cx,cz);
         CompletableFuture<RTPChunk> res = new CompletableFuture<>();
         Pair<Chunk, Long> chunkLongPair = chunkMap.get(xz);
@@ -78,7 +77,11 @@ public final class BukkitRTPWorld implements RTPWorld {
             Chunk chunk = world.getChunkAt(cx, cz);
             BukkitRTPChunk rtpChunk = new BukkitRTPChunk(chunk);
             res.complete(rtpChunk);
-        } else {
+        }
+        else if(RTP.serverAccessor.getServerIntVersion()<13) {
+            Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),() -> res.complete(new BukkitRTPChunk(world.getChunkAt(cx,cz))));
+        }
+        else {
             CompletableFuture<Chunk> chunkAtAsyncUrgently = PaperLib.getChunkAtAsyncUrgently(world, cx, cz, true);
 
             List<CompletableFuture<Chunk>> list = chunkLoads.get(xz);
@@ -176,7 +179,7 @@ public final class BukkitRTPWorld implements RTPWorld {
         if (!chunk.isLoaded()) throw new IllegalStateException();
 
         Block airBlock = location.getBlock();
-        Material air = (airBlock.isLiquid()) ? Material.AIR : airBlock.getType();
+        Material air = (airBlock.isLiquid() || airBlock.getType().isSolid()) ? Material.AIR : airBlock.getType();
         Material solid = location.getBlock().getRelative(BlockFace.DOWN).getType();
 
         ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.getInstance().configs.getParser(SafetyKeys.class);
@@ -185,7 +188,13 @@ public final class BukkitRTPWorld implements RTPWorld {
 
         Object o = safety.yamlFile.getString("platformMaterial", Material.COBBLESTONE.name());
         Material platformMaterial;
-        if (o instanceof String) platformMaterial = Material.valueOf(((String) o).toUpperCase());
+        if (o instanceof String) {
+            try {
+                platformMaterial = Material.valueOf(((String) o).toUpperCase());
+            } catch (IllegalArgumentException exception) {
+                platformMaterial = Material.COBBLESTONE;
+            }
+        }
         else throw new IllegalStateException();
 
         int platformRadius = safety.yamlFile.getInt("platformRadius", 0);

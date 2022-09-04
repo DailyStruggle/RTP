@@ -18,7 +18,6 @@ import io.github.dailystruggle.rtp.common.tasks.SetupTeleport;
 
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.logging.Level;
 
 public interface RTPCmd extends BaseRTPCmd {
     default void init() {

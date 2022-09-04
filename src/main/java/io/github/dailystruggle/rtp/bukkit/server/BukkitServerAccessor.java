@@ -16,6 +16,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shap
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.common.serverSide.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.TPS;
@@ -333,7 +334,14 @@ public class BukkitServerAccessor implements RTPServerAccessor {
             org.bukkit.WorldBorder worldBorder = world.getWorldBorder();
             return new WorldBorder(
                     () -> (Shape<?>) RTP.factoryMap.get(RTP.factoryNames.shape).get("SQUARE"),
-                    rtpLocation -> worldBorder.isInside(new Location(world,rtpLocation.x(),rtpLocation.y(),rtpLocation.z())));
+                    rtpLocation -> {
+                        if(RTP.serverAccessor.getServerIntVersion()>10)
+                            return worldBorder.isInside(new Location(world,rtpLocation.x(),rtpLocation.y(),rtpLocation.z()));
+                        Location center = worldBorder.getCenter();
+                        double radius = worldBorder.getSize()/2;
+                        RTPLocation c = new RTPLocation(rtpWorld,center.getBlockX(),center.getBlockY(),center.getBlockZ());
+                        return c.distanceSquaredXZ(rtpLocation)<Math.pow(radius,2);
+                    });
         }
         return null;
     };

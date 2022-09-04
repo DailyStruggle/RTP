@@ -26,6 +26,17 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     public Map<String, Object> language_mapping = new ConcurrentHashMap<String, Object>();
     public Map<String,String> reverse_language_mapping = new ConcurrentHashMap<>();
 
+    private ClassLoader classLoader = this.getClass().getClassLoader();
+
+    public ConfigParser(Class<E> eClass, final String name, final String version, final File pluginDirectory, File langFile, ClassLoader classLoader) {
+        super(eClass, name);
+        this.name = (name.endsWith(".yml")) ? name : name + ".yml";
+        this.version = version;
+        this.pluginDirectory = pluginDirectory;
+        this.classLoader = classLoader;
+        check(version,pluginDirectory, langFile);
+    }
+
     public ConfigParser(Class<E> eClass, final String name, final String version, final File pluginDirectory, File langFile) {
         super(eClass, name);
         this.name = (name.endsWith(".yml")) ? name : name + ".yml";
@@ -310,5 +321,10 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     @Override
     public File getMainDirectory() {
         return pluginDirectory;
+    }
+
+    @Override
+    public ClassLoader getClassLoader() {
+        return classLoader;
     }
 }
