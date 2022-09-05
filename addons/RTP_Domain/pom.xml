@@ -81,9 +81,9 @@
         <dependency>
             <groupId>io.github.torpkev</groupId>
             <artifactId>domain</artifactId>
-            <version>1.9.0</version>
+            <version>1.9.10</version>
             <scope>system</scope>
-            <systemPath>${project.basedir}/Domain_1_8_8_pre117/Domain_1_9_0.jar</systemPath>
+            <systemPath>${project.basedir}/Domain/Domain_1_9_10.jar</systemPath>
         </dependency>
     </dependencies>
 </project>
