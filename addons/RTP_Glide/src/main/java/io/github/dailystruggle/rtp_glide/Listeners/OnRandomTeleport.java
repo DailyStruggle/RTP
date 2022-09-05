@@ -1,12 +1,16 @@
 package io.github.dailystruggle.rtp_glide.Listeners;
 
+import io.github.dailystruggle.rtp.bukkit.events.PostTeleportEvent;
+import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
+import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp_glide.RTP_Glide;
 import io.github.dailystruggle.rtp_glide.Tasks.SetupGlide;
 import io.github.dailystruggle.rtp_glide.configuration.Configs;
 import io.github.dailystruggle.rtp_glide.customEvents.PlayerGlideEvent;
-import leafcraft.rtp.bukkit.customBukkitEvents.RandomTeleportEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -23,10 +27,12 @@ public final class OnRandomTeleport implements Listener {
     }
 
     @EventHandler(priority = EventPriority.NORMAL)
-    public void onRandomTeleport(RandomTeleportEvent event) {
-        if(Objects.requireNonNull(event.getTo().getWorld())
-                .getEnvironment().equals(World.Environment.NETHER))
+    public void onRandomTeleport(PostTeleportEvent event) {
+        RTPWorld rtpWorld = event.getDoTeleport().location().world();
+        World world = ((BukkitRTPWorld)rtpWorld).world();
+        Player player = ((BukkitRTPPlayer)event.getDoTeleport().player()).player();
+        if(world.getEnvironment().equals(World.Environment.NETHER))
             return;
-        new SetupGlide(event.getPlayer(), Configs).runTask(plugin);
+        Bukkit.getScheduler().runTask(plugin,new SetupGlide(player, Configs));
     }
 }

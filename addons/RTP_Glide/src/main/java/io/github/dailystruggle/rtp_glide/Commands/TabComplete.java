@@ -9,6 +9,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.util.StringUtil;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 
 public class TabComplete implements TabCompleter {

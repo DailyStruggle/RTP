@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp_glide.configuration;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp_glide.RTP_Glide;
 import org.bukkit.Bukkit;
 import org.bukkit.World;

@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp_glide.Commands;
 
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp_glide.RTP_Glide;
 import io.github.dailystruggle.rtp_glide.Tasks.SetupGlide;
 import io.github.dailystruggle.rtp_glide.configuration.Configs;
@@ -12,10 +13,11 @@ import org.bukkit.entity.Player;
 import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
+import java.util.logging.Level;
 
 public class Glide implements CommandExecutor {
     private final RTP_Glide plugin;
-    private final Configs Configs;
+    private final Configs configs;
 
     private final Map<String,String> glideCommands = new ConcurrentHashMap<>();
     private final Map<String,String> glideParams = new ConcurrentHashMap<>();
@@ -23,7 +25,7 @@ public class Glide implements CommandExecutor {
 
     public Glide(RTP_Glide plugin, Configs Configs) {
         this.plugin = plugin;
-        this.Configs = Configs;
+        this.configs = Configs;
 
         this.glideParams.put("player", "rtp.other");
     }
@@ -72,7 +74,7 @@ public class Glide implements CommandExecutor {
             return true;
         }
 
-        new SetupGlide(player, Configs).runTask(plugin);
+        Bukkit.getScheduler().runTask(plugin,new SetupGlide(player, configs));
 
         return true;
     }
