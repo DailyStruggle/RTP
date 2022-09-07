@@ -1,10 +1,8 @@
 package io.github.dailystruggle.rtp.common.commands.fill;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.parameters.RegionParameter;
-import org.bukkit.Bukkit;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;

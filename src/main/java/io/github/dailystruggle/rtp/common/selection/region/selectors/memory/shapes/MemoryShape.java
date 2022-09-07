@@ -11,7 +11,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
 
 /**
  * @param <E> enum for configuration values
@@ -48,7 +47,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     public void save(String fileName, String worldName) {
         Map<String,Object> params = new HashMap<>();
         params.put("world",worldName);
-        for (var e : data.entrySet())
+        for (Map.Entry<E,?> e : data.entrySet())
             params.put(e.getKey().name(),e.getValue().toString());
 
         Yaml fileYAML = new Yaml();
@@ -92,7 +91,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         Map<String,?> resultMap;
         Map<String,Object> params = new HashMap<>();
         params.put("world",worldName);
-        for (var e : data.entrySet())
+        for (Map.Entry<E,?> e : data.entrySet())
             params.put(e.getKey().name(),e.getValue().toString());
 
         Yaml fileYAML = new Yaml();
@@ -108,17 +107,20 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
             e.printStackTrace();
             return;
         }
+
         resultMap = fileYAML.load(inputStream);
 
-        boolean eq = true;
-        for (var e : params.entrySet()) {
-            if(!resultMap.containsKey(e.getKey())) {
-                eq = false;
-                break;
-            }
-            if(!resultMap.get(e.getKey()).equals(e.getValue())) {
-                eq = false;
-                break;
+        boolean eq = resultMap!=null;
+        if(eq) {
+            for (Map.Entry<String, ?> e : params.entrySet()) {
+                if (!resultMap.containsKey(e.getKey())) {
+                    eq = false;
+                    break;
+                }
+                if (!resultMap.get(e.getKey()).equals(e.getValue())) {
+                    eq = false;
+                    break;
+                }
             }
         }
 
@@ -126,7 +128,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
         Map<?,?> badLocations = (Map<?, ?>) resultMap.get("badLocations");
         if(badLocations == null) return;
-        for(var e : badLocations.entrySet()) {
+        for(Map.Entry<?,?> e : badLocations.entrySet()) {
             String key = String.valueOf(e.getKey());
             String val = String.valueOf(e.getValue());
 
@@ -145,14 +147,14 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
         Map<?,?> biomeLocations = (Map<?, ?>) resultMap.get("biomeLocations");
         if(biomeLocations == null) return;
-        for(var b : biomeLocations.entrySet()) {
+        for(Map.Entry<?,?> b : biomeLocations.entrySet()) {
             String biome = String.valueOf(b.getKey());
             Map<?,?> biomeMap = (Map<?, ?>) b.getValue();
             if(biomeMap == null) continue;
 
             ConcurrentSkipListMap<Long,Long> locations = new ConcurrentSkipListMap<>();
 
-            for(var e : biomeMap.entrySet()) {
+            for(Map.Entry<?,?> e : biomeMap.entrySet()) {
                 String key = String.valueOf(e.getKey());
                 String val = String.valueOf(e.getValue());
 
@@ -171,10 +173,10 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         }
 
         Object fillIterObj = resultMap.get("fillIter");
-        if(fillIterObj instanceof Number n) fillIter.set(n.longValue());
-        else if(fillIterObj instanceof String s) {
+        if(fillIterObj instanceof Number) fillIter.set(((Number) fillIterObj).longValue());
+        else if(fillIterObj instanceof String) {
             try {
-                fillIter.set(Long.parseLong(s));
+                fillIter.set(Long.parseLong((String) fillIterObj));
             }
             catch (IllegalArgumentException exception) {
                 fillIter.set(0L);

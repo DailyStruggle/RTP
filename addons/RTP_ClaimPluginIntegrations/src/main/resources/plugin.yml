@@ -1,0 +1,10 @@
+name: RTP_ClaimPluginIntegrations
+version: '${project.version}'
+main: io.github.dailystruggle.RTPClaimPluginIntegrations
+api-version: 1.13
+prefix: RTP
+depend: [ RTP ]
+softdepend: [ WorldGuard, WorldEdit, GriefDefender, GriefPrevention, TownyAdvanced, HuskTowns, Factions, Lands, RedProtect ]
+authors: [ leaf26 ]
+description: add checks for several claim plugins
+website: https://github.com/DailyStruggle

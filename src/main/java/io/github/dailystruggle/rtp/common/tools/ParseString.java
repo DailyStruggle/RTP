@@ -1,20 +1,16 @@
 package io.github.dailystruggle.rtp.common.tools;
 
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 
 public class ParseString {
-    public static Set<String> keywords(String input, Set<String> placeholders) {
+    public static Set<String> keywords(String input, Set<String> placeholders, Set<Character> front, Set<Character> back) {
         Set<String> res = new HashSet<>();
         StringBuilder builder = null;
         for(int i = 0; i < input.length(); i++) {
             char c = input.charAt(i);
             if(builder != null) {
-                if(c == ']') {
+                if(back.contains(c)) {
                     String s = builder.toString();
                     builder = null;
                     if(placeholders.contains(s)) res.add(s);
@@ -23,7 +19,7 @@ public class ParseString {
                     builder.append(c);
                 }
             }
-            else if(c == '[') {
+            else if(front.contains(c)) {
                 builder = new StringBuilder();
             }
         }

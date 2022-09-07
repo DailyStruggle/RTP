@@ -1,0 +1,8 @@
+name: RTP_Shape_Example
+version: '${project.version}'
+main: io.github.dailystrugle.rtp_shape_example.RTP_Shape_Example
+api-version: 1.19
+depend: [ RTP ]
+authors: [ leaf26 ]
+description: example for adding shapes with arbitrary inputs
+website: https://github.com/DailyStruggle

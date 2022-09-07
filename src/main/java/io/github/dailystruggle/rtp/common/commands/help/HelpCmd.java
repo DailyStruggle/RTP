@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.common.commands.help;
 
-import io.github.dailystruggle.commandsapi.bukkit.localCommands.BukkitTreeCommand;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -23,10 +22,10 @@ public class HelpCmd extends BaseRTPCmdImpl {
     public HelpCmd(@Nullable CommandsAPICommand parent) {
         super(parent);
 
-        RTP.getInstance().miscAsyncTasks.add(new RTPRunnable(this::addCommands,5));
+        RTP.getInstance().miscAsyncTasks.add(new RTPRunnable(this::addCommands,20));
     }
 
-    void addCommands() {
+    public void addCommands() {
         final Configs configs = RTP.getInstance().configs;
         for (ConfigParser<?> value : configs.configParserMap.values()) {
             String name = value.name.replace(".yml","");
@@ -71,7 +70,7 @@ public class HelpCmd extends BaseRTPCmdImpl {
 
         SendMessage.sendMessage(sender,msg,hover,click);
 
-        for(var entry : RTP.baseCommand.getCommandLookup().values()) {
+        for(CommandsAPICommand entry : RTP.baseCommand.getCommandLookup().values()) {
             if(sender.hasPermission(entry.permission())){
                 String arg = entry.name();
 

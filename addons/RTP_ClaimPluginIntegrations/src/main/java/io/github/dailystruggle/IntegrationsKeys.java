@@ -1,4 +1,4 @@
-package io.github.dailystruggle.rtp.common.configuration.enums;
+package io.github.dailystruggle;
 
 public enum IntegrationsKeys {
     rerollWorldGuard,
@@ -8,5 +8,5 @@ public enum IntegrationsKeys {
     rerollHuskTowns,
     rerollFactions,
     rerollLands,
-    rerollRedProtect,
+    rerollRedProtect
 }

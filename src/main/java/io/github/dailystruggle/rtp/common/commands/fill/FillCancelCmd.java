@@ -6,7 +6,6 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import io.github.dailystruggle.rtp.common.tasks.FillTask;
@@ -44,7 +43,7 @@ public class FillCancelCmd extends FillSubCmd {
             if(fillTask==null) {
                 if(parser == null) continue;
                 String msg = String.valueOf(parser.getConfigValue(LangKeys.fillNotRunning,""));
-                if(msg == null || msg.isBlank()) continue;
+                if(msg == null || msg.isEmpty()) continue;
                 msg = StringUtils.replaceIgnoreCase(msg, "[region]", region.name);
                 RTP.serverAccessor.announce(msg,"rtp.fill");
                 continue;
@@ -56,7 +55,7 @@ public class FillCancelCmd extends FillSubCmd {
             RTP.getInstance().fillTasks.remove(region.name);
             if(parser == null) continue;
             String msg = String.valueOf(parser.getConfigValue(LangKeys.fillCancel,""));
-            if(msg == null || msg.isBlank()) continue;
+            if(msg == null || msg.isEmpty()) continue;
             msg = StringUtils.replaceIgnoreCase(msg, "[region]", region.name);
             RTP.serverAccessor.announce(msg,"rtp.fill");
         }
@@ -70,7 +69,7 @@ public class FillCancelCmd extends FillSubCmd {
         if(regionParameter!=null) {
             for(String name : regionParameter) regions.add(RTP.getInstance().selectionAPI.getRegion(name));
         }
-        else if(sender instanceof RTPPlayer player) regions.add(RTP.getInstance().selectionAPI.getRegion(player));
+        else if(sender instanceof RTPPlayer) regions.add(RTP.getInstance().selectionAPI.getRegion((RTPPlayer) sender));
         else regions.add(RTP.getInstance().selectionAPI.getRegion("default"));
         return regions;
     }

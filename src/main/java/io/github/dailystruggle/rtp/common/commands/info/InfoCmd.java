@@ -3,7 +3,6 @@ package io.github.dailystruggle.rtp.common.commands.info;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
-import io.github.dailystruggle.rtp.common.commands.fill.FillResumeCmd;
 import io.github.dailystruggle.rtp.common.commands.parameters.RegionParameter;
 import io.github.dailystruggle.rtp.common.commands.parameters.WorldParameter;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -49,9 +48,9 @@ public class InfoCmd extends BaseRTPCmdImpl {
             boolean wbo = false;
             EnumMap<RegionKeys, Object> data = region.getData();
             Object o = data.getOrDefault(RegionKeys.worldBorderOverride,false);
-            if(o instanceof Boolean b) wbo = b;
-            else if(o instanceof String s) {
-                wbo = Boolean.parseBoolean(s);
+            if(o instanceof Boolean) wbo = (Boolean) o;
+            else if(o instanceof String) {
+                wbo = Boolean.parseBoolean((String) o);
                 data.put(RegionKeys.worldBorderOverride,wbo);
             }
             return String.valueOf(wbo);
@@ -60,9 +59,9 @@ public class InfoCmd extends BaseRTPCmdImpl {
             boolean req = false;
             EnumMap<RegionKeys, Object> data = region.getData();
             Object o = data.getOrDefault(RegionKeys.requirePermission,false);
-            if(o instanceof Boolean b) req = b;
-            else if(o instanceof String s) {
-                req = Boolean.parseBoolean(s);
+            if(o instanceof Boolean) req = (Boolean) o;
+            else if(o instanceof String) {
+                req = Boolean.parseBoolean((String) o);
                 data.put(RegionKeys.requirePermission, req);
             }
             return String.valueOf(req);
@@ -118,24 +117,28 @@ public class InfoCmd extends BaseRTPCmdImpl {
             return true;
         }
 
+        Set<Character> front = new HashSet<>(Arrays.asList('[','%'));
+        Set<Character> back = new HashSet<>(Arrays.asList(']','%'));
+
         List<String> worldNames = parameterValues.get("world");
         if(worldNames!=null) {
             Object worldInfoObj = lang.getConfigValue(LangKeys.worldInfo, "");
-            if(!(worldInfoObj instanceof List worldInfoList)) return true;
-            List<String> worldInfo = (List<String>) worldInfoList.stream().map(String::valueOf).collect(Collectors.toList());
+            if(!(worldInfoObj instanceof List)) return true;
+            List<String> worldInfo = ((List<?>) worldInfoObj).stream().map(String::valueOf).collect(Collectors.toList());
             for(String worldName : worldNames) {
                 RTPWorld rtpWorld = RTP.serverAccessor.getRTPWorld(worldName);
                 if(rtpWorld==null || !rtpWorld.isActive()) continue;
                 ArrayList<String> worldInfoCopy = new ArrayList<>(worldInfo);
                 List<String> strings = worldInfoCopy.stream().map(s -> {
-                    Set<String> keywords = ParseString.keywords(s, worldDataLookup.keySet());
+                    Set<String> keywords = ParseString.keywords(s, worldDataLookup.keySet(), front, back);
                     Map<String, String> placeholders = new HashMap<>();
                     worldDataLookup.forEach((s1, rtpWorldStringFunction) -> {
                         if (!keywords.contains(s1)) return;
                         placeholders.put(s1, rtpWorldStringFunction.apply(rtpWorld));
                     });
                     StrSubstitutor sub = new StrSubstitutor(placeholders, "[", "]");
-                    return sub.replace(s);
+                    StrSubstitutor sub2 = new StrSubstitutor(placeholders, "%", "%");
+                    return sub2.replace(sub.replace(s));
                 }).collect(Collectors.toList());
                 strings.forEach(s -> RTP.serverAccessor.sendMessage(callerId,s));
             }
@@ -144,21 +147,22 @@ public class InfoCmd extends BaseRTPCmdImpl {
         List<String> regionNames = parameterValues.get("region");
         if(regionNames!=null) {
             Object regionInfoObj = lang.getConfigValue(LangKeys.regionInfo, "");
-            if(!(regionInfoObj instanceof List regionInfoList)) return true;
-            List<String> regionInfo = (List<String>) regionInfoList.stream().map(String::valueOf).collect(Collectors.toList());
+            if(!(regionInfoObj instanceof List)) return true;
+            List<String> regionInfo = ((List<?>) regionInfoObj).stream().map(String::valueOf).collect(Collectors.toList());
             for(String regionName : regionNames) {
                 Region region = RTP.getInstance().selectionAPI.getRegion(regionName);
                 if(region ==null) continue;
                 ArrayList<String> regionInfoCopy = new ArrayList<>(regionInfo);
                 List<String> strings = regionInfoCopy.stream().map(s -> {
-                    Set<String> keywords = ParseString.keywords(s, regionDataLookup.keySet());
+                    Set<String> keywords = ParseString.keywords(s, regionDataLookup.keySet(), front, back);
                     Map<String, String> placeholders = new HashMap<>();
                     regionDataLookup.forEach((s1, rtpRegionStringFunction) -> {
                         if (!keywords.contains(s1)) return;
                         placeholders.put(s1, rtpRegionStringFunction.apply(region));
                     });
                     StrSubstitutor sub = new StrSubstitutor(placeholders, "[", "]");
-                    return sub.replace(s);
+                    StrSubstitutor sub2 = new StrSubstitutor(placeholders, "%", "%");
+                    return sub2.replace(sub.replace(s));
                 }).collect(Collectors.toList());
                 strings.forEach(s -> RTP.serverAccessor.sendMessage(callerId,s));
             }
