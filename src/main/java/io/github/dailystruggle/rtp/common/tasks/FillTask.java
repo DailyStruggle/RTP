@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.common.tasks;
 
-import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
@@ -15,7 +14,9 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import org.apache.commons.lang3.StringUtils;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -50,7 +51,6 @@ public class FillTask extends RTPRunnable {
 
     @Override
     public void run() {
-        if(!RTPBukkitPlugin.getInstance().isEnabled()) throw new IllegalStateException();
         if(pause.get() || isCancelled() || fillIncrement.get()<=0) return;
 
         isRunning = true;
@@ -116,7 +116,7 @@ public class FillTask extends RTPRunnable {
 
             ConfigParser<LangKeys> langParser = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
             String msg = langParser.getConfigValue(LangKeys.fillStatus, "").toString();
-            if(msg!=null && !msg.isBlank()) {
+            if(msg!=null && !msg.isEmpty()) {
                 long days = TimeUnit.SECONDS.toDays(estRemaining);
                 long hours = TimeUnit.SECONDS.toHours(estRemaining) % 24;
                 long minutes = TimeUnit.SECONDS.toMinutes(estRemaining) % 60;
@@ -147,7 +147,6 @@ public class FillTask extends RTPRunnable {
     }
 
     public CompletableFuture<Boolean> testPos(Region region, long pos) {
-        if(!RTPBukkitPlugin.getInstance().isEnabled()) throw new IllegalStateException();
         CompletableFuture<Boolean> res = new CompletableFuture<>();
         tests.add(res);
 
@@ -182,10 +181,8 @@ public class FillTask extends RTPRunnable {
         chunks.add(cfChunk);
 
         cfChunk.whenComplete((chunk, throwable) -> {
-            if(!RTPBukkitPlugin.getInstance().isEnabled()) throw new IllegalStateException("completed boolean after plugin disabled");
             if(isCancelled()) return;
             RTPLocation location = vert.adjust(chunk);
-            if(!RTPBukkitPlugin.getInstance().isEnabled()) throw new IllegalStateException("completed boolean after plugin disabled");
             if(location == null) {
                 res.complete(false);
                 chunk.unload();

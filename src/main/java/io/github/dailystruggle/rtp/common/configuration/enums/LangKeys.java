@@ -51,5 +51,11 @@ public enum LangKeys {
     PLAYER_SETUP,
     PLAYER_LOADING,
     PLAYER_TELEPORTING,
+    title,
+    subtitle,
+    fadeIn,
+    stay,
+    fadeOut,
+    actionbar,
     version
 }

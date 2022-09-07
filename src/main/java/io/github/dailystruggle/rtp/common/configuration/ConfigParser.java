@@ -2,13 +2,15 @@ package io.github.dailystruggle.rtp.common.configuration;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
-import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.simpleyaml.configuration.ConfigurationSection;
 import org.simpleyaml.configuration.file.YamlFile;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -23,6 +25,17 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
 
     public Map<String, Object> language_mapping = new ConcurrentHashMap<String, Object>();
     public Map<String,String> reverse_language_mapping = new ConcurrentHashMap<>();
+
+    private ClassLoader classLoader = this.getClass().getClassLoader();
+
+    public ConfigParser(Class<E> eClass, final String name, final String version, final File pluginDirectory, File langFile, ClassLoader classLoader) {
+        super(eClass, name);
+        this.name = (name.endsWith(".yml")) ? name : name + ".yml";
+        this.version = version;
+        this.pluginDirectory = pluginDirectory;
+        this.classLoader = classLoader;
+        check(version,pluginDirectory, langFile);
+    }
 
     public ConfigParser(Class<E> eClass, final String name, final String version, final File pluginDirectory, File langFile) {
         super(eClass, name);
@@ -123,7 +136,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
         }
 
         data.clear();
-        for(var v : myClass.getEnumConstants()) {
+        for(E v : myClass.getEnumConstants()) {
             Object fromString = yamlFile.get(v.name());
             if(fromString!=null) {
                 data.put(v, fromString);
@@ -218,7 +231,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
             return;
         }
 
-        for(var e : myClass.getEnumConstants()) {
+        for(E e : myClass.getEnumConstants()) {
             String name = e.name();
             if(yamlMap.containsKey(name)) {
                 data.put(e,yamlMap.get(name));
@@ -230,141 +243,6 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
         renameFiles();
         Map<E,Object> oldValues = getData();
 
-        List<String> linesInDefaultConfig = new ArrayList<>();
-        try {
-            Scanner scanner = new Scanner(
-                    new File(pluginDirectory.getAbsolutePath() + File.separator + name));
-            while (scanner.hasNextLine()) {
-                linesInDefaultConfig.add(scanner.nextLine() + "");
-            }
-            scanner.close();
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        }
-
-        List<String> newLines = new ArrayList<>();
-        final Map<String, Object> yamlMap = yamlFile.getMapValues(false);
-        for (int i = 0; i < linesInDefaultConfig.size(); i++) {
-            String line = linesInDefaultConfig.get(i);
-            StringBuilder newline;
-
-            //leading comments don't need to be changed
-            if (line.startsWith("#") || line.isBlank()) {
-                newLines.add(line);
-                continue;
-            }
-
-            //tabbed stuff is a part of a list or map
-            if (line.startsWith("  ")) {
-                continue;
-            }
-
-            //check for colon, denoting a key/val
-            String[] split = line.split(":");
-
-            //not a key
-            if(split.length < 1) {
-                newLines.add(line);
-                continue;
-            }
-
-            //key without a value denotes a list or map
-            if (split.length < 2) {
-                //check for a local value
-                Object value = yamlMap.getOrDefault(split[0],null);
-                if(value == null) continue;
-
-                //if it's a map
-                if(value instanceof Map map) {
-                    StringBuilder out = new StringBuilder();
-                    mapToStringRecursive(split[0],map,0,out);
-                    newLines.add(out.toString());
-                }
-
-                //check for factory type
-                //check for map type
-                //check for list type
-
-                continue;
-            }
-
-            //
-            String node = split[0];
-            E e;
-            try {
-                e = Enum.valueOf(myClass, node);
-            } catch (IllegalArgumentException ignored) {
-                //todo: find out if it would be removed here?
-                //continue;
-                e = null;
-            }
-
-            Object fromString = yamlMap.get(node); //todo: check this?
-            if(fromString == null) {
-                Object altName = language_mapping.get(node);
-                if(altName!=null) {
-                    fromString = yamlMap.get(altName);
-                }
-            }
-
-            if (fromString == null) {
-                newline = new StringBuilder();
-            } else if (fromString instanceof Map map) {
-                newline = new StringBuilder(node + ":\n");
-                mapToStringRecursive(node, map, 0, newline);
-            } else if (fromString instanceof List) {
-                Set<Object> duplicateCheck = new HashSet<>();
-                newline = new StringBuilder(node + ":");
-                for (Object obj : (List<?>) fromString) {
-                    if (duplicateCheck.contains(obj)) continue;
-                    duplicateCheck.add(obj);
-                    if (obj instanceof String) {
-                        newline.append("\n  - " + "\"").append(obj).append("\"");
-                    } else newline.append("\n  - ").append(obj);
-                }
-                newline.deleteCharAt(0);
-            } else if (fromString instanceof String)
-                newline = new StringBuilder(node + ": \"" + oldValues.get(e).toString() + "\"");
-            else newline = new StringBuilder(node + ": " + oldValues.get(e).toString());
-            newLines.add(newline.toString());
-        }
-
-        FileWriter fw;
-        String[] linesArray = newLines.toArray(new String[linesInDefaultConfig.size()]);
-        try {
-            fw = new FileWriter(pluginDirectory.getAbsolutePath() + File.separator + name);
-            for (String s : linesArray) {
-                if(s==null) continue;
-                fw.write(s + "\n");
-            }
-            fw.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    protected void mapToStringRecursive(String node, Map<String,Object> map, int depth, StringBuilder newline) {
-        newline.append("  ".repeat(Math.max(0, depth)));
-        newline.append(node).append(": \n");
-        depth++;
-
-        for(Map.Entry<String,Object> entry : map.entrySet()) {
-            if(entry.getValue() instanceof Map map1) mapToStringRecursive(node,map1,depth, newline);
-            else if(entry.getValue() instanceof List list){
-                Set<Object> duplicateCheck = new HashSet<>();
-                for(Object obj : list) {
-                    if(duplicateCheck.contains(obj)) continue;
-                    duplicateCheck.add(obj);
-                    newline.append("  ".repeat(Math.max(0, depth)));
-                    if(obj instanceof String) {
-                        newline.append("- \"").append(obj).append("\"\n");
-                    }
-                    else {
-                        newline.append("  - ").append(obj).append("\n");
-                    }
-                }
-            }
-        }
     }
 
     @Override
@@ -384,18 +262,18 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     public void set(@NotNull E key, @NotNull Object value) throws IllegalArgumentException {
         super.set(key,value);
         Object o = yamlFile.get(key.name());
-        if(o instanceof ConfigurationSection section) {
-            if(value instanceof FactoryValue<?> factoryValue) {
-                EnumMap<?, Object> data = factoryValue.getData();
+        if(o instanceof ConfigurationSection) {
+            if(value instanceof FactoryValue<?>) {
+                EnumMap<?, Object> data = ((FactoryValue<?>) value).getData();
                 Map<String,Object> map = new HashMap<>();
-                for(var d : data.entrySet()) map.put(d.getKey().name(),d.getValue());
-                setSection(section,map);
+                for(Map.Entry<? extends Enum<?>,Object> d : data.entrySet()) map.put(d.getKey().name(),d.getValue());
+                setSection((ConfigurationSection) o,map);
             }
-            else if(value instanceof Map map) {
-                setSection(section,map);
+            else if(value instanceof Map) {
+                setSection((ConfigurationSection) o,(Map<String, Object>) value);
             }
             else throw new IllegalArgumentException();
-            yamlFile.set(key.name(),section);
+            yamlFile.set(key.name(),o);
         }
         else {
             yamlFile.set(key.name(),value);
@@ -415,19 +293,19 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     private static void setSection(ConfigurationSection section, Map<String,Object> map) {
         Map<String, Object> mapValues = section.getMapValues(false);
 
-        for(var e : mapValues.entrySet()) {
+        for(Map.Entry<String,Object> e : mapValues.entrySet()) {
             Object o = e.getValue();
             if(!map.containsKey(e.getKey())) continue;
             Object value = map.get(e.getKey());
-            if(o instanceof ConfigurationSection subSection) {
-                if(value instanceof FactoryValue<?> factoryValue) {
-                    EnumMap<?, Object> data = factoryValue.getData();
+            if(o instanceof ConfigurationSection) {
+                if(value instanceof FactoryValue<?>) {
+                    EnumMap<?, Object> data = ((FactoryValue<?>) value).getData();
                     Map<String,Object> subMap = new HashMap<>();
-                    for(var d : data.entrySet()) subMap.put(d.getKey().name(),d.getValue());
-                    setSection(subSection,subMap);
+                    for(Map.Entry<? extends Enum<?>,?> d : data.entrySet()) subMap.put(d.getKey().name(),d.getValue());
+                    setSection((ConfigurationSection) o,subMap);
                 }
-                else if(value instanceof Map subMap) {
-                    setSection(subSection,subMap);
+                else if(value instanceof Map) {
+                    setSection((ConfigurationSection) o, (Map<String, Object>) value);
                 }
                 else throw new IllegalArgumentException();
             }
@@ -443,5 +321,10 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     @Override
     public File getMainDirectory() {
         return pluginDirectory;
+    }
+
+    @Override
+    public ClassLoader getClassLoader() {
+        return classLoader;
     }
 }

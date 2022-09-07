@@ -10,10 +10,13 @@ import io.github.dailystruggle.rtp.bukkit.server.BukkitServerAccessor;
 import io.github.dailystruggle.rtp.bukkit.server.SyncTeleportProcessing;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.spigotListeners.*;
+import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
+import io.github.dailystruggle.rtp.bukkit.tools.softdepends.VaultChecker;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
@@ -29,8 +32,6 @@ import org.bukkit.scheduler.BukkitTask;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 /**
@@ -90,10 +91,13 @@ public final class RTPBukkitPlugin extends JavaPlugin {
                 RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
             }
         });
+
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupBukkitEvents);
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupEffects);
+        Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupIntegrations);
 
         Bukkit.getScheduler().runTaskTimer(this, new TPS(),0,1);
+
     }
 
     @Override
@@ -130,6 +134,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new OnPlayerQuit(), this);
         Bukkit.getPluginManager().registerEvents(new OnPlayerRespawn(), this);
         Bukkit.getPluginManager().registerEvents(new OnPlayerTeleport(), this);
+        if(RTP.serverAccessor.getServerIntVersion()<13) Bukkit.getPluginManager().registerEvents(new OnChunkUnload(), this);
 
         EffectsAPI.init(this);
     }
@@ -155,9 +160,9 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             PreSetupTeleportEvent event = new PreSetupTeleportEvent(task);
             Bukkit.getPluginManager().callEvent(event);
             if(event.isCancelled()) task.setCancelled(true);
-            if(task.player() instanceof BukkitRTPPlayer rtpPlayer) {
+            if(task.player() instanceof BukkitRTPPlayer) {
                 if(!Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) return;
-                Player player = rtpPlayer.player();
+                Player player = ((BukkitRTPPlayer) task.player()).player();
                 RTP.getInstance().miscAsyncTasks.add(() -> {
                     EffectFactory.buildEffects("rtp.effect.presetup", player.getEffectivePermissions()).forEach(effect -> {
                         effect.setTarget(player);
@@ -171,9 +176,9 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             if(!aBoolean) return;
             PostSetupTeleportEvent event = new PostSetupTeleportEvent(task);
             Bukkit.getPluginManager().callEvent(event);
-            if(task.player() instanceof BukkitRTPPlayer rtpPlayer) {
+            if(task.player() instanceof BukkitRTPPlayer) {
                 if(!Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) return;
-                Player player = rtpPlayer.player();
+                Player player = ((BukkitRTPPlayer) task.player()).player();
                 RTP.getInstance().miscAsyncTasks.add(() -> {
                     EffectFactory.buildEffects("rtp.effect.postSetup", player.getEffectivePermissions()).forEach(effect -> {
                         effect.setTarget(player);
@@ -187,9 +192,9 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             PreLoadChunksEvent event = new PreLoadChunksEvent(task);
             Bukkit.getPluginManager().callEvent(event);
 
-            if(task.player() instanceof BukkitRTPPlayer rtpPlayer) {
+            if(task.player() instanceof BukkitRTPPlayer) {
                 if(!Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) return;
-                Player player = rtpPlayer.player();
+                Player player = ((BukkitRTPPlayer) task.player()).player();
                 RTP.getInstance().miscAsyncTasks.add(() -> {
                     EffectFactory.buildEffects("rtp.effect.presetup", player.getEffectivePermissions()).forEach(effect -> {
                         effect.setTarget(player);
@@ -203,9 +208,9 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             PostLoadChunksEvent event = new PostLoadChunksEvent(task);
             Bukkit.getPluginManager().callEvent(event);
 
-            if(task.player() instanceof BukkitRTPPlayer rtpPlayer) {
+            if(task.player() instanceof BukkitRTPPlayer) {
                 if(!Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) return;
-                Player player = rtpPlayer.player();
+                Player player = ((BukkitRTPPlayer) task.player()).player();
                 RTP.getInstance().miscAsyncTasks.add(() -> {
                     EffectFactory.buildEffects("rtp.effect.postload", player.getEffectivePermissions()).forEach(effect -> {
                         effect.setTarget(player);
@@ -219,9 +224,9 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             PreTeleportEvent event = new PreTeleportEvent(task);
             Bukkit.getPluginManager().callEvent(event);
 
-            if(task.player() instanceof BukkitRTPPlayer rtpPlayer) {
+            if(task.player() instanceof BukkitRTPPlayer) {
                 if(!Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) return;
-                Player player = rtpPlayer.player();
+                Player player = ((BukkitRTPPlayer) task.player()).player();
                 RTP.getInstance().miscAsyncTasks.add(() -> {
                     EffectFactory.buildEffects("rtp.effect.preteleport", player.getEffectivePermissions()).forEach(effect -> {
                         effect.setTarget(player);
@@ -235,15 +240,34 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             PostTeleportEvent event = new PostTeleportEvent(task);
             Bukkit.getPluginManager().callEvent(event);
 
-            if(task.player() instanceof BukkitRTPPlayer rtpPlayer) {
+            if(task.player() instanceof BukkitRTPPlayer) {
                 if(!Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) return;
-                Player player = rtpPlayer.player();
+                Player player = ((BukkitRTPPlayer) task.player()).player();
                 RTP.getInstance().miscAsyncTasks.add(() -> {
                     EffectFactory.buildEffects("rtp.effect.postteleport", player.getEffectivePermissions()).forEach(effect -> {
                         effect.setTarget(player);
                         effect.run();
                     });
                 });
+            }
+        });
+
+        DoTeleport.postActions.add(task -> {
+            ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+
+            if(task.player() instanceof BukkitRTPPlayer) {
+                Player player = ((BukkitRTPPlayer) task.player()).player();
+                String title = lang.getConfigValue(LangKeys.title, "").toString();
+                String subtitle = lang.getConfigValue(LangKeys.subtitle, "").toString();
+
+                int fadeIn = lang.getNumber(LangKeys.fadeIn,0).intValue();
+                int stay = lang.getNumber(LangKeys.stay,0).intValue();
+                int fadeOut = lang.getNumber(LangKeys.fadeOut,0).intValue();
+
+                SendMessage.title(player,title,subtitle,fadeIn,stay,fadeOut);
+
+                String actionbar = lang.getConfigValue(LangKeys.actionbar, "").toString();
+                SendMessage.actionbar(player,actionbar);
             }
         });
 
@@ -306,6 +330,15 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             EffectFactory.addPermissions("rtp.effect.postTeleport");
             EffectFactory.addPermissions("rtp.effect.cancel");
             EffectFactory.addPermissions("rtp.effect.queuePush");
+        }
+    }
+
+    public void setupIntegrations() {
+        if(RTP.economy == null && Bukkit.getServer().getPluginManager().getPlugin("Vault") != null) {
+            VaultChecker.setupEconomy();
+            VaultChecker.setupPermissions();
+            if(VaultChecker.getEconomy()!=null) RTP.economy = new VaultChecker();
+            else RTP.economy = null;
         }
     }
 

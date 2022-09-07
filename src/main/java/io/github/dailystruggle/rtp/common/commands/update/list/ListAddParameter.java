@@ -1,13 +1,9 @@
 package io.github.dailystruggle.rtp.common.commands.update.list;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
-import io.github.dailystruggle.rtp.common.RTP;
 import org.simpleyaml.configuration.file.YamlFile;
 
 import java.util.Set;
-import java.util.UUID;
-import java.util.function.BiFunction;
-import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 public class ListAddParameter extends CommandParameter {

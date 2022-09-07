@@ -13,7 +13,7 @@
 
     <description>place player up in the air and glide down</description>
     <properties>
-        <java.version>16</java.version>
+        <java.version>1.8</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
@@ -74,8 +74,9 @@
         <dependency>
             <groupId>io.github.dailystruggle</groupId>
             <artifactId>RTP</artifactId>
-            <version>1.3.23</version>
-            <scope>provided</scope>
+            <version>2.0.0-BETA01</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/../../target/original-RTP-2.0.0-BETA01.jar</systemPath>
         </dependency>
     </dependencies>
 </project>

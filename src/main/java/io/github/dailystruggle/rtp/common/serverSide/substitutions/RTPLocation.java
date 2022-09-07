@@ -1,9 +1,22 @@
 package io.github.dailystruggle.rtp.common.serverSide.substitutions;
 
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
-public record RTPLocation(RTPWorld world, int x, int y, int z) implements Cloneable {
+public final class RTPLocation implements Cloneable {
+    private final RTPWorld world;
+    private final int x;
+    private final int y;
+    private final int z;
+
+    public RTPLocation(RTPWorld world, int x, int y, int z) {
+        this.world = world;
+        this.x = x;
+        this.y = y;
+        this.z = z;
+    }
+
     public long distanceSquared(RTPLocation that) {
         if (!this.world.equals(that.world)) return Long.MAX_VALUE; // another world is pretty far away
         long dx = this.x - that.x;
@@ -33,10 +46,10 @@ public record RTPLocation(RTPWorld world, int x, int y, int z) implements Clonea
 
     public CompletableFuture<RTPBlock> getBlock() {
         CompletableFuture<RTPBlock> res = new CompletableFuture<>();
-        int cx = (x>0) ? x%16 : x%16-1;
-        int cz = (z>0) ? z%16 : z%16-1;
+        int cx = (x > 0) ? x % 16 : x % 16 - 1;
+        int cz = (z > 0) ? z % 16 : z % 16 - 1;
         CompletableFuture<RTPChunk> chunkAt = world.getChunkAt(cx, cz);
-        if(chunkAt.isDone()) {
+        if (chunkAt.isDone()) {
             try {
                 RTPChunk chunk = chunkAt.get();
                 res.complete(chunk.getBlockAt(this));
@@ -47,4 +60,46 @@ public record RTPLocation(RTPWorld world, int x, int y, int z) implements Clonea
         chunkAt.whenComplete((rtpChunk, throwable) -> res.complete(rtpChunk.getBlockAt(this)));
         return res;
     }
+
+    public RTPWorld world() {
+        return world;
+    }
+
+    public int x() {
+        return x;
+    }
+
+    public int y() {
+        return y;
+    }
+
+    public int z() {
+        return z;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == this) return true;
+        if (obj == null || obj.getClass() != this.getClass()) return false;
+        RTPLocation that = (RTPLocation) obj;
+        return Objects.equals(this.world, that.world) &&
+                this.x == that.x &&
+                this.y == that.y &&
+                this.z == that.z;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(world, x, y, z);
+    }
+
+    @Override
+    public String toString() {
+        return "RTPLocation[" +
+                "world=" + world + ", " +
+                "x=" + x + ", " +
+                "y=" + y + ", " +
+                "z=" + z + ']';
+    }
+
 }

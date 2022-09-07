@@ -3,21 +3,15 @@ package io.github.dailystruggle.rtp.common.configuration;
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.*;
-import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
+import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import org.apache.commons.lang3.StringUtils;
-import org.bukkit.Bukkit;
 import org.jetbrains.annotations.Nullable;
-import org.simpleyaml.configuration.MemorySection;
 
 import java.io.File;
-import java.util.EnumMap;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -28,19 +22,25 @@ public class Configs {
     public Map<Class<?>,ConfigParser<?>> configParserMap = new ConcurrentHashMap<>();
     public Map<Class<?>,MultiConfigParser<?>> multiConfigParserMap = new ConcurrentHashMap<>();
 
+    private static final List<Runnable> onReload = new ArrayList<>();
+
+    public static void onReload(Runnable runnable) {
+        onReload.add(runnable);
+    }
+
     public Configs(File pluginDirectory) {
         this.pluginDirectory = pluginDirectory;
-        reload();
+        RTP.getInstance().startupTasks.add(new RTPRunnable(this::reloadAction,5));
     }
 
     public void putParser(Object instance) {
         if(instance == null)
             throw new NullPointerException("instance is null");
 
-        if(instance instanceof ConfigParser<?> configParser)
-            configParserMap.put(configParser.myClass, configParser);
-        else if(instance instanceof MultiConfigParser<?> multiConfigParser)
-            multiConfigParserMap.put(multiConfigParser.myClass, multiConfigParser);
+        if(instance instanceof ConfigParser<?>)
+            configParserMap.put(((ConfigParser<?>) instance).myClass, (ConfigParser<?>) instance);
+        else if(instance instanceof MultiConfigParser<?>)
+            multiConfigParserMap.put(((MultiConfigParser<?>) instance).myClass, (MultiConfigParser<?>) instance);
         else
             throw new IllegalArgumentException("invalid type:" + instance.getClass().getSimpleName() + ", expected a config parser");
     }
@@ -70,24 +70,19 @@ public class Configs {
         return multiConfigParser.getParser(worldName);
     }
 
-    public CompletableFuture<Boolean> reload() {
-        CompletableFuture<Boolean> res = new CompletableFuture<>();
-
-        RTP.getInstance().startupTasks.add(() -> {
-            try {
-                reloadAction();
-                ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
-                if(lang == null) return;
-                String msg = String.valueOf(lang.getConfigValue(LangKeys.reloaded,""));
-                if(msg!=null) msg = StringUtils.replace(msg,"[filename]", "configs");
-                RTP.serverAccessor.sendMessage(CommandsAPI.serverId,msg);
-                res.complete(true);
-            } catch (Exception e) { //on any code failure, complete false
-                res.complete(false);
-                throw e;
-            }
-        });
-        return res;
+    public boolean reload() {
+        try {
+            reloadAction();
+            ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+            if(lang == null) return false;
+            String msg = String.valueOf(lang.getConfigValue(LangKeys.reloaded,""));
+            if(msg!=null) msg = StringUtils.replace(msg,"[filename]", "configs");
+            RTP.serverAccessor.sendMessage(CommandsAPI.serverId,msg);
+        } catch (Exception e) { //on any code failure, complete false
+            e.printStackTrace();
+            return false;
+        }
+        return true;
     }
 
 
@@ -96,21 +91,19 @@ public class Configs {
 
         ConfigParser<ConfigKeys> config = new ConfigParser<>(ConfigKeys.class, "config.yml", "1.0", pluginDirectory);
         ConfigParser<EconomyKeys> economy = new ConfigParser<>(EconomyKeys.class, "economy.yml", "1.0", pluginDirectory);
-        ConfigParser<IntegrationsKeys> integrations = new ConfigParser<>(IntegrationsKeys.class, "integrations.yml", "1.0", pluginDirectory);
         ConfigParser<PerformanceKeys> performance = new ConfigParser<>(PerformanceKeys.class, "performance.yml", "1.0", pluginDirectory);
         ConfigParser<SafetyKeys> safety = new ConfigParser<>(SafetyKeys.class, "safety", "1.0", pluginDirectory);
 
         MultiConfigParser<RegionKeys> regions = new MultiConfigParser<>(RegionKeys.class, "regions", "1.0", pluginDirectory);
         MultiConfigParser<WorldKeys> worlds = new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", pluginDirectory);
 
-        for(var world : RTP.serverAccessor.getRTPWorlds()) {
+        for(RTPWorld world : RTP.serverAccessor.getRTPWorlds()) {
             worlds.getParser(world.name());
         }
 
         putParser(lang);
         putParser(config);
         putParser(economy);
-        putParser(integrations);
         putParser(performance);
         putParser(safety);
         putParser(regions);
@@ -135,6 +128,7 @@ public class Configs {
             Region region = new Region(regionConfig.name.replace(".yml",""), data);
             RTP.getInstance().selectionAPI.permRegionLookup.put(region.name.toUpperCase(),region);
         }
+        if(onReload.size()>0) onReload.forEach(Runnable::run);
     }
 
     //todo: region setup

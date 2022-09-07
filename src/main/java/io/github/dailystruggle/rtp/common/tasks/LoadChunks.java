@@ -19,7 +19,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import java.util.logging.Level;
 
 public final class LoadChunks extends RTPRunnable {
     public static final List<Consumer<LoadChunks>> preActions = new ArrayList<>();
@@ -64,7 +63,7 @@ public final class LoadChunks extends RTPRunnable {
             RTP.getInstance().latestTeleportData.put(player.uuid(),teleportData);
         }
 
-        if (max > chunkSet.chunks().size()) {
+        if (max > chunkSet.chunks.size()) {
             chunkSet.keep(false);
             chunkSet = teleportData.targetRegion.chunks(location, radius2);
             chunkSet.keep(true);
@@ -91,15 +90,15 @@ public final class LoadChunks extends RTPRunnable {
         ChunkSet chunkSet = this.region.locAssChunks.get(location);
 
         if(     toTicks<1 &&
-                (sender.hasPermission("rtp.noDelay.chunks") || chunkSet.complete().isDone())) {
+                (sender.hasPermission("rtp.noDelay.chunks") || chunkSet.complete.isDone())) {
             if(Bukkit.isPrimaryThread()) doTeleport.run();
             else RTP.getInstance().teleportPipeline.add(doTeleport);
             postActions.forEach(consumer -> consumer.accept(this));
             return;
         }
 
-        if(!chunkSet.complete().getNow(false)) {
-            for (CompletableFuture<RTPChunk> cfChunk : chunkSet.chunks()) {
+        if(!chunkSet.complete.getNow(false)) {
+            for (CompletableFuture<RTPChunk> cfChunk : chunkSet.chunks) {
                 try {
                     cfChunk.get();
                 } catch (ExecutionException | InterruptedException e) {
@@ -137,7 +136,7 @@ public final class LoadChunks extends RTPRunnable {
     public boolean equals(Object obj) {
         if (obj == this) return true;
         if (obj == null || obj.getClass() != this.getClass()) return false;
-        var that = (LoadChunks) obj;
+        LoadChunks that = (LoadChunks) obj;
         return Objects.equals(this.sender, that.sender) &&
                 Objects.equals(this.player, that.player) &&
                 Objects.equals(this.location, that.location) &&

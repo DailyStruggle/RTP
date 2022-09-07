@@ -57,6 +57,11 @@ public class TestRTPWorld implements RTPWorld {
         return true;
     }
 
+    @Override
+    public boolean isForceLoaded(int cx, int cz) {
+        return false;
+    }
+
     public static Set<String> getBiomes() {
         HashSet<String> res = new HashSet<>();
         res.add("PLAINS");

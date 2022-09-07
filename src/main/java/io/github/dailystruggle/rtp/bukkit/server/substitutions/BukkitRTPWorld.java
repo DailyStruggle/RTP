@@ -22,38 +22,26 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public final class BukkitRTPWorld implements RTPWorld {
     private final UUID id;
     private final String name;
+    private final World world;
 
     public final Map<List<Integer>, Pair<Chunk,Long>> chunkMap = new ConcurrentHashMap<>();
     public final Map<List<Integer>,List<CompletableFuture<Chunk>>> chunkLoads = new ConcurrentHashMap<>();
-
-    private static Function<Location, String> getBiome = location -> {
-        World world = Objects.requireNonNull(location.getWorld());
-        int x = location.getBlockX();
-        int y = location.getBlockY();
-        int z = location.getBlockZ();
-        return (RTP.serverAccessor.getServerIntVersion() < 17)
-                ? world.getBiome(x, y).name()
-                : world.getBiome(x, y, z).name();
-    };
-    private static Supplier<Set<String>> getBiomes
-            = () -> Arrays.stream(Biome.values()).map(biome -> biome.name().toUpperCase()).collect(Collectors.toSet());
-    private final World world;
 
     public BukkitRTPWorld(World world) {
         this.world = world;
         if(world == null) {
             this.id = null;
             this.name = null;
-            return;
         }
-        this.id = world.getUID();
-        this.name = world.getName();
+        else {
+            this.id = world.getUID();
+            this.name = world.getName();
+        }
     }
 
     public static void setBiomeGetter(@NotNull Function<Location, String> getBiome) {
@@ -76,7 +64,6 @@ public final class BukkitRTPWorld implements RTPWorld {
 
     @Override
     public CompletableFuture<RTPChunk> getChunkAt(int cx, int cz) {
-        if(!RTPBukkitPlugin.getInstance().isEnabled()) throw new IllegalStateException("asked for chunk after disabled");
         List<Integer> xz = Arrays.asList(cx,cz);
         CompletableFuture<RTPChunk> res = new CompletableFuture<>();
         Pair<Chunk, Long> chunkLongPair = chunkMap.get(xz);
@@ -90,7 +77,11 @@ public final class BukkitRTPWorld implements RTPWorld {
             Chunk chunk = world.getChunkAt(cx, cz);
             BukkitRTPChunk rtpChunk = new BukkitRTPChunk(chunk);
             res.complete(rtpChunk);
-        } else {
+        }
+        else if(RTP.serverAccessor.getServerIntVersion()<13) {
+            Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),() -> res.complete(new BukkitRTPChunk(world.getChunkAt(cx,cz))));
+        }
+        else {
             CompletableFuture<Chunk> chunkAtAsyncUrgently = PaperLib.getChunkAtAsyncUrgently(world, cx, cz, true);
 
             List<CompletableFuture<Chunk>> list = chunkLoads.get(xz);
@@ -112,8 +103,8 @@ public final class BukkitRTPWorld implements RTPWorld {
         List<Integer> xz = Arrays.asList(cx,cz);
         if(chunkMap.containsKey(xz)) {
             Pair<Chunk, Long> chunkLongPair = chunkMap.get(xz);
-            if(Bukkit.isPrimaryThread()) chunkLongPair.getLeft().setForceLoaded(true);
-            else Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),()->chunkLongPair.getLeft().setForceLoaded(true));
+            if(Bukkit.isPrimaryThread()) setChunkForceLoaded(cx,cz,true);
+            else Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),()->setChunkForceLoaded(cx,cz,true));
             chunkLongPair.setValue(chunkLongPair.getValue()+1);
         }
         else {
@@ -121,14 +112,15 @@ public final class BukkitRTPWorld implements RTPWorld {
             chunkAt.whenComplete((rtpChunk, throwable) -> {
                 if(chunkMap.containsKey(xz)) {
                     Pair<Chunk, Long> chunkLongPair = chunkMap.get(xz);
-                    if(Bukkit.isPrimaryThread()) chunkLongPair.getLeft().setForceLoaded(true);
-                    else Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),()->chunkLongPair.getLeft().setForceLoaded(true));
+                    if(Bukkit.isPrimaryThread()) setChunkForceLoaded(cx,cz,true);
+                    else Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),()->setChunkForceLoaded(cx,cz,true));
                     chunkLongPair.setValue(chunkLongPair.getValue()+1);
                 }
-                else if(rtpChunk instanceof BukkitRTPChunk bukkitRTPChunk) {
+                else if(rtpChunk instanceof BukkitRTPChunk) {
+                    BukkitRTPChunk bukkitRTPChunk = ((BukkitRTPChunk) rtpChunk);
                     Pair<Chunk,Long> pair = new MutablePair<>(bukkitRTPChunk.chunk(), 1L);
-                    if(Bukkit.isPrimaryThread()) bukkitRTPChunk.chunk().setForceLoaded(true);
-                    else Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),()->bukkitRTPChunk.chunk().setForceLoaded(true));
+                    if(Bukkit.isPrimaryThread()) setChunkForceLoaded(cx,cz,true);
+                    else Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),()->setChunkForceLoaded(cx,cz,true));
                     chunkMap.put(xz,pair);
                 }
                 else throw new IllegalStateException();
@@ -145,15 +137,15 @@ public final class BukkitRTPWorld implements RTPWorld {
         long i = chunkLongPair.getValue()-1;
         if(i<=0) {
             chunkMap.remove(xz);
-            if(Bukkit.isPrimaryThread()) chunkLongPair.getLeft().setForceLoaded(false);
-            else Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),()->chunkLongPair.getLeft().setForceLoaded(false));
+            if(Bukkit.isPrimaryThread()) setChunkForceLoaded(cx,cz,true);
+            else Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),()->setChunkForceLoaded(cx,cz,true));
         }
         else chunkLongPair.setValue(i);
     }
 
     @Override
     public void forgetChunks() {
-        chunkMap.forEach((integers, chunkLongPair) -> chunkLongPair.getLeft().setForceLoaded(false));
+        chunkMap.forEach((integers, chunkLongPair) -> setChunkForceLoaded(integers.get(0),integers.get(1),false));
         chunkMap.clear();
     }
 
@@ -187,7 +179,7 @@ public final class BukkitRTPWorld implements RTPWorld {
         if (!chunk.isLoaded()) throw new IllegalStateException();
 
         Block airBlock = location.getBlock();
-        Material air = (airBlock.isLiquid()) ? Material.AIR : airBlock.getType();
+        Material air = (airBlock.isLiquid() || airBlock.getType().isSolid()) ? Material.AIR : airBlock.getType();
         Material solid = location.getBlock().getRelative(BlockFace.DOWN).getType();
 
         ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.getInstance().configs.getParser(SafetyKeys.class);
@@ -196,7 +188,13 @@ public final class BukkitRTPWorld implements RTPWorld {
 
         Object o = safety.yamlFile.getString("platformMaterial", Material.COBBLESTONE.name());
         Material platformMaterial;
-        if (o instanceof String s) platformMaterial = Material.valueOf(s.toUpperCase());
+        if (o instanceof String) {
+            try {
+                platformMaterial = Material.valueOf(((String) o).toUpperCase());
+            } catch (IllegalArgumentException exception) {
+                platformMaterial = Material.COBBLESTONE;
+            }
+        }
         else throw new IllegalStateException();
 
         int platformRadius = safety.yamlFile.getInt("platformRadius", 0);
@@ -220,7 +218,7 @@ public final class BukkitRTPWorld implements RTPWorld {
 
                     if (!isSolid
                             || unsafeBlocks.contains(block.getType().name().toUpperCase())
-                            || (checkWaterlogged && version > 12 && block.getBlockData() instanceof Waterlogged waterlogged && waterlogged.isWaterlogged())) {
+                            || (checkWaterlogged && version > 12 && block.getBlockData() instanceof Waterlogged && ((Waterlogged) block.getBlockData()).isWaterlogged())) {
                         block.setType(solid, true);
                     }
                 }
@@ -236,6 +234,11 @@ public final class BukkitRTPWorld implements RTPWorld {
     @Override
     public boolean isActive() {
         return Bukkit.getWorld(id)!=null;
+    }
+
+    @Override
+    public boolean isForceLoaded(int cx, int cz) {
+        return chunkMap.containsKey(Arrays.asList(cx, cz));
     }
 
     public static Set<String> getBiomes() {
@@ -255,7 +258,7 @@ public final class BukkitRTPWorld implements RTPWorld {
     public boolean equals(Object obj) {
         if (obj == this) return true;
         if (obj == null || obj.getClass() != this.getClass()) return false;
-        var that = (BukkitRTPWorld) obj;
+        BukkitRTPWorld that = (BukkitRTPWorld) obj;
         return Objects.equals(this.world, that.world);
     }
 
@@ -265,4 +268,21 @@ public final class BukkitRTPWorld implements RTPWorld {
                 "world=" + world + ']';
     }
 
+    private static Function<Location, String> getBiome = location -> {
+        World world = Objects.requireNonNull(location.getWorld());
+        int x = location.getBlockX();
+        int y = location.getBlockY();
+        int z = location.getBlockZ();
+        return (RTP.serverAccessor.getServerIntVersion() < 17)
+                ? world.getBiome(x, y).name()
+                : world.getBiome(x, y, z).name();
+    };
+    private static Supplier<Set<String>> getBiomes
+            = () -> Arrays.stream(Biome.values()).map(biome -> biome.name().toUpperCase()).collect(Collectors.toSet());
+
+    public void setChunkForceLoaded(int cx, int cz, boolean forceLoaded) {
+        if(RTP.serverAccessor.getServerIntVersion()<13) return;
+        if(Bukkit.isPrimaryThread()) world.setChunkForceLoaded(cx,cz,forceLoaded);
+        else Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),() -> world.setChunkForceLoaded(cx,cz,forceLoaded));
+    }
 }
