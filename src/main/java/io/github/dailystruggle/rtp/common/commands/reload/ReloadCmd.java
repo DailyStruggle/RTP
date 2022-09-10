@@ -61,22 +61,8 @@ public class ReloadCmd extends BaseRTPCmdImpl {
     public boolean onCommand(UUID senderId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
         addCommands();
 
+        RTP.stop();
         RTP.serverAccessor.reset();
-
-        final RTP instance = RTP.getInstance();
-        instance.setupTeleportPipeline.clear();
-        instance.loadChunksPipeline.clear();
-        instance.teleportPipeline.clear();
-        instance.chunkCleanupPipeline.execute(Long.MAX_VALUE);
-        instance.selectionAPI.permRegionLookup.values().forEach(Region::shutDown);
-        instance.selectionAPI.tempRegions.values().forEach(Region::shutDown);
-        instance.selectionAPI.tempRegions.clear();
-        instance.latestTeleportData.forEach((uuid, data) -> {
-            if(!data.completed) new RTPTeleportCancel(uuid).run();
-        });
-        instance.processingPlayers.clear();
-
-        RTP.serverAccessor.getRTPWorlds().forEach(RTPWorld::forgetChunks);
 
         if(nextCommand!=null) return true;
 
