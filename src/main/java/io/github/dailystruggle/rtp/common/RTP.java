@@ -154,7 +154,17 @@ public class RTP {
         for(Region r : instance.selectionAPI.permRegionLookup.values()) {
             r.shutDown();
         }
+        instance.selectionAPI.permRegionLookup.clear();
 
+        for(Region r : instance.selectionAPI.tempRegions.values()) {
+            r.shutDown();
+        }
+        instance.selectionAPI.tempRegions.clear();
+
+        instance.latestTeleportData.forEach((uuid, data) -> {
+            if(!data.completed) new RTPTeleportCancel(uuid).run();
+        });
+        instance.processingPlayers.clear();
 
         FillTask.kill();
 

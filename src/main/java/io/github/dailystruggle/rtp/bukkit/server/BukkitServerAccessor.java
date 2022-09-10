@@ -320,6 +320,8 @@ public class BukkitServerAccessor implements RTPServerAccessor {
         bukkitPlugin.syncTimer = new SyncTeleportProcessing().runTaskTimer(bukkitPlugin,80,1);
         bukkitPlugin.asyncTimer = new AsyncTeleportProcessing().runTaskTimerAsynchronously(bukkitPlugin,80,1);
 
+        getRTPWorlds().forEach(RTPWorld::forgetChunks);
+
         Bukkit.getScheduler().runTask(bukkitPlugin,() -> {
             while (RTP.getInstance().startupTasks.size()>0) {
                 RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
