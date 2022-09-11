@@ -107,7 +107,6 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
         String msg = String.valueOf(lang.getConfigValue(LangKeys.reloading,""));
         if(msg!=null) msg = StringUtils.replace(msg,"[filename]", parser.name);
         serverAccessor.sendMessage(CommandsAPI.serverId, senderId,msg);
-        serverAccessor.reset();
 
         CommandsAPI.commandPipeline.clear();
 

@@ -77,27 +77,20 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         Objects.requireNonNull(getCommand("wild")).setExecutor(mainCommand);
         Objects.requireNonNull(getCommand("wild")).setTabCompleter(mainCommand);
 
-        commandTimer = Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
-            long avgTime = TPS.timeSinceTick(20) / 20;
-            long currTime = TPS.timeSinceTick(1);
-            CommandsAPI.execute(avgTime - currTime);
-        }, 40, 1);
-
-        syncTimer = new SyncTeleportProcessing().runTaskTimer(this,80,1);
-        asyncTimer = new AsyncTeleportProcessing().runTaskTimerAsynchronously(this,80,1);
-
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,() -> {
             while (RTP.getInstance().startupTasks.size()>0) {
                 RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
             }
         });
 
+        Bukkit.getScheduler().scheduleSyncDelayedTask(this,RTP.serverAccessor::start);
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupBukkitEvents);
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupEffects);
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupIntegrations);
 
         Bukkit.getScheduler().runTaskTimer(this, new TPS(),0,1);
 
+        SendMessage.sendMessage(Bukkit.getConsoleSender(),"");
     }
 
     @Override

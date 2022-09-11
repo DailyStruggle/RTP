@@ -202,11 +202,6 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
     }
 
     @Override
-    public void reset() {
-
-    }
-
-    @Override
     public WorldBorder getWorldBorder(String worldName) {
         return null;
     }
@@ -228,6 +223,11 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
 
     @Override
     public void stop() {
+
+    }
+
+    @Override
+    public void start() {
 
     }
 }
