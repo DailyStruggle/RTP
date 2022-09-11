@@ -18,6 +18,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.logging.Level;
 
 public class ReloadCmd extends BaseRTPCmdImpl {
 
@@ -62,7 +63,8 @@ public class ReloadCmd extends BaseRTPCmdImpl {
         addCommands();
 
         RTP.stop();
-        RTP.serverAccessor.reset();
+        RTP.serverAccessor.stop();
+        RTP.serverAccessor.start();
 
         if(nextCommand!=null) return true;
 
@@ -73,7 +75,10 @@ public class ReloadCmd extends BaseRTPCmdImpl {
             RTP.serverAccessor.sendMessage(CommandsAPI.serverId, senderId,msg);
         }
 
-        RTP.getInstance().configs.reload();
+        boolean b = RTP.getInstance().configs.reload();
+        if(!b) throw new IllegalStateException("reload failed");
+
+        RTP.serverAccessor.start();
 
         return true;
     }

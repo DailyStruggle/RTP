@@ -86,8 +86,6 @@ public interface RTPServerAccessor {
 
     boolean isPrimaryThread();
 
-    void reset();
-
     WorldBorder getWorldBorder(String worldName);
 
     void setWorldBorderFunction(Function<String,WorldBorder> function);
@@ -97,4 +95,5 @@ public interface RTPServerAccessor {
     long numAsyncTasks();
 
     void stop();
+    void start();
 }

@@ -292,43 +292,6 @@ public class BukkitServerAccessor implements RTPServerAccessor {
         return Bukkit.isPrimaryThread();
     }
 
-    @Override
-    public void reset() {
-        final RTPBukkitPlugin bukkitPlugin = RTPBukkitPlugin.getInstance();
-
-        bukkitPlugin.commandTimer.cancel();
-
-        bukkitPlugin.commandProcessing.cancel();
-        bukkitPlugin.syncTimer.cancel();
-        bukkitPlugin.asyncTimer.cancel();
-
-        RTP.getInstance().miscAsyncTasks.add(() -> {
-            if(RTP.economy == null)  {
-                VaultChecker.setupEconomy();
-                VaultChecker.setupPermissions();
-                if(VaultChecker.getEconomy()!=null) RTP.economy = new VaultChecker();
-                else RTP.economy = null;
-            }
-        });
-
-        bukkitPlugin.commandTimer = Bukkit.getScheduler().runTaskTimerAsynchronously(bukkitPlugin, () -> {
-            long avgTime = TPS.timeSinceTick(20) / 20;
-            long currTime = TPS.timeSinceTick(1);
-            CommandsAPI.execute(avgTime - currTime);
-        }, 40, 1);
-
-        bukkitPlugin.syncTimer = new SyncTeleportProcessing().runTaskTimer(bukkitPlugin,80,1);
-        bukkitPlugin.asyncTimer = new AsyncTeleportProcessing().runTaskTimerAsynchronously(bukkitPlugin,80,1);
-
-        getRTPWorlds().forEach(RTPWorld::forgetChunks);
-
-        Bukkit.getScheduler().runTask(bukkitPlugin,() -> {
-            while (RTP.getInstance().startupTasks.size()>0) {
-                RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
-            }
-        });
-    }
-
     private Function<String,WorldBorder> worldBorderFunction = s -> {
         RTPWorld rtpWorld = getRTPWorld(s);
         if(rtpWorld instanceof BukkitRTPWorld) {
@@ -376,27 +339,30 @@ public class BukkitServerAccessor implements RTPServerAccessor {
 
     @Override
     public void stop() {
-        worldMap.forEach((s, world) -> {
-            if(world instanceof BukkitRTPWorld) {
-                ((BukkitRTPWorld) world).chunkLoads.forEach((integers, list) -> {
-                    for (CompletableFuture<Chunk> chunkCompletableFuture : list) {
-                        try {
-                            chunkCompletableFuture.cancel(true);
-                        }
-                        catch (CancellationException | CompletionException ignored) {
+        getRTPWorlds().forEach(RTPWorld::forgetChunks);
 
-                        }
-                    }
-                });
-                ((BukkitRTPWorld) world).chunkMap.forEach((integers, chunkLongPair) -> {
-                    Chunk left = chunkLongPair.getLeft();
-                    if(left == null) return;
-                    ((BukkitRTPWorld) world).setChunkForceLoaded(integers.get(0),integers.get(1),true);
-                });
-                ((BukkitRTPWorld) world).chunkMap.clear();
-            }
-        });
+        RTPBukkitPlugin plugin = RTPBukkitPlugin.getInstance();
+        plugin.commandTimer.cancel();
+        plugin.syncTimer.cancel();
+        plugin.asyncTimer.cancel();
 
+        worldMap.clear();
+        worldMapStr.clear();
+    }
 
+    @Override
+    public void start() {
+        RTPBukkitPlugin plugin = RTPBukkitPlugin.getInstance();
+
+        plugin.commandTimer = Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
+            long avgTime = TPS.timeSinceTick(20) / 20;
+            long currTime = TPS.timeSinceTick(1);
+            CommandsAPI.execute(avgTime - currTime);
+        }, 40, 1);
+
+        plugin.syncTimer = new SyncTeleportProcessing().runTaskTimer(plugin,80,1);
+        plugin.asyncTimer = new AsyncTeleportProcessing().runTaskTimerAsynchronously(plugin,80,1);
+
+        getRTPWorlds();
     }
 }
