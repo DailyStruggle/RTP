@@ -9,6 +9,7 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.MutablePair;
 
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -40,7 +41,7 @@ public final class RTPTeleportCancel extends RTPRunnable {
         data.nextTask.setCancelled(true);
 
         //dump location back onto the pile
-        if(data.selectedLocation!=null) data.targetRegion.locationQueue.add(new ImmutablePair<>(data.selectedLocation,data.attempts));
+        if(data.selectedLocation!=null) data.targetRegion.locationQueue.add(new AbstractMap.SimpleEntry<>(data.selectedLocation,data.attempts));
 
         refund(playerId);
 
@@ -60,7 +61,7 @@ public final class RTPTeleportCancel extends RTPRunnable {
         if(data.completed) return;
 
         if(data.selectedLocation!=null && data.targetRegion!=null && (data.biomes==null || data.biomes.size()==0)) {
-            data.targetRegion.locationQueue.add(new MutablePair<>(data.selectedLocation, data.attempts));
+            data.targetRegion.locationQueue.add(new AbstractMap.SimpleEntry<>(data.selectedLocation, data.attempts));
         }
 
         //reset player data

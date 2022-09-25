@@ -200,7 +200,7 @@ public interface RTPCmd extends BaseRTPCmd {
                 rtp.latestTeleportData.remove(senderId);
                 return true;
             }
-            RTPWorld rtpWorld = (RTPWorld) region.getData().get(RegionKeys.world);
+            RTPWorld rtpWorld = region.getWorld();
             Objects.requireNonNull(rtpWorld);
 
             //check for wbo

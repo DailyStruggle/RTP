@@ -13,10 +13,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -74,12 +71,12 @@ public final class SetupTeleport extends RTPRunnable {
 
         RTP.getInstance().latestTeleportData.put(player.uuid(),teleportData);
 
-        Pair<RTPLocation, Long> pair = this.region.getLocation(sender, player, biomes);
+        Map.Entry<RTPLocation, Long> pair = this.region.getLocation(sender, player, biomes);
         if(pair == null) { //player gets put on region queue
             return;
         }
-        else if(pair.getLeft() == null) {
-            teleportData.attempts = pair.getRight();
+        else if(pair.getKey() == null) {
+            teleportData.attempts = pair.getValue();
             String msg = langParser.getConfigValue(LangKeys.unsafe,"").toString();
             RTP.serverAccessor.sendMessage(sender.uuid(),player.uuid(),msg);
             postActions.forEach(consumer -> consumer.accept(this, false));
@@ -89,9 +86,9 @@ public final class SetupTeleport extends RTPRunnable {
         }
 
         if(isCancelled()) return;
-        LoadChunks loadChunks = new LoadChunks(this.sender, this.player, pair.getLeft(), this.region);
+        LoadChunks loadChunks = new LoadChunks(this.sender, this.player, pair.getKey(), this.region);
         teleportData.nextTask = loadChunks;
-        teleportData.attempts = pair.getRight();
+        teleportData.attempts = pair.getValue();
 
         boolean sync = syncLoading;
         if(!syncLoading) {

@@ -41,7 +41,7 @@ public class Region extends FactoryValue<RegionKeys> {
     /**
      * public/shared cache for this region
      */
-    public ConcurrentLinkedQueue<Pair<RTPLocation,Long>> locationQueue = new ConcurrentLinkedQueue<>();
+    public ConcurrentLinkedQueue<Map.Entry<RTPLocation,Long>> locationQueue = new ConcurrentLinkedQueue<>();
     public ConcurrentHashMap<RTPLocation, ChunkSet> locAssChunks = new ConcurrentHashMap<>();
     protected ConcurrentLinkedQueue<UUID> playerQueue = new ConcurrentLinkedQueue<>();
 
@@ -49,12 +49,12 @@ public class Region extends FactoryValue<RegionKeys> {
      * When reserving/recycling locations for specific players,
      * I want to guard against
      */
-    public ConcurrentHashMap<UUID, ConcurrentLinkedQueue<Pair<RTPLocation,Long>>> perPlayerLocationQueue = new ConcurrentHashMap<>();
+    public ConcurrentHashMap<UUID, ConcurrentLinkedQueue<Map.Entry<RTPLocation,Long>>> perPlayerLocationQueue = new ConcurrentHashMap<>();
 
     /**
      *
      */
-    public ConcurrentHashMap<UUID, CompletableFuture<Pair<RTPLocation,Long>>> fastLocations = new ConcurrentHashMap<>();
+    public ConcurrentHashMap<UUID, CompletableFuture<Map.Entry<RTPLocation,Long>>> fastLocations = new ConcurrentHashMap<>();
 
     //semaphore needed in case of async usage
     //storage for region verifiers to use for ALL regions
@@ -130,9 +130,9 @@ public class Region extends FactoryValue<RegionKeys> {
         public void run() {
             long cacheCap = getNumber(RegionKeys.cacheCap,10L).longValue();
             cacheCap = Math.max(cacheCap,playerQueue.size());
-            Pair<RTPLocation, Long> pair = getLocation(null);
+            Map.Entry<RTPLocation, Long> pair = getLocation(null);
             if(pair != null) {
-                RTPLocation location = pair.getLeft();
+                RTPLocation location = pair.getKey();
                 if(location == null) {
                     if(cachePipeline.size()+locationQueue.size()<cacheCap+playerQueue.size()) cachePipeline.add(new Cache());
                     return;
@@ -147,7 +147,7 @@ public class Region extends FactoryValue<RegionKeys> {
                     if(aBoolean) {
                         if(playerId == null) {
                             locationQueue.add(pair);
-                            locAssChunks.put(pair.getLeft(), chunkSet);
+                            locAssChunks.put(pair.getKey(), chunkSet);
                         }
                         else if(fastLocations.containsKey(playerId) && !fastLocations.get(playerId).isDone()) {
                             fastLocations.get(playerId).complete(pair);
@@ -199,16 +199,16 @@ public class Region extends FactoryValue<RegionKeys> {
             RTPPlayer player = RTP.serverAccessor.getPlayer(playerId);
             if(player == null) continue;
 
-            Pair<RTPLocation, Long> pair = locationQueue.poll();
+            Map.Entry<RTPLocation, Long> pair = locationQueue.poll();
             if(pair == null) {
                 playerQueue.add(playerId);
                 continue;
             }
 
-            teleportData.attempts = pair.getRight();
+            teleportData.attempts = pair.getValue();
 
             RTPCommandSender sender = RTP.serverAccessor.getSender(CommandsAPI.serverId);
-            LoadChunks loadChunks = new LoadChunks(sender,player,pair.getLeft(),this);
+            LoadChunks loadChunks = new LoadChunks(sender,player,pair.getKey(),this);
             teleportData.nextTask = loadChunks;
             instance.latestTeleportData.put(playerId,teleportData);
             instance.loadChunksPipeline.add(loadChunks);
@@ -285,19 +285,19 @@ public class Region extends FactoryValue<RegionKeys> {
         return res;
     }
 
-    public Pair<RTPLocation, Long> getLocation(RTPCommandSender sender, RTPPlayer player, @Nullable Set<String> biomeNames) {
-        Pair<RTPLocation, Long> pair = null;
+    public Map.Entry<RTPLocation, Long> getLocation(RTPCommandSender sender, RTPPlayer player, @Nullable Set<String> biomeNames) {
+        Map.Entry<RTPLocation, Long> pair = null;
 
         UUID playerId = player.uuid();
 
         boolean custom = biomeNames != null && biomeNames.size() > 0;
 
         if(!custom && perPlayerLocationQueue.containsKey(playerId)) {
-            ConcurrentLinkedQueue<Pair<RTPLocation, Long>> playerLocationQueue = perPlayerLocationQueue.get(playerId);
+            ConcurrentLinkedQueue<Map.Entry<RTPLocation, Long>> playerLocationQueue = perPlayerLocationQueue.get(playerId);
             while(playerLocationQueue.size()>0) {
                 pair = playerLocationQueue.poll();
-                if(pair == null || pair.getLeft() == null) continue;
-                RTPLocation left = pair.getLeft();
+                if(pair == null || pair.getKey() == null) continue;
+                RTPLocation left = pair.getKey();
                 boolean pass = true;
 
                 int cx = (left.x() > 0) ? left.x()/16 : left.x()/16-1;
@@ -337,7 +337,7 @@ public class Region extends FactoryValue<RegionKeys> {
         if(!custom && locationQueue.size()>0) {
             pair = locationQueue.poll();
             if(pair == null) return null;
-            RTPLocation left = pair.getLeft();
+            RTPLocation left = pair.getKey();
             if(left == null) return pair;
             boolean pass = checkGlobalRegionVerifiers(left);
             if(pass) return pair;
@@ -345,7 +345,7 @@ public class Region extends FactoryValue<RegionKeys> {
 
         if(custom || sender.hasPermission("rtp.unqueued")) {
             pair = getLocation(biomeNames);
-            long attempts = pair.getRight();
+            long attempts = pair.getValue();
             TeleportData data = RTP.getInstance().latestTeleportData.get(playerId);
             if(data!=null && !data.completed) {
                 data.attempts = attempts;
@@ -372,7 +372,7 @@ public class Region extends FactoryValue<RegionKeys> {
     }
 
     @Nullable
-    public Pair<RTPLocation, Long> getLocation(@Nullable Set<String> biomeNames) {
+    public Map.Entry<RTPLocation, Long> getLocation(@Nullable Set<String> biomeNames) {
         boolean defaultBiomes = false;
         if(biomeNames == null || biomeNames.size()==0) {
             defaultBiomes = true;
@@ -449,7 +449,7 @@ public class Region extends FactoryValue<RegionKeys> {
                 currBiome = world.getBiome(select[0], (vert.maxY()+vert.minY())/2, select[1]);
                 biomeFails++;
             }
-            if(biomeChecks>=maxBiomeChecks) return new ImmutablePair<>(null,i);
+            if(biomeChecks>=maxBiomeChecks) return new AbstractMap.SimpleEntry<>(null,i);
 
 
             WorldBorder border = RTP.serverAccessor.getWorldBorder(world.name());
@@ -458,7 +458,7 @@ public class Region extends FactoryValue<RegionKeys> {
                 worldBorderFails++;
                 if(worldBorderFails>10000) {
                     new IllegalStateException("10000 worldborder checks failed. region/selection is likely outside the worldborder").printStackTrace();
-                    return new ImmutablePair<>(null,i);
+                    return new AbstractMap.SimpleEntry<>(null,i);
                 }
                 continue;
             }
@@ -471,7 +471,7 @@ public class Region extends FactoryValue<RegionKeys> {
                 chunk = cfChunk.get();
             } catch (InterruptedException | ExecutionException e) {
                 e.printStackTrace();
-                return new ImmutablePair<>(null,i);
+                return new AbstractMap.SimpleEntry<>(null,i);
             }
 
             location = vert.adjust(chunk);
@@ -532,7 +532,7 @@ public class Region extends FactoryValue<RegionKeys> {
             }
         }
 
-        return new ImmutablePair<>(location,i);
+        return new AbstractMap.SimpleEntry(location,i);
     }
 
     public void shutDown() {
@@ -667,9 +667,9 @@ public class Region extends FactoryValue<RegionKeys> {
         locAssChunks.remove(location);
     }
 
-    public CompletableFuture<Pair<RTPLocation, Long>> fastQueue(UUID id) {
+    public CompletableFuture<Map.Entry<RTPLocation, Long>> fastQueue(UUID id) {
         if(fastLocations.containsKey(id)) return fastLocations.get(id);
-        CompletableFuture<Pair<RTPLocation, Long>> res = new CompletableFuture<>();
+        CompletableFuture<Map.Entry<RTPLocation, Long>> res = new CompletableFuture<>();
         fastLocations.put(id,res);
         miscPipeline.add(new Cache(id));
         return res;
@@ -682,7 +682,7 @@ public class Region extends FactoryValue<RegionKeys> {
 
     public long getTotalQueueLength(UUID uuid) {
         long res = locationQueue.size();
-        ConcurrentLinkedQueue<Pair<RTPLocation, Long>> queue = perPlayerLocationQueue.get(uuid);
+        ConcurrentLinkedQueue<Map.Entry<RTPLocation, Long>> queue = perPlayerLocationQueue.get(uuid);
         if(queue!=null) res+= queue.size();
         if(fastLocations.containsKey(uuid)) res++;
         return res;
@@ -694,7 +694,7 @@ public class Region extends FactoryValue<RegionKeys> {
 
     public long getPersonalQueueLength(UUID uuid) {
         long res = 0;
-        ConcurrentLinkedQueue<Pair<RTPLocation, Long>> queue = perPlayerLocationQueue.get(uuid);
+        ConcurrentLinkedQueue<Map.Entry<RTPLocation, Long>> queue = perPlayerLocationQueue.get(uuid);
         if(queue!=null) res += queue.size();
         if(fastLocations.containsKey(uuid)) res++;
         return res;

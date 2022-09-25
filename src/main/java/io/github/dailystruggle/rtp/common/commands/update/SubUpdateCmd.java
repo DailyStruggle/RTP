@@ -61,6 +61,7 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
         if(nextCommand!=null) return true;
 
         addParameters();
+
         if(factoryValue instanceof ConfigParser) {
             ConfigParser<?> configParser = (ConfigParser<?>) factoryValue;
             ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
@@ -90,7 +91,34 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
             if(msg!=null) msg = StringUtils.replaceIgnoreCase(msg,"[filename]", configParser.name);
             RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId,msg);
         }
-        else return true;
+        else if(factoryValue instanceof MultiConfigParser) {
+            MultiConfigParser<?> parser = (MultiConfigParser<?>) this.factoryValue;
+            List<String> remove = parameterValues.getOrDefault("remove", new ArrayList<>());
+            for(String target : remove) {
+                ConfigParser<?> configParser = (ConfigParser<?>) parser.configParserFactory.get(target);
+                try {
+                    configParser.yamlFile.deleteFile();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                parser.configParserFactory.map.remove(target.toUpperCase());
+            }
+
+            List<String> add = parameterValues.getOrDefault("add", new ArrayList<>());
+            for(String target : add) {
+                ConfigParser<?> configParser = (ConfigParser<?>) parser.configParserFactory.get("default");
+                ConfigParser<?> newConfigParser = new ConfigParser<>(
+                        configParser.myClass,
+                        target,
+                        configParser.version,
+                        configParser.pluginDirectory,
+                        null,
+                        configParser.getClassLoader());
+                parser.addParser(newConfigParser);
+            }
+
+
+        }
 
 
 
@@ -146,7 +174,7 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
             }
         }
         else if(factoryValue instanceof MultiConfigParser) {
-            MultiConfigParser parser = (MultiConfigParser) factoryValue;
+            MultiConfigParser<?> parser = (MultiConfigParser<?>) factoryValue;
             for(Object e : parser.configParserFactory.map.entrySet()) {
                 if(e instanceof Map.Entry) {
                     Map.Entry<?,?> entry = (Map.Entry<?, ?>) e;
@@ -155,6 +183,18 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
                         addSubCommand(new SubUpdateCmd(this, entry.getKey().toString(), (FactoryValue<?>) entryValue));
                 }
             }
+            addParameter("add", new CommandParameter("rtp.update","add a file", (uuid, s) -> true) {
+                @Override
+                public Set<String> values() {
+                    return new HashSet<>();
+                }
+            });
+            addParameter("remove", new CommandParameter("rtp.update","remove a file", (uuid, s) -> true) {
+                @Override
+                public Set<String> values() {
+                    return new HashSet<>();
+                }
+            });
         }
     }
 }

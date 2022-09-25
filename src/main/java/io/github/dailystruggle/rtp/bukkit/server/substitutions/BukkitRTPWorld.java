@@ -8,8 +8,6 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPChunk;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.papermc.lib.PaperLib;
-import org.apache.commons.lang3.tuple.MutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.bukkit.*;
 import org.bukkit.block.Biome;
 import org.bukkit.block.Block;
@@ -29,7 +27,7 @@ public final class BukkitRTPWorld implements RTPWorld {
     private final String name;
     private final World world;
 
-    public final Map<List<Integer>, Pair<Chunk,Long>> chunkMap = new ConcurrentHashMap<>();
+    public final Map<List<Integer>, Map.Entry<Chunk,Long>> chunkMap = new ConcurrentHashMap<>();
     public final Map<List<Integer>,List<CompletableFuture<Chunk>>> chunkLoads = new ConcurrentHashMap<>();
 
     public BukkitRTPWorld(World world) {
@@ -66,9 +64,9 @@ public final class BukkitRTPWorld implements RTPWorld {
     public CompletableFuture<RTPChunk> getChunkAt(int cx, int cz) {
         List<Integer> xz = Arrays.asList(cx,cz);
         CompletableFuture<RTPChunk> res = new CompletableFuture<>();
-        Pair<Chunk, Long> chunkLongPair = chunkMap.get(xz);
-        if(chunkLongPair!=null && chunkLongPair.getLeft()!=null) {
-            Chunk chunk = chunkLongPair.getLeft();
+        Map.Entry<Chunk, Long> chunkLongPair = chunkMap.get(xz);
+        if(chunkLongPair!=null && chunkLongPair.getKey()!=null) {
+            Chunk chunk = chunkLongPair.getKey();
             res.complete(new BukkitRTPChunk(chunk));
             return res;
         }
@@ -102,7 +100,7 @@ public final class BukkitRTPWorld implements RTPWorld {
     public void keepChunkAt(int cx, int cz) {
         List<Integer> xz = Arrays.asList(cx,cz);
         if(chunkMap.containsKey(xz)) {
-            Pair<Chunk, Long> chunkLongPair = chunkMap.get(xz);
+            Map.Entry<Chunk, Long> chunkLongPair = chunkMap.get(xz);
             if(Bukkit.isPrimaryThread()) setChunkForceLoaded(cx,cz,true);
             else Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),()->setChunkForceLoaded(cx,cz,true));
             chunkLongPair.setValue(chunkLongPair.getValue()+1);
@@ -111,14 +109,14 @@ public final class BukkitRTPWorld implements RTPWorld {
             CompletableFuture<RTPChunk> chunkAt = getChunkAt(cx, cz);
             chunkAt.whenComplete((rtpChunk, throwable) -> {
                 if(chunkMap.containsKey(xz)) {
-                    Pair<Chunk, Long> chunkLongPair = chunkMap.get(xz);
+                    Map.Entry<Chunk, Long> chunkLongPair = chunkMap.get(xz);
                     if(Bukkit.isPrimaryThread()) setChunkForceLoaded(cx,cz,true);
                     else Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),()->setChunkForceLoaded(cx,cz,true));
                     chunkLongPair.setValue(chunkLongPair.getValue()+1);
                 }
                 else if(rtpChunk instanceof BukkitRTPChunk) {
                     BukkitRTPChunk bukkitRTPChunk = ((BukkitRTPChunk) rtpChunk);
-                    Pair<Chunk,Long> pair = new MutablePair<>(bukkitRTPChunk.chunk(), 1L);
+                    Map.Entry<Chunk,Long> pair = new AbstractMap.SimpleEntry<>(bukkitRTPChunk.chunk(), 1L);
                     if(Bukkit.isPrimaryThread()) setChunkForceLoaded(cx,cz,true);
                     else Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),()->setChunkForceLoaded(cx,cz,true));
                     chunkMap.put(xz,pair);
@@ -131,7 +129,7 @@ public final class BukkitRTPWorld implements RTPWorld {
     @Override
     public void forgetChunkAt(int cx, int cz) {
         List<Integer> xz = Arrays.asList(cx,cz);
-        Pair<Chunk, Long> chunkLongPair = chunkMap.get(xz);
+        Map.Entry<Chunk, Long> chunkLongPair = chunkMap.get(xz);
         if(chunkLongPair == null) return;
 
         long i = chunkLongPair.getValue()-1;
@@ -171,10 +169,10 @@ public final class BukkitRTPWorld implements RTPWorld {
         cz = (cz > 0) ? cz / 16 : cz / 16 - 1;
 
         List<Integer> xz = Arrays.asList(cx,cz);
-        Pair<Chunk, Long> chunkLongPair = chunkMap.get(xz);
+        Map.Entry<Chunk, Long> chunkLongPair = chunkMap.get(xz);
         if(chunkLongPair == null) throw new IllegalStateException();
 
-        Chunk chunk = chunkLongPair.getLeft();
+        Chunk chunk = chunkLongPair.getKey();
         if (chunk == null) throw new IllegalStateException();
         if (!chunk.isLoaded()) throw new IllegalStateException();
 
