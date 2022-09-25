@@ -6,7 +6,6 @@ import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPCommandS
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.PAPIChecker;
-import io.github.dailystruggle.rtp.bukkit.tools.softdepends.PAPI_expansion;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;

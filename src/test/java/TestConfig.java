@@ -1,12 +1,4 @@
-import commonTestImpl.TestRTPServerAccessor;
-import commonTestImpl.commands.BaseCommand;
-import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-
-import java.io.IOException;
 
 public class TestConfig {
     @Test

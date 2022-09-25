@@ -8,17 +8,13 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
-import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
-import io.github.dailystruggle.rtp.common.tasks.RTPTeleportCancel;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.logging.Level;
 
 public class ReloadCmd extends BaseRTPCmdImpl {
 

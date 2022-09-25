@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.common.commands.reload;
 
-import com.sun.org.apache.xpath.internal.operations.Mult;
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -11,18 +10,13 @@ import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
-import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.serverSide.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
-import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
-import org.simpleyaml.configuration.MemorySection;
 
 import java.util.EnumMap;
 import java.util.List;
