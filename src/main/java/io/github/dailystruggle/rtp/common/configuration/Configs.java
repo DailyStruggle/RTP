@@ -6,14 +6,12 @@ import io.github.dailystruggle.rtp.common.configuration.enums.*;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
+import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
-import java.util.EnumMap;
-import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class Configs {
@@ -23,9 +21,15 @@ public class Configs {
     public Map<Class<?>,ConfigParser<?>> configParserMap = new ConcurrentHashMap<>();
     public Map<Class<?>,MultiConfigParser<?>> multiConfigParserMap = new ConcurrentHashMap<>();
 
+    private static final List<Runnable> onReload = new ArrayList<>();
+
+    public static void onReload(Runnable runnable) {
+        onReload.add(runnable);
+    }
+
     public Configs(File pluginDirectory) {
         this.pluginDirectory = pluginDirectory;
-        reload();
+        RTP.getInstance().startupTasks.add(new RTPRunnable(this::reloadAction,5));
     }
 
     public void putParser(Object instance) {
@@ -65,24 +69,16 @@ public class Configs {
         return multiConfigParser.getParser(worldName);
     }
 
-    public CompletableFuture<Boolean> reload() {
-        CompletableFuture<Boolean> res = new CompletableFuture<>();
-
-        RTP.getInstance().startupTasks.add(() -> {
-            try {
-                reloadAction();
-                ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
-                if(lang == null) return;
-                String msg = String.valueOf(lang.getConfigValue(LangKeys.reloaded,""));
-                if(msg!=null) msg = StringUtils.replace(msg,"[filename]", "configs");
-                RTP.serverAccessor.sendMessage(CommandsAPI.serverId,msg);
-                res.complete(true);
-            } catch (Exception e) { //on any code failure, complete false
-                res.complete(false);
-                throw e;
-            }
-        });
-        return res;
+    public boolean reload() {
+        configParserMap.clear();
+        multiConfigParserMap.clear();
+        reloadAction();
+        ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+        if(lang == null) return false;
+        String msg = String.valueOf(lang.getConfigValue(LangKeys.reloaded,""));
+        if(msg!=null) msg = StringUtils.replace(msg,"[filename]", "configs");
+        RTP.serverAccessor.sendMessage(CommandsAPI.serverId,msg);
+        return true;
     }
 
 
@@ -111,23 +107,10 @@ public class Configs {
 
         for(ConfigParser<RegionKeys> regionConfig : regions.configParserFactory.map.values()) {
             EnumMap<RegionKeys, Object> data = regionConfig.getData();
-
-            String worldName = String.valueOf(data.get(RegionKeys.world));
-            RTPWorld world;
-            if(worldName.startsWith("[") && worldName.endsWith("]")) {
-                int num = Integer.parseInt(worldName.substring(1,worldName.length()-1));
-                world = RTP.serverAccessor.getRTPWorlds().get(num);
-            }
-            else world = RTP.serverAccessor.getRTPWorld(worldName);
-            if(world == null) {
-                new IllegalArgumentException("world not found - " + worldName).printStackTrace(); //don't need to throw
-                continue;
-            }
-            data.put(RegionKeys.world,world);
-
             Region region = new Region(regionConfig.name.replace(".yml",""), data);
             RTP.getInstance().selectionAPI.permRegionLookup.put(region.name.toUpperCase(),region);
         }
+        if(onReload.size()>0) onReload.forEach(Runnable::run);
     }
 
     //todo: region setup

@@ -126,11 +126,10 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
         boolean expand = (boolean) data.getOrDefault(GenericMemoryShapeParams.expand,false);
         String mode = data.getOrDefault(GenericMemoryShapeParams.mode,"ACCUMULATE").toString().toUpperCase();
 
-        double space = getRange();
-        if((!expand) && mode.equalsIgnoreCase("ACCUMULATE")) space -= badLocationSum.get();
-        else if(expand && !mode.equals("ACCUMULATE")) space += badLocationSum.get();
+        if((!expand) && mode.equalsIgnoreCase("ACCUMULATE")) range -= badLocationSum.get();
+        else if(expand && !mode.equals("ACCUMULATE")) range += badLocationSum.get();
 
-        double res = (space) * (ThreadLocalRandom.current().nextDouble());
+        double res = (range) * (ThreadLocalRandom.current().nextDouble());
 
         long location = (long) res;
         switch (mode) {

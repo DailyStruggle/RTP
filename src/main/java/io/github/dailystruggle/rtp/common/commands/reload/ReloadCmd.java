@@ -8,10 +8,7 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
-import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
-import io.github.dailystruggle.rtp.common.tasks.RTPTeleportCancel;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
 
@@ -61,22 +58,9 @@ public class ReloadCmd extends BaseRTPCmdImpl {
     public boolean onCommand(UUID senderId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
         addCommands();
 
-        RTP.serverAccessor.reset();
-
-        final RTP instance = RTP.getInstance();
-        instance.setupTeleportPipeline.clear();
-        instance.loadChunksPipeline.clear();
-        instance.teleportPipeline.clear();
-        instance.chunkCleanupPipeline.execute(Long.MAX_VALUE);
-        instance.selectionAPI.permRegionLookup.values().forEach(Region::shutDown);
-        instance.selectionAPI.tempRegions.values().forEach(Region::shutDown);
-        instance.selectionAPI.tempRegions.clear();
-        instance.latestTeleportData.forEach((uuid, data) -> {
-            if(!data.completed) new RTPTeleportCancel(uuid).run();
-        });
-        instance.processingPlayers.clear();
-
-        RTP.serverAccessor.getRTPWorlds().forEach(RTPWorld::forgetChunks);
+        RTP.stop();
+        RTP.serverAccessor.stop();
+        RTP.serverAccessor.start();
 
         if(nextCommand!=null) return true;
 
@@ -87,7 +71,10 @@ public class ReloadCmd extends BaseRTPCmdImpl {
             RTP.serverAccessor.sendMessage(CommandsAPI.serverId, senderId,msg);
         }
 
-        RTP.getInstance().configs.reload();
+        boolean b = RTP.getInstance().configs.reload();
+        if(!b) throw new IllegalStateException("reload failed");
+
+        RTP.serverAccessor.start();
 
         return true;
     }

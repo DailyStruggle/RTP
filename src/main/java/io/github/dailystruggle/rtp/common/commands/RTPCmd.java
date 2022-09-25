@@ -18,7 +18,6 @@ import io.github.dailystruggle.rtp.common.tasks.SetupTeleport;
 
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.logging.Level;
 
 public interface RTPCmd extends BaseRTPCmd {
     default void init() {
@@ -30,7 +29,9 @@ public interface RTPCmd extends BaseRTPCmd {
     default boolean onCommand(RTPCommandSender sender, CommandsAPICommand command, String label, String[] args) {
         RTP rtp = RTP.getInstance();
 
-        long timingsStart = System.nanoTime();
+        for(String arg : args) {
+            if(!arg.contains(String.valueOf(CommandsAPI.parameterDelimiter))) return true;
+        }
 
         UUID senderId = sender.uuid();
         if(rtp.processingPlayers.contains(senderId)) {
@@ -73,7 +74,6 @@ public interface RTPCmd extends BaseRTPCmd {
 
         RTP rtp = RTP.getInstance();
         if(nextCommand!=null) {
-            rtp.processingPlayers.remove(senderId);
             return true;
         }
 
@@ -135,6 +135,7 @@ public interface RTPCmd extends BaseRTPCmd {
             floor = eco.getNumber(EconomyKeys.balanceFloor, 0.0).doubleValue();
             if(bal-price<floor) {
                 RTP.serverAccessor.sendMessage(senderId,LangKeys.notEnoughMoney);
+                rtp.processingPlayers.remove(senderId);
                 return true;
             }
         }
@@ -224,12 +225,14 @@ public interface RTPCmd extends BaseRTPCmd {
 
                 if(economy.bal(senderId)-data.cost<floor) {
                     RTP.serverAccessor.sendMessage(senderId, LangKeys.notEnoughMoney);
+                    rtp.processingPlayers.remove(senderId);
                     return true;
                 }
 
                 boolean take = economy.take(senderId, data.cost);
                 if (!take) {
                     RTP.serverAccessor.sendMessage(senderId, LangKeys.notEnoughMoney);
+                    rtp.processingPlayers.remove(senderId);
                     return true;
                 }
             }

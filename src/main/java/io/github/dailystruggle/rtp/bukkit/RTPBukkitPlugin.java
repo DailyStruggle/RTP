@@ -1,7 +1,5 @@
 package io.github.dailystruggle.rtp.bukkit;
 
-import com.google.inject.Injector;
-import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.effectsapi.EffectFactory;
 import io.github.dailystruggle.effectsapi.EffectsAPI;
 import io.github.dailystruggle.rtp.bukkit.commands.RTPCmdBukkit;
@@ -11,12 +9,13 @@ import io.github.dailystruggle.rtp.bukkit.server.BukkitServerAccessor;
 import io.github.dailystruggle.rtp.bukkit.server.SyncTeleportProcessing;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.spigotListeners.*;
-import io.github.dailystruggle.rtp.bukkit.tools.SimpleBinderModule;
+import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.VaultChecker;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
@@ -25,14 +24,11 @@ import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.*;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
-import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 /**
@@ -47,9 +43,6 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     public static RTPBukkitPlugin getInstance() {
         return instance;
     }
-
-    public final ConcurrentHashMap<UUID,Location> todoTP = new ConcurrentHashMap<>();
-    public final ConcurrentHashMap<UUID,Location> lastTP = new ConcurrentHashMap<>();
 
     public BukkitTask commandTimer = null;
     public BukkitTask commandProcessing = null;
@@ -66,10 +59,6 @@ public final class RTPBukkitPlugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
-        SimpleBinderModule module = new SimpleBinderModule(this);
-        Injector injector = module.createInjector();
-        injector.injectMembers(this);
-
         metrics = new Metrics(this,12277);
 
         RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
@@ -82,34 +71,20 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         Objects.requireNonNull(getCommand("wild")).setExecutor(mainCommand);
         Objects.requireNonNull(getCommand("wild")).setTabCompleter(mainCommand);
 
-        commandTimer = Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
-            long avgTime = TPS.timeSinceTick(20) / 20;
-            long currTime = TPS.timeSinceTick(1);
-            CommandsAPI.execute(avgTime - currTime);
-        }, 40, 1);
-
-        syncTimer = new SyncTeleportProcessing().runTaskTimer(this,80,1);
-        asyncTimer = new AsyncTeleportProcessing().runTaskTimerAsynchronously(this,80,1);
-
-        while (RTP.getInstance().startupTasks.size()>0) {
-            Bukkit.getLogger().log(Level.SEVERE,"B1");
-            RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
-        }
-
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,() -> {
-            Bukkit.getLogger().log(Level.SEVERE,"B2");
             while (RTP.getInstance().startupTasks.size()>0) {
-                Bukkit.getLogger().log(Level.SEVERE,"B3");
                 RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
             }
         });
 
+        Bukkit.getScheduler().scheduleSyncDelayedTask(this,RTP.serverAccessor::start);
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupBukkitEvents);
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupEffects);
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupIntegrations);
 
         Bukkit.getScheduler().runTaskTimer(this, new TPS(),0,1);
 
+        SendMessage.sendMessage(Bukkit.getConsoleSender(),"");
     }
 
     @Override
@@ -261,6 +236,25 @@ public final class RTPBukkitPlugin extends JavaPlugin {
                         effect.run();
                     });
                 });
+            }
+        });
+
+        DoTeleport.postActions.add(task -> {
+            ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+
+            if(task.player() instanceof BukkitRTPPlayer) {
+                Player player = ((BukkitRTPPlayer) task.player()).player();
+                String title = lang.getConfigValue(LangKeys.title, "").toString();
+                String subtitle = lang.getConfigValue(LangKeys.subtitle, "").toString();
+
+                int fadeIn = lang.getNumber(LangKeys.fadeIn,0).intValue();
+                int stay = lang.getNumber(LangKeys.stay,0).intValue();
+                int fadeOut = lang.getNumber(LangKeys.fadeOut,0).intValue();
+
+                SendMessage.title(player,title,subtitle,fadeIn,stay,fadeOut);
+
+                String actionbar = lang.getConfigValue(LangKeys.actionbar, "").toString();
+                SendMessage.actionbar(player,actionbar);
             }
         });
 

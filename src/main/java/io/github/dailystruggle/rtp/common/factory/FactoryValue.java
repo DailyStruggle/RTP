@@ -4,7 +4,6 @@ import com.google.common.base.Function;
 import io.github.dailystruggle.rtp.common.RTP;
 import org.jetbrains.annotations.NotNull;
 import org.simpleyaml.configuration.file.YamlFile;
-import org.yaml.snakeyaml.Yaml;
 
 import java.io.File;
 import java.io.IOException;
