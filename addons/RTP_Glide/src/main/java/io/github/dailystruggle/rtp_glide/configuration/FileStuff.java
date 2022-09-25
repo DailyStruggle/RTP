@@ -9,7 +9,6 @@ import java.util.ArrayList;
 public class FileStuff {
 
     public static void renameFiles(RTP_Glide plugin, String name) {
-        int num = 0;
         //load up a list of files to rename
         ArrayList<File> toRename = new ArrayList<>();
         for(int i = 1; i < 1000; i++) {
@@ -18,12 +17,12 @@ public class FileStuff {
             toRename.add(file);
         }
         //rename them top-down
-        for(Integer i = toRename.size()-1; i >= 0; i--) {
+        for(int i = toRename.size()-1; i >= 0; i--) {
             File oldFile = toRename.get(i);
             String fileName = oldFile.getName();
-            Integer oldNum = i+1;
-            Integer newNum = oldNum+1;
-            String newFileName = fileName.replace(oldNum.toString(),newNum.toString());
+            int oldNum = i+1;
+            int newNum = oldNum+1;
+            String newFileName = fileName.replace(Integer.toString(oldNum), Integer.toString(newNum));
             File newFile = new File(plugin.getDataFolder().getAbsolutePath() + File.separator + newFileName);
             try { //ensure can place
                 Files.deleteIfExists(newFile.toPath());

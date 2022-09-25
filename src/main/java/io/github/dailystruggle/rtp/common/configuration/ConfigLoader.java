@@ -11,11 +11,12 @@ import java.util.logging.Level;
 
 public interface ConfigLoader {
     File getMainDirectory();
+    ClassLoader getClassLoader();
 
     @Nullable
     default InputStream getResourceFromJar(@NotNull String filename) {
         try {
-            URL url = getClass().getClassLoader().getResource(filename);
+            URL url = getClassLoader().getResource(filename);
 
             if (url == null) {
                 return null;

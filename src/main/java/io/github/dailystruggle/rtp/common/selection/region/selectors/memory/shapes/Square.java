@@ -186,11 +186,22 @@ public class Square extends MemoryShape<GenericMemoryShapeParams> {
 
     @Override
     public int[] select() {
-        String mode = String.valueOf(data.getOrDefault(GenericMemoryShapeParams.mode,"ACCUMULATE")).toUpperCase();
+        long location = rand();
+        return locationToXZ(location);
+    }
+
+    @Override
+    public long rand() {
+        boolean expand = (boolean) data.getOrDefault(GenericMemoryShapeParams.expand,false);
+        String mode = data.getOrDefault(GenericMemoryShapeParams.mode,"ACCUMULATE").toString();
 
         double range = getRange();
+        if((!expand) && mode.equalsIgnoreCase("ACCUMULATE")) range -= badLocationSum.get();
+        else if(expand && !mode.equals("ACCUMULATE")) range += badLocationSum.get();
 
-        long location = rand();
+        double res = (range) * (ThreadLocalRandom.current().nextDouble());
+
+        long location = (long) res;
 
         switch (mode) {
             case "ACCUMULATE": {
@@ -248,7 +259,7 @@ public class Square extends MemoryShape<GenericMemoryShapeParams> {
                 if(     (check!=null)
                         && (location > check.getKey())
                         && (location < check.getKey()+check.getValue())) {
-                    return null;
+                    return -1;
                 }
             }
             default: {
@@ -265,20 +276,7 @@ public class Square extends MemoryShape<GenericMemoryShapeParams> {
         }
         if(u) addBadLocation(location);
 
-        return locationToXZ(location);
-    }
-
-    @Override
-    public long rand() {
-        boolean expand = (boolean) data.getOrDefault(GenericMemoryShapeParams.expand,false);
-        String mode = data.getOrDefault(GenericMemoryShapeParams.mode,"ACCUMULATE").toString();
-
-        double space = getRange();
-        if((!expand) && mode.equalsIgnoreCase("ACCUMULATE")) space -= badLocationSum.get();
-        else if(expand && !mode.equals("ACCUMULATE")) space += badLocationSum.get();
-
-        double res = (space) * (ThreadLocalRandom.current().nextDouble());
-        return (long) res;
+        return location;
     }
 
     @Override

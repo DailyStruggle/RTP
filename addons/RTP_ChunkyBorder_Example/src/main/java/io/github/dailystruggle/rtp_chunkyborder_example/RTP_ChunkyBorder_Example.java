@@ -8,7 +8,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
-import io.github.dailystruggle.rtp_chunkyborder_example.shapes.ChunkyRTPShape;
+import io.github.dailystruggle.rtp_chunkyborder_example.shapes.*;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;

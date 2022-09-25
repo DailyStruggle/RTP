@@ -13,6 +13,7 @@ import io.github.dailystruggle.rtp.common.serverSide.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
@@ -45,7 +46,7 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
     }
 
     @Override
-    public String getServerVersion() {
+    public @NotNull String getServerVersion() {
         if(version == null) {
             version = "1.18.2";
         }
@@ -54,7 +55,7 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
     }
 
     @Override
-    public Integer getServerIntVersion() {
+    public @NotNull Integer getServerIntVersion() {
         if(intVersion == null) {
             String[] splitVersion = getServerVersion().split("_");
             if(splitVersion.length == 0) {
@@ -76,7 +77,7 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
     }
 
     @Override
-    public RTPWorld getRTPWorld(UUID id) {
+    public @Nullable RTPWorld getRTPWorld(UUID id) {
         return new TestRTPWorld();
     }
 
@@ -93,24 +94,24 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
     }
 
     @Override
-    public List<RTPWorld> getRTPWorlds() {
+    public @NotNull List<RTPWorld> getRTPWorlds() {
         ArrayList<RTPWorld> res = new ArrayList<>(1);
         res.add(new TestRTPWorld());
         return res;
     }
 
     @Override
-    public RTPPlayer getPlayer(UUID uuid) {
+    public @Nullable RTPPlayer getPlayer(UUID uuid) {
         return new TestRTPPlayer();
     }
 
     @Override
-    public RTPPlayer getPlayer(String name) {
+    public @Nullable RTPPlayer getPlayer(String name) {
         return new TestRTPPlayer();
     }
 
     @Override
-    public RTPCommandSender getSender(UUID uuid) {
+    public @Nullable RTPCommandSender getSender(UUID uuid) {
         return new TestRTPPlayer();
     }
 
@@ -172,21 +173,6 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
     }
 
     @Override
-    public void announce(LangKeys key) {
-
-    }
-
-    @Override
-    public void announce(LangKeys key, String permission) {
-
-    }
-
-    @Override
-    public void announce(String msg) {
-
-    }
-
-    @Override
     public void announce(String msg, String permission) {
 
     }
@@ -202,18 +188,13 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
     }
 
     @Override
-    public void reset() {
-
-    }
-
-    @Override
-    public WorldBorder getWorldBorder(String worldName) {
+    public @Nullable WorldBorder getWorldBorder(String worldName) {
         return null;
     }
 
     @Override
-    public void setWorldBorderFunction(Function<String, WorldBorder> function) {
-
+    public boolean setWorldBorderFunction(Function<String, WorldBorder> function) {
+        return true;
     }
 
     @Override
@@ -222,12 +203,12 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
     }
 
     @Override
-    public long numAsyncTasks() {
-        return 1;
+    public void stop() {
+
     }
 
     @Override
-    public void stop() {
+    public void start() {
 
     }
 }
