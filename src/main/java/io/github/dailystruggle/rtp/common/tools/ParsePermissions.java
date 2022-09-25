@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.tools;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
+import org.apache.commons.lang3.StringUtils;
 
 import java.util.Set;
 import java.util.UUID;
@@ -15,10 +16,11 @@ public class ParsePermissions {
     }
 
     static public boolean hasPerm(RTPCommandSender sender, String permissionPrefix, String... permissions) {
+        permissionPrefix = permissionPrefix.toLowerCase();
         Set<String> perms = sender.getEffectivePermissions();
         boolean hasPerm = false;
         for(String perm : perms) {
-            if(!perm.startsWith(permissionPrefix)) continue;
+            if(!StringUtils.startsWithIgnoreCase(perm, permissionPrefix)) continue;
             if(perm.equalsIgnoreCase(permissionPrefix+"*")) return true;
             for(String permission : permissions) {
                 if(perm.equalsIgnoreCase(permissionPrefix + permission.toLowerCase())) return true;

@@ -108,8 +108,10 @@ public class MultiConfigParser<E extends Enum<E>>  extends FactoryValue<E> imple
         configParserFactory.add(name, value);
     }
 
-    public void addParser(ConfigParser<E> parser) {
-        configParserFactory.add(parser.name,parser);
+    public void addParser(ConfigParser<?> parser) {
+        if(!parser.myClass.equals(myClass)) throw new IllegalStateException("mismatched parser class");
+        ConfigParser<E> eConfigParser = (ConfigParser<E>) parser;
+        configParserFactory.add(parser.name,eConfigParser);
     }
 
     public void addAll(Iterable<String> keys) {

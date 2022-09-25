@@ -66,7 +66,7 @@ public class OnEventTeleports implements Listener {
         //I don't know how this can happen, but in case player dies twice, don't reprocess
         if(region.fastLocations.containsKey(id)) return;
 
-        CompletableFuture<Pair<RTPLocation,Long>> future = new CompletableFuture<>();
+        CompletableFuture<Map.Entry<RTPLocation,Long>> future = new CompletableFuture<>();
         region.fastLocations.put(id, future);
 
         if(RTP.getInstance().latestTeleportData.containsKey(id)) {
@@ -77,7 +77,7 @@ public class OnEventTeleports implements Listener {
         TeleportData data = new TeleportData();
         RTP.getInstance().latestTeleportData.put(id, data);
         region.miscPipeline.add(() -> {
-            Pair<RTPLocation, Long> location = null;
+            Map.Entry<RTPLocation, Long> location = null;
             int i = 0;
             for(; location==null && i<10;i++) {
                 location = region.getLocation(
@@ -90,12 +90,12 @@ public class OnEventTeleports implements Listener {
                 return;
             }
 
-            if(location.getLeft() == null) {
+            if(location.getKey() == null) {
                 return;
             }
 
-            data.selectedLocation = location.getLeft();
-            data.attempts = location.getRight();
+            data.selectedLocation = location.getKey();
+            data.attempts = location.getValue();
 
             future.complete(location);
         });
@@ -109,17 +109,17 @@ public class OnEventTeleports implements Listener {
         respawningPlayers.remove(player.getUniqueId());
 
         Region region = RTP.getInstance().selectionAPI.getRegion(new BukkitRTPPlayer(player));
-        ConcurrentHashMap<UUID, CompletableFuture<Pair<RTPLocation,Long>>> respawnLocations = region.fastLocations;
+        ConcurrentHashMap<UUID, CompletableFuture<Map.Entry<RTPLocation,Long>>> respawnLocations = region.fastLocations;
         if(!respawnLocations.containsKey(player.getUniqueId())) return;
 
-        CompletableFuture<Pair<RTPLocation, Long>> future = respawnLocations.get(player.getUniqueId());
+        CompletableFuture<Map.Entry<RTPLocation, Long>> future = respawnLocations.get(player.getUniqueId());
         region.fastLocations.remove(player.getUniqueId());
 
         TeleportData data = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
         data.completed = true;
 
         if(future.isDone()) {
-            Pair<RTPLocation, Long> location;
+            Map.Entry<RTPLocation, Long> location;
             try {
                 location = future.get();
             } catch (InterruptedException | ExecutionException e) {
@@ -131,11 +131,11 @@ public class OnEventTeleports implements Listener {
                 return;
             }
 
-            if(location.getLeft() == null) {
+            if(location.getKey() == null) {
                 return;
             }
 
-            RTPLocation rtpLocation = location.getLeft();
+            RTPLocation rtpLocation = location.getKey();
 
             RTPWorld rtpWorld = rtpLocation.world();
             if(rtpWorld instanceof BukkitRTPWorld) {

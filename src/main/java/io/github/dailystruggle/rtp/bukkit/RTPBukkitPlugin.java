@@ -61,6 +61,12 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     public void onEnable() {
         metrics = new Metrics(this,12277);
 
+        if(instance == null) {
+            instance = this;
+            RTP.serverAccessor = new BukkitServerAccessor();
+            new RTP();
+        }
+
         RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
 
         RTPCmdBukkit mainCommand = new RTPCmdBukkit(this);
