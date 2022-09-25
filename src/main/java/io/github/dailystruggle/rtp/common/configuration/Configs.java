@@ -12,7 +12,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class Configs {
@@ -71,17 +70,14 @@ public class Configs {
     }
 
     public boolean reload() {
-        try {
-            reloadAction();
-            ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
-            if(lang == null) return false;
-            String msg = String.valueOf(lang.getConfigValue(LangKeys.reloaded,""));
-            if(msg!=null) msg = StringUtils.replace(msg,"[filename]", "configs");
-            RTP.serverAccessor.sendMessage(CommandsAPI.serverId,msg);
-        } catch (Exception e) { //on any code failure, complete false
-            e.printStackTrace();
-            return false;
-        }
+        configParserMap.clear();
+        multiConfigParserMap.clear();
+        reloadAction();
+        ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+        if(lang == null) return false;
+        String msg = String.valueOf(lang.getConfigValue(LangKeys.reloaded,""));
+        if(msg!=null) msg = StringUtils.replace(msg,"[filename]", "configs");
+        RTP.serverAccessor.sendMessage(CommandsAPI.serverId,msg);
         return true;
     }
 
@@ -111,20 +107,6 @@ public class Configs {
 
         for(ConfigParser<RegionKeys> regionConfig : regions.configParserFactory.map.values()) {
             EnumMap<RegionKeys, Object> data = regionConfig.getData();
-
-            String worldName = String.valueOf(data.get(RegionKeys.world));
-            RTPWorld world;
-            if(worldName.startsWith("[") && worldName.endsWith("]")) {
-                int num = Integer.parseInt(worldName.substring(1,worldName.length()-1));
-                world = RTP.serverAccessor.getRTPWorlds().get(num);
-            }
-            else world = RTP.serverAccessor.getRTPWorld(worldName);
-            if(world == null) {
-                new IllegalArgumentException("world not found - " + worldName).printStackTrace(); //don't need to throw
-                continue;
-            }
-            data.put(RegionKeys.world,world);
-
             Region region = new Region(regionConfig.name.replace(".yml",""), data);
             RTP.getInstance().selectionAPI.permRegionLookup.put(region.name.toUpperCase(),region);
         }

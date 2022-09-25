@@ -1,27 +1,11 @@
 package io.github.dailystruggle.rtp.bukkit.tools.softdepends;
 
 import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
-import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPCommandSender;
-import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
-import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
-import io.github.dailystruggle.rtp.common.playerData.TeleportData;
-import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.tasks.DoTeleport;
-import io.github.dailystruggle.rtp.common.tasks.LoadChunks;
-import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
-import io.github.dailystruggle.rtp.common.tasks.SetupTeleport;
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
-import org.apache.commons.lang3.StringUtils;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
-
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 
 public class PAPI_expansion extends PlaceholderExpansion{
     @Override
