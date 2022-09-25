@@ -1,7 +1,6 @@
 package io.github.dailystrugle.rtp_shape_example;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystrugle.rtp_shape_example.shapes.Square_Normal;
 import org.bukkit.plugin.java.JavaPlugin;
 

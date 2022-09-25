@@ -6,7 +6,6 @@ import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPCommandS
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.PAPIChecker;
-import io.github.dailystruggle.rtp.bukkit.tools.softdepends.PAPI_expansion;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
@@ -85,15 +84,15 @@ public class SendMessage {
             return replacement;
         });
         placeholders.put("cooldown",uuid -> {
-            if(rtp == null) return "0";
-            if(RTP.serverAccessor==null) return "0";
+            if(rtp == null) return "A";
+            if(RTP.serverAccessor==null) return "B";
             RTPCommandSender commandSender = RTP.serverAccessor.getSender(uuid);
             Number n = rtp.configs.getParser(ConfigKeys.class).getNumber(ConfigKeys.teleportCooldown,0);
             int n2 = ParsePermissions.getInt(commandSender,"rtp.cooldown.");
             if(n2>=0) n = n2;
 
             long time = n.longValue();
-            if(time <= 0) return "0";
+            if(time <= 0) time = 0;
             ConfigParser<LangKeys> langParser = (ConfigParser<LangKeys>) rtp.configs.getParser(LangKeys.class);
             long days = TimeUnit.SECONDS.toDays(time);
             long hours = TimeUnit.SECONDS.toHours(time)%24;
@@ -108,16 +107,16 @@ public class SendMessage {
             return replacement;
         });
         placeholders.put("remainingCooldown",uuid -> {
-            if(rtp == null) return "0";
-            if(RTP.serverAccessor==null) return "0";
+            if(rtp == null) return "A";
+            if(RTP.serverAccessor==null) return "B";
 
             long start = System.nanoTime();
 
             Player player = Bukkit.getPlayer(uuid);
             if(player!=null && player.isOnline()) {
                 TeleportData teleportData = rtp.latestTeleportData.get(uuid);
-                if(teleportData==null) return "0";
-                long lastTime = teleportData.time;
+                long lastTime = 0;
+                if(teleportData!=null) lastTime=teleportData.time;
 
                 Number n = rtp.configs.getParser(ConfigKeys.class).getNumber(ConfigKeys.teleportCooldown,0);
                 int n2 = ParsePermissions.getInt(RTP.serverAccessor.getSender(player.getUniqueId()),"rtp.delay.");
@@ -148,7 +147,7 @@ public class SendMessage {
                 }
                 return replacement;
             }
-            return "0";
+            return "C";
         });
         placeholders.put("queueLocation",uuid -> {
             if(rtp == null) return "0";

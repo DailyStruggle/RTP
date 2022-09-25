@@ -412,7 +412,7 @@ public class Region extends FactoryValue<RegionKeys> {
         long biomeChecks = 0L;
 
 
-        RTPWorld world = (RTPWorld) data.getOrDefault(RegionKeys.world,RTP.serverAccessor.getRTPWorlds().get(0));
+        RTPWorld world = getWorld();
 
         long biomeFails = 0;
         long worldBorderFails = 0L;
@@ -799,8 +799,14 @@ public class Region extends FactoryValue<RegionKeys> {
         if(world instanceof RTPWorld) return (RTPWorld) world;
         else {
             String worldName = String.valueOf(world);
-            RTPWorld rtpWorld = RTP.serverAccessor.getRTPWorld(worldName);
+            RTPWorld rtpWorld;
+            if(worldName.startsWith("[") && worldName.endsWith("]")) {
+                int num = Integer.parseInt(worldName.substring(1,worldName.length()-1));
+                rtpWorld = RTP.serverAccessor.getRTPWorlds().get(num);
+            }
+            else rtpWorld = RTP.serverAccessor.getRTPWorld(worldName);
             if(rtpWorld == null) rtpWorld = RTP.serverAccessor.getRTPWorlds().get(0);
+            data.put(RegionKeys.world,rtpWorld);
             return rtpWorld;
         }
     }

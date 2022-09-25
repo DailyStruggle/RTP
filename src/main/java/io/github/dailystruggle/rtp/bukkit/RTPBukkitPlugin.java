@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.bukkit;
 
-import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.effectsapi.EffectFactory;
 import io.github.dailystruggle.effectsapi.EffectsAPI;
 import io.github.dailystruggle.rtp.bukkit.commands.RTPCmdBukkit;
@@ -25,13 +24,11 @@ import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.*;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
-import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -46,9 +43,6 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     public static RTPBukkitPlugin getInstance() {
         return instance;
     }
-
-    public final ConcurrentHashMap<UUID,Location> todoTP = new ConcurrentHashMap<>();
-    public final ConcurrentHashMap<UUID,Location> lastTP = new ConcurrentHashMap<>();
 
     public BukkitTask commandTimer = null;
     public BukkitTask commandProcessing = null;
@@ -77,27 +71,20 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         Objects.requireNonNull(getCommand("wild")).setExecutor(mainCommand);
         Objects.requireNonNull(getCommand("wild")).setTabCompleter(mainCommand);
 
-        commandTimer = Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
-            long avgTime = TPS.timeSinceTick(20) / 20;
-            long currTime = TPS.timeSinceTick(1);
-            CommandsAPI.execute(avgTime - currTime);
-        }, 40, 1);
-
-        syncTimer = new SyncTeleportProcessing().runTaskTimer(this,80,1);
-        asyncTimer = new AsyncTeleportProcessing().runTaskTimerAsynchronously(this,80,1);
-
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,() -> {
             while (RTP.getInstance().startupTasks.size()>0) {
                 RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
             }
         });
 
+        Bukkit.getScheduler().scheduleSyncDelayedTask(this,RTP.serverAccessor::start);
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupBukkitEvents);
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupEffects);
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupIntegrations);
 
         Bukkit.getScheduler().runTaskTimer(this, new TPS(),0,1);
 
+        SendMessage.sendMessage(Bukkit.getConsoleSender(),"");
     }
 
     @Override
