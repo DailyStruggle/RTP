@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.bukkit;
 
-import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.effectsapi.EffectFactory;
 import io.github.dailystruggle.effectsapi.EffectsAPI;
 import io.github.dailystruggle.rtp.bukkit.commands.RTPCmdBukkit;
@@ -25,13 +24,11 @@ import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.*;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
-import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -46,9 +43,6 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     public static RTPBukkitPlugin getInstance() {
         return instance;
     }
-
-    public final ConcurrentHashMap<UUID,Location> todoTP = new ConcurrentHashMap<>();
-    public final ConcurrentHashMap<UUID,Location> lastTP = new ConcurrentHashMap<>();
 
     public BukkitTask commandTimer = null;
     public BukkitTask commandProcessing = null;
