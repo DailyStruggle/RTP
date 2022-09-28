@@ -20,8 +20,7 @@ public class RTPAPI {
             RTP.getInstance().miscAsyncTasks.add(reloadTask);
             return;
         }
-        Map<String, CommandsAPICommand> baseCommandCommandLookup = baseCommand.getCommandLookup();
-        CommandsAPICommand reloadCmd = baseCommandCommandLookup.get("reload");
+        CommandsAPICommand reloadCmd = baseCommand.getCommandLookup().get("reload");
         if(reloadCmd!=null) reloadCmd.onCommand(CommandsAPI.serverId,new HashMap<>(),null);
         reloadTask = null;
     }

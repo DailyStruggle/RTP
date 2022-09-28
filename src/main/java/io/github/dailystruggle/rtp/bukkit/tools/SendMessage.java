@@ -40,6 +40,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -493,7 +494,8 @@ public class SendMessage {
 
         message = format(null,message);
 
-        Bukkit.getLogger().log(level,message);
+        Logger logger = Bukkit.getLogger();
+        if(logger!=null) logger.log(level,message);
     }
 
     public static void log(Level level, String message, Exception exception) {

@@ -11,21 +11,34 @@ import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.parameters.RegionParameter;
 import io.github.dailystruggle.rtp.common.commands.parameters.ShapeParameter;
 import io.github.dailystruggle.rtp.common.commands.parameters.VertParameter;
+import io.github.dailystruggle.rtp.common.commands.parameters.WorldParameter;
+import io.github.dailystruggle.rtp.common.commands.reload.ReloadCmd;
 import io.github.dailystruggle.rtp.common.commands.update.list.ListCmd;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
+import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import org.apache.commons.lang3.StringUtils;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.simpleyaml.configuration.MemorySection;
+import org.simpleyaml.configuration.file.YamlFile;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.nio.file.Files;
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.logging.Level;
 
 public class SubUpdateCmd extends BaseRTPCmdImpl {
 
@@ -35,7 +48,7 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
 
     public SubUpdateCmd(@Nullable CommandsAPICommand parent, String name, FactoryValue<?> factoryValue) {
         super(parent);
-        this.name = name;
+        this.name = name.toLowerCase();
         this.factoryValue = factoryValue;
         addParameters();
     }
@@ -60,7 +73,8 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
     public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
         if(nextCommand!=null) return true;
 
-        addParameters();
+        RTP.stop();
+        RTP.serverAccessor.stop();
 
         if(factoryValue instanceof ConfigParser) {
             ConfigParser<?> configParser = (ConfigParser<?>) factoryValue;
@@ -82,7 +96,7 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
             }
 
             try {
-                configParser.yamlFile.save();
+                configParser.save();
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
@@ -95,37 +109,43 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
             MultiConfigParser<?> parser = (MultiConfigParser<?>) this.factoryValue;
             List<String> remove = parameterValues.getOrDefault("remove", new ArrayList<>());
             for(String target : remove) {
-                ConfigParser<?> configParser = (ConfigParser<?>) parser.configParserFactory.get(target);
-                try {
-                    configParser.yamlFile.deleteFile();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                parser.configParserFactory.map.remove(target.toUpperCase());
+                String configName = target;
+                if(!StringUtils.endsWithIgnoreCase(configName,".yml")) configName = configName+".yml";
+                ConfigParser<?> configParser = (ConfigParser<?>) parser.configParserFactory.get(configName);
+                if(configParser == null) continue;
+                parser.configParserFactory.map.remove(configName.toUpperCase());
+                commandLookup.remove(target);
+                configParser.yamlFile.getConfigurationFile().deleteOnExit();
             }
 
             List<String> add = parameterValues.getOrDefault("add", new ArrayList<>());
             for(String target : add) {
-                ConfigParser<?> configParser = (ConfigParser<?>) parser.configParserFactory.get("default");
-                ConfigParser<?> newConfigParser = new ConfigParser<>(
-                        configParser.myClass,
-                        target,
-                        configParser.version,
-                        configParser.pluginDirectory,
-                        null,
-                        configParser.getClassLoader());
-                parser.addParser(newConfigParser);
+                parser.addParser(target);
+                ConfigParser<?> configParser = parser.getParser(target);
+                SubUpdateCmd subUpdateCmd = new SubUpdateCmd(this, configParser.name, configParser);
+                subUpdateCmd.addParameters();
+                addSubCommand(subUpdateCmd);
             }
-
-
         }
 
-
+        CommandsAPICommand reload;
+        reload = RTP.baseCommand.getCommandLookup().getOrDefault("reload", new ReloadCmd(RTP.baseCommand));
+        reload.onCommand(callerId,new HashMap<>(),null);
 
         return true;
     }
 
+    @Override
+    public @NotNull List<String> onTabComplete(@NotNull UUID callerId,
+                                               @NotNull Predicate<String> permissionCheckMethod,
+                                               @NotNull String[] args) {
+        addParameters();
+        return super.onTabComplete(callerId,permissionCheckMethod,args);
+    }
+
     public void addParameters() {
+        parameterLookup.clear();
+        commandLookup.clear();
         if(factoryValue == null) return;
 
         if(factoryValue instanceof ConfigParser) {
@@ -139,7 +159,13 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
                 if(nameObj!=null) s = nameObj.toString();
                 Object o = e.getValue();
 
-                if (o instanceof String) {
+                if(StringUtils.containsIgnoreCase(name,"world")) {
+                    addParameter(s, new WorldParameter("rtp.update", "", (uuid, s1) -> true));
+                }
+                else if(StringUtils.containsIgnoreCase(name,"region")) {
+                    addParameter(s, new RegionParameter("rtp.update", "", (uuid, s1) -> true));
+                }
+                else if (o instanceof String) {
                     addParameter(s, new CommandParameter("rtp.update", "", (uuid, s1) -> true) {
                         @Override
                         public Set<String> values() {
@@ -175,13 +201,10 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
         }
         else if(factoryValue instanceof MultiConfigParser) {
             MultiConfigParser<?> parser = (MultiConfigParser<?>) factoryValue;
-            for(Object e : parser.configParserFactory.map.entrySet()) {
-                if(e instanceof Map.Entry) {
-                    Map.Entry<?,?> entry = (Map.Entry<?, ?>) e;
-                    Object entryValue = entry.getValue();
-                    if(entryValue instanceof FactoryValue)
-                        addSubCommand(new SubUpdateCmd(this, entry.getKey().toString(), (FactoryValue<?>) entryValue));
-                }
+            for(Map.Entry<?,?> e : parser.configParserFactory.map.entrySet()) {
+                Object entryValue = e.getValue();
+                if(entryValue instanceof FactoryValue)
+                    addSubCommand(new SubUpdateCmd(this, e.getKey().toString(), (FactoryValue<?>) entryValue));
             }
             addParameter("add", new CommandParameter("rtp.update","add a file", (uuid, s) -> true) {
                 @Override
@@ -192,7 +215,7 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
             addParameter("remove", new CommandParameter("rtp.update","remove a file", (uuid, s) -> true) {
                 @Override
                 public Set<String> values() {
-                    return new HashSet<>();
+                    return parser.listParsers();
                 }
             });
         }

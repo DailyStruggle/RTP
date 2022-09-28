@@ -20,10 +20,12 @@ public class ParsePermissions {
         Set<String> perms = sender.getEffectivePermissions();
         boolean hasPerm = false;
         for(String perm : perms) {
-            if(!StringUtils.startsWithIgnoreCase(perm, permissionPrefix)) continue;
-            if(perm.equalsIgnoreCase(permissionPrefix+"*")) return true;
+            perm = perm.toLowerCase();
+            if(!perm.startsWith(permissionPrefix)) continue;
+            if(perm.equals(permissionPrefix+"*")) return true;
             for(String permission : permissions) {
-                if(perm.equalsIgnoreCase(permissionPrefix + permission.toLowerCase())) return true;
+                permission = permission.toLowerCase();
+                if(perm.equals(permissionPrefix + permission)) return true;
             }
         }
         return hasPerm;

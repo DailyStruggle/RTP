@@ -80,14 +80,15 @@ public final class BukkitRTPWorld implements RTPWorld {
             Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),() -> res.complete(new BukkitRTPChunk(world.getChunkAt(cx,cz))));
         }
         else {
-            CompletableFuture<Chunk> chunkAtAsyncUrgently = PaperLib.getChunkAtAsyncUrgently(world, cx, cz, true);
+//            Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),() -> res.complete(new BukkitRTPChunk(world.getChunkAt(cx,cz))));
+            CompletableFuture<Chunk> chunkAtAsync = PaperLib.getChunkAtAsyncUrgently(world, cx, cz, true);
 
             List<CompletableFuture<Chunk>> list = chunkLoads.get(xz);
             if(list == null) list = new ArrayList<>();
-            list.add(chunkAtAsyncUrgently);
+            list.add(chunkAtAsync);
             chunkLoads.put(xz,list);
 
-            chunkAtAsyncUrgently.whenComplete((chunk, throwable) -> {
+            chunkAtAsync.whenComplete((chunk, throwable) -> {
                 res.complete(new BukkitRTPChunk(chunk));
                 chunkLoads.remove(xz);
                 if(!RTPBukkitPlugin.getInstance().isEnabled()) throw new IllegalStateException("completed chunk after plugin disabled");

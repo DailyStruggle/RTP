@@ -15,6 +15,7 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPEconomy;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.SetupTeleport;
+import org.apache.commons.lang3.StringUtils;
 
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
@@ -122,7 +123,7 @@ public interface RTPCmd extends BaseRTPCmd {
         double floor = 0.0;
         RTPEconomy economy = RTP.economy;
         if (economy != null) {
-            if (!senderId.equals(CommandsAPI.serverId)) {
+            if (!senderId.equals(CommandsAPI.serverId) && !sender.hasPermission("rtp.free")) {
                 for (RTPPlayer player : players) {
                     if (player.uuid().equals(senderId)) price += eco.getNumber(EconomyKeys.price, 0.0).doubleValue();
                     else if (player.hasPermission("rtp.notme")) continue;
@@ -134,7 +135,9 @@ public interface RTPCmd extends BaseRTPCmd {
             double bal = economy.bal(senderId);
             floor = eco.getNumber(EconomyKeys.balanceFloor, 0.0).doubleValue();
             if(bal-price<floor) {
-                RTP.serverAccessor.sendMessage(senderId,LangKeys.notEnoughMoney);
+                String s = langParser.getConfigValue(LangKeys.notEnoughMoney, "").toString();
+                s = StringUtils.replaceIgnoreCase(s,"[money]", String.valueOf(price));
+                RTP.serverAccessor.sendMessage(senderId,s);
                 rtp.processingPlayers.remove(senderId);
                 return true;
             }
@@ -216,7 +219,7 @@ public interface RTPCmd extends BaseRTPCmd {
                 }
             }
 
-            if(economy!=null) {
+            if(economy!=null && !sender.hasPermission("rtp.free")) {
                 if (player.uuid().equals(senderId)) data.cost += eco.getNumber(EconomyKeys.price, 0.0).doubleValue();
                 else if (player.hasPermission("rtp.notme")) continue;
                 else data.cost += eco.getNumber(EconomyKeys.otherPrice, 0.0).doubleValue();
@@ -224,14 +227,18 @@ public interface RTPCmd extends BaseRTPCmd {
                 if (biomeList != null) data.cost += eco.getNumber(EconomyKeys.biomePrice, 0.0).doubleValue();
 
                 if(economy.bal(senderId)-data.cost<floor) {
-                    RTP.serverAccessor.sendMessage(senderId, LangKeys.notEnoughMoney);
+                    String s = langParser.getConfigValue(LangKeys.notEnoughMoney, "").toString();
+                    s = StringUtils.replaceIgnoreCase(s,"[money]", String.valueOf(price));
+                    RTP.serverAccessor.sendMessage(senderId,s);
                     rtp.processingPlayers.remove(senderId);
                     return true;
                 }
 
                 boolean take = economy.take(senderId, data.cost);
                 if (!take) {
-                    RTP.serverAccessor.sendMessage(senderId, LangKeys.notEnoughMoney);
+                    String s = langParser.getConfigValue(LangKeys.notEnoughMoney, "").toString();
+                    s = StringUtils.replaceIgnoreCase(s,"[money]", String.valueOf(price));
+                    RTP.serverAccessor.sendMessage(senderId,s);
                     rtp.processingPlayers.remove(senderId);
                     return true;
                 }
