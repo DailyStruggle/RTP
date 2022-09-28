@@ -11,6 +11,7 @@ import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
+import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tasks.SetupTeleport;
 import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
@@ -211,15 +212,20 @@ public class OnEventTeleports implements Listener {
             teleportAction(player);
     }
 
+    private static Map<UUID,RTPRunnable> tasks = new ConcurrentHashMap<>();
     private static void teleportAction(Player player){
-        BukkitRTPPlayer rtpPlayer = new BukkitRTPPlayer(player);
-        RTP.getInstance().miscAsyncTasks.add(() -> {
+        if(tasks.containsKey(player.getUniqueId())) return;
+        RTPRunnable runnable = new RTPRunnable(() -> {
             TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
-            if(teleportData == null) return;
-            RTP.getInstance().priorTeleportData.put(player.getUniqueId(),teleportData);
-            RTP.getInstance().latestTeleportData.remove(player.getUniqueId());
-        });
-        RTP.getInstance().miscAsyncTasks.add(
-                new SetupTeleport(rtpPlayer,rtpPlayer,RTP.getInstance().selectionAPI.getRegion(rtpPlayer), null));
+            if (teleportData != null) {
+                if (!teleportData.completed) return;
+                RTP.getInstance().priorTeleportData.put(player.getUniqueId(), teleportData);
+                RTP.getInstance().latestTeleportData.remove(player.getUniqueId());
+            }
+            BukkitRTPPlayer rtpPlayer = new BukkitRTPPlayer(player);
+            new SetupTeleport(rtpPlayer, rtpPlayer, RTP.getInstance().selectionAPI.getRegion(rtpPlayer), null);
+        }, 5);
+        tasks.put(player.getUniqueId(),runnable);
+        RTP.getInstance().miscAsyncTasks.add(runnable);
     }
 }
