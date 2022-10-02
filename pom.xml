@@ -312,7 +312,7 @@
         <dependency>
             <groupId>io.github.dailystruggle</groupId>
             <artifactId>CommandsAPI</artifactId>
-            <version>1.0-ALPHA65</version>
+            <version>1.0-ALPHA66</version>
             <scope>compile</scope>
         </dependency>
         <dependency>

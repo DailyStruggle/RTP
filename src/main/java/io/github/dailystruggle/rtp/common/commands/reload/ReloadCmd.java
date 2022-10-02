@@ -76,6 +76,12 @@ public class ReloadCmd extends BaseRTPCmdImpl {
         boolean b = RTP.getInstance().configs.reload();
         if(!b) throw new IllegalStateException("reload failed");
 
+        if(lang != null) {
+            String msg = String.valueOf(lang.getConfigValue(LangKeys.reloading,""));
+            if(msg!=null) msg = StringUtils.replace(msg,"[filename]", "configs");
+            RTP.serverAccessor.sendMessage(senderId,msg);
+        }
+
         RTP.serverAccessor.start();
 
         return true;
