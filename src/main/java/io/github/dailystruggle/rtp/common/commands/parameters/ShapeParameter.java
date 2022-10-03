@@ -15,16 +15,14 @@ public class ShapeParameter extends CommandParameter {
     public ShapeParameter(String permission, String description, BiFunction<UUID, String, Boolean> isRelevant) {
         super(permission,description, isRelevant);
         Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
-        factory.map.forEach((s, shape1) -> putShape(shape1.name, shape1.getParameters()));
+        factory.map.forEach((s, shape1) -> put(shape1.name, shape1.getParameters()));
     }
-
-    private final Map<String,Map<String,CommandParameter>> subParams = new ConcurrentHashMap<>();
 
     @Override
     public Set<String> values() {
         Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
         factory.map.forEach((s, shape1) -> {
-            if(!subParams.containsKey(s.toUpperCase())) putShape(shape1.name, shape1.getParameters());
+            if(!subParamMap.containsKey(s.toUpperCase())) put(shape1.name, shape1.getParameters());
         });
         return RTP.factoryMap.get(RTP.factoryNames.shape).map.keySet();
     }
@@ -33,20 +31,20 @@ public class ShapeParameter extends CommandParameter {
     public Map<String, CommandParameter> subParams(String parameter) {
         parameter = parameter.toUpperCase();
         Factory<?> shapeFactory = RTP.factoryMap.get(RTP.factoryNames.shape);
-        Map<String, CommandParameter> map = subParams.get(parameter);
+        Map<String, CommandParameter> map = subParamMap.get(parameter);
         if(map!=null) {
             return map;
         }
         Shape<?> shape = (Shape<?>) shapeFactory.get(parameter);
         if(shape!=null) {
             map = shape.getParameters();
-            subParams.put(parameter, map);
+            subParamMap.put(parameter, map);
             return map;
         }
         return new ConcurrentHashMap<>();
     }
 
-    public void putShape(String name, Map<String, CommandParameter> params) {
-        subParams.put(name.toUpperCase(),params);
+    public void put(String name, Map<String, CommandParameter> params) {
+        subParamMap.put(name.toUpperCase(),params);
     }
 }

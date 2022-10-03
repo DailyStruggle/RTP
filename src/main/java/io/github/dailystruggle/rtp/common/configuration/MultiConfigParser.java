@@ -3,11 +3,15 @@ package io.github.dailystruggle.rtp.common.configuration;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
+import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.util.EnumMap;
+import java.util.Set;
+import java.util.logging.Level;
+import java.util.stream.Collectors;
 
 public class MultiConfigParser<E extends Enum<E>>  extends FactoryValue<E> implements ConfigLoader {
     public Factory<ConfigParser<E>> configParserFactory = new Factory<>();
@@ -84,27 +88,19 @@ public class MultiConfigParser<E extends Enum<E>>  extends FactoryValue<E> imple
     }
 
     @NotNull
-    public ConfigParser<E> getParser(String name) {
-        name = name.toUpperCase();
-        if(!name.endsWith(".YML")) name = name + ".YML";
-        //todo: check for additional file
-        //todo: in worlds parser, check for additional worlds
-        ConfigParser<E> parser;
-        if(configParserFactory.contains(name)) { // old file
-            parser = configParserFactory.map.get(name);
-        }
-        else { //new file
-            parser = (ConfigParser<E>) configParserFactory.getOrDefault(name);
-            parser.check(parser.version, parser.pluginDirectory,langMap);
-            addParser(parser);
-        }
-        return parser;
+    public Set<String> listParsers() {
+        return configParserFactory.map.values().stream()
+                .map(eConfigParser -> StringUtils.replaceIgnoreCase(eConfigParser.name,".yml",""))
+                .collect(Collectors.toSet());
     }
 
-    public void addParser(String name, @Nullable EnumMap<E,Object> data) {
-        name = name.toUpperCase();
-        if(!name.endsWith(".YML")) name = name + ".YML";
-        ConfigParser<E> value = (ConfigParser<E>) configParserFactory.construct(name, data);
+    @NotNull
+    public ConfigParser<E> getParser(String name) {
+        return (ConfigParser<E>) configParserFactory.getOrDefault(name);
+    }
+
+    public void addParser(String name) {
+        ConfigParser<E> value = (ConfigParser<E>) configParserFactory.construct(name);
         configParserFactory.add(name, value);
     }
 
@@ -114,10 +110,9 @@ public class MultiConfigParser<E extends Enum<E>>  extends FactoryValue<E> imple
         configParserFactory.add(parser.name,eConfigParser);
     }
 
-    public void addAll(Iterable<String> keys) {
+    public void addAll(String... keys) {
         for(String key : keys) {
-            ConfigParser<?> value = getParser(key);
-            addParser(name,null);
+            addParser(key);
         }
     }
 

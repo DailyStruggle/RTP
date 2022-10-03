@@ -190,6 +190,7 @@ public class BukkitServerAccessor implements RTPServerAccessor {
 
     @Override
     public void sendMessage(UUID target, LangKeys msgType) {
+        if(RTPBukkitPlugin.getInstance()==null || !RTPBukkitPlugin.getInstance().isEnabled()) return;
         ConfigParser<LangKeys> parser = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
         if(parser == null) return;
         String msg = String.valueOf(parser.getConfigValue(msgType,""));
@@ -199,6 +200,7 @@ public class BukkitServerAccessor implements RTPServerAccessor {
 
     @Override
     public void sendMessage(UUID target1, UUID target2, LangKeys msgType) {
+        if(RTPBukkitPlugin.getInstance()==null || !RTPBukkitPlugin.getInstance().isEnabled()) return;
         ConfigParser<LangKeys> parser = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
         String msg = String.valueOf(parser.getConfigValue(msgType,""));
         if(msg == null || msg.isEmpty()) return;
@@ -207,6 +209,7 @@ public class BukkitServerAccessor implements RTPServerAccessor {
 
     @Override
     public void sendMessage(UUID target, String message) {
+        if(RTPBukkitPlugin.getInstance()==null || !RTPBukkitPlugin.getInstance().isEnabled()) return;
         CommandSender sender = (target.equals(CommandsAPI.serverId))
                 ? Bukkit.getConsoleSender()
                 : Bukkit.getPlayer(target);
@@ -215,11 +218,13 @@ public class BukkitServerAccessor implements RTPServerAccessor {
 
     @Override
     public void sendMessageAndSuggest(UUID target, String message, String suggestion) {
+        if(RTPBukkitPlugin.getInstance()==null || !RTPBukkitPlugin.getInstance().isEnabled()) return;
         SendMessage.sendMessage(getSender(target),message,suggestion,suggestion);
     }
 
     @Override
     public void sendMessage(UUID target1, UUID target2, String message) {
+        if(RTPBukkitPlugin.getInstance()==null || !RTPBukkitPlugin.getInstance().isEnabled()) return;
         CommandSender sender = (target1.equals(CommandsAPI.serverId))
                 ? Bukkit.getConsoleSender()
                 : Bukkit.getPlayer(target1);
@@ -232,16 +237,19 @@ public class BukkitServerAccessor implements RTPServerAccessor {
 
     @Override
     public void log(Level level, String msg) {
+        if(RTPBukkitPlugin.getInstance()==null || !RTPBukkitPlugin.getInstance().isEnabled()) return;
         SendMessage.log(level,msg);
     }
 
     @Override
     public void log(Level level, String msg, Exception exception) {
+        if(RTPBukkitPlugin.getInstance()==null || !RTPBukkitPlugin.getInstance().isEnabled()) return;
         SendMessage.log(level,msg,exception);
     }
 
     @Override
     public void announce(String msg, String permission) {
+        if(RTPBukkitPlugin.getInstance()==null || !RTPBukkitPlugin.getInstance().isEnabled()) return;
         SendMessage.sendMessage(Bukkit.getConsoleSender(), msg);
         for(Player p : Bukkit.getOnlinePlayers().stream().filter(player -> player.hasPermission(permission)).collect(Collectors.toSet())) {
             SendMessage.sendMessage(p, msg);
@@ -335,10 +343,10 @@ public class BukkitServerAccessor implements RTPServerAccessor {
             long avgTime = TPS.timeSinceTick(20) / 20;
             long currTime = TPS.timeSinceTick(1);
             CommandsAPI.execute(avgTime - currTime);
-        }, 40, 1);
+        }, 1, 1);
 
-        plugin.syncTimer = new SyncTeleportProcessing().runTaskTimer(plugin,80,1);
-        plugin.asyncTimer = new AsyncTeleportProcessing().runTaskTimerAsynchronously(plugin,80,1);
+        plugin.syncTimer = new SyncTeleportProcessing().runTaskTimer(plugin,0,1);
+        plugin.asyncTimer = new AsyncTeleportProcessing().runTaskTimerAsynchronously(plugin,0,1);
 
         getRTPWorlds();
     }
