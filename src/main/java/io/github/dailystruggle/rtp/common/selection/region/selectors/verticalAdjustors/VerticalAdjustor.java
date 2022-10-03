@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors;
 
+import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
@@ -12,6 +13,7 @@ import org.jetbrains.annotations.Nullable;
 import java.io.IOException;
 import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Predicate;
 
 public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E> {
@@ -37,6 +39,8 @@ public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E
     public abstract @Nullable
     RTPLocation adjust(@NotNull RTPChunk input);
     public abstract boolean testPlacement(@NotNull RTPBlock location);
+
+    public abstract Map<String, CommandParameter> getParameters();
 
     public abstract int minY();
     public abstract int maxY();

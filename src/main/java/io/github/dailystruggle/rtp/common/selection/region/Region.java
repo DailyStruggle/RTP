@@ -28,6 +28,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.BiConsumer;
 import java.util.function.Predicate;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public class Region extends FactoryValue<RegionKeys> {
@@ -36,7 +37,7 @@ public class Region extends FactoryValue<RegionKeys> {
     public static final List<BiConsumer<Region,UUID>> onPlayerQueuePush = new ArrayList<>();
     public static final List<BiConsumer<Region,UUID>> onPlayerQueuePop = new ArrayList<>();
 
-    public static int maxBiomeChecksPerGen = 100;
+    public static int maxBiomeChecksPerGen = 5;
 
     /**
      * public/shared cache for this region
@@ -411,10 +412,9 @@ public class Region extends FactoryValue<RegionKeys> {
         long maxBiomeChecks = maxBiomeChecksPerGen*maxAttempts;
         long biomeChecks = 0L;
 
-
         RTPWorld world = getWorld();
 
-        long biomeFails = 0;
+        long biomeFails = 0L;
         long worldBorderFails = 0L;
         long vertFails = 0L;
         long safetyFails = 0L;
@@ -422,6 +422,7 @@ public class Region extends FactoryValue<RegionKeys> {
 
         RTPLocation location = null;
         long i = 1;
+
         for(; i <= maxAttempts; i++) {
             long l = -1;
             int[] select;
@@ -451,12 +452,11 @@ public class Region extends FactoryValue<RegionKeys> {
             }
             if(biomeChecks>=maxBiomeChecks) return new AbstractMap.SimpleEntry<>(null,i);
 
-
             WorldBorder border = RTP.serverAccessor.getWorldBorder(world.name());
             if(!border.isInside().apply(new RTPLocation(world,select[0]*16, (vert.maxY()-vert.minY())/2+vert.minY(), select[1]*16))) {
                 maxAttempts++;
                 worldBorderFails++;
-                if(worldBorderFails>10000) {
+                if(worldBorderFails>1000) {
                     new IllegalStateException("10000 worldborder checks failed. region/selection is likely outside the worldborder").printStackTrace();
                     return new AbstractMap.SimpleEntry<>(null,i);
                 }
@@ -511,7 +511,6 @@ public class Region extends FactoryValue<RegionKeys> {
                 }
             }
 
-
             if(pass) {
                 pass = checkGlobalRegionVerifiers(location);
                 if(!pass) miscFails++;
@@ -531,6 +530,15 @@ public class Region extends FactoryValue<RegionKeys> {
                 location = null;
             }
         }
+
+//        RTP.log(Level.WARNING,"region:"+name);
+//        RTP.log(Level.WARNING,"biomeFails:"+biomeFails);
+//        RTP.log(Level.WARNING,"worldBorderFails:"+worldBorderFails);
+//        RTP.log(Level.WARNING,"vertFails:"+vertFails);
+//        RTP.log(Level.WARNING,"safetyFails:"+safetyFails);
+//        RTP.log(Level.WARNING,"miscFails:"+miscFails);
+
+        i = Math.min(i,maxAttempts);
 
         return new AbstractMap.SimpleEntry(location,i);
     }

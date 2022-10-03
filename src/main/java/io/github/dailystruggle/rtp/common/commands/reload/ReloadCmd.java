@@ -15,17 +15,19 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.logging.Level;
 
 public class ReloadCmd extends BaseRTPCmdImpl {
 
     public ReloadCmd(@Nullable CommandsAPICommand parent) {
         super(parent);
 
-        RTP.getInstance().miscAsyncTasks.add(new RTPRunnable(this::addCommands,20));
+        addCommands();
     }
 
     public void addCommands() {
         final Configs configs = RTP.getInstance().configs;
+        if(configs == null) RTP.getInstance().miscAsyncTasks.add(new RTPRunnable(this::addCommands,1));
         for (ConfigParser<?> value : configs.configParserMap.values()) {
             String name = value.name.replace(".yml","");
             if(getCommandLookup().containsKey(name)) continue;
@@ -56,13 +58,13 @@ public class ReloadCmd extends BaseRTPCmdImpl {
 
     @Override
     public boolean onCommand(UUID senderId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
-        addCommands();
-
         RTP.stop();
         RTP.serverAccessor.stop();
-        RTP.serverAccessor.start();
 
-        if(nextCommand!=null) return true;
+        if(nextCommand!=null) {
+            RTP.serverAccessor.start();
+            return true;
+        }
 
         ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
         if(lang != null) {
@@ -73,6 +75,12 @@ public class ReloadCmd extends BaseRTPCmdImpl {
 
         boolean b = RTP.getInstance().configs.reload();
         if(!b) throw new IllegalStateException("reload failed");
+
+        if(lang != null) {
+            String msg = String.valueOf(lang.getConfigValue(LangKeys.reloading,""));
+            if(msg!=null) msg = StringUtils.replace(msg,"[filename]", "configs");
+            RTP.serverAccessor.sendMessage(senderId,msg);
+        }
 
         RTP.serverAccessor.start();
 

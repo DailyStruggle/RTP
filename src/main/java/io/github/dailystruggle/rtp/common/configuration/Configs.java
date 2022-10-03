@@ -13,6 +13,7 @@ import org.jetbrains.annotations.Nullable;
 import java.io.File;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
 
 public class Configs {
     protected File worldLangMap;
@@ -94,7 +95,7 @@ public class Configs {
         MultiConfigParser<WorldKeys> worlds = new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", pluginDirectory);
 
         for(RTPWorld world : RTP.serverAccessor.getRTPWorlds()) {
-            worlds.getParser(world.name());
+            worlds.addParser(world.name());
         }
 
         putParser(lang);
@@ -107,8 +108,8 @@ public class Configs {
 
         for(ConfigParser<RegionKeys> regionConfig : regions.configParserFactory.map.values()) {
             EnumMap<RegionKeys, Object> data = regionConfig.getData();
-            Region region = new Region(regionConfig.name.replace(".yml",""), data);
-            RTP.getInstance().selectionAPI.permRegionLookup.put(region.name.toUpperCase(),region);
+            Region region = new Region(StringUtils.replaceIgnoreCase(regionConfig.name,".yml",""), data);
+            RTP.getInstance().selectionAPI.permRegionLookup.put(region.name,region);
         }
         if(onReload.size()>0) onReload.forEach(Runnable::run);
     }

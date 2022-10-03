@@ -39,7 +39,7 @@ public class SelectionAPI {
      */
     @Nullable
     public Region getRegion(String regionName) {
-        return permRegionLookup.get(regionName.toUpperCase());
+        return permRegionLookup.get(regionName);
     }
 
 
@@ -50,7 +50,6 @@ public class SelectionAPI {
      */
     @NotNull
     public Region getRegionExceptionally(String regionName) {
-        String regionNameCaps = regionName.toUpperCase();
         Region res = permRegionLookup.get(regionName);
         if(res == null) throw new IllegalStateException("region:" + regionName + " does not exist");
         return res;
@@ -73,8 +72,6 @@ public class SelectionAPI {
      */
     @NotNull
     public Region getRegionOrDefault(String regionName, String defaultName) {
-        regionName = regionName.toUpperCase();
-        defaultName = defaultName.toUpperCase();
         Region region = permRegionLookup.getOrDefault(regionName, permRegionLookup.get(defaultName));
         if(region == null) throw new IllegalStateException("neither '" + regionName + "' nor '" + defaultName + "' are known regions\n" + permRegionLookup);
         return Objects.requireNonNull(region);
@@ -128,9 +125,8 @@ public class SelectionAPI {
 
     public Region tempRegion(Map<String,String> regionParams,
                              @Nullable String baseRegionName) {
-        if(baseRegionName == null || baseRegionName.isEmpty() || !permRegionLookup.containsKey(baseRegionName.toUpperCase()))
+        if(baseRegionName == null || baseRegionName.isEmpty() || !permRegionLookup.containsKey(baseRegionName))
             baseRegionName = "default";
-        baseRegionName = baseRegionName.toUpperCase();
         Region baseRegion = Objects.requireNonNull(permRegionLookup.get(baseRegionName));
         EnumMap<RegionKeys, Object> data = baseRegion.getData();
         for(RegionKeys key : RegionKeys.values()) {

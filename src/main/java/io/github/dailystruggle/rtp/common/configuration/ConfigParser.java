@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.configuration;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.simpleyaml.configuration.ConfigurationSection;
@@ -209,7 +210,9 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
             else {
                 File source = new File(myDirectory + File.separator + "default.yml");
                 File target = new File(myDirectory + File.separator + name);
-                Files.copy(source.toPath(),new FileOutputStream(target.getPath()));
+                FileOutputStream outputStream = new FileOutputStream(target.getPath());
+                Files.copy(source.toPath(), outputStream);
+                outputStream.close();
             }
         }
     }
@@ -263,6 +266,18 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
         super.set(key,value);
         Object o = yamlFile.get(key.name());
         if(o instanceof ConfigurationSection) {
+            ConfigurationSection configurationSection = (ConfigurationSection) o;
+
+            if(configurationSection.getName().equalsIgnoreCase("shape") && value instanceof String) {
+                String shapeName = (String) value;
+                value = RTP.factoryMap.get(RTP.factoryNames.shape).getOrDefault(shapeName);
+            }
+
+            if(configurationSection.getName().equalsIgnoreCase("vert") && value instanceof String) {
+                String vertName = (String) value;
+                value = RTP.factoryMap.get(RTP.factoryNames.vert).getOrDefault(vertName);
+            }
+
             if(value instanceof FactoryValue<?>) {
                 EnumMap<?, Object> data = ((FactoryValue<?>) value).getData();
                 Map<String,Object> map = new HashMap<>();
@@ -272,7 +287,11 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
             else if(value instanceof Map) {
                 setSection((ConfigurationSection) o,(Map<String, Object>) value);
             }
-            else throw new IllegalArgumentException();
+            else {
+                IllegalArgumentException exception = new IllegalArgumentException();
+                exception.printStackTrace();
+                throw exception;
+            }
             yamlFile.set(key.name(),o);
         }
         else {
