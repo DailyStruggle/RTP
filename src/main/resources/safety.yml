@@ -67,6 +67,7 @@ airBlocks:
 
 #what materials, according to the bukkit api, to avoid
 unsafeBlocks:
+  - BEDROCK
   - MAGMA_BLOCK
   - TNT
   - LAVA

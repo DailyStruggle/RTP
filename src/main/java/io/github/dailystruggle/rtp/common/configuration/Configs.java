@@ -9,6 +9,7 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
+import org.simpleyaml.configuration.MemorySection;
 
 import java.io.File;
 import java.util.*;
@@ -37,12 +38,36 @@ public class Configs {
         if(instance == null)
             throw new NullPointerException("instance is null");
 
-        if(instance instanceof ConfigParser<?>)
+        ConfigParser<LoggingKeys> logging;
+        String name;
+        if(instance instanceof ConfigParser<?>) {
+            name = ((ConfigParser<?>) instance).name;
+            if(((ConfigParser<?>) instance).myClass.equals(LoggingKeys.class))
+                logging = ((ConfigParser<LoggingKeys>) instance);
+            else logging = (ConfigParser<LoggingKeys>) RTP.getInstance().configs.getParser(LoggingKeys.class);
             configParserMap.put(((ConfigParser<?>) instance).myClass, (ConfigParser<?>) instance);
-        else if(instance instanceof MultiConfigParser<?>)
+        }
+        else if(instance instanceof MultiConfigParser<?>) {
+            logging = (ConfigParser<LoggingKeys>) RTP.getInstance().configs.getParser(LoggingKeys.class);
+            name = ((MultiConfigParser<?>) instance).name;
             multiConfigParserMap.put(((MultiConfigParser<?>) instance).myClass, (MultiConfigParser<?>) instance);
+        }
         else
             throw new IllegalArgumentException("invalid type:" + instance.getClass().getSimpleName() + ", expected a config parser");
+
+        boolean detailed_reload = true;
+        if(logging!=null) {
+            Object o = logging.getConfigValue(LoggingKeys.detailed_reload, false);
+            if (o instanceof Boolean) {
+                detailed_reload = (Boolean) o;
+            } else {
+                detailed_reload = Boolean.parseBoolean(o.toString());
+            }
+        }
+
+        if(detailed_reload) {
+            RTP.log(Level.INFO, "[RTP] loaded " + name);
+        }
     }
 
     public <T extends Enum<T>> FactoryValue<T> getParser(Class<T> parserEnumClass) {
@@ -84,34 +109,85 @@ public class Configs {
 
 
     protected void reloadAction() {
-        ConfigParser<LangKeys> lang = new ConfigParser<>(LangKeys.class,"lang.yml", "1.0", pluginDirectory, null);
+        ConfigParser<LoggingKeys> logging = new ConfigParser<>(LoggingKeys.class,"logging.yml", "1.0", pluginDirectory);
+        putParser(logging);
+
+        ConfigParser<LangKeys> lang = new ConfigParser<>(LangKeys.class,"lang.yml", "1.0", pluginDirectory);
+        putParser(lang);
 
         ConfigParser<ConfigKeys> config = new ConfigParser<>(ConfigKeys.class, "config.yml", "1.0", pluginDirectory);
+        putParser(config);
+
         ConfigParser<EconomyKeys> economy = new ConfigParser<>(EconomyKeys.class, "economy.yml", "1.0", pluginDirectory);
+        putParser(economy);
+
         ConfigParser<PerformanceKeys> performance = new ConfigParser<>(PerformanceKeys.class, "performance.yml", "1.0", pluginDirectory);
+        putParser(performance);
+
         ConfigParser<SafetyKeys> safety = new ConfigParser<>(SafetyKeys.class, "safety", "1.0", pluginDirectory);
+        putParser(safety);
 
         MultiConfigParser<RegionKeys> regions = new MultiConfigParser<>(RegionKeys.class, "regions", "1.0", pluginDirectory);
+        putParser(regions);
+
         MultiConfigParser<WorldKeys> worlds = new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", pluginDirectory);
+        putParser(worlds);
 
         for(RTPWorld world : RTP.serverAccessor.getRTPWorlds()) {
             worlds.addParser(world.name());
         }
 
-        putParser(lang);
-        putParser(config);
-        putParser(economy);
-        putParser(performance);
-        putParser(safety);
-        putParser(regions);
-        putParser(worlds);
+        boolean detailed_region_init = true;
+        if(logging!=null) {
+            Object o = logging.getConfigValue(LoggingKeys.detailed_region_init, false);
+            if (o instanceof Boolean) {
+                detailed_region_init = (Boolean) o;
+            } else {
+                detailed_region_init = Boolean.parseBoolean(o.toString());
+            }
+        }
 
         for(ConfigParser<RegionKeys> regionConfig : regions.configParserFactory.map.values()) {
             EnumMap<RegionKeys, Object> data = regionConfig.getData();
+            String name = StringUtils.replaceIgnoreCase(regionConfig.name, ".yml","");
+            if(detailed_region_init) {
+                data.forEach((regionKeys, o1) -> {
+                    StringBuilder builder = new StringBuilder("[RTP] [" + name + "] " + regionKeys.name() + ": ");
+                    if(o1 instanceof MemorySection) {
+                        RTP.log(Level.INFO, builder.toString());
+                        MemorySection section = (MemorySection) o1;
+                        appendMemorySectionRecursive(section, name, 1);
+                    }
+                    else {
+                        builder.append(o1.toString());
+                        RTP.log(Level.INFO, builder.toString());
+                    }
+                });
+            }
             Region region = new Region(StringUtils.replaceIgnoreCase(regionConfig.name,".yml",""), data);
             RTP.getInstance().selectionAPI.permRegionLookup.put(region.name,region);
+            if(detailed_region_init) {
+                RTP.log(Level.INFO, "[RTP] [" + name + "] successfully created teleport region - " + region.name);
+            }
         }
         if(onReload.size()>0) onReload.forEach(Runnable::run);
+    }
+
+    private static void appendMemorySectionRecursive(MemorySection memorySection, String name, int indent) {
+        StringBuilder builder = new StringBuilder();
+        for (Map.Entry<String, Object> entry : memorySection.getMapValues(false).entrySet()) {
+            String s = entry.getKey();
+            Object o = entry.getValue();
+            builder.append("[RTP] [").append(name).append("] ").append(StringUtils.repeat("    ", indent)).append(s).append(": ");
+            if (o instanceof MemorySection) {
+                RTP.log(Level.INFO, builder.toString());
+                appendMemorySectionRecursive(memorySection, name, indent + 1);
+            } else {
+                builder.append(o.toString());
+                RTP.log(Level.INFO, builder.toString());
+            }
+            builder = new StringBuilder();
+        }
     }
 
     //todo: region setup

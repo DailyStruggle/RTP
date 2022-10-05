@@ -343,11 +343,11 @@ public class BukkitServerAccessor implements RTPServerAccessor {
             long avgTime = TPS.timeSinceTick(20) / 20;
             long currTime = TPS.timeSinceTick(1);
             CommandsAPI.execute(avgTime - currTime);
-        }, 1, 1);
+        }, 40, 1);
 
-        plugin.syncTimer = new SyncTeleportProcessing().runTaskTimer(plugin,0,1);
-        plugin.asyncTimer = new AsyncTeleportProcessing().runTaskTimerAsynchronously(plugin,0,1);
+        plugin.syncTimer = new SyncTeleportProcessing().runTaskTimer(plugin,20,1);
+        plugin.asyncTimer = new AsyncTeleportProcessing().runTaskTimerAsynchronously(plugin,20,1);
 
-        getRTPWorlds();
+        Bukkit.getScheduler().runTaskAsynchronously(plugin,this::getRTPWorlds);
     }
 }

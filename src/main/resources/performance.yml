@@ -24,8 +24,8 @@ syncLoading: false
 #on startup, whether to enable permissions parsing for onEvent permissions
 onEventParsing: false
 
-#on startup, whether to enable permissions parsing for effect permissions
-effectParsing: false
+#on startup, whether to enable permissions parsing for effect permissions-
+effectParsing: true
 
 #reuse biome locations when biome is specified
 biomeRecall: true

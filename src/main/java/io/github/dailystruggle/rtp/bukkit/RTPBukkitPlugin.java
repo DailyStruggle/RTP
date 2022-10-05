@@ -85,12 +85,17 @@ public final class RTPBukkitPlugin extends JavaPlugin {
 
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,RTP.serverAccessor::start);
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupBukkitEvents);
-        Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupEffects);
+        Bukkit.getScheduler().runTaskAsynchronously(this,this::setupEffects);
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupIntegrations);
 
         Bukkit.getScheduler().runTaskTimer(this, new TPS(),0,1);
 
         SendMessage.sendMessage(Bukkit.getConsoleSender(),"");
+
+        while (RTP.getInstance().startupTasks.size()>0) {
+            RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
+        }
+
     }
 
     @Override

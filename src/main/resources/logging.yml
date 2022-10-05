@@ -1,0 +1,15 @@
+detailed_reload: false
+detailed_region_init: true
+command: false
+teleport: true
+
+event_changeworld: true
+event_join: true
+event_respawn: true
+event_move: true
+event_teleport: true
+
+selection_failure: true #output detailed info when selection fails
+
+#DO NOT TOUCH VERSION NUMBER
+version: "1.0"
