@@ -10,9 +10,11 @@ import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -44,7 +46,7 @@ public final class BukkitRTPCommandSender implements RTPCommandSender {
     public long cooldown() {
         if (sender.hasPermission("rtp.noCooldown")) return 0;
 
-        int cooldown = ParsePermissions.getInt(new BukkitRTPCommandSender(sender), "rtp.cooldown.");
+        int cooldown = ParsePermissions.getInt(this, "rtp.cooldown.");
         if (cooldown < 0) {
             ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.getInstance().configs.getParser(ConfigKeys.class);
             cooldown = configParser.getNumber(ConfigKeys.teleportCooldown, 0).intValue();
@@ -62,6 +64,11 @@ public final class BukkitRTPCommandSender implements RTPCommandSender {
             delay = configParser.getNumber(ConfigKeys.teleportDelay, 0).intValue();
         }
         return TimeUnit.SECONDS.toNanos(delay);
+    }
+
+    @Override
+    public String name() {
+        return sender.getName();
     }
 
     @Override

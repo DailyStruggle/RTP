@@ -135,6 +135,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
         Map<?,?> badLocations = (Map<?, ?>) resultMap.get("badLocations");
         if(badLocations == null) return;
+        this.badLocationSum.set(0);
         for(Map.Entry<?,?> e : badLocations.entrySet()) {
             String key = String.valueOf(e.getKey());
             String val = String.valueOf(e.getValue());

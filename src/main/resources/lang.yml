@@ -125,4 +125,8 @@ fadeOut: 20
 
 actionbar: ""
 
+detailed_reload:
+  - "#00D94C============================="
+  - "#00D94C"
+
 version: "1.0"

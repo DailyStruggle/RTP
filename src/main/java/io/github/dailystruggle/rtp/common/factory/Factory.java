@@ -44,8 +44,8 @@ public class Factory<T extends FactoryValue<?>> {
         //guard constructor
         T value = map.get(comparableName);
         if(value == null) {
-            if(map.containsKey("DEFAULT.YML")) {
-                value = map.get("DEFAULT.YML");
+            if(map.containsKey("DEFAULT.YML") || map.size()>0) {
+                value = map.getOrDefault("DEFAULT.YML", map.values().stream().findAny().get());
                 T clone = (T) value.clone();
                 clone.name = (StringUtils.endsWithIgnoreCase(name,".yml")) ? name : name + ".yml";
 

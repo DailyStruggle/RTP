@@ -19,6 +19,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.logging.Level;
 
 public interface RTPCmd extends BaseRTPCmd {
     default void init() {
@@ -76,6 +77,21 @@ public interface RTPCmd extends BaseRTPCmd {
         RTP rtp = RTP.getInstance();
         if(nextCommand!=null) {
             return true;
+        }
+
+        ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.getInstance().configs.getParser(LoggingKeys.class);
+        boolean verbose = false;
+        if(logging!=null) {
+            Object o = logging.getConfigValue(LoggingKeys.command,false);
+            if (o instanceof Boolean) {
+                verbose = (Boolean) o;
+            } else {
+                verbose = Boolean.parseBoolean(o.toString());
+            }
+        }
+
+        if(verbose) {
+            RTP.log(Level.INFO, "[plugin] RTP command triggered by " + sender.name() + ".");
         }
 
         ConfigParser<LangKeys> langParser = (ConfigParser<LangKeys>) rtp.configs.getParser(LangKeys.class);
@@ -146,6 +162,10 @@ public interface RTPCmd extends BaseRTPCmd {
 
         for(int i = 0; i < players.size(); i++) {
             RTPPlayer player = players.get(i);
+
+            if(verbose && rtpArgs.containsKey("player")) {
+                RTP.log(Level.INFO, "[plugin] RTP processing player:" + player.name());
+            }
 
             //get their data
             TeleportData data = rtp.latestTeleportData.get(player.uuid());
