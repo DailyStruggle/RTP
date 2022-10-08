@@ -55,10 +55,6 @@ public class SendMessage {
             lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
         },2);
 
-        placeholders.put("plugin",uuid -> {
-            if(lang == null) return "[RTP]";
-            return String.valueOf(lang.getConfigValue(LangKeys.plugin,""));
-        });
         placeholders.put("delay",uuid -> {
             if(RTP.getInstance() == null) return "0";
             if(RTP.serverAccessor==null) return "0";
@@ -401,11 +397,14 @@ public class SendMessage {
         Map<String,String> placeholders = new HashMap<>(SendMessage.placeholders.size());
 
         Set<String> keywords = ParseString.keywords(text,SendMessage.placeholders.keySet(), new HashSet<>(Arrays.asList('[','%')), new HashSet<>(Arrays.asList(']','%')));
+
         //for each placeholder getter, add placeholder and result to container
-        SendMessage.placeholders.forEach((s, uuidStringFunction) -> {
-            if(!keywords.contains(s)) return;
-            placeholders.put(s,uuidStringFunction.apply(uuid));
-        });
+        for (Map.Entry<String, Function<UUID, String>> entry : SendMessage.placeholders.entrySet()) {
+            String s = entry.getKey();
+            Function<UUID, String> uuidStringFunction = entry.getValue();
+            if (!keywords.contains(s)) continue;
+            placeholders.put(s, uuidStringFunction.apply(uuid));
+        }
 
         //set up substitutor with the new placeholder results array
         // using [x] format to detect my local placeholders.
@@ -414,6 +413,35 @@ public class SendMessage {
         //replace all placeholders with their respective string function results
         text = sub.replace(text);
 
+        if(lang != null) {
+            Pattern placeholderIntPattern = Pattern.compile("\\[([Pp])(\\d*)]");
+            Matcher placeholderIntMatcher = placeholderIntPattern.matcher(text);
+            while (placeholderIntMatcher.find()) {
+                String group = placeholderIntMatcher.group(2);
+                int bits;
+                try {
+                    bits = Integer.parseInt(group);
+                } catch (NumberFormatException ignored) {
+                    continue;
+                }
+                placeholderIntMatcher.reset();
+
+                String replacement = "[invalid]";
+                ConfigParser<LangKeys> parser = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+                Object o = parser.getConfigValue(LangKeys.placeholders, new ArrayList<>());
+                if (o instanceof List) {
+                    List<?> pList = (List<?>) o;
+                    if (pList.size() > bits) {
+                        replacement = pList.get(bits).toString();
+                    }
+                }
+
+                replacement = placeholderIntPattern.matcher(replacement).replaceAll("");
+
+                text = placeholderIntMatcher.replaceFirst(replacement);
+                placeholderIntMatcher = placeholderIntPattern.matcher(text);
+            }
+        }
 
         //check PAPI exists and fill remaining PAPI placeholders
         //todo: if a null player doesn't work with another PAPI import, blame that import for not verifying its inputs.

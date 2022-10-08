@@ -1,3 +1,5 @@
+#selection and teleportation safety options
+
 #how long to give invincibility on teleport, in seconds
 invulnerabilityTime: 5
 

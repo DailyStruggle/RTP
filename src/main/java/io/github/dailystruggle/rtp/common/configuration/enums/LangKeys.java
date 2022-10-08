@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.configuration.enums;
 
 public enum LangKeys {
-    plugin,
+    placeholders,
     alreadyTeleporting,
     delayMessage,
     teleportMessage,
