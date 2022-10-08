@@ -1,5 +1,7 @@
+#toggle logs for specific occasions
+# some of these logs are not configurable due to scale
 detailed_reload: false
-detailed_region_init: true
+detailed_region_init: false
 command: false
 teleport: true
 
@@ -9,7 +11,9 @@ event_respawn: true
 event_move: true
 event_teleport: true
 
-selection_failure: true #output detailed info when selection fails
+#output detailed info when any selection fails,
+#  including failure rates and sometimes parameters for debugging
+selection_failure: true
 
 #DO NOT TOUCH VERSION NUMBER
 version: "1.0"

@@ -1,36 +1,48 @@
 #how many rerolls before stopping
+# impact: high
 maxAttempts: 100
 
 #what radius, in chunks, around the destination to pre-load
 # number of chunks loaded is (1 + 2*viewDistance)^2
 # set higher to pre-load a larger radius
+# impact: high
 viewDistanceSelect: 0
 viewDistanceTeleport: 0
 
-#number of gameticks between searching for a new location in each region
-period: 20
+#number of gameticks between searching for new locations in each region (20 gameticks is 1 second)
+# The number of selections processed will depend on past selections and an estimated remaining time in the gametick.
+# Selection tasks for the different regions will rotate
+# impact: medium
+period: 100
 
 #minimum TPS requirement before trying to queue a new location
-# must be a positive number
+# must be a number between 0 and 20 exclusive
+# impact: low
 minTPS: 19.0
 
-#whether to do/don't run a queue task after each rtp in addition to the timer
-postTeleportQueueing: true
+#whether to run a queue task after each rtp in addition to the timer
+# impact: medium
+postTeleportQueueing: false
 
 #whether to use synchronous chunk loading on command for selection
 # not recommended for server performance, but it's good for testing
+# impact: high
 syncLoading: false
 
 #on startup, whether to enable permissions parsing for onEvent permissions
+# impact: medium
 onEventParsing: false
 
 #on startup, whether to enable permissions parsing for effect permissions-
+# impact: low
 effectParsing: true
 
 #reuse biome locations when biome is specified
+# impact: low
 biomeRecall: true
 
 #have each region check all in-range chunks on chunk load
+# impact: high
 checkOnChunkLoads: false
 
 version: "1.0"
