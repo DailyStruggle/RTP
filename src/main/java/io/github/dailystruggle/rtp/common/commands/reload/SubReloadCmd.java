@@ -7,21 +7,16 @@ import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
-import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.serverSide.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
-import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
-import org.simpleyaml.configuration.MemorySection;
 
 import java.util.EnumMap;
 import java.util.List;
@@ -80,16 +75,16 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
         RTPServerAccessor serverAccessor = RTP.serverAccessor;
         Configs configs = RTP.getInstance().configs;
 
-        ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) configs.getParser(LangKeys.class);
+        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) configs.getParser(MessagesKeys.class);
         if(lang == null) return true;
 
-        String msg = String.valueOf(lang.getConfigValue(LangKeys.reloading,""));
+        String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloading,""));
         if(msg!=null) msg = StringUtils.replace(msg,"[filename]", parser.name);
         serverAccessor.sendMessage(CommandsAPI.serverId, senderId,msg);
 
         parser.check(parser.version, parser.pluginDirectory, null);
 
-        msg = String.valueOf(lang.getConfigValue(LangKeys.reloaded,""));
+        msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloaded,""));
         if(msg!=null) msg = StringUtils.replace(msg,"[filename]", parser.name);
         serverAccessor.sendMessage(CommandsAPI.serverId, senderId,msg);
 
@@ -97,16 +92,15 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
     }
 
     public boolean subReloadMulti(UUID senderId, MultiConfigParser<?> parser) {
-        ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
         if(lang == null) return true;
 
         RTPServerAccessor serverAccessor = RTP.serverAccessor;
         RTPCommandSender commandSender = serverAccessor.getSender(senderId);
 
-        String msg = String.valueOf(lang.getConfigValue(LangKeys.reloading,""));
+        String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloading,""));
         if(msg!=null) msg = StringUtils.replace(msg,"[filename]", parser.name);
         serverAccessor.sendMessage(CommandsAPI.serverId, senderId,msg);
-        serverAccessor.reset();
 
         CommandsAPI.commandPipeline.clear();
 
@@ -114,76 +108,12 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
 
         MultiConfigParser<?> newParser = new MultiConfigParser<>(parser.myClass, parser.name, "1.0", parser.pluginDirectory);
         if(parser.myClass.equals(RegionKeys.class)) {
+            MultiConfigParser<RegionKeys> regions = (MultiConfigParser<RegionKeys>) newParser;
             RTP.getInstance().selectionAPI.permRegionLookup.clear();
-            for(ConfigParser<?> regionConfig : newParser.configParserFactory.map.values()) {
-                EnumMap<RegionKeys, Object> data = (EnumMap<RegionKeys, Object>) regionConfig.getData();
-
-                String worldName = String.valueOf(data.get(RegionKeys.world));
-                RTPWorld world;
-                if(worldName.startsWith("[") && worldName.endsWith("]")) {
-                    int num = Integer.parseInt(worldName.substring(1,worldName.length()-1));
-                    world = RTP.serverAccessor.getRTPWorlds().get(num);
-                }
-                else world = serverAccessor.getRTPWorld(worldName);
-                if(world == null) {
-                    new IllegalArgumentException("world not found - " + worldName).printStackTrace(); //don't need to throw
-                    continue;
-                }
-                data.put(RegionKeys.world,world);
-
-                Object shapeObj = data.get(RegionKeys.shape);
-                Shape<?> shape;
-                if(shapeObj instanceof MemorySection) {
-                    final Map<String, Object> shapeMap = ((MemorySection) shapeObj).getMapValues(true);
-                    String shapeName = String.valueOf(shapeMap.get("name"));
-                    Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
-                    shape = (Shape<?>) factory.getOrDefault(shapeName);
-                    EnumMap<?, Object> shapeData = shape.getData();
-                    for(Map.Entry<? extends Enum<?>, Object> e : shapeData.entrySet()) {
-                        String name = e.getKey().name();
-                        if(shapeMap.containsKey(name)) {
-                            e.setValue(shapeMap.get(name));
-                        }
-                        else {
-                            String altName = shape.language_mapping.get(name).toString();
-                            if(altName!=null && shapeMap.containsKey(altName)) {
-                                e.setValue(shapeMap.get(altName));
-                            }
-                        }
-                    }
-                    shape.setData(shapeData);
-                    data.put(RegionKeys.shape,shape);
-                }
-                else throw new IllegalArgumentException("shape was not a section\n" + shapeObj);
-
-
-                Object vertObj = data.get(RegionKeys.vert);
-                if(vertObj instanceof MemorySection) {
-                    final Map<String, Object> vertMap = ((MemorySection) vertObj).getMapValues(true);
-                    String shapeName = String.valueOf(vertMap.get("name"));
-                    Factory<VerticalAdjustor<?>> factory = (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
-                    VerticalAdjustor<?> vert = (VerticalAdjustor<?>) factory.getOrDefault(shapeName);
-                    EnumMap<?, Object> vertData = vert.getData();
-                    for(Map.Entry<? extends Enum<?>, Object> e : vertData.entrySet()) {
-                        String name = e.getKey().name();
-                        if(vertMap.containsKey(name)) {
-                            e.setValue(vertMap.get(name));
-                        }
-                        else {
-                            String altName = vert.language_mapping.get(name).toString();
-                            if(altName!=null && vertMap.containsKey(altName)) {
-                                e.setValue(vertMap.get(altName));
-                            }
-                        }
-                    }
-                    vert.setData(vertData);
-                    data.put(RegionKeys.vert, vert);
-                }
-                else throw new IllegalArgumentException();
-
+            for(ConfigParser<RegionKeys> regionConfig : regions.configParserFactory.map.values()) {
+                EnumMap<RegionKeys, Object> data = regionConfig.getData();
                 Region region = new Region(regionConfig.name.replace(".yml",""), data);
-                RTP.getInstance().miscAsyncTasks.add(new RTPRunnable(
-                        ()->RTP.getInstance().selectionAPI.permRegionLookup.put(region.name,region), 5));
+                RTP.getInstance().selectionAPI.permRegionLookup.put(region.name,region);
             }
         }
         else if(parser.myClass.equals(WorldKeys.class)) {
@@ -194,7 +124,7 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
 
         instance.configs.multiConfigParserMap.put(parser.myClass,newParser);
 
-        msg = String.valueOf(lang.getConfigValue(LangKeys.reloaded,""));
+        msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloaded,""));
         if(msg!=null) msg = StringUtils.replace(msg,"[filename]", parser.name);
         serverAccessor.sendMessage(CommandsAPI.serverId, commandSender.uuid(),msg);
 

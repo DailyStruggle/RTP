@@ -7,7 +7,7 @@ import io.github.dailystruggle.rtp.common.commands.parameters.RegionParameter;
 import io.github.dailystruggle.rtp.common.commands.parameters.WorldParameter;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
@@ -92,15 +92,15 @@ public class InfoCmd extends BaseRTPCmdImpl {
 
     @Override
     public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
-        ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
 
         if(parameterValues.size()==0) {
-            String title = lang.getConfigValue(LangKeys.infoTitle, "").toString();
-            String chunks = lang.getConfigValue(LangKeys.infoChunks, "").toString();
-            String worldHeader = lang.getConfigValue(LangKeys.infoWorldHeader, "").toString();
-            String worlds = lang.getConfigValue(LangKeys.infoWorld, "").toString();
-            String regionHeader = lang.getConfigValue(LangKeys.infoRegionHeader, "").toString();
-            String regions = lang.getConfigValue(LangKeys.infoRegion, "").toString();
+            String title = lang.getConfigValue(MessagesKeys.infoTitle, "").toString();
+            String chunks = lang.getConfigValue(MessagesKeys.infoChunks, "").toString();
+            String worldHeader = lang.getConfigValue(MessagesKeys.infoWorldHeader, "").toString();
+            String worlds = lang.getConfigValue(MessagesKeys.infoWorld, "").toString();
+            String regionHeader = lang.getConfigValue(MessagesKeys.infoRegionHeader, "").toString();
+            String regions = lang.getConfigValue(MessagesKeys.infoRegion, "").toString();
 
             RTP.serverAccessor.sendMessage(callerId,title);
             RTP.serverAccessor.sendMessage(callerId,chunks);
@@ -122,7 +122,7 @@ public class InfoCmd extends BaseRTPCmdImpl {
 
         List<String> worldNames = parameterValues.get("world");
         if(worldNames!=null) {
-            Object worldInfoObj = lang.getConfigValue(LangKeys.worldInfo, "");
+            Object worldInfoObj = lang.getConfigValue(MessagesKeys.worldInfo, "");
             if(!(worldInfoObj instanceof List)) return true;
             List<String> worldInfo = ((List<?>) worldInfoObj).stream().map(String::valueOf).collect(Collectors.toList());
             for(String worldName : worldNames) {
@@ -146,7 +146,7 @@ public class InfoCmd extends BaseRTPCmdImpl {
 
         List<String> regionNames = parameterValues.get("region");
         if(regionNames!=null) {
-            Object regionInfoObj = lang.getConfigValue(LangKeys.regionInfo, "");
+            Object regionInfoObj = lang.getConfigValue(MessagesKeys.regionInfo, "");
             if(!(regionInfoObj instanceof List)) return true;
             List<String> regionInfo = ((List<?>) regionInfoObj).stream().map(String::valueOf).collect(Collectors.toList());
             for(String regionName : regionNames) {

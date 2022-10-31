@@ -2,21 +2,17 @@ package io.github.dailystruggle.rtp.common.tasks;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
-import org.apache.commons.lang3.tuple.Pair;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -44,7 +40,7 @@ public final class SetupTeleport extends RTPRunnable {
         isRunning = true;
         preActions.forEach(consumer -> consumer.accept(this));
 
-        ConfigParser<LangKeys> langParser = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+        ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
 
         ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.getInstance().configs.getParser(PerformanceKeys.class);
         boolean syncLoading = false;
@@ -74,13 +70,13 @@ public final class SetupTeleport extends RTPRunnable {
 
         RTP.getInstance().latestTeleportData.put(player.uuid(),teleportData);
 
-        Pair<RTPLocation, Long> pair = this.region.getLocation(sender, player, biomes);
+        Map.Entry<RTPLocation, Long> pair = this.region.getLocation(sender, player, biomes);
         if(pair == null) { //player gets put on region queue
             return;
         }
-        else if(pair.getLeft() == null) {
-            teleportData.attempts = pair.getRight();
-            String msg = langParser.getConfigValue(LangKeys.unsafe,"").toString();
+        else if(pair.getKey() == null) {
+            teleportData.attempts = pair.getValue();
+            String msg = langParser.getConfigValue(MessagesKeys.unsafe,"").toString();
             RTP.serverAccessor.sendMessage(sender.uuid(),player.uuid(),msg);
             postActions.forEach(consumer -> consumer.accept(this, false));
             isRunning = false;
@@ -89,9 +85,9 @@ public final class SetupTeleport extends RTPRunnable {
         }
 
         if(isCancelled()) return;
-        LoadChunks loadChunks = new LoadChunks(this.sender, this.player, pair.getLeft(), this.region);
+        LoadChunks loadChunks = new LoadChunks(this.sender, this.player, pair.getKey(), this.region);
         teleportData.nextTask = loadChunks;
-        teleportData.attempts = pair.getRight();
+        teleportData.attempts = pair.getValue();
 
         boolean sync = syncLoading;
         if(!syncLoading) {

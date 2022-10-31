@@ -7,11 +7,8 @@ import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
-import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
+import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
-import io.github.dailystruggle.rtp.common.tasks.RTPTeleportCancel;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
 
@@ -24,11 +21,12 @@ public class ReloadCmd extends BaseRTPCmdImpl {
     public ReloadCmd(@Nullable CommandsAPICommand parent) {
         super(parent);
 
-        RTP.getInstance().miscAsyncTasks.add(new RTPRunnable(this::addCommands,20));
+        addCommands();
     }
 
     public void addCommands() {
         final Configs configs = RTP.getInstance().configs;
+        if(configs == null) RTP.getInstance().miscAsyncTasks.add(new RTPRunnable(this::addCommands,1));
         for (ConfigParser<?> value : configs.configParserMap.values()) {
             String name = value.name.replace(".yml","");
             if(getCommandLookup().containsKey(name)) continue;
@@ -59,35 +57,31 @@ public class ReloadCmd extends BaseRTPCmdImpl {
 
     @Override
     public boolean onCommand(UUID senderId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
-        addCommands();
+        RTP.stop();
+        RTP.serverAccessor.stop();
 
-        RTP.serverAccessor.reset();
+        if(nextCommand!=null) {
+            RTP.serverAccessor.start();
+            return true;
+        }
 
-        final RTP instance = RTP.getInstance();
-        instance.setupTeleportPipeline.clear();
-        instance.loadChunksPipeline.clear();
-        instance.teleportPipeline.clear();
-        instance.chunkCleanupPipeline.execute(Long.MAX_VALUE);
-        instance.selectionAPI.permRegionLookup.values().forEach(Region::shutDown);
-        instance.selectionAPI.tempRegions.values().forEach(Region::shutDown);
-        instance.selectionAPI.tempRegions.clear();
-        instance.latestTeleportData.forEach((uuid, data) -> {
-            if(!data.completed) new RTPTeleportCancel(uuid).run();
-        });
-        instance.processingPlayers.clear();
-
-        RTP.serverAccessor.getRTPWorlds().forEach(RTPWorld::forgetChunks);
-
-        if(nextCommand!=null) return true;
-
-        ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
         if(lang != null) {
-            String msg = String.valueOf(lang.getConfigValue(LangKeys.reloading,""));
+            String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloading,""));
             if(msg!=null) msg = StringUtils.replace(msg,"[filename]", "configs");
             RTP.serverAccessor.sendMessage(CommandsAPI.serverId, senderId,msg);
         }
 
-        RTP.getInstance().configs.reload();
+        boolean b = RTP.getInstance().configs.reload();
+        if(!b) throw new IllegalStateException("reload failed");
+
+        if(lang != null) {
+            String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloading,""));
+            if(msg!=null) msg = StringUtils.replace(msg,"[filename]", "configs");
+            RTP.serverAccessor.sendMessage(senderId,msg);
+        }
+
+        RTP.serverAccessor.start();
 
         return true;
     }

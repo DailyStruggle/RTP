@@ -1,14 +1,16 @@
 package io.github.dailystruggle.rtp.common.factory;
 
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.Enumeration;
-import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
 
 /**
  * On request, find a stored object with the correct name, clone it, and return it
@@ -31,67 +33,46 @@ public class Factory<T extends FactoryValue<?>> {
         return map.containsKey(name);
     }
 
-    @Nullable
-    public FactoryValue<?> construct(String name, EnumMap<? extends Enum<?>,Object> data) {
-        name = name.toUpperCase();
-        if(!name.endsWith(".YML")) name = name + ".YML";
-        //guard constructor
-        T value = map.get(name);
-        if(value == null) {
-            if(map.containsKey("default")) {
-                value = (T) construct("default", data);
-                Objects.requireNonNull(value);
-                map.put(name, value);
-            }
-            else return null;
-        }
-        FactoryValue<?> res = value.clone();
-        res.setData(data);
-        return res;
-    }
-
     /**
      * @param name name of item
      * @return mutable copy of item
      */
     @Nullable
     public FactoryValue<?> construct(String name) {
-        name = name.toUpperCase();
-        if(!name.endsWith(".YML")) name = name + ".YML";
+        String comparableName = name.toUpperCase();
+        if(!comparableName.endsWith(".YML")) comparableName = comparableName + ".YML";
         //guard constructor
-        T value = map.get(name);
+        T value = map.get(comparableName);
         if(value == null) {
-            if(map.containsKey("DEFAULT.YML")) {
-                value = map.get("DEFAULT.YML");
+            if(map.containsKey("DEFAULT.YML") || map.size()>0) {
+                value = map.getOrDefault("DEFAULT.YML", map.values().stream().findAny().get());
                 T clone = (T) value.clone();
-                clone.name=name;
+                clone.name = (StringUtils.endsWithIgnoreCase(name,".yml")) ? name : name + ".yml";
 
                 if(clone instanceof ConfigParser) {
                     ConfigParser<?> configParser = (ConfigParser<?>) clone;
                     configParser.check(configParser.version,configParser.pluginDirectory,null);
                 }
-
-                map.put(name, clone);
+                value = clone;
             }
             else return null;
         }
-        return value.clone();
+        return value;
     }
 
-    @NotNull
+    @Nullable
     public FactoryValue<?> get(String name) {
         return map.get(name.toUpperCase());
     }
 
     @NotNull
     public FactoryValue<?> getOrDefault(String name) {
-        name = name.toUpperCase();
         //guard constructor
-        T value = map.get(name);
+        T value = (T) get(name);
         if(value == null) {
-            if(map.containsKey("default")) {
-                value = (T) construct("default");
-                map.put(name, value);
+            if(map.containsKey("DEFAULT.YML")) {
+                value = (T) construct(name);
+//                map.put(name, value);
             }
             else return new ArrayList<>(map.values()).get(0);
         }

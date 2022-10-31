@@ -1,7 +1,9 @@
 package io.github.dailystruggle.rtp.common.tasks;
 
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
@@ -12,7 +14,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.logging.Level;
 
 public final class DoTeleport extends RTPRunnable {
     public static final List<Consumer<DoTeleport>> preActions = new ArrayList<>();
@@ -39,6 +43,8 @@ public final class DoTeleport extends RTPRunnable {
         //todo: safety checks
         location.world().platform(location);
 
+        RTP.getInstance().invulnerablePlayers.put(player.uuid(),System.currentTimeMillis());
+
         CompletableFuture<Boolean> setLocation = player.setLocation(location);
 
         TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.uuid());
@@ -61,10 +67,46 @@ public final class DoTeleport extends RTPRunnable {
 
         TeleportData finalTeleportData = teleportData;
         setLocation.whenComplete((aBoolean, throwable) -> {
+            ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.getInstance().configs.getParser(LoggingKeys.class);
+            boolean verbose = true;
+            if(logging!=null) {
+                Object o = logging.getConfigValue(LoggingKeys.teleport,false);
+                if (o instanceof Boolean) {
+                    verbose = (Boolean) o;
+                } else {
+                    verbose = Boolean.parseBoolean(o.toString());
+                }
+            }
+
             if(aBoolean) {
                 finalTeleportData.processingTime = System.nanoTime() - finalTeleportData.time;
                 RTP.getInstance().latestTeleportData.put(player.uuid(),finalTeleportData);
-                RTP.serverAccessor.sendMessage(player.uuid(),LangKeys.teleportMessage);
+                RTP.serverAccessor.sendMessage(player.uuid(), MessagesKeys.teleportMessage);
+
+                if(verbose) {
+                    long time = finalTeleportData.processingTime;
+                    ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
+                    long days = TimeUnit.NANOSECONDS.toDays(time);
+                    long hours = TimeUnit.NANOSECONDS.toHours(time)%24;
+                    long minutes = TimeUnit.NANOSECONDS.toMinutes(time)%60;
+                    long seconds = TimeUnit.NANOSECONDS.toSeconds(time)%60;
+
+                    String replacement = "";
+                    if(days>0) replacement += days + langParser.getConfigValue(MessagesKeys.days,"").toString() + " ";
+                    if(hours>0) replacement += hours + langParser.getConfigValue(MessagesKeys.hours,"").toString() + " ";
+                    if(minutes>0) replacement += minutes + langParser.getConfigValue(MessagesKeys.minutes,"").toString() + " ";
+                    if(seconds>0) replacement += seconds + langParser.getConfigValue(MessagesKeys.seconds,"").toString();
+                    if(seconds<2) {
+                        double millis;
+                        if(seconds<1) millis = ((double) TimeUnit.NANOSECONDS.toMicros(time))/1000 % 1000;
+                        else millis = TimeUnit.NANOSECONDS.toMillis(time)%1000;
+                        replacement += millis + langParser.getConfigValue(MessagesKeys.millis,"").toString();
+                    }
+                    RTP.log(Level.INFO, "[plugin] completed teleport for player:"+player.name() + " in " + replacement);
+                }
+            }
+            else {
+                if(verbose) RTP.log(Level.WARNING, "[plugin] failed to complete teleport for player:"+player.name());
             }
         });
 

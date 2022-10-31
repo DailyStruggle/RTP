@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 
 import io.github.dailystruggle.commandsapi.bukkit.LocalParameters.*;
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 
@@ -9,6 +10,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public class Circle extends MemoryShape<GenericMemoryShapeParams> {
@@ -28,9 +30,9 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
 
             subParameters.put("mode",new EnumParameter<>("rtp.params", "x-z position adjustment method", (sender, s) -> true, Mode.class));
             subParameters.put("radius",new IntegerParameter("rtp.params", "outer radius of region", (sender, s) -> true, 64,128,256,512,1024));
-            subParameters.put("centerRadius",new IntegerParameter("rtp.params", "inner radius of region", (sender, s) -> true,16,32,64,128,256));
-            subParameters.put("centerX",new CoordinateParameter("rtp.params", "center point x", (sender, s) -> true));
-            subParameters.put("centerZ",new CoordinateParameter("rtp.params", "center point Z", (sender, s) -> true));
+            subParameters.put("centerradius",new IntegerParameter("rtp.params", "inner radius of region", (sender, s) -> true,16,32,64,128,256));
+            subParameters.put("centerx",new CoordinateParameter("rtp.params", "center point x", (sender, s) -> true));
+            subParameters.put("centerz",new CoordinateParameter("rtp.params", "center point Z", (sender, s) -> true));
             subParameters.put("weight",new FloatParameter("rtp.params", "weigh towards or away from center", (sender, s) -> true,0.1,1.0,10.0));
             subParameters.put("expand",new BooleanParameter("rtp.params", "expand region to keep a constant amount of usable land", (sender, s) -> true));
             subParameters.put("uniquePlacements",new BooleanParameter("rtp.params", "ensure each selection is unique from prior selections", (sender, s) -> true));
@@ -126,10 +128,18 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
         boolean expand = (boolean) data.getOrDefault(GenericMemoryShapeParams.expand,false);
         String mode = data.getOrDefault(GenericMemoryShapeParams.mode,"ACCUMULATE").toString().toUpperCase();
 
+//        RTP.log(Level.SEVERE,"range 1: " + range);
+
+//        RTP.log(Level.SEVERE,"bad location sum: " + badLocationSum.get());
+
         if((!expand) && mode.equalsIgnoreCase("ACCUMULATE")) range -= badLocationSum.get();
-        else if(expand && !mode.equals("ACCUMULATE")) range += badLocationSum.get();
+        else if(expand && !mode.equalsIgnoreCase("ACCUMULATE")) range += badLocationSum.get();
+
+//        RTP.log(Level.SEVERE,"range 2: " + range);
 
         double res = (range) * (ThreadLocalRandom.current().nextDouble());
+
+//        RTP.log(Level.SEVERE,"start: " + res);
 
         long location = (long) res;
         switch (mode) {

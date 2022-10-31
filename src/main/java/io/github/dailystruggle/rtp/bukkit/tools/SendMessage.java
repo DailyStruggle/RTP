@@ -6,11 +6,10 @@ import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPCommandS
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.PAPIChecker;
-import io.github.dailystruggle.rtp.bukkit.tools.softdepends.PAPI_expansion;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
@@ -41,6 +40,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -49,115 +49,109 @@ public class SendMessage {
     private static final Pattern hexColorPattern2 = Pattern.compile("(&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F])");
 
     public static final Map<String, Function<UUID,String>> placeholders = new ConcurrentHashMap<>();
-    private static RTP rtp = null;
-    private static ConfigParser<LangKeys> lang = null;
+    private static ConfigParser<MessagesKeys> lang = null;
     static {
         Bukkit.getScheduler().runTaskLater(RTPBukkitPlugin.getInstance(),() -> {
-            rtp = RTP.getInstance();
-            lang = (ConfigParser<LangKeys>) rtp.configs.getParser(LangKeys.class);
+            lang = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
         },2);
 
-        placeholders.put("plugin",uuid -> {
-            if(lang == null) return "[RTP]";
-            return String.valueOf(lang.getConfigValue(LangKeys.plugin,""));
-        });
         placeholders.put("delay",uuid -> {
-            if(rtp == null) return "0";
+            if(RTP.getInstance() == null) return "0";
             if(RTP.serverAccessor==null) return "0";
             RTPCommandSender commandSender = RTP.serverAccessor.getSender(uuid);
-            Number n = rtp.configs.getParser(ConfigKeys.class).getNumber(ConfigKeys.teleportDelay,0);
-            int n2 = ParsePermissions.getInt(commandSender,"rtp.delay.");
+            Number n = RTP.getInstance().configs.getParser(ConfigKeys.class).getNumber(ConfigKeys.teleportDelay,0);
+            int n2 = ParsePermissions.getInt(commandSender,"RTP.getInstance().delay.");
             if(n2>=0) n = n2;
             if(n.longValue() == 0) return "0";
 
             long time = n.longValue();
-            ConfigParser<LangKeys> langParser = (ConfigParser<LangKeys>) rtp.configs.getParser(LangKeys.class);
+            ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
             long days = TimeUnit.SECONDS.toDays(time);
             long hours = TimeUnit.SECONDS.toHours(time)%24;
             long minutes = TimeUnit.SECONDS.toMinutes(time)%60;
             long seconds = time%60;
 
             String replacement = "";
-            if(days>0) replacement += days + langParser.getConfigValue(LangKeys.days,"").toString() + " ";
-            if(hours>0) replacement += hours + langParser.getConfigValue(LangKeys.hours,"").toString() + " ";
-            if(minutes>0) replacement += minutes + langParser.getConfigValue(LangKeys.minutes,"").toString() + " ";
-            if(seconds>0) replacement += seconds + langParser.getConfigValue(LangKeys.seconds,"").toString();
+            if(days>0) replacement += days + langParser.getConfigValue(MessagesKeys.days,"").toString() + " ";
+            if(hours>0) replacement += hours + langParser.getConfigValue(MessagesKeys.hours,"").toString() + " ";
+            if(minutes>0) replacement += minutes + langParser.getConfigValue(MessagesKeys.minutes,"").toString() + " ";
+            if(seconds>0) replacement += seconds + langParser.getConfigValue(MessagesKeys.seconds,"").toString();
             return replacement;
         });
         placeholders.put("cooldown",uuid -> {
-            if(rtp == null) return "0";
-            if(RTP.serverAccessor==null) return "0";
+            if(RTP.getInstance() == null) return "A";
+            if(RTP.serverAccessor==null) return "B";
             RTPCommandSender commandSender = RTP.serverAccessor.getSender(uuid);
-            Number n = rtp.configs.getParser(ConfigKeys.class).getNumber(ConfigKeys.teleportCooldown,0);
-            int n2 = ParsePermissions.getInt(commandSender,"rtp.cooldown.");
+            Number n = RTP.getInstance().configs.getParser(ConfigKeys.class).getNumber(ConfigKeys.teleportCooldown,0);
+            int n2 = ParsePermissions.getInt(commandSender,"RTP.getInstance().cooldown.");
             if(n2>=0) n = n2;
 
             long time = n.longValue();
-            if(time <= 0) return "0";
-            ConfigParser<LangKeys> langParser = (ConfigParser<LangKeys>) rtp.configs.getParser(LangKeys.class);
+            if(time <= 0) time = 0;
+            ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
             long days = TimeUnit.SECONDS.toDays(time);
             long hours = TimeUnit.SECONDS.toHours(time)%24;
             long minutes = TimeUnit.SECONDS.toMinutes(time)%60;
             long seconds = time%60;
 
             String replacement = "";
-            if(days>0) replacement += days + langParser.getConfigValue(LangKeys.days,"").toString() + " ";
-            if(hours>0) replacement += hours + langParser.getConfigValue(LangKeys.hours,"").toString() + " ";
-            if(minutes>0) replacement += minutes + langParser.getConfigValue(LangKeys.minutes,"").toString() + " ";
-            if(seconds>0) replacement += seconds + langParser.getConfigValue(LangKeys.seconds,"").toString();
+            if(days>0) replacement += days + langParser.getConfigValue(MessagesKeys.days,"").toString() + " ";
+            if(hours>0) replacement += hours + langParser.getConfigValue(MessagesKeys.hours,"").toString() + " ";
+            if(minutes>0) replacement += minutes + langParser.getConfigValue(MessagesKeys.minutes,"").toString() + " ";
+            if(seconds>0) replacement += seconds + langParser.getConfigValue(MessagesKeys.seconds,"").toString();
             return replacement;
         });
         placeholders.put("remainingCooldown",uuid -> {
-            if(rtp == null) return "0";
-            if(RTP.serverAccessor==null) return "0";
+            if(RTP.getInstance() == null) return "A";
+            if(RTP.serverAccessor==null) return "B";
 
             long start = System.nanoTime();
 
             Player player = Bukkit.getPlayer(uuid);
             if(player!=null && player.isOnline()) {
-                TeleportData teleportData = rtp.latestTeleportData.get(uuid);
-                if(teleportData==null) return "0";
-                long lastTime = teleportData.time;
+                TeleportData teleportData = RTP.getInstance().latestTeleportData.get(uuid);
+                long lastTime = 0;
+                if(teleportData!=null) lastTime=teleportData.time;
 
-                Number n = rtp.configs.getParser(ConfigKeys.class).getNumber(ConfigKeys.teleportCooldown,0);
-                int n2 = ParsePermissions.getInt(RTP.serverAccessor.getSender(player.getUniqueId()),"rtp.delay.");
+                Number n = RTP.getInstance().configs.getParser(ConfigKeys.class).getNumber(ConfigKeys.teleportCooldown,0);
+                int n2 = ParsePermissions.getInt(RTP.serverAccessor.getSender(player.getUniqueId()),"RTP.getInstance().delay.");
                 if(n2>=0) n = n2;
 
                 long currTime = (start - lastTime);
                 long remainingTime = n.longValue()-currTime;
                 if(remainingTime < 0) remainingTime = Long.MAX_VALUE+remainingTime;
 
-                ConfigParser<LangKeys> langParser = (ConfigParser<LangKeys>) rtp.configs.getParser(LangKeys.class);
+                ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
                 long days = TimeUnit.NANOSECONDS.toDays(remainingTime);
                 long hours = TimeUnit.NANOSECONDS.toHours(remainingTime)%24;
                 long minutes = TimeUnit.NANOSECONDS.toMinutes(remainingTime)%60;
                 long seconds = TimeUnit.NANOSECONDS.toSeconds(remainingTime)%60;
 
                 String replacement = "";
-                if(days>0) replacement += days + langParser.getConfigValue(LangKeys.days,"").toString() + " ";
-                if(hours>0) replacement += hours + langParser.getConfigValue(LangKeys.hours,"").toString() + " ";
-                if(minutes>0) replacement += minutes + langParser.getConfigValue(LangKeys.minutes,"").toString() + " ";
-                if(seconds>0) replacement += seconds + langParser.getConfigValue(LangKeys.seconds,"").toString();
+                if(days>0) replacement += days + langParser.getConfigValue(MessagesKeys.days,"").toString() + " ";
+                if(hours>0) replacement += hours + langParser.getConfigValue(MessagesKeys.hours,"").toString() + " ";
+                if(minutes>0) replacement += minutes + langParser.getConfigValue(MessagesKeys.minutes,"").toString() + " ";
+                if(seconds>0) replacement += seconds + langParser.getConfigValue(MessagesKeys.seconds,"").toString();
                 if(seconds<2) {
                     long millis;
 
                     if(seconds<1) millis = TimeUnit.NANOSECONDS.toMicros(remainingTime) % 1000 / 1000;
                     else millis = TimeUnit.NANOSECONDS.toMillis(remainingTime) % 1000;
 
-                    replacement += millis + langParser.getConfigValue(LangKeys.millis,"").toString();
+                    replacement += millis + langParser.getConfigValue(MessagesKeys.millis,"").toString();
                 }
                 return replacement;
             }
-            return "0";
+            return "C";
         });
         placeholders.put("queueLocation",uuid -> {
-            if(rtp == null) return "0";
-            TeleportData teleportData = rtp.latestTeleportData.get(uuid);
+            if(RTP.getInstance() == null) return "0";
+            TeleportData teleportData = RTP.getInstance().latestTeleportData.get(uuid);
             if(teleportData == null) return "0";
             return String.valueOf(teleportData.queueLocation);
         });
         placeholders.put("chunks",uuid -> {
-            if(rtp == null) return "0";
+            if(RTP.getInstance() == null) return "0";
             AtomicInteger c = new AtomicInteger();
             RTP.serverAccessor.getRTPWorlds().forEach(world -> {
                 if(!(world instanceof BukkitRTPWorld)) return;
@@ -166,40 +160,40 @@ public class SendMessage {
             return String.valueOf(c.get());
         });
         placeholders.put("attempts",uuid -> {
-            if(rtp == null) return "A";
-            TeleportData teleportData = rtp.latestTeleportData.get(uuid);
+            if(RTP.getInstance() == null) return "A";
+            TeleportData teleportData = RTP.getInstance().latestTeleportData.get(uuid);
             if(teleportData == null) return "B";
             return String.valueOf(teleportData.attempts);
         });
         placeholders.put("processingTime",uuid -> {
-            if(rtp == null) return "0";
-            TeleportData teleportData = rtp.latestTeleportData.get(uuid);
+            if(RTP.getInstance() == null) return "0";
+            TeleportData teleportData = RTP.getInstance().latestTeleportData.get(uuid);
             if(teleportData == null) return "0";
 
             long time = teleportData.processingTime;
             if(time == 0) return "0";
-            ConfigParser<LangKeys> langParser = (ConfigParser<LangKeys>) rtp.configs.getParser(LangKeys.class);
+            ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
             long days = TimeUnit.NANOSECONDS.toDays(time);
             long hours = TimeUnit.NANOSECONDS.toHours(time)%24;
             long minutes = TimeUnit.NANOSECONDS.toMinutes(time)%60;
             long seconds = TimeUnit.NANOSECONDS.toSeconds(time)%60;
 
             String replacement = "";
-            if(days>0) replacement += days + langParser.getConfigValue(LangKeys.days,"").toString() + " ";
-            if(hours>0) replacement += hours + langParser.getConfigValue(LangKeys.hours,"").toString() + " ";
-            if(minutes>0) replacement += minutes + langParser.getConfigValue(LangKeys.minutes,"").toString() + " ";
-            if(seconds>0) replacement += seconds + langParser.getConfigValue(LangKeys.seconds,"").toString();
+            if(days>0) replacement += days + langParser.getConfigValue(MessagesKeys.days,"").toString() + " ";
+            if(hours>0) replacement += hours + langParser.getConfigValue(MessagesKeys.hours,"").toString() + " ";
+            if(minutes>0) replacement += minutes + langParser.getConfigValue(MessagesKeys.minutes,"").toString() + " ";
+            if(seconds>0) replacement += seconds + langParser.getConfigValue(MessagesKeys.seconds,"").toString();
             if(seconds<2) {
                 double millis;
                 if(seconds<1) millis = ((double) TimeUnit.NANOSECONDS.toMicros(time))/1000 % 1000;
                 else millis = TimeUnit.NANOSECONDS.toMillis(time)%1000;
-                replacement += millis + langParser.getConfigValue(LangKeys.millis,"").toString();
+                replacement += millis + langParser.getConfigValue(MessagesKeys.millis,"").toString();
                 }
             return replacement;
         });
         placeholders.put("spot",uuid -> {
-            if(rtp == null) return "0";
-            TeleportData teleportData = rtp.latestTeleportData.get(uuid);
+            if(RTP.getInstance() == null) return "0";
+            TeleportData teleportData = RTP.getInstance().latestTeleportData.get(uuid);
             if(teleportData == null) return "0";
 
             long spot = teleportData.queueLocation;
@@ -213,27 +207,27 @@ public class SendMessage {
             }
 
             TeleportData data = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
-            ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);;
+            ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);;
 
-            if(data == null) return SendMessage.formatDry(player, lang.getConfigValue(LangKeys.PLAYER_AVAILABLE, "").toString());
+            if(data == null) return SendMessage.formatDry(player, lang.getConfigValue(MessagesKeys.PLAYER_AVAILABLE, "").toString());
             if(data.completed) {
                 BukkitRTPCommandSender sender = new BukkitRTPCommandSender(player);
                 long dt = System.nanoTime()-data.time;
                 if(dt < 0) dt = Long.MAX_VALUE+dt;
                 if(dt < sender.cooldown()) {
-                    return SendMessage.formatDry(player, lang.getConfigValue(LangKeys.PLAYER_COOLDOWN, "").toString());
+                    return SendMessage.formatDry(player, lang.getConfigValue(MessagesKeys.PLAYER_COOLDOWN, "").toString());
                 }
 
-                return SendMessage.formatDry(player, lang.getConfigValue(LangKeys.PLAYER_AVAILABLE, "").toString());
+                return SendMessage.formatDry(player, lang.getConfigValue(MessagesKeys.PLAYER_AVAILABLE, "").toString());
             }
 
             RTPRunnable nextTask = data.nextTask;
             if(nextTask instanceof DoTeleport)
-                return SendMessage.formatDry(player, lang.getConfigValue(LangKeys.PLAYER_TELEPORTING, "").toString());
+                return SendMessage.formatDry(player, lang.getConfigValue(MessagesKeys.PLAYER_TELEPORTING, "").toString());
             if(nextTask instanceof LoadChunks)
-                return SendMessage.formatDry(player, lang.getConfigValue(LangKeys.PLAYER_LOADING, "").toString());
+                return SendMessage.formatDry(player, lang.getConfigValue(MessagesKeys.PLAYER_LOADING, "").toString());
             if(nextTask instanceof SetupTeleport)
-                return SendMessage.formatDry(player, lang.getConfigValue(LangKeys.PLAYER_SETUP, "").toString());
+                return SendMessage.formatDry(player, lang.getConfigValue(MessagesKeys.PLAYER_SETUP, "").toString());
             return "";
         });
 
@@ -403,11 +397,14 @@ public class SendMessage {
         Map<String,String> placeholders = new HashMap<>(SendMessage.placeholders.size());
 
         Set<String> keywords = ParseString.keywords(text,SendMessage.placeholders.keySet(), new HashSet<>(Arrays.asList('[','%')), new HashSet<>(Arrays.asList(']','%')));
+
         //for each placeholder getter, add placeholder and result to container
-        SendMessage.placeholders.forEach((s, uuidStringFunction) -> {
-            if(!keywords.contains(s)) return;
-            placeholders.put(s,uuidStringFunction.apply(uuid));
-        });
+        for (Map.Entry<String, Function<UUID, String>> entry : SendMessage.placeholders.entrySet()) {
+            String s = entry.getKey();
+            Function<UUID, String> uuidStringFunction = entry.getValue();
+            if (!keywords.contains(s)) continue;
+            placeholders.put(s, uuidStringFunction.apply(uuid));
+        }
 
         //set up substitutor with the new placeholder results array
         // using [x] format to detect my local placeholders.
@@ -416,6 +413,35 @@ public class SendMessage {
         //replace all placeholders with their respective string function results
         text = sub.replace(text);
 
+        if(lang != null) {
+            Pattern placeholderIntPattern = Pattern.compile("\\[([Pp])(\\d*)]");
+            Matcher placeholderIntMatcher = placeholderIntPattern.matcher(text);
+            while (placeholderIntMatcher.find()) {
+                String group = placeholderIntMatcher.group(2);
+                int bits;
+                try {
+                    bits = Integer.parseInt(group);
+                } catch (NumberFormatException ignored) {
+                    continue;
+                }
+                placeholderIntMatcher.reset();
+
+                String replacement = "[invalid]";
+                ConfigParser<MessagesKeys> parser = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
+                Object o = parser.getConfigValue(MessagesKeys.placeholders, new ArrayList<>());
+                if (o instanceof List) {
+                    List<?> pList = (List<?>) o;
+                    if (pList.size() > bits) {
+                        replacement = pList.get(bits).toString();
+                    }
+                }
+
+                replacement = placeholderIntPattern.matcher(replacement).replaceAll("");
+
+                text = placeholderIntMatcher.replaceFirst(replacement);
+                placeholderIntMatcher = placeholderIntPattern.matcher(text);
+            }
+        }
 
         //check PAPI exists and fill remaining PAPI placeholders
         //todo: if a null player doesn't work with another PAPI import, blame that import for not verifying its inputs.
@@ -494,7 +520,8 @@ public class SendMessage {
 
         message = format(null,message);
 
-        Bukkit.getLogger().log(level,message);
+        Logger logger = Bukkit.getLogger();
+        if(logger!=null) logger.log(level,message);
     }
 
     public static void log(Level level, String message, Exception exception) {

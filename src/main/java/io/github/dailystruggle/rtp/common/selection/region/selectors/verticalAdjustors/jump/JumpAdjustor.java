@@ -1,5 +1,10 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.jump;
 
+import io.github.dailystruggle.commandsapi.bukkit.LocalParameters.*;
+import io.github.dailystruggle.commandsapi.common.CommandParameter;
+import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPBlock;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPChunk;
@@ -7,20 +12,26 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.EnumMap;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
     private static final EnumMap<JumpAdjustorKeys,Object> defaults = new EnumMap<>(JumpAdjustorKeys.class);
+    protected static final Map<String, CommandParameter> subParameters = new ConcurrentHashMap<>();
+    protected static final List<String> keys = Arrays.stream(GenericMemoryShapeParams.values()).map(Enum::name).collect(Collectors.toList());
     static {
         defaults.put(JumpAdjustorKeys.maxY, 127);
         defaults.put(JumpAdjustorKeys.minY,32);
         defaults.put(JumpAdjustorKeys.step, 0);
         defaults.put(JumpAdjustorKeys.requireSkyLight,true);
+
+        subParameters.put("maxy",new IntegerParameter("rtp.params", "highest possible location", (sender, s) -> true, 64,92,127,256,320));
+        subParameters.put("miny",new IntegerParameter("rtp.params", "lowest possible location", (sender, s) -> true, -64,0,64,128));
+        subParameters.put("step",new IntegerParameter("rtp.params", "initial amount to jump", (sender, s) -> true, 1,16,32));
+        subParameters.put("requireskyLight",new BooleanParameter("rtp.params", "require sky light for placement", (sender, s) -> true));
     }
 
     public JumpAdjustor(List<Predicate<RTPBlock>> verifiers) {
@@ -37,7 +48,7 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
     RTPLocation adjust(@NotNull RTPChunk chunk) {
         if(chunk==null) return null;
 
-        int maxY = getNumber(JumpAdjustorKeys.maxY, 320L).intValue();
+        int maxY = getNumber(JumpAdjustorKeys.maxY, 255L).intValue();
         int minY = getNumber(JumpAdjustorKeys.minY, 0L).intValue();
         int step = getNumber(JumpAdjustorKeys.step, 0).intValue();
         Boolean requireSkyLight = (Boolean) getData().getOrDefault(JumpAdjustorKeys.requireSkyLight, false);
@@ -48,14 +59,21 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
         step = Math.max(step,1);
         step = Math.min(step,(maxY-minY)/8);
 
+        for(int i = minY; i < maxY; i++) {
+            if(!chunk.getBlockAt(7, i, 7).isAir()) {
+                minY = i;
+                break;
+            }
+        }
+
         for(int it_len = step; it_len > 2; it_len = it_len/2) {
-            int i = minY;
-            for(; i < maxY; i+= it_len) {
+            for(int i = minY; i < maxY; i+= it_len) {
                 int skylight = 15;
                 RTPBlock block1;
                 try {
                     block1 = chunk.getBlockAt(7, i, 7);
                 } catch (NullPointerException exception) {
+                    exception.printStackTrace();
                     return null;
                 }
                 RTPBlock block2 = chunk.getBlockAt(7, i+1, 7);
@@ -90,6 +108,11 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
                 return false;
         }
         return true;
+    }
+
+    @Override
+    public Map<String, CommandParameter> getParameters() {
+        return subParameters;
     }
 
     @Override

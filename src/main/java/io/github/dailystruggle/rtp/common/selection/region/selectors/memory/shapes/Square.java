@@ -27,9 +27,9 @@ public class Square extends MemoryShape<GenericMemoryShapeParams> {
 
         subParameters.put("mode",new EnumParameter<>("rtp.params", "x-z position adjustment method", (sender, s) -> true, Mode.class));
         subParameters.put("radius",new IntegerParameter("rtp.params", "outer radius of region", (sender, s) -> true, 64,128,256,512,1024));
-        subParameters.put("centerRadius",new IntegerParameter("rtp.params", "inner radius of region", (sender, s) -> true,16,32,64,128,256));
-        subParameters.put("centerX",new CoordinateParameter("rtp.params", "center point x", (sender, s) -> true));
-        subParameters.put("centerZ",new CoordinateParameter("rtp.params", "center point Z", (sender, s) -> true));
+        subParameters.put("centerradius",new IntegerParameter("rtp.params", "inner radius of region", (sender, s) -> true,16,32,64,128,256));
+        subParameters.put("centerx",new CoordinateParameter("rtp.params", "center point x", (sender, s) -> true));
+        subParameters.put("centerz",new CoordinateParameter("rtp.params", "center point Z", (sender, s) -> true));
         subParameters.put("weight",new FloatParameter("rtp.params", "weigh towards or away from center", (sender, s) -> true,0.1,1.0,10.0));
         subParameters.put("expand",new BooleanParameter("rtp.params", "expand region to keep a constant amount of usable land", (sender, s) -> true));
         subParameters.put("uniquePlacements",new BooleanParameter("rtp.params", "ensure each selection is unique from prior selections", (sender, s) -> true));
@@ -197,7 +197,7 @@ public class Square extends MemoryShape<GenericMemoryShapeParams> {
 
         double range = getRange();
         if((!expand) && mode.equalsIgnoreCase("ACCUMULATE")) range -= badLocationSum.get();
-        else if(expand && !mode.equals("ACCUMULATE")) range += badLocationSum.get();
+        else if(expand && !mode.equalsIgnoreCase("ACCUMULATE")) range += badLocationSum.get();
 
         double res = (range) * (ThreadLocalRandom.current().nextDouble());
 

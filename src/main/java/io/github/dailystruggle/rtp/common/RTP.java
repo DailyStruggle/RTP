@@ -21,7 +21,6 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPEconomy;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.FillTask;
-import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.common.tasks.RTPTeleportCancel;
 
@@ -111,8 +110,7 @@ public class RTP {
 
     public final Map<String, FillTask> fillTasks = new ConcurrentHashMap<>();
 
-    public final ConcurrentSkipListSet<UUID> invulnerablePlayers = new ConcurrentSkipListSet<>();
-
+    public final ConcurrentHashMap<UUID,Long> invulnerablePlayers = new ConcurrentHashMap<>();
 
     public static RTPWorld getWorld(RTPPlayer player) {
         //get region from world name, check for overrides
@@ -154,7 +152,17 @@ public class RTP {
         for(Region r : instance.selectionAPI.permRegionLookup.values()) {
             r.shutDown();
         }
+        instance.selectionAPI.permRegionLookup.clear();
 
+        for(Region r : instance.selectionAPI.tempRegions.values()) {
+            r.shutDown();
+        }
+        instance.selectionAPI.tempRegions.clear();
+
+        instance.latestTeleportData.forEach((uuid, data) -> {
+            if(!data.completed) new RTPTeleportCancel(uuid).run();
+        });
+        instance.processingPlayers.clear();
 
         FillTask.kill();
 
