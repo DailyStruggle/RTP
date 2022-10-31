@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.common.commands.fill;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
@@ -40,10 +40,10 @@ public class FillStartCmd extends FillSubCmd {
         List<Region> regions = getRegions(callerId, parameterValues.get("region"));
         for(Region region : regions) {
             FillTask fillTask = RTP.getInstance().fillTasks.get(region.name);
-            ConfigParser<LangKeys> parser = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+            ConfigParser<MessagesKeys> parser = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
             if(fillTask!=null) {
                 if(parser == null) continue;
-                String msg = String.valueOf(parser.getConfigValue(LangKeys.fillRunning,""));
+                String msg = String.valueOf(parser.getConfigValue(MessagesKeys.fillRunning,""));
                 if(msg == null || msg.isEmpty()) continue;
                 msg = StringUtils.replaceIgnoreCase(msg, "[region]", region.name);
                 RTP.serverAccessor.announce(msg,"rtp.fill");
@@ -57,7 +57,7 @@ public class FillStartCmd extends FillSubCmd {
             }
             else {
                 if(parser == null) continue;
-                String msg = String.valueOf(parser.getConfigValue(LangKeys.badArg,""));
+                String msg = String.valueOf(parser.getConfigValue(MessagesKeys.badArg,""));
                 if(msg == null || msg.isEmpty()) continue;
                 msg = StringUtils.replaceIgnoreCase(msg, "[arg]", "region:"+region.name);
                 RTP.serverAccessor.sendMessage(callerId,msg);
@@ -70,7 +70,7 @@ public class FillStartCmd extends FillSubCmd {
 
             RTP.getInstance().fillTasks.put(region.name,new FillTask(region,0L));
             if(parser == null) continue;
-            String msg = String.valueOf(parser.getConfigValue(LangKeys.fillStart,""));
+            String msg = String.valueOf(parser.getConfigValue(MessagesKeys.fillStart,""));
             if(msg == null || msg.isEmpty()) continue;
             msg = StringUtils.replaceIgnoreCase(msg, "[region]", region.name);
             RTP.serverAccessor.announce(msg,"rtp.fill");

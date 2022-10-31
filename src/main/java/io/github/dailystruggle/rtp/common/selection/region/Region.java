@@ -228,7 +228,7 @@ public class Region extends FactoryValue<RegionKeys> {
                     RTP.getInstance().latestTeleportData.put(id,data);
                 }
                 data.queueLocation = i;
-                RTP.serverAccessor.sendMessage(id, LangKeys.queueUpdate);
+                RTP.serverAccessor.sendMessage(id, MessagesKeys.queueUpdate);
             }
         }
     }
@@ -362,7 +362,7 @@ public class Region extends FactoryValue<RegionKeys> {
             onPlayerQueuePush.forEach(consumer -> consumer.accept(this,playerId));
             playerQueue.add(playerId);
             data.queueLocation = playerQueue.size();
-            RTP.serverAccessor.sendMessage(playerId, LangKeys.queueUpdate);
+            RTP.serverAccessor.sendMessage(playerId, MessagesKeys.queueUpdate);
         }
         return pair;
     }

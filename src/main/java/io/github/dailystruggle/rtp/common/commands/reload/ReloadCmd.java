@@ -7,7 +7,7 @@ import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
@@ -15,7 +15,6 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.logging.Level;
 
 public class ReloadCmd extends BaseRTPCmdImpl {
 
@@ -66,9 +65,9 @@ public class ReloadCmd extends BaseRTPCmdImpl {
             return true;
         }
 
-        ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
         if(lang != null) {
-            String msg = String.valueOf(lang.getConfigValue(LangKeys.reloading,""));
+            String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloading,""));
             if(msg!=null) msg = StringUtils.replace(msg,"[filename]", "configs");
             RTP.serverAccessor.sendMessage(CommandsAPI.serverId, senderId,msg);
         }
@@ -77,7 +76,7 @@ public class ReloadCmd extends BaseRTPCmdImpl {
         if(!b) throw new IllegalStateException("reload failed");
 
         if(lang != null) {
-            String msg = String.valueOf(lang.getConfigValue(LangKeys.reloading,""));
+            String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloading,""));
             if(msg!=null) msg = StringUtils.replace(msg,"[filename]", "configs");
             RTP.serverAccessor.sendMessage(senderId,msg);
         }

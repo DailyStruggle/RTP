@@ -16,7 +16,7 @@ import io.github.dailystruggle.rtp.common.commands.reload.ReloadCmd;
 import io.github.dailystruggle.rtp.common.commands.update.list.ListCmd;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
@@ -69,8 +69,8 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
 
         if(factoryValue instanceof ConfigParser) {
             ConfigParser<?> configParser = (ConfigParser<?>) factoryValue;
-            ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
-            String msg = String.valueOf(lang.getConfigValue(LangKeys.updating,""));
+            ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
+            String msg = String.valueOf(lang.getConfigValue(MessagesKeys.updating,""));
             if(msg!=null) msg = StringUtils.replaceIgnoreCase(msg,"[filename]", factoryValue.name);
             RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId,msg);
 
@@ -92,7 +92,7 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
                 ex.printStackTrace();
             }
 
-            msg = String.valueOf(lang.getConfigValue(LangKeys.updated,""));
+            msg = String.valueOf(lang.getConfigValue(MessagesKeys.updated,""));
             if(msg!=null) msg = StringUtils.replaceIgnoreCase(msg,"[filename]", configParser.name);
             RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId,msg);
         }

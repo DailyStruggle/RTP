@@ -8,7 +8,7 @@ import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
 import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
@@ -189,9 +189,9 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     }
 
     @Override
-    public void sendMessage(UUID target, LangKeys msgType) {
+    public void sendMessage(UUID target, MessagesKeys msgType) {
         if(RTPBukkitPlugin.getInstance()==null || !RTPBukkitPlugin.getInstance().isEnabled()) return;
-        ConfigParser<LangKeys> parser = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+        ConfigParser<MessagesKeys> parser = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
         if(parser == null) return;
         String msg = String.valueOf(parser.getConfigValue(msgType,""));
         if(msg == null || msg.isEmpty()) return;
@@ -199,9 +199,9 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     }
 
     @Override
-    public void sendMessage(UUID target1, UUID target2, LangKeys msgType) {
+    public void sendMessage(UUID target1, UUID target2, MessagesKeys msgType) {
         if(RTPBukkitPlugin.getInstance()==null || !RTPBukkitPlugin.getInstance().isEnabled()) return;
-        ConfigParser<LangKeys> parser = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+        ConfigParser<MessagesKeys> parser = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
         String msg = String.valueOf(parser.getConfigValue(msgType,""));
         if(msg == null || msg.isEmpty()) return;
         sendMessage(target1,target2,msg);

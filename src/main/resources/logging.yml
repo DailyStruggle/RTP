@@ -1,5 +1,5 @@
 #toggle logs for specific occasions
-# some of these logs are not configurable due to scale
+# these logs are not configurable due to scale
 detailed_reload: false
 detailed_region_init: false
 command: false

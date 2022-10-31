@@ -5,7 +5,7 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
@@ -54,8 +54,8 @@ public class ListCmd extends BaseRTPCmdImpl {
         if(nextCommand!=null) return true;
         addCommands();
 
-        ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
-        String msg = String.valueOf(lang.getConfigValue(LangKeys.updating,""));
+        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
+        String msg = String.valueOf(lang.getConfigValue(MessagesKeys.updating,""));
         if(msg!=null) msg = StringUtils.replaceIgnoreCase(msg,"[filename]", name);
         RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId,msg);
 
@@ -79,7 +79,7 @@ public class ListCmd extends BaseRTPCmdImpl {
             return true;
         }
 
-        msg = String.valueOf(lang.getConfigValue(LangKeys.updated,""));
+        msg = String.valueOf(lang.getConfigValue(MessagesKeys.updated,""));
         if(msg!=null) msg = StringUtils.replaceIgnoreCase(msg,"[filename]", name);
         RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId,msg);
 
