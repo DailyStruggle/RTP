@@ -2,17 +2,14 @@ package io.github.dailystrugle.rtp_shape_example.shapes;
 
 import io.github.dailystruggle.commandsapi.bukkit.LocalParameters.*;
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystrugle.rtp_shape_example.shapes.enums.NormalDistributionParams;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public class Square_Normal extends MemoryShape<NormalDistributionParams> {
@@ -20,6 +17,7 @@ public class Square_Normal extends MemoryShape<NormalDistributionParams> {
     protected static final List<String> keys = Arrays.stream(NormalDistributionParams.values()).map(Enum::name).collect(Collectors.toList());
     protected static final EnumMap<NormalDistributionParams,Object> defaults = new EnumMap<>(NormalDistributionParams.class);
     static {
+        defaults.put(NormalDistributionParams.mode,"REROLL");
         defaults.put(NormalDistributionParams.radius,256);
         defaults.put(NormalDistributionParams.centerRadius,64);
         defaults.put(NormalDistributionParams.centerX,0);
@@ -232,6 +230,9 @@ public class Square_Normal extends MemoryShape<NormalDistributionParams> {
 
             //shift over to requested mean
             gaussian = gaussian+mean;
+
+            if(mean<0.05 && gaussian<0) gaussian = -gaussian;
+            else if(mean>0.95 && gaussian>1) gaussian = 1-gaussian;
         }
         while (gaussian<0 || gaussian>1); //reject values outside distribution
 
@@ -245,10 +246,69 @@ public class Square_Normal extends MemoryShape<NormalDistributionParams> {
 
         long location = (long) res;
 
-        Map.Entry<Long, Long> idx = badLocations.firstEntry();
-        while ((idx != null) && (location >= idx.getKey() || isKnownBad(location))) {
-            location += idx.getValue();
-            idx = badLocations.ceilingEntry(idx.getKey() + idx.getValue());
+        String mode = data.getOrDefault(NormalDistributionParams.mode,"ACCUMULATE").toString().toUpperCase();
+        switch (mode) {
+            case "ACCUMULATE": {
+                Map.Entry<Long, Long> idx = badLocations.firstEntry();
+                while ((idx != null) && (location >= idx.getKey() || isKnownBad(location))) {
+                    location += idx.getValue();
+                    idx = badLocations.ceilingEntry(idx.getKey() + idx.getValue());
+                }
+            }
+            case "NEAREST": {
+                ConcurrentSkipListMap<Long,Long> map = badLocations;
+                Map.Entry<Long, Long> check = map.floorEntry(location);
+
+                if(     (check!=null)
+                        && (location >= check.getKey())
+                        && (location < (check.getKey()+check.getValue()))) {
+                    Map.Entry<Long, Long> lower = map.floorEntry(check.getKey()-1);
+                    Map.Entry<Long, Long> upper = map.ceilingEntry(check.getKey()+check.getValue());
+
+                    if(upper == null) {
+                        if(lower == null) {
+                            long cutout = check.getValue();
+                            location = ThreadLocalRandom.current().nextLong((long) (range - cutout));
+                            if (location >= check.getKey()) location += check.getValue();
+                        }
+                        else {
+                            long len = check.getKey() - (lower.getKey()+lower.getValue());
+                            location = (len <= 0) ? 0 : ThreadLocalRandom.current().nextLong(len);
+                            location += lower.getKey() + lower.getValue();
+                        }
+                    }
+                    else if(lower == null) {
+                        long len = upper.getKey() - (check.getKey()+check.getValue());
+                        location = (len <= 0) ? 0 : ThreadLocalRandom.current().nextLong(len);
+                        location += check.getKey() + check.getValue();
+                    }
+                    else {
+                        long d1 = (upper.getKey()-location);
+                        long d2 = location - (lower.getKey()+lower.getValue());
+                        if(d2>d1) {
+                            long len = check.getKey() - (lower.getKey()+lower.getValue());
+                            location = (len <= 0) ? 0 : ThreadLocalRandom.current().nextLong(len);
+                            location += lower.getKey() + lower.getValue();
+                        }
+                        else {
+                            long len = upper.getKey() - (check.getKey()+check.getValue());
+                            location = (len <= 0) ? 0 : ThreadLocalRandom.current().nextLong(len);
+                            location += check.getKey() + check.getValue();
+                        }
+                    }
+                }
+            }
+            case "REROLL": {
+                Map.Entry<Long, Long> check = badLocations.floorEntry(location);
+                if(     (check!=null)
+                        && (location > check.getKey())
+                        && (location < check.getKey()+check.getValue())) {
+                    return -1;
+                }
+            }
+            default: {
+
+            }
         }
 
         Object unique = data.getOrDefault(NormalDistributionParams.uniquePlacements,false);

@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
+import org.omg.PortableInterceptor.INACTIVE;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.*;
@@ -110,6 +111,12 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
         resultMap = fileYAML.load(inputStream);
 
+        try {
+            inputStream.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
         boolean eq = resultMap!=null;
         if(eq) {
             for (Map.Entry<String, ?> e : params.entrySet()) {
@@ -128,6 +135,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
         Map<?,?> badLocations = (Map<?, ?>) resultMap.get("badLocations");
         if(badLocations == null) return;
+        this.badLocationSum.set(0);
         for(Map.Entry<?,?> e : badLocations.entrySet()) {
             String key = String.valueOf(e.getKey());
             String val = String.valueOf(e.getValue());

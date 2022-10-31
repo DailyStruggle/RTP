@@ -11,5 +11,7 @@ public interface RTPCommandSender {
     long cooldown();
     long delay();
 
+    String name();
+
     Set<String> getEffectivePermissions();
 }

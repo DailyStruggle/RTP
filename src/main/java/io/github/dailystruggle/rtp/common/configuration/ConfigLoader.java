@@ -48,19 +48,25 @@ public interface ConfigLoader {
 
         try {
             if (!outFile.exists() || replace) {
-                OutputStream out = new FileOutputStream(outFile);
-                byte[] buf = new byte[1024];
-                int len;
-                while ((len = in.read(buf)) > 0) {
-                    out.write(buf, 0, len);
+                try {
+                    OutputStream out = new FileOutputStream(outFile);
+                    byte[] buf = new byte[1024];
+                    int len;
+                    while ((len = in.read(buf)) > 0) {
+                        out.write(buf, 0, len);
+                    }
+                    out.close();
+                } catch (IOException ex) {
+                    RTP.log(Level.SEVERE, "Could not save " + outFile.getName() + " to " + outFile, ex);
                 }
-                out.close();
-                in.close();
             } else {
                 RTP.log(Level.WARNING, "Could not save " + outFile.getName() + " to " + outFile + " because " + outFile.getName() + " already exists.");
             }
+            in.close();
         } catch (IOException ex) {
             RTP.log(Level.SEVERE, "Could not save " + outFile.getName() + " to " + outFile, ex);
+        } finally {
+
         }
     }
 }

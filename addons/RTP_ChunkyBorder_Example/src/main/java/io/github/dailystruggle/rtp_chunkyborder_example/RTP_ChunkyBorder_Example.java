@@ -22,8 +22,6 @@ public final class RTP_ChunkyBorder_Example extends JavaPlugin {
 
     @Override
     public void onEnable() {
-
-
         // Plugin startup logic
         RTP.serverAccessor.setWorldBorderFunction(worldName -> {
             Optional<BorderData> borderDataOptional = ChunkyBorderProvider.get().getBorder(worldName);

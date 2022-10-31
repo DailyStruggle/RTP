@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.bukkit;
 
-import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.effectsapi.EffectFactory;
 import io.github.dailystruggle.effectsapi.EffectsAPI;
 import io.github.dailystruggle.rtp.bukkit.commands.RTPCmdBukkit;
@@ -16,7 +15,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
@@ -25,13 +24,11 @@ import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.*;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
-import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -46,9 +43,6 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     public static RTPBukkitPlugin getInstance() {
         return instance;
     }
-
-    public final ConcurrentHashMap<UUID,Location> todoTP = new ConcurrentHashMap<>();
-    public final ConcurrentHashMap<UUID,Location> lastTP = new ConcurrentHashMap<>();
 
     public BukkitTask commandTimer = null;
     public BukkitTask commandProcessing = null;
@@ -67,6 +61,12 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     public void onEnable() {
         metrics = new Metrics(this,12277);
 
+        if(instance == null) {
+            instance = this;
+            RTP.serverAccessor = new BukkitServerAccessor();
+            new RTP();
+        }
+
         RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
 
         RTPCmdBukkit mainCommand = new RTPCmdBukkit(this);
@@ -77,26 +77,24 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         Objects.requireNonNull(getCommand("wild")).setExecutor(mainCommand);
         Objects.requireNonNull(getCommand("wild")).setTabCompleter(mainCommand);
 
-        commandTimer = Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
-            long avgTime = TPS.timeSinceTick(20) / 20;
-            long currTime = TPS.timeSinceTick(1);
-            CommandsAPI.execute(avgTime - currTime);
-        }, 40, 1);
-
-        syncTimer = new SyncTeleportProcessing().runTaskTimer(this,80,1);
-        asyncTimer = new AsyncTeleportProcessing().runTaskTimerAsynchronously(this,80,1);
-
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,() -> {
             while (RTP.getInstance().startupTasks.size()>0) {
                 RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
             }
         });
 
+        Bukkit.getScheduler().scheduleSyncDelayedTask(this,RTP.serverAccessor::start);
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupBukkitEvents);
-        Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupEffects);
+        Bukkit.getScheduler().runTaskAsynchronously(this,this::setupEffects);
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupIntegrations);
 
         Bukkit.getScheduler().runTaskTimer(this, new TPS(),0,1);
+
+        SendMessage.sendMessage(Bukkit.getConsoleSender(),"");
+
+        while (RTP.getInstance().startupTasks.size()>0) {
+            RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
+        }
 
     }
 
@@ -253,20 +251,20 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         });
 
         DoTeleport.postActions.add(task -> {
-            ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+            ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
 
             if(task.player() instanceof BukkitRTPPlayer) {
                 Player player = ((BukkitRTPPlayer) task.player()).player();
-                String title = lang.getConfigValue(LangKeys.title, "").toString();
-                String subtitle = lang.getConfigValue(LangKeys.subtitle, "").toString();
+                String title = lang.getConfigValue(MessagesKeys.title, "").toString();
+                String subtitle = lang.getConfigValue(MessagesKeys.subtitle, "").toString();
 
-                int fadeIn = lang.getNumber(LangKeys.fadeIn,0).intValue();
-                int stay = lang.getNumber(LangKeys.stay,0).intValue();
-                int fadeOut = lang.getNumber(LangKeys.fadeOut,0).intValue();
+                int fadeIn = lang.getNumber(MessagesKeys.fadeIn,0).intValue();
+                int stay = lang.getNumber(MessagesKeys.stay,0).intValue();
+                int fadeOut = lang.getNumber(MessagesKeys.fadeOut,0).intValue();
 
                 SendMessage.title(player,title,subtitle,fadeIn,stay,fadeOut);
 
-                String actionbar = lang.getConfigValue(LangKeys.actionbar, "").toString();
+                String actionbar = lang.getConfigValue(MessagesKeys.actionbar, "").toString();
                 SendMessage.actionbar(player,actionbar);
             }
         });
