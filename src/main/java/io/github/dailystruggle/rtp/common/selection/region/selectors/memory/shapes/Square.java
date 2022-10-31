@@ -197,7 +197,7 @@ public class Square extends MemoryShape<GenericMemoryShapeParams> {
 
         double range = getRange();
         if((!expand) && mode.equalsIgnoreCase("ACCUMULATE")) range -= badLocationSum.get();
-        else if(expand && !mode.equals("ACCUMULATE")) range += badLocationSum.get();
+        else if(expand && !mode.equalsIgnoreCase("ACCUMULATE")) range += badLocationSum.get();
 
         double res = (range) * (ThreadLocalRandom.current().nextDouble());
 

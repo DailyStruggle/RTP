@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.tasks;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
@@ -114,8 +114,8 @@ public class FillTask extends RTPRunnable {
             if(numLoadsRemaining<0 || numLoadsRemaining>range) numLoadsRemaining = 0;
             long estRemaining = numLoadsRemaining/cps_local;
 
-            ConfigParser<LangKeys> langParser = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
-            String msg = langParser.getConfigValue(LangKeys.fillStatus, "").toString();
+            ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
+            String msg = langParser.getConfigValue(MessagesKeys.fillStatus, "").toString();
             if(msg!=null && !msg.isEmpty()) {
                 long days = TimeUnit.SECONDS.toDays(estRemaining);
                 long hours = TimeUnit.SECONDS.toHours(estRemaining) % 24;
@@ -123,10 +123,10 @@ public class FillTask extends RTPRunnable {
                 long seconds = estRemaining % 60;
 
                 String replacement = "";
-                if (days > 0) replacement += days + langParser.getConfigValue(LangKeys.days, "").toString() + " ";
-                if (hours > 0) replacement += hours + langParser.getConfigValue(LangKeys.hours, "").toString() + " ";
-                if (minutes > 0) replacement += minutes + langParser.getConfigValue(LangKeys.minutes, "").toString() + " ";
-                if (seconds > 0) replacement += seconds + langParser.getConfigValue(LangKeys.seconds, "").toString();
+                if (days > 0) replacement += days + langParser.getConfigValue(MessagesKeys.days, "").toString() + " ";
+                if (hours > 0) replacement += hours + langParser.getConfigValue(MessagesKeys.hours, "").toString() + " ";
+                if (minutes > 0) replacement += minutes + langParser.getConfigValue(MessagesKeys.minutes, "").toString() + " ";
+                if (seconds > 0) replacement += seconds + langParser.getConfigValue(MessagesKeys.seconds, "").toString();
 
                 msg = StringUtils.replaceIgnoreCase(msg, "[chunks]", String.valueOf(finalPos1));
                 msg = StringUtils.replaceIgnoreCase(msg, "[totalChunks]", String.valueOf(range));

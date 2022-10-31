@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.common.commands.fill;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
@@ -41,7 +41,7 @@ public class FillResumeCmd extends FillSubCmd {
         List<Region> regions = getRegions(callerId, parameterValues.get("region"));
         for(Region region : regions) {
             FillTask fillTask = RTP.getInstance().fillTasks.get(region.name);
-            ConfigParser<LangKeys> parser = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+            ConfigParser<MessagesKeys> parser = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
             if(fillTask==null) {
                 return fillStartCmd.onCommand(callerId,parameterValues,null);
             }
@@ -49,7 +49,7 @@ public class FillResumeCmd extends FillSubCmd {
             fillTask.pause.set(false);
 
             if(parser == null) continue;
-            String msg = String.valueOf(parser.getConfigValue(LangKeys.fillResume,""));
+            String msg = String.valueOf(parser.getConfigValue(MessagesKeys.fillResume,""));
             if(msg == null || msg.isEmpty()) continue;
             msg = StringUtils.replaceIgnoreCase(msg, "[region]", region.name);
             RTP.serverAccessor.announce(msg,"rtp.fill");

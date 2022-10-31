@@ -6,7 +6,8 @@ import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
@@ -15,7 +16,6 @@ import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tasks.SetupTeleport;
 import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
-import org.apache.commons.lang3.tuple.Pair;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
@@ -45,7 +45,19 @@ public class OnEventTeleports implements Listener {
     @EventHandler(priority = EventPriority.NORMAL)
     public void onPlayerChangeWorld(PlayerChangedWorldEvent event) {
         Player player = event.getPlayer();
-        if (checkPerms(event.getPlayer(),"changeWorld")) {
+        if (checkPerms(event.getPlayer(),"changeworld")) {
+            ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.getInstance().configs.getParser(LoggingKeys.class);
+            boolean verbose = false;
+            if(logging!=null) {
+                Object o = logging.getConfigValue(LoggingKeys.event_join,false);
+                if (o instanceof Boolean) {
+                    verbose = (Boolean) o;
+                } else {
+                    verbose = Boolean.parseBoolean(o.toString());
+                }
+            }
+            if(verbose) RTP.log(Level.INFO, "[plugin] teleporting player:"+player+" on world change");
+
             teleportAction(player);
         }
     }
@@ -59,6 +71,18 @@ public class OnEventTeleports implements Listener {
         new RTPTeleportCancel(id).run();
 
         if (!checkPerms(player,"respawn")) return;
+
+        ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.getInstance().configs.getParser(LoggingKeys.class);
+        boolean verbose = false;
+        if(logging!=null) {
+            Object o = logging.getConfigValue(LoggingKeys.event_join,false);
+            if (o instanceof Boolean) {
+                verbose = (Boolean) o;
+            } else {
+                verbose = Boolean.parseBoolean(o.toString());
+            }
+        }
+        if(verbose) RTP.log(Level.INFO, "[plugin] generating respawn location for player:"+player+" on death");
 
         respawningPlayers.add(id);
 
@@ -119,6 +143,17 @@ public class OnEventTeleports implements Listener {
         TeleportData data = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
         data.completed = true;
 
+        ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.getInstance().configs.getParser(LoggingKeys.class);
+        boolean verbose = false;
+        if(logging!=null) {
+            Object o = logging.getConfigValue(LoggingKeys.event_respawn,false);
+            if (o instanceof Boolean) {
+                verbose = (Boolean) o;
+            } else {
+                verbose = Boolean.parseBoolean(o.toString());
+            }
+        }
+
         if(future.isDone()) {
             Map.Entry<RTPLocation, Long> location;
             try {
@@ -140,13 +175,16 @@ public class OnEventTeleports implements Listener {
 
             RTPWorld rtpWorld = rtpLocation.world();
             if(rtpWorld instanceof BukkitRTPWorld) {
+                if(verbose) RTP.log(Level.INFO, "[plugin] updating respawn location for player:"+player);
                 event.setRespawnLocation(new Location(((BukkitRTPWorld) rtpWorld).world(), rtpLocation.x(), rtpLocation.y(), rtpLocation.z()));
             }
             else throw new IllegalStateException("expected bukkit world");
             return;
         }
 
+        boolean finalVerbose = verbose;
         future.whenComplete((location, throwable) -> {
+            if(finalVerbose) RTP.log(Level.INFO, "[plugin] teleporting player:"+player+" on respawn");
             SetupTeleport setupTeleport = new SetupTeleport(
                     new BukkitRTPCommandSender(Bukkit.getConsoleSender()),
                     new BukkitRTPPlayer(player),
@@ -172,16 +210,29 @@ public class OnEventTeleports implements Listener {
 
         long cooldownTime = new BukkitRTPCommandSender(event.getPlayer()).cooldown();
 
+        ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.getInstance().configs.getParser(LoggingKeys.class);
+        boolean verbose = false;
+        if(logging!=null) {
+            Object o = logging.getConfigValue(LoggingKeys.event_join,false);
+            if (o instanceof Boolean) {
+                verbose = (Boolean) o;
+            } else {
+                verbose = Boolean.parseBoolean(o.toString());
+            }
+        }
+
         if(hasFirstJoin && !player.hasPlayedBefore()) {
+            if(verbose) RTP.log(Level.INFO, "[plugin] teleporting player:" + player + " on first join");
             teleportAction(player);
         }
         else if (hasJoin) {
             TeleportData data = rtp.latestTeleportData.get(player.getUniqueId());
             long time = (data == null) ? 0 : data.time;
             if (!player.hasPermission("rtp.nocooldown") && (start - time) < cooldownTime){
-                RTP.serverAccessor.sendMessage(player.getUniqueId(),LangKeys.cooldownMessage);
+                RTP.serverAccessor.sendMessage(player.getUniqueId(), MessagesKeys.cooldownMessage);
                 return;
             }
+            if(verbose) RTP.log(Level.INFO, "[plugin] teleporting player:" + player + " on join");
             teleportAction(player);
         }
     }
@@ -189,8 +240,10 @@ public class OnEventTeleports implements Listener {
     @EventHandler(priority = EventPriority.LOW)
     public void onPlayerMove(PlayerMoveEvent event) {
         Location to = event.getTo();
-        if(to == null) return;
         Location from = event.getFrom();
+        if(to == null) return;
+        if(from == null) return;
+        if(from.distance(to) == 0.0d) return;
         Player player = event.getPlayer();
 
         ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.getInstance().configs.configParserMap.get(ConfigKeys.class);
@@ -199,20 +252,45 @@ public class OnEventTeleports implements Listener {
         playerMoveDistances.compute(player.getUniqueId(),(uuid, aDouble) -> aDouble+=from.distance(to));
         double distance = playerMoveDistances.get(player.getUniqueId());
         if(distance < configParser.getNumber(ConfigKeys.cancelDistance,Double.MAX_VALUE).doubleValue()) return;
+
         playerMoveDistances.put(player.getUniqueId(),0D);
 
-        if(checkPerms(player,"move"))
+        if(checkPerms(player,"move")) {
+            ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.getInstance().configs.getParser(LoggingKeys.class);
+            boolean verbose = false;
+            if(logging!=null) {
+                Object o = logging.getConfigValue(LoggingKeys.event_move,false);
+                if (o instanceof Boolean) {
+                    verbose = (Boolean) o;
+                } else {
+                    verbose = Boolean.parseBoolean(o.toString());
+                }
+            }
+            if(verbose) RTP.log(Level.INFO, "[plugin] teleporting player:" + player + " on move");
             teleportAction(player);
+        }
     }
 
     @EventHandler(priority = EventPriority.LOWEST)
     public void onPlayerTeleport(PlayerTeleportEvent event) {
         Player player = event.getPlayer();
-        if (checkPerms(player,"teleport"))
+        if (checkPerms(player,"teleport")) {
+            ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.getInstance().configs.getParser(LoggingKeys.class);
+            boolean verbose = false;
+            if(logging!=null) {
+                Object o = logging.getConfigValue(LoggingKeys.event_move,false);
+                if (o instanceof Boolean) {
+                    verbose = (Boolean) o;
+                } else {
+                    verbose = Boolean.parseBoolean(o.toString());
+                }
+            }
+            if(verbose) RTP.log(Level.INFO, "[plugin] teleporting player:" + player + " on teleport");
             teleportAction(player);
+        }
     }
 
-    private static Map<UUID,RTPRunnable> tasks = new ConcurrentHashMap<>();
+    private static final Map<UUID,RTPRunnable> tasks = new ConcurrentHashMap<>();
     private static void teleportAction(Player player){
         if(tasks.containsKey(player.getUniqueId())) return;
         RTPRunnable runnable = new RTPRunnable(() -> {

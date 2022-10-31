@@ -1,5 +1,4 @@
-#DO NOT DELETE default.yml
-#case-sensitive name of world this region is in
+#case-sensitive name of target world this region is in
 # placeholder: [num] - world index according to bukkit, 0 is usually a main world
 world: "[0]"
 #override shape with vanilla worldborder settings

@@ -15,7 +15,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
@@ -85,12 +85,17 @@ public final class RTPBukkitPlugin extends JavaPlugin {
 
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,RTP.serverAccessor::start);
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupBukkitEvents);
-        Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupEffects);
+        Bukkit.getScheduler().runTaskAsynchronously(this,this::setupEffects);
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupIntegrations);
 
         Bukkit.getScheduler().runTaskTimer(this, new TPS(),0,1);
 
         SendMessage.sendMessage(Bukkit.getConsoleSender(),"");
+
+        while (RTP.getInstance().startupTasks.size()>0) {
+            RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
+        }
+
     }
 
     @Override
@@ -246,20 +251,20 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         });
 
         DoTeleport.postActions.add(task -> {
-            ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+            ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
 
             if(task.player() instanceof BukkitRTPPlayer) {
                 Player player = ((BukkitRTPPlayer) task.player()).player();
-                String title = lang.getConfigValue(LangKeys.title, "").toString();
-                String subtitle = lang.getConfigValue(LangKeys.subtitle, "").toString();
+                String title = lang.getConfigValue(MessagesKeys.title, "").toString();
+                String subtitle = lang.getConfigValue(MessagesKeys.subtitle, "").toString();
 
-                int fadeIn = lang.getNumber(LangKeys.fadeIn,0).intValue();
-                int stay = lang.getNumber(LangKeys.stay,0).intValue();
-                int fadeOut = lang.getNumber(LangKeys.fadeOut,0).intValue();
+                int fadeIn = lang.getNumber(MessagesKeys.fadeIn,0).intValue();
+                int stay = lang.getNumber(MessagesKeys.stay,0).intValue();
+                int fadeOut = lang.getNumber(MessagesKeys.fadeOut,0).intValue();
 
                 SendMessage.title(player,title,subtitle,fadeIn,stay,fadeOut);
 
-                String actionbar = lang.getConfigValue(LangKeys.actionbar, "").toString();
+                String actionbar = lang.getConfigValue(MessagesKeys.actionbar, "").toString();
                 SendMessage.actionbar(player,actionbar);
             }
         });
