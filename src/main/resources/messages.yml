@@ -1,7 +1,6 @@
 #general message configuration for user experience
 # supports bukkit color codes and hex color codes
 # supports PlaceholderAPI references
-#
 
 #list of additional placeholders
 # format: Pn - where n is the index in this list

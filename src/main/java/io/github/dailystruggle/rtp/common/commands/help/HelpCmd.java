@@ -8,7 +8,7 @@ import io.github.dailystruggle.rtp.common.commands.reload.SubReloadCmd;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import org.jetbrains.annotations.Nullable;
@@ -58,13 +58,13 @@ public class HelpCmd extends BaseRTPCmdImpl {
     @Override
     public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
         RTPCommandSender sender = RTP.serverAccessor.getSender(callerId);
-        ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
         if(!sender.hasPermission("rtp.see")) {
-            RTP.serverAccessor.sendMessage(callerId,LangKeys.noPerms);
+            RTP.serverAccessor.sendMessage(callerId, MessagesKeys.noPerms);
             return true;
         }
 
-        String msg = lang.getConfigValue(LangKeys.rtp,"").toString();
+        String msg = lang.getConfigValue(MessagesKeys.rtp,"").toString();
         String hover = "/rtp";
         String click = "/rtp";
 
@@ -74,9 +74,9 @@ public class HelpCmd extends BaseRTPCmdImpl {
             if(sender.hasPermission(entry.permission())){
                 String arg = entry.name();
 
-                LangKeys key;
+                MessagesKeys key;
                 try {
-                    key = LangKeys.valueOf(entry.name());
+                    key = MessagesKeys.valueOf(entry.name());
                 } catch (IllegalArgumentException ignored) {
                     continue;
                 }

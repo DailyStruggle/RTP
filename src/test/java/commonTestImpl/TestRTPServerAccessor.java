@@ -4,7 +4,7 @@ import commonTestImpl.substitutions.TestRTPPlayer;
 import commonTestImpl.substitutions.TestRTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
@@ -132,16 +132,16 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
     }
 
     @Override
-    public void sendMessage(UUID target, LangKeys msgType) {
-        ConfigParser<LangKeys> parser = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+    public void sendMessage(UUID target, MessagesKeys msgType) {
+        ConfigParser<MessagesKeys> parser = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
         String msg = String.valueOf(parser.getConfigValue(msgType,""));
         if(msg == null || msg.isEmpty()) return;
         sendMessage(target, msg);
     }
 
     @Override
-    public void sendMessage(UUID target1, UUID target2, LangKeys msgType) {
-        ConfigParser<LangKeys> parser = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+    public void sendMessage(UUID target1, UUID target2, MessagesKeys msgType) {
+        ConfigParser<MessagesKeys> parser = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
         String msg = String.valueOf(parser.getConfigValue(msgType,""));
         if(msg == null || msg.isEmpty()) return;
         sendMessage(target1,target2,msg);

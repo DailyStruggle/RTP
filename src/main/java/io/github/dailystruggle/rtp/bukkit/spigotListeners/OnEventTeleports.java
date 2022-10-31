@@ -6,7 +6,7 @@ import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
@@ -16,7 +16,6 @@ import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tasks.SetupTeleport;
 import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
-import org.apache.commons.lang3.tuple.Pair;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
@@ -230,7 +229,7 @@ public class OnEventTeleports implements Listener {
             TeleportData data = rtp.latestTeleportData.get(player.getUniqueId());
             long time = (data == null) ? 0 : data.time;
             if (!player.hasPermission("rtp.nocooldown") && (start - time) < cooldownTime){
-                RTP.serverAccessor.sendMessage(player.getUniqueId(),LangKeys.cooldownMessage);
+                RTP.serverAccessor.sendMessage(player.getUniqueId(), MessagesKeys.cooldownMessage);
                 return;
             }
             if(verbose) RTP.log(Level.INFO, "[plugin] teleporting player:" + player + " on join");

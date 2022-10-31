@@ -99,9 +99,9 @@ public class Configs {
         configParserMap.clear();
         multiConfigParserMap.clear();
         reloadAction();
-        ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
         if(lang == null) return false;
-        String msg = String.valueOf(lang.getConfigValue(LangKeys.reloaded,""));
+        String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloaded,""));
         if(msg!=null) msg = StringUtils.replace(msg,"[filename]", "configs");
         RTP.serverAccessor.sendMessage(CommandsAPI.serverId,msg);
         return true;
@@ -112,7 +112,7 @@ public class Configs {
         ConfigParser<LoggingKeys> logging = new ConfigParser<>(LoggingKeys.class,"logging.yml", "1.0", pluginDirectory);
         putParser(logging);
 
-        ConfigParser<LangKeys> lang = new ConfigParser<>(LangKeys.class,"lang.yml", "1.0", pluginDirectory);
+        ConfigParser<MessagesKeys> lang = new ConfigParser<>(MessagesKeys.class,"messages.yml", "1.0", pluginDirectory);
         putParser(lang);
 
         ConfigParser<ConfigKeys> config = new ConfigParser<>(ConfigKeys.class, "config.yml", "1.0", pluginDirectory);

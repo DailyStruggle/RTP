@@ -1,6 +1,6 @@
 #selection and teleportation safety options
 
-#how long to give invincibility on teleport, in seconds
+#how long to prevent damage, in seconds
 invulnerabilityTime: 5
 
 #radius, in blocks, to check for safe blocks

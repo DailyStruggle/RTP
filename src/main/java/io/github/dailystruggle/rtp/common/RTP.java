@@ -110,8 +110,7 @@ public class RTP {
 
     public final Map<String, FillTask> fillTasks = new ConcurrentHashMap<>();
 
-    public final ConcurrentSkipListSet<UUID> invulnerablePlayers = new ConcurrentSkipListSet<>();
-
+    public final ConcurrentHashMap<UUID,Long> invulnerablePlayers = new ConcurrentHashMap<>();
 
     public static RTPWorld getWorld(RTPPlayer player) {
         //get region from world name, check for overrides
