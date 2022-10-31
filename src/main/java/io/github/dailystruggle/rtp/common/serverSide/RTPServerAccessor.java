@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.serverSide;
 
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
@@ -79,7 +79,7 @@ public interface RTPServerAccessor {
      * @param target
      * @param msgType
      */
-    void sendMessage(UUID target, LangKeys msgType);
+    void sendMessage(UUID target, MessagesKeys msgType);
 
     /**
      * send a message to these people, avoiding duplicates
@@ -87,7 +87,7 @@ public interface RTPServerAccessor {
      * @param target
      * @param msgType
      */
-    void sendMessage(UUID sender, UUID target, LangKeys msgType);
+    void sendMessage(UUID sender, UUID target, MessagesKeys msgType);
 
     /**
      * send a message to this person

@@ -6,7 +6,7 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.Plugin;
@@ -24,9 +24,9 @@ public abstract class BukkitBaseRTPCmd extends BukkitTreeCommand implements io.g
         CommandSender sender = callerId.equals(CommandsAPI.serverId) ? Bukkit.getConsoleSender() : Bukkit.getPlayer(callerId);
         if(sender == null) return;
 
-        ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
 
-        String msg = String.valueOf(lang.getConfigValue(LangKeys.badArg,""));
+        String msg = String.valueOf(lang.getConfigValue(MessagesKeys.badArg,""));
         msg = msg.replace("[arg]",parameterName + ":" + parameterValue);
         SendMessage.sendMessage(sender,msg);
     }

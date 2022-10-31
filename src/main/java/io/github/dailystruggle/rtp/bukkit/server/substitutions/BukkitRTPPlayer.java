@@ -49,6 +49,11 @@ public final class BukkitRTPPlayer implements RTPPlayer {
     }
 
     @Override
+    public String name() {
+        return player.getName();
+    }
+
+    @Override
     public Set<String> getEffectivePermissions() {
         return player.getEffectivePermissions().stream().map(permissionAttachmentInfo -> {
             if (permissionAttachmentInfo.getValue()) return permissionAttachmentInfo.getPermission().toLowerCase();

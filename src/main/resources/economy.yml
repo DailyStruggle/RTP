@@ -1,3 +1,5 @@
+#prices of things, using economy interface
+
 #whether to refund price and cooldown on cancellation
 refundOnCancel: true
 

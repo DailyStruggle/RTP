@@ -1,4 +1,6 @@
-#how long to give invincibility on teleport, in seconds
+#selection and teleportation safety options
+
+#how long to prevent damage, in seconds
 invulnerabilityTime: 5
 
 #radius, in blocks, to check for safe blocks
@@ -67,6 +69,7 @@ airBlocks:
 
 #what materials, according to the bukkit api, to avoid
 unsafeBlocks:
+  - BEDROCK
   - MAGMA_BLOCK
   - TNT
   - LAVA

@@ -7,7 +7,7 @@ import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
@@ -75,16 +75,16 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
         RTPServerAccessor serverAccessor = RTP.serverAccessor;
         Configs configs = RTP.getInstance().configs;
 
-        ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) configs.getParser(LangKeys.class);
+        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) configs.getParser(MessagesKeys.class);
         if(lang == null) return true;
 
-        String msg = String.valueOf(lang.getConfigValue(LangKeys.reloading,""));
+        String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloading,""));
         if(msg!=null) msg = StringUtils.replace(msg,"[filename]", parser.name);
         serverAccessor.sendMessage(CommandsAPI.serverId, senderId,msg);
 
         parser.check(parser.version, parser.pluginDirectory, null);
 
-        msg = String.valueOf(lang.getConfigValue(LangKeys.reloaded,""));
+        msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloaded,""));
         if(msg!=null) msg = StringUtils.replace(msg,"[filename]", parser.name);
         serverAccessor.sendMessage(CommandsAPI.serverId, senderId,msg);
 
@@ -92,13 +92,13 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
     }
 
     public boolean subReloadMulti(UUID senderId, MultiConfigParser<?> parser) {
-        ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
         if(lang == null) return true;
 
         RTPServerAccessor serverAccessor = RTP.serverAccessor;
         RTPCommandSender commandSender = serverAccessor.getSender(senderId);
 
-        String msg = String.valueOf(lang.getConfigValue(LangKeys.reloading,""));
+        String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloading,""));
         if(msg!=null) msg = StringUtils.replace(msg,"[filename]", parser.name);
         serverAccessor.sendMessage(CommandsAPI.serverId, senderId,msg);
 
@@ -124,7 +124,7 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
 
         instance.configs.multiConfigParserMap.put(parser.myClass,newParser);
 
-        msg = String.valueOf(lang.getConfigValue(LangKeys.reloaded,""));
+        msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloaded,""));
         if(msg!=null) msg = StringUtils.replace(msg,"[filename]", parser.name);
         serverAccessor.sendMessage(CommandsAPI.serverId, commandSender.uuid(),msg);
 
