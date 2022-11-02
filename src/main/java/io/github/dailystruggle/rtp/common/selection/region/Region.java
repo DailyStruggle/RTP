@@ -16,6 +16,7 @@ import io.github.dailystruggle.rtp.common.tasks.FillTask;
 import io.github.dailystruggle.rtp.common.tasks.LoadChunks;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
+import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.jetbrains.annotations.Nullable;
 import org.simpleyaml.configuration.MemorySection;
 
@@ -32,7 +33,7 @@ public class Region extends FactoryValue<RegionKeys> {
     public static final List<BiConsumer<Region,UUID>> onPlayerQueuePush = new ArrayList<>();
     public static final List<BiConsumer<Region,UUID>> onPlayerQueuePop = new ArrayList<>();
 
-    public static int maxBiomeChecksPerGen = 5;
+    public static int maxBiomeChecksPerGen = 1000;
 
     /**
      * public/shared cache for this region
@@ -126,7 +127,7 @@ public class Region extends FactoryValue<RegionKeys> {
         public void run() {
             long cacheCap = getNumber(RegionKeys.cacheCap,10L).longValue();
             cacheCap = Math.max(cacheCap,playerQueue.size());
-            Map.Entry<RTPLocation, Long> pair = getLocation(null);
+            Map.Entry<RTPLocation, Long> pair = getLocation(null, new MutableBoolean(false));
             if(pair != null) {
                 RTPLocation location = pair.getKey();
                 if(location == null) {
@@ -281,7 +282,8 @@ public class Region extends FactoryValue<RegionKeys> {
         return res;
     }
 
-    public Map.Entry<RTPLocation, Long> getLocation(RTPCommandSender sender, RTPPlayer player, @Nullable Set<String> biomeNames) {
+    @Nullable
+    public Map.Entry<RTPLocation, Long> getLocation(RTPCommandSender sender, RTPPlayer player, @Nullable Set<String> biomeNames, MutableBoolean stop) {
         Map.Entry<RTPLocation, Long> pair = null;
 
         UUID playerId = player.uuid();
@@ -291,6 +293,7 @@ public class Region extends FactoryValue<RegionKeys> {
         if(!custom && perPlayerLocationQueue.containsKey(playerId)) {
             ConcurrentLinkedQueue<Map.Entry<RTPLocation, Long>> playerLocationQueue = perPlayerLocationQueue.get(playerId);
             while(playerLocationQueue.size()>0) {
+                if(stop.booleanValue()) break;
                 pair = playerLocationQueue.poll();
                 if(pair == null || pair.getKey() == null) continue;
                 RTPLocation left = pair.getKey();
@@ -340,7 +343,8 @@ public class Region extends FactoryValue<RegionKeys> {
         }
 
         if(custom || sender.hasPermission("rtp.unqueued")) {
-            pair = getLocation(biomeNames);
+            pair = getLocation(biomeNames, stop);
+            if(stop.booleanValue() || pair == null) return null;
             long attempts = pair.getValue();
             TeleportData data = RTP.getInstance().latestTeleportData.get(playerId);
             if(data!=null && !data.completed) {
@@ -368,7 +372,7 @@ public class Region extends FactoryValue<RegionKeys> {
     }
 
     @Nullable
-    public Map.Entry<RTPLocation, Long> getLocation(@Nullable Set<String> biomeNames) {
+    public Map.Entry<RTPLocation, Long> getLocation(@Nullable Set<String> biomeNames, MutableBoolean stop) {
         boolean defaultBiomes = false;
         if(biomeNames == null || biomeNames.size()==0) {
             defaultBiomes = true;
@@ -388,13 +392,13 @@ public class Region extends FactoryValue<RegionKeys> {
         }
 
         ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.getInstance().configs.getParser(LoggingKeys.class);
-        boolean verbose = true;
+        boolean verboseFail = true;
         if(logging!=null) {
-            Object o = logging.getConfigValue(LoggingKeys.teleport,false);
+            Object o = logging.getConfigValue(LoggingKeys.selection_failure,false);
             if (o instanceof Boolean) {
-                verbose = (Boolean) o;
+                verboseFail = (Boolean) o;
             } else {
-                verbose = Boolean.parseBoolean(o.toString());
+                verboseFail = Boolean.parseBoolean(o.toString());
             }
         }
 
@@ -413,9 +417,8 @@ public class Region extends FactoryValue<RegionKeys> {
         int safetyRadius = safety.yamlFile.getInt("safetyRadius", 0);
         safetyRadius = Math.max(safetyRadius,7);
 
-        long maxAttempts = performance.getNumber(PerformanceKeys.maxAttempts, 20).longValue();
-        maxAttempts = Math.max(maxAttempts,1);
-        long maxBiomeChecks = maxBiomeChecksPerGen*maxAttempts;
+        long maxAttemptsOrig = performance.getNumber(PerformanceKeys.maxAttempts, 20).longValue();
+        long maxAttempts = Math.max(maxAttemptsOrig,1);
         long biomeChecks = 0L;
 
         RTPWorld world = getWorld();
@@ -434,40 +437,64 @@ public class Region extends FactoryValue<RegionKeys> {
         RTPLocation location = null;
         long i = 1;
 
+        long maxTime = TimeUnit.SECONDS.toMillis(30);
+        long startTime = System.currentTimeMillis();
+
         for(; i <= maxAttempts; i++) {
+            if(stop.booleanValue()) return null;
+            long t = System.currentTimeMillis()-startTime;
+            if(t<0 || t > maxTime) {
+                location = null;
+                new IllegalStateException("RTP selection exceeded 30s. Please address relevant delays, such as chunk loading or biomes.")
+                        .printStackTrace();
+                break;
+            }
+
             long l = -1;
             int[] select;
             if(shape instanceof MemoryShape) {
                 l = shape.rand();
                 select = ((MemoryShape<?>) shape).locationToXZ(l);
-                if(verbose) selections.add(new AbstractMap.SimpleEntry<>((long)selections.size(),l));
+                if(verboseFail) selections.add(new AbstractMap.SimpleEntry<>((long)selections.size(),l));
             }
             else {
                 select = shape.select();
-                if(verbose) selections.add(new AbstractMap.SimpleEntry<>((long)select[0],(long)select[1]));
+                if(verboseFail) selections.add(new AbstractMap.SimpleEntry<>((long)select[0],(long)select[1]));
             }
 
             String currBiome = world.getBiome(select[0], (vert.maxY() + vert.minY()) / 2, select[1]);
 
-            for(; biomeChecks < maxBiomeChecks && !biomeNames.contains(currBiome); biomeChecks++, maxAttempts++, i++) {
+            for(; biomeChecks < maxBiomeChecksPerGen && !biomeNames.contains(currBiome); biomeChecks++, maxAttempts++, i++) {
+                if(stop.booleanValue()) return null;
+                t = System.currentTimeMillis()-startTime;
+                if(t<0 || t > maxTime) {
+                    location = null;
+                    new IllegalStateException("RTP selection exceeded 30s. Please address relevant delays, such as chunk loading or biomes.")
+                            .printStackTrace();
+                    break;
+                }
+
                 if(shape instanceof MemoryShape) {
                     if (defaultBiomes) {
                         ((MemoryShape<?>) shape).addBadLocation(l);
                     }
                     l = shape.rand();
                     select = ((MemoryShape<?>) shape).locationToXZ(l);
-                    if(verbose) selections.add(new AbstractMap.SimpleEntry<>((long)selections.size(),l));
+                    if(verboseFail) selections.add(new AbstractMap.SimpleEntry<>((long)selections.size(),l));
                 }
                 else {
                     select = shape.select();
-                    if(verbose) selections.add(new AbstractMap.SimpleEntry<>((long)select[0],(long)select[1]));
+                    if(verboseFail) selections.add(new AbstractMap.SimpleEntry<>((long)select[0],(long)select[1]));
                 }
                 biomeSpecificFails.putIfAbsent(currBiome,0L);
                 biomeSpecificFails.put(currBiome, biomeSpecificFails.get(currBiome)+1);
                 currBiome = world.getBiome(select[0], (vert.maxY()+vert.minY())/2, select[1]);
                 biomeFails++;
             }
-            if(biomeChecks>=maxBiomeChecks) return new AbstractMap.SimpleEntry<>(null,i);
+            if(biomeChecks>=maxBiomeChecksPerGen*maxAttemptsOrig) {
+                location = null;
+                break;
+            }
 
             WorldBorder border = RTP.serverAccessor.getWorldBorder(world.name());
             if(!border.isInside().apply(new RTPLocation(world,select[0]*16, (vert.maxY()-vert.minY())/2+vert.minY(), select[1]*16))) {
@@ -475,7 +502,8 @@ public class Region extends FactoryValue<RegionKeys> {
                 worldBorderFails++;
                 if(worldBorderFails>1000) {
                     new IllegalStateException("1000 worldborder checks failed. region/selection is likely outside the worldborder").printStackTrace();
-                    return new AbstractMap.SimpleEntry<>(null,i);
+                    location = null;
+                    break;
                 }
                 continue;
             }
@@ -485,7 +513,7 @@ public class Region extends FactoryValue<RegionKeys> {
             RTPChunk chunk;
 
             try {
-                chunk = cfChunk.get(5000,TimeUnit.MILLISECONDS);
+                chunk = cfChunk.get(10000,TimeUnit.MILLISECONDS);
             } catch (InterruptedException | ExecutionException e) {
                 e.printStackTrace();
                 return new AbstractMap.SimpleEntry<>(null,i);
@@ -557,7 +585,7 @@ public class Region extends FactoryValue<RegionKeys> {
             }
         }
 
-        if (verbose && i >= maxAttempts) {
+        if (verboseFail && location == null) {
             RTP.log(Level.WARNING,"[plugin] ["+name+"] failed to generate a location within " + maxAttempts + " tries");
             RTP.log(Level.WARNING,"[plugin] ["+name+"]     failed biome checks: "+biomeFails);
             if(biomeFails>maxAttempts/2) {

@@ -16,6 +16,7 @@ import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tasks.SetupTeleport;
 import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
+import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
@@ -108,7 +109,8 @@ public class OnEventTeleports implements Listener {
                 location = region.getLocation(
                         new BukkitRTPCommandSender(Bukkit.getConsoleSender()),
                         new BukkitRTPPlayer(player),
-                        null);
+                        null,
+                        new MutableBoolean(false));
             }
             if(location == null) {
                 RTP.log(Level.WARNING, "[plugin] failed to generate respawn location");
