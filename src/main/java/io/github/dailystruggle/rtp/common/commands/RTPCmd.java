@@ -91,7 +91,7 @@ public interface RTPCmd extends BaseRTPCmd {
         }
 
         if(verbose) {
-            RTP.log(Level.INFO, "[plugin] RTP command triggered by " + sender.name() + ".");
+            RTP.log(Level.INFO, "[RTP] RTP command triggered by " + sender.name() + ".");
         }
 
         ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) rtp.configs.getParser(MessagesKeys.class);
@@ -165,7 +165,7 @@ public interface RTPCmd extends BaseRTPCmd {
             RTPPlayer player = players.get(i);
 
             if(verbose && rtpArgs.containsKey("player")) {
-                RTP.log(Level.INFO, "[plugin] RTP processing player:" + player.name());
+                RTP.log(Level.INFO, "[RTP] RTP processing player:" + player.name());
             }
 
             //get their data

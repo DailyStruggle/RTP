@@ -102,11 +102,11 @@ public final class DoTeleport extends RTPRunnable {
                         else millis = TimeUnit.NANOSECONDS.toMillis(time)%1000;
                         replacement += millis + langParser.getConfigValue(MessagesKeys.millis,"").toString();
                     }
-                    RTP.log(Level.INFO, "[plugin] completed teleport for player:"+player.name() + " in " + replacement);
+                    RTP.log(Level.INFO, "[RTP] completed teleport for player:"+player.name() + " in " + replacement);
                 }
             }
             else {
-                if(verbose) RTP.log(Level.WARNING, "[plugin] failed to complete teleport for player:"+player.name());
+                if(verbose) RTP.log(Level.WARNING, "[RTP] failed to complete teleport for player:"+player.name());
             }
         });
 
