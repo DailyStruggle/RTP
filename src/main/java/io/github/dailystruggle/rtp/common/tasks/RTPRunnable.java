@@ -1,10 +1,12 @@
 package io.github.dailystruggle.rtp.common.tasks;
 
+import org.apache.commons.lang3.mutable.MutableBoolean;
+
 public class RTPRunnable implements Runnable, RTPCancellable, RTPDelayable {
-    private boolean cancelled;
+    protected MutableBoolean cancelled = new MutableBoolean(false);
     private long delay = 0;
 
-    protected boolean isRunning = false;
+    protected MutableBoolean isRunning = new MutableBoolean(false);
 
     private Runnable runnable;
 
@@ -27,12 +29,12 @@ public class RTPRunnable implements Runnable, RTPCancellable, RTPDelayable {
 
     @Override
     public boolean isCancelled() {
-        return cancelled;
+        return cancelled.booleanValue();
     }
 
     @Override
     public void setCancelled(boolean cancel) {
-        cancelled = cancel;
+        cancelled.setValue(cancel);
     }
 
     @Override
@@ -46,7 +48,7 @@ public class RTPRunnable implements Runnable, RTPCancellable, RTPDelayable {
     }
 
     public boolean isRunning() {
-        return isRunning;
+        return isRunning.booleanValue();
     }
 
     @Override

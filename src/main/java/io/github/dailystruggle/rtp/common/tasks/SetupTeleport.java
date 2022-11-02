@@ -35,9 +35,13 @@ public final class SetupTeleport extends RTPRunnable {
         this.biomes = biomes;
     }
 
+    static {
+        preActions.add(task -> task.isRunning.setTrue());
+        postActions.add((setupTeleport, aBoolean) -> setupTeleport.isRunning.setFalse());
+    }
+
     @Override
     public void run() {
-        isRunning = true;
         preActions.forEach(consumer -> consumer.accept(this));
 
         ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
@@ -70,7 +74,7 @@ public final class SetupTeleport extends RTPRunnable {
 
         RTP.getInstance().latestTeleportData.put(player.uuid(),teleportData);
 
-        Map.Entry<RTPLocation, Long> pair = this.region.getLocation(sender, player, biomes);
+        Map.Entry<RTPLocation, Long> pair = this.region.getLocation(sender, player, biomes, cancelled);
         if(pair == null) { //player gets put on region queue
             return;
         }
@@ -79,7 +83,7 @@ public final class SetupTeleport extends RTPRunnable {
             String msg = langParser.getConfigValue(MessagesKeys.unsafe,"").toString();
             RTP.serverAccessor.sendMessage(sender.uuid(),player.uuid(),msg);
             postActions.forEach(consumer -> consumer.accept(this, false));
-            isRunning = false;
+            isRunning.setFalse();
             RTPTeleportCancel.refund(player.uuid());
             return;
         }
@@ -104,7 +108,6 @@ public final class SetupTeleport extends RTPRunnable {
         }
 
         postActions.forEach(consumer -> consumer.accept(this, true));
-        isRunning = false;
     }
 
     public RTPCommandSender sender() {
