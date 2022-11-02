@@ -57,7 +57,7 @@ public class OnEventTeleports implements Listener {
                     verbose = Boolean.parseBoolean(o.toString());
                 }
             }
-            if(verbose) RTP.log(Level.INFO, "[plugin] teleporting player:"+player+" on world change");
+            if(verbose) RTP.log(Level.INFO, "[RTP] teleporting player:"+player+" on world change");
 
             teleportAction(player);
         }
@@ -83,7 +83,7 @@ public class OnEventTeleports implements Listener {
                 verbose = Boolean.parseBoolean(o.toString());
             }
         }
-        if(verbose) RTP.log(Level.INFO, "[plugin] generating respawn location for player:"+player+" on death");
+        if(verbose) RTP.log(Level.INFO, "[RTP] generating respawn location for player:"+player+" on death");
 
         respawningPlayers.add(id);
 
@@ -113,7 +113,7 @@ public class OnEventTeleports implements Listener {
                         new MutableBoolean(false));
             }
             if(location == null) {
-                RTP.log(Level.WARNING, "[plugin] failed to generate respawn location");
+                RTP.log(Level.WARNING, "[RTP] failed to generate respawn location");
                 return;
             }
 
@@ -177,7 +177,7 @@ public class OnEventTeleports implements Listener {
 
             RTPWorld rtpWorld = rtpLocation.world();
             if(rtpWorld instanceof BukkitRTPWorld) {
-                if(verbose) RTP.log(Level.INFO, "[plugin] updating respawn location for player:"+player);
+                if(verbose) RTP.log(Level.INFO, "[RTP] updating respawn location for player:"+player);
                 event.setRespawnLocation(new Location(((BukkitRTPWorld) rtpWorld).world(), rtpLocation.x(), rtpLocation.y(), rtpLocation.z()));
             }
             else throw new IllegalStateException("expected bukkit world");
@@ -186,7 +186,7 @@ public class OnEventTeleports implements Listener {
 
         boolean finalVerbose = verbose;
         future.whenComplete((location, throwable) -> {
-            if(finalVerbose) RTP.log(Level.INFO, "[plugin] teleporting player:"+player+" on respawn");
+            if(finalVerbose) RTP.log(Level.INFO, "[RTP] teleporting player:"+player+" on respawn");
             SetupTeleport setupTeleport = new SetupTeleport(
                     new BukkitRTPCommandSender(Bukkit.getConsoleSender()),
                     new BukkitRTPPlayer(player),
@@ -224,7 +224,7 @@ public class OnEventTeleports implements Listener {
         }
 
         if(hasFirstJoin && !player.hasPlayedBefore()) {
-            if(verbose) RTP.log(Level.INFO, "[plugin] teleporting player:" + player + " on first join");
+            if(verbose) RTP.log(Level.INFO, "[RTP] teleporting player:" + player + " on first join");
             teleportAction(player);
         }
         else if (hasJoin) {
@@ -234,7 +234,7 @@ public class OnEventTeleports implements Listener {
                 RTP.serverAccessor.sendMessage(player.getUniqueId(), MessagesKeys.cooldownMessage);
                 return;
             }
-            if(verbose) RTP.log(Level.INFO, "[plugin] teleporting player:" + player + " on join");
+            if(verbose) RTP.log(Level.INFO, "[RTP] teleporting player:" + player + " on join");
             teleportAction(player);
         }
     }
@@ -268,7 +268,7 @@ public class OnEventTeleports implements Listener {
                     verbose = Boolean.parseBoolean(o.toString());
                 }
             }
-            if(verbose) RTP.log(Level.INFO, "[plugin] teleporting player:" + player + " on move");
+            if(verbose) RTP.log(Level.INFO, "[RTP] teleporting player:" + player + " on move");
             teleportAction(player);
         }
     }
@@ -287,7 +287,7 @@ public class OnEventTeleports implements Listener {
                     verbose = Boolean.parseBoolean(o.toString());
                 }
             }
-            if(verbose) RTP.log(Level.INFO, "[plugin] teleporting player:" + player + " on teleport");
+            if(verbose) RTP.log(Level.INFO, "[RTP] teleporting player:" + player + " on teleport");
             teleportAction(player);
         }
     }

@@ -586,31 +586,31 @@ public class Region extends FactoryValue<RegionKeys> {
         }
 
         if (verboseFail && location == null) {
-            RTP.log(Level.WARNING,"[plugin] ["+name+"] failed to generate a location within " + maxAttempts + " tries");
-            RTP.log(Level.WARNING,"[plugin] ["+name+"]     failed biome checks: "+biomeFails);
+            RTP.log(Level.WARNING,"[RTP] ["+name+"] failed to generate a location within " + maxAttempts + " tries");
+            RTP.log(Level.WARNING,"[RTP] ["+name+"]     failed biome checks: "+biomeFails);
             if(biomeFails>maxAttempts/2) {
-                RTP.log(Level.WARNING,"[plugin] ["+name+"] biomes: \n"+ Arrays.toString(biomeNames.toArray()));
+                RTP.log(Level.WARNING,"[RTP] ["+name+"] biomes: \n"+ Arrays.toString(biomeNames.toArray()));
                 biomeSpecificFails.forEach((key, value) -> RTP.log(Level.WARNING,
-                        "[plugin] [" + name + "]     " + key + ": " + value));
+                        "[RTP] [" + name + "]     " + key + ": " + value));
             }
-            RTP.log(Level.WARNING,"[plugin] ["+name+"]     failed world border checks: "+worldBorderFails);
-            RTP.log(Level.WARNING,"[plugin] ["+name+"]     chunk timeouts: "+timeoutFails);
-            RTP.log(Level.WARNING,"[plugin] ["+name+"]     failed height checks: "+vertFails);
+            RTP.log(Level.WARNING,"[RTP] ["+name+"]     failed world border checks: "+worldBorderFails);
+            RTP.log(Level.WARNING,"[RTP] ["+name+"]     chunk timeouts: "+timeoutFails);
+            RTP.log(Level.WARNING,"[RTP] ["+name+"]     failed height checks: "+vertFails);
             if(vertFails>maxAttempts/2) {
-                RTP.log(Level.WARNING,"[plugin] ["+name+"] current vert values: "+vert);
+                RTP.log(Level.WARNING,"[RTP] ["+name+"] current vert values: "+vert);
             }
-            RTP.log(Level.WARNING,"[plugin] ["+name+"]     failed safety checks: "+safetyFails);
+            RTP.log(Level.WARNING,"[RTP] ["+name+"]     failed safety checks: "+safetyFails);
             if(safetyFails>maxAttempts/2) {
-                RTP.log(Level.WARNING,"[plugin] ["+name+"] current set of unsafe blocks: \n"+ Arrays.toString(unsafeBlocks.toArray()));
+                RTP.log(Level.WARNING,"[RTP] ["+name+"] current set of unsafe blocks: \n"+ Arrays.toString(unsafeBlocks.toArray()));
                 safetySpecificFails.forEach((key, value) -> RTP.log(Level.WARNING,
-                        "[plugin] [" + name + "]     " + key + ": " + value));
+                        "[RTP] [" + name + "]     " + key + ": " + value));
             }
-            RTP.log(Level.WARNING,"[plugin] ["+name+"]     failed addon checks: "+miscFails);
+            RTP.log(Level.WARNING,"[RTP] ["+name+"]     failed addon checks: "+miscFails);
 
             if(shape instanceof MemoryShape) {
-                RTP.log(Level.INFO,"[plugin] ["+name+"] range: " + ((MemoryShape<?>)shape).getRange());
+                RTP.log(Level.INFO,"[RTP] ["+name+"] range: " + ((MemoryShape<?>)shape).getRange());
             }
-            RTP.log(Level.INFO,"[plugin] ["+name+"] selections: "+selections);
+            RTP.log(Level.INFO,"[RTP] ["+name+"] selections: "+selections);
         }
 
         i = Math.min(i,maxAttempts);
