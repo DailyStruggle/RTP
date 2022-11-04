@@ -1,6 +1,7 @@
 package leafcraft.rtp.API.customEvents;
 
 import leafcraft.rtp.API.selection.TeleportRegion;
+import org.bukkit.Bukkit;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
@@ -14,7 +15,7 @@ public class PlayerQueuePushEvent extends Event {
     private static final HandlerList HANDLERS_LIST = new HandlerList();
 
     public PlayerQueuePushEvent(TeleportRegion region, UUID playerId) {
-        super(true);
+        super(!Bukkit.isPrimaryThread());
         this.region = region;
         this.playerId = playerId;
     }

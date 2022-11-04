@@ -143,7 +143,7 @@ public class OnEvent implements Listener {
                 SendMessage.sendMessage(player, msg);
                 return;
             }
-            teleportAction(player, SyncState.SYNC);
+            Bukkit.getScheduler().runTaskLater(RTP.getPlugin(),() -> teleportAction(player, SyncState.SYNC),20);
         }
     }
 
@@ -193,7 +193,7 @@ public class OnEvent implements Listener {
         }
     }
 
-    private static void teleportAction(Player player, SyncState syncState){
+    static void teleportAction(Player player, SyncState syncState){
         Cache cache = RTP.getCache();
 
         SetupTeleport setupTeleport = cache.setupTeleports.get(player.getUniqueId());
@@ -204,7 +204,7 @@ public class OnEvent implements Listener {
         if (doTeleport != null && doTeleport.isNoDelay()) return;
 
         cache.lastTeleportTime.put(player.getUniqueId(),System.nanoTime());
-        setupTeleport = new SetupTeleport(player, player, new RandomSelectParams(player.getWorld(),null));
+        setupTeleport = new SetupTeleport(Bukkit.getConsoleSender(), player, new RandomSelectParams(player.getWorld(),null));
 
         if(RTP.getServerIntVersion()>8) {
             switch (syncState) {

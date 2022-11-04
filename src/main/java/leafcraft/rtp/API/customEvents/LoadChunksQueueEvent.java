@@ -1,5 +1,6 @@
 package leafcraft.rtp.API.customEvents;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.event.Cancellable;
@@ -17,7 +18,7 @@ public class LoadChunksQueueEvent extends Event implements Cancellable {
     private boolean isCancelled;
 
     public LoadChunksQueueEvent(Location to, List<CompletableFuture<Chunk>> chunks) {
-        super(true);
+        super(!Bukkit.isPrimaryThread());
         this.to = to;
         this.chunks = chunks;
         this.isCancelled = false;

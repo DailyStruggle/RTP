@@ -217,7 +217,7 @@ public class RTPCmd implements CommandExecutor {
             boolean has = true;
             if (economy != null
                     && sender instanceof Player
-                    && !sender.hasPermission("rtp.near.free"))
+                    && !sender.hasPermission("rtp.free.near"))
                 has = economy.has((Player) sender, price);
 
             if(playerName.equalsIgnoreCase("random") && sender.hasPermission("rtp.near.random")) {
@@ -290,6 +290,12 @@ public class RTPCmd implements CommandExecutor {
             rtpArgs.putIfAbsent("world", world.getName());
         }
         else if(rtpArgs.containsKey("biome")) {
+            if (!sender.hasPermission("rtp.biome")) {
+                String msg = configs.lang.getLog("noPerms");
+                SendMessage.sendMessage(sender,msg);
+                return true;
+            }
+
             Biome biome;
             try {
                 biome = Biome.valueOf(rtpArgs.get("biome"));
@@ -302,30 +308,23 @@ public class RTPCmd implements CommandExecutor {
                 return true;
             }
 
-            double price = configs.config.biomePrice;
-            Economy economy = VaultChecker.getEconomy();
-            boolean has = true;
-            if (economy != null
-                    && sender instanceof Player
-                    && !sender.hasPermission("rtp.biome.free"))
-                has = economy.has((Player) sender, price);
+            if(sender instanceof Player player1) {
+                Economy economy = VaultChecker.getEconomy();
+                if(economy!=null) {
+                    double price = player1.hasPermission("rtp.free.biome")
+                        ? 0.0 : configs.config.biomePrice;
+                    boolean has = economy.has(player1, price);
 
-            if (!sender.hasPermission("rtp.biome")) {
-                String msg = configs.lang.getLog("noPerms");
-                SendMessage.sendMessage(sender,msg);
-                return true;
-            }
+                    if(!has) {
+                        String msg = configs.lang.getLog("notEnoughMoney",String.valueOf(price));
+                        PAPIChecker.fillPlaceholders(player1,msg);
+                        SendMessage.sendMessage(sender,msg);
+                        return true;
+                    }
 
-            if(!has) {
-                String msg = configs.lang.getLog("notEnoughMoney",String.valueOf(price));
-                PAPIChecker.fillPlaceholders((Player)sender,msg);
-                SendMessage.sendMessage(sender,msg);
-                return true;
-            }
-
-            if(sender instanceof Player && !sender.hasPermission("rtp.biome.free")) {
-                Objects.requireNonNull(economy).withdrawPlayer((Player)sender,price);
-                cache.currentTeleportCost.put(((Player) sender).getUniqueId(), price);
+                    economy.withdrawPlayer(player1,price);
+                    cache.currentTeleportCost.put(player1.getUniqueId(), price);
+                }
             }
         }
 

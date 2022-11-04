@@ -130,7 +130,12 @@ public class LoadChunks extends BukkitRunnable {
                 }
             } else {
                 World world = Bukkit.getWorld(rsParams.worldID);
-                if(world == null) return;
+                if(world == null) {
+                    if(sender instanceof Player player1) {
+                        cache.currentTeleportCost.remove(player1.getUniqueId());
+                    }
+                    return;
+                }
                 Chunk centerChunk = location.getChunk();
                 int vd = configs.config.vd;
                 long len = (2L*vd+1)*(2L*vd+1);

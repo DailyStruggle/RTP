@@ -57,6 +57,9 @@ public class SetupTeleport extends BukkitRunnable {
         location = cache.getRandomLocation(rsParams, state, sender, player);
         if (location == null) {
             cache.setupTeleports.remove(player.getUniqueId());
+            if(sender instanceof Player player1) {
+                cache.currentTeleportCost.remove(player1.getUniqueId());
+            }
             return;
         }
         cache.todoTP.put(player.getUniqueId(), location);
@@ -109,7 +112,7 @@ public class SetupTeleport extends BukkitRunnable {
             cache.regionKeys.put(player.getUniqueId(),rsParams);
             LoadChunks loadChunks = new LoadChunks(sender,player, delay, location);
             if(loadChunks.chunkSet == null) loadChunks.chunkSet = new ChunkSet();
-            if(sender.hasPermission("rtp.noDelay.chunks")
+            if(sender.hasPermission("rtp.noDelay.chunks") || sender.hasPermission("rtp.nodelay.chunks")
                     || (loadChunks.chunkSet.completed.get()>=loadChunks.chunkSet.expectedSize-1)) {
                 DoTeleport doTeleport = new DoTeleport(sender,player, location, loadChunks.chunkSet);
 

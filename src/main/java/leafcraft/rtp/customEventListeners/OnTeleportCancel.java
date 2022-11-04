@@ -13,6 +13,7 @@ import leafcraft.rtp.tools.selection.RandomSelectParams;
 import leafcraft.rtp.tools.softdepends.VaultChecker;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Location;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -32,6 +33,12 @@ public final class OnTeleportCancel implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onTeleportCancel(TeleportCancelEvent event) {
         Player player = event.getPlayer();
+
+        CommandSender sender = event.getSender();
+
+        if(sender instanceof Player player1) {
+            cache.currentTeleportCost.remove(player1.getUniqueId());
+        }
 
         //don't stop teleporting if there isn't supposed to be a delay
         SetupTeleport setupTeleport = cache.setupTeleports.get(player.getUniqueId());
@@ -66,7 +73,7 @@ public final class OnTeleportCancel implements Listener {
         cache.todoTP.remove(player.getUniqueId());
         cache.playerFromLocations.remove(player.getUniqueId());
 
-        if(configs.config.refund && event.getSender() instanceof Player sourcePlayer) {
+        if(configs.config.refund && sender instanceof Player sourcePlayer) {
             cache.lastTeleportTime.remove(sourcePlayer.getUniqueId());
             Economy economy = VaultChecker.getEconomy();
             if(economy!=null && economy.isEnabled()) {
@@ -76,6 +83,6 @@ public final class OnTeleportCancel implements Listener {
         }
 
         String msg = configs.lang.getLog("teleportCancel");
-        SendMessage.sendMessage(event.getSender(),event.getPlayer(),msg);
+        SendMessage.sendMessage(sender,event.getPlayer(),msg);
     }
 }

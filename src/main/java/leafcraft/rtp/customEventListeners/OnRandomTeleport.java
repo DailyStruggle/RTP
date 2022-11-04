@@ -52,7 +52,7 @@ public final class OnRandomTeleport implements Listener {
         String msg = configs.lang.getLog("teleportMessage", String.valueOf(event.getTries()));
 
         long time = System.nanoTime();
-        long diff = time-cache.lastTeleportTime.get(player.getUniqueId());
+        long diff = time-cache.lastTeleportTime.getOrDefault(player.getUniqueId(),0L);
         long days = TimeUnit.NANOSECONDS.toDays(diff);
         long hours = TimeUnit.NANOSECONDS.toHours(diff)%24;
         long minutes = TimeUnit.NANOSECONDS.toMinutes(diff)%60;

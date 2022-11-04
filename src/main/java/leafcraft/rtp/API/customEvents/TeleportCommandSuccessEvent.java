@@ -1,5 +1,6 @@
 package leafcraft.rtp.API.customEvents;
 
+import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
@@ -12,7 +13,7 @@ public class TeleportCommandSuccessEvent extends Event {
     private static final HandlerList HANDLERS_LIST = new HandlerList();
 
     public TeleportCommandSuccessEvent(CommandSender sender, Player player) {
-        super(true);
+        super(!Bukkit.isPrimaryThread());
         this.sender = sender;
         this.player = player;
     }

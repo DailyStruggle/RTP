@@ -1,5 +1,6 @@
 package leafcraft.rtp.API.customEvents;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.Event;
@@ -12,7 +13,7 @@ public class RandomSelectQueueEvent extends Event implements Cancellable {
     private boolean isCancelled;
 
     public RandomSelectQueueEvent(Location to) {
-        super(true);
+        super(!Bukkit.isPrimaryThread());
         this.to = to;
         this.isCancelled = false;
     }

@@ -11,6 +11,10 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentSkipListSet;
+
 public class DoTeleport extends BukkitRunnable {
     private final RTP plugin;
     private final CommandSender sender;
@@ -18,6 +22,7 @@ public class DoTeleport extends BukkitRunnable {
     private final Location location;
     private final Cache cache;
     private final ChunkSet chunkSet;
+    private static final Set<UUID> newPlayers = new ConcurrentSkipListSet<>();
 
     public DoTeleport(CommandSender sender, Player player, Location location, ChunkSet chunkSet) {
         this.chunkSet = chunkSet;
