@@ -269,7 +269,7 @@ public class RTPCmd implements CommandExecutor {
 
             if(sender instanceof Player
                     && (economy != null)
-                    && !sender.hasPermission("rtp.near.free")) {
+                    && !sender.hasPermission("rtp.free.near")) {
                 economy.withdrawPlayer((Player)sender,price);
                 cache.currentTeleportCost.put(((Player) sender).getUniqueId(), price);
             }
