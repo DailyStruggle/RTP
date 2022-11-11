@@ -2,7 +2,6 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
-import org.omg.PortableInterceptor.INACTIVE;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.*;

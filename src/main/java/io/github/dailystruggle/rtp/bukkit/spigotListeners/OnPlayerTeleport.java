@@ -42,7 +42,7 @@ public final class OnPlayerTeleport implements Listener {
         Location eventTo = event.getTo();
         if(eventTo == null) return;
 
-        ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.getInstance().configs.configParserMap.get(ConfigKeys.class);
+        ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.configs.configParserMap.get(ConfigKeys.class);
 
         RTPLocation location = teleportData.selectedLocation;
         if(location == null) return;

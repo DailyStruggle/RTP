@@ -46,7 +46,7 @@ public class OnEventTeleports implements Listener {
     public void onPlayerChangeWorld(PlayerChangedWorldEvent event) {
         Player player = event.getPlayer();
         if (checkPerms(event.getPlayer(),"changeworld")) {
-            ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.getInstance().configs.getParser(LoggingKeys.class);
+            ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
             boolean verbose = false;
             if(logging!=null) {
                 Object o = logging.getConfigValue(LoggingKeys.event_join,false);
@@ -72,7 +72,7 @@ public class OnEventTeleports implements Listener {
 
         if (!checkPerms(player,"respawn")) return;
 
-        ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.getInstance().configs.getParser(LoggingKeys.class);
+        ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
         boolean verbose = false;
         if(logging!=null) {
             Object o = logging.getConfigValue(LoggingKeys.event_join,false);
@@ -143,7 +143,7 @@ public class OnEventTeleports implements Listener {
         TeleportData data = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
         data.completed = true;
 
-        ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.getInstance().configs.getParser(LoggingKeys.class);
+        ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
         boolean verbose = false;
         if(logging!=null) {
             Object o = logging.getConfigValue(LoggingKeys.event_respawn,false);
@@ -210,7 +210,7 @@ public class OnEventTeleports implements Listener {
 
         long cooldownTime = new BukkitRTPCommandSender(event.getPlayer()).cooldown();
 
-        ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.getInstance().configs.getParser(LoggingKeys.class);
+        ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
         boolean verbose = false;
         if(logging!=null) {
             Object o = logging.getConfigValue(LoggingKeys.event_join,false);
@@ -246,7 +246,7 @@ public class OnEventTeleports implements Listener {
         if(from.distance(to) == 0.0d) return;
         Player player = event.getPlayer();
 
-        ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.getInstance().configs.configParserMap.get(ConfigKeys.class);
+        ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.configs.configParserMap.get(ConfigKeys.class);
 
         playerMoveDistances.putIfAbsent(player.getUniqueId(),0D);
         playerMoveDistances.compute(player.getUniqueId(),(uuid, aDouble) -> aDouble+=from.distance(to));
@@ -256,7 +256,7 @@ public class OnEventTeleports implements Listener {
         playerMoveDistances.put(player.getUniqueId(),0D);
 
         if(checkPerms(player,"move")) {
-            ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.getInstance().configs.getParser(LoggingKeys.class);
+            ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
             boolean verbose = false;
             if(logging!=null) {
                 Object o = logging.getConfigValue(LoggingKeys.event_move,false);
@@ -275,7 +275,7 @@ public class OnEventTeleports implements Listener {
     public void onPlayerTeleport(PlayerTeleportEvent event) {
         Player player = event.getPlayer();
         if (checkPerms(player,"teleport")) {
-            ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.getInstance().configs.getParser(LoggingKeys.class);
+            ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
             boolean verbose = false;
             if(logging!=null) {
                 Object o = logging.getConfigValue(LoggingKeys.event_move,false);

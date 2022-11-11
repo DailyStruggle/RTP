@@ -49,7 +49,7 @@ public final class RTPTeleportCancel extends RTPRunnable {
     }
 
     public static void refund(UUID playerId) {
-        ConfigParser<EconomyKeys> eco = (ConfigParser<EconomyKeys>) RTP.getInstance().configs.configParserMap.get(EconomyKeys.class);
+        ConfigParser<EconomyKeys> eco = (ConfigParser<EconomyKeys>) RTP.configs.configParserMap.get(EconomyKeys.class);
         Object configValue = eco.getConfigValue(EconomyKeys.refundOnCancel, true);
         boolean refund = Boolean.getBoolean(configValue.toString());
 
@@ -80,7 +80,7 @@ public final class RTPTeleportCancel extends RTPRunnable {
     }
 
     public static void message(UUID playerId) {
-        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
+        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
         String msg = lang.getConfigValue(MessagesKeys.teleportCancel,"").toString();
         RTP.serverAccessor.sendMessage(playerId,msg);
     }

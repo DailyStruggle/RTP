@@ -40,9 +40,9 @@ public final class SetupTeleport extends RTPRunnable {
         isRunning = true;
         preActions.forEach(consumer -> consumer.accept(this));
 
-        ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
+        ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
 
-        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.getInstance().configs.getParser(PerformanceKeys.class);
+        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
         boolean syncLoading = false;
         Object configValue = perf.getConfigValue(PerformanceKeys.syncLoading, false);
         if(configValue instanceof String) {

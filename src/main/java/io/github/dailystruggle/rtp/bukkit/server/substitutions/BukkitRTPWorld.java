@@ -181,7 +181,7 @@ public final class BukkitRTPWorld implements RTPWorld {
         Material air = (airBlock.isLiquid() || airBlock.getType().isSolid()) ? Material.AIR : airBlock.getType();
         Material solid = location.getBlock().getRelative(BlockFace.DOWN).getType();
 
-        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.getInstance().configs.getParser(SafetyKeys.class);
+        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
         Set<String> unsafeBlocks = safety.yamlFile.getStringList("unsafeBlocks")
                 .stream().map(String::toUpperCase).collect(Collectors.toSet());
 

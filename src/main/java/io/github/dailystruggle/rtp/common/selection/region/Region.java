@@ -134,7 +134,7 @@ public class Region extends FactoryValue<RegionKeys> {
                     return;
                 }
 
-                ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.getInstance().configs.getParser(PerformanceKeys.class);
+                ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
                 long radius = perf.getNumber(PerformanceKeys.viewDistanceSelect,0L).longValue();
 
                 ChunkSet chunkSet = chunks(location, radius);
@@ -257,7 +257,7 @@ public class Region extends FactoryValue<RegionKeys> {
         }
 
         Set<String> defaultBiomes;
-        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.getInstance().configs.getParser(SafetyKeys.class);
+        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
         Object configBiomes = safety.getConfigValue(SafetyKeys.biomes,null);
         if(configBiomes instanceof Collection) {
             boolean whitelist;
@@ -307,7 +307,7 @@ public class Region extends FactoryValue<RegionKeys> {
                     continue;
                 }
 
-                ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.getInstance().configs.getParser(SafetyKeys.class);
+                ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
                 Set<String> unsafeBlocks = safety.yamlFile.getStringList("unsafeBlocks")
                         .stream().map(String::toUpperCase).collect(Collectors.toSet());
 
@@ -372,7 +372,7 @@ public class Region extends FactoryValue<RegionKeys> {
         boolean defaultBiomes = false;
         if(biomeNames == null || biomeNames.size()==0) {
             defaultBiomes = true;
-            ConfigParser<SafetyKeys> parser = (ConfigParser<SafetyKeys>) RTP.getInstance().configs.getParser(SafetyKeys.class);
+            ConfigParser<SafetyKeys> parser = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
             boolean whitelist = parser.yamlFile.getBoolean("biomeWhitelist", false);
             List<String> biomeList = parser.yamlFile.getStringList("biomes");
             Set<String> biomeSet = (biomeList==null) ? new HashSet<>() : new HashSet<>(biomeList);
@@ -387,7 +387,7 @@ public class Region extends FactoryValue<RegionKeys> {
             }
         }
 
-        ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.getInstance().configs.getParser(LoggingKeys.class);
+        ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
         boolean verbose = true;
         if(logging!=null) {
             Object o = logging.getConfigValue(LoggingKeys.teleport,false);
@@ -404,8 +404,8 @@ public class Region extends FactoryValue<RegionKeys> {
         VerticalAdjustor<?> vert = getVert();
         if(vert == null) return null;
 
-        ConfigParser<PerformanceKeys> performance = (ConfigParser<PerformanceKeys>) RTP.getInstance().configs.getParser(PerformanceKeys.class);
-        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.getInstance().configs.getParser(SafetyKeys.class);
+        ConfigParser<PerformanceKeys> performance = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
 
         Set<String> unsafeBlocks = safety.yamlFile.getStringList("unsafeBlocks")
                 .stream().map(String::toUpperCase).collect(Collectors.toSet());

@@ -33,6 +33,9 @@ import java.util.logging.Level;
  * class to hold relevant API functions, outside of Bukkit functionality
  */
 public class RTP {
+    /**
+     * dynamic factories for certain types
+     */
     public enum factoryNames {
         shape,
         vert,
@@ -56,7 +59,10 @@ public class RTP {
      */
     public static int minRTPExecutions = 1;
 
-    public Configs configs;
+    /**
+     * only one of each of these objects
+     */
+    public static Configs configs;
     public static RTPServerAccessor serverAccessor;
     public static RTPEconomy economy = null;
 
@@ -116,7 +122,7 @@ public class RTP {
         //get region from world name, check for overrides
         Set<String> worldsAttempted = new HashSet<>();
         String worldName = player.getLocation().world().name();
-        MultiConfigParser<WorldKeys> worldParsers = (MultiConfigParser<WorldKeys>) RTP.getInstance().configs.multiConfigParserMap.get(WorldKeys.class);
+        MultiConfigParser<WorldKeys> worldParsers = (MultiConfigParser<WorldKeys>) RTP.configs.multiConfigParserMap.get(WorldKeys.class);
         ConfigParser<WorldKeys> worldParser = worldParsers.getParser(worldName);
         boolean requirePermission = Boolean.parseBoolean(worldParser.getConfigValue(WorldKeys.requirePermission,false).toString());
 

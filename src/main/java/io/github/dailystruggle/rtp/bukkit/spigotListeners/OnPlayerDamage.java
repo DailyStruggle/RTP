@@ -23,7 +23,7 @@ public class OnPlayerDamage implements Listener {
         long lastTeleport = RTP.getInstance().invulnerablePlayers.get(entity.getUniqueId());
         long current = System.currentTimeMillis();
 
-        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.getInstance().configs.getParser(SafetyKeys.class);
+        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
         long max = safety.getNumber(SafetyKeys.invulnerabilityTime, 0).longValue();
 
         if(max <= 0) {

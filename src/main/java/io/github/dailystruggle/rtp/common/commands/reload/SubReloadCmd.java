@@ -57,7 +57,7 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
     @Override
     public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
         if(nextCommand!=null) return true;
-        return subReload(callerId,RTP.getInstance().configs.getParser(configClass));
+        return subReload(callerId,RTP.configs.getParser(configClass));
     }
 
     public boolean subReload(UUID senderID, FactoryValue<?> factoryValue) {
@@ -73,7 +73,7 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
 
     public boolean subReloadSingle(UUID senderId, ConfigParser<?> parser) {
         RTPServerAccessor serverAccessor = RTP.serverAccessor;
-        Configs configs = RTP.getInstance().configs;
+        Configs configs = RTP.configs;
 
         ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) configs.getParser(MessagesKeys.class);
         if(lang == null) return true;
@@ -92,7 +92,7 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
     }
 
     public boolean subReloadMulti(UUID senderId, MultiConfigParser<?> parser) {
-        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
+        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
         if(lang == null) return true;
 
         RTPServerAccessor serverAccessor = RTP.serverAccessor;

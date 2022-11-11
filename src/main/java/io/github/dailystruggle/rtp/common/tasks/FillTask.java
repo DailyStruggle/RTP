@@ -114,7 +114,7 @@ public class FillTask extends RTPRunnable {
             if(numLoadsRemaining<0 || numLoadsRemaining>range) numLoadsRemaining = 0;
             long estRemaining = numLoadsRemaining/cps_local;
 
-            ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
+            ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
             String msg = langParser.getConfigValue(MessagesKeys.fillStatus, "").toString();
             if(msg!=null && !msg.isEmpty()) {
                 long days = TimeUnit.SECONDS.toDays(estRemaining);
@@ -199,8 +199,8 @@ public class FillTask extends RTPRunnable {
 
             boolean pass = location != null;
 
-            ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.getInstance().configs.getParser(SafetyKeys.class);
-            ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.getInstance().configs.getParser(PerformanceKeys.class);
+            ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+            ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
 
             Set<String> unsafeBlocks = safety.yamlFile.getStringList("unsafeBlocks")
                     .stream().map(String::toUpperCase).collect(Collectors.toSet());

@@ -67,7 +67,7 @@ public final class DoTeleport extends RTPRunnable {
 
         TeleportData finalTeleportData = teleportData;
         setLocation.whenComplete((aBoolean, throwable) -> {
-            ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.getInstance().configs.getParser(LoggingKeys.class);
+            ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
             boolean verbose = true;
             if(logging!=null) {
                 Object o = logging.getConfigValue(LoggingKeys.teleport,false);
@@ -85,7 +85,7 @@ public final class DoTeleport extends RTPRunnable {
 
                 if(verbose) {
                     long time = finalTeleportData.processingTime;
-                    ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
+                    ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
                     long days = TimeUnit.NANOSECONDS.toDays(time);
                     long hours = TimeUnit.NANOSECONDS.toHours(time)%24;
                     long minutes = TimeUnit.NANOSECONDS.toMinutes(time)%60;
