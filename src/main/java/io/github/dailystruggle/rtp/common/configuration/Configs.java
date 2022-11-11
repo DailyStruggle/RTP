@@ -3,6 +3,8 @@ package io.github.dailystruggle.rtp.common.configuration;
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.*;
+import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
+import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
@@ -44,11 +46,11 @@ public class Configs {
             name = ((ConfigParser<?>) instance).name;
             if(((ConfigParser<?>) instance).myClass.equals(LoggingKeys.class))
                 logging = ((ConfigParser<LoggingKeys>) instance);
-            else logging = (ConfigParser<LoggingKeys>) RTP.getInstance().configs.getParser(LoggingKeys.class);
+            else logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
             configParserMap.put(((ConfigParser<?>) instance).myClass, (ConfigParser<?>) instance);
         }
         else if(instance instanceof MultiConfigParser<?>) {
-            logging = (ConfigParser<LoggingKeys>) RTP.getInstance().configs.getParser(LoggingKeys.class);
+            logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
             name = ((MultiConfigParser<?>) instance).name;
             multiConfigParserMap.put(((MultiConfigParser<?>) instance).myClass, (MultiConfigParser<?>) instance);
         }
@@ -99,7 +101,7 @@ public class Configs {
         configParserMap.clear();
         multiConfigParserMap.clear();
         reloadAction();
-        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
+        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
         if(lang == null) return false;
         String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloaded,""));
         if(msg!=null) msg = StringUtils.replace(msg,"[filename]", "configs");

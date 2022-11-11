@@ -29,12 +29,12 @@ public class InfoCmd extends BaseRTPCmdImpl {
         worldDataLookup.put("world", RTPWorld::name);
         worldDataLookup.put("region", world -> RTP.getInstance().selectionAPI.getRegion(world).name);
         worldDataLookup.put("requirePermission", world -> {
-            MultiConfigParser<WorldKeys> worlds = (MultiConfigParser<WorldKeys>) RTP.getInstance().configs.getParser(WorldKeys.class);
+            MultiConfigParser<WorldKeys> worlds = (MultiConfigParser<WorldKeys>) RTP.configs.getParser(WorldKeys.class);
             ConfigParser<WorldKeys> parser = worlds.getParser(world.name());
             return parser.getConfigValue(WorldKeys.requirePermission,false).toString();
         });
         worldDataLookup.put("override", world -> {
-            MultiConfigParser<WorldKeys> worlds = (MultiConfigParser<WorldKeys>) RTP.getInstance().configs.getParser(WorldKeys.class);
+            MultiConfigParser<WorldKeys> worlds = (MultiConfigParser<WorldKeys>) RTP.configs.getParser(WorldKeys.class);
             ConfigParser<WorldKeys> parser = worlds.getParser(world.name());
             return parser.getConfigValue(WorldKeys.override,"[0]").toString();
         });
@@ -92,7 +92,7 @@ public class InfoCmd extends BaseRTPCmdImpl {
 
     @Override
     public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
-        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
+        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
 
         if(parameterValues.size()==0) {
             String title = lang.getConfigValue(MessagesKeys.infoTitle, "").toString();

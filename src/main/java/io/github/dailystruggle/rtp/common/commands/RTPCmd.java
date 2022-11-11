@@ -79,7 +79,7 @@ public interface RTPCmd extends BaseRTPCmd {
             return true;
         }
 
-        ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.getInstance().configs.getParser(LoggingKeys.class);
+        ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
         boolean verbose = false;
         if(logging!=null) {
             Object o = logging.getConfigValue(LoggingKeys.command,false);

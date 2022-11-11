@@ -48,7 +48,7 @@ public final class BukkitRTPCommandSender implements RTPCommandSender {
 
         int cooldown = ParsePermissions.getInt(this, "rtp.cooldown.");
         if (cooldown < 0) {
-            ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.getInstance().configs.getParser(ConfigKeys.class);
+            ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
             cooldown = configParser.getNumber(ConfigKeys.teleportCooldown, 0).intValue();
         }
         return TimeUnit.SECONDS.toNanos(cooldown);
@@ -60,7 +60,7 @@ public final class BukkitRTPCommandSender implements RTPCommandSender {
 
         int delay = ParsePermissions.getInt(new BukkitRTPCommandSender(sender), "rtp.delay.");
         if (delay < 0) {
-            ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.getInstance().configs.getParser(ConfigKeys.class);
+            ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
             delay = configParser.getNumber(ConfigKeys.teleportDelay, 0).intValue();
         }
         return TimeUnit.SECONDS.toNanos(delay);

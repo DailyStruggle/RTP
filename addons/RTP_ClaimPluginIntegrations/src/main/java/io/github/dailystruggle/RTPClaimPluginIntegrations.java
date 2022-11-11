@@ -16,11 +16,11 @@ public final class RTPClaimPluginIntegrations extends JavaPlugin {
     @Override
     public void onEnable() {
         // Plugin startup logic
-        Configs configs = RTP.getInstance().configs;
+        Configs configs = RTP.configs;
         ConfigParser<IntegrationsKeys> integrations = new ConfigParser<>(IntegrationsKeys.class,"integrations","1.0",RTP.serverAccessor.getPluginDirectory(), null, this.getClass().getClassLoader());
         configs.putParser(integrations);
 
-        Configs.onReload(() -> RTP.getInstance().configs.putParser(new ConfigParser<>(IntegrationsKeys.class,"integrations","1.0",RTP.serverAccessor.getPluginDirectory(), null, this.getClass().getClassLoader())));
+        Configs.onReload(() -> RTP.configs.putParser(new ConfigParser<>(IntegrationsKeys.class,"integrations","1.0",RTP.serverAccessor.getPluginDirectory(), null, this.getClass().getClassLoader())));
     }
 
     @Override
@@ -29,7 +29,7 @@ public final class RTPClaimPluginIntegrations extends JavaPlugin {
     }
 
     public void setupIntegrations() {
-        ConfigParser<IntegrationsKeys> configParser = (ConfigParser<IntegrationsKeys>) RTP.getInstance().configs.getParser(IntegrationsKeys.class);
+        ConfigParser<IntegrationsKeys> configParser = (ConfigParser<IntegrationsKeys>) RTP.configs.getParser(IntegrationsKeys.class);
 
         Region.addGlobalRegionVerifier(rtpLocation -> {
             RTPWorld rtpWorld = rtpLocation.world();

@@ -251,7 +251,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         });
 
         DoTeleport.postActions.add(task -> {
-            ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
+            ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
 
             if(task.player() instanceof BukkitRTPPlayer) {
                 Player player = ((BukkitRTPPlayer) task.player()).player();
@@ -346,7 +346,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         Set<String> regionsAttempted = new HashSet<>();
 
         String worldName = player.getWorld().getName();
-        MultiConfigParser<WorldKeys> worldParsers = (MultiConfigParser<WorldKeys>) RTP.getInstance().configs.multiConfigParserMap.get(WorldKeys.class);
+        MultiConfigParser<WorldKeys> worldParsers = (MultiConfigParser<WorldKeys>) RTP.configs.multiConfigParserMap.get(WorldKeys.class);
         ConfigParser<WorldKeys> worldParser = worldParsers.getParser(worldName);
         boolean requirePermission = Boolean.parseBoolean(worldParser.getConfigValue(WorldKeys.requirePermission,false).toString());
 
@@ -360,7 +360,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         }
 
         String regionName = String.valueOf(worldParser.getConfigValue(WorldKeys.region, "default"));
-        MultiConfigParser<RegionKeys> regionParsers = (MultiConfigParser<RegionKeys>) RTP.getInstance().configs.multiConfigParserMap.get(RegionKeys.class);
+        MultiConfigParser<RegionKeys> regionParsers = (MultiConfigParser<RegionKeys>) RTP.configs.multiConfigParserMap.get(RegionKeys.class);
         ConfigParser<RegionKeys> regionParser = regionParsers.getParser(regionName);
         requirePermission = Boolean.parseBoolean(regionParser.getConfigValue(RegionKeys.requirePermission,false).toString());
 

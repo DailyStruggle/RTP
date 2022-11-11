@@ -41,7 +41,7 @@ public class UpdateCmd extends BaseRTPCmdImpl {
     }
 
     public void addCommands() {
-        final Configs configs = RTP.getInstance().configs;
+        final Configs configs = RTP.configs;
         for (ConfigParser<?> value : configs.configParserMap.values()) {
             String name = value.name.replace(".yml","");
             if(getCommandLookup().containsKey(name)) continue;

@@ -44,7 +44,7 @@ public final class LoadChunks extends RTPRunnable {
         this.location = location;
         this.region = region;
 
-        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.getInstance().configs.getParser(PerformanceKeys.class);
+        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
         long radius2 = perf.getNumber(PerformanceKeys.viewDistanceTeleport, 0L).longValue();
         long max = (radius2 * radius2 * 4) + (4 * radius2) + 1;
 

@@ -148,7 +148,7 @@ public class SelectionAPI {
 
         Set<String> worldsAttempted = new HashSet<>();
         String worldName = player.getLocation().world().name();
-        MultiConfigParser<WorldKeys> worldParsers = (MultiConfigParser<WorldKeys>) RTP.getInstance().configs.multiConfigParserMap.get(WorldKeys.class);
+        MultiConfigParser<WorldKeys> worldParsers = (MultiConfigParser<WorldKeys>) RTP.configs.multiConfigParserMap.get(WorldKeys.class);
         ConfigParser<WorldKeys> worldParser = worldParsers.getParser(worldName);
         boolean requirePermission = Boolean.parseBoolean(worldParser.getConfigValue(WorldKeys.requirePermission,false).toString());
 
@@ -162,7 +162,7 @@ public class SelectionAPI {
         }
 
         String regionName = String.valueOf(worldParser.getConfigValue(WorldKeys.region, "default"));
-        MultiConfigParser<RegionKeys> regionParsers = (MultiConfigParser<RegionKeys>) RTP.getInstance().configs.multiConfigParserMap.get(RegionKeys.class);
+        MultiConfigParser<RegionKeys> regionParsers = (MultiConfigParser<RegionKeys>) RTP.configs.multiConfigParserMap.get(RegionKeys.class);
         ConfigParser<RegionKeys> regionParser = regionParsers.getParser(regionName);
         requirePermission = Boolean.parseBoolean(regionParser.getConfigValue(RegionKeys.requirePermission,false).toString());
 
@@ -181,7 +181,7 @@ public class SelectionAPI {
     public Region getRegion(RTPWorld world) {
         //get region from world name, check for overrides
         String worldName = world.name();
-        MultiConfigParser<WorldKeys> worldParsers = (MultiConfigParser<WorldKeys>) RTP.getInstance().configs.multiConfigParserMap.get(WorldKeys.class);
+        MultiConfigParser<WorldKeys> worldParsers = (MultiConfigParser<WorldKeys>) RTP.configs.multiConfigParserMap.get(WorldKeys.class);
         ConfigParser<WorldKeys> worldParser = worldParsers.getParser(worldName);
         String regionName = String.valueOf(worldParser.getConfigValue(WorldKeys.region, "default"));
         return permRegionLookup.get(regionName);

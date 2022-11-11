@@ -36,7 +36,7 @@ public final class BukkitRTPBlock implements RTPBlock {
         long t = System.currentTimeMillis();
         long dt = t - lastUpdate;
         if (dt > 5000 || dt < 0) {
-            ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.getInstance().configs.getParser(SafetyKeys.class);
+            ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
             airBlocks = safety.yamlFile.getStringList("airBlocks")
                     .stream().map(String::toUpperCase).collect(Collectors.toSet());
             if (airBlocks.size() < 1) airBlocks.add("AIR");

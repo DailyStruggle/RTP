@@ -26,7 +26,7 @@ public class HelpCmd extends BaseRTPCmdImpl {
     }
 
     public void addCommands() {
-        final Configs configs = RTP.getInstance().configs;
+        final Configs configs = RTP.configs;
         for (ConfigParser<?> value : configs.configParserMap.values()) {
             String name = value.name.replace(".yml","");
             if(getCommandLookup().containsKey(name)) continue;
@@ -58,7 +58,7 @@ public class HelpCmd extends BaseRTPCmdImpl {
     @Override
     public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
         RTPCommandSender sender = RTP.serverAccessor.getSender(callerId);
-        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
+        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
         if(!sender.hasPermission("rtp.see")) {
             RTP.serverAccessor.sendMessage(callerId, MessagesKeys.noPerms);
             return true;
