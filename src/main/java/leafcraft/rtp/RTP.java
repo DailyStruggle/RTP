@@ -28,6 +28,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.lang.invoke.MethodHandle;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * A Random Teleportation Spigot/Paper plugin, optimized for operators
@@ -40,6 +41,7 @@ public final class RTP extends JavaPlugin {
     private static RTP plugin = null;
     private static Metrics metrics;
     private static RTPCmd rtpCmd;
+    public static AtomicBoolean validBiomeLookup = new AtomicBoolean(false);
 
 //    private OnChunkLoad onChunkLoad;
 

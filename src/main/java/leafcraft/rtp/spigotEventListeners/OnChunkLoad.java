@@ -22,19 +22,35 @@ public class OnChunkLoad implements Listener {
 
 
         Location location = event.getChunk().getBlock(7,96,7).getLocation();
-        Biome biome = null;
+        Biome biome = Biome.PLAINS;
         if(RTP.getServerIntVersion() < 17) {
-            //noinspection deprecation
-            biome = world.getBiome(location.getBlockX(), location.getBlockZ());
-            if(configs.config.biomeWhitelist != configs.config.biomes.contains(biome)) return;
+            if(RTP.validBiomeLookup.get()) {
+                try {
+                    //noinspection deprecation
+                    biome = world.getBiome(location.getBlockX(), location.getBlockZ());
+                    if (configs.config.biomeWhitelist != configs.config.biomes.contains(biome)) return;
+                } catch (Exception | Error e) {
+                    RTP.validBiomeLookup.set(false);
+                    new IllegalStateException("broken biome lookup. Please fix your world gen plugins or datapacks. Continuing without biome checks after this...").printStackTrace();
+                    e.printStackTrace();
+                }
+            }
         }
 
         for(TeleportRegion region : RTP.getCache().permRegions.values()) {
             if(!world.getUID().equals(region.world.getUID())) continue;
             if(RTP.getServerIntVersion() >= 17) {
                 int midpoint = (region.minY + region.maxY)/2;
-                biome = world.getBiome(location.getBlockX(), midpoint, location.getBlockZ());
-                if(configs.config.biomeWhitelist != configs.config.biomes.contains(biome)) continue;
+                if(RTP.validBiomeLookup.get()) {
+                    try {
+                        biome = world.getBiome(location.getBlockX(), midpoint, location.getBlockZ());
+                        if(configs.config.biomeWhitelist != configs.config.biomes.contains(biome)) continue;
+                    } catch (Exception | Error e) {
+                        RTP.validBiomeLookup.set(false);
+                        new IllegalStateException("broken biome lookup. Please fix your world gen plugins or datapacks. Continuing without biome checks after this...").printStackTrace();
+                        e.printStackTrace();
+                    }
+                }
             }
 
             long regionLocation = (long) ((region.shape.equals(TeleportRegion.Shapes.SQUARE)) ?

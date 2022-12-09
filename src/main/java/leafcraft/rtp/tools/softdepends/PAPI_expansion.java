@@ -10,6 +10,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
+import org.bukkit.block.Biome;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
@@ -49,7 +50,7 @@ public class PAPI_expansion extends PlaceholderExpansion{
 
 	@Override
     public @NotNull String getVersion(){
-        return "1.3.24";
+        return "1.3.25";
     }
 
     @Override
@@ -122,12 +123,20 @@ public class PAPI_expansion extends PlaceholderExpansion{
         if(identifier.equalsIgnoreCase("teleport_biome")) {
             Location location = getTeleportLocation(player);
             World world = Objects.requireNonNull(location.getWorld());
-            //noinspection deprecation
-            return String.valueOf(
-                    (RTP.getServerIntVersion() < 17)
+            Biome biome = Biome.PLAINS;
+            if(RTP.validBiomeLookup.get()) {
+                try {
+                    //noinspection deprecation
+                    biome = (RTP.getServerIntVersion() < 17)
                             ? world.getBiome(location.getBlockX(), location.getBlockZ())
-                            : world.getBiome(location)
-            );
+                            : world.getBiome(location);
+                } catch (Exception | Error e) {
+                    RTP.validBiomeLookup.set(false);
+                    new IllegalStateException("broken biome lookup. Please fix your world gen plugins or datapacks. Continuing without biome checks after this...").printStackTrace();
+                    e.printStackTrace();
+                }
+            }
+            return biome.name();
         }
 
         return null;

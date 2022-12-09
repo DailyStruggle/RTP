@@ -126,41 +126,51 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                 if(cancelled) return;
 
                 Objects.requireNonNull(world);
-                //noinspection deprecation
-                Biome currBiome = (RTP.getServerIntVersion()<17)
-                        ? world.getBiome(xz[0]*16+7,xz[1]*16+7)
-                        : world.getBiome(xz[0]*16+7,(minY+maxY)/2,xz[1]*16+7);
-                if(configs.config.biomeWhitelist != configs.config.biomes.contains(currBiome)) {
-                    addBadLocation(it);
-                    removeBiomeLocation(it,currBiome);
+                Biome currBiome = Biome.PLAINS;
+                if(RTP.validBiomeLookup.get()) {
                     try {
-                        fillIteratorGuard.acquire();
-                        fillIterator.incrementAndGet();
-                    } catch (InterruptedException ignored) {
-                        return;
-                    } finally {
-                        fillIteratorGuard.release();
+                        //noinspection deprecation
+                        currBiome = (RTP.getServerIntVersion() < 17)
+                                ? world.getBiome(xz[0] * 16 + 7, xz[1] * 16 + 7)
+                                : world.getBiome(xz[0] * 16 + 7, (minY + maxY) / 2, xz[1] * 16 + 7);
+                        if (configs.config.biomeWhitelist != configs.config.biomes.contains(currBiome)) {
+                            addBadLocation(it);
+                            removeBiomeLocation(it, currBiome);
+                            try {
+                                fillIteratorGuard.acquire();
+                                fillIterator.incrementAndGet();
+                            } catch (InterruptedException ignored) {
+                                return;
+                            } finally {
+                                fillIteratorGuard.release();
+                            }
+                            int completionLocal;
+                            try {
+                                completionGuard.acquire();
+                                completionLocal = completion.decrementAndGet();
+                            } catch (InterruptedException e) {
+                                return;
+                            } finally {
+                                completionGuard.release();
+                            }
+                            if (completionLocal == 0 && !completed.getAndSet(true)) {
+                                fillTask = new FillTask(plugin);
+                                fillTask.runTaskLaterAsynchronously(plugin, 1);
+                            }
+                            continue;
+                        }
+                    } catch (Exception | Error e) {
+                        RTP.validBiomeLookup.set(false);
+                        new IllegalStateException("broken biome lookup. Please fix your world gen plugins or datapacks. Continuing without biome checks after this...").printStackTrace();
+                        e.printStackTrace();
                     }
-                    int completionLocal;
-                    try {
-                        completionGuard.acquire();
-                        completionLocal = completion.decrementAndGet();
-                    } catch (InterruptedException e) {
-                        return;
-                    } finally {
-                        completionGuard.release();
-                    }
-                    if(completionLocal == 0 && !completed.getAndSet(true)) {
-                        fillTask = new FillTask(plugin);
-                        fillTask.runTaskLaterAsynchronously(plugin,1);
-                    }
-                    continue;
                 }
 
                 CompletableFuture<Chunk> cfChunk = PaperLib.getChunkAtAsync(Objects.requireNonNull(world),xz[0],xz[1],true);
                 this.chunks.add(cfChunk);
                 final long finalIt = it;
                 max.set((long)totalSpace);
+                Biome finalCurrBiome = currBiome;
                 cfChunk.whenCompleteAsync((chunk, throwable) -> {
                     if(cancelled) return;
                     if(!mode.equals(Modes.NONE)) {
@@ -168,7 +178,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
                         y = getLastNonAir(chunk, y);
 
                         if (checkLocation(chunk, y)) {
-                            addBiomeLocation(finalIt, currBiome);
+                            addBiomeLocation(finalIt, finalCurrBiome);
                         } else {
                             addBadLocation(finalIt);
                         }
@@ -661,10 +671,20 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
 
                     if(isKnownBad(chunk.getX(),chunk.getZ())) return;
                     Location point = chunk.getBlock(7,(maxY+minY)/2,7).getLocation();
-                    //noinspection deprecation
-                    Biome biome = RTP.getServerIntVersion()<17
-                            ? world.getBiome(point.getBlockX(), point.getBlockZ())
-                            : world.getBiome(point);
+                    Biome biome = Biome.PLAINS;
+                    if(RTP.validBiomeLookup.get()) {
+                        try {
+                            //noinspection deprecation
+                            biome = RTP.getServerIntVersion() < 17
+                                    ? world.getBiome(point.getBlockX(), point.getBlockZ())
+                                    : world.getBiome(point);
+                        } catch (Exception | Error e) {
+                            RTP.validBiomeLookup.set(false);
+                            new IllegalStateException("broken biome lookup. Please fix your world gen plugins or datapacks. Continuing without biome checks after this...").printStackTrace();
+                            e.printStackTrace();
+                        }
+                    }
+
                     long curveLocation = (long) ((shape.equals(Shapes.SQUARE)) ?
                             Translate.xzToSquareLocation(cr,chunk.getX(),chunk.getZ(),cx,cz) :
                             Translate.xzToCircleLocation(cr,chunk.getX(),chunk.getZ(),cx,cz));
@@ -725,10 +745,20 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
 
                         if(isKnownBad(chunk.getX(),chunk.getZ())) return;
                         Location point = chunk.getBlock(7,(maxY+minY)/2,7).getLocation();
-                        //noinspection deprecation
-                        Biome biome = (RTP.getServerIntVersion()<17)
-                                ? world.getBiome(point.getBlockX(), point.getBlockZ())
-                                : world.getBiome(point);
+
+                        Biome biome = Biome.PLAINS;
+                        if(RTP.validBiomeLookup.get()) {
+                            try {
+                                //noinspection deprecation
+                                biome = (RTP.getServerIntVersion() < 17)
+                                        ? world.getBiome(point.getBlockX(), point.getBlockZ())
+                                        : world.getBiome(point);
+                            } catch (Exception | Error e) {
+                                RTP.validBiomeLookup.set(false);
+                                new IllegalStateException("broken biome lookup. Please fix your world gen plugins or datapacks. Continuing without biome checks after this...").printStackTrace();
+                                e.printStackTrace();
+                            }
+                        }
                         long curveLocation = (long) ((shape.equals(Shapes.SQUARE)) ?
                                 Translate.xzToSquareLocation(cr,chunk.getX(),chunk.getZ(),cx,cz) :
                                 Translate.xzToCircleLocation(cr,chunk.getX(),chunk.getZ(),cx,cz));
@@ -928,6 +958,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
 
     public void addBiomeLocation(Long location, Biome biome) {
         if(!isInBounds(location)) return;
+        if(!RTP.validBiomeLookup.get()) return;
 
         biomeLocations.putIfAbsent(biome, new ConcurrentSkipListMap<>());
         ConcurrentSkipListMap<Long, Long> map = biomeLocations.get(biome);
@@ -1141,13 +1172,22 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
 
             res = new Location(world,xzChunk[0]*16+7, ((float)(minY + maxY)) / 2, xzChunk[1]*16+7);
 
-            //noinspection deprecation
-            Biome currBiome = (RTP.getServerIntVersion() < 17)
-                    ? world.getBiome(res.getBlockX(),res.getBlockZ())
-                    : world.getBiome(res);
-            if(biome!=null && !currBiome.equals(biome)) {
-                removeBiomeLocation(location,biome);
-                continue;
+            Biome currBiome = Biome.PLAINS;
+            if(RTP.validBiomeLookup.get()) {
+                try {
+                    //noinspection deprecation
+                    currBiome = (RTP.getServerIntVersion() < 17)
+                            ? world.getBiome(res.getBlockX(), res.getBlockZ())
+                            : world.getBiome(res);
+                    if (biome != null && !currBiome.equals(biome)) {
+                        removeBiomeLocation(location, biome);
+                        continue;
+                    }
+                } catch (Exception | Error e) {
+                    RTP.validBiomeLookup.set(false);
+                    new IllegalStateException("broken biome lookup. Please fix your world gen plugins or datapacks. Continuing without biome checks after this...").printStackTrace();
+                    e.printStackTrace();
+                }
             }
 
             if(configs.config.biomeWhitelist != configs.config.biomes.contains(currBiome)) {
