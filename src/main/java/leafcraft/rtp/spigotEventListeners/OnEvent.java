@@ -1,6 +1,5 @@
 package leafcraft.rtp.spigotEventListeners;
 
-import leafcraft.rtp.API.selection.SyncState;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tasks.DoTeleport;
 import leafcraft.rtp.tasks.LoadChunks;
@@ -51,7 +50,7 @@ public class OnEvent implements Listener {
                 hasPerm = true;
         }
         if (hasPerm) {
-            teleportAction(player,SyncState.SYNC);
+            teleportAction(player,false);
         }
     }
 
@@ -82,7 +81,7 @@ public class OnEvent implements Listener {
         Player player = event.getPlayer();
         
         if (respawningPlayers.contains(player.getUniqueId())) {
-            teleportAction(player, SyncState.SYNC);
+            teleportAction(player,false);
             respawningPlayers.remove(player.getUniqueId());
         }
     }
@@ -143,7 +142,7 @@ public class OnEvent implements Listener {
                 SendMessage.sendMessage(player, msg);
                 return;
             }
-            Bukkit.getScheduler().runTaskLater(RTP.getPlugin(),() -> teleportAction(player, SyncState.SYNC),20);
+            Bukkit.getScheduler().runTaskLater(RTP.getPlugin(),() -> teleportAction(player,false),20);
         }
     }
 
@@ -171,7 +170,7 @@ public class OnEvent implements Listener {
                 hasPerm = true;
         }
         if (hasPerm) {
-            teleportAction(player, SyncState.ASYNC);
+            teleportAction(player,true);
         }
     }
 
@@ -189,11 +188,11 @@ public class OnEvent implements Listener {
                 hasPerm = true;
         }
         if (hasPerm) {
-            teleportAction(player, SyncState.ASYNC);
+            teleportAction(player,true);
         }
     }
 
-    static void teleportAction(Player player, SyncState syncState){
+    static void teleportAction(Player player, boolean async){
         Cache cache = RTP.getCache();
 
         SetupTeleport setupTeleport = cache.setupTeleports.get(player.getUniqueId());
@@ -207,14 +206,11 @@ public class OnEvent implements Listener {
         setupTeleport = new SetupTeleport(Bukkit.getConsoleSender(), player, new RandomSelectParams(player.getWorld(),null));
 
         if(RTP.getServerIntVersion()>8) {
-            switch (syncState) {
-                case SYNC -> setupTeleport.setupTeleportNow(SyncState.SYNC);
-                case ASYNC -> setupTeleport.runTaskLaterAsynchronously(RTP.getPlugin(), 1);
-                case ASYNC_URGENT -> setupTeleport.runTaskAsynchronously(RTP.getPlugin());
-            }
+            if(async) setupTeleport.runTaskAsynchronously(RTP.getPlugin());
+            else setupTeleport.setupTeleportNow();
         }
         else {
-            setupTeleport.setupTeleportNow(SyncState.SYNC);
+            setupTeleport.setupTeleportNow();
         }
     }
 }

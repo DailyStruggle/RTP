@@ -2,7 +2,6 @@ package leafcraft.rtp.commands;
 
 import leafcraft.rtp.API.Commands.SubCommand;
 import leafcraft.rtp.API.customEvents.TeleportCommandSuccessEvent;
-import leafcraft.rtp.API.selection.SyncState;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tasks.SetupTeleport;
 import leafcraft.rtp.tools.Cache;
@@ -358,7 +357,7 @@ public class RTPCmd implements CommandExecutor {
                 && !rsParams.params.containsKey("biome"))
                 || configs.config.syncLoading
                 || RTP.getServerIntVersion()<=8) {
-            setupTeleport.setupTeleportNow(SyncState.SYNC);
+            setupTeleport.setupTeleportNow();
         } else {
             setupTeleport.runTaskAsynchronously(plugin);
             cache.setupTeleports.put(player.getUniqueId(), setupTeleport);

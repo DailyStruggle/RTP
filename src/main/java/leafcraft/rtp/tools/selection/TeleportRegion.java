@@ -5,7 +5,6 @@ import leafcraft.rtp.API.customEvents.LoadChunksQueueEvent;
 import leafcraft.rtp.API.customEvents.PlayerQueuePushEvent;
 import leafcraft.rtp.API.customEvents.RandomSelectPlayerEvent;
 import leafcraft.rtp.API.customEvents.RandomSelectQueueEvent;
-import leafcraft.rtp.API.selection.SyncState;
 import leafcraft.rtp.API.selection.WorldBorderInterface;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tasks.DoTeleport;
@@ -571,12 +570,12 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         return res;
     }
 
-    public Location getLocation(SyncState state, CommandSender sender, Player player, Biome biome) {
+    public Location getLocation(CommandSender sender, Player player, Biome biome) {
         Configs configs = RTP.getConfigs();
 
         Location res;
-        if(biome==null) return getLocation(state,sender,player);
-        else res = getRandomLocation(state, biome);
+        if(biome==null) return getLocation(sender,player);
+        else res = getRandomLocation(biome);
         if (res == null) {
             int maxAttempts = configs.config.maxAttempts * 10;
             String msg = PAPIChecker.fillPlaceholders(player, configs.lang.getLog("unsafe", String.valueOf(maxAttempts)));
@@ -586,11 +585,11 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
     }
 
     public Location getLocation(boolean urgent, CommandSender sender, Player player, Biome biome) {
-        SyncState state = (urgent) ? SyncState.ASYNC_URGENT : SyncState.ASYNC;
-        return getLocation(state,sender,player,biome);
+        
+        return getLocation(sender,player,biome);
     }
 
-    public Location getLocation(SyncState state, CommandSender sender, Player player) {
+    public Location getLocation(CommandSender sender, Player player) {
         RTP plugin = RTP.getPlugin();
         Configs configs = RTP.getConfigs();
 
@@ -607,7 +606,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         }
         catch (NoSuchElementException exception) {
             if(sender.hasPermission("rtp.unqueued")) {
-                res = getRandomLocation(state,null);
+                res = getRandomLocation(null);
                 if(res == null) {
                     int maxAttempts = configs.config.maxAttempts;
                     String msg = PAPIChecker.fillPlaceholders(player,configs.lang.getLog("unsafe",String.valueOf(maxAttempts)));
@@ -626,8 +625,8 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
     }
 
     public Location getLocation(boolean urgent, CommandSender sender, Player player) {
-        SyncState state = (urgent) ? SyncState.ASYNC_URGENT : SyncState.ASYNC;
-        return getLocation(state,sender,player);
+        
+        return getLocation(sender,player);
     }
 
     private void addChunks(Location location, boolean urgent) {
@@ -1048,10 +1047,9 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         return (long)res;
     }
 
-    public Location getRandomLocation(SyncState state, @Nullable Biome biome) {
+    public Location getRandomLocation(@Nullable Biome biome) {
         Configs configs = RTP.getConfigs();
         Cache cache = RTP.getCache();
-        boolean urgent = !state.equals(SyncState.ASYNC);
 
         long totalTimeStart = System.nanoTime();
         Location res = new Location(world,0,this.maxY,0);
@@ -1209,68 +1207,64 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
 
             start = System.nanoTime();
             Chunk chunk;
-            switch (state) {
-                case SYNC -> {
-                    if (preCheckLocation(res)) {
-                        chunk = res.getChunk();
-                    } else continue;
-                }
-                case ASYNC, ASYNC_URGENT -> {
-                    if(RTP.getServerIntVersion() > 8) {
-                        CompletableFuture<Chunk>cfChunk = (urgent) ?
-                                PaperLib.getChunkAtAsyncUrgently(world, xzChunk[0], xzChunk[1], true) :
-                                PaperLib.getChunkAtAsync(world, xzChunk[0], xzChunk[1], true);
+            boolean primaryThread = Bukkit.isPrimaryThread();
+            if(primaryThread) {
+                if (preCheckLocation(res)) {
+                    chunk = res.getChunk();
+                } else continue;
+            }
+            else {
+                if(RTP.getServerIntVersion() > 8) {
+                    CompletableFuture<Chunk>cfChunk = PaperLib.getChunkAtAsyncUrgently(world, xzChunk[0], xzChunk[1], true);
 
-                        HashableChunk hashableChunk = new HashableChunk(world, xzChunk[0], xzChunk[1]);
-                        currChunks.put(hashableChunk, cfChunk);
+                    HashableChunk hashableChunk = new HashableChunk(world, xzChunk[0], xzChunk[1]);
+                    currChunks.put(hashableChunk, cfChunk);
 
-                        if (!preCheckLocation(res)) {
-                            try {
-                                cfChunk.cancel(true);
-                            }
-                            catch (CancellationException ignored) {
-
-                            }
-                            continue;
-                        }
-
+                    if (!preCheckLocation(res)) {
                         try {
-                            chunk = cfChunk.get(20, TimeUnit.SECONDS); //wait on chunk load/gen
-                        } catch (ExecutionException e) {
-                            e.printStackTrace();
-                            return null;
-                        } catch (InterruptedException | CancellationException | StackOverflowError | TimeoutException e) {
-                            return null;
+                            cfChunk.cancel(true);
                         }
-                        currChunks.remove(hashableChunk);
+                        catch (CancellationException ignored) {
+
+                        }
+                        continue;
                     }
-                    else {
-                        Future<Chunk> fChunk = Bukkit.getScheduler().callSyncMethod(RTP.getPlugin(), res::getChunk);
 
-                        HashableChunk hashableChunk = new HashableChunk(world, xzChunk[0], xzChunk[1]);
-
-                        if (!preCheckLocation(res)) {
-                            try {
-                                fChunk.cancel(true);
-                            }
-                            catch (CancellationException ignored) {
-
-                            }
-                            continue;
-                        }
-
-                        try {
-                            chunk = fChunk.get(20, TimeUnit.SECONDS); //wait on chunk load/gen
-                        } catch (ExecutionException e) {
-                            e.printStackTrace();
-                            return null;
-                        } catch (InterruptedException | CancellationException | StackOverflowError | TimeoutException e) {
-                            return null;
-                        }
-                        currChunks.remove(hashableChunk);
+                    try {
+                        chunk = cfChunk.get(20, TimeUnit.SECONDS); //wait on chunk load/gen
+                    } catch (ExecutionException e) {
+                        e.printStackTrace();
+                        return null;
+                    } catch (InterruptedException | CancellationException | StackOverflowError | TimeoutException e) {
+                        return null;
                     }
+                    currChunks.remove(hashableChunk);
                 }
-                default -> throw new IllegalStateException("Unexpected value: " + state);
+                else {
+                    Future<Chunk> fChunk = Bukkit.getScheduler().callSyncMethod(RTP.getPlugin(), res::getChunk);
+
+                    HashableChunk hashableChunk = new HashableChunk(world, xzChunk[0], xzChunk[1]);
+
+                    if (!preCheckLocation(res)) {
+                        try {
+                            fChunk.cancel(true);
+                        }
+                        catch (CancellationException ignored) {
+
+                        }
+                        continue;
+                    }
+
+                    try {
+                        chunk = fChunk.get(20, TimeUnit.SECONDS); //wait on chunk load/gen
+                    } catch (ExecutionException e) {
+                        e.printStackTrace();
+                        return null;
+                    } catch (InterruptedException | CancellationException | StackOverflowError | TimeoutException e) {
+                        return null;
+                    }
+                    currChunks.remove(hashableChunk);
+                }
             }
 
             res = chunk.getBlock(7,0,7).getLocation();
@@ -1283,7 +1277,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
 
             start = System.nanoTime();
             int y;
-            if(state.equals(SyncState.SYNC)) {
+            if(primaryThread) {
                 y = this.getFirstNonAir(res);
                 y = this.getLastNonAir(res, y);
             }
@@ -1303,7 +1297,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
             if (!goodLocation) {
                 res = chunk.getBlock(2,minY,2).getLocation();
                 start = System.nanoTime();
-                if(state.equals(SyncState.SYNC)) {
+                if(primaryThread) {
                     y = this.getFirstNonAir(res);
                     y = this.getLastNonAir(res, y);
                 }
@@ -1321,7 +1315,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
             if (!goodLocation) {
                 res = chunk.getBlock(13,minY,13).getLocation();
                 start = System.nanoTime();
-                if(state.equals(SyncState.SYNC)) {
+                if(primaryThread) {
                     y = this.getFirstNonAir(res);
                     y = this.getLastNonAir(res, y);
                 }
@@ -1339,7 +1333,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
             if (!goodLocation) {
                 res = chunk.getBlock(13,minY,2).getLocation();
                 start = System.nanoTime();
-                if(state.equals(SyncState.SYNC)) {
+                if(primaryThread) {
                     y = this.getFirstNonAir(res);
                     y = this.getLastNonAir(res, y);
                 }
@@ -1357,7 +1351,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
             if (!goodLocation) {
                 res = chunk.getBlock(2,minY,13).getLocation();
                 start = System.nanoTime();
-                if(state.equals(SyncState.SYNC)) {
+                if(primaryThread) {
                     y = this.getFirstNonAir(res);
                     y = this.getLastNonAir(res, y);
                 }
@@ -1385,7 +1379,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
         }
 
         cache.numTeleportAttempts.put(res, numAttempts);
-        addChunks(res, urgent);
+        addChunks(res, true);
 
         if(configs.config.timeit) {
             Bukkit.getLogger().warning(ChatColor.AQUA + "TOTAL TIME SPENT ON SELECTION FIXING: " + (selectTime)/1000000 + "ms");
@@ -1397,8 +1391,7 @@ public class TeleportRegion implements leafcraft.rtp.API.selection.TeleportRegio
     }
 
     public Location getRandomLocation(boolean urgent,Biome biome) {
-        SyncState syncState = urgent ? SyncState.ASYNC_URGENT : SyncState.ASYNC;
-        return getRandomLocation(syncState,biome);
+        return getRandomLocation(biome);
     }
 
     public Location getRandomLocation(boolean urgent) {

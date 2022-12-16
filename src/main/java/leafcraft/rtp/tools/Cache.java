@@ -1,6 +1,5 @@
 package leafcraft.rtp.tools;
 
-import leafcraft.rtp.API.selection.SyncState;
 import leafcraft.rtp.RTP;
 import leafcraft.rtp.tasks.DoTeleport;
 import leafcraft.rtp.tasks.LoadChunks;
@@ -180,7 +179,7 @@ public class Cache {
         return region.getQueuedLocation(sender, player);
     }
 
-    public Location getRandomLocation(RandomSelectParams rsParams, SyncState state, CommandSender sender, Player player) {
+    public Location getRandomLocation(RandomSelectParams rsParams, CommandSender sender, Player player) {
         TeleportRegion region;
         double price = 0.0;
         boolean didWithdraw = !(sender instanceof Player) || currentTeleportCost.containsKey(((Player) sender).getUniqueId());
@@ -214,15 +213,15 @@ public class Cache {
 
         Location res;
         if(rsParams.params.containsKey("biome")) {
-            res = region.getLocation(state, sender,player,Biome.valueOf(rsParams.params.get("biome")));
+            res = region.getLocation(sender,player,Biome.valueOf(rsParams.params.get("biome")));
         }
-        else res = region.getLocation(state, sender, player, null);
+        else res = region.getLocation(sender, player, null);
         return res;
     }
 
     public Location getRandomLocation(RandomSelectParams rsParams, boolean urgent, CommandSender sender, Player player) {
-        SyncState state = (urgent) ? SyncState.ASYNC_URGENT : SyncState.ASYNC;
-        return getRandomLocation(rsParams,state,sender,player);
+        
+        return getRandomLocation(rsParams,sender,player);
     }
 
     public void resetRegions() {

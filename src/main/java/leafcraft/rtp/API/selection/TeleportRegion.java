@@ -55,7 +55,7 @@ public interface TeleportRegion {
      * @param biome - what biome, or null
      * @return popped location, generated location, or null if too many tries
      */
-    Location getLocation(SyncState urgent, CommandSender sender, Player player, Biome biome);
+    Location getLocation(CommandSender sender, Player player, Biome biome);
     Location getLocation(boolean urgent, CommandSender sender, Player player, Biome biome);
     Location getLocation(boolean urgent, CommandSender sender, Player player);
 
@@ -95,7 +95,7 @@ public interface TeleportRegion {
      * @param biome - what biome to look for, or null for any biome
      * @return a corresponding location, or null on failure
      */
-    Location getRandomLocation(SyncState state, @Nullable Biome biome);
+    Location getRandomLocation(@Nullable Biome biome);
     Location getRandomLocation(boolean urgent, @Nullable Biome biome);
     Location getRandomLocation(boolean urgent);
 
