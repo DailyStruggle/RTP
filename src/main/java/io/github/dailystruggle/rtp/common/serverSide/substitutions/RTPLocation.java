@@ -45,20 +45,10 @@ public final class RTPLocation implements Cloneable {
     }
 
     public CompletableFuture<RTPBlock> getBlock() {
-        CompletableFuture<RTPBlock> res = new CompletableFuture<>();
         int cx = (x > 0) ? x % 16 : x % 16 - 1;
         int cz = (z > 0) ? z % 16 : z % 16 - 1;
         CompletableFuture<RTPChunk> chunkAt = world.getChunkAt(cx, cz);
-        if (chunkAt.isDone()) {
-            try {
-                RTPChunk chunk = chunkAt.get();
-                res.complete(chunk.getBlockAt(this));
-            } catch (InterruptedException | ExecutionException e) {
-                e.printStackTrace();
-            }
-        }
-        chunkAt.whenComplete((rtpChunk, throwable) -> res.complete(rtpChunk.getBlockAt(this)));
-        return res;
+        return chunkAt.thenApply(chunk -> chunk.getBlockAt(this));
     }
 
     public RTPWorld world() {

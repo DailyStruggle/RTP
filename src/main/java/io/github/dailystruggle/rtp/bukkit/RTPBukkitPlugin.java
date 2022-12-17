@@ -143,7 +143,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             rtp.miscAsyncTasks.add(this::setupEffects);
             return;
         }
-        Configs configs = rtp.configs;
+        Configs configs = RTP.configs;
         if(configs == null) {
             rtp.miscAsyncTasks.add(this::setupEffects);
             return;

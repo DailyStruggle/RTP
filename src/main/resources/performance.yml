@@ -15,6 +15,12 @@ viewDistanceTeleport: 0
 # impact: medium
 period: 100
 
+#maximum amount of time allotted to tasks per gametick
+# 0-50
+# impact: difficult to measure
+syncAllottedTime: 50
+asyncAllottedTime: 50
+
 #minimum TPS requirement before trying to queue a new location
 # must be a number between 0 and 20 exclusive
 # impact: low

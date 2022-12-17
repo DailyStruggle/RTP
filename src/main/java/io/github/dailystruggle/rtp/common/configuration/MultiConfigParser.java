@@ -1,16 +1,17 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.simpleyaml.configuration.file.YamlFile;
 
 import java.io.File;
-import java.util.EnumMap;
+import java.util.Map;
 import java.util.Set;
-import java.util.logging.Level;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 public class MultiConfigParser<E extends Enum<E>>  extends FactoryValue<E> implements ConfigLoader {
@@ -22,6 +23,9 @@ public class MultiConfigParser<E extends Enum<E>>  extends FactoryValue<E> imple
     protected final File langMap;
     private ClassLoader classLoader = this.getClass().getClassLoader();
 
+    public final YamlFileDatabase fileDatabase;
+    AtomicReference<Map<String, YamlFile>> cachedLookup;
+
     public MultiConfigParser(Class<E> eClass, String name, String version, File pluginDirectory, ClassLoader classLoader) {
         super(eClass, name);
         this.classLoader = classLoader;
@@ -29,6 +33,12 @@ public class MultiConfigParser<E extends Enum<E>>  extends FactoryValue<E> imple
         this.name = name;
         this.version = version;
         this.myDirectory = new File(pluginDirectory.getAbsolutePath() + File.separator + name);
+
+        this.fileDatabase = new YamlFileDatabase(this.myDirectory);
+        cachedLookup = fileDatabase.cachedLookup;
+        Map<String, YamlFile> connect = this.fileDatabase.connect();
+        this.fileDatabase.disconnect(connect);
+
         this.langMap = new File(pluginDirectory.getAbsolutePath() + File.separator
                 + "lang" + File.separator + name + ".lang.yml");
         if(!this.myDirectory.exists() && !myDirectory.mkdir()) return;
@@ -50,7 +60,7 @@ public class MultiConfigParser<E extends Enum<E>>  extends FactoryValue<E> imple
             fileName = fileName.replace(".yml","");
 
             ConfigParser<E> parser = new ConfigParser<>(
-                    eClass,fileName,version,myDirectory,langMap);
+                    eClass,fileName,version,myDirectory,langMap, fileDatabase);
             addParser(parser);
         }
     }
@@ -61,6 +71,11 @@ public class MultiConfigParser<E extends Enum<E>>  extends FactoryValue<E> imple
         this.name = name;
         this.version = version;
         this.myDirectory = new File(pluginDirectory.getAbsolutePath() + File.separator + name);
+
+        this.fileDatabase = new YamlFileDatabase(this.myDirectory);
+        Map<String, YamlFile> connect = this.fileDatabase.connect();
+        this.fileDatabase.disconnect(connect);
+
         this.langMap = new File(pluginDirectory.getAbsolutePath() + File.separator
                 + "lang" + File.separator + name + ".lang.yml");
         if(!this.myDirectory.exists() && !myDirectory.mkdir()) return;
@@ -82,7 +97,7 @@ public class MultiConfigParser<E extends Enum<E>>  extends FactoryValue<E> imple
             fileName = fileName.replace(".yml","");
 
             ConfigParser<E> parser = new ConfigParser<>(
-                    eClass,fileName,version,myDirectory,langMap);
+                    eClass,fileName,version,myDirectory,langMap, fileDatabase);
             addParser(parser);
         }
     }

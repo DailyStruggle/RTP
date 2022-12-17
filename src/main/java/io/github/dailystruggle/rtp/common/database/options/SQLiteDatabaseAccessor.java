@@ -1,16 +1,18 @@
 package io.github.dailystruggle.rtp.common.database.options;
 
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
+import org.jetbrains.annotations.NotNull;
+import org.json.simple.JSONObject;
 
 import java.sql.*;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-public class SQLiteDatabase extends DatabaseAccessor<Connection> {
+public class SQLiteDatabaseAccessor extends DatabaseAccessor<Connection> {
     private final String url;
 
-    public SQLiteDatabase(String url) {
+    public SQLiteDatabaseAccessor(String url) {
         this.url = url;
     }
 
@@ -21,7 +23,7 @@ public class SQLiteDatabase extends DatabaseAccessor<Connection> {
     }
 
     @Override
-    public Connection connect() {
+    public @NotNull Connection connect() {
         Connection res;
         try {
             res = DriverManager.getConnection(url);
@@ -37,7 +39,7 @@ public class SQLiteDatabase extends DatabaseAccessor<Connection> {
     }
 
     @Override
-    public Optional<TableObj> read(Connection connection, String tableName, TableObj key) {
+    public @NotNull Optional<TableObj> read(Connection connection, String tableName, TableObj key) {
         return Optional.empty();
     }
 
@@ -109,12 +111,15 @@ public class SQLiteDatabase extends DatabaseAccessor<Connection> {
                     break;
                 case BLOB: //todo: maps n shit
                     if(key.object instanceof Map) {
-                        throw new IllegalStateException("map support not done");
+                        Map<?,?> map = (Map<?, ?>) key.object;
+                        JSONObject obj = new JSONObject(map);
+                        throw new IllegalStateException("map support not done - " + obj.toJSONString());
                     }
                     else if(key.object instanceof List) {
                         throw new IllegalStateException("list support not done");
                     }
-                    break;
+                    throw new IllegalStateException("AAAAAAAA");
+//                    break;
                 default:
                     throw new IllegalStateException("Unexpected value: " + key.expectedType);
             }

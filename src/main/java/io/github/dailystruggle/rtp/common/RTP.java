@@ -104,6 +104,7 @@ public class RTP {
     public final ConcurrentSkipListSet<UUID> processingPlayers = new ConcurrentSkipListSet<>();
 
     public final RTPTaskPipe setupTeleportPipeline = new RTPTaskPipe();
+    public final RTPTaskPipe getChunkPipeline = new RTPTaskPipe();
     public final RTPTaskPipe loadChunksPipeline = new RTPTaskPipe();
     public final RTPTaskPipe teleportPipeline = new RTPTaskPipe();
     public final RTPTaskPipe chunkCleanupPipeline = new RTPTaskPipe();

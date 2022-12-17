@@ -45,7 +45,7 @@ public final class ChunkSet {
                 }
             }
             else {
-                chunk.whenComplete((chunk1, throwable) -> chunk1.keep(keep));
+                chunk.thenAccept(chunk1 -> chunk1.keep(keep));
             }
         });
     }
