@@ -18,6 +18,7 @@ import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import org.jetbrains.annotations.Nullable;
 import org.simpleyaml.configuration.MemorySection;
+import org.simpleyaml.configuration.file.YamlFile;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -308,10 +309,11 @@ public class Region extends FactoryValue<RegionKeys> {
                 }
 
                 ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
-                Set<String> unsafeBlocks = safety.yamlFile.getStringList("unsafeBlocks")
+                YamlFile yamlFile = safety.fileDatabase.cachedLookup.get().get("safety.yml");
+                Set<String> unsafeBlocks = yamlFile.getStringList("unsafeBlocks")
                         .stream().map(String::toUpperCase).collect(Collectors.toSet());
 
-                int safetyRadius = safety.yamlFile.getInt("safetyRadius", 0);
+                int safetyRadius = yamlFile.getInt("safetyRadius", 0);
                 safetyRadius = Math.max(safetyRadius,7);
 
                 //todo: waterlogged check
@@ -370,11 +372,16 @@ public class Region extends FactoryValue<RegionKeys> {
     @Nullable
     public Map.Entry<RTPLocation, Long> getLocation(@Nullable Set<String> biomeNames) {
         boolean defaultBiomes = false;
+        ConfigParser<PerformanceKeys> performance = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+        Object o;
         if(biomeNames == null || biomeNames.size()==0) {
             defaultBiomes = true;
-            ConfigParser<SafetyKeys> parser = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
-            boolean whitelist = parser.yamlFile.getBoolean("biomeWhitelist", false);
-            List<String> biomeList = parser.yamlFile.getStringList("biomes");
+            o = safety.getConfigValue(SafetyKeys.biomeWhitelist, false);
+            boolean whitelist = (o instanceof Boolean) ? (Boolean) o : Boolean.parseBoolean(o.toString());
+
+            o = safety.getConfigValue(SafetyKeys.biomes,null);
+            List<String> biomeList = (o instanceof List) ? (List<String>) o : null;
             Set<String> biomeSet = (biomeList==null) ? new HashSet<>() : new HashSet<>(biomeList);
             biomeSet = biomeSet.stream().map(String::toUpperCase).collect(Collectors.toSet());
             if(whitelist) {
@@ -390,7 +397,7 @@ public class Region extends FactoryValue<RegionKeys> {
         ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
         boolean verbose = true;
         if(logging!=null) {
-            Object o = logging.getConfigValue(LoggingKeys.teleport,false);
+            o = logging.getConfigValue(LoggingKeys.teleport,false);
             if (o instanceof Boolean) {
                 verbose = (Boolean) o;
             } else {
@@ -404,13 +411,12 @@ public class Region extends FactoryValue<RegionKeys> {
         VerticalAdjustor<?> vert = getVert();
         if(vert == null) return null;
 
-        ConfigParser<PerformanceKeys> performance = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
-        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+        o = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
+        Set<String> unsafeBlocks = (o instanceof Collection) ? ((Collection<String>) o)
+                .stream().map(String::toUpperCase).collect(Collectors.toSet())
+                : new HashSet<>();
 
-        Set<String> unsafeBlocks = safety.yamlFile.getStringList("unsafeBlocks")
-                .stream().map(String::toUpperCase).collect(Collectors.toSet());
-
-        int safetyRadius = safety.yamlFile.getInt("safetyRadius", 0);
+        int safetyRadius = safety.getNumber(SafetyKeys.safetyRadius,0).intValue();
         safetyRadius = Math.max(safetyRadius,7);
 
         long maxAttempts = performance.getNumber(PerformanceKeys.maxAttempts, 20).longValue();

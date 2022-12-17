@@ -25,6 +25,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.simpleyaml.configuration.MemorySection;
+import org.simpleyaml.configuration.file.YamlFile;
 
 import java.io.IOException;
 import java.util.*;
@@ -106,7 +107,9 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
                 if(configParser == null) continue;
                 parser.configParserFactory.map.remove(configName.toUpperCase());
                 commandLookup.remove(target);
-                configParser.yamlFile.getConfigurationFile().deleteOnExit();
+                YamlFile yamlFile = configParser.fileDatabase.cachedLookup.get().get(configName);
+                if(yamlFile!=null) yamlFile.getConfigurationFile().deleteOnExit();
+
             }
 
             List<String> add = parameterValues.getOrDefault("add", new ArrayList<>());
@@ -186,7 +189,8 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
                     else if(StringUtils.containsIgnoreCase(name,"biome")) {
                         values = () -> RTP.serverAccessor.getBiomes();
                     }
-                    addSubCommand(new ListCmd(name,this,values,configParser.yamlFile,s));
+                    YamlFile yamlFile = configParser.fileDatabase.cachedLookup.get().get(configParser.name);
+                    if(yamlFile!=null) addSubCommand(new ListCmd(name,this,values,yamlFile,s));
                 }
             }
         }
