@@ -117,7 +117,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
 //        loadResource(f);
 
         cachedLookup = fileDatabase.cachedLookup;
-        if(cachedLookup.get() == null || cachedLookup.get().size()==0) fileDatabase.connect();
+        if(cachedLookup.get() == null || !cachedLookup.get().containsKey(name)) fileDatabase.connect();
         YamlFile yamlFile = cachedLookup.get().get(name);
 
         String versionStr = yamlFile.getMapValues(false).getOrDefault("version", "1.0").toString();

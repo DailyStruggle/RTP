@@ -14,9 +14,7 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import org.apache.commons.lang3.StringUtils;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -202,10 +200,11 @@ public class FillTask extends RTPRunnable {
             ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
             ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
 
-            Set<String> unsafeBlocks = safety.yamlFile.getStringList("unsafeBlocks")
-                    .stream().map(String::toUpperCase).collect(Collectors.toSet());
+            Object o = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
+            Set<String> unsafeBlocks = ((o instanceof Collection) ? (Collection<?>)o : new ArrayList<>())
+                    .stream().map(o1 -> o1.toString().toUpperCase()).collect(Collectors.toSet());
 
-            int safetyRadius = safety.yamlFile.getInt("safetyRadius", 0);
+            int safetyRadius = safety.getNumber(SafetyKeys.safetyRadius,0).intValue();
             safetyRadius = Math.max(safetyRadius,7);
 
             //todo: waterlogged check

@@ -182,10 +182,11 @@ public final class BukkitRTPWorld implements RTPWorld {
         Material solid = location.getBlock().getRelative(BlockFace.DOWN).getType();
 
         ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
-        Set<String> unsafeBlocks = safety.yamlFile.getStringList("unsafeBlocks")
-                .stream().map(String::toUpperCase).collect(Collectors.toSet());
+        Object value = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
+        Set<String> unsafeBlocks = (((value instanceof Collection) ? (Collection<String>)value : new ArrayList<>()))
+                .stream().map(o -> o.toString().toUpperCase()).collect(Collectors.toSet());
 
-        Object o = safety.yamlFile.getString("platformMaterial", Material.COBBLESTONE.name());
+        Object o = safety.getConfigValue(SafetyKeys.platformMaterial,Material.COBBLESTONE.name());
         Material platformMaterial;
         if (o instanceof String) {
             try {
@@ -196,9 +197,9 @@ public final class BukkitRTPWorld implements RTPWorld {
         }
         else throw new IllegalStateException();
 
-        int platformRadius = safety.yamlFile.getInt("platformRadius", 0);
-        int platformDepth = safety.yamlFile.getInt("platformDepth", 1);
-        int platformAirHeight = safety.yamlFile.getInt("platformAirHeight", 2);
+        int platformRadius = safety.getNumber(SafetyKeys.platformRadius, 0).intValue();
+        int platformDepth = safety.getNumber(SafetyKeys.platformDepth,1).intValue();
+        int platformAirHeight = safety.getNumber(SafetyKeys.platformAirHeight, 2).intValue();
 
         boolean checkWaterlogged = unsafeBlocks.contains("WATERLOGGED");
 
