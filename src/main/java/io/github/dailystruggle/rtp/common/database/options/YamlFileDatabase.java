@@ -11,8 +11,8 @@ import org.simpleyaml.configuration.file.YamlFile;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * a "database" that's just reading and writing yaml files,
@@ -21,8 +21,21 @@ import java.util.concurrent.ConcurrentHashMap;
 public class YamlFileDatabase extends DatabaseAccessor<Map<String,YamlFile>> {
     private final File directory;
 
+    /**
+     * constructor
+     *
+     * provide directory where yml/yaml files should exist
+     */
     public YamlFileDatabase(File directory) {
         this.directory = directory;
+    }
+
+    /**
+     * container for map reference access, such set() will propagate changes where == would not
+     */
+    public final AtomicReference<Map<String, YamlFile>> cachedLookup = new AtomicReference<>();
+    {
+        cachedLookup.set(new ConcurrentHashMap<>());
     }
 
     @Override
@@ -31,6 +44,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String,YamlFile>> {
     }
 
     @Override
+    @NotNull
     public Map<String, YamlFile> connect() {
         if(!directory.exists()) {
             if(!directory.mkdirs()) throw new IllegalStateException("unable to create directory " + directory.getAbsolutePath());
@@ -41,14 +55,13 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String,YamlFile>> {
         Map<String,YamlFile> res = new HashMap<>();
         if(files == null) return res;
         for (File file : files) {
-            if (!file.isFile() || !file.getName().endsWith(".yml")) continue;
+            if (!file.isFile()) continue;
 
             YamlFile yamlFile;
             try {
                 yamlFile = new YamlFile(file);
                 yamlFile.loadWithComments();
-            } catch (Exception exception) {
-                exception.printStackTrace();
+            } catch (Exception exception) { //not a yaml file
                 continue;
             }
             res.put(file.getName(),yamlFile);
@@ -59,6 +72,8 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String,YamlFile>> {
                 map.put(new TableObj(entry.getKey()),new TableObj(entry.getValue()));
             }
         }
+        cachedLookup.get().clear();
+        cachedLookup.get().putAll(res);
         return res;
     }
 
@@ -74,7 +89,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String,YamlFile>> {
     }
 
     @Override
-    public Optional<TableObj> read(Map<String, YamlFile> database, String tableName, TableObj key) {
+    public @NotNull Optional<TableObj> read(Map<String, YamlFile> database, String tableName, TableObj key) {
         if(!StringUtils.endsWithIgnoreCase(tableName,".yml")) tableName = tableName + ".yml";
 
         YamlFile file = database.get(tableName);
@@ -147,13 +162,6 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String,YamlFile>> {
         else {
             file.set(keyStr,value);
         }
-    }
-
-    @Override
-    @NotNull
-    public Optional<CompletableFuture<Optional<?>>> getValue(String table, Object key) {
-        Optional<CompletableFuture<Optional<?>>> o = super.getValue(table, key);
-        return o;
     }
 
     @Override

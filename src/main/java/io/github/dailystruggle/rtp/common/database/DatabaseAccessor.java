@@ -109,8 +109,20 @@ public abstract class DatabaseAccessor<D> {
         return Optional.of(CompletableFuture.completedFuture(Optional.of(tableValue.object)));
     }
 
+    @NotNull
+    public CompletableFuture<Optional<?>> getValue(String table, Object key, Object def) {
+        Optional<CompletableFuture<Optional<?>>> res = getValue(table,key);
+        Optional<Object> optional = Optional.ofNullable(def);
+        if(!res.isPresent()) {
+            setValue(table,key,def);
+            CompletableFuture<Optional<?>> completableFuture = CompletableFuture.completedFuture(optional);
+            res = Optional.of(completableFuture);
+        }
+        return res.get();
+    }
+
     public Optional<?> setValue(String tableName, Object key, Object value) {
-        @NotNull Optional<CompletableFuture<Optional<Map<TableObj, TableObj>>>> mapOptional = getTable(tableName);
+        Optional<CompletableFuture<Optional<Map<TableObj, TableObj>>>> mapOptional = getTable(tableName);
 
         TableObj tableKey = new TableObj(key);
         Optional<TableObj> res;
@@ -192,8 +204,13 @@ public abstract class DatabaseAccessor<D> {
         disconnect(database);
     }
 
+    @NotNull
     public abstract D connect();
+
+    @NotNull
     public abstract Optional<TableObj> read(D d, String tableName, TableObj key);
+
     public abstract void write(D d, String tableName, TableObj key, TableObj value);
+
     public abstract void disconnect(D d);
 }
