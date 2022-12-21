@@ -1,18 +1,18 @@
-package io.github.dailystruggle.rtp.common.tasks;
+package io.github.dailystruggle.rtp.common.tasks.teleport;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
+import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
+import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -50,16 +50,22 @@ public final class DoTeleport extends RTPRunnable {
         TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.uuid());
         if(teleportData == null) {
             teleportData = new TeleportData();
-            teleportData.sender = sender;
+            teleportData.sender = (sender != null) ? sender : player;
             teleportData.originalLocation = player.getLocation();
-            teleportData.selectedLocation = location;
-            teleportData.time = System.nanoTime();
+            teleportData.time = System.currentTimeMillis();
             teleportData.nextTask = this;
-            teleportData.targetRegion = region;
             teleportData.delay = sender.delay();
             RTP.getInstance().latestTeleportData.put(player.uuid(),teleportData);
         }
+        teleportData.targetRegion = region;
+        teleportData.selectedLocation = location;
         teleportData.completed = true;
+
+        Map<String,Object> dataMap = DatabaseAccessor.toColumns(teleportData);
+        dataMap.put("playerName",player.name());
+        Map<String,Object> saveMap = new HashMap<>();
+        saveMap.put(player.uuid().toString(),dataMap);
+        RTP.getInstance().databaseAccessor.setValue("teleportData", saveMap);
 
         RTP.getInstance().chunkCleanupPipeline.add(new ChunkCleanup(location, region));
 
@@ -79,17 +85,17 @@ public final class DoTeleport extends RTPRunnable {
             }
 
             if(aBoolean) {
-                finalTeleportData.processingTime = System.nanoTime() - finalTeleportData.time;
+                finalTeleportData.processingTime = System.currentTimeMillis() - finalTeleportData.time;
                 RTP.getInstance().latestTeleportData.put(player.uuid(),finalTeleportData);
                 RTP.serverAccessor.sendMessage(player.uuid(), MessagesKeys.teleportMessage);
 
                 if(verbose) {
                     long time = finalTeleportData.processingTime;
                     ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-                    long days = TimeUnit.NANOSECONDS.toDays(time);
-                    long hours = TimeUnit.NANOSECONDS.toHours(time)%24;
-                    long minutes = TimeUnit.NANOSECONDS.toMinutes(time)%60;
-                    long seconds = TimeUnit.NANOSECONDS.toSeconds(time)%60;
+                    long days = TimeUnit.MILLISECONDS.toDays(time);
+                    long hours = TimeUnit.MILLISECONDS.toHours(time)%24;
+                    long minutes = TimeUnit.MILLISECONDS.toMinutes(time)%60;
+                    long seconds = TimeUnit.MILLISECONDS.toSeconds(time)%60;
 
                     String replacement = "";
                     if(days>0) replacement += days + langParser.getConfigValue(MessagesKeys.days,"").toString() + " ";
@@ -97,9 +103,7 @@ public final class DoTeleport extends RTPRunnable {
                     if(minutes>0) replacement += minutes + langParser.getConfigValue(MessagesKeys.minutes,"").toString() + " ";
                     if(seconds>0) replacement += seconds + langParser.getConfigValue(MessagesKeys.seconds,"").toString();
                     if(seconds<2) {
-                        double millis;
-                        if(seconds<1) millis = ((double) TimeUnit.NANOSECONDS.toMicros(time))/1000 % 1000;
-                        else millis = TimeUnit.NANOSECONDS.toMillis(time)%1000;
+                        double millis = time%1000;
                         replacement += millis + langParser.getConfigValue(MessagesKeys.millis,"").toString();
                     }
                     RTP.log(Level.INFO, "[plugin] completed teleport for player:"+player.name() + " in " + replacement);

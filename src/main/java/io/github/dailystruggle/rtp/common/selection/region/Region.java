@@ -13,7 +13,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdj
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.*;
 import io.github.dailystruggle.rtp.common.tasks.FillTask;
-import io.github.dailystruggle.rtp.common.tasks.LoadChunks;
+import io.github.dailystruggle.rtp.common.tasks.teleport.LoadChunks;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import org.jetbrains.annotations.Nullable;
@@ -222,7 +222,7 @@ public class Region extends FactoryValue<RegionKeys> {
                     data = new TeleportData();
                     data.completed=false;
                     data.sender = RTP.serverAccessor.getSender(CommandsAPI.serverId);
-                    data.time = System.nanoTime();
+                    data.time = System.currentTimeMillis();
                     data.delay = sender.delay();
                     data.targetRegion = this;
                     data.originalLocation = player.getLocation();
@@ -354,8 +354,9 @@ public class Region extends FactoryValue<RegionKeys> {
             RTP.getInstance().processingPlayers.add(playerId);
             if(data == null) {
                 data = new TeleportData();
+                data.sender = (sender != null) ? sender : player;
                 data.completed=false;
-                data.time = System.nanoTime();
+                data.time = System.currentTimeMillis();
                 data.delay = sender.delay();
                 data.targetRegion = this;
                 data.originalLocation = player.getLocation();

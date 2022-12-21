@@ -1,6 +1,8 @@
 package io.github.dailystruggle.rtp.bukkit.commands;
 
 import io.github.dailystruggle.commandsapi.bukkit.LocalParameters.*;
+import io.github.dailystruggle.commandsapi.common.CommandExecutor;
+import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.bukkit.events.TeleportCommandFailEvent;
 import io.github.dailystruggle.rtp.bukkit.events.TeleportCommandSuccessEvent;
@@ -22,6 +24,7 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSen
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import org.bukkit.Bukkit;
 import org.bukkit.block.Biome;
+import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -29,6 +32,7 @@ import org.bukkit.plugin.Plugin;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
 import java.util.function.Predicate;
 
@@ -106,7 +110,12 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
 
     @Override
     public boolean onCommand(CommandSender sender, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
-        return compute(new BukkitRTPCommandSender(sender).uuid(), parameterValues, nextCommand);
+        return compute(new BukkitRTPCommandSender(sender).uuid(), parameterValues, nextCommand);//todo:async
+    }
+
+    @Override
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        return onCommand(new BukkitRTPCommandSender(sender), this, label, args);
     }
 
     @Override

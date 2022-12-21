@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.bukkit.server;
 
-import io.github.dailystruggle.rtp.common.tasks.SyncTaskProcessing;
+import io.github.dailystruggle.rtp.common.tasks.tick.SyncTaskProcessing;
 import io.github.dailystruggle.rtp.common.tasks.TPS;
 import org.bukkit.scheduler.BukkitRunnable;
 
@@ -16,7 +16,7 @@ public class SyncTeleportProcessing extends BukkitRunnable {
         long currTime = TPS.timeSinceTick(1);
 
         long availableTime = avgTime - currTime;
-        availableTime = TimeUnit.MICROSECONDS.toNanos(availableTime);
+        availableTime = TimeUnit.MILLISECONDS.toNanos(availableTime);
 
         syncTaskProcessing = new SyncTaskProcessing(availableTime);
     }

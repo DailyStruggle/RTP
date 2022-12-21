@@ -22,6 +22,10 @@ import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.*;
+import io.github.dailystruggle.rtp.common.tasks.teleport.DoTeleport;
+import io.github.dailystruggle.rtp.common.tasks.teleport.LoadChunks;
+import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
+import io.github.dailystruggle.rtp.common.tasks.teleport.SetupTeleport;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -49,13 +53,13 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     public BukkitTask asyncTimer = null;
     public BukkitTask syncTimer = null;
 
-    @Override
-    public void onLoad() {
-        instance = this;
-        RTP.serverAccessor = new BukkitServerAccessor();
-
-        new RTP(); //constructor updates API instance
-    }
+//    @Override
+//    public void onLoad() {
+//        instance = this;
+//        RTP.serverAccessor = new BukkitServerAccessor();
+//
+//        new RTP(); //constructor updates API instance
+//    }
 
     @Override
     public void onEnable() {

@@ -14,7 +14,7 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSen
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPEconomy;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
-import io.github.dailystruggle.rtp.common.tasks.SetupTeleport;
+import io.github.dailystruggle.rtp.common.tasks.teleport.SetupTeleport;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.*;
@@ -29,14 +29,12 @@ public interface RTPCmd extends BaseRTPCmd {
 
     //synchronous command component
     default boolean onCommand(RTPCommandSender sender, CommandsAPICommand command, String label, String[] args) {
-        RTP rtp = RTP.getInstance();
-
         for(String arg : args) {
             if(!arg.contains(String.valueOf(CommandsAPI.parameterDelimiter))) return true;
         }
 
         UUID senderId = sender.uuid();
-        if(rtp.processingPlayers.contains(senderId)) {
+        if(RTP.getInstance().processingPlayers.contains(senderId)) {
             RTP.serverAccessor.sendMessage(senderId, MessagesKeys.alreadyTeleporting);
             return true;
         }
@@ -50,28 +48,31 @@ public interface RTPCmd extends BaseRTPCmd {
 
         //--------------------------------------------------------------------------------------------------------------
         //guard last teleport time synchronously to prevent spam
-        TeleportData senderData = rtp.latestTeleportData.getOrDefault(senderId, new TeleportData());
+        TeleportData senderData = RTP.getInstance().latestTeleportData.get(senderId);
 
-        if(senderData.sender == null) {
-            senderData.sender = sender;
+        if(senderData!=null) {
+            if (senderData.sender == null) {
+                senderData.sender = sender;
+            }
+
+
+            long dt = System.currentTimeMillis() - senderData.time;
+
+            if (dt < 0) dt = Long.MAX_VALUE + dt;
+
+            if (dt < sender.cooldown()) {
+                RTP.serverAccessor.sendMessage(senderId, MessagesKeys.cooldownMessage);
+                return true;
+            }
         }
 
-        long dt = System.nanoTime()-senderData.time;
-        if(dt < 0) dt = Long.MAX_VALUE+dt;
-        if(dt < sender.cooldown()) {
-            RTP.serverAccessor.sendMessage(senderId, MessagesKeys.cooldownMessage);
-            return true;
-        }
-
-        if(!senderId.equals(CommandsAPI.serverId)) rtp.processingPlayers.add(senderId);
+        if(!senderId.equals(CommandsAPI.serverId)) RTP.getInstance().processingPlayers.add(senderId);
 
         return onCommand(senderId,sender::hasPermission,sender::sendMessage,args);
     }
 
     //async command component
     default boolean compute(UUID senderId, Map<String, List<String>> rtpArgs, CommandsAPICommand nextCommand) {
-        long timingsStart = System.nanoTime();
-
         RTPCommandSender sender = RTP.serverAccessor.getSender(senderId);
 
         RTP rtp = RTP.getInstance();
@@ -181,7 +182,7 @@ public interface RTPCmd extends BaseRTPCmd {
                 rtp.priorTeleportData.put(player.uuid(), data);
             }
             data = new TeleportData();
-            data.time = timingsStart;
+            data.sender = sender;
             rtp.latestTeleportData.put(player.uuid(), data);
 
             String regionName;

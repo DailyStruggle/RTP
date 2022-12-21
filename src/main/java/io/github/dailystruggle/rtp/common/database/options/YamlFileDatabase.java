@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
 
 /**
  * a "database" that's just reading and writing yaml files,
@@ -51,7 +52,6 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String,YamlFile>> {
         }
 
         File[] files = directory.listFiles();
-        System.out.println(Arrays.toString(files));
         Map<String,YamlFile> res = new HashMap<>();
         if(files == null) return res;
         for (File file : files) {
@@ -90,20 +90,23 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String,YamlFile>> {
 
     @Override
     public @NotNull Optional<TableObj> read(Map<String, YamlFile> database, String tableName, TableObj key) {
+        if(!(database instanceof Map)) throw new IllegalStateException();
+
         if(!StringUtils.endsWithIgnoreCase(tableName,".yml")) tableName = tableName + ".yml";
 
         YamlFile file = database.get(tableName);
-        if(file == null || !file.exists()) throw new IllegalStateException("null file -  " + tableName);
+        if(file == null || !file.exists()) return Optional.empty();
         String s = key.object.toString();
         Object res = file.get(s);
+        if(res == null) return Optional.empty();
         return Optional.of(new TableObj(res));
     }
 
     @Override
-    public void write(Map<String, YamlFile> database, String tableName, TableObj key, TableObj val) {
+    public void write(Map<String, YamlFile> database, String tableName, Map<TableObj,TableObj> keyValuePairs) {
         if(!StringUtils.endsWithIgnoreCase(tableName,".yml")) tableName = tableName + ".yml";
         YamlFile file = database.get(tableName);
-        if(file == null) file = new YamlFile(tableName);
+        if(file == null) file = new YamlFile(directory.getAbsolutePath() + File.separator + tableName);
         if(!file.exists()) {
             if(database.containsKey("default.yml")) {
                 try {
@@ -129,49 +132,50 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String,YamlFile>> {
             return;
         }
 
-        String keyStr = key.object.toString();
-        Object o = file.get(keyStr);
-        Object value = val.object;
-        if(o instanceof ConfigurationSection) {
-            ConfigurationSection configurationSection = (ConfigurationSection) o;
+        for(Map.Entry<TableObj,TableObj> entry : keyValuePairs.entrySet()) {
+            String keyStr = entry.getKey().object.toString();
+            Object o = file.get(keyStr);
+            Object value = entry.getValue().object;
 
-            if(configurationSection.getName().equalsIgnoreCase("shape") && value instanceof String) {
-                String shapeName = (String) value;
-                value = RTP.factoryMap.get(RTP.factoryNames.shape).getOrDefault(shapeName);
-            }
+            if (o instanceof ConfigurationSection) {
+                ConfigurationSection configurationSection = (ConfigurationSection) o;
 
-            if(configurationSection.getName().equalsIgnoreCase("vert") && value instanceof String) {
-                String vertName = (String) value;
-                value = RTP.factoryMap.get(RTP.factoryNames.vert).getOrDefault(vertName);
-            }
+                if (configurationSection.getName().equalsIgnoreCase("shape") && value instanceof String) {
+                    String shapeName = (String) value;
+                    value = RTP.factoryMap.get(RTP.factoryNames.shape).getOrDefault(shapeName);
+                }
 
-            if(value instanceof FactoryValue<?>) {
-                EnumMap<?, Object> data = ((FactoryValue<?>) value).getData();
-                Map<String,Object> map = new HashMap<>();
-                for(Map.Entry<? extends Enum<?>,Object> d : data.entrySet()) map.put(d.getKey().name(),d.getValue());
-                setSection((ConfigurationSection) o,map);
+                if (configurationSection.getName().equalsIgnoreCase("vert") && value instanceof String) {
+                    String vertName = (String) value;
+                    value = RTP.factoryMap.get(RTP.factoryNames.vert).getOrDefault(vertName);
+                }
+
+                if (value instanceof FactoryValue<?>) {
+                    EnumMap<?, Object> data = ((FactoryValue<?>) value).getData();
+                    Map<String, Object> map = new HashMap<>();
+                    for (Map.Entry<? extends Enum<?>, Object> d : data.entrySet())
+                        map.put(d.getKey().name(), d.getValue());
+                    setSection((ConfigurationSection) o, map);
+                } else if (value instanceof Map) {
+                    setSection((ConfigurationSection) o, (Map<String, Object>) value);
+                } else {
+                    throw new IllegalArgumentException("expected map or similar for " + keyStr);
+                }
+                file.set(keyStr, o);
+            } else {
+                file.set(keyStr, value);
             }
-            else if(value instanceof Map) {
-                setSection((ConfigurationSection) o,(Map<String, Object>) value);
-            }
-            else {
-                throw new IllegalArgumentException("expected map or similar for " + keyStr);
-            }
-            file.set(keyStr,o);
-        }
-        else {
-            file.set(keyStr,value);
         }
     }
 
     @Override
-    public Optional<?> setValue(String tableName, Object key, Object value) {
-        Optional<?> o = super.setValue(tableName, key, value);
-        Map.Entry<String,Map.Entry<TableObj,TableObj>> writeRequest;
-        Map.Entry<TableObj,TableObj> writeValue = new AbstractMap.SimpleEntry<>(new TableObj(key), new TableObj(value));
-        writeRequest = new AbstractMap.SimpleEntry<>(tableName,writeValue);
+    public void setValue(String tableName, Map<?,?> keyValuePairs) {
+        super.setValue(tableName, keyValuePairs);
+        Map<TableObj,TableObj> writeValues = new HashMap<>();
+        keyValuePairs.forEach((o, o2) -> writeValues.put(new TableObj(o), new TableObj(o2)));
+        Map.Entry<String,Map<TableObj,TableObj>> writeRequest
+                = new AbstractMap.SimpleEntry<>(tableName,writeValues);
         writeQueue.add(writeRequest);
-        return o;
     }
 
     private static void setSection(ConfigurationSection section, Map<String,Object> map) {
@@ -193,7 +197,9 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String,YamlFile>> {
                 }
                 else throw new IllegalArgumentException();
             }
-            else section.set(e.getKey(),o);
+            else {
+                section.set(e.getKey(),value);
+            }
         }
     }
 }

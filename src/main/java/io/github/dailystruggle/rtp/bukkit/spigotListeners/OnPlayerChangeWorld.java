@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.bukkit.spigotListeners;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.tasks.RTPTeleportCancel;
+import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;

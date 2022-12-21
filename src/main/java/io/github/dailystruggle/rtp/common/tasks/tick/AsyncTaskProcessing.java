@@ -1,9 +1,11 @@
-package io.github.dailystruggle.rtp.common.tasks;
+package io.github.dailystruggle.rtp.common.tasks.tick;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.tasks.FillTask;
+import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -40,8 +42,8 @@ public final class AsyncTaskProcessing extends RTPRunnable {
         }
 
         long period = 0;
-        if(instance.configs!=null) {
-            ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) instance.configs.getParser(PerformanceKeys.class);
+        if(RTP.configs !=null) {
+            ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
             if(perf!=null) period = perf.getNumber(PerformanceKeys.period,0).longValue();
         }
 
@@ -61,5 +63,7 @@ public final class AsyncTaskProcessing extends RTPRunnable {
             }
         }
         step = (step+1)%period;
+
+        instance.databaseAccessor.processQueries(availableTime-(start-System.nanoTime()));
     }
 }
