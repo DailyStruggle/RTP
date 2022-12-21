@@ -45,4 +45,9 @@ public class TestRTPCommandSender implements RTPCommandSender {
     public Set<String> getEffectivePermissions() {
         return new HashSet<>();
     }
+
+    @Override
+    public RTPCommandSender clone() {
+        return null;
+    }
 }

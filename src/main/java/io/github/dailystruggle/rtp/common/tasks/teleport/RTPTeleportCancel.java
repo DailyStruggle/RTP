@@ -1,4 +1,4 @@
-package io.github.dailystruggle.rtp.common.tasks;
+package io.github.dailystruggle.rtp.common.tasks.teleport;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
+import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 
 import java.util.AbstractMap;
 import java.util.ArrayList;

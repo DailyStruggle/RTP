@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.database;
 
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
@@ -8,6 +9,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.logging.Level;
 
 /**
  *
@@ -77,9 +79,9 @@ public abstract class DatabaseAccessor<D> {
      */
     protected long avgTimeRead = 0;
     protected long avgTimeWrite = 0;
-    private boolean stop = false;
+    protected boolean stop = false;
     protected ConcurrentLinkedQueue<Map.Entry<String,Map.Entry<TableObj,CompletableFuture<Optional<TableObj>>>>> readQueue = new ConcurrentLinkedQueue<>();
-    protected ConcurrentLinkedQueue<Map.Entry<String,Map.Entry<TableObj,TableObj>>> writeQueue = new ConcurrentLinkedQueue<>();
+    protected ConcurrentLinkedQueue<Map.Entry<String,Map<TableObj,TableObj>>> writeQueue = new ConcurrentLinkedQueue<>();
 
     /**
      * @return what sort of database is this?
@@ -121,53 +123,85 @@ public abstract class DatabaseAccessor<D> {
         return res.get();
     }
 
-    public Optional<?> setValue(String tableName, Object key, Object value) {
+    public void setValue(String tableName, Object key, Object value) {
         Optional<CompletableFuture<Optional<Map<TableObj, TableObj>>>> mapOptional = getTable(tableName);
 
         TableObj tableKey = new TableObj(key);
-        Optional<TableObj> res;
         Map<TableObj,TableObj> table;
         if (mapOptional.isPresent()) {
             CompletableFuture<Optional<Map<TableObj, TableObj>>> future = mapOptional.get();
             if(!future.isDone()) {
                 future.whenComplete((tableKeyEntryMap, throwable) -> setValue(tableName,key,value));
-                return Optional.empty();
+                return;
             }
             Optional<Map<TableObj, TableObj>> now = future.getNow(Optional.empty());
             if(!now.isPresent()) {
                 table = new ConcurrentHashMap<>();
                 localTables.put(tableName, table);
-                res = Optional.empty();
             }
             else {
                 table = now.get();
-                res = Optional.ofNullable(table.get(tableKey));
             }
         } else {
             table = new ConcurrentHashMap<>();
             localTables.put(tableName, table);
-            res = Optional.empty();
         }
 
         TableObj tableValue = new TableObj(value);
         table.put(tableKey, tableValue);
-        writeQueue.add(new AbstractMap.SimpleEntry<>(tableName, new AbstractMap.SimpleEntry<>(tableKey, tableValue)));
-        return res;
+        Map<TableObj,TableObj> write = new HashMap<>();
+        write.put(tableKey,tableValue);
+        writeQueue.add(new AbstractMap.SimpleEntry<>(tableName, write));
+    }
+
+    public void setValue(String tableName, Map<?,?> keyValuePairs) {
+        Optional<CompletableFuture<Optional<Map<TableObj, TableObj>>>> mapOptional = getTable(tableName);
+
+        Map<TableObj,TableObj> pairs = new HashMap<>();
+        for(Map.Entry<?,?> entry : keyValuePairs.entrySet()) {
+            Object key = entry.getKey();
+            Object value = entry.getValue();
+
+            TableObj tableKey = new TableObj(key);
+            Map<TableObj, TableObj> table;
+            if (mapOptional.isPresent()) {
+                CompletableFuture<Optional<Map<TableObj, TableObj>>> future = mapOptional.get();
+                if (!future.isDone()) {
+                    future.whenComplete((tableKeyEntryMap, throwable) -> setValue(tableName, key, value));
+                    return;
+                }
+                Optional<Map<TableObj, TableObj>> now = future.getNow(Optional.empty());
+                if (!now.isPresent()) {
+                    table = new ConcurrentHashMap<>();
+                    localTables.put(tableName, table);
+                } else {
+                    table = now.get();
+                }
+            } else {
+                table = new ConcurrentHashMap<>();
+                localTables.put(tableName, table);
+            }
+
+            TableObj tableValue = new TableObj(value);
+            table.put(tableKey, tableValue);
+        }
+        writeQueue.add(new AbstractMap.SimpleEntry<>(tableName, pairs));
     }
 
     public void processQueries(long availableTime) {
+        if(readQueue.size() == 0 && writeQueue.size() == 0) return;
         D database = connect();
         if(stop) return;
-        long dt = 0;
+        long dt;
         long start = System.nanoTime();
 
         while (writeQueue.size()>0) {
             if(stop) return;
-            Map.Entry<String, Map.Entry<TableObj, TableObj>> writeRequest = writeQueue.poll();
+            Map.Entry<String, Map<TableObj, TableObj>> writeRequest = writeQueue.poll();
             if(writeRequest == null) throw new IllegalStateException("null database write request");
 
             long localStart = System.nanoTime();
-            write(database,writeRequest.getKey(),writeRequest.getValue().getKey(), writeRequest.getValue().getValue());
+            write(database,writeRequest.getKey(),writeRequest.getValue());
             long localStop = System.nanoTime();
 
             if(localStop < localStart) localStart = -(Long.MAX_VALUE - localStart);
@@ -176,7 +210,7 @@ public abstract class DatabaseAccessor<D> {
             else avgTimeWrite = ((avgTimeWrite*7)/8) + (diff/8);
 
             if(localStop < start) start = -(Long.MAX_VALUE-start); //overflow correction
-            dt = localStop -start;
+            dt = localStop - start;
             if(dt+avgTimeWrite>availableTime) break;
         }
 
@@ -197,7 +231,7 @@ public abstract class DatabaseAccessor<D> {
             else avgTimeRead = ((avgTimeRead*7)/8) + (diff/8);
 
             if(localStop < start) start = -(Long.MAX_VALUE-start); //overflow correction
-            dt = localStop -start;
+            dt = localStop - start;
             if(dt+avgTimeRead>availableTime) break;
         }
 
@@ -210,7 +244,44 @@ public abstract class DatabaseAccessor<D> {
     @NotNull
     public abstract Optional<TableObj> read(D d, String tableName, TableObj key);
 
-    public abstract void write(D d, String tableName, TableObj key, TableObj value);
+    public abstract void write(D d, String tableName, Map<TableObj,TableObj> keyValuePairs);
 
     public abstract void disconnect(D d);
+
+    public static Map<String,Object> toColumns(Object obj) {
+        Map<String,Object> res = new HashMap<>();
+        if(obj instanceof TableObj) {
+            obj = ((TableObj) obj).object;
+        }
+
+        if(obj instanceof Map.Entry) {
+            Map.Entry<?,?> entry = (Map.Entry<?, ?>) obj;
+            res.put(entry.getKey().toString(),entry.getValue());
+        }
+        else if(obj instanceof Map) {
+            Map<?,?> map = (Map<?, ?>) obj;
+            map.forEach((o, o2) -> res.put(o.toString(),o2));
+        }
+        else if(obj instanceof TeleportData) {
+            TeleportData teleportData = (TeleportData) obj;
+            res.put("senderName", teleportData.sender.name());
+            res.put("senderId", teleportData.sender.uuid().toString());
+            res.put("time", teleportData.time);
+            res.put("selectedX", teleportData.selectedLocation.x());
+            res.put("selectedY", teleportData.selectedLocation.y());
+            res.put("selectedZ", teleportData.selectedLocation.z());
+            res.put("selectedWorldName", teleportData.selectedLocation.world().name());
+            res.put("selectedWorldId", teleportData.selectedLocation.world().id().toString());
+            res.put("originalX", teleportData.originalLocation.x());
+            res.put("originalY", teleportData.originalLocation.y());
+            res.put("originalZ", teleportData.originalLocation.z());
+            res.put("originalWorldName", teleportData.originalLocation.world().name());
+            res.put("originalWorldId", teleportData.originalLocation.world().id().toString());
+            res.put("region", teleportData.targetRegion.name);
+            res.put("cost", teleportData.cost);
+            res.put("attempts", teleportData.attempts);
+        }
+
+        return res;
+    }
 }

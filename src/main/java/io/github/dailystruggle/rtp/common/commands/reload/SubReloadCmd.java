@@ -104,8 +104,6 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
 
         CommandsAPI.commandPipeline.clear();
 
-        final RTP instance = RTP.getInstance();
-
         MultiConfigParser<?> newParser = new MultiConfigParser<>(parser.myClass, parser.name, "1.0", parser.pluginDirectory);
         if(parser.myClass.equals(RegionKeys.class)) {
             MultiConfigParser<RegionKeys> regions = (MultiConfigParser<RegionKeys>) newParser;
@@ -122,7 +120,7 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
             }
         }
 
-        instance.configs.multiConfigParserMap.put(parser.myClass,newParser);
+        RTP.configs.multiConfigParserMap.put(parser.myClass,newParser);
 
         msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloaded,""));
         if(msg!=null) msg = StringUtils.replace(msg,"[filename]", parser.name);

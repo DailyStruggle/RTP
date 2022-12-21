@@ -13,10 +13,10 @@ import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
-import io.github.dailystruggle.rtp.common.tasks.DoTeleport;
-import io.github.dailystruggle.rtp.common.tasks.LoadChunks;
+import io.github.dailystruggle.rtp.common.tasks.teleport.DoTeleport;
+import io.github.dailystruggle.rtp.common.tasks.teleport.LoadChunks;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
-import io.github.dailystruggle.rtp.common.tasks.SetupTeleport;
+import io.github.dailystruggle.rtp.common.tasks.teleport.SetupTeleport;
 import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
 import io.github.dailystruggle.rtp.common.tools.ParseString;
 import net.md_5.bungee.api.ChatColor;
@@ -105,27 +105,27 @@ public class SendMessage {
             if(RTP.getInstance() == null) return "A";
             if(RTP.serverAccessor==null) return "B";
 
-            long start = System.nanoTime();
+            long start = System.currentTimeMillis();
 
             Player player = Bukkit.getPlayer(uuid);
             if(player!=null && player.isOnline()) {
                 TeleportData teleportData = RTP.getInstance().latestTeleportData.get(uuid);
-                long lastTime = 0;
+                long lastTime = start;
                 if(teleportData!=null) lastTime=teleportData.time;
 
-                Number n = RTP.configs.getParser(ConfigKeys.class).getNumber(ConfigKeys.teleportCooldown,0);
-                int n2 = ParsePermissions.getInt(RTP.serverAccessor.getSender(player.getUniqueId()),"RTP.getInstance().delay.");
-                if(n2>=0) n = n2;
+
+                RTPCommandSender sender = RTP.serverAccessor.getSender(player.getUniqueId());
+                long n = sender.cooldown();
 
                 long currTime = (start - lastTime);
-                long remainingTime = n.longValue()-currTime;
-                if(remainingTime < 0) remainingTime = Long.MAX_VALUE+remainingTime;
+                long remainingTime = n-currTime;
+                if(remainingTime < 0) remainingTime = 0;
 
                 ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-                long days = TimeUnit.NANOSECONDS.toDays(remainingTime);
-                long hours = TimeUnit.NANOSECONDS.toHours(remainingTime)%24;
-                long minutes = TimeUnit.NANOSECONDS.toMinutes(remainingTime)%60;
-                long seconds = TimeUnit.NANOSECONDS.toSeconds(remainingTime)%60;
+                long days = TimeUnit.MILLISECONDS.toDays(remainingTime);
+                long hours = TimeUnit.MILLISECONDS.toHours(remainingTime)%24;
+                long minutes = TimeUnit.MILLISECONDS.toMinutes(remainingTime)%60;
+                long seconds = TimeUnit.MILLISECONDS.toSeconds(remainingTime)%60;
 
                 String replacement = "";
                 if(days>0) replacement += days + langParser.getConfigValue(MessagesKeys.days,"").toString() + " ";
@@ -133,11 +133,7 @@ public class SendMessage {
                 if(minutes>0) replacement += minutes + langParser.getConfigValue(MessagesKeys.minutes,"").toString() + " ";
                 if(seconds>0) replacement += seconds + langParser.getConfigValue(MessagesKeys.seconds,"").toString();
                 if(seconds<2) {
-                    long millis;
-
-                    if(seconds<1) millis = TimeUnit.NANOSECONDS.toMicros(remainingTime) % 1000 / 1000;
-                    else millis = TimeUnit.NANOSECONDS.toMillis(remainingTime) % 1000;
-
+                    long millis = remainingTime % 1000;
                     replacement += millis + langParser.getConfigValue(MessagesKeys.millis,"").toString();
                 }
                 return replacement;
@@ -173,10 +169,10 @@ public class SendMessage {
             long time = teleportData.processingTime;
             if(time == 0) return "0";
             ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-            long days = TimeUnit.NANOSECONDS.toDays(time);
-            long hours = TimeUnit.NANOSECONDS.toHours(time)%24;
-            long minutes = TimeUnit.NANOSECONDS.toMinutes(time)%60;
-            long seconds = TimeUnit.NANOSECONDS.toSeconds(time)%60;
+            long days = TimeUnit.MILLISECONDS.toDays(time);
+            long hours = TimeUnit.MILLISECONDS.toHours(time)%24;
+            long minutes = TimeUnit.MILLISECONDS.toMinutes(time)%60;
+            long seconds = TimeUnit.MILLISECONDS.toSeconds(time)%60;
 
             String replacement = "";
             if(days>0) replacement += days + langParser.getConfigValue(MessagesKeys.days,"").toString() + " ";
@@ -184,9 +180,7 @@ public class SendMessage {
             if(minutes>0) replacement += minutes + langParser.getConfigValue(MessagesKeys.minutes,"").toString() + " ";
             if(seconds>0) replacement += seconds + langParser.getConfigValue(MessagesKeys.seconds,"").toString();
             if(seconds<2) {
-                double millis;
-                if(seconds<1) millis = ((double) TimeUnit.NANOSECONDS.toMicros(time))/1000 % 1000;
-                else millis = TimeUnit.NANOSECONDS.toMillis(time)%1000;
+                double millis = time%1000;
                 replacement += millis + langParser.getConfigValue(MessagesKeys.millis,"").toString();
                 }
             return replacement;
@@ -212,7 +206,7 @@ public class SendMessage {
             if(data == null) return SendMessage.formatDry(player, lang.getConfigValue(MessagesKeys.PLAYER_AVAILABLE, "").toString());
             if(data.completed) {
                 BukkitRTPCommandSender sender = new BukkitRTPCommandSender(player);
-                long dt = System.nanoTime()-data.time;
+                long dt = System.currentTimeMillis()-data.time;
                 if(dt < 0) dt = Long.MAX_VALUE+dt;
                 if(dt < sender.cooldown()) {
                     return SendMessage.formatDry(player, lang.getConfigValue(MessagesKeys.PLAYER_COOLDOWN, "").toString());

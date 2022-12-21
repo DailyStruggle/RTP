@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.bukkit.events;
 
-import io.github.dailystruggle.rtp.common.tasks.SetupTeleport;
+import io.github.dailystruggle.rtp.common.tasks.teleport.SetupTeleport;
 import org.bukkit.Bukkit;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;

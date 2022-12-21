@@ -40,8 +40,6 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     private final Map<UUID,RTPWorld> worldMap = new ConcurrentHashMap<>();
     private final Map<String,RTPWorld> worldMapStr = new ConcurrentHashMap<>();
 
-    private final long t = System.nanoTime();
-
     private String version = null;
     private Integer intVersion = null;
 

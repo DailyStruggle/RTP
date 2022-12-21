@@ -48,7 +48,7 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
     @Override
     public @NotNull String getServerVersion() {
         if(version == null) {
-            version = "1.18.2";
+            version = "1.19.3";
         }
 
         return version;
@@ -123,8 +123,12 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
     @Override
     public File getPluginDirectory() {
         try {
-            return new File(RTP.class.getProtectionDomain().getCodeSource().getLocation()
+            File res = new File(RTP.class.getProtectionDomain().getCodeSource().getLocation()
                     .toURI());
+            res = res.getParentFile();
+            res = new File(res.getAbsolutePath() + File.separator + "config");
+            res.mkdir();
+            return res;
         } catch (URISyntaxException e) {
             e.printStackTrace();
             return null;

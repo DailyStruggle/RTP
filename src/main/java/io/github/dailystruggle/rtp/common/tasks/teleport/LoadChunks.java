@@ -1,4 +1,4 @@
-package io.github.dailystruggle.rtp.common.tasks;
+package io.github.dailystruggle.rtp.common.tasks.teleport;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -10,6 +10,7 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPChunk;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
+import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import org.bukkit.Bukkit;
 
 import java.util.ArrayList;
@@ -19,6 +20,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.logging.Level;
 
 public final class LoadChunks extends RTPRunnable {
     public static final List<Consumer<LoadChunks>> preActions = new ArrayList<>();
@@ -53,10 +55,10 @@ public final class LoadChunks extends RTPRunnable {
         TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.uuid());
         if(teleportData == null) {
             teleportData = new TeleportData();
-            teleportData.sender = sender;
+            teleportData.sender = (sender != null) ? sender : player;
             teleportData.originalLocation = player.getLocation();
             teleportData.selectedLocation = location;
-            teleportData.time = System.nanoTime();
+            teleportData.time = System.currentTimeMillis();
             teleportData.nextTask = this;
             teleportData.targetRegion = region;
             teleportData.delay = sender.delay();
@@ -74,7 +76,7 @@ public final class LoadChunks extends RTPRunnable {
     @Override
     public void run() {
         preActions.forEach(consumer -> consumer.accept(this));
-        long start = System.nanoTime();
+        long start = System.currentTimeMillis();
 
         TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.uuid());
         DoTeleport doTeleport = new DoTeleport(sender, player, location, region);
@@ -85,7 +87,7 @@ public final class LoadChunks extends RTPRunnable {
         long delay = sender.delay();
         long dT = (start - lastTime);
         long remainingTime = delay - dT;
-        long toTicks = (TimeUnit.NANOSECONDS.toMillis(remainingTime)/50);
+        long toTicks = remainingTime/50;
 
         ChunkSet chunkSet = this.region.locAssChunks.get(location);
 
@@ -106,7 +108,6 @@ public final class LoadChunks extends RTPRunnable {
                 }
             }
         }
-
 
         doTeleport.setDelay(toTicks);
 

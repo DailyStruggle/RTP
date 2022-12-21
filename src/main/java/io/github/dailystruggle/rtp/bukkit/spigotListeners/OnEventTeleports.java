@@ -13,8 +13,8 @@ import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
-import io.github.dailystruggle.rtp.common.tasks.RTPTeleportCancel;
-import io.github.dailystruggle.rtp.common.tasks.SetupTeleport;
+import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
+import io.github.dailystruggle.rtp.common.tasks.teleport.SetupTeleport;
 import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -99,8 +99,8 @@ public class OnEventTeleports implements Listener {
         }
 
         //prep location so it's ready when they respawn or shortly after
-        TeleportData data = new TeleportData();
-        RTP.getInstance().latestTeleportData.put(id, data);
+        TeleportData teleportData = new TeleportData();
+        RTP.getInstance().latestTeleportData.put(id, teleportData);
         region.miscPipeline.add(() -> {
             Map.Entry<RTPLocation, Long> location = null;
             int i = 0;
@@ -119,8 +119,8 @@ public class OnEventTeleports implements Listener {
                 return;
             }
 
-            data.selectedLocation = location.getKey();
-            data.attempts = location.getValue();
+            teleportData.selectedLocation = location.getKey();
+            teleportData.attempts = location.getValue();
 
             future.complete(location);
         });
@@ -140,8 +140,12 @@ public class OnEventTeleports implements Listener {
         CompletableFuture<Map.Entry<RTPLocation, Long>> future = respawnLocations.get(player.getUniqueId());
         region.fastLocations.remove(player.getUniqueId());
 
-        TeleportData data = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
-        data.completed = true;
+        TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
+        if(teleportData == null) {
+            teleportData = new TeleportData();
+            RTP.getInstance().latestTeleportData.put(player.getUniqueId(), teleportData);
+        }
+        teleportData.completed = true;
 
         ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
         boolean verbose = false;
@@ -184,14 +188,14 @@ public class OnEventTeleports implements Listener {
 
         boolean finalVerbose = verbose;
         future.whenComplete((location, throwable) -> {
-            if(finalVerbose) RTP.log(Level.INFO, "[plugin] teleporting player:"+player+" on respawn");
+            if(finalVerbose) RTP.log(Level.INFO, "[plugin] teleporting player:"+player.getName()+" on respawn");
             SetupTeleport setupTeleport = new SetupTeleport(
                     new BukkitRTPCommandSender(Bukkit.getConsoleSender()),
                     new BukkitRTPPlayer(player),
                     region,
                     null
             );
-            data.nextTask = setupTeleport;
+            RTP.getInstance().latestTeleportData.get(player.getUniqueId()).nextTask = setupTeleport;
             RTP.getInstance().setupTeleportPipeline.add(setupTeleport);
         });
     }

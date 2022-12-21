@@ -84,6 +84,7 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
                 //todo: shape and vert updates
                 //todo: update internal data accordingly. maybe auto reload after update?
 
+
                 configParser.set(key,value);
             }
 
