@@ -13,12 +13,11 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdj
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.*;
 import io.github.dailystruggle.rtp.common.tasks.FillTask;
-import io.github.dailystruggle.rtp.common.tasks.teleport.LoadChunks;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
+import io.github.dailystruggle.rtp.common.tasks.teleport.LoadChunks;
 import org.jetbrains.annotations.Nullable;
 import org.simpleyaml.configuration.MemorySection;
-import org.simpleyaml.configuration.file.YamlFile;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -292,7 +291,9 @@ public class Region extends FactoryValue<RegionKeys> {
 
         if(!custom && perPlayerLocationQueue.containsKey(playerId)) {
             ConcurrentLinkedQueue<Map.Entry<RTPLocation, Long>> playerLocationQueue = perPlayerLocationQueue.get(playerId);
+            RTPChunk rtpChunk = null;
             while(playerLocationQueue.size()>0) {
+                if(rtpChunk!=null) rtpChunk.unload();
                 pair = playerLocationQueue.poll();
                 if(pair == null || pair.getKey() == null) continue;
                 RTPLocation left = pair.getKey();
@@ -301,7 +302,6 @@ public class Region extends FactoryValue<RegionKeys> {
                 int cx = (left.x() > 0) ? left.x()/16 : left.x()/16-1;
                 int cz = (left.z() > 0) ? left.z()/16 : left.z()/16-1;
                 CompletableFuture<RTPChunk> chunkAt = left.world().getChunkAt(cx, cz);
-                RTPChunk rtpChunk;
                 try {
                     rtpChunk = chunkAt.get();
                 } catch (InterruptedException | ExecutionException e) {
@@ -310,11 +310,14 @@ public class Region extends FactoryValue<RegionKeys> {
                 }
 
                 ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
-                YamlFile yamlFile = safety.fileDatabase.cachedLookup.get().get("safety.yml");
-                Set<String> unsafeBlocks = yamlFile.getStringList("unsafeBlocks")
-                        .stream().map(String::toUpperCase).collect(Collectors.toSet());
+                Object unsafeBlocksObj = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
+                Set<String> unsafeBlocks = new HashSet<>();
+                if(unsafeBlocksObj instanceof Collection) {
+                    unsafeBlocks = ((Collection<?>)unsafeBlocksObj).stream().map(Object::toString).collect(Collectors.toSet());
+                }
 
-                int safetyRadius = yamlFile.getInt("safetyRadius", 0);
+                int safetyRadius = safety.getNumber(SafetyKeys.safetyRadius,0).intValue();
+
                 safetyRadius = Math.max(safetyRadius,7);
 
                 //todo: waterlogged check
@@ -419,10 +422,11 @@ public class Region extends FactoryValue<RegionKeys> {
                 : new HashSet<>();
 
         int safetyRadius = safety.getNumber(SafetyKeys.safetyRadius,0).intValue();
-        safetyRadius = Math.max(safetyRadius,7);
+        safetyRadius = Math.min(safetyRadius,7);
 
-        long maxAttempts = performance.getNumber(PerformanceKeys.maxAttempts, 20).longValue();
-        maxAttempts = Math.max(maxAttempts,1);
+        long maxAttemptsBase = performance.getNumber(PerformanceKeys.maxAttempts, 20).longValue();
+        maxAttemptsBase = Math.max(maxAttemptsBase,1);
+        long maxAttempts = maxAttemptsBase;
         long maxBiomeChecks = maxBiomeChecksPerGen*maxAttempts;
         long biomeChecks = 0L;
 
@@ -572,11 +576,11 @@ public class Region extends FactoryValue<RegionKeys> {
             RTP.log(Level.WARNING,"[plugin] ["+name+"]     failed world border checks: "+worldBorderFails);
             RTP.log(Level.WARNING,"[plugin] ["+name+"]     chunk timeouts: "+timeoutFails);
             RTP.log(Level.WARNING,"[plugin] ["+name+"]     failed height checks: "+vertFails);
-            if(vertFails>maxAttempts/2) {
+            if(vertFails>maxAttemptsBase/2) {
                 RTP.log(Level.WARNING,"[plugin] ["+name+"] current vert values: "+vert);
             }
             RTP.log(Level.WARNING,"[plugin] ["+name+"]     failed safety checks: "+safetyFails);
-            if(safetyFails>maxAttempts/2) {
+            if(safetyFails>maxAttemptsBase/2) {
                 RTP.log(Level.WARNING,"[plugin] ["+name+"] current set of unsafe blocks: \n"+ Arrays.toString(unsafeBlocks.toArray()));
                 safetySpecificFails.forEach((key, value) -> RTP.log(Level.WARNING,
                         "[plugin] [" + name + "]     " + key + ": " + value));
@@ -585,6 +589,11 @@ public class Region extends FactoryValue<RegionKeys> {
 
             if(shape instanceof MemoryShape) {
                 RTP.log(Level.INFO,"[plugin] ["+name+"] range: " + ((MemoryShape<?>)shape).getRange());
+                for (int j = 0; j < selections.size(); j++) {
+                    Map.Entry<Long, Long> longLongEntry = selections.get(j);
+                    int[] xz = ((MemoryShape<?>) shape).locationToXZ(longLongEntry.getValue());
+                    selections.set(j, new AbstractMap.SimpleEntry<>((long)xz[0],(long)xz[1]));
+                }
             }
             RTP.log(Level.INFO,"[plugin] ["+name+"] selections: "+selections);
         }
@@ -662,7 +671,7 @@ public class Region extends FactoryValue<RegionKeys> {
         if(locAssChunks.containsKey(location)) {
             ChunkSet chunkSet = locAssChunks.get(location);
             if(chunkSet.chunks.size()>=sz) return chunkSet;
-            chunkSet.keep(false);
+//            chunkSet.keep(false);
         }
 
         int cx = location.x();

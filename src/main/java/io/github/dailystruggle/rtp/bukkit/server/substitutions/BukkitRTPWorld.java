@@ -105,6 +105,7 @@ public final class BukkitRTPWorld implements RTPWorld {
             if(Bukkit.isPrimaryThread()) setChunkForceLoaded(cx,cz,true);
             else Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),()->setChunkForceLoaded(cx,cz,true));
             chunkLongPair.setValue(chunkLongPair.getValue()+1);
+            chunkMap.put(xz,chunkLongPair);
         }
         else {
             CompletableFuture<RTPChunk> chunkAt = getChunkAt(cx, cz);
@@ -114,6 +115,7 @@ public final class BukkitRTPWorld implements RTPWorld {
                     if(Bukkit.isPrimaryThread()) setChunkForceLoaded(cx,cz,true);
                     else Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),()->setChunkForceLoaded(cx,cz,true));
                     chunkLongPair.setValue(chunkLongPair.getValue()+1);
+                    chunkMap.put(xz,chunkLongPair);
                 }
                 else if(rtpChunk instanceof BukkitRTPChunk) {
                     BukkitRTPChunk bukkitRTPChunk = ((BukkitRTPChunk) rtpChunk);
