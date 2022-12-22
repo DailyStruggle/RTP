@@ -131,7 +131,7 @@ public abstract class DatabaseAccessor<D> {
         if (mapOptional.isPresent()) {
             CompletableFuture<Optional<Map<TableObj, TableObj>>> future = mapOptional.get();
             if(!future.isDone()) {
-                future.whenComplete((tableKeyEntryMap, throwable) -> setValue(tableName,key,value));
+                future.thenAccept(tableKeyEntryMap -> setValue(tableName,key,value));
                 return;
             }
             Optional<Map<TableObj, TableObj>> now = future.getNow(Optional.empty());
@@ -167,7 +167,7 @@ public abstract class DatabaseAccessor<D> {
             if (mapOptional.isPresent()) {
                 CompletableFuture<Optional<Map<TableObj, TableObj>>> future = mapOptional.get();
                 if (!future.isDone()) {
-                    future.whenComplete((tableKeyEntryMap, throwable) -> setValue(tableName, key, value));
+                    future.thenAccept(tableKeyEntryMap -> setValue(tableName, key, value));
                     return;
                 }
                 Optional<Map<TableObj, TableObj>> now = future.getNow(Optional.empty());

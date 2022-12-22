@@ -57,13 +57,12 @@ public class ReloadCmd extends BaseRTPCmdImpl {
 
     @Override
     public boolean onCommand(UUID senderId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
-        RTP.stop();
-        RTP.serverAccessor.stop();
-
         if(nextCommand!=null) {
-            RTP.serverAccessor.start();
             return true;
         }
+
+        RTP.stop();
+        RTP.serverAccessor.stop();
 
         ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
         if(lang != null) {
@@ -76,7 +75,7 @@ public class ReloadCmd extends BaseRTPCmdImpl {
         if(!b) throw new IllegalStateException("reload failed");
 
         if(lang != null) {
-            String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloading,""));
+            String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloaded,""));
             if(msg!=null) msg = StringUtils.replace(msg,"[filename]", "configs");
             RTP.serverAccessor.sendMessage(senderId,msg);
         }

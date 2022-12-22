@@ -8,26 +8,32 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdj
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
+import java.util.logging.Level;
 
 public class VertParameter extends CommandParameter {
     public VertParameter(String permission, String description, BiFunction<UUID, String, Boolean> isRelevant) {
         super(permission,description, isRelevant);
         Factory<VerticalAdjustor<?>> factory = (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
-        factory.map.forEach((s, verticalAdjustor) -> put(verticalAdjustor.name, verticalAdjustor.getParameters()));
+        factory.map.forEach((s, verticalAdjustor) -> {
+            put(verticalAdjustor.name, verticalAdjustor.getParameters());
+        });
+
     }
 
     @Override
     public Set<String> values() {
         Factory<VerticalAdjustor<?>> factory = (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
         factory.map.forEach((s, verticalAdjustor) -> {
-            if(!subParamMap.containsKey(s.toUpperCase())) put(verticalAdjustor.name, verticalAdjustor.getParameters());
+            if(!subParamMap.containsKey(s.toLowerCase())) {
+                put(verticalAdjustor.name, verticalAdjustor.getParameters());
+            }
         });
         return RTP.factoryMap.get(RTP.factoryNames.vert).map.keySet();
     }
 
     @Override
     public Map<String, CommandParameter> subParams(String parameter) {
-        parameter = parameter.toUpperCase();
+        parameter = parameter.toLowerCase();
         Factory<?> factory = RTP.factoryMap.get(RTP.factoryNames.vert);
         Map<String, CommandParameter> map = subParamMap.get(parameter);
         if(map!=null) {
@@ -43,6 +49,8 @@ public class VertParameter extends CommandParameter {
     }
 
     public void put(String name, Map<String, CommandParameter> params) {
-        subParamMap.put(name.toUpperCase(),params);
+        Map<String,CommandParameter> lowercase = new ConcurrentHashMap<>();
+        params.forEach((s, parameter) -> lowercase.put(s.toLowerCase(),parameter));
+        subParamMap.put(name.toLowerCase(),lowercase);
     }
 }

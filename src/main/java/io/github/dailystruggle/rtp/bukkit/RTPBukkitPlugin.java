@@ -143,20 +143,8 @@ public final class RTPBukkitPlugin extends JavaPlugin {
 
     private void setupEffects() {
         RTP rtp = RTP.getInstance();
-        if(rtp == null) {
-            rtp.miscAsyncTasks.add(this::setupEffects);
-            return;
-        }
         Configs configs = RTP.configs;
-        if(configs == null) {
-            rtp.miscAsyncTasks.add(this::setupEffects);
-            return;
-        }
         FactoryValue<PerformanceKeys> parser = configs.getParser(PerformanceKeys.class);
-        if(parser == null) {
-            rtp.miscAsyncTasks.add(this::setupEffects);
-            return;
-        }
 
         SetupTeleport.preActions.add(task -> {
             PreSetupTeleportEvent event = new PreSetupTeleportEvent(task);

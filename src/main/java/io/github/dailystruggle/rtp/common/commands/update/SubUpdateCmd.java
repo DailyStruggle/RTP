@@ -17,6 +17,7 @@ import io.github.dailystruggle.rtp.common.commands.update.list.ListCmd;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
@@ -24,6 +25,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdj
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.simpleyaml.configuration.ConfigurationSection;
 import org.simpleyaml.configuration.MemorySection;
 import org.simpleyaml.configuration.file.YamlFile;
 
@@ -31,6 +33,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.logging.Level;
 
 public class SubUpdateCmd extends BaseRTPCmdImpl {
 
@@ -77,13 +80,96 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
 
             for(Map.Entry<String,List<String>> e : parameterValues.entrySet()) {
                 String key = e.getKey();
-                String value = e.getValue().get(0);
+                Object value = e.getValue().get(0);
 
                 if(key == null || value == null) continue;
+                if(!getParameterLookup().containsKey(key.toLowerCase())) continue;
 
                 //todo: shape and vert updates
-                //todo: update internal data accordingly. maybe auto reload after update?
+                if(key.equalsIgnoreCase("shape")) {
+                    Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+                    if(factory == null) continue;
+                    Shape<?> shape = (Shape<?>) factory.get(value.toString());
+                    if(shape == null) msgBadParameter(callerId, key, value.toString());
 
+                    EnumMap<?, Object> data = shape.getData();
+
+                    Map<String, Object> subParams = new HashMap<>();
+                    subParams.put("name", shape.name);
+                    for(Map.Entry<? extends Enum<?>,Object> entry : data.entrySet()) {
+                        subParams.put(entry.getKey().name(),entry.getValue());
+                    }
+
+                    YamlFile yamlFile = configParser.fileDatabase.cachedLookup.get().get(configParser.name);
+                    if(yamlFile!=null) {
+                        Object o = yamlFile.get(key);
+                        if(o instanceof ConfigurationSection) {
+                            ConfigurationSection section = (ConfigurationSection) o;
+                            Map<String, Object> mapValues = section.getMapValues(false);
+                            for(Map.Entry<String,Object> entry : mapValues.entrySet()) {
+                                if(subParams.containsKey(entry.getKey())) subParams.put(entry.getKey(),entry.getValue());
+                            }
+                        }
+                        else if(o instanceof Map) {
+                            Map<String, Object> mapValues = (Map<String, Object>) o;
+                            for(Map.Entry<String,Object> entry : mapValues.entrySet()) {
+                                if(subParams.containsKey(entry.getKey())) subParams.put(entry.getKey(),entry.getValue());
+                            }
+                        }
+                    }
+
+                    for(Map.Entry<? extends Enum<?>,Object> entry : data.entrySet()) {
+                        String name = entry.getKey().name();
+                        String lowerCase = name.toLowerCase();
+                        List<String> strings = parameterValues.get(lowerCase);
+                        if (strings!=null && strings.size()>0) {
+                            subParams.put(name,strings.get(0));
+                        }
+                    }
+                    value = subParams;
+                }
+                else if(key.equalsIgnoreCase("vert")) {
+                    Factory<VerticalAdjustor<?>> factory = (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
+                    if(factory == null) continue;
+                    VerticalAdjustor<?> vert = (VerticalAdjustor<?>) factory.get(value.toString());
+                    if(vert == null) msgBadParameter(callerId, key, value.toString());
+
+                    EnumMap<?, Object> vertData = vert.getData();
+
+                    Map<String, Object> subParams = new HashMap<>();
+                    subParams.put("name",vert.name);
+                    for(Map.Entry<? extends Enum<?>,Object> entry : vertData.entrySet()) {
+                        subParams.put(entry.getKey().name(),entry.getValue());
+                    }
+
+                    YamlFile yamlFile = configParser.fileDatabase.cachedLookup.get().get(configParser.name);
+                    if(yamlFile!=null) {
+                        Object o = yamlFile.get(key);
+                        if(o instanceof ConfigurationSection) {
+                            ConfigurationSection section = (ConfigurationSection) o;
+                            Map<String, Object> mapValues = section.getMapValues(false);
+                            for(Map.Entry<String,Object> entry : mapValues.entrySet()) {
+                                if(subParams.containsKey(entry.getKey())) subParams.put(entry.getKey(),entry.getValue());
+                            }
+                        }
+                        else if(o instanceof Map) {
+                            Map<String, Object> mapValues = (Map<String, Object>) o;
+                            for(Map.Entry<String,Object> entry : mapValues.entrySet()) {
+                                if(subParams.containsKey(entry.getKey())) subParams.put(entry.getKey(),entry.getValue());
+                            }
+                        }
+                    }
+
+                    for(Map.Entry<? extends Enum<?>,Object> entry : vertData.entrySet()) {
+                        String name = entry.getKey().name();
+                        String lowerCase = name.toLowerCase();
+                        List<String> strings = parameterValues.get(lowerCase);
+                        if (strings!=null && strings.size()>0) {
+                            subParams.put(name,strings.get(0));
+                        }
+                    }
+                    value = subParams;
+                }
 
                 configParser.set(key,value);
             }
@@ -110,7 +196,6 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
                 commandLookup.remove(target);
                 YamlFile yamlFile = configParser.fileDatabase.cachedLookup.get().get(configName);
                 if(yamlFile!=null) yamlFile.getConfigurationFile().deleteOnExit();
-
             }
 
             List<String> add = parameterValues.getOrDefault("add", new ArrayList<>());
@@ -121,12 +206,11 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
                 subUpdateCmd.addParameters();
                 addSubCommand(subUpdateCmd);
             }
+
         }
 
-        CommandsAPICommand reload;
-        reload = RTP.baseCommand.getCommandLookup().getOrDefault("reload", new ReloadCmd(RTP.baseCommand));
+        CommandsAPICommand reload = RTP.baseCommand.getCommandLookup().getOrDefault("reload", new ReloadCmd(RTP.baseCommand));
         reload.onCommand(callerId,new HashMap<>(),null);
-
         return true;
     }
 
@@ -180,8 +264,13 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
                 } else if (o instanceof Region) {
                     addParameter(s, new RegionParameter("rtp.update", "", (uuid, s1) -> true));
                 } else if (o instanceof MemorySection) {
-                    if(s.equalsIgnoreCase("shape")) addParameter(s, new ShapeParameter("rtp.update", "", (uuid, s1) -> true));
-                    else if(s.equalsIgnoreCase("vert")) addParameter(s, new VertParameter("rtp.update", "", (uuid, s1) -> true));
+                    if(s.equalsIgnoreCase("shape")) {
+                        addParameter(s, new ShapeParameter("rtp.update", "", (uuid, s1) -> true));
+                    }
+                    else if(s.equalsIgnoreCase("vert")) {
+                        VertParameter vertParameter = new VertParameter("rtp.update", "", (uuid, s1) -> true);
+                        addParameter(s, vertParameter);
+                    }
                 } else if (o instanceof List) {
                     Supplier<Set<String>> values = HashSet::new;
                     if(StringUtils.containsIgnoreCase(name,"block")) {
