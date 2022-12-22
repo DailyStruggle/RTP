@@ -82,7 +82,7 @@ public class FillTask extends RTPRunnable {
             CompletableFuture<Boolean> future = testPos(region, pos);
 
             long finalPos = pos;
-            future.whenComplete((aBoolean, throwable) -> {
+            future.thenAccept(aBoolean -> {
                 if(isCancelled()) return;
                 if(!aBoolean) shape.addBadLocation(finalPos);
                 try {
@@ -100,7 +100,7 @@ public class FillTask extends RTPRunnable {
         }
 
         long finalPos1 = pos;
-        done.whenComplete((aBoolean, throwable) -> {
+        done.thenAccept(aBoolean -> {
             if(isCancelled()) return;
 
             long completedChecks = finalPos1-start;
@@ -178,7 +178,7 @@ public class FillTask extends RTPRunnable {
         CompletableFuture<RTPChunk> cfChunk = world.getChunkAt(select[0], select[1]);
         chunks.add(cfChunk);
 
-        cfChunk.whenComplete((chunk, throwable) -> {
+        cfChunk.thenAccept(chunk -> {
             if(isCancelled()) return;
             RTPLocation location = vert.adjust(chunk);
             if(location == null) {

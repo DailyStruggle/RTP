@@ -177,7 +177,8 @@ public class Region extends FactoryValue<RegionKeys> {
             if(locationQueue.size()>=cacheCap) return;
             while(cachePipeline.size()+locationQueue.size()<cacheCap+playerQueue.size())
                 cachePipeline.add(new Cache());
-            cachePipeline.execute(availableTime - (System.nanoTime()-start));
+//            cachePipeline.execute(availableTime - (System.nanoTime()-start)); todo: too fast for server
+            cachePipeline.execute(0);
         } catch (InterruptedException e) {
             e.printStackTrace();
         } finally {
@@ -492,14 +493,10 @@ public class Region extends FactoryValue<RegionKeys> {
             RTPChunk chunk;
 
             try {
-                chunk = cfChunk.get(5000,TimeUnit.MILLISECONDS);
+                chunk = cfChunk.get();
             } catch (InterruptedException | ExecutionException e) {
                 e.printStackTrace();
                 return new AbstractMap.SimpleEntry<>(null,i);
-            } catch (TimeoutException e) {
-                cfChunk.cancel(false);
-                timeoutFails++;
-                continue;
             }
 
             location = vert.adjust(chunk);
@@ -690,7 +687,7 @@ public class Region extends FactoryValue<RegionKeys> {
                 if(shape instanceof MemoryShape<?>) {
                     long finalJ = j;
                     long finalI = i;
-                    cfChunk.whenComplete((chunk, throwable) -> {
+                    cfChunk.thenAccept(chunk -> {
                         RTPLocation rtpLocation = chunk.getBlockAt(7, (vert.minY() + vert.maxY()) / 2, 7).getLocation();
                         String currBiome = rtpWorld.getBiome(rtpLocation.x(),rtpLocation.y(),rtpLocation.z());
 

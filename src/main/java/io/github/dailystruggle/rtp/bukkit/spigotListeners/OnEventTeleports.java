@@ -187,7 +187,7 @@ public class OnEventTeleports implements Listener {
         }
 
         boolean finalVerbose = verbose;
-        future.whenComplete((location, throwable) -> {
+        future.thenAccept(location -> {
             if(finalVerbose) RTP.log(Level.INFO, "[plugin] teleporting player:"+player.getName()+" on respawn");
             SetupTeleport setupTeleport = new SetupTeleport(
                     new BukkitRTPCommandSender(Bukkit.getConsoleSender()),

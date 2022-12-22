@@ -1,6 +1,6 @@
 #how many rerolls before stopping
 # impact: high
-maxAttempts: 100
+maxAttempts: 10
 
 #what radius, in chunks, around the destination to pre-load
 # number of chunks loaded is (1 + 2*viewDistance)^2

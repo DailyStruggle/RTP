@@ -107,11 +107,6 @@ public class Configs {
         configParserMap.clear();
         multiConfigParserMap.clear();
         reloadAction();
-        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-        if(lang == null) return false;
-        String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloaded,""));
-        if(msg!=null) msg = StringUtils.replace(msg,"[filename]", "configs");
-        RTP.serverAccessor.sendMessage(CommandsAPI.serverId,msg);
         return true;
     }
 

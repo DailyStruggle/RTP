@@ -88,7 +88,7 @@ public final class BukkitRTPWorld implements RTPWorld {
             list.add(chunkAtAsync);
             chunkLoads.put(xz,list);
 
-            chunkAtAsync.whenComplete((chunk, throwable) -> {
+            chunkAtAsync.thenAccept(chunk -> {
                 res.complete(new BukkitRTPChunk(chunk));
                 chunkLoads.remove(xz);
                 if(!RTPBukkitPlugin.getInstance().isEnabled()) throw new IllegalStateException("completed chunk after plugin disabled");
@@ -108,7 +108,7 @@ public final class BukkitRTPWorld implements RTPWorld {
         }
         else {
             CompletableFuture<RTPChunk> chunkAt = getChunkAt(cx, cz);
-            chunkAt.whenComplete((rtpChunk, throwable) -> {
+            chunkAt.thenAccept(rtpChunk -> {
                 if(chunkMap.containsKey(xz)) {
                     Map.Entry<Chunk, Long> chunkLongPair = chunkMap.get(xz);
                     if(Bukkit.isPrimaryThread()) setChunkForceLoaded(cx,cz,true);

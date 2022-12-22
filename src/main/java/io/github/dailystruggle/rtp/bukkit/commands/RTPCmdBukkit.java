@@ -114,11 +114,6 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
     }
 
     @Override
-    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        return onCommand(new BukkitRTPCommandSender(sender), this, label, args);
-    }
-
-    @Override
     public void successEvent(RTPCommandSender sender, RTPPlayer player) {
         TeleportCommandSuccessEvent event = new TeleportCommandSuccessEvent(sender, player);
         Bukkit.getPluginManager().callEvent(event);

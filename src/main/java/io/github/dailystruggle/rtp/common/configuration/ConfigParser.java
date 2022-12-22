@@ -291,20 +291,24 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     public void set(String key, Object value) {
         String translate = reverse_language_mapping.get(key);
         if(translate!=null) key = translate;
-
         E k = enumLookup.get(key.toLowerCase());
-        if(k == null) return;
+        if(k == null) throw new IllegalArgumentException("invalid key - " + key);
 
         set(k,value);
     }
 
-    private static void setSection(ConfigurationSection section, Map<String,Object> map) {
+    private static void setSection(ConfigurationSection section, Map<?,?> map) {
         Map<String, Object> mapValues = section.getMapValues(false);
+        Map<?,?> inputClone = new HashMap<>(map);
 
-        for(Map.Entry<String,Object> e : mapValues.entrySet()) {
+        for(Map.Entry<?,?> e : mapValues.entrySet()) {
+            String key = e.getKey().toString();
             Object o = e.getValue();
-            if(!map.containsKey(e.getKey())) continue;
-            Object value = map.get(e.getKey());
+            if(!map.containsKey(key)) {
+                section.remove(key);
+                continue;
+            }
+            Object value = map.get(key);
             if(o instanceof ConfigurationSection) {
                 if(value instanceof FactoryValue<?>) {
                     EnumMap<?, Object> data = ((FactoryValue<?>) value).getData();
@@ -317,13 +321,29 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
                 }
                 else throw new IllegalArgumentException();
             }
-            else section.set(e.getKey(),o);
+            else section.set(key,value);
+            inputClone.remove(key);
+        }
+
+        for(Map.Entry<?,?> e : inputClone.entrySet()) {
+            String key = e.getKey().toString();
+            Object o = e.getValue();
+            if(o instanceof Map) {
+                section.createSection(key,(Map<?,?>) o);
+            }
+            else if(o instanceof FactoryValue) {
+                EnumMap<?, Object> data = ((FactoryValue<?>) o).getData();
+                Map<String,Object> subMap = new HashMap<>();
+                for(Map.Entry<? extends Enum<?>,?> d : data.entrySet()) subMap.put(d.getKey().name(),d.getValue());
+                section.createSection(key,subMap);
+            }
+            else section.set(key,o);
         }
     }
 
     public void save() throws IOException {
-        YamlFile yamlFile = cachedLookup.get().get(name);
-        yamlFile.save(new File(pluginDirectory.getAbsolutePath()+File.separator+name));
+
+        cachedLookup.get().get(name).save();
     }
 
     @Override

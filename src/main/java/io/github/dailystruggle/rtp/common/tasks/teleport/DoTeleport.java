@@ -72,7 +72,7 @@ public final class DoTeleport extends RTPRunnable {
         RTP.getInstance().processingPlayers.remove(player.uuid());
 
         TeleportData finalTeleportData = teleportData;
-        setLocation.whenComplete((aBoolean, throwable) -> {
+        setLocation.thenAccept(aBoolean -> {
             ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
             boolean verbose = true;
             if(logging!=null) {
