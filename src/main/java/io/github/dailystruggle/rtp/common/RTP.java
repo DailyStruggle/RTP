@@ -26,7 +26,7 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.FillTask;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
-import org.bukkit.Bukkit;
+import org.jetbrains.annotations.NotNull;
 import org.simpleyaml.configuration.ConfigurationSection;
 import org.simpleyaml.configuration.file.YamlFile;
 
@@ -94,16 +94,15 @@ public class RTP {
 
         File databaseDirectory = serverAccessor.getPluginDirectory();
         databaseDirectory = new File(databaseDirectory.getAbsolutePath() + File.separator + "database");
-        boolean mkdirs = databaseDirectory.mkdirs();
         databaseAccessor = new YamlFileDatabase(databaseDirectory); //todo: sqlite
 
         Map<String, YamlFile> connect = databaseAccessor.connect();
-        Optional<DatabaseAccessor.TableObj> read = databaseAccessor.read(connect, "teleportData", new DatabaseAccessor.TableObj("referenceTime"));
+        @NotNull Optional<Map<String, Object>> read = databaseAccessor.read(connect, "teleportData", new AbstractMap.SimpleEntry<>("referenceTime",0L));
         if(read.isPresent()) {
             YamlFile yamlFile = connect.get("teleportData.yml");
 
             try {
-                long referenceTime = Long.parseLong(read.get().object.toString());
+                long referenceTime = Long.parseLong(read.get().get("referenceTime").toString());
                 Map<String, Object> mapValues = yamlFile.getMapValues(false);
                 for(Map.Entry<String,Object> entry : mapValues.entrySet()) {
                     String key = entry.getKey();
