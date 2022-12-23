@@ -56,7 +56,7 @@ public class ListCmd extends BaseRTPCmdImpl {
 
         ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
         String msg = String.valueOf(lang.getConfigValue(MessagesKeys.updating,""));
-        if(msg!=null) msg = StringUtils.replaceIgnoreCase(msg,"[filename]", name);
+        if(msg!=null) msg = msg.replace("[filename]", name);
         RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId,msg);
 
         List<String> stringList = file.getStringList(key);
@@ -80,7 +80,7 @@ public class ListCmd extends BaseRTPCmdImpl {
         }
 
         msg = String.valueOf(lang.getConfigValue(MessagesKeys.updated,""));
-        if(msg!=null) msg = StringUtils.replaceIgnoreCase(msg,"[filename]", name);
+        if(msg!=null) msg = msg.replace("[filename]", name);
         RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId,msg);
 
         return true;

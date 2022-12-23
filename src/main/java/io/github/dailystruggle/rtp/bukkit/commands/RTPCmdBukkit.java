@@ -32,9 +32,11 @@ import org.bukkit.plugin.Plugin;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
 import java.util.function.Predicate;
+import java.util.logging.Level;
 
 public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
     //for optimizing parameters,
@@ -106,6 +108,11 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
         addSubCommand(new UpdateCmd(this));
         addSubCommand(new FillCmd(this));
         addSubCommand(new InfoCmd(this));
+    }
+
+    @Override
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        return onCommand(new BukkitRTPCommandSender(sender), this, label, args);
     }
 
     @Override

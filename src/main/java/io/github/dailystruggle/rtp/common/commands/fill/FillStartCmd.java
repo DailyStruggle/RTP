@@ -45,7 +45,7 @@ public class FillStartCmd extends FillSubCmd {
                 if(parser == null) continue;
                 String msg = String.valueOf(parser.getConfigValue(MessagesKeys.fillRunning,""));
                 if(msg == null || msg.isEmpty()) continue;
-                msg = StringUtils.replaceIgnoreCase(msg, "[region]", region.name);
+                msg = msg.replace("[region]", region.name);
                 RTP.serverAccessor.announce(msg,"rtp.fill");
                 continue;
             }
@@ -59,7 +59,7 @@ public class FillStartCmd extends FillSubCmd {
                 if(parser == null) continue;
                 String msg = String.valueOf(parser.getConfigValue(MessagesKeys.badArg,""));
                 if(msg == null || msg.isEmpty()) continue;
-                msg = StringUtils.replaceIgnoreCase(msg, "[arg]", "region:"+region.name);
+                msg = msg.replace("[arg]", "region:"+region.name);
                 RTP.serverAccessor.sendMessage(callerId,msg);
                 continue;
             }
@@ -72,7 +72,7 @@ public class FillStartCmd extends FillSubCmd {
             if(parser == null) continue;
             String msg = String.valueOf(parser.getConfigValue(MessagesKeys.fillStart,""));
             if(msg == null || msg.isEmpty()) continue;
-            msg = StringUtils.replaceIgnoreCase(msg, "[region]", region.name);
+            msg = msg.replace("[region]", region.name);
             RTP.serverAccessor.announce(msg,"rtp.fill");
         }
 

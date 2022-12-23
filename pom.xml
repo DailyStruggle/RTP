@@ -264,7 +264,7 @@
         <dependency>
             <groupId>org.spigotmc</groupId>
             <artifactId>spigot-api</artifactId>
-            <version>1.19.2-R0.1-SNAPSHOT</version>
+            <version>1.16.5-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
             <exclusions>
                 <exclusion>
@@ -312,13 +312,13 @@
         <dependency>
             <groupId>io.github.dailystruggle</groupId>
             <artifactId>CommandsAPI</artifactId>
-            <version>1.0-ALPHA72</version>
+            <version>1.0-ALPHA75</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>io.github.dailystruggle</groupId>
             <artifactId>EffectsAPI</artifactId>
-            <version>1.0-ALPHA23</version>
+            <version>1.0-ALPHA32</version>
             <scope>compile</scope>
         </dependency>
         <dependency>

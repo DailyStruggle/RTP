@@ -75,7 +75,7 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
             ConfigParser<?> configParser = (ConfigParser<?>) factoryValue;
             ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
             String msg = String.valueOf(lang.getConfigValue(MessagesKeys.updating,""));
-            if(msg!=null) msg = StringUtils.replaceIgnoreCase(msg,"[filename]", factoryValue.name);
+            if(msg!=null) msg = msg.replace("[filename]", factoryValue.name);
             RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId,msg);
 
             for(Map.Entry<String,List<String>> e : parameterValues.entrySet()) {
@@ -181,7 +181,7 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
             }
 
             msg = String.valueOf(lang.getConfigValue(MessagesKeys.updated,""));
-            if(msg!=null) msg = StringUtils.replaceIgnoreCase(msg,"[filename]", configParser.name);
+            if(msg!=null) msg = msg.replace("[filename]", configParser.name);
             RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId,msg);
         }
         else if(factoryValue instanceof MultiConfigParser) {
