@@ -152,7 +152,7 @@ public class Configs {
 
         for(ConfigParser<RegionKeys> regionConfig : regions.configParserFactory.map.values()) {
             EnumMap<RegionKeys, Object> data = regionConfig.getData();
-            String name = StringUtils.replaceIgnoreCase(regionConfig.name, ".yml","");
+            String name = regionConfig.name.replace(".yml","");
             if(detailed_region_init) {
                 data.forEach((regionKeys, o1) -> {
                     StringBuilder builder = new StringBuilder("[RTP] [" + name + "] " + regionKeys.name() + ": ");
@@ -167,7 +167,7 @@ public class Configs {
                     }
                 });
             }
-            Region region = new Region(StringUtils.replaceIgnoreCase(regionConfig.name,".yml",""), data);
+            Region region = new Region(regionConfig.name.replace(".yml",""), data);
             RTP.getInstance().selectionAPI.permRegionLookup.put(region.name,region);
             if(detailed_region_init) {
                 RTP.log(Level.INFO, "[RTP] [" + name + "] successfully created teleport region - " + region.name);

@@ -30,11 +30,12 @@ public interface RTPCmd extends BaseRTPCmd {
 
     //synchronous command component
     default boolean onCommand(RTPCommandSender sender, CommandsAPICommand command, String label, String[] args) {
+        UUID senderId = sender.uuid();
         for(String arg : args) {
-            if(!arg.contains(String.valueOf(CommandsAPI.parameterDelimiter))) return true;
+            if(!arg.contains(String.valueOf(CommandsAPI.parameterDelimiter)))
+                return onCommand(senderId,sender::hasPermission,sender::sendMessage,args);
         }
 
-        UUID senderId = sender.uuid();
         if(RTP.getInstance().processingPlayers.contains(senderId)) {
             RTP.serverAccessor.sendMessage(senderId, MessagesKeys.alreadyTeleporting);
             return true;
@@ -60,9 +61,6 @@ public interface RTPCmd extends BaseRTPCmd {
             long dt = System.currentTimeMillis() - senderData.time;
 
             if (dt < 0) dt = Long.MAX_VALUE + dt;
-
-            RTP.log(Level.WARNING,"dt = " + TimeUnit.MILLISECONDS.toSeconds(dt));
-            RTP.log(Level.WARNING,"cooldown = " + TimeUnit.MILLISECONDS.toSeconds(sender.cooldown()));
 
             if (dt < sender.cooldown()) {
                 RTP.serverAccessor.sendMessage(senderId, MessagesKeys.cooldownMessage);
@@ -99,9 +97,9 @@ public interface RTPCmd extends BaseRTPCmd {
             RTP.log(Level.INFO, "[plugin] RTP command triggered by " + sender.name() + ".");
         }
 
-        ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) rtp.configs.getParser(MessagesKeys.class);
-        ConfigParser<EconomyKeys> eco = (ConfigParser<EconomyKeys>) rtp.configs.getParser(EconomyKeys.class);
-        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) rtp.configs.getParser(PerformanceKeys.class);
+        ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+        ConfigParser<EconomyKeys> eco = (ConfigParser<EconomyKeys>) RTP.configs.getParser(EconomyKeys.class);
+        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
         boolean syncLoading = false;
         Object configValue = perf.getConfigValue(PerformanceKeys.syncLoading, false);
         if(configValue instanceof String) {
@@ -157,7 +155,7 @@ public interface RTPCmd extends BaseRTPCmd {
             floor = eco.getNumber(EconomyKeys.balanceFloor, 0.0).doubleValue();
             if(bal-price<floor) {
                 String s = langParser.getConfigValue(MessagesKeys.notEnoughMoney, "").toString();
-                s = StringUtils.replaceIgnoreCase(s,"[money]", String.valueOf(price));
+                s = s.replace("[money]", String.valueOf(price));
                 RTP.serverAccessor.sendMessage(senderId,s);
                 rtp.processingPlayers.remove(senderId);
                 return true;
@@ -207,7 +205,7 @@ public interface RTPCmd extends BaseRTPCmd {
                     worldName = player.getLocation().world().name();
                 }
 
-                ConfigParser<WorldKeys> worldParser = rtp.configs.getWorldParser(worldName);
+                ConfigParser<WorldKeys> worldParser = RTP.configs.getWorldParser(worldName);
 
                 if(worldParser == null) {
                     //todo: message world not exist
@@ -253,7 +251,7 @@ public interface RTPCmd extends BaseRTPCmd {
 
                 if(economy.bal(senderId)-data.cost<floor) {
                     String s = langParser.getConfigValue(MessagesKeys.notEnoughMoney, "").toString();
-                    s = StringUtils.replaceIgnoreCase(s,"[money]", String.valueOf(price));
+                    s = s.replace("[money]", String.valueOf(price));
                     RTP.serverAccessor.sendMessage(senderId,s);
                     rtp.processingPlayers.remove(senderId);
                     return true;
@@ -262,7 +260,7 @@ public interface RTPCmd extends BaseRTPCmd {
                 boolean take = economy.take(senderId, data.cost);
                 if (!take) {
                     String s = langParser.getConfigValue(MessagesKeys.notEnoughMoney, "").toString();
-                    s = StringUtils.replaceIgnoreCase(s,"[money]", String.valueOf(price));
+                    s = s.replace("[money]", String.valueOf(price));
                     RTP.serverAccessor.sendMessage(senderId,s);
                     rtp.processingPlayers.remove(senderId);
                     return true;

@@ -105,7 +105,7 @@ public class MultiConfigParser<E extends Enum<E>>  extends FactoryValue<E> imple
     @NotNull
     public Set<String> listParsers() {
         return configParserFactory.map.values().stream()
-                .map(eConfigParser -> StringUtils.replaceIgnoreCase(eConfigParser.name,".yml",""))
+                .map(eConfigParser -> eConfigParser.name.replace(".yml",""))
                 .collect(Collectors.toSet());
     }
 

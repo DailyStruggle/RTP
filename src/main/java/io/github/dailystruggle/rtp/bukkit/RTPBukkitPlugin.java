@@ -89,7 +89,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
 
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,RTP.serverAccessor::start);
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupBukkitEvents);
-        Bukkit.getScheduler().runTaskAsynchronously(this,this::setupEffects);
+        if(RTP.serverAccessor.getServerIntVersion()>12) Bukkit.getScheduler().runTaskAsynchronously(this,this::setupEffects);
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupIntegrations);
 
         Bukkit.getScheduler().runTaskTimer(this, new TPS(),0,1);
@@ -138,7 +138,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new OnPlayerTeleport(), this);
         if(RTP.serverAccessor.getServerIntVersion()<13) Bukkit.getPluginManager().registerEvents(new OnChunkUnload(), this);
 
-        EffectsAPI.init(this);
+        if(RTP.serverAccessor.getServerIntVersion()>12) EffectsAPI.init(this);
     }
 
     private void setupEffects() {

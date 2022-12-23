@@ -44,7 +44,7 @@ public class FillCancelCmd extends FillSubCmd {
                 if(parser == null) continue;
                 String msg = String.valueOf(parser.getConfigValue(MessagesKeys.fillNotRunning,""));
                 if(msg == null || msg.isEmpty()) continue;
-                msg = StringUtils.replaceIgnoreCase(msg, "[region]", region.name);
+                msg = msg.replace("[region]", region.name);
                 RTP.serverAccessor.announce(msg,"rtp.fill");
                 continue;
             }
@@ -56,7 +56,7 @@ public class FillCancelCmd extends FillSubCmd {
             if(parser == null) continue;
             String msg = String.valueOf(parser.getConfigValue(MessagesKeys.fillCancel,""));
             if(msg == null || msg.isEmpty()) continue;
-            msg = StringUtils.replaceIgnoreCase(msg, "[region]", region.name);
+            msg = msg.replace("[region]", region.name);
             RTP.serverAccessor.announce(msg,"rtp.fill");
         }
 

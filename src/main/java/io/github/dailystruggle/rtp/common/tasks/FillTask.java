@@ -126,11 +126,11 @@ public class FillTask extends RTPRunnable {
                 if (minutes > 0) replacement += minutes + langParser.getConfigValue(MessagesKeys.minutes, "").toString() + " ";
                 if (seconds > 0) replacement += seconds + langParser.getConfigValue(MessagesKeys.seconds, "").toString();
 
-                msg = StringUtils.replaceIgnoreCase(msg, "[chunks]", String.valueOf(finalPos1));
-                msg = StringUtils.replaceIgnoreCase(msg, "[totalChunks]", String.valueOf(range));
-                msg = StringUtils.replaceIgnoreCase(msg, "[cps]", String.valueOf(cps.get()));
-                msg = StringUtils.replaceIgnoreCase(msg, "[eta]", replacement);
-                msg = StringUtils.replaceIgnoreCase(msg, "[region]", region.name);
+                msg = msg.replace("[chunks]", String.valueOf(finalPos1));
+                msg = msg.replace("[totalChunks]", String.valueOf(range));
+                msg = msg.replace("[cps]", String.valueOf(cps.get()));
+                msg = msg.replace("[eta]", replacement);
+                msg = msg.replace("[region]", region.name);
 
                 RTP.serverAccessor.announce(msg,"rtp.fill");
             }
