@@ -19,6 +19,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
 public interface RTPCmd extends BaseRTPCmd {
@@ -59,6 +60,9 @@ public interface RTPCmd extends BaseRTPCmd {
             long dt = System.currentTimeMillis() - senderData.time;
 
             if (dt < 0) dt = Long.MAX_VALUE + dt;
+
+            RTP.log(Level.WARNING,"dt = " + TimeUnit.MILLISECONDS.toSeconds(dt));
+            RTP.log(Level.WARNING,"cooldown = " + TimeUnit.MILLISECONDS.toSeconds(sender.cooldown()));
 
             if (dt < sender.cooldown()) {
                 RTP.serverAccessor.sendMessage(senderId, MessagesKeys.cooldownMessage);

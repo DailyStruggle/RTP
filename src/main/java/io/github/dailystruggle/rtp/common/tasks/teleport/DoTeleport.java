@@ -55,11 +55,11 @@ public final class DoTeleport extends RTPRunnable {
             teleportData.time = System.currentTimeMillis();
             teleportData.nextTask = this;
             teleportData.delay = sender.delay();
-            RTP.getInstance().latestTeleportData.put(player.uuid(),teleportData);
         }
         teleportData.targetRegion = region;
         teleportData.selectedLocation = location;
         teleportData.completed = true;
+        RTP.getInstance().latestTeleportData.put(player.uuid(),teleportData);
 
         Map<String,Object> dataMap = DatabaseAccessor.toColumns(teleportData);
         dataMap.put("playerName",player.name());
@@ -96,6 +96,11 @@ public final class DoTeleport extends RTPRunnable {
                     long hours = TimeUnit.MILLISECONDS.toHours(time)%24;
                     long minutes = TimeUnit.MILLISECONDS.toMinutes(time)%60;
                     long seconds = TimeUnit.MILLISECONDS.toSeconds(time)%60;
+                    long millis = time % 1000;
+                    if(millis>500 && seconds>0) {
+                        seconds++;
+                        millis = 0;
+                    }
 
                     String replacement = "";
                     if(days>0) replacement += days + langParser.getConfigValue(MessagesKeys.days,"").toString() + " ";
@@ -103,7 +108,6 @@ public final class DoTeleport extends RTPRunnable {
                     if(minutes>0) replacement += minutes + langParser.getConfigValue(MessagesKeys.minutes,"").toString() + " ";
                     if(seconds>0) replacement += seconds + langParser.getConfigValue(MessagesKeys.seconds,"").toString();
                     if(seconds<2) {
-                        double millis = time%1000;
                         replacement += millis + langParser.getConfigValue(MessagesKeys.millis,"").toString();
                     }
                     RTP.log(Level.INFO, "[plugin] completed teleport for player:"+player.name() + " in " + replacement);

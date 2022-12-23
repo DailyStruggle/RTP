@@ -2,11 +2,12 @@ import commonTestImpl.TestRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.simpleyaml.configuration.file.YamlFile;
 
-import java.io.File;
+import java.util.AbstractMap;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -37,10 +38,12 @@ public class YamlDatabaseTest {
         testMap.put(key,new DatabaseAccessor.TableObj(2));
         database.write(connect,"config.yml",testMap);
 
-        Optional<DatabaseAccessor.TableObj> read = database.read(connect, "config.yml", key);
+        @NotNull Optional<Map<String, Object>> read = database.read(connect,
+                "config.yml",
+                new AbstractMap.SimpleEntry<>(key.object.toString(),5));
         Assertions.assertNotNull(read);
         Assertions.assertTrue(read.isPresent());
-        Assertions.assertEquals(2L,read.get().object);
+        Assertions.assertEquals(2L,read.get().get("teleportDelay"));
 
         testMap.put(key,new DatabaseAccessor.TableObj(5));
         database.write(connect,"config.yml",testMap);
@@ -48,10 +51,12 @@ public class YamlDatabaseTest {
         database.disconnect(connect);
 
         connect = database.connect();
-        read = database.read(connect, "config.yml", key);
+        read = database.read(connect,
+                "config.yml",
+                new AbstractMap.SimpleEntry<>(key.object.toString(),2));
         Assertions.assertNotNull(read);
         Assertions.assertTrue(read.isPresent());
-        Assertions.assertTrue(read.get().equals(5));
+        Assertions.assertEquals(5,read.get().get("teleportDelay"));
         database.disconnect(connect);
     }
 }

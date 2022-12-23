@@ -96,7 +96,7 @@ public class Configs {
         Objects.requireNonNull(multiConfigParser);
 
         if(!multiConfigParser.configParserFactory.contains(worldName)) {
-            multiConfigParser.addParser(new ConfigParser<>(WorldKeys.class, worldName,"1.0", multiConfigParser.myDirectory, worldLangMap, fileDatabase));
+            multiConfigParser.addParser(new ConfigParser<>(WorldKeys.class, worldName,"1.0", multiConfigParser.myDirectory, worldLangMap, multiConfigParser.fileDatabase));
         }
 
         return multiConfigParser.getParser(worldName);

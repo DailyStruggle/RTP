@@ -126,14 +126,21 @@ public class SendMessage {
                 long hours = TimeUnit.MILLISECONDS.toHours(remainingTime)%24;
                 long minutes = TimeUnit.MILLISECONDS.toMinutes(remainingTime)%60;
                 long seconds = TimeUnit.MILLISECONDS.toSeconds(remainingTime)%60;
+                long millis = remainingTime % 1000;
+                if(millis>500 && seconds>0) {
+                    seconds++;
+                    millis = 0;
+                }
 
                 String replacement = "";
                 if(days>0) replacement += days + langParser.getConfigValue(MessagesKeys.days,"").toString() + " ";
                 if(hours>0) replacement += hours + langParser.getConfigValue(MessagesKeys.hours,"").toString() + " ";
                 if(minutes>0) replacement += minutes + langParser.getConfigValue(MessagesKeys.minutes,"").toString() + " ";
-                if(seconds>0) replacement += seconds + langParser.getConfigValue(MessagesKeys.seconds,"").toString();
+                if(seconds>0) {
+
+                    replacement += seconds + langParser.getConfigValue(MessagesKeys.seconds,"").toString();
+                }
                 if(seconds<2) {
-                    long millis = remainingTime % 1000;
                     replacement += millis + langParser.getConfigValue(MessagesKeys.millis,"").toString();
                 }
                 return replacement;
@@ -173,6 +180,11 @@ public class SendMessage {
             long hours = TimeUnit.MILLISECONDS.toHours(time)%24;
             long minutes = TimeUnit.MILLISECONDS.toMinutes(time)%60;
             long seconds = TimeUnit.MILLISECONDS.toSeconds(time)%60;
+            long millis = time % 1000;
+            if(millis>500 && seconds>0) {
+                seconds++;
+                millis = 0;
+            }
 
             String replacement = "";
             if(days>0) replacement += days + langParser.getConfigValue(MessagesKeys.days,"").toString() + " ";
@@ -180,9 +192,8 @@ public class SendMessage {
             if(minutes>0) replacement += minutes + langParser.getConfigValue(MessagesKeys.minutes,"").toString() + " ";
             if(seconds>0) replacement += seconds + langParser.getConfigValue(MessagesKeys.seconds,"").toString();
             if(seconds<2) {
-                double millis = time%1000;
                 replacement += millis + langParser.getConfigValue(MessagesKeys.millis,"").toString();
-                }
+            }
             return replacement;
         });
         placeholders.put("spot",uuid -> {

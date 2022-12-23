@@ -13,7 +13,6 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Level;
 
 /**
  * a "database" that's just reading and writing yaml files,
@@ -89,17 +88,19 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String,YamlFile>> {
     }
 
     @Override
-    public @NotNull Optional<TableObj> read(Map<String, YamlFile> database, String tableName, TableObj key) {
+    public @NotNull Optional<Map<String, Object>> read(Map<String, YamlFile> database, String tableName, Map.Entry<String,Object> lookup) {
         if(!(database instanceof Map)) throw new IllegalStateException();
 
         if(!StringUtils.endsWithIgnoreCase(tableName,".yml")) tableName = tableName + ".yml";
 
         YamlFile file = database.get(tableName);
         if(file == null || !file.exists()) return Optional.empty();
-        String s = key.object.toString();
-        Object res = file.get(s);
-        if(res == null) return Optional.empty();
-        return Optional.of(new TableObj(res));
+        String s = lookup.getKey();
+        Object o = file.get(s,lookup.getValue());
+        if(o == null) return Optional.empty();
+        Map<String,Object> res = new HashMap<>();
+        res.put(s,o);
+        return Optional.of(res);
     }
 
     @Override

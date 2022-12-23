@@ -9,7 +9,6 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.logging.Level;
 
 /**
  *
@@ -80,7 +79,7 @@ public abstract class DatabaseAccessor<D> {
     protected long avgTimeRead = 0;
     protected long avgTimeWrite = 0;
     protected boolean stop = false;
-    protected ConcurrentLinkedQueue<Map.Entry<String,Map.Entry<TableObj,CompletableFuture<Optional<TableObj>>>>> readQueue = new ConcurrentLinkedQueue<>();
+    protected ConcurrentLinkedQueue<Map.Entry<String,Map.Entry<Map.Entry<TableObj,TableObj>,CompletableFuture<Optional<Map<String, Object>>>>>> readQueue = new ConcurrentLinkedQueue<>();
     protected ConcurrentLinkedQueue<Map.Entry<String,Map<TableObj,TableObj>>> writeQueue = new ConcurrentLinkedQueue<>();
 
     /**
@@ -94,11 +93,11 @@ public abstract class DatabaseAccessor<D> {
     }
 
     @NotNull
-    protected Optional<CompletableFuture<Optional<Map<TableObj,TableObj>>>> getTable(String tableName) {
-        if (!localTables.containsKey(tableName)) return Optional.empty();
+    protected CompletableFuture<Optional<Map<TableObj,TableObj>>> getTable(String tableName) {
+        if (!localTables.containsKey(tableName)) return CompletableFuture.completedFuture(Optional.empty());
         Map<TableObj,TableObj> table = localTables.get(tableName);
-        if(table == null) return Optional.empty();
-        return Optional.of(CompletableFuture.completedFuture(Optional.of(table)));
+        if(table == null) return CompletableFuture.completedFuture(Optional.empty());
+        return CompletableFuture.completedFuture(Optional.of(table));
     }
 
     @NotNull
@@ -124,27 +123,21 @@ public abstract class DatabaseAccessor<D> {
     }
 
     public void setValue(String tableName, Object key, Object value) {
-        Optional<CompletableFuture<Optional<Map<TableObj, TableObj>>>> mapOptional = getTable(tableName);
+        @NotNull CompletableFuture<Optional<Map<TableObj, TableObj>>> future = getTable(tableName);
 
         TableObj tableKey = new TableObj(key);
         Map<TableObj,TableObj> table;
-        if (mapOptional.isPresent()) {
-            CompletableFuture<Optional<Map<TableObj, TableObj>>> future = mapOptional.get();
-            if(!future.isDone()) {
-                future.thenAccept(tableKeyEntryMap -> setValue(tableName,key,value));
-                return;
-            }
-            Optional<Map<TableObj, TableObj>> now = future.getNow(Optional.empty());
-            if(!now.isPresent()) {
-                table = new ConcurrentHashMap<>();
-                localTables.put(tableName, table);
-            }
-            else {
-                table = now.get();
-            }
-        } else {
+        if(!future.isDone()) {
+            future.thenAccept(tableKeyEntryMap -> setValue(tableName,key,value));
+            return;
+        }
+        Optional<Map<TableObj, TableObj>> now = future.getNow(Optional.empty());
+        if(!now.isPresent()) {
             table = new ConcurrentHashMap<>();
             localTables.put(tableName, table);
+        }
+        else {
+            table = now.get();
         }
 
         TableObj tableValue = new TableObj(value);
@@ -155,7 +148,7 @@ public abstract class DatabaseAccessor<D> {
     }
 
     public void setValue(String tableName, Map<?,?> keyValuePairs) {
-        Optional<CompletableFuture<Optional<Map<TableObj, TableObj>>>> mapOptional = getTable(tableName);
+        @NotNull CompletableFuture<Optional<Map<TableObj, TableObj>>> future = getTable(tableName);
 
         Map<TableObj,TableObj> pairs = new HashMap<>();
         for(Map.Entry<?,?> entry : keyValuePairs.entrySet()) {
@@ -164,22 +157,17 @@ public abstract class DatabaseAccessor<D> {
 
             TableObj tableKey = new TableObj(key);
             Map<TableObj, TableObj> table;
-            if (mapOptional.isPresent()) {
-                CompletableFuture<Optional<Map<TableObj, TableObj>>> future = mapOptional.get();
-                if (!future.isDone()) {
-                    future.thenAccept(tableKeyEntryMap -> setValue(tableName, key, value));
-                    return;
-                }
-                Optional<Map<TableObj, TableObj>> now = future.getNow(Optional.empty());
-                if (!now.isPresent()) {
-                    table = new ConcurrentHashMap<>();
-                    localTables.put(tableName, table);
-                } else {
-                    table = now.get();
-                }
-            } else {
+
+            if (!future.isDone()) {
+                future.thenAccept(tableKeyEntryMap -> setValue(tableName, key, value));
+                return;
+            }
+            Optional<Map<TableObj, TableObj>> now = future.getNow(Optional.empty());
+            if (!now.isPresent()) {
                 table = new ConcurrentHashMap<>();
                 localTables.put(tableName, table);
+            } else {
+                table = now.get();
             }
 
             TableObj tableValue = new TableObj(value);
@@ -216,13 +204,12 @@ public abstract class DatabaseAccessor<D> {
 
         while (readQueue.size()>0) {
             if(stop) return;
-            Map.Entry<String, Map.Entry<TableObj, CompletableFuture<Optional<TableObj>>>> readRequest = readQueue.poll();
+            Map.Entry<String, Map.Entry<Map.Entry<TableObj, TableObj>, CompletableFuture<Optional<Map<String, Object>>>>> readRequest = readQueue.poll();
             if(readRequest == null) throw new IllegalStateException("null database read request");
 
             long localStart = System.nanoTime();
-            readRequest.getValue().getValue().complete(
-                    read(database,readRequest.getKey(),readRequest.getValue().getKey())
-            );
+            Optional<Map<String, Object>> read = read(database, readRequest.getKey(), new AbstractMap.SimpleEntry<>(readRequest.getValue().getKey().toString(), readRequest.getValue().getValue()));
+            readRequest.getValue().getValue().complete(read);
             long localStop = System.nanoTime();
 
             if(localStop < localStart) localStart = -(Long.MAX_VALUE - localStart);
@@ -242,7 +229,7 @@ public abstract class DatabaseAccessor<D> {
     public abstract D connect();
 
     @NotNull
-    public abstract Optional<TableObj> read(D d, String tableName, TableObj key);
+    public abstract Optional<Map<String,Object>> read(D d, String tableName, Map.Entry<String,Object> lookup);
 
     public abstract void write(D d, String tableName, Map<TableObj,TableObj> keyValuePairs);
 
