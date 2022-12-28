@@ -157,13 +157,11 @@ public class Configs {
                 data.forEach((regionKeys, o1) -> {
                     StringBuilder builder = new StringBuilder("[RTP] [" + name + "] " + regionKeys.name() + ": ");
                     if(o1 instanceof MemorySection) {
-                        RTP.log(Level.INFO, builder.toString());
                         MemorySection section = (MemorySection) o1;
                         appendMemorySectionRecursive(section, name, 1);
                     }
                     else {
                         builder.append(o1.toString());
-                        RTP.log(Level.INFO, builder.toString());
                     }
                 });
             }
@@ -183,11 +181,9 @@ public class Configs {
             Object o = entry.getValue();
             builder.append("[RTP] [").append(name).append("] ").append(StringUtils.repeat("    ", indent)).append(s).append(": ");
             if (o instanceof MemorySection) {
-                RTP.log(Level.INFO, builder.toString());
                 appendMemorySectionRecursive(memorySection, name, indent + 1);
             } else {
                 builder.append(o.toString());
-                RTP.log(Level.INFO, builder.toString());
             }
             builder = new StringBuilder();
         }

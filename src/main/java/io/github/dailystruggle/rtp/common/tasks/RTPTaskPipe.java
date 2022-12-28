@@ -1,12 +1,16 @@
 package io.github.dailystruggle.rtp.common.tasks;
 
+import io.github.dailystruggle.rtp.common.RTP;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
 
 public class RTPTaskPipe {
     protected long avgTime = TimeUnit.MILLISECONDS.toNanos(50);
+//    protected long avgTime = Long.MAX_VALUE;
     private boolean stop = false;
     private final ConcurrentLinkedQueue<Runnable> runnables = new ConcurrentLinkedQueue<>();
 
@@ -46,14 +50,11 @@ public class RTPTaskPipe {
             runnable.run();
             long localStop = System.nanoTime();
 
-            if(localStop < localStart) localStart = -(Long.MAX_VALUE - localStart);
             long diff = localStop - localStart;
-            if(avgTime == 0) avgTime = diff;
-            else avgTime = ((avgTime*7)/8) + (diff/8);
+            avgTime = ((avgTime/8)*7) + (diff/8);
 
-            if(localStop < start) start = -(Long.MAX_VALUE-start); //overflow correction
-            dt = localStop -start;
-        } while (runnables.size()>0 && dt+avgTime<availableTime);
+            dt = localStop - start;
+        } while (runnables.size()>0 && (dt+avgTime)<availableTime);
 
         runnables.addAll(delayedRunnables);
     }

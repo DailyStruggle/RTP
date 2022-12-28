@@ -10,6 +10,7 @@ import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
 public final class AsyncTaskProcessing extends RTPRunnable {
@@ -60,7 +61,7 @@ public final class AsyncTaskProcessing extends RTPRunnable {
             long l = (long) (((double)i)*increment);
 
             if(l == location) {
-                regions.get(i).execute(availableTime - (start - System.nanoTime()));
+                regions.get(i).execute(availableTime - (System.nanoTime()-start));
             }
         }
         step = (step+1)%period;

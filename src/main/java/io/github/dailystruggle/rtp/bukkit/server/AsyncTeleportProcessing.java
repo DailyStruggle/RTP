@@ -23,7 +23,7 @@ public class AsyncTeleportProcessing extends BukkitRunnable {
         long currTime = TPS.timeSinceTick(1);
 
         long availableTime = avgTime - currTime;
-        availableTime = TimeUnit.MILLISECONDS.toNanos(availableTime);
+        availableTime = TimeUnit.MILLISECONDS.toNanos(availableTime)/2;
 
         asyncTaskProcessing.set(new AsyncTaskProcessing(availableTime));
     }
