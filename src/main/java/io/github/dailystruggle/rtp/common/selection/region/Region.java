@@ -13,10 +13,9 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdj
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.*;
 import io.github.dailystruggle.rtp.common.tasks.FillTask;
-import io.github.dailystruggle.rtp.common.tasks.LoadChunks;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
-import org.apache.commons.lang3.mutable.MutableBoolean;
+import io.github.dailystruggle.rtp.common.tasks.teleport.LoadChunks;
 import org.jetbrains.annotations.Nullable;
 import org.simpleyaml.configuration.MemorySection;
 
@@ -33,7 +32,7 @@ public class Region extends FactoryValue<RegionKeys> {
     public static final List<BiConsumer<Region,UUID>> onPlayerQueuePush = new ArrayList<>();
     public static final List<BiConsumer<Region,UUID>> onPlayerQueuePop = new ArrayList<>();
 
-    public static int maxBiomeChecksPerGen = 1000;
+    public static int maxBiomeChecksPerGen = 5;
 
     /**
      * public/shared cache for this region
@@ -127,7 +126,7 @@ public class Region extends FactoryValue<RegionKeys> {
         public void run() {
             long cacheCap = getNumber(RegionKeys.cacheCap,10L).longValue();
             cacheCap = Math.max(cacheCap,playerQueue.size());
-            Map.Entry<RTPLocation, Long> pair = getLocation(null, new MutableBoolean(false));
+            Map.Entry<RTPLocation, Long> pair = getLocation(null);
             if(pair != null) {
                 RTPLocation location = pair.getKey();
                 if(location == null) {
@@ -135,7 +134,7 @@ public class Region extends FactoryValue<RegionKeys> {
                     return;
                 }
 
-                ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.getInstance().configs.getParser(PerformanceKeys.class);
+                ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
                 long radius = perf.getNumber(PerformanceKeys.viewDistanceSelect,0L).longValue();
 
                 ChunkSet chunkSet = chunks(location, radius);
@@ -177,7 +176,8 @@ public class Region extends FactoryValue<RegionKeys> {
             if(locationQueue.size()>=cacheCap) return;
             while(cachePipeline.size()+locationQueue.size()<cacheCap+playerQueue.size())
                 cachePipeline.add(new Cache());
-            cachePipeline.execute(availableTime - (System.nanoTime()-start));
+            cachePipeline.execute(availableTime - (System.nanoTime()-start)); //todo: too fast for server
+//            cachePipeline.execute(0);
         } catch (InterruptedException e) {
             e.printStackTrace();
         } finally {
@@ -222,7 +222,7 @@ public class Region extends FactoryValue<RegionKeys> {
                     data = new TeleportData();
                     data.completed=false;
                     data.sender = RTP.serverAccessor.getSender(CommandsAPI.serverId);
-                    data.time = System.nanoTime();
+                    data.time = System.currentTimeMillis();
                     data.delay = sender.delay();
                     data.targetRegion = this;
                     data.originalLocation = player.getLocation();
@@ -258,7 +258,7 @@ public class Region extends FactoryValue<RegionKeys> {
         }
 
         Set<String> defaultBiomes;
-        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.getInstance().configs.getParser(SafetyKeys.class);
+        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
         Object configBiomes = safety.getConfigValue(SafetyKeys.biomes,null);
         if(configBiomes instanceof Collection) {
             boolean whitelist;
@@ -282,8 +282,7 @@ public class Region extends FactoryValue<RegionKeys> {
         return res;
     }
 
-    @Nullable
-    public Map.Entry<RTPLocation, Long> getLocation(RTPCommandSender sender, RTPPlayer player, @Nullable Set<String> biomeNames, MutableBoolean stop) {
+    public Map.Entry<RTPLocation, Long> getLocation(RTPCommandSender sender, RTPPlayer player, @Nullable Set<String> biomeNames) {
         Map.Entry<RTPLocation, Long> pair = null;
 
         UUID playerId = player.uuid();
@@ -292,8 +291,9 @@ public class Region extends FactoryValue<RegionKeys> {
 
         if(!custom && perPlayerLocationQueue.containsKey(playerId)) {
             ConcurrentLinkedQueue<Map.Entry<RTPLocation, Long>> playerLocationQueue = perPlayerLocationQueue.get(playerId);
+            RTPChunk rtpChunk = null;
             while(playerLocationQueue.size()>0) {
-                if(stop.booleanValue()) break;
+                if(rtpChunk!=null) rtpChunk.unload();
                 pair = playerLocationQueue.poll();
                 if(pair == null || pair.getKey() == null) continue;
                 RTPLocation left = pair.getKey();
@@ -302,7 +302,6 @@ public class Region extends FactoryValue<RegionKeys> {
                 int cx = (left.x() > 0) ? left.x()/16 : left.x()/16-1;
                 int cz = (left.z() > 0) ? left.z()/16 : left.z()/16-1;
                 CompletableFuture<RTPChunk> chunkAt = left.world().getChunkAt(cx, cz);
-                RTPChunk rtpChunk;
                 try {
                     rtpChunk = chunkAt.get();
                 } catch (InterruptedException | ExecutionException e) {
@@ -310,11 +309,15 @@ public class Region extends FactoryValue<RegionKeys> {
                     continue;
                 }
 
-                ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.getInstance().configs.getParser(SafetyKeys.class);
-                Set<String> unsafeBlocks = safety.yamlFile.getStringList("unsafeBlocks")
-                        .stream().map(String::toUpperCase).collect(Collectors.toSet());
+                ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+                Object unsafeBlocksObj = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
+                Set<String> unsafeBlocks = new HashSet<>();
+                if(unsafeBlocksObj instanceof Collection) {
+                    unsafeBlocks = ((Collection<?>)unsafeBlocksObj).stream().map(Object::toString).collect(Collectors.toSet());
+                }
 
-                int safetyRadius = safety.yamlFile.getInt("safetyRadius", 0);
+                int safetyRadius = safety.getNumber(SafetyKeys.safetyRadius,0).intValue();
+
                 safetyRadius = Math.max(safetyRadius,7);
 
                 //todo: waterlogged check
@@ -343,8 +346,7 @@ public class Region extends FactoryValue<RegionKeys> {
         }
 
         if(custom || sender.hasPermission("rtp.unqueued")) {
-            pair = getLocation(biomeNames, stop);
-            if(stop.booleanValue() || pair == null) return null;
+            pair = getLocation(biomeNames);
             long attempts = pair.getValue();
             TeleportData data = RTP.getInstance().latestTeleportData.get(playerId);
             if(data!=null && !data.completed) {
@@ -352,12 +354,13 @@ public class Region extends FactoryValue<RegionKeys> {
             }
         }
         else {
-            TeleportData data = RTP.getInstance().latestTeleportData.get(playerId);
             RTP.getInstance().processingPlayers.add(playerId);
+            TeleportData data = RTP.getInstance().latestTeleportData.get(playerId);
             if(data == null) {
                 data = new TeleportData();
+                data.sender = (sender != null) ? sender : player;
                 data.completed=false;
-                data.time = System.nanoTime();
+                data.time = System.currentTimeMillis();
                 data.delay = sender.delay();
                 data.targetRegion = this;
                 data.originalLocation = player.getLocation();
@@ -372,13 +375,18 @@ public class Region extends FactoryValue<RegionKeys> {
     }
 
     @Nullable
-    public Map.Entry<RTPLocation, Long> getLocation(@Nullable Set<String> biomeNames, MutableBoolean stop) {
+    public Map.Entry<RTPLocation, Long> getLocation(@Nullable Set<String> biomeNames) {
         boolean defaultBiomes = false;
+        ConfigParser<PerformanceKeys> performance = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+        Object o;
         if(biomeNames == null || biomeNames.size()==0) {
             defaultBiomes = true;
-            ConfigParser<SafetyKeys> parser = (ConfigParser<SafetyKeys>) RTP.getInstance().configs.getParser(SafetyKeys.class);
-            boolean whitelist = parser.yamlFile.getBoolean("biomeWhitelist", false);
-            List<String> biomeList = parser.yamlFile.getStringList("biomes");
+            o = safety.getConfigValue(SafetyKeys.biomeWhitelist, false);
+            boolean whitelist = (o instanceof Boolean) ? (Boolean) o : Boolean.parseBoolean(o.toString());
+
+            o = safety.getConfigValue(SafetyKeys.biomes,null);
+            List<String> biomeList = (o instanceof List) ? (List<String>) o : null;
             Set<String> biomeSet = (biomeList==null) ? new HashSet<>() : new HashSet<>(biomeList);
             biomeSet = biomeSet.stream().map(String::toUpperCase).collect(Collectors.toSet());
             if(whitelist) {
@@ -391,14 +399,14 @@ public class Region extends FactoryValue<RegionKeys> {
             }
         }
 
-        ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.getInstance().configs.getParser(LoggingKeys.class);
-        boolean verboseFail = true;
+        ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
+        boolean verbose = true;
         if(logging!=null) {
-            Object o = logging.getConfigValue(LoggingKeys.selection_failure,false);
+            o = logging.getConfigValue(LoggingKeys.teleport,false);
             if (o instanceof Boolean) {
-                verboseFail = (Boolean) o;
+                verbose = (Boolean) o;
             } else {
-                verboseFail = Boolean.parseBoolean(o.toString());
+                verbose = Boolean.parseBoolean(o.toString());
             }
         }
 
@@ -408,17 +416,18 @@ public class Region extends FactoryValue<RegionKeys> {
         VerticalAdjustor<?> vert = getVert();
         if(vert == null) return null;
 
-        ConfigParser<PerformanceKeys> performance = (ConfigParser<PerformanceKeys>) RTP.getInstance().configs.getParser(PerformanceKeys.class);
-        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.getInstance().configs.getParser(SafetyKeys.class);
+        o = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
+        Set<String> unsafeBlocks = (o instanceof Collection) ? ((Collection<String>) o)
+                .stream().map(String::toUpperCase).collect(Collectors.toSet())
+                : new HashSet<>();
 
-        Set<String> unsafeBlocks = safety.yamlFile.getStringList("unsafeBlocks")
-                .stream().map(String::toUpperCase).collect(Collectors.toSet());
+        int safetyRadius = safety.getNumber(SafetyKeys.safetyRadius,0).intValue();
+        safetyRadius = Math.min(safetyRadius,7);
 
-        int safetyRadius = safety.yamlFile.getInt("safetyRadius", 0);
-        safetyRadius = Math.max(safetyRadius,7);
-
-        long maxAttemptsOrig = performance.getNumber(PerformanceKeys.maxAttempts, 20).longValue();
-        long maxAttempts = Math.max(maxAttemptsOrig,1);
+        long maxAttemptsBase = performance.getNumber(PerformanceKeys.maxAttempts, 20).longValue();
+        maxAttemptsBase = Math.max(maxAttemptsBase,1);
+        long maxAttempts = maxAttemptsBase;
+        long maxBiomeChecks = maxBiomeChecksPerGen*maxAttempts;
         long biomeChecks = 0L;
 
         RTPWorld world = getWorld();
@@ -437,64 +446,40 @@ public class Region extends FactoryValue<RegionKeys> {
         RTPLocation location = null;
         long i = 1;
 
-        long maxTime = TimeUnit.SECONDS.toMillis(30);
-        long startTime = System.currentTimeMillis();
-
         for(; i <= maxAttempts; i++) {
-            if(stop.booleanValue()) return null;
-            long t = System.currentTimeMillis()-startTime;
-            if(t<0 || t > maxTime) {
-                location = null;
-                new IllegalStateException("RTP selection exceeded 30s. Please address relevant delays, such as chunk loading or biomes.")
-                        .printStackTrace();
-                break;
-            }
-
             long l = -1;
             int[] select;
             if(shape instanceof MemoryShape) {
                 l = shape.rand();
                 select = ((MemoryShape<?>) shape).locationToXZ(l);
-                if(verboseFail) selections.add(new AbstractMap.SimpleEntry<>((long)selections.size(),l));
+                if(verbose) selections.add(new AbstractMap.SimpleEntry<>((long)selections.size(),l));
             }
             else {
                 select = shape.select();
-                if(verboseFail) selections.add(new AbstractMap.SimpleEntry<>((long)select[0],(long)select[1]));
+                if(verbose) selections.add(new AbstractMap.SimpleEntry<>((long)select[0],(long)select[1]));
             }
 
             String currBiome = world.getBiome(select[0], (vert.maxY() + vert.minY()) / 2, select[1]);
 
-            for(; biomeChecks < maxBiomeChecksPerGen && !biomeNames.contains(currBiome); biomeChecks++, maxAttempts++, i++) {
-                if(stop.booleanValue()) return null;
-                t = System.currentTimeMillis()-startTime;
-                if(t<0 || t > maxTime) {
-                    location = null;
-                    new IllegalStateException("RTP selection exceeded 30s. Please address relevant delays, such as chunk loading or biomes.")
-                            .printStackTrace();
-                    break;
-                }
-
+            for(; biomeChecks < maxBiomeChecks && !biomeNames.contains(currBiome); biomeChecks++, maxAttempts++, i++) {
                 if(shape instanceof MemoryShape) {
                     if (defaultBiomes) {
                         ((MemoryShape<?>) shape).addBadLocation(l);
                     }
                     l = shape.rand();
                     select = ((MemoryShape<?>) shape).locationToXZ(l);
-                    if(verboseFail) selections.add(new AbstractMap.SimpleEntry<>((long)selections.size(),l));
+                    if(verbose) selections.add(new AbstractMap.SimpleEntry<>((long)selections.size(),l));
                 }
                 else {
                     select = shape.select();
-                    if(verboseFail) selections.add(new AbstractMap.SimpleEntry<>((long)select[0],(long)select[1]));
+                    if(verbose) selections.add(new AbstractMap.SimpleEntry<>((long)select[0],(long)select[1]));
                 }
                 biomeSpecificFails.putIfAbsent(currBiome,0L);
                 biomeSpecificFails.put(currBiome, biomeSpecificFails.get(currBiome)+1);
                 currBiome = world.getBiome(select[0], (vert.maxY()+vert.minY())/2, select[1]);
                 biomeFails++;
             }
-            if(biomeChecks>=maxBiomeChecksPerGen*maxAttemptsOrig) {
-                location = null;
-                break;
-            }
+            if(biomeChecks>=maxBiomeChecks) return new AbstractMap.SimpleEntry<>(null,i);
 
             WorldBorder border = RTP.serverAccessor.getWorldBorder(world.name());
             if(!border.isInside().apply(new RTPLocation(world,select[0]*16, (vert.maxY()-vert.minY())/2+vert.minY(), select[1]*16))) {
@@ -502,8 +487,7 @@ public class Region extends FactoryValue<RegionKeys> {
                 worldBorderFails++;
                 if(worldBorderFails>1000) {
                     new IllegalStateException("1000 worldborder checks failed. region/selection is likely outside the worldborder").printStackTrace();
-                    location = null;
-                    break;
+                    return new AbstractMap.SimpleEntry<>(null,i);
                 }
                 continue;
             }
@@ -513,14 +497,10 @@ public class Region extends FactoryValue<RegionKeys> {
             RTPChunk chunk;
 
             try {
-                chunk = cfChunk.get(10000,TimeUnit.MILLISECONDS);
+                chunk = cfChunk.get();
             } catch (InterruptedException | ExecutionException e) {
                 e.printStackTrace();
                 return new AbstractMap.SimpleEntry<>(null,i);
-            } catch (TimeoutException e) {
-                cfChunk.cancel(false);
-                timeoutFails++;
-                continue;
             }
 
             location = vert.adjust(chunk);
@@ -529,6 +509,7 @@ public class Region extends FactoryValue<RegionKeys> {
                     ((MemoryShape<?>) shape).addBadLocation(l);
                 }
                 vertFails++;
+                chunk.unload();
                 continue;
             }
 
@@ -543,6 +524,7 @@ public class Region extends FactoryValue<RegionKeys> {
                 biomeSpecificFails.putIfAbsent(currBiome,0L);
                 biomeSpecificFails.put(currBiome, biomeSpecificFails.get(currBiome)+1);
                 biomeFails++;
+                chunk.unload();
                 continue;
             }
 
@@ -583,34 +565,40 @@ public class Region extends FactoryValue<RegionKeys> {
                 }
                 location = null;
             }
+            chunk.unload();
         }
 
-        if (verboseFail && location == null) {
-            RTP.log(Level.WARNING,"[RTP] ["+name+"] failed to generate a location within " + maxAttempts + " tries");
-            RTP.log(Level.WARNING,"[RTP] ["+name+"]     failed biome checks: "+biomeFails);
+        if (verbose && i >= maxAttempts) {
+            RTP.log(Level.WARNING,"[plugin] ["+name+"] failed to generate a location within " + maxAttempts + " tries");
+            RTP.log(Level.WARNING,"[plugin] ["+name+"]     failed biome checks: "+biomeFails);
             if(biomeFails>maxAttempts/2) {
-                RTP.log(Level.WARNING,"[RTP] ["+name+"] biomes: \n"+ Arrays.toString(biomeNames.toArray()));
+                RTP.log(Level.WARNING,"[plugin] ["+name+"] biomes: \n"+ Arrays.toString(biomeNames.toArray()));
                 biomeSpecificFails.forEach((key, value) -> RTP.log(Level.WARNING,
-                        "[RTP] [" + name + "]     " + key + ": " + value));
+                        "[plugin] [" + name + "]     " + key + ": " + value));
             }
-            RTP.log(Level.WARNING,"[RTP] ["+name+"]     failed world border checks: "+worldBorderFails);
-            RTP.log(Level.WARNING,"[RTP] ["+name+"]     chunk timeouts: "+timeoutFails);
-            RTP.log(Level.WARNING,"[RTP] ["+name+"]     failed height checks: "+vertFails);
-            if(vertFails>maxAttempts/2) {
-                RTP.log(Level.WARNING,"[RTP] ["+name+"] current vert values: "+vert);
+            RTP.log(Level.WARNING,"[plugin] ["+name+"]     failed world border checks: "+worldBorderFails);
+            RTP.log(Level.WARNING,"[plugin] ["+name+"]     chunk timeouts: "+timeoutFails);
+            RTP.log(Level.WARNING,"[plugin] ["+name+"]     failed height checks: "+vertFails);
+            if(vertFails>maxAttemptsBase/2) {
+                RTP.log(Level.WARNING,"[plugin] ["+name+"] current vert values: "+vert);
             }
-            RTP.log(Level.WARNING,"[RTP] ["+name+"]     failed safety checks: "+safetyFails);
-            if(safetyFails>maxAttempts/2) {
-                RTP.log(Level.WARNING,"[RTP] ["+name+"] current set of unsafe blocks: \n"+ Arrays.toString(unsafeBlocks.toArray()));
+            RTP.log(Level.WARNING,"[plugin] ["+name+"]     failed safety checks: "+safetyFails);
+            if(safetyFails>maxAttemptsBase/2) {
+                RTP.log(Level.WARNING,"[plugin] ["+name+"] current set of unsafe blocks: \n"+ Arrays.toString(unsafeBlocks.toArray()));
                 safetySpecificFails.forEach((key, value) -> RTP.log(Level.WARNING,
-                        "[RTP] [" + name + "]     " + key + ": " + value));
+                        "[plugin] [" + name + "]     " + key + ": " + value));
             }
-            RTP.log(Level.WARNING,"[RTP] ["+name+"]     failed addon checks: "+miscFails);
+            RTP.log(Level.WARNING,"[plugin] ["+name+"]     failed addon checks: "+miscFails);
 
             if(shape instanceof MemoryShape) {
-                RTP.log(Level.INFO,"[RTP] ["+name+"] range: " + ((MemoryShape<?>)shape).getRange());
+                RTP.log(Level.INFO,"[plugin] ["+name+"] range: " + ((MemoryShape<?>)shape).getRange());
+                for (int j = 0; j < selections.size(); j++) {
+                    Map.Entry<Long, Long> longLongEntry = selections.get(j);
+                    int[] xz = ((MemoryShape<?>) shape).locationToXZ(longLongEntry.getValue());
+                    selections.set(j, new AbstractMap.SimpleEntry<>((long)xz[0],(long)xz[1]));
+                }
             }
-            RTP.log(Level.INFO,"[RTP] ["+name+"] selections: "+selections);
+            RTP.log(Level.INFO,"[plugin] ["+name+"] selections: "+selections);
         }
 
         i = Math.min(i,maxAttempts);
@@ -686,7 +674,7 @@ public class Region extends FactoryValue<RegionKeys> {
         if(locAssChunks.containsKey(location)) {
             ChunkSet chunkSet = locAssChunks.get(location);
             if(chunkSet.chunks.size()>=sz) return chunkSet;
-            chunkSet.keep(false);
+//            chunkSet.keep(false);
         }
 
         int cx = location.x();
@@ -711,7 +699,7 @@ public class Region extends FactoryValue<RegionKeys> {
                 if(shape instanceof MemoryShape<?>) {
                     long finalJ = j;
                     long finalI = i;
-                    cfChunk.whenComplete((chunk, throwable) -> {
+                    cfChunk.thenAccept(chunk -> {
                         RTPLocation rtpLocation = chunk.getBlockAt(7, (vert.minY() + vert.maxY()) / 2, 7).getLocation();
                         String currBiome = rtpWorld.getBiome(rtpLocation.x(),rtpLocation.y(),rtpLocation.z());
 

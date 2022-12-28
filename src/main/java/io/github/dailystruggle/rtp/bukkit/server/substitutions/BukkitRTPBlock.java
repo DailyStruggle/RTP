@@ -8,8 +8,7 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import org.bukkit.block.Block;
 
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.stream.Collectors;
 
@@ -36,9 +35,10 @@ public final class BukkitRTPBlock implements RTPBlock {
         long t = System.currentTimeMillis();
         long dt = t - lastUpdate;
         if (dt > 5000 || dt < 0) {
-            ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.getInstance().configs.getParser(SafetyKeys.class);
-            airBlocks = safety.yamlFile.getStringList("airBlocks")
-                    .stream().map(String::toUpperCase).collect(Collectors.toSet());
+            ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+            Object o = safety.getConfigValue(SafetyKeys.airBlocks, new ArrayList<>());
+            airBlocks = ((o instanceof Collection) ? (Collection<?>)o : new ArrayList<>())
+                    .stream().map(o1 -> o1.toString().toUpperCase()).collect(Collectors.toSet());
             if (airBlocks.size() < 1) airBlocks.add("AIR");
             lastUpdate = t;
         }

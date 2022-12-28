@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.common.configuration;
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.*;
+import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
@@ -10,6 +11,7 @@ import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
 import org.simpleyaml.configuration.MemorySection;
+import org.simpleyaml.configuration.file.YamlFile;
 
 import java.io.File;
 import java.util.*;
@@ -29,9 +31,14 @@ public class Configs {
         onReload.add(runnable);
     }
 
+    public final YamlFileDatabase fileDatabase;
+
     public Configs(File pluginDirectory) {
         this.pluginDirectory = pluginDirectory;
         RTP.getInstance().startupTasks.add(new RTPRunnable(this::reloadAction,5));
+        this.fileDatabase = new YamlFileDatabase(pluginDirectory);
+        Map<String, YamlFile> connect = this.fileDatabase.connect();
+        this.fileDatabase.disconnect(connect);
     }
 
     public void putParser(Object instance) {
@@ -44,11 +51,11 @@ public class Configs {
             name = ((ConfigParser<?>) instance).name;
             if(((ConfigParser<?>) instance).myClass.equals(LoggingKeys.class))
                 logging = ((ConfigParser<LoggingKeys>) instance);
-            else logging = (ConfigParser<LoggingKeys>) RTP.getInstance().configs.getParser(LoggingKeys.class);
+            else logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
             configParserMap.put(((ConfigParser<?>) instance).myClass, (ConfigParser<?>) instance);
         }
         else if(instance instanceof MultiConfigParser<?>) {
-            logging = (ConfigParser<LoggingKeys>) RTP.getInstance().configs.getParser(LoggingKeys.class);
+            logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
             name = ((MultiConfigParser<?>) instance).name;
             multiConfigParserMap.put(((MultiConfigParser<?>) instance).myClass, (MultiConfigParser<?>) instance);
         }
@@ -89,42 +96,38 @@ public class Configs {
         Objects.requireNonNull(multiConfigParser);
 
         if(!multiConfigParser.configParserFactory.contains(worldName)) {
-            multiConfigParser.addParser(new ConfigParser<>(WorldKeys.class, worldName,"1.0", multiConfigParser.myDirectory, worldLangMap));
+            multiConfigParser.addParser(new ConfigParser<>(WorldKeys.class, worldName,"1.0", multiConfigParser.myDirectory, worldLangMap, multiConfigParser.fileDatabase));
         }
 
         return multiConfigParser.getParser(worldName);
     }
 
     public boolean reload() {
+        this.fileDatabase.processQueries(Long.MAX_VALUE);
         configParserMap.clear();
         multiConfigParserMap.clear();
         reloadAction();
-        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
-        if(lang == null) return false;
-        String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloaded,""));
-        if(msg!=null) msg = StringUtils.replace(msg,"[filename]", "configs");
-        RTP.serverAccessor.sendMessage(CommandsAPI.serverId,msg);
         return true;
     }
 
 
     protected void reloadAction() {
-        ConfigParser<LoggingKeys> logging = new ConfigParser<>(LoggingKeys.class,"logging.yml", "1.0", pluginDirectory);
+        ConfigParser<LoggingKeys> logging = new ConfigParser<>(LoggingKeys.class,"logging.yml", "1.0", pluginDirectory, fileDatabase);
         putParser(logging);
 
-        ConfigParser<MessagesKeys> lang = new ConfigParser<>(MessagesKeys.class,"messages.yml", "1.0", pluginDirectory);
+        ConfigParser<MessagesKeys> lang = new ConfigParser<>(MessagesKeys.class,"messages.yml", "1.0", pluginDirectory, fileDatabase);
         putParser(lang);
 
-        ConfigParser<ConfigKeys> config = new ConfigParser<>(ConfigKeys.class, "config.yml", "1.0", pluginDirectory);
+        ConfigParser<ConfigKeys> config = new ConfigParser<>(ConfigKeys.class, "config.yml", "1.0", pluginDirectory, fileDatabase);
         putParser(config);
 
-        ConfigParser<EconomyKeys> economy = new ConfigParser<>(EconomyKeys.class, "economy.yml", "1.0", pluginDirectory);
+        ConfigParser<EconomyKeys> economy = new ConfigParser<>(EconomyKeys.class, "economy.yml", "1.0", pluginDirectory, fileDatabase);
         putParser(economy);
 
-        ConfigParser<PerformanceKeys> performance = new ConfigParser<>(PerformanceKeys.class, "performance.yml", "1.0", pluginDirectory);
+        ConfigParser<PerformanceKeys> performance = new ConfigParser<>(PerformanceKeys.class, "performance.yml", "1.0", pluginDirectory, fileDatabase);
         putParser(performance);
 
-        ConfigParser<SafetyKeys> safety = new ConfigParser<>(SafetyKeys.class, "safety", "1.0", pluginDirectory);
+        ConfigParser<SafetyKeys> safety = new ConfigParser<>(SafetyKeys.class, "safety", "1.0", pluginDirectory, fileDatabase);
         putParser(safety);
 
         MultiConfigParser<RegionKeys> regions = new MultiConfigParser<>(RegionKeys.class, "regions", "1.0", pluginDirectory);
@@ -149,7 +152,7 @@ public class Configs {
 
         for(ConfigParser<RegionKeys> regionConfig : regions.configParserFactory.map.values()) {
             EnumMap<RegionKeys, Object> data = regionConfig.getData();
-            String name = StringUtils.replaceIgnoreCase(regionConfig.name, ".yml","");
+            String name = regionConfig.name.replace(".yml","");
             if(detailed_region_init) {
                 data.forEach((regionKeys, o1) -> {
                     StringBuilder builder = new StringBuilder("[RTP] [" + name + "] " + regionKeys.name() + ": ");
@@ -164,7 +167,7 @@ public class Configs {
                     }
                 });
             }
-            Region region = new Region(StringUtils.replaceIgnoreCase(regionConfig.name,".yml",""), data);
+            Region region = new Region(regionConfig.name.replace(".yml",""), data);
             RTP.getInstance().selectionAPI.permRegionLookup.put(region.name,region);
             if(detailed_region_init) {
                 RTP.log(Level.INFO, "[RTP] [" + name + "] successfully created teleport region - " + region.name);

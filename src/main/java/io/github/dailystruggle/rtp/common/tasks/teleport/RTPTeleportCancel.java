@@ -1,4 +1,4 @@
-package io.github.dailystruggle.rtp.common.tasks;
+package io.github.dailystruggle.rtp.common.tasks.teleport;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
+import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 
 import java.util.AbstractMap;
 import java.util.ArrayList;
@@ -39,7 +40,7 @@ public final class RTPTeleportCancel extends RTPRunnable {
         data.nextTask.setCancelled(true);
 
         //dump location back onto the pile
-        if(data.selectedLocation!=null) data.targetRegion.locationQueue.add(new AbstractMap.SimpleEntry<>(data.selectedLocation,data.attempts));
+//        if(data.selectedLocation!=null) data.targetRegion.locationQueue.add(new AbstractMap.SimpleEntry<>(data.selectedLocation,data.attempts));
 
         refund(playerId);
 
@@ -49,7 +50,7 @@ public final class RTPTeleportCancel extends RTPRunnable {
     }
 
     public static void refund(UUID playerId) {
-        ConfigParser<EconomyKeys> eco = (ConfigParser<EconomyKeys>) RTP.getInstance().configs.configParserMap.get(EconomyKeys.class);
+        ConfigParser<EconomyKeys> eco = (ConfigParser<EconomyKeys>) RTP.configs.configParserMap.get(EconomyKeys.class);
         Object configValue = eco.getConfigValue(EconomyKeys.refundOnCancel, true);
         boolean refund = Boolean.getBoolean(configValue.toString());
 
@@ -58,9 +59,9 @@ public final class RTPTeleportCancel extends RTPRunnable {
         if(data == null) return;
         if(data.completed) return;
 
-        if(data.selectedLocation!=null && data.targetRegion!=null && (data.biomes==null || data.biomes.size()==0)) {
-            data.targetRegion.locationQueue.add(new AbstractMap.SimpleEntry<>(data.selectedLocation, data.attempts));
-        }
+//        if(data.selectedLocation!=null && data.targetRegion!=null && (data.biomes==null || data.biomes.size()==0)) {
+//            data.targetRegion.locationQueue.add(new AbstractMap.SimpleEntry<>(data.selectedLocation, data.attempts));
+//        }
 
         //reset player data
         TeleportData repData = RTP.getInstance().priorTeleportData.get(playerId);
@@ -80,7 +81,7 @@ public final class RTPTeleportCancel extends RTPRunnable {
     }
 
     public static void message(UUID playerId) {
-        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
+        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
         String msg = lang.getConfigValue(MessagesKeys.teleportCancel,"").toString();
         RTP.serverAccessor.sendMessage(playerId,msg);
     }

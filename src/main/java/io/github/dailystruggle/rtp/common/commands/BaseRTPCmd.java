@@ -10,7 +10,7 @@ import java.util.UUID;
 public interface BaseRTPCmd extends TreeCommand {
     @Override
     default void msgBadParameter(UUID callerId, String parameterName, String parameterValue) {
-        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
+        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
 
         String msg = String.valueOf(lang.getConfigValue(MessagesKeys.badArg,""));
         msg = msg.replace("[arg]",parameterName + ":" + parameterValue);

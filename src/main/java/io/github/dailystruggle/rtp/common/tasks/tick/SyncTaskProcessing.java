@@ -1,9 +1,11 @@
-package io.github.dailystruggle.rtp.common.tasks;
+package io.github.dailystruggle.rtp.common.tasks.tick;
 
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
+
+import java.util.logging.Level;
 
 public final class SyncTaskProcessing extends RTPRunnable {
-    long step = 0;
     private final long availableTime;
 
     public SyncTaskProcessing(long availableTime) {

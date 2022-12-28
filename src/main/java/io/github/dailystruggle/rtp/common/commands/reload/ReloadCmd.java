@@ -25,7 +25,7 @@ public class ReloadCmd extends BaseRTPCmdImpl {
     }
 
     public void addCommands() {
-        final Configs configs = RTP.getInstance().configs;
+        final Configs configs = RTP.configs;
         if(configs == null) RTP.getInstance().miscAsyncTasks.add(new RTPRunnable(this::addCommands,1));
         for (ConfigParser<?> value : configs.configParserMap.values()) {
             String name = value.name.replace(".yml","");
@@ -57,26 +57,25 @@ public class ReloadCmd extends BaseRTPCmdImpl {
 
     @Override
     public boolean onCommand(UUID senderId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
-        RTP.stop();
-        RTP.serverAccessor.stop();
-
         if(nextCommand!=null) {
-            RTP.serverAccessor.start();
             return true;
         }
 
-        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
+        RTP.stop();
+        RTP.serverAccessor.stop();
+
+        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
         if(lang != null) {
             String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloading,""));
             if(msg!=null) msg = StringUtils.replace(msg,"[filename]", "configs");
             RTP.serverAccessor.sendMessage(CommandsAPI.serverId, senderId,msg);
         }
 
-        boolean b = RTP.getInstance().configs.reload();
+        boolean b = RTP.configs.reload();
         if(!b) throw new IllegalStateException("reload failed");
 
         if(lang != null) {
-            String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloading,""));
+            String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloaded,""));
             if(msg!=null) msg = StringUtils.replace(msg,"[filename]", "configs");
             RTP.serverAccessor.sendMessage(senderId,msg);
         }

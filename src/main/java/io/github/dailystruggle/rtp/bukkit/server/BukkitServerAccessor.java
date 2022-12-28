@@ -40,8 +40,6 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     private final Map<UUID,RTPWorld> worldMap = new ConcurrentHashMap<>();
     private final Map<String,RTPWorld> worldMapStr = new ConcurrentHashMap<>();
 
-    private final long t = System.nanoTime();
-
     private String version = null;
     private Integer intVersion = null;
 
@@ -191,7 +189,7 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     @Override
     public void sendMessage(UUID target, MessagesKeys msgType) {
         if(RTPBukkitPlugin.getInstance()==null || !RTPBukkitPlugin.getInstance().isEnabled()) return;
-        ConfigParser<MessagesKeys> parser = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
+        ConfigParser<MessagesKeys> parser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
         if(parser == null) return;
         String msg = String.valueOf(parser.getConfigValue(msgType,""));
         if(msg == null || msg.isEmpty()) return;
@@ -201,7 +199,7 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     @Override
     public void sendMessage(UUID target1, UUID target2, MessagesKeys msgType) {
         if(RTPBukkitPlugin.getInstance()==null || !RTPBukkitPlugin.getInstance().isEnabled()) return;
-        ConfigParser<MessagesKeys> parser = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
+        ConfigParser<MessagesKeys> parser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
         String msg = String.valueOf(parser.getConfigValue(msgType,""));
         if(msg == null || msg.isEmpty()) return;
         sendMessage(target1,target2,msg);
@@ -345,8 +343,11 @@ public class BukkitServerAccessor implements RTPServerAccessor {
             CommandsAPI.execute(avgTime - currTime);
         }, 40, 1);
 
-        plugin.syncTimer = new SyncTeleportProcessing().runTaskTimer(plugin,20,1);
-        plugin.asyncTimer = new AsyncTeleportProcessing().runTaskTimerAsynchronously(plugin,20,1);
+        plugin.syncTimer = new SyncTeleportProcessing().runTaskTimer(plugin,20,2);
+        plugin.asyncTimer = Bukkit.getScheduler().runTaskTimer(plugin,() -> {
+            new AsyncTeleportProcessing().run();
+        },20,1);
+        plugin.asyncTimer = new AsyncTeleportProcessing().runTaskTimer(plugin,21,2);
 
         Bukkit.getScheduler().runTaskAsynchronously(plugin,this::getRTPWorlds);
     }

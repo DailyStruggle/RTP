@@ -3,6 +3,8 @@ package io.github.dailystruggle.softdepends;
 import me.angeschossen.lands.api.integration.LandsIntegration;
 import org.bukkit.plugin.Plugin;
 
+import java.util.Objects;
+
 public class LandsChecker {
     private static LandsIntegration landsIntegration = null;
 
@@ -17,7 +19,11 @@ public class LandsChecker {
 
     public static Boolean isInClaim(org.bukkit.Location location) {
         try {
-            return landsIntegration.isClaimed(location);
+            int x = location.getBlockX();
+            int z = location.getBlockZ();
+            int chunkX = (x>0) ? x/16 : x/16-1;
+            int chunkZ = (z>0) ? z/16 : z/16-1;
+            return landsIntegration.isClaimed(Objects.requireNonNull(location.getWorld()),chunkX,chunkZ);
         }
         catch (NullPointerException | NoClassDefFoundError e) {
             return false;

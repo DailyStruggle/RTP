@@ -39,12 +39,12 @@ public class FillPauseCmd extends FillSubCmd {
         List<Region> regions = getRegions(callerId, parameterValues.get("region"));
         for(Region region : regions) {
             FillTask fillTask = RTP.getInstance().fillTasks.get(region.name);
-            ConfigParser<MessagesKeys> parser = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
+            ConfigParser<MessagesKeys> parser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
             if(fillTask==null) {
                 if(parser == null) continue;
                 String msg = String.valueOf(parser.getConfigValue(MessagesKeys.fillNotRunning,""));
                 if(msg == null || msg.isEmpty()) continue;
-                msg = StringUtils.replaceIgnoreCase(msg, "[region]", region.name);
+                msg = msg.replace("[region]", region.name);
                 RTP.serverAccessor.announce(msg,"rtp.fill");
                 continue;
             }
@@ -56,7 +56,7 @@ public class FillPauseCmd extends FillSubCmd {
             if(parser == null) continue;
             String msg = String.valueOf(parser.getConfigValue(MessagesKeys.fillPause,""));
             if(msg == null || msg.isEmpty()) continue;
-            msg = StringUtils.replaceIgnoreCase(msg, "[region]", region.name);
+            msg = msg.replace("[region]", region.name);
             RTP.serverAccessor.announce(msg,"rtp.fill");
         }
         return true;

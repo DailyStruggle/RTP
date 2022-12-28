@@ -1,4 +1,4 @@
-package io.github.dailystruggle.rtp.common.tasks;
+package io.github.dailystruggle.rtp.common.tasks.teleport;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -9,12 +9,14 @@ import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
+import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.logging.Level;
 
 public final class SetupTeleport extends RTPRunnable {
     public static final List<Consumer<SetupTeleport>> preActions = new ArrayList<>();
@@ -44,10 +46,11 @@ public final class SetupTeleport extends RTPRunnable {
     public void run() {
         preActions.forEach(consumer -> consumer.accept(this));
 
-        ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
+        ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
 
-        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.getInstance().configs.getParser(PerformanceKeys.class);
+        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
         boolean syncLoading = false;
+
         Object configValue = perf.getConfigValue(PerformanceKeys.syncLoading, false);
         if(configValue instanceof String) {
             configValue = Boolean.parseBoolean((String) configValue);
@@ -59,9 +62,9 @@ public final class SetupTeleport extends RTPRunnable {
         TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.uuid());
         if(teleportData == null) {
             teleportData = new TeleportData();
-            teleportData.sender = sender;
+            teleportData.sender = (sender != null) ? sender : player;
             teleportData.originalLocation = player.getLocation();
-            teleportData.time = System.nanoTime();
+            teleportData.time = System.currentTimeMillis();
             teleportData.nextTask = this;
             teleportData.targetRegion = region;
             teleportData.delay = sender.delay();
@@ -91,6 +94,7 @@ public final class SetupTeleport extends RTPRunnable {
         if(isCancelled()) return;
         LoadChunks loadChunks = new LoadChunks(this.sender, this.player, pair.getKey(), this.region);
         teleportData.nextTask = loadChunks;
+        teleportData.selectedLocation = pair.getKey();
         teleportData.attempts = pair.getValue();
 
         boolean sync = syncLoading;

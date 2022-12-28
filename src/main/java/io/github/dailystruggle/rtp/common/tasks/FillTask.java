@@ -14,9 +14,7 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import org.apache.commons.lang3.StringUtils;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -84,7 +82,7 @@ public class FillTask extends RTPRunnable {
             CompletableFuture<Boolean> future = testPos(region, pos);
 
             long finalPos = pos;
-            future.whenComplete((aBoolean, throwable) -> {
+            future.thenAccept(aBoolean -> {
                 if(isCancelled()) return;
                 if(!aBoolean) shape.addBadLocation(finalPos);
                 try {
@@ -102,7 +100,7 @@ public class FillTask extends RTPRunnable {
         }
 
         long finalPos1 = pos;
-        done.whenComplete((aBoolean, throwable) -> {
+        done.thenAccept(aBoolean -> {
             if(isCancelled()) return;
 
             long completedChecks = finalPos1-start;
@@ -114,7 +112,7 @@ public class FillTask extends RTPRunnable {
             if(numLoadsRemaining<0 || numLoadsRemaining>range) numLoadsRemaining = 0;
             long estRemaining = numLoadsRemaining/cps_local;
 
-            ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
+            ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
             String msg = langParser.getConfigValue(MessagesKeys.fillStatus, "").toString();
             if(msg!=null && !msg.isEmpty()) {
                 long days = TimeUnit.SECONDS.toDays(estRemaining);
@@ -128,11 +126,11 @@ public class FillTask extends RTPRunnable {
                 if (minutes > 0) replacement += minutes + langParser.getConfigValue(MessagesKeys.minutes, "").toString() + " ";
                 if (seconds > 0) replacement += seconds + langParser.getConfigValue(MessagesKeys.seconds, "").toString();
 
-                msg = StringUtils.replaceIgnoreCase(msg, "[chunks]", String.valueOf(finalPos1));
-                msg = StringUtils.replaceIgnoreCase(msg, "[totalChunks]", String.valueOf(range));
-                msg = StringUtils.replaceIgnoreCase(msg, "[cps]", String.valueOf(cps.get()));
-                msg = StringUtils.replaceIgnoreCase(msg, "[eta]", replacement);
-                msg = StringUtils.replaceIgnoreCase(msg, "[region]", region.name);
+                msg = msg.replace("[chunks]", String.valueOf(finalPos1));
+                msg = msg.replace("[totalChunks]", String.valueOf(range));
+                msg = msg.replace("[cps]", String.valueOf(cps.get()));
+                msg = msg.replace("[eta]", replacement);
+                msg = msg.replace("[region]", region.name);
 
                 RTP.serverAccessor.announce(msg,"rtp.fill");
             }
@@ -180,7 +178,7 @@ public class FillTask extends RTPRunnable {
         CompletableFuture<RTPChunk> cfChunk = world.getChunkAt(select[0], select[1]);
         chunks.add(cfChunk);
 
-        cfChunk.whenComplete((chunk, throwable) -> {
+        cfChunk.thenAccept(chunk -> {
             if(isCancelled()) return;
             RTPLocation location = vert.adjust(chunk);
             if(location == null) {
@@ -199,13 +197,14 @@ public class FillTask extends RTPRunnable {
 
             boolean pass = location != null;
 
-            ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.getInstance().configs.getParser(SafetyKeys.class);
-            ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.getInstance().configs.getParser(PerformanceKeys.class);
+            ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+            ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
 
-            Set<String> unsafeBlocks = safety.yamlFile.getStringList("unsafeBlocks")
-                    .stream().map(String::toUpperCase).collect(Collectors.toSet());
+            Object o = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
+            Set<String> unsafeBlocks = ((o instanceof Collection) ? (Collection<?>)o : new ArrayList<>())
+                    .stream().map(o1 -> o1.toString().toUpperCase()).collect(Collectors.toSet());
 
-            int safetyRadius = safety.yamlFile.getInt("safetyRadius", 0);
+            int safetyRadius = safety.getNumber(SafetyKeys.safetyRadius,0).intValue();
             safetyRadius = Math.max(safetyRadius,7);
 
             //todo: waterlogged check
