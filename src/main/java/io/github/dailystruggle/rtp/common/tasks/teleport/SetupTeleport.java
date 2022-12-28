@@ -77,7 +77,7 @@ public final class SetupTeleport extends RTPRunnable {
 
         RTP.getInstance().latestTeleportData.put(player.uuid(),teleportData);
 
-        Map.Entry<RTPLocation, Long> pair = this.region.getLocation(sender, player, biomes, cancelled);
+        Map.Entry<RTPLocation, Long> pair = this.region.getLocation(sender, player, biomes);
         if(pair == null) { //player gets put on region queue
             return;
         }

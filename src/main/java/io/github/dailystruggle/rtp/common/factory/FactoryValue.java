@@ -131,8 +131,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
         Object resObj = data.getOrDefault(key,def);
         if(resObj instanceof Number) {
             res = (Number) resObj;
-        }
-        else if(resObj instanceof String) {
+        } else if(resObj instanceof String) {
             res = numberParsers.get(def.getClass()).apply((String) resObj);
         } else if(resObj instanceof Character) {
             res = Integer.parseInt(((Character) resObj).toString());

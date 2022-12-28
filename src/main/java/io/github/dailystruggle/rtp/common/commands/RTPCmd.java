@@ -277,11 +277,7 @@ public interface RTPCmd extends BaseRTPCmd {
 
             if(shapeNames != null) {
                 for (int j = 0; j < 1 && shapeNames != null && shapeNames.size() > 0; j++) {
-                    Object o = region.getData().get(RegionKeys.shape);
-
-                    Shape<?> originalShape;
-                    if (!(o instanceof Shape<?>)) break;
-                    originalShape = (Shape<?>) o;
+                    Shape<?> originalShape = region.getShape();
 
                     rtp.selectionAPI.tempRegions.put(senderId, region);
                     String shapeName = pickOne(shapeNames, "CIRCLE");
@@ -289,7 +285,8 @@ public interface RTPCmd extends BaseRTPCmd {
                     Shape<?> shape = (Shape<?>) factory.get(shapeName);
 
                     EnumMap<?, Object> originalShapeData = originalShape.getData();
-                    for (Map.Entry<? extends Enum<?>, Object> entry : shape.getData().entrySet()) {
+                    EnumMap<?, Object> shapeData = shape.getData();
+                    for (Map.Entry<? extends Enum<?>, Object> entry : shapeData.entrySet()) {
                         String name = entry.getKey().name();
                         if (name.equalsIgnoreCase("name")) continue;
                         if (name.equalsIgnoreCase("version")) continue;
@@ -318,19 +315,20 @@ public interface RTPCmd extends BaseRTPCmd {
                             }
 
                             entry.setValue(value);
-                        }
+                        } else {
+                            Enum<?> e;
+                            try {
+                                e = Enum.valueOf(originalShape.myClass, name);
+                            } catch (IllegalArgumentException ignored) {
+                                continue;
+                            }
 
-                        Enum<?> e;
-                        try {
-                            e = Enum.valueOf(originalShape.myClass, name);
-                        } catch (IllegalArgumentException ignored) {
-                            continue;
+                            Object o1 = originalShapeData.get(e);
+                            if ((o1 instanceof Number) || entry.getValue().getClass().isAssignableFrom(o1.getClass()))
+                                entry.setValue(o1);
                         }
-
-                        Object o1 = originalShapeData.get(e);
-                        if ((o1 instanceof Number) || entry.getValue().getClass().isAssignableFrom(o1.getClass()))
-                            entry.setValue(o1);
                     }
+                    shape.setData(shapeData);
                     region.set(RegionKeys.shape, shape);
                 }
             }
