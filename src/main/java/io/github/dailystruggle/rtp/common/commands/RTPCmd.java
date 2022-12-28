@@ -94,7 +94,7 @@ public interface RTPCmd extends BaseRTPCmd {
         }
 
         if(verbose) {
-            RTP.log(Level.INFO, "[plugin] RTP command triggered by " + sender.name() + ".");
+            RTP.log(Level.INFO, "[RTP] RTP command triggered by " + sender.name() + ".");
         }
 
         ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
@@ -138,6 +138,7 @@ public interface RTPCmd extends BaseRTPCmd {
 
         List<String> biomeList = rtpArgs.get("biome");
         List<String> shapeNames = rtpArgs.get("shape");
+        List<String> vertNames = rtpArgs.get("vert");
         double price = 0.0;
         double floor = 0.0;
         RTPEconomy economy = RTP.economy;
@@ -147,13 +148,13 @@ public interface RTPCmd extends BaseRTPCmd {
                     if (player.uuid().equals(senderId)) price += eco.getNumber(EconomyKeys.price, 0.0).doubleValue();
                     else if (player.hasPermission("rtp.notme")) continue;
                     else price += eco.getNumber(EconomyKeys.otherPrice, 0.0).doubleValue();
-                    if (shapeNames != null) price += eco.getNumber(EconomyKeys.paramsPrice, 0.0).doubleValue();
+                    if (shapeNames != null || vertNames != null) price += eco.getNumber(EconomyKeys.paramsPrice, 0.0).doubleValue();
                     if (biomeList != null) price += eco.getNumber(EconomyKeys.biomePrice, 0.0).doubleValue();
                 }
             }
             double bal = economy.bal(senderId);
             floor = eco.getNumber(EconomyKeys.balanceFloor, 0.0).doubleValue();
-            if(bal-price<floor) {
+            if((bal-price)<floor) {
                 String s = langParser.getConfigValue(MessagesKeys.notEnoughMoney, "").toString();
                 s = s.replace("[money]", String.valueOf(price));
                 RTP.serverAccessor.sendMessage(senderId,s);
@@ -167,7 +168,7 @@ public interface RTPCmd extends BaseRTPCmd {
             RTPPlayer player = players.get(i);
 
             if(verbose && rtpArgs.containsKey("player")) {
-                RTP.log(Level.INFO, "[plugin] RTP processing player:" + player.name());
+                RTP.log(Level.INFO, "[RTP] RTP processing player:" + player.name());
             }
 
             //get their data
@@ -246,7 +247,7 @@ public interface RTPCmd extends BaseRTPCmd {
                 if (player.uuid().equals(senderId)) data.cost += eco.getNumber(EconomyKeys.price, 0.0).doubleValue();
                 else if (player.hasPermission("rtp.notme")) continue;
                 else data.cost += eco.getNumber(EconomyKeys.otherPrice, 0.0).doubleValue();
-                if (shapeNames != null || doWBO) data.cost += eco.getNumber(EconomyKeys.paramsPrice, 0.0).doubleValue();
+                if (shapeNames != null || vertNames != null || doWBO) data.cost += eco.getNumber(EconomyKeys.paramsPrice, 0.0).doubleValue();
                 if (biomeList != null) data.cost += eco.getNumber(EconomyKeys.biomePrice, 0.0).doubleValue();
 
                 if(economy.bal(senderId)-data.cost<floor) {
@@ -270,65 +271,68 @@ public interface RTPCmd extends BaseRTPCmd {
             Set<String> biomes = null;
             if(biomeList!=null) biomes = new HashSet<>(biomeList);
 
-            for(int j = 0; j<1 && shapeNames!=null && shapeNames.size()>0; j++) {
-                Object o = region.getData().get(RegionKeys.shape);
-
-                Shape<?> originalShape;
-                if(!(o instanceof Shape<?>)) break;
-                originalShape = (Shape<?>) o;
-
+            if(shapeNames != null || vertNames != null) {
                 region = region.clone();
-                rtp.selectionAPI.tempRegions.put(senderId,region);
-                String shapeName = pickOne(shapeNames,"CIRCLE");
-                Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
-                Shape<?> shape = (Shape<?>) factory.get(shapeName);
+            }
 
-                EnumMap<?, Object> originalShapeData = originalShape.getData();
-                for(Map.Entry<? extends Enum<?>,Object> entry : shape.getData().entrySet()) {
-                    String name = entry.getKey().name();
-                    if(name.equalsIgnoreCase("name")) continue;
-                    if(name.equalsIgnoreCase("version")) continue;
-                    if(rtpArgs.containsKey(name)) {
-                        String string = pickOne(rtpArgs.get(name), "");
+            if(shapeNames != null) {
+                for (int j = 0; j < 1 && shapeNames != null && shapeNames.size() > 0; j++) {
+                    Object o = region.getData().get(RegionKeys.shape);
 
-                        Object value;
-                        if(string.equalsIgnoreCase("true")) {
-                            value = true;
-                        }
-                        else if(string.equalsIgnoreCase("false")) {
-                            value = false;
-                        }
-                        else {
-                            try {
-                                value = Long.parseLong(string);
-                            } catch (IllegalArgumentException ignored) {
+                    Shape<?> originalShape;
+                    if (!(o instanceof Shape<?>)) break;
+                    originalShape = (Shape<?>) o;
+
+                    rtp.selectionAPI.tempRegions.put(senderId, region);
+                    String shapeName = pickOne(shapeNames, "CIRCLE");
+                    Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+                    Shape<?> shape = (Shape<?>) factory.get(shapeName);
+
+                    EnumMap<?, Object> originalShapeData = originalShape.getData();
+                    for (Map.Entry<? extends Enum<?>, Object> entry : shape.getData().entrySet()) {
+                        String name = entry.getKey().name();
+                        if (name.equalsIgnoreCase("name")) continue;
+                        if (name.equalsIgnoreCase("version")) continue;
+                        if (rtpArgs.containsKey(name)) {
+                            String string = pickOne(rtpArgs.get(name), "");
+
+                            Object value;
+                            if (string.equalsIgnoreCase("true")) {
+                                value = true;
+                            } else if (string.equalsIgnoreCase("false")) {
+                                value = false;
+                            } else {
                                 try {
-                                    value = Double.parseDouble(string);
-                                } catch (IllegalArgumentException ignored2) {
+                                    value = Long.parseLong(string);
+                                } catch (IllegalArgumentException ignored) {
                                     try {
-                                        value = Boolean.valueOf(string);
-                                    } catch (IllegalArgumentException ignored3) {
-                                        value = string;
+                                        value = Double.parseDouble(string);
+                                    } catch (IllegalArgumentException ignored2) {
+                                        try {
+                                            value = Boolean.valueOf(string);
+                                        } catch (IllegalArgumentException ignored3) {
+                                            value = string;
+                                        }
                                     }
                                 }
                             }
+
+                            entry.setValue(value);
                         }
 
-                        entry.setValue(value);
-                    }
+                        Enum<?> e;
+                        try {
+                            e = Enum.valueOf(originalShape.myClass, name);
+                        } catch (IllegalArgumentException ignored) {
+                            continue;
+                        }
 
-                    Enum<?> e;
-                    try {
-                        e = Enum.valueOf(originalShape.myClass, name);
-                    }catch (IllegalArgumentException ignored) {
-                        continue;
+                        Object o1 = originalShapeData.get(e);
+                        if ((o1 instanceof Number) || entry.getValue().getClass().isAssignableFrom(o1.getClass()))
+                            entry.setValue(o1);
                     }
-
-                    Object o1 = originalShapeData.get(e);
-                    if((o1 instanceof Number) || entry.getValue().getClass().isAssignableFrom(o1.getClass()))
-                        entry.setValue(o1);
+                    region.set(RegionKeys.shape, shape);
                 }
-                region.set(RegionKeys.shape, shape);
             }
 
             //todo: vert params

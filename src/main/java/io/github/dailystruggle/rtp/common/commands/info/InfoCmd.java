@@ -13,8 +13,8 @@ import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tools.ParseString;
-import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang.text.StrSubstitutor;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.text.StringSubstitutor;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
@@ -136,8 +136,8 @@ public class InfoCmd extends BaseRTPCmdImpl {
                         if (!keywords.contains(s1)) return;
                         placeholders.put(s1, rtpWorldStringFunction.apply(rtpWorld));
                     });
-                    StrSubstitutor sub = new StrSubstitutor(placeholders, "[", "]");
-                    StrSubstitutor sub2 = new StrSubstitutor(placeholders, "%", "%");
+                    StringSubstitutor sub = new StringSubstitutor(placeholders, "[", "]");
+                    StringSubstitutor sub2 = new StringSubstitutor(placeholders, "%", "%");
                     return sub2.replace(sub.replace(s));
                 }).collect(Collectors.toList());
                 strings.forEach(s -> RTP.serverAccessor.sendMessage(callerId,s));
@@ -160,8 +160,8 @@ public class InfoCmd extends BaseRTPCmdImpl {
                         if (!keywords.contains(s1)) return;
                         placeholders.put(s1, rtpRegionStringFunction.apply(region));
                     });
-                    StrSubstitutor sub = new StrSubstitutor(placeholders, "[", "]");
-                    StrSubstitutor sub2 = new StrSubstitutor(placeholders, "%", "%");
+                    StringSubstitutor sub = new StringSubstitutor(placeholders, "[", "]");
+                    StringSubstitutor sub2 = new StringSubstitutor(placeholders, "%", "%");
                     return sub2.replace(sub.replace(s));
                 }).collect(Collectors.toList());
                 strings.forEach(s -> RTP.serverAccessor.sendMessage(callerId,s));

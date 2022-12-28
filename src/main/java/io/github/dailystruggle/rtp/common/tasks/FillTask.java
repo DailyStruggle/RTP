@@ -51,7 +51,7 @@ public class FillTask extends RTPRunnable {
     public void run() {
         if(pause.get() || isCancelled() || fillIncrement.get()<=0) return;
 
-        isRunning = true;
+        isRunning.setValue(true);
         long timingStart = System.currentTimeMillis();
 
         MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
@@ -61,7 +61,7 @@ public class FillTask extends RTPRunnable {
         long limit = fillIncrement.get();
         for(pos = start; pos < range && pos < start+limit; pos++) {
             if(pause.get() || isCancelled()) {
-                isRunning = false;
+                isRunning.setValue(false);
                 return;
             }
 
@@ -140,7 +140,7 @@ public class FillTask extends RTPRunnable {
 
             if(aBoolean && finalPos1<range && !isCancelled()) RTP.getInstance().fillTasks.put(region.name, new FillTask(region, finalPos1));
             else RTP.getInstance().fillTasks.remove(region.name);
-            isRunning = false;
+            isRunning.setValue(false);
         });
     }
 
