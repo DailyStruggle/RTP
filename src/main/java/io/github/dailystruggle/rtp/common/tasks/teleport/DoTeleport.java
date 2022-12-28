@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
+import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
@@ -45,8 +46,6 @@ public final class DoTeleport extends RTPRunnable {
 
         RTP.getInstance().invulnerablePlayers.put(player.uuid(),System.currentTimeMillis());
 
-        CompletableFuture<Boolean> setLocation = player.setLocation(location);
-
         TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.uuid());
         if(teleportData == null) {
             teleportData = new TeleportData();
@@ -61,10 +60,18 @@ public final class DoTeleport extends RTPRunnable {
         teleportData.completed = true;
         RTP.getInstance().latestTeleportData.put(player.uuid(),teleportData);
 
+        CompletableFuture<Boolean> setLocation = player.setLocation(location);
+
         Map<String,Object> dataMap = DatabaseAccessor.toColumns(teleportData);
         dataMap.put("playerName",player.name());
         Map<String,Object> saveMap = new HashMap<>();
-        saveMap.put(player.uuid().toString(),dataMap);
+        if (RTP.getInstance().databaseAccessor instanceof YamlFileDatabase) {
+            saveMap.put(player.uuid().toString(),dataMap);
+        }
+        else {
+            saveMap.put("UUID",player.uuid().toString());
+            saveMap.putAll(dataMap);
+        }
         RTP.getInstance().databaseAccessor.setValue("teleportData", saveMap);
 
         RTP.getInstance().chunkCleanupPipeline.add(new ChunkCleanup(location, region));

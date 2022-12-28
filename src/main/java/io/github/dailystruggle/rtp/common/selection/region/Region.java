@@ -176,8 +176,8 @@ public class Region extends FactoryValue<RegionKeys> {
             if(locationQueue.size()>=cacheCap) return;
             while(cachePipeline.size()+locationQueue.size()<cacheCap+playerQueue.size())
                 cachePipeline.add(new Cache());
-//            cachePipeline.execute(availableTime - (System.nanoTime()-start)); todo: too fast for server
-            cachePipeline.execute(0);
+            cachePipeline.execute(availableTime - (System.nanoTime()-start)); //todo: too fast for server
+//            cachePipeline.execute(0);
         } catch (InterruptedException e) {
             e.printStackTrace();
         } finally {
@@ -354,8 +354,8 @@ public class Region extends FactoryValue<RegionKeys> {
             }
         }
         else {
-            TeleportData data = RTP.getInstance().latestTeleportData.get(playerId);
             RTP.getInstance().processingPlayers.add(playerId);
+            TeleportData data = RTP.getInstance().latestTeleportData.get(playerId);
             if(data == null) {
                 data = new TeleportData();
                 data.sender = (sender != null) ? sender : player;
@@ -509,6 +509,7 @@ public class Region extends FactoryValue<RegionKeys> {
                     ((MemoryShape<?>) shape).addBadLocation(l);
                 }
                 vertFails++;
+                chunk.unload();
                 continue;
             }
 
@@ -523,6 +524,7 @@ public class Region extends FactoryValue<RegionKeys> {
                 biomeSpecificFails.putIfAbsent(currBiome,0L);
                 biomeSpecificFails.put(currBiome, biomeSpecificFails.get(currBiome)+1);
                 biomeFails++;
+                chunk.unload();
                 continue;
             }
 
@@ -563,6 +565,7 @@ public class Region extends FactoryValue<RegionKeys> {
                 }
                 location = null;
             }
+            chunk.unload();
         }
 
         if (verbose && i >= maxAttempts) {

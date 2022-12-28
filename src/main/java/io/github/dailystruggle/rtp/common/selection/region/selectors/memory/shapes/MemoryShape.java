@@ -50,6 +50,8 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         for (Map.Entry<E,?> e : data.entrySet())
             params.put(e.getKey().name(),e.getValue().toString());
 
+
+
         Yaml fileYAML = new Yaml();
 
         File pluginDir = RTP.serverAccessor.getPluginDirectory();

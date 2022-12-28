@@ -27,6 +27,9 @@ public class YamlDatabaseTest {
         }
 
         YamlFileDatabase database = new YamlFileDatabase(RTP.configs.pluginDirectory);
+        RTP.getInstance().databaseAccessor = database;
+        database.startup();
+
         Map<String, YamlFile> connect = database.connect();
         Assertions.assertNotNull(connect);
         Assertions.assertNotEquals(0,connect.size());

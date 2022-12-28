@@ -332,5 +332,11 @@
             <artifactId>title-api</artifactId>
             <version>1.0</version>
         </dependency>
+        <dependency>
+            <groupId>org.xerial</groupId>
+            <artifactId>sqlite-jdbc</artifactId>
+            <version>3.15.1</version>
+            <scope>provided</scope>
+        </dependency>
     </dependencies>
 </project>
