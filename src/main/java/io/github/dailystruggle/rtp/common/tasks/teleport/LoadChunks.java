@@ -27,8 +27,8 @@ public final class LoadChunks extends RTPRunnable {
     public static final List<Consumer<LoadChunks>> postActions = new ArrayList<>();
 
     static {
-        preActions.add(task -> task.isRunning = true);
-        postActions.add(task -> task.isRunning = false);
+        preActions.add(task -> task.isRunning.setTrue());
+        postActions.add(task -> task.isRunning.setFalse());
     }
 
     private final RTPCommandSender sender;

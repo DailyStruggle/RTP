@@ -70,7 +70,10 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
         regionParameter.put("worldborderoverride", new BooleanParameter("rtp.params","modify xz selection",(uuid, s)->true));
         regionParameter.put("shape", new ShapeParameter("rtp.params","modify xz selection",(uuid,s)->true));
         regionParameter.put("vert", new VertParameter("rtp.params","modify y selection",(uuid,s)->true));
-        regionParameter.put("biome", new EnumParameter<>(
+
+        addParameter("region", regionParameter);
+
+        addParameter("biome", new EnumParameter<>(
                 "rtp.biome",
                 "select a world to teleport to",
                 (sender, s) -> {
@@ -81,8 +84,8 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
                     }
                     return sender.hasPermission("rtp.biome." + s);
                 },
-                Biome.class));
-        addParameter("region", regionParameter);
+                Biome.class)
+        );
 
         //target player parameter
         // filter by player exists and player permission

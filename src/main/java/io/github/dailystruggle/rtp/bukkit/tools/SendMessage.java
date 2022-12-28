@@ -26,7 +26,8 @@ import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.HoverEvent;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.chat.hover.content.Text;
-import org.apache.commons.lang.text.StrSubstitutor;
+import org.apache.commons.lang3.text.StrSubstitutor;
+import org.apache.commons.text.StringSubstitutor;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
@@ -413,7 +414,7 @@ public class SendMessage {
 
         //set up substitutor with the new placeholder results array
         // using [x] format to detect my local placeholders.
-        StrSubstitutor sub = new StrSubstitutor(placeholders,"[","]");
+        StringSubstitutor sub = new StringSubstitutor(placeholders,"[","]");
 
         //replace all placeholders with their respective string function results
         text = sub.replace(text);
@@ -477,7 +478,7 @@ public class SendMessage {
 
         //set up substitutor with the new placeholder results array
         // using [x] format to detect my local placeholders.
-        StrSubstitutor sub = new StrSubstitutor(placeholders,"[","]");
+        StringSubstitutor sub = new StringSubstitutor(placeholders,"[","]");
 
         //replace all placeholders with their respective string function results
         text = sub.replace(text);
