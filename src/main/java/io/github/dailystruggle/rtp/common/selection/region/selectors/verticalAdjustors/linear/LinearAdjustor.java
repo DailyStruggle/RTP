@@ -52,11 +52,20 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
         int minY = getNumber(GenericVerticalAdjustorKeys.minY, 0L).intValue();
         int dir = getNumber(GenericVerticalAdjustorKeys.direction, 0).intValue();
 
+        boolean requireSkyLight;
+        Object o = getData().getOrDefault(GenericVerticalAdjustorKeys.requireSkyLight, false);
+        if(o instanceof Boolean) {
+            requireSkyLight = (Boolean) o;
+        }
+        else requireSkyLight = Boolean.parseBoolean(o.toString());
+
         switch(dir) {
             case 0: { //bottom up
                 for (int i = minY; i < maxY; i++) {
                     resBlock = input.getBlockAt(7,i,7);
-                    if(testPlacement(resBlock)) return resBlock.getLocation();
+                    int skylight = 15;
+                    if(requireSkyLight) skylight = resBlock.skyLight();
+                    if(skylight>7 && testPlacement(resBlock)) return resBlock.getLocation();
                 }
                 break;
             }

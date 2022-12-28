@@ -38,7 +38,7 @@ public class TestRTPCommandSender implements RTPCommandSender {
 
     @Override
     public String name() {
-        return null;
+        return "console";
     }
 
     @Override
@@ -48,6 +48,11 @@ public class TestRTPCommandSender implements RTPCommandSender {
 
     @Override
     public RTPCommandSender clone() {
+        try {
+            return (RTPCommandSender) super.clone();
+        } catch (CloneNotSupportedException e) {
+            e.printStackTrace();
+        }
         return null;
     }
 }

@@ -10,6 +10,7 @@ import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
 
 public final class AsyncTaskProcessing extends RTPRunnable {
     long step = 0;

@@ -3,6 +3,9 @@ package io.github.dailystruggle.rtp.common.database.options;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
+import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.simpleyaml.configuration.ConfigurationSection;
@@ -13,6 +16,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
 
 /**
  * a "database" that's just reading and writing yaml files,
@@ -80,6 +84,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String,YamlFile>> {
     public void disconnect(Map<String, YamlFile> database) {
         for (YamlFile file : database.values()) {
             try {
+                if(!file.exists()) file.createNewFile(true);
                 file.save();
             } catch (IOException e) {
                 e.printStackTrace();
@@ -109,9 +114,10 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String,YamlFile>> {
         YamlFile file = database.get(tableName);
         if(file == null) file = new YamlFile(directory.getAbsolutePath() + File.separator + tableName);
         if(!file.exists()) {
+            String filePath = file.getFilePath();
             if(database.containsKey("default.yml")) {
                 try {
-                    database.get("default.yml").copyTo(file.getFilePath());
+                    database.get("default.yml").copyTo(filePath);
                 } catch (IOException e) {
                     e.printStackTrace();
                     return;
@@ -125,6 +131,8 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String,YamlFile>> {
                     return;
                 }
             }
+            String substring = filePath.substring(filePath.lastIndexOf(File.separator) + 1);
+            database.put(substring,file);
         }
         try {
             file.loadWithComments();
@@ -177,6 +185,61 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String,YamlFile>> {
         Map.Entry<String,Map<TableObj,TableObj>> writeRequest
                 = new AbstractMap.SimpleEntry<>(tableName,writeValues);
         writeQueue.add(writeRequest);
+    }
+
+    @Override
+    public void startup() {
+        Map<String,YamlFile> lookup = connect();
+        @NotNull Optional<Map<String, Object>> read = read(lookup, "referenceData", new AbstractMap.SimpleEntry<>("referenceTime",0L));
+        if(read.isPresent()) {
+            YamlFile yamlFile = lookup.get("teleportData.yml");
+            try {
+                long referenceTime = Long.parseLong(read.get().get("referenceTime").toString());
+                Map<String, Object> mapValues = yamlFile.getMapValues(false);
+                for(Map.Entry<String,Object> entry : mapValues.entrySet()) {
+                    String key = entry.getKey();
+                    Object value = entry.getValue();
+
+                    Map<String,Object> dataMap;
+                    if(value instanceof Map) {
+                        dataMap = (Map<String, Object>) value;
+                    }
+                    else if(value instanceof ConfigurationSection) {
+                        dataMap = ((ConfigurationSection) value).getMapValues(false);
+                    }
+                    else throw new IllegalStateException();
+
+                    try {
+                        UUID id = UUID.fromString(key.split("\\.")[0]);
+                        TeleportData teleportData = new TeleportData();
+                        teleportData.sender = RTP.serverAccessor.getSender(UUID.fromString(dataMap.get("senderId").toString()));
+                        teleportData.time = (Long) dataMap.getOrDefault("time", 0L);
+                        if(teleportData.time!=0L) teleportData.time = System.currentTimeMillis() - Math.abs(referenceTime - teleportData.time);
+                        RTPWorld originalWorldId = RTP.serverAccessor.getRTPWorld(UUID.fromString(dataMap.get("originalWorldId").toString()));
+                        if(originalWorldId!=null)
+                            teleportData.originalLocation = new RTPLocation(originalWorldId,
+                                    ((Number)dataMap.get("originalX")).intValue(),
+                                    ((Number)dataMap.get("originalY")).intValue(),
+                                    ((Number)dataMap.get("originalZ")).intValue());
+                        RTPWorld selectedWorldId = RTP.serverAccessor.getRTPWorld(UUID.fromString(dataMap.get("selectedWorldId").toString()));
+                        if(selectedWorldId!=null)
+                            teleportData.selectedLocation = new RTPLocation(selectedWorldId,
+                                    ((Number)dataMap.get("selectedX")).intValue(),
+                                    ((Number)dataMap.get("selectedY")).intValue(),
+                                    ((Number)dataMap.get("selectedZ")).intValue());
+                        teleportData.attempts = ((Number)dataMap.get("attempts")).intValue();
+                        teleportData.cost = ((Number)dataMap.get("cost")).intValue();
+                        teleportData.targetRegion = RTP.getInstance().selectionAPI.getRegion(dataMap.get("region").toString());
+                        teleportData.completed = true;
+                        RTP.getInstance().latestTeleportData.put(id, teleportData);
+                    } catch (Exception ignored) {
+
+                    }
+                }
+            } catch (IllegalArgumentException exception) {
+                exception.printStackTrace();
+            }
+        }
     }
 
     private static void setSection(ConfigurationSection section, Map<String,Object> map) {

@@ -7,6 +7,7 @@ import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
+import io.github.dailystruggle.rtp.common.database.options.SQLiteDatabaseAccessor;
 import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
@@ -31,6 +32,8 @@ import org.simpleyaml.configuration.ConfigurationSection;
 import org.simpleyaml.configuration.file.YamlFile;
 
 import java.io.File;
+import java.sql.Connection;
+import java.sql.DriverManager;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
@@ -60,7 +63,7 @@ public class RTP {
         factoryMap.put(factoryNames.multiConfig, new Factory<MultiConfigParser<?>>());
     }
 
-    public DatabaseAccessor<Map<String, YamlFile>> databaseAccessor;
+    public DatabaseAccessor<?> databaseAccessor;
 
     /**
      * minimum number of teleportations to executeAsyncTasks per gametick, to prevent bottlenecking during lag spikes
@@ -87,68 +90,10 @@ public class RTP {
 
         RTPAPI.addShape(new Circle());
         RTPAPI.addShape(new Square());
-        new LinearAdjustor(new ArrayList<>());
+//        new LinearAdjustor(new ArrayList<>()); todo: make this work
         new JumpAdjustor(new ArrayList<>());
 
         configs = new Configs(serverAccessor.getPluginDirectory());
-
-        File databaseDirectory = serverAccessor.getPluginDirectory();
-        databaseDirectory = new File(databaseDirectory.getAbsolutePath() + File.separator + "database");
-        databaseAccessor = new YamlFileDatabase(databaseDirectory); //todo: sqlite
-
-        Map<String, YamlFile> connect = databaseAccessor.connect();
-        @NotNull Optional<Map<String, Object>> read = databaseAccessor.read(connect, "teleportData", new AbstractMap.SimpleEntry<>("referenceTime",0L));
-        if(read.isPresent()) {
-            YamlFile yamlFile = connect.get("teleportData.yml");
-
-            try {
-                long referenceTime = Long.parseLong(read.get().get("referenceTime").toString());
-                Map<String, Object> mapValues = yamlFile.getMapValues(false);
-                for(Map.Entry<String,Object> entry : mapValues.entrySet()) {
-                    String key = entry.getKey();
-                    if(key.equals("referenceTime")) continue;
-                    Object value = entry.getValue();
-
-                    Map<String,Object> dataMap;
-                    if(value instanceof Map) {
-                        dataMap = (Map<String, Object>) value;
-                    }
-                    else if(value instanceof ConfigurationSection) {
-                        dataMap = ((ConfigurationSection) value).getMapValues(false);
-                    }
-                    else throw new IllegalStateException();
-
-                    try {
-                        UUID id = UUID.fromString(key.split("\\.")[0]);
-                        TeleportData teleportData = new TeleportData();
-                        teleportData.sender = serverAccessor.getSender(UUID.fromString(dataMap.get("senderId").toString()));
-                        teleportData.time = (Long) dataMap.getOrDefault("time", 0L);
-                        if(teleportData.time!=0L) teleportData.time = System.currentTimeMillis() - Math.abs(referenceTime - teleportData.time);
-                        RTPWorld originalWorldId = serverAccessor.getRTPWorld(UUID.fromString(dataMap.get("originalWorldId").toString()));
-                        if(originalWorldId!=null)
-                            teleportData.originalLocation = new RTPLocation(originalWorldId,
-                                    ((Number)dataMap.get("originalX")).intValue(),
-                                    ((Number)dataMap.get("originalY")).intValue(),
-                                    ((Number)dataMap.get("originalZ")).intValue());
-                        RTPWorld selectedWorldId = serverAccessor.getRTPWorld(UUID.fromString(dataMap.get("selectedWorldId").toString()));
-                        if(selectedWorldId!=null)
-                            teleportData.selectedLocation = new RTPLocation(selectedWorldId,
-                                    ((Number)dataMap.get("selectedX")).intValue(),
-                                    ((Number)dataMap.get("selectedY")).intValue(),
-                                    ((Number)dataMap.get("selectedZ")).intValue());
-                        teleportData.attempts = ((Number)dataMap.get("attempts")).intValue();
-                        teleportData.cost = ((Number)dataMap.get("cost")).intValue();
-                        teleportData.targetRegion = selectionAPI.getRegion(dataMap.get("region").toString());
-                        teleportData.completed = true;
-                        latestTeleportData.put(id, teleportData);
-                    } catch (Exception ignored) {
-
-                    }
-                }
-            } catch (IllegalArgumentException exception) {
-                exception.printStackTrace();
-            }
-        }
     }
 
     public static RTP getInstance() {
@@ -239,11 +184,13 @@ public class RTP {
 
         FillTask.kill();
 
-        Map<String,Object> referenceData = new HashMap<>();
-        referenceData.put("referenceTime",System.currentTimeMillis());
-        instance.databaseAccessor.setValue("teleportData", referenceData);
-        instance.databaseAccessor.processQueries(Long.MAX_VALUE);
-
         serverAccessor.stop();
+
+        DriverManager.setLoginTimeout(60);
+        Map<String,Object> referenceData = new HashMap<>();
+        referenceData.put("time",System.currentTimeMillis());
+        referenceData.put("UUID",new UUID(0,0).toString());
+        instance.databaseAccessor.setValue("referenceData", referenceData);
+        instance.databaseAccessor.processQueries(Long.MAX_VALUE);
     }
 }

@@ -19,6 +19,8 @@ import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
+import io.github.dailystruggle.rtp.common.database.options.SQLiteDatabaseAccessor;
+import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.*;
@@ -32,6 +34,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
+import java.io.File;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -53,13 +56,32 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     public BukkitTask asyncTimer = null;
     public BukkitTask syncTimer = null;
 
-//    @Override
-//    public void onLoad() {
+    @Override
+    public void onLoad() {
+        try {
+            Class.forName("org.sqlite.JDBC");
+        } catch (ClassNotFoundException e) {
+            throw new IllegalStateException();
+        }
+
 //        instance = this;
 //        RTP.serverAccessor = new BukkitServerAccessor();
 //
-//        new RTP(); //constructor updates API instance
-//    }
+//        RTP rtp = new RTP();//constructor updates API instance
+//
+//        File databaseDirectory = RTP.configs.pluginDirectory;
+//        databaseDirectory = new File(databaseDirectory.getAbsolutePath() + File.separator + "database");
+//        databaseDirectory.mkdirs();
+//        rtp.databaseAccessor = new SQLiteDatabaseAccessor(
+//                "jdbc:sqlite:" + databaseDirectory.getAbsolutePath() + File.separator + "RTP.db");
+//        rtp.databaseAccessor.startup();
+
+//        File pluginDirectory = RTP.configs.pluginDirectory;
+//        pluginDirectory = new File(pluginDirectory.getAbsolutePath() + File.separator + "database");
+//        YamlFileDatabase database = new YamlFileDatabase(pluginDirectory);
+//        rtp.databaseAccessor = database;
+//        database.startup();
+    }
 
     @Override
     public void onEnable() {
@@ -68,7 +90,14 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         if(instance == null) {
             instance = this;
             RTP.serverAccessor = new BukkitServerAccessor();
-            new RTP();
+            RTP rtp = new RTP();//constructor updates API instance
+
+            File databaseDirectory = RTP.configs.pluginDirectory;
+            databaseDirectory = new File(databaseDirectory.getAbsolutePath() + File.separator + "database");
+            databaseDirectory.mkdirs();
+            rtp.databaseAccessor = new SQLiteDatabaseAccessor(
+                    "jdbc:sqlite:" + databaseDirectory.getAbsolutePath() + File.separator + "RTP.db");
+            rtp.databaseAccessor.startup();
         }
 
         RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
