@@ -51,7 +51,13 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
         int maxY = getNumber(JumpAdjustorKeys.maxY, 255L).intValue();
         int minY = getNumber(JumpAdjustorKeys.minY, 0L).intValue();
         int step = getNumber(JumpAdjustorKeys.step, 0).intValue();
-        Boolean requireSkyLight = (Boolean) getData().getOrDefault(JumpAdjustorKeys.requireSkyLight, false);
+
+        boolean requireSkyLight;
+        Object o = getData().getOrDefault(JumpAdjustorKeys.requireSkyLight, false);
+        if(o instanceof Boolean) {
+            requireSkyLight = (Boolean) o;
+        }
+        else requireSkyLight = Boolean.parseBoolean(o.toString());
 
         int oldY = minY;
 
@@ -68,7 +74,6 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
 
         for(int it_len = step; it_len > 2; it_len = it_len/2) {
             for(int i = minY; i < maxY; i+= it_len) {
-                int skylight = 15;
                 RTPBlock block1;
                 try {
                     block1 = chunk.getBlockAt(7, i, 7);
@@ -77,6 +82,7 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
                     return null;
                 }
                 RTPBlock block2 = chunk.getBlockAt(7, i+1, 7);
+                int skylight = 15;
                 if(requireSkyLight) skylight = block2.skyLight();
                 if(block1.isAir() && block2.isAir() && skylight > 7) {
                     minY = oldY;
@@ -89,9 +95,9 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
         }
 
         for(int i = minY; i < maxY; i++) {
-            int skylight = 15;
             RTPBlock block1 = chunk.getBlockAt(7, i, 7);
             RTPBlock block2 = chunk.getBlockAt(7, i+1, 7);
+            int skylight = 15;
             if(requireSkyLight) skylight = block2.skyLight();
             if(block1.isAir() && block2.isAir() && skylight > 7) {
                 return block1.getLocation();

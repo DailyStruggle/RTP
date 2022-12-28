@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.bukkit.server.substitutions;
 import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import org.bukkit.Bukkit;
@@ -59,6 +60,17 @@ public final class BukkitRTPPlayer implements RTPPlayer {
             if (permissionAttachmentInfo.getValue()) return permissionAttachmentInfo.getPermission().toLowerCase();
             else return null;
         }).filter(Objects::nonNull).collect(Collectors.toSet());
+    }
+
+    @Override
+    public RTPCommandSender clone() {
+        RTPCommandSender clone = null;
+        try {
+            clone = (RTPCommandSender) super.clone();
+        } catch (CloneNotSupportedException e) {
+            e.printStackTrace();
+        }
+        return clone;
     }
 
     @Override

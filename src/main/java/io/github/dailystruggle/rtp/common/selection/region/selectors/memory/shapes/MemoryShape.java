@@ -50,10 +50,12 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         for (Map.Entry<E,?> e : data.entrySet())
             params.put(e.getKey().name(),e.getValue().toString());
 
+
+
         Yaml fileYAML = new Yaml();
 
         File pluginDir = RTP.serverAccessor.getPluginDirectory();
-        String dirPath = pluginDir.getAbsolutePath() + File.separator + "rawShapeData";
+        String dirPath = pluginDir.getAbsolutePath() + File.separator + "database" + File.separator + "regionData";
         String filePath = dirPath + File.separator + fileName;
         File dir = new File(dirPath);
         File file = new File(filePath);
@@ -96,7 +98,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
         Yaml fileYAML = new Yaml();
         File pluginDir = RTP.serverAccessor.getPluginDirectory();
-        String filePath = pluginDir.getAbsolutePath() + File.separator + "rawShapeData" + File.separator + fileName;
+        String filePath = pluginDir.getAbsolutePath() + File.separator + "database" + File.separator + "regionData" + File.separator + fileName;
         File file = new File(filePath);
         if(!file.exists()) return;
 

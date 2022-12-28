@@ -92,7 +92,7 @@ public final class BukkitRTPWorld implements RTPWorld {
             list.add(chunkAtAsync);
             chunkLoads.put(xz,list);
 
-            chunkAtAsync.whenComplete((chunk, throwable) -> {
+            chunkAtAsync.thenAccept(chunk -> {
                 res.complete(new BukkitRTPChunk(chunk));
                 chunkLoads.remove(xz);
                 if(!RTPBukkitPlugin.getInstance().isEnabled()) throw new IllegalStateException("completed chunk after plugin disabled");
@@ -109,15 +109,17 @@ public final class BukkitRTPWorld implements RTPWorld {
             if(Bukkit.isPrimaryThread()) setChunkForceLoaded(cx,cz,true);
             else Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),()->setChunkForceLoaded(cx,cz,true));
             chunkLongPair.setValue(chunkLongPair.getValue()+1);
+            chunkMap.put(xz,chunkLongPair);
         }
         else {
             CompletableFuture<RTPChunk> chunkAt = getChunkAt(cx, cz);
-            chunkAt.whenComplete((rtpChunk, throwable) -> {
+            chunkAt.thenAccept(rtpChunk -> {
                 if(chunkMap.containsKey(xz)) {
                     Map.Entry<Chunk, Long> chunkLongPair = chunkMap.get(xz);
                     if(Bukkit.isPrimaryThread()) setChunkForceLoaded(cx,cz,true);
                     else Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),()->setChunkForceLoaded(cx,cz,true));
                     chunkLongPair.setValue(chunkLongPair.getValue()+1);
+                    chunkMap.put(xz,chunkLongPair);
                 }
                 else if(rtpChunk instanceof BukkitRTPChunk) {
                     BukkitRTPChunk bukkitRTPChunk = ((BukkitRTPChunk) rtpChunk);
@@ -185,11 +187,12 @@ public final class BukkitRTPWorld implements RTPWorld {
         Material air = (airBlock.isLiquid() || airBlock.getType().isSolid()) ? Material.AIR : airBlock.getType();
         Material solid = location.getBlock().getRelative(BlockFace.DOWN).getType();
 
-        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.getInstance().configs.getParser(SafetyKeys.class);
-        Set<String> unsafeBlocks = safety.yamlFile.getStringList("unsafeBlocks")
-                .stream().map(String::toUpperCase).collect(Collectors.toSet());
+        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+        Object value = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
+        Set<String> unsafeBlocks = (((value instanceof Collection) ? (Collection<String>)value : new ArrayList<>()))
+                .stream().map(o -> o.toString().toUpperCase()).collect(Collectors.toSet());
 
-        Object o = safety.yamlFile.getString("platformMaterial", Material.COBBLESTONE.name());
+        Object o = safety.getConfigValue(SafetyKeys.platformMaterial,Material.COBBLESTONE.name());
         Material platformMaterial;
         if (o instanceof String) {
             try {
@@ -200,9 +203,9 @@ public final class BukkitRTPWorld implements RTPWorld {
         }
         else throw new IllegalStateException();
 
-        int platformRadius = safety.yamlFile.getInt("platformRadius", 0);
-        int platformDepth = safety.yamlFile.getInt("platformDepth", 1);
-        int platformAirHeight = safety.yamlFile.getInt("platformAirHeight", 2);
+        int platformRadius = safety.getNumber(SafetyKeys.platformRadius, 0).intValue();
+        int platformDepth = safety.getNumber(SafetyKeys.platformDepth,1).intValue();
+        int platformAirHeight = safety.getNumber(SafetyKeys.platformAirHeight, 2).intValue();
 
         boolean checkWaterlogged = unsafeBlocks.contains("WATERLOGGED");
 

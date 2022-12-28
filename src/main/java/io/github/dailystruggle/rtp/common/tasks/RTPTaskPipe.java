@@ -3,9 +3,10 @@ package io.github.dailystruggle.rtp.common.tasks;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.TimeUnit;
 
 public class RTPTaskPipe {
-    protected long avgTime = 0;
+    protected long avgTime = TimeUnit.MILLISECONDS.toNanos(50);
     private boolean stop = false;
     private final ConcurrentLinkedQueue<Runnable> runnables = new ConcurrentLinkedQueue<>();
 

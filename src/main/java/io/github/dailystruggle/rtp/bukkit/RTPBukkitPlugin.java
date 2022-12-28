@@ -19,15 +19,22 @@ import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
+import io.github.dailystruggle.rtp.common.database.options.SQLiteDatabaseAccessor;
+import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.*;
+import io.github.dailystruggle.rtp.common.tasks.teleport.DoTeleport;
+import io.github.dailystruggle.rtp.common.tasks.teleport.LoadChunks;
+import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
+import io.github.dailystruggle.rtp.common.tasks.teleport.SetupTeleport;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
+import java.io.File;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -51,10 +58,29 @@ public final class RTPBukkitPlugin extends JavaPlugin {
 
     @Override
     public void onLoad() {
-        instance = this;
-        RTP.serverAccessor = new BukkitServerAccessor();
+        try {
+            Class.forName("org.sqlite.JDBC");
+        } catch (ClassNotFoundException e) {
+            throw new IllegalStateException();
+        }
 
-        new RTP(); //constructor updates API instance
+//        instance = this;
+//        RTP.serverAccessor = new BukkitServerAccessor();
+//
+//        RTP rtp = new RTP();//constructor updates API instance
+//
+//        File databaseDirectory = RTP.configs.pluginDirectory;
+//        databaseDirectory = new File(databaseDirectory.getAbsolutePath() + File.separator + "database");
+//        databaseDirectory.mkdirs();
+//        rtp.databaseAccessor = new SQLiteDatabaseAccessor(
+//                "jdbc:sqlite:" + databaseDirectory.getAbsolutePath() + File.separator + "RTP.db");
+//        rtp.databaseAccessor.startup();
+
+//        File pluginDirectory = RTP.configs.pluginDirectory;
+//        pluginDirectory = new File(pluginDirectory.getAbsolutePath() + File.separator + "database");
+//        YamlFileDatabase database = new YamlFileDatabase(pluginDirectory);
+//        rtp.databaseAccessor = database;
+//        database.startup();
     }
 
     @Override
@@ -64,7 +90,14 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         if(instance == null) {
             instance = this;
             RTP.serverAccessor = new BukkitServerAccessor();
-            new RTP();
+            RTP rtp = new RTP();//constructor updates API instance
+
+            File databaseDirectory = RTP.configs.pluginDirectory;
+            databaseDirectory = new File(databaseDirectory.getAbsolutePath() + File.separator + "database");
+            databaseDirectory.mkdirs();
+            rtp.databaseAccessor = new SQLiteDatabaseAccessor(
+                    "jdbc:sqlite:" + databaseDirectory.getAbsolutePath() + File.separator + "RTP.db");
+            rtp.databaseAccessor.startup();
         }
 
         RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
@@ -85,7 +118,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
 
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,RTP.serverAccessor::start);
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupBukkitEvents);
-        Bukkit.getScheduler().runTaskAsynchronously(this,this::setupEffects);
+        if(RTP.serverAccessor.getServerIntVersion()>12) Bukkit.getScheduler().runTaskAsynchronously(this,this::setupEffects);
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupIntegrations);
 
         Bukkit.getScheduler().runTaskTimer(this, new TPS(),0,1);
@@ -134,25 +167,13 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new OnPlayerTeleport(), this);
         if(RTP.serverAccessor.getServerIntVersion()<13) Bukkit.getPluginManager().registerEvents(new OnChunkUnload(), this);
 
-        EffectsAPI.init(this);
+        if(RTP.serverAccessor.getServerIntVersion()>12) EffectsAPI.init(this);
     }
 
     private void setupEffects() {
         RTP rtp = RTP.getInstance();
-        if(rtp == null) {
-            rtp.miscAsyncTasks.add(this::setupEffects);
-            return;
-        }
-        Configs configs = rtp.configs;
-        if(configs == null) {
-            rtp.miscAsyncTasks.add(this::setupEffects);
-            return;
-        }
+        Configs configs = RTP.configs;
         FactoryValue<PerformanceKeys> parser = configs.getParser(PerformanceKeys.class);
-        if(parser == null) {
-            rtp.miscAsyncTasks.add(this::setupEffects);
-            return;
-        }
 
         SetupTeleport.preActions.add(task -> {
             PreSetupTeleportEvent event = new PreSetupTeleportEvent(task);
@@ -251,7 +272,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         });
 
         DoTeleport.postActions.add(task -> {
-            ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.getInstance().configs.getParser(MessagesKeys.class);
+            ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
 
             if(task.player() instanceof BukkitRTPPlayer) {
                 Player player = ((BukkitRTPPlayer) task.player()).player();
@@ -346,7 +367,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         Set<String> regionsAttempted = new HashSet<>();
 
         String worldName = player.getWorld().getName();
-        MultiConfigParser<WorldKeys> worldParsers = (MultiConfigParser<WorldKeys>) RTP.getInstance().configs.multiConfigParserMap.get(WorldKeys.class);
+        MultiConfigParser<WorldKeys> worldParsers = (MultiConfigParser<WorldKeys>) RTP.configs.multiConfigParserMap.get(WorldKeys.class);
         ConfigParser<WorldKeys> worldParser = worldParsers.getParser(worldName);
         boolean requirePermission = Boolean.parseBoolean(worldParser.getConfigValue(WorldKeys.requirePermission,false).toString());
 
@@ -360,7 +381,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         }
 
         String regionName = String.valueOf(worldParser.getConfigValue(WorldKeys.region, "default"));
-        MultiConfigParser<RegionKeys> regionParsers = (MultiConfigParser<RegionKeys>) RTP.getInstance().configs.multiConfigParserMap.get(RegionKeys.class);
+        MultiConfigParser<RegionKeys> regionParsers = (MultiConfigParser<RegionKeys>) RTP.configs.multiConfigParserMap.get(RegionKeys.class);
         ConfigParser<RegionKeys> regionParser = regionParsers.getParser(regionName);
         requirePermission = Boolean.parseBoolean(regionParser.getConfigValue(RegionKeys.requirePermission,false).toString());
 

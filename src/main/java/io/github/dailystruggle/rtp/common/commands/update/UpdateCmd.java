@@ -12,6 +12,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.logging.Level;
 
 public class UpdateCmd extends BaseRTPCmdImpl {
     public UpdateCmd(@Nullable CommandsAPICommand parent) {
@@ -41,7 +42,7 @@ public class UpdateCmd extends BaseRTPCmdImpl {
     }
 
     public void addCommands() {
-        final Configs configs = RTP.getInstance().configs;
+        final Configs configs = RTP.configs;
         for (ConfigParser<?> value : configs.configParserMap.values()) {
             String name = value.name.replace(".yml","");
             if(getCommandLookup().containsKey(name)) continue;

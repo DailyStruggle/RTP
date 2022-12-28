@@ -48,10 +48,10 @@ public final class BukkitRTPCommandSender implements RTPCommandSender {
 
         int cooldown = ParsePermissions.getInt(this, "rtp.cooldown.");
         if (cooldown < 0) {
-            ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.getInstance().configs.getParser(ConfigKeys.class);
+            ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
             cooldown = configParser.getNumber(ConfigKeys.teleportCooldown, 0).intValue();
         }
-        return TimeUnit.SECONDS.toNanos(cooldown);
+        return TimeUnit.SECONDS.toMillis(cooldown);
     }
 
     @Override
@@ -60,10 +60,10 @@ public final class BukkitRTPCommandSender implements RTPCommandSender {
 
         int delay = ParsePermissions.getInt(new BukkitRTPCommandSender(sender), "rtp.delay.");
         if (delay < 0) {
-            ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.getInstance().configs.getParser(ConfigKeys.class);
+            ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
             delay = configParser.getNumber(ConfigKeys.teleportDelay, 0).intValue();
         }
-        return TimeUnit.SECONDS.toNanos(delay);
+        return TimeUnit.SECONDS.toMillis(delay);
     }
 
     @Override
@@ -77,6 +77,17 @@ public final class BukkitRTPCommandSender implements RTPCommandSender {
             if (permissionAttachmentInfo.getValue()) return permissionAttachmentInfo.getPermission().toLowerCase();
             else return null;
         }).filter(Objects::nonNull).collect(Collectors.toSet());
+    }
+
+    @Override
+    public RTPCommandSender clone() {
+        RTPCommandSender clone = null;
+        try {
+            clone = (RTPCommandSender) super.clone();
+        } catch (CloneNotSupportedException e) {
+            e.printStackTrace();
+        }
+        return clone;
     }
 
     public CommandSender sender() {

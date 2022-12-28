@@ -1,8 +1,10 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
+import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
+import org.bukkit.command.TabCompleter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.simpleyaml.configuration.ConfigurationSection;
@@ -14,23 +16,27 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements ConfigLoader {
-    public YamlFile yamlFile;
-
     public String version;
     public File pluginDirectory;
 
     public Map<String, Object> language_mapping = new ConcurrentHashMap<String, Object>();
     public Map<String,String> reverse_language_mapping = new ConcurrentHashMap<>();
 
+    public final YamlFileDatabase fileDatabase;
+    AtomicReference<Map<String, YamlFile>> cachedLookup;
+
     private ClassLoader classLoader = this.getClass().getClassLoader();
 
-    public ConfigParser(Class<E> eClass, final String name, final String version, final File pluginDirectory, File langFile, ClassLoader classLoader) {
+    public ConfigParser(Class<E> eClass, final String name, final String version, final File pluginDirectory, File langFile, YamlFileDatabase fileDatabase, ClassLoader classLoader) {
         super(eClass, name);
+        this.fileDatabase = fileDatabase;
         this.name = (name.endsWith(".yml")) ? name : name + ".yml";
         this.version = version;
         this.pluginDirectory = pluginDirectory;
@@ -38,16 +44,18 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
         check(version,pluginDirectory, langFile);
     }
 
-    public ConfigParser(Class<E> eClass, final String name, final String version, final File pluginDirectory, File langFile) {
+    public ConfigParser(Class<E> eClass, final String name, final String version, final File pluginDirectory, File langFile, YamlFileDatabase fileDatabase) {
         super(eClass, name);
+        this.fileDatabase = fileDatabase;
         this.name = (name.endsWith(".yml")) ? name : name + ".yml";
         this.version = version;
         this.pluginDirectory = pluginDirectory;
         check(version,pluginDirectory, langFile);
     }
 
-    public ConfigParser(Class<E> eClass, final String name, final String version, final File pluginDirectory) {
+    public ConfigParser(Class<E> eClass, final String name, final String version, final File pluginDirectory, YamlFileDatabase fileDatabase) {
         super(eClass, name);
+        this.fileDatabase = fileDatabase;
         this.name = (name.endsWith(".yml")) ? name : name + ".yml";
         this.version = version;
         this.pluginDirectory = pluginDirectory;
@@ -106,7 +114,11 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
                 return;
             }
         }
-        loadResource(f);
+//        loadResource(f);
+
+        cachedLookup = fileDatabase.cachedLookup;
+        if(cachedLookup.get() == null || !cachedLookup.get().containsKey(name)) fileDatabase.connect();
+        YamlFile yamlFile = cachedLookup.get().get(name);
 
         String versionStr = yamlFile.getMapValues(false).getOrDefault("version", "1.0").toString();
 
@@ -133,7 +145,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
         if(update) {
             update();
             f = new File(pluginDirectory, this.name);
-            loadResource(f);
+//            loadResource(f);
         }
 
         data.clear();
@@ -217,35 +229,10 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
         }
     }
 
-    public void loadResource(File f) {
-        Map<String,Object> yamlMap;
-        if(f.exists()) {
-            yamlFile = new YamlFile(f.getPath());
-            try {
-                yamlFile.loadWithComments();
-            } catch (IOException e) {
-                e.printStackTrace();
-                return;
-            }
-            yamlMap = yamlFile.getMapValues(false);
-        }
-        else {
-            new FileNotFoundException(f.getAbsolutePath()).printStackTrace();
-            return;
-        }
-
-        for(E e : myClass.getEnumConstants()) {
-            String name = e.name();
-            if(yamlMap.containsKey(name)) {
-                data.put(e,yamlMap.get(name));
-            }
-        }
-    }
-
     public void update() {
         renameFiles();
         Map<E,Object> oldValues = getData();
-
+//        saveResourceFromJar();
     }
 
     @Override
@@ -264,6 +251,8 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     @Override
     public void set(@NotNull E key, @NotNull Object value) throws IllegalArgumentException {
         super.set(key,value);
+
+        YamlFile yamlFile = cachedLookup.get().get(name);
         Object o = yamlFile.get(key.name());
         if(o instanceof ConfigurationSection) {
             ConfigurationSection configurationSection = (ConfigurationSection) o;
@@ -302,20 +291,24 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     public void set(String key, Object value) {
         String translate = reverse_language_mapping.get(key);
         if(translate!=null) key = translate;
-
         E k = enumLookup.get(key.toLowerCase());
-        if(k == null) return;
+        if(k == null) throw new IllegalArgumentException("invalid key - " + key);
 
         set(k,value);
     }
 
-    private static void setSection(ConfigurationSection section, Map<String,Object> map) {
+    private static void setSection(ConfigurationSection section, Map<?,?> map) {
         Map<String, Object> mapValues = section.getMapValues(false);
+        Map<?,?> inputClone = new HashMap<>(map);
 
-        for(Map.Entry<String,Object> e : mapValues.entrySet()) {
+        for(Map.Entry<?,?> e : mapValues.entrySet()) {
+            String key = e.getKey().toString();
             Object o = e.getValue();
-            if(!map.containsKey(e.getKey())) continue;
-            Object value = map.get(e.getKey());
+            if(!map.containsKey(key)) {
+                section.remove(key);
+                continue;
+            }
+            Object value = map.get(key);
             if(o instanceof ConfigurationSection) {
                 if(value instanceof FactoryValue<?>) {
                     EnumMap<?, Object> data = ((FactoryValue<?>) value).getData();
@@ -328,13 +321,29 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
                 }
                 else throw new IllegalArgumentException();
             }
-            else section.set(e.getKey(),o);
+            else section.set(key,value);
+            inputClone.remove(key);
+        }
+
+        for(Map.Entry<?,?> e : inputClone.entrySet()) {
+            String key = e.getKey().toString();
+            Object o = e.getValue();
+            if(o instanceof Map) {
+                section.createSection(key,(Map<?,?>) o);
+            }
+            else if(o instanceof FactoryValue) {
+                EnumMap<?, Object> data = ((FactoryValue<?>) o).getData();
+                Map<String,Object> subMap = new HashMap<>();
+                for(Map.Entry<? extends Enum<?>,?> d : data.entrySet()) subMap.put(d.getKey().name(),d.getValue());
+                section.createSection(key,subMap);
+            }
+            else section.set(key,o);
         }
     }
 
     public void save() throws IOException {
-        yamlFile.save(new File(pluginDirectory.getAbsolutePath()+File.separator+name));
-        yamlFile.loadWithComments();
+
+        cachedLookup.get().get(name).save();
     }
 
     @Override

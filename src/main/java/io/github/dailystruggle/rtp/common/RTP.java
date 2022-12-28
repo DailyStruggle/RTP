@@ -6,6 +6,9 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
+import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
+import io.github.dailystruggle.rtp.common.database.options.SQLiteDatabaseAccessor;
+import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
@@ -18,12 +21,19 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdj
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
 import io.github.dailystruggle.rtp.common.serverSide.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPEconomy;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.FillTask;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
-import io.github.dailystruggle.rtp.common.tasks.RTPTeleportCancel;
+import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
+import org.jetbrains.annotations.NotNull;
+import org.simpleyaml.configuration.ConfigurationSection;
+import org.simpleyaml.configuration.file.YamlFile;
 
+import java.io.File;
+import java.sql.Connection;
+import java.sql.DriverManager;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
@@ -33,6 +43,9 @@ import java.util.logging.Level;
  * class to hold relevant API functions, outside of Bukkit functionality
  */
 public class RTP {
+    /**
+     * dynamic factories for certain types
+     */
     public enum factoryNames {
         shape,
         vert,
@@ -50,13 +63,17 @@ public class RTP {
         factoryMap.put(factoryNames.multiConfig, new Factory<MultiConfigParser<?>>());
     }
 
+    public DatabaseAccessor<?> databaseAccessor;
 
     /**
      * minimum number of teleportations to executeAsyncTasks per gametick, to prevent bottlenecking during lag spikes
      */
     public static int minRTPExecutions = 1;
 
-    public Configs configs;
+    /**
+     * only one of each of these objects
+     */
+    public static Configs configs;
     public static RTPServerAccessor serverAccessor;
     public static RTPEconomy economy = null;
 
@@ -73,7 +90,7 @@ public class RTP {
 
         RTPAPI.addShape(new Circle());
         RTPAPI.addShape(new Square());
-        new LinearAdjustor(new ArrayList<>());
+//        new LinearAdjustor(new ArrayList<>()); todo: make this work
         new JumpAdjustor(new ArrayList<>());
 
         configs = new Configs(serverAccessor.getPluginDirectory());
@@ -98,6 +115,7 @@ public class RTP {
     public final ConcurrentSkipListSet<UUID> processingPlayers = new ConcurrentSkipListSet<>();
 
     public final RTPTaskPipe setupTeleportPipeline = new RTPTaskPipe();
+    public final RTPTaskPipe getChunkPipeline = new RTPTaskPipe();
     public final RTPTaskPipe loadChunksPipeline = new RTPTaskPipe();
     public final RTPTaskPipe teleportPipeline = new RTPTaskPipe();
     public final RTPTaskPipe chunkCleanupPipeline = new RTPTaskPipe();
@@ -116,7 +134,7 @@ public class RTP {
         //get region from world name, check for overrides
         Set<String> worldsAttempted = new HashSet<>();
         String worldName = player.getLocation().world().name();
-        MultiConfigParser<WorldKeys> worldParsers = (MultiConfigParser<WorldKeys>) RTP.getInstance().configs.multiConfigParserMap.get(WorldKeys.class);
+        MultiConfigParser<WorldKeys> worldParsers = (MultiConfigParser<WorldKeys>) RTP.configs.multiConfigParserMap.get(WorldKeys.class);
         ConfigParser<WorldKeys> worldParser = worldParsers.getParser(worldName);
         boolean requirePermission = Boolean.parseBoolean(worldParser.getConfigValue(WorldKeys.requirePermission,false).toString());
 
@@ -167,5 +185,12 @@ public class RTP {
         FillTask.kill();
 
         serverAccessor.stop();
+
+        DriverManager.setLoginTimeout(60);
+        Map<String,Object> referenceData = new HashMap<>();
+        referenceData.put("time",System.currentTimeMillis());
+        referenceData.put("UUID",new UUID(0,0).toString());
+        instance.databaseAccessor.setValue("referenceData", referenceData);
+        instance.databaseAccessor.processQueries(Long.MAX_VALUE);
     }
 }

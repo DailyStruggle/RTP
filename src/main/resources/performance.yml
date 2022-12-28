@@ -1,6 +1,6 @@
 #how many rerolls before stopping
 # impact: high
-maxAttempts: 20
+maxAttempts: 10
 
 #what radius, in chunks, around the destination to pre-load
 # number of chunks loaded is (1 + 2*viewDistance)^2
@@ -14,6 +14,12 @@ viewDistanceTeleport: 0
 # Selection tasks for the different regions will rotate
 # impact: medium
 period: 100
+
+#maximum amount of time allotted to tasks per gametick
+# 0-50
+# impact: difficult to measure
+syncAllottedTime: 50
+asyncAllottedTime: 50
 
 #minimum TPS requirement before trying to queue a new location
 # must be a number between 0 and 20 exclusive
