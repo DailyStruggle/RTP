@@ -36,6 +36,7 @@ postTeleportQueueing: false
 syncLoading: false
 
 #on startup, whether to enable permissions parsing for onEvent permissions
+# incompatible with *.* permission
 # impact: medium
 onEventParsing: false
 

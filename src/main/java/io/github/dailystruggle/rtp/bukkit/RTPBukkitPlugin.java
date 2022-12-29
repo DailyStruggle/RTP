@@ -157,7 +157,15 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     }
 
     private void setupBukkitEvents() {
-        Bukkit.getPluginManager().registerEvents(new OnEventTeleports(), this);
+        ConfigParser<PerformanceKeys> performance =
+                (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+
+        boolean onEventParsing;
+        Object o = performance.getConfigValue(PerformanceKeys.onEventParsing, false);
+        if(o instanceof Boolean) onEventParsing = (Boolean) o;
+        else onEventParsing = Boolean.parseBoolean(o.toString());
+
+        if(onEventParsing) Bukkit.getPluginManager().registerEvents(new OnEventTeleports(), this);
         Bukkit.getPluginManager().registerEvents(new OnPlayerChangeWorld(), this);
         Bukkit.getPluginManager().registerEvents(new OnPlayerDamage(), this);
         Bukkit.getPluginManager().registerEvents(new OnPlayerJoin(), this);

@@ -25,7 +25,7 @@ public class ParsePermissions {
             Map.Entry<Long, Boolean> entry = entryMap.get(permissionPrefix);
             if(entry !=null) {
                 long dt = current-entry.getKey();
-                if(dt<5000 && dt >0) return entry.getValue();
+                if(dt<5000 && dt > 0) return entry.getValue();
             }
         }
         else {
@@ -34,14 +34,11 @@ public class ParsePermissions {
         }
 
         permissionPrefix = permissionPrefix.toLowerCase();
-        String finalPermissionPrefix = permissionPrefix;
-        Set<String> perms = Arrays.stream(permissions).map(s -> finalPermissionPrefix+s.toLowerCase()).collect(Collectors.toSet());
         boolean hasPerm = false;
         if(sender.hasPermission(permissionPrefix+"*")) hasPerm = true;
         else {
-            for (String perm : perms) {
-                perm = perm.toLowerCase();
-                if (sender.hasPermission(perm)) {
+            for (String perm : permissions) {
+                if (sender.hasPermission((permissionPrefix + perm).toLowerCase())) {
                     hasPerm = true;
                     break;
                 }
