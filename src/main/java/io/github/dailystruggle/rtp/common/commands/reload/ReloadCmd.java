@@ -83,7 +83,6 @@ public class ReloadCmd extends BaseRTPCmdImpl {
 
             RTP.getInstance().miscSyncTasks.add(new RTPRunnable(() -> {
                 RTP.reloading.set(false);
-                RTP.log(Level.WARNING, "B");
             },1));
 
             RTP.getInstance().miscSyncTasks.start();
