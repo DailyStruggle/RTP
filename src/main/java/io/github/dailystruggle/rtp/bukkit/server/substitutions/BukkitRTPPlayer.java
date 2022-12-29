@@ -63,6 +63,11 @@ public final class BukkitRTPPlayer implements RTPPlayer {
     }
 
     @Override
+    public void performCommand(String command) {
+        player.performCommand(command);
+    }
+
+    @Override
     public RTPCommandSender clone() {
         RTPCommandSender clone = null;
         try {

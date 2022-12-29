@@ -5,5 +5,7 @@ public enum ConfigKeys {
     teleportCooldown,
     cancelDistance,
     logging,
+    consoleCommands,
+    playerCommands,
     version
 }

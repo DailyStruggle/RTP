@@ -7,6 +7,7 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
+import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -77,6 +78,11 @@ public final class BukkitRTPCommandSender implements RTPCommandSender {
             if (permissionAttachmentInfo.getValue()) return permissionAttachmentInfo.getPermission().toLowerCase();
             else return null;
         }).filter(Objects::nonNull).collect(Collectors.toSet());
+    }
+
+    @Override
+    public void performCommand(String command) {
+        Bukkit.dispatchCommand(sender,command);
     }
 
     @Override
