@@ -15,6 +15,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.logging.Level;
 
 public class ReloadCmd extends BaseRTPCmdImpl {
 
@@ -57,30 +58,42 @@ public class ReloadCmd extends BaseRTPCmdImpl {
 
     @Override
     public boolean onCommand(UUID senderId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
-        if(nextCommand!=null) {
-            return true;
+        RTP.reloading.set(true);
+
+        if(nextCommand==null) {
+            RTP.stop();
+
+            ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+            if(lang != null) {
+                String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloading,""));
+                if(msg!=null) msg = StringUtils.replace(msg,"[filename]", "configs");
+                RTP.serverAccessor.sendMessage(CommandsAPI.serverId, senderId,msg);
+            }
+
+            boolean b = RTP.configs.reload();
+            if(!b) throw new IllegalStateException("reload failed");
+
+            if(lang != null) {
+                String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloaded,""));
+                if(msg!=null) msg = StringUtils.replace(msg,"[filename]", "configs");
+                RTP.serverAccessor.sendMessage(senderId,msg);
+            }
+
+            RTP.serverAccessor.start();
+
+            RTP.getInstance().miscSyncTasks.add(new RTPRunnable(() -> {
+                RTP.reloading.set(false);
+                RTP.log(Level.WARNING, "B");
+            },1));
+
+            RTP.getInstance().miscSyncTasks.start();
+            RTP.getInstance().miscAsyncTasks.start();
+            RTP.getInstance().setupTeleportPipeline.start();
+            RTP.getInstance().loadChunksPipeline.start();
+            RTP.getInstance().teleportPipeline.start();
+            RTP.getInstance().startupTasks.start();
+            RTP.getInstance().getChunkPipeline.start();
         }
-
-        RTP.stop();
-        RTP.serverAccessor.stop();
-
-        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-        if(lang != null) {
-            String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloading,""));
-            if(msg!=null) msg = StringUtils.replace(msg,"[filename]", "configs");
-            RTP.serverAccessor.sendMessage(CommandsAPI.serverId, senderId,msg);
-        }
-
-        boolean b = RTP.configs.reload();
-        if(!b) throw new IllegalStateException("reload failed");
-
-        if(lang != null) {
-            String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloaded,""));
-            if(msg!=null) msg = StringUtils.replace(msg,"[filename]", "configs");
-            RTP.serverAccessor.sendMessage(senderId,msg);
-        }
-
-        RTP.serverAccessor.start();
 
         return true;
     }

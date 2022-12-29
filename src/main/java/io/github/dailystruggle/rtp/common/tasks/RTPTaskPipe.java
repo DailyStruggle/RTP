@@ -27,7 +27,11 @@ public class RTPTaskPipe {
             if(runnable instanceof RTPDelayable) {
                 long d = ((RTPDelayable) runnable).getDelay();
                 if(d>0) {
+                    RTP.log(Level.WARNING,"A");
                     ((RTPDelayable) runnable).setDelay(d-1);
+                }
+                if(d>1) {
+                    delayedRunnables.add(runnable);
                 }
             }
         }
@@ -39,7 +43,6 @@ public class RTPTaskPipe {
             if(runnable instanceof RTPDelayable) {
                 long d = ((RTPDelayable) runnable).getDelay();
                 if(d>0) {
-                    delayedRunnables.add(runnable);
                     continue;
                 }
             }
@@ -73,6 +76,10 @@ public class RTPTaskPipe {
 
     public void clear() {
         runnables.clear();
+    }
+
+    public void start() {
+        stop = false;
     }
 
     public void stop() {

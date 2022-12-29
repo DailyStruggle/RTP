@@ -3,7 +3,8 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAd
 import io.github.dailystruggle.commandsapi.bukkit.LocalParameters.*;
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPBlock;
@@ -14,8 +15,9 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Predicate;
-import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
@@ -43,6 +45,8 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
         return Arrays.stream(JumpAdjustorKeys.values()).map(Enum::name).collect(Collectors.toList());
     }
 
+    private static final Set<String> unsafeBlocks = new ConcurrentSkipListSet<>();
+    private static final AtomicLong lastUpdate = new AtomicLong();
     @Override
     public @Nullable
     RTPLocation adjust(@NotNull RTPChunk chunk) {
@@ -65,8 +69,21 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
         step = Math.max(step,1);
         step = Math.min(step,(maxY-minY)/8);
 
+        long t = System.currentTimeMillis();
+        long dt = t - lastUpdate.get();
+        if (dt > 5000 || dt < 0) {
+            ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+            Object value = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
+            unsafeBlocks.clear();
+            if(value instanceof Collection) {
+                unsafeBlocks.addAll(((Collection<?>) value).stream().filter(Objects::nonNull).map(Object::toString).collect(Collectors.toSet()));
+            }
+            lastUpdate.set(t);
+        }
+
         for(int i = minY; i < maxY; i++) {
-            if(!chunk.getBlockAt(7, i, 7).isAir()) {
+            RTPBlock blockAt = chunk.getBlockAt(7, i, 7);
+            if(!blockAt.isAir() && !unsafeBlocks.contains(blockAt.getMaterial())) {
                 minY = i;
                 break;
             }
@@ -84,7 +101,8 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
                 RTPBlock block2 = chunk.getBlockAt(7, i+1, 7);
                 int skylight = 15;
                 if(requireSkyLight) skylight = block2.skyLight();
-                if(block1.isAir() && block2.isAir() && skylight > 7) {
+                if(block1.isAir() && block2.isAir() && skylight > 7
+                        && !unsafeBlocks.contains(block2.getMaterial())) {
                     minY = oldY;
                     maxY = i;
                     break;
@@ -99,7 +117,10 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
             RTPBlock block2 = chunk.getBlockAt(7, i+1, 7);
             int skylight = 15;
             if(requireSkyLight) skylight = block2.skyLight();
-            if(block1.isAir() && block2.isAir() && skylight > 7) {
+            if(block1.isAir() && block2.isAir() && skylight > 7
+                    && !unsafeBlocks.contains(block1.getMaterial())
+                    && !unsafeBlocks.contains(block2.getMaterial())
+                    && !unsafeBlocks.contains(chunk.getBlockAt(7, i-1, 7).getMaterial())) {
                 return block1.getLocation();
             }
         }

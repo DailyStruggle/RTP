@@ -15,6 +15,7 @@ import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.serverSide.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
+import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
 
@@ -67,6 +68,7 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
         else if(factoryValue instanceof ConfigParser) {
             return subReloadSingle(senderID, (ConfigParser<?>) factoryValue);
         }
+        RTP.getInstance().miscSyncTasks.add(new RTPRunnable(() -> RTP.reloading.set(false),1));
         return false;
     }
 

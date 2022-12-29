@@ -21,6 +21,8 @@ import org.simpleyaml.configuration.MemorySection;
 
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 import java.util.function.Predicate;
 import java.util.logging.Level;
@@ -281,6 +283,9 @@ public class Region extends FactoryValue<RegionKeys> {
         return res;
     }
 
+    private static final Set<String> unsafeBlocks = new ConcurrentSkipListSet<>();
+    private static final AtomicLong lastUpdate = new AtomicLong(0);
+    private static final AtomicInteger safetyRadius = new AtomicInteger(0);
     public Map.Entry<RTPLocation, Long> getLocation(RTPCommandSender sender, RTPPlayer player, @Nullable Set<String> biomeNames) {
         Map.Entry<RTPLocation, Long> pair = null;
 
@@ -308,22 +313,27 @@ public class Region extends FactoryValue<RegionKeys> {
                     continue;
                 }
 
-                ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
-                Object unsafeBlocksObj = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
-                Set<String> unsafeBlocks = new HashSet<>();
-                if(unsafeBlocksObj instanceof Collection) {
-                    unsafeBlocks = ((Collection<?>)unsafeBlocksObj).stream().map(Object::toString).collect(Collectors.toSet());
+                long t = System.currentTimeMillis();
+                long dt = t - lastUpdate.get();
+                if (dt > 5000 || dt < 0) {
+                    ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+                    Object value = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
+                    unsafeBlocks.clear();
+                    if(value instanceof Collection) {
+                        unsafeBlocks.addAll(((Collection<?>) value).stream().filter(Objects::nonNull).map(Object::toString).collect(Collectors.toSet()));
+                    }
+                    lastUpdate.set(t);
+                    safetyRadius.set(Math.max(safety.getNumber(SafetyKeys.safetyRadius,0).intValue(),7));
                 }
 
-                int safetyRadius = safety.getNumber(SafetyKeys.safetyRadius,0).intValue();
 
-                safetyRadius = Math.max(safetyRadius,7);
 
                 //todo: waterlogged check
+                int safe = safetyRadius.get();
                 RTPBlock block;
-                for(int x = left.x()-safetyRadius; x < left.x()+safetyRadius && pass; x++) {
-                    for(int z = left.z()-safetyRadius; z < left.z()+safetyRadius && pass; z++) {
-                        for(int y = left.y()-safetyRadius; y < left.y()+safetyRadius && pass; y++) {
+                for(int x = left.x()- safe; x < left.x()+ safe && pass; x++) {
+                    for(int z = left.z()- safe; z < left.z()+ safe && pass; z++) {
+                        for(int y = left.y()- safe; y < left.y()+ safe && pass; y++) {
                             block = rtpChunk.getBlockAt(x,y,z);
                             if(unsafeBlocks.contains(block.getMaterial())) pass = false;
                         }
