@@ -27,7 +27,6 @@ public class RTPTaskPipe {
             if(runnable instanceof RTPDelayable) {
                 long d = ((RTPDelayable) runnable).getDelay();
                 if(d>0) {
-                    RTP.log(Level.WARNING,"A");
                     ((RTPDelayable) runnable).setDelay(d-1);
                 }
                 if(d>1) {
