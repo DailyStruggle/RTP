@@ -31,6 +31,12 @@ public interface RTPCmd extends BaseRTPCmd {
     //synchronous command component
     default boolean onCommand(RTPCommandSender sender, CommandsAPICommand command, String label, String[] args) {
         UUID senderId = sender.uuid();
+
+        if(RTP.reloading.get()) {
+            RTP.serverAccessor.sendMessage(senderId,"&4busy");
+            return true;
+        }
+
         for(String arg : args) {
             if(!arg.contains(String.valueOf(CommandsAPI.parameterDelimiter)))
                 return onCommand(senderId,sender::hasPermission,sender::sendMessage,args);

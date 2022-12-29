@@ -189,9 +189,7 @@ public abstract class DatabaseAccessor<D> {
         while (writeQueue.size()>0) {
             if(stop.get()) return;
             Map.Entry<String, Map<TableObj, TableObj>> writeRequest = writeQueue.poll();
-            if(writeRequest == null) throw new IllegalStateException("null database write request");
-            if(writeRequest.getValue() == null) throw new IllegalStateException("invalid database write request");
-            if(writeRequest.getValue().size() == 0) throw new IllegalStateException("invalid database write request");
+            if (writeRequest == null || writeRequest.getValue() == null || writeRequest.getValue().size() == 0) continue;
 
             long localStart = System.nanoTime();
             write(database,writeRequest.getKey(),writeRequest.getValue());

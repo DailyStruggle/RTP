@@ -37,6 +37,7 @@ import java.sql.DriverManager;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 
 /**
@@ -78,6 +79,8 @@ public class RTP {
     public static RTPEconomy economy = null;
 
     public static TreeCommand baseCommand;
+
+    public static AtomicBoolean reloading = new AtomicBoolean(false);
 
     /**
      * only one instance will exist at a time, reset on plugin load
@@ -151,7 +154,6 @@ public class RTP {
     }
 
     public static void stop() {
-        RTP instance = RTP.instance;
         if(instance == null) return;
 
         for(Map.Entry<UUID, TeleportData> e : instance.latestTeleportData.entrySet()) {
@@ -180,17 +182,11 @@ public class RTP {
         instance.latestTeleportData.forEach((uuid, data) -> {
             if(!data.completed) new RTPTeleportCancel(uuid).run();
         });
+
         instance.processingPlayers.clear();
 
         FillTask.kill();
 
         serverAccessor.stop();
-
-        DriverManager.setLoginTimeout(60);
-        Map<String,Object> referenceData = new HashMap<>();
-        referenceData.put("time",System.currentTimeMillis());
-        referenceData.put("UUID",new UUID(0,0).toString());
-        instance.databaseAccessor.setValue("referenceData", referenceData);
-        instance.databaseAccessor.processQueries(Long.MAX_VALUE);
     }
 }

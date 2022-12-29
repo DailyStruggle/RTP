@@ -19,6 +19,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public class FillTask extends RTPRunnable {
@@ -69,7 +70,8 @@ public class FillTask extends RTPRunnable {
             if(shape.isKnownBad(pos)) {
                 try {
                     completionGuard.acquire();
-                    completionCounter.addAndGet(1);
+                    long l = completionCounter.incrementAndGet();
+                    if(pos == range-1 || l == limit) done.complete(true);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                     done.complete(false);
@@ -87,10 +89,11 @@ public class FillTask extends RTPRunnable {
                 if(isCancelled()) return;
                 if(!aBoolean) shape.addBadLocation(finalPos);
                 try {
-                    completionGuard.acquire();
-                    long l = completionCounter.addAndGet(1);
+                    boolean b = completionGuard.tryAcquire(10, TimeUnit.SECONDS);
+                    if(!b) throw new IllegalStateException();
+                    long l = completionCounter.incrementAndGet();
                     if(finalPos == range-1 || l == limit) done.complete(true);
-                } catch (InterruptedException e) {
+                } catch (InterruptedException | IllegalStateException e) {
                     e.printStackTrace();
                     done.complete(false);
                 }

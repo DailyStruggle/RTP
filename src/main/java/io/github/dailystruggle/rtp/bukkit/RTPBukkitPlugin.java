@@ -153,6 +153,12 @@ public final class RTPBukkitPlugin extends JavaPlugin {
                 b -> b.getOwner().getName().equalsIgnoreCase("RTP") && !b.isSync() && !b.isCancelled()).collect(Collectors.toList());
         pendingTasks.forEach(BukkitTask::cancel);
 
+        Map<String,Object> referenceData = new HashMap<>();
+        referenceData.put("time",System.currentTimeMillis());
+        referenceData.put("UUID",new UUID(0,0).toString());
+        RTP.getInstance().databaseAccessor.setValue("referenceData", referenceData);
+        RTP.getInstance().databaseAccessor.processQueries(Long.MAX_VALUE);
+
         super.onDisable();
     }
 
