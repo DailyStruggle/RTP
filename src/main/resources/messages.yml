@@ -104,8 +104,8 @@ regionInfo:
   - "#58CCED  shape: [shape]"
   - "#58CCED  requirePermission: [requirePermission]"
   - "#58CCED  worldBorderOverride: [worldBorderOverride]"
-  - "#58CCED  queueLen: [queueLen]"
-  - "#58CCED  queued: [queued]"
+  - "#58CCED  cacheCap: [cacheCap]"
+  - "#58CCED  cached: [cached]"
 
 #command descriptions
 rtp: "&b/rtp - teleport to a random location"

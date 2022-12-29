@@ -171,7 +171,6 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     }
 
     private void setupEffects() {
-        RTP rtp = RTP.getInstance();
         Configs configs = RTP.configs;
         FactoryValue<PerformanceKeys> parser = configs.getParser(PerformanceKeys.class);
 

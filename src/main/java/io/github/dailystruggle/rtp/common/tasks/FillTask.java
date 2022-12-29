@@ -18,6 +18,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 public class FillTask extends RTPRunnable {
@@ -31,7 +32,7 @@ public class FillTask extends RTPRunnable {
     private final AtomicLong completionCounter = new AtomicLong();
     private final Semaphore completionGuard = new Semaphore(1);
     private final List<CompletableFuture<RTPChunk>> chunks = new ArrayList<>();
-    private final List<CompletableFuture<Boolean>> tests = new ArrayList<>();
+    private final AtomicReference<List<CompletableFuture<Boolean>>> tests = new AtomicReference<>(new ArrayList<>());
 
     public FillTask(Region region, long start) {
         this.region = region;
@@ -146,7 +147,7 @@ public class FillTask extends RTPRunnable {
 
     public CompletableFuture<Boolean> testPos(Region region, long pos) {
         CompletableFuture<Boolean> res = new CompletableFuture<>();
-        tests.add(res);
+        tests.get().add(res);
 
         MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
         RTPWorld world = region.getWorld();
@@ -252,7 +253,7 @@ public class FillTask extends RTPRunnable {
 
             }
             try {
-                tests.forEach(test -> test.cancel(true));
+                tests.get().forEach(test -> test.cancel(true));
             } catch (CancellationException | CompletionException ignored) {
 
             }

@@ -54,8 +54,7 @@ public class AsyncTeleportProcessing extends BukkitRunnable {
     }
 
     public static void kill() {
-        if(asyncTaskProcessing.get()!=null && !asyncTaskProcessing.get().isCancelled()) asyncTaskProcessing.get().setCancelled(true);
-        asyncTaskProcessing.set(null);
+        clear();
         killed.set(true);
     }
 }

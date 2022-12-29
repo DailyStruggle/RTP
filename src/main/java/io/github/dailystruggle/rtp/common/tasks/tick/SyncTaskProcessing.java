@@ -17,14 +17,12 @@ public final class SyncTaskProcessing extends RTPRunnable {
         if(isCancelled()) return;
         long start = System.nanoTime();
 
-        RTP instance = RTP.getInstance();
-
-        instance.cancelTasks.execute(Long.MAX_VALUE);
+        RTP.getInstance().cancelTasks.execute(Long.MAX_VALUE);
         if(isCancelled()) return;
-        instance.chunkCleanupPipeline.execute(availableTime);
+        RTP.getInstance().chunkCleanupPipeline.execute(availableTime);
         if(isCancelled()) return;
-        instance.teleportPipeline.execute(availableTime-(start-System.nanoTime()));
+        RTP.getInstance().teleportPipeline.execute(availableTime-(start-System.nanoTime()));
         if(isCancelled()) return;
-        instance.miscSyncTasks.execute(availableTime-(start-System.nanoTime()));
+        RTP.getInstance().miscSyncTasks.execute(availableTime-(start-System.nanoTime()));
     }
 }

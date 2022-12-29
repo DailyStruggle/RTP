@@ -24,15 +24,13 @@ public final class OnPlayerMove implements Listener {
     public void onPlayerMove(PlayerMoveEvent event) {
         UUID id = event.getPlayer().getUniqueId();
 
-        RTP instance = RTP.getInstance();
-
-        TeleportData data = instance.latestTeleportData.get(id);
+        TeleportData data = RTP.getInstance().latestTeleportData.get(id);
         if(data == null || data.completed) return;
 
         long t = System.nanoTime();
         if(     t < lastUpdateTime ||
                 ((t-lastUpdateTime) > TimeUnit.SECONDS.toNanos(5))) {
-            ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) instance.configs.configParserMap.get(ConfigKeys.class);
+            ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.getInstance().configs.configParserMap.get(ConfigKeys.class);
             cancelDistanceSquared = Math.pow(configParser.getNumber(ConfigKeys.cancelDistance, 0).doubleValue(), 2);
             lastUpdateTime = t;
         }

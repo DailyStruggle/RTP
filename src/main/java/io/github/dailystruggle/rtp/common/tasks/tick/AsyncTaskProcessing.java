@@ -25,19 +25,17 @@ public final class AsyncTaskProcessing extends RTPRunnable {
     public void run() {
         if(isCancelled()) return;
         long start = System.nanoTime();
-
-        RTP instance = RTP.getInstance();
-
-        instance.cancelTasks.execute(Long.MAX_VALUE);
+        
+        RTP.getInstance().cancelTasks.execute(Long.MAX_VALUE);
         if(isCancelled()) return;
-        instance.loadChunksPipeline.execute(availableTime-(start-System.nanoTime()));
+        RTP.getInstance().loadChunksPipeline.execute(availableTime-(System.nanoTime() - start));
         if(isCancelled()) return;
-        instance.setupTeleportPipeline.execute(availableTime-(start-System.nanoTime()));
+        RTP.getInstance().setupTeleportPipeline.execute(availableTime-(System.nanoTime() - start));
         if(isCancelled()) return;
-        instance.miscAsyncTasks.execute(availableTime-(start-System.nanoTime()));
+        RTP.getInstance().miscAsyncTasks.execute(availableTime-(System.nanoTime() - start));
         if(isCancelled()) return;
 
-        for(Map.Entry<String, FillTask> e : instance.fillTasks.entrySet()) {
+        for(Map.Entry<String, FillTask> e : RTP.getInstance().fillTasks.entrySet()) {
             if(e.getValue().isRunning()) continue;
             e.getValue().run();
             if(isCancelled()) return;
@@ -49,7 +47,7 @@ public final class AsyncTaskProcessing extends RTPRunnable {
             if(perf!=null) period = perf.getNumber(PerformanceKeys.period,0).longValue();
         }
 
-        List<Region> regions = new ArrayList<>(instance.selectionAPI.permRegionLookup.values());
+        List<Region> regions = new ArrayList<>(RTP.getInstance().selectionAPI.permRegionLookup.values());
         if(period<=0) period = regions.size();
         if(period<=0) return;
 
@@ -66,6 +64,6 @@ public final class AsyncTaskProcessing extends RTPRunnable {
         }
         step = (step+1)%period;
 
-        instance.databaseAccessor.processQueries(availableTime-(start-System.nanoTime()));
+        RTP.getInstance().databaseAccessor.processQueries(availableTime-(System.nanoTime() - start));
     }
 }

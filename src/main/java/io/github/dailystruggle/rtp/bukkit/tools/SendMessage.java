@@ -172,10 +172,11 @@ public class SendMessage {
         placeholders.put("processingTime",uuid -> {
             if(RTP.getInstance() == null) return "0";
             TeleportData teleportData = RTP.getInstance().latestTeleportData.get(uuid);
-            if(teleportData == null) return "0";
 
-            long time = teleportData.processingTime;
-            if(time == 0) return "0";
+            long time = (teleportData != null)
+                    ? teleportData.processingTime
+                    : 0L;
+
             ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
             long days = TimeUnit.MILLISECONDS.toDays(time);
             long hours = TimeUnit.MILLISECONDS.toHours(time)%24;

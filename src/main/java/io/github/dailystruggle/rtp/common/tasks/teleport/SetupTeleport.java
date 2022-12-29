@@ -57,8 +57,6 @@ public final class SetupTeleport extends RTPRunnable {
         }
         if(configValue instanceof Boolean) syncLoading = (Boolean) configValue;
 
-        RTP rtp = RTP.getInstance();
-
         TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.uuid());
         if(teleportData == null) {
             teleportData = new TeleportData();
@@ -108,7 +106,7 @@ public final class SetupTeleport extends RTPRunnable {
             loadChunks.run();
         }
         else {
-            rtp.loadChunksPipeline.add(loadChunks);
+            RTP.getInstance().loadChunksPipeline.add(loadChunks);
         }
 
         postActions.forEach(consumer -> consumer.accept(this, true));

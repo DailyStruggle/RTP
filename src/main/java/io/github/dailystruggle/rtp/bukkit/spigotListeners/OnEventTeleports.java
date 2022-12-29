@@ -204,8 +204,6 @@ public class OnEventTeleports implements Listener {
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
 
-        RTP rtp = RTP.getInstance();
-
         long start = System.nanoTime();
 
         BukkitRTPCommandSender sender = new BukkitRTPCommandSender(player);
@@ -230,7 +228,7 @@ public class OnEventTeleports implements Listener {
             teleportAction(player);
         }
         else if (hasJoin) {
-            TeleportData data = rtp.latestTeleportData.get(player.getUniqueId());
+            TeleportData data = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
             long time = (data == null) ? 0 : data.time;
             if (!player.hasPermission("rtp.nocooldown") && (start - time) < cooldownTime){
                 RTP.serverAccessor.sendMessage(player.getUniqueId(), MessagesKeys.cooldownMessage);
