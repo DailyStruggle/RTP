@@ -168,7 +168,6 @@ public class Region extends FactoryValue<RegionKeys> {
 
         miscPipeline.execute(availableTime);
 
-        RTP instance = RTP.getInstance();
         long cacheCap = getNumber(RegionKeys.cacheCap,10L).longValue();
         cacheCap = Math.max(cacheCap,playerQueue.size());
         try {
@@ -207,8 +206,8 @@ public class Region extends FactoryValue<RegionKeys> {
             RTPCommandSender sender = RTP.serverAccessor.getSender(CommandsAPI.serverId);
             LoadChunks loadChunks = new LoadChunks(sender,player,pair.getKey(),this);
             teleportData.nextTask = loadChunks;
-            instance.latestTeleportData.put(playerId,teleportData);
-            instance.loadChunksPipeline.add(loadChunks);
+            RTP.getInstance().latestTeleportData.put(playerId,teleportData);
+            RTP.getInstance().loadChunksPipeline.add(loadChunks);
             onPlayerQueuePop.forEach(consumer -> consumer.accept(this,playerId));
 
             Iterator<UUID> iterator = playerQueue.iterator();

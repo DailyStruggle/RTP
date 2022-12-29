@@ -42,8 +42,8 @@ public class InfoCmd extends BaseRTPCmdImpl {
         regionDataLookup.put("region", region -> region.name);
         regionDataLookup.put("world", region -> region.getWorld().name());
         regionDataLookup.put("shape", region -> region.getShape().name);
-        regionDataLookup.put("queueLen", region -> String.valueOf(region.getPublicQueueLength()));
-        regionDataLookup.put("queued", region -> String.valueOf(region.locationQueue.size()));
+        regionDataLookup.put("cacheCap", region -> region.getNumber(RegionKeys.cacheCap,0).toString());
+        regionDataLookup.put("cached", region -> String.valueOf(region.getPublicQueueLength()));
         regionDataLookup.put("worldBorderOverride", region -> {
             boolean wbo = false;
             EnumMap<RegionKeys, Object> data = region.getData();

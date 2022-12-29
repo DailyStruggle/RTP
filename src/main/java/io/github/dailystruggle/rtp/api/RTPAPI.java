@@ -34,9 +34,6 @@ public class RTPAPI {
     }
 
     public static boolean addShape(Shape<?> shape) {
-        RTP rtp = RTP.getInstance();
-        if(rtp == null) return false;
-
         Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
         if(factory == null) return false;
 
@@ -52,9 +49,8 @@ public class RTPAPI {
     }
 
     public static long loadedLocations(String regionName) {
-        RTP instance = RTP.getInstance();
-        if(instance == null) return 0;
-        SelectionAPI selectionAPI = instance.selectionAPI;
+        if(RTP.getInstance() == null) return 0;
+        SelectionAPI selectionAPI = RTP.getInstance().selectionAPI;
         if(selectionAPI == null) return 0;
         Region region = selectionAPI.getRegion(regionName);
         if(region == null) return 0;
