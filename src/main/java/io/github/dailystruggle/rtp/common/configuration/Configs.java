@@ -118,7 +118,7 @@ public class Configs {
         ConfigParser<MessagesKeys> lang = new ConfigParser<>(MessagesKeys.class,"messages.yml", "1.0", pluginDirectory, fileDatabase);
         putParser(lang);
 
-        ConfigParser<ConfigKeys> config = new ConfigParser<>(ConfigKeys.class, "config.yml", "1.0", pluginDirectory, fileDatabase);
+        ConfigParser<ConfigKeys> config = new ConfigParser<>(ConfigKeys.class, "config.yml", "3.0", pluginDirectory, fileDatabase);
         putParser(config);
 
         ConfigParser<EconomyKeys> economy = new ConfigParser<>(EconomyKeys.class, "economy.yml", "1.0", pluginDirectory, fileDatabase);

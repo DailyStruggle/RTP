@@ -1,7 +1,9 @@
 package io.github.dailystruggle.rtp.common.tasks.teleport;
 
+import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
@@ -124,6 +126,36 @@ public final class DoTeleport extends RTPRunnable {
                 if(verbose) RTP.log(Level.WARNING, "[RTP] failed to complete teleport for player:"+player.name());
             }
         });
+
+        ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
+        Object configValue = configParser.getConfigValue(ConfigKeys.consoleCommands, null);
+        if(configValue instanceof Collection<?>) {
+            Collection<?> collection = (Collection<?>) configValue;
+            for(Object o : collection) {
+                String cmd = o.toString();
+                try {
+                    RTP.serverAccessor.getSender(CommandsAPI.serverId).performCommand(cmd);
+                }
+                catch (Throwable throwable) {
+                    throwable.printStackTrace();
+                }
+            }
+        }
+
+        configValue = configParser.getConfigValue(ConfigKeys.playerCommands, null);
+        if(configValue instanceof Collection<?>) {
+            Collection<?> collection = (Collection<?>) configValue;
+            for(Object o : collection) {
+                String cmd = o.toString();
+                try {
+                    player.performCommand(cmd);
+                }
+                catch (Throwable throwable) {
+                    throwable.printStackTrace();
+                }
+            }
+        }
+
 
         postActions.forEach(consumer -> consumer.accept(this));
     }

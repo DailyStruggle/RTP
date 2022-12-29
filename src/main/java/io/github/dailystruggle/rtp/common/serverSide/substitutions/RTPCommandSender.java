@@ -15,5 +15,7 @@ public interface RTPCommandSender extends Cloneable {
 
     Set<String> getEffectivePermissions();
 
+    void performCommand(String command);
+
     RTPCommandSender clone();
 }

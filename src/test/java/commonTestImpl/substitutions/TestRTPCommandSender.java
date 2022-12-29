@@ -47,6 +47,11 @@ public class TestRTPCommandSender implements RTPCommandSender {
     }
 
     @Override
+    public void performCommand(String command) {
+
+    }
+
+    @Override
     public RTPCommandSender clone() {
         try {
             return (RTPCommandSender) super.clone();
