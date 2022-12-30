@@ -132,7 +132,8 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
         if((!expand) && mode.equalsIgnoreCase("ACCUMULATE")) range -= badLocationSum.get();
         else if(expand && !mode.equalsIgnoreCase("ACCUMULATE")) range += badLocationSum.get();
 
-        double res = (range) * (ThreadLocalRandom.current().nextDouble());
+        double weight = getNumber(GenericMemoryShapeParams.weight,1.0).doubleValue();
+        double res = (range) * Math.pow(ThreadLocalRandom.current().nextDouble(),weight);
 
         long location = (long) res;
         switch (mode) {

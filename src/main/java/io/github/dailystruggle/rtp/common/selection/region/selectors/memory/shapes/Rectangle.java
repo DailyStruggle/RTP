@@ -73,15 +73,21 @@ public class Rectangle extends MemoryShape<RectangleParams> {
         long cx = getNumber(RectangleParams.centerX,0L).longValue();
         long cz = getNumber(RectangleParams.centerZ,0L).longValue();
         long width = getNumber(RectangleParams.width,256L).longValue();
+        long height = getNumber(RectangleParams.height,256L).longValue();
 
         int[] res = new int[2];
 
+
         //compute initial xz
-        res[0] = (int) (location % width);
+        res[0] = (int) Math.floorMod(location,width);
         res[1] = (int) (location / width);
 
+        //center
+        res[0] = (int) (res[0]-(width/2));
+        res[1] = (int) (res[1]-(height/2));
+
         //rotate around origin
-        res = rotate(res, degrees);
+        res = rotate(res,degrees);
 
         //shift
         res[0] += cx;
