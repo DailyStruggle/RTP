@@ -74,9 +74,9 @@
         <dependency>
             <groupId>io.github.dailystruggle</groupId>
             <artifactId>RTP</artifactId>
-            <version>2.0.0-BETA01</version>
+            <version>2.0.0-BETA02</version>
             <scope>system</scope>
-            <systemPath>${project.basedir}/../../target/RTP-2.0.0-BETA01.jar</systemPath>
+            <systemPath>${project.basedir}/../../target/RTP-2.0.0-BETA02.jar</systemPath>
         </dependency>
         <dependency>
             <groupId>org.popcraft</groupId>
