@@ -1,4 +1,4 @@
-package io.github.dailystruggle.softdepends;
+package io.github.dailystruggle.rtp.softdepends;
 
 import me.ryanhamshire.GriefPrevention.Claim;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;

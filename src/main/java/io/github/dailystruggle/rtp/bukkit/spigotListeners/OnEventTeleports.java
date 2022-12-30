@@ -86,7 +86,7 @@ public class OnEventTeleports implements Listener {
 
         respawningPlayers.add(id);
 
-        Region region = RTP.getInstance().selectionAPI.getRegion(new BukkitRTPPlayer(player));
+        Region region = RTP.selectionAPI.getRegion(new BukkitRTPPlayer(player));
 
         //I don't know how this can happen, but in case player dies twice, don't reprocess
         if(region.fastLocations.containsKey(id)) return;
@@ -133,7 +133,7 @@ public class OnEventTeleports implements Listener {
         if (!respawningPlayers.contains(player.getUniqueId())) return;
         respawningPlayers.remove(player.getUniqueId());
 
-        Region region = RTP.getInstance().selectionAPI.getRegion(new BukkitRTPPlayer(player));
+        Region region = RTP.selectionAPI.getRegion(new BukkitRTPPlayer(player));
         ConcurrentHashMap<UUID, CompletableFuture<Map.Entry<RTPLocation,Long>>> respawnLocations = region.fastLocations;
         if(!respawnLocations.containsKey(player.getUniqueId())) return;
 
@@ -303,7 +303,7 @@ public class OnEventTeleports implements Listener {
                 RTP.getInstance().latestTeleportData.remove(player.getUniqueId());
             }
             BukkitRTPPlayer rtpPlayer = new BukkitRTPPlayer(player);
-            new SetupTeleport(rtpPlayer, rtpPlayer, RTP.getInstance().selectionAPI.getRegion(rtpPlayer), null);
+            new SetupTeleport(rtpPlayer, rtpPlayer, RTP.selectionAPI.getRegion(rtpPlayer), null);
         }, 5);
         tasks.put(player.getUniqueId(),runnable);
         RTP.getInstance().miscAsyncTasks.add(runnable);

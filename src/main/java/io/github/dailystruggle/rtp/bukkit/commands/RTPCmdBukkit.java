@@ -64,7 +64,7 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
         RegionParameter regionParameter = new RegionParameter(
                 "rtp.region",
                 "select a region to teleport to",
-                (uuid, s) -> RTP.getInstance().selectionAPI.regionNames().contains(s) && RTP.serverAccessor.getSender(uuid).hasPermission("rtp.regions." + s));
+                (uuid, s) -> RTP.selectionAPI.regionNames().contains(s) && RTP.serverAccessor.getSender(uuid).hasPermission("rtp.regions." + s));
         regionParameter.put("world", new io.github.dailystruggle.rtp.common.commands.parameters.WorldParameter("rtp.params","modify xz selection",(uuid, s)->true));
         regionParameter.put("price", new FloatParameter("rtp.params","modify xz selection",(uuid, s)->true));
         regionParameter.put("worldborderoverride", new BooleanParameter("rtp.params","modify xz selection",(uuid, s)->true));

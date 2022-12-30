@@ -38,7 +38,7 @@ public class RTPAPI {
         if(factory == null) return false;
 
         if(factory.contains(shape.name)) return true;
-        factory.add(shape.name,shape);
+        factory.add(shape.name,shape.clone());
 
         if(reloadTask==null) {
             reloadTask = RTPAPI::reload;
@@ -50,7 +50,7 @@ public class RTPAPI {
 
     public static long loadedLocations(String regionName) {
         if(RTP.getInstance() == null) return 0;
-        SelectionAPI selectionAPI = RTP.getInstance().selectionAPI;
+        SelectionAPI selectionAPI = RTP.selectionAPI;
         if(selectionAPI == null) return 0;
         Region region = selectionAPI.getRegion(regionName);
         if(region == null) return 0;

@@ -53,7 +53,7 @@ public class BukkitServerAccessor implements RTPServerAccessor {
         shapeFunction = s -> {
             World world = Bukkit.getWorld(s);
             if(world == null) return null;
-            Region region = RTP.getInstance().selectionAPI.getRegion(getRTPWorld(world.getUID()));
+            Region region = RTP.selectionAPI.getRegion(getRTPWorld(world.getUID()));
             if(region == null) throw new IllegalStateException();
             Object o = region.getData().get(RegionKeys.shape);
             if(!(o instanceof Shape<?>)) throw new IllegalStateException();

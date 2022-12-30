@@ -20,7 +20,7 @@ public class RegionParameter extends CommandParameter {
     //todo: store and update
     @Override
     public Set<String> values() {
-        return RTP.getInstance().selectionAPI.regionNames();
+        return RTP.selectionAPI.regionNames();
     }
 
     @Override

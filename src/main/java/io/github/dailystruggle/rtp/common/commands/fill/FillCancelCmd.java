@@ -67,10 +67,10 @@ public class FillCancelCmd extends FillSubCmd {
         List<Region> regions = new ArrayList<>();
         RTPCommandSender sender = RTP.serverAccessor.getSender(callerId);
         if(regionParameter!=null) {
-            for(String name : regionParameter) regions.add(RTP.getInstance().selectionAPI.getRegion(name));
+            for(String name : regionParameter) regions.add(RTP.selectionAPI.getRegion(name));
         }
-        else if(sender instanceof RTPPlayer) regions.add(RTP.getInstance().selectionAPI.getRegion((RTPPlayer) sender));
-        else regions.add(RTP.getInstance().selectionAPI.getRegion("default"));
+        else if(sender instanceof RTPPlayer) regions.add(RTP.selectionAPI.getRegion((RTPPlayer) sender));
+        else regions.add(RTP.selectionAPI.getRegion("default"));
         return regions;
     }
 }

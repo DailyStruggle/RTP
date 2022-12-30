@@ -222,7 +222,7 @@ public interface RTPCmd extends BaseRTPCmd {
                 regionName = worldParser.getConfigValue(WorldKeys.region, "default").toString();
             }
 
-            SelectionAPI selectionAPI = RTP.getInstance().selectionAPI;
+            SelectionAPI selectionAPI = RTP.selectionAPI;
 
             Region region;
             try {
@@ -232,6 +232,7 @@ public interface RTPCmd extends BaseRTPCmd {
                 RTP.getInstance().latestTeleportData.remove(senderId);
                 return true;
             }
+            region.getShape().select();
             RTPWorld rtpWorld = region.getWorld();
             Objects.requireNonNull(rtpWorld);
 
@@ -284,7 +285,7 @@ public interface RTPCmd extends BaseRTPCmd {
                 for (int j = 0; j < 1 && shapeNames != null && shapeNames.size() > 0; j++) {
                     Shape<?> originalShape = region.getShape();
 
-                    RTP.getInstance().selectionAPI.tempRegions.put(senderId, region);
+                    RTP.selectionAPI.tempRegions.put(senderId, region);
                     String shapeName = pickOne(shapeNames, "CIRCLE");
                     Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
                     Shape<?> shape = (Shape<?>) factory.get(shapeName);

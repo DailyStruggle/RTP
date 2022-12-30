@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.factory;
 
 import com.google.common.base.Function;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import org.jetbrains.annotations.NotNull;
 import org.simpleyaml.configuration.file.YamlFile;
 
@@ -28,7 +29,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
      *      mapped enum value to object to stay organized
      */
     public String name;
-    protected final EnumMap<E,Object> data;
+    protected EnumMap<E,Object> data;
     protected final EnumMap<E,String[]> desc;
 
     protected final Map<String,E> enumLookup;
@@ -58,6 +59,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
      * @param data - data to apply.
      */
     public void setData(final EnumMap<? extends Enum<?>,?> data) throws IllegalArgumentException {
+        this.data = new EnumMap<>(myClass);
         data.forEach((key, value) -> {
             if(key == null) throw new IllegalArgumentException("null key");
             if(value == null) throw new IllegalArgumentException("null value");
@@ -107,7 +109,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     public FactoryValue<E> clone() {
         try {
             FactoryValue<E> clone = (FactoryValue<E>) super.clone();
-            clone.setData(getData());
+            clone.data = data.clone();
             return clone;
         } catch (CloneNotSupportedException e) {
             e.printStackTrace();
@@ -131,8 +133,13 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
         Object resObj = data.getOrDefault(key,def);
         if(resObj instanceof Number) {
             res = (Number) resObj;
+        } else if(resObj instanceof Integer
+                || resObj instanceof Long
+                || resObj instanceof Float
+                || resObj instanceof Double) {
+            res = (Number) resObj;
         } else if(resObj instanceof String) {
-            res = numberParsers.get(def.getClass()).apply((String) resObj);
+            res = Double.parseDouble((String) resObj);
         } else if(resObj instanceof Character) {
             res = Integer.parseInt(((Character) resObj).toString());
         }

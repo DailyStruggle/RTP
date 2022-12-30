@@ -47,7 +47,7 @@ public final class AsyncTaskProcessing extends RTPRunnable {
             if(perf!=null) period = perf.getNumber(PerformanceKeys.period,0).longValue();
         }
 
-        List<Region> regions = new ArrayList<>(RTP.getInstance().selectionAPI.permRegionLookup.values());
+        List<Region> regions = new ArrayList<>(RTP.selectionAPI.permRegionLookup.values());
         if(period<=0) period = regions.size();
         if(period<=0) return;
 

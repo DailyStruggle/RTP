@@ -13,8 +13,7 @@ import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.*;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.jump.JumpAdjustor;
@@ -93,7 +92,10 @@ public class RTP {
 
         RTPAPI.addShape(new Circle());
         RTPAPI.addShape(new Square());
-//        new LinearAdjustor(new ArrayList<>()); todo: make this work
+        RTPAPI.addShape(new Rectangle());
+        RTPAPI.addShape(new Circle_Normal());
+        RTPAPI.addShape(new Square_Normal());
+        new LinearAdjustor(new ArrayList<>()); //todo: make this work
         new JumpAdjustor(new ArrayList<>());
 
         configs = new Configs(serverAccessor.getPluginDirectory());
@@ -111,7 +113,7 @@ public class RTP {
         serverAccessor.log(level, str, exception);
     }
 
-    public final SelectionAPI selectionAPI = new SelectionAPI();
+    public static final SelectionAPI selectionAPI = new SelectionAPI();
 
     public final ConcurrentHashMap<UUID, TeleportData> priorTeleportData = new ConcurrentHashMap<>();
     public final ConcurrentHashMap<UUID, TeleportData> latestTeleportData = new ConcurrentHashMap<>();

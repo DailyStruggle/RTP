@@ -37,7 +37,7 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
         // command processing timer is delayed to ensure this is set up before it's used
 
         shapeFunction = s -> {
-            Region region = RTP.getInstance().selectionAPI.getRegion(new TestRTPWorld());
+            Region region = RTP.selectionAPI.getRegion(new TestRTPWorld());
             if(region == null) throw new IllegalStateException();
             Object o = region.getData().get(RegionKeys.shape);
             if(!(o instanceof Shape<?>)) throw new IllegalStateException();

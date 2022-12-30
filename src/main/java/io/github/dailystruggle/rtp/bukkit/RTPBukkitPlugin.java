@@ -406,6 +406,6 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             regionParser = regionParsers.getParser(regionName);
             requirePermission = Boolean.parseBoolean(regionParser.getConfigValue(RegionKeys.requirePermission,false).toString());
         }
-        return RTP.getInstance().selectionAPI.permRegionLookup.get(regionName);
+        return RTP.selectionAPI.permRegionLookup.get(regionName);
     }
 }

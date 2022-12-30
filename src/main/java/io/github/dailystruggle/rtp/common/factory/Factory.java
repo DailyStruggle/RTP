@@ -57,12 +57,14 @@ public class Factory<T extends FactoryValue<?>> {
             }
             else return null;
         }
-        return value;
+        return value.clone();
     }
 
     @Nullable
     public FactoryValue<?> get(String name) {
-        return map.get(name.toUpperCase());
+        T t = map.get(name.toUpperCase());
+        if(t == null) return null;
+        return t.clone();
     }
 
     @NotNull
@@ -74,8 +76,8 @@ public class Factory<T extends FactoryValue<?>> {
                 value = (T) construct(name);
 //                map.put(name, value);
             }
-            else return new ArrayList<>(map.values()).get(0);
+            else return new ArrayList<>(map.values()).get(0).clone();
         }
-        return value;
+        return value.clone();
     }
 }

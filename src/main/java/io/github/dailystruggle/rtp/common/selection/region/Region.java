@@ -640,6 +640,7 @@ public class Region extends FactoryValue<RegionKeys> {
     @Override
     public Region clone() {
         Region clone = (Region) super.clone();
+        clone.data = data.clone();
         clone.locationQueue = new ConcurrentLinkedQueue<>();
         clone.locAssChunks = new ConcurrentHashMap<>();
         clone.playerQueue = new ConcurrentLinkedQueue<>();
@@ -790,7 +791,7 @@ public class Region extends FactoryValue<RegionKeys> {
         }
 
         RTPWorld world;
-        o = data.getOrDefault(RegionKeys.world, null);
+        o = data.get(RegionKeys.world);
         if(o instanceof RTPWorld) world = (RTPWorld) o;
         else if(o instanceof String) {
             world = RTP.serverAccessor.getRTPWorld((String) o);
@@ -850,9 +851,9 @@ public class Region extends FactoryValue<RegionKeys> {
         }
         else if(vertObj instanceof MemorySection) {
             final Map<String, Object> vertMap = ((MemorySection) vertObj).getMapValues(true);
-            String shapeName = String.valueOf(vertMap.get("name"));
+            String vertName = String.valueOf(vertMap.get("name"));
             Factory<VerticalAdjustor<?>> factory = (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
-            vert = (VerticalAdjustor<?>) factory.get(shapeName);
+            vert = (VerticalAdjustor<?>) factory.get(vertName);
             EnumMap<?, Object> vertData = vert.getData();
             for(Map.Entry<? extends Enum<?>,Object> e : vertData.entrySet()) {
                 String name = e.getKey().name();

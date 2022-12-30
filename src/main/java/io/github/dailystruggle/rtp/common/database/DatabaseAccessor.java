@@ -265,7 +265,7 @@ public abstract class DatabaseAccessor<D> {
             if(originalLocation == null) originalLocation = new RTPLocation(RTP.serverAccessor.getRTPWorlds().get(0),0,0,0);
 
             Region targetRegion = teleportData.targetRegion;
-            if(targetRegion == null) targetRegion = RTP.getInstance().selectionAPI.getRegion("default");
+            if(targetRegion == null) targetRegion = RTP.selectionAPI.getRegion("default");
 
             if(sender != null) {
                 res.put("senderName", sender.name());

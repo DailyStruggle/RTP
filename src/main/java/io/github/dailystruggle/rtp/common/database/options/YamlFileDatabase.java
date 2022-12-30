@@ -229,7 +229,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String,YamlFile>> {
                                     ((Number)dataMap.get("selectedZ")).intValue());
                         teleportData.attempts = ((Number)dataMap.get("attempts")).intValue();
                         teleportData.cost = ((Number)dataMap.get("cost")).intValue();
-                        teleportData.targetRegion = RTP.getInstance().selectionAPI.getRegion(dataMap.get("region").toString());
+                        teleportData.targetRegion = RTP.selectionAPI.getRegion(dataMap.get("region").toString());
                         teleportData.completed = true;
                         RTP.getInstance().latestTeleportData.put(id, teleportData);
                     } catch (Exception ignored) {

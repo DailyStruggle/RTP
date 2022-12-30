@@ -1,4 +1,4 @@
-package io.github.dailystruggle.softdepends;
+package io.github.dailystruggle.rtp.softdepends;
 
 import br.net.fabiozumbi12.RedProtect.Bukkit.RedProtect;
 import org.bukkit.Location;

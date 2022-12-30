@@ -1,4 +1,4 @@
-package io.github.dailystrugle.rtp_shape_example.shapes.enums;
+package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums;
 
 public enum NormalDistributionParams {
     mode,

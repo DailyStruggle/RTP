@@ -3,6 +3,9 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAd
 import io.github.dailystruggle.commandsapi.bukkit.LocalParameters.BooleanParameter;
 import io.github.dailystruggle.commandsapi.bukkit.LocalParameters.IntegerParameter;
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
+import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.GenericVerticalAdjustorKeys;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
@@ -15,6 +18,8 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -43,9 +48,11 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
         return Arrays.stream(GenericVerticalAdjustorKeys.values()).map(Enum::name).collect(Collectors.toList());
     }
 
+    private static final Set<String> unsafeBlocks = new ConcurrentSkipListSet<>();
+    private static final AtomicLong lastUpdate = new AtomicLong();
     @Override
     public @Nullable
-    RTPLocation adjust(@NotNull RTPChunk input) {
+    RTPLocation adjust(@NotNull RTPChunk chunk) {
         RTPBlock resBlock;
 
         int maxY = getNumber(GenericVerticalAdjustorKeys.maxY, 320L).intValue();
@@ -59,20 +66,46 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
         }
         else requireSkyLight = Boolean.parseBoolean(o.toString());
 
+        long t = System.currentTimeMillis();
+        long dt = t - lastUpdate.get();
+        if (dt > 5000 || dt < 0) {
+            ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+            Object value = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
+            unsafeBlocks.clear();
+            if(value instanceof Collection) {
+                unsafeBlocks.addAll(((Collection<?>) value).stream().filter(Objects::nonNull).map(Object::toString).collect(Collectors.toSet()));
+            }
+            lastUpdate.set(t);
+        }
+
         switch(dir) {
             case 0: { //bottom up
                 for (int i = minY; i < maxY; i++) {
-                    resBlock = input.getBlockAt(7,i,7);
+                    RTPBlock block1 = chunk.getBlockAt(7, i, 7);
+                    RTPBlock block2 = chunk.getBlockAt(7, i+1, 7);
                     int skylight = 15;
-                    if(requireSkyLight) skylight = resBlock.skyLight();
-                    if(skylight>7 && testPlacement(resBlock)) return resBlock.getLocation();
+                    if(requireSkyLight) skylight = block2.skyLight();
+                    if(block1.isAir() && block2.isAir() && skylight > 7
+                            && !unsafeBlocks.contains(block2.getMaterial())
+                            && !unsafeBlocks.contains(block1.getMaterial())
+                            && !unsafeBlocks.contains(chunk.getBlockAt(7, i-1, 7).getMaterial())) {
+                        return block1.getLocation();
+                    }
                 }
                 break;
             }
             case 1: { //top down
                 for (int i = maxY; i > minY; i--) {
-                    resBlock = input.getBlockAt(7,i,7);
-                    if(testPlacement(resBlock)) return resBlock.getLocation();
+                    RTPBlock block1 = chunk.getBlockAt(7, i, 7);
+                    RTPBlock block2 = chunk.getBlockAt(7, i+1, 7);
+                    int skylight = 15;
+                    if(requireSkyLight) skylight = block2.skyLight();
+                    if(block1.isAir() && block2.isAir() && skylight > 7
+                            && !unsafeBlocks.contains(block2.getMaterial())
+                            && !unsafeBlocks.contains(block1.getMaterial())
+                            && !unsafeBlocks.contains(chunk.getBlockAt(7, i-1, 7).getMaterial())) {
+                        return block1.getLocation();
+                    }
                 }
                 break;
             }
@@ -81,12 +114,28 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
                 int middle = minY + maxDistance;
                 for (int i = 0; i <= maxDistance; i++) {
                     //try top
-                    resBlock = input.getBlockAt(7,middle+i,7);
-                    if(testPlacement(resBlock)) return resBlock.getLocation();
+                    RTPBlock block1 = chunk.getBlockAt(7, middle+i, 7);
+                    RTPBlock block2 = chunk.getBlockAt(7, middle+i+1, 7);
+                    int skylight = 15;
+                    if(requireSkyLight) skylight = block2.skyLight();
+                    if(block1.isAir() && block2.isAir() && skylight > 7
+                            && !unsafeBlocks.contains(block2.getMaterial())
+                            && !unsafeBlocks.contains(block1.getMaterial())
+                            && !unsafeBlocks.contains(chunk.getBlockAt(7, middle+i-1, 7).getMaterial())) {
+                        return block1.getLocation();
+                    }
 
                     //try bottom
-                    resBlock = input.getBlockAt(7,middle-i,7);
-                    if(testPlacement(resBlock)) return resBlock.getLocation();
+                    block1 = chunk.getBlockAt(7, middle-i, 7);
+                    block2 = chunk.getBlockAt(7, middle-i+1, 7);
+                    skylight = 15;
+                    if(requireSkyLight) skylight = block2.skyLight();
+                    if(block1.isAir() && block2.isAir() && skylight > 7
+                            && !unsafeBlocks.contains(block2.getMaterial())
+                            && !unsafeBlocks.contains(block1.getMaterial())
+                            && !unsafeBlocks.contains(chunk.getBlockAt(7, middle-i-1, 7).getMaterial())) {
+                        return block1.getLocation();
+                    }
                 }
                 break;
             }
@@ -95,12 +144,28 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
                 int middle = minY + maxDistance;
                 for (int i = maxDistance; i >= 0; i--) {
                     //try top
-                    resBlock = input.getBlockAt(7,middle+i,7);
-                    if(testPlacement(resBlock)) return resBlock.getLocation();
+                    RTPBlock block1 = chunk.getBlockAt(7, middle+i, 7);
+                    RTPBlock block2 = chunk.getBlockAt(7, middle+i+1, 7);
+                    int skylight = 15;
+                    if(requireSkyLight) skylight = block2.skyLight();
+                    if(block1.isAir() && block2.isAir() && skylight > 7
+                            && !unsafeBlocks.contains(block2.getMaterial())
+                            && !unsafeBlocks.contains(block1.getMaterial())
+                            && !unsafeBlocks.contains(chunk.getBlockAt(7, middle+i-1, 7).getMaterial())) {
+                        return block1.getLocation();
+                    }
 
                     //try bottom
-                    resBlock = input.getBlockAt(7,middle-i,7);
-                    if(testPlacement(resBlock)) return resBlock.getLocation();
+                    block1 = chunk.getBlockAt(7, middle-i, 7);
+                    block2 = chunk.getBlockAt(7, middle-i+1, 7);
+                    skylight = 15;
+                    if(requireSkyLight) skylight = block2.skyLight();
+                    if(block1.isAir() && block2.isAir() && skylight > 7
+                            && !unsafeBlocks.contains(block2.getMaterial())
+                            && !unsafeBlocks.contains(block1.getMaterial())
+                            && !unsafeBlocks.contains(chunk.getBlockAt(7, middle-i-1, 7).getMaterial())) {
+                        return block1.getLocation();
+                    }
                 }
                 break;
             }
@@ -116,8 +181,16 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
 
                 //try each
                 for(int i : trials) {
-                    resBlock = input.getBlockAt(7,i,7);
-                    if(testPlacement(resBlock)) return resBlock.getLocation();
+                    RTPBlock block1 = chunk.getBlockAt(7, i, 7);
+                    RTPBlock block2 = chunk.getBlockAt(7, i+1, 7);
+                    int skylight = 15;
+                    if(requireSkyLight) skylight = block2.skyLight();
+                    if(block1.isAir() && block2.isAir() && skylight > 7
+                            && !unsafeBlocks.contains(block2.getMaterial())
+                            && !unsafeBlocks.contains(block1.getMaterial())
+                            && !unsafeBlocks.contains(chunk.getBlockAt(7, i-1, 7).getMaterial())) {
+                        return block1.getLocation();
+                    }
                 }
             }
         }
