@@ -127,7 +127,7 @@ public class Circle_Normal extends MemoryShape<NormalDistributionParams> {
         long cr = getNumber(NormalDistributionParams.centerRadius,64L).longValue();
         double mean = getNumber(NormalDistributionParams.mean,0.5).doubleValue();
         double deviation = getNumber(NormalDistributionParams.deviation,1.0).doubleValue();
-        double range = (radius-cr)*(radius+cr)*4;
+        double range = (radius-cr)*(radius+cr)*Math.PI;
 
         boolean expand = Boolean.parseBoolean(data.getOrDefault(NormalDistributionParams.expand,false).toString());
         if(!expand) range -= badLocationSum.get();
