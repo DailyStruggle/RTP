@@ -118,10 +118,10 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
                         }
                     }
 
+                    subParams.put("name", shape.name);
                     for(Map.Entry<? extends Enum<?>,Object> entry : data.entrySet()) {
                         String name = entry.getKey().name();
-                        String lowerCase = name.toLowerCase();
-                        List<String> strings = parameterValues.get(lowerCase);
+                        List<String> strings = parameterValues.get(name.toLowerCase());
                         if (strings!=null && strings.size()>0) {
                             subParams.put(name,strings.get(0));
                         }
@@ -160,10 +160,10 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
                         }
                     }
 
+                    subParams.put("name", vert.name);
                     for(Map.Entry<? extends Enum<?>,Object> entry : vertData.entrySet()) {
                         String name = entry.getKey().name();
-                        String lowerCase = name.toLowerCase();
-                        List<String> strings = parameterValues.get(lowerCase);
+                        List<String> strings = parameterValues.get(name.toLowerCase());
                         if (strings!=null && strings.size()>0) {
                             subParams.put(name,strings.get(0));
                         }
