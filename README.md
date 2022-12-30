@@ -1,5 +1,6 @@
 # RTP
 
+## Overview
 A spigot plugin for random teleportation.
 https://www.spigotmc.org/resources/rtp.94812/
 
@@ -11,7 +12,7 @@ The goal of this plugin is function over form,
  * adjustment of region and world settings by command or by config file 
  * adjustment of all plugin messages in lang.yml
 
-##Shapes
+## Shapes
 The plugin has some pretty useful shapes by default - 
 
 circle, using an exponential distribution of 0.1, 1.0, 10.0
