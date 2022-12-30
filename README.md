@@ -1,5 +1,6 @@
 # RTP
 
+## Overview
 A spigot plugin for random teleportation.
 https://www.spigotmc.org/resources/rtp.94812/
 
@@ -11,15 +12,22 @@ The goal of this plugin is function over form,
  * adjustment of region and world settings by command or by config file 
  * adjustment of all plugin messages in lang.yml
 
-I made this in a flow state and now I only understand how it works because I wrote down the math. I question my sanity.
+## Shapes
+The plugin has some pretty useful shapes by default - 
 
-V1 is primarily focused on setting up a functional implementation with various plugin integrations.
+circle, using an exponential distribution of 0.1, 1.0, 10.0
+![zu5gW62](https://user-images.githubusercontent.com/28832622/210043913-fd624a9f-8bdd-45de-b877-6a5f5e3bf40a.png)
 
-V2 is planned to focus on pushing main functions into a server-independent API and on supplying developers with additional options.
+square, using an exponential distribution of 0.1, 1.0, 10.0
+![3mrkKh1](https://user-images.githubusercontent.com/28832622/210043922-4d94e3d6-e829-4adc-a21a-74cce484f8e6.png)
 
-V2 will take an unknown amount of time for the following reasons: 
- - V1 already involves some multi-dimensional thinking, so it's hard to conceptualize the entire thing and how to redefine it.
- - Several classes in V1 currently rely on supplied methods from the bukkit/spigot server, so I want to replace a lot of those supplied methods to enforce platform-independence in the new API.
- - Java is fickle in ways I didn't expect, so there is a lot of nuance involved in implementing the new API design.
-   - e.g. runtime factories and generics where I want to add modularity for addons.
- - I want to implement a bunch of system-level changes in a single pass to ease the burden on operators and developers
+circle, using a normal distribution
+![SUGBQk3](https://user-images.githubusercontent.com/28832622/210043926-5c5013cf-032e-444c-9397-e381c17a4752.png)
+
+square, using a normal distribution
+![pzu9j63](https://user-images.githubusercontent.com/28832622/210043956-df964dde-4c70-460b-a377-ffd49a365e69.png)
+
+rectangle, using a flat distribution and a rotation
+![3Yw2tBj](https://user-images.githubusercontent.com/28832622/210043964-ca9725b8-be25-4e3c-a460-90f8b81326cb.png)
+
+This plugin also allows arbitrary shape addition via API calls.
