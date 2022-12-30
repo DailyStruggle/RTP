@@ -1,4 +1,4 @@
-package io.github.dailystruggle;
+package io.github.dailystruggle.rtp;
 
 public enum IntegrationsKeys {
     rerollWorldGuard,

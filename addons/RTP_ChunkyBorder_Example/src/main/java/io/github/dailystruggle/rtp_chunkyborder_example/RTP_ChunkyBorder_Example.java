@@ -44,7 +44,7 @@ public final class RTP_ChunkyBorder_Example extends JavaPlugin {
                 World world = bukkitRTPWorld.world();
                 org.bukkit.WorldBorder worldBorder = world.getWorldBorder();
                 return new WorldBorder(
-                        () -> (Shape<?>) RTP.factoryMap.get(RTP.factoryNames.shape).get("SQUARE"),
+                        () -> ((Shape<?>) RTP.factoryMap.get(RTP.factoryNames.shape).get("SQUARE")),
                         rtpLocation -> worldBorder.isInside(new Location(world, rtpLocation.x(), rtpLocation.y(), rtpLocation.z())));
             }
 

@@ -1,10 +1,9 @@
-package io.github.dailystrugle.rtp_shape_example.shapes;
+package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes;
 
 import io.github.dailystruggle.commandsapi.bukkit.LocalParameters.*;
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
-import io.github.dailystrugle.rtp_shape_example.shapes.enums.NormalDistributionParams;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.NormalDistributionParams;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -207,12 +206,6 @@ public class Square_Normal extends MemoryShape<NormalDistributionParams> {
 
         mean = Math.abs(mean)%1.0; //ensure mean 0.0-1.0
         deviation = Math.abs(deviation); //ensure deviation>0
-
-//        double center = (radius-cr)*mean+cr; //relative point between these two radii
-//        center = (center-cr)*(center+cr)*4; //convert to range at this point
-
-//        double upper = range-center; //distance from center to max
-//        double lower = center; //distance from center to min
 
         //get a valid number between 0 and 1
         // apply corrective deviation to get , apply requested deviation, shift over to mean

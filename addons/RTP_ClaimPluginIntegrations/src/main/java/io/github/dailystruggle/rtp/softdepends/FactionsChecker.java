@@ -1,4 +1,4 @@
-package io.github.dailystruggle.softdepends;
+package io.github.dailystruggle.rtp.softdepends;
 
 import com.massivecraft.factions.Board;
 import com.massivecraft.factions.FLocation;

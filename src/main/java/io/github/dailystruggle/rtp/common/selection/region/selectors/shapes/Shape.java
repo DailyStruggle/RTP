@@ -33,6 +33,19 @@ public abstract class Shape<E extends Enum<E>> extends FactoryValue<E> {
         }
     }
 
+    public int[] rotate(int[] input, long degrees) {
+        double angle = Math.toRadians(degrees);
+
+        double s = Math.sin(-angle);
+        double c = Math.cos(-angle);
+
+        // rotate point
+        input[0] = (int) (input[0] * c - input[1] * s);
+        input[1] = (int) (input[0] * s + input[1] * c);
+
+        return input;
+    }
+
     @Override
     public @NotNull EnumMap<E, Object> getData() {
         return data.clone();

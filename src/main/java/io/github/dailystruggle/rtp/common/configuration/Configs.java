@@ -166,10 +166,13 @@ public class Configs {
                 });
             }
             Region region = new Region(regionConfig.name.replace(".yml",""), data);
-            RTP.getInstance().selectionAPI.permRegionLookup.put(region.name,region);
+            RTP.selectionAPI.permRegionLookup.put(region.name,region);
             if(detailed_region_init) {
                 RTP.log(Level.INFO, "[RTP] [" + name + "] successfully created teleport region - " + region.name);
             }
+            RTP.getInstance().miscAsyncTasks.add(new RTPRunnable(() -> {
+                RTP.selectionAPI.permRegionLookup.get(region.name).getShape().select();
+            },60));
         }
         if(onReload.size()>0) onReload.forEach(Runnable::run);
     }

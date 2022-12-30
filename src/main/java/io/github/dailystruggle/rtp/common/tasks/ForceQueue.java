@@ -20,18 +20,18 @@ public final class ForceQueue extends RTPRunnable {
 
     public ForceQueue() {
         sender = RTP.serverAccessor.getSender(CommandsAPI.serverId);
-        regions = RTP.getInstance().selectionAPI.permRegionLookup.values();
+        regions = RTP.selectionAPI.permRegionLookup.values();
     }
 
     public ForceQueue(RTPCommandSender sender) {
         this.sender = sender;
-        regions = RTP.getInstance().selectionAPI.permRegionLookup.values();
+        regions = RTP.selectionAPI.permRegionLookup.values();
     }
 
     public ForceQueue(RTPCommandSender sender,
                       @Nullable Collection<Region> regions) {
         this.sender = sender;
-        if(regions == null || regions.size()==0) regions = RTP.getInstance().selectionAPI.permRegionLookup.values();
+        if(regions == null || regions.size()==0) regions = RTP.selectionAPI.permRegionLookup.values();
         this.regions = regions;
     }
 

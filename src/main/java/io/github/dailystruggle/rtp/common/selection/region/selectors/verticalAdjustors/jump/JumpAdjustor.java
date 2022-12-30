@@ -52,7 +52,7 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
     RTPLocation adjust(@NotNull RTPChunk chunk) {
         if(chunk==null) return null;
 
-        int maxY = getNumber(JumpAdjustorKeys.maxY, 255L).intValue();
+        int maxY = getNumber(JumpAdjustorKeys.maxY, 256L).intValue();
         int minY = getNumber(JumpAdjustorKeys.minY, 0L).intValue();
         int step = getNumber(JumpAdjustorKeys.step, 0).intValue();
 
@@ -118,8 +118,8 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
             int skylight = 15;
             if(requireSkyLight) skylight = block2.skyLight();
             if(block1.isAir() && block2.isAir() && skylight > 7
-                    && !unsafeBlocks.contains(block1.getMaterial())
                     && !unsafeBlocks.contains(block2.getMaterial())
+                    && !unsafeBlocks.contains(block1.getMaterial())
                     && !unsafeBlocks.contains(chunk.getBlockAt(7, i-1, 7).getMaterial())) {
                 return block1.getLocation();
             }

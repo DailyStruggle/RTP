@@ -1,4 +1,4 @@
-package io.github.dailystruggle;
+package io.github.dailystruggle.rtp;
 
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -6,7 +6,7 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
-import io.github.dailystruggle.softdepends.*;
+import io.github.dailystruggle.rtp.softdepends.*;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -17,10 +17,10 @@ public final class RTPClaimPluginIntegrations extends JavaPlugin {
     public void onEnable() {
         // Plugin startup logic
         Configs configs = RTP.configs;
-        ConfigParser<IntegrationsKeys> integrations = new ConfigParser<>(IntegrationsKeys.class,"integrations","1.0",RTP.serverAccessor.getPluginDirectory(), null, this.getClass().getClassLoader());
+        ConfigParser<IntegrationsKeys> integrations = new ConfigParser<>(IntegrationsKeys.class,"integrations","1.0",RTP.serverAccessor.getPluginDirectory(), RTP.configs.fileDatabase);
         configs.putParser(integrations);
 
-        Configs.onReload(() -> RTP.configs.putParser(new ConfigParser<>(IntegrationsKeys.class,"integrations","1.0",RTP.serverAccessor.getPluginDirectory(), null, this.getClass().getClassLoader())));
+        Configs.onReload(() -> RTP.configs.putParser(new ConfigParser<>(IntegrationsKeys.class,"integrations","1.0",RTP.serverAccessor.getPluginDirectory(), RTP.configs.fileDatabase)));
     }
 
     @Override
@@ -33,9 +33,8 @@ public final class RTPClaimPluginIntegrations extends JavaPlugin {
 
         Region.addGlobalRegionVerifier(rtpLocation -> {
             RTPWorld rtpWorld = rtpLocation.world();
-            if(!(rtpWorld instanceof BukkitRTPWorld)) return false;
+            if(!(rtpWorld instanceof BukkitRTPWorld bukkitRTPWorld)) return false;
             if(!rtpWorld.isActive()) return false;
-            BukkitRTPWorld bukkitRTPWorld = (BukkitRTPWorld) rtpWorld;
             World world = bukkitRTPWorld.world();
             Location location = new Location(world, rtpLocation.x(), rtpLocation.y(), rtpLocation.z());
 

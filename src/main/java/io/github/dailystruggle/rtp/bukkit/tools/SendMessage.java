@@ -244,7 +244,7 @@ public class SendMessage {
                 return "";
             }
 
-            Region region = RTP.getInstance().selectionAPI.getRegion(new BukkitRTPPlayer(player));
+            Region region = RTP.selectionAPI.getRegion(new BukkitRTPPlayer(player));
             if(region==null) return "0";
             return String.valueOf(region.getTotalQueueLength(player.getUniqueId()));
         });
@@ -255,7 +255,7 @@ public class SendMessage {
                 return "";
             }
 
-            Region region = RTP.getInstance().selectionAPI.getRegion(new BukkitRTPPlayer(player));
+            Region region = RTP.selectionAPI.getRegion(new BukkitRTPPlayer(player));
             if(region==null) return "0";
             return String.valueOf(region.getPublicQueueLength());
         });
@@ -266,7 +266,7 @@ public class SendMessage {
                 return "";
             }
 
-            Region region = RTP.getInstance().selectionAPI.getRegion(new BukkitRTPPlayer(player));
+            Region region = RTP.selectionAPI.getRegion(new BukkitRTPPlayer(player));
             if(region==null) return "0";
             return String.valueOf(region.getPersonalQueueLength(player.getUniqueId()));
         });

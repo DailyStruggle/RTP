@@ -27,7 +27,7 @@ public class InfoCmd extends BaseRTPCmdImpl {
     private static final Map<String, Function<Region, String>> regionDataLookup = new ConcurrentHashMap<>();
     static {
         worldDataLookup.put("world", RTPWorld::name);
-        worldDataLookup.put("region", world -> RTP.getInstance().selectionAPI.getRegion(world).name);
+        worldDataLookup.put("region", world -> RTP.selectionAPI.getRegion(world).name);
         worldDataLookup.put("requirePermission", world -> {
             MultiConfigParser<WorldKeys> worlds = (MultiConfigParser<WorldKeys>) RTP.configs.getParser(WorldKeys.class);
             ConfigParser<WorldKeys> parser = worlds.getParser(world.name());
@@ -110,7 +110,7 @@ public class InfoCmd extends BaseRTPCmdImpl {
                 RTP.serverAccessor.sendMessageAndSuggest(callerId,msg,"rtp info world:"+world.name());
             });
             RTP.serverAccessor.sendMessage(callerId,regionHeader);
-            RTP.getInstance().selectionAPI.permRegionLookup.values().forEach(region -> {
+            RTP.selectionAPI.permRegionLookup.values().forEach(region -> {
                 String msg = StringUtils.replace(regions,"[region]",region.name);
                 RTP.serverAccessor.sendMessageAndSuggest(callerId,msg,"rtp info region:"+region.name);
             });
@@ -150,7 +150,7 @@ public class InfoCmd extends BaseRTPCmdImpl {
             if(!(regionInfoObj instanceof List)) return true;
             List<String> regionInfo = ((List<?>) regionInfoObj).stream().map(String::valueOf).collect(Collectors.toList());
             for(String regionName : regionNames) {
-                Region region = RTP.getInstance().selectionAPI.getRegion(regionName);
+                Region region = RTP.selectionAPI.getRegion(regionName);
                 if(region ==null) continue;
                 ArrayList<String> regionInfoCopy = new ArrayList<>(regionInfo);
                 List<String> strings = regionInfoCopy.stream().map(s -> {

@@ -18,7 +18,7 @@ public final class OnPlayerChangeWorld implements Listener {
         Player player = event.getPlayer();
 
         if(player.hasPermission("rtp.personalQueue")) {
-            Region region = RTP.getInstance().selectionAPI.getRegion(new BukkitRTPPlayer(player));
+            Region region = RTP.selectionAPI.getRegion(new BukkitRTPPlayer(player));
             if(region == null) return;
             region.queue(player.getUniqueId());
         }

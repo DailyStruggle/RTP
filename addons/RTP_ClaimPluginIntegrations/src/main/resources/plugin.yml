@@ -1,6 +1,6 @@
 name: RTP_ClaimPluginIntegrations
 version: '${project.version}'
-main: io.github.dailystruggle.RTPClaimPluginIntegrations
+main: io.github.dailystruggle.rtp.RTPClaimPluginIntegrations
 api-version: 1.13
 prefix: RTP
 depend: [ RTP ]
