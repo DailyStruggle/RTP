@@ -32,7 +32,7 @@ public class Square extends MemoryShape<GenericMemoryShapeParams> {
         subParameters.put("centerz",new CoordinateParameter("rtp.params", "center point Z", (sender, s) -> true));
         subParameters.put("weight",new FloatParameter("rtp.params", "weigh towards or away from center", (sender, s) -> true,0.1,1.0,10.0));
         subParameters.put("expand",new BooleanParameter("rtp.params", "expand region to keep a constant amount of usable land", (sender, s) -> true));
-        subParameters.put("uniquePlacements",new BooleanParameter("rtp.params", "ensure each selection is unique from prior selections", (sender, s) -> true));
+        subParameters.put("uniqueplacements",new BooleanParameter("rtp.params", "ensure each selection is unique from prior selections", (sender, s) -> true));
     }
 
     public Square() {

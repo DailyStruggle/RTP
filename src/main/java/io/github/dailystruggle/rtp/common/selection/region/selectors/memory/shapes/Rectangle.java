@@ -30,7 +30,7 @@ public class Rectangle extends MemoryShape<RectangleParams> {
         subParameters.put("rotation",new IntegerParameter("rtp.params", "outer radius of region", (sender, s) -> true, 0,30,45,60,90));
         subParameters.put("centerx",new CoordinateParameter("rtp.params", "center point x", (sender, s) -> true));
         subParameters.put("centerz",new CoordinateParameter("rtp.params", "center point Z", (sender, s) -> true));
-        subParameters.put("uniquePlacements",new BooleanParameter("rtp.params", "ensure each selection is unique from prior selections", (sender, s) -> true));
+        subParameters.put("uniqueplacements",new BooleanParameter("rtp.params", "ensure each selection is unique from prior selections", (sender, s) -> true));
     }
 
     public Rectangle() {
