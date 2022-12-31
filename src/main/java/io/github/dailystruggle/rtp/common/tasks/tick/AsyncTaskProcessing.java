@@ -35,12 +35,6 @@ public final class AsyncTaskProcessing extends RTPRunnable {
         RTP.getInstance().miscAsyncTasks.execute(availableTime-(System.nanoTime() - start));
         if(isCancelled()) return;
 
-        for(Map.Entry<String, FillTask> e : RTP.getInstance().fillTasks.entrySet()) {
-            if(e.getValue().isRunning()) continue;
-            e.getValue().run();
-            if(isCancelled()) return;
-        }
-
         long period = 0;
         if(RTP.configs !=null) {
             ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);

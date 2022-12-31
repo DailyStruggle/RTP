@@ -33,6 +33,7 @@ public class FillTask extends RTPRunnable {
     private final AtomicLong completionCounter = new AtomicLong();
     private final Semaphore completionGuard = new Semaphore(1);
     private final List<CompletableFuture<RTPChunk>> chunks = new ArrayList<>();
+    private final Semaphore testsGuard = new Semaphore(1);
     private final AtomicReference<List<CompletableFuture<Boolean>>> tests = new AtomicReference<>(new ArrayList<>());
 
     public FillTask(Region region, long start) {
@@ -51,9 +52,10 @@ public class FillTask extends RTPRunnable {
 
     @Override
     public void run() {
+        isRunning.setTrue();
         if(pause.get() || isCancelled() || fillIncrement.get()<=0) return;
 
-        isRunning.setValue(true);
+
         long timingStart = System.currentTimeMillis();
 
         MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
@@ -71,7 +73,9 @@ public class FillTask extends RTPRunnable {
                 try {
                     completionGuard.acquire();
                     long l = completionCounter.incrementAndGet();
-                    if(pos == range-1 || l == limit) done.complete(true);
+                    if(pos == range-1 || l == limit) {
+                        done.complete(true);
+                    }
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                     done.complete(false);
@@ -89,10 +93,11 @@ public class FillTask extends RTPRunnable {
                 if(isCancelled()) return;
                 if(!aBoolean) shape.addBadLocation(finalPos);
                 try {
-                    boolean b = completionGuard.tryAcquire(10, TimeUnit.SECONDS);
-                    if(!b) throw new IllegalStateException();
+                    completionGuard.acquire();
                     long l = completionCounter.incrementAndGet();
-                    if(finalPos == range-1 || l == limit) done.complete(true);
+                    if(finalPos == range-1 || l == limit) {
+                        done.complete(true);
+                    }
                 } catch (InterruptedException | IllegalStateException e) {
                     e.printStackTrace();
                     done.complete(false);
@@ -141,8 +146,11 @@ public class FillTask extends RTPRunnable {
 
             shape.fillIter.set(finalPos1);
             shape.save(region.name,region.getWorld().name());
+            region.getWorld().save();
 
-            if(aBoolean && finalPos1<range && !isCancelled()) RTP.getInstance().fillTasks.put(region.name, new FillTask(region, finalPos1));
+            if(aBoolean && finalPos1<range && !isCancelled()) {
+                RTP.getInstance().fillTasks.put(region.name, new FillTask(region, finalPos1));
+            }
             else RTP.getInstance().fillTasks.remove(region.name);
             isRunning.setValue(false);
         });
@@ -150,7 +158,15 @@ public class FillTask extends RTPRunnable {
 
     public CompletableFuture<Boolean> testPos(Region region, long pos) {
         CompletableFuture<Boolean> res = new CompletableFuture<>();
-        tests.get().add(res);
+        try {
+            testsGuard.acquire();
+            tests.get().add(res);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            testsGuard.release();
+        }
+
 
         MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
         RTPWorld world = region.getWorld();
@@ -256,9 +272,12 @@ public class FillTask extends RTPRunnable {
 
             }
             try {
+                testsGuard.acquire();
                 tests.get().forEach(test -> test.cancel(true));
-            } catch (CancellationException | CompletionException ignored) {
+            } catch (CancellationException | CompletionException | InterruptedException ignored) {
 
+            } finally {
+                testsGuard.release();
             }
         }
         super.setCancelled(cancelled);

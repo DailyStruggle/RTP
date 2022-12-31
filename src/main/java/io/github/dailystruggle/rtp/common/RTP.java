@@ -26,6 +26,7 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.FillTask;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
+import io.github.dailystruggle.rtp.common.tools.ChunkyChecker;
 import org.jetbrains.annotations.NotNull;
 import org.simpleyaml.configuration.ConfigurationSection;
 import org.simpleyaml.configuration.file.YamlFile;
@@ -99,6 +100,8 @@ public class RTP {
         new JumpAdjustor(new ArrayList<>());
 
         configs = new Configs(serverAccessor.getPluginDirectory());
+
+        miscAsyncTasks.add(ChunkyChecker::loadChunky);
     }
 
     public static RTP getInstance() {

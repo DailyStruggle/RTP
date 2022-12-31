@@ -247,6 +247,11 @@ public final class BukkitRTPWorld implements RTPWorld {
         return chunkMap.containsKey(Arrays.asList(cx, cz));
     }
 
+    @Override
+    public void save() {
+        world.save();
+    }
+
     public static Set<String> getBiomes() {
         return getBiomes.get();
     }
