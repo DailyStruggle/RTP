@@ -20,4 +20,6 @@ public interface RTPWorld {
     boolean isActive();
 
     boolean isForceLoaded(int cx, int cz);
+
+    void save();
 }

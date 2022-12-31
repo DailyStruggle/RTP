@@ -246,6 +246,10 @@
             <id>jitpack.io</id>
             <url>https://jitpack.io</url>
         </repository>
+        <repository>
+            <id>codemc</id>
+            <url>https://repo.codemc.io/repository/maven-public/</url>
+        </repository>
     </repositories>
 
     <dependencies>
@@ -318,7 +322,7 @@
         <dependency>
             <groupId>io.github.dailystruggle</groupId>
             <artifactId>EffectsAPI</artifactId>
-            <version>1.0-ALPHA32</version>
+            <version>1.0-ALPHA33</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -336,6 +340,18 @@
             <groupId>org.xerial</groupId>
             <artifactId>sqlite-jdbc</artifactId>
             <version>3.15.1</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.popcraft</groupId>
+            <artifactId>chunkyborder-common</artifactId>
+            <version>1.0.70</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.popcraft</groupId>
+            <artifactId>chunky-common</artifactId>
+            <version>1.2.217</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>

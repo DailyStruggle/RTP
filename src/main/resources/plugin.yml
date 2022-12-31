@@ -4,7 +4,7 @@ main: io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin
 api-version: 1.13
 authors: [ leaf26 ]
 description: 'a fast and flexible random teleportation plugin'
-softdepend: [WorldGuard, WorldEdit, GriefDefender, GriefPrevention, Vault, PlaceholderAPI, TownyAdvanced, HuskTowns, Factions, Lands, RedProtect]
+softdepend: [WorldGuard, WorldEdit, PlaceholderAPI, Vault, Chunky, ChunkyBorder]
 
 commands:
   rtp:

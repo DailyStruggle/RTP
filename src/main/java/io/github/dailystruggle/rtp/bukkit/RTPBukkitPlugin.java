@@ -6,10 +6,12 @@ import io.github.dailystruggle.rtp.bukkit.commands.RTPCmdBukkit;
 import io.github.dailystruggle.rtp.bukkit.events.*;
 import io.github.dailystruggle.rtp.bukkit.server.AsyncTeleportProcessing;
 import io.github.dailystruggle.rtp.bukkit.server.BukkitServerAccessor;
+import io.github.dailystruggle.rtp.bukkit.server.FillTaskProcessing;
 import io.github.dailystruggle.rtp.bukkit.server.SyncTeleportProcessing;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.spigotListeners.*;
 import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
+import io.github.dailystruggle.rtp.bukkit.tools.softdepends.ChunkyBorderChecker;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.VaultChecker;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -28,6 +30,7 @@ import io.github.dailystruggle.rtp.common.tasks.teleport.DoTeleport;
 import io.github.dailystruggle.rtp.common.tasks.teleport.LoadChunks;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tasks.teleport.SetupTeleport;
+import io.github.dailystruggle.rtp.common.tools.ChunkyChecker;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -55,6 +58,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     public BukkitTask commandProcessing = null;
     public BukkitTask asyncTimer = null;
     public BukkitTask syncTimer = null;
+    public BukkitTask fillTimer = null;
 
     @Override
     public void onLoad() {
@@ -100,6 +104,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             rtp.databaseAccessor.startup();
         }
 
+        RTP.getInstance().miscAsyncTasks.add(ChunkyBorderChecker::loadChunky);
         RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
 
         RTPCmdBukkit mainCommand = new RTPCmdBukkit(this);
@@ -138,10 +143,11 @@ public final class RTPBukkitPlugin extends JavaPlugin {
 
         AsyncTeleportProcessing.kill();
         SyncTeleportProcessing.kill();
+        FillTaskProcessing.kill();
 
-        syncTimer.cancel();
-        asyncTimer.cancel();
-
+        if(syncTimer!=null) syncTimer.cancel();
+        if(asyncTimer!=null) asyncTimer.cancel();
+        if(fillTimer!=null) fillTimer.cancel();
 
 
 //        onChunkLoad.shutdown();

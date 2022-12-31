@@ -349,6 +349,9 @@ public class BukkitServerAccessor implements RTPServerAccessor {
         plugin.asyncTimer = Bukkit.getScheduler().runTaskTimer(plugin,() -> {
             new AsyncTeleportProcessing().run();
         },20,1);
+        plugin.fillTimer = Bukkit.getScheduler().runTaskTimer(plugin,() -> {
+            new FillTaskProcessing().run();
+        },20,20);
 
         Bukkit.getScheduler().runTaskAsynchronously(plugin,this::getRTPWorlds);
     }

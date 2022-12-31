@@ -8,8 +8,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
-import io.github.dailystruggle.rtp_chunkyborder_example.shapes.*;
-import org.bukkit.Bukkit;
+import io.github.dailystruggle.rtp_chunkyborder_example.shapes.ChunkyRTPShape;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -40,7 +39,8 @@ public final class RTP_ChunkyBorder_Example extends JavaPlugin {
                 return new WorldBorder(() -> finalShape, rtpLocation -> border.isBounding(rtpLocation.x()/16.0, rtpLocation.z()/16.0));
             }
             RTPWorld rtpWorld = RTP.serverAccessor.getRTPWorld(worldName);
-            if (rtpWorld instanceof BukkitRTPWorld bukkitRTPWorld) {
+            if (rtpWorld instanceof BukkitRTPWorld) {
+                BukkitRTPWorld bukkitRTPWorld = (BukkitRTPWorld) rtpWorld;
                 World world = bukkitRTPWorld.world();
                 org.bukkit.WorldBorder worldBorder = world.getWorldBorder();
                 return new WorldBorder(

@@ -62,6 +62,11 @@ public class TestRTPWorld implements RTPWorld {
         return false;
     }
 
+    @Override
+    public void save() {
+
+    }
+
     public static Set<String> getBiomes() {
         HashSet<String> res = new HashSet<>();
         res.add("PLAINS");

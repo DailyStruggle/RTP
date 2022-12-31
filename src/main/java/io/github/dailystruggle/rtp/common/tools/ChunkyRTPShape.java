@@ -1,4 +1,4 @@
-package io.github.dailystruggle.rtp_chunkyborder_example.shapes;
+package io.github.dailystruggle.rtp.common.tools;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
@@ -8,7 +8,6 @@ public class ChunkyRTPShape extends Circle {
     public ChunkyRTPShape(org.popcraft.chunky.shape.Shape chunkyShape) {
         super(chunkyShape.name().toUpperCase());
         this.chunkyShape = chunkyShape;
-
 
         RTPAPI.addShape(this);
     }
@@ -25,7 +24,6 @@ public class ChunkyRTPShape extends Circle {
             xz = locationToXZ(res);
             i++;
             if(i>10000) {
-                new IllegalStateException("10000 worldborder checks failed. region is likely outside the worldborder").printStackTrace();
                 return badLocations.firstEntry().getValue();
             }
         }
