@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
@@ -45,14 +46,14 @@ public class ChunkyBorderChecker {
                         BorderData borderData = borderDataOptional.get();
                         Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
                         org.popcraft.chunky.shape.Shape border = borderData.getBorder();
-                        Shape<GenericMemoryShapeParams> shape = (Shape<GenericMemoryShapeParams>) factory.get(border.name());
+                        Shape<RectangleParams> shape = (Shape<RectangleParams>) factory.get(border.name());
                         if (!(shape instanceof ChunkyRTPShape)) {
-                            shape = new ChunkyRTPShape(border);
+                            shape = new ChunkyRTPShape(border.name());
                             RTPAPI.addShape(shape);
                         }
                         double radius = Math.min(borderData.getRadiusX(), borderData.getRadiusZ()) * 0.9;
-                        shape.set(GenericMemoryShapeParams.radius, radius);
-                        Shape<GenericMemoryShapeParams> finalShape = shape;
+                        shape.set(RectangleParams.width, radius);
+                        Shape<RectangleParams> finalShape = shape;
                         return new WorldBorder(() -> finalShape, rtpLocation -> border.isBounding(rtpLocation.x() / 16.0, rtpLocation.z() / 16.0));
                     }
                     RTPWorld rtpWorld = RTP.serverAccessor.getRTPWorld(worldName);

@@ -4,21 +4,17 @@ package io.github.dailystruggle.rtp.bukkit.server;
 import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.tasks.FillTask;
-import io.github.dailystruggle.rtp.common.tasks.TPS;
-import io.github.dailystruggle.rtp.common.tasks.tick.AsyncTaskProcessing;
 import org.bukkit.Bukkit;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 
-public class FillTaskProcessing extends BukkitRunnable {
+public class DatabaseProcessing extends BukkitRunnable {
     private static final AtomicBoolean killed = new AtomicBoolean(false);
     private static final AtomicReference<BukkitTask> asyncTask = new AtomicReference<>(null);
 
@@ -29,14 +25,10 @@ public class FillTaskProcessing extends BukkitRunnable {
 
         CompletableFuture<Boolean> future = new CompletableFuture<>();
         BukkitTask task = Bukkit.getScheduler().runTaskAsynchronously(RTPBukkitPlugin.getInstance(), () -> {
-            for(Map.Entry<String, FillTask> e : RTP.getInstance().fillTasks.entrySet()) {
-                if(e.getValue().isRunning()) continue;
-                e.getValue().run();
-            }
-            future.complete(true);
+            RTP.getInstance().databaseAccessor.processQueries(Long.MAX_VALUE);
         });
         asyncTask.set(task);
-//        RTP.log(Level.SEVERE,"A - " + task.getTaskId());
+//        RTP.log(Level.SEVERE,"B - " + task.getTaskId());
         future.thenAccept(aBoolean -> asyncTask.set(null));
     }
 

@@ -25,6 +25,7 @@ import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.scheduler.BukkitTask;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -323,6 +324,7 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     @Override
     public void stop() {
         getRTPWorlds().forEach(RTPWorld::forgetChunks);
+        RTP.getInstance().databaseAccessor.stop.set(true);
 
         RTPBukkitPlugin plugin = RTPBukkitPlugin.getInstance();
         plugin.commandTimer.cancel();
@@ -336,6 +338,7 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     @Override
     public void start() {
         RTPBukkitPlugin plugin = RTPBukkitPlugin.getInstance();
+        RTP.getInstance().databaseAccessor.stop.set(false);
 
         plugin.commandTimer = Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
             long avgTime = TPS.timeSinceTick(20) / 20;
@@ -351,8 +354,12 @@ public class BukkitServerAccessor implements RTPServerAccessor {
         },20,1);
         plugin.fillTimer = Bukkit.getScheduler().runTaskTimer(plugin,() -> {
             new FillTaskProcessing().run();
-        },20,20);
+        },25,20);
+        plugin.databaseTimer = Bukkit.getScheduler().runTaskTimer(plugin,() -> {
+            new DatabaseProcessing().run();
+        },30,20);
 
-        Bukkit.getScheduler().runTaskAsynchronously(plugin,this::getRTPWorlds);
+        BukkitTask task = Bukkit.getScheduler().runTask(plugin, this::getRTPWorlds);
+//        RTP.log(Level.SEVERE,"C - " + task.getTaskId());
     }
 }

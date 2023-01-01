@@ -1,16 +1,19 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes;
 
+import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
+import io.github.dailystruggle.rtp.common.tools.ParseString;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.*;
-import java.util.EnumMap;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.stream.Collectors;
 
 /**
  * @param <E> enum for configuration values
@@ -45,6 +48,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     }
 
     public void save(String fileName, String worldName) {
+        if(!fileName.endsWith(".yml")) fileName = fileName + ".yml";
         Map<String,Object> params = new HashMap<>();
         params.put("world",worldName);
         for (Map.Entry<E,?> e : data.entrySet())
@@ -90,6 +94,8 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     }
 
     public void load(String fileName, String worldName) {
+        if(!fileName.endsWith(".yml")) fileName = fileName + ".yml";
+
         Map<String,?> resultMap;
         Map<String,Object> params = new HashMap<>();
         params.put("world",worldName);
@@ -100,7 +106,9 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         File pluginDir = RTP.serverAccessor.getPluginDirectory();
         String filePath = pluginDir.getAbsolutePath() + File.separator + "database" + File.separator + "regionData" + File.separator + fileName;
         File file = new File(filePath);
-        if(!file.exists()) return;
+        if(!file.exists()) {
+            return;
+        }
 
         InputStream inputStream;
         try {
@@ -120,22 +128,59 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
         boolean eq = resultMap!=null;
         if(eq) {
-            for (Map.Entry<String, ?> e : params.entrySet()) {
+            List<RTPWorld> rtpWorlds = RTP.serverAccessor.getRTPWorlds();
+            Map<String,String> worldNames = new HashMap<>();
+            for (int i = 0; i < rtpWorlds.size(); i++) {
+                RTPWorld world = rtpWorlds.get(i);
+                worldNames.put(String.valueOf(i),world.name());
+            }
+            for (Map.Entry<String, Object> e : params.entrySet()) {
                 if (!resultMap.containsKey(e.getKey())) {
                     eq = false;
                     break;
                 }
-                if (!resultMap.get(e.getKey()).equals(e.getValue())) {
+                Object value = e.getValue();
+                if(e.getKey().equalsIgnoreCase("world")) {
+                    String s = value.toString();
+                    Set<String> keywords = ParseString.keywords(
+                            s,
+                            worldNames.keySet(),
+                            new HashSet<>(Collections.singletonList('[')),
+                            new HashSet<>(Collections.singletonList(']'))
+                    );
+                    for(String keyword : keywords) {
+                        int v;
+                        try {
+                            v = Integer.parseInt(keyword);
+                            s = s.replace("[" + keyword + "]", worldNames.get(keyword));
+                        } catch (IllegalArgumentException ignored) {
+
+                        }
+                    }
+                    value = s;
+                }
+                Object o = resultMap.get(e.getKey());
+                try {
+                    value = Double.parseDouble(value.toString());
+                    o = Double.parseDouble(o.toString());
+                } catch (IllegalArgumentException ignored) {
+
+                }
+                if (!o.equals(value)) {
                     eq = false;
                     break;
                 }
             }
         }
 
-        if(!eq) return;
+        if(!eq) {
+            return;
+        }
 
         Map<?,?> badLocations = (Map<?, ?>) resultMap.get("badLocations");
-        if(badLocations == null) return;
+        if(badLocations == null) {
+            return;
+        }
         this.badLocationSum.set(0);
         for(Map.Entry<?,?> e : badLocations.entrySet()) {
             String key = String.valueOf(e.getKey());
@@ -155,7 +200,9 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         }
 
         Map<?,?> biomeLocations = (Map<?, ?>) resultMap.get("biomeLocations");
-        if(biomeLocations == null) return;
+        if(biomeLocations == null) {
+            return;
+        }
         for(Map.Entry<?,?> b : biomeLocations.entrySet()) {
             String biome = String.valueOf(b.getKey());
             Map<?,?> biomeMap = (Map<?, ?>) b.getValue();

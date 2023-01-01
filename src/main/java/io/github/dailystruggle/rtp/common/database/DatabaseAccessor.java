@@ -83,7 +83,7 @@ public abstract class DatabaseAccessor<D> {
      */
     protected long avgTimeRead = 0;
     protected long avgTimeWrite = 0;
-    protected final AtomicBoolean stop = new AtomicBoolean(false);
+    public final AtomicBoolean stop = new AtomicBoolean(false);
     protected ConcurrentLinkedQueue<Map.Entry<String,Map.Entry<Map.Entry<TableObj,TableObj>,CompletableFuture<Optional<Map<String, Object>>>>>> readQueue = new ConcurrentLinkedQueue<>();
     protected ConcurrentLinkedQueue<Map.Entry<String,Map<TableObj,TableObj>>> writeQueue = new ConcurrentLinkedQueue<>();
 

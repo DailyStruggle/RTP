@@ -249,7 +249,8 @@ public final class BukkitRTPWorld implements RTPWorld {
 
     @Override
     public void save() {
-        world.save();
+        if(Bukkit.isPrimaryThread()) world.save();
+        else Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(), world::save);
     }
 
     public static Set<String> getBiomes() {
