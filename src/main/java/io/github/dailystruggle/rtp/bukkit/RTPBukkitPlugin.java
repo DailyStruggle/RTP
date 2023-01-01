@@ -368,53 +368,53 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             });
         });
 
-        RTP.getInstance().miscAsyncTasks.add(() -> {
-            if (Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) {
-                EffectFactory.addPermissions("rtp.effect.presetup");
-            }
-        });
-
-        RTP.getInstance().miscAsyncTasks.add(() -> {
-            if (Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) {
-                EffectFactory.addPermissions("rtp.effect.postsetup");
-            }
-        });
-
-        RTP.getInstance().miscAsyncTasks.add(() -> {
-            if (Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) {
-                EffectFactory.addPermissions("rtp.effect.preload");
-            }
-        });
-
-        RTP.getInstance().miscAsyncTasks.add(() -> {
-            if (Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) {
-                EffectFactory.addPermissions("rtp.effect.postload");
-            }
-        });
-
-        RTP.getInstance().miscAsyncTasks.add(() -> {
-            if (Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) {
-                EffectFactory.addPermissions("rtp.effect.preteleport");
-            }
-        });
-
-        RTP.getInstance().miscAsyncTasks.add(() -> {
-            if (Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) {
-                EffectFactory.addPermissions("rtp.effect.postteleport");
-            }
-        });
-
-        RTP.getInstance().miscAsyncTasks.add(() -> {
-            if (Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) {
-                EffectFactory.addPermissions("rtp.effect.cancel");
-            }
-        });
-
-        RTP.getInstance().miscAsyncTasks.add(() -> {
-            if (Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) {
-                EffectFactory.addPermissions("rtp.effect.queuepush");
-            }
-        });
+//        RTP.getInstance().miscAsyncTasks.add(() -> {
+//            if (Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) {
+//                EffectFactory.addPermissions("rtp.effect.presetup");
+//            }
+//        });
+//
+//        RTP.getInstance().miscSyncTasks.add(() -> {
+//            if (Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) {
+//                EffectFactory.addPermissions("rtp.effect.postsetup");
+//            }
+//        });
+//
+//        RTP.getInstance().miscSyncTasks.add(() -> {
+//            if (Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) {
+//                EffectFactory.addPermissions("rtp.effect.preload");
+//            }
+//        });
+//
+//        RTP.getInstance().miscSyncTasks.add(() -> {
+//            if (Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) {
+//                EffectFactory.addPermissions("rtp.effect.postload");
+//            }
+//        });
+//
+//        RTP.getInstance().miscSyncTasks.add(() -> {
+//            if (Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) {
+//                EffectFactory.addPermissions("rtp.effect.preteleport");
+//            }
+//        });
+//
+//        RTP.getInstance().miscSyncTasks.add(() -> {
+//            if (Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) {
+//                EffectFactory.addPermissions("rtp.effect.postteleport");
+//            }
+//        });
+//
+//        RTP.getInstance().miscSyncTasks.add(() -> {
+//            if (Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) {
+//                EffectFactory.addPermissions("rtp.effect.cancel");
+//            }
+//        });
+//
+//        RTP.getInstance().miscSyncTasks.add(() -> {
+//            if (Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) {
+//                EffectFactory.addPermissions("rtp.effect.queuepush");
+//            }
+//        });
     }
 
     public void setupIntegrations() {

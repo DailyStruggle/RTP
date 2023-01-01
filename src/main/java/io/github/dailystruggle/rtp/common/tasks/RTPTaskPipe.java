@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
@@ -13,6 +14,7 @@ public class RTPTaskPipe {
 //    protected long avgTime = Long.MAX_VALUE;
     private boolean stop = false;
     private final ConcurrentLinkedQueue<Runnable> runnables = new ConcurrentLinkedQueue<>();
+    private final Semaphore accessGuard = new Semaphore(1);
 
     public void execute(long availableTime) {
         if(stop) return;
@@ -36,26 +38,36 @@ public class RTPTaskPipe {
         }
 
         do {
-            if(stop) return;
-            Runnable runnable = runnables.poll();
-            if(runnable == null) continue;
-            if(runnable instanceof RTPDelayable) {
-                long d = ((RTPDelayable) runnable).getDelay();
-                if(d>0) {
-                    continue;
+            try {
+                accessGuard.acquire();
+                    if(stop) return;
+                Runnable runnable = runnables.poll();
+                if(runnable == null) continue;
+                if(runnable instanceof RTPDelayable) {
+                    long d = ((RTPDelayable) runnable).getDelay();
+                    if(d>0) {
+                        continue;
+                    }
                 }
+
+                if(runnable instanceof RTPCancellable && ((RTPCancellable) runnable).isCancelled()) continue;
+
+                long localStart = System.nanoTime();
+                runnable.run();
+                long localStop = System.nanoTime();
+
+                long diff = localStop - localStart;
+                avgTime = ((avgTime/8)*7) + (diff/8);
+
+                dt = localStop - start;
+            } catch (InterruptedException ignored) {
+
+            } catch (Throwable t) {
+                t.printStackTrace();
+            } finally {
+                accessGuard.release();
             }
 
-            if(runnable instanceof RTPCancellable && ((RTPCancellable) runnable).isCancelled()) continue;
-
-            long localStart = System.nanoTime();
-            runnable.run();
-            long localStop = System.nanoTime();
-
-            long diff = localStop - localStart;
-            avgTime = ((avgTime/8)*7) + (diff/8);
-
-            dt = localStop - start;
         } while (runnables.size()>0 && (dt+avgTime)<availableTime);
 
         runnables.addAll(delayedRunnables);
