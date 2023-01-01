@@ -28,9 +28,9 @@ public final class AsyncTaskProcessing extends RTPRunnable {
         
         RTP.getInstance().cancelTasks.execute(Long.MAX_VALUE);
         if(isCancelled()) return;
-        RTP.getInstance().loadChunksPipeline.execute(availableTime-(System.nanoTime() - start));
-        if(isCancelled()) return;
         RTP.getInstance().setupTeleportPipeline.execute(availableTime-(System.nanoTime() - start));
+        if(isCancelled()) return;
+        RTP.getInstance().loadChunksPipeline.execute(availableTime-(System.nanoTime() - start));
         if(isCancelled()) return;
         RTP.getInstance().miscAsyncTasks.execute(availableTime-(System.nanoTime() - start));
         if(isCancelled()) return;
@@ -57,7 +57,5 @@ public final class AsyncTaskProcessing extends RTPRunnable {
             }
         }
         step = (step+1)%period;
-
-        RTP.getInstance().databaseAccessor.processQueries(availableTime-(System.nanoTime() - start));
     }
 }

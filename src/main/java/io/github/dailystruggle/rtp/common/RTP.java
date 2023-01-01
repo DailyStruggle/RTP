@@ -101,7 +101,7 @@ public class RTP {
 
         configs = new Configs(serverAccessor.getPluginDirectory());
 
-        miscAsyncTasks.add(ChunkyChecker::loadChunky);
+        ChunkyChecker.loadChunky();
     }
 
     public static RTP getInstance() {
@@ -167,6 +167,8 @@ public class RTP {
             new RTPTeleportCancel(e.getKey()).run();
         }
 
+        instance.databaseAccessor.stop.set(true);
+
         instance.chunkCleanupPipeline.stop();
         instance.miscAsyncTasks.stop();
         instance.miscSyncTasks.stop();
@@ -174,15 +176,15 @@ public class RTP {
         instance.loadChunksPipeline.stop();
         instance.teleportPipeline.stop();
 
-        for(Region r : instance.selectionAPI.permRegionLookup.values()) {
+        for(Region r : selectionAPI.permRegionLookup.values()) {
             r.shutDown();
         }
-        instance.selectionAPI.permRegionLookup.clear();
+        selectionAPI.permRegionLookup.clear();
 
-        for(Region r : instance.selectionAPI.tempRegions.values()) {
+        for(Region r : selectionAPI.tempRegions.values()) {
             r.shutDown();
         }
-        instance.selectionAPI.tempRegions.clear();
+        selectionAPI.tempRegions.clear();
 
         instance.latestTeleportData.forEach((uuid, data) -> {
             if(!data.completed) new RTPTeleportCancel(uuid).run();

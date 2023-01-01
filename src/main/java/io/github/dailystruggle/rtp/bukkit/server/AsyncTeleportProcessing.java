@@ -54,6 +54,7 @@ public class AsyncTeleportProcessing extends BukkitRunnable {
             future.complete(true);
         });
         asyncTasks.put(task.getTaskId(),task);
+//        RTP.log(Level.SEVERE,"E - " + task.getTaskId());
         future.thenAccept(aBoolean -> asyncTasks.remove(task.getTaskId()));
     }
 

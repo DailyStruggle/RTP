@@ -67,7 +67,13 @@ public class SQLiteDatabaseAccessor extends DatabaseAccessor<Connection> {
             if(writeRequest.getValue().size() == 0) throw new IllegalStateException("invalid database write request");
 
             long localStart = System.nanoTime();
-            write(database,writeRequest.getKey(),writeRequest.getValue());
+            try {
+                write(database,writeRequest.getKey(),writeRequest.getValue());
+            } catch (Exception e) {
+                writeQueue.add(writeRequest);
+                disconnect(database);
+                return;
+            }
             long localStop = System.nanoTime();
 
             if(localStop < localStart) localStart = -(Long.MAX_VALUE - localStart);
@@ -92,9 +98,16 @@ public class SQLiteDatabaseAccessor extends DatabaseAccessor<Connection> {
             Map.Entry<TableObj, TableObj> keyObj = readRequest.getValue().getKey();
             Map.Entry<String,Object> lookup =
                     new AbstractMap.SimpleEntry<>(keyObj.getKey().object.toString(),keyObj.getValue().object);
-            readRequest.getValue().getValue().complete(
-                    read(database,readRequest.getKey(), lookup)
-            );
+            Optional<Map<String, Object>> read;
+            try {
+                read = read(database, readRequest.getKey(), lookup);
+            } catch (Exception e) {
+                readQueue.add(readRequest);
+                disconnect(database);
+                return;
+            }
+
+            readRequest.getValue().getValue().complete(read);
             long localStop = System.nanoTime();
 
             if(localStop < localStart) localStart = -(Long.MAX_VALUE - localStart);
@@ -317,7 +330,6 @@ public class SQLiteDatabaseAccessor extends DatabaseAccessor<Connection> {
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
             throw new IllegalStateException();
         }
 
@@ -377,7 +389,7 @@ public class SQLiteDatabaseAccessor extends DatabaseAccessor<Connection> {
         try {
             statement.execute(builder.toString());
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new IllegalStateException();
         }
     }
 

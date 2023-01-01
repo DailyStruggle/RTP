@@ -577,7 +577,8 @@ public class Region extends FactoryValue<RegionKeys> {
             chunk.unload();
         }
 
-        if (verbose && i >= maxAttempts) {
+        if (verbose) {
+//        if (verbose && i >= maxAttempts) {
             RTP.log(Level.WARNING,"[plugin] ["+name+"] failed to generate a location within " + maxAttempts + " tries");
             RTP.log(Level.WARNING,"[plugin] ["+name+"]     failed biome checks: "+biomeFails);
             if(biomeFails>maxAttempts/2) {

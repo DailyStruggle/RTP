@@ -4,10 +4,7 @@ import io.github.dailystruggle.effectsapi.EffectFactory;
 import io.github.dailystruggle.effectsapi.EffectsAPI;
 import io.github.dailystruggle.rtp.bukkit.commands.RTPCmdBukkit;
 import io.github.dailystruggle.rtp.bukkit.events.*;
-import io.github.dailystruggle.rtp.bukkit.server.AsyncTeleportProcessing;
-import io.github.dailystruggle.rtp.bukkit.server.BukkitServerAccessor;
-import io.github.dailystruggle.rtp.bukkit.server.FillTaskProcessing;
-import io.github.dailystruggle.rtp.bukkit.server.SyncTeleportProcessing;
+import io.github.dailystruggle.rtp.bukkit.server.*;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.spigotListeners.*;
 import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
@@ -39,6 +36,7 @@ import org.bukkit.scheduler.BukkitTask;
 
 import java.io.File;
 import java.util.*;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 /**
@@ -59,6 +57,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     public BukkitTask asyncTimer = null;
     public BukkitTask syncTimer = null;
     public BukkitTask fillTimer = null;
+    public BukkitTask databaseTimer = null;
 
     @Override
     public void onLoad() {
@@ -104,7 +103,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             rtp.databaseAccessor.startup();
         }
 
-        RTP.getInstance().miscAsyncTasks.add(ChunkyBorderChecker::loadChunky);
+        ChunkyBorderChecker.loadChunky();
         RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
 
         RTPCmdBukkit mainCommand = new RTPCmdBukkit(this);
@@ -122,9 +121,13 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         });
 
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,RTP.serverAccessor::start);
+//        setupEffects();
+//        if(RTP.serverAccessor.getServerIntVersion()>12) {
+//            BukkitTask task = Bukkit.getScheduler().runTask(this, this::setupEffects);
+//        }
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupBukkitEvents);
-        if(RTP.serverAccessor.getServerIntVersion()>12) Bukkit.getScheduler().runTaskAsynchronously(this,this::setupEffects);
         Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupIntegrations);
+        Bukkit.getScheduler().scheduleSyncDelayedTask(this,this::setupEffects);
 
         Bukkit.getScheduler().runTaskTimer(this, new TPS(),0,1);
 
@@ -144,10 +147,12 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         AsyncTeleportProcessing.kill();
         SyncTeleportProcessing.kill();
         FillTaskProcessing.kill();
+        DatabaseProcessing.kill();
 
         if(syncTimer!=null) syncTimer.cancel();
         if(asyncTimer!=null) asyncTimer.cancel();
         if(fillTimer!=null) fillTimer.cancel();
+        if(databaseTimer!=null) databaseTimer.cancel();
 
 
 //        onChunkLoad.shutdown();
@@ -157,7 +162,11 @@ public final class RTPBukkitPlugin extends JavaPlugin {
 
         List<BukkitTask> pendingTasks = Bukkit.getScheduler().getPendingTasks().stream().filter(
                 b -> b.getOwner().getName().equalsIgnoreCase("RTP") && !b.isSync() && !b.isCancelled()).collect(Collectors.toList());
-        pendingTasks.forEach(BukkitTask::cancel);
+        for (BukkitTask pendingTask : pendingTasks) {
+            pendingTask.cancel();
+            RTP.log(Level.SEVERE, "remaining task - " + pendingTask.getTaskId());
+        }
+
 
         Map<String,Object> referenceData = new HashMap<>();
         referenceData.put("time",System.currentTimeMillis());
@@ -359,16 +368,53 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             });
         });
 
-        if(Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) {
-            EffectFactory.addPermissions("rtp.effect.preSetup");
-            EffectFactory.addPermissions("rtp.effect.postSetup");
-            EffectFactory.addPermissions("rtp.effect.preLoad");
-            EffectFactory.addPermissions("rtp.effect.postLoad");
-            EffectFactory.addPermissions("rtp.effect.preTeleport");
-            EffectFactory.addPermissions("rtp.effect.postTeleport");
-            EffectFactory.addPermissions("rtp.effect.cancel");
-            EffectFactory.addPermissions("rtp.effect.queuePush");
-        }
+        RTP.getInstance().miscAsyncTasks.add(() -> {
+            if (Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) {
+                EffectFactory.addPermissions("rtp.effect.presetup");
+            }
+        });
+
+        RTP.getInstance().miscAsyncTasks.add(() -> {
+            if (Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) {
+                EffectFactory.addPermissions("rtp.effect.postsetup");
+            }
+        });
+
+        RTP.getInstance().miscAsyncTasks.add(() -> {
+            if (Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) {
+                EffectFactory.addPermissions("rtp.effect.preload");
+            }
+        });
+
+        RTP.getInstance().miscAsyncTasks.add(() -> {
+            if (Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) {
+                EffectFactory.addPermissions("rtp.effect.postload");
+            }
+        });
+
+        RTP.getInstance().miscAsyncTasks.add(() -> {
+            if (Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) {
+                EffectFactory.addPermissions("rtp.effect.preteleport");
+            }
+        });
+
+        RTP.getInstance().miscAsyncTasks.add(() -> {
+            if (Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) {
+                EffectFactory.addPermissions("rtp.effect.postteleport");
+            }
+        });
+
+        RTP.getInstance().miscAsyncTasks.add(() -> {
+            if (Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) {
+                EffectFactory.addPermissions("rtp.effect.cancel");
+            }
+        });
+
+        RTP.getInstance().miscAsyncTasks.add(() -> {
+            if (Boolean.parseBoolean(parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString())) {
+                EffectFactory.addPermissions("rtp.effect.queuepush");
+            }
+        });
     }
 
     public void setupIntegrations() {

@@ -49,8 +49,10 @@ public class FillCancelCmd extends FillSubCmd {
                 continue;
             }
 
+            fillTask.setCancelled(true);
             fillTask.pause.set(true);
             MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
+            shape.fillIter.set(0L);
             shape.save(region.name,region.getWorld().name());
             RTP.getInstance().fillTasks.remove(region.name);
             if(parser == null) continue;

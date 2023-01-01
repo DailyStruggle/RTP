@@ -7,12 +7,18 @@ import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPBlock;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPChunk;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
+import io.github.dailystruggle.rtp.common.tools.ChunkyRTPShape;
 import org.apache.commons.lang3.StringUtils;
+import org.popcraft.chunky.ChunkyProvider;
+import org.popcraft.chunky.Selection;
+import org.popcraft.chunky.shape.Shape;
+import org.popcraft.chunky.shape.ShapeFactory;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -148,7 +154,7 @@ public class FillTask extends RTPRunnable {
             shape.save(region.name,region.getWorld().name());
             region.getWorld().save();
 
-            if(aBoolean && finalPos1<range && !isCancelled()) {
+            if(aBoolean && finalPos1<range && !isCancelled() && !pause.get()) {
                 RTP.getInstance().fillTasks.put(region.name, new FillTask(region, finalPos1));
             }
             else RTP.getInstance().fillTasks.remove(region.name);
@@ -188,6 +194,22 @@ public class FillTask extends RTPRunnable {
         }
         catch (IllegalStateException ignored) {
 
+        }
+
+        if(isInside && shape instanceof ChunkyRTPShape) {
+            ChunkyRTPShape chunkyRTPShape = (ChunkyRTPShape) shape;
+            Selection.Builder builder = Selection.builder(ChunkyProvider.get(), null);
+            builder.centerX(chunkyRTPShape.getNumber(RectangleParams.centerX,0).doubleValue());
+            builder.centerZ(chunkyRTPShape.getNumber(RectangleParams.centerZ,0).doubleValue());
+
+            builder.radius(chunkyRTPShape.getNumber(RectangleParams.width, 256).doubleValue());
+            builder.radiusX(chunkyRTPShape.getNumber(RectangleParams.width, 256).doubleValue());
+            builder.radiusZ(chunkyRTPShape.getNumber(RectangleParams.height, 256).doubleValue());
+
+            builder.shape(chunkyRTPShape.chunkyShapeName);
+            Shape shape1 = ShapeFactory.getShape(builder.build());
+
+            if(!shape1.isBounding(select[0],select[1])) isInside = false;
         }
 
         if(!isInside || isCancelled() || pause.get()) {

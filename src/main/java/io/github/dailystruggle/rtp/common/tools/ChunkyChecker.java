@@ -4,6 +4,7 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import org.popcraft.chunky.Chunky;
 import org.popcraft.chunky.ChunkyProvider;
@@ -41,18 +42,11 @@ public class ChunkyChecker {
                     } catch (Throwable t) {
                         continue;
                     }
-                    org.popcraft.chunky.shape.Shape chunkyShape;
-
-                    try {
-                        chunkyShape = ShapeFactory.getShape(ChunkyProvider.get().getSelection().shape(s).build());
-                    } catch (Throwable t) {
-                        continue;
-                    }
 
                     Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
-                    Shape<GenericMemoryShapeParams> shape = (Shape<GenericMemoryShapeParams>) factory.get(chunkyShape.name());
+                    Shape<RectangleParams> shape = (Shape<RectangleParams>) factory.get(s);
                     if (shape == null) {
-                        shape = new ChunkyRTPShape(chunkyShape);
+                        shape = new ChunkyRTPShape(s);
                         RTPAPI.addShape(shape);
                     }
                 }
