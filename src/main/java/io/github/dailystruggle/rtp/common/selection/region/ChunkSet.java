@@ -36,22 +36,21 @@ public final class ChunkSet {
 
     public void keep(boolean keep) {
         chunks.forEach(chunk -> {
-            if(chunk.isDone()) {
+            if (chunk.isDone()) {
                 try {
                     RTPChunk rtpChunk = chunk.get();
                     rtpChunk.keep(keep);
                 } catch (InterruptedException | ExecutionException e) {
                     e.printStackTrace();
                 }
-            }
-            else {
+            } else {
                 chunk.thenAccept(chunk1 -> chunk1.keep(keep));
             }
         });
     }
 
     public void whenComplete(Consumer<Boolean> consumer) {
-        if(complete.isDone()) {
+        if (complete.isDone()) {
             try {
                 consumer.accept(complete.get());
             } catch (InterruptedException | ExecutionException e) {

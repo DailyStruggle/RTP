@@ -11,6 +11,7 @@ import java.util.logging.Level;
 
 public interface ConfigLoader {
     File getMainDirectory();
+
     ClassLoader getClassLoader();
 
     @Nullable
@@ -43,7 +44,7 @@ public interface ConfigLoader {
 
         if (!outDir.exists()) {
             boolean mkdirs = outDir.mkdirs();
-            if(!mkdirs) throw new IllegalStateException("failed to create directory - " + outDir.getPath());
+            if (!mkdirs) throw new IllegalStateException("failed to create directory - " + outDir.getPath());
         }
 
         try {

@@ -9,7 +9,6 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shap
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import io.github.dailystruggle.rtp.common.tasks.FillTask;
-import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -34,30 +33,30 @@ public class FillPauseCmd extends FillSubCmd {
 
     @Override
     public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
-        if(nextCommand!=null) return true;
+        if (nextCommand != null) return true;
 
         List<Region> regions = getRegions(callerId, parameterValues.get("region"));
-        for(Region region : regions) {
+        for (Region region : regions) {
             FillTask fillTask = RTP.getInstance().fillTasks.get(region.name);
             ConfigParser<MessagesKeys> parser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-            if(fillTask==null) {
-                if(parser == null) continue;
-                String msg = String.valueOf(parser.getConfigValue(MessagesKeys.fillNotRunning,""));
-                if(msg == null || msg.isEmpty()) continue;
+            if (fillTask == null) {
+                if (parser == null) continue;
+                String msg = String.valueOf(parser.getConfigValue(MessagesKeys.fillNotRunning, ""));
+                if (msg == null || msg.isEmpty()) continue;
                 msg = msg.replace("[region]", region.name);
-                RTP.serverAccessor.announce(msg,"rtp.fill");
+                RTP.serverAccessor.announce(msg, "rtp.fill");
                 continue;
             }
 
             fillTask.pause.set(true);
             MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
-            shape.save(region.name,region.getWorld().name());
+            shape.save(region.name, region.getWorld().name());
 
-            if(parser == null) continue;
-            String msg = String.valueOf(parser.getConfigValue(MessagesKeys.fillPause,""));
-            if(msg == null || msg.isEmpty()) continue;
+            if (parser == null) continue;
+            String msg = String.valueOf(parser.getConfigValue(MessagesKeys.fillPause, ""));
+            if (msg == null || msg.isEmpty()) continue;
             msg = msg.replace("[region]", region.name);
-            RTP.serverAccessor.announce(msg,"rtp.fill");
+            RTP.serverAccessor.announce(msg, "rtp.fill");
         }
         return true;
     }
@@ -65,10 +64,9 @@ public class FillPauseCmd extends FillSubCmd {
     public List<Region> getRegions(UUID callerId, List<String> regionParameter) {
         List<Region> regions = new ArrayList<>();
         RTPCommandSender sender = RTP.serverAccessor.getSender(callerId);
-        if(regionParameter!=null) {
-            for(String name : regionParameter) regions.add(RTP.selectionAPI.getRegion(name));
-        }
-        else if(sender instanceof RTPPlayer) regions.add(RTP.selectionAPI.getRegion((RTPPlayer) sender));
+        if (regionParameter != null) {
+            for (String name : regionParameter) regions.add(RTP.selectionAPI.getRegion(name));
+        } else if (sender instanceof RTPPlayer) regions.add(RTP.selectionAPI.getRegion((RTPPlayer) sender));
         else regions.add(RTP.selectionAPI.getRegion("default"));
         return regions;
     }

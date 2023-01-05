@@ -2,7 +2,6 @@ package io.github.dailystruggle.rtp.common.serverSide.substitutions;
 
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 public final class RTPLocation implements Cloneable {
     private final RTPWorld world;

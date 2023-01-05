@@ -74,13 +74,13 @@ noPerms: "&eI'm sorry, but you do not have permission to perform this command. P
 # placeholder: [world] - the world attempted in the command
 noGlobalPerms: "&eYou don't have permission to teleport to [world] from your location"
 
-fillStart: "&a[rtp] fill task started for region [region]"
-fillCancel: "&e[rtp] fill task cancelled for region [region]"
-fillPause: "#A020F0[rtp] fill task paused for region [region]"
-fillResume: "#10A5F5[rtp] fill task resumed for region [region]"
-fillRunning: "&c[rtp] fill task already running for region [region]"
+fillStart: "&a[P0] fill task started for region [region]"
+fillCancel: "&e[P0] fill task cancelled for region [region]"
+fillPause: "#A020F0[P0] fill task paused for region [region]"
+fillResume: "#10A5F5[P0] fill task resumed for region [region]"
+fillRunning: "&c[P0] fill task already running for region [region]"
 fillNotRunning: "&c[rtp] fill task not running for region [region]"
-fillStatus: "&a[rtp] completed [chunks] / [totalChunks] chunks for region [region]. [cps] cps. ETA: [eta]"
+fillStatus: "&a[P0] completed [chunks] / [totalChunks] chunks for region [region]. [cps] cps. ETA: [eta]"
 
 #info command
 infoTitle: "&a======RTP Info======"

@@ -1,10 +1,7 @@
 package io.github.dailystruggle.rtp.common.tools;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.common.factory.FactoryValue;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Rectangle;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams;
 import org.popcraft.chunky.ChunkyProvider;
 import org.popcraft.chunky.Selection;
@@ -24,8 +21,8 @@ public class ChunkyRTPShape extends Rectangle {
     @Override
     public long rand() {
         Selection.Builder builder = Selection.builder(ChunkyProvider.get(), null);
-        builder.centerX(getNumber(RectangleParams.centerX,0).doubleValue());
-        builder.centerZ(getNumber(RectangleParams.centerZ,0).doubleValue());
+        builder.centerX(getNumber(RectangleParams.centerX, 0).doubleValue());
+        builder.centerZ(getNumber(RectangleParams.centerZ, 0).doubleValue());
 
         builder.radius(getNumber(RectangleParams.width, 256).doubleValue());
         builder.radiusX(getNumber(RectangleParams.width, 256).doubleValue());
@@ -38,12 +35,12 @@ public class ChunkyRTPShape extends Rectangle {
         int[] xz = locationToXZ(res);
 
         int i = 0;
-        while(!shape.isBounding(xz[0],xz[1])) {
+        while (!shape.isBounding(xz[0], xz[1])) {
             addBadLocation(res);
             res = super.rand();
             xz = locationToXZ(res);
             i++;
-            if(i>10000) {
+            if (i > 10000) {
                 return badLocations.firstEntry().getValue();
             }
         }

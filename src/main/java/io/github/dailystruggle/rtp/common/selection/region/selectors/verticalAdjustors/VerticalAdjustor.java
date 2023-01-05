@@ -21,14 +21,14 @@ public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E
 
     public String name;
 
-    protected VerticalAdjustor(Class<E> eClass, String name, List<Predicate<RTPBlock>> verifiers, EnumMap<E,Object> def) {
+    protected VerticalAdjustor(Class<E> eClass, String name, List<Predicate<RTPBlock>> verifiers, EnumMap<E, Object> def) {
         super(eClass, name);
         this.verifiers = verifiers;
         setData(def);
         Factory<VerticalAdjustor<?>> vertAdjustorFactory = (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
         this.name = name;
-        if(!vertAdjustorFactory.contains(name))
-            vertAdjustorFactory.add(name,this);
+        if (!vertAdjustorFactory.contains(name))
+            vertAdjustorFactory.add(name, this);
         try {
             loadLangFile("vert");
         } catch (IOException e) {
@@ -38,10 +38,12 @@ public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E
 
     public abstract @Nullable
     RTPLocation adjust(@NotNull RTPChunk input);
+
     public abstract boolean testPlacement(@NotNull RTPBlock location);
 
     public abstract Map<String, CommandParameter> getParameters();
 
     public abstract int minY();
+
     public abstract int maxY();
 }

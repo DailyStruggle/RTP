@@ -16,11 +16,15 @@ import org.jetbrains.annotations.Nullable;
 import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.logging.Level;
 
 public final class SetupTeleport extends RTPRunnable {
     public static final List<Consumer<SetupTeleport>> preActions = new ArrayList<>();
-    public static final List<BiConsumer<SetupTeleport,Boolean>> postActions = new ArrayList<>();
+    public static final List<BiConsumer<SetupTeleport, Boolean>> postActions = new ArrayList<>();
+
+    static {
+        preActions.add(task -> task.isRunning.set(true));
+        postActions.add((setupTeleport, aBoolean) -> setupTeleport.isRunning.set(false));
+    }
 
     private final RTPCommandSender sender;
     private final RTPPlayer player;
@@ -37,11 +41,6 @@ public final class SetupTeleport extends RTPRunnable {
         this.biomes = biomes;
     }
 
-    static {
-        preActions.add(task -> task.isRunning.setTrue());
-        postActions.add((setupTeleport, aBoolean) -> setupTeleport.isRunning.setFalse());
-    }
-
     @Override
     public void run() {
         preActions.forEach(consumer -> consumer.accept(this));
@@ -52,60 +51,57 @@ public final class SetupTeleport extends RTPRunnable {
         boolean syncLoading = false;
 
         Object configValue = perf.getConfigValue(PerformanceKeys.syncLoading, false);
-        if(configValue instanceof String) {
+        if (configValue instanceof String) {
             configValue = Boolean.parseBoolean((String) configValue);
         }
-        if(configValue instanceof Boolean) syncLoading = (Boolean) configValue;
+        if (configValue instanceof Boolean) syncLoading = (Boolean) configValue;
 
         TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.uuid());
-        if(teleportData == null) {
+        if (teleportData == null) {
             teleportData = new TeleportData();
             teleportData.sender = (sender != null) ? sender : player;
             teleportData.originalLocation = player.getLocation();
-            teleportData.time = System.currentTimeMillis();
             teleportData.nextTask = this;
             teleportData.targetRegion = region;
             teleportData.delay = sender.delay();
-            RTP.getInstance().latestTeleportData.put(player.uuid(),teleportData);
+            RTP.getInstance().latestTeleportData.put(player.uuid(), teleportData);
         }
 
         teleportData.targetRegion = this.region;
 
         teleportData.originalLocation = player.getLocation();
 
-        RTP.getInstance().latestTeleportData.put(player.uuid(),teleportData);
+        RTP.getInstance().latestTeleportData.put(player.uuid(), teleportData);
 
         Map.Entry<RTPLocation, Long> pair = this.region.getLocation(sender, player, biomes);
-        if(pair == null) { //player gets put on region queue
+        if (pair == null) { //player gets put on region queue
             return;
-        }
-        else if(pair.getKey() == null) {
+        } else if (pair.getKey() == null) {
             teleportData.attempts = pair.getValue();
-            String msg = langParser.getConfigValue(MessagesKeys.unsafe,"").toString();
-            RTP.serverAccessor.sendMessage(sender.uuid(),player.uuid(),msg);
+            String msg = langParser.getConfigValue(MessagesKeys.unsafe, "").toString();
+            RTP.serverAccessor.sendMessage(sender.uuid(), player.uuid(), msg);
             postActions.forEach(consumer -> consumer.accept(this, false));
-            isRunning.setFalse();
+            isRunning.set(false);
             RTPTeleportCancel.refund(player.uuid());
             return;
         }
 
-        if(isCancelled()) return;
+        if (isCancelled()) return;
         LoadChunks loadChunks = new LoadChunks(this.sender, this.player, pair.getKey(), this.region);
         teleportData.nextTask = loadChunks;
         teleportData.selectedLocation = pair.getKey();
         teleportData.attempts = pair.getValue();
 
         boolean sync = syncLoading;
-        if(!syncLoading) {
-            sync = teleportData.delay<=0
-                    && (biomes == null || biomes.size()==0)
+        if (!syncLoading) {
+            sync = teleportData.delay <= 0
+                    && (biomes == null || biomes.size() == 0)
                     && !loadChunks.modified;
         }
 
-        if(sync) {
+        if (sync) {
             loadChunks.run();
-        }
-        else {
+        } else {
             RTP.getInstance().loadChunksPipeline.add(loadChunks);
         }
 

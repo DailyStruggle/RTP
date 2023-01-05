@@ -4,7 +4,6 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
@@ -38,7 +37,7 @@ public class ChunkyBorderChecker {
         getChunky();
 
         // chunkyborder initialization
-        if(chunkyBorder!=null) {
+        if (chunkyBorder != null) {
             RTP.serverAccessor.setWorldBorderFunction(worldName -> {
                 try {
                     Optional<BorderData> borderDataOptional = ChunkyBorderProvider.get().getBorder(worldName);

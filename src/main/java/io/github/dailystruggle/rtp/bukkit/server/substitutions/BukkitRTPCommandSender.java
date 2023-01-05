@@ -11,11 +11,9 @@ import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -45,6 +43,7 @@ public final class BukkitRTPCommandSender implements RTPCommandSender {
 
     @Override
     public long cooldown() {
+        if (sender.hasPermission("rtp.nocooldown")) return 0;
         if (sender.hasPermission("rtp.noCooldown")) return 0;
 
         int cooldown = ParsePermissions.getInt(this, "rtp.cooldown.");
@@ -57,6 +56,7 @@ public final class BukkitRTPCommandSender implements RTPCommandSender {
 
     @Override
     public long delay() {
+        if (sender.hasPermission("rtp.nodelay")) return 0;
         if (sender.hasPermission("rtp.noDelay")) return 0;
 
         int delay = ParsePermissions.getInt(new BukkitRTPCommandSender(sender), "rtp.delay.");
@@ -82,7 +82,7 @@ public final class BukkitRTPCommandSender implements RTPCommandSender {
 
     @Override
     public void performCommand(String command) {
-        Bukkit.dispatchCommand(sender,command);
+        Bukkit.dispatchCommand(sender, command);
     }
 
     @Override

@@ -28,10 +28,10 @@ public class SQLiteDatabaseAccessor extends DatabaseAccessor<Connection> {
     public @NotNull Connection connect() {
         Connection res;
 
-        String filePath = url.substring(url.lastIndexOf(":")+1);
+        String filePath = url.substring(url.lastIndexOf(":") + 1);
         File databaseFile = new File(filePath);
         try {
-            if(!databaseFile.exists()) {
+            if (!databaseFile.exists()) {
                 databaseFile.getParentFile().mkdirs();
                 databaseFile.createNewFile();
             }
@@ -45,30 +45,30 @@ public class SQLiteDatabaseAccessor extends DatabaseAccessor<Connection> {
 
     @Override
     public void processQueries(long availableTime) {
-        if(readQueue.size() == 0 && writeQueue.size() == 0) return;
-        if(stop.get()) return;
+        if (readQueue.size() == 0 && writeQueue.size() == 0) return;
+        if (stop.get()) return;
         Connection database = connect();
-        if(database == null) return;
-        if(stop.get()) {
+        if (database == null) return;
+        if (stop.get()) {
             disconnect(database);
             return;
         }
         long dt;
         long start = System.nanoTime();
 
-        while (writeQueue.size()>0) {
-            if(stop.get()) {
+        while (writeQueue.size() > 0) {
+            if (stop.get()) {
                 disconnect(database);
                 return;
             }
             Map.Entry<String, Map<TableObj, TableObj>> writeRequest = writeQueue.poll();
-            if(writeRequest == null) throw new IllegalStateException("invalid database write request");
-            if(writeRequest.getValue() == null) throw new IllegalStateException("invalid database write request");
-            if(writeRequest.getValue().size() == 0) throw new IllegalStateException("invalid database write request");
+            if (writeRequest == null) throw new IllegalStateException("invalid database write request");
+            if (writeRequest.getValue() == null) throw new IllegalStateException("invalid database write request");
+            if (writeRequest.getValue().size() == 0) throw new IllegalStateException("invalid database write request");
 
             long localStart = System.nanoTime();
             try {
-                write(database,writeRequest.getKey(),writeRequest.getValue());
+                write(database, writeRequest.getKey(), writeRequest.getValue());
             } catch (Exception e) {
                 writeQueue.add(writeRequest);
                 disconnect(database);
@@ -76,28 +76,28 @@ public class SQLiteDatabaseAccessor extends DatabaseAccessor<Connection> {
             }
             long localStop = System.nanoTime();
 
-            if(localStop < localStart) localStart = -(Long.MAX_VALUE - localStart);
+            if (localStop < localStart) localStart = -(Long.MAX_VALUE - localStart);
             long diff = localStop - localStart;
-            if(avgTimeWrite == 0) avgTimeWrite = diff;
-            else avgTimeWrite = ((avgTimeWrite*7)/8) + (diff/8);
+            if (avgTimeWrite == 0) avgTimeWrite = diff;
+            else avgTimeWrite = ((avgTimeWrite * 7) / 8) + (diff / 8);
 
-            if(localStop < start) start = -(Long.MAX_VALUE-start); //overflow correction
+            if (localStop < start) start = -(Long.MAX_VALUE - start); //overflow correction
             dt = localStop - start;
-            if(dt+avgTimeWrite>availableTime) break;
+            if (dt + avgTimeWrite > availableTime) break;
         }
 
-        while (readQueue.size()>0) {
-            if(stop.get()) {
+        while (readQueue.size() > 0) {
+            if (stop.get()) {
                 disconnect(database);
                 return;
             }
             Map.Entry<String, Map.Entry<Map.Entry<TableObj, TableObj>, CompletableFuture<Optional<Map<String, Object>>>>> readRequest = readQueue.poll();
-            if(readRequest == null) throw new IllegalStateException("null database read request");
+            if (readRequest == null) throw new IllegalStateException("null database read request");
 
             long localStart = System.nanoTime();
             Map.Entry<TableObj, TableObj> keyObj = readRequest.getValue().getKey();
-            Map.Entry<String,Object> lookup =
-                    new AbstractMap.SimpleEntry<>(keyObj.getKey().object.toString(),keyObj.getValue().object);
+            Map.Entry<String, Object> lookup =
+                    new AbstractMap.SimpleEntry<>(keyObj.getKey().object.toString(), keyObj.getValue().object);
             Optional<Map<String, Object>> read;
             try {
                 read = read(database, readRequest.getKey(), lookup);
@@ -110,14 +110,14 @@ public class SQLiteDatabaseAccessor extends DatabaseAccessor<Connection> {
             readRequest.getValue().getValue().complete(read);
             long localStop = System.nanoTime();
 
-            if(localStop < localStart) localStart = -(Long.MAX_VALUE - localStart);
+            if (localStop < localStart) localStart = -(Long.MAX_VALUE - localStart);
             long diff = localStop - localStart;
-            if(avgTimeRead == 0) avgTimeRead = diff;
-            else avgTimeRead = ((avgTimeRead*7)/8) + (diff/8);
+            if (avgTimeRead == 0) avgTimeRead = diff;
+            else avgTimeRead = ((avgTimeRead * 7) / 8) + (diff / 8);
 
-            if(localStop < start) start = -(Long.MAX_VALUE-start); //overflow correction
+            if (localStop < start) start = -(Long.MAX_VALUE - start); //overflow correction
             dt = localStop - start;
-            if(dt+avgTimeRead>availableTime) break;
+            if (dt + avgTimeRead > availableTime) break;
         }
 
         disconnect(database);
@@ -127,8 +127,8 @@ public class SQLiteDatabaseAccessor extends DatabaseAccessor<Connection> {
     public void startup() {
         DriverManager.setLoginTimeout(30);
         Connection connection = connect();
-        @NotNull Optional<Map<String, Object>> read = read(connection, "referenceData", new AbstractMap.SimpleEntry<>("UUID",new UUID(0,0)));
-        if(!read.isPresent()) {
+        @NotNull Optional<Map<String, Object>> read = read(connection, "referenceData", new AbstractMap.SimpleEntry<>("UUID", new UUID(0, 0)));
+        if (!read.isPresent()) {
             try {
                 connection.close();
             } catch (SQLException e) {
@@ -161,7 +161,7 @@ public class SQLiteDatabaseAccessor extends DatabaseAccessor<Connection> {
                 return;
             }
 
-            if(resultSet == null) {
+            if (resultSet == null) {
                 connection.close();
                 return;
             }
@@ -169,8 +169,8 @@ public class SQLiteDatabaseAccessor extends DatabaseAccessor<Connection> {
             //each data
             while (resultSet.next()) {
                 String uuidStr = resultSet.getString("UUID");
-                if(uuidStr == null) continue;
-                
+                if (uuidStr == null) continue;
+
                 UUID uuid = UUID.fromString(uuidStr);
 
                 TeleportData teleportData = new TeleportData();
@@ -182,15 +182,17 @@ public class SQLiteDatabaseAccessor extends DatabaseAccessor<Connection> {
                         Integer.parseInt(resultSet.getString("selectedY")),
                         Integer.parseInt(resultSet.getString("selectedZ"))
                 );
+                if (teleportData.selectedLocation.world() == null) continue;
                 teleportData.originalLocation = new RTPLocation(
                         RTP.serverAccessor.getRTPWorld(UUID.fromString(resultSet.getString("originalWorldId"))),
                         Integer.parseInt(resultSet.getString("originalX")),
                         Integer.parseInt(resultSet.getString("originalY")),
                         Integer.parseInt(resultSet.getString("originalZ"))
                 );
+                if (teleportData.originalLocation.world() == null) continue;
                 teleportData.cost = Double.parseDouble(resultSet.getString("cost"));
 
-                RTP.getInstance().latestTeleportData.put(uuid,teleportData);
+                RTP.getInstance().latestTeleportData.put(uuid, teleportData);
             }
         } catch (SQLException throwables) {
             throwables.printStackTrace();
@@ -216,7 +218,7 @@ public class SQLiteDatabaseAccessor extends DatabaseAccessor<Connection> {
             statement.execute(sql);
             ResultSet resultSet = statement.getResultSet();
 
-            if(resultSet == null) return Optional.empty();
+            if (resultSet == null) return Optional.empty();
 
             while (resultSet.next()) {
                 column_info.put(resultSet.getString("name"), resultSet.getString("type"));
@@ -226,17 +228,17 @@ public class SQLiteDatabaseAccessor extends DatabaseAccessor<Connection> {
         }
 
         //validate and add necessary column_info
-        Map<String,Object> row = new HashMap<>();
+        Map<String, Object> row = new HashMap<>();
 
         sql = "SELECT * FROM " + tableName + " WHERE " + lookup.getKey() + " = " + "\"" + lookup.getValue().toString() + "\"";
 
         try {
             statement.execute(sql);
             ResultSet resultSet = statement.getResultSet();
-            for(String key : column_info.keySet()) {
+            for (String key : column_info.keySet()) {
                 Object object = resultSet.getObject(key);
-                if(object == null || object.equals("NULL")) continue;
-                row.put(key,object);
+                if (object == null || object.equals("NULL")) continue;
+                row.put(key, object);
             }
             return Optional.of(row);
         } catch (SQLException ignored) {
@@ -244,12 +246,11 @@ public class SQLiteDatabaseAccessor extends DatabaseAccessor<Connection> {
         }
 
 
-
         return Optional.empty();
     }
 
     @Override
-    public void write(Connection connection, String tableName, Map<TableObj,TableObj> keyValuePairs) {
+    public void write(Connection connection, String tableName, Map<TableObj, TableObj> keyValuePairs) {
         if (keyValuePairs == null) throw new IllegalStateException();
         if (keyValuePairs.size() == 0) throw new IllegalStateException();
 
@@ -269,12 +270,12 @@ public class SQLiteDatabaseAccessor extends DatabaseAccessor<Connection> {
                 for (Map.Entry<TableObj, TableObj> entry : keyValuePairs.entrySet()) {
                     create = create.append("\"").append(entry.getKey().object.toString()).append("\" ").append("TEXT").append(", ");
                 }
-                create = create.replace(create.lastIndexOf(","),create.length(), "");
+                create = create.replace(create.lastIndexOf(","), create.length(), "");
                 create = create.append(");");
                 statement.execute(create.toString());
 
-                if(keyValuePairs.containsKey(new TableObj("UUID"))) {
-                    String unique = "CREATE UNIQUE INDEX IF NOT EXISTS " + "UID" + " ON " + tableName +" (" + "UUID" + ");";
+                if (keyValuePairs.containsKey(new TableObj("UUID"))) {
+                    String unique = "CREATE UNIQUE INDEX IF NOT EXISTS " + "UID" + " ON " + tableName + " (" + "UUID" + ");";
                     statement.execute(unique);
                 }
 
@@ -282,17 +283,17 @@ public class SQLiteDatabaseAccessor extends DatabaseAccessor<Connection> {
                 resultSet = statement.getResultSet();
             }
 
-            if(resultSet == null) {
+            if (resultSet == null) {
                 StringBuilder create = new StringBuilder("CREATE TABLE IF NOT EXISTS " + tableName + " (");
                 for (Map.Entry<TableObj, TableObj> entry : keyValuePairs.entrySet()) {
                     create = create.append(entry.getKey().object.toString()).append(" ").append("TEXT").append(", ");
                 }
-                create = create.replace(create.lastIndexOf(","),create.length(), "");
+                create = create.replace(create.lastIndexOf(","), create.length(), "");
                 create = create.append(");");
                 statement.execute(create.toString());
 
-                if(keyValuePairs.containsKey(new TableObj("UUID"))) {
-                    String unique = "CREATE UNIQUE INDEX IF NOT EXISTS " + "UID" + " ON " + tableName +" (" + "UUID" + ");";
+                if (keyValuePairs.containsKey(new TableObj("UUID"))) {
+                    String unique = "CREATE UNIQUE INDEX IF NOT EXISTS " + "UID" + " ON " + tableName + " (" + "UUID" + ");";
                     statement.execute(unique);
                 }
 
@@ -307,17 +308,17 @@ public class SQLiteDatabaseAccessor extends DatabaseAccessor<Connection> {
                 columns.put(resultSet.getString("name"), resultSet.getString("type"));
             }
 
-            if(i==0) {
+            if (i == 0) {
                 StringBuilder create = new StringBuilder("CREATE TABLE IF NOT EXISTS " + tableName + " (");
                 for (Map.Entry<TableObj, TableObj> entry : keyValuePairs.entrySet()) {
                     create = create.append(entry.getKey().object.toString()).append(" ").append("TEXT").append(", ");
                 }
-                create = create.replace(create.lastIndexOf(","),create.length(), "");
+                create = create.replace(create.lastIndexOf(","), create.length(), "");
                 create = create.append(");");
                 statement.execute(create.toString());
 
-                if(keyValuePairs.containsKey(new TableObj("UUID"))) {
-                    String unique = "CREATE UNIQUE INDEX IF NOT EXISTS " + "UID" + " ON " + tableName +" (" + "UUID" + ");";
+                if (keyValuePairs.containsKey(new TableObj("UUID"))) {
+                    String unique = "CREATE UNIQUE INDEX IF NOT EXISTS " + "UID" + " ON " + tableName + " (" + "UUID" + ");";
                     statement.execute(unique);
                 }
 
@@ -334,7 +335,6 @@ public class SQLiteDatabaseAccessor extends DatabaseAccessor<Connection> {
         }
 
 
-
         //validate and add necessary columns
         List<String> keys = new ArrayList<>();
         List<String> values = new ArrayList<>();
@@ -344,7 +344,7 @@ public class SQLiteDatabaseAccessor extends DatabaseAccessor<Connection> {
             keys.add(key);
             values.add("\"" + entry.getValue().object.toString() + "\"");
 
-            if(columns.containsKey(key)) continue;
+            if (columns.containsKey(key)) continue;
 
             String typeStr;
             switch (entry.getValue().expectedType) {
@@ -364,7 +364,7 @@ public class SQLiteDatabaseAccessor extends DatabaseAccessor<Connection> {
                     throw new IllegalStateException("Unexpected value: " + entry.getKey().expectedType);
             }
 
-            sql = "ALTER TABLE " + tableName +" ADD " + key + " " + typeStr + ";";
+            sql = "ALTER TABLE " + tableName + " ADD " + key + " " + typeStr + ";";
             try {
                 statement.execute(sql);
             } catch (SQLException e) {
@@ -376,13 +376,13 @@ public class SQLiteDatabaseAccessor extends DatabaseAccessor<Connection> {
         for (int i = 0; i < keys.size(); i++) {
             String key = keys.get(i);
             builder = builder.append("\"").append(key).append("\"");
-            if(i<keys.size()-1) builder = builder.append(',');
+            if (i < keys.size() - 1) builder = builder.append(',');
         }
         builder = builder.append(") VALUES(");
         for (int i = 0; i < values.size(); i++) {
             String value = values.get(i);
             builder = builder.append(value);
-            if(i<values.size()-1) builder = builder.append(',');
+            if (i < values.size() - 1) builder = builder.append(',');
         }
         builder = builder.append(");");
 
