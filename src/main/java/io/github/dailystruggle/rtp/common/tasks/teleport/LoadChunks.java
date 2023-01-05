@@ -18,17 +18,15 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import java.util.logging.Level;
 
 public final class LoadChunks extends RTPRunnable {
     public static final List<Consumer<LoadChunks>> preActions = new ArrayList<>();
     public static final List<Consumer<LoadChunks>> postActions = new ArrayList<>();
 
     static {
-        preActions.add(task -> task.isRunning.setTrue());
-        postActions.add(task -> task.isRunning.setFalse());
+        preActions.add(task -> task.isRunning.set(true));
+        postActions.add(task -> task.isRunning.set(false));
     }
 
     private final RTPCommandSender sender;
@@ -53,7 +51,7 @@ public final class LoadChunks extends RTPRunnable {
         ChunkSet chunkSet = this.region.chunks(location, radius2);
 
         TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.uuid());
-        if(teleportData == null) {
+        if (teleportData == null) {
             teleportData = new TeleportData();
             teleportData.sender = (sender != null) ? sender : player;
             teleportData.originalLocation = player.getLocation();
@@ -62,7 +60,7 @@ public final class LoadChunks extends RTPRunnable {
             teleportData.nextTask = this;
             teleportData.targetRegion = region;
             teleportData.delay = sender.delay();
-            RTP.getInstance().latestTeleportData.put(player.uuid(),teleportData);
+            RTP.getInstance().latestTeleportData.put(player.uuid(), teleportData);
         }
 
         if (max > chunkSet.chunks.size()) {
@@ -87,19 +85,19 @@ public final class LoadChunks extends RTPRunnable {
         long delay = sender.delay();
         long dT = (start - lastTime);
         long remainingTime = delay - dT;
-        long toTicks = remainingTime/50;
+        long toTicks = remainingTime / 50;
 
         ChunkSet chunkSet = this.region.locAssChunks.get(location);
 
-        if(     toTicks<1 &&
+        if (toTicks < 1 &&
                 (sender.hasPermission("rtp.noDelay.chunks") || chunkSet.complete.isDone())) {
-            if(Bukkit.isPrimaryThread()) doTeleport.run();
+            if (Bukkit.isPrimaryThread()) doTeleport.run();
             else RTP.getInstance().teleportPipeline.add(doTeleport);
             postActions.forEach(consumer -> consumer.accept(this));
             return;
         }
 
-        if(!chunkSet.complete.getNow(false)) {
+        if (!chunkSet.complete.getNow(false)) {
             for (CompletableFuture<RTPChunk> cfChunk : chunkSet.chunks) {
                 try {
                     cfChunk.get();
@@ -111,7 +109,7 @@ public final class LoadChunks extends RTPRunnable {
 
         doTeleport.setDelay(toTicks);
 
-        if(toTicks<1 && Bukkit.isPrimaryThread()) doTeleport.run();
+        if (toTicks < 1 && Bukkit.isPrimaryThread()) doTeleport.run();
         else RTP.getInstance().teleportPipeline.add(doTeleport);
 
         postActions.forEach(consumer -> consumer.accept(this));

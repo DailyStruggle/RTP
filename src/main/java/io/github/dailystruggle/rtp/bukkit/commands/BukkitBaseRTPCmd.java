@@ -22,12 +22,12 @@ public abstract class BukkitBaseRTPCmd extends BukkitTreeCommand implements io.g
     @Override
     public void msgBadParameter(UUID callerId, String parameterName, String parameterValue) {
         CommandSender sender = callerId.equals(CommandsAPI.serverId) ? Bukkit.getConsoleSender() : Bukkit.getPlayer(callerId);
-        if(sender == null) return;
+        if (sender == null) return;
 
         ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
 
-        String msg = String.valueOf(lang.getConfigValue(MessagesKeys.badArg,""));
-        msg = msg.replace("[arg]",parameterName + ":" + parameterValue);
-        SendMessage.sendMessage(sender,msg);
+        String msg = String.valueOf(lang.getConfigValue(MessagesKeys.badArg, ""));
+        msg = msg.replace("[arg]", parameterName + ":" + parameterValue);
+        SendMessage.sendMessage(sender, msg);
     }
 }

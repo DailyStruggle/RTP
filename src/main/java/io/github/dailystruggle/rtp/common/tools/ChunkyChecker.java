@@ -3,12 +3,10 @@ package io.github.dailystruggle.rtp.common.tools;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import org.popcraft.chunky.Chunky;
 import org.popcraft.chunky.ChunkyProvider;
-import org.popcraft.chunky.shape.ShapeFactory;
 import org.popcraft.chunky.shape.ShapeType;
 
 import java.lang.reflect.Field;
@@ -18,6 +16,7 @@ import java.lang.reflect.Modifier;
 public class ChunkyChecker {
     //stored object reference to skip plugin getting sometimes
     private static Chunky chunky = null;
+
     /**
      * getPAPI - function to if PAPI exists and fill the above object reference accordingly
      */
@@ -33,9 +32,9 @@ public class ChunkyChecker {
         //if I don't have a correct object reference, try to get one.
         getChunky();
 
-        if(chunky != null) {
+        if (chunky != null) {
             for (Field field : ShapeType.class.getDeclaredFields()) {
-                if(Modifier.isStatic(field.getModifiers()) && field.getType().equals(String.class)) {
+                if (Modifier.isStatic(field.getModifiers()) && field.getType().equals(String.class)) {
                     String s;
                     try {
                         s = (String) field.get(null);

@@ -2,9 +2,7 @@ package draw;
 import commonTestImpl.TestRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle_Normal;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.NormalDistributionParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import javafx.application.Application;
@@ -47,9 +45,9 @@ public class drawCircleNormal extends Application {
         circle3.set(NormalDistributionParams.mean,0.99);
         circle3.set(NormalDistributionParams.deviation,1.2);
 
-        XYChart.Series series1 = new XYChart.Series();
-        XYChart.Series series2 = new XYChart.Series();
-        XYChart.Series series3 = new XYChart.Series();
+        XYChart.Series<Number,Number> series1 = new XYChart.Series<>();
+        XYChart.Series<Number,Number> series2 = new XYChart.Series<>();
+        XYChart.Series<Number,Number> series3 = new XYChart.Series<>();
         series1.setName("flat locations");
         series2.setName("near locations");
         series3.setName("far locations");
@@ -58,12 +56,14 @@ public class drawCircleNormal extends Application {
             int[] select1 = circle1.select();
             int[] select2 = circle2.select();
             int[] select3 = circle3.select();
-            series1.getData().add(new XYChart.Data(select1[0], select1[1]));
-            series2.getData().add(new XYChart.Data(select2[0], select2[1]));
-            series3.getData().add(new XYChart.Data(select3[0], select3[1]));
+            series1.getData().add(new XYChart.Data<>(select1[0], select1[1]));
+            series2.getData().add(new XYChart.Data<>(select2[0], select2[1]));
+            series3.getData().add(new XYChart.Data<>(select3[0], select3[1]));
         }
 
-        sc.getData().addAll(series1,series2,series3);
+        sc.getData().add(series1);
+        sc.getData().add(series2);
+        sc.getData().add(series3);
         Scene scene  = new Scene(sc, 800, 800);
         stage.setScene(scene);
         stage.show();

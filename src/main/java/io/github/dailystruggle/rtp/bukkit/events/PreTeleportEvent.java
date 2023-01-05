@@ -8,22 +8,22 @@ import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
 
 public class PreTeleportEvent extends Event implements Cancellable {
-    private boolean cancelled = false;
     private static final HandlerList HANDLERS_LIST = new HandlerList();
     private final DoTeleport doTeleport;
+    private boolean cancelled = false;
 
-    @Override
-    public @NotNull HandlerList getHandlers() {
-        return HANDLERS_LIST;
+    public PreTeleportEvent(DoTeleport doTeleport) {
+        super(!Bukkit.isPrimaryThread());
+        this.doTeleport = doTeleport;
     }
 
     public static HandlerList getHandlerList() {
         return HANDLERS_LIST;
     }
 
-    public PreTeleportEvent(DoTeleport doTeleport) {
-        super(!Bukkit.isPrimaryThread());
-        this.doTeleport = doTeleport;
+    @Override
+    public @NotNull HandlerList getHandlers() {
+        return HANDLERS_LIST;
     }
 
     @Override

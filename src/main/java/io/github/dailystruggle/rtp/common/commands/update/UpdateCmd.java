@@ -12,13 +12,12 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.logging.Level;
 
 public class UpdateCmd extends BaseRTPCmdImpl {
     public UpdateCmd(@Nullable CommandsAPICommand parent) {
         super(parent);
 
-        RTP.getInstance().miscAsyncTasks.add(new RTPRunnable(this::addCommands,20));
+        RTP.getInstance().miscAsyncTasks.add(new RTPRunnable(this::addCommands, 20));
     }
 
     @Override
@@ -44,15 +43,15 @@ public class UpdateCmd extends BaseRTPCmdImpl {
     public void addCommands() {
         final Configs configs = RTP.configs;
         for (ConfigParser<?> value : configs.configParserMap.values()) {
-            String name = value.name.replace(".yml","");
-            if(getCommandLookup().containsKey(name)) continue;
-            addSubCommand(new SubUpdateCmd(this,value.name, value));
+            String name = value.name.replace(".yml", "");
+            if (getCommandLookup().containsKey(name)) continue;
+            addSubCommand(new SubUpdateCmd(this, value.name, value));
         }
 
         for (Map.Entry<Class<?>, MultiConfigParser<?>> e : configs.multiConfigParserMap.entrySet()) {
             MultiConfigParser<? extends Enum<?>> value = e.getValue();
-            if(getCommandLookup().containsKey(value.name)) continue;
-            addSubCommand(new SubUpdateCmd(this,value.name, value));
+            if (getCommandLookup().containsKey(value.name)) continue;
+            addSubCommand(new SubUpdateCmd(this, value.name, value));
         }
     }
 }

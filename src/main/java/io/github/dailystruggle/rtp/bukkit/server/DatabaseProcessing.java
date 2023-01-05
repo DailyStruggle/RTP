@@ -1,4 +1,3 @@
-
 package io.github.dailystruggle.rtp.bukkit.server;
 
 import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
@@ -8,20 +7,29 @@ import org.bukkit.Bukkit;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Level;
 
 public class DatabaseProcessing extends BukkitRunnable {
     private static final AtomicBoolean killed = new AtomicBoolean(false);
     private static final AtomicReference<BukkitTask> asyncTask = new AtomicReference<>(null);
 
+    public static void clear() {
+        if (asyncTask.get() != null) asyncTask.get().cancel();
+        asyncTask.set(null);
+    }
+
+    public static void kill() {
+        FillTask.kill();
+        clear();
+        killed.set(true);
+    }
+
     @Override
     public void run() {
-        if(killed.get()) return;
-        if(asyncTask.get()!=null) return;
+        if (killed.get()) return;
+        if (asyncTask.get() != null) return;
 
         CompletableFuture<Boolean> future = new CompletableFuture<>();
         BukkitTask task = Bukkit.getScheduler().runTaskAsynchronously(RTPBukkitPlugin.getInstance(), () -> {
@@ -36,16 +44,5 @@ public class DatabaseProcessing extends BukkitRunnable {
     public void cancel() {
         kill();
         super.cancel();
-    }
-
-    public static void clear() {
-        if(asyncTask.get()!=null) asyncTask.get().cancel();
-        asyncTask.set(null);
-    }
-
-    public static void kill() {
-        FillTask.kill();
-        clear();
-        killed.set(true);
     }
 }

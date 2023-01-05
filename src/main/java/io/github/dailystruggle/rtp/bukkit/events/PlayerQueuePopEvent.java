@@ -9,23 +9,23 @@ import org.jetbrains.annotations.NotNull;
 import java.util.UUID;
 
 public class PlayerQueuePopEvent extends Event {
+    private static final HandlerList HANDLERS_LIST = new HandlerList();
     private final Region region;
     private final UUID playerId;
-    private static final HandlerList HANDLERS_LIST = new HandlerList();
 
-    @Override
-    public @NotNull HandlerList getHandlers() {
-        return HANDLERS_LIST;
+    public PlayerQueuePopEvent(Region region, UUID playerId) {
+        super(!Bukkit.isPrimaryThread());
+        this.region = region;
+        this.playerId = playerId;
     }
 
     public static HandlerList getHandlerList() {
         return HANDLERS_LIST;
     }
 
-    public PlayerQueuePopEvent(Region region, UUID playerId) {
-        super(!Bukkit.isPrimaryThread());
-        this.region = region;
-        this.playerId = playerId;
+    @Override
+    public @NotNull HandlerList getHandlers() {
+        return HANDLERS_LIST;
     }
 
     public Region getRegion() {

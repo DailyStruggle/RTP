@@ -18,8 +18,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class SelectionAPI {
-    private final Factory<Region> regionFactory = new Factory<>();
-
     /**
      * pipe of selection tasks to be done.
      * will be done in the order given, trying urgent tasks first
@@ -27,13 +25,13 @@ public class SelectionAPI {
      */
     public final ConcurrentLinkedQueue<Runnable> selectionPipeline = new ConcurrentLinkedQueue<>();
     public final ConcurrentLinkedQueue<Runnable> selectionPipelineUrgent = new ConcurrentLinkedQueue<>();
-
     public final ConcurrentHashMap<UUID, Region> tempRegions = new ConcurrentHashMap<>();
-
     public final ConcurrentHashMap<String, Region> permRegionLookup = new ConcurrentHashMap<>();
+    private final Factory<Region> regionFactory = new Factory<>();
 
     /**
      * getFromString a region by name
+     *
      * @param regionName - name of region, case-insensitive
      * @return region object by that name, or null on bad lookup
      */
@@ -45,44 +43,49 @@ public class SelectionAPI {
 
     /**
      * getFromString a region by name
+     *
      * @param regionName - name of region, case-insensitive
      * @return region object by that name, or null on bad lookup
      */
     @NotNull
     public Region getRegionExceptionally(String regionName) {
         Region res = permRegionLookup.get(regionName);
-        if(res == null) throw new IllegalStateException("region:" + regionName + " does not exist");
+        if (res == null) throw new IllegalStateException("region:" + regionName + " does not exist");
         return res;
     }
 
     /**
      * getFromString a region by name
+     *
      * @param regionName - name of region
      * @return region by that name, or null if none
      */
     @NotNull
     public Region getRegionOrDefault(String regionName) {
-        return getRegionOrDefault(regionName,"DEFAULT");
+        return getRegionOrDefault(regionName, "DEFAULT");
     }
 
     /**
      * getFromString a region by name
+     *
      * @param regionName - name of region
      * @return region by that name, or null if none
      */
     @NotNull
     public Region getRegionOrDefault(String regionName, String defaultName) {
         Region region = permRegionLookup.getOrDefault(regionName, permRegionLookup.get(defaultName));
-        if(region == null) throw new IllegalStateException("neither '" + regionName + "' nor '" + defaultName + "' are known regions\n" + permRegionLookup);
+        if (region == null)
+            throw new IllegalStateException("neither '" + regionName + "' nor '" + defaultName + "' are known regions\n" + permRegionLookup);
         return Objects.requireNonNull(region);
     }
 
     /**
      * add or update a region by name
+     *
      * @param regionName - name of region
-     * @param params - mapped parameters, based on parameters in default.yml
+     * @param params     - mapped parameters, based on parameters in default.yml
      */
-    public void setRegion(String regionName, Map<String,String> params) {
+    public void setRegion(String regionName, Map<String, String> params) {
         //todo: implement
 //        params.put("region",regionName);
 //
@@ -110,29 +113,29 @@ public class SelectionAPI {
 
         int req = RTP.minRTPExecutions;
 
-        while(selectionPipelineUrgent.size() > 0 && (serverAccessor.overTime()<0 || req>0)) {
-            if(selectionPipelineUrgent.size()>0)
+        while (selectionPipelineUrgent.size() > 0 && (serverAccessor.overTime() < 0 || req > 0)) {
+            if (selectionPipelineUrgent.size() > 0)
                 selectionPipelineUrgent.poll().run();
             req--;
         }
 
-        while(selectionPipeline.size() > 0 && (serverAccessor.overTime()<0 || req>0)) {
-            if(selectionPipeline.size()>0)
+        while (selectionPipeline.size() > 0 && (serverAccessor.overTime() < 0 || req > 0)) {
+            if (selectionPipeline.size() > 0)
                 selectionPipeline.poll().run();
             req--;
         }
     }
 
-    public Region tempRegion(Map<String,String> regionParams,
+    public Region tempRegion(Map<String, String> regionParams,
                              @Nullable String baseRegionName) {
-        if(baseRegionName == null || baseRegionName.isEmpty() || !permRegionLookup.containsKey(baseRegionName))
+        if (baseRegionName == null || baseRegionName.isEmpty() || !permRegionLookup.containsKey(baseRegionName))
             baseRegionName = "default";
         Region baseRegion = Objects.requireNonNull(permRegionLookup.get(baseRegionName));
         EnumMap<RegionKeys, Object> data = baseRegion.getData();
-        for(RegionKeys key : RegionKeys.values()) {
-            if(regionParams.containsKey(key.name())) {
+        for (RegionKeys key : RegionKeys.values()) {
+            if (regionParams.containsKey(key.name())) {
                 String val = regionParams.get(key.name());
-                data.put(key,val);
+                data.put(key, val);
             }
         }
 
@@ -150,30 +153,32 @@ public class SelectionAPI {
         String worldName = player.getLocation().world().name();
         MultiConfigParser<WorldKeys> worldParsers = (MultiConfigParser<WorldKeys>) RTP.configs.multiConfigParserMap.get(WorldKeys.class);
         ConfigParser<WorldKeys> worldParser = worldParsers.getParser(worldName);
-        boolean requirePermission = Boolean.parseBoolean(worldParser.getConfigValue(WorldKeys.requirePermission,false).toString());
+        boolean requirePermission = Boolean.parseBoolean(worldParser.getConfigValue(WorldKeys.requirePermission, false).toString());
 
-        while(requirePermission && !player.hasPermission("rtp.worlds."+worldName)) {
-            if(worldsAttempted.contains(worldName)) throw new IllegalStateException("infinite override loop detected at world - " + worldName);
+        while (requirePermission && !player.hasPermission("rtp.worlds." + worldName)) {
+            if (worldsAttempted.contains(worldName))
+                throw new IllegalStateException("infinite override loop detected at world - " + worldName);
             worldsAttempted.add(worldName);
 
-            worldName = String.valueOf(worldParser.getConfigValue(WorldKeys.override,"default"));
+            worldName = String.valueOf(worldParser.getConfigValue(WorldKeys.override, "default"));
             worldParser = worldParsers.getParser(worldName);
-            requirePermission = Boolean.parseBoolean(worldParser.getConfigValue(WorldKeys.requirePermission,false).toString());
+            requirePermission = Boolean.parseBoolean(worldParser.getConfigValue(WorldKeys.requirePermission, false).toString());
         }
 
         String regionName = String.valueOf(worldParser.getConfigValue(WorldKeys.region, "default"));
         MultiConfigParser<RegionKeys> regionParsers = (MultiConfigParser<RegionKeys>) RTP.configs.multiConfigParserMap.get(RegionKeys.class);
         ConfigParser<RegionKeys> regionParser = regionParsers.getParser(regionName);
-        requirePermission = Boolean.parseBoolean(regionParser.getConfigValue(RegionKeys.requirePermission,false).toString());
+        requirePermission = Boolean.parseBoolean(regionParser.getConfigValue(RegionKeys.requirePermission, false).toString());
 
         Set<String> regionsAttempted = new HashSet<>();
-        while(requirePermission && !player.hasPermission("rtp.regions."+regionName)) {
-            if(regionsAttempted.contains(regionName)) throw new IllegalStateException("infinite override loop detected at region - " + regionName);
+        while (requirePermission && !player.hasPermission("rtp.regions." + regionName)) {
+            if (regionsAttempted.contains(regionName))
+                throw new IllegalStateException("infinite override loop detected at region - " + regionName);
             regionsAttempted.add(regionName);
 
-            regionName = String.valueOf(regionParser.getConfigValue(RegionKeys.override,"default"));
+            regionName = String.valueOf(regionParser.getConfigValue(RegionKeys.override, "default"));
             regionParser = regionParsers.getParser(regionName);
-            requirePermission = Boolean.parseBoolean(regionParser.getConfigValue(RegionKeys.requirePermission,false).toString());
+            requirePermission = Boolean.parseBoolean(regionParser.getConfigValue(RegionKeys.requirePermission, false).toString());
         }
         return getRegion(regionName);
     }

@@ -12,8 +12,8 @@ public interface BaseRTPCmd extends TreeCommand {
     default void msgBadParameter(UUID callerId, String parameterName, String parameterValue) {
         ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
 
-        String msg = String.valueOf(lang.getConfigValue(MessagesKeys.badArg,""));
-        msg = msg.replace("[arg]",parameterName + ":" + parameterValue);
-        RTP.serverAccessor.sendMessage(callerId,msg);
+        String msg = String.valueOf(lang.getConfigValue(MessagesKeys.badArg, ""));
+        msg = msg.replace("[arg]", parameterName + ":" + parameterValue);
+        RTP.serverAccessor.sendMessage(callerId, msg);
     }
 }

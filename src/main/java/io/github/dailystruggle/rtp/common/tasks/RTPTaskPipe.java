@@ -1,63 +1,48 @@
 package io.github.dailystruggle.rtp.common.tasks;
 
-import io.github.dailystruggle.rtp.common.RTP;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
 
 public class RTPTaskPipe {
-    protected long avgTime = TimeUnit.MILLISECONDS.toNanos(50);
-//    protected long avgTime = Long.MAX_VALUE;
-    private boolean stop = false;
     private final ConcurrentLinkedQueue<Runnable> runnables = new ConcurrentLinkedQueue<>();
     private final Semaphore accessGuard = new Semaphore(1);
+    protected long avgTime = TimeUnit.MILLISECONDS.toNanos(50);
+    //    protected long avgTime = Long.MAX_VALUE;
+    private boolean stop = false;
 
     public void execute(long availableTime) {
-        if(stop) return;
-        if(runnables.size() == 0) return;
+        if (stop) return;
+        if (runnables.size() == 0) return;
         long dt = 0;
         long start = System.nanoTime();
 
-        List<Runnable> delayedRunnables = new ArrayList<>(runnables.size());
-
-        for(Runnable runnable : runnables) {
-            if(stop) return;
-            if(runnable instanceof RTPDelayable) {
-                long d = ((RTPDelayable) runnable).getDelay();
-                if(d>0) {
-                    ((RTPDelayable) runnable).setDelay(d-1);
-                }
-                if(d>1) {
-                    delayedRunnables.add(runnable);
-                }
-            }
-        }
+        List<RTPDelayable> delayedRunnables = new ArrayList<>(runnables.size());
 
         do {
             try {
                 accessGuard.acquire();
-                    if(stop) return;
+                if (stop) return;
                 Runnable runnable = runnables.poll();
-                if(runnable == null) continue;
-                if(runnable instanceof RTPDelayable) {
+                if (runnable == null) continue;
+                if (runnable instanceof RTPDelayable) {
                     long d = ((RTPDelayable) runnable).getDelay();
-                    if(d>0) {
+                    if (d > 0) {
+                        delayedRunnables.add((RTPDelayable) runnable);
                         continue;
                     }
                 }
 
-                if(runnable instanceof RTPCancellable && ((RTPCancellable) runnable).isCancelled()) continue;
+                if (runnable instanceof RTPCancellable && ((RTPCancellable) runnable).isCancelled()) continue;
 
                 long localStart = System.nanoTime();
                 runnable.run();
                 long localStop = System.nanoTime();
 
                 long diff = localStop - localStart;
-                avgTime = ((avgTime/8)*7) + (diff/8);
+                avgTime = ((avgTime / 8) * 7) + (diff / 8);
 
                 dt = localStop - start;
             } catch (InterruptedException ignored) {
@@ -68,7 +53,11 @@ public class RTPTaskPipe {
                 accessGuard.release();
             }
 
-        } while (runnables.size()>0 && (dt+avgTime)<availableTime);
+        } while (runnables.size() > 0 && (dt + avgTime) < availableTime);
+
+        for (RTPDelayable runnable : delayedRunnables) {
+            runnable.setDelay(runnable.getDelay() - 1);
+        }
 
         runnables.addAll(delayedRunnables);
     }
@@ -95,7 +84,7 @@ public class RTPTaskPipe {
 
     public void stop() {
         runnables.forEach(runnable -> {
-            if(runnable instanceof RTPRunnable) ((RTPRunnable) runnable).setCancelled(true);
+            if (runnable instanceof RTPRunnable) ((RTPRunnable) runnable).setCancelled(true);
         });
         stop = true;
     }

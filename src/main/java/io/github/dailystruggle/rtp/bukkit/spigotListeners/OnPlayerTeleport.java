@@ -23,7 +23,7 @@ public final class OnPlayerTeleport implements Listener {
         Player player = event.getPlayer();
 
         TeleportData data = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
-        if(data == null || data.completed) return;
+        if (data == null || data.completed) return;
 
         //if currently teleporting, stop that and clean up
         if (RTP.getInstance().latestTeleportData.containsKey(player.getUniqueId())) {
@@ -37,27 +37,28 @@ public final class OnPlayerTeleport implements Listener {
         Player player = event.getPlayer();
 
         TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
-        if(teleportData == null) return;
+        if (teleportData == null) return;
 
         Location eventTo = event.getTo();
-        if(eventTo == null) return;
+        if (eventTo == null) return;
 
         ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.configs.configParserMap.get(ConfigKeys.class);
 
         RTPLocation location = teleportData.selectedLocation;
-        if(location == null) return;
+        if (location == null) return;
 
         RTPWorld rtpWorld = RTP.serverAccessor.getRTPWorld(eventTo.getWorld().getUID());
-        if(rtpWorld == null) return;
+        if (rtpWorld == null) return;
 
         RTPCommandSender sender = teleportData.sender;
-        if(sender == null) return;
+        if (sender == null) return;
 
         RTPLocation to = new RTPLocation(rtpWorld, eventTo.getBlockX(), eventTo.getBlockY(), eventTo.getBlockZ());
         double distanceSquared = (Objects.requireNonNull(Objects.requireNonNull(eventTo).getWorld()).getUID()
                 .equals(Objects.requireNonNull(event.getFrom().getWorld()).getUID()))
                 ? location.distanceSquared(to) : Double.MAX_VALUE;
-        if (distanceSquared < Math.pow(configParser.getNumber(ConfigKeys.cancelDistance,Float.MAX_VALUE).doubleValue(),2)) return;
+        if (distanceSquared < Math.pow(configParser.getNumber(ConfigKeys.cancelDistance, Float.MAX_VALUE).doubleValue(), 2))
+            return;
 
         new RTPTeleportCancel(player.getUniqueId()).run();
     }

@@ -7,8 +7,6 @@ import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
-import io.github.dailystruggle.rtp.common.database.options.SQLiteDatabaseAccessor;
-import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
@@ -20,20 +18,13 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdj
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
 import io.github.dailystruggle.rtp.common.serverSide.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPEconomy;
-import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.FillTask;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tools.ChunkyChecker;
-import org.jetbrains.annotations.NotNull;
-import org.simpleyaml.configuration.ConfigurationSection;
-import org.simpleyaml.configuration.file.YamlFile;
 
-import java.io.File;
-import java.sql.Connection;
-import java.sql.DriverManager;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
@@ -44,16 +35,25 @@ import java.util.logging.Level;
  * class to hold relevant API functions, outside of Bukkit functionality
  */
 public class RTP {
-    /**
-     * dynamic factories for certain types
-     */
-    public enum factoryNames {
-        shape,
-        vert,
-        singleConfig,
-        multiConfig
-    }
+    public static final SelectionAPI selectionAPI = new SelectionAPI();
     public static EnumMap<factoryNames, Factory<?>> factoryMap = new EnumMap<>(factoryNames.class);
+    /**
+     * minimum number of teleportations to executeAsyncTasks per gametick, to prevent bottlenecking during lag spikes
+     */
+    public static int minRTPExecutions = 1;
+    /**
+     * only one of each of these objects
+     */
+    public static Configs configs;
+    public static RTPServerAccessor serverAccessor;
+    public static RTPEconomy economy = null;
+    public static TreeCommand baseCommand;
+    public static AtomicBoolean reloading = new AtomicBoolean(false);
+    /**
+     * only one instance will exist at a time, reset on plugin load
+     */
+    private static RTP instance;
+
     static {
         Factory<Shape<?>> shapeFactory = new Factory<>();
         factoryMap.put(factoryNames.shape, shapeFactory);
@@ -64,31 +64,23 @@ public class RTP {
         factoryMap.put(factoryNames.multiConfig, new Factory<MultiConfigParser<?>>());
     }
 
+    public final ConcurrentHashMap<UUID, TeleportData> priorTeleportData = new ConcurrentHashMap<>();
+    public final ConcurrentHashMap<UUID, TeleportData> latestTeleportData = new ConcurrentHashMap<>();
+    public final ConcurrentSkipListSet<UUID> processingPlayers = new ConcurrentSkipListSet<>();
+    public final RTPTaskPipe setupTeleportPipeline = new RTPTaskPipe();
+    public final RTPTaskPipe getChunkPipeline = new RTPTaskPipe();
+    public final RTPTaskPipe loadChunksPipeline = new RTPTaskPipe();
+    public final RTPTaskPipe teleportPipeline = new RTPTaskPipe();
+    public final RTPTaskPipe chunkCleanupPipeline = new RTPTaskPipe();
+    public final RTPTaskPipe miscSyncTasks = new RTPTaskPipe();
+    public final RTPTaskPipe miscAsyncTasks = new RTPTaskPipe();
+    public final RTPTaskPipe startupTasks = new RTPTaskPipe();
+    public final RTPTaskPipe cancelTasks = new RTPTaskPipe();
+    public final Map<String, FillTask> fillTasks = new ConcurrentHashMap<>();
+    public final ConcurrentHashMap<UUID, Long> invulnerablePlayers = new ConcurrentHashMap<>();
     public DatabaseAccessor<?> databaseAccessor;
-
-    /**
-     * minimum number of teleportations to executeAsyncTasks per gametick, to prevent bottlenecking during lag spikes
-     */
-    public static int minRTPExecutions = 1;
-
-    /**
-     * only one of each of these objects
-     */
-    public static Configs configs;
-    public static RTPServerAccessor serverAccessor;
-    public static RTPEconomy economy = null;
-
-    public static TreeCommand baseCommand;
-
-    public static AtomicBoolean reloading = new AtomicBoolean(false);
-
-    /**
-     * only one instance will exist at a time, reset on plugin load
-     */
-    private static RTP instance;
-
     public RTP() {
-        if(serverAccessor == null) throw new IllegalStateException("null serverAccessor");
+        if (serverAccessor == null) throw new IllegalStateException("null serverAccessor");
         instance = this;
 
         RTPAPI.addShape(new Circle());
@@ -116,54 +108,34 @@ public class RTP {
         serverAccessor.log(level, str, exception);
     }
 
-    public static final SelectionAPI selectionAPI = new SelectionAPI();
-
-    public final ConcurrentHashMap<UUID, TeleportData> priorTeleportData = new ConcurrentHashMap<>();
-    public final ConcurrentHashMap<UUID, TeleportData> latestTeleportData = new ConcurrentHashMap<>();
-    public final ConcurrentSkipListSet<UUID> processingPlayers = new ConcurrentSkipListSet<>();
-
-    public final RTPTaskPipe setupTeleportPipeline = new RTPTaskPipe();
-    public final RTPTaskPipe getChunkPipeline = new RTPTaskPipe();
-    public final RTPTaskPipe loadChunksPipeline = new RTPTaskPipe();
-    public final RTPTaskPipe teleportPipeline = new RTPTaskPipe();
-    public final RTPTaskPipe chunkCleanupPipeline = new RTPTaskPipe();
-
-    public final RTPTaskPipe miscSyncTasks = new RTPTaskPipe();
-    public final RTPTaskPipe miscAsyncTasks = new RTPTaskPipe();
-    public final RTPTaskPipe startupTasks = new RTPTaskPipe();
-
-    public final RTPTaskPipe cancelTasks = new RTPTaskPipe();
-
-    public final Map<String, FillTask> fillTasks = new ConcurrentHashMap<>();
-
-    public final ConcurrentHashMap<UUID,Long> invulnerablePlayers = new ConcurrentHashMap<>();
-
     public static RTPWorld getWorld(RTPPlayer player) {
         //get region from world name, check for overrides
         Set<String> worldsAttempted = new HashSet<>();
         String worldName = player.getLocation().world().name();
         MultiConfigParser<WorldKeys> worldParsers = (MultiConfigParser<WorldKeys>) RTP.configs.multiConfigParserMap.get(WorldKeys.class);
         ConfigParser<WorldKeys> worldParser = worldParsers.getParser(worldName);
-        boolean requirePermission = Boolean.parseBoolean(worldParser.getConfigValue(WorldKeys.requirePermission,false).toString());
+        boolean requirePermission = Boolean.parseBoolean(worldParser.getConfigValue(WorldKeys.requirePermission, false).toString());
 
-        while(requirePermission && !player.hasPermission("rtp.worlds."+worldName)) {
-            if(worldsAttempted.contains(worldName)) throw new IllegalStateException("infinite override loop detected at world - " + worldName);
+        while (requirePermission && !player.hasPermission("rtp.worlds." + worldName)) {
+            if (worldsAttempted.contains(worldName))
+                throw new IllegalStateException("infinite override loop detected at world - " + worldName);
             worldsAttempted.add(worldName);
 
-            worldName = String.valueOf(worldParser.getConfigValue(WorldKeys.override,"default"));
+            worldName = String.valueOf(worldParser.getConfigValue(WorldKeys.override, "DEFAULT.YML")).toUpperCase();
+            if(!worldName.equals(".YML")) worldName = worldName + ".YML";
             worldParser = worldParsers.getParser(worldName);
-            requirePermission = Boolean.parseBoolean(worldParser.getConfigValue(WorldKeys.requirePermission,false).toString());
+            requirePermission = Boolean.parseBoolean(worldParser.getConfigValue(WorldKeys.requirePermission, false).toString());
         }
 
         return serverAccessor.getRTPWorld(worldName);
     }
 
     public static void stop() {
-        if(instance == null) return;
+        if (instance == null) return;
 
-        for(Map.Entry<UUID, TeleportData> e : instance.latestTeleportData.entrySet()) {
+        for (Map.Entry<UUID, TeleportData> e : instance.latestTeleportData.entrySet()) {
             TeleportData data = e.getValue();
-            if(data == null || data.completed) continue;
+            if (data == null || data.completed) continue;
             new RTPTeleportCancel(e.getKey()).run();
         }
 
@@ -176,18 +148,18 @@ public class RTP {
         instance.loadChunksPipeline.stop();
         instance.teleportPipeline.stop();
 
-        for(Region r : selectionAPI.permRegionLookup.values()) {
+        for (Region r : selectionAPI.permRegionLookup.values()) {
             r.shutDown();
         }
         selectionAPI.permRegionLookup.clear();
 
-        for(Region r : selectionAPI.tempRegions.values()) {
+        for (Region r : selectionAPI.tempRegions.values()) {
             r.shutDown();
         }
         selectionAPI.tempRegions.clear();
 
         instance.latestTeleportData.forEach((uuid, data) -> {
-            if(!data.completed) new RTPTeleportCancel(uuid).run();
+            if (!data.completed) new RTPTeleportCancel(uuid).run();
         });
 
         instance.processingPlayers.clear();
@@ -195,5 +167,15 @@ public class RTP {
         FillTask.kill();
 
         serverAccessor.stop();
+    }
+
+    /**
+     * dynamic factories for certain types
+     */
+    public enum factoryNames {
+        shape,
+        vert,
+        singleConfig,
+        multiConfig
     }
 }

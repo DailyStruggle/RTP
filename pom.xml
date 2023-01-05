@@ -358,12 +358,6 @@
             <scope>compile</scope>
         </dependency>
         <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-text</artifactId>
-            <version>1.10.0</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
             <groupId>xyz.tozymc.spigot</groupId>
             <artifactId>title-api</artifactId>
             <version>1.0</version>

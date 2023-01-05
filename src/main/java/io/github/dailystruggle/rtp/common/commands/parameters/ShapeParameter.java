@@ -13,7 +13,7 @@ import java.util.function.BiFunction;
 
 public class ShapeParameter extends CommandParameter {
     public ShapeParameter(String permission, String description, BiFunction<UUID, String, Boolean> isRelevant) {
-        super(permission,description, isRelevant);
+        super(permission, description, isRelevant);
         Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
         factory.map.forEach((s, shape1) -> put(shape1.name, shape1.getParameters()));
     }
@@ -22,7 +22,7 @@ public class ShapeParameter extends CommandParameter {
     public Set<String> values() {
         Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
         factory.map.forEach((s, shape1) -> {
-            if(!subParamMap.containsKey(s.toUpperCase())) put(shape1.name, shape1.getParameters());
+            if (!subParamMap.containsKey(s.toUpperCase())) put(shape1.name, shape1.getParameters());
         });
         return RTP.factoryMap.get(RTP.factoryNames.shape).map.keySet();
     }
@@ -32,11 +32,11 @@ public class ShapeParameter extends CommandParameter {
         parameter = parameter.toUpperCase();
         Factory<?> shapeFactory = RTP.factoryMap.get(RTP.factoryNames.shape);
         Map<String, CommandParameter> map = subParamMap.get(parameter);
-        if(map!=null) {
+        if (map != null) {
             return map;
         }
         Shape<?> shape = (Shape<?>) shapeFactory.get(parameter);
-        if(shape!=null) {
+        if (shape != null) {
             map = shape.getParameters();
             subParamMap.put(parameter, map);
             return map;
@@ -45,6 +45,6 @@ public class ShapeParameter extends CommandParameter {
     }
 
     public void put(String name, Map<String, CommandParameter> params) {
-        subParamMap.put(name.toUpperCase(),params);
+        subParamMap.put(name.toUpperCase(), params);
     }
 }

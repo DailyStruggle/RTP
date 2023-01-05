@@ -16,13 +16,13 @@ import io.github.dailystruggle.rtp.common.serverSide.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
-import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
 
@@ -57,76 +57,75 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
 
     @Override
     public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
-        if(nextCommand!=null) return true;
-        return subReload(callerId,RTP.configs.getParser(configClass));
+        if (nextCommand != null) return true;
+        return subReload(callerId, RTP.configs.getParser(configClass));
     }
 
     public boolean subReload(UUID senderID, FactoryValue<?> factoryValue) {
-        if(factoryValue instanceof MultiConfigParser) {
+        if (factoryValue instanceof MultiConfigParser) {
             return subReloadMulti(senderID, (MultiConfigParser<?>) factoryValue);
-        }
-        else if(factoryValue instanceof ConfigParser) {
+        } else if (factoryValue instanceof ConfigParser) {
             return subReloadSingle(senderID, (ConfigParser<?>) factoryValue);
         }
-        RTP.getInstance().miscSyncTasks.add(new RTPRunnable(() -> RTP.reloading.set(false),1));
+        RTP.getInstance().miscSyncTasks.add(new RTPRunnable(() -> RTP.reloading.set(false), 1));
         return false;
     }
 
 
+    private static final Pattern filenamePattern = Pattern.compile("\\[filename]",Pattern.CASE_INSENSITIVE);
     public boolean subReloadSingle(UUID senderId, ConfigParser<?> parser) {
         RTPServerAccessor serverAccessor = RTP.serverAccessor;
         Configs configs = RTP.configs;
 
         ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) configs.getParser(MessagesKeys.class);
-        if(lang == null) return true;
+        if (lang == null) return true;
 
-        String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloading,""));
-        if(msg!=null) msg = StringUtils.replace(msg,"[filename]", parser.name);
-        serverAccessor.sendMessage(CommandsAPI.serverId, senderId,msg);
+        String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloading, ""));
+        if (msg != null) msg = filenamePattern.matcher(msg).replaceAll(parser.name);
+        serverAccessor.sendMessage(CommandsAPI.serverId, senderId, msg);
 
         parser.check(parser.version, parser.pluginDirectory, null);
 
-        msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloaded,""));
-        if(msg!=null) msg = StringUtils.replace(msg,"[filename]", parser.name);
-        serverAccessor.sendMessage(CommandsAPI.serverId, senderId,msg);
+        msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloaded, ""));
+        if (msg != null) msg = filenamePattern.matcher(msg).replaceAll(parser.name);
+        serverAccessor.sendMessage(CommandsAPI.serverId, senderId, msg);
 
         return true;
     }
 
     public boolean subReloadMulti(UUID senderId, MultiConfigParser<?> parser) {
         ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-        if(lang == null) return true;
+        if (lang == null) return true;
 
         RTPServerAccessor serverAccessor = RTP.serverAccessor;
         RTPCommandSender commandSender = serverAccessor.getSender(senderId);
 
-        String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloading,""));
-        if(msg!=null) msg = StringUtils.replace(msg,"[filename]", parser.name);
-        serverAccessor.sendMessage(CommandsAPI.serverId, senderId,msg);
+        String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloading, ""));
+        if (msg != null) msg = filenamePattern.matcher(msg).replaceAll(parser.name);
+        serverAccessor.sendMessage(CommandsAPI.serverId, senderId, msg);
 
         CommandsAPI.commandPipeline.clear();
 
         MultiConfigParser<?> newParser = new MultiConfigParser<>(parser.myClass, parser.name, "1.0", parser.pluginDirectory);
-        if(parser.myClass.equals(RegionKeys.class)) {
+        if (parser.myClass.equals(RegionKeys.class)) {
             MultiConfigParser<RegionKeys> regions = (MultiConfigParser<RegionKeys>) newParser;
             RTP.selectionAPI.permRegionLookup.clear();
-            for(ConfigParser<RegionKeys> regionConfig : regions.configParserFactory.map.values()) {
+            for (ConfigParser<RegionKeys> regionConfig : regions.configParserFactory.map.values()) {
                 EnumMap<RegionKeys, Object> data = regionConfig.getData();
-                Region region = new Region(regionConfig.name.replace(".yml",""), data);
-                RTP.selectionAPI.permRegionLookup.put(region.name,region);
+                Region region = new Region(regionConfig.name.replace(".yml", ""), data);
+                RTP.selectionAPI.permRegionLookup.put(region.name, region);
             }
-        }
-        else if(parser.myClass.equals(WorldKeys.class)) {
-            for(RTPWorld world : serverAccessor.getRTPWorlds()) {
+        } else if (parser.myClass.equals(WorldKeys.class)) {
+            for (RTPWorld world : serverAccessor.getRTPWorlds()) {
                 newParser.getParser(world.name());
             }
         }
 
-        RTP.configs.multiConfigParserMap.put(parser.myClass,newParser);
+        RTP.configs.multiConfigParserMap.put(parser.myClass, newParser);
 
-        msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloaded,""));
-        if(msg!=null) msg = StringUtils.replace(msg,"[filename]", parser.name);
-        serverAccessor.sendMessage(CommandsAPI.serverId, commandSender.uuid(),msg);
+        msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloaded, ""));
+        if (msg != null) msg = filenamePattern.matcher(msg).replaceAll(parser.name);
+        serverAccessor.sendMessage(CommandsAPI.serverId, commandSender.uuid(), msg);
 
         return true;
     }
