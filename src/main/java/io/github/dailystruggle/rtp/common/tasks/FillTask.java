@@ -207,6 +207,12 @@ public class FillTask extends RTPRunnable {
 
         if(!Region.defaultBiomes.contains(initialBiome)) {
             res.complete(false);
+
+            ConfigParser<PerformanceKeys> performance = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+            boolean biomeRecall = Boolean.parseBoolean(performance.getConfigValue(PerformanceKeys.biomeRecall, false).toString());
+            if (biomeRecall) {
+                shape.addBadLocation(pos);
+            }
             return res;
         }
 
@@ -259,7 +265,13 @@ public class FillTask extends RTPRunnable {
                 return;
             }
 
-            boolean pass = true;
+            boolean pass = location.y() < vert.maxY();
+            if(!pass) {
+                shape.addBadLocation(pos);
+                res.complete(false);
+                chunk.unload();
+                return;
+            }
 
             ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
             ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
@@ -285,14 +297,15 @@ public class FillTask extends RTPRunnable {
 
             if (isCancelled()) {
                 chunk.unload();
+                res.complete(false);
                 return;
             }
             if (pass) pass = Region.checkGlobalRegionVerifiers(location);
 
             if (pass) {
-                res.complete(true);
                 if (Boolean.parseBoolean(perf.getConfigValue(PerformanceKeys.biomeRecall, false).toString()))
                     shape.addBiomeLocation(pos, currBiome);
+                res.complete(true);
             } else {
                 shape.addBadLocation(pos);
                 res.complete(false);

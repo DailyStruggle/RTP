@@ -439,19 +439,19 @@ public class Region extends FactoryValue<RegionKeys> {
 
 
                 select = memoryShape.locationToXZ(l);
-                if (verbose) selections.add(new AbstractMap.SimpleEntry<>((long) selections.size(), l));
+//                if (verbose) selections.add(new AbstractMap.SimpleEntry<>((long) selections.size(), l));
             } else {
                 select = shape.select();
-                if (verbose) selections.add(new AbstractMap.SimpleEntry<>((long) select[0], (long) select[1]));
+//                if (verbose) selections.add(new AbstractMap.SimpleEntry<>((long) select[0], (long) select[1]));
             }
 
             String currBiome = world.getBiome(select[0], (vert.maxY() + vert.minY()) / 2, select[1]);
 
             for (; biomeChecks < maxBiomeChecks && !biomeNames.contains(currBiome); biomeChecks++, maxAttempts++, i++) {
                 if (shape instanceof MemoryShape) {
-//                    if (defaultBiomes) {
-//                        ((MemoryShape<?>) shape).addBadLocation(l);
-//                    }
+                    if (defaultBiomes && biomeRecall) {
+                        ((MemoryShape<?>) shape).addBadLocation(l);
+                    }
                     MemoryShape<?> memoryShape = (MemoryShape<?>) shape;
                     for(String b : biomeNames) {
                         memoryShape.removeBiomeLocation(l, b);
@@ -471,15 +471,16 @@ public class Region extends FactoryValue<RegionKeys> {
                             l = entry.getKey() + ThreadLocalRandom.current().nextLong(entry.getValue());
                         }
                         else l = memoryShape.rand();
+//                        RTP.log(Level.WARNING,"A");
                     } else {
                         l = memoryShape.rand();
+//                        RTP.log(Level.WARNING,"B");
                     }
 
-                    select = ((MemoryShape<?>) shape).locationToXZ(l);
-                    if (verbose) selections.add(new AbstractMap.SimpleEntry<>((long) selections.size(), l));
+                    select = memoryShape.locationToXZ(l);
                 } else {
                     select = shape.select();
-                    if (verbose) selections.add(new AbstractMap.SimpleEntry<>((long) select[0], (long) select[1]));
+//                    if (verbose) selections.add(new AbstractMap.SimpleEntry<>((long) select[0], (long) select[1]));
                 }
                 biomeSpecificFails.putIfAbsent(currBiome, 0L);
                 biomeSpecificFails.put(currBiome, biomeSpecificFails.get(currBiome) + 1);
@@ -487,6 +488,11 @@ public class Region extends FactoryValue<RegionKeys> {
                 biomeFails++;
             }
             if (biomeChecks >= maxBiomeChecks) return new AbstractMap.SimpleEntry<>(null, i);
+
+            if (verbose) {
+                if(shape instanceof MemoryShape) selections.add(new AbstractMap.SimpleEntry<>((long) selections.size(), l));
+                else selections.add(new AbstractMap.SimpleEntry<>((long) select[0], (long) select[1]));
+            }
 
             WorldBorder border = RTP.serverAccessor.getWorldBorder(world.name());
             if (!border.isInside().apply(new RTPLocation(world, select[0] * 16, (vert.maxY() - vert.minY()) / 2 + vert.minY(), select[1] * 16))) {
@@ -512,7 +518,7 @@ public class Region extends FactoryValue<RegionKeys> {
 
             location = vert.adjust(chunk);
             if (location == null) {
-                if (defaultBiomes && shape instanceof MemoryShape) {
+                if (defaultBiomes && shape instanceof MemoryShape && biomeRecall) {
                     ((MemoryShape<?>) shape).addBadLocation(l);
                 }
                 vertFails++;
@@ -525,9 +531,9 @@ public class Region extends FactoryValue<RegionKeys> {
             if (!biomeNames.contains(currBiome)) {
                 biomeChecks++;
                 maxAttempts++;
-//                if(defaultBiomes && shape instanceof MemoryShape) {
-//                    ((MemoryShape<?>) shape).addBadLocation(l);
-//                }
+                if(defaultBiomes && shape instanceof MemoryShape && biomeRecall) {
+                    ((MemoryShape<?>) shape).addBadLocation(l);
+                }
                 biomeSpecificFails.putIfAbsent(currBiome, 0L);
                 biomeSpecificFails.put(currBiome, biomeSpecificFails.get(currBiome) + 1);
                 biomeFails++;
@@ -701,31 +707,6 @@ public class Region extends FactoryValue<RegionKeys> {
         for (long i = -radius; i <= radius; i++) {
             for (long j = -radius; j <= radius; j++) {
                 CompletableFuture<RTPChunk> cfChunk = location.world().getChunkAt((int) (cx + i), (int) (cz + j));
-                if (shape instanceof MemoryShape<?>) {
-                    long finalJ = j;
-                    long finalI = i;
-                    cfChunk.thenAccept(chunk -> {
-                        RTPLocation rtpLocation = chunk.getBlockAt(7, (vert.minY() + vert.maxY()) / 2, 7).getLocation();
-                        String currBiome = rtpWorld.getBiome(rtpLocation.x(), rtpLocation.y(), rtpLocation.z());
-
-                        rtpLocation = vert.adjust(chunk);
-
-                        boolean pass;
-                        if (rtpLocation == null) {
-                            pass = false;
-                        } else {
-                            pass = checkGlobalRegionVerifiers(rtpLocation);
-                        }
-
-                        if (pass) {
-                            ((MemoryShape<?>) shape).addBiomeLocation((long) ((MemoryShape<?>) shape).xzToLocation(finalI, finalJ), currBiome);
-                        } else {
-                            long l = (long) ((MemoryShape<?>) shape).xzToLocation(finalI, finalJ);
-                            ((MemoryShape<?>) shape).addBadLocation(l);
-                            ((MemoryShape<?>) shape).removeBiomeLocation(l, currBiome);
-                        }
-                    });
-                }
                 chunks.add(cfChunk);
             }
         }

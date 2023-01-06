@@ -6,7 +6,7 @@
 
     <groupId>io.github.dailystruggle</groupId>
     <artifactId>RTP</artifactId>
-    <version>2.0.0-BETA04</version>
+    <version>2.0.0</version>
     <packaging>jar</packaging>
 
     <name>RTP</name>
@@ -190,6 +190,7 @@
                                 <exclude>org.yaml.snakeyaml.*</exclude>
                                 <exclude>META-INF/*</exclude>
                                 <exclude>META-INF/versions/16/</exclude>
+                                <exclude>META-INF/MANIFEST.MF</exclude>
                             </excludes>
                         </filter>
                         <filter>
@@ -202,6 +203,7 @@
                                 <exclude>org.yaml.snakeyaml.*</exclude>
                                 <exclude>META-INF/*</exclude>
                                 <exclude>META-INF/versions/16/</exclude>
+                                <exclude>META-INF/MANIFEST.MF</exclude>
                             </excludes>
                         </filter>
                         <filter>
@@ -214,6 +216,7 @@
                                 <exclude>org.yaml.snakeyaml.*</exclude>
                                 <exclude>META-INF/*</exclude>
                                 <exclude>META-INF/versions/16/</exclude>
+                                <exclude>META-INF/MANIFEST.MF</exclude>
                             </excludes>
                         </filter>
                     </filters>
@@ -233,6 +236,7 @@
                                         <exclude>META-INF/*.SF</exclude>
                                         <exclude>META-INF/*.DSA</exclude>
                                         <exclude>META-INF/*.RSA</exclude>
+                                        <exclude>META-INF/*.MF</exclude>
                                     </excludes>
                                 </filter>
                             </filters>
