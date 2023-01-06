@@ -8,7 +8,7 @@ import org.jetbrains.annotations.Nullable;
 public abstract class FillSubCmd extends BaseRTPCmdImpl {
     public FillSubCmd(@Nullable CommandsAPICommand parent) {
         super(parent);
-        addParameter("region", new RegionParameter("rtp.fill","fill a specific region", (uuid, s) -> true));
+        addParameter("region", new RegionParameter("rtp.fill", "fill a specific region", (uuid, s) -> true));
     }
 
     @Override

@@ -8,15 +8,12 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public abstract class BaseRTPCmdImpl implements BaseRTPCmd {
-    protected long avgTime = 0;
-
     protected final Map<String, CommandParameter> parameterLookup = new ConcurrentHashMap<>();
-
-    private final CommandsAPICommand parent;
-
     // key: command name
     // value: command object
     protected final Map<String, CommandsAPICommand> commandLookup = new ConcurrentHashMap<>();
+    private final CommandsAPICommand parent;
+    protected long avgTime = 0;
 
     public BaseRTPCmdImpl(@Nullable CommandsAPICommand parent) {
         this.parent = parent;

@@ -7,7 +7,7 @@ import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
-import io.github.dailystruggle.rtp.common.tasks.RTPTeleportCancel;
+import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -24,15 +24,13 @@ public final class OnPlayerMove implements Listener {
     public void onPlayerMove(PlayerMoveEvent event) {
         UUID id = event.getPlayer().getUniqueId();
 
-        RTP instance = RTP.getInstance();
-
-        TeleportData data = instance.latestTeleportData.get(id);
-        if(data == null || data.completed) return;
+        TeleportData data = RTP.getInstance().latestTeleportData.get(id);
+        if (data == null || data.completed) return;
 
         long t = System.nanoTime();
-        if(     t < lastUpdateTime ||
-                ((t-lastUpdateTime) > TimeUnit.SECONDS.toNanos(5))) {
-            ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) instance.configs.configParserMap.get(ConfigKeys.class);
+        if (t < lastUpdateTime ||
+                ((t - lastUpdateTime) > TimeUnit.SECONDS.toNanos(5))) {
+            ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.configs.configParserMap.get(ConfigKeys.class);
             cancelDistanceSquared = Math.pow(configParser.getNumber(ConfigKeys.cancelDistance, 0).doubleValue(), 2);
             lastUpdateTime = t;
         }
@@ -40,7 +38,7 @@ public final class OnPlayerMove implements Listener {
         RTPPlayer player = new BukkitRTPPlayer(event.getPlayer());
 
         RTPLocation originalLocation = data.originalLocation;
-        if(originalLocation == null) {
+        if (originalLocation == null) {
             return;
         }
 

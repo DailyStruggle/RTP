@@ -19,7 +19,7 @@ public final class ChunkSet {
 
         AtomicLong count = new AtomicLong();
         Semaphore countAccess = new Semaphore(1);
-        chunks.forEach(rtpChunkCompletableFuture -> rtpChunkCompletableFuture.whenComplete((rtpChunk, throwable) -> {
+        chunks.forEach(rtpChunkCompletableFuture -> rtpChunkCompletableFuture.thenAccept(rtpChunk -> {
             try {
                 countAccess.acquire();
                 long i = count.incrementAndGet();
@@ -36,22 +36,21 @@ public final class ChunkSet {
 
     public void keep(boolean keep) {
         chunks.forEach(chunk -> {
-            if(chunk.isDone()) {
+            if (chunk.isDone()) {
                 try {
                     RTPChunk rtpChunk = chunk.get();
                     rtpChunk.keep(keep);
                 } catch (InterruptedException | ExecutionException e) {
                     e.printStackTrace();
                 }
-            }
-            else {
-                chunk.whenComplete((chunk1, throwable) -> chunk1.keep(keep));
+            } else {
+                chunk.thenAccept(chunk1 -> chunk1.keep(keep));
             }
         });
     }
 
     public void whenComplete(Consumer<Boolean> consumer) {
-        if(complete.isDone()) {
+        if (complete.isDone()) {
             try {
                 consumer.accept(complete.get());
             } catch (InterruptedException | ExecutionException e) {
@@ -60,6 +59,6 @@ public final class ChunkSet {
             return;
         }
 
-        complete.whenComplete((aBoolean, throwable) -> consumer.accept(aBoolean));
+        complete.thenAccept(consumer);
     }
 }

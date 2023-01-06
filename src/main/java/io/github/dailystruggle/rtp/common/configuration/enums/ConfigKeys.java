@@ -4,7 +4,8 @@ public enum ConfigKeys {
     teleportDelay,
     teleportCooldown,
     cancelDistance,
-    biomeWhitelist,
-    biomes,
+    logging,
+    consoleCommands,
+    playerCommands,
     version
 }

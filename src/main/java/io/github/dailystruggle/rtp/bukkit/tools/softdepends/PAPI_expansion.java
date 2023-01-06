@@ -7,44 +7,45 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
-public class PAPI_expansion extends PlaceholderExpansion{
+public class PAPI_expansion extends PlaceholderExpansion {
     @Override
-    public boolean persist(){
+    public boolean persist() {
         return true;
     }
 
-	@Override
-    public boolean canRegister(){
+    @Override
+    public boolean canRegister() {
         return true;
     }
 
-	@Override
-	public @NotNull String getAuthor() {
-		return RTPBukkitPlugin.getInstance().getDescription().getAuthors().toString();
-	}
+    @Override
+    public @NotNull String getAuthor() {
+        return RTPBukkitPlugin.getInstance().getDescription().getAuthors().toString();
+    }
 
-	@Override
-	public @NotNull String getIdentifier() {
-		return "rtp";
-	}
+    @Override
+    public @NotNull String getIdentifier() {
+        return "rtp";
+    }
 
-	@Override
-    public @NotNull String getVersion(){
+    @Override
+    public @NotNull String getVersion() {
         return "2.0.0-BETA";
     }
 
     @Override
     public String onRequest(OfflinePlayer player, @NotNull String params) {
-        return onPlaceholderRequest(player.getPlayer(),params);
+        return onPlaceholderRequest(player.getPlayer(), params);
     }
 
-	@Override
-    public String onPlaceholderRequest(Player player, @NotNull String identifier){
-		if(player == null){
+    @Override
+    public String onPlaceholderRequest(Player player, @NotNull String identifier) {
+        if (player == null) {
             return "";
         }
 
-        if(SendMessage.placeholders.containsKey(identifier)) return SendMessage.placeholders.get(identifier).apply(player.getUniqueId());
+        if (SendMessage.placeholders.containsKey(identifier))
+            return SendMessage.placeholders.get(identifier).apply(player.getUniqueId());
 
         return "";
     }
