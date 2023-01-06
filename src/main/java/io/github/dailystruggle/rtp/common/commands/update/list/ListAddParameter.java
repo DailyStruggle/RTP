@@ -12,7 +12,7 @@ public class ListAddParameter extends CommandParameter {
     private final String key;
 
     public ListAddParameter(Supplier<Set<String>> values, YamlFile file, String key) {
-        super("rtp.update","add items to a list", (uuid, s) -> true);
+        super("rtp.update", "add items to a list", (uuid, s) -> true);
         this.values = values;
         this.file = file;
         this.key = key;

@@ -15,13 +15,11 @@ import io.github.dailystruggle.rtp.common.commands.parameters.ShapeParameter;
 import io.github.dailystruggle.rtp.common.commands.parameters.VertParameter;
 import io.github.dailystruggle.rtp.common.commands.reload.ReloadCmd;
 import io.github.dailystruggle.rtp.common.commands.update.UpdateCmd;
-import io.github.dailystruggle.rtp.common.factory.Factory;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import org.bukkit.Bukkit;
 import org.bukkit.block.Biome;
+import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -38,33 +36,24 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
     private final Semaphore senderChecksGuard = new Semaphore(1);
     private final List<Predicate<CommandSender>> senderChecks = new ArrayList<>();
 
-    public void addSenderCheck(Predicate<CommandSender> senderCheck) {
-        try {
-            senderChecksGuard.acquire();
-            senderChecks.add(senderCheck);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        finally {
-            senderChecksGuard.release();
-        }
-    }
-
     public RTPCmdBukkit(Plugin plugin) {
-        super(plugin,null);
+        super(plugin, null);
 
         //region name parameter
         // filter by region exists and sender permission
         RegionParameter regionParameter = new RegionParameter(
                 "rtp.region",
                 "select a region to teleport to",
-                (uuid, s) -> RTP.getInstance().selectionAPI.regionNames().contains(s) && RTP.serverAccessor.getSender(uuid).hasPermission("rtp.regions." + s));
-        regionParameter.put("world", new io.github.dailystruggle.rtp.common.commands.parameters.WorldParameter("rtp.params","modify xz selection",(uuid, s)->true));
-        regionParameter.put("price", new FloatParameter("rtp.params","modify xz selection",(uuid, s)->true));
-        regionParameter.put("worldborderoverride", new BooleanParameter("rtp.params","modify xz selection",(uuid, s)->true));
-        regionParameter.put("shape", new ShapeParameter("rtp.params","modify xz selection",(uuid,s)->true));
-        regionParameter.put("vert", new VertParameter("rtp.params","modify y selection",(uuid,s)->true));
-        regionParameter.put("biome", new EnumParameter<>(
+                (uuid, s) -> RTP.selectionAPI.regionNames().contains(s) && RTP.serverAccessor.getSender(uuid).hasPermission("rtp.regions." + s));
+        regionParameter.put("world", new io.github.dailystruggle.rtp.common.commands.parameters.WorldParameter("rtp.params", "modify xz selection", (uuid, s) -> true));
+        regionParameter.put("price", new FloatParameter("rtp.params", "modify xz selection", (uuid, s) -> true));
+        regionParameter.put("worldborderoverride", new BooleanParameter("rtp.params", "modify xz selection", (uuid, s) -> true));
+        regionParameter.put("shape", new ShapeParameter("rtp.params", "modify xz selection", (uuid, s) -> true));
+        regionParameter.put("vert", new VertParameter("rtp.params", "modify y selection", (uuid, s) -> true));
+
+        addParameter("region", regionParameter);
+
+        addParameter("biome", new EnumParameter<>(
                 "rtp.biome",
                 "select a world to teleport to",
                 (sender, s) -> {
@@ -75,8 +64,8 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
                     }
                     return sender.hasPermission("rtp.biome." + s);
                 },
-                Biome.class));
-        addParameter("region", regionParameter);
+                Biome.class)
+        );
 
         //target player parameter
         // filter by player exists and player permission
@@ -94,7 +83,7 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
         addParameter("world", new WorldParameter(
                 "rtp.world",
                 "select a world to teleport to",
-                (sender, s) -> Bukkit.getWorld(s)!=null && sender.hasPermission("rtp.worlds." + s)));
+                (sender, s) -> Bukkit.getWorld(s) != null && sender.hasPermission("rtp.worlds." + s)));
 
 
         addSubCommand(new ReloadCmd(this));
@@ -104,9 +93,25 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
         addSubCommand(new InfoCmd(this));
     }
 
+    public void addSenderCheck(Predicate<CommandSender> senderCheck) {
+        try {
+            senderChecksGuard.acquire();
+            senderChecks.add(senderCheck);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            senderChecksGuard.release();
+        }
+    }
+
+    @Override
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        return onCommand(new BukkitRTPCommandSender(sender), this, label, args);
+    }
+
     @Override
     public boolean onCommand(CommandSender sender, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
-        return compute(new BukkitRTPCommandSender(sender).uuid(), parameterValues, nextCommand);
+        return compute(new BukkitRTPCommandSender(sender).uuid(), parameterValues, nextCommand);//todo:async
     }
 
     @Override

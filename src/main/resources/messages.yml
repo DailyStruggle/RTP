@@ -1,0 +1,134 @@
+#general message configuration for user experience
+# supports bukkit color codes and hex color codes
+# supports PlaceholderAPI references
+
+#list of additional placeholders
+# format: Pn - where n is the index in this list
+placeholders:
+  - "[RTP]" #P0
+
+#when teleporting, say this
+alreadyTeleporting: "&e[P0] you're already teleporting!"
+delayMessage: "&e[P0] Teleporting in [delay]. Don't move"
+chunkLoading: "&e[P0] Loading chunks! please wait..."
+teleportMessage: "&e[P0] Teleported in [attempts] attempts, in [processingTime]"
+
+#if teleport is cancel
+teleportCancel: "&e[P0] Teleport cancelled!"
+
+#if no safe places after reaching max attempts
+unsafe: "&e[P0] could not find a safe location within [attempts] attempts"
+
+# when the player is on cooldown
+cooldownMessage: "&e[P0] You can't teleport again for [remainingCooldown]"
+
+#if the region doesn't have any locations queued and the player doesn't have rtp.unqueued permission
+noLocationsQueued: "#f5eb73[P0] no locations ready at this time"
+
+#when the line shifts
+queueUpdate: "#2636ef[P0] your spot in line: [spot]"
+
+#if the player doesn't have enough money to teleport in the region
+# placeholder: [money] - how much money is required for the command
+notEnoughMoney: "&e[P0] you need at least $[money] for that."
+
+# for time placeholders, what to call days, hours, minutes, seconds
+days: "d"
+hours: "h"
+minutes: "m"
+seconds: "s"
+millis: "ms"
+
+# a configuration file 'version' is lower than the latest
+# placeholder: [filename] - name of file, including file extension
+oldFile: "&b[P0] old [filename] detected. Updating"
+
+# detected a bukkit world that isn't in the config file
+# placeholder: [world] - the world detected
+newWorld: "&b[P0] detected a new world '[world]'"
+
+# world doesn't exist in bukkit
+invalidWorld: "&e[P0] could not find world '[world]'"
+
+#configuration updates
+updatingWorlds: "&b[P0] updating worlds configuration..."
+updatedWorlds: "&b[P0] updated worlds configuration!"
+
+updatingRegions: "&b[P0] updating regions configuration..."
+updatedRegions: "&b[P0] updated regions configuration!"
+
+# plugin reload text
+reloading: "&b[P0] loading [filename]..."
+reloaded: "&b[P0] successfully loaded [filename]."
+updating: "&a[P0] updating [filename]..."
+updated: "&a[P0] successfully updated [filename]."
+
+# plugin doesn't have the command the user requested
+# placeholder: [arg] - the argument attempted
+badArg: "&c[P0] invalid command argument [arg]"
+
+# user doesn't have permission for the command requested
+noPerms: "&eI'm sorry, but you do not have permission to perform this command. Please contact the server administrators if you believe that this is in error."
+
+# user tried to wake a world that doesn't send messages to their location, without perms
+# placeholder: [world] - the world attempted in the command
+noGlobalPerms: "&eYou don't have permission to teleport to [world] from your location"
+
+fillStart: "&a[P0] fill task started for region [region]"
+fillCancel: "&e[P0] fill task cancelled for region [region]"
+fillPause: "#A020F0[P0] fill task paused for region [region]"
+fillResume: "#10A5F5[P0] fill task resumed for region [region]"
+fillRunning: "&c[P0] fill task already running for region [region]"
+fillNotRunning: "&c[rtp] fill task not running for region [region]"
+fillStatus: "&a[P0] completed [chunks] / [totalChunks] chunks for region [region]. [cps] cps. ETA: [eta]"
+
+#info command
+infoTitle: "&a======RTP Info======"
+infoChunks: "#D4AF37Chunks currently loaded by RTP: [chunks]"
+infoWorldHeader: "#008080Worlds:"
+infoWorld: "  #21ADA8[world]"
+infoRegionHeader: "#63C5DARegions:"
+infoRegion: "  #52B2BF[region]"
+
+#sub-info
+worldInfo:
+  - "#21ADA8[world]:"
+  - "#99EEBB  name: [name]"
+  - "#99EEBB  region: [region]"
+  - "#99EEBB  requirePermission: [requirePermission]"
+  - "#99EEBB  override: [override]"
+
+regionInfo:
+  - "#52B2BF[region]:"
+  - "#58CCED  world: [world]"
+  - "#58CCED  shape: [shape]"
+  - "#58CCED  requirePermission: [requirePermission]"
+  - "#58CCED  worldBorderOverride: [worldBorderOverride]"
+  - "#58CCED  cacheCap: [cacheCap]"
+  - "#58CCED  cached: [cached]"
+
+#command descriptions
+rtp: "&b/rtp - teleport to a random location"
+help: "&b/rtp help - see this"
+reload: "&b/rtp reload - reload config files"
+fill: "&b/rtp fill - try all possible region placements to improve load times"
+
+#player teleport status placeholders for PAPI
+PLAYER_AVAILABLE: "&aAVAILABLE"
+PLAYER_COOLDOWN: "&eON COOLDOWN"
+PLAYER_SETUP: "&bPICKING A LOCATION"
+PLAYER_LOADING: "&bLOADING CHUNKS"
+PLAYER_TELEPORTING: "&bTELEPORTING"
+
+#show title
+# remove or set title to "" to disable
+# PlaceholderAPI is recommended for coordinates
+title: "&aTeleported!"
+subtitle: "&bhave fun!"
+fadeIn: 20
+stay: 20
+fadeOut: 20
+
+actionbar: ""
+
+version: "1.0"

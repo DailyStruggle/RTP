@@ -18,9 +18,9 @@ public final class OnPlayerRespawn implements Listener {
     @EventHandler(priority = EventPriority.HIGH)
     public void onPlayerRespawn(PlayerRespawnEvent event) {
         Player player = event.getPlayer();
-        if(player.hasPermission("rtp.personalQueue")) {
-            Region region = RTP.getInstance().selectionAPI.getRegion(new BukkitRTPPlayer(player));
-            if(region == null) return;
+        if (player.hasPermission("rtp.personalqueue")) {
+            Region region = RTP.selectionAPI.getRegion(new BukkitRTPPlayer(player));
+            if (region == null) return;
             region.queue(player.getUniqueId());
         }
     }

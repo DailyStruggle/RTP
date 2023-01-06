@@ -16,7 +16,7 @@ public class OnChunkUnload implements Listener {
         World world = chunk.getWorld();
         int x = chunk.getX();
         int z = chunk.getZ();
-        if(event instanceof Cancellable && RTP.serverAccessor.getRTPWorld(world.getUID()).isForceLoaded(x,z)) {
+        if (event instanceof Cancellable && RTP.serverAccessor.getRTPWorld(world.getUID()).isForceLoaded(x, z)) {
             ((Cancellable) event).setCancelled(true);
         }
     }

@@ -8,7 +8,7 @@ import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
 import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
@@ -25,6 +25,7 @@ import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.scheduler.BukkitTask;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -34,18 +35,34 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.logging.Level;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class BukkitServerAccessor implements RTPServerAccessor {
-    private final Map<UUID,RTPWorld> worldMap = new ConcurrentHashMap<>();
-    private final Map<String,RTPWorld> worldMapStr = new ConcurrentHashMap<>();
-
-    private final long t = System.nanoTime();
-
+    private final Map<UUID, RTPWorld> worldMap = new ConcurrentHashMap<>();
+    private final Map<String, RTPWorld> worldMapStr = new ConcurrentHashMap<>();
+    Function<String, Shape<?>> shapeFunction;
     private String version = null;
     private Integer intVersion = null;
-
-    Function<String,Shape<?>> shapeFunction;
+    private Supplier<Set<String>> biomes = BukkitRTPWorld::getBiomes;
+    private Function<String, WorldBorder> worldBorderFunction = s -> {
+        RTPWorld rtpWorld = getRTPWorld(s);
+        if (rtpWorld instanceof BukkitRTPWorld) {
+            World world = ((BukkitRTPWorld) rtpWorld).world();
+            org.bukkit.WorldBorder worldBorder = world.getWorldBorder();
+            return new WorldBorder(
+                    () -> (Shape<?>) RTP.factoryMap.get(RTP.factoryNames.shape).get("SQUARE"),
+                    rtpLocation -> {
+                        if (RTP.serverAccessor.getServerIntVersion() > 10)
+                            return worldBorder.isInside(new Location(world, rtpLocation.x(), rtpLocation.y(), rtpLocation.z()));
+                        Location center = worldBorder.getCenter();
+                        double radius = worldBorder.getSize() / 2;
+                        RTPLocation c = new RTPLocation(rtpWorld, center.getBlockX(), center.getBlockY(), center.getBlockZ());
+                        return c.distanceSquaredXZ(rtpLocation) < Math.pow(radius, 2);
+                    });
+        }
+        return null;
+    };
 
     public BukkitServerAccessor() {
         //run later to ensure RTP instance exists
@@ -54,20 +71,21 @@ public class BukkitServerAccessor implements RTPServerAccessor {
 
         shapeFunction = s -> {
             World world = Bukkit.getWorld(s);
-            if(world == null) return null;
-            Region region = RTP.getInstance().selectionAPI.getRegion(getRTPWorld(world.getUID()));
-            if(region == null) throw new IllegalStateException();
+            if (world == null) return null;
+            Region region = RTP.selectionAPI.getRegion(getRTPWorld(world.getUID()));
+            if (region == null) throw new IllegalStateException();
             Object o = region.getData().get(RegionKeys.shape);
-            if(!(o instanceof Shape<?>)) throw new IllegalStateException();
+            if (!(o instanceof Shape<?>)) throw new IllegalStateException();
             return (Shape<?>) o;
         };
     }
 
+    private static final Pattern versionPattern = Pattern.compile("[-+^.a-zA-Z]*",Pattern.CASE_INSENSITIVE);
     @Override
     public @NotNull String getServerVersion() {
-        if(version == null) {
+        if (version == null) {
             version = RTPBukkitPlugin.getInstance().getServer().getClass().getPackage().getName();
-            version = version.replaceAll("[-+^.a-zA-Z]*","");
+            version = versionPattern.matcher(version).replaceAll("");
         }
 
         return version;
@@ -75,15 +93,13 @@ public class BukkitServerAccessor implements RTPServerAccessor {
 
     @Override
     public @NotNull Integer getServerIntVersion() {
-        if(intVersion == null) {
+        if (intVersion == null) {
             String[] splitVersion = getServerVersion().split("_");
-            if(splitVersion.length == 0) {
+            if (splitVersion.length == 0) {
                 intVersion = 0;
-            }
-            else if (splitVersion.length == 1) {
+            } else if (splitVersion.length == 1) {
                 intVersion = Integer.valueOf(splitVersion[0]);
-            }
-            else {
+            } else {
                 intVersion = Integer.valueOf(splitVersion[1]);
             }
         }
@@ -93,15 +109,14 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     @Override
     public RTPWorld getRTPWorld(String name) {
         RTPWorld world = worldMapStr.get(name);
-        if(world == null) {
+        if (world == null) {
             World bukkitWorld = Bukkit.getWorld(name);
-            if(bukkitWorld==null) return null;
+            if (bukkitWorld == null) return null;
             world = new BukkitRTPWorld(bukkitWorld);
-            if(world == null) return null;
-            worldMapStr.put(name,world);
-            worldMap.put(world.id(),world);
-        }
-        else if(!world.isActive()) {
+            if (world == null) return null;
+            worldMapStr.put(name, world);
+            worldMap.put(world.id(), world);
+        } else if (!world.isActive()) {
             worldMap.remove(world.id());
             worldMapStr.remove(world.name());
             return null;
@@ -112,13 +127,12 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     @Override
     public @Nullable RTPWorld getRTPWorld(UUID id) {
         RTPWorld world = worldMap.get(id);
-        if(world == null) {
+        if (world == null) {
             world = new BukkitRTPWorld(Bukkit.getWorld(id));
-            if(world == null) return null;
-            worldMap.put(id,world);
-            worldMapStr.put(world.name(),world);
-        }
-        else if(!world.isActive()) {
+            if (world == null || !world.isActive()) return null;
+            worldMap.put(id, world);
+            worldMapStr.put(world.name(), world);
+        } else if (!world.isActive()) {
             worldMap.remove(world.id());
             worldMapStr.remove(world.name());
             return null;
@@ -134,17 +148,16 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     @Override
     public boolean setShapeFunction(Function<String, Shape<?>> shapeFunction) {
         boolean works = true;
-        for(World world : Bukkit.getWorlds()) {
+        for (World world : Bukkit.getWorlds()) {
             try {
                 Shape<?> shape = shapeFunction.apply(world.getName());
                 shape.select();
-            }
-            catch (Exception exception) {
+            } catch (Exception exception) {
                 works = false;
                 break;
             }
         }
-        if(works) {
+        if (works) {
             this.shapeFunction = shapeFunction;
         }
 
@@ -159,22 +172,22 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     @Override
     public @Nullable RTPPlayer getPlayer(UUID uuid) {
         Player player = Bukkit.getPlayer(uuid);
-        if(player == null) return null;
+        if (player == null) return null;
         return new BukkitRTPPlayer(player);
     }
 
     @Override
     public @Nullable RTPPlayer getPlayer(String name) {
         Player player = Bukkit.getPlayer(name);
-        if(player == null) return null;
+        if (player == null) return null;
         return new BukkitRTPPlayer(player);
     }
 
     @Override
     public @Nullable RTPCommandSender getSender(UUID uuid) {
         CommandSender commandSender = (uuid == CommandsAPI.serverId) ? Bukkit.getConsoleSender() : Bukkit.getPlayer(uuid);
-        if(commandSender == null) return null;
-        if(commandSender instanceof Player) return new BukkitRTPPlayer((Player) commandSender);
+        if (commandSender == null) return null;
+        if (commandSender instanceof Player) return new BukkitRTPPlayer((Player) commandSender);
         return new BukkitRTPCommandSender(commandSender);
     }
 
@@ -189,42 +202,42 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     }
 
     @Override
-    public void sendMessage(UUID target, LangKeys msgType) {
-        if(RTPBukkitPlugin.getInstance()==null || !RTPBukkitPlugin.getInstance().isEnabled()) return;
-        ConfigParser<LangKeys> parser = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
-        if(parser == null) return;
-        String msg = String.valueOf(parser.getConfigValue(msgType,""));
-        if(msg == null || msg.isEmpty()) return;
+    public void sendMessage(UUID target, MessagesKeys msgType) {
+        if (RTPBukkitPlugin.getInstance() == null || !RTPBukkitPlugin.getInstance().isEnabled()) return;
+        ConfigParser<MessagesKeys> parser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+        if (parser == null) return;
+        String msg = String.valueOf(parser.getConfigValue(msgType, ""));
+        if (msg == null || msg.isEmpty()) return;
         sendMessage(target, msg);
     }
 
     @Override
-    public void sendMessage(UUID target1, UUID target2, LangKeys msgType) {
-        if(RTPBukkitPlugin.getInstance()==null || !RTPBukkitPlugin.getInstance().isEnabled()) return;
-        ConfigParser<LangKeys> parser = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
-        String msg = String.valueOf(parser.getConfigValue(msgType,""));
-        if(msg == null || msg.isEmpty()) return;
-        sendMessage(target1,target2,msg);
+    public void sendMessage(UUID target1, UUID target2, MessagesKeys msgType) {
+        if (RTPBukkitPlugin.getInstance() == null || !RTPBukkitPlugin.getInstance().isEnabled()) return;
+        ConfigParser<MessagesKeys> parser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+        String msg = String.valueOf(parser.getConfigValue(msgType, ""));
+        if (msg == null || msg.isEmpty()) return;
+        sendMessage(target1, target2, msg);
     }
 
     @Override
     public void sendMessage(UUID target, String message) {
-        if(RTPBukkitPlugin.getInstance()==null || !RTPBukkitPlugin.getInstance().isEnabled()) return;
+        if (RTPBukkitPlugin.getInstance() == null || !RTPBukkitPlugin.getInstance().isEnabled()) return;
         CommandSender sender = (target.equals(CommandsAPI.serverId))
                 ? Bukkit.getConsoleSender()
                 : Bukkit.getPlayer(target);
-        if(sender!=null) SendMessage.sendMessage(sender,message);
+        if (sender != null) SendMessage.sendMessage(sender, message);
     }
 
     @Override
     public void sendMessageAndSuggest(UUID target, String message, String suggestion) {
-        if(RTPBukkitPlugin.getInstance()==null || !RTPBukkitPlugin.getInstance().isEnabled()) return;
-        SendMessage.sendMessage(getSender(target),message,suggestion,suggestion);
+        if (RTPBukkitPlugin.getInstance() == null || !RTPBukkitPlugin.getInstance().isEnabled()) return;
+        SendMessage.sendMessage(getSender(target), message, suggestion, suggestion);
     }
 
     @Override
     public void sendMessage(UUID target1, UUID target2, String message) {
-        if(RTPBukkitPlugin.getInstance()==null || !RTPBukkitPlugin.getInstance().isEnabled()) return;
+        if (RTPBukkitPlugin.getInstance() == null || !RTPBukkitPlugin.getInstance().isEnabled()) return;
         CommandSender sender = (target1.equals(CommandsAPI.serverId))
                 ? Bukkit.getConsoleSender()
                 : Bukkit.getPlayer(target1);
@@ -232,31 +245,35 @@ public class BukkitServerAccessor implements RTPServerAccessor {
                 ? Bukkit.getConsoleSender()
                 : Bukkit.getPlayer(target2);
 
-        if(sender!=null && player!=null) SendMessage.sendMessage(sender,player,message);
+        if (sender != null && player != null) SendMessage.sendMessage(sender, player, message);
     }
 
     @Override
     public void log(Level level, String msg) {
-        if(RTPBukkitPlugin.getInstance()==null || !RTPBukkitPlugin.getInstance().isEnabled()) return;
-        SendMessage.log(level,msg);
+        if (RTPBukkitPlugin.getInstance() == null || !RTPBukkitPlugin.getInstance().isEnabled()) return;
+        SendMessage.log(level, msg);
     }
 
     @Override
     public void log(Level level, String msg, Exception exception) {
-        if(RTPBukkitPlugin.getInstance()==null || !RTPBukkitPlugin.getInstance().isEnabled()) return;
-        SendMessage.log(level,msg,exception);
+        if (RTPBukkitPlugin.getInstance() == null || !RTPBukkitPlugin.getInstance().isEnabled()) return;
+        SendMessage.log(level, msg, exception);
     }
 
     @Override
     public void announce(String msg, String permission) {
-        if(RTPBukkitPlugin.getInstance()==null || !RTPBukkitPlugin.getInstance().isEnabled()) return;
+        if (RTPBukkitPlugin.getInstance() == null || !RTPBukkitPlugin.getInstance().isEnabled()) return;
         SendMessage.sendMessage(Bukkit.getConsoleSender(), msg);
-        for(Player p : Bukkit.getOnlinePlayers().stream().filter(player -> player.hasPermission(permission)).collect(Collectors.toSet())) {
+        for (Player p : Bukkit.getOnlinePlayers().stream().filter(player -> player.hasPermission(permission)).collect(Collectors.toSet())) {
             SendMessage.sendMessage(p, msg);
         }
     }
 
-    private Supplier<Set<String>> biomes = BukkitRTPWorld::getBiomes;
+    @Override
+    public Set<String> getBiomes() {
+        return biomes.get();
+    }
+
     public void setBiomes(Supplier<Set<String>> biomes) {
         try {
             biomes.get();
@@ -268,33 +285,9 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     }
 
     @Override
-    public Set<String> getBiomes() {
-        return biomes.get();
-    }
-
-    @Override
     public boolean isPrimaryThread() {
         return Bukkit.isPrimaryThread();
     }
-
-    private Function<String,WorldBorder> worldBorderFunction = s -> {
-        RTPWorld rtpWorld = getRTPWorld(s);
-        if(rtpWorld instanceof BukkitRTPWorld) {
-            World world = ((BukkitRTPWorld) rtpWorld).world();
-            org.bukkit.WorldBorder worldBorder = world.getWorldBorder();
-            return new WorldBorder(
-                    () -> (Shape<?>) RTP.factoryMap.get(RTP.factoryNames.shape).get("SQUARE"),
-                    rtpLocation -> {
-                        if(RTP.serverAccessor.getServerIntVersion()>10)
-                            return worldBorder.isInside(new Location(world,rtpLocation.x(),rtpLocation.y(),rtpLocation.z()));
-                        Location center = worldBorder.getCenter();
-                        double radius = worldBorder.getSize()/2;
-                        RTPLocation c = new RTPLocation(rtpWorld,center.getBlockX(),center.getBlockY(),center.getBlockZ());
-                        return c.distanceSquaredXZ(rtpLocation)<Math.pow(radius,2);
-                    });
-        }
-        return null;
-    };
 
     @Override
     public @Nullable WorldBorder getWorldBorder(String worldName) {
@@ -304,10 +297,10 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     @Override
     public boolean setWorldBorderFunction(Function<String, WorldBorder> function) {
         try {
-            for(RTPWorld world : getRTPWorlds()) {
+            for (RTPWorld world : getRTPWorlds()) {
                 WorldBorder border = function.apply(getRTPWorlds().get(0).name());
                 int[] select = border.getShape().get().select();
-                border.isInside().apply(new RTPLocation(world,select[0],92,select[1]));
+                border.isInside().apply(new RTPLocation(world, select[0], 92, select[1]));
             }
             worldBorderFunction = function;
         } catch (Error | Exception ignored) {
@@ -325,11 +318,16 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     @Override
     public void stop() {
         getRTPWorlds().forEach(RTPWorld::forgetChunks);
+        RTP.getInstance().databaseAccessor.stop.set(true);
 
         RTPBukkitPlugin plugin = RTPBukkitPlugin.getInstance();
         plugin.commandTimer.cancel();
         plugin.syncTimer.cancel();
         plugin.asyncTimer.cancel();
+
+        for(RTPWorld world : worldMap.values()) {
+            world.forgetChunks();
+        }
 
         worldMap.clear();
         worldMapStr.clear();
@@ -338,16 +336,28 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     @Override
     public void start() {
         RTPBukkitPlugin plugin = RTPBukkitPlugin.getInstance();
+        RTP.getInstance().databaseAccessor.stop.set(false);
 
         plugin.commandTimer = Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
             long avgTime = TPS.timeSinceTick(20) / 20;
             long currTime = TPS.timeSinceTick(1);
             CommandsAPI.execute(avgTime - currTime);
-        }, 1, 1);
+        }, 40, 1);
 
-        plugin.syncTimer = new SyncTeleportProcessing().runTaskTimer(plugin,0,1);
-        plugin.asyncTimer = new AsyncTeleportProcessing().runTaskTimerAsynchronously(plugin,0,1);
+        plugin.syncTimer = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            new SyncTeleportProcessing().run();
+        }, 20, 1);
+        plugin.asyncTimer = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            new AsyncTeleportProcessing().run();
+        }, 20, 1);
+        plugin.fillTimer = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            new FillTaskProcessing().run();
+        }, 25, 20);
+        plugin.databaseTimer = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            new DatabaseProcessing().run();
+        }, 30, 20);
 
-        getRTPWorlds();
+        BukkitTask task = Bukkit.getScheduler().runTask(plugin, this::getRTPWorlds);
+//        RTP.log(Level.SEVERE,"C - " + task.getTaskId());
     }
 }

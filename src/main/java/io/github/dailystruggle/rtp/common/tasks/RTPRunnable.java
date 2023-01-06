@@ -1,11 +1,11 @@
 package io.github.dailystruggle.rtp.common.tasks;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 public class RTPRunnable implements Runnable, RTPCancellable, RTPDelayable {
-    private boolean cancelled;
+    protected AtomicBoolean cancelled = new AtomicBoolean(false);
+    protected AtomicBoolean isRunning = new AtomicBoolean(false);
     private long delay = 0;
-
-    protected boolean isRunning = false;
-
     private Runnable runnable;
 
     public RTPRunnable() {
@@ -27,17 +27,12 @@ public class RTPRunnable implements Runnable, RTPCancellable, RTPDelayable {
 
     @Override
     public boolean isCancelled() {
-        return cancelled;
+        return cancelled.get();
     }
 
     @Override
     public void setCancelled(boolean cancel) {
-        cancelled = cancel;
-    }
-
-    @Override
-    public void setDelay(final long delay) {
-        this.delay = delay;
+        cancelled.set(cancel);
     }
 
     @Override
@@ -45,12 +40,17 @@ public class RTPRunnable implements Runnable, RTPCancellable, RTPDelayable {
         return delay;
     }
 
+    @Override
+    public void setDelay(final long delay) {
+        this.delay = delay;
+    }
+
     public boolean isRunning() {
-        return isRunning;
+        return isRunning.get();
     }
 
     @Override
     public void run() {
-        if(runnable!=null) runnable.run();
+        if (runnable != null) runnable.run();
     }
 }

@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.serverSide;
 
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
@@ -65,7 +65,7 @@ public interface RTPServerAccessor {
 
     /**
      * @return predicted next tick time minus current time, in millis
-     *          if >0, RTP should cut short any pipeline processing
+     * if >0, RTP should cut short any pipeline processing
      */
     long overTime();
 
@@ -76,21 +76,24 @@ public interface RTPServerAccessor {
 
     /**
      * send a message to this person
+     *
      * @param target
      * @param msgType
      */
-    void sendMessage(UUID target, LangKeys msgType);
+    void sendMessage(UUID target, MessagesKeys msgType);
 
     /**
      * send a message to these people, avoiding duplicates
+     *
      * @param sender
      * @param target
      * @param msgType
      */
-    void sendMessage(UUID sender, UUID target, LangKeys msgType);
+    void sendMessage(UUID sender, UUID target, MessagesKeys msgType);
 
     /**
      * send a message to this person
+     *
      * @param target
      * @param message
      */
@@ -98,6 +101,7 @@ public interface RTPServerAccessor {
 
     /**
      * send a message with a hover and click event for suggesting a subsequent command
+     *
      * @param target
      * @param message
      * @param suggestion
@@ -106,6 +110,7 @@ public interface RTPServerAccessor {
 
     /**
      * send a message to these people, avoiding duplicates
+     *
      * @param sender
      * @param target
      * @param message
@@ -114,6 +119,7 @@ public interface RTPServerAccessor {
 
     /**
      * output a message to console
+     *
      * @param level
      * @param msg
      */
@@ -121,6 +127,7 @@ public interface RTPServerAccessor {
 
     /**
      * output a message to console
+     *
      * @param level
      * @param msg
      * @param exception
@@ -129,7 +136,8 @@ public interface RTPServerAccessor {
 
     /**
      * send a message to all players with this permission
-     * @param msg message to send
+     *
+     * @param msg        message to send
      * @param permission permission required
      */
     void announce(String msg, String permission);
@@ -146,12 +154,14 @@ public interface RTPServerAccessor {
 
     /**
      * getShape method for overriding region shape
+     *
      * @param worldName name of world
      * @return desired shape of world
      */
     @Nullable
     Shape<?> getShape(String worldName);
-    boolean setShapeFunction(Function<String,Shape<?>> shapeFunction);
+
+    boolean setShapeFunction(Function<String, Shape<?>> shapeFunction);
 
     /**
      * @param worldName name of world
@@ -159,7 +169,8 @@ public interface RTPServerAccessor {
      */
     @Nullable
     WorldBorder getWorldBorder(String worldName);
-    boolean setWorldBorderFunction(Function<String,WorldBorder> function);
+
+    boolean setWorldBorderFunction(Function<String, WorldBorder> function);
 
     /**
      * @return set of all possible block types
@@ -168,13 +179,13 @@ public interface RTPServerAccessor {
 
     /**
      * using server scheduling methods,
-     *  cancel command/teleport tasks and clear all chunk loads
+     * cancel command/teleport tasks and clear all chunk loads
      */
     void stop();
 
     /**
      * using server scheduling methods,
-     *  schedule repeating tasks for command and teleport methods
+     * schedule repeating tasks for command and teleport methods
      */
     void start();
 }

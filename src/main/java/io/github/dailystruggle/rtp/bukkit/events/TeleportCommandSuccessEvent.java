@@ -8,23 +8,23 @@ import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
 
 public class TeleportCommandSuccessEvent extends Event {
+    private static final HandlerList HANDLERS_LIST = new HandlerList();
     private final RTPCommandSender sender;
     private final RTPPlayer player;
-    private static final HandlerList HANDLERS_LIST = new HandlerList();
 
-    @Override
-    public @NotNull HandlerList getHandlers() {
-        return HANDLERS_LIST;
+    public TeleportCommandSuccessEvent(RTPCommandSender sender, RTPPlayer player) {
+        super(!Bukkit.isPrimaryThread());
+        this.sender = sender;
+        this.player = player;
     }
 
     public static HandlerList getHandlerList() {
         return HANDLERS_LIST;
     }
 
-    public TeleportCommandSuccessEvent(RTPCommandSender sender, RTPPlayer player) {
-        super(!Bukkit.isPrimaryThread());
-        this.sender = sender;
-        this.player = player;
+    @Override
+    public @NotNull HandlerList getHandlers() {
+        return HANDLERS_LIST;
     }
 
     public RTPPlayer getPlayer() {
@@ -35,5 +35,5 @@ public class TeleportCommandSuccessEvent extends Event {
         return sender;
     }
 
-    
+
 }

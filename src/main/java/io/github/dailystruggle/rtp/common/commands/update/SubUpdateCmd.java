@@ -16,29 +16,22 @@ import io.github.dailystruggle.rtp.common.commands.reload.ReloadCmd;
 import io.github.dailystruggle.rtp.common.commands.update.list.ListCmd;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
-import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
-import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
-import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.simpleyaml.configuration.ConfigurationSection;
 import org.simpleyaml.configuration.MemorySection;
 import org.simpleyaml.configuration.file.YamlFile;
 
-import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.nio.channels.FileChannel;
-import java.nio.channels.FileLock;
-import java.nio.file.Files;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
-import java.util.logging.Level;
 
 public class SubUpdateCmd extends BaseRTPCmdImpl {
 
@@ -71,28 +64,113 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
 
     @Override
     public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
-        if(nextCommand!=null) return true;
+        if (nextCommand != null) return true;
 
         RTP.stop();
         RTP.serverAccessor.stop();
 
-        if(factoryValue instanceof ConfigParser) {
+        if (factoryValue instanceof ConfigParser) {
             ConfigParser<?> configParser = (ConfigParser<?>) factoryValue;
-            ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
-            String msg = String.valueOf(lang.getConfigValue(LangKeys.updating,""));
-            if(msg!=null) msg = StringUtils.replaceIgnoreCase(msg,"[filename]", factoryValue.name);
-            RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId,msg);
+            ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+            String msg = String.valueOf(lang.getConfigValue(MessagesKeys.updating, ""));
+            if (msg != null) msg = msg.replace("[filename]", factoryValue.name);
+            RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId, msg);
 
-            for(Map.Entry<String,List<String>> e : parameterValues.entrySet()) {
+            for (Map.Entry<String, List<String>> e : parameterValues.entrySet()) {
                 String key = e.getKey();
-                String value = e.getValue().get(0);
+                Object value = e.getValue().get(0);
 
-                if(key == null || value == null) continue;
+                if (key == null || value == null) continue;
+                if (!getParameterLookup().containsKey(key.toLowerCase())) continue;
 
                 //todo: shape and vert updates
-                //todo: update internal data accordingly. maybe auto reload after update?
+                if (key.equalsIgnoreCase("shape")) {
+                    Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+                    if (factory == null) continue;
+                    Shape<?> shape = (Shape<?>) factory.get(value.toString());
+                    if (shape == null) msgBadParameter(callerId, key, value.toString());
 
-                configParser.set(key,value);
+                    EnumMap<?, Object> data = shape.getData();
+
+                    Map<String, Object> subParams = new HashMap<>();
+                    subParams.put("name", shape.name);
+                    for (Map.Entry<? extends Enum<?>, Object> entry : data.entrySet()) {
+                        subParams.put(entry.getKey().name(), entry.getValue());
+                    }
+
+                    YamlFile yamlFile = configParser.fileDatabase.cachedLookup.get().get(configParser.name);
+                    if (yamlFile != null) {
+                        Object o = yamlFile.get(key);
+                        if (o instanceof ConfigurationSection) {
+                            ConfigurationSection section = (ConfigurationSection) o;
+                            Map<String, Object> mapValues = section.getMapValues(false);
+                            for (Map.Entry<String, Object> entry : mapValues.entrySet()) {
+                                if (subParams.containsKey(entry.getKey()))
+                                    subParams.put(entry.getKey(), entry.getValue());
+                            }
+                        } else if (o instanceof Map) {
+                            Map<String, Object> mapValues = (Map<String, Object>) o;
+                            for (Map.Entry<String, Object> entry : mapValues.entrySet()) {
+                                if (subParams.containsKey(entry.getKey()))
+                                    subParams.put(entry.getKey(), entry.getValue());
+                            }
+                        }
+                    }
+
+                    subParams.put("name", shape.name);
+                    for (Map.Entry<? extends Enum<?>, Object> entry : data.entrySet()) {
+                        String name = entry.getKey().name();
+                        List<String> strings = parameterValues.get(name.toLowerCase());
+                        if (strings != null && strings.size() > 0) {
+                            subParams.put(name, strings.get(0));
+                        }
+                    }
+                    value = subParams;
+                } else if (key.equalsIgnoreCase("vert")) {
+                    Factory<VerticalAdjustor<?>> factory = (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
+                    if (factory == null) continue;
+                    VerticalAdjustor<?> vert = (VerticalAdjustor<?>) factory.get(value.toString());
+                    if (vert == null) msgBadParameter(callerId, key, value.toString());
+
+                    EnumMap<?, Object> vertData = vert.getData();
+
+                    Map<String, Object> subParams = new HashMap<>();
+                    subParams.put("name", vert.name);
+                    for (Map.Entry<? extends Enum<?>, Object> entry : vertData.entrySet()) {
+                        subParams.put(entry.getKey().name(), entry.getValue());
+                    }
+
+                    YamlFile yamlFile = configParser.fileDatabase.cachedLookup.get().get(configParser.name);
+                    if (yamlFile != null) {
+                        Object o = yamlFile.get(key);
+                        if (o instanceof ConfigurationSection) {
+                            ConfigurationSection section = (ConfigurationSection) o;
+                            Map<String, Object> mapValues = section.getMapValues(false);
+                            for (Map.Entry<String, Object> entry : mapValues.entrySet()) {
+                                if (subParams.containsKey(entry.getKey()))
+                                    subParams.put(entry.getKey(), entry.getValue());
+                            }
+                        } else if (o instanceof Map) {
+                            Map<String, Object> mapValues = (Map<String, Object>) o;
+                            for (Map.Entry<String, Object> entry : mapValues.entrySet()) {
+                                if (subParams.containsKey(entry.getKey()))
+                                    subParams.put(entry.getKey(), entry.getValue());
+                            }
+                        }
+                    }
+
+                    subParams.put("name", vert.name);
+                    for (Map.Entry<? extends Enum<?>, Object> entry : vertData.entrySet()) {
+                        String name = entry.getKey().name();
+                        List<String> strings = parameterValues.get(name.toLowerCase());
+                        if (strings != null && strings.size() > 0) {
+                            subParams.put(name, strings.get(0));
+                        }
+                    }
+                    value = subParams;
+                }
+
+                configParser.set(key, value);
             }
 
             try {
@@ -101,37 +179,36 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
                 ex.printStackTrace();
             }
 
-            msg = String.valueOf(lang.getConfigValue(LangKeys.updated,""));
-            if(msg!=null) msg = StringUtils.replaceIgnoreCase(msg,"[filename]", configParser.name);
-            RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId,msg);
-        }
-        else if(factoryValue instanceof MultiConfigParser) {
+            msg = String.valueOf(lang.getConfigValue(MessagesKeys.updated, ""));
+            if (msg != null) msg = msg.replace("[filename]", configParser.name);
+            RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId, msg);
+        } else if (factoryValue instanceof MultiConfigParser) {
             MultiConfigParser<?> parser = (MultiConfigParser<?>) this.factoryValue;
             List<String> remove = parameterValues.getOrDefault("remove", new ArrayList<>());
-            for(String target : remove) {
+            for (String target : remove) {
                 String configName = target;
-                if(!StringUtils.endsWithIgnoreCase(configName,".yml")) configName = configName+".yml";
+                if (!configName.endsWith(".yml")) configName = configName + ".yml";
                 ConfigParser<?> configParser = (ConfigParser<?>) parser.configParserFactory.get(configName);
-                if(configParser == null) continue;
+                if (configParser == null) continue;
                 parser.configParserFactory.map.remove(configName.toUpperCase());
                 commandLookup.remove(target);
-                configParser.yamlFile.getConfigurationFile().deleteOnExit();
+                YamlFile yamlFile = configParser.fileDatabase.cachedLookup.get().get(configName);
+                if (yamlFile != null) yamlFile.getConfigurationFile().deleteOnExit();
             }
 
             List<String> add = parameterValues.getOrDefault("add", new ArrayList<>());
-            for(String target : add) {
+            for (String target : add) {
                 parser.addParser(target);
                 ConfigParser<?> configParser = parser.getParser(target);
                 SubUpdateCmd subUpdateCmd = new SubUpdateCmd(this, configParser.name, configParser);
                 subUpdateCmd.addParameters();
                 addSubCommand(subUpdateCmd);
             }
+
         }
 
-        CommandsAPICommand reload;
-        reload = RTP.baseCommand.getCommandLookup().getOrDefault("reload", new ReloadCmd(RTP.baseCommand));
-        reload.onCommand(callerId,new HashMap<>(),null);
-
+        CommandsAPICommand reload = RTP.baseCommand.getCommandLookup().getOrDefault("reload", new ReloadCmd(RTP.baseCommand));
+        reload.onCommand(callerId, new HashMap<>(), null);
         return true;
     }
 
@@ -140,32 +217,30 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
                                                @NotNull Predicate<String> permissionCheckMethod,
                                                @NotNull String[] args) {
         addParameters();
-        return super.onTabComplete(callerId,permissionCheckMethod,args);
+        return super.onTabComplete(callerId, permissionCheckMethod, args);
     }
 
     public void addParameters() {
         parameterLookup.clear();
         commandLookup.clear();
-        if(factoryValue == null) return;
+        if (factoryValue == null) return;
 
-        if(factoryValue instanceof ConfigParser) {
+        if (factoryValue instanceof ConfigParser) {
             ConfigParser<?> configParser = (ConfigParser<?>) this.factoryValue;
-            EnumMap<?,?> data = configParser.getData();
-            for (Map.Entry<? extends Enum<?>,?> e : data.entrySet()) {
+            EnumMap<?, ?> data = configParser.getData();
+            for (Map.Entry<? extends Enum<?>, ?> e : data.entrySet()) {
                 String name = e.getKey().name();
-                if(name.equalsIgnoreCase("version")) continue;
+                if (name.equalsIgnoreCase("version")) continue;
                 String s = name;
                 Object nameObj = configParser.language_mapping.get(name);
-                if(nameObj!=null) s = nameObj.toString();
+                if (nameObj != null) s = nameObj.toString();
                 Object o = e.getValue();
 
-                if(StringUtils.containsIgnoreCase(name,"world")) {
+                if (name.contains("world")) {
                     addParameter(s, new WorldParameter("rtp.update", "", (uuid, s1) -> true));
-                }
-                else if(StringUtils.containsIgnoreCase(name,"region")) {
+                } else if (name.contains("region")) {
                     addParameter(s, new RegionParameter("rtp.update", "", (uuid, s1) -> true));
-                }
-                else if (o instanceof String) {
+                } else if (o instanceof String) {
                     addParameter(s, new CommandParameter("rtp.update", "", (uuid, s1) -> true) {
                         @Override
                         public Set<String> values() {
@@ -185,34 +260,37 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
                 } else if (o instanceof Region) {
                     addParameter(s, new RegionParameter("rtp.update", "", (uuid, s1) -> true));
                 } else if (o instanceof MemorySection) {
-                    if(s.equalsIgnoreCase("shape")) addParameter(s, new ShapeParameter("rtp.update", "", (uuid, s1) -> true));
-                    else if(s.equalsIgnoreCase("vert")) addParameter(s, new VertParameter("rtp.update", "", (uuid, s1) -> true));
+                    if (s.equalsIgnoreCase("shape")) {
+                        addParameter(s, new ShapeParameter("rtp.update", "", (uuid, s1) -> true));
+                    } else if (s.equalsIgnoreCase("vert")) {
+                        VertParameter vertParameter = new VertParameter("rtp.update", "", (uuid, s1) -> true);
+                        addParameter(s, vertParameter);
+                    }
                 } else if (o instanceof List) {
                     Supplier<Set<String>> values = HashSet::new;
-                    if(StringUtils.containsIgnoreCase(name,"block")) {
+                    if (name.contains("block")) {
                         values = () -> RTP.serverAccessor.materials();
-                    }
-                    else if(StringUtils.containsIgnoreCase(name,"biome")) {
+                    } else if (name.contains("biome")) {
                         values = () -> RTP.serverAccessor.getBiomes();
                     }
-                    addSubCommand(new ListCmd(name,this,values,configParser.yamlFile,s));
+                    YamlFile yamlFile = configParser.fileDatabase.cachedLookup.get().get(configParser.name);
+                    if (yamlFile != null) addSubCommand(new ListCmd(name, this, values, yamlFile, s));
                 }
             }
-        }
-        else if(factoryValue instanceof MultiConfigParser) {
+        } else if (factoryValue instanceof MultiConfigParser) {
             MultiConfigParser<?> parser = (MultiConfigParser<?>) factoryValue;
-            for(Map.Entry<?,?> e : parser.configParserFactory.map.entrySet()) {
+            for (Map.Entry<?, ?> e : parser.configParserFactory.map.entrySet()) {
                 Object entryValue = e.getValue();
-                if(entryValue instanceof FactoryValue)
+                if (entryValue instanceof FactoryValue)
                     addSubCommand(new SubUpdateCmd(this, e.getKey().toString(), (FactoryValue<?>) entryValue));
             }
-            addParameter("add", new CommandParameter("rtp.update","add a file", (uuid, s) -> true) {
+            addParameter("add", new CommandParameter("rtp.update", "add a file", (uuid, s) -> true) {
                 @Override
                 public Set<String> values() {
                     return new HashSet<>();
                 }
             });
-            addParameter("remove", new CommandParameter("rtp.update","remove a file", (uuid, s) -> true) {
+            addParameter("remove", new CommandParameter("rtp.update", "remove a file", (uuid, s) -> true) {
                 @Override
                 public Set<String> values() {
                     return parser.listParsers();

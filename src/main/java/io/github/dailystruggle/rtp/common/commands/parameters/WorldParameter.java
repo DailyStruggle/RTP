@@ -11,7 +11,7 @@ import java.util.stream.Collectors;
 
 public class WorldParameter extends CommandParameter {
     public WorldParameter(String permission, String description, BiFunction<UUID, String, Boolean> isRelevant) {
-        super(permission,description, isRelevant);
+        super(permission, description, isRelevant);
     }
 
     //todo: store and update

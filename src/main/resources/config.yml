@@ -1,3 +1,5 @@
+#basic UX configuration
+
 #time, in seconds, to delay teleportation
 # allows server some time to preload the chunks
 teleportDelay: 2
@@ -8,7 +10,7 @@ cancelDistance: 2
 #attempt cooldown, in seconds, to prevent spam
 teleportCooldown: 300
 
-#commands to run after any teleportation
+#list of commands to run after any teleportation
 # e.g.
 #consoleCommands:
 #  - "say Someone Teleported!"
@@ -16,4 +18,4 @@ consoleCommands:
 playerCommands:
 
 #DO NOT TOUCH VERSION NUMBER
-version: "1.0"
+version: "3.0"

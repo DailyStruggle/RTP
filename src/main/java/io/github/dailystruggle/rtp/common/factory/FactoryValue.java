@@ -9,36 +9,49 @@ import java.io.File;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 /**
  * this exists solely because java is so stubborn about constructors and generics.
  * rather than calling a constructor, the factory value will be copied from a value in the factory
+ *
  * @param <E> enum of available parameters
  */
 @SuppressWarnings("unchecked")
 public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
 
+    private static final Map<Class<? extends Number>, Function<String, Number>> numberParsers = new ConcurrentHashMap<>();
+
+    static {
+        numberParsers.put(Double.class, Double::parseDouble);
+        numberParsers.put(Float.class, Float::parseFloat);
+        numberParsers.put(Long.class, Long::parseLong);
+        numberParsers.put(Integer.class, Integer::parseInt);
+        numberParsers.put(Short.class, Short::parseShort);
+        numberParsers.put(Byte.class, Byte::parseByte);
+    }
+
     //hacky way just to do Enum.valueOf on the correct enum
     public final Class<E> myClass;
+    protected final EnumMap<E, String[]> desc;
 
+    protected final Map<String, E> enumLookup;
     /**
      * data - container for arbitrary data values
-     *      mapped enum value to object to stay organized
+     * mapped enum value to object to stay organized
      */
     public String name;
-    protected final EnumMap<E,Object> data;
-    protected final EnumMap<E,String[]> desc;
-
-    protected final Map<String,E> enumLookup;
+    public Map<String, Object> language_mapping = new ConcurrentHashMap<>();
+    public Map<String, String> reverse_language_mapping = new ConcurrentHashMap<>();
+    protected EnumMap<E, Object> data;
+    private Set<String> keys = null;
 
     protected FactoryValue(Class<E> myClass, String name) {
         this.myClass = myClass;
         enumLookup = new ConcurrentHashMap<>();
         E[] enumConstants = myClass.getEnumConstants();
-        for(E constant : enumConstants) {
-            enumLookup.put(constant.name().toLowerCase(),constant);
+        for (E constant : enumConstants) {
+            enumLookup.put(constant.name().toLowerCase(), constant);
         }
         data = new EnumMap<>(myClass);
         desc = new EnumMap<>(myClass);
@@ -47,20 +60,22 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
 
     /**
      * generic getter
+     *
      * @return copy of data, to prevent editing
      */
     @NotNull
-    public EnumMap<E,Object> getData() {
+    public EnumMap<E, Object> getData() {
         return data.clone();
     }
 
     /**
      * @param data - data to apply.
      */
-    public void setData(final EnumMap<? extends Enum<?>,?> data) throws IllegalArgumentException {
+    public void setData(final EnumMap<? extends Enum<?>, ?> data) throws IllegalArgumentException {
+        this.data = new EnumMap<>(myClass);
         data.forEach((key, value) -> {
-            if(key == null) throw new IllegalArgumentException("null key");
-            if(value == null) throw new IllegalArgumentException("null value");
+            if (key == null) throw new IllegalArgumentException("null key");
+            if (value == null) throw new IllegalArgumentException("null value");
             if (!myClass.isAssignableFrom(key.getClass())) {
                 throw new IllegalArgumentException("invalid assignment"
                         + "\nexpected:" + myClass.getSimpleName()
@@ -71,28 +86,17 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
         });
     }
 
-    public void setDesc(@NotNull E key, @NotNull String[] desc) throws IllegalArgumentException {
-        if(key == null) throw new IllegalArgumentException("null key");
-        if(desc == null) throw new IllegalArgumentException("null desc");
-        this.desc.put(key,desc.clone());
-    }
-
-    public void set(@NotNull E key, @NotNull Object value) throws IllegalArgumentException {
-        if(key == null) throw new IllegalArgumentException("null key");
-        if(value == null) throw new IllegalArgumentException("null value");
-        this.data.put(key, value);
-    }
-
     /**
      * todo: guard value types??
+     *
      * @param data - data to apply. key is case-sensitive
      */
-    public void setData(final Map<String,Object> data) throws IllegalArgumentException {
+    public void setData(final Map<String, Object> data) throws IllegalArgumentException {
         data.forEach((keyStr, value) -> {
-            if(keyStr == null) return;
-            if(value == null) return;
+            if (keyStr == null) return;
+            if (value == null) return;
 
-            if(language_mapping.containsKey(keyStr)) keyStr = language_mapping.get(keyStr).toString();
+            if (language_mapping.containsKey(keyStr)) keyStr = language_mapping.get(keyStr).toString();
 
             try {
                 E key = Enum.valueOf(myClass, keyStr);
@@ -103,11 +107,23 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
         });
     }
 
+    public void setDesc(@NotNull E key, @NotNull String[] desc) throws IllegalArgumentException {
+        if (key == null) throw new IllegalArgumentException("null key");
+        if (desc == null) throw new IllegalArgumentException("null desc");
+        this.desc.put(key, desc.clone());
+    }
+
+    public void set(@NotNull E key, @NotNull Object value) throws IllegalArgumentException {
+        if (key == null) throw new IllegalArgumentException("null key");
+        if (value == null) throw new IllegalArgumentException("null value");
+        this.data.put(key, value);
+    }
+
     @Override
     public FactoryValue<E> clone() {
         try {
             FactoryValue<E> clone = (FactoryValue<E>) super.clone();
-            clone.setData(getData());
+            clone.data = data.clone();
             return clone;
         } catch (CloneNotSupportedException e) {
             e.printStackTrace();
@@ -115,35 +131,28 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
         return null;
     }
 
-    private static final Map<Class<? extends Number>, Function<String, Number>> numberParsers = new ConcurrentHashMap<>();
-    static {
-        numberParsers.put(Double.class,Double::parseDouble);
-        numberParsers.put(Float.class,Float::parseFloat);
-        numberParsers.put(Long.class,Long::parseLong);
-        numberParsers.put(Integer.class,Integer::parseInt);
-        numberParsers.put(Short.class,Short::parseShort);
-        numberParsers.put(Byte.class,Byte::parseByte);
-    }
-
     public Number getNumber(E key, Number def) throws NumberFormatException {
         Number res = def;
 
-        Object resObj = data.getOrDefault(key,def);
-        if(resObj instanceof Number) {
+        Object resObj = data.getOrDefault(key, def);
+        if (resObj instanceof Number) {
             res = (Number) resObj;
-        }
-        else if(resObj instanceof String) {
-            res = numberParsers.get(def.getClass()).apply((String) resObj);
-        } else if(resObj instanceof Character) {
+        } else if (resObj instanceof Integer
+                || resObj instanceof Long
+                || resObj instanceof Float
+                || resObj instanceof Double) {
+            res = (Number) resObj;
+        } else if (resObj instanceof String) {
+            res = Double.parseDouble((String) resObj);
+        } else if (resObj instanceof Character) {
             res = Integer.parseInt(((Character) resObj).toString());
         }
-        data.put(key,res);
+        data.put(key, res);
         return res;
     }
 
-    private Set<String> keys = null;
     public Collection<String> keys() {
-        if(keys == null) keys = Arrays.stream(myClass.getEnumConstants()).map(Enum::name).collect(Collectors.toSet());
+        if (keys == null) keys = Arrays.stream(myClass.getEnumConstants()).map(Enum::name).collect(Collectors.toSet());
         return keys;
     }
 
@@ -156,10 +165,10 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
 
     public String toYAML() {
         StringBuilder res = new StringBuilder();
-        for(Map.Entry<? extends Enum<?>, Object> e : data.entrySet()) {
+        for (Map.Entry<? extends Enum<?>, Object> e : data.entrySet()) {
             String[] desc = this.desc.get(e.getKey());
-            if(desc!=null) {
-                for(String d : desc) {
+            if (desc != null) {
+                for (String d : desc) {
                     res.append(d).append("\n");
                 }
             }
@@ -167,31 +176,25 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
             res.append(e.getKey().name()).append(": ");
 
             Object value = e.getValue();
-            if(value instanceof FactoryValue<?>) {
+            if (value instanceof FactoryValue<?>) {
                 res.append("\n");
                 String s = ((FactoryValue<?>) value).toYAML();
-                s = s.replaceAll("\n","  \n");
+                s = s.replaceAll("\n", "  \n");
                 res.append(s);
-            }
-            else if(value instanceof Map) {
+            } else if (value instanceof Map) {
                 ((Map<?, ?>) value).forEach((o, o2) -> res.append("\n").append(o.toString()).append(": ").append(o2.toString()));
-            }
-            else if(value instanceof List) {
+            } else if (value instanceof List) {
                 ((List<?>) value).forEach(o -> res.append("\n").append(o.toString()));
-            }
-            else {
+            } else {
                 res.append(value.toString());
             }
         }
         return res.toString();
     }
 
-    public Map<String, Object> language_mapping = new ConcurrentHashMap<>();
-    public Map<String,String> reverse_language_mapping = new ConcurrentHashMap<>();
-
     public void loadLangFile(String subDir) throws IOException {
         String name = this.name;
-        if(!name.endsWith(".yml")) name = name + ".yml";
+        if (!name.endsWith(".yml")) name = name + ".yml";
         File langFile;
         String langDirStr = RTP.serverAccessor.getPluginDirectory().getAbsolutePath()
                 + File.separator
@@ -199,9 +202,9 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
                 + File.separator
                 + subDir;
         File langDir = new File(langDirStr);
-        if(!langDir.exists()) {
+        if (!langDir.exists()) {
             boolean mkdir = langDir.mkdirs();
-            if(!mkdir) throw new IllegalStateException();
+            if (!mkdir) throw new IllegalStateException();
         }
 
         String mapFileName = langDir + File.separator
@@ -228,17 +231,16 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
 
     @Override
     public boolean equals(Object other) {
-        if(!(other instanceof FactoryValue)) return false;
-        if(!(this.getClass().isAssignableFrom(other.getClass()))) return false;
-        if(!(((FactoryValue<?>) other).myClass.equals(myClass))) return false;
-        EnumMap<E,Object> data = (EnumMap<E, Object>) ((FactoryValue<?>) other).getData();
+        if (!(other instanceof FactoryValue)) return false;
+        if (!(this.getClass().isAssignableFrom(other.getClass()))) return false;
+        if (!(((FactoryValue<?>) other).myClass.equals(myClass))) return false;
+        EnumMap<E, Object> data = (EnumMap<E, Object>) ((FactoryValue<?>) other).getData();
         for (Map.Entry<? extends Enum<?>, Object> e : this.data.entrySet()) {
             Object mine = e.getValue();
             Object theirs = data.get(e.getKey());
-            if(mine.getClass().equals(theirs.getClass())) {
-                if(!mine.equals(theirs)) return false;
-            }
-            else if(!mine.toString().equalsIgnoreCase(theirs.toString())) return false;
+            if (mine.getClass().equals(theirs.getClass())) {
+                if (!mine.equals(theirs)) return false;
+            } else if (!mine.toString().equalsIgnoreCase(theirs.toString())) return false;
         }
         return true;
     }

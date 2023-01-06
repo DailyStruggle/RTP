@@ -37,7 +37,27 @@ public class TestRTPCommandSender implements RTPCommandSender {
     }
 
     @Override
+    public String name() {
+        return "console";
+    }
+
+    @Override
     public Set<String> getEffectivePermissions() {
         return new HashSet<>();
+    }
+
+    @Override
+    public void performCommand(String command) {
+
+    }
+
+    @Override
+    public RTPCommandSender clone() {
+        try {
+            return (RTPCommandSender) super.clone();
+        } catch (CloneNotSupportedException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 }

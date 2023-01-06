@@ -4,7 +4,7 @@ import commonTestImpl.substitutions.TestRTPPlayer;
 import commonTestImpl.substitutions.TestRTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
@@ -37,7 +37,7 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
         // command processing timer is delayed to ensure this is set up before it's used
 
         shapeFunction = s -> {
-            Region region = RTP.getInstance().selectionAPI.getRegion(new TestRTPWorld());
+            Region region = RTP.selectionAPI.getRegion(new TestRTPWorld());
             if(region == null) throw new IllegalStateException();
             Object o = region.getData().get(RegionKeys.shape);
             if(!(o instanceof Shape<?>)) throw new IllegalStateException();
@@ -48,7 +48,7 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
     @Override
     public @NotNull String getServerVersion() {
         if(version == null) {
-            version = "1.18.2";
+            version = "1.19.3";
         }
 
         return version;
@@ -123,8 +123,12 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
     @Override
     public File getPluginDirectory() {
         try {
-            return new File(RTP.class.getProtectionDomain().getCodeSource().getLocation()
+            File res = new File(RTP.class.getProtectionDomain().getCodeSource().getLocation()
                     .toURI());
+            res = res.getParentFile();
+            res = new File(res.getAbsolutePath() + File.separator + "config");
+            res.mkdir();
+            return res;
         } catch (URISyntaxException e) {
             e.printStackTrace();
             return null;
@@ -132,16 +136,16 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
     }
 
     @Override
-    public void sendMessage(UUID target, LangKeys msgType) {
-        ConfigParser<LangKeys> parser = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+    public void sendMessage(UUID target, MessagesKeys msgType) {
+        ConfigParser<MessagesKeys> parser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
         String msg = String.valueOf(parser.getConfigValue(msgType,""));
         if(msg == null || msg.isEmpty()) return;
         sendMessage(target, msg);
     }
 
     @Override
-    public void sendMessage(UUID target1, UUID target2, LangKeys msgType) {
-        ConfigParser<LangKeys> parser = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
+    public void sendMessage(UUID target1, UUID target2, MessagesKeys msgType) {
+        ConfigParser<MessagesKeys> parser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
         String msg = String.valueOf(parser.getConfigValue(msgType,""));
         if(msg == null || msg.isEmpty()) return;
         sendMessage(target1,target2,msg);

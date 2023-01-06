@@ -8,7 +8,7 @@ import io.github.dailystruggle.rtp.common.commands.reload.SubReloadCmd;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.LangKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import org.jetbrains.annotations.Nullable;
@@ -22,21 +22,21 @@ public class HelpCmd extends BaseRTPCmdImpl {
     public HelpCmd(@Nullable CommandsAPICommand parent) {
         super(parent);
 
-        RTP.getInstance().miscAsyncTasks.add(new RTPRunnable(this::addCommands,20));
+        RTP.getInstance().miscAsyncTasks.add(new RTPRunnable(this::addCommands, 20));
     }
 
     public void addCommands() {
-        final Configs configs = RTP.getInstance().configs;
+        final Configs configs = RTP.configs;
         for (ConfigParser<?> value : configs.configParserMap.values()) {
-            String name = value.name.replace(".yml","");
-            if(getCommandLookup().containsKey(name)) continue;
-            addSubCommand(new SubReloadCmd<>(this,value.name,"rtp.reload","reload only " + value.name, value.myClass));
+            String name = value.name.replace(".yml", "");
+            if (getCommandLookup().containsKey(name)) continue;
+            addSubCommand(new SubReloadCmd<>(this, value.name, "rtp.reload", "reload only " + value.name, value.myClass));
         }
 
         for (Map.Entry<Class<?>, MultiConfigParser<?>> e : configs.multiConfigParserMap.entrySet()) {
             MultiConfigParser<? extends Enum<?>> value = e.getValue();
-            if(getCommandLookup().containsKey(value.name)) continue;
-            addSubCommand(new SubReloadCmd<>(this,value.name,"rtp.reload","reload only " + value.name, value.myClass));
+            if (getCommandLookup().containsKey(value.name)) continue;
+            addSubCommand(new SubReloadCmd<>(this, value.name, "rtp.reload", "reload only " + value.name, value.myClass));
         }
     }
 
@@ -58,34 +58,34 @@ public class HelpCmd extends BaseRTPCmdImpl {
     @Override
     public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
         RTPCommandSender sender = RTP.serverAccessor.getSender(callerId);
-        ConfigParser<LangKeys> lang = (ConfigParser<LangKeys>) RTP.getInstance().configs.getParser(LangKeys.class);
-        if(!sender.hasPermission("rtp.see")) {
-            RTP.serverAccessor.sendMessage(callerId,LangKeys.noPerms);
+        ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+        if (!sender.hasPermission("rtp.see")) {
+            RTP.serverAccessor.sendMessage(callerId, MessagesKeys.noPerms);
             return true;
         }
 
-        String msg = lang.getConfigValue(LangKeys.rtp,"").toString();
+        String msg = lang.getConfigValue(MessagesKeys.rtp, "").toString();
         String hover = "/rtp";
         String click = "/rtp";
 
-        SendMessage.sendMessage(sender,msg,hover,click);
+        SendMessage.sendMessage(sender, msg, hover, click);
 
-        for(CommandsAPICommand entry : RTP.baseCommand.getCommandLookup().values()) {
-            if(sender.hasPermission(entry.permission())){
+        for (CommandsAPICommand entry : RTP.baseCommand.getCommandLookup().values()) {
+            if (sender.hasPermission(entry.permission())) {
                 String arg = entry.name();
 
-                LangKeys key;
+                MessagesKeys key;
                 try {
-                    key = LangKeys.valueOf(entry.name());
+                    key = MessagesKeys.valueOf(entry.name());
                 } catch (IllegalArgumentException ignored) {
                     continue;
                 }
 
-                msg = lang.getConfigValue(key,"").toString();
+                msg = lang.getConfigValue(key, "").toString();
                 hover = "/rtp " + arg;
                 click = "/rtp " + arg;
 
-                SendMessage.sendMessage(sender,msg,hover,click);
+                SendMessage.sendMessage(sender, msg, hover, click);
             }
         }
         return true;
