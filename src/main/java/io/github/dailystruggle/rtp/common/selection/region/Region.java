@@ -38,7 +38,6 @@ public class Region extends FactoryValue<RegionKeys> {
     private static final Set<String> unsafeBlocks = new ConcurrentSkipListSet<>();
     private static final AtomicLong lastUpdate = new AtomicLong(0);
     private static final AtomicInteger safetyRadius = new AtomicInteger(0);
-    public static Set<String> defaultBiomes;
     public static int maxBiomeChecksPerGen = 100;
     private final Semaphore cacheGuard = new Semaphore(1);
     /**
@@ -97,23 +96,6 @@ public class Region extends FactoryValue<RegionKeys> {
         for (long i = cachePipeline.size(); i < cacheCap; i++) {
             cachePipeline.add(new Cache());
         }
-
-        Set<String> defaultBiomes;
-        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
-        Object configBiomes = safety.getConfigValue(SafetyKeys.biomes, null);
-        if (configBiomes instanceof Collection) {
-            boolean whitelist;
-            Object configValue = safety.getConfigValue(SafetyKeys.biomeWhitelist, false);
-            if (configValue instanceof Boolean) whitelist = (Boolean) configValue;
-            else whitelist = Boolean.parseBoolean(configValue.toString());
-
-            Set<String> collect = ((Collection<?>) configBiomes).stream().map(Object::toString).collect(Collectors.toSet());
-
-            defaultBiomes = whitelist
-                    ? collect
-                    : RTP.serverAccessor.getBiomes().stream().filter(s -> !collect.contains(s)).collect(Collectors.toSet());
-        } else defaultBiomes = RTP.serverAccessor.getBiomes();
-        Region.defaultBiomes = defaultBiomes;
     }
 
     /**
@@ -353,14 +335,20 @@ public class Region extends FactoryValue<RegionKeys> {
 
             o = safety.getConfigValue(SafetyKeys.biomes, null);
             List<String> biomeList = (o instanceof List) ? (List<String>) o : null;
-            Set<String> biomeSet = (biomeList == null) ? new HashSet<>() : new HashSet<>(biomeList);
-            biomeSet = biomeSet.stream().map(String::toUpperCase).collect(Collectors.toSet());
+            Set<String> biomeSet = (biomeList == null)
+                    ? new HashSet<>()
+                    : biomeList.stream().map(String::toUpperCase).collect(Collectors.toSet());
             if (whitelist) {
                 biomeNames = biomeSet;
             } else {
-                Set<String> finalBiomeSet = biomeSet;
-                biomeNames = RTP.serverAccessor.getBiomes().stream().filter(
-                        s -> !finalBiomeSet.contains(s.toUpperCase())).collect(Collectors.toSet());
+                Set<String> biomes = RTP.serverAccessor.getBiomes(getWorld());
+                Set<String> set = new HashSet<>();
+                for (String s : biomes) {
+                    if (!biomeSet.contains(s.toUpperCase())) {
+                        set.add(s);
+                    }
+                }
+                biomeNames = set;
             }
         }
 

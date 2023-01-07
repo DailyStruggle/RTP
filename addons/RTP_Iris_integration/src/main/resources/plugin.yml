@@ -1,0 +1,7 @@
+name: RTP_Iris_integration
+version: '${version}'
+main: io.github.dailystruggle.rtp_iris_integration.RTP_Iris_integration
+api-version: 1.19
+depend: [ RTP, Iris ]
+authors: [ leaf26 ]
+description: swap bukkit calls for iris calls

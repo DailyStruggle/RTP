@@ -145,7 +145,7 @@ public interface RTPServerAccessor {
     /**
      * @return list of all possible biomes
      */
-    Set<String> getBiomes();
+    Set<String> getBiomes(RTPWorld rtpWorld);
 
     /**
      * @return thread state, for determining whether to apply a change now or schedule it
