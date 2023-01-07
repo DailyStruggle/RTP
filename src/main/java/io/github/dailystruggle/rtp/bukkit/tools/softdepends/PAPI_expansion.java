@@ -30,7 +30,7 @@ public class PAPI_expansion extends PlaceholderExpansion {
 
     @Override
     public @NotNull String getVersion() {
-        return "2.0.0-BETA";
+        return "2.0.1";
     }
 
     @Override

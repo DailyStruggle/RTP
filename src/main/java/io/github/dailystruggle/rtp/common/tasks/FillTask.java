@@ -186,6 +186,22 @@ public class FillTask extends RTPRunnable {
     }
 
     public CompletableFuture<Boolean> testPos(Region region, final long pos) {
+        Set<String> defaultBiomes;
+        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+        Object configBiomes = safety.getConfigValue(SafetyKeys.biomes, null);
+        if (configBiomes instanceof Collection) {
+            boolean whitelist;
+            Object configValue = safety.getConfigValue(SafetyKeys.biomeWhitelist, false);
+            if (configValue instanceof Boolean) whitelist = (Boolean) configValue;
+            else whitelist = Boolean.parseBoolean(configValue.toString());
+
+            Set<String> collect = ((Collection<?>) configBiomes).stream().map(Object::toString).collect(Collectors.toSet());
+
+            defaultBiomes = whitelist
+                    ? collect
+                    : RTP.serverAccessor.getBiomes(region.getWorld()).stream().filter(s -> !collect.contains(s)).collect(Collectors.toSet());
+        } else defaultBiomes = RTP.serverAccessor.getBiomes(region.getWorld());
+
         CompletableFuture<Boolean> res = new CompletableFuture<>();
         try {
             testsGuard.acquire();
@@ -205,7 +221,7 @@ public class FillTask extends RTPRunnable {
 
         String initialBiome = world.getBiome(select[0] * 16, (vert.maxY() + vert.minY()) / 2, select[1] * 16);
 
-        if(!Region.defaultBiomes.contains(initialBiome)) {
+        if(!defaultBiomes.contains(initialBiome)) {
             res.complete(false);
 
             ConfigParser<PerformanceKeys> performance = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
@@ -259,7 +275,7 @@ public class FillTask extends RTPRunnable {
 
             String currBiome = world.getBiome(location.x(), location.y(), location.z());
 
-            if(!Region.defaultBiomes.contains(currBiome)) {
+            if(!defaultBiomes.contains(currBiome)) {
                 res.complete(false);
                 chunk.unload();
                 return;
@@ -273,7 +289,6 @@ public class FillTask extends RTPRunnable {
                 return;
             }
 
-            ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
             ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
 
             Object o = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
