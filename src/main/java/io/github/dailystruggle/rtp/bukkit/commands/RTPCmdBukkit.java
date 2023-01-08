@@ -106,11 +106,21 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        boolean valid = true;
+        for (Predicate<CommandSender> commandSenderPredicate : senderChecks) {
+            valid &= commandSenderPredicate.test(sender);
+        }
+        if(!valid) return false;
         return onCommand(new BukkitRTPCommandSender(sender), this, label, args);
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
+        boolean valid = true;
+        for (Predicate<CommandSender> commandSenderPredicate : senderChecks) {
+            valid &= commandSenderPredicate.test(sender);
+        }
+        if(!valid) return false;
         return compute(new BukkitRTPCommandSender(sender).uuid(), parameterValues, nextCommand);//todo:async
     }
 

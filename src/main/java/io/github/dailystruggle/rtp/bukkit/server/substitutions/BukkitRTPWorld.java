@@ -13,13 +13,13 @@ import org.bukkit.block.Biome;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.Waterlogged;
+import org.bukkit.generator.BiomeProvider;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 public final class BukkitRTPWorld implements RTPWorld {
@@ -28,12 +28,24 @@ public final class BukkitRTPWorld implements RTPWorld {
         int x = location.getBlockX();
         int y = location.getBlockY();
         int z = location.getBlockZ();
+
         return (RTP.serverAccessor.getServerIntVersion() < 17)
                 ? world.getBiome(x, y).name()
-                : world.getBiome(x, y, z).name();
+                : world.getBiome(x,y,z).name();
     };
-    private static Supplier<Set<String>> getBiomes
-            = () -> Arrays.stream(Biome.values()).map(biome -> biome.name().toUpperCase()).collect(Collectors.toSet());
+    private static @NotNull Function<RTPWorld, Set<String>> getBiomes
+            = (rtpWorld) -> {
+        if(rtpWorld instanceof BukkitRTPWorld && RTP.serverAccessor.getServerIntVersion() > 16) {
+            World world1 = ((BukkitRTPWorld) rtpWorld).world;
+            BiomeProvider biomeProvider = world1.getBiomeProvider();
+            if(biomeProvider!=null) {
+                List<Biome> biomes = biomeProvider.getBiomes(world1);
+                return biomes.stream().map(Enum::name).collect(Collectors.toSet());
+            }
+        }
+        return Arrays.stream(Biome.values()).map(biome -> biome.name().toUpperCase()).collect(Collectors.toSet());
+    };
+
     public final Map<List<Integer>, Map.Entry<Chunk, Long>> chunkMap = new ConcurrentHashMap<>();
     public final Map<List<Integer>, List<CompletableFuture<Chunk>>> chunkLoads = new ConcurrentHashMap<>();
     private final UUID id;
@@ -55,12 +67,12 @@ public final class BukkitRTPWorld implements RTPWorld {
         BukkitRTPWorld.getBiome = getBiome;
     }
 
-    public static void setBiomesGetter(@NotNull Supplier<Set<String>> getBiomes) {
+    public static void setBiomesGetter(@NotNull Function<RTPWorld,Set<String>> getBiomes) {
         BukkitRTPWorld.getBiomes = getBiomes;
     }
 
-    public static Set<String> getBiomes() {
-        return getBiomes.get();
+    public static Set<String> getBiomes(RTPWorld world) {
+        return getBiomes.apply(world);
     }
 
     @Override

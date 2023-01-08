@@ -52,6 +52,6 @@ public final class AsyncTaskProcessing extends RTPRunnable {
                 regions.get(i).execute(availableTime - (System.nanoTime() - start));
             }
         }
-        step = (step + 1) % period;
+        step = (step + 1) % (period+1);
     }
 }
