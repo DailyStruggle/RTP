@@ -182,7 +182,7 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
     }
 
     @Override
-    public Set<String> getBiomes() {
+    public Set<String> getBiomes(RTPWorld rtpWorld) {
         return TestRTPWorld.getBiomes();
     }
 

@@ -22,6 +22,7 @@ import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.simpleyaml.configuration.ConfigurationSection;
@@ -271,7 +272,14 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
                     if (name.contains("block")) {
                         values = () -> RTP.serverAccessor.materials();
                     } else if (name.contains("biome")) {
-                        values = () -> RTP.serverAccessor.getBiomes();
+                        values = () -> {
+                            Set<String> res = new HashSet<>();
+                            List<RTPWorld> rtpWorlds = RTP.serverAccessor.getRTPWorlds();
+                            for (RTPWorld rtpWorld : rtpWorlds) {
+                                res.addAll(RTP.serverAccessor.getBiomes(rtpWorld));
+                            }
+                            return res;
+                        };
                     }
                     YamlFile yamlFile = configParser.fileDatabase.cachedLookup.get().get(configParser.name);
                     if (yamlFile != null) addSubCommand(new ListCmd(name, this, values, yamlFile, s));

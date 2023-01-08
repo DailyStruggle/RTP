@@ -33,7 +33,6 @@ import java.io.File;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -44,7 +43,7 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     Function<String, Shape<?>> shapeFunction;
     private String version = null;
     private Integer intVersion = null;
-    private Supplier<Set<String>> biomes = BukkitRTPWorld::getBiomes;
+    private Function<RTPWorld,Set<String>> biomes = BukkitRTPWorld::getBiomes;
     private Function<String, WorldBorder> worldBorderFunction = s -> {
         RTPWorld rtpWorld = getRTPWorld(s);
         if (rtpWorld instanceof BukkitRTPWorld) {
@@ -270,13 +269,13 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     }
 
     @Override
-    public Set<String> getBiomes() {
-        return biomes.get();
+    public Set<String> getBiomes(RTPWorld rtpWorld) {
+        return biomes.apply(rtpWorld);
     }
 
-    public void setBiomes(Supplier<Set<String>> biomes) {
+    public void setBiomes(Function<RTPWorld,Set<String>> biomes) {
         try {
-            biomes.get();
+            biomes.apply(getRTPWorlds().get(0));
         } catch (Exception exception) {
             exception.printStackTrace();
             return;
