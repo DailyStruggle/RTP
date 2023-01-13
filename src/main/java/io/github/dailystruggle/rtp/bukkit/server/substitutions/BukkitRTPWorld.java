@@ -13,7 +13,6 @@ import org.bukkit.block.Biome;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.Waterlogged;
-import org.bukkit.generator.BiomeProvider;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
@@ -34,17 +33,7 @@ public final class BukkitRTPWorld implements RTPWorld {
                 : world.getBiome(x,y,z).name();
     };
     private static @NotNull Function<RTPWorld, Set<String>> getBiomes
-            = (rtpWorld) -> {
-        if(rtpWorld instanceof BukkitRTPWorld && RTP.serverAccessor.getServerIntVersion() > 16) {
-            World world1 = ((BukkitRTPWorld) rtpWorld).world;
-            BiomeProvider biomeProvider = world1.getBiomeProvider();
-            if(biomeProvider!=null) {
-                List<Biome> biomes = biomeProvider.getBiomes(world1);
-                return biomes.stream().map(Enum::name).collect(Collectors.toSet());
-            }
-        }
-        return Arrays.stream(Biome.values()).map(biome -> biome.name().toUpperCase()).collect(Collectors.toSet());
-    };
+            = (rtpWorld) -> Arrays.stream(Biome.values()).map(biome -> biome.name().toUpperCase()).collect(Collectors.toSet());
 
     public final Map<List<Integer>, Map.Entry<Chunk, Long>> chunkMap = new ConcurrentHashMap<>();
     public final Map<List<Integer>, List<CompletableFuture<Chunk>>> chunkLoads = new ConcurrentHashMap<>();

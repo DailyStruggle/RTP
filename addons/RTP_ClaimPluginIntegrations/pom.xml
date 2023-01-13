@@ -99,9 +99,9 @@
         <dependency>
             <groupId>io.github.dailystruggle</groupId>
             <artifactId>RTP</artifactId>
-            <version>2.0.1</version>
+            <version>2.0.2</version>
             <scope>system</scope>
-            <systemPath>${project.basedir}/../../target/original-RTP-2.0.1.jar</systemPath>
+            <systemPath>${project.basedir}/../../target/original-RTP-2.0.2.jar</systemPath>
         </dependency>
         <dependency>
             <groupId>com.sk89q.worldguard</groupId>
