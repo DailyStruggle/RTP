@@ -4,3 +4,4 @@ main: io.github.dailystruggle.rtpmixedseedfix.RTPMixedSeedFix
 api-version: 1.19
 authors: [ leaf26 ]
 description: use chunk biome lookup instead of world biome lookup
+depend: [ RTP ]
