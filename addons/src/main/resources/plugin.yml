@@ -1,6 +1,0 @@
-name: RTP_iris_integration
-version: '${project.version}'
-main: io.github.dailystruggle.rtp_iris_integration.RTP_iris_integration
-api-version: 1.15
-authors: [leaf26]
-description: swap some bukkit references for iris world gen references
