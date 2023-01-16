@@ -455,7 +455,6 @@ public class SendMessage {
         //todo: if a null player doesn't work with another PAPI import, blame that import for not verifying its inputs.
         text = PAPIChecker.fillPlaceholders(player, text);
 
-
         text = ChatColor.translateAlternateColorCodes('&', text);
         text = Hex2Color(text);
         return text;
@@ -485,6 +484,8 @@ public class SendMessage {
 
         //check PAPI exists and fill remaining PAPI placeholders
         //todo: if a null player doesn't work with another PAPI import, blame that import for not verifying its inputs.
+        text = PAPIChecker.fillPlaceholders(player, text);
+
         text = ChatColor.translateAlternateColorCodes('&', text);
         text = Hex2Color(text);
         return text;

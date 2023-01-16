@@ -9,6 +9,7 @@ import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.spigotListeners.*;
 import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.ChunkyBorderChecker;
+import io.github.dailystruggle.rtp.bukkit.tools.softdepends.PAPI_expansion;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.VaultChecker;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -170,6 +171,9 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
         }
 
+        if(Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
+            new PAPI_expansion().register();
+        }
     }
 
     @Override
