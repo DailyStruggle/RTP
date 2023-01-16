@@ -6,8 +6,6 @@ worldBorderOverride: false
 shape:
   #shape of bounds
   # each shape may use different optional input parameters, so update accordingly
-  #todo: update by command
-  #todo: write according to type in region map
   name: "CIRCLE"
   #what selection adjustment method to use
   # ACCUMULATE - accumulate all bad sectors up to the initial selection (even distribution, slow at large radii)
@@ -38,7 +36,7 @@ vert:
   #initial length to adjust
   step: 16
   #ensure above ground by checking light level
-  requireSkyLight: true
+  requireSkyLight: false
 #check rtp.regions.[region] node on command
 requirePermission: false
 #if no perms, try this one
