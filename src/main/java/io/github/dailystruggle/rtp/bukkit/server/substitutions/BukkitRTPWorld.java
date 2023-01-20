@@ -168,8 +168,19 @@ public final class BukkitRTPWorld implements RTPWorld {
     public void platform(RTPLocation rtpLocation) {
         int version = RTP.serverAccessor.getServerIntVersion();
 
+        World world = Bukkit.getWorld(rtpLocation.world().name());
+        if(world == null) return;
+
+        if(!world.isChunkLoaded(rtpLocation.x()/16,rtpLocation.z()/16)) {
+            if(!Bukkit.isPrimaryThread()) {
+                Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),() -> platform(rtpLocation));
+                return;
+            }
+        }
+
+
         Location location = new Location(
-                Bukkit.getWorld(rtpLocation.world().name()),
+                world,
                 rtpLocation.x(),
                 rtpLocation.y(),
                 rtpLocation.z());
@@ -185,8 +196,8 @@ public final class BukkitRTPWorld implements RTPWorld {
         if (chunkLongPair == null) throw new IllegalStateException();
 
         Chunk chunk = chunkLongPair.getKey();
-        if (chunk == null) throw new IllegalStateException();
-        if (!chunk.isLoaded()) throw new IllegalStateException();
+        if (chunk == null) chunk = location.getChunk();
+        if (!chunk.isLoaded()) chunk.load();
 
         Block airBlock = location.getBlock();
         Material air = (airBlock.isLiquid() || airBlock.getType().isSolid()) ? Material.AIR : airBlock.getType();
