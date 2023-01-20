@@ -7,24 +7,18 @@ import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
+import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPBlock;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPChunk;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
-import io.github.dailystruggle.rtp.common.tools.ChunkyRTPShape;
-import org.popcraft.chunky.ChunkyProvider;
-import org.popcraft.chunky.Selection;
-import org.popcraft.chunky.shape.Shape;
-import org.popcraft.chunky.shape.ShapeFactory;
 
 import java.math.BigInteger;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 public class FillTask extends RTPRunnable {
@@ -41,7 +35,6 @@ public class FillTask extends RTPRunnable {
     private final Semaphore completionGuard = new Semaphore(1);
     private final List<CompletableFuture<RTPChunk>> chunks = new ArrayList<>();
     private final Semaphore testsGuard = new Semaphore(1);
-    private final AtomicReference<List<CompletableFuture<Boolean>>> tests = new AtomicReference<>(new ArrayList<>());
     public AtomicBoolean pause = new AtomicBoolean(false);
 
     public FillTask(Region region, long start) {
@@ -82,7 +75,6 @@ public class FillTask extends RTPRunnable {
         isRunning.set(true);
         if (pause.get() || isCancelled() || fillIncrement.get() <= 0) return;
 
-
         long timingStart = System.currentTimeMillis();
 
         MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
@@ -97,18 +89,6 @@ public class FillTask extends RTPRunnable {
             }
 
             if (shape.isKnownBad(pos)) {
-                try {
-                    completionGuard.acquire();
-                    long l = completionCounter.incrementAndGet();
-                    if (pos == range - 1 || l == limit) {
-                        done.complete(true);
-                    }
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                    done.complete(false);
-                } finally {
-                    completionGuard.release();
-                }
                 continue;
             }
 
@@ -187,98 +167,93 @@ public class FillTask extends RTPRunnable {
 
     public CompletableFuture<Boolean> testPos(Region region, final long pos) {
         Set<String> defaultBiomes;
+
+        ConfigParser<PerformanceKeys> performance = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
         ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
-        Object configBiomes = safety.getConfigValue(SafetyKeys.biomes, null);
-        if (configBiomes instanceof Collection) {
-            boolean whitelist;
-            Object configValue = safety.getConfigValue(SafetyKeys.biomeWhitelist, false);
-            if (configValue instanceof Boolean) whitelist = (Boolean) configValue;
-            else whitelist = Boolean.parseBoolean(configValue.toString());
+        Object o;
+        o = safety.getConfigValue(SafetyKeys.biomeWhitelist, false);
+        boolean whitelist = (o instanceof Boolean) ? (Boolean) o : Boolean.parseBoolean(o.toString());
 
-            Set<String> collect = ((Collection<?>) configBiomes).stream().map(Object::toString).collect(Collectors.toSet());
-
-            defaultBiomes = whitelist
-                    ? collect
-                    : RTP.serverAccessor.getBiomes(region.getWorld()).stream().filter(s -> !collect.contains(s)).collect(Collectors.toSet());
-        } else defaultBiomes = RTP.serverAccessor.getBiomes(region.getWorld());
-
-        CompletableFuture<Boolean> res = new CompletableFuture<>();
-        try {
-            testsGuard.acquire();
-            tests.get().add(res);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        } finally {
-            testsGuard.release();
+        o = safety.getConfigValue(SafetyKeys.biomes, null);
+        List<String> biomeList = (o instanceof List) ? (List<String>) o : null;
+        Set<String> biomeSet = (biomeList == null)
+                ? new HashSet<>()
+                : biomeList.stream().map(String::toUpperCase).collect(Collectors.toSet());
+        if (whitelist) {
+            defaultBiomes = biomeSet;
+        } else {
+            Set<String> biomes = RTP.serverAccessor.getBiomes(region.getWorld());
+            Set<String> set = new HashSet<>();
+            for (String s : biomes) {
+                if (!biomeSet.contains(s.toUpperCase())) {
+                    set.add(s);
+                }
+            }
+            defaultBiomes = set;
         }
 
-
         MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
-        RTPWorld world = region.getWorld();
+        if(shape == null) return CompletableFuture.completedFuture(false);
+
         VerticalAdjustor<?> vert = region.getVert();
+        if(vert == null) return CompletableFuture.completedFuture(false);
+
+        o = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
+        Set<String> unsafeBlocks = (o instanceof Collection) ? ((Collection<?>) o)
+                .stream().map(o1 -> o1.toString().toUpperCase()).collect(Collectors.toSet())
+                : new HashSet<>();
+
+        int safetyRadius = safety.getNumber(SafetyKeys.safetyRadius, 0).intValue();
+        safetyRadius = Math.min(safetyRadius, 7);
+
+        RTPWorld world = region.getWorld();
+
+        boolean biomeRecall = Boolean.parseBoolean(performance.getConfigValue(PerformanceKeys.biomeRecall, false).toString());
 
         int[] select = shape.locationToXZ(pos);
 
-        String initialBiome = world.getBiome(select[0] * 16, (vert.maxY() + vert.minY()) / 2, select[1] * 16);
+        String currBiome = world.getBiome(select[0] * 16 + 7, (vert.maxY() + vert.minY()) / 2, select[1] * 16 + 7);
 
-        if(!defaultBiomes.contains(initialBiome)) {
-            res.complete(false);
-
-            ConfigParser<PerformanceKeys> performance = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
-            boolean biomeRecall = Boolean.parseBoolean(performance.getConfigValue(PerformanceKeys.biomeRecall, false).toString());
+        if(!defaultBiomes.contains(currBiome)) {
             if (biomeRecall) {
                 shape.addBadLocation(pos);
+                return CompletableFuture.completedFuture(false);
             }
-            return res;
         }
 
-        boolean isInside = true;
-        try {
-            isInside = RTP.serverAccessor.getWorldBorder(world.name()).isInside()
-                    .apply(new RTPLocation(world, select[0] * 16, (vert.maxY() - vert.minY()) / 2 + vert.minY(), select[1] * 16));
-        } catch (IllegalStateException ignored) {
-
+        WorldBorder border = RTP.serverAccessor.getWorldBorder(world.name());
+        if (!border.isInside().apply(new RTPLocation(world, select[0] * 16, (vert.maxY() + vert.minY()) / 2, select[1] * 16))) {
+            shape.addBadLocation(pos);
+            return CompletableFuture.completedFuture(false);
         }
 
-        if (isInside && shape instanceof ChunkyRTPShape) {
-            ChunkyRTPShape chunkyRTPShape = (ChunkyRTPShape) shape;
-            Selection.Builder builder = Selection.builder(ChunkyProvider.get(), null);
-            builder.centerX(chunkyRTPShape.getNumber(RectangleParams.centerX, 0).doubleValue());
-            builder.centerZ(chunkyRTPShape.getNumber(RectangleParams.centerZ, 0).doubleValue());
-
-            builder.radius(chunkyRTPShape.getNumber(RectangleParams.width, 256).doubleValue());
-            builder.radiusX(chunkyRTPShape.getNumber(RectangleParams.width, 256).doubleValue());
-            builder.radiusZ(chunkyRTPShape.getNumber(RectangleParams.height, 256).doubleValue());
-
-            builder.shape(chunkyRTPShape.chunkyShapeName);
-            Shape shape1 = ShapeFactory.getShape(builder.build());
-
-            if (!shape1.isBounding(select[0], select[1])) isInside = false;
-        }
-
-        if (!isInside || isCancelled() || pause.get()) {
-            res.complete(false);
-            return res;
+        if (isCancelled() || pause.get()) {
+            return CompletableFuture.completedFuture(false);
         }
 
         CompletableFuture<RTPChunk> cfChunk = world.getChunkAt(select[0], select[1]);
         chunks.add(cfChunk);
 
+        CompletableFuture<Boolean> res = new CompletableFuture<>();
+        int finalSafetyRadius = safetyRadius;
         cfChunk.thenAccept(chunk -> {
             if (isCancelled()) return;
             RTPLocation location = vert.adjust(chunk);
             if (location == null) {
+                if(biomeRecall) shape.addBadLocation(pos);
                 res.complete(false);
                 chunk.unload();
                 return;
             }
 
-            String currBiome = world.getBiome(location.x(), location.y(), location.z());
-
-            if(!defaultBiomes.contains(currBiome)) {
-                res.complete(false);
-                chunk.unload();
-                return;
+            String currBiome1 = world.getBiome(location.x(), location.y(), location.z());
+            if(!defaultBiomes.contains(currBiome1)) {
+                if(biomeRecall) {
+                    shape.addBadLocation(pos);
+                    res.complete(false);
+                    chunk.unload();
+                    return;
+                }
             }
 
             boolean pass = location.y() < vert.maxY();
@@ -289,22 +264,15 @@ public class FillTask extends RTPRunnable {
                 return;
             }
 
-            ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
-
-            Object o = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
-            Set<String> unsafeBlocks = ((o instanceof Collection) ? (Collection<?>) o : new ArrayList<>())
-                    .stream().map(o1 -> o1.toString().toUpperCase()).collect(Collectors.toSet());
-
-            int safetyRadius = safety.getNumber(SafetyKeys.safetyRadius, 0).intValue();
-            safetyRadius = Math.max(safetyRadius, 7);
-
             //todo: waterlogged check
             RTPBlock block;
-            for (int x = location.x() - safetyRadius; x < location.x() + safetyRadius && pass; x++) {
-                for (int z = location.z() - safetyRadius; z < location.z() + safetyRadius && pass; z++) {
-                    for (int y = location.y() - safetyRadius; y < location.y() + safetyRadius && pass; y++) {
+            for (int x = location.x() - finalSafetyRadius; x < location.x() + finalSafetyRadius && pass; x++) {
+                for (int z = location.z() - finalSafetyRadius; z < location.z() + finalSafetyRadius && pass; z++) {
+                    for (int y = location.y() - finalSafetyRadius; y < location.y() + finalSafetyRadius && pass; y++) {
                         block = chunk.getBlockAt(x, y, z);
-                        if (unsafeBlocks.contains(block.getMaterial())) pass = false;
+                        if (unsafeBlocks.contains(block.getMaterial())) {
+                            pass = false;
+                        }
                     }
                 }
             }
@@ -315,11 +283,11 @@ public class FillTask extends RTPRunnable {
                 res.complete(false);
                 return;
             }
+
             if (pass) pass = Region.checkGlobalRegionVerifiers(location);
 
             if (pass) {
-                if (Boolean.parseBoolean(perf.getConfigValue(PerformanceKeys.biomeRecall, false).toString()))
-                    shape.addBiomeLocation(pos, currBiome);
+                if (biomeRecall) shape.addBiomeLocation(pos, currBiome1);
                 res.complete(true);
             } else {
                 shape.addBadLocation(pos);
@@ -342,14 +310,6 @@ public class FillTask extends RTPRunnable {
                 chunks.forEach(rtpChunkCompletableFuture -> rtpChunkCompletableFuture.cancel(true));
             } catch (CancellationException | CompletionException ignored) {
 
-            }
-            try {
-                testsGuard.acquire();
-                tests.get().forEach(test -> test.cancel(true));
-            } catch (CancellationException | CompletionException | InterruptedException ignored) {
-
-            } finally {
-                testsGuard.release();
             }
         }
         super.setCancelled(cancelled);

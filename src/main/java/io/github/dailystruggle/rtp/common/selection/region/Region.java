@@ -327,6 +327,7 @@ public class Region extends FactoryValue<RegionKeys> {
         boolean defaultBiomes = false;
         ConfigParser<PerformanceKeys> performance = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
         ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+        ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
         Object o;
         if (biomeNames == null || biomeNames.size() == 0) {
             defaultBiomes = true;
@@ -334,7 +335,7 @@ public class Region extends FactoryValue<RegionKeys> {
             boolean whitelist = (o instanceof Boolean) ? (Boolean) o : Boolean.parseBoolean(o.toString());
 
             o = safety.getConfigValue(SafetyKeys.biomes, null);
-            List<String> biomeList = (o instanceof List) ? (List<String>) o : null;
+            List<String> biomeList = (o instanceof List) ? ((List<?>) o).stream().map(Object::toString).collect(Collectors.toList()) : null;
             Set<String> biomeSet = (biomeList == null)
                     ? new HashSet<>()
                     : biomeList.stream().map(String::toUpperCase).collect(Collectors.toSet());
@@ -352,7 +353,6 @@ public class Region extends FactoryValue<RegionKeys> {
             }
         }
 
-        ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
         boolean verbose = true;
         if (logging != null) {
             o = logging.getConfigValue(LoggingKeys.teleport, false);
@@ -370,8 +370,8 @@ public class Region extends FactoryValue<RegionKeys> {
         if (vert == null) return null;
 
         o = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
-        Set<String> unsafeBlocks = (o instanceof Collection) ? ((Collection<String>) o)
-                .stream().map(String::toUpperCase).collect(Collectors.toSet())
+        Set<String> unsafeBlocks = (o instanceof Collection) ? ((Collection<?>) o)
+                .stream().map(o1 -> o1.toString().toUpperCase()).collect(Collectors.toSet())
                 : new HashSet<>();
 
         int safetyRadius = safety.getNumber(SafetyKeys.safetyRadius, 0).intValue();
@@ -381,6 +381,7 @@ public class Region extends FactoryValue<RegionKeys> {
         maxAttemptsBase = Math.max(maxAttemptsBase, 1);
         long maxAttempts = maxAttemptsBase;
         long maxBiomeChecks = maxBiomeChecksPerGen * maxAttempts;
+        if(!defaultBiomes) maxBiomeChecks *= 10;
         long biomeChecks = 0L;
 
         RTPWorld world = getWorld();
@@ -414,35 +415,35 @@ public class Region extends FactoryValue<RegionKeys> {
                             biomes.addAll(map.entrySet());
                         }
                     }
+//                    RTP.log(Level.CONFIG,"biome input - " + biomes);
                     Map.Entry<Long, Long> entry;
                     if(biomes.size()>0) {
                         int nextInt = ThreadLocalRandom.current().nextInt(biomes.size());
                         entry = biomes.get(nextInt);
+//                        RTP.log(Level.CONFIG,"target selected - " + entry.toString());
                         l = entry.getKey() + ThreadLocalRandom.current().nextLong(entry.getValue());
+//                        RTP.log(Level.CONFIG,"final selection - " + l);
                     }
                     else l = memoryShape.rand();
                 } else {
                     l = memoryShape.rand();
                 }
 
-
                 select = memoryShape.locationToXZ(l);
+
 //                if (verbose) selections.add(new AbstractMap.SimpleEntry<>((long) selections.size(), l));
             } else {
                 select = shape.select();
 //                if (verbose) selections.add(new AbstractMap.SimpleEntry<>((long) select[0], (long) select[1]));
             }
 
-            String currBiome = world.getBiome(select[0], (vert.maxY() + vert.minY()) / 2, select[1]);
+            String currBiome = world.getBiome(select[0] * 16 + 7, (vert.minY() + vert.maxY()) / 2, select[1] * 16 + 7);
 
             for (; biomeChecks < maxBiomeChecks && !biomeNames.contains(currBiome); biomeChecks++, maxAttempts++, i++) {
                 if (shape instanceof MemoryShape) {
-                    if (defaultBiomes && biomeRecall) {
-                        ((MemoryShape<?>) shape).addBadLocation(l);
-                    }
                     MemoryShape<?> memoryShape = (MemoryShape<?>) shape;
-                    for(String b : biomeNames) {
-                        memoryShape.removeBiomeLocation(l, b);
+                    if (defaultBiomes && biomeRecall) {
+                        memoryShape.addBadLocation(l);
                     }
                     if (biomeRecall && !defaultBiomes) {
                         List<Map.Entry<Long, Long>> biomes = new ArrayList<>();
@@ -472,7 +473,7 @@ public class Region extends FactoryValue<RegionKeys> {
                 }
                 biomeSpecificFails.putIfAbsent(currBiome, 0L);
                 biomeSpecificFails.put(currBiome, biomeSpecificFails.get(currBiome) + 1);
-                currBiome = world.getBiome(select[0], (vert.maxY() + vert.minY()) / 2, select[1]);
+                currBiome = world.getBiome(select[0] * 16 + 7, (vert.minY() + vert.maxY()) / 2, select[1] * 16 + 7);
                 biomeFails++;
             }
             if (biomeChecks >= maxBiomeChecks) return new AbstractMap.SimpleEntry<>(null, i);
@@ -483,7 +484,7 @@ public class Region extends FactoryValue<RegionKeys> {
             }
 
             WorldBorder border = RTP.serverAccessor.getWorldBorder(world.name());
-            if (!border.isInside().apply(new RTPLocation(world, select[0] * 16, (vert.maxY() - vert.minY()) / 2 + vert.minY(), select[1] * 16))) {
+            if (!border.isInside().apply(new RTPLocation(world, select[0] * 16, (vert.maxY() + vert.minY()) / 2, select[1] * 16))) {
                 maxAttempts++;
                 worldBorderFails++;
                 if (worldBorderFails > 1000) {
@@ -529,7 +530,7 @@ public class Region extends FactoryValue<RegionKeys> {
                 continue;
             }
 
-            boolean pass = location != null;
+            boolean pass = true;
 
             //todo: waterlogged check
             RTPBlock block;
@@ -561,7 +562,6 @@ public class Region extends FactoryValue<RegionKeys> {
             } else {
                 if (shape instanceof MemoryShape) {
                     ((MemoryShape<?>) shape).addBadLocation(l);
-                    ((MemoryShape<?>) shape).removeBiomeLocation(l, currBiome);
                 }
                 location = null;
             }
@@ -673,7 +673,8 @@ public class Region extends FactoryValue<RegionKeys> {
         if (locAssChunks.containsKey(location)) {
             ChunkSet chunkSet = locAssChunks.get(location);
             if (chunkSet.chunks.size() >= sz) return chunkSet;
-//            chunkSet.keep(false);
+            chunkSet.keep(false);
+            locAssChunks.remove(location);
         }
 
         int cx = location.x();
