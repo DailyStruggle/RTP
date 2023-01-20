@@ -261,6 +261,10 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
             badLocations.remove(upper.getKey());
         }
 
+        for(String biome : biomeLocations.keySet()) {
+            removeBiomeLocation(location,biome);
+        }
+
         badLocationSum.incrementAndGet();
     }
 

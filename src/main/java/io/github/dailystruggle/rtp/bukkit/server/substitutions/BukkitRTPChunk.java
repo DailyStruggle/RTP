@@ -1,10 +1,12 @@
 package io.github.dailystruggle.rtp.bukkit.server.substitutions;
 
+import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPBlock;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPChunk;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
+import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 
 import java.util.Objects;
@@ -53,8 +55,8 @@ public final class BukkitRTPChunk implements RTPChunk {
 
     @Override
     public void unload() {
-//        if (Bukkit.isPrimaryThread()) chunk.unload(false);
-//        else Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(), () -> chunk.unload(false));
+        if (Bukkit.isPrimaryThread()) chunk.unload(false);
+        else Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(), () -> chunk.unload(false));
     }
 
     public Chunk chunk() {
