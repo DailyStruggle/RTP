@@ -114,14 +114,15 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
         }
 
         for (int i = minY; i < maxY; i++) {
+            RTPBlock block0 = chunk.getBlockAt(7, i - 1, 7);
             RTPBlock block1 = chunk.getBlockAt(7, i, 7);
             RTPBlock block2 = chunk.getBlockAt(7, i + 1, 7);
             int skylight = 15;
             if (requireSkyLight) skylight = block2.skyLight();
-            if (block1.isAir() && block2.isAir() && skylight > 7
+            if (!block0.isAir() && block1.isAir() && block2.isAir() && skylight > 7
                     && !unsafeBlocks.contains(block2.getMaterial())
                     && !unsafeBlocks.contains(block1.getMaterial())
-                    && !unsafeBlocks.contains(chunk.getBlockAt(7, i - 1, 7).getMaterial())) {
+                    && !unsafeBlocks.contains(block0.getMaterial())) {
                 return block1.getLocation();
             }
         }

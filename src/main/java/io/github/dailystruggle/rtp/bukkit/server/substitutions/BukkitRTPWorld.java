@@ -4,6 +4,7 @@ import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPChunk;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
@@ -18,19 +19,64 @@ import org.jetbrains.annotations.NotNull;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public final class BukkitRTPWorld implements RTPWorld {
+    private static final AtomicBoolean chunkBiomes = new AtomicBoolean(false);
     private static Function<Location, String> getBiome = location -> {
         World world = Objects.requireNonNull(location.getWorld());
         int x = location.getBlockX();
         int y = location.getBlockY();
         int z = location.getBlockZ();
 
-        return (RTP.serverAccessor.getServerIntVersion() < 17)
+        int chunkX = x/16;
+        int chunkZ = z/16;
+
+        int bx = x % 16;
+        int bz = z % 16;
+        if (bx < 0) bx += 16;
+        if (bz < 0) bz += 16;
+
+        if(RTP.serverAccessor.getServerIntVersion()<13 || chunkBiomes.get()) {
+            Region.maxBiomeChecksPerGen = 2;
+
+            Future<Chunk> future;
+            if(RTP.serverAccessor.getServerIntVersion()>=13) {
+                future = PaperLib.getChunkAtAsyncUrgently(world,chunkX,chunkZ,true);
+            }
+            else {
+                if(Bukkit.isPrimaryThread()) future = CompletableFuture.completedFuture(world.getChunkAt(chunkX, chunkZ));
+                else future = Bukkit.getScheduler().callSyncMethod(RTPBukkitPlugin.getInstance(),() -> world.getChunkAt(chunkX,chunkZ));
+            }
+
+            try {
+                Chunk chunk = future.get();
+                return chunk.getBlock(bx,y,bz).getBiome().name().toUpperCase();
+            } catch (InterruptedException | ExecutionException e) {
+                e.printStackTrace();
+            }
+        }
+
+        String initialBiome = (RTP.serverAccessor.getServerIntVersion() < 17)
                 ? world.getBiome(x, y).name()
-                : world.getBiome(x,y,z).name();
+                : world.getBiome(x, y, z).name();
+
+        if(world.isChunkLoaded(chunkX,chunkZ)) {
+            Chunk chunkAt = world.getChunkAt(chunkX, chunkZ);
+            String chunkBiome = chunkAt.getBlock(bx, y, bz).getBiome().name().toUpperCase();
+            if(!chunkBiome.equals(initialBiome)) {
+                RTP.log(Level.WARNING, "[RTP] detected biome mismatch. Using localized lookup instead");
+                chunkBiomes.set(true);
+            }
+            return chunkBiome;
+        }
+
+        return initialBiome;
     };
     private static @NotNull Function<RTPWorld, Set<String>> getBiomes
             = (rtpWorld) -> Arrays.stream(Biome.values()).map(biome -> biome.name().toUpperCase()).collect(Collectors.toSet());

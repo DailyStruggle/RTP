@@ -343,7 +343,7 @@ public class SendMessage {
         if (sender instanceof Player) sendMessage((Player) sender, message);
         else {
             message = format(Bukkit.getOfflinePlayer(CommandsAPI.serverId), message);
-            if (RTP.serverAccessor.getServerIntVersion() >= 12) {
+            if (RTP.serverAccessor.getServerIntVersion() > 12) {
                 BaseComponent[] components = TextComponent.fromLegacyText(message);
                 sender.spigot().sendMessage(components);
             } else sender.sendMessage(message);
@@ -353,7 +353,7 @@ public class SendMessage {
     public static void sendMessage(Player player, String message) {
         if (message == null || message.isEmpty()) return;
         message = format(player, message);
-        if (RTP.serverAccessor.getServerIntVersion() >= 12) {
+        if (RTP.serverAccessor.getServerIntVersion() > 12) {
             BaseComponent[] components = TextComponent.fromLegacyText(message);
             player.spigot().sendMessage(components);
         } else player.sendMessage(message);
@@ -368,7 +368,7 @@ public class SendMessage {
 
         message = format(player, message);
 
-        if (RTP.serverAccessor.getServerIntVersion() >= 12) {
+        if (RTP.serverAccessor.getServerIntVersion() > 12) {
             BaseComponent[] textComponents = TextComponent.fromLegacyText(message);
 
             if (!hover.equals("")) {
@@ -522,24 +522,37 @@ public class SendMessage {
 
         message = format(null, message);
 
+        if(RTP.serverAccessor.getServerIntVersion() <= 12) message = ChatColor.stripColor(message);
 
         if (level.equals(Level.INFO)) {
             String[] split = message.split("\n");
             for (String s : split) {
-                BaseComponent[] baseComponents = TextComponent.fromLegacyText(ChatColor.WHITE + s);
-                Bukkit.getConsoleSender().spigot().sendMessage(baseComponents);
+                s = ChatColor.WHITE + s;
+                if(RTP.serverAccessor.getServerIntVersion() > 12) {
+                    BaseComponent[] baseComponents = TextComponent.fromLegacyText(s);
+                    Bukkit.getConsoleSender().spigot().sendMessage(baseComponents);
+                }
+                else Bukkit.getLogger().log(Level.INFO,s);
             }
         } else if (level.equals(Level.CONFIG)) {
             String[] split = message.split("\n");
             for (String s : split) {
-                BaseComponent[] baseComponents = TextComponent.fromLegacyText(ChatColor.GREEN + s);
-                Bukkit.getConsoleSender().spigot().sendMessage(baseComponents);
+                s = ChatColor.GREEN + s;
+                if(RTP.serverAccessor.getServerIntVersion() > 12) {
+                    BaseComponent[] baseComponents = TextComponent.fromLegacyText(s);
+                    Bukkit.getConsoleSender().spigot().sendMessage(baseComponents);
+                }
+                else Bukkit.getLogger().log(Level.INFO,s);
             }
         } else if (level.equals(Level.WARNING)) {
             String[] split = message.split("\n");
             for (String s : split) {
-                BaseComponent[] baseComponents = TextComponent.fromLegacyText(ChatColor.YELLOW + s);
-                Bukkit.getConsoleSender().spigot().sendMessage(baseComponents);
+                s = ChatColor.YELLOW + s;
+                if(RTP.serverAccessor.getServerIntVersion() > 12) {
+                    BaseComponent[] baseComponents = TextComponent.fromLegacyText(s);
+                    Bukkit.getConsoleSender().spigot().sendMessage(baseComponents);
+                }
+                else Bukkit.getLogger().log(Level.WARNING,s);
             }
         } else {
             Logger logger = Bukkit.getLogger();
