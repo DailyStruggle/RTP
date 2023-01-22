@@ -536,7 +536,7 @@ public class Region extends FactoryValue<RegionKeys> {
             RTPBlock block;
             for (int x = location.x() - safetyRadius; x < location.x() + safetyRadius && pass; x++) {
                 for (int z = location.z() - safetyRadius; z < location.z() + safetyRadius && pass; z++) {
-                    for (int y = location.y() - safetyRadius; y < location.y() + safetyRadius && pass; y++) {
+                    for (int y = location.y() - safetyRadius; (y < location.y() + safetyRadius) && pass; y++) {
                         block = chunk.getBlockAt(x, y, z);
                         String material = block.getMaterial();
                         if (unsafeBlocks.contains(material)) {

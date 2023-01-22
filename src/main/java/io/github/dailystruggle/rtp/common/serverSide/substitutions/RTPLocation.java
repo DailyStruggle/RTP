@@ -44,8 +44,8 @@ public final class RTPLocation implements Cloneable {
     }
 
     public CompletableFuture<RTPBlock> getBlock() {
-        int cx = (x > 0) ? x % 16 : x % 16 - 1;
-        int cz = (z > 0) ? z % 16 : z % 16 - 1;
+        int cx = (x > 0) ? x / 16 : x / 16 - 1;
+        int cz = (z > 0) ? z / 16 : z / 16 - 1;
         CompletableFuture<RTPChunk> chunkAt = world.getChunkAt(cx, cz);
         return chunkAt.thenApply(chunk -> chunk.getBlockAt(this));
     }
