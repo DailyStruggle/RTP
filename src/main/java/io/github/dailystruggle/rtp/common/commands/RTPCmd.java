@@ -256,6 +256,8 @@ public interface RTPCmd extends BaseRTPCmd {
                     data.cost += eco.getNumber(EconomyKeys.paramsPrice, 0.0).doubleValue();
                 if (biomeList != null) data.cost += eco.getNumber(EconomyKeys.biomePrice, 0.0).doubleValue();
 
+                data.cost += region.getNumber(RegionKeys.price,0.0d).doubleValue();
+
                 if (economy.bal(senderId) - data.cost < floor) {
                     String s = langParser.getConfigValue(MessagesKeys.notEnoughMoney, "").toString();
                     s = s.replace("[money]", String.valueOf(price));

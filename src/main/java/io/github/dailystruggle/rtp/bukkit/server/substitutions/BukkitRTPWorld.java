@@ -34,8 +34,8 @@ public final class BukkitRTPWorld implements RTPWorld {
         int y = location.getBlockY();
         int z = location.getBlockZ();
 
-        int chunkX = x/16;
-        int chunkZ = z/16;
+        int chunkX = (x>0) ? x/16 : x/16-1;
+        int chunkZ = (z>0) ? z/16 : z/16-1;
 
         int bx = x % 16;
         int bz = z % 16;
@@ -68,7 +68,8 @@ public final class BukkitRTPWorld implements RTPWorld {
 
         if(world.isChunkLoaded(chunkX,chunkZ)) {
             Chunk chunkAt = world.getChunkAt(chunkX, chunkZ);
-            String chunkBiome = chunkAt.getBlock(bx, y, bz).getBiome().name().toUpperCase();
+            Block block = chunkAt.getBlock(bx, y, bz);
+            String chunkBiome = block.getBiome().name().toUpperCase();
             if(!chunkBiome.equals(initialBiome)) {
                 RTP.log(Level.WARNING, "[RTP] detected biome mismatch. Using localized lookup instead");
                 chunkBiomes.set(true);
