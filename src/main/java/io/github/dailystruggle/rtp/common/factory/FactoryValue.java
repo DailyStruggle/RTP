@@ -148,6 +148,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
         } else if (resObj instanceof Character) {
             res = Integer.parseInt(((Character) resObj).toString());
         }
+        else throw new IllegalArgumentException("[RTP] " + key.name() + ":NaN");
         data.put(key, res);
         return res;
     }

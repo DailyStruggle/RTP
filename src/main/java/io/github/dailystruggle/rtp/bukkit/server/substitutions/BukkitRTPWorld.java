@@ -326,10 +326,8 @@ public final class BukkitRTPWorld implements RTPWorld {
 
     @Override
     public boolean equals(Object obj) {
-        if (obj == this) return true;
-        if (obj == null || obj.getClass() != this.getClass()) return false;
-        BukkitRTPWorld that = (BukkitRTPWorld) obj;
-        return Objects.equals(this.world, that.world);
+        if (!(obj instanceof RTPWorld)) return false;
+        return Objects.equals(this.id(), ((RTPWorld) obj).id());
     }
 
     @Override

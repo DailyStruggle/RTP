@@ -126,7 +126,7 @@ public class SelectionAPI {
         }
     }
 
-    public Region tempRegion(Map<String, String> regionParams,
+    public Region tempRegion(Map<String, Object> regionParams,
                              @Nullable String baseRegionName) {
         if (baseRegionName == null || baseRegionName.isEmpty() || !permRegionLookup.containsKey(baseRegionName))
             baseRegionName = "default";
@@ -134,7 +134,7 @@ public class SelectionAPI {
         EnumMap<RegionKeys, Object> data = baseRegion.getData();
         for (RegionKeys key : RegionKeys.values()) {
             if (regionParams.containsKey(key.name())) {
-                String val = regionParams.get(key.name());
+                Object val = regionParams.get(key.name());
                 data.put(key, val);
             }
         }
