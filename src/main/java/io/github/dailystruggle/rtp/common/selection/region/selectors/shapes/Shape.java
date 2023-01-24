@@ -62,4 +62,27 @@ public abstract class Shape<E extends Enum<E>> extends FactoryValue<E> {
     public Shape<E> clone() {
         return (Shape<E>) super.clone();
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if(!o.getClass().equals(getClass()) || !((Shape<?>) o).myClass.equals(myClass)) return false;
+        EnumMap<E, Object> data1 = getData();
+        EnumMap<E, Object> data2 = ((Shape<E>) o).getData();
+        for(Map.Entry<E,Object> entry : data1.entrySet()) {
+            E key = entry.getKey();
+            Object value = entry.getValue();
+            try {
+                Number number1 = getNumber(key, 0);
+                try {
+                    Number number2 = ((Shape<E>) o).getNumber(key, 0);
+                    if(number1.doubleValue()!=number2.doubleValue()) return false;
+                } catch (IllegalArgumentException ignored) {
+                    return false;
+                }
+            } catch (IllegalArgumentException ignored) {
+                if(!value.toString().equals(data2.get(key).toString())) return false;
+            }
+        }
+        return true;
+    }
 }

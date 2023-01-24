@@ -355,7 +355,7 @@ public class Region extends FactoryValue<RegionKeys> {
 
         boolean verbose = true;
         if (logging != null) {
-            o = logging.getConfigValue(LoggingKeys.teleport, false);
+            o = logging.getConfigValue(LoggingKeys.selection_failure, false);
             if (o instanceof Boolean) {
                 verbose = (Boolean) o;
             } else {
@@ -897,5 +897,16 @@ public class Region extends FactoryValue<RegionKeys> {
             if (cachePipeline.size() + locationQueue.size() < cacheCap + playerQueue.size())
                 cachePipeline.add(new Cache());
         }
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        if(!(other instanceof Region)) return false;
+        Region region = (Region) other;
+
+        if(!getShape().equals(region.getShape())) return false;
+        if(!getVert().equals(region.getVert())) return false;
+        if(!getWorld().equals(region.getWorld())) return false;
+        return Boolean.parseBoolean(region.data.get(RegionKeys.worldBorderOverride).toString()) == Boolean.parseBoolean(data.get(RegionKeys.worldBorderOverride).toString());
     }
 }
