@@ -353,7 +353,7 @@ public class Region extends FactoryValue<RegionKeys> {
             }
         }
 
-        boolean verbose = true;
+        boolean verbose = false;
         if (logging != null) {
             o = logging.getConfigValue(LoggingKeys.selection_failure, false);
             if (o instanceof Boolean) {
