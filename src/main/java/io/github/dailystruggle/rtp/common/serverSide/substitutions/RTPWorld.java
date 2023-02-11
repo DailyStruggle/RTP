@@ -25,4 +25,7 @@ public interface RTPWorld {
     boolean isForceLoaded(int cx, int cz);
 
     void save();
+
+    int getMaxHeight();
+    int getMinHeight();
 }

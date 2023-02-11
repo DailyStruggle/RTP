@@ -17,7 +17,7 @@ public class UpdateCmd extends BaseRTPCmdImpl {
     public UpdateCmd(@Nullable CommandsAPICommand parent) {
         super(parent);
 
-        RTP.getInstance().miscAsyncTasks.add(new RTPRunnable(this::addCommands, 20));
+        RTP.getInstance().miscAsyncTasks.add(new RTPRunnable(this::addCommands, 5));
     }
 
     @Override

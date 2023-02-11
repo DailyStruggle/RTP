@@ -139,8 +139,13 @@ public final class BukkitRTPWorld implements RTPWorld {
         } else if (RTP.serverAccessor.getServerIntVersion() < 13) {
             Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(), () -> res.complete(new BukkitRTPChunk(world.getChunkAt(cx, cz))));
         } else {
-//            Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),() -> res.complete(new BukkitRTPChunk(world.getChunkAt(cx,cz))));
-            CompletableFuture<Chunk> chunkAtAsync = PaperLib.getChunkAtAsyncUrgently(world, cx, cz, true);
+            CompletableFuture<Chunk> chunkAtAsync;
+            try {
+                chunkAtAsync = PaperLib.getChunkAtAsyncUrgently(world, cx, cz, true);
+            } catch (IllegalStateException exception) {
+                chunkAtAsync = new CompletableFuture<>();
+                Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),() -> res.complete(new BukkitRTPChunk(world.getChunkAt(cx,cz))));
+            }
 
             List<CompletableFuture<Chunk>> list = chunkLoads.get(xz);
             if (list == null) list = new ArrayList<>();
@@ -341,5 +346,13 @@ public final class BukkitRTPWorld implements RTPWorld {
         if (Bukkit.isPrimaryThread()) world.setChunkForceLoaded(cx, cz, forceLoaded);
         else
             Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(), () -> world.setChunkForceLoaded(cx, cz, forceLoaded));
+    }
+
+    public int getMaxHeight() {
+        return world.getMaxHeight();
+    }
+
+    public int getMinHeight() {
+        return world.getMinHeight();
     }
 }

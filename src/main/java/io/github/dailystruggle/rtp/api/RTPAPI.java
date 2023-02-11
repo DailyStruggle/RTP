@@ -172,6 +172,4 @@ public class RTPAPI {
         if(location == null || location.getKey() == null) return Optional.empty();
         return Optional.of(location.getKey());
     }
-
-    
 }
