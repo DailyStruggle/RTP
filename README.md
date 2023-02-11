@@ -10,7 +10,12 @@ The goal of this plugin is function over form,
  * region-based design, supporting any number of rtp regions per world
  * per-world and per-region configuration and teleport permissions
  * adjustment of region and world settings by command or by config file 
- * adjustment of all plugin messages in lang.yml
+ * adjustment of all plugin messages
+ 
+## Build Instructions
+This codebase was put together in Intellij IDEA. You can open the base directory as a project, trust the sources, and build as-is with maven.
+
+more detailed instructions can be found here - https://github.com/DailyStruggle/RTP/wiki/Compiling-and-Editing 
 
 ## Shapes
 The plugin has some pretty useful shapes by default - 
