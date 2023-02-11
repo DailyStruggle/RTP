@@ -9,6 +9,8 @@ public interface RTPChunk {
 
     RTPBlock getBlockAt(RTPLocation location);
 
+    RTPWorld getWorld();
+
     void keep(boolean keep);
 
     void unload();

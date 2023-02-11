@@ -17,6 +17,7 @@ import io.github.dailystruggle.rtp.common.commands.update.list.ListCmd;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
@@ -77,6 +78,67 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
             if (msg != null) msg = msg.replace("[filename]", factoryValue.name);
             RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId, msg);
 
+            if(parameterValues.containsKey("world")
+                    && configParser.myClass.equals(RegionKeys.class)
+                    && !parameterValues.containsKey("vert")) {
+                ConfigParser<RegionKeys> regionParser = (ConfigParser<RegionKeys>) configParser;
+
+                RTPWorld rtpWorld = RTP.serverAccessor.getRTPWorld(parameterValues.get("world").get(0));
+                if(rtpWorld!=null) {
+                    Object o = regionParser.getConfigValue(RegionKeys.vert,null);
+                    if(o instanceof ConfigurationSection) {
+                        ConfigurationSection section = (ConfigurationSection) o;
+                        String name = section.getString("name");
+                        String maxYStr = section.getString("maxY").replace(",",".");
+                        String minYStr = section.getString("minY").replace(",",".");
+
+                        try {
+                            int maxY = ((Number) Double.parseDouble(maxYStr)).intValue();
+
+                            int minY = ((Number) Double.parseDouble(minYStr)).intValue();
+
+                            parameterValues.put("vert", Collections.singletonList(name));
+                            if (rtpWorld.name().endsWith("_nether")) {
+                                maxY = Math.min(maxY, 127);
+                                parameterValues.put("requireskylight", Collections.singletonList(String.valueOf(false)));
+                            }
+                            maxY = Math.min(maxY, rtpWorld.getMaxHeight());
+
+                            if (maxY < minY) {
+                                minY = rtpWorld.getMinHeight();
+                            } else {
+                                minY = Math.max(minY, rtpWorld.getMinHeight());
+                            }
+
+                            parameterValues.put("miny", Collections.singletonList(String.valueOf(minY)));
+                            parameterValues.put("maxy", Collections.singletonList(String.valueOf(maxY)));
+                        } catch (IllegalArgumentException ignored) {
+
+                        }
+                    } else if(o instanceof VerticalAdjustor<?>) {
+                        VerticalAdjustor<?> vert = (VerticalAdjustor<?>) o;
+                        int maxY = vert.maxY();
+                        int minY = vert.minY();
+
+                        parameterValues.put("vert", Collections.singletonList(name));
+                        if (rtpWorld.name().endsWith("_nether")) {
+                            maxY = Math.min(maxY, 127);
+                            parameterValues.put("requireskylight", Collections.singletonList(String.valueOf(false)));
+                        }
+                        maxY = Math.min(maxY, rtpWorld.getMaxHeight());
+
+                        if (maxY < minY) {
+                            minY = rtpWorld.getMinHeight();
+                        } else {
+                            minY = Math.max(minY, rtpWorld.getMinHeight());
+                        }
+
+                        parameterValues.put("miny", Collections.singletonList(String.valueOf(minY)));
+                        parameterValues.put("maxy", Collections.singletonList(String.valueOf(maxY)));
+                    }
+                }
+            }
+
             for (Map.Entry<String, List<String>> e : parameterValues.entrySet()) {
                 String key = e.getKey();
                 Object value = e.getValue().get(0);
@@ -133,7 +195,7 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
                     VerticalAdjustor<?> vert = (VerticalAdjustor<?>) factory.get(value.toString());
                     if (vert == null) msgBadParameter(callerId, key, value.toString());
 
-                    EnumMap<?, Object> vertData = vert.getData();
+                    EnumMap<? extends Enum<?>, Object> vertData = vert.getData();
 
                     Map<String, Object> subParams = new HashMap<>();
                     subParams.put("name", vert.name);

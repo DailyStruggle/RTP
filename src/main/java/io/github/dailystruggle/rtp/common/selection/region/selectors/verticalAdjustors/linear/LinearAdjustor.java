@@ -53,11 +53,13 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
     @Override
     public @Nullable
     RTPLocation adjust(@NotNull RTPChunk chunk) {
-        RTPBlock resBlock;
+        if (chunk == null) return null;
 
         int maxY = getNumber(GenericVerticalAdjustorKeys.maxY, 320L).intValue();
         int minY = getNumber(GenericVerticalAdjustorKeys.minY, 0L).intValue();
         int dir = getNumber(GenericVerticalAdjustorKeys.direction, 0).intValue();
+
+        maxY = Math.min(maxY,chunk.getWorld().getMaxHeight());
 
         boolean requireSkyLight;
         Object o = getData().getOrDefault(GenericVerticalAdjustorKeys.requireSkyLight, false);

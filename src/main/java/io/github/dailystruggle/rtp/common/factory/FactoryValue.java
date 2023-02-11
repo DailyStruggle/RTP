@@ -96,8 +96,6 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
             if (keyStr == null) return;
             if (value == null) return;
 
-            if (language_mapping.containsKey(keyStr)) keyStr = language_mapping.get(keyStr).toString();
-
             try {
                 E key = Enum.valueOf(myClass, keyStr);
                 this.data.put(key, value);

@@ -58,6 +58,8 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
         int minY = getNumber(JumpAdjustorKeys.minY, 0L).intValue();
         int step = getNumber(JumpAdjustorKeys.step, 0).intValue();
 
+        maxY = Math.min(maxY,chunk.getWorld().getMaxHeight());
+
         boolean requireSkyLight;
         Object o = getData().getOrDefault(JumpAdjustorKeys.requireSkyLight, false);
         if (o instanceof Boolean) {

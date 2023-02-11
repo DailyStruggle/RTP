@@ -67,6 +67,16 @@ public class TestRTPWorld implements RTPWorld {
 
     }
 
+    @Override
+    public int getMaxHeight() {
+        return 0;
+    }
+
+    @Override
+    public int getMinHeight() {
+        return 0;
+    }
+
     public static Set<String> getBiomes() {
         HashSet<String> res = new HashSet<>();
         res.add("PLAINS");

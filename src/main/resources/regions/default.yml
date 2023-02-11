@@ -32,7 +32,7 @@ vert:
   name: "JUMP"
   #height range for placement, set lower for more caves and ravines
   minY: 32
-  maxY: 127
+  maxY: 255
   #initial length to adjust
   step: 16
   #ensure above ground by checking light level

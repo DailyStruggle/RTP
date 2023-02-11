@@ -357,6 +357,5 @@ public class BukkitServerAccessor implements RTPServerAccessor {
         }, 30, 20);
 
         BukkitTask task = Bukkit.getScheduler().runTask(plugin, this::getRTPWorlds);
-//        RTP.log(Level.SEVERE,"C - " + task.getTaskId());
     }
 }
