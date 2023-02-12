@@ -41,123 +41,129 @@ public final class DoTeleport extends RTPRunnable {
 
     @Override
     public void run() {
-        preActions.forEach(consumer -> consumer.accept(this));
+        try {
+            preActions.forEach(consumer -> consumer.accept(this));
 
-        //todo: safety checks
-        location.world().platform(location);
+            //todo: safety checks
+            location.world().platform(location);
 
-        RTP.getInstance().invulnerablePlayers.put(player.uuid(), System.currentTimeMillis());
+            RTP.getInstance().invulnerablePlayers.put(player.uuid(), System.currentTimeMillis());
 
-        TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.uuid());
-        if (teleportData == null) {
-            teleportData = new TeleportData();
-            teleportData.sender = (sender != null) ? sender : player;
-            teleportData.originalLocation = player.getLocation();
-            teleportData.time = System.currentTimeMillis();
-            teleportData.nextTask = this;
-            teleportData.delay = sender.delay();
-        }
-        teleportData.targetRegion = region;
-        teleportData.selectedLocation = location;
-        teleportData.completed = true;
-        RTP.getInstance().latestTeleportData.put(player.uuid(), teleportData);
-
-        RTP.getInstance().processingPlayers.remove(player.uuid());
-
-        CompletableFuture<Boolean> setLocation = player.setLocation(location);
-
-        Map<String, Object> dataMap = DatabaseAccessor.toColumns(teleportData);
-        dataMap.put("playerName", player.name());
-        Map<String, Object> saveMap = new HashMap<>();
-        if (RTP.getInstance().databaseAccessor instanceof YamlFileDatabase) {
-            saveMap.put(player.uuid().toString(), dataMap);
-        } else {
-            saveMap.put("UUID", player.uuid().toString());
-            saveMap.putAll(dataMap);
-        }
-        RTP.getInstance().databaseAccessor.setValue("teleportData", saveMap);
-
-        RTP.getInstance().chunkCleanupPipeline.add(new ChunkCleanup(location, region));
-
-        TeleportData finalTeleportData = teleportData;
-        setLocation.thenAccept(aBoolean -> {
-            ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
-            boolean verbose = true;
-            if (logging != null) {
-                Object o = logging.getConfigValue(LoggingKeys.teleport, false);
-                if (o instanceof Boolean) {
-                    verbose = (Boolean) o;
-                } else {
-                    verbose = Boolean.parseBoolean(o.toString());
-                }
+            TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.uuid());
+            if (teleportData == null) {
+                teleportData = new TeleportData();
+                teleportData.sender = (sender != null) ? sender : player;
+                teleportData.originalLocation = player.getLocation();
+                teleportData.time = System.currentTimeMillis();
+                teleportData.nextTask = this;
+                teleportData.delay = sender.delay();
             }
+            teleportData.targetRegion = region;
+            teleportData.selectedLocation = location;
+            teleportData.completed = true;
+            RTP.getInstance().latestTeleportData.put(player.uuid(), teleportData);
 
-            if (aBoolean) {
-                finalTeleportData.processingTime = System.currentTimeMillis() - finalTeleportData.time;
-                RTP.getInstance().latestTeleportData.put(player.uuid(), finalTeleportData);
-                RTP.serverAccessor.sendMessage(player.uuid(), MessagesKeys.teleportMessage);
+            RTP.getInstance().processingPlayers.remove(player.uuid());
 
-                if (verbose) {
-                    long time = finalTeleportData.processingTime;
-                    ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-                    long days = TimeUnit.MILLISECONDS.toDays(time);
-                    long hours = TimeUnit.MILLISECONDS.toHours(time) % 24;
-                    long minutes = TimeUnit.MILLISECONDS.toMinutes(time) % 60;
-                    long seconds = TimeUnit.MILLISECONDS.toSeconds(time) % 60;
-                    long millis = time % 1000;
-                    if (millis > 500 && seconds > 0) {
-                        seconds++;
-                        millis = 0;
-                    }
+            CompletableFuture<Boolean> setLocation = player.setLocation(location);
 
-                    String replacement = "";
-                    if (days > 0)
-                        replacement += days + langParser.getConfigValue(MessagesKeys.days, "").toString() + " ";
-                    if (hours > 0)
-                        replacement += hours + langParser.getConfigValue(MessagesKeys.hours, "").toString() + " ";
-                    if (minutes > 0)
-                        replacement += minutes + langParser.getConfigValue(MessagesKeys.minutes, "").toString() + " ";
-                    if (seconds > 0)
-                        replacement += seconds + langParser.getConfigValue(MessagesKeys.seconds, "").toString();
-                    if (seconds < 2) {
-                        replacement += millis + langParser.getConfigValue(MessagesKeys.millis, "").toString();
-                    }
-                    RTP.log(Level.INFO, "#00FFA0[RTP] completed teleport for player:" + player.name() + " in " + replacement);
-                }
+            Map<String, Object> dataMap = DatabaseAccessor.toColumns(teleportData);
+            dataMap.put("playerName", player.name());
+            Map<String, Object> saveMap = new HashMap<>();
+            if (RTP.getInstance().databaseAccessor instanceof YamlFileDatabase) {
+                saveMap.put(player.uuid().toString(), dataMap);
             } else {
-                if (verbose) RTP.log(Level.WARNING, "[RTP] failed to complete teleport for player:" + player.name());
+                saveMap.put("UUID", player.uuid().toString());
+                saveMap.putAll(dataMap);
             }
-        });
+            RTP.getInstance().databaseAccessor.setValue("teleportData", saveMap);
 
-        ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
-        Object configValue = configParser.getConfigValue(ConfigKeys.consoleCommands, null);
-        if (configValue instanceof Collection<?>) {
-            Collection<?> collection = (Collection<?>) configValue;
-            for (Object o : collection) {
-                String cmd = o.toString();
-                try {
-                    RTP.serverAccessor.getSender(CommandsAPI.serverId).performCommand(cmd);
-                } catch (Throwable throwable) {
-                    throwable.printStackTrace();
+            RTP.getInstance().chunkCleanupPipeline.add(new ChunkCleanup(location, region));
+
+            TeleportData finalTeleportData = teleportData;
+            setLocation.thenAccept(aBoolean -> {
+                ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
+                boolean verbose = true;
+                if (logging != null) {
+                    Object o = logging.getConfigValue(LoggingKeys.teleport, false);
+                    if (o instanceof Boolean) {
+                        verbose = (Boolean) o;
+                    } else {
+                        verbose = Boolean.parseBoolean(o.toString());
+                    }
+                }
+
+                if (aBoolean) {
+                    finalTeleportData.processingTime = System.currentTimeMillis() - finalTeleportData.time;
+                    RTP.getInstance().latestTeleportData.put(player.uuid(), finalTeleportData);
+                    RTP.serverAccessor.sendMessage(player.uuid(), MessagesKeys.teleportMessage);
+
+                    if (verbose) {
+                        long time = finalTeleportData.processingTime;
+                        ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+                        long days = TimeUnit.MILLISECONDS.toDays(time);
+                        long hours = TimeUnit.MILLISECONDS.toHours(time) % 24;
+                        long minutes = TimeUnit.MILLISECONDS.toMinutes(time) % 60;
+                        long seconds = TimeUnit.MILLISECONDS.toSeconds(time) % 60;
+                        long millis = time % 1000;
+                        if (millis > 500 && seconds > 0) {
+                            seconds++;
+                            millis = 0;
+                        }
+
+                        String replacement = "";
+                        if (days > 0)
+                            replacement += days + langParser.getConfigValue(MessagesKeys.days, "").toString() + " ";
+                        if (hours > 0)
+                            replacement += hours + langParser.getConfigValue(MessagesKeys.hours, "").toString() + " ";
+                        if (minutes > 0)
+                            replacement += minutes + langParser.getConfigValue(MessagesKeys.minutes, "").toString() + " ";
+                        if (seconds > 0)
+                            replacement += seconds + langParser.getConfigValue(MessagesKeys.seconds, "").toString();
+                        if (seconds < 2) {
+                            replacement += millis + langParser.getConfigValue(MessagesKeys.millis, "").toString();
+                        }
+                        RTP.log(Level.INFO, "#00FFA0[RTP] completed teleport for player:" + player.name() + " in " + replacement);
+                    }
+                } else {
+                    if (verbose)
+                        RTP.log(Level.WARNING, "[RTP] failed to complete teleport for player:" + player.name());
+                }
+            });
+
+            ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
+            Object configValue = configParser.getConfigValue(ConfigKeys.consoleCommands, null);
+            if (configValue instanceof Collection<?>) {
+                Collection<?> collection = (Collection<?>) configValue;
+                for (Object o : collection) {
+                    String cmd = o.toString();
+                    try {
+                        RTP.serverAccessor.getSender(CommandsAPI.serverId).performCommand(cmd);
+                    } catch (Throwable throwable) {
+                        throwable.printStackTrace();
+                    }
                 }
             }
-        }
 
-        configValue = configParser.getConfigValue(ConfigKeys.playerCommands, null);
-        if (configValue instanceof Collection<?>) {
-            Collection<?> collection = (Collection<?>) configValue;
-            for (Object o : collection) {
-                String cmd = o.toString();
-                try {
-                    player.performCommand(cmd);
-                } catch (Throwable throwable) {
-                    throwable.printStackTrace();
+            configValue = configParser.getConfigValue(ConfigKeys.playerCommands, null);
+            if (configValue instanceof Collection<?>) {
+                Collection<?> collection = (Collection<?>) configValue;
+                for (Object o : collection) {
+                    String cmd = o.toString();
+                    try {
+                        player.performCommand(cmd);
+                    } catch (Throwable throwable) {
+                        throwable.printStackTrace();
+                    }
                 }
             }
+
+            postActions.forEach(consumer -> consumer.accept(this));
         }
-
-
-        postActions.forEach(consumer -> consumer.accept(this));
+        catch (Throwable throwable) {
+            throwable.printStackTrace();
+            new RTPTeleportCancel(player.uuid()).run();
+        }
     }
 
     public RTPCommandSender sender() {

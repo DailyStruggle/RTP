@@ -28,6 +28,14 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
     private static final Set<String> unsafeBlocks = new ConcurrentSkipListSet<>();
     private static final AtomicLong lastUpdate = new AtomicLong();
 
+    private static final List<List<Integer>> testCoords = Arrays.asList(
+            Arrays.asList(7,7),
+            Arrays.asList(2,2),
+            Arrays.asList(12,12),
+            Arrays.asList(2,12),
+            Arrays.asList(12,2)
+    );
+
     static {
         defaults.put(JumpAdjustorKeys.maxY, 127);
         defaults.put(JumpAdjustorKeys.minY, 32);
@@ -58,7 +66,7 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
         int minY = getNumber(JumpAdjustorKeys.minY, 0L).intValue();
         int step = getNumber(JumpAdjustorKeys.step, 0).intValue();
 
-        maxY = Math.min(maxY,chunk.getWorld().getMaxHeight());
+        maxY = Math.min(maxY, chunk.getWorld().getMaxHeight());
 
         boolean requireSkyLight;
         Object o = getData().getOrDefault(JumpAdjustorKeys.requireSkyLight, false);
@@ -84,51 +92,55 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
             lastUpdate.set(t);
         }
 
-        for (int i = minY; i < maxY; i++) {
-            RTPBlock blockAt = chunk.getBlockAt(7, i, 7);
-            if (!blockAt.isAir() && !unsafeBlocks.contains(blockAt.getMaterial())) {
-                minY = i;
-                break;
-            }
-        }
+        for (List<Integer> xz : testCoords) {
+            int x = xz.get(0);
+            int z = xz.get(1);
 
-        for (int it_len = step; it_len > 2; it_len = it_len / 2) {
-            for (int i = minY; i < maxY; i += it_len) {
-                RTPBlock block1;
-                try {
-                    block1 = chunk.getBlockAt(7, i, 7);
-                } catch (NullPointerException exception) {
-                    exception.printStackTrace();
-                    return null;
-                }
-                RTPBlock block2 = chunk.getBlockAt(7, i + 1, 7);
-                int skylight = 15;
-                if (requireSkyLight) skylight = block2.skyLight();
-                if (block1.isAir() && block2.isAir() && skylight > 7
-                        && !unsafeBlocks.contains(block2.getMaterial())) {
-                    minY = oldY;
-                    maxY = i;
+            for (int i = minY; i < maxY; i++) {
+                RTPBlock blockAt = chunk.getBlockAt(x, i, z);
+                if (!blockAt.isAir() && !unsafeBlocks.contains(blockAt.getMaterial())) {
+                    minY = i;
                     break;
                 }
-                if (i > maxY - it_len) return null;
-                oldY = i;
+            }
+
+            for (int it_len = step; it_len > 2; it_len = it_len / 2) {
+                for (int i = minY; i < maxY; i += it_len) {
+                    RTPBlock block1;
+                    try {
+                        block1 = chunk.getBlockAt(x, i, z);
+                    } catch (NullPointerException exception) {
+                        exception.printStackTrace();
+                        return null;
+                    }
+                    RTPBlock block2 = chunk.getBlockAt(x, i + 1, z);
+                    int skylight = 15;
+                    if (requireSkyLight) skylight = block2.skyLight();
+                    if (block1.isAir() && block2.isAir() && skylight > 7
+                            && !unsafeBlocks.contains(block2.getMaterial())) {
+                        minY = oldY;
+                        maxY = i;
+                        break;
+                    }
+                    if (i > maxY - it_len) return null;
+                    oldY = i;
+                }
+            }
+
+            for (int i = minY; i < maxY; i++) {
+                RTPBlock block0 = chunk.getBlockAt(x, i - 1, z);
+                RTPBlock block1 = chunk.getBlockAt(x, i, z);
+                RTPBlock block2 = chunk.getBlockAt(x, i + 1, z);
+                int skylight = 15;
+                if (requireSkyLight) skylight = block2.skyLight();
+                if (!block0.isAir() && block1.isAir() && block2.isAir() && skylight > 7
+                        && !unsafeBlocks.contains(block2.getMaterial())
+                        && !unsafeBlocks.contains(block1.getMaterial())
+                        && !unsafeBlocks.contains(block0.getMaterial())) {
+                    return block1.getLocation();
+                }
             }
         }
-
-        for (int i = minY; i < maxY; i++) {
-            RTPBlock block0 = chunk.getBlockAt(7, i - 1, 7);
-            RTPBlock block1 = chunk.getBlockAt(7, i, 7);
-            RTPBlock block2 = chunk.getBlockAt(7, i + 1, 7);
-            int skylight = 15;
-            if (requireSkyLight) skylight = block2.skyLight();
-            if (!block0.isAir() && block1.isAir() && block2.isAir() && skylight > 7
-                    && !unsafeBlocks.contains(block2.getMaterial())
-                    && !unsafeBlocks.contains(block1.getMaterial())
-                    && !unsafeBlocks.contains(block0.getMaterial())) {
-                return block1.getLocation();
-            }
-        }
-
         return null;
     }
 

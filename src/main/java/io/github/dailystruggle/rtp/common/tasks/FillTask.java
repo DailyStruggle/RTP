@@ -204,7 +204,6 @@ public class FillTask extends RTPRunnable {
                 : new HashSet<>();
 
         int safetyRadius = safety.getNumber(SafetyKeys.safetyRadius, 0).intValue();
-        safetyRadius = Math.min(safetyRadius, 7);
 
         RTPWorld world = region.getWorld();
 

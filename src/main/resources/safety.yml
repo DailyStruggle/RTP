@@ -4,7 +4,6 @@
 invulnerabilityTime: 5
 
 #radius, in blocks, to check for safe blocks
-# 0-7
 safetyRadius: 0
 
 #create a platform on random teleport

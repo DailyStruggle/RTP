@@ -79,64 +79,60 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
             RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId, msg);
 
             if(parameterValues.containsKey("world")
-                    && configParser.myClass.equals(RegionKeys.class)
-                    && !parameterValues.containsKey("vert")) {
+                    && configParser.myClass.equals(RegionKeys.class)) vertFixBlock: {
                 ConfigParser<RegionKeys> regionParser = (ConfigParser<RegionKeys>) configParser;
 
                 RTPWorld rtpWorld = RTP.serverAccessor.getRTPWorld(parameterValues.get("world").get(0));
-                if(rtpWorld!=null) {
-                    Object o = regionParser.getConfigValue(RegionKeys.vert,null);
-                    if(o instanceof ConfigurationSection) {
-                        ConfigurationSection section = (ConfigurationSection) o;
-                        String name = section.getString("name");
-                        String maxYStr = section.getString("maxY").replace(",",".");
-                        String minYStr = section.getString("minY").replace(",",".");
+                if(rtpWorld == null) break vertFixBlock;
 
-                        try {
-                            int maxY = ((Number) Double.parseDouble(maxYStr)).intValue();
+                String name = "JUMP";
+                int maxY = 255;
+                int minY = 0;
 
-                            int minY = ((Number) Double.parseDouble(minYStr)).intValue();
+                Object o = regionParser.getConfigValue(RegionKeys.vert,null);
+                if(o instanceof ConfigurationSection) {
+                    ConfigurationSection section = (ConfigurationSection) o;
+                    name = parameterValues.containsKey("vert")
+                            ? parameterValues.get("vert").get(0)
+                            : section.getString("name");
+                    if(name == null) break vertFixBlock;
 
-                            parameterValues.put("vert", Collections.singletonList(name));
-                            if (rtpWorld.name().endsWith("_nether")) {
-                                maxY = Math.min(maxY, 127);
-                                parameterValues.put("requireskylight", Collections.singletonList(String.valueOf(false)));
-                            }
-                            maxY = Math.min(maxY, rtpWorld.getMaxHeight());
+                    String maxYStr = parameterValues.containsKey("maxy")
+                            ? parameterValues.get("maxy").get(0)
+                            : section.getString("maxY").replace(",",".");
 
-                            if (maxY < minY) {
-                                minY = rtpWorld.getMinHeight();
-                            } else {
-                                minY = Math.max(minY, rtpWorld.getMinHeight());
-                            }
+                    String minYStr = parameterValues.containsKey("miny")
+                            ? parameterValues.get("miny").get(0)
+                            : section.getString("minY").replace(",",".");
 
-                            parameterValues.put("miny", Collections.singletonList(String.valueOf(minY)));
-                            parameterValues.put("maxy", Collections.singletonList(String.valueOf(maxY)));
-                        } catch (IllegalArgumentException ignored) {
+                    try {
+                        maxY = ((Number) Double.parseDouble(maxYStr)).intValue();
+                        minY = ((Number) Double.parseDouble(minYStr)).intValue();
+                    } catch (IllegalArgumentException ignored) {
 
-                        }
-                    } else if(o instanceof VerticalAdjustor<?>) {
-                        VerticalAdjustor<?> vert = (VerticalAdjustor<?>) o;
-                        int maxY = vert.maxY();
-                        int minY = vert.minY();
-
-                        parameterValues.put("vert", Collections.singletonList(name));
-                        if (rtpWorld.name().endsWith("_nether")) {
-                            maxY = Math.min(maxY, 127);
-                            parameterValues.put("requireskylight", Collections.singletonList(String.valueOf(false)));
-                        }
-                        maxY = Math.min(maxY, rtpWorld.getMaxHeight());
-
-                        if (maxY < minY) {
-                            minY = rtpWorld.getMinHeight();
-                        } else {
-                            minY = Math.max(minY, rtpWorld.getMinHeight());
-                        }
-
-                        parameterValues.put("miny", Collections.singletonList(String.valueOf(minY)));
-                        parameterValues.put("maxy", Collections.singletonList(String.valueOf(maxY)));
                     }
+                } else if(o instanceof VerticalAdjustor<?>) {
+                    VerticalAdjustor<?> vert = (VerticalAdjustor<?>) o;
+                    name = vert.name;
+                    maxY = vert.maxY();
+                    minY = vert.minY();
                 }
+
+                parameterValues.putIfAbsent("vert", Collections.singletonList(name));
+                if (rtpWorld.name().endsWith("_nether")) {
+                    maxY = Math.min(maxY, 128);
+                    parameterValues.putIfAbsent("requireskylight", Collections.singletonList(String.valueOf(false)));
+                }
+                maxY = Math.min(maxY, rtpWorld.getMaxHeight());
+
+                if (maxY < minY) {
+                    minY = rtpWorld.getMinHeight();
+                } else {
+                    minY = Math.max(minY, rtpWorld.getMinHeight());
+                }
+
+                parameterValues.putIfAbsent("miny", Collections.singletonList(String.valueOf(minY)));
+                parameterValues.putIfAbsent("maxy", Collections.singletonList(String.valueOf(maxY)));
             }
 
             for (Map.Entry<String, List<String>> e : parameterValues.entrySet()) {

@@ -43,69 +43,75 @@ public final class SetupTeleport extends RTPRunnable {
 
     @Override
     public void run() {
-        preActions.forEach(consumer -> consumer.accept(this));
+        try {
+            preActions.forEach(consumer -> consumer.accept(this));
 
-        ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+            ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
 
-        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
-        boolean syncLoading = false;
+            ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+            boolean syncLoading = false;
 
-        Object configValue = perf.getConfigValue(PerformanceKeys.syncLoading, false);
-        if (configValue instanceof String) {
-            configValue = Boolean.parseBoolean((String) configValue);
-        }
-        if (configValue instanceof Boolean) syncLoading = (Boolean) configValue;
+            Object configValue = perf.getConfigValue(PerformanceKeys.syncLoading, false);
+            if (configValue instanceof String) {
+                configValue = Boolean.parseBoolean((String) configValue);
+            }
+            if (configValue instanceof Boolean) syncLoading = (Boolean) configValue;
 
-        TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.uuid());
-        if (teleportData == null) {
-            teleportData = new TeleportData();
-            teleportData.sender = (sender != null) ? sender : player;
+            TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.uuid());
+            if (teleportData == null) {
+                teleportData = new TeleportData();
+                teleportData.sender = (sender != null) ? sender : player;
+                teleportData.originalLocation = player.getLocation();
+                teleportData.nextTask = this;
+                teleportData.targetRegion = region;
+                teleportData.delay = sender.delay();
+                RTP.getInstance().latestTeleportData.put(player.uuid(), teleportData);
+            }
+
+            teleportData.targetRegion = this.region;
+
             teleportData.originalLocation = player.getLocation();
-            teleportData.nextTask = this;
-            teleportData.targetRegion = region;
-            teleportData.delay = sender.delay();
+
             RTP.getInstance().latestTeleportData.put(player.uuid(), teleportData);
-        }
 
-        teleportData.targetRegion = this.region;
+            Map.Entry<RTPLocation, Long> pair = this.region.getLocation(sender, player, biomes);
+            if (pair == null) { //player gets put on region queue
+                return;
+            } else if (pair.getKey() == null) {
+                teleportData.attempts = pair.getValue();
+                String msg = langParser.getConfigValue(MessagesKeys.unsafe, "").toString();
+                RTP.serverAccessor.sendMessage(sender.uuid(), player.uuid(), msg);
+                postActions.forEach(consumer -> consumer.accept(this, false));
+                isRunning.set(false);
+                RTPTeleportCancel.refund(player.uuid());
+                return;
+            }
 
-        teleportData.originalLocation = player.getLocation();
-
-        RTP.getInstance().latestTeleportData.put(player.uuid(), teleportData);
-
-        Map.Entry<RTPLocation, Long> pair = this.region.getLocation(sender, player, biomes);
-        if (pair == null) { //player gets put on region queue
-            return;
-        } else if (pair.getKey() == null) {
+            if (isCancelled()) return;
+            LoadChunks loadChunks = new LoadChunks(this.sender, this.player, pair.getKey(), this.region);
+            teleportData.nextTask = loadChunks;
+            teleportData.selectedLocation = pair.getKey();
             teleportData.attempts = pair.getValue();
-            String msg = langParser.getConfigValue(MessagesKeys.unsafe, "").toString();
-            RTP.serverAccessor.sendMessage(sender.uuid(), player.uuid(), msg);
-            postActions.forEach(consumer -> consumer.accept(this, false));
-            isRunning.set(false);
-            RTPTeleportCancel.refund(player.uuid());
-            return;
+
+            boolean sync = syncLoading;
+            if (!syncLoading) {
+                sync = teleportData.delay <= 0
+                        && (biomes == null || biomes.size() == 0)
+                        && !loadChunks.modified;
+            }
+
+            if (sync) {
+                loadChunks.run();
+            } else {
+                RTP.getInstance().loadChunksPipeline.add(loadChunks);
+            }
+
+            postActions.forEach(consumer -> consumer.accept(this, true));
         }
-
-        if (isCancelled()) return;
-        LoadChunks loadChunks = new LoadChunks(this.sender, this.player, pair.getKey(), this.region);
-        teleportData.nextTask = loadChunks;
-        teleportData.selectedLocation = pair.getKey();
-        teleportData.attempts = pair.getValue();
-
-        boolean sync = syncLoading;
-        if (!syncLoading) {
-            sync = teleportData.delay <= 0
-                    && (biomes == null || biomes.size() == 0)
-                    && !loadChunks.modified;
+        catch (Throwable throwable) {
+            throwable.printStackTrace();
+            new RTPTeleportCancel(player.uuid()).run();
         }
-
-        if (sync) {
-            loadChunks.run();
-        } else {
-            RTP.getInstance().loadChunksPipeline.add(loadChunks);
-        }
-
-        postActions.forEach(consumer -> consumer.accept(this, true));
     }
 
     public RTPCommandSender sender() {
