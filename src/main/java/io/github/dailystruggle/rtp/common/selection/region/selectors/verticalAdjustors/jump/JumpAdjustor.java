@@ -40,12 +40,12 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
         defaults.put(JumpAdjustorKeys.maxY, 127);
         defaults.put(JumpAdjustorKeys.minY, 32);
         defaults.put(JumpAdjustorKeys.step, 0);
-        defaults.put(JumpAdjustorKeys.requireSkyLight, true);
+        defaults.put(JumpAdjustorKeys.requireSkyLight, false);
 
         subParameters.put("maxy", new IntegerParameter("rtp.params", "highest possible location", (sender, s) -> true, 64, 92, 127, 256, 320));
         subParameters.put("miny", new IntegerParameter("rtp.params", "lowest possible location", (sender, s) -> true, -64, 0, 64, 128));
         subParameters.put("step", new IntegerParameter("rtp.params", "initial amount to jump", (sender, s) -> true, 1, 16, 32));
-        subParameters.put("requireskyLight", new BooleanParameter("rtp.params", "require sky light for placement", (sender, s) -> true));
+        subParameters.put("requireskylight", new BooleanParameter("rtp.params", "require sky light for placement", (sender, s) -> true));
     }
 
     public JumpAdjustor(List<Predicate<RTPBlock>> verifiers) {

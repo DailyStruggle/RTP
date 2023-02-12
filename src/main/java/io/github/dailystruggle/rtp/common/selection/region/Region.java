@@ -920,7 +920,6 @@ public class Region extends FactoryValue<RegionKeys> {
             Map<String,Object> validY = new HashMap<>();
             validY.put("minY",Math.max(getWorld().getMinHeight(),vert.minY()));
             validY.put("maxY",Math.min(getWorld().getMaxHeight(),vert.maxY()));
-            if(getWorld().name().endsWith("_nether"))
 
             vert.setData(vertData);
             vert.setData(validY);

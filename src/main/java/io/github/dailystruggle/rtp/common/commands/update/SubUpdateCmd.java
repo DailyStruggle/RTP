@@ -123,6 +123,9 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
                     maxY = Math.min(maxY, 128);
                     parameterValues.putIfAbsent("requireskylight", Collections.singletonList(String.valueOf(false)));
                 }
+                else if (rtpWorld.name().endsWith("_the_end")) {
+                    parameterValues.putIfAbsent("requireskylight", Collections.singletonList(String.valueOf(false)));
+                }
                 maxY = Math.min(maxY, rtpWorld.getMaxHeight());
 
                 if (maxY < minY) {

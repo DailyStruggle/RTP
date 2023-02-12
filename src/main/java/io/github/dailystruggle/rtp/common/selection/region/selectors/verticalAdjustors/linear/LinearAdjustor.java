@@ -41,7 +41,7 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
         defaults.put(GenericVerticalAdjustorKeys.maxY, 127);
         defaults.put(GenericVerticalAdjustorKeys.minY, 32);
         defaults.put(GenericVerticalAdjustorKeys.direction, 0);
-        defaults.put(GenericVerticalAdjustorKeys.requireSkyLight, true);
+        defaults.put(GenericVerticalAdjustorKeys.requireSkyLight, false);
 
         subParameters.put("maxy", new IntegerParameter("rtp.params", "highest possible location", (sender, s) -> true, 64, 92, 127, 256, 320));
         subParameters.put("miny", new IntegerParameter("rtp.params", "lowest possible location", (sender, s) -> true, -64, 0, 64, 128));
