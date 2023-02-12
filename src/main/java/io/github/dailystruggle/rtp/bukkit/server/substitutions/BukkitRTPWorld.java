@@ -276,11 +276,52 @@ public final class BukkitRTPWorld implements RTPWorld {
 
         boolean checkWaterlogged = unsafeBlocks.contains("WATERLOGGED");
 
+        int x = location.getBlockX()%16;
+        if(x<0) x+=16;
+
+        int z = location.getBlockX()%16;
+        if(z<0) z+=16;
+
         if (!solid.isSolid()) solid = platformMaterial;
-        for (int i = 7 - platformRadius; i <= 7 + platformRadius; i++) {
-            for (int j = 7 - platformRadius; j <= 7 + platformRadius; j++) {
+        Chunk chunk1;
+        for (int i = x - platformRadius; i <= x + platformRadius; i++) {
+            int ii = i;
+            int dx = Math.abs(ii/16);
+            int chunkX = chunk.getX();
+
+            if(ii < 0) {
+                chunkX-=dx+1;
+                if(ii%16==0) ii+=16*dx;
+                else ii+=16*(dx+1);
+            } else if(ii >= 16) {
+                chunkX+=dx;
+                ii-=16*dx;
+            }
+
+            for (int j = z - platformRadius; j <= z + platformRadius; j++) {
+                int jj = j;
+                int dz = Math.abs(jj/16);
+                int chunkZ = chunk.getZ();
+
+                if(jj < 0) {
+                    chunkZ-=dz+1;
+                    if(jj%16==0) jj+=16*dz;
+                    else jj+=16*(dz+1);
+                } else if(jj >= 16) {
+                    chunkZ+=dz;
+                    jj-=16*dz;
+                }
+
+                try {
+                    chunk1 = ((BukkitRTPChunk)getChunkAt(chunkX,chunkZ).get()).chunk();
+                } catch (InterruptedException | ExecutionException e) {
+                    return;
+                }
+
                 for (int y = location.getBlockY() - 1; y >= location.getBlockY() - platformDepth; y--) {
-                    Block block = chunk.getBlock(i, y, j);
+                    if(y>getMaxHeight() || y<getMinHeight()) continue;
+
+                    Block block = chunk1.getBlock(ii, y, jj);
 
                     boolean isSolid;
                     try {
@@ -296,7 +337,7 @@ public final class BukkitRTPWorld implements RTPWorld {
                     }
                 }
                 for (int y = location.getBlockY() + platformAirHeight - 1; y >= location.getBlockY(); y--) {
-                    Block block = chunk.getBlock(i, y, j);
+                    Block block = chunk1.getBlock(ii, y, jj);
                     block.breakNaturally();
                     block.setType(air, true); //also clear liquids
                 }

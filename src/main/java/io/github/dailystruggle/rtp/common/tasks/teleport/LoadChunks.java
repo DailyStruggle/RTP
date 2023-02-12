@@ -73,46 +73,58 @@ public final class LoadChunks extends RTPRunnable {
 
     @Override
     public void run() {
-        preActions.forEach(consumer -> consumer.accept(this));
-        long start = System.currentTimeMillis();
+        try {
+            preActions.forEach(consumer -> consumer.accept(this));
+            long start = System.currentTimeMillis();
 
-        TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.uuid());
-        DoTeleport doTeleport = new DoTeleport(sender, player, location, region);
-        teleportData.nextTask = doTeleport;
+            TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.uuid());
+            DoTeleport doTeleport = new DoTeleport(sender, player, location, region);
+            teleportData.nextTask = doTeleport;
 
-        long lastTime = teleportData.time;
+            long lastTime = teleportData.time;
 
-        long delay = sender.delay();
-        long dT = (start - lastTime);
-        long remainingTime = delay - dT;
-        long toTicks = remainingTime / 50;
+            long delay = sender.delay();
+            long dT = (start - lastTime);
+            long remainingTime = delay - dT;
+            long toTicks = remainingTime / 50;
 
-        ChunkSet chunkSet = this.region.locAssChunks.get(location);
+            ChunkSet chunkSet = this.region.locAssChunks.get(location);
 
-        if (toTicks < 1 &&
-                (sender.hasPermission("rtp.noDelay.chunks") || chunkSet.complete.isDone())) {
-            if (Bukkit.isPrimaryThread()) doTeleport.run();
-            else RTP.getInstance().teleportPipeline.add(doTeleport);
-            postActions.forEach(consumer -> consumer.accept(this));
-            return;
-        }
+            if (toTicks < 1 &&
+                    (sender.hasPermission("rtp.noDelay.chunks") || chunkSet.complete.isDone())) {
+                if (Bukkit.isPrimaryThread()) {
+                    try {
+                        doTeleport.run();
+                    } catch (Throwable throwable) {
+                        throwable.printStackTrace();
+                        new RTPTeleportCancel(player.uuid()).run();
+                    }
+                } else RTP.getInstance().teleportPipeline.add(doTeleport);
+                postActions.forEach(consumer -> consumer.accept(this));
+                return;
+            }
 
-        if (!chunkSet.complete.getNow(false)) {
-            for (CompletableFuture<RTPChunk> cfChunk : chunkSet.chunks) {
-                try {
-                    cfChunk.get();
-                } catch (ExecutionException | InterruptedException e) {
-                    e.printStackTrace();
+            if (!chunkSet.complete.getNow(false)) {
+                for (CompletableFuture<RTPChunk> cfChunk : chunkSet.chunks) {
+                    try {
+                        cfChunk.get();
+                    } catch (ExecutionException | InterruptedException e) {
+                        e.printStackTrace();
+                    }
                 }
             }
+
+            doTeleport.setDelay(toTicks);
+
+            if (toTicks < 1 && Bukkit.isPrimaryThread()) doTeleport.run();
+            else RTP.getInstance().teleportPipeline.add(doTeleport);
+
+            postActions.forEach(consumer -> consumer.accept(this));
         }
-
-        doTeleport.setDelay(toTicks);
-
-        if (toTicks < 1 && Bukkit.isPrimaryThread()) doTeleport.run();
-        else RTP.getInstance().teleportPipeline.add(doTeleport);
-
-        postActions.forEach(consumer -> consumer.accept(this));
+        catch (Throwable throwable) {
+            throwable.printStackTrace();
+            new RTPTeleportCancel(player.uuid()).run();
+        }
     }
 
     public RTPCommandSender sender() {

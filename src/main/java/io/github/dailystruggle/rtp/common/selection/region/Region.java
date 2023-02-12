@@ -236,9 +236,9 @@ public class Region extends FactoryValue<RegionKeys> {
 
         if (!custom && perPlayerLocationQueue.containsKey(playerId)) {
             ConcurrentLinkedQueue<Map.Entry<RTPLocation, Long>> playerLocationQueue = perPlayerLocationQueue.get(playerId);
-            RTPChunk rtpChunk = null;
+            RTPChunk chunk = null;
             while (playerLocationQueue.size() > 0) {
-                if (rtpChunk != null) rtpChunk.unload();
+                if (chunk != null) chunk.unload();
                 pair = playerLocationQueue.poll();
                 if (pair == null || pair.getKey() == null) continue;
                 RTPLocation left = pair.getKey();
@@ -248,7 +248,7 @@ public class Region extends FactoryValue<RegionKeys> {
                 int cz = (left.z() > 0) ? left.z() / 16 : left.z() / 16 - 1;
                 CompletableFuture<RTPChunk> chunkAt = left.world().getChunkAt(cx, cz);
                 try {
-                    rtpChunk = chunkAt.get();
+                    chunk = chunkAt.get();
                 } catch (InterruptedException | ExecutionException e) {
                     e.printStackTrace();
                     continue;
@@ -271,14 +271,60 @@ public class Region extends FactoryValue<RegionKeys> {
                 //todo: waterlogged check
                 int safe = safetyRadius.get();
                 RTPBlock block;
+                RTPChunk chunk1;
+                Map<List<Integer>,RTPChunk> chunks = new HashMap<>();
+                chunks.put(Arrays.asList(chunk.x(), chunk.z()), chunk);
+                chunk.keep(true);
                 for (int x = left.x() - safe; x < left.x() + safe && pass; x++) {
+                    int xx = x;
+                    int dx = Math.abs(xx/16);
+                    int chunkX = chunk.x();
+
+                    if(xx < 0) {
+                        chunkX-=dx+1;
+                        if(xx%16==0) xx+=16*dx;
+                        else xx+=16*(dx+1);
+                    } else if(xx >= 16) {
+                        chunkX+=dx;
+                        xx-=16*dx;
+                    }
+
                     for (int z = left.z() - safe; z < left.z() + safe && pass; z++) {
+                        int zz = z;
+
+                        int dz = Math.abs(zz/16);
+
+                        int chunkZ = chunk.z();
+
+                        if(zz < 0) {
+                            chunkZ-=dz+1;
+                            if(zz%16==0) zz+=16*dz;
+                            else zz+=16*(dz+1);
+                        } else if(zz >= 16) {
+                            chunkZ+=dz;
+                            zz-=16*dz;
+                        }
+
+                        List<Integer> xz = Arrays.asList(chunkX, chunkZ);
+                        if(chunks.containsKey(xz)) chunk1 = chunks.get(xz);
+                        else {
+                            try {
+                                chunk1 = getWorld().getChunkAt(chunkX, chunkZ).get();
+                                chunks.put(xz,chunk1);
+                                chunk1.keep(true);
+                            } catch (InterruptedException | ExecutionException e) {
+                                return null;
+                            }
+                        }
+
                         for (int y = left.y() - safe; y < left.y() + safe && pass; y++) {
-                            block = rtpChunk.getBlockAt(x, y, z);
+                            if(y>getWorld().getMaxHeight() || y<getWorld().getMinHeight()) continue;
+                            block = chunk1.getBlockAt(xx, y, zz);
                             if (unsafeBlocks.contains(block.getMaterial())) pass = false;
                         }
                     }
                 }
+                for(RTPChunk usedChunk : chunks.values()) usedChunk.keep(false);
 
                 if (pass) pass = checkGlobalRegionVerifiers(left);
                 if (pass) return pair;
@@ -375,7 +421,6 @@ public class Region extends FactoryValue<RegionKeys> {
                 : new HashSet<>();
 
         int safetyRadius = safety.getNumber(SafetyKeys.safetyRadius, 0).intValue();
-        safetyRadius = Math.min(safetyRadius, 7);
 
         long maxAttemptsBase = performance.getNumber(PerformanceKeys.maxAttempts, 20).longValue();
         maxAttemptsBase = Math.max(maxAttemptsBase, 1);
@@ -534,12 +579,57 @@ public class Region extends FactoryValue<RegionKeys> {
 
             //todo: waterlogged check
             RTPBlock block;
+            RTPChunk chunk1;
+            Map<List<Integer>,RTPChunk> chunks = new HashMap<>();
+            chunks.put(Arrays.asList(chunk.x(),chunk.z()),chunk);
+            chunk.keep(true);
             for (int x = location.x() - safetyRadius; x < location.x() + safetyRadius && pass; x++) {
+                int xx = x;
+                int dx = Math.abs(xx/16);
+                int chunkX = chunk.x();
+
+                if(xx < 0) {
+                    chunkX-=dx+1;
+                    if(xx%16==0) xx+=16*dx;
+                    else xx+=16*(dx+1);
+                } else if(xx >= 16) {
+                    chunkX+=dx;
+                    xx-=16*dx;
+                }
+
                 for (int z = location.z() - safetyRadius; z < location.z() + safetyRadius && pass; z++) {
-                    for (int y = location.y() - safetyRadius; (y < location.y() + safetyRadius) && pass; y++) {
-                        block = chunk.getBlockAt(x, y, z);
+                    int zz = z;
+
+                    int dz = Math.abs(zz/16);
+
+                    int chunkZ = chunk.z();
+
+                    if(zz < 0) {
+                        chunkZ-=dz+1;
+                        if(zz%16==0) zz+=16*dz;
+                        else zz+=16*(dz+1);
+                    } else if(zz >= 16) {
+                        chunkZ+=dz;
+                        zz-=16*dz;
+                    }
+
+                    List<Integer> xz = Arrays.asList(chunkX, chunkZ);
+                    if(chunks.containsKey(xz)) chunk1 = chunks.get(xz);
+                    else {
+                        try {
+                            chunk1 = getWorld().getChunkAt(chunkX, chunkZ).get();
+                            chunks.put(xz,chunk1);
+                            chunk1.keep(true);
+                        } catch (InterruptedException | ExecutionException e) {
+                            return null;
+                        }
+                    }
+
+                    for (int y = location.y() - safetyRadius; y < location.y() + safetyRadius && pass; y++) {
+                        if(y>getWorld().getMaxHeight() || y<getWorld().getMinHeight()) continue;
+                        block = chunk1.getBlockAt(xx, y, zz);
                         String material = block.getMaterial();
-                        if (unsafeBlocks.contains(material)) {
+                        if (unsafeBlocks.contains(block.getMaterial())) {
                             pass = false;
                             safetyFails++;
                             safetySpecificFails.putIfAbsent(material, 0L);
@@ -548,6 +638,7 @@ public class Region extends FactoryValue<RegionKeys> {
                     }
                 }
             }
+            for(RTPChunk usedChunk : chunks.values()) usedChunk.keep(false);
 
             if (pass) {
                 pass = checkGlobalRegionVerifiers(location);
@@ -826,7 +917,14 @@ public class Region extends FactoryValue<RegionKeys> {
                     }
                 }
             }
+            Map<String,Object> validY = new HashMap<>();
+            validY.put("minY",Math.max(getWorld().getMinHeight(),vert.minY()));
+            validY.put("maxY",Math.min(getWorld().getMaxHeight(),vert.maxY()));
+            if(getWorld().name().endsWith("_nether"))
+
             vert.setData(vertData);
+            vert.setData(validY);
+
             data.put(RegionKeys.vert, vert);
         } else throw new IllegalArgumentException("invalid shape\n" + vertObj);
 

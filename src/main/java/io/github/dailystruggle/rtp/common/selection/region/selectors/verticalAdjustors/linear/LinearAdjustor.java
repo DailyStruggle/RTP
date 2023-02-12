@@ -29,6 +29,14 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
     private static final Set<String> unsafeBlocks = new ConcurrentSkipListSet<>();
     private static final AtomicLong lastUpdate = new AtomicLong();
 
+    private static final List<List<Integer>> testCoords = Arrays.asList(
+            Arrays.asList(7,7),
+            Arrays.asList(2,2),
+            Arrays.asList(12,12),
+            Arrays.asList(2,12),
+            Arrays.asList(12,2)
+    );
+
     static {
         defaults.put(GenericVerticalAdjustorKeys.maxY, 127);
         defaults.put(GenericVerticalAdjustorKeys.minY, 32);
@@ -79,118 +87,122 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
             lastUpdate.set(t);
         }
 
-        switch (dir) {
-            case 0: { //bottom up
-                for (int i = minY; i < maxY; i++) {
-                    RTPBlock block1 = chunk.getBlockAt(7, i, 7);
-                    RTPBlock block2 = chunk.getBlockAt(7, i + 1, 7);
-                    int skylight = 15;
-                    if (requireSkyLight) skylight = block2.skyLight();
-                    if (block1.isAir() && block2.isAir() && skylight > 7
-                            && !unsafeBlocks.contains(block2.getMaterial())
-                            && !unsafeBlocks.contains(block1.getMaterial())
-                            && !unsafeBlocks.contains(chunk.getBlockAt(7, i - 1, 7).getMaterial())) {
-                        return block1.getLocation();
+        for (List<Integer> xz : testCoords) {
+            int x = xz.get(0);
+            int z = xz.get(1);
+            switch (dir) {
+                case 0: { //bottom up
+                    for (int i = minY; i < maxY; i++) {
+                        RTPBlock block1 = chunk.getBlockAt(x, i, z);
+                        RTPBlock block2 = chunk.getBlockAt(x, i + 1, z);
+                        int skylight = 15;
+                        if (requireSkyLight) skylight = block2.skyLight();
+                        if (block1.isAir() && block2.isAir() && skylight > 7
+                                && !unsafeBlocks.contains(block2.getMaterial())
+                                && !unsafeBlocks.contains(block1.getMaterial())
+                                && !unsafeBlocks.contains(chunk.getBlockAt(x, i - 1, z).getMaterial())) {
+                            return block1.getLocation();
+                        }
                     }
+                    break;
                 }
-                break;
-            }
-            case 1: { //top down
-                for (int i = maxY; i > minY; i--) {
-                    RTPBlock block1 = chunk.getBlockAt(7, i, 7);
-                    RTPBlock block2 = chunk.getBlockAt(7, i + 1, 7);
-                    int skylight = 15;
-                    if (requireSkyLight) skylight = block2.skyLight();
-                    if (block1.isAir() && block2.isAir() && skylight > 7
-                            && !unsafeBlocks.contains(block2.getMaterial())
-                            && !unsafeBlocks.contains(block1.getMaterial())
-                            && !unsafeBlocks.contains(chunk.getBlockAt(7, i - 1, 7).getMaterial())) {
-                        return block1.getLocation();
+                case 1: { //top down
+                    for (int i = maxY; i > minY; i--) {
+                        RTPBlock block1 = chunk.getBlockAt(x, i, z);
+                        RTPBlock block2 = chunk.getBlockAt(x, i + 1, z);
+                        int skylight = 15;
+                        if (requireSkyLight) skylight = block2.skyLight();
+                        if (block1.isAir() && block2.isAir() && skylight > 7
+                                && !unsafeBlocks.contains(block2.getMaterial())
+                                && !unsafeBlocks.contains(block1.getMaterial())
+                                && !unsafeBlocks.contains(chunk.getBlockAt(x, i - 1, z).getMaterial())) {
+                            return block1.getLocation();
+                        }
                     }
+                    break;
                 }
-                break;
-            }
-            case 2: { //middle out
-                int maxDistance = (maxY - minY) / 2; //dividing distance is more overflow-safe than simple average
-                int middle = minY + maxDistance;
-                for (int i = 0; i <= maxDistance; i++) {
-                    //try top
-                    RTPBlock block1 = chunk.getBlockAt(7, middle + i, 7);
-                    RTPBlock block2 = chunk.getBlockAt(7, middle + i + 1, 7);
-                    int skylight = 15;
-                    if (requireSkyLight) skylight = block2.skyLight();
-                    if (block1.isAir() && block2.isAir() && skylight > 7
-                            && !unsafeBlocks.contains(block2.getMaterial())
-                            && !unsafeBlocks.contains(block1.getMaterial())
-                            && !unsafeBlocks.contains(chunk.getBlockAt(7, middle + i - 1, 7).getMaterial())) {
-                        return block1.getLocation();
+                case 2: { //middle out
+                    int maxDistance = (maxY - minY) / 2; //dividing distance is more overflow-safe than simple average
+                    int middle = minY + maxDistance;
+                    for (int i = 0; i <= maxDistance; i++) {
+                        //try top
+                        RTPBlock block1 = chunk.getBlockAt(x, middle + i, z);
+                        RTPBlock block2 = chunk.getBlockAt(x, middle + i + 1, z);
+                        int skylight = 15;
+                        if (requireSkyLight) skylight = block2.skyLight();
+                        if (block1.isAir() && block2.isAir() && skylight > 7
+                                && !unsafeBlocks.contains(block2.getMaterial())
+                                && !unsafeBlocks.contains(block1.getMaterial())
+                                && !unsafeBlocks.contains(chunk.getBlockAt(x, middle + i - 1, z).getMaterial())) {
+                            return block1.getLocation();
+                        }
+
+                        //try bottom
+                        block1 = chunk.getBlockAt(x, middle - i, z);
+                        block2 = chunk.getBlockAt(x, middle - i + 1, z);
+                        skylight = 15;
+                        if (requireSkyLight) skylight = block2.skyLight();
+                        if (block1.isAir() && block2.isAir() && skylight > 7
+                                && !unsafeBlocks.contains(block2.getMaterial())
+                                && !unsafeBlocks.contains(block1.getMaterial())
+                                && !unsafeBlocks.contains(chunk.getBlockAt(x, middle - i - 1, z).getMaterial())) {
+                            return block1.getLocation();
+                        }
+                    }
+                    break;
+                }
+                case 3: { //edges in
+                    int maxDistance = (maxY - minY) / 2; //dividing distance is more overflow-safe than simple average
+                    int middle = minY + maxDistance;
+                    for (int i = maxDistance; i >= 0; i--) {
+                        //try top
+                        RTPBlock block1 = chunk.getBlockAt(x, middle + i, z);
+                        RTPBlock block2 = chunk.getBlockAt(x, middle + i + 1, z);
+                        int skylight = 15;
+                        if (requireSkyLight) skylight = block2.skyLight();
+                        if (block1.isAir() && block2.isAir() && skylight > 7
+                                && !unsafeBlocks.contains(block2.getMaterial())
+                                && !unsafeBlocks.contains(block1.getMaterial())
+                                && !unsafeBlocks.contains(chunk.getBlockAt(x, middle + i - 1, z).getMaterial())) {
+                            return block1.getLocation();
+                        }
+
+                        //try bottom
+                        block1 = chunk.getBlockAt(x, middle - i, z);
+                        block2 = chunk.getBlockAt(x, middle - i + 1, z);
+                        skylight = 15;
+                        if (requireSkyLight) skylight = block2.skyLight();
+                        if (block1.isAir() && block2.isAir() && skylight > 7
+                                && !unsafeBlocks.contains(block2.getMaterial())
+                                && !unsafeBlocks.contains(block1.getMaterial())
+                                && !unsafeBlocks.contains(chunk.getBlockAt(x, middle - i - 1, z).getMaterial())) {
+                            return block1.getLocation();
+                        }
+                    }
+                    break;
+                }
+                default: { //random order
+                    //load up a list of possible vertical indices
+                    List<Integer> trials = new ArrayList<>(maxY - minY + 1);
+                    for (int i = minY; i < maxY; i++) {
+                        trials.add(i);
                     }
 
-                    //try bottom
-                    block1 = chunk.getBlockAt(7, middle - i, 7);
-                    block2 = chunk.getBlockAt(7, middle - i + 1, 7);
-                    skylight = 15;
-                    if (requireSkyLight) skylight = block2.skyLight();
-                    if (block1.isAir() && block2.isAir() && skylight > 7
-                            && !unsafeBlocks.contains(block2.getMaterial())
-                            && !unsafeBlocks.contains(block1.getMaterial())
-                            && !unsafeBlocks.contains(chunk.getBlockAt(7, middle - i - 1, 7).getMaterial())) {
-                        return block1.getLocation();
-                    }
-                }
-                break;
-            }
-            case 3: { //edges in
-                int maxDistance = (maxY - minY) / 2; //dividing distance is more overflow-safe than simple average
-                int middle = minY + maxDistance;
-                for (int i = maxDistance; i >= 0; i--) {
-                    //try top
-                    RTPBlock block1 = chunk.getBlockAt(7, middle + i, 7);
-                    RTPBlock block2 = chunk.getBlockAt(7, middle + i + 1, 7);
-                    int skylight = 15;
-                    if (requireSkyLight) skylight = block2.skyLight();
-                    if (block1.isAir() && block2.isAir() && skylight > 7
-                            && !unsafeBlocks.contains(block2.getMaterial())
-                            && !unsafeBlocks.contains(block1.getMaterial())
-                            && !unsafeBlocks.contains(chunk.getBlockAt(7, middle + i - 1, 7).getMaterial())) {
-                        return block1.getLocation();
-                    }
+                    //randomize order
+                    Collections.shuffle(trials);
 
-                    //try bottom
-                    block1 = chunk.getBlockAt(7, middle - i, 7);
-                    block2 = chunk.getBlockAt(7, middle - i + 1, 7);
-                    skylight = 15;
-                    if (requireSkyLight) skylight = block2.skyLight();
-                    if (block1.isAir() && block2.isAir() && skylight > 7
-                            && !unsafeBlocks.contains(block2.getMaterial())
-                            && !unsafeBlocks.contains(block1.getMaterial())
-                            && !unsafeBlocks.contains(chunk.getBlockAt(7, middle - i - 1, 7).getMaterial())) {
-                        return block1.getLocation();
-                    }
-                }
-                break;
-            }
-            default: { //random order
-                //load up a list of possible vertical indices
-                List<Integer> trials = new ArrayList<>(maxY - minY + 1);
-                for (int i = minY; i < maxY; i++) {
-                    trials.add(i);
-                }
-
-                //randomize order
-                Collections.shuffle(trials);
-
-                //try each
-                for (int i : trials) {
-                    RTPBlock block1 = chunk.getBlockAt(7, i, 7);
-                    RTPBlock block2 = chunk.getBlockAt(7, i + 1, 7);
-                    int skylight = 15;
-                    if (requireSkyLight) skylight = block2.skyLight();
-                    if (block1.isAir() && block2.isAir() && skylight > 7
-                            && !unsafeBlocks.contains(block2.getMaterial())
-                            && !unsafeBlocks.contains(block1.getMaterial())
-                            && !unsafeBlocks.contains(chunk.getBlockAt(7, i - 1, 7).getMaterial())) {
-                        return block1.getLocation();
+                    //try each
+                    for (int i : trials) {
+                        RTPBlock block1 = chunk.getBlockAt(x, i, z);
+                        RTPBlock block2 = chunk.getBlockAt(x, i + 1, z);
+                        int skylight = 15;
+                        if (requireSkyLight) skylight = block2.skyLight();
+                        if (block1.isAir() && block2.isAir() && skylight > 7
+                                && !unsafeBlocks.contains(block2.getMaterial())
+                                && !unsafeBlocks.contains(block1.getMaterial())
+                                && !unsafeBlocks.contains(chunk.getBlockAt(x, i - 1, z).getMaterial())) {
+                            return block1.getLocation();
+                        }
                     }
                 }
             }
