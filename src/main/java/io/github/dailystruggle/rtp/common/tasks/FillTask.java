@@ -265,17 +265,59 @@ public class FillTask extends RTPRunnable {
 
             //todo: waterlogged check
             RTPBlock block;
+            RTPChunk chunk1;
+            Map<List<Integer>,RTPChunk> chunks = new HashMap<>();
+            chunks.put(Arrays.asList(chunk.x(), chunk.z()), chunk);
+            chunk.keep(true);
             for (int x = location.x() - finalSafetyRadius; x < location.x() + finalSafetyRadius && pass; x++) {
+                int xx = x;
+                int dx = Math.abs(xx/16);
+                int chunkX = chunk.x();
+
+                if(xx < 0) {
+                    chunkX-=dx+1;
+                    if(xx%16==0) xx+=16*dx;
+                    else xx+=16*(dx+1);
+                } else if(xx >= 16) {
+                    chunkX+=dx;
+                    xx-=16*dx;
+                }
+
                 for (int z = location.z() - finalSafetyRadius; z < location.z() + finalSafetyRadius && pass; z++) {
+                    int zz = z;
+                    int dz = Math.abs(zz/16);
+                    int chunkZ = chunk.x();
+
+                    if(zz < 0) {
+                        chunkZ-=dx+1;
+                        if(zz%16==0) zz+=16*dz;
+                        else zz+=16*(dx+1);
+                    } else if(zz >= 16) {
+                        chunkZ+=dz;
+                        zz-=16*dz;
+                    }
+
+                    List<Integer> xz = Arrays.asList(chunkX, chunkZ);
+                    if(chunks.containsKey(xz)) chunk1 = chunks.get(xz);
+                    else {
+                        try {
+                            chunk1 = region.getWorld().getChunkAt(chunkX, chunkZ).get();
+                            chunks.put(xz,chunk1);
+                            chunk1.keep(true);
+                        } catch (InterruptedException | ExecutionException e) {
+                            return;
+                        }
+                    }
+
                     for (int y = location.y() - finalSafetyRadius; y < location.y() + finalSafetyRadius && pass; y++) {
-                        block = chunk.getBlockAt(x, y, z);
+                        block = chunk1.getBlockAt(xx, y, zz);
                         if (unsafeBlocks.contains(block.getMaterial())) {
                             pass = false;
                         }
                     }
                 }
             }
-
+            for(RTPChunk usedChunk : chunks.values()) usedChunk.keep(false);
 
             if (isCancelled()) {
                 chunk.unload();
