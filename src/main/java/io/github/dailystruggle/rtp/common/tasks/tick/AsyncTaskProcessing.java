@@ -8,10 +8,14 @@ import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicLong;
 
 public final class AsyncTaskProcessing extends RTPRunnable {
     private final long availableTime;
-    long step = 0;
+    private static final AtomicLong step = new AtomicLong();
+    private static final AtomicLong betweenStep = new AtomicLong();
+    private static final Semaphore stepSemaphore = new Semaphore(1);
 
     public AsyncTaskProcessing(long availableTime) {
         this.availableTime = availableTime;
@@ -38,20 +42,31 @@ public final class AsyncTaskProcessing extends RTPRunnable {
         }
 
         List<Region> regions = new ArrayList<>(RTP.selectionAPI.permRegionLookup.values());
-        if (period <= 0) period = regions.size();
-        if (period <= 0) return;
+        if (period < regions.size()) period = regions.size();
+
+        long betweenTime = Math.max((period / regions.size())-1,0);
+        long betweenStep;
+        long step;
+        try {
+            stepSemaphore.acquire();
+            if(betweenTime<=0) betweenStep = 0;
+            else betweenStep = AsyncTaskProcessing.betweenStep.incrementAndGet() % betweenTime;
+            step = AsyncTaskProcessing.step.get();
+            if(betweenStep==0) step = (step+1)%regions.size();
+            AsyncTaskProcessing.betweenStep.set(betweenStep);
+            AsyncTaskProcessing.step.set(step);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            return;
+        } finally {
+            stepSemaphore.release();
+        }
 
         //step computation according to period
-        double increment = ((double) period) / regions.size();
-        long location = (long) (increment * step);
-        for (int i = 0; i < regions.size(); i++) {
+        if(betweenStep == 0) {
             if (isCancelled()) return;
-            long l = (long) (((double) i) * increment);
-
-            if (l == location) {
-                regions.get(i).execute(availableTime - (System.nanoTime() - start));
-            }
+            Region region = regions.get((int) step);
+            region.execute(availableTime - (System.nanoTime() - start));
         }
-        step = (step + 1) % (period+1);
     }
 }
