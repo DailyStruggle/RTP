@@ -28,56 +28,71 @@ import java.util.stream.Collectors;
 
 public final class BukkitRTPWorld implements RTPWorld {
     private static final AtomicBoolean chunkBiomes = new AtomicBoolean(false);
+    private static final AtomicBoolean biomeException = new AtomicBoolean(false);
     private static Function<Location, String> getBiome = location -> {
-        World world = Objects.requireNonNull(location.getWorld());
-        int x = location.getBlockX();
-        int y = location.getBlockY();
-        int z = location.getBlockZ();
+        if(biomeException.get()) return Biome.PLAINS.name();
 
-        int chunkX = (x>0) ? x/16 : x/16-1;
-        int chunkZ = (z>0) ? z/16 : z/16-1;
+        try {
+            World world = Objects.requireNonNull(location.getWorld());
+            int x = location.getBlockX();
+            int y = location.getBlockY();
+            int z = location.getBlockZ();
 
-        int bx = x % 16;
-        int bz = z % 16;
-        if (bx < 0) bx += 16;
-        if (bz < 0) bz += 16;
+            int chunkX = (x > 0) ? x / 16 : x / 16 - 1;
+            int chunkZ = (z > 0) ? z / 16 : z / 16 - 1;
 
-        if(RTP.serverAccessor.getServerIntVersion()<13 || chunkBiomes.get()) {
-            Region.maxBiomeChecksPerGen = 2;
+            int bx = x % 16;
+            int bz = z % 16;
+            if (bx < 0) bx += 16;
+            if (bz < 0) bz += 16;
 
-            Future<Chunk> future;
-            if(RTP.serverAccessor.getServerIntVersion()>=13) {
-                future = PaperLib.getChunkAtAsyncUrgently(world,chunkX,chunkZ,true);
+            if (RTP.serverAccessor.getServerIntVersion() < 13 || chunkBiomes.get()) {
+                Region.maxBiomeChecksPerGen = 2;
+
+                Future<Chunk> future;
+                if (RTP.serverAccessor.getServerIntVersion() >= 13) {
+                    future = PaperLib.getChunkAtAsyncUrgently(world, chunkX, chunkZ, true);
+                } else {
+                    if (Bukkit.isPrimaryThread())
+                        future = CompletableFuture.completedFuture(world.getChunkAt(chunkX, chunkZ));
+                    else
+                        future = Bukkit.getScheduler().callSyncMethod(RTPBukkitPlugin.getInstance(), () -> world.getChunkAt(chunkX, chunkZ));
+                }
+
+                try {
+                    Chunk chunk = future.get();
+                    return chunk.getBlock(bx, y, bz).getBiome().name().toUpperCase();
+                } catch (InterruptedException | ExecutionException e) {
+                    e.printStackTrace();
+                }
             }
-            else {
-                if(Bukkit.isPrimaryThread()) future = CompletableFuture.completedFuture(world.getChunkAt(chunkX, chunkZ));
-                else future = Bukkit.getScheduler().callSyncMethod(RTPBukkitPlugin.getInstance(),() -> world.getChunkAt(chunkX,chunkZ));
+
+            String initialBiome = (RTP.serverAccessor.getServerIntVersion() < 17)
+                    ? world.getBiome(x, y).name()
+                    : world.getBiome(x, y, z).name();
+
+            if (world.isChunkLoaded(chunkX, chunkZ)) {
+                Chunk chunkAt = world.getChunkAt(chunkX, chunkZ);
+                Block block = chunkAt.getBlock(bx, y, bz);
+                String chunkBiome = block.getBiome().name().toUpperCase();
+                if (!chunkBiome.equals(initialBiome)) {
+                    RTP.log(Level.WARNING, "[RTP] detected biome mismatch. Using localized lookup instead");
+                    chunkBiomes.set(true);
+                }
+                return chunkBiome;
             }
 
-            try {
-                Chunk chunk = future.get();
-                return chunk.getBlock(bx,y,bz).getBiome().name().toUpperCase();
-            } catch (InterruptedException | ExecutionException e) {
-                e.printStackTrace();
-            }
+            return initialBiome;
+        } catch (Throwable throwable) {
+            RTP.log(Level.SEVERE,
+                    "[RTP] world.getBiome() has thrown. " +
+                            "This method will only return PLAINS until shutdown. " +
+                            "Please fix your world generation or use a plugin to replace this method");
+            throwable.printStackTrace();
+            biomeException.set(true);
+            setBiomesGetter(rtpWorld -> Collections.singleton(Biome.PLAINS.name()));
+            return Biome.PLAINS.name();
         }
-
-        String initialBiome = (RTP.serverAccessor.getServerIntVersion() < 17)
-                ? world.getBiome(x, y).name()
-                : world.getBiome(x, y, z).name();
-
-        if(world.isChunkLoaded(chunkX,chunkZ)) {
-            Chunk chunkAt = world.getChunkAt(chunkX, chunkZ);
-            Block block = chunkAt.getBlock(bx, y, bz);
-            String chunkBiome = block.getBiome().name().toUpperCase();
-            if(!chunkBiome.equals(initialBiome)) {
-                RTP.log(Level.WARNING, "[RTP] detected biome mismatch. Using localized lookup instead");
-                chunkBiomes.set(true);
-            }
-            return chunkBiome;
-        }
-
-        return initialBiome;
     };
     private static @NotNull Function<RTPWorld, Set<String>> getBiomes
             = (rtpWorld) -> Arrays.stream(Biome.values()).map(biome -> biome.name().toUpperCase()).collect(Collectors.toSet());

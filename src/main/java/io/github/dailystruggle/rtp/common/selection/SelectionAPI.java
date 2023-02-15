@@ -148,7 +148,6 @@ public class SelectionAPI {
 
     public Region getRegion(RTPPlayer player) {
         //get region from world name, check for overrides
-
         Set<String> worldsAttempted = new HashSet<>();
         String worldName = player.getLocation().world().name();
         MultiConfigParser<WorldKeys> worldParsers = (MultiConfigParser<WorldKeys>) RTP.configs.multiConfigParserMap.get(WorldKeys.class);
