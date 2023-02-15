@@ -10,7 +10,7 @@ The goal of this plugin is function over form,
  * region-based design, supporting any number of rtp regions per world
  * per-world and per-region configuration and teleport permissions
  * adjustment of region and world settings by command or by config file 
- * adjustment of all plugin messages
+ * adjustment of all plugin messages, except for utility logs
  
 ## Build Instructions
 This codebase was put together in Intellij IDEA. You can open the base directory as a project, trust the sources, and build as-is with maven.
@@ -35,4 +35,6 @@ square, using a normal distribution
 rectangle, using a flat distribution and a rotation
 ![3Yw2tBj](https://user-images.githubusercontent.com/28832622/210043964-ca9725b8-be25-4e3c-a460-90f8b81326cb.png)
 
-This plugin also allows arbitrary shape addition via API calls.
+This plugin also allows arbitrary shape addition via API calls. 
+
+Check the addons directory for examples on adding shapes, biome methods, claim plugin integrations, and commands
