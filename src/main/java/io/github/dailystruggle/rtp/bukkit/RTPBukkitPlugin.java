@@ -14,11 +14,8 @@ import io.github.dailystruggle.rtp.bukkit.tools.softdepends.VaultChecker;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
-import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
-import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
-import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.database.options.SQLiteDatabaseAccessor;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
@@ -45,6 +42,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     private static final EffectsAPI effectsAPI = null;
     private static RTPBukkitPlugin instance = null;
     private static Metrics metrics;
+
     public BukkitTask commandTimer = null;
     public BukkitTask commandProcessing = null;
     public BukkitTask asyncTimer = null;
@@ -52,74 +50,39 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     public BukkitTask fillTimer = null;
     public BukkitTask databaseTimer = null;
 
+    /**
+     * @return the single plugin instance initialized at bukkit startup, faster than bukkit api
+     */
     public static RTPBukkitPlugin getInstance() {
         return instance;
     }
 
+    /**
+     * bukkit-specific method to find the correct region for the player's location and permissions
+     *
+     * @param player bukkit player
+     * @return region object
+     */
     public static Region getRegion(Player player) {
-        //get region from world name, check for overrides
-        Set<String> worldsAttempted = new HashSet<>();
-        Set<String> regionsAttempted = new HashSet<>();
-
-        String worldName = player.getWorld().getName();
-        MultiConfigParser<WorldKeys> worldParsers = (MultiConfigParser<WorldKeys>) RTP.configs.multiConfigParserMap.get(WorldKeys.class);
-        ConfigParser<WorldKeys> worldParser = worldParsers.getParser(worldName);
-        boolean requirePermission = Boolean.parseBoolean(worldParser.getConfigValue(WorldKeys.requirePermission, false).toString());
-
-        while (requirePermission && !player.hasPermission("rtp.worlds." + worldName)) {
-            if (worldsAttempted.contains(worldName))
-                throw new IllegalStateException("infinite override loop detected at world - " + worldName);
-            worldsAttempted.add(worldName);
-
-            worldName = String.valueOf(worldParser.getConfigValue(WorldKeys.override, "default"));
-            worldParser = worldParsers.getParser(worldName);
-            requirePermission = Boolean.parseBoolean(worldParser.getConfigValue(WorldKeys.requirePermission, false).toString());
-        }
-
-        String regionName = String.valueOf(worldParser.getConfigValue(WorldKeys.region, "default"));
-        MultiConfigParser<RegionKeys> regionParsers = (MultiConfigParser<RegionKeys>) RTP.configs.multiConfigParserMap.get(RegionKeys.class);
-        ConfigParser<RegionKeys> regionParser = regionParsers.getParser(regionName);
-        requirePermission = Boolean.parseBoolean(regionParser.getConfigValue(RegionKeys.requirePermission, false).toString());
-
-        while (requirePermission && !player.hasPermission("rtp.regions." + regionName)) {
-            if (regionsAttempted.contains(regionName))
-                throw new IllegalStateException("infinite override loop detected at region - " + regionName);
-            regionsAttempted.add(regionName);
-
-            regionName = String.valueOf(regionParser.getConfigValue(RegionKeys.override, "default"));
-            regionParser = regionParsers.getParser(regionName);
-            requirePermission = Boolean.parseBoolean(regionParser.getConfigValue(RegionKeys.requirePermission, false).toString());
-        }
-        return RTP.selectionAPI.permRegionLookup.get(regionName);
+        return RTP.selectionAPI.getRegion(new BukkitRTPPlayer(player));
     }
 
+    /**
+     * on class load by bukkit
+     */
     @Override
     public void onLoad() {
+        //prepare sqlite capability
         try {
             Class.forName("org.sqlite.JDBC");
         } catch (ClassNotFoundException e) {
             throw new IllegalStateException();
         }
-
-//        instance = this;
-//        RTP.serverAccessor = new BukkitServerAccessor();
-//
-//        RTP rtp = new RTP();//constructor updates API instance
-//
-//        File databaseDirectory = RTP.configs.pluginDirectory;
-//        databaseDirectory = new File(databaseDirectory.getAbsolutePath() + File.separator + "database");
-//        databaseDirectory.mkdirs();
-//        rtp.databaseAccessor = new SQLiteDatabaseAccessor(
-//                "jdbc:sqlite:" + databaseDirectory.getAbsolutePath() + File.separator + "RTP.db");
-//        rtp.databaseAccessor.startup();
-
-//        File pluginDirectory = RTP.configs.pluginDirectory;
-//        pluginDirectory = new File(pluginDirectory.getAbsolutePath() + File.separator + "database");
-//        YamlFileDatabase database = new YamlFileDatabase(pluginDirectory);
-//        rtp.databaseAccessor = database;
-//        database.startup();
     }
 
+    /**
+     * whenever bukkit feels like enabling this plugin
+     */
     @Override
     public void onEnable() {
         metrics = new Metrics(this, 12277);
@@ -176,6 +139,9 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         }
     }
 
+    /**
+     * whenever bukkit feels like disabling this plugin
+     */
     @Override
     public void onDisable() {
         if (commandTimer != null) commandTimer.cancel();
