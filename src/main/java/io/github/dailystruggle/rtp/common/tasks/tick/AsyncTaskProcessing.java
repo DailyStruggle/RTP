@@ -8,6 +8,7 @@ import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -16,6 +17,7 @@ public final class AsyncTaskProcessing extends RTPRunnable {
     private static final AtomicLong step = new AtomicLong();
     private static final AtomicLong betweenStep = new AtomicLong();
     private static final Semaphore stepSemaphore = new Semaphore(1);
+    private static final Semaphore futuresSemaphore = new Semaphore(1);
 
     public AsyncTaskProcessing(long availableTime) {
         this.availableTime = availableTime;
@@ -23,6 +25,21 @@ public final class AsyncTaskProcessing extends RTPRunnable {
 
     @Override
     public void run() {
+        try {
+            futuresSemaphore.acquire();
+            List<CompletableFuture<?>> futures = new ArrayList<>(RTP.futures.size());
+            while (RTP.futures.size()>0) {
+                CompletableFuture<?> future = RTP.futures.poll();
+                if(future!=null && !future.isDone()) futures.add(future);
+            }
+
+            RTP.futures.addAll(futures);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            futuresSemaphore.release();
+        }
+
         if (isCancelled()) return;
         long start = System.nanoTime();
 
@@ -42,9 +59,11 @@ public final class AsyncTaskProcessing extends RTPRunnable {
         }
 
         List<Region> regions = new ArrayList<>(RTP.selectionAPI.permRegionLookup.values());
-        if (period < regions.size()) period = regions.size();
+        int size = regions.size();
+        if(size == 0) return;
+        if (period < size) period = size;
 
-        long betweenTime = Math.max((period / regions.size())-1,0);
+        long betweenTime = Math.max((period / size)-1,0);
         long betweenStep;
         long step;
         try {
@@ -52,7 +71,7 @@ public final class AsyncTaskProcessing extends RTPRunnable {
             if(betweenTime<=0) betweenStep = 0;
             else betweenStep = AsyncTaskProcessing.betweenStep.incrementAndGet() % betweenTime;
             step = AsyncTaskProcessing.step.get();
-            if(betweenStep==0) step = (step+1)%regions.size();
+            if(betweenStep==0) step = (step+1)% size;
             AsyncTaskProcessing.betweenStep.set(betweenStep);
             AsyncTaskProcessing.step.set(step);
         } catch (InterruptedException e) {
@@ -65,6 +84,7 @@ public final class AsyncTaskProcessing extends RTPRunnable {
         //step computation according to period
         if(betweenStep == 0) {
             if (isCancelled()) return;
+            if(regions.size() < step) return;
             Region region = regions.get((int) step);
             region.execute(availableTime - (System.nanoTime() - start));
         }

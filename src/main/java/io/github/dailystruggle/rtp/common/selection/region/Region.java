@@ -253,6 +253,7 @@ public class Region extends FactoryValue<RegionKeys> {
                     e.printStackTrace();
                     continue;
                 }
+                if(chunk == null) return null;
 
                 long t = System.currentTimeMillis();
                 long dt = t - lastUpdate.get();
@@ -368,8 +369,18 @@ public class Region extends FactoryValue<RegionKeys> {
         return pair;
     }
 
+    protected enum FailTypes {
+        biome,
+        worldBorder,
+        timeout,
+        vert,
+        safety,
+        safetyExternal,
+        misc
+    }
     @Nullable
     public Map.Entry<RTPLocation, Long> getLocation(@Nullable Set<String> biomeNames) {
+
         boolean defaultBiomes = false;
         ConfigParser<PerformanceKeys> performance = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
         ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
@@ -431,15 +442,8 @@ public class Region extends FactoryValue<RegionKeys> {
 
         RTPWorld world = getWorld();
 
-        long biomeFails = 0L;
-        long worldBorderFails = 0L;
-        long timeoutFails = 0L;
-        long vertFails = 0L;
-        long safetyFails = 0L;
-        long miscFails = 0L;
-
-        Map<String, Long> biomeSpecificFails = new HashMap<>();
-        Map<String, Long> safetySpecificFails = new HashMap<>();
+        Map<FailTypes,Map<String,Long>> failMap = new EnumMap<>(FailTypes.class);
+        for(FailTypes f : FailTypes.values()) failMap.put(f,new HashMap<>());
         List<Map.Entry<Long, Long>> selections = new ArrayList<>();
 
         RTPLocation location = null;
@@ -516,10 +520,14 @@ public class Region extends FactoryValue<RegionKeys> {
                     select = shape.select();
 //                    if (verbose) selections.add(new AbstractMap.SimpleEntry<>((long) select[0], (long) select[1]));
                 }
-                biomeSpecificFails.putIfAbsent(currBiome, 0L);
-                biomeSpecificFails.put(currBiome, biomeSpecificFails.get(currBiome) + 1);
+                String key = "biome="+currBiome;
+                if(verbose) {
+                    failMap.get(FailTypes.biome).compute(key, (s, aLong) -> {
+                        if (aLong == null) return 1L;
+                        return ++aLong;
+                    });
+                }
                 currBiome = world.getBiome(select[0] * 16 + 7, (vert.minY() + vert.maxY()) / 2, select[1] * 16 + 7);
-                biomeFails++;
             }
             if (biomeChecks >= maxBiomeChecks) return new AbstractMap.SimpleEntry<>(null, i);
 
@@ -531,15 +539,18 @@ public class Region extends FactoryValue<RegionKeys> {
             WorldBorder border = RTP.serverAccessor.getWorldBorder(world.name());
             if (!border.isInside().apply(new RTPLocation(world, select[0] * 16, (vert.maxY() + vert.minY()) / 2, select[1] * 16))) {
                 maxAttempts++;
+                Long worldBorderFails = failMap.get(FailTypes.worldBorder).getOrDefault("OUTSIDE_BORDER", 0L);
                 worldBorderFails++;
                 if (worldBorderFails > 1000) {
                     new IllegalStateException("1000 worldborder checks failed. region/selection is likely outside the worldborder").printStackTrace();
                     return new AbstractMap.SimpleEntry<>(null, i);
                 }
+                failMap.get(FailTypes.worldBorder).put("OUTSIDE_BORDER",worldBorderFails);
                 continue;
             }
 
             CompletableFuture<RTPChunk> cfChunk = world.getChunkAt(select[0], select[1]);
+            RTP.futures.add(cfChunk);
 
             RTPChunk chunk;
 
@@ -549,13 +560,17 @@ public class Region extends FactoryValue<RegionKeys> {
                 e.printStackTrace();
                 return new AbstractMap.SimpleEntry<>(null, i);
             }
+            if(chunk == null) return null;
 
             location = vert.adjust(chunk);
             if (location == null) {
                 if (defaultBiomes && shape instanceof MemoryShape && biomeRecall) {
                     ((MemoryShape<?>) shape).addBadLocation(l);
                 }
-                vertFails++;
+                if(verbose) {
+                    failMap.get(FailTypes.vert).compute("biome=" + currBiome,
+                            (s, aLong) -> (aLong==null) ? (1L) : (++aLong));
+                }
                 chunk.unload();
                 continue;
             }
@@ -568,9 +583,11 @@ public class Region extends FactoryValue<RegionKeys> {
                 if(defaultBiomes && shape instanceof MemoryShape && biomeRecall) {
                     ((MemoryShape<?>) shape).addBadLocation(l);
                 }
-                biomeSpecificFails.putIfAbsent(currBiome, 0L);
-                biomeSpecificFails.put(currBiome, biomeSpecificFails.get(currBiome) + 1);
-                biomeFails++;
+
+                if(verbose) {
+                    failMap.get(FailTypes.biome).compute("biome=" + currBiome,
+                            (s, aLong) -> (aLong == null) ? 1L : ++aLong);
+                }
                 chunk.unload();
                 continue;
             }
@@ -631,19 +648,20 @@ public class Region extends FactoryValue<RegionKeys> {
                         String material = block.getMaterial();
                         if (unsafeBlocks.contains(block.getMaterial())) {
                             pass = false;
-                            safetyFails++;
-                            safetySpecificFails.putIfAbsent(material, 0L);
-                            safetySpecificFails.put(material, safetySpecificFails.get(material) + 1);
+                            if(verbose) {
+                                String key = "material=" + material;
+                                failMap.get(FailTypes.safety).compute(key, (s, aLong) -> {
+                                    if (aLong == null) return 1L;
+                                    return ++aLong;
+                                });
+                            }
                         }
                     }
                 }
             }
             for(RTPChunk usedChunk : chunks.values()) usedChunk.keep(false);
 
-            if (pass) {
-                pass = checkGlobalRegionVerifiers(location);
-                if (!pass) miscFails++;
-            }
+            pass &= checkGlobalRegionVerifiers(location);
 
             if (pass) {
                 if (shape instanceof MemoryShape) {
@@ -651,6 +669,8 @@ public class Region extends FactoryValue<RegionKeys> {
                 }
                 break;
             } else {
+                if (verbose) failMap.get(FailTypes.misc).compute("location="+"("+location.x()+","+location.y()+","+location.z(),
+                        (s, aLong) -> (aLong==null) ? 1L : ++aLong);
                 if (shape instanceof MemoryShape) {
                     ((MemoryShape<?>) shape).addBadLocation(l);
                 }
@@ -661,36 +681,34 @@ public class Region extends FactoryValue<RegionKeys> {
 
 //        if (verbose) {
         if (verbose && i >= maxAttempts || i > maxAttemptsBase*maxBiomeChecksPerGen) {
-            RTP.log(Level.WARNING, "#0f0080[RTP] [" + name + "] failed to generate a location within " + maxAttempts + " tries");
-            RTP.log(Level.WARNING, "#0f0080[RTP] [" + name + "]     failed biome checks: " + biomeFails);
-            if (biomeFails > maxAttempts / 2) {
-                RTP.log(Level.WARNING, "#0f0080[RTP] [" + name + "] biomes: \n" + Arrays.toString(biomeNames.toArray()));
-                biomeSpecificFails.forEach((key, value) -> RTP.log(Level.WARNING,
-                        "#0f0080[RTP] [" + name + "]     " + key + ": " + value));
-            }
-            RTP.log(Level.WARNING, "#0f0080[RTP] [" + name + "]     failed world border checks: " + worldBorderFails);
-            RTP.log(Level.WARNING, "#0f0080[RTP] [" + name + "]     chunk timeouts: " + timeoutFails);
-            RTP.log(Level.WARNING, "#0f0080[RTP] [" + name + "]     failed height checks: " + vertFails);
-            if (vertFails > maxAttemptsBase / 2) {
-                RTP.log(Level.WARNING, "#0f0080[RTP] [" + name + "] current vert values: " + vert);
-            }
-            RTP.log(Level.WARNING, "#0f0080[RTP] [" + name + "]     failed safety checks: " + safetyFails);
-            if (safetyFails > maxAttemptsBase / 2) {
-                RTP.log(Level.WARNING, "#0f0080[RTP] [" + name + "] current set of unsafe blocks: \n" + Arrays.toString(unsafeBlocks.toArray()));
-                safetySpecificFails.forEach((key, value) -> RTP.log(Level.WARNING,
-                        "#0f0080[RTP] [" + name + "]     " + key + ": " + value));
-            }
-            RTP.log(Level.WARNING, "#0f0080[RTP] [" + name + "]     failed addon checks: " + miscFails);
-
-            if (shape instanceof MemoryShape) {
-                RTP.log(Level.INFO, "#0f0080[RTP] [" + name + "] range: " + ((MemoryShape<?>) shape).getRange());
-                for (int j = 0; j < selections.size(); j++) {
-                    Map.Entry<Long, Long> longLongEntry = selections.get(j);
-                    int[] xz = ((MemoryShape<?>) shape).locationToXZ(longLongEntry.getValue());
-                    selections.set(j, new AbstractMap.SimpleEntry<>((long) xz[0], (long) xz[1]));
+            RTP.log(Level.INFO, "#00ff80[RTP] [" + name + "] failed to generate a location within " + maxAttempts + " tries. Adjust your configuration.");
+            for(Map.Entry<FailTypes,Map<String,Long>> mapEntry : failMap.entrySet()) {
+                Map<String, Long> map = mapEntry.getValue();
+                String[] output = new String[map.size()];
+                int pos = 0;
+                long count = 0;
+                for(Map.Entry<String,Long> entry : map.entrySet()) {
+                    output[pos] = "#00ff80[RTP] [" + name + "] " + " cause=" + mapEntry.getKey() + " " + entry.getKey() + " fails=" + entry.getValue();
+                    count+=entry.getValue();
+                    pos++;
+                }
+                RTP.log(Level.INFO,"#00ff80[RTP] [" + name + "] " + " cause=" + mapEntry.getKey() + " fails=" + count);
+                for(String out : output) {
+                    RTP.log(Level.INFO,out);
                 }
             }
-            RTP.log(Level.INFO, "#0f0080[RTP] [" + name + "] selections: " + selections);
+
+            StringBuilder selectionsStr = new StringBuilder();
+            boolean first = true;
+            selectionsStr = selectionsStr.append("{");
+            for(Map.Entry<Long, Long> entry : selections) {
+                if(!first) {
+                    selectionsStr = selectionsStr.append(",");
+                }
+                selectionsStr = selectionsStr.append("(").append(entry.getKey()).append(",").append(entry.getValue()).append(")");
+            }
+            selectionsStr = selectionsStr.append("}");
+            RTP.log(Level.INFO, "#0f0080[RTP] [" + name + "] selections: " + selectionsStr);
         }
 
         i = Math.min(i, maxAttempts);

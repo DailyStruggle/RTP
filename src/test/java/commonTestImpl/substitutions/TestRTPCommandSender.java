@@ -2,6 +2,7 @@ package commonTestImpl.substitutions;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -47,7 +48,7 @@ public class TestRTPCommandSender implements RTPCommandSender {
     }
 
     @Override
-    public void performCommand(String command) {
+    public void performCommand(RTPPlayer player, String command) {
 
     }
 

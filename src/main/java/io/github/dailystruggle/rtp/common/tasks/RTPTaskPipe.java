@@ -38,7 +38,12 @@ public class RTPTaskPipe {
                 if (runnable instanceof RTPCancellable && ((RTPCancellable) runnable).isCancelled()) continue;
 
                 long localStart = System.nanoTime();
-                runnable.run();
+                try {
+                    runnable.run();
+                } catch (Throwable throwable) {
+                    throwable.printStackTrace();
+                    continue;
+                }
                 long localStop = System.nanoTime();
 
                 long diff = localStop - localStart;

@@ -209,7 +209,20 @@ public class SendMessage {
             long spot = teleportData.queueLocation;
             return String.valueOf(spot);
         });
-
+        placeholders.put("player", uuid -> {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player == null) {
+                return "";
+            }
+            return player.getName();
+        });
+        placeholders.put("player_name", uuid -> {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player == null) {
+                return "";
+            }
+            return player.getName();
+        });
         placeholders.put("player_status", uuid -> {
             Player player = Bukkit.getPlayer(uuid);
             if (player == null) {
@@ -490,6 +503,97 @@ public class SendMessage {
         text = Hex2Color(text);
         return text;
     }
+
+    public static String formatNoColor(@Nullable OfflinePlayer player, @Nullable String text) {
+        if (text == null) return "";
+
+        //get uuid to be referenced by placeholder getters
+        UUID uuid = (player != null) ? player.getUniqueId() : CommandsAPI.serverId;
+
+        //create a container for placeholder getter results
+        // initialize with the same size as the placeholder getter map to skip reallocation
+        Map<String, String> placeholders = new HashMap<>(SendMessage.placeholders.size());
+
+        Set<String> keywords = ParseString.keywords(text, SendMessage.placeholders.keySet(), new HashSet<>(Arrays.asList('[', '%')), new HashSet<>(Arrays.asList(']', '%')));
+        //for each placeholder getter, add placeholder and result to container
+        for (Map.Entry<String, Function<UUID, String>> entry : SendMessage.placeholders.entrySet()) {
+            String s = entry.getKey();
+            if (!keywords.contains(s)) continue;
+            Function<UUID, String> uuidStringFunction = entry.getValue();
+            placeholders.put(s, uuidStringFunction.apply(uuid));
+        }
+
+        //replace all placeholders with their respective string function results
+        for (Map.Entry<String, String> e : placeholders.entrySet()) {
+            text = Pattern.compile("\\[" + e.getKey() + "]",Pattern.CASE_INSENSITIVE).matcher(text).replaceAll(e.getValue());
+            text = Pattern.compile("%" + e.getKey() + "%",Pattern.CASE_INSENSITIVE).matcher(text).replaceAll(e.getValue());
+        }
+
+        if (lang != null) {
+            Pattern placeholderIntPattern = Pattern.compile("\\[([Pp])(\\d*)]");
+            Pattern placeholderIntPattern2 = Pattern.compile("%([Pp])(\\d*)%");
+            Matcher placeholderIntMatcher = placeholderIntPattern.matcher(text);
+            Matcher placeholderIntMatcher2 = placeholderIntPattern.matcher(text);
+            while (placeholderIntMatcher.find()) {
+                String group = placeholderIntMatcher.group(2);
+                int bits;
+                try {
+                    bits = Integer.parseInt(group);
+                } catch (NumberFormatException ignored) {
+                    continue;
+                }
+                placeholderIntMatcher.reset();
+
+                String replacement = "[invalid]";
+                ConfigParser<MessagesKeys> parser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+                Object o = parser.getConfigValue(MessagesKeys.placeholders, new ArrayList<>());
+                if (o instanceof List) {
+                    List<?> pList = (List<?>) o;
+                    if (pList.size() > bits) {
+                        replacement = pList.get(bits).toString();
+                    }
+                }
+
+                replacement = placeholderIntPattern.matcher(replacement).replaceAll("");
+
+                text = placeholderIntMatcher.replaceFirst(replacement);
+                placeholderIntMatcher = placeholderIntPattern.matcher(text);
+            }
+
+            while (placeholderIntMatcher2.find()) {
+                String group = placeholderIntMatcher2.group(2);
+                int bits;
+                try {
+                    bits = Integer.parseInt(group);
+                } catch (NumberFormatException ignored) {
+                    continue;
+                }
+                placeholderIntMatcher2.reset();
+
+                String replacement = "[invalid]";
+                ConfigParser<MessagesKeys> parser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+                Object o = parser.getConfigValue(MessagesKeys.placeholders, new ArrayList<>());
+                if (o instanceof List) {
+                    List<?> pList = (List<?>) o;
+                    if (pList.size() > bits) {
+                        replacement = pList.get(bits).toString();
+                    }
+                }
+
+                replacement = placeholderIntPattern2.matcher(replacement).replaceAll("");
+
+                text = placeholderIntMatcher2.replaceFirst(replacement);
+                placeholderIntMatcher2 = placeholderIntPattern.matcher(text);
+            }
+        }
+
+        //check PAPI exists and fill remaining PAPI placeholders
+        //todo: if a null player doesn't work with another PAPI import, blame that import for not verifying its inputs.
+        text = PAPIChecker.fillPlaceholders(player, text);
+
+        return text;
+    }
+
 
     private static String Hex2Color(String text) {
         //reduce patterns

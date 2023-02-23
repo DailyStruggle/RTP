@@ -33,6 +33,7 @@ public class FillTaskProcessing extends BukkitRunnable {
         if (asyncTask.get() != null) return;
 
         CompletableFuture<Boolean> future = new CompletableFuture<>();
+        RTP.futures.add(future);
         BukkitTask task = Bukkit.getScheduler().runTaskAsynchronously(RTPBukkitPlugin.getInstance(), () -> {
             for (Map.Entry<String, FillTask> e : RTP.getInstance().fillTasks.entrySet()) {
                 if (e.getValue().isRunning()) continue;

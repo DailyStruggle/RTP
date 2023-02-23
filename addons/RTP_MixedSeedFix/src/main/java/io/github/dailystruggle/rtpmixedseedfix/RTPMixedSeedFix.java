@@ -23,6 +23,7 @@ public final class RTPMixedSeedFix extends JavaPlugin {
                 if(x<0) x += 16;
                 if(z<0) z += 16;
                 Chunk chunk = PaperLib.getChunkAtAsync(location).get();
+                if(chunk == null) return;
                 biome = chunk.getBlock(x,y,z).getBiome();
             } catch (InterruptedException | ExecutionException e) {
                 e.printStackTrace();
