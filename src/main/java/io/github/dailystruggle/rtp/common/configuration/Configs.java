@@ -8,7 +8,6 @@ import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import org.jetbrains.annotations.Nullable;
-import org.simpleyaml.configuration.file.YamlFile;
 
 import java.io.File;
 import java.util.*;
@@ -27,8 +26,8 @@ public class Configs {
         this.pluginDirectory = pluginDirectory;
         RTP.getInstance().startupTasks.add(new RTPRunnable(this::reloadAction, 5));
         this.fileDatabase = new YamlFileDatabase(pluginDirectory);
-        Map<String, YamlFile> connect = this.fileDatabase.connect();
-        this.fileDatabase.disconnect(connect);
+        this.fileDatabase.connect();
+//        this.fileDatabase.disconnect(connect);
     }
 
     public static void onReload(Runnable runnable) {

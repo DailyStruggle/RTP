@@ -31,6 +31,9 @@ public class FillTask extends RTPRunnable {
     private final Region region;
     private final long start;
     private final CompletableFuture<Boolean> done = new CompletableFuture<>();
+    {
+        RTP.futures.add(done);
+    }
     private final AtomicLong completionCounter = new AtomicLong();
     private final Semaphore completionGuard = new Semaphore(1);
     private final List<CompletableFuture<RTPChunk>> chunks = new ArrayList<>();
@@ -103,6 +106,8 @@ public class FillTask extends RTPRunnable {
                     if (finalPos == range - 1 || l == limit) {
                         done.complete(true);
                     }
+                } catch (CancellationException e) {
+                    done.complete(false);
                 } catch (InterruptedException | IllegalStateException e) {
                     e.printStackTrace();
                     done.complete(false);
@@ -234,9 +239,8 @@ public class FillTask extends RTPRunnable {
         chunks.add(cfChunk);
 
         CompletableFuture<Boolean> res = new CompletableFuture<>();
-        int finalSafetyRadius = safetyRadius;
         cfChunk.thenAccept(chunk -> {
-            if (isCancelled()) return;
+            if (chunk == null || isCancelled()) return;
             RTPLocation location = vert.adjust(chunk);
             if (location == null) {
                 if(biomeRecall) shape.addBadLocation(pos);
@@ -269,7 +273,7 @@ public class FillTask extends RTPRunnable {
             Map<List<Integer>,RTPChunk> chunks = new HashMap<>();
             chunks.put(Arrays.asList(chunk.x(), chunk.z()), chunk);
             chunk.keep(true);
-            for (int x = location.x() - finalSafetyRadius; x < location.x() + finalSafetyRadius && pass; x++) {
+            for (int x = location.x() - safetyRadius; x < location.x() + safetyRadius && pass; x++) {
                 int xx = x;
                 int dx = Math.abs(xx/16);
                 int chunkX = chunk.x();
@@ -283,7 +287,7 @@ public class FillTask extends RTPRunnable {
                     xx-=16*dx;
                 }
 
-                for (int z = location.z() - finalSafetyRadius; z < location.z() + finalSafetyRadius && pass; z++) {
+                for (int z = location.z() - safetyRadius; z < location.z() + safetyRadius && pass; z++) {
                     int zz = z;
                     int dz = Math.abs(zz/16);
                     int chunkZ = chunk.x();
@@ -302,6 +306,7 @@ public class FillTask extends RTPRunnable {
                     else {
                         try {
                             chunk1 = region.getWorld().getChunkAt(chunkX, chunkZ).get();
+                            if(chunk1 == null) return;
                             chunks.put(xz,chunk1);
                             chunk1.keep(true);
                         } catch (InterruptedException | ExecutionException e) {
@@ -309,7 +314,7 @@ public class FillTask extends RTPRunnable {
                         }
                     }
 
-                    for (int y = location.y() - finalSafetyRadius; y < location.y() + finalSafetyRadius && pass; y++) {
+                    for (int y = location.y() - safetyRadius; y < location.y() + safetyRadius && pass; y++) {
                         block = chunk1.getBlockAt(xx, y, zz);
                         if (unsafeBlocks.contains(block.getMaterial())) {
                             pass = false;

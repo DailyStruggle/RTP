@@ -61,6 +61,7 @@ public final class BukkitRTPWorld implements RTPWorld {
 
                 try {
                     Chunk chunk = future.get();
+                    if(chunk == null) return "PLAINS";
                     return chunk.getBlock(bx, y, bz).getBiome().name().toUpperCase();
                 } catch (InterruptedException | ExecutionException e) {
                     e.printStackTrace();
@@ -143,24 +144,34 @@ public final class BukkitRTPWorld implements RTPWorld {
         Map.Entry<Chunk, Long> chunkLongPair = chunkMap.get(xz);
         if (chunkLongPair != null && chunkLongPair.getKey() != null) {
             Chunk chunk = chunkLongPair.getKey();
-            res.complete(new BukkitRTPChunk(chunk));
+            if(chunk == null) return null;
+            else res.complete(new BukkitRTPChunk(chunk));
             return res;
         }
 
         if (Bukkit.isPrimaryThread() || world.isChunkLoaded(cx, cz)) {
             Chunk chunk = world.getChunkAt(cx, cz);
-            BukkitRTPChunk rtpChunk = new BukkitRTPChunk(chunk);
-            res.complete(rtpChunk);
+            if(chunk == null) res.complete(null);
+            else res.complete(new BukkitRTPChunk(chunk));
         } else if (RTP.serverAccessor.getServerIntVersion() < 13) {
-            Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(), () -> res.complete(new BukkitRTPChunk(world.getChunkAt(cx, cz))));
+            Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(), () -> {
+                Chunk chunkAt = world.getChunkAt(cx, cz);
+                if(chunkAt == null) res.complete(null);
+                else res.complete(new BukkitRTPChunk(chunkAt));
+            });
         } else {
             CompletableFuture<Chunk> chunkAtAsync;
             try {
                 chunkAtAsync = PaperLib.getChunkAtAsyncUrgently(world, cx, cz, true);
             } catch (IllegalStateException exception) {
                 chunkAtAsync = new CompletableFuture<>();
-                Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),() -> res.complete(new BukkitRTPChunk(world.getChunkAt(cx,cz))));
+                Bukkit.getScheduler().runTask(RTPBukkitPlugin.getInstance(),() -> {
+                    Chunk chunkAt = world.getChunkAt(cx, cz);
+                    if(chunkAt == null) res.complete(null);
+                    else res.complete(new BukkitRTPChunk(chunkAt));
+                });
             }
+            RTP.futures.add(chunkAtAsync);
 
             List<CompletableFuture<Chunk>> list = chunkLoads.get(xz);
             if (list == null) list = new ArrayList<>();
@@ -168,7 +179,8 @@ public final class BukkitRTPWorld implements RTPWorld {
             chunkLoads.put(xz, list);
 
             chunkAtAsync.thenAccept(chunk -> {
-                res.complete(new BukkitRTPChunk(chunk));
+                if(chunk == null) res.complete(null);
+                else res.complete(new BukkitRTPChunk(chunk));
                 chunkLoads.remove(xz);
                 if (!RTPBukkitPlugin.getInstance().isEnabled())
                     throw new IllegalStateException("completed chunk after plugin disabled");

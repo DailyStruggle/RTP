@@ -6,8 +6,10 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
+import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -81,7 +83,11 @@ public final class BukkitRTPCommandSender implements RTPCommandSender {
     }
 
     @Override
-    public void performCommand(String command) {
+    public void performCommand(RTPPlayer rtpPlayer, String command) {
+        OfflinePlayer player;
+        if(rtpPlayer==null) player = (sender instanceof OfflinePlayer) ? (OfflinePlayer) sender : null;
+        else player = ((BukkitRTPPlayer) rtpPlayer).player();
+        command = SendMessage.formatNoColor(player,command);
         Bukkit.dispatchCommand(sender, command);
     }
 

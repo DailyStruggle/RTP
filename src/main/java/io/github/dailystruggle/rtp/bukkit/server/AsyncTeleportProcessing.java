@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.bukkit.server;
 
 import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.tasks.TPS;
 import io.github.dailystruggle.rtp.common.tasks.tick.AsyncTaskProcessing;
 import org.bukkit.Bukkit;
@@ -55,6 +56,7 @@ public class AsyncTeleportProcessing extends BukkitRunnable {
         if (asyncTasks.size() > 1) return;
 
         CompletableFuture<Boolean> future = new CompletableFuture<>();
+        RTP.futures.add(future);
         BukkitTask task = Bukkit.getScheduler().runTaskAsynchronously(RTPBukkitPlugin.getInstance(), () -> {
             AsyncTaskProcessing asyncTaskProcessing2 = AsyncTeleportProcessing.asyncTaskProcessing.get();
             if (asyncTaskProcessing2 == null) {

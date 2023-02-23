@@ -8,6 +8,7 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 
@@ -63,8 +64,12 @@ public final class BukkitRTPPlayer implements RTPPlayer {
     }
 
     @Override
-    public void performCommand(String command) {
-        player.performCommand(command);
+    public void performCommand(RTPPlayer rtpPlayer, String command) {
+        OfflinePlayer player;
+        if(rtpPlayer==null) player = player();
+        else player = ((BukkitRTPPlayer) rtpPlayer).player();
+        command = SendMessage.formatNoColor(player,command);
+        player().performCommand(command);
     }
 
     @Override

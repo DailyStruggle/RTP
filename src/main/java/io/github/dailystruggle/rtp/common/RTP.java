@@ -26,8 +26,7 @@ import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tools.ChunkyChecker;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 
@@ -35,6 +34,8 @@ import java.util.logging.Level;
  * class to hold relevant API functions, outside of Bukkit functionality
  */
 public class RTP {
+    public static final ConcurrentLinkedQueue<CompletableFuture<?>> futures = new ConcurrentLinkedQueue<>();
+
     public static final SelectionAPI selectionAPI = new SelectionAPI();
     public static EnumMap<factoryNames, Factory<?>> factoryMap = new EnumMap<>(factoryNames.class);
     /**
@@ -131,6 +132,21 @@ public class RTP {
     }
 
     public static void stop() {
+        List<CompletableFuture<?>> validFutures = new ArrayList<>(futures.size());
+        for(CompletableFuture<?> future : futures) {
+            if(!future.isDone()) validFutures.add(future);
+        }
+        if(validFutures.size()>0) {
+            for (CompletableFuture<?> future : validFutures) {
+                try {
+                    if (future.isDone()) continue;
+                    future.complete(null);
+                } catch (CancellationException ignored) {
+
+                }
+            }
+        }
+
         if (instance == null) return;
 
         for (Map.Entry<UUID, TeleportData> e : instance.latestTeleportData.entrySet()) {
