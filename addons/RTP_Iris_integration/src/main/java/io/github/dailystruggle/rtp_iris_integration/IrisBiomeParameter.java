@@ -18,12 +18,22 @@ import org.bukkit.World;
 import org.bukkit.block.Biome;
 
 import java.util.*;
+import java.util.logging.Level;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class IrisBiomeParameter extends CommandParameter {
     public IrisBiomeParameter() {
-        super("rtp.biome", "iris biomes", (uuid, s) -> Objects.requireNonNull(RTP.serverAccessor.getSender(uuid)).hasPermission("rtp.biome." + s));
+        super("rtp.biome", "iris biomes", (uuid, s) -> {
+            s = s.toUpperCase();
+            RTPCommandSender sender = Objects.requireNonNull(RTP.serverAccessor.getSender(uuid));
+            if(!sender.hasPermission("rtp.biome." + s)) return false;
+            for(RTPWorld world : RTP.serverAccessor.getRTPWorlds()) {
+                Set<String> set = RTP_Iris_integration.getBiomes(world);
+                if(set.contains(s)) return true;
+            }
+            return false;
+        });
     }
 
     private static final Pattern invalidCharacters = Pattern.compile("[ :,]");

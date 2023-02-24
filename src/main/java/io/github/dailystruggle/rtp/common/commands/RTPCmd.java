@@ -277,7 +277,12 @@ public interface RTPCmd extends BaseRTPCmd {
             }
 
             Set<String> biomes = null;
-            if (biomeList != null) biomes = new HashSet<>(biomeList);
+            if (biomeList != null) {
+                biomes = new HashSet<>(biomeList.size());
+                for(String biome : biomeList) {
+                    biomes.add(biome.toUpperCase());
+                }
+            }
 
             if (shapeNames != null || vertNames != null) {
                 region = region.clone();

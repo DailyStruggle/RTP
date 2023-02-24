@@ -147,10 +147,26 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         if (commandTimer != null) commandTimer.cancel();
         if (commandProcessing != null) commandProcessing.cancel();
 
-        AsyncTeleportProcessing.kill();
-        SyncTeleportProcessing.kill();
-        FillTaskProcessing.kill();
-        DatabaseProcessing.kill();
+        try {
+            AsyncTeleportProcessing.kill();
+        } catch (NoClassDefFoundError ignored) {
+            //catch plugin replaced, no use for old logs
+        }
+        try {
+            SyncTeleportProcessing.kill();
+        } catch (NoClassDefFoundError ignored) {
+            //catch plugin replaced, no use for old logs
+        }
+        try {
+            FillTaskProcessing.kill();
+        } catch (NoClassDefFoundError ignored) {
+            //catch plugin replaced, no use for old logs
+        }
+        try {
+            DatabaseProcessing.kill();
+        } catch (NoClassDefFoundError ignored) {
+            //catch plugin replaced, no use for old logs
+        }
 
         if (syncTimer != null) syncTimer.cancel();
         if (asyncTimer != null) asyncTimer.cancel();
@@ -161,7 +177,11 @@ public final class RTPBukkitPlugin extends JavaPlugin {
 //        onChunkLoad.shutdown();
         metrics = null;
 
-        RTP.stop();
+        try {
+            RTP.stop();
+        } catch (NoClassDefFoundError ignored) {
+            //catch plugin replaced, no use for old logs
+        }
 
         List<BukkitTask> pendingTasks = Bukkit.getScheduler().getPendingTasks().stream().filter(
                 b -> b.getOwner().getName().equalsIgnoreCase("RTP") && !b.isSync() && !b.isCancelled()).collect(Collectors.toList());
@@ -170,11 +190,15 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         }
 
 
-        Map<String, Object> referenceData = new HashMap<>();
-        referenceData.put("time", System.currentTimeMillis());
-        referenceData.put("UUID", new UUID(0, 0).toString());
-        RTP.getInstance().databaseAccessor.setValue("referenceData", referenceData);
-        RTP.getInstance().databaseAccessor.processQueries(Long.MAX_VALUE);
+        try {
+            Map<String, Object> referenceData = new HashMap<>();
+            referenceData.put("time", System.currentTimeMillis());
+            referenceData.put("UUID", new UUID(0, 0).toString());
+            RTP.getInstance().databaseAccessor.setValue("referenceData", referenceData);
+            RTP.getInstance().databaseAccessor.processQueries(Long.MAX_VALUE);
+        } catch (NoClassDefFoundError ignored) {
+            //catch plugin replaced, no use for old logs
+        }
 
         super.onDisable();
     }

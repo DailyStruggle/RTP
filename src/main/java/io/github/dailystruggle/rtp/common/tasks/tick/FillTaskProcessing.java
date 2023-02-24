@@ -7,10 +7,6 @@ import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import java.util.Map;
 
 public final class FillTaskProcessing extends RTPRunnable {
-    public FillTaskProcessing() {
-
-    }
-
     @Override
     public void run() {
         if (isCancelled()) return;
