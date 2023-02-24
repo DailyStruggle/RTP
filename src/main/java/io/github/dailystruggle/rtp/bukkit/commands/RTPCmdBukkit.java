@@ -45,11 +45,23 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
                 "rtp.region",
                 "select a region to teleport to",
                 (uuid, s) -> RTP.selectionAPI.regionNames().contains(s) && RTP.serverAccessor.getSender(uuid).hasPermission("rtp.regions." + s));
-        regionParameter.put("world", new io.github.dailystruggle.rtp.common.commands.parameters.WorldParameter("rtp.params", "modify xz selection", (uuid, s) -> true));
-        regionParameter.put("price", new FloatParameter("rtp.params", "modify xz selection", (uuid, s) -> true));
-        regionParameter.put("worldborderoverride", new BooleanParameter("rtp.params", "modify xz selection", (uuid, s) -> true));
-        regionParameter.put("shape", new ShapeParameter("rtp.params", "modify xz selection", (uuid, s) -> true));
-        regionParameter.put("vert", new VertParameter("rtp.params", "modify y selection", (uuid, s) -> true));
+        regionParameter.put("world", new io.github.dailystruggle.rtp.common.commands.parameters.WorldParameter("rtp.params", "modify xz selection",
+                (uuid, s) -> Bukkit.getWorld(s) != null));
+        regionParameter.put("price", new FloatParameter("rtp.params", "modify xz selection",
+                (uuid, s) -> {
+                    try {
+                        Double.parseDouble(s);
+                        return true;
+                    } catch (NumberFormatException exception) {
+                        return false;
+                    }
+                }));
+        regionParameter.put("worldborderoverride", new BooleanParameter("rtp.params", "modify xz selection",
+                (uuid, s) -> (s.equalsIgnoreCase("true") || s.equalsIgnoreCase("false"))));
+        regionParameter.put("shape", new ShapeParameter("rtp.params", "modify xz selection",
+                (uuid, s) -> RTP.factoryMap.get(RTP.factoryNames.shape).contains(s)));
+        regionParameter.put("vert", new VertParameter("rtp.params", "modify y selection",
+                (uuid, s) -> RTP.factoryMap.get(RTP.factoryNames.vert).contains(s)));
 
         addParameter("region", regionParameter);
 
@@ -62,7 +74,7 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
                     } catch (IllegalArgumentException badBiome) {
                         return false;
                     }
-                    return sender.hasPermission("rtp.biome." + s);
+                    return sender.hasPermission("rtp.biome.*") || sender.hasPermission("rtp.biome." + s);
                 },
                 Biome.class)
         );

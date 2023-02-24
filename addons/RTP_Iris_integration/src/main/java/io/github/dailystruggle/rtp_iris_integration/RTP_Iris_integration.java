@@ -36,7 +36,7 @@ public final class RTP_Iris_integration extends JavaPlugin {
         // Plugin shutdown logic
     }
 
-    private static Set<String> getBiomes(RTPWorld rtpWorld) {
+    static Set<String> getBiomes(RTPWorld rtpWorld) {
         if(!(rtpWorld instanceof BukkitRTPWorld)) {
             return new HashSet<>();
         }
