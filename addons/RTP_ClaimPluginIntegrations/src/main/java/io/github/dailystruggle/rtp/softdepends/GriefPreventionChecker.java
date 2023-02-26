@@ -18,11 +18,20 @@ public class GriefPreventionChecker {
         return (GriefPrevention) plugin;
     }
 
+    private static boolean exists = true;
     public static Boolean isInClaim(org.bukkit.Location location) {
-        if(getGriefPrevention() == null) return false;
-        int chunkX = (location.getBlockX() >= 0 || (location.getBlockX()%16==0)) ? (location.getBlockX() / 16) : (location.getBlockX() / 16) - 1;
-        int chunkZ = (location.getBlockZ() >= 0 || (location.getBlockZ()%16==0)) ? (location.getBlockZ() / 16) : (location.getBlockZ() / 16) - 1;
-        Collection<Claim> claims = GriefPrevention.instance.dataStore.getClaims(chunkX,chunkZ);
-        return claims.size()>0;
+        if(exists) {
+            try {
+                if (getGriefPrevention() == null) return false;
+                int chunkX = (location.getBlockX() >= 0 || (location.getBlockX() % 16 == 0)) ? (location.getBlockX() / 16) : (location.getBlockX() / 16) - 1;
+                int chunkZ = (location.getBlockZ() >= 0 || (location.getBlockZ() % 16 == 0)) ? (location.getBlockZ() / 16) : (location.getBlockZ() / 16) - 1;
+                Collection<Claim> claims = GriefPrevention.instance.dataStore.getClaims(chunkX, chunkZ);
+                return claims.size() > 0;
+            } catch (Throwable t) {
+                exists = false;
+                t.printStackTrace();
+            }
+        }
+        return false;
     }
 }
