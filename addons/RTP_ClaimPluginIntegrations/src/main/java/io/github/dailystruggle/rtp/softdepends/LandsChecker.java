@@ -1,7 +1,9 @@
 package io.github.dailystruggle.rtp.softdepends;
 
+import io.github.dailystruggle.rtp.RTPClaimPluginIntegrations;
 import me.angeschossen.lands.api.integration.LandsIntegration;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.Objects;
 
@@ -17,16 +19,21 @@ public class LandsChecker {
         }
     }
 
+    private static boolean exists = true;
     public static Boolean isInClaim(org.bukkit.Location location) {
-        try {
-            int x = location.getBlockX();
-            int z = location.getBlockZ();
-            int chunkX = (x>0) ? x/16 : x/16-1;
-            int chunkZ = (z>0) ? z/16 : z/16-1;
-            return landsIntegration.isClaimed(Objects.requireNonNull(location.getWorld()),chunkX,chunkZ);
+        if(exists) {
+            try {
+                int x = location.getBlockX();
+                int z = location.getBlockZ();
+                int chunkX = (x > 0) ? x / 16 : x / 16 - 1;
+                int chunkZ = (z > 0) ? z / 16 : z / 16 - 1;
+                if (landsIntegration == null) landsSetup(JavaPlugin.getPlugin(RTPClaimPluginIntegrations.class));
+                return landsIntegration.isClaimed(Objects.requireNonNull(location.getWorld()), chunkX, chunkZ);
+            } catch (Throwable t) {
+                exists = false;
+                t.printStackTrace();
+            }
         }
-        catch (NullPointerException | NoClassDefFoundError e) {
-            return false;
-        }
+        return false;
     }
 }

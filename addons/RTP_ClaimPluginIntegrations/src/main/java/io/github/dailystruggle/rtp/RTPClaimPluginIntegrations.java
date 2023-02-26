@@ -4,6 +4,8 @@ import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
+import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
+import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.softdepends.*;
@@ -11,16 +13,18 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.io.File;
+
 public final class RTPClaimPluginIntegrations extends JavaPlugin {
 
     @Override
     public void onEnable() {
         // Plugin startup logic
         Configs configs = RTP.configs;
-        ConfigParser<IntegrationsKeys> integrations = new ConfigParser<>(IntegrationsKeys.class,"integrations","1.0",RTP.serverAccessor.getPluginDirectory(), RTP.configs.fileDatabase);
+        ConfigParser<IntegrationsKeys> integrations = new ConfigParser<>(IntegrationsKeys.class, "integrations", "1.0", RTP.serverAccessor.getPluginDirectory(), null, RTP.configs.fileDatabase, this.getClassLoader());
         configs.putParser(integrations);
 
-        Configs.onReload(() -> RTP.configs.putParser(new ConfigParser<>(IntegrationsKeys.class,"integrations","1.0",RTP.serverAccessor.getPluginDirectory(), RTP.configs.fileDatabase)));
+        Configs.onReload(() -> RTP.configs.putParser(new ConfigParser<>(IntegrationsKeys.class, "integrations", "1.0", RTP.serverAccessor.getPluginDirectory(), null, RTP.configs.fileDatabase, this.getClassLoader())));
     }
 
     @Override

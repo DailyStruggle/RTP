@@ -5,12 +5,17 @@ import com.griefdefender.api.GriefDefender;
 import java.util.Objects;
 
 public class GriefDefenderChecker {
+    private static boolean exists = true;
     public static Boolean isInClaim(org.bukkit.Location location) {
-        try {
-            return !Objects.requireNonNull(GriefDefender.getCore().getClaimAt(location)).isWilderness();
+        if(exists) {
+            try {
+                return !Objects.requireNonNull(GriefDefender.getCore().getClaimAt(location)).isWilderness();
+            }
+            catch (Throwable t) {
+                exists = false;
+                t.printStackTrace();
+            }
         }
-        catch (NullPointerException | NoClassDefFoundError e) {
-            return false;
-        }
+        return false;
     }
 }
