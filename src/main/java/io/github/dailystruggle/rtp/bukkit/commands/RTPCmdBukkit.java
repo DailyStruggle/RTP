@@ -46,7 +46,7 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
                 "select a region to teleport to",
                 (uuid, s) -> RTP.selectionAPI.regionNames().contains(s) && RTP.serverAccessor.getSender(uuid).hasPermission("rtp.regions." + s));
         regionParameter.put("world", new io.github.dailystruggle.rtp.common.commands.parameters.WorldParameter("rtp.params", "modify xz selection",
-                (uuid, s) -> Bukkit.getWorld(s) != null));
+                (uuid, s) -> (Bukkit.getWorld(s) != null) & RTP.serverAccessor.getSender(uuid).hasPermission("rtp.worlds."+s)));
         regionParameter.put("price", new FloatParameter("rtp.params", "modify xz selection",
                 (uuid, s) -> {
                     try {
@@ -96,6 +96,11 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
                 "rtp.world",
                 "select a world to teleport to",
                 (sender, s) -> Bukkit.getWorld(s) != null && sender.hasPermission("rtp.worlds." + s)));
+
+        addParameter("toggletargetperms", new BooleanParameter(
+                "rtp.params",
+                "check player's perms when running this command",
+                (sender, s) -> true));
 
 
         addSubCommand(new ReloadCmd(this));
