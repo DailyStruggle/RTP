@@ -83,6 +83,12 @@ unsafeBlocks:
 #switch between blacklist/whitelist
 biomeWhitelist: false
 biomes:
+  - BEACH
+  - BASALT_DELTAS
+  - FROZEN_RIVER
+  - SNOWY_BEACH
+  - STONY_SHORE
+  - SWAMP
   - OCEAN
   - WARM_OCEAN
   - LUKEWARM_OCEAN
@@ -92,12 +98,8 @@ biomes:
   - DEEP_LUKEWARM_OCEAN
   - DEEP_OCEAN
   - RIVER
+  - SMALL_END_ISLANDS
   - THE_VOID
-  - BASALT_DELTAS
-  - FROZEN_RIVER
-  - BEACH
-  - SNOWY_BEACH
-  - STONY_SHORE
-  - SWAMP
+
 
 version: "1.0"

@@ -90,6 +90,9 @@ public interface RTPCmd extends BaseRTPCmd {
             return true;
         }
 
+        List<String> toggletargetpermsList = rtpArgs.get("toggletargetperms");
+        boolean toggleTargetPerms = toggletargetpermsList != null && Boolean.parseBoolean(toggletargetpermsList.get(0));
+
         ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
         boolean verbose = false;
         if (logging != null) {
@@ -188,8 +191,18 @@ public interface RTPCmd extends BaseRTPCmd {
                     continue;
                 }
 
+                if(toggleTargetPerms) {
+                    long dt = System.currentTimeMillis() - data.time;
+                    if (dt < 0) dt = Long.MAX_VALUE + dt;
+                    if (dt < player.cooldown()) {
+                        RTP.serverAccessor.sendMessage(senderId, player.uuid(), MessagesKeys.cooldownMessage);
+                        continue;
+                    }
+                }
+
                 RTP.getInstance().priorTeleportData.put(player.uuid(), data);
             }
+
             data = new TeleportData();
             data.sender = sender;
             RTP.getInstance().latestTeleportData.put(player.uuid(), data);
@@ -276,6 +289,32 @@ public interface RTPCmd extends BaseRTPCmd {
                 }
             }
 
+            if (economy != null && toggleTargetPerms && !player.hasPermission("rtp.free") && !player.uuid().equals(senderId)) {
+                data.cost += eco.getNumber(EconomyKeys.price, 0.0).doubleValue();
+                if (shapeNames != null || vertNames != null || doWBO)
+                    data.cost += eco.getNumber(EconomyKeys.paramsPrice, 0.0).doubleValue();
+                if (biomeList != null) data.cost += eco.getNumber(EconomyKeys.biomePrice, 0.0).doubleValue();
+
+                data.cost += region.getNumber(RegionKeys.price,0.0d).doubleValue();
+
+                if (economy.bal(player.uuid()) - data.cost < floor) {
+                    String s = langParser.getConfigValue(MessagesKeys.notEnoughMoney, "").toString();
+                    s = s.replace("[money]", String.valueOf(price));
+                    RTP.serverAccessor.sendMessage(senderId,player.uuid(), s);
+                    RTP.getInstance().processingPlayers.remove(senderId);
+                    return true;
+                }
+
+                boolean take = economy.take(player.uuid(), data.cost);
+                if (!take) {
+                    String s = langParser.getConfigValue(MessagesKeys.notEnoughMoney, "").toString();
+                    s = s.replace("[money]", String.valueOf(price));
+                    RTP.serverAccessor.sendMessage(senderId,player.uuid(), s);
+                    RTP.getInstance().processingPlayers.remove(senderId);
+                    return true;
+                }
+            }
+
             Set<String> biomes = null;
             if (biomeList != null) {
                 biomes = new HashSet<>(biomeList.size());
@@ -351,7 +390,7 @@ public interface RTPCmd extends BaseRTPCmd {
             SetupTeleport setupTeleport = new SetupTeleport(sender, player, region, biomes);
             data.nextTask = setupTeleport;
 
-            long delay = sender.delay();
+            long delay = (toggleTargetPerms) ? player.delay() : sender.delay();
             data.delay = delay;
             if (delay > 0) {
                 String msg = langParser.getConfigValue(MessagesKeys.delayMessage, "").toString();
