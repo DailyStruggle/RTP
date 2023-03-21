@@ -85,6 +85,7 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
                 "rtp.other",
                 "teleport someone else",
                 (sender, s) -> {
+                    if(!sender.hasPermission("rtp.other")) return false;
                     Player player = Bukkit.getPlayer(s);
                     return player != null && !player.hasPermission("rtp.notme");
                 })
@@ -100,7 +101,7 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
         addParameter("toggletargetperms", new BooleanParameter(
                 "rtp.params",
                 "check player's perms when running this command",
-                (sender, s) -> true));
+                (sender, s) -> sender.hasPermission("rtp.params")));
 
 
         addSubCommand(new ReloadCmd(this));
