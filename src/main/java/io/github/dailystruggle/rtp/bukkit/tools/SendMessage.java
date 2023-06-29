@@ -687,8 +687,12 @@ public class SendMessage {
 
         if (noTitle && noSubtitle) return;
 
-        if (title != null) title = Hex2Color(ChatColor.translateAlternateColorCodes('&', title));
-        if (subtitle != null) subtitle = Hex2Color(ChatColor.translateAlternateColorCodes('&', subtitle));
+        if (title != null) {
+            title = format(player,title);
+        }
+        if (subtitle != null) {
+            subtitle = format(player,subtitle);
+        }
 
         if (RTP.serverAccessor.getServerIntVersion() < 18) TitleApi.sendTitle(player, title, subtitle, in, stay, out);
         else player.sendTitle(title, subtitle, in, stay, out);

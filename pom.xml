@@ -6,7 +6,7 @@
 
     <groupId>io.github.dailystruggle</groupId>
     <artifactId>RTP</artifactId>
-    <version>2.0.10</version>
+    <version>2.0.14</version>
     <packaging>jar</packaging>
 
     <name>RTP</name>
@@ -352,7 +352,7 @@
         <dependency>
             <groupId>io.github.dailystruggle</groupId>
             <artifactId>CommandsAPI</artifactId>
-            <version>1.0-ALPHA79</version>
+            <version>1.0-ALPHA80</version>
             <scope>compile</scope>
         </dependency>
         <dependency>

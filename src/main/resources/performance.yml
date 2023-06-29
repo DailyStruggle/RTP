@@ -45,8 +45,11 @@ onEventParsing: false
 effectParsing: true
 
 #reuse biome locations when biome is specified
-# impact: low
+# impact: depends on use case
 biomeRecall: true
+
+#temporary option to refuse biomes not visited yet
+biomeRecallForced: false
 
 #have each region check all in-range chunks on chunk load
 # impact: high

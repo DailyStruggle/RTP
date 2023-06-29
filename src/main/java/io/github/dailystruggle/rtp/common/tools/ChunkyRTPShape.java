@@ -13,7 +13,7 @@ public class ChunkyRTPShape extends Rectangle {
 
     public ChunkyRTPShape(String chunkyShapeName) {
         super(chunkyShapeName.toUpperCase());
-        this.chunkyShapeName = chunkyShapeName;
+        this.chunkyShapeName = "chunky_" + chunkyShapeName;
 
         RTPAPI.addShape(this);
     }
@@ -28,7 +28,7 @@ public class ChunkyRTPShape extends Rectangle {
         builder.radiusX(getNumber(RectangleParams.width, 256).doubleValue());
         builder.radiusZ(getNumber(RectangleParams.height, 256).doubleValue());
 
-        builder.shape(chunkyShapeName);
+        builder.shape(chunkyShapeName.replace("chunky_",""));
         Shape shape = ShapeFactory.getShape(builder.build());
 
         long res = super.rand();
