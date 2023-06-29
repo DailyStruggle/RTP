@@ -25,10 +25,12 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, YamlFile>> {
      * container for map reference access, such set() will propagate changes where == would not
      */
     public final AtomicReference<Map<String, YamlFile>> cachedLookup = new AtomicReference<>();
+    public final AtomicReference<Map<String, Long>> cachedLookupLastModified = new AtomicReference<>();
     private final File directory;
 
     {
         cachedLookup.set(new ConcurrentHashMap<>());
+        cachedLookupLastModified.set(new ConcurrentHashMap<>());
     }
 
     /**
@@ -82,10 +84,19 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, YamlFile>> {
         for (File file : files) {
             if (!file.isFile()) continue;
 
+            long lastModified = file.lastModified();
+            long dt = lastModified - cachedLookupLastModified.get().getOrDefault(file.getName(),-1L);
+            if(dt == 0) {
+                res.put(file.getName(), cachedLookup.get().get(file.getName()));
+                continue;
+            }
+
             YamlFile yamlFile;
             try {
                 yamlFile = new YamlFile(file);
                 yamlFile.loadWithComments();
+                cachedLookupLastModified.get().put(file.getName(), lastModified);
+                cachedLookup.get().put(file.getName(),yamlFile);
             } catch (Exception exception) { //not a yaml file
                 continue;
             }
@@ -97,8 +108,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, YamlFile>> {
                 map.put(new TableObj(entry.getKey()), new TableObj(entry.getValue()));
             }
         }
-        cachedLookup.get().clear();
-        cachedLookup.get().putAll(res);
+
         return res;
     }
 

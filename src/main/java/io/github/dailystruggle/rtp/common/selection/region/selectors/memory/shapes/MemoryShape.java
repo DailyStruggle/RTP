@@ -19,6 +19,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     public ConcurrentSkipListMap<Long, Long> badLocations = new ConcurrentSkipListMap<>();
     public AtomicLong badLocationSum = new AtomicLong(0L);
     public ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> biomeLocations = new ConcurrentHashMap<>();
+    public ConcurrentSkipListMap<Long,Long> biomeMapped = new ConcurrentSkipListMap<>();
     public AtomicLong fillIter = new AtomicLong(0L);
 
     /**
@@ -293,6 +294,24 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
             map.put(lower.getKey(), lower.getValue() + upper.getValue());
             map.remove(upper.getKey());
         }
+
+        map = biomeMapped;
+
+        if ((lower != null) && (location < lower.getKey() + lower.getValue())) {
+            return;
+        } else if ((lower != null) && (location == lower.getKey() + lower.getValue())) {
+            map.put(lower.getKey(), lower.getValue() + 1);
+        } else {
+            map.put(location, 1L);
+        }
+
+        lower = map.floorEntry(location);
+
+        // if upper start meets position + length, merge its length and delete upper entry
+        if ((upper != null) && (lower.getKey() + lower.getValue() >= upper.getKey())) {
+            map.put(lower.getKey(), lower.getValue() + upper.getValue());
+            map.remove(upper.getKey());
+        }
     }
 
     public void removeBiomeLocation(Long location, String biome) {
@@ -300,6 +319,22 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         ConcurrentSkipListMap<Long, Long> map = biomeLocations.get(biome);
 
         Map.Entry<Long, Long> lower = map.floorEntry(location);
+        if ((lower != null) && (location < lower.getKey() + lower.getValue())) {
+            long key = lower.getKey();
+            long val = lower.getValue();
+            if (location < key + val) { //if within bounds, slice the bounds to remove the location
+                map.remove(lower.getKey());
+                if (location > key) {
+                    map.put(key, location - key);
+                }
+                if (location + 1 < key + val) {
+                    map.put(location + 1, (key + val) - (location + 1));
+                }
+            }
+        }
+
+        map = biomeMapped;
+        lower = map.floorEntry(location);
         if ((lower != null) && (location < lower.getKey() + lower.getValue())) {
             long key = lower.getKey();
             long val = lower.getValue();

@@ -45,13 +45,15 @@ public class ChunkyBorderChecker {
                         BorderData borderData = borderDataOptional.get();
                         Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
                         org.popcraft.chunky.shape.Shape border = borderData.getBorder();
-                        Shape<RectangleParams> shape = (Shape<RectangleParams>) factory.get(border.name());
+                        Shape<RectangleParams> shape = (Shape<RectangleParams>) factory.get("chunky_" + border.name());
                         if (!(shape instanceof ChunkyRTPShape)) {
-                            shape = new ChunkyRTPShape(border.name());
+                            shape = new ChunkyRTPShape("chunky_" + border.name());
                             RTPAPI.addShape(shape);
                         }
                         double radius = Math.min(borderData.getRadiusX(), borderData.getRadiusZ()) * 0.9;
                         shape.set(RectangleParams.width, radius);
+                        radius = Math.max(borderData.getRadiusX(), borderData.getRadiusZ()) * 0.9;
+                        shape.set(RectangleParams.height, radius);
                         Shape<RectangleParams> finalShape = shape;
                         return new WorldBorder(() -> finalShape, rtpLocation -> border.isBounding(rtpLocation.x() / 16.0, rtpLocation.z() / 16.0));
                     }

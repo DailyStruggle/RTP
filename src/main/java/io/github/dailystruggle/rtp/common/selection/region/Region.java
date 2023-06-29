@@ -421,10 +421,16 @@ public class Region extends FactoryValue<RegionKeys> {
         }
 
         Shape<?> shape = getShape();
-        if (shape == null) return null;
+        if (shape == null) {
+            new IllegalStateException("[RTP] invalid state, null shape").printStackTrace();
+            return null;
+        }
 
         VerticalAdjustor<?> vert = getVert();
-        if (vert == null) return null;
+        if (vert == null) {
+            new IllegalStateException("[RTP] invalid state, null vert").printStackTrace();
+            return null;
+        }
 
         o = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
         Set<String> unsafeBlocks = (o instanceof Collection) ? ((Collection<?>) o)
@@ -450,6 +456,7 @@ public class Region extends FactoryValue<RegionKeys> {
         long i = 1;
 
         boolean biomeRecall = Boolean.parseBoolean(performance.getConfigValue(PerformanceKeys.biomeRecall, false).toString());
+        boolean biomeRecallForced = Boolean.parseBoolean(performance.getConfigValue(PerformanceKeys.biomeRecallForced, false).toString());
 
         for (; i <= maxAttempts; i++) {
             long l = -1;
@@ -464,14 +471,15 @@ public class Region extends FactoryValue<RegionKeys> {
                             biomes.addAll(map.entrySet());
                         }
                     }
-//                    RTP.log(Level.CONFIG,"biome input - " + biomes);
                     Map.Entry<Long, Long> entry;
                     if(biomes.size()>0) {
                         int nextInt = ThreadLocalRandom.current().nextInt(biomes.size());
                         entry = biomes.get(nextInt);
-//                        RTP.log(Level.CONFIG,"target selected - " + entry.toString());
                         l = entry.getKey() + ThreadLocalRandom.current().nextLong(entry.getValue());
-//                        RTP.log(Level.CONFIG,"final selection - " + l);
+                    }
+                    else if(biomeRecallForced) {
+                        new IllegalStateException("[RTP] invalid state, biome recall enabled but biomes are not in memory - " + Arrays.toString(biomeNames.toArray())).printStackTrace();
+                        return new AbstractMap.SimpleEntry<>(null, i);
                     }
                     else l = memoryShape.rand();
                 } else {
@@ -480,15 +488,19 @@ public class Region extends FactoryValue<RegionKeys> {
 
                 select = memoryShape.locationToXZ(l);
 
-//                if (verbose) selections.add(new AbstractMap.SimpleEntry<>((long) selections.size(), l));
             } else {
                 select = shape.select();
-//                if (verbose) selections.add(new AbstractMap.SimpleEntry<>((long) select[0], (long) select[1]));
+            }
+            if (verbose) {
+//                if(shape instanceof MemoryShape) selections.add(new AbstractMap.SimpleEntry<>((long) selections.size(), l));
+//                else selections.add(new AbstractMap.SimpleEntry<>((long) select[0], (long) select[1]));
+                selections.add(new AbstractMap.SimpleEntry<>((long) select[0], (long) select[1]));
             }
 
             String currBiome = world.getBiome(select[0] * 16 + 7, (vert.minY() + vert.maxY()) / 2, select[1] * 16 + 7);
 
-            for (; biomeChecks < maxBiomeChecks && !biomeNames.contains(currBiome); biomeChecks++, maxAttempts++, i++) {
+            for (; biomeChecks < maxBiomeChecks && !biomeNames.contains(currBiome); biomeChecks++, maxAttempts++, i++)
+            {
                 if (shape instanceof MemoryShape) {
                     MemoryShape<?> memoryShape = (MemoryShape<?>) shape;
                     if (defaultBiomes && biomeRecall) {
@@ -508,18 +520,26 @@ public class Region extends FactoryValue<RegionKeys> {
                             entry = biomes.get(nextInt);
                             l = entry.getKey() + ThreadLocalRandom.current().nextLong(entry.getValue());
                         }
+                        else if(biomeRecallForced) {
+                            new IllegalStateException("[RTP] invalid state, biome recall enabled but biomes are not in memory - " + Arrays.toString(biomeNames.toArray())).printStackTrace();
+                            return new AbstractMap.SimpleEntry<>(null, i);
+                        }
                         else l = memoryShape.rand();
-//                        RTP.log(Level.WARNING,"A");
                     } else {
                         l = memoryShape.rand();
-//                        RTP.log(Level.WARNING,"B");
                     }
 
                     select = memoryShape.locationToXZ(l);
                 } else {
                     select = shape.select();
-//                    if (verbose) selections.add(new AbstractMap.SimpleEntry<>((long) select[0], (long) select[1]));
                 }
+
+                if (verbose) {
+//                if(shape instanceof MemoryShape) selections.add(new AbstractMap.SimpleEntry<>((long) selections.size(), l));
+//                else selections.add(new AbstractMap.SimpleEntry<>((long) select[0], (long) select[1]));
+                    selections.add(new AbstractMap.SimpleEntry<>((long) select[0], (long) select[1]));
+                }
+
                 String key = "biome="+currBiome;
                 if(verbose) {
                     failMap.get(FailTypes.biome).compute(key, (s, aLong) -> {
@@ -529,15 +549,11 @@ public class Region extends FactoryValue<RegionKeys> {
                 }
                 currBiome = world.getBiome(select[0] * 16 + 7, (vert.minY() + vert.maxY()) / 2, select[1] * 16 + 7);
             }
-            if (biomeChecks >= maxBiomeChecks) return new AbstractMap.SimpleEntry<>(null, i);
-
-            if (verbose) {
-                if(shape instanceof MemoryShape) selections.add(new AbstractMap.SimpleEntry<>((long) selections.size(), l));
-                else selections.add(new AbstractMap.SimpleEntry<>((long) select[0], (long) select[1]));
-            }
+            if(biomeChecks>=maxBiomeChecks) break;
 
             WorldBorder border = RTP.serverAccessor.getWorldBorder(world.name());
             if (!border.isInside().apply(new RTPLocation(world, select[0] * 16, (vert.maxY() + vert.minY()) / 2, select[1] * 16))) {
+                new IllegalStateException("worldborder check failed. region/selection is likely outside the worldborder").printStackTrace();
                 maxAttempts++;
                 Long worldBorderFails = failMap.get(FailTypes.worldBorder).getOrDefault("OUTSIDE_BORDER", 0L);
                 worldBorderFails++;
@@ -560,7 +576,10 @@ public class Region extends FactoryValue<RegionKeys> {
                 e.printStackTrace();
                 return new AbstractMap.SimpleEntry<>(null, i);
             }
-            if(chunk == null) return null;
+            if(chunk == null) {
+                new IllegalStateException("[RTP] null chunk").printStackTrace();
+                return null;
+            }
 
             location = vert.adjust(chunk);
             if (location == null) {
@@ -638,6 +657,7 @@ public class Region extends FactoryValue<RegionKeys> {
                             chunks.put(xz,chunk1);
                             chunk1.keep(true);
                         } catch (InterruptedException | ExecutionException e) {
+                            e.printStackTrace();
                             return null;
                         }
                     }
@@ -999,14 +1019,17 @@ public class Region extends FactoryValue<RegionKeys> {
                     if (aBoolean) {
                         if (playerId == null) {
                             locationQueue.add(pair);
-                            locAssChunks.put(pair.getKey(), chunkSet);
+                            locAssChunks.put(location, chunkSet);
                         } else if (fastLocations.containsKey(playerId) && !fastLocations.get(playerId).isDone()) {
                             fastLocations.get(playerId).complete(pair);
                         } else {
                             perPlayerLocationQueue.putIfAbsent(playerId, new ConcurrentLinkedQueue<>());
                             perPlayerLocationQueue.get(playerId).add(pair);
                         }
-                    } else chunkSet.keep(false);
+                    } else {
+                        chunkSet.keep(false);
+                        locAssChunks.remove(location);
+                    }
                 });
             }
             if (cachePipeline.size() + locationQueue.size() < cacheCap + playerQueue.size())

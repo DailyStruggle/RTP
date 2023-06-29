@@ -12,6 +12,7 @@ public enum PerformanceKeys {
     onEventParsing,
     effectParsing,
     biomeRecall,
+    biomeRecallForced,
     timeit,
     version
 }

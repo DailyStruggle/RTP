@@ -17,7 +17,7 @@ shape:
   radius: 256
   #donut hole in center, where players shouldn't land
   centerRadius: 64
-  #center position, using regular x-z coordinates
+  #center position, using chunk x-z coordinates
   centerX: 0
   centerZ: 0
   #shift players towards or away from the center, by exponent

@@ -42,6 +42,8 @@ public class ChunkyChecker {
                         continue;
                     }
 
+                    s = "chunky_" + s;
+
                     Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
                     Shape<RectangleParams> shape = (Shape<RectangleParams>) factory.get(s);
                     if (shape == null) {

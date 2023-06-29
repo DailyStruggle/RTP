@@ -253,6 +253,13 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
             } else {
                 File source = new File(myDirectory + File.separator + "default.yml");
                 File target = new File(myDirectory + File.separator + name);
+                if(!source.exists()) {
+                    saveResourceFromJar(diff + File.separator + "default.yml", overwrite);
+                }
+                if(!target.exists()) {
+                    boolean newFile = target.createNewFile();
+                    if(!newFile) throw new IOException("failed to create new file");
+                }
                 FileOutputStream outputStream = new FileOutputStream(target.getPath());
                 Files.copy(source.toPath(), outputStream);
                 outputStream.close();

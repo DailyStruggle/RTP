@@ -95,6 +95,7 @@ public class Configs {
 
     public boolean reload() {
         this.fileDatabase.processQueries(Long.MAX_VALUE);
+        this.fileDatabase.connect();
         configParserMap.clear();
         multiConfigParserMap.clear();
         reloadAction();
