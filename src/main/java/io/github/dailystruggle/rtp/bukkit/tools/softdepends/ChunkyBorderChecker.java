@@ -50,9 +50,8 @@ public class ChunkyBorderChecker {
                             shape = new ChunkyRTPShape("chunky_" + border.name());
                             RTPAPI.addShape(shape);
                         }
-                        double radius = Math.min(borderData.getRadiusX(), borderData.getRadiusZ()) * 0.9;
+                        double radius = (Math.max(borderData.getRadiusX(), borderData.getRadiusZ()) * 0.9)/16;
                         shape.set(RectangleParams.width, radius);
-                        radius = Math.max(borderData.getRadiusX(), borderData.getRadiusZ()) * 0.9;
                         shape.set(RectangleParams.height, radius);
                         Shape<RectangleParams> finalShape = shape;
                         return new WorldBorder(() -> finalShape, rtpLocation -> border.isBounding(rtpLocation.x() / 16.0, rtpLocation.z() / 16.0));

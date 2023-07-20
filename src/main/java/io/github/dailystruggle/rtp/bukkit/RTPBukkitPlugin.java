@@ -97,6 +97,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             databaseDirectory.mkdirs();
             rtp.databaseAccessor = new SQLiteDatabaseAccessor(
                     "jdbc:sqlite:" + databaseDirectory.getAbsolutePath() + File.separator + "RTP.db");
+
             Bukkit.getScheduler().scheduleSyncDelayedTask(this, () -> RTP.getInstance().databaseAccessor.startup());
         }
 
