@@ -258,7 +258,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
                 }
                 if(!target.exists()) {
                     boolean newFile = target.createNewFile();
-                    if(!newFile) throw new IOException("failed to create new file");
+                    if(!newFile) throw new IOException("failed to create new file - " + target.getAbsolutePath());
                 }
                 FileOutputStream outputStream = new FileOutputStream(target.getPath());
                 Files.copy(source.toPath(), outputStream);

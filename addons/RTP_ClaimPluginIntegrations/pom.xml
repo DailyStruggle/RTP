@@ -101,7 +101,7 @@
             <artifactId>RTP</artifactId>
             <version>2.0.9</version>
             <scope>system</scope>
-            <systemPath>${project.basedir}/../../target/original-RTP-2.0.14.jar</systemPath>
+            <systemPath>${project.basedir}/../../target/original-RTP-2.0.15.jar</systemPath>
         </dependency>
         <dependency>
             <groupId>com.sk89q.worldguard</groupId>
