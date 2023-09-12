@@ -17,12 +17,13 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.teleport.SetupTeleport;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 
 public interface RTPCmd extends BaseRTPCmd {
     static String pickOne(List<String> param, String d) {
-        if (param == null || param.size() == 0) return d;
+        if (param == null || param.isEmpty()) return d;
         int sel = ThreadLocalRandom.current().nextInt(param.size());
         return param.get(sel);
     }
@@ -41,8 +42,10 @@ public interface RTPCmd extends BaseRTPCmd {
         }
 
         for (String arg : args) {
-            if (!arg.contains(String.valueOf(CommandsAPI.parameterDelimiter)))
-                return onCommand(senderId, sender::hasPermission, sender::sendMessage, args);
+            if (!arg.contains(String.valueOf(CommandsAPI.parameterDelimiter))) {
+                CompletableFuture<Boolean> future = onCommand(senderId, sender::hasPermission, sender::sendMessage, args);
+                return (future.getNow(false));
+            }
         }
 
         if (RTP.getInstance().processingPlayers.contains(senderId)) {
@@ -50,7 +53,7 @@ public interface RTPCmd extends BaseRTPCmd {
             return true;
         }
 
-        //--------------------------------------------------------------------------------------------------------------
+        //------------------------D--------------------------------------------------------------------------------------
         //guard command perms with custom message
         if (!sender.hasPermission("rtp.use")) {
             RTP.serverAccessor.sendMessage(senderId, MessagesKeys.noPerms);
@@ -79,12 +82,22 @@ public interface RTPCmd extends BaseRTPCmd {
 
         if (!senderId.equals(CommandsAPI.serverId)) RTP.getInstance().processingPlayers.add(senderId);
 
-        return onCommand(senderId, sender::hasPermission, sender::sendMessage, args);
+        CompletableFuture<Boolean> b = new CompletableFuture<>();
+        try {
+            b = onCommand(senderId, sender::hasPermission, sender::sendMessage, args);
+        } catch (Throwable throwable)
+        {
+            throwable.printStackTrace();
+            b.complete(false);
+        }
+        RTP.getInstance().processingPlayers.remove(senderId);
+        return b.getNow(false);
     }
 
     //async command component
     default boolean compute(UUID senderId, Map<String, List<String>> rtpArgs, CommandsAPICommand nextCommand) {
         RTPCommandSender sender = RTP.serverAccessor.getSender(senderId);
+        RTP.getInstance().processingPlayers.add(senderId);
 
         if (nextCommand != null) {
             return true;
