@@ -17,56 +17,57 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public final class BukkitRTPCommandSender implements RTPCommandSender {
     private final CommandSender sender;
 
-    public BukkitRTPCommandSender(CommandSender sender) {
+    public BukkitRTPCommandSender( CommandSender sender ) {
         this.sender = sender;
     }
 
     @Override
     public UUID uuid() {
-        if (sender instanceof Player)
-            return ((Player) sender).getUniqueId();
+        if ( sender instanceof Player )
+            return ( (Player ) sender ).getUniqueId();
         return CommandsAPI.serverId;
     }
 
     @Override
-    public boolean hasPermission(String permission) {
-        return sender.hasPermission(permission);
+    public boolean hasPermission( String permission ) {
+        return sender.hasPermission( permission );
     }
 
     @Override
-    public void sendMessage(String message) {
-        SendMessage.sendMessage(sender, message);
+    public void sendMessage( String message ) {
+        SendMessage.sendMessage( sender, message );
     }
 
     @Override
     public long cooldown() {
-        if (sender.hasPermission("rtp.nocooldown")) return 0;
-        if (sender.hasPermission("rtp.noCooldown")) return 0;
+        if ( sender.hasPermission( "rtp.nocooldown") ) return 0;
+        if ( sender.hasPermission( "rtp.noCooldown") ) return 0;
 
-        int cooldown = ParsePermissions.getInt(this, "rtp.cooldown.");
-        if (cooldown < 0) {
-            ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
-            cooldown = configParser.getNumber(ConfigKeys.teleportCooldown, 0).intValue();
+        int cooldown = ParsePermissions.getInt( this, "rtp.cooldown." );
+        if ( cooldown < 0 ) {
+            ConfigParser<ConfigKeys> configParser = ( ConfigParser<ConfigKeys> ) RTP.configs.getParser( ConfigKeys.class );
+            cooldown = configParser.getNumber( ConfigKeys.teleportCooldown, 0 ).intValue();
         }
-        return TimeUnit.SECONDS.toMillis(cooldown);
+        return TimeUnit.SECONDS.toMillis( cooldown );
     }
 
     @Override
     public long delay() {
-        if (sender.hasPermission("rtp.nodelay")) return 0;
-        if (sender.hasPermission("rtp.noDelay")) return 0;
+        if ( sender.hasPermission( "rtp.nodelay") ) return 0;
+        if ( sender.hasPermission( "rtp.noDelay") ) return 0;
 
-        int delay = ParsePermissions.getInt(new BukkitRTPCommandSender(sender), "rtp.delay.");
-        if (delay < 0) {
-            ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
-            delay = configParser.getNumber(ConfigKeys.teleportDelay, 0).intValue();
+        int delay = ParsePermissions.getInt( new BukkitRTPCommandSender( sender ), "rtp.delay." );
+        if ( delay < 0 ) {
+            ConfigParser<ConfigKeys> configParser = ( ConfigParser<ConfigKeys> ) RTP.configs.getParser( ConfigKeys.class );
+            delay = configParser.getNumber( ConfigKeys.teleportDelay, 0 ).intValue();
         }
-        return TimeUnit.SECONDS.toMillis(delay);
+        return TimeUnit.SECONDS.toMillis( delay );
     }
 
     @Override
@@ -76,28 +77,28 @@ public final class BukkitRTPCommandSender implements RTPCommandSender {
 
     @Override
     public Set<String> getEffectivePermissions() {
-        return sender.getEffectivePermissions().stream().map(permissionAttachmentInfo -> {
-            if (permissionAttachmentInfo.getValue()) return permissionAttachmentInfo.getPermission().toLowerCase();
+        return sender.getEffectivePermissions().stream().map( permissionAttachmentInfo -> {
+            if ( permissionAttachmentInfo.getValue() ) return permissionAttachmentInfo.getPermission().toLowerCase();
             else return null;
-        }).filter(Objects::nonNull).collect(Collectors.toSet());
+        } ).filter( Objects::nonNull ).collect( Collectors.toSet() );
     }
 
     @Override
-    public void performCommand(RTPPlayer rtpPlayer, String command) {
+    public void performCommand( RTPPlayer rtpPlayer, String command ) {
         OfflinePlayer player;
-        if(rtpPlayer==null) player = (sender instanceof OfflinePlayer) ? (OfflinePlayer) sender : null;
-        else player = ((BukkitRTPPlayer) rtpPlayer).player();
-        command = SendMessage.formatNoColor(player,command);
-        Bukkit.dispatchCommand(sender, command);
+        if( rtpPlayer==null ) player = ( sender instanceof OfflinePlayer ) ? ( OfflinePlayer ) sender : null;
+        else player = ( (BukkitRTPPlayer ) rtpPlayer ).player();
+        command = SendMessage.formatNoColor( player,command );
+        Bukkit.dispatchCommand( sender, command );
     }
 
     @Override
     public RTPCommandSender clone() {
         RTPCommandSender clone = null;
         try {
-            clone = (RTPCommandSender) super.clone();
-        } catch (CloneNotSupportedException e) {
-            e.printStackTrace();
+            clone = ( RTPCommandSender ) super.clone();
+        } catch ( CloneNotSupportedException e ) {
+            RTP.log( Level.WARNING, e.getMessage(), e );
         }
         return clone;
     }
@@ -107,16 +108,16 @@ public final class BukkitRTPCommandSender implements RTPCommandSender {
     }
 
     @Override
-    public boolean equals(Object obj) {
-        if (obj == this) return true;
-        if (obj == null || obj.getClass() != this.getClass()) return false;
-        BukkitRTPCommandSender that = (BukkitRTPCommandSender) obj;
-        return Objects.equals(this.sender, that.sender);
+    public boolean equals( Object obj ) {
+        if ( obj == this ) return true;
+        if ( obj == null || obj.getClass() != this.getClass() ) return false;
+        BukkitRTPCommandSender that = ( BukkitRTPCommandSender ) obj;
+        return Objects.equals( this.sender, that.sender );
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(sender);
+        return Objects.hash( sender );
     }
 
     @Override
