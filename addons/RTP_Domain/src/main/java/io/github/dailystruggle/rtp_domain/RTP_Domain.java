@@ -12,7 +12,7 @@ import java.lang.invoke.MutableCallSite;
 
 public final class RTP_Domain extends JavaPlugin {
     private static final MutableCallSite callSite = new MutableCallSite(
-            MethodType.methodType(boolean.class, Location.class));
+            MethodType.methodType( boolean.class, Location.class) );
     private static final MethodHandle methodHandle = callSite.dynamicInvoker();
 
     public MethodHandle mh;
@@ -21,12 +21,12 @@ public final class RTP_Domain extends JavaPlugin {
     public void onEnable() {
         // Plugin startup logic
         try {
-            mh = MethodHandles.publicLookup().findStatic(Check.class, "inField", MethodType.methodType(boolean.class, Location.class));
-            callSite.setTarget(mh);
-        } catch (NoSuchMethodException | IllegalAccessException e) {
-            e.printStackTrace();
+            mh = MethodHandles.publicLookup().findStatic( Check.class, "inField", MethodType.methodType( boolean.class, Location.class) );
+            callSite.setTarget( mh );
+        } catch ( NoSuchMethodException | IllegalAccessException e ) {
+            RTP.log( Level.WARNING, e.getMessage(), e );
         }
-        RTP.addLocationCheck(methodHandle);
+        RTP.addLocationCheck( methodHandle );
     }
 
     @Override

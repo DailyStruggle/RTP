@@ -19,31 +19,31 @@ public final class ForceQueue extends RTPRunnable {
     private final Collection<Region> regions;
 
     public ForceQueue() {
-        sender = RTP.serverAccessor.getSender(CommandsAPI.serverId);
+        sender = RTP.serverAccessor.getSender( CommandsAPI.serverId );
         regions = RTP.selectionAPI.permRegionLookup.values();
     }
 
-    public ForceQueue(RTPCommandSender sender) {
+    public ForceQueue( RTPCommandSender sender ) {
         this.sender = sender;
         regions = RTP.selectionAPI.permRegionLookup.values();
     }
 
-    public ForceQueue(RTPCommandSender sender,
-                      @Nullable Collection<Region> regions) {
+    public ForceQueue( RTPCommandSender sender,
+                      @Nullable Collection<Region> regions ) {
         this.sender = sender;
-        if (regions == null || regions.size() == 0) regions = RTP.selectionAPI.permRegionLookup.values();
+        if ( regions == null || regions.isEmpty() ) regions = RTP.selectionAPI.permRegionLookup.values();
         this.regions = regions;
     }
 
     @Override
     public void run() {
-        preActions.forEach(consumer -> consumer.accept(this));
+        preActions.forEach( consumer -> consumer.accept( this) );
 
-        for (Region region : regions) {
-            region.execute(Long.MAX_VALUE);
+        for ( Region region : regions ) {
+            region.execute( Long.MAX_VALUE );
         }
 
-        postActions.forEach(consumer -> consumer.accept(this));
+        postActions.forEach( consumer -> consumer.accept( this) );
     }
 
     public RTPCommandSender sender() {
@@ -55,17 +55,17 @@ public final class ForceQueue extends RTPRunnable {
     }
 
     @Override
-    public boolean equals(Object obj) {
-        if (obj == this) return true;
-        if (obj == null || obj.getClass() != this.getClass()) return false;
-        ForceQueue that = (ForceQueue) obj;
-        return Objects.equals(this.sender, that.sender) &&
-                Objects.equals(this.regions, that.regions);
+    public boolean equals( Object obj ) {
+        if ( obj == this ) return true;
+        if ( obj == null || obj.getClass() != this.getClass() ) return false;
+        ForceQueue that = ( ForceQueue ) obj;
+        return Objects.equals( this.sender, that.sender ) &&
+                Objects.equals( this.regions, that.regions );
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(sender, regions);
+        return Objects.hash( sender, regions );
     }
 
     @Override

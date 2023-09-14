@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.logging.Level;
 
 public class TestConfig {
     @Test
@@ -15,24 +16,24 @@ public class TestConfig {
         RTP rtp = new RTP();
 
         int i = 0;
-        while (rtp.startupTasks.size()>0) {
-            rtp.startupTasks.execute(Long.MAX_VALUE);
+        while ( rtp.startupTasks.size()>0 ) {
+            rtp.startupTasks.execute( Long.MAX_VALUE );
             i++;
-            if(i>50) return;
+            if( i>50 ) return;
         }
 
         //modify values
-        ConfigParser<ConfigKeys> parser = (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
-        parser.set(ConfigKeys.cancelDistance,5);
+        ConfigParser<ConfigKeys> parser = ( ConfigParser<ConfigKeys> ) RTP.configs.getParser( ConfigKeys.class );
+        parser.set( ConfigKeys.cancelDistance,5 );
 
         try {
             parser.save();
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch ( IOException e ) {
+            RTP.log( Level.WARNING, e.getMessage(), e );
             Assertions.fail();
             return;
         }
 
-        Assertions.assertEquals(parser.getNumber(ConfigKeys.cancelDistance,0.0).longValue(),5);
+        Assertions.assertEquals( parser.getNumber( ConfigKeys.cancelDistance,0.0 ).longValue(),5 );
     }
 }
