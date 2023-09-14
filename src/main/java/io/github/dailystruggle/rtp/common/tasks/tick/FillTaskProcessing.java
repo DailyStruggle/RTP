@@ -9,12 +9,12 @@ import java.util.Map;
 public final class FillTaskProcessing extends RTPRunnable {
     @Override
     public void run() {
-        if (isCancelled()) return;
+        if ( isCancelled() ) return;
 
-        for (Map.Entry<String, FillTask> e : RTP.getInstance().fillTasks.entrySet()) {
-            if (e.getValue().isRunning()) continue;
+        for ( Map.Entry<String, FillTask> e : RTP.getInstance().fillTasks.entrySet() ) {
+            if ( e.getValue().isRunning() ) continue;
             e.getValue().run();
-            if (isCancelled()) return;
+            if ( isCancelled() ) return;
         }
     }
 }

@@ -11,25 +11,25 @@ public class SyncTeleportProcessing extends BukkitRunnable {
     private static boolean killed = false;
 
     public SyncTeleportProcessing() {
-        if (syncTaskProcessing != null) return;
-        long avgTime = TPS.timeSinceTick(20) / 20;
-        long currTime = TPS.timeSinceTick(1);
+        if ( syncTaskProcessing != null ) return;
+        long avgTime = TPS.timeSinceTick( 20 ) / 20;
+        long currTime = TPS.timeSinceTick( 1 );
 
         long availableTime = avgTime - currTime - 30;
-        availableTime = TimeUnit.MILLISECONDS.toNanos(availableTime) / 2;
+        availableTime = TimeUnit.MILLISECONDS.toNanos( availableTime ) / 2;
 
-        syncTaskProcessing = new SyncTaskProcessing(availableTime);
+        syncTaskProcessing = new SyncTaskProcessing( availableTime );
     }
 
     public static void kill() {
-        if (syncTaskProcessing != null) syncTaskProcessing.setCancelled(true);
+        if ( syncTaskProcessing != null ) syncTaskProcessing.setCancelled( true );
         syncTaskProcessing = null;
         killed = true;
     }
 
     @Override
     public void run() {
-        if (killed) return;
+        if ( killed ) return;
         syncTaskProcessing.run();
     }
 

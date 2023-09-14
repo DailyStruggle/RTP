@@ -11,8 +11,8 @@ public class TeleportCancelEvent extends Event {
     private static final HandlerList HANDLERS_LIST = new HandlerList();
     private final UUID playerId;
 
-    public TeleportCancelEvent(UUID playerId) {
-        super(!Bukkit.isPrimaryThread());
+    public TeleportCancelEvent( UUID playerId ) {
+        super( !Bukkit.isPrimaryThread() );
         this.playerId = playerId;
     }
 

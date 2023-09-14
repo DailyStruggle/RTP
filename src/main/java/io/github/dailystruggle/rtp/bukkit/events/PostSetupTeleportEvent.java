@@ -10,8 +10,8 @@ public class PostSetupTeleportEvent extends Event {
     private static final HandlerList HANDLERS_LIST = new HandlerList();
     private final SetupTeleport setupTeleport;
 
-    public PostSetupTeleportEvent(SetupTeleport setupTeleport) {
-        super(!Bukkit.isPrimaryThread());
+    public PostSetupTeleportEvent( SetupTeleport setupTeleport ) {
+        super( !Bukkit.isPrimaryThread() );
         this.setupTeleport = setupTeleport;
     }
 

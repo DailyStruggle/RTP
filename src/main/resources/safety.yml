@@ -11,7 +11,7 @@ safetyRadius: 0
 # radius less than 0 will turn this off
 platformRadius: 0
 platformDepth: 1
-#break blocks above platform to make air (may cause lighting bugs)
+#break blocks above platform to make air ( may cause lighting bugs )
 platformAirHeight: 2
 #if no solid block under player, use this
 platformMaterial: SMOOTH_STONE

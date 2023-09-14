@@ -9,27 +9,27 @@ import java.util.Collection;
 
 public class GriefPreventionChecker {
     private static GriefPrevention getGriefPrevention() {
-        Plugin plugin = Bukkit.getServer().getPluginManager().getPlugin("GriefPrevention");
+        Plugin plugin = Bukkit.getServer().getPluginManager().getPlugin( "GriefPrevention" );
 
         // WorldGuard may not be loaded
-        if (!(plugin instanceof GriefPrevention)) {
+        if ( !(plugin instanceof GriefPrevention) ) {
             return null; // Maybe you want throw an exception instead
         }
-        return (GriefPrevention) plugin;
+        return ( GriefPrevention ) plugin;
     }
 
     private static boolean exists = true;
-    public static Boolean isInClaim(org.bukkit.Location location) {
-        if(exists) {
+    public static Boolean isInClaim( org.bukkit.Location location ) {
+        if( exists ) {
             try {
-                if (getGriefPrevention() == null) return false;
-                int chunkX = (location.getBlockX() >= 0 || (location.getBlockX() % 16 == 0)) ? (location.getBlockX() / 16) : (location.getBlockX() / 16) - 1;
-                int chunkZ = (location.getBlockZ() >= 0 || (location.getBlockZ() % 16 == 0)) ? (location.getBlockZ() / 16) : (location.getBlockZ() / 16) - 1;
-                Collection<Claim> claims = GriefPrevention.instance.dataStore.getClaims(chunkX, chunkZ);
-                return claims.size() > 0;
-            } catch (Throwable t) {
+                if ( getGriefPrevention() == null ) return false;
+                int chunkX = ( location.getBlockX() >= 0 || ( location.getBlockX() % 16 == 0) ) ? ( location.getBlockX() / 16 ) : ( location.getBlockX() / 16 ) - 1;
+                int chunkZ = ( location.getBlockZ() >= 0 || ( location.getBlockZ() % 16 == 0) ) ? ( location.getBlockZ() / 16 ) : ( location.getBlockZ() / 16 ) - 1;
+                Collection<Claim> claims = GriefPrevention.instance.dataStore.getClaims( chunkX, chunkZ );
+                return !claims.isEmpty();
+            } catch ( Throwable t ) {
                 exists = false;
-                t.printStackTrace();
+                RTP.log( Level.WARNING, t.getMessage(), t );
             }
         }
         return false;

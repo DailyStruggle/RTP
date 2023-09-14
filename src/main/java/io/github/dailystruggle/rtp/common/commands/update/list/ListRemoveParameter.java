@@ -12,9 +12,9 @@ public class ListRemoveParameter extends CommandParameter {
     private final YamlFile file;
     private final String key;
 
-    public ListRemoveParameter(YamlFile file, String key) {
-        super("rtp.update", "add items to a list", (uuid, s) -> true);
-        this.values = () -> new HashSet<>(file.getStringList(key));
+    public ListRemoveParameter( YamlFile file, String key ) {
+        super( "rtp.update", "add items to a list", ( uuid, s ) -> true );
+        this.values = () -> new HashSet<>( file.getStringList( key) );
         this.file = file;
         this.key = key;
     }

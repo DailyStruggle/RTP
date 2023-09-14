@@ -5,13 +5,13 @@ public interface RTPChunk {
 
     int z();
 
-    RTPBlock getBlockAt(int x, int y, int z);
+    RTPBlock getBlockAt( int x, int y, int z );
 
-    RTPBlock getBlockAt(RTPLocation location);
+    RTPBlock getBlockAt( RTPLocation location );
 
     RTPWorld getWorld();
 
-    void keep(boolean keep);
+    void keep( boolean keep );
 
     void unload();
 }

@@ -15,10 +15,10 @@ public class PAPIChecker {
      * getPAPI - function to if PAPI exists and fill the above object reference accordingly
      */
     private static void getPAPI() {
-        Plugin plugin = Bukkit.getServer().getPluginManager().getPlugin("PlaceholderAPI");
+        Plugin plugin = Bukkit.getServer().getPluginManager().getPlugin( "PlaceholderAPI" );
 
-        if (plugin instanceof PlaceholderAPIPlugin && plugin.isEnabled()) {
-            placeholderAPIPlugin = (PlaceholderAPIPlugin) plugin;
+        if ( plugin instanceof PlaceholderAPIPlugin && plugin.isEnabled() ) {
+            placeholderAPIPlugin = ( PlaceholderAPIPlugin ) plugin;
         } else placeholderAPIPlugin = null;
     }
 
@@ -29,13 +29,13 @@ public class PAPIChecker {
      * @param input  a message to apply replacements to
      * @return message with replacements, or same message if replacements aren't possible
      */
-    public static String fillPlaceholders(@Nullable OfflinePlayer player, String input) {
+    public static String fillPlaceholders( @Nullable OfflinePlayer player, String input ) {
         //if I don't have a correct object reference for PAPI, try to get one.
-        if (placeholderAPIPlugin == null || !placeholderAPIPlugin.isEnabled()) {
+        if ( placeholderAPIPlugin == null || !placeholderAPIPlugin.isEnabled() ) {
             getPAPI();
         }
-        if (placeholderAPIPlugin == null) return input;
+        if ( placeholderAPIPlugin == null ) return input;
 
-        return PlaceholderAPI.setPlaceholders(player, input);
+        return PlaceholderAPI.setPlaceholders( player, input );
     }
 }

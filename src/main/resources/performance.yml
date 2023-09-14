@@ -3,13 +3,13 @@
 maxAttempts: 10
 
 #what radius, in chunks, around the destination to pre-load
-# number of chunks loaded is (1 + 2*viewDistance)^2
+# number of chunks loaded is ( 1 + 2*viewDistance )^2
 # set higher to pre-load a larger radius
 # impact: high
 viewDistanceSelect: 0
 viewDistanceTeleport: 0
 
-#number of gameticks between searching for new locations in each region (20 gameticks is 1 second)
+#number of gameticks between searching for new locations in each region ( 20 gameticks is 1 second )
 # The number of selections processed will depend on past selections and an estimated remaining time in the gametick.
 # Selection tasks for the different regions will rotate
 # impact: medium

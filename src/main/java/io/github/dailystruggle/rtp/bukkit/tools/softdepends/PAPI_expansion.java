@@ -34,18 +34,18 @@ public class PAPI_expansion extends PlaceholderExpansion {
     }
 
     @Override
-    public String onRequest(OfflinePlayer player, @NotNull String params) {
-        return onPlaceholderRequest(player.getPlayer(), params);
+    public String onRequest( OfflinePlayer player, @NotNull String params ) {
+        return onPlaceholderRequest( player.getPlayer(), params );
     }
 
     @Override
-    public String onPlaceholderRequest(Player player, @NotNull String identifier) {
-        if (player == null) {
+    public String onPlaceholderRequest( Player player, @NotNull String identifier ) {
+        if ( player == null ) {
             return "";
         }
 
-        if (SendMessage.placeholders.containsKey(identifier))
-            return SendMessage.placeholders.get(identifier).apply(player.getUniqueId());
+        if ( SendMessage.placeholders.containsKey( identifier) )
+            return SendMessage.placeholders.get( identifier ).apply( player.getUniqueId() );
 
         return "";
     }
