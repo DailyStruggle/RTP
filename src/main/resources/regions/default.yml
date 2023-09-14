@@ -8,10 +8,10 @@ shape:
   # each shape may use different optional input parameters, so update accordingly
   name: "CIRCLE"
   #what selection adjustment method to use
-  # ACCUMULATE - accumulate all bad sectors up to the initial selection (even distribution, slow at large radii)
-  # NEAREST - try nearest non-hit (possible clustering, but fast)
-  # REROLL - reroll early on a known hit (even distribution, non-deterministic time, but still fast)
-  # NONE - don't check if it's a known hit, just load and try (best for massive radii, >50k)
+  # ACCUMULATE - accumulate all bad sectors up to the initial selection ( even distribution, slow at large radii )
+  # NEAREST - try nearest non-hit ( possible clustering, but fast )
+  # REROLL - reroll early on a known hit ( even distribution, non-deterministic time, but still fast )
+  # NONE - don't check if it's a known hit, just load and try ( best for massive radii, >50k )
   mode: "ACCUMULATE"
   #outer radius of selection in chunks
   radius: 256
@@ -21,7 +21,7 @@ shape:
   centerX: 0
   centerZ: 0
   #shift players towards or away from the center, by exponent
-  # rand()^(x), given rand() is between 0 and 1
+  # rand()^( x ), given rand() is between 0 and 1
   # bigger is closer, smaller is farther
   weight: 1.0
   #prevent nearby placements by adding selected chunks to the region's list of bad chunks

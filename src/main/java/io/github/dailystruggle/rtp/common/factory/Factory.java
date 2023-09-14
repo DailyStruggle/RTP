@@ -16,18 +16,18 @@ import java.util.concurrent.ConcurrentHashMap;
 public class Factory<T extends FactoryValue<?>> {
     public final ConcurrentHashMap<String, T> map = new ConcurrentHashMap<>();
 
-    public void add(String name, T value) {
-        map.put(name.toUpperCase(), value);
+    public void add( String name, T value ) {
+        map.put( name.toUpperCase(), value );
     }
 
     public Enumeration<String> list() {
         return map.keys();
     }
 
-    public boolean contains(String name) {
+    public boolean contains( String name ) {
         name = name.toUpperCase();
-        if (!name.endsWith(".YML")) name = name + ".YML";
-        return map.containsKey(name);
+        if ( !name.endsWith( ".YML") ) name = name + ".YML";
+        return map.containsKey( name );
     }
 
     /**
@@ -35,20 +35,20 @@ public class Factory<T extends FactoryValue<?>> {
      * @return mutable copy of item
      */
     @Nullable
-    public FactoryValue<?> construct(String name) {
+    public FactoryValue<?> construct( String name ) {
         String comparableName = name.toUpperCase();
-        if (!comparableName.endsWith(".YML")) comparableName = comparableName + ".YML";
+        if ( !comparableName.endsWith( ".YML") ) comparableName = comparableName + ".YML";
         //guard constructor
-        T value = map.get(comparableName);
-        if (value == null) {
-            if (map.containsKey("DEFAULT.YML") || map.size() > 0) {
-                value = map.getOrDefault("DEFAULT.YML", map.values().stream().findAny().get());
-                T clone = (T) value.clone();
-                clone.name = (name.endsWith(".yml")) ? name : name + ".yml";
+        T value = map.get( comparableName );
+        if ( value == null ) {
+            if ( map.containsKey( "DEFAULT.YML" ) || !map.isEmpty() ) {
+                value = map.getOrDefault( "DEFAULT.YML", map.values().stream().findAny().get() );
+                T clone = ( T ) value.clone();
+                clone.name = ( name.endsWith( ".yml") ) ? name : name + ".yml";
 
-                if (clone instanceof ConfigParser) {
-                    ConfigParser<?> configParser = (ConfigParser<?>) clone;
-                    configParser.check(configParser.version, configParser.pluginDirectory, null);
+                if ( clone instanceof ConfigParser ) {
+                    ConfigParser<?> configParser = ( ConfigParser<?> ) clone;
+                    configParser.check( configParser.version, configParser.pluginDirectory, null );
                 }
                 value = clone;
             } else return null;
@@ -57,22 +57,22 @@ public class Factory<T extends FactoryValue<?>> {
     }
 
     @Nullable
-    public FactoryValue<?> get(String name) {
-        T t = map.get(name.toUpperCase());
-        if (t == null) return null;
+    public FactoryValue<?> get( String name ) {
+        T t = map.get( name.toUpperCase() );
+        if ( t == null ) return null;
         return t.clone();
     }
 
     @NotNull
-    public FactoryValue<?> getOrDefault(String name) {
+    public FactoryValue<?> getOrDefault( String name ) {
         name = name.toUpperCase();
         //guard constructor
-        T value = (T) get(name);
-        if (value == null) {
-            if (map.containsKey("DEFAULT.YML")) {
-                value = (T) construct(name);
-                map.put(name, value);
-            } else return new ArrayList<>(map.values()).get(0).clone();
+        T value = ( T ) get( name );
+        if ( value == null ) {
+            if ( map.containsKey( "DEFAULT.YML") ) {
+                value = ( T ) construct( name );
+                map.put( name, value );
+            } else return new ArrayList<>( map.values() ).get( 0 ).clone();
         }
         return value.clone();
     }

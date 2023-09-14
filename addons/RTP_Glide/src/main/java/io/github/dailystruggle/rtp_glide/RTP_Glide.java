@@ -20,19 +20,19 @@ public final class RTP_Glide extends JavaPlugin {
 
     @Override
     public void onEnable() {
-        Configs = new Configs(this);
+        Configs = new Configs( this );
         // Plugin startup logic
-        Glide glide = new Glide(this, Configs);
-        Objects.requireNonNull(getCommand("glide")).setExecutor(glide);
-        Objects.requireNonNull(getCommand("glide")).setTabCompleter(new TabComplete());
+        Glide glide = new Glide( this, Configs );
+        Objects.requireNonNull( getCommand( "glide") ).setExecutor( glide );
+        Objects.requireNonNull( getCommand( "glide") ).setTabCompleter( new TabComplete() );
 
-        glide.addCommandHandle("reload","glide.reload",new Reload(Configs));
+        glide.addCommandHandle( "reload","glide.reload",new Reload( Configs) );
 
-        if(Bukkit.getPluginManager().getPlugin("RTP") != null)
-            getServer().getPluginManager().registerEvents(new OnRandomTeleport(this, Configs), this);
-        getServer().getPluginManager().registerEvents(new OnGlideToggle(this),this);
+        if( Bukkit.getPluginManager().getPlugin( "RTP" ) != null )
+            getServer().getPluginManager().registerEvents( new OnRandomTeleport( this, Configs ), this );
+        getServer().getPluginManager().registerEvents( new OnGlideToggle( this ),this );
 
-        SetupGlide.setPlugin(this);
+        SetupGlide.setPlugin( this );
     }
 
     @Override
@@ -46,11 +46,11 @@ public final class RTP_Glide extends JavaPlugin {
         return glidingPlayers;
     }
 
-    public static boolean isTeleportGliding(UUID uuid) {
-        return glidingPlayers.contains(uuid);
+    public static boolean isTeleportGliding( UUID uuid ) {
+        return glidingPlayers.contains( uuid );
     }
 
-    public static boolean isTeleportGliding(Entity entity) {
-        return glidingPlayers.contains(entity.getUniqueId());
+    public static boolean isTeleportGliding( Entity entity ) {
+        return glidingPlayers.contains( entity.getUniqueId() );
     }
 }

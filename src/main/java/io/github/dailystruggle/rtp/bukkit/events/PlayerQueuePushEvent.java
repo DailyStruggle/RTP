@@ -13,8 +13,8 @@ public class PlayerQueuePushEvent extends Event {
     private final Region region;
     private final UUID playerId;
 
-    public PlayerQueuePushEvent(Region region, UUID playerId) {
-        super(!Bukkit.isPrimaryThread());
+    public PlayerQueuePushEvent( Region region, UUID playerId ) {
+        super( !Bukkit.isPrimaryThread() );
         this.region = region;
         this.playerId = playerId;
     }

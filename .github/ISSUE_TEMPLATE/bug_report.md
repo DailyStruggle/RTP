@@ -22,7 +22,7 @@ Steps to reproduce the behavior:
 1. Start server
 2. Join server
 3. Input command `rtp`
-4. See (or don't see) error `x` in chat/console
+4. See ( or don't see ) error `x` in chat/console
 
 **Expected behavior**
 A clear and concise description of what you expected to happen.

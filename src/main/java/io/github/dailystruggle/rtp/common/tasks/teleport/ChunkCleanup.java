@@ -15,16 +15,16 @@ public final class ChunkCleanup extends RTPRunnable {
     private final RTPLocation location;
     private final Region region;
 
-    public ChunkCleanup(RTPLocation location, Region region) {
+    public ChunkCleanup( RTPLocation location, Region region ) {
         this.location = location;
         this.region = region;
     }
 
     @Override
     public void run() {
-        preActions.forEach(consumer -> consumer.accept(this));
-        region.removeChunks(location);
-        postActions.forEach(consumer -> consumer.accept(this));
+        preActions.forEach( consumer -> consumer.accept( this) );
+        region.removeChunks( location );
+        postActions.forEach( consumer -> consumer.accept( this) );
     }
 
     public RTPLocation location() {
@@ -36,17 +36,17 @@ public final class ChunkCleanup extends RTPRunnable {
     }
 
     @Override
-    public boolean equals(Object obj) {
-        if (obj == this) return true;
-        if (obj == null || obj.getClass() != this.getClass()) return false;
-        ChunkCleanup that = (ChunkCleanup) obj;
-        return Objects.equals(this.location, that.location) &&
-                Objects.equals(this.region, that.region);
+    public boolean equals( Object obj ) {
+        if ( obj == this ) return true;
+        if ( obj == null || obj.getClass() != this.getClass() ) return false;
+        ChunkCleanup that = ( ChunkCleanup ) obj;
+        return Objects.equals( this.location, that.location ) &&
+                Objects.equals( this.region, that.region );
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(location, region);
+        return Objects.hash( location, region );
     }
 
     @Override

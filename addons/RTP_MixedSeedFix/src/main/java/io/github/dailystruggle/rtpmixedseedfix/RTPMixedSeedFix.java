@@ -14,22 +14,22 @@ public final class RTPMixedSeedFix extends JavaPlugin {
     public void onEnable() {
         // Plugin startup logic
         Region.maxBiomeChecksPerGen=1;
-        BukkitRTPWorld.setBiomeGetter(location -> {
+        BukkitRTPWorld.setBiomeGetter( location -> {
             Biome biome = Biome.PLAINS;
             try {
                 int x = location.getBlockX()%16;
                 int y = location.getBlockY();
                 int z = location.getBlockZ()%16;
-                if(x<0) x += 16;
-                if(z<0) z += 16;
-                Chunk chunk = PaperLib.getChunkAtAsync(location).get();
-                if(chunk == null) return;
-                biome = chunk.getBlock(x,y,z).getBiome();
-            } catch (InterruptedException | ExecutionException e) {
-                e.printStackTrace();
+                if( x<0 ) x += 16;
+                if( z<0 ) z += 16;
+                Chunk chunk = PaperLib.getChunkAtAsync( location ).get();
+                if( chunk == null ) return;
+                biome = chunk.getBlock( x,y,z ).getBiome();
+            } catch ( InterruptedException | ExecutionException e ) {
+                RTP.log( Level.WARNING, e.getMessage(), e );
             }
             return biome.name();
-        });
+        } );
     }
 
     @Override

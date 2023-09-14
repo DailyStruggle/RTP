@@ -8,9 +8,9 @@ import java.util.UUID;
 public interface RTPCommandSender extends Cloneable {
     UUID uuid();
 
-    boolean hasPermission(String permission);
+    boolean hasPermission( String permission );
 
-    void sendMessage(String message);
+    void sendMessage( String message );
 
     long cooldown();
 
@@ -20,7 +20,7 @@ public interface RTPCommandSender extends Cloneable {
 
     Set<String> getEffectivePermissions();
 
-    void performCommand(@Nullable RTPPlayer player, String command);
+    void performCommand( @Nullable RTPPlayer player, String command );
 
     RTPCommandSender clone();
 }

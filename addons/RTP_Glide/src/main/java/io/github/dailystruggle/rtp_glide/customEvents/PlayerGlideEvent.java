@@ -10,7 +10,7 @@ public class PlayerGlideEvent extends Event {
 
     private final Player player;
 
-    public PlayerGlideEvent(Player player) {
+    public PlayerGlideEvent( Player player ) {
         this.player = player;
     }
 

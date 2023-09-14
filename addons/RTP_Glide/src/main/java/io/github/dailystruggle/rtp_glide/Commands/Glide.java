@@ -23,58 +23,58 @@ public class Glide implements CommandExecutor {
     private final Map<String,String> glideParams = new ConcurrentHashMap<>();
     private final Map<String,CommandExecutor> commandHandles = new ConcurrentHashMap<>();
 
-    public Glide(RTP_Glide plugin, Configs Configs) {
+    public Glide( RTP_Glide plugin, Configs Configs ) {
         this.plugin = plugin;
         this.configs = Configs;
 
-        this.glideParams.put("player", "rtp.other");
+        this.glideParams.put( "player", "rtp.other" );
     }
 
-    public void addCommandHandle(String command, String perm, CommandExecutor handle) {
-        commandHandles.put(command,handle);
-        glideCommands.put(command,perm);
+    public void addCommandHandle( String command, String perm, CommandExecutor handle ) {
+        commandHandles.put( command,handle );
+        glideCommands.put( command,perm );
     }
 
     @Override
-    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if(!command.getName().equals("glide")) return true;
+    public boolean onCommand( CommandSender sender, Command command, String label, String[] args ) {
+        if( !command.getName().equals( "glide") ) return true;
 
-        if(args.length > 0 && glideCommands.containsKey(args[0])) {
-            if(!sender.hasPermission(glideCommands.get(args[0]))) {
+        if( args.length > 0 && glideCommands.containsKey( args[0]) ) {
+            if( !sender.hasPermission( glideCommands.get( args[0])) ) {
                 return false;
             }
             else {
-                return commandHandles.get(args[0]).onCommand(sender,command,label, Arrays.copyOfRange(args, 1, args.length));
+                return commandHandles.get( args[0] ).onCommand( sender,command,label, Arrays.copyOfRange( args, 1, args.length) );
             }
         }
 
-        if(!sender.hasPermission("glide.use")) return false;
+        if( !sender.hasPermission( "glide.use") ) return false;
 
         Map<String,String> glideArgs = new ConcurrentHashMap<>();
-        for(int i = 0; i < args.length; i++) {
-            int idx = args[i].indexOf(':');
-            String arg = idx>0 ? args[i].substring(0,idx) : args[i];
-            if(this.glideParams.containsKey(arg) && sender.hasPermission(glideParams.get(arg)) && idx < args[i].length()-1) {
-                glideArgs.putIfAbsent(arg,args[i].substring(idx+1)); //only use first instance
+        for( int i = 0; i < args.length; i++ ) {
+            int idx = args[i].indexOf( ':' );
+            String arg = idx>0 ? args[i].substring( 0,idx ) : args[i];
+            if( this.glideParams.containsKey( arg ) && sender.hasPermission( glideParams.get( arg) ) && idx < args[i].length()-1 ) {
+                glideArgs.putIfAbsent( arg,args[i].substring( idx+1) ); //only use first instance
             }
         }
 
         String playerName;
-        if(!glideArgs.containsKey("player")) {
-            if(!(sender instanceof Player)) {
-                RTP.log(Level.WARNING, "glide needs a player argument");
+        if( !glideArgs.containsKey( "player") ) {
+            if( !(sender instanceof Player) ) {
+                RTP.log( Level.WARNING, "glide needs a player argument" );
                 return true;
             }
             else playerName = sender.getName();
         }
-        else playerName = glideArgs.get("player");
-        Player player = Bukkit.getPlayer(playerName);
-        if(player == null) {
-            sender.sendMessage("[glide] player '" + playerName + "' not found");
+        else playerName = glideArgs.get( "player" );
+        Player player = Bukkit.getPlayer( playerName );
+        if( player == null ) {
+            sender.sendMessage( "[glide] player '" + playerName + "' not found" );
             return true;
         }
 
-        Bukkit.getScheduler().runTask(plugin,new SetupGlide(player, configs));
+        Bukkit.getScheduler().runTask( plugin,new SetupGlide( player, configs) );
 
         return true;
     }

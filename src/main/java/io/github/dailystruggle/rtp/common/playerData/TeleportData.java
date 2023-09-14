@@ -40,7 +40,7 @@ public class TeleportData implements Cloneable {
     @Override
     public TeleportData clone() {
         try {
-            TeleportData clone = (TeleportData) super.clone();
+            TeleportData clone = ( TeleportData ) super.clone();
             // TODO: copy mutable state here, so the clone can't change the internals of the original
             clone.sender = sender.clone();
             clone.originalLocation = originalLocation.clone();
@@ -50,14 +50,14 @@ public class TeleportData implements Cloneable {
             clone.cost = cost;
             clone.completed = completed;
             clone.delay = delay;
-            clone.biomes = new HashSet<>(biomes);
+            clone.biomes = new HashSet<>( biomes );
             clone.nextTask = nextTask;
             clone.attempts = attempts;
             clone.queueLocation = queueLocation;
             clone.processingTime = processingTime;
             clone.written = written;
             return clone;
-        } catch (CloneNotSupportedException e) {
+        } catch ( CloneNotSupportedException e ) {
             throw new AssertionError();
         }
     }

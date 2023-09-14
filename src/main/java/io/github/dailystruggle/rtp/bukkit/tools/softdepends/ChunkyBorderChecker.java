@@ -4,6 +4,7 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
@@ -27,7 +28,7 @@ public class ChunkyBorderChecker {
     private static void getChunky() {
         try {
             chunkyBorder = ChunkyBorderProvider.get();
-        } catch (Throwable t) {
+        } catch ( Throwable t ) {
             chunkyBorder = null;
         }
     }
@@ -37,48 +38,52 @@ public class ChunkyBorderChecker {
         getChunky();
 
         // chunkyborder initialization
-        if (chunkyBorder != null) {
-            RTP.serverAccessor.setWorldBorderFunction(worldName -> {
+        if ( chunkyBorder != null ) {
+            RTP.serverAccessor.setWorldBorderFunction( worldName -> {
                 try {
-                    Optional<BorderData> borderDataOptional = ChunkyBorderProvider.get().getBorder(worldName);
-                    if (borderDataOptional.isPresent()) {
+                    Optional<BorderData> borderDataOptional = ChunkyBorderProvider.get().getBorder( worldName );
+                    if ( borderDataOptional.isPresent() ) {
                         BorderData borderData = borderDataOptional.get();
-                        Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+
+                        Factory<?> factory = RTP.factoryMap.get( RTP.factoryNames.shape );
                         org.popcraft.chunky.shape.Shape border = borderData.getBorder();
-                        Shape<RectangleParams> shape = (Shape<RectangleParams>) factory.get("chunky_" + border.name());
-                        if (!(shape instanceof ChunkyRTPShape)) {
-                            shape = new ChunkyRTPShape("chunky_" + border.name());
-                            RTPAPI.addShape(shape);
+                        FactoryValue<?> value = factory.get( "chunky_" + border.name() );
+                        if( !(value instanceof Shape<?>) ) throw new IllegalStateException( "Shape factory is not using shape class" );
+                        if( !value.myClass.equals( RectangleParams.class) ) throw new IllegalStateException( "chunky shape ` " + "chunky_" + border.name() + " ` not using rectangle as its superclass" );
+                        @SuppressWarnings( "unchecked" ) Shape<RectangleParams> shape = ( Shape<RectangleParams> ) value;
+                        if ( !(shape instanceof ChunkyRTPShape) ) {
+                            shape = new ChunkyRTPShape( "chunky_" + border.name() );
+                            RTPAPI.addShape( shape );
                         }
-                        double radius = (Math.max(borderData.getRadiusX(), borderData.getRadiusZ()) * 0.9)/16;
-                        shape.set(RectangleParams.width, radius);
-                        shape.set(RectangleParams.height, radius);
+                        double radius = ( Math.max( borderData.getRadiusX(), borderData.getRadiusZ() ) * 0.9 )/16;
+                        shape.set( RectangleParams.width, radius );
+                        shape.set( RectangleParams.height, radius );
                         Shape<RectangleParams> finalShape = shape;
-                        return new WorldBorder(() -> finalShape, rtpLocation -> border.isBounding(rtpLocation.x() / 16.0, rtpLocation.z() / 16.0));
+                        return new WorldBorder( () -> finalShape, rtpLocation -> border.isBounding( rtpLocation.x() / 16.0, rtpLocation.z() / 16.0) );
                     }
-                    RTPWorld rtpWorld = RTP.serverAccessor.getRTPWorld(worldName);
-                    if (rtpWorld instanceof BukkitRTPWorld) {
-                        BukkitRTPWorld bukkitRTPWorld = (BukkitRTPWorld) rtpWorld;
+                    RTPWorld rtpWorld = RTP.serverAccessor.getRTPWorld( worldName );
+                    if ( rtpWorld instanceof BukkitRTPWorld ) {
+                        BukkitRTPWorld bukkitRTPWorld = ( BukkitRTPWorld ) rtpWorld;
                         World world = bukkitRTPWorld.world();
                         org.bukkit.WorldBorder worldBorder = world.getWorldBorder();
                         return new WorldBorder(
-                                () -> ((Shape<?>) RTP.factoryMap.get(RTP.factoryNames.shape).get("SQUARE")),
-                                rtpLocation -> worldBorder.isInside(new Location(world, rtpLocation.x(), rtpLocation.y(), rtpLocation.z())));
+                                () -> ( (Shape<?> ) RTP.factoryMap.get( RTP.factoryNames.shape ).get( "SQUARE") ),
+                                rtpLocation -> worldBorder.isInside( new Location( world, rtpLocation.x(), rtpLocation.y(), rtpLocation.z())) );
                     }
-                } catch (Throwable t) {
+                } catch ( Throwable t ) {
                     chunkyBorder = null;
-                    RTPWorld rtpWorld = RTP.serverAccessor.getRTPWorld(worldName);
-                    if (rtpWorld instanceof BukkitRTPWorld) {
-                        BukkitRTPWorld bukkitRTPWorld = (BukkitRTPWorld) rtpWorld;
+                    RTPWorld rtpWorld = RTP.serverAccessor.getRTPWorld( worldName );
+                    if ( rtpWorld instanceof BukkitRTPWorld ) {
+                        BukkitRTPWorld bukkitRTPWorld = ( BukkitRTPWorld ) rtpWorld;
                         World world = bukkitRTPWorld.world();
                         org.bukkit.WorldBorder worldBorder = world.getWorldBorder();
                         return new WorldBorder(
-                                () -> ((Shape<?>) RTP.factoryMap.get(RTP.factoryNames.shape).get("SQUARE")),
-                                rtpLocation -> worldBorder.isInside(new Location(world, rtpLocation.x(), rtpLocation.y(), rtpLocation.z())));
+                                () -> ( (Shape<?> ) RTP.factoryMap.get( RTP.factoryNames.shape ).get( "SQUARE") ),
+                                rtpLocation -> worldBorder.isInside( new Location( world, rtpLocation.x(), rtpLocation.y(), rtpLocation.z())) );
                     }
                 }
                 return null;
-            });
+            } );
         }
     }
 }
