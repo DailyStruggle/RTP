@@ -31,7 +31,9 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.io.File;
+import java.nio.file.FileSystemException;
 import java.util.*;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 /**
@@ -94,7 +96,12 @@ public final class RTPBukkitPlugin extends JavaPlugin {
 
             File databaseDirectory = RTP.configs.pluginDirectory;
             databaseDirectory = new File( databaseDirectory.getAbsolutePath() + File.separator + "database" );
-            databaseDirectory.mkdirs();
+            boolean mkdirs = databaseDirectory.mkdirs();
+            if(!mkdirs && !databaseDirectory.exists()) {
+                RTP.log(Level.SEVERE, "unable to make directories", new FileSystemException("unable to make directories"));
+                onDisable();
+                return;
+            }
             rtp.databaseAccessor = new SQLiteDatabaseAccessor( 
                     "jdbc:sqlite:" + databaseDirectory.getAbsolutePath() + File.separator + "RTP.db" );
 
