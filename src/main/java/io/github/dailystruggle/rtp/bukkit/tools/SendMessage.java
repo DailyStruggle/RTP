@@ -373,7 +373,7 @@ public class SendMessage {
     }
 
     public static void sendMessage( RTPCommandSender sender, String message, String hover, String click ) {
-        if ( message.equals( "") ) return;
+        if (message.isEmpty()) return;
 
         OfflinePlayer player;
         if ( sender instanceof Player ) player = ( OfflinePlayer ) sender;
@@ -384,7 +384,7 @@ public class SendMessage {
         if ( RTP.serverAccessor.getServerIntVersion() > 12 ) {
             BaseComponent[] textComponents = TextComponent.fromLegacyText( message );
 
-            if ( !hover.equals( "") ) {
+            if (!hover.isEmpty()) {
                 BaseComponent[] hoverComponents = TextComponent.fromLegacyText( format( player, hover) );
                 //noinspection deprecation
                 HoverEvent hoverEvent = ( RTP.serverAccessor.getServerIntVersion() >= 16 )
@@ -395,7 +395,7 @@ public class SendMessage {
                 }
             }
 
-            if ( !click.equals( "") ) {
+            if (!click.isEmpty()) {
                 ClickEvent clickEvent = new ClickEvent( ClickEvent.Action.SUGGEST_COMMAND, click );
                 for ( BaseComponent component : textComponents ) {
                     component.setClickEvent( clickEvent );
@@ -425,8 +425,8 @@ public class SendMessage {
         for ( Map.Entry<String, Function<UUID, String>> entry : SendMessage.placeholders.entrySet() ) {
             String s = entry.getKey();
             Function<UUID, String> uuidStringFunction = entry.getValue();
-            if ( !keywords.contains( s) ) continue;
-            placeholders.put( s, uuidStringFunction.apply( uuid) );
+            if ( !keywords.contains( s ) ) continue;
+            placeholders.put( s, uuidStringFunction.apply( uuid ) );
         }
 
         //replace all placeholders with their respective string function results
@@ -435,7 +435,7 @@ public class SendMessage {
         }
 
         if ( lang != null ) {
-            Pattern placeholderIntPattern = Pattern.compile( "\\[( [Pp] )( \\d* )]" );
+            Pattern placeholderIntPattern = Pattern.compile( "\\[([Pp])(\\d*)]" );
             Matcher placeholderIntMatcher = placeholderIntPattern.matcher( text );
             while ( placeholderIntMatcher.find() ) {
                 String group = placeholderIntMatcher.group( 2 );
@@ -610,9 +610,9 @@ public class SendMessage {
         while ( matcher1.find() ) {
             String hexColor = text.substring( matcher1.start(), matcher1.end() );
             String bukkitColor;
-            StringBuilder bukkitColorCode = new StringBuilder( '\u00A7' + "x" );
+            StringBuilder bukkitColorCode = new StringBuilder( '§' + "x" );
             for ( int i = hexColor.indexOf( '#' ) + 1; i < hexColor.length(); i++ ) {
-                bukkitColorCode.append( '\u00A7' ).append( hexColor.charAt( i) );
+                bukkitColorCode.append( '§' ).append( hexColor.charAt( i) );
             }
             bukkitColor = bukkitColorCode.toString().toLowerCase();
             text = text.replaceAll( hexColor, bukkitColor );

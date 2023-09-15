@@ -300,7 +300,12 @@ public class OnEventTeleports implements Listener {
         if ( from.distance( to ) == 0.0d ) return;
         Player player = event.getPlayer();
 
-        ConfigParser<ConfigKeys> configParser = ( ConfigParser<ConfigKeys> ) RTP.configs.configParserMap.get( ConfigKeys.class );
+        ConfigParser<?> parser = RTP.configs.configParserMap.get(ConfigKeys.class);
+        if(!parser.myClass.equals(ConfigKeys.class)) {
+            RTP.log(Level.SEVERE,"", new IllegalStateException("unexpected class for configParser"));
+            return;
+        }
+        @SuppressWarnings("unchecked") ConfigParser<ConfigKeys> configParser = ( ConfigParser<ConfigKeys> ) parser;
 
         playerMoveDistances.putIfAbsent( player.getUniqueId(), 0D );
         playerMoveDistances.compute( player.getUniqueId(), ( uuid, aDouble ) -> aDouble += from.distance( to) );
