@@ -18,8 +18,8 @@ import java.util.Map;
 import java.util.UUID;
 
 public class FillStartCmd extends FillSubCmd {
-    public FillStartCmd(@Nullable CommandsAPICommand parent) {
-        super(parent);
+    public FillStartCmd( @Nullable CommandsAPICommand parent ) {
+        super( parent );
     }
 
     @Override
@@ -33,57 +33,57 @@ public class FillStartCmd extends FillSubCmd {
     }
 
     @Override
-    public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
-        if (nextCommand != null) return true;
+    public boolean onCommand( UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand ) {
+        if ( nextCommand != null ) return true;
 
-        List<Region> regions = getRegions(callerId, parameterValues.get("region"));
-        for (Region region : regions) {
-            FillTask fillTask = RTP.getInstance().fillTasks.get(region.name);
-            ConfigParser<MessagesKeys> parser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-            if (fillTask != null) {
-                if (parser == null) continue;
-                String msg = String.valueOf(parser.getConfigValue(MessagesKeys.fillRunning, ""));
-                if (msg == null || msg.isEmpty()) continue;
-                msg = msg.replace("[region]", region.name);
-                RTP.serverAccessor.announce(msg, "rtp.fill");
+        List<Region> regions = getRegions( callerId, parameterValues.get( "region") );
+        for ( Region region : regions ) {
+            FillTask fillTask = RTP.getInstance().fillTasks.get( region.name );
+            ConfigParser<MessagesKeys> parser = ( ConfigParser<MessagesKeys> ) RTP.configs.getParser( MessagesKeys.class );
+            if ( fillTask != null ) {
+                if ( parser == null ) continue;
+                String msg = String.valueOf( parser.getConfigValue( MessagesKeys.fillRunning, "") );
+                if ( msg == null || msg.isEmpty() ) continue;
+                msg = msg.replace( "[region]", region.name );
+                RTP.serverAccessor.announce( msg, "rtp.fill" );
                 continue;
             }
 
             Shape<?> shapeObj = region.getShape();
             MemoryShape<?> shape;
-            if (shapeObj instanceof MemoryShape) {
-                shape = (MemoryShape<?>) shapeObj;
+            if ( shapeObj instanceof MemoryShape ) {
+                shape = ( MemoryShape<?> ) shapeObj;
             } else {
-                if (parser == null) continue;
-                String msg = String.valueOf(parser.getConfigValue(MessagesKeys.badArg, ""));
-                if (msg == null || msg.isEmpty()) continue;
-                msg = msg.replace("[arg]", "region:" + region.name);
-                RTP.serverAccessor.sendMessage(callerId, msg);
+                if ( parser == null ) continue;
+                String msg = String.valueOf( parser.getConfigValue( MessagesKeys.badArg, "") );
+                if ( msg == null || msg.isEmpty() ) continue;
+                msg = msg.replace( "[arg]", "region:" + region.name );
+                RTP.serverAccessor.sendMessage( callerId, msg );
                 continue;
             }
 
             shape.badLocations.clear();
             shape.biomeLocations.clear();
-            shape.badLocationSum.set(0);
+            shape.badLocationSum.set( 0 );
 
-            RTP.getInstance().fillTasks.put(region.name, new FillTask(region, 0L));
-            if (parser == null) continue;
-            String msg = String.valueOf(parser.getConfigValue(MessagesKeys.fillStart, ""));
-            if (msg == null || msg.isEmpty()) continue;
-            msg = msg.replace("[region]", region.name);
-            RTP.serverAccessor.announce(msg, "rtp.fill");
+            RTP.getInstance().fillTasks.put( region.name, new FillTask( region, 0L) );
+            if ( parser == null ) continue;
+            String msg = String.valueOf( parser.getConfigValue( MessagesKeys.fillStart, "") );
+            if ( msg == null || msg.isEmpty() ) continue;
+            msg = msg.replace( "[region]", region.name );
+            RTP.serverAccessor.announce( msg, "rtp.fill" );
         }
 
         return true;
     }
 
-    public List<Region> getRegions(UUID callerId, List<String> regionParameter) {
+    public List<Region> getRegions( UUID callerId, List<String> regionParameter ) {
         List<Region> regions = new ArrayList<>();
-        RTPCommandSender sender = RTP.serverAccessor.getSender(callerId);
-        if (regionParameter != null) {
-            for (String name : regionParameter) regions.add(RTP.selectionAPI.getRegion(name));
-        } else if (sender instanceof RTPPlayer) regions.add(RTP.selectionAPI.getRegion((RTPPlayer) sender));
-        else regions.add(RTP.selectionAPI.getRegion("default"));
+        RTPCommandSender sender = RTP.serverAccessor.getSender( callerId );
+        if ( regionParameter != null ) {
+            for ( String name : regionParameter ) regions.add( RTP.selectionAPI.getRegion( name) );
+        } else if ( sender instanceof RTPPlayer ) regions.add( RTP.selectionAPI.getRegion( (RTPPlayer ) sender) );
+        else regions.add( RTP.selectionAPI.getRegion( "default") );
         return regions;
     }
 }

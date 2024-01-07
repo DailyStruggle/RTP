@@ -3,45 +3,41 @@ import commonTestImpl.substitutions.TestRTPCommandSender;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.database.options.SQLiteDatabaseAccessor;
-import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.simpleyaml.configuration.file.YamlFile;
 
 import java.io.File;
-import java.io.IOException;
-import java.net.MalformedURLException;
 import java.sql.Connection;
 import java.util.*;
+import java.util.logging.Level;
 
 public class SQLiteDatabaseTest {
 
     @Test
     void TestSQLiteConnection() {
         try {
-            Class.forName("org.sqlite.JDBC");
-        } catch (ClassNotFoundException e) {
-            e.printStackTrace();
+            Class.forName( "org.sqlite.JDBC" );
+        } catch ( ClassNotFoundException e ) {
+            RTP.log( Level.WARNING, "ClassNotFoundException", e );
             return;
         }
         RTP.serverAccessor = new TestRTPServerAccessor();
         RTP rtp = new RTP();
 
         File databaseDirectory = RTP.configs.pluginDirectory;
-        databaseDirectory = new File(databaseDirectory.getAbsolutePath() + File.separator + "database");
+        databaseDirectory = new File( databaseDirectory.getAbsolutePath() + File.separator + "database" );
         databaseDirectory.mkdirs();
-        SQLiteDatabaseAccessor database = new SQLiteDatabaseAccessor(
-                "jdbc:sqlite:" + databaseDirectory.getAbsolutePath() + File.separator + "RTP.db");
+        SQLiteDatabaseAccessor database = new SQLiteDatabaseAccessor( 
+                "jdbc:sqlite:" + databaseDirectory.getAbsolutePath() + File.separator + "RTP.db" );
         RTP.getInstance().databaseAccessor = database;
         RTP.getInstance().databaseAccessor.startup();
 
         int i = 0;
-        while (rtp.startupTasks.size()>0) {
-            rtp.startupTasks.execute(Long.MAX_VALUE);
+        while ( rtp.startupTasks.size()>0 ) {
+            rtp.startupTasks.execute( Long.MAX_VALUE );
             i++;
-            if(i>50) return;
+            if( i>50 ) return;
         }
 
         String table = "teleportData";
@@ -55,43 +51,43 @@ public class SQLiteDatabaseTest {
 
 
         Connection connect = database.connect();
-        Assertions.assertNotNull(connect);
+        Assertions.assertNotNull( connect );
 
-        DatabaseAccessor.TableObj key = new DatabaseAccessor.TableObj(playerId.toString());
-        Assertions.assertNotNull(key);
-        Assertions.assertNotNull(key.object);
+        DatabaseAccessor.TableObj key = new DatabaseAccessor.TableObj( playerId.toString() );
+        Assertions.assertNotNull( key );
+        Assertions.assertNotNull( key.object );
 
         Map<DatabaseAccessor.TableObj, DatabaseAccessor.TableObj> testMap = new HashMap<>();
-        for (Map.Entry<String, Object> entry : DatabaseAccessor.toColumns(inputData).entrySet()) {
+        for ( Map.Entry<String, Object> entry : DatabaseAccessor.toColumns( inputData ).entrySet() ) {
             String key1 = entry.getKey();
             Object value = entry.getValue();
-            testMap.put(new DatabaseAccessor.TableObj(key1),new DatabaseAccessor.TableObj(value));
+            testMap.put( new DatabaseAccessor.TableObj( key1 ),new DatabaseAccessor.TableObj( value) );
         }
-        testMap.put(new DatabaseAccessor.TableObj("UUID"), new DatabaseAccessor.TableObj(playerId));
-        database.write(connect, table,testMap);
+        testMap.put( new DatabaseAccessor.TableObj( "UUID" ), new DatabaseAccessor.TableObj( playerId) );
+        database.write( connect, table,testMap );
 
-        Optional<Map<String, Object>> read = database.read(connect,
+        Optional<Map<String, Object>> read = database.read( connect,
                 table,
-                new AbstractMap.SimpleEntry<>("UUID",key.object));
+                new AbstractMap.SimpleEntry<>( "UUID",key.object) );
 
-        Assertions.assertNotNull(read);
-        Assertions.assertTrue(read.isPresent());
+        Assertions.assertNotNull( read );
+        Assertions.assertTrue( read.isPresent() );
 
-        Assertions.assertEquals("2",read.get().get("delay"));
+        Assertions.assertEquals( "2",read.get().get( "delay") );
 
-        testMap.put(new DatabaseAccessor.TableObj("delay"),new DatabaseAccessor.TableObj(5));
-        database.write(connect,table,testMap);
+        testMap.put( new DatabaseAccessor.TableObj( "delay" ),new DatabaseAccessor.TableObj( 5) );
+        database.write( connect,table,testMap );
 
-        database.disconnect(connect);
+        database.disconnect( connect );
 
         connect = database.connect();
-        read = database.read(connect,
+        read = database.read( connect,
                 table,
-                new AbstractMap.SimpleEntry<>("UUID",key.object));
-        Assertions.assertNotNull(read);
-        Assertions.assertTrue(read.isPresent());
+                new AbstractMap.SimpleEntry<>( "UUID",key.object) );
+        Assertions.assertNotNull( read );
+        Assertions.assertTrue( read.isPresent() );
 
-        Assertions.assertEquals("5",read.get().get("delay"));
-        database.disconnect(connect);
+        Assertions.assertEquals( "5",read.get().get( "delay") );
+        database.disconnect( connect );
     }
 }

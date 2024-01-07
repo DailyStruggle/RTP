@@ -19,14 +19,15 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
+import java.util.logging.Level;
 
 public final class LoadChunks extends RTPRunnable {
     public static final List<Consumer<LoadChunks>> preActions = new ArrayList<>();
     public static final List<Consumer<LoadChunks>> postActions = new ArrayList<>();
 
     static {
-        preActions.add(task -> task.isRunning.set(true));
-        postActions.add(task -> task.isRunning.set(false));
+        preActions.add( task -> task.isRunning.set( true) );
+        postActions.add( task -> task.isRunning.set( false) );
     }
 
     private final RTPCommandSender sender;
@@ -35,38 +36,38 @@ public final class LoadChunks extends RTPRunnable {
     private final Region region;
     public boolean modified = false;
 
-    public LoadChunks(RTPCommandSender sender,
+    public LoadChunks( RTPCommandSender sender,
                       RTPPlayer player,
                       RTPLocation location,
-                      Region region) {
+                      Region region ) {
         this.sender = sender;
         this.player = player;
         this.location = location;
         this.region = region;
 
-        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
-        long radius2 = perf.getNumber(PerformanceKeys.viewDistanceTeleport, 0L).longValue();
-        long max = (radius2 * radius2 * 4) + (4 * radius2) + 1;
+        ConfigParser<PerformanceKeys> perf = ( ConfigParser<PerformanceKeys> ) RTP.configs.getParser( PerformanceKeys.class );
+        long radius2 = perf.getNumber( PerformanceKeys.viewDistanceTeleport, 0L ).longValue();
+        long max = ( radius2 * radius2 * 4 ) + ( 4 * radius2 ) + 1;
 
-        ChunkSet chunkSet = this.region.chunks(location, radius2);
+        ChunkSet chunkSet = this.region.chunks( location, radius2 );
 
-        TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.uuid());
-        if (teleportData == null) {
+        TeleportData teleportData = RTP.getInstance().latestTeleportData.get( player.uuid() );
+        if ( teleportData == null ) {
             teleportData = new TeleportData();
-            teleportData.sender = (sender != null) ? sender : player;
+            teleportData.sender = ( sender != null ) ? sender : player;
             teleportData.originalLocation = player.getLocation();
             teleportData.selectedLocation = location;
             teleportData.time = System.currentTimeMillis();
             teleportData.nextTask = this;
             teleportData.targetRegion = region;
             teleportData.delay = sender.delay();
-            RTP.getInstance().latestTeleportData.put(player.uuid(), teleportData);
+            RTP.getInstance().latestTeleportData.put( player.uuid(), teleportData );
         }
 
-        if (max > chunkSet.chunks.size()) {
-            chunkSet.keep(false);
-            chunkSet = teleportData.targetRegion.chunks(location, radius2);
-            chunkSet.keep(true);
+        if ( max > chunkSet.chunks.size() ) {
+            chunkSet.keep( false );
+            chunkSet = teleportData.targetRegion.chunks( location, radius2 );
+            chunkSet.keep( true );
             modified = true;
         }
     }
@@ -74,56 +75,56 @@ public final class LoadChunks extends RTPRunnable {
     @Override
     public void run() {
         try {
-            preActions.forEach(consumer -> consumer.accept(this));
+            preActions.forEach( consumer -> consumer.accept( this) );
             long start = System.currentTimeMillis();
 
-            TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.uuid());
-            DoTeleport doTeleport = new DoTeleport(sender, player, location, region);
+            TeleportData teleportData = RTP.getInstance().latestTeleportData.get( player.uuid() );
+            DoTeleport doTeleport = new DoTeleport( sender, player, location, region );
             teleportData.nextTask = doTeleport;
 
             long lastTime = teleportData.time;
 
             long delay = sender.delay();
-            long dT = (start - lastTime);
+            long dT = ( start - lastTime );
             long remainingTime = delay - dT;
             long toTicks = remainingTime / 50;
 
-            ChunkSet chunkSet = this.region.locAssChunks.get(location);
+            ChunkSet chunkSet = this.region.locAssChunks.get( location );
 
-            if (toTicks < 1 &&
-                    (sender.hasPermission("rtp.noDelay.chunks") || chunkSet.complete.isDone())) {
-                if (Bukkit.isPrimaryThread()) {
+            if ( toTicks < 1 &&
+                    ( sender.hasPermission( "rtp.noDelay.chunks" ) || chunkSet.complete.isDone()) ) {
+                if ( Bukkit.isPrimaryThread() ) {
                     try {
                         doTeleport.run();
-                    } catch (Throwable throwable) {
-                        throwable.printStackTrace();
-                        new RTPTeleportCancel(player.uuid()).run();
+                    } catch ( Throwable throwable ) {
+                        RTP.log( Level.WARNING, throwable.getMessage(), throwable );
+                        new RTPTeleportCancel( player.uuid() ).run();
                     }
-                } else RTP.getInstance().teleportPipeline.add(doTeleport);
-                postActions.forEach(consumer -> consumer.accept(this));
+                } else RTP.getInstance().teleportPipeline.add( doTeleport );
+                postActions.forEach( consumer -> consumer.accept( this) );
                 return;
             }
 
-            if (!chunkSet.complete.getNow(false)) {
-                for (CompletableFuture<RTPChunk> cfChunk : chunkSet.chunks) {
+            if ( !chunkSet.complete.getNow( false) ) {
+                for ( CompletableFuture<RTPChunk> cfChunk : chunkSet.chunks ) {
                     try {
                         cfChunk.get();
-                    } catch (ExecutionException | InterruptedException e) {
-                        e.printStackTrace();
+                    } catch ( ExecutionException | InterruptedException e ) {
+                        RTP.log( Level.WARNING, e.getMessage(), e );
                     }
                 }
             }
 
-            doTeleport.setDelay(toTicks);
+            doTeleport.setDelay( toTicks );
 
-            if (toTicks < 1 && Bukkit.isPrimaryThread()) doTeleport.run();
-            else RTP.getInstance().teleportPipeline.add(doTeleport);
+            if ( toTicks < 1 && Bukkit.isPrimaryThread() ) doTeleport.run();
+            else RTP.getInstance().teleportPipeline.add( doTeleport );
 
-            postActions.forEach(consumer -> consumer.accept(this));
+            postActions.forEach( consumer -> consumer.accept( this) );
         }
-        catch (Throwable throwable) {
-            throwable.printStackTrace();
-            new RTPTeleportCancel(player.uuid()).run();
+        catch ( Throwable throwable ) {
+            RTP.log( Level.WARNING, throwable.getMessage(), throwable );
+            new RTPTeleportCancel( player.uuid() ).run();
         }
     }
 
@@ -144,19 +145,19 @@ public final class LoadChunks extends RTPRunnable {
     }
 
     @Override
-    public boolean equals(Object obj) {
-        if (obj == this) return true;
-        if (obj == null || obj.getClass() != this.getClass()) return false;
-        LoadChunks that = (LoadChunks) obj;
-        return Objects.equals(this.sender, that.sender) &&
-                Objects.equals(this.player, that.player) &&
-                Objects.equals(this.location, that.location) &&
-                Objects.equals(this.region, that.region);
+    public boolean equals( Object obj ) {
+        if ( obj == this ) return true;
+        if ( obj == null || obj.getClass() != this.getClass() ) return false;
+        LoadChunks that = ( LoadChunks ) obj;
+        return Objects.equals( this.sender, that.sender ) &&
+                Objects.equals( this.player, that.player ) &&
+                Objects.equals( this.location, that.location ) &&
+                Objects.equals( this.region, that.region );
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(sender, player, location, region);
+        return Objects.hash( sender, player, location, region );
     }
 
     @Override

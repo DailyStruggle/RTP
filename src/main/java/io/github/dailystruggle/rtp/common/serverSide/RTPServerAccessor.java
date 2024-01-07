@@ -34,34 +34,34 @@ public interface RTPServerAccessor {
      * @return world
      */
     @Nullable
-    RTPWorld getRTPWorld(String name);
+    RTPWorld getRTPWorld( String name );
 
     /**
      * @param id id of world
      * @return world
      */
     @Nullable
-    RTPWorld getRTPWorld(UUID id);
+    RTPWorld getRTPWorld( UUID id );
 
     @NotNull
     List<RTPWorld> getRTPWorlds();
 
     @Nullable
-    RTPPlayer getPlayer(UUID uuid);
+    RTPPlayer getPlayer( UUID uuid );
 
     /**
      * @param name player identification
      * @return player, or null if they don't exist
      */
     @Nullable
-    RTPPlayer getPlayer(String name);
+    RTPPlayer getPlayer( String name );
 
     /**
      * @param uuid player identification
      * @return sender, or null if they don't exist
      */
     @Nullable
-    RTPCommandSender getSender(UUID uuid);
+    RTPCommandSender getSender( UUID uuid );
 
     /**
      * @return predicted next tick time minus current time, in millis
@@ -80,7 +80,7 @@ public interface RTPServerAccessor {
      * @param target
      * @param msgType
      */
-    void sendMessage(UUID target, MessagesKeys msgType);
+    void sendMessage( UUID target, MessagesKeys msgType );
 
     /**
      * send a message to these people, avoiding duplicates
@@ -89,7 +89,7 @@ public interface RTPServerAccessor {
      * @param target
      * @param msgType
      */
-    void sendMessage(UUID sender, UUID target, MessagesKeys msgType);
+    void sendMessage( UUID sender, UUID target, MessagesKeys msgType );
 
     /**
      * send a message to this person
@@ -97,7 +97,7 @@ public interface RTPServerAccessor {
      * @param target
      * @param message
      */
-    void sendMessage(UUID target, String message);
+    void sendMessage( UUID target, String message );
 
     /**
      * send a message with a hover and click event for suggesting a subsequent command
@@ -106,7 +106,7 @@ public interface RTPServerAccessor {
      * @param message
      * @param suggestion
      */
-    void sendMessageAndSuggest(UUID target, String message, String suggestion);
+    void sendMessageAndSuggest( UUID target, String message, String suggestion );
 
     /**
      * send a message to these people, avoiding duplicates
@@ -115,7 +115,7 @@ public interface RTPServerAccessor {
      * @param target
      * @param message
      */
-    void sendMessage(UUID sender, UUID target, String message);
+    void sendMessage( UUID sender, UUID target, String message );
 
     /**
      * output a message to console
@@ -123,16 +123,16 @@ public interface RTPServerAccessor {
      * @param level
      * @param msg
      */
-    void log(Level level, String msg);
+    void log( Level level, String msg );
 
     /**
      * output a message to console
      *
-     * @param level
+     * @param level log level, warning is colored yellow but marked as info
      * @param msg
-     * @param exception
+     * @param throwable
      */
-    void log(Level level, String msg, Exception exception);
+    void log( Level level, String msg, Throwable throwable );
 
     /**
      * send a message to all players with this permission
@@ -140,12 +140,12 @@ public interface RTPServerAccessor {
      * @param msg        message to send
      * @param permission permission required
      */
-    void announce(String msg, String permission);
+    void announce( String msg, String permission );
 
     /**
      * @return list of all possible biomes
      */
-    Set<String> getBiomes(RTPWorld rtpWorld);
+    Set<String> getBiomes( RTPWorld rtpWorld );
 
     /**
      * @return thread state, for determining whether to apply a change now or schedule it
@@ -159,18 +159,18 @@ public interface RTPServerAccessor {
      * @return desired shape of world
      */
     @Nullable
-    Shape<?> getShape(String worldName);
+    Shape<?> getShape( String worldName );
 
-    boolean setShapeFunction(Function<String, Shape<?>> shapeFunction);
+    boolean setShapeFunction( Function<String, Shape<?>> shapeFunction );
 
     /**
      * @param worldName name of world
      * @return a worldborder as defined in this library
      */
     @Nullable
-    WorldBorder getWorldBorder(String worldName);
+    WorldBorder getWorldBorder( String worldName );
 
-    boolean setWorldBorderFunction(Function<String, WorldBorder> function);
+    boolean setWorldBorderFunction( Function<String, WorldBorder> function );
 
     /**
      * @return set of all possible block types

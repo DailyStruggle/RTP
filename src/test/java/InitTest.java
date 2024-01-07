@@ -12,10 +12,10 @@ public class InitTest {
         RTP rtp = new RTP();
 
         int i = 0;
-        while (rtp.startupTasks.size()>0) {
-            rtp.startupTasks.execute(Long.MAX_VALUE);
+        while ( rtp.startupTasks.size()>0 ) {
+            rtp.startupTasks.execute( Long.MAX_VALUE );
             i++;
-            if(i>50) return;
+            if( i>50 ) return;
         }
     }
 }

@@ -12,8 +12,8 @@ public class PreSetupTeleportEvent extends Event implements Cancellable {
     private final SetupTeleport setupTeleport;
     private boolean cancelled = false;
 
-    public PreSetupTeleportEvent(SetupTeleport setupTeleport) {
-        super(!Bukkit.isPrimaryThread());
+    public PreSetupTeleportEvent( SetupTeleport setupTeleport ) {
+        super( !Bukkit.isPrimaryThread() );
         this.setupTeleport = setupTeleport;
     }
 
@@ -32,7 +32,7 @@ public class PreSetupTeleportEvent extends Event implements Cancellable {
     }
 
     @Override
-    public void setCancelled(boolean cancel) {
+    public void setCancelled( boolean cancel ) {
         cancelled = cancel;
     }
 

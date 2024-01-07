@@ -15,7 +15,7 @@ public abstract class BaseRTPCmdImpl implements BaseRTPCmd {
     private final CommandsAPICommand parent;
     protected long avgTime = 0;
 
-    public BaseRTPCmdImpl(@Nullable CommandsAPICommand parent) {
+    public BaseRTPCmdImpl( @Nullable CommandsAPICommand parent ) {
         this.parent = parent;
     }
 

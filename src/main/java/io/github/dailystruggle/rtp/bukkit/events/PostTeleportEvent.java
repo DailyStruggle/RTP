@@ -10,8 +10,8 @@ public class PostTeleportEvent extends Event {
     private static final HandlerList HANDLERS_LIST = new HandlerList();
     private final DoTeleport doTeleport;
 
-    public PostTeleportEvent(DoTeleport doTeleport) {
-        super(!Bukkit.isPrimaryThread());
+    public PostTeleportEvent( DoTeleport doTeleport ) {
+        super( !Bukkit.isPrimaryThread() );
         this.doTeleport = doTeleport;
     }
 

@@ -13,8 +13,8 @@ public class PlayerQueuePopEvent extends Event {
     private final Region region;
     private final UUID playerId;
 
-    public PlayerQueuePopEvent(Region region, UUID playerId) {
-        super(!Bukkit.isPrimaryThread());
+    public PlayerQueuePopEvent( Region region, UUID playerId ) {
+        super( !Bukkit.isPrimaryThread() );
         this.region = region;
         this.playerId = playerId;
     }

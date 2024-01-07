@@ -18,12 +18,12 @@ public class TestRTPChunk implements RTPChunk {
     }
 
     @Override
-    public RTPBlock getBlockAt(int x, int y, int z) {
+    public RTPBlock getBlockAt( int x, int y, int z ) {
         return null;
     }
 
     @Override
-    public RTPBlock getBlockAt(RTPLocation location) {
+    public RTPBlock getBlockAt( RTPLocation location ) {
         return null;
     }
 
@@ -33,7 +33,7 @@ public class TestRTPChunk implements RTPChunk {
     }
 
     @Override
-    public void keep(boolean keep) {
+    public void keep( boolean keep ) {
 
     }
 

@@ -12,8 +12,8 @@ public class TeleportCommandSuccessEvent extends Event {
     private final RTPCommandSender sender;
     private final RTPPlayer player;
 
-    public TeleportCommandSuccessEvent(RTPCommandSender sender, RTPPlayer player) {
-        super(!Bukkit.isPrimaryThread());
+    public TeleportCommandSuccessEvent( RTPCommandSender sender, RTPPlayer player ) {
+        super( !Bukkit.isPrimaryThread() );
         this.sender = sender;
         this.player = player;
     }

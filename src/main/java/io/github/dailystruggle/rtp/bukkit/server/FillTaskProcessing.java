@@ -13,37 +13,37 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class FillTaskProcessing extends BukkitRunnable {
-    private static final AtomicBoolean killed = new AtomicBoolean(false);
-    private static final AtomicReference<BukkitTask> asyncTask = new AtomicReference<>(null);
+    private static final AtomicBoolean killed = new AtomicBoolean( false );
+    private static final AtomicReference<BukkitTask> asyncTask = new AtomicReference<>( null );
 
     public static void clear() {
-        if (asyncTask.get() != null) asyncTask.get().cancel();
-        asyncTask.set(null);
+        if ( asyncTask.get() != null ) asyncTask.get().cancel();
+        asyncTask.set( null );
     }
 
     public static void kill() {
         FillTask.kill();
         clear();
-        killed.set(true);
+        killed.set( true );
     }
 
     @Override
     public void run() {
-        if (killed.get()) return;
-        if (asyncTask.get() != null) return;
+        if ( killed.get() ) return;
+        if ( asyncTask.get() != null ) return;
 
         CompletableFuture<Boolean> future = new CompletableFuture<>();
-        RTP.futures.add(future);
-        BukkitTask task = Bukkit.getScheduler().runTaskAsynchronously(RTPBukkitPlugin.getInstance(), () -> {
-            for (Map.Entry<String, FillTask> e : RTP.getInstance().fillTasks.entrySet()) {
-                if (e.getValue().isRunning()) continue;
+        RTP.futures.add( future );
+        BukkitTask task = Bukkit.getScheduler().runTaskAsynchronously( RTPBukkitPlugin.getInstance(), () -> {
+            for ( Map.Entry<String, FillTask> e : RTP.getInstance().fillTasks.entrySet() ) {
+                if ( e.getValue().isRunning() ) continue;
                 e.getValue().run();
             }
-            future.complete(true);
-        });
-        asyncTask.set(task);
-//        RTP.log(Level.SEVERE,"A - " + task.getTaskId());
-        future.thenAccept(aBoolean -> asyncTask.set(null));
+            future.complete( true );
+        } );
+        asyncTask.set( task );
+//        RTP.log( Level.SEVERE,"A - " + task.getTaskId() );
+        future.thenAccept( aBoolean -> asyncTask.set( null) );
     }
 
     @Override
