@@ -8,21 +8,25 @@ public interface RTPWorld {
 
     UUID id();
 
-    CompletableFuture<RTPChunk> getChunkAt(int chunkX, int chunkZ);
+    CompletableFuture<RTPChunk> getChunkAt( int chunkX, int chunkZ );
 
-    void keepChunkAt(int chunkX, int chunkZ);
+    void keepChunkAt( int chunkX, int chunkZ );
 
-    void forgetChunkAt(int chunkX, int chunkZ);
+    void forgetChunkAt( int chunkX, int chunkZ );
 
     void forgetChunks();
 
-    String getBiome(int x, int y, int z);
+    String getBiome( int x, int y, int z );
 
-    void platform(RTPLocation location);
+    void platform( RTPLocation location );
 
-    boolean isActive();
+    boolean isInactive();
+    default boolean isActive()
+    {
+        return !isInactive();
+    }
 
-    boolean isForceLoaded(int cx, int cz);
+    boolean isForceLoaded( int cx, int cz );
 
     void save();
 

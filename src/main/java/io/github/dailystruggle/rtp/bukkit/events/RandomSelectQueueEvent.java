@@ -12,8 +12,8 @@ public class RandomSelectQueueEvent extends Event {
     private final RTPCommandSender sender;
     private final RTPPlayer player;
 
-    public RandomSelectQueueEvent(RTPCommandSender sender, RTPPlayer player) {
-        super(!Bukkit.isPrimaryThread());
+    public RandomSelectQueueEvent( RTPCommandSender sender, RTPPlayer player ) {
+        super( !Bukkit.isPrimaryThread() );
         this.sender = sender;
         this.player = player;
     }

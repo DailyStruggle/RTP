@@ -12,8 +12,8 @@ public class PreLoadChunksEvent extends Event implements Cancellable {
     private final LoadChunks loadChunks;
     private boolean cancelled = false;
 
-    public PreLoadChunksEvent(LoadChunks loadChunks) {
-        super(!Bukkit.isPrimaryThread());
+    public PreLoadChunksEvent( LoadChunks loadChunks ) {
+        super( !Bukkit.isPrimaryThread() );
         this.loadChunks = loadChunks;
     }
 
@@ -32,7 +32,7 @@ public class PreLoadChunksEvent extends Event implements Cancellable {
     }
 
     @Override
-    public void setCancelled(boolean cancel) {
+    public void setCancelled( boolean cancel ) {
         cancelled = cancel;
     }
 

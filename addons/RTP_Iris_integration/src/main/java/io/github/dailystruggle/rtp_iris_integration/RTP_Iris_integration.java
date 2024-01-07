@@ -19,16 +19,16 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public final class RTP_Iris_integration extends JavaPlugin {
-    private static final Pattern invalidCharacters = Pattern.compile("[ :,]");
+    private static final Pattern invalidCharacters = Pattern.compile( "[ :,]" );
     @Override
     public void onEnable() {
         // Plugin startup logic
-        BukkitRTPWorld.setBiomesGetter(RTP_Iris_integration::getBiomes);
-        BukkitRTPWorld.setBiomeGetter(RTP_Iris_integration::getBiome);
-        Bukkit.getScheduler().scheduleSyncDelayedTask(this,() -> {
-            RTP.baseCommand.addParameter("biome", new IrisBiomeParameter());
+        BukkitRTPWorld.setBiomesGetter( RTP_Iris_integration::getBiomes );
+        BukkitRTPWorld.setBiomeGetter( RTP_Iris_integration::getBiome );
+        Bukkit.getScheduler().scheduleSyncDelayedTask( this,() -> {
+            RTP.baseCommand.addParameter( "biome", new IrisBiomeParameter() );
             RTP.configs.reload();
-        });
+        } );
     }
 
     @Override
@@ -36,28 +36,28 @@ public final class RTP_Iris_integration extends JavaPlugin {
         // Plugin shutdown logic
     }
 
-    static Set<String> getBiomes(RTPWorld rtpWorld) {
-        if(!(rtpWorld instanceof BukkitRTPWorld)) {
+    static Set<String> getBiomes( RTPWorld rtpWorld ) {
+        if( !(rtpWorld instanceof BukkitRTPWorld) ) {
             return new HashSet<>();
         }
-        BukkitRTPWorld world = (BukkitRTPWorld) rtpWorld;
-        PlatformChunkGenerator access = IrisToolbelt.access(world.world());
-        if(access == null) return Arrays.stream(Biome.values()).map(Enum::name).collect(Collectors.toSet());
+        BukkitRTPWorld world = ( BukkitRTPWorld ) rtpWorld;
+        PlatformChunkGenerator access = IrisToolbelt.access( world.world() );
+        if( access == null ) return Arrays.stream( Biome.values() ).map( Enum::name ).collect( Collectors.toSet() );
         KList<IrisBiome> allBiomes = access.getEngine().getAllBiomes();
         Set<String> collect = new HashSet<>();
-        for (IrisBiome irisBiome : allBiomes) {
+        for ( IrisBiome irisBiome : allBiomes ) {
             String s = irisBiome.getName().toUpperCase();
-            s = invalidCharacters.matcher(s).replaceAll("_");
-            collect.add(s);
+            s = invalidCharacters.matcher( s ).replaceAll( "_" );
+            collect.add( s );
         }
         return collect;
     }
 
-    private static String getBiome(Location location) {
-        PlatformChunkGenerator access = IrisToolbelt.access(location.getWorld());
-        if(access == null) return location.getWorld().getBiome(location).name().toUpperCase();
-        String s = access.getEngine().getBiome(location).getName().toUpperCase();
-        s = invalidCharacters.matcher(s).replaceAll("_");
+    private static String getBiome( Location location ) {
+        PlatformChunkGenerator access = IrisToolbelt.access( location.getWorld() );
+        if( access == null ) return location.getWorld().getBiome( location ).name().toUpperCase();
+        String s = access.getEngine().getBiome( location ).getName().toUpperCase();
+        s = invalidCharacters.matcher( s ).replaceAll( "_" );
         return s;
     }
 }

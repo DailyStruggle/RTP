@@ -10,7 +10,7 @@ public class PlayerLandEvent extends Event {
 
     private final Player player;
 
-    public PlayerLandEvent(Player player) {
+    public PlayerLandEvent( Player player ) {
         this.player = player;
     }
 

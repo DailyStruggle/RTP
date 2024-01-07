@@ -18,13 +18,13 @@ public class TestRTPCommandSender implements RTPCommandSender {
     }
 
     @Override
-    public boolean hasPermission(String permission) {
+    public boolean hasPermission( String permission ) {
         return true;
     }
 
     @Override
-    public void sendMessage(String message) {
-        RTP.log(Level.INFO, "received: " + message);
+    public void sendMessage( String message ) {
+        RTP.log( Level.INFO, "received: " + message );
     }
 
     @Override
@@ -48,16 +48,16 @@ public class TestRTPCommandSender implements RTPCommandSender {
     }
 
     @Override
-    public void performCommand(RTPPlayer player, String command) {
+    public void performCommand( RTPPlayer player, String command ) {
 
     }
 
     @Override
     public RTPCommandSender clone() {
         try {
-            return (RTPCommandSender) super.clone();
-        } catch (CloneNotSupportedException e) {
-            e.printStackTrace();
+            return ( RTPCommandSender ) super.clone();
+        } catch ( CloneNotSupportedException e ) {
+            RTP.log( Level.WARNING, e.getMessage(), e );
         }
         return null;
     }

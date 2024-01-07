@@ -20,36 +20,36 @@ public final class BukkitRTPBlock implements RTPBlock {
     private static long lastUpdate = 0;
 
     static {
-        airBlocks.add("AIR");
+        airBlocks.add( "AIR" );
     }
 
     private final Block block;
 
-    public BukkitRTPBlock(Block block) {
+    public BukkitRTPBlock( Block block ) {
         this.block = block;
     }
 
     @Override
     public RTPLocation getLocation() {
-        return new RTPLocation(RTP.serverAccessor.getRTPWorld(block.getWorld().getUID()), block.getX(), block.getY(), block.getZ());
+        return new RTPLocation( RTP.serverAccessor.getRTPWorld( block.getWorld().getUID() ), block.getX(), block.getY(), block.getZ() );
     }
 
     @Override
     public boolean isAir() {
         long t = System.currentTimeMillis();
         long dt = t - lastUpdate;
-        if (dt > 5000 || dt < 0) {
-            ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
-            Object o = safety.getConfigValue(SafetyKeys.airBlocks, new ArrayList<>());
-            airBlocks = ((o instanceof Collection) ? (Collection<?>) o : new ArrayList<>())
-                    .stream().map(o1 -> o1.toString().toUpperCase()).collect(Collectors.toSet());
-            if (airBlocks.size() < 1) airBlocks.add("AIR");
+        if ( dt > 5000 || dt < 0 ) {
+            ConfigParser<SafetyKeys> safety = ( ConfigParser<SafetyKeys> ) RTP.configs.getParser( SafetyKeys.class );
+            Object o = safety.getConfigValue( SafetyKeys.airBlocks, new ArrayList<>() );
+            airBlocks = ( (o instanceof Collection ) ? ( Collection<?> ) o : new ArrayList<>() )
+                    .stream().map( o1 -> o1.toString().toUpperCase() ).collect( Collectors.toSet() );
+            if ( airBlocks.size() < 1 ) airBlocks.add( "AIR" );
             lastUpdate = t;
         }
 
         String material = getMaterial();
 
-        return airBlocks.contains(material);
+        return airBlocks.contains( material );
     }
 
     @Override
@@ -69,7 +69,7 @@ public final class BukkitRTPBlock implements RTPBlock {
 
     @Override
     public RTPWorld world() {
-        return RTP.serverAccessor.getRTPWorld(block.getWorld().getUID());
+        return RTP.serverAccessor.getRTPWorld( block.getWorld().getUID() );
     }
 
     @Override
@@ -87,16 +87,16 @@ public final class BukkitRTPBlock implements RTPBlock {
     }
 
     @Override
-    public boolean equals(Object obj) {
-        if (obj == this) return true;
-        if (obj == null || obj.getClass() != this.getClass()) return false;
-        BukkitRTPBlock that = (BukkitRTPBlock) obj;
-        return Objects.equals(this.block, that.block);
+    public boolean equals( Object obj ) {
+        if ( obj == this ) return true;
+        if ( obj == null || obj.getClass() != this.getClass() ) return false;
+        BukkitRTPBlock that = ( BukkitRTPBlock ) obj;
+        return Objects.equals( this.block, that.block );
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(block);
+        return Objects.hash( block );
     }
 
     @Override

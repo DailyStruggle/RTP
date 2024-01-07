@@ -37,17 +37,17 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
         // command processing timer is delayed to ensure this is set up before it's used
 
         shapeFunction = s -> {
-            Region region = RTP.selectionAPI.getRegion(new TestRTPWorld());
-            if(region == null) throw new IllegalStateException();
-            Object o = region.getData().get(RegionKeys.shape);
-            if(!(o instanceof Shape<?>)) throw new IllegalStateException();
-            return (Shape<?>) o;
+            Region region = RTP.selectionAPI.getRegion( new TestRTPWorld() );
+            if( region == null ) throw new IllegalStateException();
+            Object o = region.getData().get( RegionKeys.shape );
+            if( !(o instanceof Shape<?>) ) throw new IllegalStateException();
+            return ( Shape<?> ) o;
         };
     }
 
     @Override
     public @NotNull String getServerVersion() {
-        if(version == null) {
+        if( version == null ) {
             version = "1.19.3";
         }
 
@@ -56,38 +56,38 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
 
     @Override
     public @NotNull Integer getServerIntVersion() {
-        if(intVersion == null) {
-            String[] splitVersion = getServerVersion().split("_");
-            if(splitVersion.length == 0) {
+        if( intVersion == null ) {
+            String[] splitVersion = getServerVersion().split( "_" );
+            if( splitVersion.length == 0 ) {
                 intVersion = 0;
             }
-            else if (splitVersion.length == 1) {
-                intVersion = Integer.valueOf(splitVersion[0]);
+            else if ( splitVersion.length == 1 ) {
+                intVersion = Integer.valueOf( splitVersion[0] );
             }
             else {
-                intVersion = Integer.valueOf(splitVersion[1]);
+                intVersion = Integer.valueOf( splitVersion[1] );
             }
         }
         return intVersion;
     }
 
     @Override
-    public RTPWorld getRTPWorld(String name) {
+    public RTPWorld getRTPWorld( String name ) {
         return new TestRTPWorld();
     }
 
     @Override
-    public @Nullable RTPWorld getRTPWorld(UUID id) {
+    public @Nullable RTPWorld getRTPWorld( UUID id ) {
         return new TestRTPWorld();
     }
 
     @Override
-    public @Nullable Shape<?> getShape(String name) {
-        return shapeFunction.apply(name);
+    public @Nullable Shape<?> getShape( String name ) {
+        return shapeFunction.apply( name );
     }
 
     @Override
-    public boolean setShapeFunction(Function<String, Shape<?>> shapeFunction) {
+    public boolean setShapeFunction( Function<String, Shape<?>> shapeFunction ) {
         boolean works = true;
         this.shapeFunction = shapeFunction;
         return works;
@@ -95,23 +95,23 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
 
     @Override
     public @NotNull List<RTPWorld> getRTPWorlds() {
-        ArrayList<RTPWorld> res = new ArrayList<>(1);
-        res.add(new TestRTPWorld());
+        ArrayList<RTPWorld> res = new ArrayList<>( 1 );
+        res.add( new TestRTPWorld() );
         return res;
     }
 
     @Override
-    public @Nullable RTPPlayer getPlayer(UUID uuid) {
+    public @Nullable RTPPlayer getPlayer( UUID uuid ) {
         return new TestRTPPlayer();
     }
 
     @Override
-    public @Nullable RTPPlayer getPlayer(String name) {
+    public @Nullable RTPPlayer getPlayer( String name ) {
         return new TestRTPPlayer();
     }
 
     @Override
-    public @Nullable RTPCommandSender getSender(UUID uuid) {
+    public @Nullable RTPCommandSender getSender( UUID uuid ) {
         return new TestRTPPlayer();
     }
 
@@ -123,66 +123,66 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
     @Override
     public File getPluginDirectory() {
         try {
-            File res = new File(RTP.class.getProtectionDomain().getCodeSource().getLocation()
-                    .toURI());
+            File res = new File( RTP.class.getProtectionDomain().getCodeSource().getLocation()
+                    .toURI() );
             res = res.getParentFile();
-            res = new File(res.getAbsolutePath() + File.separator + "config");
+            res = new File( res.getAbsolutePath() + File.separator + "config" );
             res.mkdir();
             return res;
-        } catch (URISyntaxException e) {
-            e.printStackTrace();
+        } catch ( URISyntaxException e ) {
+            RTP.log( Level.WARNING, e.getMessage(), e );
             return null;
         }
     }
 
     @Override
-    public void sendMessage(UUID target, MessagesKeys msgType) {
-        ConfigParser<MessagesKeys> parser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-        String msg = String.valueOf(parser.getConfigValue(msgType,""));
-        if(msg == null || msg.isEmpty()) return;
-        sendMessage(target, msg);
+    public void sendMessage( UUID target, MessagesKeys msgType ) {
+        ConfigParser<MessagesKeys> parser = ( ConfigParser<MessagesKeys> ) RTP.configs.getParser( MessagesKeys.class );
+        String msg = String.valueOf( parser.getConfigValue( msgType,"") );
+        if( msg == null || msg.isEmpty() ) return;
+        sendMessage( target, msg );
     }
 
     @Override
-    public void sendMessage(UUID target1, UUID target2, MessagesKeys msgType) {
-        ConfigParser<MessagesKeys> parser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-        String msg = String.valueOf(parser.getConfigValue(msgType,""));
-        if(msg == null || msg.isEmpty()) return;
-        sendMessage(target1,target2,msg);
+    public void sendMessage( UUID target1, UUID target2, MessagesKeys msgType ) {
+        ConfigParser<MessagesKeys> parser = ( ConfigParser<MessagesKeys> ) RTP.configs.getParser( MessagesKeys.class );
+        String msg = String.valueOf( parser.getConfigValue( msgType,"") );
+        if( msg == null || msg.isEmpty() ) return;
+        sendMessage( target1,target2,msg );
     }
 
     @Override
-    public void sendMessage(UUID target, String message) {
-
-    }
-
-    @Override
-    public void sendMessageAndSuggest(UUID target, String message, String suggestion) {
+    public void sendMessage( UUID target, String message ) {
 
     }
 
     @Override
-    public void sendMessage(UUID target1, UUID target2, String message) {
+    public void sendMessageAndSuggest( UUID target, String message, String suggestion ) {
 
     }
 
     @Override
-    public void log(Level level, String msg) {
-        System.out.println(level.getName() + ": " + msg);
-    }
-
-    @Override
-    public void log(Level level, String msg, Exception exception) {
-        System.out.println(level.getName() + ": " + msg);
-    }
-
-    @Override
-    public void announce(String msg, String permission) {
+    public void sendMessage( UUID target1, UUID target2, String message ) {
 
     }
 
     @Override
-    public Set<String> getBiomes(RTPWorld rtpWorld) {
+    public void log( Level level, String msg ) {
+        System.out.println( level.getName() + ": " + msg );
+    }
+
+    @Override
+    public void log( Level level, String msg, Throwable throwable ) {
+        System.out.println( level.getName() + ": " + msg );
+    }
+
+    @Override
+    public void announce( String msg, String permission ) {
+
+    }
+
+    @Override
+    public Set<String> getBiomes( RTPWorld rtpWorld ) {
         return TestRTPWorld.getBiomes();
     }
 
@@ -192,12 +192,12 @@ public class TestRTPServerAccessor implements RTPServerAccessor {
     }
 
     @Override
-    public @Nullable WorldBorder getWorldBorder(String worldName) {
+    public @Nullable WorldBorder getWorldBorder( String worldName ) {
         return null;
     }
 
     @Override
-    public boolean setWorldBorderFunction(Function<String, WorldBorder> function) {
+    public boolean setWorldBorderFunction( Function<String, WorldBorder> function ) {
         return true;
     }
 

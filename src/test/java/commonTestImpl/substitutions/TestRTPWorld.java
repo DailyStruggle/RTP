@@ -23,17 +23,17 @@ public class TestRTPWorld implements RTPWorld {
     }
 
     @Override
-    public CompletableFuture<RTPChunk> getChunkAt(int chunkX, int chunkZ) {
+    public CompletableFuture<RTPChunk> getChunkAt( int chunkX, int chunkZ ) {
         return null;
     }
 
     @Override
-    public void keepChunkAt(int chunkX, int chunkZ) {
+    public void keepChunkAt( int chunkX, int chunkZ ) {
 
     }
 
     @Override
-    public void forgetChunkAt(int chunkX, int chunkZ) {
+    public void forgetChunkAt( int chunkX, int chunkZ ) {
 
     }
 
@@ -43,22 +43,22 @@ public class TestRTPWorld implements RTPWorld {
     }
 
     @Override
-    public String getBiome(int x, int y, int z) {
+    public String getBiome( int x, int y, int z ) {
         return null;
     }
 
     @Override
-    public void platform(RTPLocation location) {
+    public void platform( RTPLocation location ) {
 
     }
 
     @Override
-    public boolean isActive() {
-        return true;
+    public boolean isInactive() {
+        return false;
     }
 
     @Override
-    public boolean isForceLoaded(int cx, int cz) {
+    public boolean isForceLoaded( int cx, int cz ) {
         return false;
     }
 
@@ -79,7 +79,7 @@ public class TestRTPWorld implements RTPWorld {
 
     public static Set<String> getBiomes() {
         HashSet<String> res = new HashSet<>();
-        res.add("PLAINS");
+        res.add( "PLAINS" );
         return res;
     }
 }

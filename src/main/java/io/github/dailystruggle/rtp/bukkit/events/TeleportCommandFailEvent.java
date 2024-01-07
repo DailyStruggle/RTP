@@ -11,8 +11,8 @@ public class TeleportCommandFailEvent extends Event {
     private final RTPCommandSender sender;
     private String failMsg;
 
-    public TeleportCommandFailEvent(RTPCommandSender sender, String failMsg) {
-        super(!Bukkit.isPrimaryThread());
+    public TeleportCommandFailEvent( RTPCommandSender sender, String failMsg ) {
+        super( !Bukkit.isPrimaryThread() );
         this.sender = sender;
         this.failMsg = failMsg;
     }
@@ -35,7 +35,7 @@ public class TeleportCommandFailEvent extends Event {
         return failMsg;
     }
 
-    public void setFailMsg(String failMsg) {
+    public void setFailMsg( String failMsg ) {
         this.failMsg = failMsg;
     }
 }

@@ -10,8 +10,8 @@ public class PostLoadChunksEvent extends Event {
     private static final HandlerList HANDLERS_LIST = new HandlerList();
     private final LoadChunks loadChunks;
 
-    public PostLoadChunksEvent(LoadChunks loadChunks) {
-        super(!Bukkit.isPrimaryThread());
+    public PostLoadChunksEvent( LoadChunks loadChunks ) {
+        super( !Bukkit.isPrimaryThread() );
         this.loadChunks = loadChunks;
     }
 

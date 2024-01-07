@@ -21,18 +21,18 @@ public final class OnRandomTeleport implements Listener {
     private final RTP_Glide plugin;
     private final Configs Configs;
 
-    public OnRandomTeleport(RTP_Glide plugin, Configs Configs) {
+    public OnRandomTeleport( RTP_Glide plugin, Configs Configs ) {
         this.plugin = plugin;
         this.Configs = Configs;
     }
 
-    @EventHandler(priority = EventPriority.NORMAL)
-    public void onRandomTeleport(PostTeleportEvent event) {
+    @EventHandler( priority = EventPriority.NORMAL )
+    public void onRandomTeleport( PostTeleportEvent event ) {
         RTPWorld rtpWorld = event.getDoTeleport().location().world();
-        World world = ((BukkitRTPWorld)rtpWorld).world();
-        Player player = ((BukkitRTPPlayer)event.getDoTeleport().player()).player();
-        if(world.getEnvironment().equals(World.Environment.NETHER))
+        World world = ( (BukkitRTPWorld )rtpWorld ).world();
+        Player player = ( (BukkitRTPPlayer )event.getDoTeleport().player() ).player();
+        if( world.getEnvironment().equals( World.Environment.NETHER) )
             return;
-        Bukkit.getScheduler().runTask(plugin,new SetupGlide(player, Configs));
+        Bukkit.getScheduler().runTask( plugin,new SetupGlide( player, Configs) );
     }
 }

@@ -10,15 +10,15 @@ import java.util.Map;
 import java.util.UUID;
 
 public class FillCmd extends BaseRTPCmdImpl {
-    FillResumeCmd fillResumeCmd = new FillResumeCmd(this);
+    FillResumeCmd fillResumeCmd = new FillResumeCmd( this );
 
-    public FillCmd(@Nullable CommandsAPICommand parent) {
-        super(parent);
-        addSubCommand(new FillStartCmd(this));
-        addSubCommand(new FillPauseCmd(this));
-        addSubCommand(fillResumeCmd);
-        addSubCommand(new FillCancelCmd(this));
-        addParameter("region", new RegionParameter("rtp.fill", "fill a specific region", (uuid, s) -> true));
+    public FillCmd( @Nullable CommandsAPICommand parent ) {
+        super( parent );
+        addSubCommand( new FillStartCmd( this) );
+        addSubCommand( new FillPauseCmd( this) );
+        addSubCommand( fillResumeCmd );
+        addSubCommand( new FillCancelCmd( this) );
+        addParameter( "region", new RegionParameter( "rtp.fill", "fill a specific region", ( uuid, s ) -> true) );
     }
 
     @Override
@@ -37,16 +37,16 @@ public class FillCmd extends BaseRTPCmdImpl {
     }
 
     @Override
-    public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
-        if (nextCommand != null) {
-            if (parameterValues != null && parameterValues.size() > 0) {
-                nextCommand.onCommand(callerId, parameterValues, null);
+    public boolean onCommand( UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand ) {
+        if ( nextCommand != null ) {
+            if ( parameterValues != null && !parameterValues.isEmpty() ) {
+                nextCommand.onCommand( callerId, parameterValues, null );
                 return false;
             }
             return true;
         }
 
-        fillResumeCmd.onCommand(callerId, parameterValues, nextCommand);
+        fillResumeCmd.onCommand( callerId, parameterValues, nextCommand );
         return false;
     }
 }

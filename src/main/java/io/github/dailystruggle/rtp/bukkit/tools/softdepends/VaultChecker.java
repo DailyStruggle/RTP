@@ -14,70 +14,64 @@ import java.util.UUID;
 
 public class VaultChecker implements RTPEconomy {
     private static Economy econ = null;
-    private static Permission perms = null;
 
     public static void setupEconomy() {
-        if (Bukkit.getServer().getPluginManager().getPlugin("Vault") == null) {
+        if ( Bukkit.getServer().getPluginManager().getPlugin( "Vault" ) == null ) {
             return;
         }
-        RegisteredServiceProvider<Economy> rsp = Bukkit.getServer().getServicesManager().getRegistration(Economy.class);
-        if (rsp == null) return;
+        RegisteredServiceProvider<Economy> rsp = Bukkit.getServer().getServicesManager().getRegistration( Economy.class );
+        if ( rsp == null ) return;
         econ = rsp.getProvider();
     }
 
     public static void setupPermissions() {
-        if (Bukkit.getPluginManager().getPlugin("Vault") == null) {
+        if ( Bukkit.getPluginManager().getPlugin( "Vault" ) == null ) {
             return;
         }
-        RegisteredServiceProvider<Permission> rsp = Bukkit.getServer().getServicesManager().getRegistration(Permission.class);
-        if (rsp == null) return;
-        perms = rsp.getProvider();
+        RegisteredServiceProvider<Permission> rsp = Bukkit.getServer().getServicesManager().getRegistration( Permission.class );
+        if ( rsp == null ) return;
     }
 
     public static Economy getEconomy() {
         return econ;
     }
 
-    public static Permission getPermissions() {
-        return perms;
+    @Override
+    public void give( UUID playerId, double money ) {
+        if ( playerId.equals( CommandsAPI.serverId) ) return;
+        if ( econ == null ) {
+            RTP.economy = null;
+            return;
+        }
+        OfflinePlayer player = Bukkit.getOfflinePlayer( playerId );
+        if ( !player.isOnline() ) return;
+        EconomyResponse economyResponse = econ.depositPlayer( player, money );
+        economyResponse.transactionSuccess();
     }
 
     @Override
-    public boolean give(UUID playerId, double money) {
-        if (playerId.equals(CommandsAPI.serverId)) return true;
-        if (econ == null) {
+    public boolean take( UUID playerId, double money ) {
+        if ( playerId.equals( CommandsAPI.serverId) ) return true;
+
+        if ( econ == null ) {
             RTP.economy = null;
             return true;
         }
-        OfflinePlayer player = Bukkit.getOfflinePlayer(playerId);
-        if (!player.isOnline()) return false;
-        EconomyResponse economyResponse = econ.depositPlayer(player, money);
+        OfflinePlayer player = Bukkit.getOfflinePlayer( playerId );
+        if ( !player.isOnline() ) return false;
+        EconomyResponse economyResponse = econ.withdrawPlayer( player, money );
         return economyResponse.transactionSuccess();
     }
 
     @Override
-    public boolean take(UUID playerId, double money) {
-        if (playerId.equals(CommandsAPI.serverId)) return true;
-
-        if (econ == null) {
-            RTP.economy = null;
-            return true;
-        }
-        OfflinePlayer player = Bukkit.getOfflinePlayer(playerId);
-        if (!player.isOnline()) return false;
-        EconomyResponse economyResponse = econ.withdrawPlayer(player, money);
-        return economyResponse.transactionSuccess();
-    }
-
-    @Override
-    public double bal(UUID playerId) {
-        if (playerId.equals(CommandsAPI.serverId)) return Double.MAX_VALUE;
-        if (econ == null) {
+    public double bal( UUID playerId ) {
+        if ( playerId.equals( CommandsAPI.serverId) ) return Double.MAX_VALUE;
+        if ( econ == null ) {
             RTP.economy = null;
             return 0;
         }
-        OfflinePlayer player = Bukkit.getOfflinePlayer(playerId);
-        if (!player.isOnline()) return 0;
-        return econ.getBalance(player);
+        OfflinePlayer player = Bukkit.getOfflinePlayer( playerId );
+        if ( !player.isOnline() ) return 0;
+        return econ.getBalance( player );
     }
 }
