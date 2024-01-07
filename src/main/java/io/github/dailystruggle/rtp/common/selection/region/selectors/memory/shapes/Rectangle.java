@@ -94,8 +94,8 @@ public class Rectangle extends MemoryShape<RectangleParams> {
         res = rotate( res, degrees );
 
         //shift
-        res[0] += cx;
-        res[1] += cz;
+        res[0] += (int) cx;
+        res[1] += (int) cz;
 
         return res;
     }
