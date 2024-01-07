@@ -21,6 +21,10 @@ public interface RTPWorld {
     void platform( RTPLocation location );
 
     boolean isInactive();
+    default boolean isActive()
+    {
+        return !isInactive();
+    }
 
     boolean isForceLoaded( int cx, int cz );
 
