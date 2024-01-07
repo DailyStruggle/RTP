@@ -1,6 +1,9 @@
 package io.github.dailystruggle.rtp.softdepends;
 
+import io.github.dailystruggle.rtp.common.RTP;
 import me.william278.husktowns.HuskTownsAPI;
+
+import java.util.logging.Level;
 
 public class HuskTownsChecker {
     private static boolean exists = true;

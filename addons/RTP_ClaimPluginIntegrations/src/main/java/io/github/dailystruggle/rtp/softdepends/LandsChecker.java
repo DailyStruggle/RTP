@@ -1,11 +1,13 @@
 package io.github.dailystruggle.rtp.softdepends;
 
 import io.github.dailystruggle.rtp.RTPClaimPluginIntegrations;
+import io.github.dailystruggle.rtp.common.RTP;
 import me.angeschossen.lands.api.integration.LandsIntegration;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.Objects;
+import java.util.logging.Level;
 
 public class LandsChecker {
     private static LandsIntegration landsIntegration = null;

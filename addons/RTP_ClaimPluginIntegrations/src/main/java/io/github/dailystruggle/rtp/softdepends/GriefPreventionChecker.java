@@ -1,11 +1,13 @@
 package io.github.dailystruggle.rtp.softdepends;
 
+import io.github.dailystruggle.rtp.common.RTP;
 import me.ryanhamshire.GriefPrevention.Claim;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 
 import java.util.Collection;
+import java.util.logging.Level;
 
 public class GriefPreventionChecker {
     private static GriefPrevention getGriefPrevention() {

@@ -1,8 +1,10 @@
 package io.github.dailystruggle.rtp.softdepends;
 
 import com.griefdefender.api.GriefDefender;
+import io.github.dailystruggle.rtp.common.RTP;
 
 import java.util.Objects;
+import java.util.logging.Level;
 
 public class GriefDefenderChecker {
     private static boolean exists = true;

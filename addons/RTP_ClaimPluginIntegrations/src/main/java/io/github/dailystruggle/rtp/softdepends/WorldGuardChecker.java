@@ -11,10 +11,12 @@ import com.sk89q.worldguard.protection.flags.StateFlag;
 import com.sk89q.worldguard.protection.flags.registry.FlagConflictException;
 import com.sk89q.worldguard.protection.flags.registry.FlagRegistry;
 import com.sk89q.worldguard.protection.managers.RegionManager;
+import io.github.dailystruggle.rtp.common.RTP;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 
 import java.util.Objects;
+import java.util.logging.Level;
 
 public class WorldGuardChecker {
     public static StateFlag CAN_RTP_SELECT_HERE = null;
