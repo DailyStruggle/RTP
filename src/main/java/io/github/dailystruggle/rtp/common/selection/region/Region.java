@@ -230,6 +230,8 @@ public class Region extends FactoryValue<RegionKeys> {
     public Map.Entry<RTPLocation, Long> getLocation( RTPCommandSender sender, RTPPlayer player, @Nullable Set<String> biomeNames ) {
         Map.Entry<RTPLocation, Long> pair = null;
 
+        getShape(); //validate shape before using cache
+
         UUID playerId = player.uuid();
 
         boolean custom = biomeNames != null && !biomeNames.isEmpty();
@@ -265,7 +267,7 @@ public class Region extends FactoryValue<RegionKeys> {
                         unsafeBlocks.addAll( ((Collection<?> ) value ).stream().filter( Objects::nonNull ).map( Object::toString ).collect( Collectors.toSet()) );
                     }
                     lastUpdate.set( t );
-                    safetyRadius.set( Math.max( safety.getNumber( SafetyKeys.safetyRadius, 0 ).intValue(), 7) );
+                    safetyRadius.set( safety.getNumber( SafetyKeys.safetyRadius, 0 ).intValue() );
                 }
 
 
@@ -332,7 +334,7 @@ public class Region extends FactoryValue<RegionKeys> {
             }
         }
 
-        if ( !custom && !locationQueue.isEmpty() ) {
+        while ( !custom && !locationQueue.isEmpty() ) {
             pair = locationQueue.poll();
             if ( pair == null ) return null;
             RTPLocation left = pair.getKey();
@@ -884,12 +886,7 @@ public class Region extends FactoryValue<RegionKeys> {
             data.put( RegionKeys.worldBorderOverride, wbo );
         }
 
-        RTPWorld world;
-        o = data.get( RegionKeys.world );
-        if ( o instanceof RTPWorld ) world = ( RTPWorld ) o;
-        else if ( o instanceof String ) {
-            world = RTP.serverAccessor.getRTPWorld( (String ) o );
-        } else world = null;
+        RTPWorld world = getWorld();
         if ( world == null ) world = RTP.serverAccessor.getRTPWorlds().get( 0 );
 
         Object shapeObj = data.get( RegionKeys.shape );
@@ -919,17 +916,20 @@ public class Region extends FactoryValue<RegionKeys> {
 
         if ( wbo ) {
             Shape<?> worldShape;
-            try {
-                worldShape = RTP.serverAccessor.getWorldBorder( world.name() ).getShape().get();
-            } catch ( IllegalStateException ignored ) {
-                return shape;
-            }
-            if ( !worldShape.equals( shape) ) {
+            worldShape = RTP.serverAccessor.getWorldBorder( world.name() ).getShape().get();
+            if ( !worldShape.equals( shape ) ) {
                 shape = worldShape;
-                data.put( RegionKeys.shape, shape );
+                data.put(RegionKeys.shape, shape);
+                for (Map.Entry<UUID, ConcurrentLinkedQueue<Map.Entry<RTPLocation, Long>>> entry : perPlayerLocationQueue.entrySet()) {
+                    ConcurrentLinkedQueue<Map.Entry<RTPLocation, Long>> value = entry.getValue();
+                    for (Map.Entry<RTPLocation, Long> entry1 : value) removeChunks(entry1.getKey());
+                    value.clear();
+                }
+                perPlayerLocationQueue.clear();
+                for (Map.Entry<RTPLocation, Long> entry : locationQueue) removeChunks(entry.getKey());
+                locationQueue.clear();
             }
         }
-
         return shape;
     }
 
@@ -968,25 +968,25 @@ public class Region extends FactoryValue<RegionKeys> {
         return vert;
     }
 
+    protected RTPWorld savedWorld = null;
     public RTPWorld getWorld() {
-        Object world = data.get( RegionKeys.world );
-        if ( world instanceof RTPWorld ) return ( RTPWorld ) world;
-        else {
-            String worldName = String.valueOf( world );
-            RTPWorld rtpWorld;
-            if ( worldName.startsWith( "[" ) && worldName.endsWith( "]") ) {
-                int num = Integer.parseInt( worldName.substring( 1, worldName.length() - 1) );
-                rtpWorld = RTP.serverAccessor.getRTPWorlds().get( num );
-            } else rtpWorld = RTP.serverAccessor.getRTPWorld( worldName );
-            if ( rtpWorld == null ) rtpWorld = RTP.serverAccessor.getRTPWorlds().get( 0 );
-            data.put( RegionKeys.world, rtpWorld );
-            return rtpWorld;
+        if ( savedWorld instanceof RTPWorld && savedWorld.isActive() ) {
+            return savedWorld;
         }
+
+        Object world = data.get( RegionKeys.world );
+        String worldName = String.valueOf( world );
+        if ( worldName.startsWith( "[" ) && worldName.endsWith( "]") ) {
+            int num = Integer.parseInt( worldName.substring( 1, worldName.length() - 1) );
+            savedWorld = RTP.serverAccessor.getRTPWorlds().get( num );
+        } else savedWorld = RTP.serverAccessor.getRTPWorld( worldName );
+        if ( savedWorld == null ) savedWorld = RTP.serverAccessor.getRTPWorlds().get(0);
+
+        return savedWorld;
     }
 
     //localized generic task for
     protected class Cache extends RTPRunnable {
-        private static final long lastUpdate = 0;
         private final UUID playerId;
 
         public Cache() {

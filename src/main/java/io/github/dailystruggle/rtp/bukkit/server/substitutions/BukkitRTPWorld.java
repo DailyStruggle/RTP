@@ -182,6 +182,9 @@ public final class BukkitRTPWorld implements RTPWorld {
                 if( chunk == null ) res.complete( null );
                 else res.complete( new BukkitRTPChunk( chunk) );
                 chunkLoads.remove( xz );
+                RTP.futures.forEach(completableFuture -> {
+                    if(completableFuture.isDone()) RTP.futures.remove(completableFuture);
+                });
                 if ( !RTPBukkitPlugin.getInstance().isEnabled() )
                     throw new IllegalStateException( "completed chunk after plugin disabled" );
             } );

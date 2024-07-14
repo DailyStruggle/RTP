@@ -11,6 +11,9 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.common.serverSide.RTPServerAccessor;
@@ -50,7 +53,19 @@ public class BukkitServerAccessor implements RTPServerAccessor {
             World world = ( (BukkitRTPWorld ) rtpWorld ).world();
             org.bukkit.WorldBorder worldBorder = world.getWorldBorder();
             return new WorldBorder( 
-                    () -> ( Shape<?> ) RTP.factoryMap.get( RTP.factoryNames.shape ).get( "SQUARE" ),
+                    () -> {
+                        Shape<?> shape = (Shape<?>) RTP.factoryMap.get(RTP.factoryNames.shape).get("SQUARE");
+                        Square square = (Square) shape;
+                        square.set(GenericMemoryShapeParams.radius, ((long) worldBorder.getSize()*0.9) / 32);
+                        square.set(GenericMemoryShapeParams.centerRadius, 0L);
+                        square.set(GenericMemoryShapeParams.centerX,worldBorder.getCenter().getBlockX()/16);
+                        square.set(GenericMemoryShapeParams.centerZ,worldBorder.getCenter().getBlockZ()/16);
+                        square.set(GenericMemoryShapeParams.expand,false);
+                        square.set(GenericMemoryShapeParams.weight,1);
+                        square.set(GenericMemoryShapeParams.mode, Mode.NEAREST);
+                        square.set(GenericMemoryShapeParams.uniquePlacements,false);
+                        return shape;
+                    },
                     rtpLocation -> {
                         if ( RTP.serverAccessor.getServerIntVersion() > 10 )
                             return worldBorder.isInside( new Location( world, rtpLocation.x(), rtpLocation.y(), rtpLocation.z()) );
@@ -84,7 +99,16 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     public @NotNull String getServerVersion() {
         if ( version == null ) {
             version = RTPBukkitPlugin.getInstance().getServer().getClass().getPackage().getName();
-            version = versionPattern.matcher( version ).replaceAll( "" );
+            if(!version.contains("1_")) {
+                String bukkitVersion = RTPBukkitPlugin.getInstance().getServer().getBukkitVersion();
+
+                int end = bukkitVersion.indexOf("-R");
+                if(end < 0) return "1_13_2";
+
+                bukkitVersion = bukkitVersion.substring(0,end).replaceAll("\\.","_");
+                return bukkitVersion;
+            }
+            else version = versionPattern.matcher( version ).replaceAll( "" );
         }
 
         return version;
@@ -95,11 +119,27 @@ public class BukkitServerAccessor implements RTPServerAccessor {
         if ( intVersion == null ) {
             String[] splitVersion = getServerVersion().split( "_" );
             if ( splitVersion.length == 0 ) {
-                intVersion = 0;
+                intVersion = 1;
             } else if ( splitVersion.length == 1 ) {
-                intVersion = Integer.valueOf( splitVersion[0] );
+                try {
+                    intVersion = Integer.valueOf( splitVersion[0] );
+                } catch (NumberFormatException e) {
+                    Bukkit.getLogger().log(Level.SEVERE, "expected number, received - " + splitVersion[0]);
+                    Bukkit.getLogger().log(Level.SEVERE, "full string - " +
+                            RTPBukkitPlugin.getInstance().getServer().getClass().getPackage().getName());
+                    e.printStackTrace();
+                    intVersion = 1;
+                }
             } else {
-                intVersion = Integer.valueOf( splitVersion[1] );
+                try {
+                    intVersion = Integer.valueOf( splitVersion[1] );
+                } catch (NumberFormatException e) {
+                    Bukkit.getLogger().log(Level.SEVERE, "expected number, received - " + splitVersion[1]);
+                    Bukkit.getLogger().log(Level.SEVERE, "full string - " +
+                            RTPBukkitPlugin.getInstance().getServer().getClass().getPackage().getName());
+                    e.printStackTrace();
+                    intVersion = 1;
+                }
             }
         }
         return intVersion;
@@ -126,14 +166,15 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     @Override
     public @Nullable RTPWorld getRTPWorld( UUID id ) {
         RTPWorld world = worldMap.get( id );
-        if ( world == null ) {
-            world = new BukkitRTPWorld( Bukkit.getWorld( id) );
-            if ( world == null || world.isInactive() ) return null;
+        World bukkitWorld = Bukkit.getWorld(id);
+        if ( world == null && bukkitWorld !=null ) {
+            world = new BukkitRTPWorld(bukkitWorld);
             worldMap.put( id, world );
             worldMapStr.put( world.name(), world );
-        } else if ( world.isInactive() ) {
-            worldMap.remove( world.id() );
-            worldMapStr.remove( world.name() );
+        }
+        if(bukkitWorld == null && world!=null) {
+            worldMap.remove( id );
+            worldMapStr.remove(world.name());
             return null;
         }
         return world;

@@ -118,57 +118,67 @@ public class FillTask extends RTPRunnable {
             } );
         }
 
-        long finalPos1 = pos;
-        done.thenAccept( aBoolean -> {
+        //WAIT FOR COMPLETION, EXCEPTIONALLY
+        for(CompletableFuture<RTPChunk> completableFuture : chunks)
+        {
             if ( isCancelled() ) return;
-
-            long completedChecks = finalPos1 - start;
-            long dt = TimeUnit.MILLISECONDS.toSeconds( System.currentTimeMillis() - timingStart );
-            if ( dt <= 0 ) dt = 1;
-            long cps_local = ( long ) ( ((double ) completedChecks ) / ( dt) );
-            cps_all = cps_all.add( new BigInteger( String.valueOf( cps_local)) );
-            cps_divisor = cps_divisor.add( increment_big );
-            cps.set( (cps.get()*7/8 ) + cps_local / 8 );
-
-            long numLoadsRemaining = range - finalPos1;
-            if ( numLoadsRemaining < 0 || numLoadsRemaining > range ) numLoadsRemaining = 0;
-            long estRemaining = numLoadsRemaining / cps_all.divide( cps_divisor ).longValue();
-
-            ConfigParser<MessagesKeys> langParser = ( ConfigParser<MessagesKeys> ) RTP.configs.getParser( MessagesKeys.class );
-            String msg = langParser.getConfigValue( MessagesKeys.fillStatus, "" ).toString();
-            if ( msg != null && !msg.isEmpty() ) {
-                long days = TimeUnit.SECONDS.toDays( estRemaining );
-                long hours = TimeUnit.SECONDS.toHours( estRemaining ) % 24;
-                long minutes = TimeUnit.SECONDS.toMinutes( estRemaining ) % 60;
-                long seconds = estRemaining % 60;
-
-                String replacement = "";
-                if ( days > 0 ) replacement += days + langParser.getConfigValue( MessagesKeys.days, "" ).toString() + " ";
-                if ( hours > 0 )
-                    replacement += hours + langParser.getConfigValue( MessagesKeys.hours, "" ).toString() + " ";
-                if ( minutes > 0 )
-                    replacement += minutes + langParser.getConfigValue( MessagesKeys.minutes, "" ).toString() + " ";
-                if ( seconds > 0 )
-                    replacement += seconds + langParser.getConfigValue( MessagesKeys.seconds, "" ).toString();
-
-                msg = msg.replace( "[chunks]", String.valueOf( finalPos1) );
-                msg = msg.replace( "[totalChunks]", String.valueOf( range) );
-                msg = msg.replace( "[cps]", String.valueOf( cps_local) );
-                msg = msg.replace( "[eta]", replacement );
-                msg = msg.replace( "[region]", region.name );
-
-                RTP.serverAccessor.announce( msg, "rtp.fill" );
+            try {
+                completableFuture.get(10, TimeUnit.SECONDS);
+            } catch (InterruptedException | ExecutionException e) {
+                RTP.log(Level.WARNING, "encountered exception in chunk loading - ", e);
+            } catch (TimeoutException e) {
+                RTP.log(Level.WARNING, "chunks took more than 10 seconds to load during fill task, skipping some...");
+                break;
             }
+        }
 
-            shape.fillIter.set( finalPos1 );
-            shape.save( region.name, region.getWorld().name() );
-            region.getWorld().save();
 
-            if ( aBoolean && finalPos1 < range && !isCancelled() && !pause.get() ) {
-                RTP.getInstance().fillTasks.put( region.name, new FillTask( region, finalPos1, cps_all,cps_divisor) );
-            } else RTP.getInstance().fillTasks.remove( region.name );
-            isRunning.set( false );
-        } );
+        long completedChecks = pos - start;
+        long dt = TimeUnit.MILLISECONDS.toSeconds( System.currentTimeMillis() - timingStart );
+        if ( dt <= 0 ) dt = 1;
+        long cps_local = ( long ) ( ((double ) completedChecks ) / ( dt) );
+        cps_all = cps_all.add( new BigInteger( String.valueOf( cps_local)) );
+        cps_divisor = cps_divisor.add( increment_big );
+        cps.set( (cps.get()*7/8 ) + cps_local / 8 );
+
+        long numLoadsRemaining = range - pos;
+        if ( numLoadsRemaining < 0 || numLoadsRemaining > range ) numLoadsRemaining = 0;
+        long estRemaining = numLoadsRemaining / cps_all.divide( cps_divisor ).longValue();
+
+        ConfigParser<MessagesKeys> langParser = ( ConfigParser<MessagesKeys> ) RTP.configs.getParser( MessagesKeys.class );
+        String msg = langParser.getConfigValue( MessagesKeys.fillStatus, "" ).toString();
+        if ( msg != null && !msg.isEmpty() ) {
+            long days = TimeUnit.SECONDS.toDays( estRemaining );
+            long hours = TimeUnit.SECONDS.toHours( estRemaining ) % 24;
+            long minutes = TimeUnit.SECONDS.toMinutes( estRemaining ) % 60;
+            long seconds = estRemaining % 60;
+
+            String replacement = "";
+            if ( days > 0 ) replacement += days + langParser.getConfigValue( MessagesKeys.days, "" ).toString() + " ";
+            if ( hours > 0 )
+                replacement += hours + langParser.getConfigValue( MessagesKeys.hours, "" ).toString() + " ";
+            if ( minutes > 0 )
+                replacement += minutes + langParser.getConfigValue( MessagesKeys.minutes, "" ).toString() + " ";
+            if ( seconds > 0 )
+                replacement += seconds + langParser.getConfigValue( MessagesKeys.seconds, "" ).toString();
+
+            msg = msg.replace( "[chunks]", String.valueOf( pos) );
+            msg = msg.replace( "[totalChunks]", String.valueOf( range) );
+            msg = msg.replace( "[cps]", String.valueOf( cps_local) );
+            msg = msg.replace( "[eta]", replacement );
+            msg = msg.replace( "[region]", region.name );
+
+            RTP.serverAccessor.announce( msg, "rtp.fill" );
+        }
+
+        shape.fillIter.set( pos );
+        shape.save( region.name, region.getWorld().name() );
+        region.getWorld().save();
+
+        if ( pos < range && !isCancelled() && !pause.get() ) {
+            RTP.getInstance().fillTasks.put( region.name, new FillTask( region, pos, cps_all,cps_divisor) );
+        } else RTP.getInstance().fillTasks.remove( region.name );
+        isRunning.set( false );
     }
 
     public CompletableFuture<Boolean> testPos( Region region, final long pos ) {

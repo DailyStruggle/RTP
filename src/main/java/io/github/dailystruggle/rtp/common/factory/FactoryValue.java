@@ -131,7 +131,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     }
 
     public Number getNumber( E key, Number def ) throws NumberFormatException {
-        Number res = def;
+        Number res;
 
         Object resObj = data.getOrDefault( key, def );
         if ( resObj instanceof Number ) {
@@ -143,9 +143,21 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
             res = ( Number ) resObj;
         } else if ( resObj instanceof String ) {
             resObj = ( (String ) resObj ).replaceAll( ",","." );
-            res = Double.parseDouble( (String ) resObj );
+            try {
+                res = Double.parseDouble( ((Character ) resObj ).toString() );
+            } catch (NumberFormatException e) {
+                RTP.log(Level.SEVERE, "expected floating point value for " + key.name() + ", received - " + resObj);
+                e.printStackTrace();
+                res = def;
+            }
         } else if ( resObj instanceof Character ) {
-            res = Integer.parseInt( ((Character ) resObj ).toString() );
+            try {
+                res = Integer.parseInt( ((Character ) resObj ).toString() );
+            } catch (NumberFormatException e) {
+                RTP.log(Level.SEVERE, "expected integer for " + key.name() + ", received - " + resObj);
+                e.printStackTrace();
+                res = def;
+            }
         }
         else throw new IllegalArgumentException( "[RTP] " + key.name() + ":NaN" );
         data.put( key, res );

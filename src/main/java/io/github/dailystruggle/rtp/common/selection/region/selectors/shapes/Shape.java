@@ -65,8 +65,10 @@ public abstract class Shape<E extends Enum<E>> extends FactoryValue<E> {
         return ( Shape<E> ) super.clone();
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public boolean equals( Object o ) {
+        if( o == null ) return false;
         if( !o.getClass().equals( getClass() ) || !( (Shape<?> ) o ).myClass.equals( myClass) ) return false;
         EnumMap<E, Object> data1 = getData();
         EnumMap<E, Object> data2 = ( (Shape<E> ) o ).getData();
