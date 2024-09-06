@@ -1,12 +1,11 @@
 package io.github.dailystruggle.rtp.bukkit.server.substitutions;
 
-import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
-import org.bukkit.Bukkit;
+import io.papermc.lib.PaperLib;
 import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
@@ -91,12 +90,7 @@ public final class BukkitRTPPlayer implements RTPPlayer {
         double y = to.y();
         double z = to.z() + 0.5;
 
-        CompletableFuture<Boolean> res = new CompletableFuture<>();
-
-        if ( Bukkit.isPrimaryThread() ) res.complete( player.teleport( new Location( world, x, y, z)) );
-        else Bukkit.getScheduler().runTask( RTPBukkitPlugin.getInstance(),
-                () -> res.complete( player.teleport( new Location( world, x, y, z))) );
-        return res;
+        return PaperLib.teleportAsync(player,new Location(world, x, y, z));
     }
 
     @Override

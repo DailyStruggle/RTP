@@ -69,6 +69,11 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
         return data.clone();
     }
 
+    public Object getData(E key)
+    {
+        return data.get(key);
+    }
+
     /**
      * @param data - data to apply.
      */

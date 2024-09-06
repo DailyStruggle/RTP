@@ -109,7 +109,13 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
 
     @NotNull
     public ConfigParser<E> getParser( String name ) {
-        return ( ConfigParser<E> ) configParserFactory.getOrDefault( name.toUpperCase() );
+        name = name.toUpperCase();
+        if(configParserFactory.contains(name)) return configParserFactory.map.get(name);
+        else {
+            ConfigParser<E> parser = (ConfigParser<E>) configParserFactory.getOrDefault(name);
+            configParserFactory.add(name, parser);
+            return parser;
+        }
     }
 
     public void addParser( String name ) {

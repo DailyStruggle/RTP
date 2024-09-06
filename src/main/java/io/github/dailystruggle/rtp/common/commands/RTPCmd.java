@@ -250,6 +250,7 @@ public interface RTPCmd extends BaseRTPCmd {
 
                 ConfigParser<WorldKeys> worldParser = RTP.configs.getWorldParser( worldName );
 
+
                 if ( worldParser == null ) {
                     //todo: message world not exist
                     RTP.getInstance().processingPlayers.remove( senderId );
@@ -269,7 +270,7 @@ public interface RTPCmd extends BaseRTPCmd {
                 RTP.getInstance().latestTeleportData.remove( senderId );
                 return true;
             }
-            region.getShape().select();
+
             RTPWorld rtpWorld = region.getWorld();
             Objects.requireNonNull( rtpWorld );
 

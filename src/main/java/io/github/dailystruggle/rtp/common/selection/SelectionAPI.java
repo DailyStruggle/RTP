@@ -74,10 +74,13 @@ public class SelectionAPI {
      */
     @NotNull
     public Region getRegionOrDefault( String regionName, String defaultName ) {
-        Region region = permRegionLookup.getOrDefault( regionName, permRegionLookup.get( defaultName) );
-        if ( region == null )
-            throw new IllegalStateException( "neither '" + regionName + "' nor '" + defaultName + "' are known regions\n" + permRegionLookup );
-        return Objects.requireNonNull( region );
+        if( permRegionLookup.containsKey( regionName ) ) return  permRegionLookup.get(regionName);
+        else {
+            Region region = permRegionLookup.get( defaultName );
+            if ( region == null )
+                throw new IllegalStateException( "neither '" + regionName + "' nor '" + defaultName + "' are known regions\n" + permRegionLookup );
+            return Objects.requireNonNull( region );
+        }
     }
 
     /**

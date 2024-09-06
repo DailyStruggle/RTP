@@ -14,7 +14,6 @@ import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSen
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPLocation;
 import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
-import org.simpleyaml.configuration.file.YamlFile;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -133,29 +132,14 @@ public final class DoTeleport extends RTPRunnable {
             } );
 
             ConfigParser<ConfigKeys> configParser = ( ConfigParser<ConfigKeys> ) RTP.configs.getParser( ConfigKeys.class );
-            YamlFile yamlFile = configParser.fileDatabase.cachedLookup.get().get( "config.yml" );
-            if( yamlFile!=null && yamlFile.exists() ) {
-                List<String> configValue = yamlFile.getStringList( "consoleCommands" );
-//                List<String> configValue = RTPBukkitPlugin.getInstance().getConfig().getStringList( "consoleCommands" );
-                if ( configValue !=null ) {
-                    for ( String cmd : configValue ) {
-                        try {
-                            RTP.serverAccessor.getSender( CommandsAPI.serverId ).performCommand( player,cmd );
-                        } catch ( Throwable throwable ) {
-                            throwable.printStackTrace();
-                        }
-                    }
-                }
-
-//                configValue = RTPBukkitPlugin.getInstance().getConfig().getStringList( "playercommands" );
-                configValue = yamlFile.getStringList( "playerCommands" );
-                if ( configValue !=null ) {
-                    for ( String cmd : configValue ) {
-                        try {
-                            player.performCommand( player,cmd );
-                        } catch ( Throwable throwable ) {
-                            throwable.printStackTrace();
-                        }
+            Object o = configParser.getConfigValue(ConfigKeys.consoleCommands, null);
+            if(o instanceof List) {
+                List<?> list = (List<?>) o;
+                for ( Object cmd : list ) {
+                    try {
+                        RTP.serverAccessor.getSender( CommandsAPI.serverId ).performCommand( player,cmd.toString() );
+                    } catch ( Throwable throwable ) {
+                        throwable.printStackTrace();
                     }
                 }
             }

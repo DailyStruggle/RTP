@@ -327,9 +327,37 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             PostTeleportEvent event = new PostTeleportEvent( task );
             Bukkit.getPluginManager().callEvent( event );
 
+            ConfigParser<MessagesKeys> lang = ( ConfigParser<MessagesKeys> ) RTP.configs.getParser( MessagesKeys.class );
+
             if ( task.player() instanceof BukkitRTPPlayer ) {
-                if ( !Boolean.parseBoolean( parser.getData().getOrDefault( PerformanceKeys.effectParsing, false ).toString()) )
-                    return;
+                Player player = ( (BukkitRTPPlayer ) task.player() ).player();
+
+                RTP.getInstance().miscAsyncTasks.add( () -> {
+                    String title = lang.getConfigValue( MessagesKeys.title, "" ).toString();
+                    String subtitle = lang.getConfigValue( MessagesKeys.subtitle, "" ).toString();
+
+                    int fadeIn = lang.getNumber( MessagesKeys.fadeIn, 0 ).intValue();
+                    int stay = lang.getNumber( MessagesKeys.stay, 0 ).intValue();
+                    int fadeOut = lang.getNumber( MessagesKeys.fadeOut, 0 ).intValue();
+
+                    SendMessage.title( player, title, subtitle, fadeIn, stay, fadeOut );
+
+                    String actionbar = lang.getConfigValue( MessagesKeys.actionbar, "" ).toString();
+                    SendMessage.actionbar( player, actionbar );
+                } );
+            }
+
+            if ( task.player() instanceof BukkitRTPPlayer ) {
+                boolean effectParsing;
+                Object data = parser.getData(PerformanceKeys.effectParsing);
+                if(data instanceof Boolean) effectParsing = (Boolean) data;
+                else {
+                    effectParsing = Boolean.parseBoolean(data.toString());
+                    parser.set(PerformanceKeys.effectParsing, effectParsing);
+                }
+
+                if(!effectParsing) return;
+
                 Player player = ( (BukkitRTPPlayer ) task.player() ).player();
                 RTP.getInstance().miscAsyncTasks.add( () -> {
                     EffectFactory.buildEffects( "rtp.effect.postteleport", player.getEffectivePermissions() ).forEach( effect -> {
@@ -337,25 +365,6 @@ public final class RTPBukkitPlugin extends JavaPlugin {
                         effect.run();
                     } );
                 } );
-            }
-        } );
-
-        DoTeleport.postActions.add( task -> {
-            ConfigParser<MessagesKeys> lang = ( ConfigParser<MessagesKeys> ) RTP.configs.getParser( MessagesKeys.class );
-
-            if ( task.player() instanceof BukkitRTPPlayer ) {
-                Player player = ( (BukkitRTPPlayer ) task.player() ).player();
-                String title = lang.getConfigValue( MessagesKeys.title, "" ).toString();
-                String subtitle = lang.getConfigValue( MessagesKeys.subtitle, "" ).toString();
-
-                int fadeIn = lang.getNumber( MessagesKeys.fadeIn, 0 ).intValue();
-                int stay = lang.getNumber( MessagesKeys.stay, 0 ).intValue();
-                int fadeOut = lang.getNumber( MessagesKeys.fadeOut, 0 ).intValue();
-
-                SendMessage.title( player, title, subtitle, fadeIn, stay, fadeOut );
-
-                String actionbar = lang.getConfigValue( MessagesKeys.actionbar, "" ).toString();
-                SendMessage.actionbar( player, actionbar );
             }
         } );
 

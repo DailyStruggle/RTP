@@ -4,8 +4,8 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -67,12 +67,18 @@ public class Factory<T extends FactoryValue<?>> {
     public FactoryValue<?> getOrDefault( String name ) {
         name = name.toUpperCase();
         //guard constructor
-        T value = ( T ) get( name );
+        T value = map.get( name );
         if ( value == null ) {
             if ( map.containsKey( "DEFAULT.YML") ) {
                 value = ( T ) construct( name );
                 map.put( name, value );
-            } else return new ArrayList<>( map.values() ).get( 0 ).clone();
+            } else {
+                Optional<T> any = map.values().stream().findAny();
+                if(any.isPresent()) return any.get().clone();
+                else {
+                    new IllegalStateException("no values in map").printStackTrace();
+                }
+            }
         }
         return value.clone();
     }

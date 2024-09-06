@@ -47,14 +47,17 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     private String version = null;
     private Integer intVersion = null;
     private Function<RTPWorld,Set<String>> biomes = BukkitRTPWorld::getBiomes;
+
     private Function<String, WorldBorder> worldBorderFunction = s -> {
         RTPWorld rtpWorld = getRTPWorld( s );
         if ( rtpWorld instanceof BukkitRTPWorld ) {
             World world = ( (BukkitRTPWorld ) rtpWorld ).world();
             org.bukkit.WorldBorder worldBorder = world.getWorldBorder();
-            return new WorldBorder( 
+            return new WorldBorder(
                     () -> {
-                        Shape<?> shape = (Shape<?>) RTP.factoryMap.get(RTP.factoryNames.shape).get("SQUARE");
+                        Shape<?> shape = RTP.serverAccessor.getShape(s);
+                        if( !shape.name.equalsIgnoreCase("SQUARE") )
+                            shape = (Shape<?>) RTP.factoryMap.get(RTP.factoryNames.shape).get("SQUARE");
                         Square square = (Square) shape;
                         square.set(GenericMemoryShapeParams.radius, ((long) worldBorder.getSize()*0.9) / 32);
                         square.set(GenericMemoryShapeParams.centerRadius, 0L);
@@ -88,7 +91,7 @@ public class BukkitServerAccessor implements RTPServerAccessor {
             if ( world == null ) return null;
             Region region = RTP.selectionAPI.getRegion( getRTPWorld( world.getUID()) );
             if ( region == null ) throw new IllegalStateException();
-            Object o = region.getData().get( RegionKeys.shape );
+            Object o = region.getData( RegionKeys.shape );
             if ( !(o instanceof Shape<?>) ) throw new IllegalStateException();
             return ( Shape<?> ) o;
         };

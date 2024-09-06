@@ -138,7 +138,7 @@ public class RTP {
         for( CompletableFuture<?> future : futures ) {
             if( !future.isDone() ) validFutures.add( future );
         }
-        if( validFutures.size()>0 ) {
+        if(!validFutures.isEmpty()) {
             for ( CompletableFuture<?> future : validFutures ) {
                 try {
                     if ( future.isDone() ) continue;

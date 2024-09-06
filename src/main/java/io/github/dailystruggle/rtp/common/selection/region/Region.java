@@ -262,9 +262,35 @@ public class Region extends FactoryValue<RegionKeys> {
                 if ( dt > 5000 || dt < 0 ) {
                     ConfigParser<SafetyKeys> safety = ( ConfigParser<SafetyKeys> ) RTP.configs.getParser( SafetyKeys.class );
                     Object value = safety.getConfigValue( SafetyKeys.unsafeBlocks, new ArrayList<>() );
-                    unsafeBlocks.clear();
                     if ( value instanceof Collection ) {
-                        unsafeBlocks.addAll( ((Collection<?> ) value ).stream().filter( Objects::nonNull ).map( Object::toString ).collect( Collectors.toSet()) );
+                        Collection<?> collection = (Collection<?>) value;
+                        if(((Collection<?>) value).isEmpty()) unsafeBlocks.clear();
+                        else if(((Collection<?>) value).size() == unsafeBlocks.size()) {
+                            if(value instanceof List<?>) {
+                                List<?> list = (List<?>) value;
+                                if(list.get(0) instanceof String) {
+                                    List<String> stringList = (List<String>) list;
+                                    boolean same = true;
+                                    for(String s : stringList) {
+                                        if( !unsafeBlocks.contains(s)) {
+                                            same = false;
+                                            break;
+                                        }
+                                    }
+                                    if(!same) {
+                                        unsafeBlocks.clear();
+                                        unsafeBlocks.addAll(list.stream().map(Object::toString).collect(Collectors.toSet()));
+                                    }
+                                }
+                                else {
+                                    unsafeBlocks.clear();
+                                    unsafeBlocks.addAll(list.stream().map(Object::toString).collect(Collectors.toSet()));
+                                }
+                            }
+                        }
+
+
+                        unsafeBlocks.addAll( collection.stream().filter( Objects::nonNull ).map( Object::toString ).collect( Collectors.toSet()) );
                     }
                     lastUpdate.set( t );
                     safetyRadius.set( safety.getNumber( SafetyKeys.safetyRadius, 0 ).intValue() );

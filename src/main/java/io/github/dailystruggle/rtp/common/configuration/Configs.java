@@ -90,7 +90,25 @@ public class Configs {
             multiConfigParser.addParser( new ConfigParser<>( WorldKeys.class, worldName, "1.0", multiConfigParser.myDirectory, worldLangMap, multiConfigParser.fileDatabase) );
         }
 
-        return multiConfigParser.getParser( worldName );
+        ConfigParser<WorldKeys> parser = multiConfigParser.getParser( worldName );
+        return parser;
+    }
+
+    public Object getWorldParserValue( String worldName, WorldKeys key) {
+        if ( RTP.serverAccessor.getRTPWorld( worldName ) == null ) {
+            return null;
+        }
+
+        MultiConfigParser<WorldKeys> multiConfigParser = ( MultiConfigParser<WorldKeys> ) multiConfigParserMap.get( WorldKeys.class );
+
+        Objects.requireNonNull( multiConfigParser );
+
+        if ( !multiConfigParser.configParserFactory.contains( worldName) ) {
+            multiConfigParser.addParser( new ConfigParser<>( WorldKeys.class, worldName, "1.0", multiConfigParser.myDirectory, worldLangMap, multiConfigParser.fileDatabase) );
+        }
+
+        ConfigParser<WorldKeys> parser = multiConfigParser.getParser( worldName );
+        return parser;
     }
 
     public boolean reload() {
