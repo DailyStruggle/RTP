@@ -25,15 +25,11 @@ public final class RTPTeleportCancel extends RTPRunnable {
     public static void refund( UUID playerId ) {
         ConfigParser<EconomyKeys> eco = ( ConfigParser<EconomyKeys> ) RTP.configs.configParserMap.get( EconomyKeys.class );
         Object configValue = eco.getConfigValue( EconomyKeys.refundOnCancel, Boolean.TRUE );
-        System.out.println( configValue );
 
         boolean refund;
         if( configValue instanceof Boolean ) refund = ( Boolean ) configValue;
         else if( configValue instanceof String ) refund = Boolean.parseBoolean( (String ) configValue );
         else refund = Boolean.parseBoolean( configValue.toString() );
-
-        System.out.println( refund );
-
 
         //check if teleporting
         TeleportData data = RTP.getInstance().latestTeleportData.get( playerId );

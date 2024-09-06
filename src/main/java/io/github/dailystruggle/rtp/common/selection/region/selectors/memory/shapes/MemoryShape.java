@@ -24,7 +24,10 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     public AtomicLong fillIter = new AtomicLong( 0L );
 
     /**
+     * @param eClass - enum class to use
      * @param name - unique name of shape
+     * @param data - default data
+     * @throws IllegalArgumentException - in case of invalid inputs for expected types
      */
     public MemoryShape( Class<E> eClass, String name, EnumMap<E, Object> data ) throws IllegalArgumentException {
         super( eClass, name, data );

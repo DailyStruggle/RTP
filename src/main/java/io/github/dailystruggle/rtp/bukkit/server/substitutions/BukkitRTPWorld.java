@@ -104,6 +104,7 @@ public final class BukkitRTPWorld implements RTPWorld {
     private final String name;
     private final World world;
 
+    private static int i = 0;
     public BukkitRTPWorld( World world ) {
         this.world = world;
         if ( world == null ) {

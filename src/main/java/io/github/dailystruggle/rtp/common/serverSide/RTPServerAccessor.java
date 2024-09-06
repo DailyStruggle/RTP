@@ -65,7 +65,7 @@ public interface RTPServerAccessor {
 
     /**
      * @return predicted next tick time minus current time, in millis
-     * if >0, RTP should cut short any pipeline processing
+     * if over 0, RTP should cut short any pipeline processing
      */
     long overTime();
 
@@ -77,51 +77,51 @@ public interface RTPServerAccessor {
     /**
      * send a message to this person
      *
-     * @param target
-     * @param msgType
+     * @param target - who to send message to
+     * @param msgType - enumerated type of message
      */
     void sendMessage( UUID target, MessagesKeys msgType );
 
     /**
      * send a message to these people, avoiding duplicates
      *
-     * @param sender
-     * @param target
-     * @param msgType
+     * @param sender - who's sending the message
+     * @param target - who to send message to
+     * @param msgType - enumerated type of message
      */
     void sendMessage( UUID sender, UUID target, MessagesKeys msgType );
 
     /**
      * send a message to this person
      *
-     * @param target
-     * @param message
+     * @param target - who to send message to
+     * @param message - what message to send
      */
     void sendMessage( UUID target, String message );
 
     /**
      * send a message with a hover and click event for suggesting a subsequent command
      *
-     * @param target
-     * @param message
-     * @param suggestion
+     * @param target - who to send message to
+     * @param message - what message to send
+     * @param suggestion - autofill option
      */
     void sendMessageAndSuggest( UUID target, String message, String suggestion );
 
     /**
      * send a message to these people, avoiding duplicates
      *
-     * @param sender
-     * @param target
-     * @param message
+     * @param sender - who's sending the message
+     * @param target - who's receiving the message
+     * @param message - message sent
      */
     void sendMessage( UUID sender, UUID target, String message );
 
     /**
      * output a message to console
      *
-     * @param level
-     * @param msg
+     * @param level - log level
+     * @param msg - message to log
      */
     void log( Level level, String msg );
 
@@ -129,8 +129,8 @@ public interface RTPServerAccessor {
      * output a message to console
      *
      * @param level log level, warning is colored yellow but marked as info
-     * @param msg
-     * @param throwable
+     * @param msg - message to log
+     * @param throwable - throwable to get stacktrace from
      */
     void log( Level level, String msg, Throwable throwable );
 
@@ -143,7 +143,8 @@ public interface RTPServerAccessor {
     void announce( String msg, String permission );
 
     /**
-     * @return list of all possible biomes
+     * @param rtpWorld world with a possibly unique set of biomes to get
+     * @return set of all possible biomes
      */
     Set<String> getBiomes( RTPWorld rtpWorld );
 
@@ -170,6 +171,10 @@ public interface RTPServerAccessor {
     @Nullable
     WorldBorder getWorldBorder( String worldName );
 
+    /**
+     * @param function what to use for world border function
+     * @return success
+     */
     boolean setWorldBorderFunction( Function<String, WorldBorder> function );
 
     /**

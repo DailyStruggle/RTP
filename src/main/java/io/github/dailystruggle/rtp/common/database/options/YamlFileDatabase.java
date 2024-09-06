@@ -36,7 +36,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, YamlFile>> {
 
     /**
      * constructor
-     * <p>
+     * @param directory - location of file
      * provide directory where yml/yaml files should exist
      */
     public YamlFileDatabase( File directory ) {

@@ -44,12 +44,12 @@ public final class BukkitRTPChunk implements RTPChunk {
 
     @Override
     public RTPWorld getWorld() {
-        return new BukkitRTPWorld( chunk.getWorld() );
+        return RTP.serverAccessor.getRTPWorld( chunk.getWorld().getUID() );
     }
 
     @Override
     public void keep( boolean keep ) {
-        RTPWorld rtpWorld = RTP.serverAccessor.getRTPWorld( chunk.getWorld().getUID() );
+        RTPWorld rtpWorld = getWorld();
 
         if ( keep ) {
             rtpWorld.keepChunkAt( x(), z() );

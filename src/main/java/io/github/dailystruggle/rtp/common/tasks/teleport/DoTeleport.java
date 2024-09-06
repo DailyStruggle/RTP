@@ -142,7 +142,7 @@ public final class DoTeleport extends RTPRunnable {
                         try {
                             RTP.serverAccessor.getSender( CommandsAPI.serverId ).performCommand( player,cmd );
                         } catch ( Throwable throwable ) {
-                            RTP.log( Level.WARNING, throwable.getMessage(), throwable );
+                            throwable.printStackTrace();
                         }
                     }
                 }
@@ -154,7 +154,7 @@ public final class DoTeleport extends RTPRunnable {
                         try {
                             player.performCommand( player,cmd );
                         } catch ( Throwable throwable ) {
-                            RTP.log( Level.WARNING, throwable.getMessage(), throwable );
+                            throwable.printStackTrace();
                         }
                     }
                 }
@@ -163,7 +163,7 @@ public final class DoTeleport extends RTPRunnable {
             postActions.forEach( consumer -> consumer.accept( this) );
         }
         catch ( Throwable throwable ) {
-            RTP.log( Level.WARNING, throwable.getMessage(), throwable );
+            throwable.printStackTrace();
             new RTPTeleportCancel( player.uuid() ).run();
         }
     }

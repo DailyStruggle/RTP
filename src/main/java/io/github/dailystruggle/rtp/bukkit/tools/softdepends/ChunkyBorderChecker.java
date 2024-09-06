@@ -116,8 +116,7 @@ public class ChunkyBorderChecker {
                 }
 
                 if(chunkyBorder != null) return chunkyBorder;
-                if(vanillaBorder != null) return chunkyBorder;
-                return null;
+                return vanillaBorder;
             } );
         }
     }

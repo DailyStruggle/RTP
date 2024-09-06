@@ -69,6 +69,7 @@ public class SelectionAPI {
      * getFromString a region by name
      *
      * @param regionName - name of region
+     * @param defaultName - name of default region to fall back on
      * @return region by that name, or null if none
      */
     @NotNull

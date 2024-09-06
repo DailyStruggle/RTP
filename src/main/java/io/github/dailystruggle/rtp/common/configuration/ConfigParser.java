@@ -239,6 +239,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
      *
      * @param name      file name, e.g. "config.yml"
      * @param overwrite whether to overwrite an existing file with that name
+     * @throws IOException - file read exceptions
      */
     public void saveResource( String name, boolean overwrite ) throws IOException {
         String myDirectory = pluginDirectory.getAbsolutePath();

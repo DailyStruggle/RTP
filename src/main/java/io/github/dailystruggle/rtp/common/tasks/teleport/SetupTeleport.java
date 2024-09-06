@@ -16,7 +16,6 @@ import org.jetbrains.annotations.Nullable;
 import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.logging.Level;
 
 public final class SetupTeleport extends RTPRunnable {
     public static final List<Consumer<SetupTeleport>> preActions = new ArrayList<>();
@@ -110,7 +109,7 @@ public final class SetupTeleport extends RTPRunnable {
             postActions.forEach( consumer -> consumer.accept( this, true) );
         }
         catch ( Throwable throwable ) {
-            RTP.log( Level.WARNING, throwable.getMessage(), throwable );
+            throwable.printStackTrace();
             new RTPTeleportCancel( player.uuid() ).run();
         }
     }

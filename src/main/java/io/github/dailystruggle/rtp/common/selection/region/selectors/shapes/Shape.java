@@ -18,7 +18,10 @@ public abstract class Shape<E extends Enum<E>> extends FactoryValue<E> {
     protected final List<BiPredicate<UUID, RTPLocation>> verifiers = new ArrayList<>();
 
     /**
+     * @param eClass - enum class to use
      * @param name - unique name of shape
+     * @param data - default data
+     * @throws IllegalArgumentException - in case of invalid inputs for expected types
      */
     public Shape( Class<E> eClass, String name, EnumMap<E, Object> data ) throws IllegalArgumentException {
         super( eClass, name );

@@ -302,7 +302,7 @@ public class OnEventTeleports implements Listener {
 
         ConfigParser<?> parser = RTP.configs.configParserMap.get(ConfigKeys.class);
         if(!parser.myClass.equals(ConfigKeys.class)) {
-            RTP.log(Level.SEVERE,"", new IllegalStateException("unexpected class for configParser"));
+            new IllegalStateException("unexpected class for configParser").printStackTrace();
             return;
         }
         @SuppressWarnings("unchecked") ConfigParser<ConfigKeys> configParser = ( ConfigParser<ConfigKeys> ) parser;

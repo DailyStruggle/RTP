@@ -37,7 +37,7 @@ public class FillTask extends RTPRunnable {
     }
     private final AtomicLong completionCounter = new AtomicLong();
     private final Semaphore completionGuard = new Semaphore( 1 );
-    private final List<CompletableFuture<RTPChunk>> chunks = new ArrayList<>();
+    private final List<CompletableFuture<Boolean>> chunks = new ArrayList<>();
     private final Semaphore testsGuard = new Semaphore( 1 );
     public AtomicBoolean pause = new AtomicBoolean( false );
 
@@ -116,10 +116,12 @@ public class FillTask extends RTPRunnable {
                     completionGuard.release();
                 }
             } );
+
+            chunks.add( future );
         }
 
         //WAIT FOR COMPLETION, EXCEPTIONALLY
-        for(CompletableFuture<RTPChunk> completableFuture : chunks)
+        for(CompletableFuture<Boolean> completableFuture : chunks)
         {
             if ( isCancelled() ) return;
             try {
@@ -190,11 +192,14 @@ public class FillTask extends RTPRunnable {
         o = safety.getConfigValue( SafetyKeys.biomeWhitelist, false );
         boolean whitelist = ( o instanceof Boolean ) ? ( Boolean ) o : Boolean.parseBoolean( o.toString() );
 
-        o = safety.getConfigValue( SafetyKeys.biomes, null );
-        List<String> biomeList = ( o instanceof List ) ? ( List<String> ) o : null;
-        Set<String> biomeSet = ( biomeList == null )
-                ? new HashSet<>()
-                : biomeList.stream().map( String::toUpperCase ).collect( Collectors.toSet() );
+        o = safety.getConfigValue( SafetyKeys.biomes, new ArrayList<String>() );
+        if(!(o instanceof List<?>)) {
+            new IllegalArgumentException("expected list for biomes in safety.yml, received - " + o.getClass().getSimpleName()).printStackTrace();
+            safety.set(SafetyKeys.biomes, new ArrayList<String>());
+        }
+
+        List<?> objList = ( o instanceof List ) ? (( List<?> ) o) : new ArrayList<String>();
+        Set<String> biomeSet = objList.stream().map(o2 -> o2.toString().toUpperCase()).collect( Collectors.toSet() );
         if ( whitelist ) {
             defaultBiomes = biomeSet;
         } else {
@@ -229,7 +234,7 @@ public class FillTask extends RTPRunnable {
 
         String currBiome = world.getBiome( select[0] * 16 + 7, ( vert.maxY() + vert.minY() ) / 2, select[1] * 16 + 7 );
 
-        if( !defaultBiomes.contains( currBiome) ) {
+        if( !defaultBiomes.contains( currBiome ) ) {
             if ( biomeRecall ) {
                 shape.addBadLocation( pos );
                 return CompletableFuture.completedFuture( false );
@@ -247,7 +252,6 @@ public class FillTask extends RTPRunnable {
         }
 
         CompletableFuture<RTPChunk> cfChunk = world.getChunkAt( select[0], select[1] );
-        chunks.add( cfChunk );
 
         CompletableFuture<Boolean> res = new CompletableFuture<>();
         cfChunk.thenAccept( chunk -> {

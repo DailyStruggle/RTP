@@ -622,7 +622,7 @@ public class SendMessage {
     }
 
     public static void log( Level level, String message ) {
-        if ( message.isEmpty() ) return;
+        if ( Objects.isNull(message) || message.isEmpty() ) return;
 
         message = format( null, message );
 
@@ -665,37 +665,24 @@ public class SendMessage {
     }
 
     public static void log( Level level, String message, Throwable throwable ) {
-        if ( message.isEmpty() ) return;
+        if ( Objects.isNull(message) || message.isEmpty() ) return;
+
+        CommandSender.Spigot spigot = Bukkit.getConsoleSender().spigot();
 
         if ( level.equals( Level.INFO) )
-            Bukkit.getConsoleSender().spigot().sendMessage( TextComponent.fromLegacyText( format( null, message)) );
+            spigot.sendMessage( TextComponent.fromLegacyText( format( null, message)) );
         else if ( level.equals( Level.CONFIG) )
-            Bukkit.getConsoleSender().spigot().sendMessage( TextComponent.fromLegacyText( ChatColor.GREEN + format( null, message)) );
+            spigot.sendMessage( TextComponent.fromLegacyText( ChatColor.GREEN + format( null, message)) );
         else if ( level.equals( Level.WARNING) )
-            Bukkit.getConsoleSender().spigot().sendMessage( TextComponent.fromLegacyText( ChatColor.YELLOW + format( null, message)) );
+            spigot.sendMessage( TextComponent.fromLegacyText( ChatColor.YELLOW + format( null, message)) );
         else if ( level.equals( Level.SEVERE) )
-            Bukkit.getConsoleSender().spigot().sendMessage( TextComponent.fromLegacyText( ChatColor.RED + format( null, message)) );
+            spigot.sendMessage( TextComponent.fromLegacyText( ChatColor.RED + format( null, message)) );
         else {
             Logger logger = Bukkit.getLogger();
             if ( logger != null ) logger.log( level, message );
         }
 
-        for ( StackTraceElement element : throwable.getStackTrace() ) {
-            Logger logger = Bukkit.getLogger();
-            message = element.toString();
-
-            if ( level.equals( Level.INFO) )
-                Bukkit.getConsoleSender().spigot().sendMessage( TextComponent.fromLegacyText( format( null, message)) );
-            else if ( level.equals( Level.CONFIG) )
-                Bukkit.getConsoleSender().spigot().sendMessage( TextComponent.fromLegacyText( ChatColor.GREEN + format( null, message)) );
-            else if ( level.equals( Level.WARNING) )
-                Bukkit.getConsoleSender().spigot().sendMessage( TextComponent.fromLegacyText( ChatColor.YELLOW + format( null, message)) );
-            else if ( level.equals( Level.SEVERE) )
-                Bukkit.getConsoleSender().spigot().sendMessage( TextComponent.fromLegacyText( ChatColor.RED + format( null, message)) );
-            else {
-                if ( logger != null ) logger.log( level, message );
-            }
-        }
+        throwable.printStackTrace();
     }
 
     public static void title( Player player, String title, String subtitle, int in, int stay, int out ) {

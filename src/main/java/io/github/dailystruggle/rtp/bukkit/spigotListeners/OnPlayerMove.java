@@ -15,7 +15,6 @@ import org.bukkit.event.player.PlayerMoveEvent;
 
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
 
 public final class OnPlayerMove implements Listener {
     private double cancelDistanceSquared = 2;
@@ -37,7 +36,7 @@ public final class OnPlayerMove implements Listener {
                 //noinspection unchecked
                 configParser = ( ConfigParser<ConfigKeys> ) parser;
             else {
-                RTP.log( Level.SEVERE, "", new IllegalStateException( "ConfigParser is not using ConfigKeys") );
+                new IllegalStateException( "ConfigParser is not using ConfigKeys").printStackTrace();
                 return;
             }
 

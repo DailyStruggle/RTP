@@ -16,7 +16,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerTeleportEvent;
 
 import java.util.Objects;
-import java.util.logging.Level;
 
 public final class OnPlayerTeleport implements Listener {
     @EventHandler( priority = EventPriority.LOWEST )
@@ -49,7 +48,7 @@ public final class OnPlayerTeleport implements Listener {
             //noinspection unchecked
             configParser = ( ConfigParser<ConfigKeys> ) parser;
         else {
-            RTP.log( Level.SEVERE, "", new IllegalStateException( "ConfigParser is not using ConfigKeys") );
+            new IllegalStateException( "ConfigParser is not using ConfigKeys").printStackTrace();
             return;
         }
 

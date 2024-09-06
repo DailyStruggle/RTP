@@ -19,7 +19,6 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
-import java.util.logging.Level;
 
 public final class LoadChunks extends RTPRunnable {
     public static final List<Consumer<LoadChunks>> preActions = new ArrayList<>();
@@ -97,7 +96,7 @@ public final class LoadChunks extends RTPRunnable {
                     try {
                         doTeleport.run();
                     } catch ( Throwable throwable ) {
-                        RTP.log( Level.WARNING, throwable.getMessage(), throwable );
+                        throwable.printStackTrace();
                         new RTPTeleportCancel( player.uuid() ).run();
                     }
                 } else RTP.getInstance().teleportPipeline.add( doTeleport );
@@ -110,7 +109,7 @@ public final class LoadChunks extends RTPRunnable {
                     try {
                         cfChunk.get();
                     } catch ( ExecutionException | InterruptedException e ) {
-                        RTP.log( Level.WARNING, e.getMessage(), e );
+                        e.printStackTrace();
                     }
                 }
             }
@@ -123,7 +122,7 @@ public final class LoadChunks extends RTPRunnable {
             postActions.forEach( consumer -> consumer.accept( this) );
         }
         catch ( Throwable throwable ) {
-            RTP.log( Level.WARNING, throwable.getMessage(), throwable );
+            throwable.printStackTrace();
             new RTPTeleportCancel( player.uuid() ).run();
         }
     }

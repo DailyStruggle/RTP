@@ -50,17 +50,14 @@ public interface RTPCmd extends BaseRTPCmd {
             }
         }
 
-        if ( RTP.getInstance().processingPlayers.contains( senderId) ) {
-            RTP.serverAccessor.sendMessage( senderId, MessagesKeys.alreadyTeleporting );
-            return true;
-        }
-
         //------------------------D--------------------------------------------------------------------------------------
         //guard command perms with custom message
         if ( !sender.hasPermission( "rtp.use") ) {
             RTP.serverAccessor.sendMessage( senderId, MessagesKeys.noPerms );
             return true;
         }
+
+        long dt = -1;
 
         //--------------------------------------------------------------------------------------------------------------
         //guard last teleport time synchronously to prevent spam
@@ -72,7 +69,7 @@ public interface RTPCmd extends BaseRTPCmd {
             }
 
 
-            long dt = System.currentTimeMillis() - senderData.time;
+            dt = System.currentTimeMillis() - senderData.time;
 
             if ( dt < 0 ) dt = Long.MAX_VALUE + dt;
 
@@ -80,6 +77,18 @@ public interface RTPCmd extends BaseRTPCmd {
                 RTP.serverAccessor.sendMessage( senderId, MessagesKeys.cooldownMessage );
                 return true;
             }
+            else if ( senderData.completed ) { //resolve command bugs preemptively
+                RTP.getInstance().processingPlayers.remove( senderId );
+            }
+        }
+        else { //resolve command bugs preemptively
+            RTP.getInstance().processingPlayers.remove( senderId );
+        }
+
+
+        if ( RTP.getInstance().processingPlayers.contains( senderId ) ) {
+            RTP.serverAccessor.sendMessage( senderId, MessagesKeys.alreadyTeleporting );
+            return true;
         }
 
         if ( !senderId.equals( CommandsAPI.serverId) ) RTP.getInstance().processingPlayers.add( senderId );
@@ -98,12 +107,13 @@ public interface RTPCmd extends BaseRTPCmd {
 
     //async command component
     default boolean compute( UUID senderId, Map<String, List<String>> rtpArgs, CommandsAPICommand nextCommand ) {
-        RTPCommandSender sender = RTP.serverAccessor.getSender( senderId );
-        RTP.getInstance().processingPlayers.add( senderId );
-
         if ( nextCommand != null ) {
             return true;
         }
+
+        RTPCommandSender sender = RTP.serverAccessor.getSender( senderId );
+
+        RTP.getInstance().processingPlayers.add( senderId );
 
         List<String> toggletargetpermsList = rtpArgs.get( "toggletargetperms" );
         boolean toggleTargetPerms = toggletargetpermsList != null && Boolean.parseBoolean( toggletargetpermsList.get( 0) );

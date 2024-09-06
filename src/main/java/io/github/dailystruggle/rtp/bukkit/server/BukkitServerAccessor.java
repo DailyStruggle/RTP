@@ -124,20 +124,14 @@ public class BukkitServerAccessor implements RTPServerAccessor {
                 try {
                     intVersion = Integer.valueOf( splitVersion[0] );
                 } catch (NumberFormatException e) {
-                    Bukkit.getLogger().log(Level.SEVERE, "expected number, received - " + splitVersion[0]);
-                    Bukkit.getLogger().log(Level.SEVERE, "full string - " +
-                            RTPBukkitPlugin.getInstance().getServer().getClass().getPackage().getName());
-                    e.printStackTrace();
+                    RTP.log(Level.WARNING,"expected number, received - " + splitVersion[0],e);
                     intVersion = 1;
                 }
             } else {
                 try {
                     intVersion = Integer.valueOf( splitVersion[1] );
                 } catch (NumberFormatException e) {
-                    Bukkit.getLogger().log(Level.SEVERE, "expected number, received - " + splitVersion[1]);
-                    Bukkit.getLogger().log(Level.SEVERE, "full string - " +
-                            RTPBukkitPlugin.getInstance().getServer().getClass().getPackage().getName());
-                    e.printStackTrace();
+                    RTP.log(Level.WARNING,"expected number, received - " + splitVersion[1],e);
                     intVersion = 1;
                 }
             }
@@ -148,16 +142,15 @@ public class BukkitServerAccessor implements RTPServerAccessor {
     @Override
     public RTPWorld getRTPWorld( String name ) {
         RTPWorld world = worldMapStr.get( name );
-        if ( world == null ) {
-            World bukkitWorld = Bukkit.getWorld( name );
-            if ( bukkitWorld == null ) return null;
-            world = new BukkitRTPWorld( bukkitWorld );
-            if ( world == null ) return null;
-            worldMapStr.put( name, world );
+        World bukkitWorld = Bukkit.getWorld( name );
+        if ( world == null && bukkitWorld !=null ) {
+            world = new BukkitRTPWorld(bukkitWorld);
             worldMap.put( world.id(), world );
-        } else if ( world.isInactive() ) {
+            worldMapStr.put( world.name(), world );
+        }
+        if(bukkitWorld == null && world!=null) {
             worldMap.remove( world.id() );
-            worldMapStr.remove( world.name() );
+            worldMapStr.remove(world.name());
             return null;
         }
         return world;
@@ -169,11 +162,11 @@ public class BukkitServerAccessor implements RTPServerAccessor {
         World bukkitWorld = Bukkit.getWorld(id);
         if ( world == null && bukkitWorld !=null ) {
             world = new BukkitRTPWorld(bukkitWorld);
-            worldMap.put( id, world );
+            worldMap.put( world.id(), world );
             worldMapStr.put( world.name(), world );
         }
         if(bukkitWorld == null && world!=null) {
-            worldMap.remove( id );
+            worldMap.remove( world.id() );
             worldMapStr.remove(world.name());
             return null;
         }
