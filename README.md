@@ -1,4 +1,9 @@
 # RTP
+[abandoned]
+
+I'm not supporting this anymore. The public is free to do whatever they want with the software.
+
+There are probably some bugs remaining and memory usage isn't great with an in-memory database. It's hard to pin down everything. Regardless, I hope the codebase provides a good example for optimization via mathematical modeling.
 
 ## Overview
 A spigot plugin for random teleportation.
