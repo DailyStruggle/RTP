@@ -1,0 +1,28 @@
+plugins {
+    id 'java'
+}
+
+group = 'io.github.dailystruggle'
+version = '1.0-SNAPSHOT'
+
+// Note: Target updated to 16 to match your POM
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+repositories {
+    mavenCentral()
+    maven { url 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
+}
+
+dependencies {
+    // Core RTP classes (will now work after the refactor above)
+    compileOnly project(':')
+
+    // The Domain API
+    compileOnly 'work.torp:Domain:2.11.2'
+
+    // Spigot API (Required for the addon to see Bukkit classes)
+    compileOnly 'org.spigotmc:spigot-api:1.16.5-R0.1-SNAPSHOT'
+}

@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp_domain;
 
-import leafcraft.rtp.RTP;
+import io.github.dailystruggle.rtp.common.RTP;
 import org.bukkit.Location;
 import org.bukkit.plugin.java.JavaPlugin;
 import work.torp.domain.helper.Check;

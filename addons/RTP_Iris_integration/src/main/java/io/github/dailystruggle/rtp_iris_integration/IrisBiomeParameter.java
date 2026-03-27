@@ -5,7 +5,7 @@ import com.volmit.iris.engine.object.IrisBiome;
 import com.volmit.iris.engine.platform.PlatformChunkGenerator;
 import com.volmit.iris.util.collection.KList;
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
-import io.github.dailystruggle.rtp.commandsapi.common.CommandParameter;
+import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;

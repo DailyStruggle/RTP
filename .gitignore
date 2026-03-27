@@ -114,3 +114,6 @@ run/
 
 !RTP_Domain/target/RTP_Domain-1.0-SNAPSHOT.jar
 src/test/java/commonTestImpl/TestRTPServerAccessor.java
+/.gradle/
+/build/
+/gradle/

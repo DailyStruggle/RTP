@@ -1,0 +1,36 @@
+plugins {
+    id 'java'
+    id 'com.gradleup.shadow' version '8.3.8'
+}
+
+group = 'io.github.dailystruggle'
+version = '1.0-SNAPSHOT'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+repositories {
+    mavenCentral()
+    maven { url 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
+}
+
+dependencies {
+    compileOnly project(':')
+    compileOnly 'io.papermc:paperlib:1.0.7'
+    compileOnly 'org.spigotmc:spigot-api:1.16.5-R0.1-SNAPSHOT'
+}
+
+shadowJar {
+    relocate 'io.papermc.lib', 'io.github.dailystruggle.rtp.paperlib'
+
+    dependencies {
+        exclude(project(':'))
+    }
+
+    archiveClassifier.set('') // Use the standard jar name
+}
+
+// Ensure the 'build' task uses the shadowed (rewritten) jar
+assemble.dependsOn shadowJar

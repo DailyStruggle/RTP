@@ -1,13 +1,15 @@
 package io.github.dailystruggle.rtpmixedseedfix;
 
 import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.paperlib.PaperLib;
+import io.papermc.lib.PaperLib;
 import org.bukkit.Chunk;
 import org.bukkit.block.Biome;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.concurrent.ExecutionException;
+import java.util.logging.Level;
 
 public final class RTPMixedSeedFix extends JavaPlugin {
     @Override
@@ -23,7 +25,7 @@ public final class RTPMixedSeedFix extends JavaPlugin {
                 if( x<0 ) x += 16;
                 if( z<0 ) z += 16;
                 Chunk chunk = PaperLib.getChunkAtAsync( location ).get();
-                if( chunk == null ) return;
+                if( chunk == null ) return biome.name();
                 biome = chunk.getBlock( x,y,z ).getBiome();
             } catch ( InterruptedException | ExecutionException e ) {
                 RTP.log( Level.WARNING, e.getMessage(), e );

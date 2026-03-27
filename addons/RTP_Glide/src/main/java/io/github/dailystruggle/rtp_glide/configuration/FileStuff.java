@@ -1,10 +1,12 @@
 package io.github.dailystruggle.rtp_glide.configuration;
 
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp_glide.RTP_Glide;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.logging.Level;
 
 public class FileStuff {
 

@@ -1,0 +1,29 @@
+plugins {
+    id 'java'
+}
+
+group = 'io.github.dailystruggle'
+version = '1.0.1'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven { url 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
+}
+
+dependencies {
+    compileOnly 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
+    compileOnly project(':')
+
+    implementation 'io.github.dailystruggle:CommandsAPI:1.0.0-RELEASE'
+
+    // Binds the local jar file to the compile classpath
+    compileOnly files('lib/Iris-3.9.1-1.20.1-1.21.11.jar')
+}
