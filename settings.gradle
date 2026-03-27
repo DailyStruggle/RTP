@@ -1,0 +1,6 @@
+rootProject.name = 'RTP'
+
+include 'addons:RTP_Glide'
+include 'addons:RTP_ClaimPluginIntegrations'
+include 'addons:RTP_Iris_integration'
+include 'addons:RTP_MixedSeedFix'

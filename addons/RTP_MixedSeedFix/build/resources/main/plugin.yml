@@ -1,0 +1,7 @@
+name: RTP_MixedSeedFix
+version: '1.0-SNAPSHOT'
+main: io.github.dailystruggle.rtpmixedseedfix.RTPMixedSeedFix
+api-version: 1.13
+authors: [ leaf26 ]
+description: use chunk biome lookup instead of world biome lookup
+depend: [ RTP ]

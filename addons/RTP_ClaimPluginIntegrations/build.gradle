@@ -1,0 +1,47 @@
+plugins {
+    id 'java'
+}
+
+group = 'io.github.dailystruggle'
+version = '1.0.0'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+repositories {
+    mavenCentral()
+    maven { url 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
+    maven { url 'https://jitpack.io' }
+    maven { url 'https://maven.enginehub.org/repo/' }
+    maven { url 'https://repo.dmulloy2.net/repository/public/' }
+    maven { url 'https://ci.ender.zone/plugin/repository/everything/' }
+    maven { url 'https://repo.glaremasters.me/repository/bloodshot/' }
+    maven { url 'https://raw.githubusercontent.com/FabioZumbi12/RedProtect/mvn-repo/' }
+}
+
+dependencies {
+    compileOnly 'org.spigotmc:spigot-api:1.16.5-R0.1-SNAPSHOT'
+    compileOnly project(':')
+
+    // Claim Plugin Integrations
+    // We force these in the root, but declaring them here helps IntelliJ indexing
+    compileOnly 'com.sk89q.worldguard:worldguard-bukkit:7.0.9'
+    compileOnly 'com.sk89q.worldedit:worldedit-bukkit:7.2.15'
+    compileOnly 'com.github.TechFortress:GriefPrevention:16.18.1'
+    compileOnly 'com.github.WiIIiam278:HuskTowns:1.6.2'
+    compileOnly 'com.github.LlmDl:Towny:0.97.5.0'
+    compileOnly 'com.massivecraft:Factions:1.6.9.5-U0.6.9'
+    compileOnly 'com.griefdefender:api:2.1.0-SNAPSHOT'
+    compileOnly 'com.github.angeschossen:LandsAPI:6.22.0'
+    compileOnly 'br.net.fabiozumbi12.RedProtect:RedProtect-Core:7.7.3'
+
+    // Exclude the broken transitive lookups from RedProtect
+    compileOnly('br.net.fabiozumbi12.RedProtect:RedProtect-Spigot:7.7.3') {
+        exclude group: 'com.destroystokyo.paper', module: 'paper-api'
+        exclude group: 'com.sk89q.worldedit'
+        exclude group: 'com.sk89q.worldguard'
+        exclude group: 'de.keyle', module: 'mypet'
+    }
+}
