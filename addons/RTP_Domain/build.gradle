@@ -7,8 +7,8 @@ version = '1.0-SNAPSHOT'
 
 // Note: Target updated to 16 to match your POM
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
 
 repositories {

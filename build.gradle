@@ -9,8 +9,11 @@ group = 'io.github.dailystruggle'
 version = '2.0.18'
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
     withSourcesJar()
     withJavadocJar()
 }
@@ -29,7 +32,6 @@ repositories {
 dependencies {
     // Provided Dependencies (Compile Only)
     compileOnly 'org.spigotmc:spigot-api:1.16.5-R0.1-SNAPSHOT'
-    compileOnly 'dev.folia:folia-api:1.20.1-R0.1-SNAPSHOT'
     compileOnly 'com.github.MilkBowl:VaultAPI:1.7.1'
     compileOnly 'me.clip:placeholderapi:2.11.6'
     compileOnly 'org.xerial:sqlite-jdbc:3.46.1.0'
@@ -51,7 +53,6 @@ dependencies {
     // These ensure that your 'compileOnly' dependencies are actually
     // available when you run InitTest and YamlDatabaseTest.
     testImplementation 'org.spigotmc:spigot-api:1.16.5-R0.1-SNAPSHOT'
-    testImplementation 'dev.folia:folia-api:1.20.1-R0.1-SNAPSHOT'
 
     // If FactoryValue uses Vault or PAPI classes, add them too:
     testImplementation 'com.github.MilkBowl:VaultAPI:1.7.1'
@@ -118,7 +119,7 @@ allprojects {
     plugins.withId('java') {
         java {
             toolchain {
-                languageVersion.convention(JavaLanguageVersion.of(17))
+                languageVersion.convention(JavaLanguageVersion.of(21))
             }
         }
 
