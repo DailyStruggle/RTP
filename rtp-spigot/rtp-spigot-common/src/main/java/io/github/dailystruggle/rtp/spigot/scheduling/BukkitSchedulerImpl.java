@@ -1,8 +1,13 @@
 package io.github.dailystruggle.rtp.spigot.scheduling;
 
+import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
+import io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask;
+import io.github.dailystruggle.rtp.common.RTP;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import java.util.UUID;
 
 public class BukkitSchedulerImpl implements RTPScheduler {
     private final JavaPlugin plugin;
@@ -37,6 +42,23 @@ public class BukkitSchedulerImpl implements RTPScheduler {
             ((org.bukkit.scheduler.BukkitTask) task).cancel();
         } else if (task instanceof Integer) {
             Bukkit.getScheduler().cancelTask((Integer) task);
+        }
+    }
+
+    @Override
+    public void scheduleTeleport(io.github.dailystruggle.rtp.api.entity.RTPPlayer player, io.github.dailystruggle.rtp.common.tasks.RTPRunnable task, long delayTicks) {
+        String taskId = UUID.randomUUID().toString();
+        TrackedRTPTask trackedTask = new TrackedRTPTask(task, taskId);
+        if (RTPAPI.serverAccessor != null) {
+            RTPAPI.serverAccessor.registerAction(trackedTask);
+        }
+
+        if (delayTicks < 1 && RTP.serverAccessor.isPrimaryThread()) {
+            trackedTask.run();
+        } else if (delayTicks > 0) {
+            Bukkit.getScheduler().runTaskLater(plugin, trackedTask, delayTicks);
+        } else {
+            RTP.getInstance().teleportPipeline.add(trackedTask);
         }
     }
 }

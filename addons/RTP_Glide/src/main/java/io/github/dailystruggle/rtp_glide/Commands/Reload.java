@@ -13,19 +13,20 @@ public class Reload implements CommandExecutor {
 
     /**
      * Constructor for Reload command executor
+     *
      * @param Configs the configurations instance
      */
-    public Reload( Configs Configs ) {
+    public Reload(Configs Configs) {
         this.Configs = Configs;
     }
 
     @Override
-    public boolean onCommand( CommandSender sender, Command command, String label, String[] args ) {
-        if( !sender.hasPermission( "rtp.reload") ) return false;
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (!sender.hasPermission("rtp.reload")) return false;
 
         Configs.refresh();
 
-        sender.sendMessage( "[rtp_glide] reloaded." );
+        sender.sendMessage("[rtp_glide] reloaded.");
 
         return true;
     }

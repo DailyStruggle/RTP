@@ -17,13 +17,13 @@ dependencies {
 
     compileOnly 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
     testImplementation 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
-    
+
     // Optional/Soft dependencies
     compileOnly 'com.github.MilkBowl:VaultAPI:1.7.1'
     compileOnly 'me.clip:placeholderapi:2.11.6'
     compileOnly 'org.popcraft:chunkyborder-common:1.0.70'
     compileOnly 'org.popcraft:chunky-common:1.2.217'
-    
+
     implementation 'org.bstats:bstats-bukkit:3.0.3'
     implementation 'xyz.tozymc.spigot:title-api:1.0'
 }
@@ -36,7 +36,7 @@ shadowJar {
     archiveBaseName.set('RTP')
     archiveClassifier.set('')
     archiveVersion.set(project.version.toString())
-    
+
     relocate 'org.bstats', 'io.github.dailystruggle.rtp.bstats'
     relocate 'io.github.dailystruggle.commandsapi', 'io.github.dailystruggle.rtp.commandsapi'
     relocate 'io.github.dailystruggle.effectsapi', 'io.github.dailystruggle.rtp.effectsapi'

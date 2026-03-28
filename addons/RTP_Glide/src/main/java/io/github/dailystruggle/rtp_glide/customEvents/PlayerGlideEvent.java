@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp_glide.customEvents;
 
-import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
@@ -15,10 +14,20 @@ public class PlayerGlideEvent extends Event {
 
     /**
      * Constructor for PlayerGlideEvent
+     *
      * @param player the player who started gliding
      */
-    public PlayerGlideEvent( Player player ) {
+    public PlayerGlideEvent(Player player) {
         this.player = player;
+    }
+
+    /**
+     * Get the handler list for this event
+     *
+     * @return the handler list
+     */
+    public static HandlerList getHandlerList() {
+        return HANDLERS_LIST;
     }
 
     @Override
@@ -27,15 +36,8 @@ public class PlayerGlideEvent extends Event {
     }
 
     /**
-     * Get the handler list for this event
-     * @return the handler list
-     */
-    public static HandlerList getHandlerList() {
-        return HANDLERS_LIST;
-    }
-
-    /**
      * Get the player involved in the event
+     *
      * @return the player
      */
     public Player getPlayer() {

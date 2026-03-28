@@ -5,4 +5,4 @@ api-version: 1.17
 authors: [ leaf26 ]
 description: Add Domain's location check to RTP
 website: https://io.github.com/DailyStruggle
-depend: [RTP,Domain]
+depend: [ RTP,Domain ]

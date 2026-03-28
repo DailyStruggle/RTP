@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
+import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.api.world.RTPChunk;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -28,68 +28,71 @@ public final class ChunkSet {
 
     /**
      * Constructor for ChunkSet
-     * @param chunks the list of futures for the chunks
+     *
+     * @param chunks   the list of futures for the chunks
      * @param complete the future that completes when all chunks are loaded
      */
-    public ChunkSet( List<CompletableFuture<Long>> chunks, CompletableFuture<Boolean> complete ) {
+    public ChunkSet(List<CompletableFuture<Long>> chunks, CompletableFuture<Boolean> complete) {
         this.chunks = chunks;
         this.complete = complete;
 
         AtomicLong count = new AtomicLong();
-        Semaphore countAccess = new Semaphore( 1 );
-        chunks.forEach( rtpChunkCompletableFuture -> rtpChunkCompletableFuture.thenAccept( rtpChunk -> {
+        Semaphore countAccess = new Semaphore(1);
+        chunks.forEach(rtpChunkCompletableFuture -> rtpChunkCompletableFuture.thenAccept(rtpChunk -> {
             try {
                 countAccess.acquire();
                 long i = count.incrementAndGet();
-                if ( i == chunks.size() ) {
-                    this.complete.complete( true );
+                if (i == chunks.size()) {
+                    this.complete.complete(true);
                 }
-            } catch ( InterruptedException e ) {
-                RTP.log( Level.WARNING, e.getMessage(), e );
+            } catch (InterruptedException e) {
+                RTP.log(Level.WARNING, e.getMessage(), e);
             } finally {
                 countAccess.release();
             }
-        }) );
+        }));
     }
 
     /**
      * Set whether the chunks in the set should be kept loaded
+     *
      * @param keep true to keep loaded, false otherwise
      */
-    public void keep( boolean keep, RTPWorld<?> world ) {
-        chunks.forEach( chunk -> {
-            if ( chunk.isDone() ) {
+    public void keep(boolean keep, RTPWorld<?> world) {
+        chunks.forEach(chunk -> {
+            if (chunk.isDone()) {
                 try {
                     Long key = chunk.get();
-                    RTPChunk<?> rtpChunk = world.getCachedChunk( key );
-                    if( rtpChunk != null ) rtpChunk.keep( keep );
-                } catch ( InterruptedException | ExecutionException e ) {
-                    RTP.log( Level.WARNING, e.getMessage(), e );
+                    RTPChunk<?> rtpChunk = world.getCachedChunk(key);
+                    if (rtpChunk != null) rtpChunk.keep(keep);
+                } catch (InterruptedException | ExecutionException e) {
+                    RTP.log(Level.WARNING, e.getMessage(), e);
                 }
             } else {
-                chunk.thenAccept( key -> {
-                    RTPChunk<?> rtpChunk = world.getCachedChunk( key );
-                    if( rtpChunk != null ) rtpChunk.keep( keep );
+                chunk.thenAccept(key -> {
+                    RTPChunk<?> rtpChunk = world.getCachedChunk(key);
+                    if (rtpChunk != null) rtpChunk.keep(keep);
                 });
             }
-        } );
+        });
     }
 
     /**
      * Perform an action when all chunks are loaded
+     *
      * @param consumer the action to perform
      */
-    public void whenComplete( Consumer<Boolean> consumer ) {
-        if ( complete.isDone() ) {
+    public void whenComplete(Consumer<Boolean> consumer) {
+        if (complete.isDone()) {
             try {
-                consumer.accept( complete.get() );
-            } catch ( InterruptedException | ExecutionException e ) {
-                RTP.log( Level.WARNING, e.getMessage(), e );
+                consumer.accept(complete.get());
+            } catch (InterruptedException | ExecutionException e) {
+                RTP.log(Level.WARNING, e.getMessage(), e);
             }
             return;
         }
 
-        complete.thenAccept( consumer );
+        complete.thenAccept(consumer);
     }
 }
 

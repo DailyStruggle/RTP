@@ -1,10 +1,21 @@
 plugins {
     id 'java'
     id 'com.gradleup.shadow' version '8.3.8' apply false
+    id 'com.diffplug.spotless' version '6.25.0'
 }
 
 group = 'io.github.dailystruggle'
 version = '2.0.18'
+
+spotless {
+    java {
+        target 'rtp-*/**/*.java', 'addons/**/*.java'
+        googleJavaFormat()
+        removeUnusedImports()
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+}
 
 allprojects {
     repositories {

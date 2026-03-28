@@ -22,7 +22,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
-import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -36,125 +35,123 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public abstract class AbstractServerAccessor implements RTPServerAccessor {
+    protected static final Pattern versionPattern = Pattern.compile("[-+^.a-zA-Z]*", Pattern.CASE_INSENSITIVE);
     protected final Map<UUID, RTPWorld<?>> worldMap = new ConcurrentHashMap<>();
     protected final Map<String, RTPWorld<?>> worldMapStr = new ConcurrentHashMap<>();
     protected Function<String, Shape<?>> shapeFunction;
     protected String version = null;
     protected Integer intVersion = null;
     protected Function<RTPWorld<?>, Set<String>> biomes = BukkitRTPWorld::getBiomes;
-
     protected Function<String, WorldBorder> worldBorderFunction = s -> {
-        RTPWorld<?> rtpWorld = getRTPWorld( s );
-        if ( rtpWorld instanceof BukkitRTPWorld ) {
-            World world = ( (BukkitRTPWorld ) rtpWorld ).world();
+        RTPWorld<?> rtpWorld = getRTPWorld(s);
+        if (rtpWorld instanceof BukkitRTPWorld) {
+            World world = ((BukkitRTPWorld) rtpWorld).world();
             org.bukkit.WorldBorder worldBorder = world.getWorldBorder();
             return new WorldBorder(
                     () -> {
                         Shape<?> shape = (Shape<?>) RTP.serverAccessor.getShape(s);
-                        if( shape == null || !shape.name.equalsIgnoreCase("SQUARE") )
+                        if (shape == null || !shape.name.equalsIgnoreCase("SQUARE"))
                             shape = (Shape<?>) RTP.factoryMap.get(RTP.factoryNames.shape).get("SQUARE");
                         Square square = (Square) shape;
-                        square.set(GenericMemoryShapeParams.radius, ((long) worldBorder.getSize()*0.9) / 32);
+                        square.set(GenericMemoryShapeParams.radius, ((long) worldBorder.getSize() * 0.9) / 32);
                         square.set(GenericMemoryShapeParams.centerRadius, 0L);
-                        square.set(GenericMemoryShapeParams.centerX,worldBorder.getCenter().getBlockX()/16);
-                        square.set(GenericMemoryShapeParams.centerZ,worldBorder.getCenter().getBlockZ()/16);
-                        square.set(GenericMemoryShapeParams.expand,false);
-                        square.set(GenericMemoryShapeParams.weight,1);
+                        square.set(GenericMemoryShapeParams.centerX, worldBorder.getCenter().getBlockX() / 16);
+                        square.set(GenericMemoryShapeParams.centerZ, worldBorder.getCenter().getBlockZ() / 16);
+                        square.set(GenericMemoryShapeParams.expand, false);
+                        square.set(GenericMemoryShapeParams.weight, 1);
                         square.set(GenericMemoryShapeParams.mode, Mode.NEAREST);
-                        square.set(GenericMemoryShapeParams.uniquePlacements,false);
+                        square.set(GenericMemoryShapeParams.uniquePlacements, false);
                         return shape;
                     },
                     rtpLocation -> {
-                        if ( getServerIntVersion() > 10 )
-                            return worldBorder.isInside( new Location( world, rtpLocation.x(), rtpLocation.y(), rtpLocation.z()) );
+                        if (getServerIntVersion() > 10)
+                            return worldBorder.isInside(new Location(world, rtpLocation.x(), rtpLocation.y(), rtpLocation.z()));
                         Location center = worldBorder.getCenter();
                         double radius = worldBorder.getSize() / 2;
-                        RTPLocation c = new RTPLocation( rtpWorld, center.getBlockX(), center.getBlockY(), center.getBlockZ() );
-                        return c.distanceSquaredXZ( rtpLocation ) < Math.pow( radius, 2 );
-                    } );
+                        RTPLocation c = new RTPLocation(rtpWorld, center.getBlockX(), center.getBlockY(), center.getBlockZ());
+                        return c.distanceSquaredXZ(rtpLocation) < Math.pow(radius, 2);
+                    });
         }
         return null;
     };
 
     public AbstractServerAccessor() {
         shapeFunction = s -> {
-            World world = Bukkit.getWorld( s );
-            if ( world == null ) return null;
-            Region region = RTP.selectionAPI.getRegion( getRTPWorld( world.getUID()) );
-            if ( region == null ) throw new IllegalStateException();
-            Object o = region.getData( RegionKeys.shape );
-            if ( !(o instanceof Shape<?>) ) throw new IllegalStateException();
-            return ( Shape<?> ) o;
+            World world = Bukkit.getWorld(s);
+            if (world == null) return null;
+            Region region = RTP.selectionAPI.getRegion(getRTPWorld(world.getUID()));
+            if (region == null) throw new IllegalStateException();
+            Object o = region.getData(RegionKeys.shape);
+            if (!(o instanceof Shape<?>)) throw new IllegalStateException();
+            return (Shape<?>) o;
         };
     }
 
-    protected static final Pattern versionPattern = Pattern.compile( "[-+^.a-zA-Z]*",Pattern.CASE_INSENSITIVE );
     @Override
     public @NotNull String getServerVersion() {
-        if ( version == null ) {
+        if (version == null) {
             version = Bukkit.getServer().getClass().getPackage().getName();
-            if(!version.contains("1_")) {
+            if (!version.contains("1_")) {
                 String bukkitVersion = Bukkit.getServer().getBukkitVersion();
                 int end = bukkitVersion.indexOf("-R");
-                if(end < 0) return "1_13_2";
-                bukkitVersion = bukkitVersion.substring(0,end).replaceAll("\\.","_");
+                if (end < 0) return "1_13_2";
+                bukkitVersion = bukkitVersion.substring(0, end).replaceAll("\\.", "_");
                 return bukkitVersion;
-            }
-            else version = versionPattern.matcher( version ).replaceAll( "" );
+            } else version = versionPattern.matcher(version).replaceAll("");
         }
         return version;
     }
 
     @Override
     public @NotNull Integer getServerIntVersion() {
-        if ( intVersion == null ) {
+        if (intVersion == null) {
             String v = getServerVersion();
-            if ( v.contains( "1_13" ) ) intVersion = 13;
-            else if ( v.contains( "1_14" ) ) intVersion = 14;
-            else if ( v.contains( "1_15" ) ) intVersion = 15;
-            else if ( v.contains( "1_16" ) ) intVersion = 16;
-            else if ( v.contains( "1_17" ) ) intVersion = 17;
-            else if ( v.contains( "1_18" ) ) intVersion = 18;
-            else if ( v.contains( "1_19" ) ) intVersion = 19;
-            else if ( v.contains( "1_20" ) ) intVersion = 20;
-            else if ( v.contains( "1_21" ) ) intVersion = 21;
-            else if ( v.contains( "26_1" ) ) intVersion = 26;
+            if (v.contains("1_13")) intVersion = 13;
+            else if (v.contains("1_14")) intVersion = 14;
+            else if (v.contains("1_15")) intVersion = 15;
+            else if (v.contains("1_16")) intVersion = 16;
+            else if (v.contains("1_17")) intVersion = 17;
+            else if (v.contains("1_18")) intVersion = 18;
+            else if (v.contains("1_19")) intVersion = 19;
+            else if (v.contains("1_20")) intVersion = 20;
+            else if (v.contains("1_21")) intVersion = 21;
+            else if (v.contains("26_1")) intVersion = 26;
             else intVersion = 13;
         }
         return intVersion;
     }
 
     @Override
-    public @Nullable RTPWorld<?> getRTPWorld( String name ) {
-        if ( worldMapStr.containsKey( name ) ) {
-            RTPWorld<?> rtpWorld = worldMapStr.get( name );
-            if ( rtpWorld.isInactive() ) {
-                worldMapStr.remove( name );
-                worldMap.remove( rtpWorld.id() );
+    public @Nullable RTPWorld<?> getRTPWorld(String name) {
+        if (worldMapStr.containsKey(name)) {
+            RTPWorld<?> rtpWorld = worldMapStr.get(name);
+            if (rtpWorld.isInactive()) {
+                worldMapStr.remove(name);
+                worldMap.remove(rtpWorld.id());
             } else return rtpWorld;
         }
-        World world = Bukkit.getWorld( name );
-        if ( world == null ) return null;
-        RTPWorld<?> rtpWorld = new BukkitRTPWorld( world );
-        worldMap.put( world.getUID(), rtpWorld );
-        worldMapStr.put( name, rtpWorld );
+        World world = Bukkit.getWorld(name);
+        if (world == null) return null;
+        RTPWorld<?> rtpWorld = new BukkitRTPWorld(world);
+        worldMap.put(world.getUID(), rtpWorld);
+        worldMapStr.put(name, rtpWorld);
         return rtpWorld;
     }
 
     @Override
-    public @Nullable RTPWorld<?> getRTPWorld( UUID id ) {
-        if ( worldMap.containsKey( id ) ) {
-            RTPWorld<?> rtpWorld = worldMap.get( id );
-            if ( rtpWorld.isInactive() ) {
-                worldMap.remove( id );
-                worldMapStr.remove( rtpWorld.name() );
+    public @Nullable RTPWorld<?> getRTPWorld(UUID id) {
+        if (worldMap.containsKey(id)) {
+            RTPWorld<?> rtpWorld = worldMap.get(id);
+            if (rtpWorld.isInactive()) {
+                worldMap.remove(id);
+                worldMapStr.remove(rtpWorld.name());
             } else return rtpWorld;
         }
-        World world = Bukkit.getWorld( id );
-        if ( world == null ) return null;
-        RTPWorld<?> rtpWorld = new BukkitRTPWorld( world );
-        worldMap.put( id, rtpWorld );
-        worldMapStr.put( world.getName(), rtpWorld );
+        World world = Bukkit.getWorld(id);
+        if (world == null) return null;
+        RTPWorld<?> rtpWorld = new BukkitRTPWorld(world);
+        worldMap.put(id, rtpWorld);
+        worldMapStr.put(world.getName(), rtpWorld);
         return rtpWorld;
     }
 
@@ -162,8 +159,8 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
     public abstract @NotNull io.github.dailystruggle.rtp.api.world.RTPChunkManager getChunkManager();
 
     @Override
-    public @Nullable Object getShape( String name ) {
-        return shapeFunction.apply( name );
+    public @Nullable Object getShape(String name) {
+        return shapeFunction.apply(name);
     }
 
     @Override
@@ -172,35 +169,35 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
     }
 
     @Override
-    public @Nullable Object getWorldBorder( String worldName ) {
-        return worldBorderFunction.apply( worldName );
+    public @Nullable Object getWorldBorder(String worldName) {
+        return worldBorderFunction.apply(worldName);
     }
 
     @Override
     public @NotNull List<RTPWorld<?>> getRTPWorlds() {
-        return Bukkit.getWorlds().stream().map( world -> getRTPWorld( world.getUID() ) ).collect( Collectors.toList() );
+        return Bukkit.getWorlds().stream().map(world -> getRTPWorld(world.getUID())).collect(Collectors.toList());
     }
 
     @Override
-    public @Nullable RTPPlayer getPlayer( UUID uuid ) {
-        Player player = Bukkit.getPlayer( uuid );
-        if ( player == null ) return null;
-        return new BukkitRTPPlayer( player );
+    public @Nullable RTPPlayer getPlayer(UUID uuid) {
+        Player player = Bukkit.getPlayer(uuid);
+        if (player == null) return null;
+        return new BukkitRTPPlayer(player);
     }
 
     @Override
-    public @Nullable RTPPlayer getPlayer( String name ) {
-        Player player = Bukkit.getPlayer( name );
-        if ( player == null ) return null;
-        return new BukkitRTPPlayer( player );
+    public @Nullable RTPPlayer getPlayer(String name) {
+        Player player = Bukkit.getPlayer(name);
+        if (player == null) return null;
+        return new BukkitRTPPlayer(player);
     }
 
     @Override
-    public @NotNull RTPCommandSender getSender( UUID uuid ) {
-        if ( uuid.equals( RTPAPI.serverId ) ) return new BukkitRTPCommandSender( Bukkit.getConsoleSender() );
-        Player player = Bukkit.getPlayer( uuid );
-        if ( player == null ) return new BukkitRTPCommandSender( Bukkit.getConsoleSender() );
-        return new BukkitRTPPlayer( player );
+    public @NotNull RTPCommandSender getSender(UUID uuid) {
+        if (uuid.equals(RTPAPI.serverId)) return new BukkitRTPCommandSender(Bukkit.getConsoleSender());
+        Player player = Bukkit.getPlayer(uuid);
+        if (player == null) return new BukkitRTPCommandSender(Bukkit.getConsoleSender());
+        return new BukkitRTPPlayer(player);
     }
 
     @Override
@@ -210,83 +207,83 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
     @Override
     public @NotNull File getPluginDirectory() {
-        return Bukkit.getPluginManager().getPlugin( "RTP" ).getDataFolder();
+        return Bukkit.getPluginManager().getPlugin("RTP").getDataFolder();
     }
 
     @Override
-    public void sendMessage( UUID target, MessagesKeys msgType ) {
-        if ( target.equals( RTPAPI.serverId ) ) {
-            SendMessage.sendMessage( Bukkit.getConsoleSender(), msgType );
+    public void sendMessage(UUID target, MessagesKeys msgType) {
+        if (target.equals(RTPAPI.serverId)) {
+            SendMessage.sendMessage(Bukkit.getConsoleSender(), msgType);
             return;
         }
-        Player player = Bukkit.getPlayer( target );
-        if ( player != null ) SendMessage.sendMessage( player, msgType );
+        Player player = Bukkit.getPlayer(target);
+        if (player != null) SendMessage.sendMessage(player, msgType);
     }
 
     @Override
-    public void sendMessage( UUID target1, UUID target2, MessagesKeys msgType ) {
-        OfflinePlayer player1 = Bukkit.getOfflinePlayer( target1 );
-        OfflinePlayer player2 = Bukkit.getOfflinePlayer( target2 );
-        if ( target1.equals( RTPAPI.serverId ) ) {
-            SendMessage.sendMessage( Bukkit.getConsoleSender(), player2, msgType );
+    public void sendMessage(UUID target1, UUID target2, MessagesKeys msgType) {
+        OfflinePlayer player1 = Bukkit.getOfflinePlayer(target1);
+        OfflinePlayer player2 = Bukkit.getOfflinePlayer(target2);
+        if (target1.equals(RTPAPI.serverId)) {
+            SendMessage.sendMessage(Bukkit.getConsoleSender(), player2, msgType);
         } else {
-            Player p1 = Bukkit.getPlayer( target1 );
-            if ( p1 != null ) SendMessage.sendMessage( p1, player2, msgType );
+            Player p1 = Bukkit.getPlayer(target1);
+            if (p1 != null) SendMessage.sendMessage(p1, player2, msgType);
         }
     }
 
     @Override
-    public void sendMessage( UUID target, String message ) {
-        if ( target.equals( RTPAPI.serverId ) ) {
-            SendMessage.sendMessage( Bukkit.getConsoleSender(), message );
+    public void sendMessage(UUID target, String message) {
+        if (target.equals(RTPAPI.serverId)) {
+            SendMessage.sendMessage(Bukkit.getConsoleSender(), message);
             return;
         }
-        Player player = Bukkit.getPlayer( target );
-        if ( player != null ) SendMessage.sendMessage( player, message );
+        Player player = Bukkit.getPlayer(target);
+        if (player != null) SendMessage.sendMessage(player, message);
     }
 
     @Override
-    public void sendMessageAndSuggest( UUID target, String message, String suggestion ) {
+    public void sendMessageAndSuggest(UUID target, String message, String suggestion) {
         // Implementation
     }
 
     @Override
-    public void sendMessage( UUID target1, UUID target2, String message ) {
-        OfflinePlayer player2 = Bukkit.getOfflinePlayer( target2 );
-        if ( target1.equals( RTPAPI.serverId ) ) {
-            SendMessage.sendMessage( Bukkit.getConsoleSender(), player2, message );
+    public void sendMessage(UUID target1, UUID target2, String message) {
+        OfflinePlayer player2 = Bukkit.getOfflinePlayer(target2);
+        if (target1.equals(RTPAPI.serverId)) {
+            SendMessage.sendMessage(Bukkit.getConsoleSender(), player2, message);
         } else {
-            Player p1 = Bukkit.getPlayer( target1 );
-            if ( p1 != null ) SendMessage.sendMessage( p1, player2, message );
+            Player p1 = Bukkit.getPlayer(target1);
+            if (p1 != null) SendMessage.sendMessage(p1, player2, message);
         }
     }
 
     @Override
-    public void log( Level level, String msg ) {
-        Bukkit.getLogger().log( level, msg );
+    public void log(Level level, String msg) {
+        Bukkit.getLogger().log(level, msg);
     }
 
     @Override
-    public void log( Level level, String msg, Throwable throwable ) {
-        Bukkit.getLogger().log( level, msg, throwable );
+    public void log(Level level, String msg, Throwable throwable) {
+        Bukkit.getLogger().log(level, msg, throwable);
     }
 
     @Override
-    public void announce( String msg, String permission ) {
-        Bukkit.broadcast( msg, permission );
-        if ( !permission.equalsIgnoreCase( "rtp.see" ) ) {
-            Bukkit.getConsoleSender().sendMessage( msg );
+    public void announce(String msg, String permission) {
+        Bukkit.broadcast(msg, permission);
+        if (!permission.equalsIgnoreCase("rtp.see")) {
+            Bukkit.getConsoleSender().sendMessage(msg);
         }
     }
 
     @Override
-    public @NotNull Set<String> getBiomes( RTPWorld<?> rtpWorld ) {
-        return biomes.apply( rtpWorld );
+    public @NotNull Set<String> getBiomes(RTPWorld<?> rtpWorld) {
+        return biomes.apply(rtpWorld);
     }
 
     @Override
     public @NotNull Set<String> materials() {
-        return Arrays.stream( Material.values() ).map( material -> material.name().toUpperCase() ).collect( Collectors.toSet() );
+        return Arrays.stream(Material.values()).map(material -> material.name().toUpperCase()).collect(Collectors.toSet());
     }
 
     @Override
@@ -300,27 +297,27 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
     }
 
     @Override
-    public boolean setShapeFunction( Function<String, ?> shapeFunction ) {
-        this.shapeFunction = ( Function<String, Shape<?>> ) shapeFunction;
+    public boolean setShapeFunction(Function<String, ?> shapeFunction) {
+        this.shapeFunction = (Function<String, Shape<?>>) shapeFunction;
         return true;
     }
 
     @Override
-    public boolean setWorldBorderFunction( Function<String, ?> function ) {
-        this.worldBorderFunction = ( Function<String, WorldBorder> ) function;
+    public boolean setWorldBorderFunction(Function<String, ?> function) {
+        this.worldBorderFunction = (Function<String, WorldBorder>) function;
         return true;
     }
 
     @Override
-    public void setBiomeGetter( Function<RTPLocation, String> getter ) {
-        BukkitRTPWorld.setBiomeGetter( location -> getter.apply( new RTPLocation(
-                getRTPWorld( location.world().id() ),
-                location.x(), location.y(), location.z() ) ) );
+    public void setBiomeGetter(Function<RTPLocation, String> getter) {
+        BukkitRTPWorld.setBiomeGetter(location -> getter.apply(new RTPLocation(
+                getRTPWorld(location.world().id()),
+                location.x(), location.y(), location.z())));
     }
 
     @Override
-    public void setBiomesGetter( Function<RTPWorld<?>, Set<String>> getter ) {
+    public void setBiomesGetter(Function<RTPWorld<?>, Set<String>> getter) {
         this.biomes = getter;
-        BukkitRTPWorld.setBiomesGetter( getter );
+        BukkitRTPWorld.setBiomesGetter(getter);
     }
 }
