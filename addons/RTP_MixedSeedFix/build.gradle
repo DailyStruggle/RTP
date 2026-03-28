@@ -17,16 +17,26 @@ repositories {
 }
 
 dependencies {
-    compileOnly project(':')
+    compileOnly project(':rtp-api')
+    compileOnly project(':rtp-core')
+    compileOnly project(':rtp-spigot-v1_20_R1')
+    compileOnly project(':rtp-paper-v1_20_R1')
     compileOnly 'io.papermc:paperlib:1.0.7'
     compileOnly 'org.spigotmc:spigot-api:1.16.5-R0.1-SNAPSHOT'
+}
+
+test {
+    useJUnitPlatform()
 }
 
 shadowJar {
     relocate 'io.papermc.lib', 'io.github.dailystruggle.rtp.paperlib'
 
     dependencies {
-        exclude(project(':'))
+        exclude(project(':rtp-api'))
+        exclude(project(':rtp-core'))
+        exclude(project(':rtp-spigot-v1_20_R1'))
+        exclude(project(':rtp-paper-v1_20_R1'))
     }
 
     archiveClassifier.set('') // Use the standard jar name

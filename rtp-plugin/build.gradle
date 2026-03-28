@@ -1,0 +1,46 @@
+plugins {
+    id 'java'
+    id 'com.gradleup.shadow'
+}
+
+dependencies {
+    implementation project(':rtp-core')
+    implementation project(':rtp-spigot-v1_20_R1')
+    implementation project(':rtp-paper-v1_20_R1')
+    implementation project(':rtp-spigot-v1_21_R1')
+    implementation project(':rtp-paper-v1_21_R1')
+    implementation 'io.github.dailystruggle:CommandsAPI:1.0.0-RELEASE'
+    implementation 'io.github.dailystruggle:EffectsAPI:1.0.1-BETA01'
+
+    compileOnly 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
+    testImplementation 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
+    
+    // Optional/Soft dependencies
+    compileOnly 'com.github.MilkBowl:VaultAPI:1.7.1'
+    compileOnly 'me.clip:placeholderapi:2.11.6'
+    compileOnly 'org.popcraft:chunkyborder-common:1.0.70'
+    compileOnly 'org.popcraft:chunky-common:1.2.217'
+    
+    implementation 'org.bstats:bstats-bukkit:3.0.3'
+    implementation 'xyz.tozymc.spigot:title-api:1.0'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+shadowJar {
+    archiveBaseName.set('RTP')
+    archiveClassifier.set('')
+    archiveVersion.set(project.version.toString())
+    
+    relocate 'org.bstats', 'io.github.dailystruggle.rtp.bstats'
+    relocate 'io.github.dailystruggle.commandsapi', 'io.github.dailystruggle.rtp.commandsapi'
+    relocate 'io.github.dailystruggle.effectsapi', 'io.github.dailystruggle.rtp.effectsapi'
+    relocate 'org.yaml.snakeyaml', 'io.github.dailystruggle.rtp.snakeyaml'
+    relocate 'me.carleslc.Simple-YAML', 'io.github.dailystruggle.rtp.Simple-Yaml'
+}
+
+artifacts {
+    archives shadowJar
+}

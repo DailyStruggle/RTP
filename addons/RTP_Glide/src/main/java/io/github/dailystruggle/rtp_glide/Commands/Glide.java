@@ -15,6 +15,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
 import java.util.logging.Level;
 
+/**
+ * Command executor for the /glide command
+ */
 public class Glide implements CommandExecutor {
     private final RTP_Glide plugin;
     private final Configs configs;
@@ -23,6 +26,11 @@ public class Glide implements CommandExecutor {
     private final Map<String,String> glideParams = new ConcurrentHashMap<>();
     private final Map<String,CommandExecutor> commandHandles = new ConcurrentHashMap<>();
 
+    /**
+     * Constructor for Glide command executor
+     * @param plugin the plugin instance
+     * @param Configs the configurations instance
+     */
     public Glide( RTP_Glide plugin, Configs Configs ) {
         this.plugin = plugin;
         this.configs = Configs;
@@ -30,6 +38,12 @@ public class Glide implements CommandExecutor {
         this.glideParams.put( "player", "rtp.other" );
     }
 
+    /**
+     * Add a subcommand handle
+     * @param command the subcommand name
+     * @param perm the permission required
+     * @param handle the command executor for the subcommand
+     */
     public void addCommandHandle( String command, String perm, CommandExecutor handle ) {
         commandHandles.put( command,handle );
         glideCommands.put( command,perm );
@@ -79,3 +93,5 @@ public class Glide implements CommandExecutor {
         return true;
     }
 }
+
+

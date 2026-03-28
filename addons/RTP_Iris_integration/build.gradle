@@ -20,10 +20,17 @@ repositories {
 
 dependencies {
     compileOnly 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
-    compileOnly project(':')
+    compileOnly project(':rtp-api')
+    compileOnly project(':rtp-core')
+    compileOnly project(':rtp-spigot-v1_20_R1')
+    compileOnly project(':rtp-paper-v1_20_R1')
 
     implementation 'io.github.dailystruggle:CommandsAPI:1.0.0-RELEASE'
 
     // Binds the local jar file to the compile classpath
     compileOnly files('lib/Iris-3.9.1-1.20.1-1.21.11.jar')
+}
+
+test {
+    useJUnitPlatform()
 }

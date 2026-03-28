@@ -1,17 +1,25 @@
 package io.github.dailystruggle.rtp;
 
-import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
+
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
+import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.softdepends.*;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.plugin.java.JavaPlugin;
 
+/**
+ * Main class for RTPClaimPluginIntegrations addon
+ */
 public final class RTPClaimPluginIntegrations extends JavaPlugin {
+    /**
+     * Default constructor for RTPClaimPluginIntegrations
+     */
+    public RTPClaimPluginIntegrations() {
+    }
 
     @Override
     public void onEnable() {
@@ -33,9 +41,9 @@ public final class RTPClaimPluginIntegrations extends JavaPlugin {
 
         Region.addGlobalRegionVerifier( rtpLocation -> {
             RTPWorld rtpWorld = rtpLocation.world();
-            if( !(rtpWorld instanceof BukkitRTPWorld bukkitRTPWorld) ) return false;
+            org.bukkit.World world = org.bukkit.Bukkit.getWorld( rtpWorld.id() );
+            if( world == null ) return false;
             if( !rtpWorld.isActive() ) return false;
-            World world = bukkitRTPWorld.world();
             Location location = new Location( world, rtpLocation.x(), rtpLocation.y(), rtpLocation.z() );
 
             boolean res = true;
@@ -76,3 +84,5 @@ public final class RTPClaimPluginIntegrations extends JavaPlugin {
         } );
     }
 }
+
+

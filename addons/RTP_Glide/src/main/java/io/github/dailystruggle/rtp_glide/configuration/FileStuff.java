@@ -8,8 +8,21 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.logging.Level;
 
+/**
+ * Utility class for file operations in RTP_Glide
+ */
 public class FileStuff {
+    /**
+     * Default constructor for FileStuff
+     */
+    private FileStuff() {
+    }
 
+    /**
+     * Rename configuration files (e.g. on version upgrade)
+     * @param plugin the plugin instance
+     * @param name the name of the file or directory
+     */
     public static void renameFiles( RTP_Glide plugin, String name ) {
         //load up a list of files to rename
         ArrayList<File> toRename = new ArrayList<>();
@@ -45,3 +58,5 @@ public class FileStuff {
         plugin.saveResource( name, true );
     }
 }
+
+

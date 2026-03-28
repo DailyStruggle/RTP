@@ -20,10 +20,17 @@ import java.util.ArrayList;
 import java.util.Scanner;
 import java.util.logging.Level;
 
+/**
+ * Configuration for worlds in RTP_Glide
+ */
 public class Worlds {
     private final RTP_Glide plugin;
     private FileConfiguration config;
 
+    /**
+     * Constructor for Worlds configuration
+     * @param plugin the plugin instance
+     */
     public Worlds( RTP_Glide plugin ) {
         this.plugin = plugin;
 
@@ -42,6 +49,9 @@ public class Worlds {
         update();
     }
 
+    /**
+     * Update the worlds configuration file with any new worlds
+     */
     public void update() {
         ArrayList<String> linesInWorlds = new ArrayList<>();
         int defaultRelative = config.getConfigurationSection( "default" ).getInt( "relative",75 );
@@ -105,11 +115,23 @@ public class Worlds {
         config = YamlConfiguration.loadConfiguration( new File( plugin.getDataFolder(), "worlds/default.yml") );
     }
 
+    /**
+     * Get a setting for a world
+     * @param worldName the name of the world
+     * @param name the name of the setting
+     * @param def the default value
+     * @return the setting value
+     */
     public Object getWorldSetting( String worldName, String name, Object def ) {
         if( !config.contains( worldName) ) return def;
         return this.config.getConfigurationSection( worldName ).get( name,def );
     }
 
+    /**
+     * Check if a world exists and update configuration if it's new
+     * @param worldName the name of the world
+     * @return true if world exists, false otherwise
+     */
     public Boolean checkWorldExists( String worldName ) {
         if( worldName == null ) return false;
         Boolean bukkitWorldExists = Bukkit.getWorld( worldName )!=null;
@@ -126,3 +148,5 @@ public class Worlds {
         return true;
     }
 }
+
+

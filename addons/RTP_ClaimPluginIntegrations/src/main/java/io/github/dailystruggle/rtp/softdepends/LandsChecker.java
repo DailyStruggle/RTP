@@ -9,9 +9,16 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.util.Objects;
 import java.util.logging.Level;
 
+/**
+ * Checker for Lands claims
+ */
 public class LandsChecker {
     private static LandsIntegration landsIntegration = null;
 
+    /**
+     * Setup Lands integration
+     * @param yourPlugin the plugin instance
+     */
     public static void landsSetup( Plugin yourPlugin ) {
         try {
             landsIntegration = new LandsIntegration( yourPlugin );
@@ -22,6 +29,12 @@ public class LandsChecker {
     }
 
     private static boolean exists = true;
+
+    /**
+     * Check if a location is within a Lands claim
+     * @param location the location to check
+     * @return true if in a claim, false otherwise
+     */
     public static Boolean isInClaim( org.bukkit.Location location ) {
         if( exists ) {
             try {
@@ -39,3 +52,5 @@ public class LandsChecker {
         return false;
     }
 }
+
+

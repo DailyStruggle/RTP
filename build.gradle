@@ -1,175 +1,45 @@
 plugins {
     id 'java'
-    id 'com.gradleup.shadow' version '8.3.8'
-    id 'application'
-    id 'org.openjfx.javafxplugin' version '0.1.0'
+    id 'com.gradleup.shadow' version '8.3.8' apply false
 }
 
 group = 'io.github.dailystruggle'
 version = '2.0.18'
 
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+allprojects {
+    repositories {
+        mavenCentral()
+        maven { url 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
+        maven { url 'https://repo.papermc.io/repository/maven-public/' }
+        maven { url 'https://repo.extendedclip.com/content/repositories/placeholderapi/' }
+        maven { url 'https://jitpack.io' }
+        maven { url 'https://repo.codemc.io/repository/maven-public/' }
     }
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
-    withSourcesJar()
-    withJavadocJar()
-}
-
-// Translate <repositories>
-repositories {
-    mavenCentral()
-    maven { url 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
-    maven { url 'https://repo.papermc.io/repository/maven-public/' }
-    maven { url 'https://repo.extendedclip.com/content/repositories/placeholderapi/' }
-    maven { url 'https://jitpack.io' }
-    maven { url 'https://repo.codemc.io/repository/maven-public/' }
-}
-
-// Translate <dependencies>
-dependencies {
-    // Provided Dependencies (Compile Only)
-    compileOnly 'org.spigotmc:spigot-api:1.16.5-R0.1-SNAPSHOT'
-    compileOnly 'com.github.MilkBowl:VaultAPI:1.7.1'
-    compileOnly 'me.clip:placeholderapi:2.11.6'
-    compileOnly 'org.xerial:sqlite-jdbc:3.46.1.0'
-    compileOnly 'org.popcraft:chunkyborder-common:1.0.70'
-    compileOnly 'org.popcraft:chunky-common:1.2.217'
-
-    // Compile Dependencies (Implementation/Shaded)
-    implementation 'org.yaml:snakeyaml:2.3'
-    implementation('me.carleslc.Simple-YAML:Simple-Yaml:1.8.4') {
-        exclude group: 'org.yaml', module: 'snakeyaml'
-    }
-    implementation 'org.bstats:bstats-bukkit:3.0.3'
-    implementation 'io.papermc:paperlib:1.0.7'
-    implementation 'io.github.dailystruggle:CommandsAPI:1.0.0-RELEASE'
-    implementation 'io.github.dailystruggle:EffectsAPI:1.0.1-BETA01'
-    implementation 'xyz.tozymc.spigot:title-api:1.0'
-
-    // --- Provided Dependencies for Tests ---
-    // These ensure that your 'compileOnly' dependencies are actually
-    // available when you run InitTest and YamlDatabaseTest.
-    testImplementation 'org.spigotmc:spigot-api:1.16.5-R0.1-SNAPSHOT'
-
-    // If FactoryValue uses Vault or PAPI classes, add them too:
-    testImplementation 'com.github.MilkBowl:VaultAPI:1.7.1'
-    testImplementation 'me.clip:placeholderapi:2.11.6'
-
-    // --- Standard Test Setup (Keep these) ---
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.11.0'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-    testImplementation 'org.jetbrains:annotations:24.1.0'
-    testRuntimeOnly 'org.xerial:sqlite-jdbc:3.46.1.0'
-}
-
-// Translate maven-shade-plugin
-shadowJar {
-    relocate 'org.bstats', 'io.github.dailystruggle.rtp.bstats'
-    relocate 'io.papermc.lib', 'io.github.dailystruggle.rtp.paperlib'
-    relocate 'io.github.dailystruggle.commandsapi', 'io.github.dailystruggle.rtp.commandsapi'
-    relocate 'io.github.dailystruggle.effectsapi', 'io.github.dailystruggle.rtp.effectsapi'
-    relocate 'org.yaml.snakeyaml', 'io.github.dailystruggle.rtp.snakeyaml'
-    relocate 'me.carleslc.Simple-YAML', 'io.github.dailystruggle.rtp.Simple-Yaml'
-
-    // Equivalent to your artifact exclusion filters
-    dependencies {
-        exclude(dependency('io.papermc:.*'))
-        exclude(dependency('io.github.dailystruggle:CommandsAPI:.*'))
-        exclude(dependency('io.github.dailystruggle:EffectsAPI:.*'))
-    }
-
-    exclude 'org/jetbrains/**'
-    exclude 'plugin.yml'
-    exclude '*.yml'
-    exclude '*.xml'
-    exclude '*.properties'
-    exclude 'META-INF/**'
-}
-
-application {
-    // Replace this with the actual package and class name of your JavaFX Main class
-    mainClass = 'io.github.dailystruggle.rtp.Main'
-}
-
-javafx {
-    version = "17"
-    // Specify the JavaFX modules your application actually uses
-    modules = [ 'javafx.controls', 'javafx.fxml', 'javafx.graphics' ]
-}
-
-tasks.withType(JavaCompile) {
-    options.encoding = 'UTF-8'
 }
 
 subprojects {
-    // Only apply this to actual addons, not the 'addons' container folder
-    plugins.withType(JavaPlugin).configureEach {
-        dependencies {
-            // Every sub-addon now sees the root project by default
-            compileOnly project(':')
-        }
-    }
-}
+    apply plugin: 'java-library'
 
-allprojects {
-    // This block ONLY triggers for projects that actually have the 'java' plugin
-    plugins.withId('java') {
-        java {
-            toolchain {
-                languageVersion.convention(JavaLanguageVersion.of(21))
-            }
-        }
-
-        repositories {
-            mavenCentral()
-            maven { url 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
-            maven { url 'https://repo.papermc.io/repository/maven-public/' }          // For paper-api
-            maven { url 'https://maven.enginehub.org/repo/' }                       // For WorldGuard/WorldEdit
-            maven { url 'https://repo.spongepowered.org/repository/maven-public/' } // For Configurate
-            maven { url 'https://jitpack.io' }
-            maven { url 'https://repo.codemc.io/repository/maven-public/' }
-        }
-
-        dependencies {
-            // Using add() is safer in complex builds than the shorthand method call
-            add('testImplementation', 'org.junit.jupiter:junit-jupiter-api:5.11.0')
-            add('testRuntimeOnly', 'org.junit.jupiter:junit-jupiter-engine:5.11.0')
-            add('testImplementation', 'org.jetbrains:annotations:24.1.0')
-            add('testRuntimeOnly', 'org.xerial:sqlite-jdbc:3.46.1.0')
-        }
-
-        configurations.configureEach {
-            resolutionStrategy {
-                // Force Java 17 compatible versions for everyone
-                force 'com.sk89q.worldguard:worldguard-bukkit:7.0.9'
-                force 'com.sk89q.worldedit:worldedit-bukkit:7.2.15'
-                force 'com.sk89q.worldedit:worldedit-core:7.2.15'
-            }
-        }
-
-        tasks.withType(Test).configureEach {
-            useJUnitPlatform()
-            failOnNoDiscoveredTests = false
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(21)
         }
     }
 
-    tasks.withType(JavaCompile).configureEach {
+    tasks.withType(JavaCompile) {
         options.encoding = 'UTF-8'
-        // This ensures the compiler respects the toolchain set in each subproject
     }
 
-    tasks.withType(ProcessResources).configureEach {
-        filteringCharset = 'UTF-8'
+    dependencies {
+        compileOnly 'org.jetbrains:annotations:24.1.0'
+        testImplementation platform('org.junit:junit-bom:5.10.0')
+        testImplementation 'org.junit.jupiter:junit-jupiter'
+        testImplementation 'org.mockito:mockito-core:5.5.0'
+        testImplementation 'org.jetbrains:annotations:24.1.0'
+        testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    }
 
-        filesMatching('**/*.yml') {
-            filter { String line ->
-                line.replace('${project.version}', project.version?.toString() ?: "1.0-SNAPSHOT")
-                        .replace('${project.name}', project.name?.toString() ?: project.name)
-                        .replace('${project.description}', project.description?.toString() ?: "")
-            }
-        }
+    test {
+        useJUnitPlatform()
     }
 }

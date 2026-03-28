@@ -14,7 +14,15 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentSkipListSet;
 
+/**
+ * Main class for RTP_Glide addon
+ */
 public final class RTP_Glide extends JavaPlugin {
+    /**
+     * Default constructor for RTP_Glide
+     */
+    public RTP_Glide() {
+    }
     private static final ConcurrentSkipListSet<UUID> glidingPlayers = new ConcurrentSkipListSet<>();
     private static Configs Configs;
 
@@ -42,15 +50,31 @@ public final class RTP_Glide extends JavaPlugin {
         Configs = null;
     }
 
+    /**
+     * Get the set of players currently gliding
+     * @return the set of player UUIDs
+     */
     public ConcurrentSkipListSet<UUID> getGlidingPlayers() {
         return glidingPlayers;
     }
 
+    /**
+     * Check if a player is currently gliding due to teleportation
+     * @param uuid the player's UUID
+     * @return true if gliding, false otherwise
+     */
     public static boolean isTeleportGliding( UUID uuid ) {
         return glidingPlayers.contains( uuid );
     }
 
+    /**
+     * Check if an entity is currently gliding due to teleportation
+     * @param entity the entity
+     * @return true if gliding, false otherwise
+     */
     public static boolean isTeleportGliding( Entity entity ) {
         return glidingPlayers.contains( entity.getUniqueId() );
     }
 }
+
+
