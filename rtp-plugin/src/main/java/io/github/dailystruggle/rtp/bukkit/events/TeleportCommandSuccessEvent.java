@@ -1,0 +1,41 @@
+package io.github.dailystruggle.rtp.bukkit.events;
+
+import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
+import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
+import org.bukkit.Bukkit;
+import org.bukkit.event.Event;
+import org.bukkit.event.HandlerList;
+import org.jetbrains.annotations.NotNull;
+
+public class TeleportCommandSuccessEvent extends Event {
+    private static final HandlerList HANDLERS_LIST = new HandlerList();
+    private final RTPCommandSender sender;
+    private final RTPPlayer player;
+
+    public TeleportCommandSuccessEvent( RTPCommandSender sender, RTPPlayer player ) {
+        super( !Bukkit.isPrimaryThread() );
+        this.sender = sender;
+        this.player = player;
+    }
+
+    public static HandlerList getHandlerList() {
+        return HANDLERS_LIST;
+    }
+
+    @Override
+    public @NotNull HandlerList getHandlers() {
+        return HANDLERS_LIST;
+    }
+
+    public RTPPlayer getPlayer() {
+        return player;
+    }
+
+    public RTPCommandSender getSender() {
+        return sender;
+    }
+
+
+}
+
+

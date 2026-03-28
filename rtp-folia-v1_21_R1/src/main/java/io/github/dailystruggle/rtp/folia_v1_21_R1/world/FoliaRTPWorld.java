@@ -1,0 +1,129 @@
+package io.github.dailystruggle.rtp.folia_v1_21_R1.world;
+
+import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.api.world.RTPChunk;
+import io.github.dailystruggle.rtp.api.world.RTPLocation;
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.World;
+import org.bukkit.block.Biome;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+public final class FoliaRTPWorld extends RTPWorld<World> {
+    private static final AtomicBoolean biomeException = new AtomicBoolean( false );
+    private static Function<Location, String> getBiome = location -> {
+        if( biomeException.get() ) return Biome.PLAINS.name();
+        try {
+            World world = Objects.requireNonNull( location.getWorld() );
+            int x = location.getBlockX();
+            int y = location.getBlockY();
+            int z = location.getBlockZ();
+            return world.getBiome(x, y, z).name();
+        } catch (Throwable t) {
+            return Biome.PLAINS.name();
+        }
+    };
+
+    private static @NotNull Function<RTPWorld<?>, Set<String>> getBiomes
+            = ( rtpWorld ) -> Arrays.stream( Biome.values() ).map( biome -> biome.name().toUpperCase() ).collect( Collectors.toSet() );
+
+    private final UUID id;
+    private final String name;
+
+    public FoliaRTPWorld( World world ) {
+        super( world );
+        if ( world == null ) {
+            this.id = null;
+            this.name = null;
+        } else {
+            this.id = world.getUID();
+            this.name = world.getName();
+        }
+    }
+
+    public static void setBiomeGetter( @NotNull Function<Location, String> getBiome ) {
+        FoliaRTPWorld.getBiome = getBiome;
+    }
+
+    public static void setBiomesGetter( @NotNull Function<RTPWorld<?>,Set<String>> getBiomes ) {
+        FoliaRTPWorld.getBiomes = getBiomes;
+    }
+
+    public static Set<String> getBiomes( RTPWorld<?> world ) {
+        return getBiomes.apply( world );
+    }
+
+    @Override
+    public String name() {
+        return name;
+    }
+
+    @Override
+    public UUID id() {
+        return id;
+    }
+
+    @Override
+    public CompletableFuture<RTPChunk<?>> getChunkAt( int cx, int cz ) {
+        return world.getChunkAtAsync(cx, cz, true).thenApply(chunk -> {
+            if(chunk == null) return null;
+            return new FoliaRTPChunk(chunk);
+        });
+    }
+
+    @Override
+    public void keepChunkAt( int cx, int cz ) {
+        world.setChunkForceLoaded(cx, cz, true);
+    }
+
+    @Override
+    public void forgetChunkAt( int cx, int cz ) {
+        world.setChunkForceLoaded(cx, cz, false);
+    }
+
+    @Override
+    public void forgetChunks() {
+        // Implementation
+    }
+
+    @Override
+    public String getBiome( int x, int y, int z ) {
+        return getBiome.apply(new Location(world, x, y, z));
+    }
+
+    @Override
+    public void platform( RTPLocation location ) {
+        // Implementation
+    }
+
+    @Override
+    public boolean isInactive() {
+        return Bukkit.getWorld(id) == null;
+    }
+
+    @Override
+    public boolean isForceLoaded( int cx, int cz ) {
+        return world.isChunkForceLoaded(cx, cz);
+    }
+
+    @Override
+    public void save() {
+        world.save();
+    }
+
+    @Override
+    public int getMaxHeight() {
+        return world.getMaxHeight();
+    }
+
+    @Override
+    public int getMinHeight() {
+        return world.getMinHeight();
+    }
+}

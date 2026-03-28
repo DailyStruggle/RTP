@@ -1,5 +1,10 @@
 # User-specific stuff
 .idea/
+docs/
+tmp/
+build/
+*.bin
+*.uniqueid*
 
 *.iml
 *.ipr

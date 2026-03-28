@@ -12,13 +12,24 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityToggleGlideEvent;
 
+/**
+ * Listener for entity glide toggle events
+ */
 public class OnGlideToggle implements Listener {
     private final RTP_Glide plugin;
 
+    /**
+     * Constructor for OnGlideToggle listener
+     * @param plugin the plugin instance
+     */
     public OnGlideToggle( RTP_Glide plugin ) {
         this.plugin = plugin;
     }
 
+    /**
+     * EventHandler for EntityToggleGlideEvent
+     * @param event the event
+     */
     @EventHandler( priority = EventPriority.LOWEST )
     public void onGlideToggle( EntityToggleGlideEvent event ) {
         if( !(event.getEntity() instanceof Player) ) return;
@@ -31,3 +42,5 @@ public class OnGlideToggle implements Listener {
         else event.setCancelled( true );
     }
 }
+
+

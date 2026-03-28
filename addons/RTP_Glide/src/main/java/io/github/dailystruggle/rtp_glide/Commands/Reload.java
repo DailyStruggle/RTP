@@ -5,9 +5,16 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 
+/**
+ * Command executor for the /glide reload command
+ */
 public class Reload implements CommandExecutor {
     private final Configs Configs;
 
+    /**
+     * Constructor for Reload command executor
+     * @param Configs the configurations instance
+     */
     public Reload( Configs Configs ) {
         this.Configs = Configs;
     }
@@ -23,3 +30,5 @@ public class Reload implements CommandExecutor {
         return true;
     }
 }
+
+

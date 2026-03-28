@@ -4,15 +4,15 @@ import com.volmit.iris.core.tools.IrisToolbelt;
 import com.volmit.iris.engine.object.IrisBiome;
 import com.volmit.iris.engine.platform.PlatformChunkGenerator;
 import com.volmit.iris.util.collection.KList;
-import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
+
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
-import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPCommandSender;
-import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPPlayer;
-import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
+import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
+import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
+import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.block.Biome;
@@ -22,7 +22,13 @@ import java.util.logging.Level;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+/**
+ * Command parameter for Iris biomes
+ */
 public class IrisBiomeParameter extends CommandParameter {
+    /**
+     * Default constructor for IrisBiomeParameter
+     */
     public IrisBiomeParameter() {
         super( "rtp.biome", "iris biomes", ( uuid, s ) -> {
             s = s.toUpperCase();
@@ -41,11 +47,11 @@ public class IrisBiomeParameter extends CommandParameter {
     public Set<String> values() {
         Set<String> res = new HashSet<>();
         for( RTPWorld rtpWorld : RTP.serverAccessor.getRTPWorlds() ) {
-            if( !(rtpWorld instanceof BukkitRTPWorld) ) {
+            org.bukkit.World bukkitWorld = Bukkit.getWorld( rtpWorld.id() );
+            if ( bukkitWorld == null ) {
                 continue;
             }
-            BukkitRTPWorld world = ( BukkitRTPWorld ) rtpWorld;
-            PlatformChunkGenerator access = IrisToolbelt.access( world.world() );
+            PlatformChunkGenerator access = IrisToolbelt.access( bukkitWorld );
             if( access == null ) {
                 res.addAll( Arrays.stream( Biome.values() ).map( Enum::name ).collect( Collectors.toSet()) );
                 continue;
@@ -72,7 +78,7 @@ public class IrisBiomeParameter extends CommandParameter {
 
             Set<String> worldsAttempted = new HashSet<>();
             String worldName = player.getLocation().world().name();
-            MultiConfigParser<WorldKeys> worldParsers = ( MultiConfigParser<WorldKeys> ) RTP.configs.multiConfigParserMap.get( WorldKeys.class );
+            MultiConfigParser<WorldKeys> worldParsers = ( MultiConfigParser<WorldKeys> ) RTP.configs.getParser( WorldKeys.class );
             ConfigParser<WorldKeys> worldParser = worldParsers.getParser( worldName );
 
             for ( boolean requirePermission = Boolean.parseBoolean( worldParser.getConfigValue( WorldKeys.requirePermission, false ).toString() );
@@ -105,3 +111,5 @@ public class IrisBiomeParameter extends CommandParameter {
         return res;
     }
 }
+
+

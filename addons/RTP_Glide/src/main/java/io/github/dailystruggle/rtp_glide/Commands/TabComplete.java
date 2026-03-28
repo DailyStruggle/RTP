@@ -12,6 +12,9 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 
+/**
+ * Tab completer for Glide commands
+ */
 public class TabComplete implements TabCompleter {
     private class SubCommand {
         String perm;
@@ -37,6 +40,9 @@ public class TabComplete implements TabCompleter {
 
     private final SubCommand subCommands = new SubCommand( "rtp" );
 
+    /**
+     * Default constructor for TabComplete
+     */
     public TabComplete() {
         //load rtp commands and permission nodes into map
         subCommands.addSubParam( "player","glide.use.other" );
@@ -58,6 +64,15 @@ public class TabComplete implements TabCompleter {
         return res;
     }
 
+    /**
+     * Get the list of possible tab completions
+     * @param knownParams already provided parameters
+     * @param res list to add completions to
+     * @param command current subcommand context
+     * @param args command arguments
+     * @param i current argument index
+     * @param sender command sender
+     */
     public void getList( Set<String> knownParams,List<String> res, SubCommand command, String[] args, int i, CommandSender sender ) {
         if( i>=args.length ) return;
         int idx = args[i].indexOf( ':' );
@@ -111,3 +126,5 @@ public class TabComplete implements TabCompleter {
         }
     }
 }
+
+

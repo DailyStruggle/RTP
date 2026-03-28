@@ -4,9 +4,10 @@ import com.volmit.iris.core.tools.IrisToolbelt;
 import com.volmit.iris.engine.object.IrisBiome;
 import com.volmit.iris.engine.platform.PlatformChunkGenerator;
 import com.volmit.iris.util.collection.KList;
-import io.github.dailystruggle.rtp.bukkit.server.substitutions.BukkitRTPWorld;
+
+import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.serverSide.substitutions.RTPWorld;
+import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.block.Biome;
@@ -18,13 +19,25 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+/**
+ * Main class for RTP_Iris_integration addon
+ */
 public final class RTP_Iris_integration extends JavaPlugin {
+    /**
+     * Default constructor for RTP_Iris_integration
+     */
+    public RTP_Iris_integration() {
+    }
     private static final Pattern invalidCharacters = Pattern.compile( "[ :,]" );
     @Override
     public void onEnable() {
         // Plugin startup logic
-        BukkitRTPWorld.setBiomesGetter( RTP_Iris_integration::getBiomes );
-        BukkitRTPWorld.setBiomeGetter( RTP_Iris_integration::getBiome );
+        RTP.serverAccessor.setBiomesGetter( RTP_Iris_integration::getBiomes );
+        RTP.serverAccessor.setBiomeGetter( rtpLocation -> {
+            org.bukkit.World bukkitWorld = Bukkit.getWorld(rtpLocation.world().id());
+            if (bukkitWorld == null) return "PLAINS";
+            return getBiome(new Location(bukkitWorld, rtpLocation.x(), rtpLocation.y(), rtpLocation.z()));
+        } );
         Bukkit.getScheduler().scheduleSyncDelayedTask( this,() -> {
             RTP.baseCommand.addParameter( "biome", new IrisBiomeParameter() );
             RTP.configs.reload();
@@ -37,11 +50,11 @@ public final class RTP_Iris_integration extends JavaPlugin {
     }
 
     static Set<String> getBiomes( RTPWorld rtpWorld ) {
-        if( !(rtpWorld instanceof BukkitRTPWorld) ) {
+        org.bukkit.World bukkitWorld = Bukkit.getWorld( rtpWorld.id() );
+        if ( bukkitWorld == null ) {
             return new HashSet<>();
         }
-        BukkitRTPWorld world = ( BukkitRTPWorld ) rtpWorld;
-        PlatformChunkGenerator access = IrisToolbelt.access( world.world() );
+        PlatformChunkGenerator access = IrisToolbelt.access( bukkitWorld );
         if( access == null ) return Arrays.stream( Biome.values() ).map( Enum::name ).collect( Collectors.toSet() );
         KList<IrisBiome> allBiomes = access.getEngine().getAllBiomes();
         Set<String> collect = new HashSet<>();
@@ -61,3 +74,5 @@ public final class RTP_Iris_integration extends JavaPlugin {
         return s;
     }
 }
+
+

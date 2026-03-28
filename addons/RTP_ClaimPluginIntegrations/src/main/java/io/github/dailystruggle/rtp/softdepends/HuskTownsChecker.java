@@ -19,3 +19,5 @@ public class HuskTownsChecker {
         return false;
     }
 }
+
+
