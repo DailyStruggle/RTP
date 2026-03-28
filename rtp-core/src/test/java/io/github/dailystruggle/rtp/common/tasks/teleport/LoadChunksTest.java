@@ -31,21 +31,21 @@ public class LoadChunksTest {
         when(serverAccessor.getChunkManager()).thenReturn(chunkManager);
         RTP.serverAccessor = serverAccessor;
         
-        CompletableFuture<RTPChunk<?>> future = new CompletableFuture<>();
+        CompletableFuture<Long> future = new CompletableFuture<>();
         when(chunkManager.getChunkAtAsync(any(), anyInt(), anyInt())).thenReturn(future);
         
         // Assert that we can complete the future later
         CompletableFuture<Void> testFuture = CompletableFuture.runAsync(() -> {
             try {
                 TimeUnit.MILLISECONDS.sleep(100);
-                future.complete(mock(RTPChunk.class));
+                future.complete(1L);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
         });
         
-        RTPChunk<?> chunk = future.get(1, TimeUnit.SECONDS);
-        assertNotNull(chunk);
+        Long chunkKey = future.get(1, TimeUnit.SECONDS);
+        assertNotNull(chunkKey);
         assertTrue(testFuture.isDone());
     }
 }

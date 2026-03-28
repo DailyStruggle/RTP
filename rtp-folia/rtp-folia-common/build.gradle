@@ -1,0 +1,8 @@
+plugins {
+    id 'java-library'
+}
+
+dependencies {
+    api project(':rtp-paper:rtp-paper-common')
+    compileOnly 'dev.folia:folia-api:1.20.1-R0.1-SNAPSHOT'
+}

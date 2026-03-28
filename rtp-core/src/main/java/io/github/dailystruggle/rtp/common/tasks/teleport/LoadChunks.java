@@ -63,9 +63,9 @@ public final class LoadChunks extends RTPRunnable {
         }
 
         if ( max > chunkSet.chunks.size() ) {
-            chunkSet.keep( false );
+            chunkSet.keep( false, location.world() );
             chunkSet = teleportData.targetRegion.chunks( location, radius2 );
-            chunkSet.keep( true );
+            chunkSet.keep( true, location.world() );
             modified = true;
         }
     }
@@ -104,7 +104,7 @@ public final class LoadChunks extends RTPRunnable {
             }
 
             if ( !chunkSet.complete.getNow( false) ) {
-                for ( CompletableFuture<RTPChunk<?>> cfChunk : chunkSet.chunks ) {
+                for ( CompletableFuture<Long> cfChunk : chunkSet.chunks ) {
                     try {
                         cfChunk.get();
                     } catch ( ExecutionException | InterruptedException e ) {
