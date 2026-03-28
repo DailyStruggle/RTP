@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 public final class FoliaRTPPlayer implements RTPPlayer {
     private final Player player;
 
-    public FoliaRTPPlayer( Player player ) {
+    public FoliaRTPPlayer(Player player) {
         this.player = player;
     }
 
@@ -30,23 +30,23 @@ public final class FoliaRTPPlayer implements RTPPlayer {
     }
 
     @Override
-    public boolean hasPermission( String permission ) {
-        return player.hasPermission( permission );
+    public boolean hasPermission(String permission) {
+        return player.hasPermission(permission);
     }
 
     @Override
-    public void sendMessage( String message ) {
-        SendMessage.sendMessage( player, message );
+    public void sendMessage(String message) {
+        SendMessage.sendMessage(player, message);
     }
 
     @Override
     public long cooldown() {
-        return new FoliaRTPCommandSender( player ).cooldown();
+        return new FoliaRTPCommandSender(player).cooldown();
     }
 
     @Override
     public long delay() {
-        return new FoliaRTPCommandSender( player ).delay();
+        return new FoliaRTPCommandSender(player).delay();
     }
 
     @Override
@@ -56,18 +56,18 @@ public final class FoliaRTPPlayer implements RTPPlayer {
 
     @Override
     public Set<String> getEffectivePermissions() {
-        return player.getEffectivePermissions().stream().map( permissionAttachmentInfo -> {
-            if ( permissionAttachmentInfo.getValue() ) return permissionAttachmentInfo.getPermission().toLowerCase();
+        return player.getEffectivePermissions().stream().map(permissionAttachmentInfo -> {
+            if (permissionAttachmentInfo.getValue()) return permissionAttachmentInfo.getPermission().toLowerCase();
             else return null;
-        } ).filter( Objects::nonNull ).collect( Collectors.toSet() );
+        }).filter(Objects::nonNull).collect(Collectors.toSet());
     }
 
     @Override
-    public void performCommand( RTPPlayer rtpPlayer, String command ) {
+    public void performCommand(RTPPlayer rtpPlayer, String command) {
         OfflinePlayer player;
-        if( rtpPlayer==null ) player = player();
-        else player = ( (FoliaRTPPlayer ) rtpPlayer ).player();
-        command = SendMessage.formatNoColor( player,command );
+        if (rtpPlayer == null) player = player();
+        else player = ((FoliaRTPPlayer) rtpPlayer).player();
+        command = SendMessage.formatNoColor(player, command);
         final String finalCommand = command;
         this.player.getScheduler().run(
                 org.bukkit.Bukkit.getPluginManager().getPlugin("RTP"),
@@ -82,8 +82,8 @@ public final class FoliaRTPPlayer implements RTPPlayer {
     }
 
     @Override
-    public CompletableFuture<Boolean> setLocation( RTPLocation to ) {
-        World world = ( (FoliaRTPWorld ) to.world() ).world();
+    public CompletableFuture<Boolean> setLocation(RTPLocation to) {
+        World world = ((FoliaRTPWorld) to.world()).world();
         double x = to.x() + 0.5;
         double y = to.y();
         double z = to.z() + 0.5;
@@ -95,8 +95,8 @@ public final class FoliaRTPPlayer implements RTPPlayer {
     public RTPLocation getLocation() {
         Location location = player.getLocation();
         return new RTPLocation(
-                RTP.serverAccessor.getRTPWorld( player.getWorld().getUID() ),
-                location.getBlockX(), location.getBlockY(), location.getBlockZ() );
+                RTP.serverAccessor.getRTPWorld(player.getWorld().getUID()),
+                location.getBlockX(), location.getBlockY(), location.getBlockZ());
     }
 
     @Override
@@ -109,16 +109,16 @@ public final class FoliaRTPPlayer implements RTPPlayer {
     }
 
     @Override
-    public boolean equals( Object obj ) {
-        if ( obj == this ) return true;
-        if ( obj == null || obj.getClass() != this.getClass() ) return false;
-        FoliaRTPPlayer that = ( FoliaRTPPlayer ) obj;
-        return Objects.equals( this.player, that.player );
+    public boolean equals(Object obj) {
+        if (obj == this) return true;
+        if (obj == null || obj.getClass() != this.getClass()) return false;
+        FoliaRTPPlayer that = (FoliaRTPPlayer) obj;
+        return Objects.equals(this.player, that.player);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash( player );
+        return Objects.hash(player);
     }
 
     @Override

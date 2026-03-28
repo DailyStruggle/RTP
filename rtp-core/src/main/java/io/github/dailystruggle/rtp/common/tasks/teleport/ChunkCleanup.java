@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.tasks.teleport;
 
-import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
+import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 
 import java.util.ArrayList;
@@ -27,23 +27,25 @@ public final class ChunkCleanup extends RTPRunnable {
 
     /**
      * Constructor for ChunkCleanup
+     *
      * @param location the location of the teleportation
-     * @param region the region of the teleportation
+     * @param region   the region of the teleportation
      */
-    public ChunkCleanup( RTPLocation location, Region region ) {
+    public ChunkCleanup(RTPLocation location, Region region) {
         this.location = location;
         this.region = region;
     }
 
     @Override
     public void run() {
-        preActions.forEach( consumer -> consumer.accept( this) );
-        region.removeChunks( location );
-        postActions.forEach( consumer -> consumer.accept( this) );
+        preActions.forEach(consumer -> consumer.accept(this));
+        region.removeChunks(location);
+        postActions.forEach(consumer -> consumer.accept(this));
     }
 
     /**
      * Get the location of the teleportation
+     *
      * @return the location
      */
     public RTPLocation location() {
@@ -52,6 +54,7 @@ public final class ChunkCleanup extends RTPRunnable {
 
     /**
      * Get the region of the teleportation
+     *
      * @return the region
      */
     public Region region() {
@@ -59,17 +62,17 @@ public final class ChunkCleanup extends RTPRunnable {
     }
 
     @Override
-    public boolean equals( Object obj ) {
-        if ( obj == this ) return true;
-        if ( obj == null || obj.getClass() != this.getClass() ) return false;
-        ChunkCleanup that = ( ChunkCleanup ) obj;
-        return Objects.equals( this.location, that.location ) &&
-                Objects.equals( this.region, that.region );
+    public boolean equals(Object obj) {
+        if (obj == this) return true;
+        if (obj == null || obj.getClass() != this.getClass()) return false;
+        ChunkCleanup that = (ChunkCleanup) obj;
+        return Objects.equals(this.location, that.location) &&
+                Objects.equals(this.region, that.region);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash( location, region );
+        return Objects.hash(location, region);
     }
 
     @Override

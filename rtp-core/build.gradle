@@ -4,7 +4,7 @@ plugins {
 
 dependencies {
     api project(':rtp-api')
-    
+
     // Core logic dependencies (platform agnostic)
     implementation 'org.yaml:snakeyaml:2.3'
     implementation('me.carleslc.Simple-YAML:Simple-Yaml:1.8.4') {

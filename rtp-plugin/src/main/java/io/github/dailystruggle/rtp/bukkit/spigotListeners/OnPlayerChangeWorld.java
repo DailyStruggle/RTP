@@ -11,16 +11,16 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 
 public final class OnPlayerChangeWorld implements Listener {
-    @EventHandler( priority = EventPriority.NORMAL )
-    public void onPlayerChangeWorld( PlayerChangedWorldEvent event ) {
-        new RTPTeleportCancel( event.getPlayer().getUniqueId() ).run();
+    @EventHandler(priority = EventPriority.NORMAL)
+    public void onPlayerChangeWorld(PlayerChangedWorldEvent event) {
+        new RTPTeleportCancel(event.getPlayer().getUniqueId()).run();
 
         Player player = event.getPlayer();
 
-        if ( player.hasPermission( "rtp.personalqueue") ) {
-            Region region = RTP.selectionAPI.getRegion( RTP.serverAccessor.getPlayer( player.getUniqueId() ) );
-            if ( region == null ) return;
-            region.queue( player.getUniqueId() );
+        if (player.hasPermission("rtp.personalqueue")) {
+            Region region = RTP.selectionAPI.getRegion(RTP.serverAccessor.getPlayer(player.getUniqueId()));
+            if (region == null) return;
+            region.queue(player.getUniqueId());
         }
     }
 }

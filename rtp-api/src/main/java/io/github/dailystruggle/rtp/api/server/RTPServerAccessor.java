@@ -3,20 +3,38 @@ package io.github.dailystruggle.rtp.api.server;
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
+import io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 
 import java.io.File;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.logging.Level;
 
 /**
  * Interface for accessing server-specific functionality
  */
 public interface RTPServerAccessor {
+    ConcurrentHashMap<String, TrackedRTPTask> activeTasks = new ConcurrentHashMap<>();
+
+    default void registerAction(TrackedRTPTask task) {
+        activeTasks.put(task.getTrackingId(), task);
+    }
+
+    default void removeAction(String trackingId) {
+        activeTasks.remove(trackingId);
+    }
+
+    default Map<String, Long> getTaskSnapshot() {
+        ConcurrentHashMap<String, Long> snapshot = new ConcurrentHashMap<>();
+        activeTasks.forEach((s, trackedRTPTask) -> snapshot.put(s, System.currentTimeMillis() - trackedRTPTask.getQueuedTime()));
+        return snapshot;
+    }
+
     String getServerVersion();
 
     Integer getServerIntVersion();

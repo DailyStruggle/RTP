@@ -1,7 +1,8 @@
 package io.github.dailystruggle.rtp.bukkit.tools.softdepends;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
-
+import io.github.dailystruggle.rtp.api.world.RTPLocation;
+import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
@@ -11,8 +12,6 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
-import io.github.dailystruggle.rtp.api.world.RTPLocation;
-import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.tools.ChunkyRTPShape;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -27,13 +26,14 @@ import java.util.Optional;
  * Utility class for interacting with the ChunkyBorder plugin
  */
 public class ChunkyBorderChecker {
+    //stored object reference to skip plugin getting sometimes
+    private static ChunkyBorder chunkyBorder = null;
+
     /**
      * Default constructor for ChunkyBorderChecker
      */
     private ChunkyBorderChecker() {
     }
-    //stored object reference to skip plugin getting sometimes
-    private static ChunkyBorder chunkyBorder = null;
 
     /**
      * getPAPI - function to if PAPI exists and fill the above object reference accordingly
@@ -41,7 +41,7 @@ public class ChunkyBorderChecker {
     private static void getChunky() {
         try {
             chunkyBorder = ChunkyBorderProvider.get();
-        } catch ( Throwable t ) {
+        } catch (Throwable t) {
             chunkyBorder = null;
         }
     }
@@ -54,14 +54,14 @@ public class ChunkyBorderChecker {
         getChunky();
 
         // chunkyborder initialization
-        if ( chunkyBorder != null ) {
-            RTP.serverAccessor.setWorldBorderFunction( worldName -> {
+        if (chunkyBorder != null) {
+            RTP.serverAccessor.setWorldBorderFunction(worldName -> {
                 RTPWorld rtpWorld = RTP.serverAccessor.getRTPWorld(worldName);
                 WorldBorder vanillaBorder = null;
                 WorldBorder chunkyBorder = null;
                 long radiusVanilla = Long.MAX_VALUE;
-                World world = Bukkit.getWorld( rtpWorld.id() );
-                if ( world != null ) {
+                World world = Bukkit.getWorld(rtpWorld.id());
+                if (world != null) {
                     org.bukkit.WorldBorder worldBorder = world.getWorldBorder();
                     radiusVanilla = ((long) (worldBorder.getSize() * 0.9d)) / 16;
                     vanillaBorder = new WorldBorder(
@@ -106,11 +106,11 @@ public class ChunkyBorderChecker {
                             shape = new ChunkyRTPShape("chunky_" + border.name());
                             RTPAPI.addShape(shape);
                         }
-                        long radiusX = (long) ((borderData.getRadiusX() * 0.9d)/16);
-                        long radiusZ = (long) ((borderData.getRadiusZ() * 0.9d)/16);
+                        long radiusX = (long) ((borderData.getRadiusX() * 0.9d) / 16);
+                        long radiusZ = (long) ((borderData.getRadiusZ() * 0.9d) / 16);
 
-                        radiusX = Math.min(radiusX,radiusVanilla);
-                        radiusZ = Math.min(radiusZ,radiusVanilla);
+                        radiusX = Math.min(radiusX, radiusVanilla);
+                        radiusZ = Math.min(radiusZ, radiusVanilla);
 
                         shape.set(RectangleParams.width, radiusX);
                         shape.set(RectangleParams.height, radiusZ);
@@ -126,9 +126,9 @@ public class ChunkyBorderChecker {
 
                 }
 
-                if(chunkyBorder != null) return chunkyBorder;
+                if (chunkyBorder != null) return chunkyBorder;
                 return vanillaBorder;
-            } );
+            });
         }
     }
 }

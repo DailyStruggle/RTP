@@ -29,9 +29,10 @@ public abstract class BaseRTPCmdImpl implements BaseRTPCmd {
 
     /**
      * Constructor for BaseRTPCmdImpl
+     *
      * @param parent the parent command
      */
-    public BaseRTPCmdImpl( @Nullable CommandsAPICommand parent ) {
+    public BaseRTPCmdImpl(@Nullable CommandsAPICommand parent) {
         this.parent = parent;
     }
 

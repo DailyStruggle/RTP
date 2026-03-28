@@ -3,7 +3,6 @@ package io.github.dailystruggle.rtp.folia_v1_20_R1.scheduling;
 import io.papermc.paper.threadedregions.scheduler.AsyncScheduler;
 import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
 import org.bukkit.Bukkit;
-import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,10 +32,10 @@ class FoliaSchedulerTest {
     void testRunTask() {
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
             bukkit.when(Bukkit::getGlobalRegionScheduler).thenReturn(globalScheduler);
-            
+
             Runnable task = mock(Runnable.class);
             scheduler.runTask(task);
-            
+
             verify(globalScheduler).run(eq(plugin), any(Consumer.class));
         }
     }
@@ -45,10 +44,10 @@ class FoliaSchedulerTest {
     void testRunTaskAsynchronously() {
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
             bukkit.when(Bukkit::getAsyncScheduler).thenReturn(asyncScheduler);
-            
+
             Runnable task = mock(Runnable.class);
             scheduler.runTaskAsynchronously(task);
-            
+
             verify(asyncScheduler).runNow(eq(plugin), any(Consumer.class));
         }
     }
@@ -57,10 +56,10 @@ class FoliaSchedulerTest {
     void testRunTaskLater() {
         try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
             bukkit.when(Bukkit::getGlobalRegionScheduler).thenReturn(globalScheduler);
-            
+
             Runnable task = mock(Runnable.class);
             scheduler.runTaskLater(task, 20L);
-            
+
             verify(globalScheduler).runDelayed(eq(plugin), any(Consumer.class), eq(20L));
         }
     }

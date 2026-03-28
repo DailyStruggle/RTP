@@ -18,34 +18,34 @@ import java.util.stream.Collectors;
 public class FoliaRTPCommandSender implements RTPCommandSender {
     protected final CommandSender sender;
 
-    public FoliaRTPCommandSender( CommandSender sender ) {
+    public FoliaRTPCommandSender(CommandSender sender) {
         this.sender = sender;
     }
 
     @Override
     public UUID uuid() {
-        if ( sender instanceof Player ) return ( (Player ) sender ).getUniqueId();
+        if (sender instanceof Player) return ((Player) sender).getUniqueId();
         return RTPAPI.serverId;
     }
 
     @Override
-    public boolean hasPermission( String permission ) {
-        return sender.hasPermission( permission );
+    public boolean hasPermission(String permission) {
+        return sender.hasPermission(permission);
     }
 
     @Override
-    public void sendMessage( String message ) {
-        SendMessage.sendMessage( sender, message );
+    public void sendMessage(String message) {
+        SendMessage.sendMessage(sender, message);
     }
 
     @Override
     public long cooldown() {
-        return ParsePermissions.getInt( uuid(), "rtp.cooldown." );
+        return ParsePermissions.getInt(uuid(), "rtp.cooldown.");
     }
 
     @Override
     public long delay() {
-        return ParsePermissions.getInt( uuid(), "rtp.delay." );
+        return ParsePermissions.getInt(uuid(), "rtp.delay.");
     }
 
     @Override
@@ -55,16 +55,16 @@ public class FoliaRTPCommandSender implements RTPCommandSender {
 
     @Override
     public Set<String> getEffectivePermissions() {
-        return sender.getEffectivePermissions().stream().map( permissionAttachmentInfo -> {
-            if ( permissionAttachmentInfo.getValue() ) return permissionAttachmentInfo.getPermission().toLowerCase();
+        return sender.getEffectivePermissions().stream().map(permissionAttachmentInfo -> {
+            if (permissionAttachmentInfo.getValue()) return permissionAttachmentInfo.getPermission().toLowerCase();
             else return null;
-        } ).filter( Objects::nonNull ).collect( Collectors.toSet() );
+        }).filter(Objects::nonNull).collect(Collectors.toSet());
     }
 
     @Override
-    public void performCommand( @Nullable RTPPlayer player, String command ) {
+    public void performCommand(@Nullable RTPPlayer player, String command) {
         CommandSender sender = this.sender;
-        command = SendMessage.formatNoColor( player,command );
+        command = SendMessage.formatNoColor(player, command);
         final String finalCommand = command;
         Bukkit.getGlobalRegionScheduler().run(Bukkit.getPluginManager().getPlugin("RTP"), scheduledTask -> Bukkit.dispatchCommand(sender, finalCommand));
     }
@@ -79,16 +79,16 @@ public class FoliaRTPCommandSender implements RTPCommandSender {
     }
 
     @Override
-    public boolean equals( Object obj ) {
-        if ( obj == this ) return true;
-        if ( obj == null || obj.getClass() != this.getClass() ) return false;
-        FoliaRTPCommandSender that = ( FoliaRTPCommandSender ) obj;
-        return Objects.equals( this.sender, that.sender );
+    public boolean equals(Object obj) {
+        if (obj == this) return true;
+        if (obj == null || obj.getClass() != this.getClass()) return false;
+        FoliaRTPCommandSender that = (FoliaRTPCommandSender) obj;
+        return Objects.equals(this.sender, that.sender);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash( sender );
+        return Objects.hash(sender);
     }
 
     @Override

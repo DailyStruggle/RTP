@@ -1,9 +1,13 @@
 package io.github.dailystruggle.rtp.folia.scheduling;
 
+import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
+import io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import java.util.UUID;
 
 public class FoliaSchedulerImpl implements RTPScheduler {
     private final JavaPlugin plugin;
@@ -37,5 +41,20 @@ public class FoliaSchedulerImpl implements RTPScheduler {
         if (task instanceof ScheduledTask) {
             ((ScheduledTask) task).cancel();
         }
+    }
+
+    @Override
+    public void scheduleTeleport(io.github.dailystruggle.rtp.api.entity.RTPPlayer player, io.github.dailystruggle.rtp.common.tasks.RTPRunnable task, long delayTicks) {
+        org.bukkit.entity.Player bukkitPlayer = Bukkit.getPlayer(player.uuid());
+        if (bukkitPlayer == null) return;
+
+        String taskId = UUID.randomUUID().toString();
+        TrackedRTPTask trackedTask = new TrackedRTPTask(task, taskId);
+        if (RTPAPI.serverAccessor != null) {
+            RTPAPI.serverAccessor.registerAction(trackedTask);
+        }
+
+        if (delayTicks <= 0) delayTicks = 1;
+        bukkitPlayer.getScheduler().runDelayed(plugin, (scheduledTask) -> trackedTask.run(), null, delayTicks);
     }
 }

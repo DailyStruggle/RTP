@@ -1,7 +1,5 @@
 package io.github.dailystruggle.rtp_glide.configuration;
 
-import com.google.common.collect.BiMap;
-import com.google.common.collect.HashBiMap;
 import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp_glide.RTP_Glide;
@@ -9,8 +7,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.permissions.Permission;
-import org.bukkit.permissions.PermissionDefault;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -29,22 +25,22 @@ public class Worlds {
 
     /**
      * Constructor for Worlds configuration
+     *
      * @param plugin the plugin instance
      */
-    public Worlds( RTP_Glide plugin ) {
+    public Worlds(RTP_Glide plugin) {
         this.plugin = plugin;
 
-        File f = new File( plugin.getDataFolder(), "worlds/default.yml" );
-        if( !f.exists() )
-        {
-            plugin.saveResource( "worlds/default.yml", false );
+        File f = new File(plugin.getDataFolder(), "worlds/default.yml");
+        if (!f.exists()) {
+            plugin.saveResource("worlds/default.yml", false);
         }
-        config = YamlConfiguration.loadConfiguration( f );
+        config = YamlConfiguration.loadConfiguration(f);
 
-        if(  	( config.getDouble( "version" ) < 1.0 ) ) {
-            SendMessage.sendMessage( Bukkit.getConsoleSender(), "[rtp_glide] old default.yml detected. Updating" );
-            FileStuff.renameFiles( plugin,"worlds" );
-            config = YamlConfiguration.loadConfiguration( f );
+        if ((config.getDouble("version") < 1.0)) {
+            SendMessage.sendMessage(Bukkit.getConsoleSender(), "[rtp_glide] old default.yml detected. Updating");
+            FileStuff.renameFiles(plugin, "worlds");
+            config = YamlConfiguration.loadConfiguration(f);
         }
         update();
     }
@@ -54,96 +50,95 @@ public class Worlds {
      */
     public void update() {
         ArrayList<String> linesInWorlds = new ArrayList<>();
-        int defaultRelative = config.getConfigurationSection( "default" ).getInt( "relative",75 );
-        int defaultMax = config.getConfigurationSection( "default" ).getInt( "max",320 );
+        int defaultRelative = config.getConfigurationSection("default").getInt("relative", 75);
+        int defaultMax = config.getConfigurationSection("default").getInt("max", 320);
 
         try {
-            Scanner scanner = new Scanner( 
-                    new File( plugin.getDataFolder().getAbsolutePath() + File.separator + "worlds/default.yml") );
+            Scanner scanner = new Scanner(
+                    new File(plugin.getDataFolder().getAbsolutePath() + File.separator + "worlds/default.yml"));
             //for each line in original messages file
             String currWorldName = "default";
-            while ( scanner.hasNextLine() ) {
+            while (scanner.hasNextLine()) {
                 String s = scanner.nextLine();
 
                 //append at first blank line
-                if( !(s.matches( ".*[a-z].*" )||s.matches( ".*[A-Z].*")) ) {
+                if (!(s.matches(".*[a-z].*") || s.matches(".*[A-Z].*"))) {
                     //for each missing world, add some default data
-                    for( World w : Bukkit.getWorlds() ) {
+                    for (World w : Bukkit.getWorlds()) {
                         String worldName = w.getName();
-                        if( config.contains( worldName) ) continue;
-                        config.set( worldName, config.getConfigurationSection( "default") );
+                        if (config.contains(worldName)) continue;
+                        config.set(worldName, config.getConfigurationSection("default"));
 
-                        if( linesInWorlds.get( linesInWorlds.size()-1 ).length() < 4 )
-                            linesInWorlds.set( linesInWorlds.size()-1,"    " + worldName + ":" );
-                        else linesInWorlds.add( worldName + ":" );
-                        linesInWorlds.add( "    relative: " + defaultRelative );
-                        linesInWorlds.add( "    max: " + defaultMax );
+                        if (linesInWorlds.get(linesInWorlds.size() - 1).length() < 4)
+                            linesInWorlds.set(linesInWorlds.size() - 1, "    " + worldName + ":");
+                        else linesInWorlds.add(worldName + ":");
+                        linesInWorlds.add("    relative: " + defaultRelative);
+                        linesInWorlds.add("    max: " + defaultMax);
                     }
-                }
-                else { //if not a blank line
-                    if( s.startsWith( "    relative:") )
-                        s = "    relative: " + config.getConfigurationSection( currWorldName ).getInt( "relative", defaultRelative );
-                    else if( s.startsWith( "    max:") )
-                        s = "    max: " + config.getConfigurationSection( currWorldName ).getInt( "max", defaultMax );
-                    else if( !s.startsWith( "#" ) && !s.startsWith( "  " ) && !s.startsWith( "version" ) && ( s.matches( ".*[a-z].*" ) || s.matches( ".*[A-Z].*")) )
-                    {
-                        currWorldName = s.replace( ":","" );
+                } else { //if not a blank line
+                    if (s.startsWith("    relative:"))
+                        s = "    relative: " + config.getConfigurationSection(currWorldName).getInt("relative", defaultRelative);
+                    else if (s.startsWith("    max:"))
+                        s = "    max: " + config.getConfigurationSection(currWorldName).getInt("max", defaultMax);
+                    else if (!s.startsWith("#") && !s.startsWith("  ") && !s.startsWith("version") && (s.matches(".*[a-z].*") || s.matches(".*[A-Z].*"))) {
+                        currWorldName = s.replace(":", "");
                     }
                 }
 
                 //add line
-                linesInWorlds.add( s );
+                linesInWorlds.add(s);
             }
             scanner.close();
-        } catch ( FileNotFoundException e ) {
-            RTP.log( Level.WARNING, e.getMessage(), e );
+        } catch (FileNotFoundException e) {
+            RTP.log(Level.WARNING, e.getMessage(), e);
         }
 
         FileWriter fw;
-        String[] linesArray = linesInWorlds.toArray( new String[linesInWorlds.size()] );
+        String[] linesArray = linesInWorlds.toArray(new String[linesInWorlds.size()]);
         try {
-            fw = new FileWriter( plugin.getDataFolder().getAbsolutePath() + File.separator + "worlds/default.yml" );
-            for ( String s : linesArray ) {
-                fw.write( s + "\n" );
+            fw = new FileWriter(plugin.getDataFolder().getAbsolutePath() + File.separator + "worlds/default.yml");
+            for (String s : linesArray) {
+                fw.write(s + "\n");
             }
             fw.close();
-        } catch ( IOException e ) {
-            RTP.log( Level.WARNING, e.getMessage(), e );
+        } catch (IOException e) {
+            RTP.log(Level.WARNING, e.getMessage(), e);
         }
 
         //-------------UPDATE INTERNAL VERSION ACCORDINGLY-------------
-        config = YamlConfiguration.loadConfiguration( new File( plugin.getDataFolder(), "worlds/default.yml") );
+        config = YamlConfiguration.loadConfiguration(new File(plugin.getDataFolder(), "worlds/default.yml"));
     }
 
     /**
      * Get a setting for a world
+     *
      * @param worldName the name of the world
-     * @param name the name of the setting
-     * @param def the default value
+     * @param name      the name of the setting
+     * @param def       the default value
      * @return the setting value
      */
-    public Object getWorldSetting( String worldName, String name, Object def ) {
-        if( !config.contains( worldName) ) return def;
-        return this.config.getConfigurationSection( worldName ).get( name,def );
+    public Object getWorldSetting(String worldName, String name, Object def) {
+        if (!config.contains(worldName)) return def;
+        return this.config.getConfigurationSection(worldName).get(name, def);
     }
 
     /**
      * Check if a world exists and update configuration if it's new
+     *
      * @param worldName the name of the world
      * @return true if world exists, false otherwise
      */
-    public Boolean checkWorldExists( String worldName ) {
-        if( worldName == null ) return false;
-        Boolean bukkitWorldExists = Bukkit.getWorld( worldName )!=null;
-        Boolean worldKnown = this.config.contains( worldName );
-        if(  !bukkitWorldExists  ) {
+    public Boolean checkWorldExists(String worldName) {
+        if (worldName == null) return false;
+        Boolean bukkitWorldExists = Bukkit.getWorld(worldName) != null;
+        Boolean worldKnown = this.config.contains(worldName);
+        if (!bukkitWorldExists) {
             return false;
-        }
-        else if(  !worldKnown  ) {
-            SendMessage.sendMessage( Bukkit.getConsoleSender(),"[rtp_glide] detected a new world '" + worldName + "'" );
-            SendMessage.sendMessage( Bukkit.getConsoleSender(),"[rtp_glide] updating worlds configuration..." );
+        } else if (!worldKnown) {
+            SendMessage.sendMessage(Bukkit.getConsoleSender(), "[rtp_glide] detected a new world '" + worldName + "'");
+            SendMessage.sendMessage(Bukkit.getConsoleSender(), "[rtp_glide] updating worlds configuration...");
             update(); //not optimal but it works
-            SendMessage.sendMessage( Bukkit.getConsoleSender(),"[rtp_glide] updated worlds configuration!" );
+            SendMessage.sendMessage(Bukkit.getConsoleSender(), "[rtp_glide] updated worlds configuration!");
         }
         return true;
     }

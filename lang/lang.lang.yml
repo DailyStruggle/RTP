@@ -1,4 +1,4 @@
-{oldFile: oldFile, worldInfo: worldInfo, teleportMessage: teleportMessage, noLocationsQueued: noLocationsQueued,
+{ oldFile: oldFile, worldInfo: worldInfo, teleportMessage: teleportMessage, noLocationsQueued: noLocationsQueued,
   fillNotRunning: fillNotRunning, fillCancel: fillCancel, PLAYER_COOLDOWN: PLAYER_COOLDOWN,
   seconds: seconds, fillPause: fillPause, regionInfo: regionInfo, worldHeader: worldHeader,
   PLAYER_AVAILABLE: PLAYER_AVAILABLE, consoleCmdNotAllowed: consoleCmdNotAllowed,
@@ -14,4 +14,4 @@
   missingRegionParam: missingRegionParam, PLAYER_SETUP: PLAYER_SETUP, stay: stay,
   updatedWorlds: updatedWorlds, rtp: rtp, help: help, fillStatus: fillStatus, plugin: plugin,
   chunkLoading: chunkLoading, newWorld: newWorld, infoHeader: infoHeader, fillRunning: fillRunning,
-  days: days}
+  days: days }
