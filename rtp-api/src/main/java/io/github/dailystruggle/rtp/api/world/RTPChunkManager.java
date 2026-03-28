@@ -11,7 +11,7 @@ public interface RTPChunkManager {
      * @param world the world
      * @param x the x coordinate
      * @param z the z coordinate
-     * @return a future that completes with the chunk
+     * @return a future that completes with the chunk key
      */
-    CompletableFuture<RTPChunk<?>> getChunkAtAsync( RTPWorld<?> world, int x, int z );
+    CompletableFuture<Long> getChunkAtAsync( RTPWorld<?> world, int x, int z );
 }

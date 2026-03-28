@@ -262,6 +262,7 @@ public class Region extends FactoryValue<RegionKeys> {
         if ( !custom && perPlayerLocationQueue.containsKey( playerId) ) {
             ConcurrentLinkedQueue<Map.Entry<RTPLocation, Long>> playerLocationQueue = perPlayerLocationQueue.get( playerId );
             RTPChunk chunk = null;
+            Long chunkKey = null;
             while ( !playerLocationQueue.isEmpty() ) {
                 if ( chunk != null ) chunk.unload();
                 pair = playerLocationQueue.poll();
@@ -271,9 +272,10 @@ public class Region extends FactoryValue<RegionKeys> {
 
                 int cx = ( left.x() > 0 ) ? left.x() / 16 : left.x() / 16 - 1;
                 int cz = ( left.z() > 0 ) ? left.z() / 16 : left.z() / 16 - 1;
-                CompletableFuture<RTPChunk<?>> chunkAt = RTP.serverAccessor.getChunkManager().getChunkAtAsync( left.world(), cx, cz );
+                CompletableFuture<Long> chunkAt = RTP.serverAccessor.getChunkManager().getChunkAtAsync( left.world(), cx, cz );
                 try {
-                    chunk = chunkAt.get();
+                    chunkKey = chunkAt.get();
+                    if( chunkKey != null ) chunk = left.world().getCachedChunk( chunkKey );
                 } catch ( InterruptedException | ExecutionException e ) {
                    RTP.log( Level.WARNING, e.getMessage(), e );
                     continue;
@@ -361,7 +363,8 @@ public class Region extends FactoryValue<RegionKeys> {
                         if( chunks.containsKey( xz) ) chunk1 = chunks.get( xz );
                         else {
                             try {
-                                chunk1 = RTP.serverAccessor.getChunkManager().getChunkAtAsync( getWorld(), chunkX, chunkZ ).get();
+                                Long key = RTP.serverAccessor.getChunkManager().getChunkAtAsync( getWorld(), chunkX, chunkZ ).get();
+                                chunk1 = getWorld().getCachedChunk( key );
                                 chunks.put( xz,chunk1 );
                                 chunk1.keep( true );
                             } catch ( InterruptedException | ExecutionException e ) {
@@ -621,13 +624,14 @@ public class Region extends FactoryValue<RegionKeys> {
                 continue;
             }
 
-            CompletableFuture<RTPChunk<?>> cfChunk = RTP.serverAccessor.getChunkManager().getChunkAtAsync( world, select[0], select[1] );
+            CompletableFuture<Long> cfChunk = RTP.serverAccessor.getChunkManager().getChunkAtAsync( world, select[0], select[1] );
             RTP.futures.add( cfChunk );
 
             RTPChunk<?> chunk;
 
             try {
-                chunk = cfChunk.get();
+                Long key = cfChunk.get();
+                chunk = world.getCachedChunk( key );
             } catch ( InterruptedException | ExecutionException e ) {
                RTP.log( Level.WARNING, e.getMessage(), e );
                 return new AbstractMap.SimpleEntry<>( null, i );
@@ -709,7 +713,8 @@ public class Region extends FactoryValue<RegionKeys> {
                     if( chunks.containsKey( xz) ) chunk1 = chunks.get( xz );
                     else {
                         try {
-                            chunk1 = RTP.serverAccessor.getChunkManager().getChunkAtAsync( getWorld(), chunkX, chunkZ ).get();
+                            Long key = RTP.serverAccessor.getChunkManager().getChunkAtAsync( getWorld(), chunkX, chunkZ ).get();
+                            chunk1 = getWorld().getCachedChunk( key );
                             chunks.put( xz,chunk1 );
                             chunk1.keep( true );
                         } catch ( InterruptedException | ExecutionException e ) {
@@ -813,7 +818,7 @@ public class Region extends FactoryValue<RegionKeys> {
         perPlayerLocationQueue.clear();
         fastLocations.clear();
         locationQueue.clear();
-        locAssChunks.forEach( (rtpLocation, chunkSet ) -> chunkSet.keep( false) );
+        locAssChunks.forEach( (rtpLocation, chunkSet ) -> chunkSet.keep( false, rtpLocation.world() ) );
         locAssChunks.clear();
     }
 
@@ -871,7 +876,7 @@ public class Region extends FactoryValue<RegionKeys> {
         if ( locAssChunks.containsKey( location) ) {
             ChunkSet chunkSet = locAssChunks.get( location );
             if ( chunkSet.chunks.size() >= sz ) return chunkSet;
-            chunkSet.keep( false );
+            chunkSet.keep( false, location.world() );
             locAssChunks.remove( location );
         }
 
@@ -880,7 +885,7 @@ public class Region extends FactoryValue<RegionKeys> {
         cx = ( cx > 0 ) ? cx / 16 : cx / 16 - 1;
         cz = ( cz > 0 ) ? cz / 16 : cz / 16 - 1;
 
-        List<CompletableFuture<RTPChunk<?>>> chunks = new ArrayList<>();
+        List<CompletableFuture<Long>> chunks = new ArrayList<>();
 
         Shape<?> shape = getShape();
         if ( shape == null ) return null;
@@ -893,13 +898,13 @@ public class Region extends FactoryValue<RegionKeys> {
 
         for ( long i = -radius; i <= radius; i++ ) {
             for ( long j = -radius; j <= radius; j++ ) {
-                CompletableFuture<RTPChunk<?>> cfChunk = RTP.serverAccessor.getChunkManager().getChunkAtAsync( location.world(), (int ) ( cx + i ), ( int ) ( cz + j) );
+                CompletableFuture<Long> cfChunk = RTP.serverAccessor.getChunkManager().getChunkAtAsync( location.world(), (int ) ( cx + i ), ( int ) ( cz + j) );
                 chunks.add( cfChunk );
             }
         }
 
         ChunkSet chunkSet = new ChunkSet( chunks, new CompletableFuture<>() );
-        chunkSet.keep( true );
+        chunkSet.keep( true, location.world() );
         locAssChunks.put( location, chunkSet );
         return chunkSet;
     }
@@ -911,7 +916,7 @@ public class Region extends FactoryValue<RegionKeys> {
     public void removeChunks( RTPLocation location ) {
         if ( !locAssChunks.containsKey( location) ) return;
         ChunkSet chunkSet = locAssChunks.get( location );
-        chunkSet.keep( false );
+        chunkSet.keep( false, location.world() );
         locAssChunks.remove( location );
     }
 
@@ -1121,7 +1126,7 @@ public class Region extends FactoryValue<RegionKeys> {
                             perPlayerLocationQueue.get( playerId ).add( pair );
                         }
                     } else {
-                        chunkSet.keep( false );
+                        chunkSet.keep( false, location.world() );
                         locAssChunks.remove( location );
                     }
                 } );

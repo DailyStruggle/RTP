@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
+import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 
@@ -16,9 +17,9 @@ import java.util.logging.Level;
  */
 public final class ChunkSet {
     /**
-     * List of futures for the chunks in the set
+     * List of futures for the chunk keys in the set
      */
-    public final List<CompletableFuture<RTPChunk<?>>> chunks;
+    public final List<CompletableFuture<Long>> chunks;
 
     /**
      * Future that completes when all chunks are loaded
@@ -30,7 +31,7 @@ public final class ChunkSet {
      * @param chunks the list of futures for the chunks
      * @param complete the future that completes when all chunks are loaded
      */
-    public ChunkSet( List<CompletableFuture<RTPChunk<?>>> chunks, CompletableFuture<Boolean> complete ) {
+    public ChunkSet( List<CompletableFuture<Long>> chunks, CompletableFuture<Boolean> complete ) {
         this.chunks = chunks;
         this.complete = complete;
 
@@ -55,17 +56,21 @@ public final class ChunkSet {
      * Set whether the chunks in the set should be kept loaded
      * @param keep true to keep loaded, false otherwise
      */
-    public void keep( boolean keep ) {
+    public void keep( boolean keep, RTPWorld<?> world ) {
         chunks.forEach( chunk -> {
             if ( chunk.isDone() ) {
                 try {
-                    RTPChunk<?> rtpChunk = chunk.get();
-                    rtpChunk.keep( keep );
+                    Long key = chunk.get();
+                    RTPChunk<?> rtpChunk = world.getCachedChunk( key );
+                    if( rtpChunk != null ) rtpChunk.keep( keep );
                 } catch ( InterruptedException | ExecutionException e ) {
                     RTP.log( Level.WARNING, e.getMessage(), e );
                 }
             } else {
-                chunk.thenAccept( chunk1 -> chunk1.keep( keep) );
+                chunk.thenAccept( key -> {
+                    RTPChunk<?> rtpChunk = world.getCachedChunk( key );
+                    if( rtpChunk != null ) rtpChunk.keep( keep );
+                });
             }
         } );
     }

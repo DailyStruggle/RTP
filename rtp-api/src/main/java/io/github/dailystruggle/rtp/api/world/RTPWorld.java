@@ -31,12 +31,19 @@ public abstract class RTPWorld<T> {
     public abstract UUID id();
 
     /**
-     * Get a chunk in the world
+     * Get the chunk at the specified coordinates asynchronously
      * @param chunkX the x coordinate of the chunk
      * @param chunkZ the z coordinate of the chunk
-     * @return a future that completes with the chunk
+     * @return a future that completes with the chunk key
      */
-    public abstract CompletableFuture<RTPChunk<?>> getChunkAt( int chunkX, int chunkZ );
+    public abstract CompletableFuture<Long> getChunkAt( int chunkX, int chunkZ );
+
+    /**
+     * Get a cached chunk by its key
+     * @param key the chunk key
+     * @return the chunk, or null if not cached
+     */
+    public abstract RTPChunk<?> getCachedChunk( long key );
 
     /**
      * Keep a chunk loaded

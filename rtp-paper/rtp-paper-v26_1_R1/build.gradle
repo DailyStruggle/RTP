@@ -1,0 +1,13 @@
+plugins {
+    id 'java-library'
+}
+
+dependencies {
+    implementation project(':rtp-paper:rtp-paper-common')
+    compileOnly 'io.papermc.paper:paper-api:26.1-R0.1-SNAPSHOT'
+    testImplementation 'io.papermc.paper:paper-api:26.1-R0.1-SNAPSHOT'
+}
+
+test {
+    useJUnitPlatform()
+}

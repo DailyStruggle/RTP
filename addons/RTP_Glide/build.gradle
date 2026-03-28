@@ -19,8 +19,8 @@ dependencies {
     compileOnly 'org.spigotmc:spigot-api:1.17.1-R0.1-SNAPSHOT'
     compileOnly project(':rtp-api')
     compileOnly project(':rtp-core')
-    compileOnly project(':rtp-spigot-v1_20_R1')
-    compileOnly project(':rtp-paper-v1_20_R1')
+    compileOnly project(':rtp-spigot:rtp-spigot-v1_20_R1')
+    compileOnly project(':rtp-paper:rtp-paper-v1_20_R1')
     compileOnly project(':rtp-plugin')
 }
 

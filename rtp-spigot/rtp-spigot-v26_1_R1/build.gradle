@@ -1,0 +1,13 @@
+plugins {
+    id 'java-library'
+}
+
+dependencies {
+    implementation project(':rtp-spigot:rtp-spigot-common')
+    compileOnly 'org.spigotmc:spigot-api:26.1-R0.1-SNAPSHOT'
+    testImplementation 'org.spigotmc:spigot-api:26.1-R0.1-SNAPSHOT'
+}
+
+test {
+    useJUnitPlatform()
+}
