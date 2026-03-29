@@ -38,16 +38,24 @@ public class FoliaRegionProcessor implements Runnable {
             task.run();
         }
 
-        if (!queue.isEmpty()) {
-            World world = Bukkit.getWorld(key.worldId());
+        if (queue.isEmpty()) {
+            activeProcessors.remove(key);
+            // Double-check in case a task was injected during removal
+            if (!queue.isEmpty() && activeProcessors.add(key)) {
+                org.bukkit.World world = org.bukkit.Bukkit.getWorld(key.worldId());
+                if (world != null) {
+                    org.bukkit.Location loc = new org.bukkit.Location(world, key.regionX() << 9, 0, key.regionZ() << 9);
+                    org.bukkit.Bukkit.getRegionScheduler().runDelayed(plugin, loc, scheduledTask -> this.run(), 1L);
+                }
+            }
+        } else {
+            org.bukkit.World world = org.bukkit.Bukkit.getWorld(key.worldId());
             if (world != null) {
-                Location loc = new Location(world, key.regionX() << 9, 0, key.regionZ() << 9);
-                Bukkit.getRegionScheduler().runDelayed(plugin, loc, scheduledTask -> this.run(), 1L);
+                org.bukkit.Location loc = new org.bukkit.Location(world, key.regionX() << 9, 0, key.regionZ() << 9);
+                org.bukkit.Bukkit.getRegionScheduler().runDelayed(plugin, loc, scheduledTask -> this.run(), 1L);
             } else {
                 activeProcessors.remove(key);
             }
-        } else {
-            activeProcessors.remove(key);
         }
     }
 }
