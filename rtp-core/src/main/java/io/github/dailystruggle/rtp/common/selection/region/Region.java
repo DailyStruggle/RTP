@@ -71,7 +71,7 @@ public class Region extends FactoryValue<RegionKeys> {
     super(RegionKeys.class, name);
     this.name = name;
     this.data.putAll(params);
-    this.cachePipeline = (RTPTaskPipe) RTP.serverAccessor.createTaskPipe();
+    this.cachePipeline = (RTPTaskPipe) RTP.serverAccessor.createCachePipe();
     this.miscPipeline = (RTPTaskPipe) RTP.serverAccessor.createTaskPipe();
 
     ConfigParser<LoggingKeys> logging =
@@ -1268,7 +1268,7 @@ public class Region extends FactoryValue<RegionKeys> {
       final long cacheCap = getNumber(RegionKeys.cacheCap, 10L).longValue();
       final long playerQueueSize = playerQueue.size();
       final long totalCap = Math.max(cacheCap, playerQueueSize);
-      Map.Entry<RTPCoords, Long> pair = getLocation(null);
+      Map.Entry<RTPCoords, Long> pair = Region.this.getLocation((java.util.Set<String>) null);
       if (pair != null) {
         RTPCoords coords = pair.getKey();
         if (coords == null) {

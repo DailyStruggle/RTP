@@ -104,7 +104,7 @@ public final class LoadChunks extends RTPRunnable {
   }
 
   @Override
-  public RTPLocation getLocation() {
+  public io.github.dailystruggle.rtp.api.world.RTPLocation getLocation() {
     return new RTPLocation(
         RTP.serverAccessor.getRTPWorld(coords.worldName()), coords.x(), coords.y(), coords.z());
   }

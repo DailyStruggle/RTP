@@ -351,6 +351,11 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   }
 
   @Override
+  public RTPTaskPipe createCachePipe() {
+    return new TimeBoundTaskPipe();
+  }
+
+  @Override
   public void setBiomeGetter(Function<RTPLocation, String> getter) {
     BukkitRTPWorld.setBiomeGetter(
         location ->

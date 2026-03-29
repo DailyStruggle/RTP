@@ -104,4 +104,6 @@ public interface RTPServerAccessor {
   boolean setShapeFunction(java.util.function.Function<String, ?> shapeFunction);
 
   Object createTaskPipe();
+
+  Object createCachePipe();
 }

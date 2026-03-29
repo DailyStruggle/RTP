@@ -15,8 +15,8 @@ import io.github.dailystruggle.rtp.folia.entity.FoliaRTPCommandSender;
 import io.github.dailystruggle.rtp.folia.entity.FoliaRTPPlayer;
 import io.github.dailystruggle.rtp.folia.world.FoliaRTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
+import io.github.dailystruggle.rtp.folia.tasks.CountBoundTaskPipe;
 import io.github.dailystruggle.rtp.folia.tasks.FoliaRegionProcessor;
-import io.github.dailystruggle.rtp.folia.tasks.FoliaTaskDispatcher;
 import io.github.dailystruggle.rtp.folia.tasks.RegionKey;
 import java.io.File;
 import java.util.*;
@@ -306,7 +306,12 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
 
   @Override
   public RTPTaskPipe createTaskPipe() {
-    return new FoliaTaskDispatcher(10);
+    return new CountBoundTaskPipe((Plugin) plugin, 10);
+  }
+
+  @Override
+  public RTPTaskPipe createCachePipe() {
+    return new CountBoundTaskPipe((Plugin) plugin, 20);
   }
 
   @Override
