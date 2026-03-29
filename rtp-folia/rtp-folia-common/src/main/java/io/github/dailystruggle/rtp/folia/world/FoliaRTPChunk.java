@@ -1,9 +1,9 @@
 package io.github.dailystruggle.rtp.folia.world;
 
-import io.github.dailystruggle.rtp.api.world.RTPBlock;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
+import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.spigot.world.BukkitRTPBlock;
+import io.github.dailystruggle.rtp.folia.world.FoliaRTPWorld;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 
@@ -37,9 +37,30 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
     chunk.getWorld().setChunkForceLoaded(chunk.getX(), chunk.getZ(), keep);
   }
 
+
   @Override
-  public RTPBlock<?> getBlockAt(int x, int y, int z) {
-    return new BukkitRTPBlock(chunk.getBlock(x & 0xF, y, z & 0xF));
+  public boolean isAir(int x, int y, int z) {
+    return chunk.getBlock(x & 0xF, y, z & 0xF).getType().isAir();
+  }
+
+  @Override
+  public int getSkyLight(int x, int y, int z) {
+    return chunk.getBlock(x & 0xF, y, z & 0xF).getLightFromSky();
+  }
+
+  @Override
+  public int getSurfaceHeight(int x, int z) {
+    x = Math.max(0, Math.min(15, x));
+    z = Math.max(0, Math.min(15, z));
+    int globalX = (chunk.getX() << 4) + x;
+    int globalZ = (chunk.getZ() << 4) + z;
+    return chunk.getWorld().getHighestBlockYAt(globalX, globalZ, org.bukkit.HeightMap.MOTION_BLOCKING_NO_LEAVES);
+  }
+
+  @Override
+  public boolean isSafe(int x, int y, int z, java.util.Set<String> unsafeBlocks) {
+    String materialName = chunk.getBlock(x & 0xF, y, z & 0xF).getType().name();
+    return !unsafeBlocks.contains(materialName);
   }
 
   @Override

@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
-import io.github.dailystruggle.rtp.api.world.RTPBlock;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -17,14 +16,14 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E> {
-  protected final List<Predicate<RTPBlock<?>>> verifiers;
+  protected final List<Predicate<RTPCoords>> verifiers;
 
   public String name;
 
   protected VerticalAdjustor(
       Class<E> eClass,
       String name,
-      List<Predicate<RTPBlock<?>>> verifiers,
+      List<Predicate<RTPCoords>> verifiers,
       EnumMap<E, Object> def) {
     super(eClass, name);
     this.verifiers = verifiers;
@@ -42,7 +41,7 @@ public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E
 
   public abstract @Nullable RTPCoords adjust(@NotNull RTPChunk input);
 
-  public abstract boolean testPlacement(@NotNull RTPBlock<?> location);
+  public abstract boolean testPlacement(@NotNull RTPCoords coords);
 
   public abstract Map<String, CommandParameter> getParameters();
 

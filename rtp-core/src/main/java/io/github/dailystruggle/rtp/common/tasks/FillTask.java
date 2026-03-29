@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.common.tasks;
 
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
-import io.github.dailystruggle.rtp.api.world.RTPBlock;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
@@ -334,7 +333,6 @@ public class FillTask extends RTPRunnable {
           }
 
           // todo: waterlogged check
-          RTPBlock<?> block;
           RTPChunk<?> chunk1;
           Map<Long, RTPChunk<?>> chunks = new HashMap<>();
           long initialKey = ((long) chunk.x() & 0xFFFFFFFFL) | (((long) chunk.z() & 0xFFFFFFFFL) << 32);
@@ -366,8 +364,7 @@ public class FillTask extends RTPRunnable {
                 for (int y = coords.y() - safetyRadius;
                     y < coords.y() + safetyRadius && pass;
                     y++) {
-                  block = chunk1.getBlockAt(xx, y, zz);
-                  if (unsafeBlocks.contains(block.getMaterial())) {
+                  if (!chunk1.isSafe(xx, y, zz, unsafeBlocks)) {
                     pass = false;
                   }
                 }

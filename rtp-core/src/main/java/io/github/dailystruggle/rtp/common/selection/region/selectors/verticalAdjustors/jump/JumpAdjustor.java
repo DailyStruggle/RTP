@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.jump;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
-import io.github.dailystruggle.rtp.api.world.RTPBlock;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -47,7 +46,7 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
     // subParameter removed
   }
 
-  public JumpAdjustor(List<Predicate<RTPBlock<?>>> verifiers) {
+  public JumpAdjustor(List<Predicate<RTPCoords>> verifiers) {
     super(JumpAdjustorKeys.class, "jump", verifiers, defaults);
   }
 
@@ -99,10 +98,12 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
     for (List<Integer> xz : testCoords) {
       int x = xz.get(0);
       int z = xz.get(1);
+      int globalX = (chunk.x() << 4) + x;
+      int globalZ = (chunk.z() << 4) + z;
 
       for (int i = minY; i < maxY; i++) {
-        RTPBlock blockAt = chunk.getBlockAt(x, i, z);
-        if (!blockAt.isAir() && !unsafeBlocks.contains(blockAt.getMaterial())) {
+        if (chunk.isAir(x, i, z)) continue;
+        if (!chunk.isSafe(x, i, z, unsafeBlocks)) {
           minY = i;
           break;
         }
@@ -110,20 +111,12 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
 
       for (int it_len = step; it_len > 2; it_len = it_len / 2) {
         for (int i = minY; i < maxY; i += it_len) {
-          RTPBlock block1;
-          try {
-            block1 = chunk.getBlockAt(x, i, z);
-          } catch (NullPointerException exception) {
-            exception.printStackTrace();
-            return null;
-          }
-          RTPBlock block2 = chunk.getBlockAt(x, i + 1, z);
           int skylight = 15;
-          if (requireSkyLight) skylight = block2.skyLight();
-          if (block1.isAir()
-              && block2.isAir()
+          if (requireSkyLight) skylight = chunk.getSkyLight(x, i + 1, z);
+          if (chunk.isAir(x, i, z)
+              && chunk.isAir(x, i + 1, z)
               && skylight > 7
-              && !unsafeBlocks.contains(block2.getMaterial())) {
+              && chunk.isSafe(x, i + 1, z, unsafeBlocks)) {
             minY = oldY;
             maxY = i;
             break;
@@ -134,19 +127,16 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
       }
 
       for (int i = minY; i < maxY; i++) {
-        RTPBlock block0 = chunk.getBlockAt(x, i - 1, z);
-        RTPBlock block1 = chunk.getBlockAt(x, i, z);
-        RTPBlock block2 = chunk.getBlockAt(x, i + 1, z);
         int skylight = 15;
-        if (requireSkyLight) skylight = block2.skyLight();
-        if (!block0.isAir()
-            && block1.isAir()
-            && block2.isAir()
+        if (requireSkyLight) skylight = chunk.getSkyLight(x, i + 1, z);
+        if (!chunk.isAir(x, i - 1, z)
+            && chunk.isAir(x, i, z)
+            && chunk.isAir(x, i + 1, z)
             && skylight > 7
-            && !unsafeBlocks.contains(block2.getMaterial())
-            && !unsafeBlocks.contains(block1.getMaterial())
-            && !unsafeBlocks.contains(block0.getMaterial())) {
-          return new RTPCoords(chunk.getWorld().name(), block1.x(), block1.y(), block1.z());
+            && chunk.isSafe(x, i + 1, z, unsafeBlocks)
+            && chunk.isSafe(x, i, z, unsafeBlocks)
+            && chunk.isSafe(x, i - 1, z, unsafeBlocks)) {
+          return new RTPCoords(chunk.getWorld().name(), globalX, i, globalZ);
         }
       }
     }
@@ -154,9 +144,9 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
   }
 
   @Override
-  public boolean testPlacement(@NotNull RTPBlock<?> block) {
-    for (Predicate<RTPBlock<?>> rtpLocationPredicate : verifiers) {
-      if (!rtpLocationPredicate.test(block)) return false;
+  public boolean testPlacement(@NotNull RTPCoords coords) {
+    for (Predicate<RTPCoords> rtpLocationPredicate : verifiers) {
+      if (!rtpLocationPredicate.test(coords)) return false;
     }
     return true;
   }

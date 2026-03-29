@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
-import io.github.dailystruggle.rtp.api.world.RTPBlock;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -48,7 +47,7 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
     // subParameter removed
   }
 
-  public LinearAdjustor(List<Predicate<RTPBlock<?>>> verifiers) {
+  public LinearAdjustor(List<Predicate<RTPCoords>> verifiers) {
     super(GenericVerticalAdjustorKeys.class, "linear", verifiers, defaults);
   }
 
@@ -96,21 +95,30 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
     for (List<Integer> xz : testCoords) {
       int x = xz.get(0);
       int z = xz.get(1);
+      int globalX = (chunk.x() << 4) + x;
+      int globalZ = (chunk.z() << 4) + z;
+      if (requireSkyLight) {
+        int y = chunk.getSurfaceHeight(x, z);
+        if (y >= minY && y < maxY) {
+          if (chunk.isSafe(x, y, z, unsafeBlocks)) {
+            return new RTPCoords(chunk.getWorld().name(), globalX, y + 1, globalZ);
+          }
+        }
+        continue; // Sky light is required, so do not check lower blocks.
+      }
       switch (dir) {
         case 0:
           { // bottom up
             for (int i = minY; i < maxY; i++) {
-              RTPBlock block1 = chunk.getBlockAt(x, i, z);
-              RTPBlock block2 = chunk.getBlockAt(x, i + 1, z);
               int skylight = 15;
-              if (requireSkyLight) skylight = block2.skyLight();
-              if (block1.isAir()
-                  && block2.isAir()
-                  && skylight > 7
-                  && !unsafeBlocks.contains(block2.getMaterial())
-                  && !unsafeBlocks.contains(block1.getMaterial())
-                  && !unsafeBlocks.contains(chunk.getBlockAt(x, i - 1, z).getMaterial())) {
-                return new RTPCoords(chunk.getWorld().name(), block1.x(), block1.y(), block1.z());
+              if (requireSkyLight) skylight = chunk.getSkyLight(x, i + 1, z);
+              if (skylight > 7
+                  && chunk.isSafe(x, i, z, unsafeBlocks)
+                  && chunk.isSafe(x, i + 1, z, unsafeBlocks)
+                  && chunk.isSafe(x, i - 1, z, unsafeBlocks)) {
+                if (chunk.isAir(x, i, z) && chunk.isAir(x, i + 1, z)) {
+                  return new RTPCoords(chunk.getWorld().name(), globalX, i, globalZ);
+                }
               }
             }
             break;
@@ -118,17 +126,15 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
         case 1:
           { // top down
             for (int i = maxY; i > minY; i--) {
-              RTPBlock block1 = chunk.getBlockAt(x, i, z);
-              RTPBlock block2 = chunk.getBlockAt(x, i + 1, z);
               int skylight = 15;
-              if (requireSkyLight) skylight = block2.skyLight();
-              if (block1.isAir()
-                  && block2.isAir()
-                  && skylight > 7
-                  && !unsafeBlocks.contains(block2.getMaterial())
-                  && !unsafeBlocks.contains(block1.getMaterial())
-                  && !unsafeBlocks.contains(chunk.getBlockAt(x, i - 1, z).getMaterial())) {
-                return new RTPCoords(chunk.getWorld().name(), block1.x(), block1.y(), block1.z());
+              if (requireSkyLight) skylight = chunk.getSkyLight(x, i + 1, z);
+              if (skylight > 7
+                  && chunk.isSafe(x, i, z, unsafeBlocks)
+                  && chunk.isSafe(x, i + 1, z, unsafeBlocks)
+                  && chunk.isSafe(x, i - 1, z, unsafeBlocks)) {
+                if (chunk.isAir(x, i, z) && chunk.isAir(x, i + 1, z)) {
+                  return new RTPCoords(chunk.getWorld().name(), globalX, i, globalZ);
+                }
               }
             }
             break;
@@ -140,31 +146,29 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
             int middle = minY + maxDistance;
             for (int i = 0; i <= maxDistance; i++) {
               // try top
-              RTPBlock block1 = chunk.getBlockAt(x, middle + i, z);
-              RTPBlock block2 = chunk.getBlockAt(x, middle + i + 1, z);
+              int y = middle + i;
               int skylight = 15;
-              if (requireSkyLight) skylight = block2.skyLight();
-              if (block1.isAir()
-                  && block2.isAir()
-                  && skylight > 7
-                  && !unsafeBlocks.contains(block2.getMaterial())
-                  && !unsafeBlocks.contains(block1.getMaterial())
-                  && !unsafeBlocks.contains(chunk.getBlockAt(x, middle + i - 1, z).getMaterial())) {
-                return new RTPCoords(chunk.getWorld().name(), block1.x(), block1.y(), block1.z());
+              if (requireSkyLight) skylight = chunk.getSkyLight(x, y + 1, z);
+              if (skylight > 7
+                  && chunk.isSafe(x, y, z, unsafeBlocks)
+                  && chunk.isSafe(x, y + 1, z, unsafeBlocks)
+                  && chunk.isSafe(x, y - 1, z, unsafeBlocks)) {
+                if (chunk.isAir(x, y, z) && chunk.isAir(x, y + 1, z)) {
+                  return new RTPCoords(chunk.getWorld().name(), globalX, y, globalZ);
+                }
               }
 
               // try bottom
-              block1 = chunk.getBlockAt(x, middle - i, z);
-              block2 = chunk.getBlockAt(x, middle - i + 1, z);
+              y = middle - i;
               skylight = 15;
-              if (requireSkyLight) skylight = block2.skyLight();
-              if (block1.isAir()
-                  && block2.isAir()
-                  && skylight > 7
-                  && !unsafeBlocks.contains(block2.getMaterial())
-                  && !unsafeBlocks.contains(block1.getMaterial())
-                  && !unsafeBlocks.contains(chunk.getBlockAt(x, middle - i - 1, z).getMaterial())) {
-                return new RTPCoords(chunk.getWorld().name(), block1.x(), block1.y(), block1.z());
+              if (requireSkyLight) skylight = chunk.getSkyLight(x, y + 1, z);
+              if (skylight > 7
+                  && chunk.isSafe(x, y, z, unsafeBlocks)
+                  && chunk.isSafe(x, y + 1, z, unsafeBlocks)
+                  && chunk.isSafe(x, y - 1, z, unsafeBlocks)) {
+                if (chunk.isAir(x, y, z) && chunk.isAir(x, y + 1, z)) {
+                  return new RTPCoords(chunk.getWorld().name(), globalX, y, globalZ);
+                }
               }
             }
             break;
@@ -176,31 +180,29 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
             int middle = minY + maxDistance;
             for (int i = maxDistance; i >= 0; i--) {
               // try top
-              RTPBlock block1 = chunk.getBlockAt(x, middle + i, z);
-              RTPBlock block2 = chunk.getBlockAt(x, middle + i + 1, z);
+              int y = middle + i;
               int skylight = 15;
-              if (requireSkyLight) skylight = block2.skyLight();
-              if (block1.isAir()
-                  && block2.isAir()
-                  && skylight > 7
-                  && !unsafeBlocks.contains(block2.getMaterial())
-                  && !unsafeBlocks.contains(block1.getMaterial())
-                  && !unsafeBlocks.contains(chunk.getBlockAt(x, middle + i - 1, z).getMaterial())) {
-                return new RTPCoords(chunk.getWorld().name(), block1.x(), block1.y(), block1.z());
+              if (requireSkyLight) skylight = chunk.getSkyLight(x, y + 1, z);
+              if (skylight > 7
+                  && chunk.isSafe(x, y, z, unsafeBlocks)
+                  && chunk.isSafe(x, y + 1, z, unsafeBlocks)
+                  && chunk.isSafe(x, y - 1, z, unsafeBlocks)) {
+                if (chunk.isAir(x, y, z) && chunk.isAir(x, y + 1, z)) {
+                  return new RTPCoords(chunk.getWorld().name(), globalX, y, globalZ);
+                }
               }
 
               // try bottom
-              block1 = chunk.getBlockAt(x, middle - i, z);
-              block2 = chunk.getBlockAt(x, middle - i + 1, z);
+              y = middle - i;
               skylight = 15;
-              if (requireSkyLight) skylight = block2.skyLight();
-              if (block1.isAir()
-                  && block2.isAir()
-                  && skylight > 7
-                  && !unsafeBlocks.contains(block2.getMaterial())
-                  && !unsafeBlocks.contains(block1.getMaterial())
-                  && !unsafeBlocks.contains(chunk.getBlockAt(x, middle - i - 1, z).getMaterial())) {
-                return new RTPCoords(chunk.getWorld().name(), block1.x(), block1.y(), block1.z());
+              if (requireSkyLight) skylight = chunk.getSkyLight(x, y + 1, z);
+              if (skylight > 7
+                  && chunk.isSafe(x, y, z, unsafeBlocks)
+                  && chunk.isSafe(x, y + 1, z, unsafeBlocks)
+                  && chunk.isSafe(x, y - 1, z, unsafeBlocks)) {
+                if (chunk.isAir(x, y, z) && chunk.isAir(x, y + 1, z)) {
+                  return new RTPCoords(chunk.getWorld().name(), globalX, y, globalZ);
+                }
               }
             }
             break;
@@ -218,17 +220,15 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
 
             // try each
             for (int i : trials) {
-              RTPBlock block1 = chunk.getBlockAt(x, i, z);
-              RTPBlock block2 = chunk.getBlockAt(x, i + 1, z);
               int skylight = 15;
-              if (requireSkyLight) skylight = block2.skyLight();
-              if (block1.isAir()
-                  && block2.isAir()
-                  && skylight > 7
-                  && !unsafeBlocks.contains(block2.getMaterial())
-                  && !unsafeBlocks.contains(block1.getMaterial())
-                  && !unsafeBlocks.contains(chunk.getBlockAt(x, i - 1, z).getMaterial())) {
-                return new RTPCoords(chunk.getWorld().name(), block1.x(), block1.y(), block1.z());
+              if (requireSkyLight) skylight = chunk.getSkyLight(x, i + 1, z);
+              if (skylight > 7
+                  && chunk.isSafe(x, i, z, unsafeBlocks)
+                  && chunk.isSafe(x, i + 1, z, unsafeBlocks)
+                  && chunk.isSafe(x, i - 1, z, unsafeBlocks)) {
+                if (chunk.isAir(x, i, z) && chunk.isAir(x, i + 1, z)) {
+                  return new RTPCoords(chunk.getWorld().name(), globalX, i, globalZ);
+                }
               }
             }
           }
@@ -238,9 +238,9 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
   }
 
   @Override
-  public boolean testPlacement(@NotNull RTPBlock<?> block) {
-    for (Predicate<RTPBlock<?>> rtpLocationPredicate : verifiers) {
-      if (!rtpLocationPredicate.test(block)) return false;
+  public boolean testPlacement(@NotNull RTPCoords coords) {
+    for (Predicate<RTPCoords> rtpLocationPredicate : verifiers) {
+      if (!rtpLocationPredicate.test(coords)) return false;
     }
     return true;
   }

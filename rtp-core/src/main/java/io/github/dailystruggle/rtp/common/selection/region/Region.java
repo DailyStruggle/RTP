@@ -4,7 +4,6 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.api.world.RTPBlock;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
@@ -412,8 +411,7 @@ public class Region extends FactoryValue<RegionKeys> {
 
             for (int y = left.y() - safe; y < left.y() + safe && pass; y++) {
               if (y > world.getMaxHeight() || y < world.getMinHeight()) continue;
-              RTPBlock block = chunk1.getBlockAt(xx, y, zz);
-              if (unsafeBlocks.contains(block.getMaterial())) {
+              if (!chunk1.isSafe(xx, y, zz, unsafeBlocks)) {
                 pass = false;
                 break;
               }
@@ -765,7 +763,6 @@ public class Region extends FactoryValue<RegionKeys> {
       boolean pass = true;
 
       // todo: waterlogged check
-      RTPBlock block;
       RTPChunk chunk1;
       Map<Long, RTPChunk> chunks = new HashMap<>();
       long initialChunkKey = ((long) chunk.x() & 0xFFFFFFFFL) | (((long) chunk.z() & 0xFFFFFFFFL) << 32);
@@ -822,21 +819,8 @@ public class Region extends FactoryValue<RegionKeys> {
 
           for (int y = finalY - safetyRadius; y < finalY + safetyRadius && pass; y++) {
             if (y > getWorld().getMaxHeight() || y < getWorld().getMinHeight()) continue;
-            block = chunk1.getBlockAt(xx, y, zz);
-            String material = block.getMaterial();
-            if (unsafeBlocks.contains(block.getMaterial())) {
+            if (!chunk1.isSafe(xx, y, zz, unsafeBlocks)) {
               pass = false;
-              if (verbose) {
-                String key = "material=" + material;
-                failMap
-                    .get(FailTypes.safety)
-                    .compute(
-                        key,
-                        (s, aLong) -> {
-                          if (aLong == null) return 1L;
-                          return ++aLong;
-                        });
-              }
             }
           }
         }
