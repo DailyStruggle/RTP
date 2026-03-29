@@ -19,6 +19,8 @@ import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.spigot.entity.BukkitRTPCommandSender;
 import io.github.dailystruggle.rtp.spigot.entity.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.spigot.world.BukkitRTPWorld;
+import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
+import io.github.dailystruggle.rtp.common.tasks.TimeBoundTaskPipe;
 import java.io.File;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -168,6 +170,11 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   public abstract @NotNull io.github.dailystruggle.rtp.api.world.RTPChunkManager getChunkManager();
 
   @Override
+  public void executeTask(io.github.dailystruggle.rtp.common.tasks.RTPRunnable task) {
+    task.run();
+  }
+
+  @Override
   public @Nullable Object getShape(String name) {
     return shapeFunction.apply(name);
   }
@@ -302,6 +309,8 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
         .collect(Collectors.toSet());
   }
 
+  private Object plugin;
+
   @Override
   public void stop() {
     // Implementation
@@ -309,7 +318,19 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   @Override
   public void start() {
-    // Implementation
+    start(plugin);
+  }
+
+  @Override
+  public void start(Object plugin) {
+    this.plugin = plugin;
+    if (!(plugin instanceof org.bukkit.plugin.java.JavaPlugin)) return;
+    org.bukkit.plugin.java.JavaPlugin javaPlugin = (org.bukkit.plugin.java.JavaPlugin) plugin;
+
+    new io.github.dailystruggle.rtp.spigot.server.SyncTeleportProcessing().runTaskTimer(javaPlugin, 0, 1);
+    new io.github.dailystruggle.rtp.spigot.server.AsyncTeleportProcessing(javaPlugin).runTaskTimer(javaPlugin, 0, 1);
+    new io.github.dailystruggle.rtp.spigot.server.FillTaskProcessing(javaPlugin).runTaskTimer(javaPlugin, 0, 1);
+    new io.github.dailystruggle.rtp.spigot.server.DatabaseProcessing(javaPlugin).runTaskTimer(javaPlugin, 0, 1);
   }
 
   @Override
@@ -322,6 +343,11 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   public boolean setWorldBorderFunction(Function<String, ?> function) {
     this.worldBorderFunction = (Function<String, WorldBorder>) function;
     return true;
+  }
+
+  @Override
+  public RTPTaskPipe createTaskPipe() {
+    return new TimeBoundTaskPipe();
   }
 
   @Override

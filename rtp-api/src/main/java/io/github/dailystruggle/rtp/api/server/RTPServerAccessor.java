@@ -82,6 +82,8 @@ public interface RTPServerAccessor {
 
   void start();
 
+  void start(Object plugin);
+
   void setBiomeGetter(
       java.util.function.Function<io.github.dailystruggle.rtp.api.world.RTPLocation, String>
           getter);
@@ -91,11 +93,15 @@ public interface RTPServerAccessor {
               io.github.dailystruggle.rtp.api.world.RTPWorld<?>, java.util.Set<String>>
           getter);
 
+  void executeTask(io.github.dailystruggle.rtp.common.tasks.RTPRunnable task);
+
   Object getWorldBorder(String worldName);
 
   Object getShape(String name);
 
   boolean setWorldBorderFunction(Function<String, ?> function);
 
-  boolean setShapeFunction(Function<String, ?> shapeFunction);
+  boolean setShapeFunction(java.util.function.Function<String, ?> shapeFunction);
+
+  Object createTaskPipe();
 }

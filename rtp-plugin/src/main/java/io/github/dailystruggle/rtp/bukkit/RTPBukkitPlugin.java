@@ -5,11 +5,11 @@ import io.github.dailystruggle.effectsapi.EffectsAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.bukkit.commands.RTPCmdBukkit;
 import io.github.dailystruggle.rtp.bukkit.events.*;
-import io.github.dailystruggle.rtp.bukkit.server.AsyncTeleportProcessing;
-import io.github.dailystruggle.rtp.bukkit.server.DatabaseProcessing;
-import io.github.dailystruggle.rtp.bukkit.server.FillTaskProcessing;
-import io.github.dailystruggle.rtp.bukkit.server.SyncTeleportProcessing;
 import io.github.dailystruggle.rtp.bukkit.spigotListeners.*;
+import io.github.dailystruggle.rtp.spigot.server.AsyncTeleportProcessing;
+import io.github.dailystruggle.rtp.spigot.server.DatabaseProcessing;
+import io.github.dailystruggle.rtp.spigot.server.FillTaskProcessing;
+import io.github.dailystruggle.rtp.spigot.server.SyncTeleportProcessing;
 import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.ChunkyBorderChecker;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.PAPI_expansion;
@@ -45,10 +45,6 @@ public final class RTPBukkitPlugin extends JavaPlugin {
   private static Metrics metrics;
   public BukkitTask commandTimer = null;
   public BukkitTask commandProcessing = null;
-  public BukkitTask asyncTimer = null;
-  public BukkitTask syncTimer = null;
-  public BukkitTask fillTimer = null;
-  public BukkitTask databaseTimer = null;
 
   /**
    * @return the single plugin instance initialized at bukkit startup, faster than bukkit api
@@ -233,7 +229,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         },
         1);
 
-    RTP.scheduler.runTaskLater(RTP.serverAccessor::start, 1);
+    RTP.scheduler.runTaskLater(() -> RTP.serverAccessor.start(this), 1);
     //        setupEffects();
     //        if( RTP.serverAccessor.getServerIntVersion()>12 ) {
     //            BukkitTask task = Bukkit.getScheduler().runTask( this, this::setupEffects );
@@ -281,11 +277,6 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     } catch (NoClassDefFoundError ignored) {
       // catch plugin replaced, no use for old logs
     }
-
-    if (syncTimer != null) syncTimer.cancel();
-    if (asyncTimer != null) asyncTimer.cancel();
-    if (fillTimer != null) fillTimer.cancel();
-    if (databaseTimer != null) databaseTimer.cancel();
 
     //        onChunkLoad.shutdown();
     metrics = null;

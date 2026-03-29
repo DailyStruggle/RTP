@@ -3,7 +3,7 @@ plugins {
 }
 
 dependencies {
-    implementation project(':rtp-folia:rtp-folia-common')
+    api project(':rtp-folia:rtp-folia-common')
     compileOnly 'io.papermc.paper:paper-api:1.21.3-R0.1-SNAPSHOT'
     testImplementation 'io.papermc.paper:paper-api:1.21.3-R0.1-SNAPSHOT'
 }

@@ -1,11 +1,11 @@
 package io.github.dailystruggle.rtp.common.tasks.teleport;
+import io.github.dailystruggle.rtp.api.world.RTPLocation;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
@@ -205,14 +205,31 @@ public final class DoTeleport extends RTPRunnable {
     return player;
   }
 
+  @Override
+  public RTPLocation getLocation() {
+    return getTargetLocation();
+  }
+
   /**
    * Get the target location
    *
    * @return the location
    */
-  public RTPLocation location() {
+  @Override
+  public RTPLocation getTargetLocation() {
     return new RTPLocation(
         RTP.serverAccessor.getRTPWorld(coords.worldName()), coords.x(), coords.y(), coords.z());
+  }
+
+  /**
+   * Get the target location
+   *
+   * @return the location
+   * @deprecated use {@link #getTargetLocation()}
+   */
+  @Deprecated
+  public RTPLocation location() {
+    return getTargetLocation();
   }
 
   /**

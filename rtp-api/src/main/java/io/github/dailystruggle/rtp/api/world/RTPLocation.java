@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.api.world;
 
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
 
 public final class RTPLocation implements Cloneable {
   private final RTPWorld<?> world;

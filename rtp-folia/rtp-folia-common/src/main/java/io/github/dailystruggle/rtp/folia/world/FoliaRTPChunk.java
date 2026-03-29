@@ -1,9 +1,7 @@
 package io.github.dailystruggle.rtp.folia.world;
 
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
-import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.folia.world.FoliaRTPWorld;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 

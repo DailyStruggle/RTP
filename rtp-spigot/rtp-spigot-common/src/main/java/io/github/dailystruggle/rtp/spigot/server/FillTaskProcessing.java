@@ -1,6 +1,5 @@
-package io.github.dailystruggle.rtp.bukkit.server;
+package io.github.dailystruggle.rtp.spigot.server;
 
-import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.tasks.FillTask;
 import java.util.Map;
@@ -8,12 +7,18 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.bukkit.Bukkit;
+import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
 public class FillTaskProcessing extends BukkitRunnable {
   private static final AtomicBoolean killed = new AtomicBoolean(false);
   private static final AtomicReference<BukkitTask> asyncTask = new AtomicReference<>(null);
+  private final JavaPlugin plugin;
+
+  public FillTaskProcessing(JavaPlugin plugin) {
+    this.plugin = plugin;
+  }
 
   public static void clear() {
     if (asyncTask.get() != null) asyncTask.get().cancel();
@@ -36,7 +41,7 @@ public class FillTaskProcessing extends BukkitRunnable {
     BukkitTask task =
         Bukkit.getScheduler()
             .runTaskAsynchronously(
-                RTPBukkitPlugin.getInstance(),
+                plugin,
                 () -> {
                   for (Map.Entry<String, FillTask> e : RTP.getInstance().fillTasks.entrySet()) {
                     if (e.getValue().isRunning()) continue;
@@ -45,7 +50,6 @@ public class FillTaskProcessing extends BukkitRunnable {
                   future.complete(true);
                 });
     asyncTask.set(task);
-    //        RTP.log( Level.SEVERE,"A - " + task.getTaskId() );
     future.thenAccept(aBoolean -> asyncTask.set(null));
   }
 

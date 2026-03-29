@@ -1,4 +1,4 @@
-package io.github.dailystruggle.rtp.bukkit.server;
+package io.github.dailystruggle.rtp.spigot.server;
 
 import io.github.dailystruggle.rtp.common.tasks.TPS;
 import io.github.dailystruggle.rtp.common.tasks.tick.SyncTaskProcessing;
@@ -29,7 +29,7 @@ public class SyncTeleportProcessing extends BukkitRunnable {
   @Override
   public void run() {
     if (killed) return;
-    syncTaskProcessing.run();
+    if (syncTaskProcessing != null) syncTaskProcessing.run();
   }
 
   @Override

@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.spigot.world;
 
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
-import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;

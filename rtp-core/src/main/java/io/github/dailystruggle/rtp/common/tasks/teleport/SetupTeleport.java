@@ -1,4 +1,5 @@
 package io.github.dailystruggle.rtp.common.tasks.teleport;
+import io.github.dailystruggle.rtp.api.world.RTPLocation;
 
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
@@ -122,6 +123,11 @@ public final class SetupTeleport extends RTPRunnable {
       throwable.printStackTrace();
       new RTPTeleportCancel(player.uuid()).run();
     }
+  }
+
+  public RTPLocation getTargetLocation() {
+    if (player == null) return null;
+    return player.getLocation();
   }
 
   public RTPCommandSender sender() {

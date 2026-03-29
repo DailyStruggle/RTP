@@ -52,4 +52,12 @@ public interface RTPScheduler {
       io.github.dailystruggle.rtp.api.entity.RTPPlayer player,
       io.github.dailystruggle.rtp.common.tasks.RTPRunnable task,
       long delayTicks);
+
+  /**
+   * Run a task on a specific region
+   *
+   * @param location the location of the region
+   * @param task the task to run
+   */
+  void runTask(io.github.dailystruggle.rtp.api.world.RTPLocation location, Runnable task);
 }

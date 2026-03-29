@@ -1,4 +1,5 @@
 package io.github.dailystruggle.rtp.common.tasks.teleport;
+import io.github.dailystruggle.rtp.api.world.RTPLocation;
 
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
@@ -100,6 +101,17 @@ public final class LoadChunks extends RTPRunnable {
       throwable.printStackTrace();
       new RTPTeleportCancel(player.uuid()).run();
     }
+  }
+
+  @Override
+  public RTPLocation getLocation() {
+    return new RTPLocation(
+        RTP.serverAccessor.getRTPWorld(coords.worldName()), coords.x(), coords.y(), coords.z());
+  }
+
+  public RTPLocation getTargetLocation() {
+    if (player == null) return null;
+    return player.getLocation();
   }
 
   public RTPCommandSender sender() {
