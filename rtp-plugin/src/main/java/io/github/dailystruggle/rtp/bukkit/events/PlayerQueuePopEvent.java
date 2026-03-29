@@ -1,40 +1,37 @@
 package io.github.dailystruggle.rtp.bukkit.events;
 
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import java.util.UUID;
 import org.bukkit.Bukkit;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.UUID;
-
 public class PlayerQueuePopEvent extends Event {
-    private static final HandlerList HANDLERS_LIST = new HandlerList();
-    private final Region region;
-    private final UUID playerId;
+  private static final HandlerList HANDLERS_LIST = new HandlerList();
+  private final Region region;
+  private final UUID playerId;
 
-    public PlayerQueuePopEvent(Region region, UUID playerId) {
-        super(!Bukkit.isPrimaryThread());
-        this.region = region;
-        this.playerId = playerId;
-    }
+  public PlayerQueuePopEvent(Region region, UUID playerId) {
+    super(!Bukkit.isPrimaryThread());
+    this.region = region;
+    this.playerId = playerId;
+  }
 
-    public static HandlerList getHandlerList() {
-        return HANDLERS_LIST;
-    }
+  public static HandlerList getHandlerList() {
+    return HANDLERS_LIST;
+  }
 
-    @Override
-    public @NotNull HandlerList getHandlers() {
-        return HANDLERS_LIST;
-    }
+  @Override
+  public @NotNull HandlerList getHandlers() {
+    return HANDLERS_LIST;
+  }
 
-    public Region getRegion() {
-        return region;
-    }
+  public Region getRegion() {
+    return region;
+  }
 
-    public UUID getPlayerId() {
-        return playerId;
-    }
+  public UUID getPlayerId() {
+    return playerId;
+  }
 }
-
-

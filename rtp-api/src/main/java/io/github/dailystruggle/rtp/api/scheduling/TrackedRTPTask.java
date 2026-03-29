@@ -1,98 +1,98 @@
 package io.github.dailystruggle.rtp.api.scheduling;
 
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
-
 import java.util.UUID;
 
 public class TrackedRTPTask extends RTPRunnable {
-    private final RTPRunnable task;
-    private final String trackingId;
-    private final long queuedTime;
-    private long startTime = -1;
-    private long endTime = -1;
-    public TrackedRTPTask(RTPRunnable task, UUID trackingId) {
-        this(task, trackingId.toString());
-    }
+  private final RTPRunnable task;
+  private final String trackingId;
+  private final long queuedTime;
+  private long startTime = -1;
+  private long endTime = -1;
 
-    public TrackedRTPTask(RTPRunnable task, String trackingId) {
-        this.task = task;
-        this.trackingId = trackingId;
-        this.queuedTime = System.currentTimeMillis();
-    }
+  public TrackedRTPTask(RTPRunnable task, UUID trackingId) {
+    this(task, trackingId.toString());
+  }
 
-    @Override
-    public boolean isCancelled() {
-        return task.isCancelled();
-    }
+  public TrackedRTPTask(RTPRunnable task, String trackingId) {
+    this.task = task;
+    this.trackingId = trackingId;
+    this.queuedTime = System.currentTimeMillis();
+  }
 
-    @Override
-    public void setCancelled(boolean cancel) {
-        task.setCancelled(cancel);
-    }
+  @Override
+  public boolean isCancelled() {
+    return task.isCancelled();
+  }
 
-    @Override
-    public long getDelay() {
-        return task.getDelay();
-    }
+  @Override
+  public void setCancelled(boolean cancel) {
+    task.setCancelled(cancel);
+  }
 
-    @Override
-    public void setDelay(long delay) {
-        task.setDelay(delay);
-    }
+  @Override
+  public long getDelay() {
+    return task.getDelay();
+  }
 
-    @Override
-    public boolean isRunning() {
-        return task.isRunning();
-    }
+  @Override
+  public void setDelay(long delay) {
+    task.setDelay(delay);
+  }
 
-    @Override
-    public void run() {
-        this.startTime = System.currentTimeMillis();
-        try {
-            task.run();
-        } finally {
-            this.endTime = System.currentTimeMillis();
-            if (io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor != null) {
-                io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor.removeAction(trackingId);
-            }
-        }
-    }
+  @Override
+  public boolean isRunning() {
+    return task.isRunning();
+  }
 
-    public TaskState getState() {
-        if (endTime != -1) return TaskState.COMPLETED;
-        if (startTime != -1) return TaskState.RUNNING;
-        return TaskState.PENDING;
+  @Override
+  public void run() {
+    this.startTime = System.currentTimeMillis();
+    try {
+      task.run();
+    } finally {
+      this.endTime = System.currentTimeMillis();
+      if (io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor != null) {
+        io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor.removeAction(trackingId);
+      }
     }
+  }
 
-    public long getDuration() {
-        if (startTime == -1) return 0;
-        if (endTime == -1) return System.currentTimeMillis() - startTime;
-        return endTime - startTime;
-    }
+  public TaskState getState() {
+    if (endTime != -1) return TaskState.COMPLETED;
+    if (startTime != -1) return TaskState.RUNNING;
+    return TaskState.PENDING;
+  }
 
-    public long getQueuedTime() {
-        return queuedTime;
-    }
+  public long getDuration() {
+    if (startTime == -1) return 0;
+    if (endTime == -1) return System.currentTimeMillis() - startTime;
+    return endTime - startTime;
+  }
 
-    public long getStartTime() {
-        return startTime;
-    }
+  public long getQueuedTime() {
+    return queuedTime;
+  }
 
-    public long getEndTime() {
-        return endTime;
-    }
+  public long getStartTime() {
+    return startTime;
+  }
 
-    public String getTrackingId() {
-        return trackingId;
-    }
+  public long getEndTime() {
+    return endTime;
+  }
 
-    public RTPRunnable getTask() {
-        return task;
-    }
+  public String getTrackingId() {
+    return trackingId;
+  }
 
-    public enum TaskState {
-        PENDING,
-        RUNNING,
-        COMPLETED
-    }
+  public RTPRunnable getTask() {
+    return task;
+  }
+
+  public enum TaskState {
+    PENDING,
+    RUNNING,
+    COMPLETED
+  }
 }

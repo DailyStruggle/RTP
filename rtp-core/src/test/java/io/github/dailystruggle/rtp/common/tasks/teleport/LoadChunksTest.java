@@ -1,13 +1,5 @@
 package io.github.dailystruggle.rtp.common.tasks.teleport;
 
-import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
-import io.github.dailystruggle.rtp.api.world.RTPChunkManager;
-import io.github.dailystruggle.rtp.common.RTP;
-import org.junit.jupiter.api.Test;
-
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -15,30 +7,39 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
+import io.github.dailystruggle.rtp.api.world.RTPChunkManager;
+import io.github.dailystruggle.rtp.common.RTP;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.Test;
+
 public class LoadChunksTest {
-    @Test
-    public void testFutureCompletion() throws Exception {
-        // This is a simplified test to demonstrate the future completion check
-        RTPServerAccessor serverAccessor = mock(RTPServerAccessor.class);
-        RTPChunkManager chunkManager = mock(RTPChunkManager.class);
-        when(serverAccessor.getChunkManager()).thenReturn(chunkManager);
-        RTP.serverAccessor = serverAccessor;
+  @Test
+  public void testFutureCompletion() throws Exception {
+    // This is a simplified test to demonstrate the future completion check
+    RTPServerAccessor serverAccessor = mock(RTPServerAccessor.class);
+    RTPChunkManager chunkManager = mock(RTPChunkManager.class);
+    when(serverAccessor.getChunkManager()).thenReturn(chunkManager);
+    RTP.serverAccessor = serverAccessor;
 
-        CompletableFuture<Long> future = new CompletableFuture<>();
-        when(chunkManager.getChunkAtAsync(any(), anyInt(), anyInt())).thenReturn(future);
+    CompletableFuture<Long> future = new CompletableFuture<>();
+    when(chunkManager.getChunkAtAsync(any(), anyInt(), anyInt())).thenReturn(future);
 
-        // Assert that we can complete the future later
-        CompletableFuture<Void> testFuture = CompletableFuture.runAsync(() -> {
-            try {
+    // Assert that we can complete the future later
+    CompletableFuture<Void> testFuture =
+        CompletableFuture.runAsync(
+            () -> {
+              try {
                 TimeUnit.MILLISECONDS.sleep(100);
                 future.complete(1L);
-            } catch (InterruptedException e) {
+              } catch (InterruptedException e) {
                 e.printStackTrace();
-            }
-        });
+              }
+            });
 
-        Long chunkKey = future.get(1, TimeUnit.SECONDS);
-        assertNotNull(chunkKey);
-        assertTrue(testFuture.isDone());
-    }
+    Long chunkKey = future.get(1, TimeUnit.SECONDS);
+    assertNotNull(chunkKey);
+    assertTrue(testFuture.isDone());
+  }
 }

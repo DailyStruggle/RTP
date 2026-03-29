@@ -12,6 +12,7 @@ dependencies {
     implementation project(':rtp-spigot:rtp-spigot-v26_1_R1')
     implementation project(':rtp-paper:rtp-paper-v26_1_R1')
     implementation project(':rtp-folia:rtp-folia-v26_1_R1')
+    implementation project(':rtp-folia:rtp-folia-v1_21_R1')
     implementation 'io.github.dailystruggle:CommandsAPI:1.0.0-RELEASE'
     implementation 'io.github.dailystruggle:EffectsAPI:1.0.1-BETA01'
 

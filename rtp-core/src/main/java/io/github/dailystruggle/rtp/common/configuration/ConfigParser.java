@@ -3,11 +3,6 @@ package io.github.dailystruggle.rtp.common.configuration;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-import org.simpleyaml.configuration.ConfigurationSection;
-import org.simpleyaml.configuration.file.YamlFile;
-
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -17,6 +12,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.simpleyaml.configuration.ConfigurationSection;
+import org.simpleyaml.configuration.file.YamlFile;
 
 /**
  * Class for parsing configuration files
@@ -24,424 +23,428 @@ import java.util.stream.Collectors;
  * @param <E> enum of configuration keys
  */
 public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements ConfigLoader {
-    /**
-     * The file database used by this parser
-     */
-    public final YamlFileDatabase fileDatabase;
+  /** The file database used by this parser */
+  public final YamlFileDatabase fileDatabase;
 
-    /**
-     * The version of the configuration
-     */
-    public String version;
+  /** The version of the configuration */
+  public String version;
 
-    /**
-     * The directory where the configuration is stored
-     */
-    public File pluginDirectory;
+  /** The directory where the configuration is stored */
+  public File pluginDirectory;
 
-    /**
-     * Map for language translations
-     */
-    public Map<String, Object> language_mapping = new ConcurrentHashMap<String, Object>();
+  /** Map for language translations */
+  public Map<String, Object> language_mapping = new ConcurrentHashMap<String, Object>();
 
-    /**
-     * Reverse map for language translations
-     */
-    public Map<String, String> reverse_language_mapping = new ConcurrentHashMap<>();
+  /** Reverse map for language translations */
+  public Map<String, String> reverse_language_mapping = new ConcurrentHashMap<>();
 
-    /**
-     * Cached lookup for YAML files
-     */
-    AtomicReference<Map<String, YamlFile>> cachedLookup;
+  /** Cached lookup for YAML files */
+  AtomicReference<Map<String, YamlFile>> cachedLookup;
 
-    private ClassLoader classLoader = this.getClass().getClassLoader();
+  private ClassLoader classLoader = this.getClass().getClassLoader();
 
-    /**
-     * Constructor for ConfigParser
-     *
-     * @param eClass          the enum class for configuration keys
-     * @param name            the name of the configuration
-     * @param version         the version of the configuration
-     * @param pluginDirectory the plugin directory
-     * @param langFile        the language file
-     * @param fileDatabase    the file database
-     * @param classLoader     the class loader
-     */
-    public ConfigParser(Class<E> eClass, final String name, final String version, final File pluginDirectory, File langFile, YamlFileDatabase fileDatabase, ClassLoader classLoader) {
-        super(eClass, name);
-        this.fileDatabase = fileDatabase;
-        this.name = (name.endsWith(".yml")) ? name : name + ".yml";
-        this.version = version;
-        this.pluginDirectory = pluginDirectory;
-        this.classLoader = classLoader;
-        check(version, pluginDirectory, langFile);
+  /**
+   * Constructor for ConfigParser
+   *
+   * @param eClass the enum class for configuration keys
+   * @param name the name of the configuration
+   * @param version the version of the configuration
+   * @param pluginDirectory the plugin directory
+   * @param langFile the language file
+   * @param fileDatabase the file database
+   * @param classLoader the class loader
+   */
+  public ConfigParser(
+      Class<E> eClass,
+      final String name,
+      final String version,
+      final File pluginDirectory,
+      File langFile,
+      YamlFileDatabase fileDatabase,
+      ClassLoader classLoader) {
+    super(eClass, name);
+    this.fileDatabase = fileDatabase;
+    this.name = (name.endsWith(".yml")) ? name : name + ".yml";
+    this.version = version;
+    this.pluginDirectory = pluginDirectory;
+    this.classLoader = classLoader;
+    check(version, pluginDirectory, langFile);
+  }
+
+  /**
+   * Constructor for ConfigParser without a custom class loader
+   *
+   * @param eClass the enum class for configuration keys
+   * @param name the name of the configuration
+   * @param version the version of the configuration
+   * @param pluginDirectory the plugin directory
+   * @param langFile the language file
+   * @param fileDatabase the file database
+   */
+  public ConfigParser(
+      Class<E> eClass,
+      final String name,
+      final String version,
+      final File pluginDirectory,
+      File langFile,
+      YamlFileDatabase fileDatabase) {
+    super(eClass, name);
+    this.fileDatabase = fileDatabase;
+    this.name = (name.endsWith(".yml")) ? name : name + ".yml";
+    this.version = version;
+    this.pluginDirectory = pluginDirectory;
+    check(version, pluginDirectory, langFile);
+  }
+
+  /**
+   * Constructor for ConfigParser with default language file and class loader
+   *
+   * @param eClass the enum class for configuration keys
+   * @param name the name of the configuration
+   * @param version the version of the configuration
+   * @param pluginDirectory the plugin directory
+   * @param fileDatabase the file database
+   */
+  public ConfigParser(
+      Class<E> eClass,
+      final String name,
+      final String version,
+      final File pluginDirectory,
+      YamlFileDatabase fileDatabase) {
+    super(eClass, name);
+    this.fileDatabase = fileDatabase;
+    this.name = (name.endsWith(".yml")) ? name : name + ".yml";
+    this.version = version;
+    this.pluginDirectory = pluginDirectory;
+    check(version, pluginDirectory, null);
+  }
+
+  private static void setSection(ConfigurationSection section, Map<?, ?> map) {
+    Map<String, Object> mapValues = section.getMapValues(false);
+    Map<?, ?> inputClone = new HashMap<>(map);
+
+    for (Map.Entry<?, ?> e : mapValues.entrySet()) {
+      String key = e.getKey().toString();
+      Object o = e.getValue();
+      if (!map.containsKey(key)) {
+        section.remove(key);
+        continue;
+      }
+      Object value = map.get(key);
+      if (o instanceof ConfigurationSection) {
+        if (value instanceof FactoryValue<?>) {
+          EnumMap<?, Object> data = ((FactoryValue<?>) value).getData();
+          Map<String, Object> subMap = new HashMap<>();
+          for (Map.Entry<? extends Enum<?>, ?> d : data.entrySet())
+            subMap.put(d.getKey().name(), d.getValue());
+          setSection((ConfigurationSection) o, subMap);
+        } else if (value instanceof Map) {
+          setSection((ConfigurationSection) o, (Map<String, Object>) value);
+        } else throw new IllegalArgumentException();
+      } else section.set(key, value);
+      inputClone.remove(key);
     }
 
-    /**
-     * Constructor for ConfigParser without a custom class loader
-     *
-     * @param eClass          the enum class for configuration keys
-     * @param name            the name of the configuration
-     * @param version         the version of the configuration
-     * @param pluginDirectory the plugin directory
-     * @param langFile        the language file
-     * @param fileDatabase    the file database
-     */
-    public ConfigParser(Class<E> eClass, final String name, final String version, final File pluginDirectory, File langFile, YamlFileDatabase fileDatabase) {
-        super(eClass, name);
-        this.fileDatabase = fileDatabase;
-        this.name = (name.endsWith(".yml")) ? name : name + ".yml";
-        this.version = version;
-        this.pluginDirectory = pluginDirectory;
-        check(version, pluginDirectory, langFile);
+    for (Map.Entry<?, ?> e : inputClone.entrySet()) {
+      String key = e.getKey().toString();
+      Object o = e.getValue();
+      if (o instanceof Map) {
+        section.createSection(key, (Map<?, ?>) o);
+      } else if (o instanceof FactoryValue) {
+        EnumMap<?, Object> data = ((FactoryValue<?>) o).getData();
+        Map<String, Object> subMap = new HashMap<>();
+        for (Map.Entry<? extends Enum<?>, ?> d : data.entrySet())
+          subMap.put(d.getKey().name(), d.getValue());
+        section.createSection(key, subMap);
+      } else section.set(key, o);
+    }
+  }
+
+  /**
+   * Load the language file
+   *
+   * @param langFile the language file, or null to use default
+   * @throws IOException if an I/O error occurs
+   */
+  protected void loadLangFile(@Nullable File langFile) throws IOException {
+    if (langFile == null) {
+      String langDirStr =
+          pluginDirectory.getAbsolutePath() + File.separator + "lang" + File.separator;
+      File langDir = new File(langDirStr);
+      if (!langDir.exists()) {
+        boolean mkdir = langDir.mkdirs();
+        if (!mkdir) throw new IllegalStateException();
+      }
+
+      String mapFileName = langDir + File.separator + name.replace(".yml", ".lang.yml");
+      langFile = new File(mapFileName);
     }
 
-    /**
-     * Constructor for ConfigParser with default language file and class loader
-     *
-     * @param eClass          the enum class for configuration keys
-     * @param name            the name of the configuration
-     * @param version         the version of the configuration
-     * @param pluginDirectory the plugin directory
-     * @param fileDatabase    the file database
-     */
-    public ConfigParser(Class<E> eClass, final String name, final String version, final File pluginDirectory, YamlFileDatabase fileDatabase) {
-        super(eClass, name);
-        this.fileDatabase = fileDatabase;
-        this.name = (name.endsWith(".yml")) ? name : name + ".yml";
-        this.version = version;
-        this.pluginDirectory = pluginDirectory;
-        check(version, pluginDirectory, null);
+    YamlFile langYaml = new YamlFile(langFile.getPath());
+    language_mapping.clear();
+    reverse_language_mapping.clear();
+    if (!langFile.exists()) {
+      for (String key : keys()) { // default data, to guard exceptions
+        langYaml.set(key, key);
+        language_mapping.put(key, key);
+        reverse_language_mapping.put(key, key);
+      }
+      langYaml.save();
     }
 
-    private static void setSection(ConfigurationSection section, Map<?, ?> map) {
-        Map<String, Object> mapValues = section.getMapValues(false);
-        Map<?, ?> inputClone = new HashMap<>(map);
+    langYaml.loadWithComments();
+    language_mapping = langYaml.getMapValues(true);
+    language_mapping.forEach((s, o) -> reverse_language_mapping.put(o.toString(), s));
+  }
 
-        for (Map.Entry<?, ?> e : mapValues.entrySet()) {
-            String key = e.getKey().toString();
-            Object o = e.getValue();
-            if (!map.containsKey(key)) {
-                section.remove(key);
-                continue;
-            }
-            Object value = map.get(key);
-            if (o instanceof ConfigurationSection) {
-                if (value instanceof FactoryValue<?>) {
-                    EnumMap<?, Object> data = ((FactoryValue<?>) value).getData();
-                    Map<String, Object> subMap = new HashMap<>();
-                    for (Map.Entry<? extends Enum<?>, ?> d : data.entrySet())
-                        subMap.put(d.getKey().name(), d.getValue());
-                    setSection((ConfigurationSection) o, subMap);
-                } else if (value instanceof Map) {
-                    setSection((ConfigurationSection) o, (Map<String, Object>) value);
-                } else throw new IllegalArgumentException();
-            } else section.set(key, value);
-            inputClone.remove(key);
+  /**
+   * Check and update the configuration
+   *
+   * @param version the required version
+   * @param pluginDirectory the plugin directory
+   * @param langFile the language file
+   */
+  public void check(final String version, final File pluginDirectory, @Nullable File langFile) {
+    // construct language file from enum vals
+    // todo: apply translation to loads and saves
+    try {
+      loadLangFile(langFile);
+    } catch (IOException e) {
+      RTP.log(Level.WARNING, e.getMessage(), e);
+      return;
+    }
+
+    File f = new File(pluginDirectory + File.separator + this.name);
+    if (!f.exists()) {
+      try {
+        saveResource(this.name, true);
+      } catch (IOException e) {
+        RTP.log(Level.WARNING, e.getMessage(), e);
+        return;
+      }
+    }
+    //        loadResource( f );
+
+    cachedLookup = fileDatabase.cachedLookup;
+    if (cachedLookup.get() == null || !cachedLookup.get().containsKey(name)) fileDatabase.connect();
+    YamlFile yamlFile = cachedLookup.get().get(name);
+
+    String versionStr = yamlFile.getMapValues(false).getOrDefault("version", "1.0").toString();
+
+    String[] versionArr = Objects.requireNonNull(versionStr).split("\\.");
+
+    boolean update = false;
+    String[] split = version.split("\\.");
+    List<Integer> parsedVersion =
+        Arrays.stream(split).map(Integer::parseUnsignedInt).collect(Collectors.toList());
+
+    if (versionArr.length != parsedVersion.size()) {
+      update = true;
+    } else {
+      for (int i = 0; i < versionArr.length; i++) {
+        int v = Integer.parseInt(versionArr[i]);
+        int cv = parsedVersion.get(i);
+        if (v != cv) {
+          update = true;
+          break;
         }
-
-        for (Map.Entry<?, ?> e : inputClone.entrySet()) {
-            String key = e.getKey().toString();
-            Object o = e.getValue();
-            if (o instanceof Map) {
-                section.createSection(key, (Map<?, ?>) o);
-            } else if (o instanceof FactoryValue) {
-                EnumMap<?, Object> data = ((FactoryValue<?>) o).getData();
-                Map<String, Object> subMap = new HashMap<>();
-                for (Map.Entry<? extends Enum<?>, ?> d : data.entrySet()) subMap.put(d.getKey().name(), d.getValue());
-                section.createSection(key, subMap);
-            } else section.set(key, o);
-        }
+      }
     }
 
-    /**
-     * Load the language file
-     *
-     * @param langFile the language file, or null to use default
-     * @throws IOException if an I/O error occurs
-     */
-    protected void loadLangFile(@Nullable File langFile) throws IOException {
-        if (langFile == null) {
-            String langDirStr = pluginDirectory.getAbsolutePath() + File.separator
-                    + "lang" + File.separator;
-            File langDir = new File(langDirStr);
-            if (!langDir.exists()) {
-                boolean mkdir = langDir.mkdirs();
-                if (!mkdir) throw new IllegalStateException();
-            }
-
-            String mapFileName = langDir + File.separator
-                    + name.replace(".yml", ".lang.yml");
-            langFile = new File(mapFileName);
-        }
-
-        YamlFile langYaml = new YamlFile(langFile.getPath());
-        language_mapping.clear();
-        reverse_language_mapping.clear();
-        if (!langFile.exists()) {
-            for (String key : keys()) { //default data, to guard exceptions
-                langYaml.set(key, key);
-                language_mapping.put(key, key);
-                reverse_language_mapping.put(key, key);
-            }
-            langYaml.save();
-        }
-
-        langYaml.loadWithComments();
-        language_mapping = langYaml.getMapValues(true);
-        language_mapping.forEach((s, o) -> reverse_language_mapping.put(o.toString(), s));
+    if (update) {
+      update();
+      f = new File(pluginDirectory, this.name);
+      //            loadResource( f );
     }
 
-    /**
-     * Check and update the configuration
-     *
-     * @param version         the required version
-     * @param pluginDirectory the plugin directory
-     * @param langFile        the language file
-     */
-    public void check(final String version, final File pluginDirectory, @Nullable File langFile) {
-        //construct language file from enum vals
-        //todo: apply translation to loads and saves
-        try {
-            loadLangFile(langFile);
-        } catch (IOException e) {
-            RTP.log(Level.WARNING, e.getMessage(), e);
-            return;
+    data.clear();
+    for (E v : myClass.getEnumConstants()) {
+      Object fromString = yamlFile.get(v.name());
+      if (fromString != null) {
+        data.put(v, fromString);
+      }
+    }
+  }
+
+  /** Rename configuration files if necessary (e.g. on version upgrade) */
+  public void renameFiles() {
+    // load up a list of files to rename
+    ArrayList<File> toRename = new ArrayList<>();
+    for (int i = 1; i < 1000; i++) {
+      File file = new File(pluginDirectory.getAbsolutePath() + File.separator + name + ".old" + i);
+      if (!file.exists()) break;
+      toRename.add(file);
+    }
+    // rename them top-down so as not to overwrite
+    for (int i = toRename.size() - 1; i >= 0; i--) {
+      File oldFile = toRename.get(i);
+      String fileName = oldFile.getName();
+      int oldNum = i + 1;
+      int newNum = oldNum + 1;
+      String newFileName = fileName.replace(Integer.toString(oldNum), Integer.toString(newNum));
+      File newFile = new File(pluginDirectory.getAbsolutePath() + File.separator + newFileName);
+      try { // ensure can place
+        Files.deleteIfExists(newFile.toPath());
+      } catch (IOException e) {
+        RTP.log(Level.WARNING, e.getMessage(), e);
+      }
+      boolean b = oldFile.getAbsoluteFile().renameTo(newFile.getAbsoluteFile());
+      if (!b)
+        RTP.log(
+            Level.WARNING,
+            "RTP - unable to rename file:" + oldFile.getName() + " to: " + newFile.getName());
+    }
+
+    // rename the last one
+    File oldFile = new File(pluginDirectory.getAbsolutePath() + File.separator + name);
+    File newFile = new File(pluginDirectory.getAbsolutePath() + File.separator + name + ".old1");
+    try {
+      Files.deleteIfExists(newFile.toPath());
+    } catch (IOException e) {
+      RTP.log(Level.WARNING, e.getMessage(), e);
+    }
+    boolean b = oldFile.getAbsoluteFile().renameTo(newFile.getAbsoluteFile());
+    if (!b) RTP.log(Level.WARNING, "RTP - unable to rename file:" + oldFile.getAbsoluteFile());
+
+    saveResourceFromJar(this.name, true);
+  }
+
+  /**
+   * Get a configuration value
+   *
+   * @param key the key
+   * @param def the default value
+   * @return the configuration value
+   */
+  public Object getConfigValue(E key, Object def) {
+    return data.getOrDefault(key, def);
+  }
+
+  /**
+   * server function for saving a plugin config file from package
+   *
+   * @param name file name, e.g. "config.yml"
+   * @param overwrite whether to overwrite an existing file with that name
+   * @throws IOException - file read exceptions
+   */
+  public void saveResource(String name, boolean overwrite) throws IOException {
+    String myDirectory = pluginDirectory.getAbsolutePath();
+
+    String pDirectory = RTP.serverAccessor.getPluginDirectory().getAbsolutePath();
+    if (myDirectory.equals(pDirectory)) {
+      saveResourceFromJar(name, overwrite);
+    } else {
+      String diff = myDirectory.substring(pDirectory.length() + 1);
+      if (name.equals("default.yml")) {
+        saveResourceFromJar(diff + File.separator + name, overwrite);
+      } else {
+        File source = new File(myDirectory + File.separator + "default.yml");
+        File target = new File(myDirectory + File.separator + name);
+        if (!source.exists()) {
+          saveResourceFromJar(diff + File.separator + "default.yml", overwrite);
         }
-
-        File f = new File(pluginDirectory + File.separator + this.name);
-        if (!f.exists()) {
-            try {
-                saveResource(this.name, true);
-            } catch (IOException e) {
-                RTP.log(Level.WARNING, e.getMessage(), e);
-                return;
-            }
+        if (!target.exists()) {
+          boolean newFile = target.createNewFile();
+          if (!newFile)
+            throw new IOException("failed to create new file - " + target.getAbsolutePath());
         }
-//        loadResource( f );
-
-        cachedLookup = fileDatabase.cachedLookup;
-        if (cachedLookup.get() == null || !cachedLookup.get().containsKey(name)) fileDatabase.connect();
-        YamlFile yamlFile = cachedLookup.get().get(name);
-
-        String versionStr = yamlFile.getMapValues(false).getOrDefault("version", "1.0").toString();
-
-        String[] versionArr = Objects.requireNonNull(versionStr).split("\\.");
-
-        boolean update = false;
-        String[] split = version.split("\\.");
-        List<Integer> parsedVersion = Arrays.stream(split).map(Integer::parseUnsignedInt).collect(Collectors.toList());
-
-        if (versionArr.length != parsedVersion.size()) {
-            update = true;
-        } else {
-            for (int i = 0; i < versionArr.length; i++) {
-                int v = Integer.parseInt(versionArr[i]);
-                int cv = parsedVersion.get(i);
-                if (v != cv) {
-                    update = true;
-                    break;
-                }
-            }
-        }
-
-        if (update) {
-            update();
-            f = new File(pluginDirectory, this.name);
-//            loadResource( f );
-        }
-
-        data.clear();
-        for (E v : myClass.getEnumConstants()) {
-            Object fromString = yamlFile.get(v.name());
-            if (fromString != null) {
-                data.put(v, fromString);
-            }
-        }
+        FileOutputStream outputStream = new FileOutputStream(target.getPath());
+        Files.copy(source.toPath(), outputStream);
+        outputStream.close();
+      }
     }
+  }
 
-    /**
-     * Rename configuration files if necessary (e.g. on version upgrade)
-     */
-    public void renameFiles() {
-        //load up a list of files to rename
-        ArrayList<File> toRename = new ArrayList<>();
-        for (int i = 1; i < 1000; i++) {
-            File file = new File(pluginDirectory.getAbsolutePath() + File.separator + name + ".old" + i);
-            if (!file.exists()) break;
-            toRename.add(file);
-        }
-        //rename them top-down so as not to overwrite
-        for (int i = toRename.size() - 1; i >= 0; i--) {
-            File oldFile = toRename.get(i);
-            String fileName = oldFile.getName();
-            int oldNum = i + 1;
-            int newNum = oldNum + 1;
-            String newFileName = fileName.replace(Integer.toString(oldNum), Integer.toString(newNum));
-            File newFile = new File(pluginDirectory.getAbsolutePath() + File.separator + newFileName);
-            try { //ensure can place
-                Files.deleteIfExists(newFile.toPath());
-            } catch (IOException e) {
-                RTP.log(Level.WARNING, e.getMessage(), e);
-            }
-            boolean b = oldFile.getAbsoluteFile().renameTo(newFile.getAbsoluteFile());
-            if (!b) RTP.log(Level.WARNING,
-                    "RTP - unable to rename file:" + oldFile.getName() + " to: " + newFile.getName());
-        }
+  /** Update the configuration */
+  public void update() {
+    renameFiles();
+    Map<E, Object> oldValues = getData();
+    //        saveResourceFromJar();
+  }
 
-        //rename the last one
-        File oldFile = new File(pluginDirectory.getAbsolutePath() + File.separator + name);
-        File newFile = new File(pluginDirectory.getAbsolutePath() + File.separator + name + ".old1");
-        try {
-            Files.deleteIfExists(newFile.toPath());
-        } catch (IOException e) {
-            RTP.log(Level.WARNING, e.getMessage(), e);
-        }
-        boolean b = oldFile.getAbsoluteFile().renameTo(newFile.getAbsoluteFile());
-        if (!b) RTP.log(Level.WARNING,
-                "RTP - unable to rename file:" + oldFile.getAbsoluteFile());
+  @Override
+  public ConfigParser<E> clone() {
+    ConfigParser<E> clone = (ConfigParser<E>) super.clone();
 
-        saveResourceFromJar(this.name, true);
+    clone.language_mapping = this.language_mapping;
+    clone.reverse_language_mapping = this.reverse_language_mapping;
+    clone.name = name;
+    clone.version = version;
+    clone.pluginDirectory = pluginDirectory;
+    clone.check(version, pluginDirectory, null);
+    return clone;
+  }
+
+  @Override
+  public void set(@NotNull E key, @NotNull Object value) throws IllegalArgumentException {
+    super.set(key, value);
+
+    YamlFile yamlFile = cachedLookup.get().get(name);
+    Object o = yamlFile.get(key.name());
+    if (o instanceof ConfigurationSection) {
+      ConfigurationSection configurationSection = (ConfigurationSection) o;
+
+      if (configurationSection.getName().equalsIgnoreCase("shape") && value instanceof String) {
+        String shapeName = (String) value;
+        value = RTP.factoryMap.get(RTP.factoryNames.shape).getOrDefault(shapeName);
+      }
+
+      if (configurationSection.getName().equalsIgnoreCase("vert") && value instanceof String) {
+        String vertName = (String) value;
+        value = RTP.factoryMap.get(RTP.factoryNames.vert).getOrDefault(vertName);
+      }
+
+      if (value instanceof FactoryValue<?>) {
+        EnumMap<?, Object> data = ((FactoryValue<?>) value).getData();
+        Map<String, Object> map = new HashMap<>();
+        for (Map.Entry<? extends Enum<?>, Object> d : data.entrySet())
+          map.put(d.getKey().name(), d.getValue());
+        setSection((ConfigurationSection) o, map);
+      } else if (value instanceof Map) {
+        setSection((ConfigurationSection) o, (Map<String, Object>) value);
+      } else {
+        IllegalArgumentException exception = new IllegalArgumentException();
+        exception.printStackTrace();
+        throw exception;
+      }
+      yamlFile.set(key.name(), o);
+    } else {
+      yamlFile.set(key.name(), value);
     }
+  }
 
-    /**
-     * Get a configuration value
-     *
-     * @param key the key
-     * @param def the default value
-     * @return the configuration value
-     */
-    public Object getConfigValue(E key, Object def) {
-        return data.getOrDefault(key, def);
-    }
+  /**
+   * Set a configuration value by its key name
+   *
+   * @param key the key name
+   * @param value the value to set
+   */
+  public void set(String key, Object value) {
+    String translate = reverse_language_mapping.get(key);
+    if (translate != null) key = translate;
+    E k = enumLookup.get(key.toLowerCase());
+    if (k == null) throw new IllegalArgumentException("invalid key - " + key);
 
-    /**
-     * server function for saving a plugin config file from package
-     *
-     * @param name      file name, e.g. "config.yml"
-     * @param overwrite whether to overwrite an existing file with that name
-     * @throws IOException - file read exceptions
-     */
-    public void saveResource(String name, boolean overwrite) throws IOException {
-        String myDirectory = pluginDirectory.getAbsolutePath();
+    set(k, value);
+  }
 
-        String pDirectory = RTP.serverAccessor.getPluginDirectory().getAbsolutePath();
-        if (myDirectory.equals(pDirectory)) {
-            saveResourceFromJar(name, overwrite);
-        } else {
-            String diff = myDirectory.substring(pDirectory.length() + 1);
-            if (name.equals("default.yml")) {
-                saveResourceFromJar(diff + File.separator + name, overwrite);
-            } else {
-                File source = new File(myDirectory + File.separator + "default.yml");
-                File target = new File(myDirectory + File.separator + name);
-                if (!source.exists()) {
-                    saveResourceFromJar(diff + File.separator + "default.yml", overwrite);
-                }
-                if (!target.exists()) {
-                    boolean newFile = target.createNewFile();
-                    if (!newFile) throw new IOException("failed to create new file - " + target.getAbsolutePath());
-                }
-                FileOutputStream outputStream = new FileOutputStream(target.getPath());
-                Files.copy(source.toPath(), outputStream);
-                outputStream.close();
-            }
-        }
-    }
+  /**
+   * Save the configuration to disk
+   *
+   * @throws IOException if an I/O error occurs
+   */
+  public void save() throws IOException {
 
-    /**
-     * Update the configuration
-     */
-    public void update() {
-        renameFiles();
-        Map<E, Object> oldValues = getData();
-//        saveResourceFromJar();
-    }
+    cachedLookup.get().get(name).save();
+  }
 
-    @Override
-    public ConfigParser<E> clone() {
-        ConfigParser<E> clone = (ConfigParser<E>) super.clone();
+  @Override
+  public File getMainDirectory() {
+    return pluginDirectory;
+  }
 
-        clone.language_mapping = this.language_mapping;
-        clone.reverse_language_mapping = this.reverse_language_mapping;
-        clone.name = name;
-        clone.version = version;
-        clone.pluginDirectory = pluginDirectory;
-        clone.check(version, pluginDirectory, null);
-        return clone;
-    }
-
-    @Override
-    public void set(@NotNull E key, @NotNull Object value) throws IllegalArgumentException {
-        super.set(key, value);
-
-        YamlFile yamlFile = cachedLookup.get().get(name);
-        Object o = yamlFile.get(key.name());
-        if (o instanceof ConfigurationSection) {
-            ConfigurationSection configurationSection = (ConfigurationSection) o;
-
-            if (configurationSection.getName().equalsIgnoreCase("shape") && value instanceof String) {
-                String shapeName = (String) value;
-                value = RTP.factoryMap.get(RTP.factoryNames.shape).getOrDefault(shapeName);
-            }
-
-            if (configurationSection.getName().equalsIgnoreCase("vert") && value instanceof String) {
-                String vertName = (String) value;
-                value = RTP.factoryMap.get(RTP.factoryNames.vert).getOrDefault(vertName);
-            }
-
-            if (value instanceof FactoryValue<?>) {
-                EnumMap<?, Object> data = ((FactoryValue<?>) value).getData();
-                Map<String, Object> map = new HashMap<>();
-                for (Map.Entry<? extends Enum<?>, Object> d : data.entrySet()) map.put(d.getKey().name(), d.getValue());
-                setSection((ConfigurationSection) o, map);
-            } else if (value instanceof Map) {
-                setSection((ConfigurationSection) o, (Map<String, Object>) value);
-            } else {
-                IllegalArgumentException exception = new IllegalArgumentException();
-                exception.printStackTrace();
-                throw exception;
-            }
-            yamlFile.set(key.name(), o);
-        } else {
-            yamlFile.set(key.name(), value);
-        }
-    }
-
-    /**
-     * Set a configuration value by its key name
-     *
-     * @param key   the key name
-     * @param value the value to set
-     */
-    public void set(String key, Object value) {
-        String translate = reverse_language_mapping.get(key);
-        if (translate != null) key = translate;
-        E k = enumLookup.get(key.toLowerCase());
-        if (k == null) throw new IllegalArgumentException("invalid key - " + key);
-
-        set(k, value);
-    }
-
-    /**
-     * Save the configuration to disk
-     *
-     * @throws IOException if an I/O error occurs
-     */
-    public void save() throws IOException {
-
-        cachedLookup.get().get(name).save();
-    }
-
-    @Override
-    public File getMainDirectory() {
-        return pluginDirectory;
-    }
-
-    @Override
-    public ClassLoader getClassLoader() {
-        return classLoader;
-    }
+  @Override
+  public ClassLoader getClassLoader() {
+    return classLoader;
+  }
 }
-
-

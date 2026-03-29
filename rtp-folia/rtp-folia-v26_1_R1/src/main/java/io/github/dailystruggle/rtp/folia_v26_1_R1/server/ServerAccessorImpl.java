@@ -6,8 +6,8 @@ import io.github.dailystruggle.rtp.folia.world.FoliaRTPChunkManager;
 import org.jetbrains.annotations.NotNull;
 
 public class ServerAccessorImpl extends AbstractFoliaServerAccessor {
-    @Override
-    public @NotNull RTPChunkManager getChunkManager() {
-        return new FoliaRTPChunkManager();
-    }
+  @Override
+  public @NotNull RTPChunkManager getChunkManager() {
+    return new FoliaRTPChunkManager();
+  }
 }

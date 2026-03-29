@@ -4,8 +4,8 @@ plugins {
 
 dependencies {
     implementation project(':rtp-folia:rtp-folia-common')
-    compileOnly 'dev.folia:folia-api:1.21.1-R0.1-SNAPSHOT'
-    testImplementation 'dev.folia:folia-api:1.21.1-R0.1-SNAPSHOT'
+    compileOnly 'io.papermc.paper:paper-api:1.21.1-R0.1-SNAPSHOT'
+    testImplementation 'io.papermc.paper:paper-api:1.21.1-R0.1-SNAPSHOT'
 }
 
 test {

@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.bukkit.spigotListeners;
 
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
-import io.github.dailystruggle.rtp.api.world.RTPLocation;
+import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -15,60 +15,63 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerTeleportEvent;
 
-import java.util.Objects;
-
 public final class OnPlayerTeleport implements Listener {
-    @EventHandler(priority = EventPriority.LOWEST)
-    public void onPlayerTeleport(PlayerTeleportEvent event) {
-        Player player = event.getPlayer();
+  @EventHandler(priority = EventPriority.LOWEST)
+  public void onPlayerTeleport(PlayerTeleportEvent event) {
+    Player player = event.getPlayer();
 
-        TeleportData data = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
-        if (data == null || data.completed) return;
+    TeleportData data = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
+    if (data == null || data.completed) return;
 
-        //if currently teleporting, stop that and clean up
-        if (RTP.getInstance().latestTeleportData.containsKey(player.getUniqueId())) {
-            TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
-            if (!teleportData.completed)
-                stopTeleport(event);
-        }
+    // if currently teleporting, stop that and clean up
+    if (RTP.getInstance().latestTeleportData.containsKey(player.getUniqueId())) {
+      TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
+      if (!teleportData.completed) stopTeleport(event);
+    }
+  }
+
+  private void stopTeleport(PlayerTeleportEvent event) {
+    Player player = event.getPlayer();
+
+    TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
+    if (teleportData == null) return;
+
+    Location eventTo = event.getTo();
+    if (eventTo == null) return;
+
+    ConfigParser<?> parser = RTP.configs.configParserMap.get(ConfigKeys.class);
+    ConfigParser<ConfigKeys> configParser;
+    if (parser.myClass.equals(ConfigKeys.class))
+      //noinspection unchecked
+      configParser = (ConfigParser<ConfigKeys>) parser;
+    else {
+      new IllegalStateException("ConfigParser is not using ConfigKeys").printStackTrace();
+      return;
     }
 
-    private void stopTeleport(PlayerTeleportEvent event) {
-        Player player = event.getPlayer();
+    RTPCoords selectedCoords = teleportData.selectedCoords;
+    if (selectedCoords == null) return;
 
-        TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
-        if (teleportData == null) return;
+    RTPWorld rtpWorld = RTP.serverAccessor.getRTPWorld(eventTo.getWorld().getUID());
+    if (rtpWorld == null) return;
 
-        Location eventTo = event.getTo();
-        if (eventTo == null) return;
+    RTPCommandSender sender = teleportData.sender;
+    if (sender == null) return;
 
-        ConfigParser<?> parser = RTP.configs.configParserMap.get(ConfigKeys.class);
-        ConfigParser<ConfigKeys> configParser;
-        if (parser.myClass.equals(ConfigKeys.class))
-            //noinspection unchecked
-            configParser = (ConfigParser<ConfigKeys>) parser;
-        else {
-            new IllegalStateException("ConfigParser is not using ConfigKeys").printStackTrace();
-            return;
-        }
-
-        RTPLocation location = teleportData.selectedLocation;
-        if (location == null) return;
-
-        RTPWorld rtpWorld = RTP.serverAccessor.getRTPWorld(eventTo.getWorld().getUID());
-        if (rtpWorld == null) return;
-
-        RTPCommandSender sender = teleportData.sender;
-        if (sender == null) return;
-
-        RTPLocation to = new RTPLocation(rtpWorld, eventTo.getBlockX(), eventTo.getBlockY(), eventTo.getBlockZ());
-        double distanceSquared = (Objects.requireNonNull(Objects.requireNonNull(eventTo).getWorld()).getUID()
-                .equals(Objects.requireNonNull(event.getFrom().getWorld()).getUID()))
-                ? location.distanceSquared(to) : Double.MAX_VALUE;
-        if (distanceSquared < Math.pow(configParser.getNumber(ConfigKeys.cancelDistance, Float.MAX_VALUE).doubleValue(), 2))
-            return;
-
-        new RTPTeleportCancel(player.getUniqueId()).run();
+    double distanceSquared;
+    if (!selectedCoords.worldName().equals(rtpWorld.name())) {
+      distanceSquared = Double.MAX_VALUE;
+    } else {
+      distanceSquared =
+          Math.pow(selectedCoords.x() - eventTo.getBlockX(), 2)
+              + Math.pow(selectedCoords.y() - eventTo.getBlockY(), 2)
+              + Math.pow(selectedCoords.z() - eventTo.getBlockZ(), 2);
     }
+    if (distanceSquared
+        < Math.pow(
+            configParser.getNumber(ConfigKeys.cancelDistance, Float.MAX_VALUE).doubleValue(), 2))
+      return;
+
+    new RTPTeleportCancel(player.getUniqueId()).run();
+  }
 }
-

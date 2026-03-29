@@ -6,9 +6,8 @@ import io.github.dailystruggle.rtp.spigot.server.AbstractServerAccessor;
 import org.jetbrains.annotations.NotNull;
 
 public class ServerAccessorImpl extends AbstractServerAccessor {
-    @Override
-    public @NotNull RTPChunkManager getChunkManager() {
-        return new PaperRTPChunkManager();
-    }
+  @Override
+  public @NotNull RTPChunkManager getChunkManager() {
+    return new PaperRTPChunkManager();
+  }
 }
-

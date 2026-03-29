@@ -1,9 +1,7 @@
 package io.github.dailystruggle.rtp.common.tasks;
 
 public interface RTPCancellable {
-    boolean isCancelled();
+  boolean isCancelled();
 
-    void setCancelled( boolean cancel );
+  void setCancelled(boolean cancel);
 }
-
-

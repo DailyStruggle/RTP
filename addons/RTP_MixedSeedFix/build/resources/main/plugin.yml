@@ -1,5 +1,5 @@
 name: RTP_MixedSeedFix
-version: '1.0-SNAPSHOT'
+version: '${project.version}'
 main: io.github.dailystruggle.rtpmixedseedfix.RTPMixedSeedFix
 api-version: 1.13
 authors: [ leaf26 ]

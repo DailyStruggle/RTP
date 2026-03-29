@@ -11,36 +11,32 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityToggleGlideEvent;
 
-/**
- * Listener for entity glide toggle events
- */
+/** Listener for entity glide toggle events */
 public class OnGlideToggle implements Listener {
-    private final RTP_Glide plugin;
+  private final RTP_Glide plugin;
 
-    /**
-     * Constructor for OnGlideToggle listener
-     *
-     * @param plugin the plugin instance
-     */
-    public OnGlideToggle(RTP_Glide plugin) {
-        this.plugin = plugin;
-    }
+  /**
+   * Constructor for OnGlideToggle listener
+   *
+   * @param plugin the plugin instance
+   */
+  public OnGlideToggle(RTP_Glide plugin) {
+    this.plugin = plugin;
+  }
 
-    /**
-     * EventHandler for EntityToggleGlideEvent
-     *
-     * @param event the event
-     */
-    @EventHandler(priority = EventPriority.LOWEST)
-    public void onGlideToggle(EntityToggleGlideEvent event) {
-        if (!(event.getEntity() instanceof Player)) return;
-        if (!plugin.getGlidingPlayers().contains(event.getEntity().getUniqueId())) return;
-        Block block = event.getEntity().getLocation().getBlock().getRelative(BlockFace.DOWN);
-        if (block.getType().isSolid() || block.isLiquid() || ((Player) event.getEntity()).isFlying()) {
-            plugin.getGlidingPlayers().remove(event.getEntity().getUniqueId());
-            Bukkit.getPluginManager().callEvent(new PlayerLandEvent((Player) event.getEntity()));
-        } else event.setCancelled(true);
-    }
+  /**
+   * EventHandler for EntityToggleGlideEvent
+   *
+   * @param event the event
+   */
+  @EventHandler(priority = EventPriority.LOWEST)
+  public void onGlideToggle(EntityToggleGlideEvent event) {
+    if (!(event.getEntity() instanceof Player)) return;
+    if (!plugin.getGlidingPlayers().contains(event.getEntity().getUniqueId())) return;
+    Block block = event.getEntity().getLocation().getBlock().getRelative(BlockFace.DOWN);
+    if (block.getType().isSolid() || block.isLiquid() || ((Player) event.getEntity()).isFlying()) {
+      plugin.getGlidingPlayers().remove(event.getEntity().getUniqueId());
+      Bukkit.getPluginManager().callEvent(new PlayerLandEvent((Player) event.getEntity()));
+    } else event.setCancelled(true);
+  }
 }
-
-

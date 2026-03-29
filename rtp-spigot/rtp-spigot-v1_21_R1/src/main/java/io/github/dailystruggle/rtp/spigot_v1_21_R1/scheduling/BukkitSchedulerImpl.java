@@ -2,8 +2,9 @@ package io.github.dailystruggle.rtp.spigot_v1_21_R1.scheduling;
 
 import org.bukkit.plugin.java.JavaPlugin;
 
-public class BukkitSchedulerImpl extends io.github.dailystruggle.rtp.spigot.scheduling.BukkitSchedulerImpl {
-    public BukkitSchedulerImpl(JavaPlugin plugin) {
-        super(plugin);
-    }
+public class BukkitSchedulerImpl
+    extends io.github.dailystruggle.rtp.spigot.scheduling.BukkitSchedulerImpl {
+  public BukkitSchedulerImpl(JavaPlugin plugin) {
+    super(plugin);
+  }
 }
