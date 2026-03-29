@@ -206,7 +206,7 @@ public final class DoTeleport extends RTPRunnable {
   }
 
   @Override
-  public RTPLocation getLocation() {
+  public io.github.dailystruggle.rtp.api.world.RTPLocation getLocation() {
     return getTargetLocation();
   }
 
