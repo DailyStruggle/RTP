@@ -2,59 +2,49 @@ package io.github.dailystruggle.rtp.common.commands;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import org.jetbrains.annotations.Nullable;
-
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.jetbrains.annotations.Nullable;
 
-/**
- * Base implementation for RTP commands
- */
+/** Base implementation for RTP commands */
 public abstract class BaseRTPCmdImpl implements BaseRTPCmd {
-    /**
-     * Map of command parameters
-     */
-    protected final Map<String, CommandParameter> parameterLookup = new ConcurrentHashMap<>();
+  /** Map of command parameters */
+  protected final Map<String, CommandParameter> parameterLookup = new ConcurrentHashMap<>();
 
-    /**
-     * Map of subcommands
-     */
-    protected final Map<String, CommandsAPICommand> commandLookup = new ConcurrentHashMap<>();
-    private final CommandsAPICommand parent;
+  /** Map of subcommands */
+  protected final Map<String, CommandsAPICommand> commandLookup = new ConcurrentHashMap<>();
 
-    /**
-     * Average time taken to execute the command
-     */
-    protected long avgTime = 0;
+  private final CommandsAPICommand parent;
 
-    /**
-     * Constructor for BaseRTPCmdImpl
-     *
-     * @param parent the parent command
-     */
-    public BaseRTPCmdImpl(@Nullable CommandsAPICommand parent) {
-        this.parent = parent;
-    }
+  /** Average time taken to execute the command */
+  protected long avgTime = 0;
 
-    @Override
-    public CommandsAPICommand parent() {
-        return parent;
-    }
+  /**
+   * Constructor for BaseRTPCmdImpl
+   *
+   * @param parent the parent command
+   */
+  public BaseRTPCmdImpl(@Nullable CommandsAPICommand parent) {
+    this.parent = parent;
+  }
 
-    @Override
-    public Map<String, CommandParameter> getParameterLookup() {
-        return parameterLookup;
-    }
+  @Override
+  public CommandsAPICommand parent() {
+    return parent;
+  }
 
-    @Override
-    public Map<String, CommandsAPICommand> getCommandLookup() {
-        return commandLookup;
-    }
+  @Override
+  public Map<String, CommandParameter> getParameterLookup() {
+    return parameterLookup;
+  }
 
-    @Override
-    public long avgTime() {
-        return avgTime;
-    }
+  @Override
+  public Map<String, CommandsAPICommand> getCommandLookup() {
+    return commandLookup;
+  }
+
+  @Override
+  public long avgTime() {
+    return avgTime;
+  }
 }
-
-

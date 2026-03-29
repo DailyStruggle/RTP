@@ -5,7 +5,6 @@ import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-
 import java.io.File;
 import java.util.List;
 import java.util.Map;
@@ -15,84 +14,88 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.logging.Level;
 
-/**
- * Interface for accessing server-specific functionality
- */
+/** Interface for accessing server-specific functionality */
 public interface RTPServerAccessor {
-    ConcurrentHashMap<String, TrackedRTPTask> activeTasks = new ConcurrentHashMap<>();
+  ConcurrentHashMap<String, TrackedRTPTask> activeTasks = new ConcurrentHashMap<>();
 
-    default void registerAction(TrackedRTPTask task) {
-        activeTasks.put(task.getTrackingId(), task);
-    }
+  default void registerAction(TrackedRTPTask task) {
+    activeTasks.put(task.getTrackingId(), task);
+  }
 
-    default void removeAction(String trackingId) {
-        activeTasks.remove(trackingId);
-    }
+  default void removeAction(String trackingId) {
+    activeTasks.remove(trackingId);
+  }
 
-    default Map<String, Long> getTaskSnapshot() {
-        ConcurrentHashMap<String, Long> snapshot = new ConcurrentHashMap<>();
-        activeTasks.forEach((s, trackedRTPTask) -> snapshot.put(s, System.currentTimeMillis() - trackedRTPTask.getQueuedTime()));
-        return snapshot;
-    }
+  default Map<String, Long> getTaskSnapshot() {
+    ConcurrentHashMap<String, Long> snapshot = new ConcurrentHashMap<>();
+    activeTasks.forEach(
+        (s, trackedRTPTask) ->
+            snapshot.put(s, System.currentTimeMillis() - trackedRTPTask.getQueuedTime()));
+    return snapshot;
+  }
 
-    String getServerVersion();
+  String getServerVersion();
 
-    Integer getServerIntVersion();
+  Integer getServerIntVersion();
 
-    RTPWorld<?> getRTPWorld(String name);
+  RTPWorld<?> getRTPWorld(String name);
 
-    RTPWorld<?> getRTPWorld(UUID id);
+  RTPWorld<?> getRTPWorld(UUID id);
 
-    io.github.dailystruggle.rtp.api.world.RTPChunkManager getChunkManager();
+  io.github.dailystruggle.rtp.api.world.RTPChunkManager getChunkManager();
 
-    List<RTPWorld<?>> getRTPWorlds();
+  List<RTPWorld<?>> getRTPWorlds();
 
-    RTPPlayer getPlayer(UUID uuid);
+  RTPPlayer getPlayer(UUID uuid);
 
-    RTPPlayer getPlayer(String name);
+  RTPPlayer getPlayer(String name);
 
-    RTPCommandSender getSender(UUID uuid);
+  RTPCommandSender getSender(UUID uuid);
 
-    long overTime();
+  long overTime();
 
-    File getPluginDirectory();
+  File getPluginDirectory();
 
-    void sendMessage(UUID target, MessagesKeys msgType);
+  void sendMessage(UUID target, MessagesKeys msgType);
 
-    void sendMessage(UUID target1, UUID target2, MessagesKeys msgType);
+  void sendMessage(UUID target1, UUID target2, MessagesKeys msgType);
 
-    void sendMessage(UUID target, String message);
+  void sendMessage(UUID target, String message);
 
-    void sendMessageAndSuggest(UUID target, String message, String suggestion);
+  void sendMessageAndSuggest(UUID target, String message, String suggestion);
 
-    void sendMessage(UUID sender, UUID target, String message);
+  void sendMessage(UUID sender, UUID target, String message);
 
-    void log(Level level, String msg);
+  void log(Level level, String msg);
 
-    void log(Level level, String msg, Throwable throwable);
+  void log(Level level, String msg, Throwable throwable);
 
-    void announce(String msg, String permission);
+  void announce(String msg, String permission);
 
-    Set<String> getBiomes(RTPWorld<?> rtpWorld);
+  Set<String> getBiomes(RTPWorld<?> rtpWorld);
 
-    boolean isPrimaryThread();
+  boolean isPrimaryThread();
 
-    Set<String> materials();
+  Set<String> materials();
 
-    void stop();
+  void stop();
 
-    void start();
+  void start();
 
-    void setBiomeGetter(java.util.function.Function<io.github.dailystruggle.rtp.api.world.RTPLocation, String> getter);
+  void setBiomeGetter(
+      java.util.function.Function<io.github.dailystruggle.rtp.api.world.RTPLocation, String>
+          getter);
 
-    void setBiomesGetter(java.util.function.Function<io.github.dailystruggle.rtp.api.world.RTPWorld<?>, java.util.Set<String>> getter);
+  void setBiomesGetter(
+      java.util.function.Function<
+              io.github.dailystruggle.rtp.api.world.RTPWorld<?>, java.util.Set<String>>
+          getter);
 
-    Object getWorldBorder(String worldName);
+  Object getWorldBorder(String worldName);
 
-    Object getShape(String name);
+  Object getShape(String name);
 
-    boolean setWorldBorderFunction(Function<String, ?> function);
+  boolean setWorldBorderFunction(Function<String, ?> function);
 
-    boolean setShapeFunction(Function<String, ?> shapeFunction);
+  boolean setShapeFunction(Function<String, ?> shapeFunction);
 }
-

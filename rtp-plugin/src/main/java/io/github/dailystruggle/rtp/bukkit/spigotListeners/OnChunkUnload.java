@@ -10,16 +10,15 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.world.ChunkUnloadEvent;
 
 public class OnChunkUnload implements Listener {
-    @EventHandler(priority = EventPriority.NORMAL)
-    public void onChunkUnload(ChunkUnloadEvent event) {
-        Chunk chunk = event.getChunk();
-        World world = chunk.getWorld();
-        int x = chunk.getX();
-        int z = chunk.getZ();
-        if (event instanceof Cancellable && RTP.serverAccessor.getRTPWorld(world.getUID()).isForceLoaded(x, z)) {
-            ((Cancellable) event).setCancelled(true);
-        }
+  @EventHandler(priority = EventPriority.NORMAL)
+  public void onChunkUnload(ChunkUnloadEvent event) {
+    Chunk chunk = event.getChunk();
+    World world = chunk.getWorld();
+    int x = chunk.getX();
+    int z = chunk.getZ();
+    if (event instanceof Cancellable
+        && RTP.serverAccessor.getRTPWorld(world.getUID()).isForceLoaded(x, z)) {
+      ((Cancellable) event).setCancelled(true);
     }
+  }
 }
-
-
