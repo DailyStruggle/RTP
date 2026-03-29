@@ -273,8 +273,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
 
       if (RTP.selectionAPI != null) {
         for (io.github.dailystruggle.rtp.common.selection.region.Region region : RTP.selectionAPI.permRegionLookup.values()) {
-          if (region.cachePipeline != null) region.cachePipeline.execute();
-          if (region.miscPipeline != null) region.miscPipeline.execute();
+          region.execute(Long.MAX_VALUE);
         }
       }
 
