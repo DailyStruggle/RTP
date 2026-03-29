@@ -54,6 +54,17 @@ public class FoliaSchedulerImpl implements RTPScheduler {
   }
 
   @Override
+  public Object runTaskTimerAsynchronously(Runnable task, long delay, long period) {
+    return Bukkit.getAsyncScheduler()
+        .runAtFixedRate(
+            plugin,
+            scheduledTask -> task.run(),
+            Math.max(1, delay) * 50,
+            Math.max(1, period) * 50,
+            java.util.concurrent.TimeUnit.MILLISECONDS);
+  }
+
+  @Override
   public void cancelTask(Object task) {
     if (task instanceof ScheduledTask) {
       ((ScheduledTask) task).cancel();

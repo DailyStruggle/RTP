@@ -17,14 +17,14 @@ public class TimeBoundTaskPipe extends RTPTaskPipe {
     }
 
     @Override
-    public void execute() {
-        execute(availableTime);
+    public boolean execute() {
+        return execute(availableTime);
     }
 
     @Override
-    public void execute(long availableTime) {
-        if (stop) return;
-        if (runnables.isEmpty()) return;
+    public boolean execute(long availableTime) {
+        if (stop) return true;
+        if (runnables.isEmpty()) return true;
         long dt = 0;
         long start = System.nanoTime();
 
@@ -33,7 +33,7 @@ public class TimeBoundTaskPipe extends RTPTaskPipe {
         do {
             try {
                 accessGuard.acquire();
-                if (stop) return;
+                if (stop) return true;
                 Runnable runnable = runnables.poll();
                 if (runnable == null) continue;
                 if (runnable instanceof RTPDelayable) {
@@ -50,7 +50,7 @@ public class TimeBoundTaskPipe extends RTPTaskPipe {
                 long localStart = System.nanoTime();
                 try {
                     if (runnable instanceof RTPRunnable)
-                        RTP.serverAccessor.executeTask((RTPRunnable) runnable);
+                        ((RTPRunnable) runnable).runWithTracking();
                     else runnable.run();
                 } catch (Throwable throwable) {
                     RTP.log(Level.WARNING, throwable.getMessage(), throwable);
@@ -77,6 +77,8 @@ public class TimeBoundTaskPipe extends RTPTaskPipe {
         }
 
         runnables.addAll(delayedRunnables);
+
+        return runnables.isEmpty();
     }
 
     public long getAvailableTime() {

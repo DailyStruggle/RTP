@@ -41,6 +41,11 @@ public class BukkitSchedulerImpl implements RTPScheduler {
   }
 
   @Override
+  public Object runTaskTimerAsynchronously(Runnable task, long delay, long period) {
+    return Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, task, delay, period);
+  }
+
+  @Override
   public void cancelTask(Object task) {
     if (task instanceof org.bukkit.scheduler.BukkitTask) {
       ((org.bukkit.scheduler.BukkitTask) task).cancel();

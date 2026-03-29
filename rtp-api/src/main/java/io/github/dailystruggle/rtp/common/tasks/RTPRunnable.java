@@ -3,6 +3,16 @@ package io.github.dailystruggle.rtp.common.tasks;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class RTPRunnable implements Runnable, RTPCancellable, RTPDelayable {
+  public void runWithTracking() {
+    long start = System.nanoTime();
+    try {
+      this.run();
+    } finally {
+      io.github.dailystruggle.rtp.common.tools.PerformanceTracker.totalNanosecondsConsumed.add(
+          System.nanoTime() - start);
+    }
+  }
+
   protected AtomicBoolean cancelled = new AtomicBoolean(false);
   protected AtomicBoolean isRunning = new AtomicBoolean(false);
   private long delay = 0;

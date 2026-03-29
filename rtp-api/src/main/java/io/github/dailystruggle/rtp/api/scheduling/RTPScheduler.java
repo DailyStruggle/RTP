@@ -35,6 +35,16 @@ public interface RTPScheduler {
   Object runTaskTimer(Runnable task, long delay, long period);
 
   /**
+   * Run a task timer asynchronously
+   *
+   * @param task the task to run
+   * @param delay the delay in ticks
+   * @param period the period in ticks
+   * @return a task ID or object that can be used to cancel the task
+   */
+  Object runTaskTimerAsynchronously(Runnable task, long delay, long period);
+
+  /**
    * Cancel a task
    *
    * @param task the task ID or object returned by runTaskTimer
