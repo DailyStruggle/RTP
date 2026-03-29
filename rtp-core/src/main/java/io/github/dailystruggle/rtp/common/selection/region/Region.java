@@ -178,7 +178,8 @@ public class Region extends FactoryValue<RegionKeys> {
     long start = System.nanoTime();
     long currentAvailable = availableTime;
 
-    miscPipeline.execute(currentAvailable);
+    boolean miscFinished = miscPipeline.execute(currentAvailable);
+    if (!miscFinished) return;
     currentAvailable -= (System.nanoTime() - start);
 
     long cacheCap = getNumber(RegionKeys.cacheCap, 10L).longValue();
@@ -188,7 +189,8 @@ public class Region extends FactoryValue<RegionKeys> {
       if (locationQueue.size() >= cacheCap) return;
       while (cachePipeline.size() + locationQueue.size() < cacheCap + playerQueue.size())
         cachePipeline.add(new Cache());
-      cachePipeline.execute(currentAvailable);
+      boolean cacheFinished = cachePipeline.execute(currentAvailable);
+      if (!cacheFinished) return;
     } catch (InterruptedException e) {
       RTP.log(Level.WARNING, e.getMessage(), e);
     } finally {

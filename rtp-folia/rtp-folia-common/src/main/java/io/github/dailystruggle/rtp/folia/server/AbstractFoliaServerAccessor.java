@@ -85,7 +85,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   @Override
   public void executeTask(io.github.dailystruggle.rtp.common.tasks.RTPRunnable task) {
     if (!(plugin instanceof Plugin bukkitPlugin)) {
-      RTP.scheduler.runTaskAsynchronously(task);
+      RTP.scheduler.runTaskAsynchronously(task::runWithTracking);
       return;
     }
 
@@ -93,7 +93,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
     RegionKey key = RegionKey.from(rtpLoc);
 
     if (key == null) {
-      Bukkit.getAsyncScheduler().runNow(bukkitPlugin, scheduledTask -> task.run());
+      Bukkit.getAsyncScheduler().runNow(bukkitPlugin, scheduledTask -> task.runWithTracking());
     } else {
       regionQueues.computeIfAbsent(key, k -> new ConcurrentLinkedQueue<>()).add(task);
       if (activeProcessors.add(key)) {

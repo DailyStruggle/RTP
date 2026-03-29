@@ -171,7 +171,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   @Override
   public void executeTask(io.github.dailystruggle.rtp.common.tasks.RTPRunnable task) {
-    task.run();
+    task.runWithTracking();
   }
 
   @Override

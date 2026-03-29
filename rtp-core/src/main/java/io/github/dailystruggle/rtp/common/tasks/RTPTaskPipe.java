@@ -15,9 +15,18 @@ public abstract class RTPTaskPipe {
   //    protected long avgTime = Long.MAX_VALUE;
   protected boolean stop = false;
 
-  public abstract void execute();
+  /**
+   * @return true if the pipeline completed all tasks in the queue.
+   * Returns false if the pipeline yielded because it hit its time/count limit.
+   */
+  public abstract boolean execute();
 
-  public abstract void execute(long availableTime);
+  /**
+   * @param availableTime maximum time allowed for execution in nanoseconds
+   * @return true if the pipeline completed all tasks in the queue.
+   * Returns false if the pipeline yielded because it hit its time/count limit.
+   */
+  public abstract boolean execute(long availableTime);
 
   public long size() {
     return runnables.size();

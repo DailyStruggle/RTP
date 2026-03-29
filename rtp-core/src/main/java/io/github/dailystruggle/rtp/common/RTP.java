@@ -123,6 +123,8 @@ public class RTP {
         60,
         60,
         TimeUnit.SECONDS);
+
+    io.github.dailystruggle.rtp.common.tools.PerformanceTracker.start(scheduler);
   }
 
   public static void addShape(Shape<?> shape) {

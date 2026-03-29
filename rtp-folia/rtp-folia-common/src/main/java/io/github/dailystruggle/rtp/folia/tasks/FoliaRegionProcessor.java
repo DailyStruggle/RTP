@@ -35,7 +35,7 @@ public class FoliaRegionProcessor implements Runnable {
         while (System.nanoTime() - start < availableTime) {
             RTPRunnable task = queue.poll();
             if (task == null) break;
-            task.run();
+            task.runWithTracking();
         }
 
         if (queue.isEmpty()) {

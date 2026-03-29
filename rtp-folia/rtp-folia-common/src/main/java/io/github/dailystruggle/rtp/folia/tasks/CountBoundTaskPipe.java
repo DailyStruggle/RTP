@@ -19,13 +19,13 @@ public class CountBoundTaskPipe extends RTPTaskPipe {
     }
 
     @Override
-    public void execute() {
-        execute(Long.MAX_VALUE);
+    public boolean execute() {
+        return execute(Long.MAX_VALUE);
     }
 
     @Override
-    public void execute(long ignoredTime) {
-        if (stop) return;
+    public boolean execute(long ignoredTime) {
+        if (stop) return true;
         for (int i = 0; i < maxTasksPerTick; i++) {
             Runnable runnable = runnables.poll();
             if (runnable == null) break;
@@ -36,16 +36,26 @@ public class CountBoundTaskPipe extends RTPTaskPipe {
             }
 
             if (rtpLocation == null) {
-                Bukkit.getAsyncScheduler().runNow(plugin, scheduledTask -> runnable.run());
+                Bukkit.getAsyncScheduler().runNow(plugin, scheduledTask -> {
+                    if (runnable instanceof RTPRunnable) ((RTPRunnable) runnable).runWithTracking();
+                    else runnable.run();
+                });
             } else {
                 if (rtpLocation.world() instanceof FoliaRTPWorld) {
                     World world = ((FoliaRTPWorld) rtpLocation.world()).world();
                     Location loc = new Location(world, rtpLocation.x(), rtpLocation.y(), rtpLocation.z());
-                    Bukkit.getRegionScheduler().run(plugin, loc, scheduledTask -> runnable.run());
+                    Bukkit.getRegionScheduler().run(plugin, loc, scheduledTask -> {
+                        if (runnable instanceof RTPRunnable) ((RTPRunnable) runnable).runWithTracking();
+                        else runnable.run();
+                    });
                 } else {
-                    Bukkit.getGlobalRegionScheduler().run(plugin, scheduledTask -> runnable.run());
+                    Bukkit.getGlobalRegionScheduler().run(plugin, scheduledTask -> {
+                        if (runnable instanceof RTPRunnable) ((RTPRunnable) runnable).runWithTracking();
+                        else runnable.run();
+                    });
                 }
             }
         }
+        return runnables.isEmpty();
     }
 }
