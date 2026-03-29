@@ -29,24 +29,44 @@ public abstract class RTPChunk<T> {
   public abstract int z();
 
   /**
-   * Get the block at the specified coordinates within the chunk
+   * Check if the block at the specified coordinates within the chunk is an air block
    *
    * @param x the x coordinate (0-15)
    * @param y the y coordinate
    * @param z the z coordinate (0-15)
-   * @return the block
+   * @return true if air, false otherwise
    */
-  public abstract RTPBlock<?> getBlockAt(int x, int y, int z);
+  public abstract boolean isAir(int x, int y, int z);
 
   /**
-   * Get the block at the specified location within the chunk
+   * Get the sky light level at the specified coordinates within the chunk
    *
-   * @param location the location
-   * @return the block
+   * @param x the x coordinate (0-15)
+   * @param y the y coordinate
+   * @param z the z coordinate (0-15)
+   * @return the sky light level
    */
-  public RTPBlock<?> getBlockAt(RTPLocation location) {
-    return getBlockAt(location.x(), location.y(), location.z());
-  }
+  public abstract int getSkyLight(int x, int y, int z);
+
+  /**
+   * Get the highest solid block Y coordinate at the specified coordinates within the chunk
+   *
+   * @param x the x coordinate (0-15)
+   * @param z the z coordinate (0-15)
+   * @return the highest solid block Y coordinate
+   */
+  public abstract int getSurfaceHeight(int x, int z);
+
+  /**
+   * Check if the block at the specified coordinates within the chunk is safe
+   *
+   * @param x            the x coordinate (0-15)
+   * @param y            the y coordinate
+   * @param z            the z coordinate (0-15)
+   * @param unsafeBlocks the set of unsafe blocks
+   * @return true if safe, false otherwise
+   */
+  public abstract boolean isSafe(int x, int y, int z, java.util.Set<String> unsafeBlocks);
 
   /**
    * Get the world the chunk is in
