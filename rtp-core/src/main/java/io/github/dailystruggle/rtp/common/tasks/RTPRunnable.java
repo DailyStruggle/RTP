@@ -1,4 +1,5 @@
 package io.github.dailystruggle.rtp.common.tasks;
+import io.github.dailystruggle.rtp.api.world.RTPLocation;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -55,6 +56,14 @@ public class RTPRunnable implements Runnable, RTPCancellable, RTPDelayable {
 
   public boolean isRunning() {
     return isRunning.get();
+  }
+
+  public RTPLocation getLocation() {
+    return null;
+  }
+
+  public RTPLocation getTargetLocation() {
+    return null;
   }
 
   @Override

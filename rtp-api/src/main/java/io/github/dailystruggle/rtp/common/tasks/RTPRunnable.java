@@ -49,6 +49,10 @@ public class RTPRunnable implements Runnable, RTPCancellable, RTPDelayable {
     return isRunning.get();
   }
 
+  public io.github.dailystruggle.rtp.api.world.RTPLocation getLocation() {
+    return null;
+  }
+
   @Override
   public void run() {
     if (runnable != null) runnable.run();

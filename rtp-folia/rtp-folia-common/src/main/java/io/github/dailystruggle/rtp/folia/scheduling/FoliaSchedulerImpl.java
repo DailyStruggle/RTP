@@ -3,9 +3,12 @@ package io.github.dailystruggle.rtp.folia.scheduling;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask;
+import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.folia.world.FoliaRTPWorld;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import java.util.UUID;
 import org.bukkit.Bukkit;
+import org.bukkit.World;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class FoliaSchedulerImpl implements RTPScheduler {
@@ -23,6 +26,18 @@ public class FoliaSchedulerImpl implements RTPScheduler {
   @Override
   public void runTask(Runnable task) {
     Bukkit.getGlobalRegionScheduler().run(plugin, scheduledTask -> task.run());
+  }
+
+  @Override
+  public void runTask(io.github.dailystruggle.rtp.api.world.RTPLocation location, Runnable task) {
+    RTPWorld<?> rtpWorld = location.world();
+    if (rtpWorld instanceof FoliaRTPWorld) {
+      World world = ((FoliaRTPWorld) rtpWorld).world();
+      Bukkit.getRegionScheduler()
+          .run(plugin, world, (int) location.x() >> 4, (int) location.z() >> 4, scheduledTask -> task.run());
+    } else {
+      runTask(task);
+    }
   }
 
   @Override

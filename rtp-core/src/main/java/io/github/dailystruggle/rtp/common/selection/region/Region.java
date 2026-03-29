@@ -61,8 +61,8 @@ public class Region extends FactoryValue<RegionKeys> {
   public ConcurrentHashMap<UUID, CompletableFuture<Map.Entry<RTPCoords, Long>>> fastLocations =
       new ConcurrentHashMap<>();
 
-  public RTPTaskPipe cachePipeline = new RTPTaskPipe();
-  public RTPTaskPipe miscPipeline = new RTPTaskPipe();
+  public RTPTaskPipe cachePipeline;
+  public RTPTaskPipe miscPipeline;
   protected java.util.concurrent.ConcurrentLinkedQueue<UUID> playerQueue =
       new java.util.concurrent.ConcurrentLinkedQueue<>();
   protected RTPWorld<?> savedWorld = null;
@@ -71,6 +71,8 @@ public class Region extends FactoryValue<RegionKeys> {
     super(RegionKeys.class, name);
     this.name = name;
     this.data.putAll(params);
+    this.cachePipeline = (RTPTaskPipe) RTP.serverAccessor.createTaskPipe();
+    this.miscPipeline = (RTPTaskPipe) RTP.serverAccessor.createTaskPipe();
 
     ConfigParser<LoggingKeys> logging =
         (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
@@ -174,8 +176,10 @@ public class Region extends FactoryValue<RegionKeys> {
    */
   public void execute(long availableTime) {
     long start = System.nanoTime();
+    long currentAvailable = availableTime;
 
-    miscPipeline.execute(availableTime);
+    miscPipeline.execute(currentAvailable);
+    currentAvailable -= (System.nanoTime() - start);
 
     long cacheCap = getNumber(RegionKeys.cacheCap, 10L).longValue();
     cacheCap = Math.max(cacheCap, playerQueue.size());
@@ -184,9 +188,7 @@ public class Region extends FactoryValue<RegionKeys> {
       if (locationQueue.size() >= cacheCap) return;
       while (cachePipeline.size() + locationQueue.size() < cacheCap + playerQueue.size())
         cachePipeline.add(new Cache());
-      cachePipeline.execute(
-          availableTime - (System.nanoTime() - start)); // todo: too fast for server
-      //            cachePipeline.execute( 0 );
+      cachePipeline.execute(currentAvailable);
     } catch (InterruptedException e) {
       RTP.log(Level.WARNING, e.getMessage(), e);
     } finally {

@@ -9,24 +9,35 @@ import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.tasks.teleport.DoTeleport;
+import io.github.dailystruggle.rtp.common.tasks.teleport.LoadChunks;
 import io.github.dailystruggle.rtp.folia.entity.FoliaRTPCommandSender;
 import io.github.dailystruggle.rtp.folia.entity.FoliaRTPPlayer;
 import io.github.dailystruggle.rtp.folia.world.FoliaRTPWorld;
+import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
+import io.github.dailystruggle.rtp.folia.tasks.FoliaRegionProcessor;
+import io.github.dailystruggle.rtp.folia.tasks.FoliaTaskDispatcher;
+import io.github.dailystruggle.rtp.folia.tasks.RegionKey;
 import java.io.File;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   protected final Map<UUID, FoliaRTPWorld> worldMap = new ConcurrentHashMap<>();
+  protected final ConcurrentHashMap<RegionKey, ConcurrentLinkedQueue<io.github.dailystruggle.rtp.common.tasks.RTPRunnable>> regionQueues = new ConcurrentHashMap<>();
+  protected final Set<RegionKey> activeProcessors = ConcurrentHashMap.newKeySet();
   protected Function<String, ?> shapeFunction = (s) -> null;
   protected Function<String, ?> worldBorderFunction = (s) -> null;
   protected Function<RTPWorld<?>, Set<String>> biomes = (rtpWorld) -> new HashSet<>();
@@ -70,6 +81,31 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
 
   @Override
   public abstract io.github.dailystruggle.rtp.api.world.RTPChunkManager getChunkManager();
+
+  @Override
+  public void executeTask(io.github.dailystruggle.rtp.common.tasks.RTPRunnable task) {
+    if (!(plugin instanceof Plugin bukkitPlugin)) {
+      RTP.scheduler.runTaskAsynchronously(task);
+      return;
+    }
+
+    RTPLocation rtpLoc = task.getLocation();
+    RegionKey key = RegionKey.from(rtpLoc);
+
+    if (key == null) {
+      Bukkit.getAsyncScheduler().runNow(bukkitPlugin, scheduledTask -> task.run());
+    } else {
+      regionQueues.computeIfAbsent(key, k -> new ConcurrentLinkedQueue<>()).add(task);
+      if (activeProcessors.add(key)) {
+        World world = Bukkit.getWorld(key.worldId());
+        if (world != null) {
+          Location bukkitLoc = new Location(world, key.regionX() << 9, 0, key.regionZ() << 9);
+          FoliaRegionProcessor processor = new FoliaRegionProcessor(bukkitPlugin, key, regionQueues.get(key), activeProcessors, 5000000L);
+          Bukkit.getRegionScheduler().run(bukkitPlugin, bukkitLoc, scheduledTask -> processor.run());
+        }
+      }
+    }
+  }
 
   @Override
   public @Nullable Object getShape(String name) {
@@ -207,11 +243,55 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
         .collect(Collectors.toSet());
   }
 
+  private Object plugin;
+
   @Override
   public void stop() {}
 
   @Override
-  public void start() {}
+  public void start() {
+    start(plugin);
+  }
+
+  @Override
+  public void start(Object plugin) {
+    this.plugin = plugin;
+    if (!(plugin instanceof org.bukkit.plugin.java.JavaPlugin)) return;
+    org.bukkit.plugin.java.JavaPlugin javaPlugin = (org.bukkit.plugin.java.JavaPlugin) plugin;
+
+    org.bukkit.Bukkit.getGlobalRegionScheduler().runAtFixedRate(javaPlugin, scheduledTask -> {
+      RTP rtp = RTP.getInstance();
+      if (rtp == null) return;
+
+      if (rtp.setupTeleportPipeline != null) rtp.setupTeleportPipeline.execute();
+      if (rtp.loadChunksPipeline != null) rtp.loadChunksPipeline.execute();
+      if (rtp.teleportPipeline != null) rtp.teleportPipeline.execute();
+      if (rtp.chunkCleanupPipeline != null) rtp.chunkCleanupPipeline.execute();
+      if (rtp.miscSyncTasks != null) rtp.miscSyncTasks.execute();
+      if (rtp.miscAsyncTasks != null) rtp.miscAsyncTasks.execute();
+      if (rtp.cancelTasks != null) rtp.cancelTasks.execute();
+
+      if (RTP.selectionAPI != null) {
+        for (io.github.dailystruggle.rtp.common.selection.region.Region region : RTP.selectionAPI.permRegionLookup.values()) {
+          if (region.cachePipeline != null) region.cachePipeline.execute();
+          if (region.miscPipeline != null) region.miscPipeline.execute();
+        }
+      }
+
+      // Also process fill and database tasks as they are normally processed on Spigot via their own tasks
+      if (rtp.fillTasks != null) {
+        for (io.github.dailystruggle.rtp.common.tasks.FillTask fillTask : rtp.fillTasks.values()) {
+          if (!fillTask.isRunning()) {
+            rtp.scheduler.runTaskAsynchronously(fillTask);
+          }
+        }
+      }
+
+      if (rtp.databaseAccessor != null) {
+        rtp.scheduler.runTaskAsynchronously(() -> rtp.databaseAccessor.processQueries(Long.MAX_VALUE));
+      }
+    }, 1, 1);
+  }
 
   @Override
   public boolean setShapeFunction(Function<String, ?> shapeFunction) {
@@ -223,6 +303,11 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   public boolean setWorldBorderFunction(Function<String, ?> function) {
     this.worldBorderFunction = function;
     return true;
+  }
+
+  @Override
+  public RTPTaskPipe createTaskPipe() {
+    return new FoliaTaskDispatcher(10);
   }
 
   @Override

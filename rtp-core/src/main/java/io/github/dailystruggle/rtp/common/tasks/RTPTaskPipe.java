@@ -8,12 +8,14 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
-public class RTPTaskPipe {
-  private final ConcurrentLinkedQueue<Runnable> runnables = new ConcurrentLinkedQueue<>();
-  private final Semaphore accessGuard = new Semaphore(1);
+public abstract class RTPTaskPipe {
+  protected final ConcurrentLinkedQueue<Runnable> runnables = new ConcurrentLinkedQueue<>();
+  protected final Semaphore accessGuard = new Semaphore(1);
   protected long avgTime = TimeUnit.MILLISECONDS.toNanos(50);
   //    protected long avgTime = Long.MAX_VALUE;
-  private boolean stop = false;
+  protected boolean stop = false;
+
+  public abstract void execute();
 
   public void execute(long availableTime) {
     if (stop) return;
@@ -42,7 +44,9 @@ public class RTPTaskPipe {
 
         long localStart = System.nanoTime();
         try {
-          runnable.run();
+          if (runnable instanceof RTPRunnable)
+            RTP.serverAccessor.executeTask((RTPRunnable) runnable);
+          else runnable.run();
         } catch (Throwable throwable) {
           RTP.log(Level.WARNING, throwable.getMessage(), throwable);
           continue;

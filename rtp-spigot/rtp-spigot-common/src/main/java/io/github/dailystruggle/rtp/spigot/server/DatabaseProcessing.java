@@ -1,18 +1,23 @@
-package io.github.dailystruggle.rtp.bukkit.server;
+package io.github.dailystruggle.rtp.spigot.server;
 
-import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.tasks.FillTask;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.bukkit.Bukkit;
+import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
 public class DatabaseProcessing extends BukkitRunnable {
   private static final AtomicBoolean killed = new AtomicBoolean(false);
   private static final AtomicReference<BukkitTask> asyncTask = new AtomicReference<>(null);
+  private final JavaPlugin plugin;
+
+  public DatabaseProcessing(JavaPlugin plugin) {
+    this.plugin = plugin;
+  }
 
   public static void clear() {
     if (asyncTask.get() != null) asyncTask.get().cancel();
@@ -34,12 +39,13 @@ public class DatabaseProcessing extends BukkitRunnable {
     BukkitTask task =
         Bukkit.getScheduler()
             .runTaskAsynchronously(
-                RTPBukkitPlugin.getInstance(),
+                plugin,
                 () -> {
-                  RTP.getInstance().databaseAccessor.processQueries(Long.MAX_VALUE);
+                  if (RTP.getInstance().databaseAccessor != null)
+                    RTP.getInstance().databaseAccessor.processQueries(Long.MAX_VALUE);
+                  future.complete(true);
                 });
     asyncTask.set(task);
-    //        RTP.log( Level.SEVERE,"B - " + task.getTaskId() );
     future.thenAccept(aBoolean -> asyncTask.set(null));
   }
 

@@ -26,6 +26,11 @@ public class BukkitSchedulerImpl implements RTPScheduler {
   }
 
   @Override
+  public void runTask(io.github.dailystruggle.rtp.api.world.RTPLocation location, Runnable task) {
+    runTask(task);
+  }
+
+  @Override
   public void runTaskLater(Runnable task, long delay) {
     Bukkit.getScheduler().runTaskLater(plugin, task, delay);
   }

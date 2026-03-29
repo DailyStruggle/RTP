@@ -1,6 +1,5 @@
-package io.github.dailystruggle.rtp.bukkit.server;
+package io.github.dailystruggle.rtp.spigot.server;
 
-import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.tasks.TPS;
 import io.github.dailystruggle.rtp.common.tasks.tick.AsyncTaskProcessing;
@@ -11,19 +10,20 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.bukkit.Bukkit;
+import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
-/** Task for processing teleportation asynchronously in Bukkit */
 public class AsyncTeleportProcessing extends BukkitRunnable {
   private static final AtomicReference<AsyncTaskProcessing> asyncTaskProcessing =
       new AtomicReference<>();
   private static final AtomicBoolean killed = new AtomicBoolean(false);
   private static final ConcurrentHashMap<Integer, BukkitTask> asyncTasks =
       new ConcurrentHashMap<>();
+  private final JavaPlugin plugin;
 
-  /** Default constructor for AsyncTeleportProcessing */
-  public AsyncTeleportProcessing() {
+  public AsyncTeleportProcessing(JavaPlugin plugin) {
+    this.plugin = plugin;
     if (killed.get()) return;
     if (asyncTaskProcessing.get() != null) return;
     long avgTime = TPS.timeSinceTick(20) / 20;
@@ -35,7 +35,6 @@ public class AsyncTeleportProcessing extends BukkitRunnable {
     asyncTaskProcessing.set(new AsyncTaskProcessing(availableTime));
   }
 
-  /** Clear all scheduled tasks */
   public static void clear() {
     if (asyncTaskProcessing.get() != null && !asyncTaskProcessing.get().isCancelled())
       asyncTaskProcessing.get().setCancelled(true);
@@ -48,7 +47,6 @@ public class AsyncTeleportProcessing extends BukkitRunnable {
     asyncTasks.clear();
   }
 
-  /** Kill all scheduled tasks and prevent new ones from being created */
   public static void kill() {
     clear();
     killed.set(true);
@@ -65,7 +63,7 @@ public class AsyncTeleportProcessing extends BukkitRunnable {
     BukkitTask task =
         Bukkit.getScheduler()
             .runTaskAsynchronously(
-                RTPBukkitPlugin.getInstance(),
+                plugin,
                 () -> {
                   AsyncTaskProcessing asyncTaskProcessing2 =
                       AsyncTeleportProcessing.asyncTaskProcessing.get();
