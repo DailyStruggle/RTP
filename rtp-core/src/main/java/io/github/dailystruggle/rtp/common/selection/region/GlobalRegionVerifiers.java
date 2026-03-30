@@ -48,7 +48,8 @@ public class GlobalRegionVerifiers {
             return false;
         }
 
-        for (Predicate<RTPCoords> verifier : regionVerifiers) {
+        for (int i = 0; i < regionVerifiers.size(); i++) {
+            Predicate<RTPCoords> verifier = regionVerifiers.get(i);
             try {
                 // if invalid placement, stop and return invalid
                 // clone location to prevent methods from messing with the data

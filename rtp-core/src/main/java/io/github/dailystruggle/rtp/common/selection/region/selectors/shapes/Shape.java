@@ -24,14 +24,16 @@ public abstract class Shape<E extends Enum<E>> extends FactoryValue<E> {
   protected final List<BiPredicate<GenerationContext, MutableRTPCoords>> verifiersMutable = new ArrayList<>();
 
   public boolean checkVerifiers(GenerationContext context, RTPCoords coords) {
-    for (BiPredicate<GenerationContext, RTPCoords> verifier : verifiers) {
+    for (int i = 0; i < verifiers.size(); i++) {
+      BiPredicate<GenerationContext, RTPCoords> verifier = verifiers.get(i);
       if (!verifier.test(context, coords)) return false;
     }
     return true;
   }
 
   public boolean checkVerifiers(GenerationContext context, MutableRTPCoords coords) {
-    for (BiPredicate<GenerationContext, MutableRTPCoords> verifier : verifiersMutable) {
+    for (int i = 0; i < verifiersMutable.size(); i++) {
+      BiPredicate<GenerationContext, MutableRTPCoords> verifier = verifiersMutable.get(i);
       if (!verifier.test(context, coords)) return false;
     }
     return true;

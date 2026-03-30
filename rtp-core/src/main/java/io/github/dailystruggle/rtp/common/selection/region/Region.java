@@ -134,7 +134,9 @@ public class Region extends FactoryValue<RegionKeys> {
       RTP.getInstance().latestTeleportData.put(playerId, teleportData);
       inFlightCalculations.incrementAndGet();
       RTP.getInstance().loadChunksPipeline.add(loadChunks);
-      onPlayerQueuePop.forEach(consumer -> consumer.accept(this, playerId));
+      for (int i = 0; i < onPlayerQueuePop.size(); i++) {
+        onPlayerQueuePop.get(i).accept(this, playerId);
+      }
 
       Iterator<UUID> iterator = queueManager.playerQueue.iterator();
       int i = 0;

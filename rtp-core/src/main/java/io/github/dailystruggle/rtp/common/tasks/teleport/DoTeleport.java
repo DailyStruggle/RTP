@@ -92,7 +92,7 @@ public final class DoTeleport extends RTPRunnable {
         saveMap.put("UUID", player.uuid().toString());
         saveMap.putAll(dataMap);
       }
-      RTP.getInstance().databaseAccessor.setValue("teleportData", saveMap);
+      RTP.getInstance().databaseAccessor.cacheValue("teleportData", saveMap);
       region.inFlightCalculations.decrementAndGet();
 
       RTP.getInstance().chunkCleanupPipeline.add(new ChunkCleanup(coords, region));
