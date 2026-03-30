@@ -17,9 +17,10 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdj
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.common.tasks.FillTask;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
-import io.github.dailystruggle.rtp.common.tasks.teleport.LoadChunks;
+import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.logging.Level;
@@ -28,9 +29,7 @@ import org.jetbrains.annotations.Nullable;
 public class Region extends FactoryValue<RegionKeys> {
   public static final List<BiConsumer<Region, UUID>> onPlayerQueuePush = new ArrayList<>();
   public static final List<BiConsumer<Region, UUID>> onPlayerQueuePop = new ArrayList<>();
-  // semaphore needed in case of async usage
-  // storage for region verifiers to use for ALL regions
-  private final Semaphore cacheGuard = new Semaphore(1);
+  private final AtomicBoolean isRefillingCache = new AtomicBoolean(false);
 
   public final RegionQueueManager queueManager = new RegionQueueManager(this);
   public final RegionChunkManager chunkManager = new RegionChunkManager(this);
@@ -119,11 +118,12 @@ public class Region extends FactoryValue<RegionKeys> {
       teleportData.selectedCoords = pair.getKey();
 
       RTPCommandSender sender = RTP.serverAccessor.getSender(CommandsAPI.serverId);
-      LoadChunks loadChunks = new LoadChunks(sender, player, pair.getKey(), this);
-      teleportData.nextTask = loadChunks;
+      TeleportPipelineTask pipelineTask = new TeleportPipelineTask(new GenerationContext(sender, player, null), this, pair.getKey());
+      teleportData.nextTask = pipelineTask;
+      RTP.scheduler.runTaskAsynchronously(pipelineTask);
+
       RTP.getInstance().latestTeleportData.put(playerId, teleportData);
       inFlightCalculations.incrementAndGet();
-      RTP.getInstance().loadChunksPipeline.add(loadChunks);
       for (int i = 0; i < onPlayerQueuePop.size(); i++) {
         onPlayerQueuePop.get(i).accept(this, playerId);
       }
@@ -165,8 +165,8 @@ public class Region extends FactoryValue<RegionKeys> {
 
     long cacheCap = settings.cacheCap();
     cacheCap = Math.max(cacheCap, queueManager.playerQueue.size());
+    if (!isRefillingCache.compareAndSet(false, true)) return;
     try {
-      cacheGuard.acquire();
       if (queueManager.locationQueue.size() + inFlightCalculations.get() >= cacheCap) return;
       while (cachePipeline.size() + queueManager.locationQueue.size() + inFlightCalculations.get()
           < cacheCap + queueManager.playerQueue.size()) {
@@ -174,10 +174,8 @@ public class Region extends FactoryValue<RegionKeys> {
         inFlightCalculations.incrementAndGet();
       }
       cachePipeline.execute(currentAvailable);
-    } catch (InterruptedException e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
     } finally {
-      cacheGuard.release();
+      isRefillingCache.set(false);
     }
   }
 

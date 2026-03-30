@@ -46,6 +46,28 @@ public final class TeleportPipelineTask extends RTPRunnable {
   public static final List<Consumer<TeleportPipelineTask>> cleanupPreActions = new ArrayList<>();
   public static final List<Consumer<TeleportPipelineTask>> cleanupPostActions = new ArrayList<>();
 
+  public static class ConfigCache {
+    public static String unsafe = "";
+    public static String teleportMessage = "";
+    public static long viewDistanceTeleport = 0;
+
+    static {
+      RTP.configs.onReload(ConfigCache::reload);
+      if (!RTP.reloading.get()) reload();
+    }
+
+    public static void reload() {
+      ConfigParser<MessagesKeys> langParser =
+          (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+      unsafe = langParser.getConfigValue(MessagesKeys.unsafe, "").toString();
+      teleportMessage = langParser.getConfigValue(MessagesKeys.teleportMessage, "").toString();
+
+      ConfigParser<PerformanceKeys> perf =
+          (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+      viewDistanceTeleport = perf.getNumber(PerformanceKeys.viewDistanceTeleport, 0L).longValue();
+    }
+  }
+
   static {
     setupPreActions.add(task -> task.isRunning.set(true));
     setupPostActions.add((task, success) -> { if (!success) task.isRunning.set(false); });
@@ -68,6 +90,21 @@ public final class TeleportPipelineTask extends RTPRunnable {
   public TeleportPipelineTask(GenerationContext context, Region region) {
     this.context = context;
     this.region = region;
+  }
+
+  public TeleportPipelineTask(GenerationContext context, Region region, RTPCoords preSelectedCoords) {
+    this.context = context;
+    this.region = region;
+    this.coords = preSelectedCoords;
+    this.currentPhase = Phase.LOAD;
+  }
+
+  public Phase getPhase() {
+    return this.currentPhase;
+  }
+
+  public void setPhase(Phase phase) {
+    this.currentPhase = phase;
   }
 
   @Override
@@ -142,10 +179,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
       if (coords == null) {
         teleportData.attempts = attempts;
-        ConfigParser<MessagesKeys> langParser =
-            (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-        String msg = langParser.getConfigValue(MessagesKeys.unsafe, "").toString();
-        RTP.serverAccessor.sendMessage(sender().uuid(), player.uuid(), msg);
+        RTP.serverAccessor.sendMessage(sender().uuid(), player.uuid(), ConfigCache.unsafe);
         region.inFlightCalculations.decrementAndGet();
         RTPTeleportCancel.refund(player.uuid());
         return;
@@ -164,9 +198,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
       if (success) {
         currentPhase = Phase.LOAD;
 
-        ConfigParser<PerformanceKeys> perf =
-            (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
-        long radius2 = perf.getNumber(PerformanceKeys.viewDistanceTeleport, 0L).longValue();
+        long radius2 = ConfigCache.viewDistanceTeleport;
         long max = (radius2 * radius2 * 4) + (4 * radius2) + 1;
         ChunkSet chunkSet = this.region.chunkManager.chunks(coords, radius2);
         if (max > chunkSet.chunks.size()) {
@@ -188,8 +220,36 @@ public final class TeleportPipelineTask extends RTPRunnable {
       return;
     }
 
+    if (teleportData == null) {
+      RTPPlayer player = context.player();
+      if (player == null) {
+        if (region != null) region.inFlightCalculations.decrementAndGet();
+        return;
+      }
+      UUID playerId = player.uuid();
+      teleportData = RTP.getInstance().latestTeleportData.get(playerId);
+      if (teleportData == null) {
+        teleportData = new TeleportData();
+        teleportData.sender = (context.sender() != null) ? context.sender() : player;
+        teleportData.completed = false;
+        teleportData.time = System.currentTimeMillis();
+        teleportData.delay = teleportData.sender.delay();
+        teleportData.targetRegion = region;
+        teleportData.originalCoords =
+            new RTPCoords(
+                player.getLocation().world().name(),
+                player.getLocation().x(),
+                player.getLocation().y(),
+                player.getLocation().z());
+        RTP.getInstance().latestTeleportData.put(playerId, teleportData);
+      }
+      teleportData.nextTask = this;
+      teleportData.targetRegion = region;
+      teleportData.selectedCoords = coords;
+    }
+
     if (region == null || coords == null) {
-      region.inFlightCalculations.decrementAndGet();
+      if (region != null) region.inFlightCalculations.decrementAndGet();
       return;
     }
 
@@ -242,6 +302,8 @@ public final class TeleportPipelineTask extends RTPRunnable {
       RTP.getInstance().invulnerablePlayers.put(playerId, System.currentTimeMillis());
 
       teleportData.completed = true;
+      long processingTime = System.currentTimeMillis() - teleportData.time;
+      teleportData.processingTime = processingTime;
       RTP.getInstance().processingPlayers.remove(playerId);
 
       CompletableFuture<Boolean> setLocation = player.setLocation(location);
@@ -260,7 +322,11 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
       setLocation.thenAccept(
           aBoolean -> {
-            RTP.serverAccessor.sendMessage(playerId, MessagesKeys.teleportMessage);
+            if (aBoolean) {
+              RTP.serverAccessor.sendMessage(playerId, ConfigCache.teleportMessage);
+            } else {
+              RTP.serverAccessor.sendMessage(playerId, ConfigCache.unsafe);
+            }
           });
 
       teleportPostActions.forEach(consumer -> consumer.accept(this));
@@ -280,16 +346,6 @@ public final class TeleportPipelineTask extends RTPRunnable {
     Consumer<Boolean> cleanupAction =
         (success) -> {
           chunkSet.keep(false, rtpWorld);
-          chunkSet.chunks.forEach(
-              cf -> {
-                if (cf.isDone()) {
-                  Long key = cf.getNow(null);
-                  if (key != null) {
-                    RTPChunk<?> chunk = rtpWorld.getCachedChunk(key);
-                    if (chunk != null) chunk.unload();
-                  }
-                }
-              });
           region.chunkManager.removeChunks(coords);
           cleanupPostActions.forEach(consumer -> consumer.accept(this));
         };

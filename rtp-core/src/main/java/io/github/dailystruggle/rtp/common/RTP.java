@@ -74,11 +74,6 @@ public class RTP {
   public final ConcurrentHashMap<UUID, TeleportData> priorTeleportData = new ConcurrentHashMap<>();
   public final ConcurrentHashMap<UUID, TeleportData> latestTeleportData = new ConcurrentHashMap<>();
   public final ConcurrentSkipListSet<UUID> processingPlayers = new ConcurrentSkipListSet<>();
-  public final RTPTaskPipe setupTeleportPipeline;
-  public final RTPTaskPipe getChunkPipeline;
-  public final RTPTaskPipe loadChunksPipeline;
-  public final RTPTaskPipe teleportPipeline;
-  public final RTPTaskPipe chunkCleanupPipeline;
   public final RTPTaskPipe miscSyncTasks;
   public final RTPTaskPipe miscAsyncTasks;
   public final RTPTaskPipe startupTasks;
@@ -92,11 +87,6 @@ public class RTP {
     if (serverAccessor == null) throw new IllegalStateException("null serverAccessor");
     if (scheduler == null) throw new IllegalStateException("null scheduler");
 
-    setupTeleportPipeline = (RTPTaskPipe) serverAccessor.createTaskPipe();
-    getChunkPipeline = (RTPTaskPipe) serverAccessor.createTaskPipe();
-    loadChunksPipeline = (RTPTaskPipe) serverAccessor.createTaskPipe();
-    teleportPipeline = (RTPTaskPipe) serverAccessor.createTaskPipe();
-    chunkCleanupPipeline = (RTPTaskPipe) serverAccessor.createTaskPipe();
     miscSyncTasks = (RTPTaskPipe) serverAccessor.createTaskPipe();
     miscAsyncTasks = (RTPTaskPipe) serverAccessor.createTaskPipe();
     startupTasks = (RTPTaskPipe) serverAccessor.createTaskPipe();
@@ -218,12 +208,8 @@ public class RTP {
       instance.databaseAccessor.stop.set(true);
     }
 
-    instance.chunkCleanupPipeline.stop();
     instance.miscAsyncTasks.stop();
     instance.miscSyncTasks.stop();
-    instance.setupTeleportPipeline.stop();
-    instance.loadChunksPipeline.stop();
-    instance.teleportPipeline.stop();
 
     for (Region r : selectionAPI.permRegionLookup.values()) {
       r.shutDown();

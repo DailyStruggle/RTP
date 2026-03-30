@@ -70,7 +70,7 @@ public class BukkitSchedulerImpl implements RTPScheduler {
     } else if (delayTicks > 0) {
       Bukkit.getScheduler().runTaskLater(plugin, trackedTask, delayTicks);
     } else {
-      RTP.getInstance().teleportPipeline.add(trackedTask);
+      Bukkit.getScheduler().runTask(plugin, trackedTask);
     }
   }
 }

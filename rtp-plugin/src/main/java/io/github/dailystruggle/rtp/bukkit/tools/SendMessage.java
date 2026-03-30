@@ -11,9 +11,8 @@ import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
-import io.github.dailystruggle.rtp.common.tasks.teleport.DoTeleport;
-import io.github.dailystruggle.rtp.common.tasks.teleport.LoadChunks;
-import io.github.dailystruggle.rtp.common.tasks.teleport.SetupTeleport;
+import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
+import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
 import io.github.dailystruggle.rtp.common.tools.ParseString;
 import java.util.*;
@@ -299,15 +298,22 @@ public class SendMessage {
           }
 
           RTPRunnable nextTask = data.nextTask;
-          if (nextTask instanceof DoTeleport)
-            return SendMessage.formatDry(
-                player, lang.getConfigValue(MessagesKeys.PLAYER_TELEPORTING, "").toString());
-          if (nextTask instanceof LoadChunks)
-            return SendMessage.formatDry(
-                player, lang.getConfigValue(MessagesKeys.PLAYER_LOADING, "").toString());
-          if (nextTask instanceof SetupTeleport)
-            return SendMessage.formatDry(
-                player, lang.getConfigValue(MessagesKeys.PLAYER_SETUP, "").toString());
+          if (nextTask instanceof TeleportPipelineTask) {
+            TeleportPipelineTask task = (TeleportPipelineTask) nextTask;
+            switch (task.getPhase()) {
+              case TELEPORT:
+                return SendMessage.formatDry(
+                    player, lang.getConfigValue(MessagesKeys.PLAYER_TELEPORTING, "").toString());
+              case LOAD:
+                return SendMessage.formatDry(
+                    player, lang.getConfigValue(MessagesKeys.PLAYER_LOADING, "").toString());
+              case SETUP:
+                return SendMessage.formatDry(
+                    player, lang.getConfigValue(MessagesKeys.PLAYER_SETUP, "").toString());
+              default:
+                break;
+            }
+          }
           return "";
         });
 

@@ -180,7 +180,7 @@ public class FillTask extends RTPRunnable {
         continue;
       }
 
-      CompletableFuture<Boolean> future = testPos(region, pos, cursor.x >> 4, cursor.z >> 4, safetyRadius, unsafeBlocks, defaultBiomes, biomeRecall, border);
+      CompletableFuture<Boolean> future = testPos(region, pos, cursor.x, cursor.z, safetyRadius, unsafeBlocks, defaultBiomes, biomeRecall, border);
 
       try {
         Boolean valid = future.join();
@@ -259,8 +259,8 @@ public class FillTask extends RTPRunnable {
    *
    * @param region the region
    * @param pos the location index
-   * @param cx chunk x coordinate
-   * @param cz chunk z coordinate
+   * @param blockX block x coordinate
+   * @param blockZ block z coordinate
    * @param safetyRadius safety radius for chunk verification
    * @param unsafeBlocks set of unsafe block names
    * @param defaultBiomes set of allowed biomes
@@ -271,13 +271,15 @@ public class FillTask extends RTPRunnable {
   public CompletableFuture<Boolean> testPos(
       Region region,
       final long pos,
-      final int cx,
-      final int cz,
+      final int blockX,
+      final int blockZ,
       int safetyRadius,
       Set<String> unsafeBlocks,
       Set<String> defaultBiomes,
       boolean biomeRecall,
       WorldBorder border) {
+    int cx = blockX >> 4;
+    int cz = blockZ >> 4;
     MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
     if (shape == null) return CompletableFuture.completedFuture(false);
 
@@ -339,7 +341,7 @@ public class FillTask extends RTPRunnable {
 
           chunk.keep(true);
           RTPChunk<?>[] localChunks = new RTPChunk[(safetyRadius * 2 + 1) * (safetyRadius * 2 + 1)];
-          MutableRTPCoords localCursor = new MutableRTPCoords(cx, cz);
+          MutableRTPCoords localCursor = new MutableRTPCoords(blockX, blockZ);
           localCursor.setWorldName(world.name());
           try {
           if (!vert.adjust(chunk, localCursor)) {

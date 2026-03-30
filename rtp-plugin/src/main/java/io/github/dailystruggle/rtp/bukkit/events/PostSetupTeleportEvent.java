@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.bukkit.events;
 
-import io.github.dailystruggle.rtp.common.tasks.teleport.SetupTeleport;
+import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import org.bukkit.Bukkit;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
@@ -8,9 +8,9 @@ import org.jetbrains.annotations.NotNull;
 
 public class PostSetupTeleportEvent extends Event {
   private static final HandlerList HANDLERS_LIST = new HandlerList();
-  private final SetupTeleport setupTeleport;
+  private final TeleportPipelineTask setupTeleport;
 
-  public PostSetupTeleportEvent(SetupTeleport setupTeleport) {
+  public PostSetupTeleportEvent(TeleportPipelineTask setupTeleport) {
     super(!Bukkit.isPrimaryThread());
     this.setupTeleport = setupTeleport;
   }
@@ -24,7 +24,7 @@ public class PostSetupTeleportEvent extends Event {
     return HANDLERS_LIST;
   }
 
-  public SetupTeleport getSetupTeleport() {
+  public TeleportPipelineTask getSetupTeleport() {
     return setupTeleport;
   }
 }

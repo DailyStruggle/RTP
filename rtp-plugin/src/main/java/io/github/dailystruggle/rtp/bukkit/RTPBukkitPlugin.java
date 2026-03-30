@@ -23,10 +23,8 @@ import io.github.dailystruggle.rtp.common.database.options.SQLiteDatabaseAccesso
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.TPS;
-import io.github.dailystruggle.rtp.common.tasks.teleport.DoTeleport;
-import io.github.dailystruggle.rtp.common.tasks.teleport.LoadChunks;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
-import io.github.dailystruggle.rtp.common.tasks.teleport.SetupTeleport;
+import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import java.io.File;
 import java.nio.file.FileSystemException;
 import java.util.*;
@@ -343,7 +341,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     Configs configs = RTP.configs;
     FactoryValue<PerformanceKeys> parser = configs.getParser(PerformanceKeys.class);
 
-    SetupTeleport.preActions.add(
+    TeleportPipelineTask.setupPreActions.add(
         task -> {
           PreSetupTeleportEvent event = new PreSetupTeleportEvent(task);
           Bukkit.getPluginManager().callEvent(event);
@@ -369,7 +367,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
           }
         });
 
-    SetupTeleport.postActions.add(
+    TeleportPipelineTask.setupPostActions.add(
         (task, aBoolean) -> {
           if (!aBoolean) return;
           PostSetupTeleportEvent event = new PostSetupTeleportEvent(task);
@@ -395,7 +393,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
           }
         });
 
-    LoadChunks.preActions.add(
+    TeleportPipelineTask.loadPreActions.add(
         task -> {
           PreLoadChunksEvent event = new PreLoadChunksEvent(task);
           Bukkit.getPluginManager().callEvent(event);
@@ -421,7 +419,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
           }
         });
 
-    LoadChunks.postActions.add(
+    TeleportPipelineTask.loadPostActions.add(
         task -> {
           PostLoadChunksEvent event = new PostLoadChunksEvent(task);
           Bukkit.getPluginManager().callEvent(event);
@@ -447,7 +445,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
           }
         });
 
-    DoTeleport.preActions.add(
+    TeleportPipelineTask.teleportPreActions.add(
         task -> {
           PreTeleportEvent event = new PreTeleportEvent(task);
           Bukkit.getPluginManager().callEvent(event);
@@ -473,7 +471,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
           }
         });
 
-    DoTeleport.postActions.add(
+    TeleportPipelineTask.teleportPostActions.add(
         task -> {
           PostTeleportEvent event = new PostTeleportEvent(task);
           Bukkit.getPluginManager().callEvent(event);
