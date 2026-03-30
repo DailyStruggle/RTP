@@ -1,6 +1,8 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.shapes;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
+import io.github.dailystruggle.rtp.api.selection.GenerationContext;
+import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
@@ -18,7 +20,22 @@ import org.jetbrains.annotations.NotNull;
 public abstract class Shape<E extends Enum<E>> extends FactoryValue<E> {
   public final String name;
 
-  protected final List<BiPredicate<UUID, RTPCoords>> verifiers = new ArrayList<>();
+  protected final List<BiPredicate<GenerationContext, RTPCoords>> verifiers = new ArrayList<>();
+  protected final List<BiPredicate<GenerationContext, MutableRTPCoords>> verifiersMutable = new ArrayList<>();
+
+  public boolean checkVerifiers(GenerationContext context, RTPCoords coords) {
+    for (BiPredicate<GenerationContext, RTPCoords> verifier : verifiers) {
+      if (!verifier.test(context, coords)) return false;
+    }
+    return true;
+  }
+
+  public boolean checkVerifiers(GenerationContext context, MutableRTPCoords coords) {
+    for (BiPredicate<GenerationContext, MutableRTPCoords> verifier : verifiersMutable) {
+      if (!verifier.test(context, coords)) return false;
+    }
+    return true;
+  }
 
   /**
    * Constructor for Shape

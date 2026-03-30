@@ -322,7 +322,7 @@ public class SendMessage {
           Region region =
               RTP.selectionAPI.getRegion(RTP.serverAccessor.getPlayer(player.getUniqueId()));
           if (region == null) return "0";
-          return String.valueOf(region.getTotalQueueLength(player.getUniqueId()));
+          return String.valueOf(region.queueManager.getTotalQueueLength(player.getUniqueId()));
         });
 
     placeholders.put(
@@ -336,7 +336,7 @@ public class SendMessage {
           Region region =
               RTP.selectionAPI.getRegion(RTP.serverAccessor.getPlayer(player.getUniqueId()));
           if (region == null) return "0";
-          return String.valueOf(region.getPublicQueueLength());
+          return String.valueOf(region.queueManager.getPublicQueueLength());
         });
 
     placeholders.put(
@@ -350,7 +350,7 @@ public class SendMessage {
           Region region =
               RTP.selectionAPI.getRegion(RTP.serverAccessor.getPlayer(player.getUniqueId()));
           if (region == null) return "0";
-          return String.valueOf(region.getPersonalQueueLength(player.getUniqueId()));
+          return String.valueOf(region.queueManager.getPersonalQueueLength(player.getUniqueId()));
         });
 
     placeholders.put(

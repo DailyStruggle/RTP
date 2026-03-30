@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
+import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import java.util.*;
@@ -104,6 +105,71 @@ public class Square extends MemoryShape<GenericMemoryShapeParams> {
 
     x = x - cx;
     z = z - cz;
+
+    double theta = ((Math.atan(((double) z) / x) / (2 * Math.PI)) + 1) % 0.25;
+
+    if ((z < 0) && (x < 0)) {
+      theta += 0.5;
+    } else if (z < 0) {
+      theta += 0.75;
+    } else if (x < 0) {
+      theta += 0.25;
+    }
+
+    long radius;
+    long ax = Math.abs(x);
+    long az = Math.abs(z);
+    radius = Math.max(ax, az);
+
+    long perimeterStep = 0;
+    if (theta < 0.5) {
+      if (theta < 0.25) {
+        if (theta < 0.125) { // octant 1, from 0 to pi/4
+          perimeterStep += az;
+        } else { // octant 2, from pi/4 to pi/2
+          perimeterStep += radius;
+          perimeterStep += (radius - ax);
+        }
+      } else {
+        if (theta < 0.375) { // octant 3
+          perimeterStep += radius * 2;
+          perimeterStep += ax; // x is negative in this quadrant, so fix
+        } else { // octant 4
+          perimeterStep += radius * 3;
+          perimeterStep += (radius - az);
+        }
+      }
+    } else {
+      if (theta < 0.75) {
+        if (theta < 0.625) { // octant 5
+          perimeterStep += radius * 4;
+          perimeterStep += az;
+        } else { // octant 6
+          perimeterStep += radius * 5;
+          perimeterStep += (radius - ax);
+        }
+      } else {
+        if (theta < 0.875) { // octant 7
+          perimeterStep += radius * 6;
+          perimeterStep += ax;
+        } else { // octant 8
+          perimeterStep += radius * 7;
+          perimeterStep += (radius - az);
+        }
+      }
+    }
+
+    return ((radius * radius - cr * cr) * 4) + perimeterStep;
+  }
+
+  @Override
+  public double xzToLocation(MutableRTPCoords coords) {
+    long cr = getNumber(GenericMemoryShapeParams.centerRadius, 64L).longValue();
+    long cx = getNumber(GenericMemoryShapeParams.centerX, 0L).longValue();
+    long cz = getNumber(GenericMemoryShapeParams.centerZ, 0L).longValue();
+
+    long x = coords.x - cx;
+    long z = coords.z - cz;
 
     double theta = ((Math.atan(((double) z) / x) / (2 * Math.PI)) + 1) % 0.25;
 

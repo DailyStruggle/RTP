@@ -49,7 +49,7 @@ public class InfoCmd extends BaseRTPCmdImpl {
     regionDataLookup.put("world", region -> region.getWorld().name());
     regionDataLookup.put("shape", region -> region.getShape().name);
     regionDataLookup.put("cacheCap", region -> region.getNumber(RegionKeys.cacheCap, 0).toString());
-    regionDataLookup.put("cached", region -> String.valueOf(region.getPublicQueueLength()));
+    regionDataLookup.put("cached", region -> String.valueOf(region.queueManager.getPublicQueueLength()));
     regionDataLookup.put(
         "worldBorderOverride",
         region -> {

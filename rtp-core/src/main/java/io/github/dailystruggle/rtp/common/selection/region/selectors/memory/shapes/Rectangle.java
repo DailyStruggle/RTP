@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
+import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams;
 import java.util.*;
@@ -66,6 +67,25 @@ public class Rectangle extends MemoryShape<RectangleParams> {
     // shift point back to origin:
     x -= cx;
     z -= cz;
+
+    int[] input = new int[] {(int) x, (int) z};
+
+    input = rotate(input, -degrees);
+
+    // translate to position
+    return input[1] * width + input[0];
+  }
+
+  @Override
+  public double xzToLocation(MutableRTPCoords coords) {
+    long degrees = getNumber(RectangleParams.rotation, 0L).longValue();
+    long cx = getNumber(RectangleParams.centerX, 0L).longValue();
+    long cz = getNumber(RectangleParams.centerZ, 0L).longValue();
+    long width = getNumber(RectangleParams.width, 256L).longValue();
+
+    // shift point back to origin:
+    long x = coords.x - cx;
+    long z = coords.z - cz;
 
     int[] input = new int[] {(int) x, (int) z};
 

@@ -4,6 +4,7 @@ import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
+import io.github.dailystruggle.rtp.api.selection.GenerationContext;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -87,8 +88,11 @@ public final class SetupTeleport extends RTPRunnable {
 
       RTP.getInstance().latestTeleportData.put(player.uuid(), teleportData);
 
-      Map.Entry<RTPCoords, Long> pair = this.region.getLocation(sender, player, biomes);
+      GenerationContext context = new GenerationContext(sender, player, biomes);
+      Map.Entry<RTPCoords, Long> pair = this.region.getLocation(context);
       if (pair == null) { // player gets put on region queue
+        // decrement because a new Cache task will be added via Region.queue or already exists
+        region.inFlightCalculations.decrementAndGet();
         return;
       } else if (pair.getKey() == null) {
         teleportData.attempts = pair.getValue();
@@ -96,11 +100,15 @@ public final class SetupTeleport extends RTPRunnable {
         RTP.serverAccessor.sendMessage(sender.uuid(), player.uuid(), msg);
         postActions.forEach(consumer -> consumer.accept(this, false));
         isRunning.set(false);
+        region.inFlightCalculations.decrementAndGet();
         RTPTeleportCancel.refund(player.uuid());
         return;
       }
 
-      if (isCancelled()) return;
+      if (isCancelled()) {
+        region.inFlightCalculations.decrementAndGet();
+        return;
+      }
       LoadChunks loadChunks = new LoadChunks(this.sender, this.player, pair.getKey(), this.region);
       teleportData.nextTask = loadChunks;
       teleportData.selectedCoords = pair.getKey();
@@ -113,14 +121,17 @@ public final class SetupTeleport extends RTPRunnable {
       }
 
       if (sync) {
+        region.inFlightCalculations.incrementAndGet();
         loadChunks.run();
       } else {
+        region.inFlightCalculations.incrementAndGet();
         RTP.scheduler.runTaskAsynchronously(loadChunks);
       }
 
       postActions.forEach(consumer -> consumer.accept(this, true));
     } catch (Throwable throwable) {
       throwable.printStackTrace();
+      region.inFlightCalculations.decrementAndGet();
       new RTPTeleportCancel(player.uuid()).run();
     }
   }

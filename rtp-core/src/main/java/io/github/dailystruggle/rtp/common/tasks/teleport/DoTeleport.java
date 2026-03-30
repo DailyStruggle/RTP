@@ -93,6 +93,7 @@ public final class DoTeleport extends RTPRunnable {
         saveMap.putAll(dataMap);
       }
       RTP.getInstance().databaseAccessor.setValue("teleportData", saveMap);
+      region.inFlightCalculations.decrementAndGet();
 
       RTP.getInstance().chunkCleanupPipeline.add(new ChunkCleanup(coords, region));
 
@@ -183,6 +184,7 @@ public final class DoTeleport extends RTPRunnable {
       postActions.forEach(consumer -> consumer.accept(this));
     } catch (Throwable throwable) {
       throwable.printStackTrace();
+      region.inFlightCalculations.decrementAndGet();
       new RTPTeleportCancel(player.uuid()).run();
     }
   }

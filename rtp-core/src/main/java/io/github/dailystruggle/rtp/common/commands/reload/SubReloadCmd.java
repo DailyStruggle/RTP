@@ -15,6 +15,8 @@ import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.selection.region.RegionConfigLoader;
+import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import java.util.EnumMap;
 import java.util.List;
@@ -118,8 +120,8 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
       MultiConfigParser<RegionKeys> regions = (MultiConfigParser<RegionKeys>) newParser;
       RTP.selectionAPI.permRegionLookup.clear();
       for (ConfigParser<RegionKeys> regionConfig : regions.configParserFactory.map.values()) {
-        EnumMap<RegionKeys, Object> data = regionConfig.getData();
-        Region region = new Region(regionConfig.name.replace(".yml", ""), data);
+        RegionSettings settings = RegionConfigLoader.load(regionConfig);
+        Region region = new Region(settings.name(), settings);
         RTP.selectionAPI.permRegionLookup.put(region.name, region);
       }
     } else if (parser.myClass.equals(WorldKeys.class)) {

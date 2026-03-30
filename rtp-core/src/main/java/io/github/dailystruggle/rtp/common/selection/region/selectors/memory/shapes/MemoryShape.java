@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes;
 
+import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import java.io.*;
@@ -59,6 +60,14 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   public abstract double xzToLocation(long x, long z);
 
   /**
+   * Convert xz coordinates to a location value
+   *
+   * @param coords the coordinates
+   * @return the location value
+   */
+  public abstract double xzToLocation(MutableRTPCoords coords);
+
+  /**
    * Convert a location value to xz coordinates
    *
    * @param location the location value
@@ -75,6 +84,16 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    */
   public boolean isKnownBad(int x, int z) {
     return isKnownBad((long) xzToLocation(x, z));
+  }
+
+  /**
+   * Check if a location is known to be bad
+   *
+   * @param coords the coordinates
+   * @return true if known bad, false otherwise
+   */
+  public boolean isKnownBad(MutableRTPCoords coords) {
+    return isKnownBad((long) xzToLocation(coords));
   }
 
   /**
