@@ -6,7 +6,6 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
@@ -139,7 +138,7 @@ public class Rectangle extends MemoryShape<RectangleParams> {
 
     long location;
     if (mode.equalsIgnoreCase("ACCUMULATE")) {
-      rebuildCacheIfNeeded();
+      flushAndRebuild();
       long target = (long) res;
       int index = java.util.Arrays.binarySearch(badPrefixSumsCache, target);
       if (index < 0) index = -index - 1;
@@ -157,50 +156,31 @@ public class Rectangle extends MemoryShape<RectangleParams> {
         }
       case "NEAREST":
         {
-          ConcurrentSkipListMap<Long, Long> map = badLocations;
-          Map.Entry<Long, Long> check = map.floorEntry(location);
+          if (isKnownBad(location)) {
+            long[] keys = badKeysCache;
+            long[] sums = badPrefixSumsCache;
+            int idx = Arrays.binarySearch(keys, location);
+            int floorIdx = (idx >= 0) ? idx : -(idx + 1) - 1;
 
-          if ((check != null)
-              && (location >= check.getKey())
-              && (location < (check.getKey() + check.getValue()))) {
-            Map.Entry<Long, Long> lower = map.floorEntry(check.getKey() - 1);
-            Map.Entry<Long, Long> upper = map.ceilingEntry(check.getKey() + check.getValue());
+            long key = keys[floorIdx];
+            long sum = sums[floorIdx];
+            long prevSum = (floorIdx > 0) ? sums[floorIdx - 1] : 0L;
+            long val = sum - prevSum;
 
-            if (upper == null) {
-              if (lower == null) {
-                long cutout = check.getValue();
-                location = ThreadLocalRandom.current().nextLong((long) (range - cutout));
-                if (location >= check.getKey()) location += check.getValue();
-              } else {
-                long len = check.getKey() - (lower.getKey() + lower.getValue());
-                location = (len <= 0) ? 0 : ThreadLocalRandom.current().nextLong(len);
-                location += lower.getKey() + lower.getValue();
-              }
-            } else if (lower == null) {
-              long len = upper.getKey() - (check.getKey() + check.getValue());
-              location = (len <= 0) ? 0 : ThreadLocalRandom.current().nextLong(len);
-              location += check.getKey() + check.getValue();
-            } else {
-              long d1 = (upper.getKey() - location);
-              long d2 = location - (lower.getKey() + lower.getValue());
-              if (d2 > d1) {
-                long len = check.getKey() - (lower.getKey() + lower.getValue());
-                location = (len <= 0) ? 0 : ThreadLocalRandom.current().nextLong(len);
-                location += lower.getKey() + lower.getValue();
-              } else {
-                long len = upper.getKey() - (check.getKey() + check.getValue());
-                location = (len <= 0) ? 0 : ThreadLocalRandom.current().nextLong(len);
-                location += check.getKey() + check.getValue();
-              }
+            long lowerGood = key - 1;
+            long upperGood = key + val;
+
+            if (lowerGood < 0) location = upperGood;
+            else if (upperGood >= range) location = lowerGood;
+            else {
+              if (location - lowerGood < upperGood - location) location = lowerGood;
+              else location = upperGood;
             }
           }
         }
       case "REROLL":
         {
-          Map.Entry<Long, Long> check = badLocations.floorEntry(location);
-          if ((check != null)
-              && (location > check.getKey())
-              && (location < check.getKey() + check.getValue())) {
+          if (isKnownBad(location)) {
             return -1;
           }
         }

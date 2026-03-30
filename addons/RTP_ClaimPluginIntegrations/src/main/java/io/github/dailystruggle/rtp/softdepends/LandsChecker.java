@@ -1,12 +1,10 @@
 package io.github.dailystruggle.rtp.softdepends;
 
-import io.github.dailystruggle.rtp.RTPClaimPluginIntegrations;
 import io.github.dailystruggle.rtp.common.RTP;
 import java.util.Objects;
 import java.util.logging.Level;
 import me.angeschossen.lands.api.integration.LandsIntegration;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.plugin.java.JavaPlugin;
 
 /** Checker for Lands claims */
 public class LandsChecker {
@@ -26,6 +24,13 @@ public class LandsChecker {
     }
   }
 
+  public static Boolean isInClaim(io.github.dailystruggle.rtp.api.world.RTPCoords location) {
+    if (!exists) return false;
+    org.bukkit.World world = org.bukkit.Bukkit.getWorld(location.worldName());
+    if (world == null) return false;
+    return isInClaim(new org.bukkit.Location(world, location.x(), location.y(), location.z()));
+  }
+
   /**
    * Check if a location is within a Lands claim
    *
@@ -33,20 +38,20 @@ public class LandsChecker {
    * @return true if in a claim, false otherwise
    */
   public static Boolean isInClaim(org.bukkit.Location location) {
-    if (exists) {
-      try {
-        int x = location.getBlockX();
-        int z = location.getBlockZ();
-        int chunkX = (x > 0) ? x / 16 : x / 16 - 1;
-        int chunkZ = (z > 0) ? z / 16 : z / 16 - 1;
-        if (landsIntegration == null)
-          landsSetup(JavaPlugin.getPlugin(RTPClaimPluginIntegrations.class));
-        return landsIntegration.isClaimed(
-            Objects.requireNonNull(location.getWorld()), chunkX, chunkZ);
-      } catch (Throwable t) {
-        exists = false;
-        RTP.log(Level.WARNING, t.getMessage(), t);
-      }
+    if (!exists) return false;
+    try {
+      int x = location.getBlockX();
+      int z = location.getBlockZ();
+      int chunkX = (x > 0) ? x / 16 : x / 16 - 1;
+      int chunkZ = (z > 0) ? z / 16 : z / 16 - 1;
+      return landsIntegration.isClaimed(
+          Objects.requireNonNull(location.getWorld()), chunkX, chunkZ);
+    } catch (Throwable t) {
+      exists = false;
+      RTP.log(
+          Level.SEVERE,
+          "[RTP] Critical architectural incompatibility detected. Disabling Lands integration for this session to prevent server instability.",
+          t);
     }
     return false;
   }

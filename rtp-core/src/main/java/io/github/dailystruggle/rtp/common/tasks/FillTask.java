@@ -150,7 +150,6 @@ public class FillTask extends RTPRunnable {
             : new HashSet<>();
 
     int safetyRadius = safety.getNumber(SafetyKeys.safetyRadius, 0).intValue();
-    RTPChunk<?>[] localChunks = new RTPChunk[(safetyRadius * 2 + 1) * (safetyRadius * 2 + 1)];
 
     boolean biomeRecall =
         Boolean.parseBoolean(
@@ -165,6 +164,7 @@ public class FillTask extends RTPRunnable {
     MutableRTPCoords cursor = new MutableRTPCoords(0, 0);
     cursor.setWorldName(region.getWorld().name());
 
+    java.util.HashSet<Long> testedChunks = new HashSet<>();
     for (pos = start; pos < range && pos < start + limit; pos++) {
       if (pause.get() || isCancelled()) {
         isRunning.set(false);
@@ -172,11 +172,15 @@ public class FillTask extends RTPRunnable {
       }
 
       shape.locationToXZ(pos, cursor);
+      long chunkKey = ((long)(cursor.x >> 4) & 0xFFFFFFFFL) | (((long)(cursor.z >> 4) & 0xFFFFFFFFL) << 32);
+      if (!testedChunks.add(chunkKey)) {
+        continue;
+      }
       if (shape.isKnownBad(cursor)) {
         continue;
       }
 
-      CompletableFuture<Boolean> future = testPos(region, pos, cursor, safetyRadius, unsafeBlocks, localChunks, defaultBiomes, biomeRecall, border);
+      CompletableFuture<Boolean> future = testPos(region, pos, cursor.x >> 4, cursor.z >> 4, safetyRadius, unsafeBlocks, defaultBiomes, biomeRecall, border);
 
       try {
         Boolean valid = future.join();
@@ -255,10 +259,10 @@ public class FillTask extends RTPRunnable {
    *
    * @param region the region
    * @param pos the location index
-   * @param cursor mutable coordinates cursor
+   * @param cx chunk x coordinate
+   * @param cz chunk z coordinate
    * @param safetyRadius safety radius for chunk verification
    * @param unsafeBlocks set of unsafe block names
-   * @param localChunks pre-allocated array for chunk caching
    * @param defaultBiomes set of allowed biomes
    * @param biomeRecall whether to record bad locations for biomes
    * @param border world border for the current world
@@ -267,10 +271,10 @@ public class FillTask extends RTPRunnable {
   public CompletableFuture<Boolean> testPos(
       Region region,
       final long pos,
-      MutableRTPCoords cursor,
+      final int cx,
+      final int cz,
       int safetyRadius,
       Set<String> unsafeBlocks,
-      RTPChunk<?>[] localChunks,
       Set<String> defaultBiomes,
       boolean biomeRecall,
       WorldBorder border) {
@@ -283,7 +287,7 @@ public class FillTask extends RTPRunnable {
     RTPWorld world = region.getWorld();
 
     String currBiome =
-        world.getBiome(cursor.x * 16 + 7, (vert.maxY() + vert.minY()) / 2, cursor.z * 16 + 7);
+        world.getBiome(cx * 16 + 7, (vert.maxY() + vert.minY()) / 2, cz * 16 + 7);
 
     if (!defaultBiomes.contains(currBiome)) {
       if (biomeRecall) {
@@ -296,7 +300,7 @@ public class FillTask extends RTPRunnable {
         .isInside()
         .apply(
             new RTPLocation(
-                world, cursor.x * 16, (vert.maxY() + vert.minY()) / 2, cursor.z * 16))) {
+                world, cx * 16, (vert.maxY() + vert.minY()) / 2, cz * 16))) {
       shape.addBadLocation(pos);
       return CompletableFuture.completedFuture(false);
     }
@@ -306,12 +310,24 @@ public class FillTask extends RTPRunnable {
     }
 
     CompletableFuture<Long> cfChunk =
-        RTP.serverAccessor.getChunkManager().getChunkAtAsync(world, cursor.x, cursor.z);
+        RTP.serverAccessor
+            .getChunkManager()
+            .getChunkAtAsync(world, cx, cz)
+            .orTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+            .exceptionally(
+                ex -> {
+                  return null;
+                });
 
     CompletableFuture<Boolean> res = new CompletableFuture<>();
     cfChunk.thenAccept(
         chunkKey -> {
-          if (chunkKey == null || isCancelled()) {
+          if (chunkKey == null) {
+            shape.addBadLocation(pos);
+            res.complete(false);
+            return;
+          }
+          if (isCancelled()) {
             res.complete(false);
             return;
           }
@@ -322,14 +338,17 @@ public class FillTask extends RTPRunnable {
           }
 
           chunk.keep(true);
+          RTPChunk<?>[] localChunks = new RTPChunk[(safetyRadius * 2 + 1) * (safetyRadius * 2 + 1)];
+          MutableRTPCoords localCursor = new MutableRTPCoords(cx, cz);
+          localCursor.setWorldName(world.name());
           try {
-          if (!vert.adjust(chunk, cursor)) {
+          if (!vert.adjust(chunk, localCursor)) {
             if (biomeRecall) shape.addBadLocation(pos);
             res.complete(false);
             return;
           }
 
-          String currBiome1 = world.getBiome(cursor.x, cursor.y, cursor.z);
+          String currBiome1 = world.getBiome(localCursor.x, localCursor.y, localCursor.z);
           if (!defaultBiomes.contains(currBiome1)) {
             if (biomeRecall) {
               shape.addBadLocation(pos);
@@ -338,7 +357,7 @@ public class FillTask extends RTPRunnable {
             }
           }
 
-          boolean pass = cursor.y < vert.maxY();
+          boolean pass = localCursor.y < vert.maxY();
           if (!pass) {
             shape.addBadLocation(pos);
             res.complete(false);
@@ -352,12 +371,12 @@ public class FillTask extends RTPRunnable {
           localChunks[safetyRadius * L + safetyRadius] = chunk;
           chunk.keep(true);
           try {
-            for (int x = cursor.x - safetyRadius; x < cursor.x + safetyRadius && pass; x++) {
+            for (int x = localCursor.x - safetyRadius; x < localCursor.x + safetyRadius && pass; x++) {
               int chunkX = x >> 4;
               int xx = x & 15;
               int dcX = chunkX - centerChunkX;
 
-              for (int z = cursor.z - safetyRadius; z < cursor.z + safetyRadius && pass; z++) {
+              for (int z = localCursor.z - safetyRadius; z < localCursor.z + safetyRadius && pass; z++) {
                 int chunkZ = z >> 4;
                 int zz = z & 15;
                 int dcZ = chunkZ - centerChunkZ;
@@ -376,7 +395,7 @@ public class FillTask extends RTPRunnable {
                   chunk1.keep(true);
                 }
 
-                for (int y = cursor.y - safetyRadius; y < cursor.y + safetyRadius && pass; y++) {
+                for (int y = localCursor.y - safetyRadius; y < localCursor.y + safetyRadius && pass; y++) {
                   if (!chunk1.isSafe(xx, y, zz, unsafeBlocks)) {
                     pass = false;
                   }
@@ -397,7 +416,7 @@ public class FillTask extends RTPRunnable {
               return;
             }
 
-            if (pass) pass = GlobalRegionVerifiers.checkGlobalRegionVerifiers(cursor);
+            if (pass) pass = GlobalRegionVerifiers.checkGlobalRegionVerifiers(localCursor);
 
             if (pass) {
               if (biomeRecall) shape.addBiomeLocation(pos, currBiome1);
