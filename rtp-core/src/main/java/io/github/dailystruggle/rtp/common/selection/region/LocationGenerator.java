@@ -44,11 +44,11 @@ public class LocationGenerator {
         misc
     }
 
-    public static Map.Entry<RTPCoords, Long> getLocation(Region region, GenerationContext context) {
+    public static GenerationResult getLocation(Region region, GenerationContext context) {
         return getLocation(region, context.sender(), context.player(), context.biomeNames());
     }
 
-    public static Map.Entry<RTPCoords, Long> generateLocation(Region region, GenerationContext context) {
+    public static GenerationResult generateLocation(Region region, GenerationContext context) {
         return getLocation(region, context.biomeNames());
     }
 
@@ -61,9 +61,10 @@ public class LocationGenerator {
      * @param biomeNames optional set of biomes to filter by
      * @return location and number of attempts
      */
-    public static Map.Entry<RTPCoords, Long> getLocation(
+    public static GenerationResult getLocation(
             Region region, RTPCommandSender sender, RTPPlayer player, @Nullable Set<String> biomeNames) {
         Map.Entry<RTPCoords, Long> pair = null;
+        ChunkSet chunkSet = null;
 
         region.getShape(); // validate shape before using cache
 
@@ -74,6 +75,7 @@ public class LocationGenerator {
         if (!custom && region.queueManager.perPlayerLocationQueue.containsKey(playerId)) {
             java.util.concurrent.ConcurrentLinkedQueue<Map.Entry<RTPCoords, Long>> playerLocationQueue =
                     region.queueManager.perPlayerLocationQueue.get(playerId);
+            boolean success = false;
             while (!playerLocationQueue.isEmpty()) {
                 pair = playerLocationQueue.poll();
                 if (pair == null || pair.getKey() == null) continue;
@@ -196,16 +198,20 @@ public class LocationGenerator {
                         }
                     }
                 } finally {
-                    for (RTPChunk usedChunk : localChunks) {
-                        if (usedChunk != null) usedChunk.keep(false);
+                    if (!pass) {
+                        for (RTPChunk usedChunk : localChunks) {
+                            if (usedChunk != null) usedChunk.keep(false);
+                        }
                     }
                 }
 
                     if (!pass) continue;
                     if (!GlobalRegionVerifiers.checkGlobalRegionVerifiers(left)) continue;
-                    return pair;
+                    chunkSet = region.chunkManager.locAssChunks.get(left);
+                    success = true;
+                    return new GenerationResult(left, pair.getValue(), chunkSet);
                 } finally {
-                    chunk.unload();
+                    if (!success) chunk.unload();
                 }
             }
         }
@@ -216,13 +222,18 @@ public class LocationGenerator {
             RTPCoords left = pair.getKey();
             if (left == null) continue;
             boolean pass = GlobalRegionVerifiers.checkGlobalRegionVerifiers(left);
-            if (pass) return pair;
+            if (pass) {
+                chunkSet = region.chunkManager.locAssChunks.get(left);
+                return new GenerationResult(left, pair.getValue(), chunkSet);
+            }
         }
 
         if (custom || sender.hasPermission("rtp.unqueued")) {
-            pair = getLocation(region, biomeNames);
-            if (pair != null) {
-                long attempts = pair.getValue();
+            GenerationResult res = getLocation(region, biomeNames);
+            if (res != null) {
+                pair = new AbstractMap.SimpleEntry<>(res.coords(), res.attempts());
+                chunkSet = res.verifiedChunks();
+                long attempts = res.attempts();
                 TeleportData data = RTP.getInstance().latestTeleportData.get(playerId);
                 if (data != null && !data.completed) {
                     data.attempts = attempts;
@@ -253,7 +264,7 @@ public class LocationGenerator {
             data.queueLocation = region.queueManager.playerQueue.size();
             RTP.serverAccessor.sendMessage(playerId, MessagesKeys.queueUpdate);
         }
-        return pair;
+        return new GenerationResult((pair != null) ? pair.getKey() : null, (pair != null) ? pair.getValue() : 1, chunkSet);
     }
 
     /**
@@ -264,7 +275,7 @@ public class LocationGenerator {
      * @return location and number of attempts
      */
     @Nullable
-    public static Map.Entry<RTPCoords, Long> getLocation(Region region, @Nullable Set<String> biomeNames) {
+    public static GenerationResult getLocation(Region region, @Nullable Set<String> biomeNames) {
 
         boolean defaultBiomes = false;
         ConfigParser<PerformanceKeys> performance =
@@ -382,7 +393,7 @@ public class LocationGenerator {
                                 "[RTP] invalid state, biome recall enabled but biomes are not in memory - "
                                         + Arrays.toString(biomeNames.toArray()))
                                 .printStackTrace();
-                        return new AbstractMap.SimpleEntry<>(null, i);
+                        return new GenerationResult(null, i, null);
                     } else l = memoryShape.rand();
                 } else {
                     l = memoryShape.rand();
@@ -431,7 +442,7 @@ public class LocationGenerator {
                                     "[RTP] invalid state, biome recall enabled but biomes are not in memory - "
                                             + Arrays.toString(biomeNames.toArray()))
                                     .printStackTrace();
-                            return new AbstractMap.SimpleEntry<>(null, i);
+                            return new GenerationResult(null, i, null);
                         } else l = memoryShape.rand();
                     } else {
                         l = memoryShape.rand();
@@ -484,7 +495,7 @@ public class LocationGenerator {
                     new IllegalStateException(
                             "1000 worldborder checks failed. region/selection is likely outside the worldborder")
                             .printStackTrace();
-                    return new AbstractMap.SimpleEntry<>(null, i);
+                    return new GenerationResult(null, i, null);
                 }
                 if (verbose) {
                     failMap.get(FailTypes.worldBorder).put("OUTSIDE_BORDER", worldBorderFails);
@@ -596,14 +607,19 @@ public class LocationGenerator {
                         }
                     }
                 } finally {
-                    for (RTPChunk usedChunk : localChunks) {
-                        if (usedChunk != null) usedChunk.keep(false);
+                    if (!pass) {
+                        for (RTPChunk usedChunk : localChunks) {
+                            if (usedChunk != null) usedChunk.keep(false);
+                        }
                     }
                 }
 
                 pass &= GlobalRegionVerifiers.checkGlobalRegionVerifiers(cursor.toImmutable());
 
                 if (!pass) {
+                    for (RTPChunk usedChunk : localChunks) {
+                        if (usedChunk != null) usedChunk.keep(false);
+                    }
                     if (verbose)
                         failMap
                                 .get(FailTypes.misc)
@@ -622,7 +638,7 @@ public class LocationGenerator {
                 locationFound = true;
                 break;
             } finally {
-                chunk.unload();
+                if (!locationFound) chunk.unload();
             }
         }
 
@@ -683,8 +699,13 @@ public class LocationGenerator {
 
         i = Math.min(i, maxAttempts);
 
-        if (!locationFound) return new AbstractMap.SimpleEntry<>(null, i);
+        if (!locationFound) return new GenerationResult(null, i, null);
         cursor.setXZ(finalX, finalZ);
-        return new AbstractMap.SimpleEntry<>(cursor.toImmutable(), i);
+        RTPCoords resCoords = cursor.toImmutable();
+
+        long viewDistanceRadius = performance.getNumber(PerformanceKeys.viewDistanceSelect, 0L).longValue();
+        ChunkSet verifiedChunks = region.chunkManager.chunks(resCoords, Math.max(safetyRadius, (int) viewDistanceRadius));
+
+        return new GenerationResult(resCoords, i, verifiedChunks);
     }
 }

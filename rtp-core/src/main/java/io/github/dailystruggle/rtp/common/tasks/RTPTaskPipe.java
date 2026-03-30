@@ -1,12 +1,8 @@
 package io.github.dailystruggle.rtp.common.tasks;
 
-import io.github.dailystruggle.rtp.common.RTP;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
 
 public abstract class RTPTaskPipe {
   protected final ConcurrentLinkedQueue<Runnable> runnables = new ConcurrentLinkedQueue<>();

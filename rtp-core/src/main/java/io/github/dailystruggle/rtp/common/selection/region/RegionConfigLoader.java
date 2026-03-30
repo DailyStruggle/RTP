@@ -8,7 +8,6 @@ import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
-import io.github.dailystruggle.rtp.common.tasks.FillTask;
 
 import java.util.logging.Level;
 
@@ -43,7 +42,7 @@ public class RegionConfigLoader {
             }
             String worldName = (world != null) ? world.name() : "null";
             ((MemoryShape<?>) shape).load(name + ".bin", worldName);
-            
+
             long iter = ((MemoryShape<?>) shape).fillIter.get();
             if (iter > 0 && iter < Double.valueOf(((MemoryShape<?>) shape).getRange()).longValue()) {
                 // This part is a bit tricky since it modifies a global map.

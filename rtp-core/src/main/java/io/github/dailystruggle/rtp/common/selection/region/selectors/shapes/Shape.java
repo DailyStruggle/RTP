@@ -86,6 +86,25 @@ public abstract class Shape<E extends Enum<E>> extends FactoryValue<E> {
     return input;
   }
 
+  /**
+   * Rotate coordinates around the origin
+   *
+   * @param coords the coordinates
+   * @param degrees the degrees to rotate
+   */
+  public void rotate(MutableRTPCoords coords, long degrees) {
+    double angle = Math.toRadians(degrees);
+
+    double s = Math.sin(angle);
+    double c = Math.cos(angle);
+
+    int x = coords.x;
+    int z = coords.z;
+
+    // generate new point
+    coords.setXZ((int) (x * c - z * s), (int) (x * s + z * c));
+  }
+
   @Override
   public @NotNull EnumMap<E, Object> getData() {
     return data.clone();

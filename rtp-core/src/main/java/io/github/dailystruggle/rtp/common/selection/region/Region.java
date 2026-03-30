@@ -4,19 +4,11 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
-import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.selection.GenerationContext;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
-import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
-import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
-import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
@@ -24,19 +16,14 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.common.tasks.FillTask;
-import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.common.tasks.teleport.LoadChunks;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
-import java.util.function.Predicate;
 import java.util.logging.Level;
-import java.util.stream.Collectors;
 import org.jetbrains.annotations.Nullable;
-import org.simpleyaml.configuration.MemorySection;
 
 public class Region extends FactoryValue<RegionKeys> {
   public static final List<BiConsumer<Region, UUID>> onPlayerQueuePush = new ArrayList<>();
@@ -47,8 +34,8 @@ public class Region extends FactoryValue<RegionKeys> {
 
   public final RegionQueueManager queueManager = new RegionQueueManager(this);
   public final RegionChunkManager chunkManager = new RegionChunkManager(this);
-  public final java.util.concurrent.atomic.AtomicInteger inFlightCalculations =
-      new java.util.concurrent.atomic.AtomicInteger(0);
+  public final AtomicInteger inFlightCalculations =
+      new AtomicInteger(0);
 
   public RTPTaskPipe cachePipeline;
   public RTPTaskPipe miscPipeline;
@@ -67,8 +54,11 @@ public class Region extends FactoryValue<RegionKeys> {
 
     if (shape instanceof MemoryShape<?>) {
       long iter = ((MemoryShape<?>) shape).fillIter.get();
-      if (iter > 0 && iter < Double.valueOf(((MemoryShape<?>) shape).getRange()).longValue())
-        RTP.getInstance().fillTasks.put(name, new FillTask(this, iter));
+      if (iter > 0 && iter < Double.valueOf(((MemoryShape<?>) shape).getRange()).longValue()) {
+        FillTask task = new FillTask(this, iter);
+        RTP.getInstance().fillTasks.put(name, task);
+        RTP.scheduler.runTaskAsynchronously(task);
+      }
     }
 
     final long cacheCap = settings.cacheCap();
@@ -209,7 +199,7 @@ public class Region extends FactoryValue<RegionKeys> {
    * @param context generation context
    * @return location and number of attempts
    */
-  public Map.Entry<RTPCoords, Long> getLocation(GenerationContext context) {
+  public GenerationResult getLocation(GenerationContext context) {
     return LocationGenerator.getLocation(this, context);
   }
 
@@ -219,7 +209,7 @@ public class Region extends FactoryValue<RegionKeys> {
    * @param biomeNames set of biomes to filter by
    * @return location and number of attempts
    */
-  public Map.Entry<RTPCoords, Long> getLocation(@Nullable Set<String> biomeNames) {
+  public GenerationResult getLocation(@Nullable Set<String> biomeNames) {
     return LocationGenerator.generateLocation(this, new GenerationContext(null, null, biomeNames));
   }
 

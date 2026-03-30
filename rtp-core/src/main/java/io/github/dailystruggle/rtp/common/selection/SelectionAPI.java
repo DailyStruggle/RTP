@@ -144,20 +144,20 @@ public class SelectionAPI {
         || baseRegionName.isEmpty()
         || !permRegionLookup.containsKey(baseRegionName)) baseRegionName = "default";
     Region baseRegion = Objects.requireNonNull(permRegionLookup.get(baseRegionName));
-    
+
     // Create a dummy ConfigParser to use RegionConfigLoader
     // This is a bit of a hack but it's consistent with moving logic to RegionConfigLoader
     MultiConfigParser<RegionKeys> regionParsers =
         (MultiConfigParser<RegionKeys>) RTP.configs.multiConfigParserMap.get(RegionKeys.class);
     ConfigParser<RegionKeys> baseParser = regionParsers.getParser(baseRegionName);
-    
+
     // We want to override values from regionParams
     // Since ConfigParser.getData() returns a copy or we shouldn't modify the base one,
     // we'll need a way to create a modified one.
     // For now, let's just manually update RegionSettings from the base region.
-    
+
     RegionSettings baseSettings = baseRegion.getSettings();
-    
+
     RTPWorld<?> world = (RTPWorld<?>) regionParams.getOrDefault(RegionKeys.world.name(), baseSettings.world());
     Shape<?> shape = (Shape<?>) regionParams.getOrDefault(RegionKeys.shape.name(), baseSettings.shape());
     VerticalAdjustor<?> vert = (VerticalAdjustor<?>) regionParams.getOrDefault(RegionKeys.vert.name(), baseSettings.vert());

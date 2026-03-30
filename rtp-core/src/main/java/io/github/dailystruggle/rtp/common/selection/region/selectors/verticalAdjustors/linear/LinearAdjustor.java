@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
+import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -60,7 +61,14 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
 
   @Override
   public @Nullable RTPCoords adjust(@NotNull RTPChunk chunk) {
-    if (chunk == null) return null;
+    MutableRTPCoords output = new MutableRTPCoords(chunk.getWorld().name(), 0, 0, 0);
+    if (adjust(chunk, output)) return output.toImmutable();
+    return null;
+  }
+
+  @Override
+  public boolean adjust(@NotNull RTPChunk chunk, @NotNull MutableRTPCoords output) {
+    if (chunk == null) return false;
 
     int maxY = getNumber(GenericVerticalAdjustorKeys.maxY, 320L).intValue();
     int minY = getNumber(GenericVerticalAdjustorKeys.minY, 0L).intValue();
@@ -102,7 +110,10 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
         int y = chunk.getSurfaceHeight(x, z);
         if (y >= minY && y < maxY) {
           if (chunk.isSafe(x, y, z, unsafeBlocks)) {
-            return new RTPCoords(chunk.getWorld().name(), globalX, y + 1, globalZ);
+            output.setWorldName(chunk.getWorld().name());
+            output.setXZ(globalX, globalZ);
+            output.setY(y + 1);
+            return true;
           }
         }
         continue; // Sky light is required, so do not check lower blocks.
@@ -118,7 +129,10 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
                   && chunk.isSafe(x, i + 1, z, unsafeBlocks)
                   && chunk.isSafe(x, i - 1, z, unsafeBlocks)) {
                 if (chunk.isAir(x, i, z) && chunk.isAir(x, i + 1, z)) {
-                  return new RTPCoords(chunk.getWorld().name(), globalX, i, globalZ);
+                  output.setWorldName(chunk.getWorld().name());
+                  output.setXZ(globalX, globalZ);
+                  output.setY(i);
+                  return true;
                 }
               }
             }
@@ -134,7 +148,10 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
                   && chunk.isSafe(x, i + 1, z, unsafeBlocks)
                   && chunk.isSafe(x, i - 1, z, unsafeBlocks)) {
                 if (chunk.isAir(x, i, z) && chunk.isAir(x, i + 1, z)) {
-                  return new RTPCoords(chunk.getWorld().name(), globalX, i, globalZ);
+                  output.setWorldName(chunk.getWorld().name());
+                  output.setXZ(globalX, globalZ);
+                  output.setY(i);
+                  return true;
                 }
               }
             }
@@ -155,7 +172,10 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
                   && chunk.isSafe(x, y + 1, z, unsafeBlocks)
                   && chunk.isSafe(x, y - 1, z, unsafeBlocks)) {
                 if (chunk.isAir(x, y, z) && chunk.isAir(x, y + 1, z)) {
-                  return new RTPCoords(chunk.getWorld().name(), globalX, y, globalZ);
+                  output.setWorldName(chunk.getWorld().name());
+                  output.setXZ(globalX, globalZ);
+                  output.setY(y);
+                  return true;
                 }
               }
 
@@ -168,7 +188,10 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
                   && chunk.isSafe(x, y + 1, z, unsafeBlocks)
                   && chunk.isSafe(x, y - 1, z, unsafeBlocks)) {
                 if (chunk.isAir(x, y, z) && chunk.isAir(x, y + 1, z)) {
-                  return new RTPCoords(chunk.getWorld().name(), globalX, y, globalZ);
+                  output.setWorldName(chunk.getWorld().name());
+                  output.setXZ(globalX, globalZ);
+                  output.setY(y);
+                  return true;
                 }
               }
             }
@@ -189,7 +212,10 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
                   && chunk.isSafe(x, y + 1, z, unsafeBlocks)
                   && chunk.isSafe(x, y - 1, z, unsafeBlocks)) {
                 if (chunk.isAir(x, y, z) && chunk.isAir(x, y + 1, z)) {
-                  return new RTPCoords(chunk.getWorld().name(), globalX, y, globalZ);
+                  output.setWorldName(chunk.getWorld().name());
+                  output.setXZ(globalX, globalZ);
+                  output.setY(y);
+                  return true;
                 }
               }
 
@@ -202,7 +228,10 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
                   && chunk.isSafe(x, y + 1, z, unsafeBlocks)
                   && chunk.isSafe(x, y - 1, z, unsafeBlocks)) {
                 if (chunk.isAir(x, y, z) && chunk.isAir(x, y + 1, z)) {
-                  return new RTPCoords(chunk.getWorld().name(), globalX, y, globalZ);
+                  output.setWorldName(chunk.getWorld().name());
+                  output.setXZ(globalX, globalZ);
+                  output.setY(y);
+                  return true;
                 }
               }
             }
@@ -229,14 +258,17 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
                   && chunk.isSafe(x, i + 1, z, unsafeBlocks)
                   && chunk.isSafe(x, i - 1, z, unsafeBlocks)) {
                 if (chunk.isAir(x, i, z) && chunk.isAir(x, i + 1, z)) {
-                  return new RTPCoords(chunk.getWorld().name(), globalX, i, globalZ);
+                  output.setWorldName(chunk.getWorld().name());
+                  output.setXZ(globalX, globalZ);
+                  output.setY(i);
+                  return true;
                 }
               }
             }
           }
       }
     }
-    return null;
+    return false;
   }
 
   @Override

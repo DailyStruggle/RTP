@@ -12,6 +12,7 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.selection.region.GenerationResult;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tasks.teleport.SetupTeleport;
@@ -148,15 +149,17 @@ public class OnEventTeleports implements Listener {
                   RTP.serverAccessor.getSender(RTPAPI.serverId),
                   RTP.serverAccessor.getPlayer(player.getUniqueId()),
                   null);
-          Map.Entry<RTPCoords, Long> location = null;
+          GenerationResult res = null;
           int i = 0;
-          for (; location == null && i < 10; i++) {
-            location = region.getLocation(context);
+          for (; res == null && i < 10; i++) {
+            res = region.getLocation(context);
           }
-          if (location == null) {
+          if (res == null) {
             RTP.log(Level.WARNING, "#0080FF[RTP] failed to generate respawn location");
             return;
           }
+
+          Map.Entry<RTPCoords, Long> location = new java.util.AbstractMap.SimpleEntry<>(res.coords(), res.attempts());
 
           if (location.getKey() == null) {
             return;

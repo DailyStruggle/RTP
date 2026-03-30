@@ -1,13 +1,9 @@
 package io.github.dailystruggle.rtp.folia.tasks;
 
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
-import org.bukkit.Bukkit;
-import org.bukkit.Location;
-import org.bukkit.World;
 import org.bukkit.plugin.Plugin;
 
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class FoliaRegionProcessor implements Runnable {

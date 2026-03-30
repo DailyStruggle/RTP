@@ -97,30 +97,30 @@ public class Rectangle extends MemoryShape<RectangleParams> {
 
   @Override
   public int[] locationToXZ(long location) {
+    MutableRTPCoords output = new MutableRTPCoords(0, 0);
+    locationToXZ(location, output);
+    return new int[] {output.x, output.z};
+  }
+
+  @Override
+  public void locationToXZ(long location, MutableRTPCoords output) {
     long degrees = getNumber(RectangleParams.rotation, 0L).longValue();
     long cx = getNumber(RectangleParams.centerX, 0L).longValue();
     long cz = getNumber(RectangleParams.centerZ, 0L).longValue();
     long width = getNumber(RectangleParams.width, 256L).longValue();
     long height = getNumber(RectangleParams.height, 256L).longValue();
 
-    int[] res = new int[2];
-
     // compute initial xz
-    res[0] = (int) (location % width);
-    res[1] = (int) (location / width);
+    output.setXZ((int) (location % width), (int) (location / width));
 
     // center
-    res[0] -= (int) (width / 2);
-    res[1] -= (int) (height / 2);
+    output.setXZ(output.x - (int) (width / 2), output.z - (int) (height / 2));
 
     // rotate around origin
-    res = rotate(res, degrees);
+    rotate(output, degrees);
 
     // shift
-    res[0] += (int) cx;
-    res[1] += (int) cz;
-
-    return res;
+    output.setXZ(output.x + (int) cx, output.z + (int) cz);
   }
 
   @Override
