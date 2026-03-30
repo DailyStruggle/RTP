@@ -8,14 +8,23 @@ import org.bukkit.Location;
 public class TownyAdvancedChecker {
   private static boolean exists = true;
 
+  public static boolean isInClaim(io.github.dailystruggle.rtp.api.world.RTPCoords location) {
+    if (!exists) return false;
+    org.bukkit.World world = org.bukkit.Bukkit.getWorld(location.worldName());
+    if (world == null) return false;
+    return isInClaim(new org.bukkit.Location(world, location.x(), location.y(), location.z()));
+  }
+
   public static boolean isInClaim(Location location) {
-    if (exists) {
-      try {
-        return !TownyAPI.getInstance().isWilderness(location);
-      } catch (Throwable t) {
-        exists = false;
-        RTP.log(Level.WARNING, t.getMessage(), t);
-      }
+    if (!exists) return false;
+    try {
+      return !TownyAPI.getInstance().isWilderness(location);
+    } catch (Throwable t) {
+      exists = false;
+      RTP.log(
+          Level.SEVERE,
+          "[RTP] Critical architectural incompatibility detected. Disabling TownyAdvanced integration for this session to prevent server instability.",
+          t);
     }
     return false;
   }

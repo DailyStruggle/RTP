@@ -21,24 +21,33 @@ public class GriefPreventionChecker {
     return (GriefPrevention) plugin;
   }
 
+  public static Boolean isInClaim(io.github.dailystruggle.rtp.api.world.RTPCoords location) {
+    if (!exists) return false;
+    org.bukkit.World world = org.bukkit.Bukkit.getWorld(location.worldName());
+    if (world == null) return false;
+    return isInClaim(new org.bukkit.Location(world, location.x(), location.y(), location.z()));
+  }
+
   public static Boolean isInClaim(org.bukkit.Location location) {
-    if (exists) {
-      try {
-        if (getGriefPrevention() == null) return false;
-        int chunkX =
-            (location.getBlockX() >= 0 || (location.getBlockX() % 16 == 0))
-                ? (location.getBlockX() / 16)
-                : (location.getBlockX() / 16) - 1;
-        int chunkZ =
-            (location.getBlockZ() >= 0 || (location.getBlockZ() % 16 == 0))
-                ? (location.getBlockZ() / 16)
-                : (location.getBlockZ() / 16) - 1;
-        Collection<Claim> claims = GriefPrevention.instance.dataStore.getClaims(chunkX, chunkZ);
-        return !claims.isEmpty();
-      } catch (Throwable t) {
-        exists = false;
-        RTP.log(Level.WARNING, t.getMessage(), t);
-      }
+    if (!exists) return false;
+    try {
+      if (getGriefPrevention() == null) return false;
+      int chunkX =
+          (location.getBlockX() >= 0 || (location.getBlockX() % 16 == 0))
+              ? (location.getBlockX() / 16)
+              : (location.getBlockX() / 16) - 1;
+      int chunkZ =
+          (location.getBlockZ() >= 0 || (location.getBlockZ() % 16 == 0))
+              ? (location.getBlockZ() / 16)
+              : (location.getBlockZ() / 16) - 1;
+      Collection<Claim> claims = GriefPrevention.instance.dataStore.getClaims(chunkX, chunkZ);
+      return !claims.isEmpty();
+    } catch (Throwable t) {
+      exists = false;
+      RTP.log(
+          Level.SEVERE,
+          "[RTP] Critical architectural incompatibility detected. Disabling GriefPrevention integration for this session to prevent server instability.",
+          t);
     }
     return false;
   }

@@ -63,9 +63,7 @@ public class FillStartCmd extends FillSubCmd {
         continue;
       }
 
-      shape.badLocations.clear();
-      shape.biomeLocations.clear();
-      shape.badLocationSum.set(0);
+      shape.clear();
 
       FillTask task = new FillTask(region, 0L);
       RTP.getInstance().fillTasks.put(region.name, task);

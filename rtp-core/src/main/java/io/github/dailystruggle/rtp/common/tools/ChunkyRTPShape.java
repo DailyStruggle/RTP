@@ -53,7 +53,10 @@ public class ChunkyRTPShape extends Rectangle {
       xz = locationToXZ(res);
       i++;
       if (i > 10000) {
-        return badLocations.firstEntry().getValue();
+        if (badPrefixSumsCache.length > 0) {
+          return badPrefixSumsCache[0];
+        }
+        return -1;
       }
     }
     return res;

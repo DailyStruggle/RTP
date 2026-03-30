@@ -378,9 +378,13 @@ public class LocationGenerator {
                 if (biomeRecall && !defaultBiomes) {
                     List<Map.Entry<Long, Long>> biomes = new ArrayList<>();
                     for (String biomeName : biomeNames) {
-                        ConcurrentSkipListMap<Long, Long> map = memoryShape.biomeLocations.get(biomeName);
-                        if (map != null) {
-                            biomes.addAll(map.entrySet());
+                        long[] keys = memoryShape.getBiomeKeys(biomeName);
+                        long[] sums = memoryShape.getBiomePrefixSums(biomeName);
+                        if (keys != null && sums != null) {
+                            for (int k = 0; k < keys.length; k++) {
+                                long prevSum = (k > 0) ? sums[k - 1] : 0L;
+                                biomes.add(new AbstractMap.SimpleEntry<>(keys[k], sums[k] - prevSum));
+                            }
                         }
                     }
                     Map.Entry<Long, Long> entry;
@@ -427,9 +431,13 @@ public class LocationGenerator {
                     if (biomeRecall && !defaultBiomes) {
                         List<Map.Entry<Long, Long>> biomes = new ArrayList<>();
                         for (String biomeName : biomeNames) {
-                            ConcurrentSkipListMap<Long, Long> map = memoryShape.biomeLocations.get(biomeName);
-                            if (map != null) {
-                                biomes.addAll(map.entrySet());
+                            long[] keys = memoryShape.getBiomeKeys(biomeName);
+                            long[] sums = memoryShape.getBiomePrefixSums(biomeName);
+                            if (keys != null && sums != null) {
+                                for (int k = 0; k < keys.length; k++) {
+                                    long prevSum = (k > 0) ? sums[k - 1] : 0L;
+                                    biomes.add(new AbstractMap.SimpleEntry<>(keys[k], sums[k] - prevSum));
+                                }
                             }
                         }
                         Map.Entry<Long, Long> entry;

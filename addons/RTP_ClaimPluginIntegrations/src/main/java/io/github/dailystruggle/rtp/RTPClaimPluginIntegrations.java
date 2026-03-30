@@ -12,9 +12,6 @@ import io.github.dailystruggle.rtp.softdepends.LandsChecker;
 import io.github.dailystruggle.rtp.softdepends.RedProtectChecker;
 import io.github.dailystruggle.rtp.softdepends.TownyAdvancedChecker;
 import io.github.dailystruggle.rtp.softdepends.WorldGuardChecker;
-import org.bukkit.Bukkit;
-import org.bukkit.Location;
-import org.bukkit.World;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /** Main class for RTPClaimPluginIntegrations addon */
@@ -36,6 +33,7 @@ public final class RTPClaimPluginIntegrations extends JavaPlugin {
             RTP.configs.fileDatabase,
             this.getClassLoader());
     configs.putParser(integrations);
+    LandsChecker.landsSetup(this);
 
     Configs.onReload(
         () ->
@@ -59,75 +57,54 @@ public final class RTPClaimPluginIntegrations extends JavaPlugin {
     ConfigParser<IntegrationsKeys> configParser =
         (ConfigParser<IntegrationsKeys>) RTP.configs.getParser(IntegrationsKeys.class);
 
-    GlobalRegionVerifiers.addGlobalRegionVerifier(
-        rtpLocation -> {
-          World world = Bukkit.getWorld(rtpLocation.worldName());
-          if (world == null) return false;
-          Location location =
-              new Location(world, rtpLocation.x(), rtpLocation.y(), rtpLocation.z());
+    boolean factionsEnabled =
+        Boolean.parseBoolean(
+            configParser.getConfigValue(IntegrationsKeys.rerollFactions, false).toString());
+    boolean griefDefenderEnabled =
+        Boolean.parseBoolean(
+            configParser.getConfigValue(IntegrationsKeys.rerollGriefDefender, false).toString());
+    boolean griefPreventionEnabled =
+        Boolean.parseBoolean(
+            configParser.getConfigValue(IntegrationsKeys.rerollGriefPrevention, false).toString());
+    boolean landsEnabled =
+        Boolean.parseBoolean(
+            configParser.getConfigValue(IntegrationsKeys.rerollLands, false).toString());
+    boolean huskTownsEnabled =
+        Boolean.parseBoolean(
+            configParser.getConfigValue(IntegrationsKeys.rerollHuskTowns, false).toString());
+    boolean redProtectEnabled =
+        Boolean.parseBoolean(
+            configParser.getConfigValue(IntegrationsKeys.rerollRedProtect, false).toString());
+    boolean townyAdvancedEnabled =
+        Boolean.parseBoolean(
+            configParser.getConfigValue(IntegrationsKeys.rerollTownyAdvanced, false).toString());
+    boolean worldGuardEnabled =
+        Boolean.parseBoolean(
+            configParser.getConfigValue(IntegrationsKeys.rerollWorldGuard, false).toString());
 
-          boolean res = true;
-
-          if (Boolean.parseBoolean(
-              configParser.getConfigValue(IntegrationsKeys.rerollFactions, false).toString())) {
-            res = !FactionsChecker.isInClaim(location);
-          }
-
-          if (res
-              && Boolean.parseBoolean(
-                  configParser
-                      .getConfigValue(IntegrationsKeys.rerollGriefDefender, false)
-                      .toString())) {
-            res = !GriefDefenderChecker.isInClaim(location);
-          }
-
-          if (res
-              && Boolean.parseBoolean(
-                  configParser
-                      .getConfigValue(IntegrationsKeys.rerollGriefPrevention, false)
-                      .toString())) {
-            res = !GriefPreventionChecker.isInClaim(location);
-          }
-
-          if (res
-              && Boolean.parseBoolean(
-                  configParser.getConfigValue(IntegrationsKeys.rerollLands, false).toString())) {
-            res = !LandsChecker.isInClaim(location);
-          }
-
-          if (res
-              && Boolean.parseBoolean(
-                  configParser
-                      .getConfigValue(IntegrationsKeys.rerollHuskTowns, false)
-                      .toString())) {
-            res = !HuskTownsChecker.isInClaim(location);
-          }
-
-          if (res
-              && Boolean.parseBoolean(
-                  configParser
-                      .getConfigValue(IntegrationsKeys.rerollRedProtect, false)
-                      .toString())) {
-            res = !RedProtectChecker.isInClaim(location);
-          }
-
-          if (res
-              && Boolean.parseBoolean(
-                  configParser
-                      .getConfigValue(IntegrationsKeys.rerollTownyAdvanced, false)
-                      .toString())) {
-            res = !TownyAdvancedChecker.isInClaim(location);
-          }
-
-          if (res
-              && Boolean.parseBoolean(
-                  configParser
-                      .getConfigValue(IntegrationsKeys.rerollWorldGuard, false)
-                      .toString())) {
-            res = !WorldGuardChecker.isInClaim(location);
-          }
-
-          return res;
-        });
+    if (factionsEnabled) {
+      GlobalRegionVerifiers.addGlobalRegionVerifier(loc -> !FactionsChecker.isInClaim(loc));
+    }
+    if (griefDefenderEnabled) {
+      GlobalRegionVerifiers.addGlobalRegionVerifier(loc -> !GriefDefenderChecker.isInClaim(loc));
+    }
+    if (griefPreventionEnabled) {
+      GlobalRegionVerifiers.addGlobalRegionVerifier(loc -> !GriefPreventionChecker.isInClaim(loc));
+    }
+    if (landsEnabled) {
+      GlobalRegionVerifiers.addGlobalRegionVerifier(loc -> !LandsChecker.isInClaim(loc));
+    }
+    if (huskTownsEnabled) {
+      GlobalRegionVerifiers.addGlobalRegionVerifier(loc -> !HuskTownsChecker.isInClaim(loc));
+    }
+    if (redProtectEnabled) {
+      GlobalRegionVerifiers.addGlobalRegionVerifier(loc -> !RedProtectChecker.isInClaim(loc));
+    }
+    if (townyAdvancedEnabled) {
+      GlobalRegionVerifiers.addGlobalRegionVerifier(loc -> !TownyAdvancedChecker.isInClaim(loc));
+    }
+    if (worldGuardEnabled) {
+      GlobalRegionVerifiers.addGlobalRegionVerifier(loc -> !WorldGuardChecker.isInClaim(loc));
+    }
   }
 }

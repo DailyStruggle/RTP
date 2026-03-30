@@ -8,6 +8,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 
 /**
@@ -16,11 +17,7 @@ import java.util.logging.Level;
  * @param <E> enum for configuration values
  */
 public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
-  public ConcurrentSkipListMap<Long, Long> badLocations = new ConcurrentSkipListMap<>();
   public AtomicLong badLocationSum = new AtomicLong(0L);
-  public ConcurrentHashMap<String, ConcurrentSkipListMap<Long, Long>> biomeLocations =
-      new ConcurrentHashMap<>();
-  public ConcurrentSkipListMap<Long, Long> biomeMapped = new ConcurrentSkipListMap<>();
   public AtomicLong fillIter = new AtomicLong(0L);
 
   protected volatile long[] badKeysCache = new long[0];
@@ -28,10 +25,32 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   protected volatile ConcurrentHashMap<String, long[]> biomeKeysCache = new ConcurrentHashMap<>();
   protected volatile ConcurrentHashMap<String, long[]> biomePrefixSumsCache =
       new ConcurrentHashMap<>();
+  protected volatile long[] biomeMappedKeysCache = new long[0];
+  protected volatile long[] biomeMappedPrefixSumsCache = new long[0];
+
   protected volatile boolean badLocationsDirty = true;
   protected volatile boolean biomeLocationsDirty = true;
   protected final java.util.concurrent.atomic.AtomicBoolean isRebuilding =
       new java.util.concurrent.atomic.AtomicBoolean(false);
+  protected final java.util.concurrent.locks.ReentrantLock writeLock = new ReentrantLock();
+
+  protected final java.util.concurrent.atomic.AtomicReference<
+          java.util.concurrent.ConcurrentHashMap<Long, Boolean>>
+      pendingBadLocations =
+          new java.util.concurrent.atomic.AtomicReference<>(
+              new java.util.concurrent.ConcurrentHashMap<>());
+  protected final java.util.concurrent.atomic.AtomicReference<
+          java.util.concurrent.ConcurrentHashMap<
+              String, java.util.concurrent.ConcurrentHashMap<Long, Boolean>>>
+      pendingBiomeLocations =
+          new java.util.concurrent.atomic.AtomicReference<>(
+              new java.util.concurrent.ConcurrentHashMap<>());
+
+  protected final java.util.concurrent.atomic.AtomicReference<
+          java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.ConcurrentHashMap<Long, Boolean>>>
+      pendingBiomeRemovals =
+          new java.util.concurrent.atomic.AtomicReference<>(
+              new java.util.concurrent.ConcurrentHashMap<>());
 
   /**
    * Constructor for MemoryShape
@@ -114,6 +133,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @return true if known bad, false otherwise
    */
   public boolean isKnownBad(long location) {
+    if (pendingBadLocations.get().containsKey(location)) return true;
     long[] sums = badPrefixSumsCache;
     long[] keys = badKeysCache;
     int idx = Arrays.binarySearch(keys, location);
@@ -147,20 +167,24 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       out.writeUTF(worldName);
       out.writeLong(fillIter.get());
 
-      out.writeInt(badLocations.size());
-      for (Map.Entry<Long, Long> entry : badLocations.entrySet()) {
-        out.writeLong(entry.getKey());
-        out.writeLong(entry.getValue());
+      out.writeInt(badKeysCache.length);
+      for (int i = 0; i < badKeysCache.length; i++) {
+        out.writeLong(badKeysCache[i]);
+        long prevSum = (i > 0) ? badPrefixSumsCache[i - 1] : 0L;
+        out.writeLong(badPrefixSumsCache[i] - prevSum);
       }
 
-      out.writeInt(biomeLocations.size());
-      for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> entry : biomeLocations.entrySet()) {
-        out.writeUTF(entry.getKey());
-        Map<Long, Long> innerMap = entry.getValue();
-        out.writeInt(innerMap.size());
-        for (Map.Entry<Long, Long> innerEntry : innerMap.entrySet()) {
-          out.writeLong(innerEntry.getKey());
-          out.writeLong(innerEntry.getValue());
+      out.writeInt(biomeKeysCache.size());
+      for (Map.Entry<String, long[]> entry : biomeKeysCache.entrySet()) {
+        String biome = entry.getKey();
+        out.writeUTF(biome);
+        long[] keys = entry.getValue();
+        long[] sums = biomePrefixSumsCache.get(biome);
+        out.writeInt(keys.length);
+        for (int i = 0; i < keys.length; i++) {
+          out.writeLong(keys[i]);
+          long prevSum = (i > 0) ? sums[i - 1] : 0L;
+          out.writeLong(sums[i] - prevSum);
         }
       }
     } catch (IOException e) {
@@ -189,32 +213,46 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       String readWorldName = in.readUTF();
       if (!readWorldName.equals(worldName)) return;
 
-      this.badLocations.clear();
-      this.badLocationSum.set(0);
-      this.biomeLocations.clear();
+      badLocationSum.set(0);
 
       fillIter.set(in.readLong());
 
       int badSize = in.readInt();
+      long[] newBadKeys = new long[badSize];
+      long[] newBadSums = new long[badSize];
+      long currentSum = 0;
       for (int i = 0; i < badSize; i++) {
         long k = in.readLong();
         long v = in.readLong();
-        this.badLocations.put(k, v);
+        newBadKeys[i] = k;
+        currentSum += v;
+        newBadSums[i] = currentSum;
         this.badLocationSum.addAndGet(v);
       }
+      this.badKeysCache = newBadKeys;
+      this.badPrefixSumsCache = newBadSums;
 
       int biomeSize = in.readInt();
+      ConcurrentHashMap<String, long[]> newBiomeKeysCache = new ConcurrentHashMap<>();
+      ConcurrentHashMap<String, long[]> newBiomePrefixSumsCache = new ConcurrentHashMap<>();
       for (int i = 0; i < biomeSize; i++) {
         String biome = in.readUTF();
         int innerSize = in.readInt();
-        ConcurrentSkipListMap<Long, Long> innerMap = new ConcurrentSkipListMap<>();
+        long[] keys = new long[innerSize];
+        long[] sums = new long[innerSize];
+        long currentBiomeSum = 0;
         for (int j = 0; j < innerSize; j++) {
           long k = in.readLong();
           long v = in.readLong();
-          innerMap.put(k, v);
+          keys[j] = k;
+          currentBiomeSum += v;
+          sums[j] = currentBiomeSum;
         }
-        this.biomeLocations.put(biome, innerMap);
+        newBiomeKeysCache.put(biome, keys);
+        newBiomePrefixSumsCache.put(biome, sums);
       }
+      this.biomeKeysCache = newBiomeKeysCache;
+      this.biomePrefixSumsCache = newBiomePrefixSumsCache;
       this.badLocationsDirty = true;
       this.biomeLocationsDirty = true;
     } catch (IOException e) {
@@ -223,89 +261,37 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   public void addBadLocation(Long location) {
-    if (location < 0) return;
-    if (isKnownBad(location)) return;
-
-    Map.Entry<Long, Long> lower = badLocations.floorEntry(location);
-    Map.Entry<Long, Long> upper = badLocations.ceilingEntry(location);
-
-    // goal: merge adjacent values
-    // if within bounds of lower entry, do nothing
-    // if lower start+length meets position, add 1 to its length and use that
-    if ((lower != null) && (location < lower.getKey() + lower.getValue())) {
-      return;
-    } else if ((lower != null) && (location == lower.getKey() + lower.getValue())) {
-      badLocations.put(lower.getKey(), lower.getValue() + 1);
-    } else {
-      badLocations.put(location, 1L);
-    }
-
-    lower = badLocations.floorEntry(location);
-
-    // if upper start meets position + length, merge its length and delete upper entry
-    if ((upper != null) && (lower.getKey() + lower.getValue() >= upper.getKey())) {
-      badLocations.put(lower.getKey(), lower.getValue() + upper.getValue());
-      badLocations.remove(upper.getKey());
-    }
-
-    for (String biome : biomeLocations.keySet()) {
-      removeBiomeLocation(location, biome);
-    }
-
+    pendingBadLocations.get().put(location, true);
     badLocationSum.incrementAndGet();
     badLocationsDirty = true;
   }
 
-  /**
-   * Add a biome-specific valid location
-   *
-   * @param location the location value
-   * @param biome the biome name
-   */
   public void addBiomeLocation(Long location, String biome) {
-    biomeLocations.putIfAbsent(biome, new ConcurrentSkipListMap<>());
-    ConcurrentSkipListMap<Long, Long> map = biomeLocations.get(biome);
-
-    Map.Entry<Long, Long> lower = map.floorEntry(location);
-    Map.Entry<Long, Long> upper = map.ceilingEntry(location);
-
-    // goal: merge adjacent values
-    // if within bounds of lower entry, do nothing
-    // if lower start+length meets position, add 1 to its length and use that
-    if ((lower != null) && (location < lower.getKey() + lower.getValue())) {
-      return;
-    } else if ((lower != null) && (location == lower.getKey() + lower.getValue())) {
-      map.put(lower.getKey(), lower.getValue() + 1);
-    } else {
-      map.put(location, 1L);
-    }
-
-    lower = map.floorEntry(location);
-
-    // if upper start meets position + length, merge its length and delete upper entry
-    if ((upper != null) && (lower.getKey() + lower.getValue() >= upper.getKey())) {
-      map.put(lower.getKey(), lower.getValue() + upper.getValue());
-      map.remove(upper.getKey());
-    }
-
-    map = biomeMapped;
-
-    if ((lower != null) && (location < lower.getKey() + lower.getValue())) {
-      return;
-    } else if ((lower != null) && (location == lower.getKey() + lower.getValue())) {
-      map.put(lower.getKey(), lower.getValue() + 1);
-    } else {
-      map.put(location, 1L);
-    }
-
-    lower = map.floorEntry(location);
-
-    // if upper start meets position + length, merge its length and delete upper entry
-    if ((upper != null) && (lower.getKey() + lower.getValue() >= upper.getKey())) {
-      map.put(lower.getKey(), lower.getValue() + upper.getValue());
-      map.remove(upper.getKey());
-    }
+    pendingBiomeLocations
+        .get()
+        .computeIfAbsent(biome, b -> new ConcurrentHashMap<>())
+        .put(location, true);
     biomeLocationsDirty = true;
+  }
+
+  public void clear() {
+    badKeysCache = new long[0];
+    badPrefixSumsCache = new long[0];
+    biomeKeysCache = new ConcurrentHashMap<>();
+    biomePrefixSumsCache = new ConcurrentHashMap<>();
+    biomeMappedKeysCache = new long[0];
+    biomeMappedPrefixSumsCache = new long[0];
+    badLocationSum.set(0);
+    badLocationsDirty = true;
+    biomeLocationsDirty = true;
+  }
+
+  public long[] getBiomeKeys(String biome) {
+    return biomeKeysCache.get(biome);
+  }
+
+  public long[] getBiomePrefixSums(String biome) {
+    return biomePrefixSumsCache.get(biome);
   }
 
   /**
@@ -315,86 +301,154 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @param biome the biome name
    */
   public void removeBiomeLocation(Long location, String biome) {
-    biomeLocations.putIfAbsent(biome, new ConcurrentSkipListMap<>());
-    ConcurrentSkipListMap<Long, Long> map = biomeLocations.get(biome);
-
-    Map.Entry<Long, Long> lower = map.floorEntry(location);
-    if ((lower != null) && (location < lower.getKey() + lower.getValue())) {
-      long key = lower.getKey();
-      long val = lower.getValue();
-      if (location < key + val) { // if within bounds, slice the bounds to remove the location
-        map.remove(lower.getKey());
-        if (location > key) {
-          map.put(key, location - key);
-        }
-        if (location + 1 < key + val) {
-          map.put(location + 1, (key + val) - (location + 1));
-        }
-      }
-    }
-
-    map = biomeMapped;
-    lower = map.floorEntry(location);
-    if ((lower != null) && (location < lower.getKey() + lower.getValue())) {
-      long key = lower.getKey();
-      long val = lower.getValue();
-      if (location < key + val) { // if within bounds, slice the bounds to remove the location
-        map.remove(lower.getKey());
-        if (location > key) {
-          map.put(key, location - key);
-        }
-        if (location + 1 < key + val) {
-          map.put(location + 1, (key + val) - (location + 1));
-        }
-      }
-    }
+    pendingBiomeRemovals
+        .get()
+        .computeIfAbsent(biome, b -> new ConcurrentHashMap<>())
+        .put(location, true);
     biomeLocationsDirty = true;
   }
 
-  protected void rebuildCacheIfNeeded() {
+  protected void flushAndRebuild() {
     if (!badLocationsDirty && !biomeLocationsDirty) return;
     if (isRebuilding.compareAndSet(false, true)) {
       try {
-        if (badLocationsDirty) {
-          int size = badLocations.size();
-          long[] newKeys = new long[size];
-          long[] newSums = new long[size];
-          long currentSum = 0;
-          int i = 0;
-          for (Map.Entry<Long, Long> entry : badLocations.entrySet()) {
-            newKeys[i] = entry.getKey();
-            currentSum += entry.getValue();
-            newSums[i] = currentSum;
-            i++;
-          }
-          badKeysCache = newKeys;
-          badPrefixSumsCache = newSums;
-          badLocationsDirty = false;
+        ConcurrentHashMap<Long, Boolean> localPendingBad =
+            pendingBadLocations.getAndSet(new ConcurrentHashMap<>());
+        ConcurrentHashMap<String, ConcurrentHashMap<Long, Boolean>> localPendingBiome =
+            pendingBiomeLocations.getAndSet(new ConcurrentHashMap<>());
+        ConcurrentHashMap<String, ConcurrentHashMap<Long, Boolean>> localPendingBiomeRemovals =
+            pendingBiomeRemovals.getAndSet(new ConcurrentHashMap<>());
+
+        if (localPendingBad.isEmpty()
+            && localPendingBiome.isEmpty()
+            && localPendingBiomeRemovals.isEmpty()) {
+          return;
         }
 
-        if (biomeLocationsDirty) {
-          ConcurrentHashMap<String, long[]> newBiomeKeysCache = new ConcurrentHashMap<>();
-          ConcurrentHashMap<String, long[]> newBiomePrefixSumsCache = new ConcurrentHashMap<>();
-          for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> biomeEntry : biomeLocations.entrySet()) {
-            String biome = biomeEntry.getKey();
-            ConcurrentSkipListMap<Long, Long> map = biomeEntry.getValue();
-            int size = map.size();
-            long[] newKeys = new long[size];
-            long[] newSums = new long[size];
-            long currentSum = 0;
-            int i = 0;
-            for (Map.Entry<Long, Long> entry : map.entrySet()) {
-              newKeys[i] = entry.getKey();
-              currentSum += entry.getValue();
-              newSums[i] = currentSum;
-              i++;
-            }
-            newBiomeKeysCache.put(biome, newKeys);
-            newBiomePrefixSumsCache.put(biome, newSums);
+        // 4. Read current volatile arrays
+        long[] currentBadKeys = badKeysCache;
+        long[] currentBadSums = badPrefixSumsCache;
+
+        // 5. Merge values from capturedBad into local data with RLE compression
+        TreeMap<Long, Long> badMap = new TreeMap<>();
+        for (int i = 0; i < currentBadKeys.length; i++) {
+          long prevSum = (i > 0) ? currentBadSums[i - 1] : 0L;
+          badMap.put(currentBadKeys[i], currentBadSums[i] - prevSum);
+        }
+
+        for (Long loc : localPendingBad.keySet()) {
+          if (loc < 0) continue;
+          Map.Entry<Long, Long> floor = badMap.floorEntry(loc);
+          if (floor != null && loc < floor.getKey() + floor.getValue()) continue;
+
+          Map.Entry<Long, Long> ceiling = badMap.ceilingEntry(loc);
+          if (floor != null && loc == floor.getKey() + floor.getValue()) {
+            badMap.put(floor.getKey(), floor.getValue() + 1);
+            floor = badMap.floorEntry(loc); // update floor after merge
+          } else {
+            badMap.put(loc, 1L);
+            floor = badMap.floorEntry(loc);
           }
-          biomeKeysCache = newBiomeKeysCache;
-          biomePrefixSumsCache = newBiomePrefixSumsCache;
-          biomeLocationsDirty = false;
+
+          if (ceiling != null && floor.getKey() + floor.getValue() >= ceiling.getKey()) {
+            badMap.put(floor.getKey(), floor.getValue() + ceiling.getValue());
+            badMap.remove(ceiling.getKey());
+          }
+        }
+
+        // Build newKeys and newSums local arrays
+        int newSize = badMap.size();
+        long[] newKeys = new long[newSize];
+        long[] newSums = new long[newSize];
+        long runningSum = 0;
+        int idx = 0;
+        for (Map.Entry<Long, Long> entry : badMap.entrySet()) {
+          newKeys[idx] = entry.getKey();
+          runningSum += entry.getValue();
+          newSums[idx] = runningSum;
+          idx++;
+        }
+
+        // 7. Perform bottom-up swap
+        this.badKeysCache = newKeys;
+        this.badPrefixSumsCache = newSums;
+        this.badLocationsDirty = false;
+
+        // Biome logic (similar to bad locations but per biome)
+        // Note: The issue description primarily focuses on the bad locations, 
+        // but we should maintain consistency for biomes if they were dirty.
+        if (!localPendingBiome.isEmpty() || !localPendingBiomeRemovals.isEmpty()) {
+          ConcurrentHashMap<String, long[]> newBiomeKeysCache = new ConcurrentHashMap<>(biomeKeysCache);
+          ConcurrentHashMap<String, long[]> newBiomePrefixSumsCache = new ConcurrentHashMap<>(biomePrefixSumsCache);
+
+          Set<String> affectedBiomes = new HashSet<>();
+          affectedBiomes.addAll(localPendingBiome.keySet());
+          affectedBiomes.addAll(localPendingBiomeRemovals.keySet());
+
+          for (String biome : affectedBiomes) {
+            TreeMap<Long, Long> bMap = new TreeMap<>();
+            long[] bKeys = biomeKeysCache.get(biome);
+            long[] bSums = biomePrefixSumsCache.get(biome);
+            if (bKeys != null && bSums != null) {
+              for (int i = 0; i < bKeys.length; i++) {
+                long prevSum = (i > 0) ? bSums[i - 1] : 0L;
+                bMap.put(bKeys[i], bSums[i] - prevSum);
+              }
+            }
+
+            // Additions
+            ConcurrentHashMap<Long, Boolean> additions = localPendingBiome.get(biome);
+            if (additions != null) {
+              for (Long loc : additions.keySet()) {
+                Map.Entry<Long, Long> floor = bMap.floorEntry(loc);
+                if (floor != null && loc < floor.getKey() + floor.getValue()) continue;
+                Map.Entry<Long, Long> ceiling = bMap.ceilingEntry(loc);
+                if (floor != null && loc == floor.getKey() + floor.getValue()) {
+                  bMap.put(floor.getKey(), floor.getValue() + 1);
+                  floor = bMap.floorEntry(loc);
+                } else {
+                  bMap.put(loc, 1L);
+                  floor = bMap.floorEntry(loc);
+                }
+                if (ceiling != null && floor.getKey() + floor.getValue() >= ceiling.getKey()) {
+                  bMap.put(floor.getKey(), floor.getValue() + ceiling.getValue());
+                  bMap.remove(ceiling.getKey());
+                }
+              }
+            }
+
+            // Removals
+            ConcurrentHashMap<Long, Boolean> removals = localPendingBiomeRemovals.get(biome);
+            if (removals != null) {
+              for (Long loc : removals.keySet()) {
+                Map.Entry<Long, Long> floor = bMap.floorEntry(loc);
+                if (floor != null && loc < floor.getKey() + floor.getValue()) {
+                  long key = floor.getKey();
+                  long val = floor.getValue();
+                  bMap.remove(key);
+                  if (loc > key) bMap.put(key, loc - key);
+                  if (loc + 1 < key + val) bMap.put(loc + 1, (key + val) - (loc + 1));
+                }
+              }
+            }
+
+            int bSize = bMap.size();
+            long[] nbKeys = new long[bSize];
+            long[] nbSums = new long[bSize];
+            long bRunningSum = 0;
+            int bIdx = 0;
+            for (Map.Entry<Long, Long> entry : bMap.entrySet()) {
+              nbKeys[bIdx] = entry.getKey();
+              bRunningSum += entry.getValue();
+              nbSums[bIdx] = bRunningSum;
+              bIdx++;
+            }
+            newBiomeKeysCache.put(biome, nbKeys);
+            newBiomePrefixSumsCache.put(biome, nbSums);
+          }
+          this.biomeKeysCache = newBiomeKeysCache;
+          this.biomePrefixSumsCache = newBiomePrefixSumsCache;
+          this.biomeLocationsDirty = false;
         }
       } finally {
         isRebuilding.set(false);
@@ -413,13 +467,13 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   public MemoryShape<E> clone() {
     MemoryShape<E> shape = (MemoryShape<E>) super.clone();
     shape.badLocationSum = new AtomicLong(0);
-    shape.badLocations = new ConcurrentSkipListMap<>();
-    shape.biomeLocations = new ConcurrentHashMap<>();
     shape.fillIter = new AtomicLong(0);
     shape.badKeysCache = new long[0];
     shape.badPrefixSumsCache = new long[0];
     shape.biomeKeysCache = new ConcurrentHashMap<>();
     shape.biomePrefixSumsCache = new ConcurrentHashMap<>();
+    shape.biomeMappedKeysCache = new long[0];
+    shape.biomeMappedPrefixSumsCache = new long[0];
     shape.badLocationsDirty = true;
     shape.biomeLocationsDirty = true;
     return shape;

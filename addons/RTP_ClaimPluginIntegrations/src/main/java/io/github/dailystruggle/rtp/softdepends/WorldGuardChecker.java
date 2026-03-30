@@ -19,6 +19,7 @@ import org.bukkit.plugin.Plugin;
 
 public class WorldGuardChecker {
   public static StateFlag CAN_RTP_SELECT_HERE = null;
+  private static WorldGuardPlugin worldGuardPlugin = null;
   private static boolean exists = true;
 
   public static void setupWGFlag() {
@@ -42,6 +43,8 @@ public class WorldGuardChecker {
   }
 
   private static WorldGuardPlugin getWorldGuard() {
+    if (worldGuardPlugin != null) return worldGuardPlugin;
+
     Plugin plugin = Bukkit.getServer().getPluginManager().getPlugin("WorldGuard");
 
     // WorldGuard may not be loaded
@@ -49,26 +52,36 @@ public class WorldGuardChecker {
       return null; // Maybe you want throw an exception instead
     }
 
-    return (WorldGuardPlugin) plugin;
+    worldGuardPlugin = (WorldGuardPlugin) plugin;
+    return worldGuardPlugin;
+  }
+
+  public static Boolean isInClaim(io.github.dailystruggle.rtp.api.world.RTPCoords location) {
+    if (!exists) return false;
+    org.bukkit.World world = org.bukkit.Bukkit.getWorld(location.worldName());
+    if (world == null) return false;
+    return isInClaim(new org.bukkit.Location(world, location.x(), location.y(), location.z()));
   }
 
   public static Boolean isInClaim(org.bukkit.Location location) {
-    if (exists) {
-      try {
-        if (getWorldGuard() == null) return false;
-        if (CAN_RTP_SELECT_HERE == null) setupWGFlag();
-        if (CAN_RTP_SELECT_HERE == null) return false;
+    if (!exists) return false;
+    try {
+      if (getWorldGuard() == null) return false;
+      if (CAN_RTP_SELECT_HERE == null) setupWGFlag();
+      if (CAN_RTP_SELECT_HERE == null) return false;
 
-        World world = BukkitAdapter.adapt(Objects.requireNonNull(location.getWorld()));
-        BlockVector3 pt = BukkitAdapter.asBlockVector(location);
-        RegionManager regionManager =
-            WorldGuard.getInstance().getPlatform().getRegionContainer().get(world);
-        ApplicableRegionSet set = Objects.requireNonNull(regionManager).getApplicableRegions(pt);
-        return set.testState(null, CAN_RTP_SELECT_HERE);
-      } catch (Throwable t) {
-        exists = false;
-        RTP.log(Level.WARNING, t.getMessage(), t);
-      }
+      World world = BukkitAdapter.adapt(Objects.requireNonNull(location.getWorld()));
+      BlockVector3 pt = BukkitAdapter.asBlockVector(location);
+      RegionManager regionManager =
+          WorldGuard.getInstance().getPlatform().getRegionContainer().get(world);
+      ApplicableRegionSet set = Objects.requireNonNull(regionManager).getApplicableRegions(pt);
+      return set.testState(null, CAN_RTP_SELECT_HERE);
+    } catch (Throwable t) {
+      exists = false;
+      RTP.log(
+          Level.SEVERE,
+          "[RTP] Critical architectural incompatibility detected. Disabling WorldGuard integration for this session to prevent server instability.",
+          t);
     }
     return false;
   }
