@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
+import io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.softdepends.*;
 import org.bukkit.Location;
@@ -50,7 +51,7 @@ public final class RTPClaimPluginIntegrations extends JavaPlugin {
     ConfigParser<IntegrationsKeys> configParser =
         (ConfigParser<IntegrationsKeys>) RTP.configs.getParser(IntegrationsKeys.class);
 
-    Region.addGlobalRegionVerifier(
+    GlobalRegionVerifiers.addGlobalRegionVerifier(
         rtpLocation -> {
           org.bukkit.World world = org.bukkit.Bukkit.getWorld(rtpLocation.worldName());
           if (world == null) return false;

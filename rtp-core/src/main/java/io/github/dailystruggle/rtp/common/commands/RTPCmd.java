@@ -446,8 +446,10 @@ public interface RTPCmd extends BaseRTPCmd {
       }
 
       if (syncLoading) {
+        region.inFlightCalculations.incrementAndGet();
         setupTeleport.run();
       } else {
+        region.inFlightCalculations.incrementAndGet();
         RTP.getInstance().setupTeleportPipeline.add(setupTeleport);
       }
     }

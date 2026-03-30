@@ -10,6 +10,9 @@ import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -141,19 +144,43 @@ public class SelectionAPI {
         || baseRegionName.isEmpty()
         || !permRegionLookup.containsKey(baseRegionName)) baseRegionName = "default";
     Region baseRegion = Objects.requireNonNull(permRegionLookup.get(baseRegionName));
-    EnumMap<RegionKeys, Object> data = baseRegion.getData();
-    for (RegionKeys key : RegionKeys.values()) {
-      if (regionParams.containsKey(key.name())) {
-        Object val = regionParams.get(key.name());
-        data.put(key, val);
-      }
-    }
+    
+    // Create a dummy ConfigParser to use RegionConfigLoader
+    // This is a bit of a hack but it's consistent with moving logic to RegionConfigLoader
+    MultiConfigParser<RegionKeys> regionParsers =
+        (MultiConfigParser<RegionKeys>) RTP.configs.multiConfigParserMap.get(RegionKeys.class);
+    ConfigParser<RegionKeys> baseParser = regionParsers.getParser(baseRegionName);
+    
+    // We want to override values from regionParams
+    // Since ConfigParser.getData() returns a copy or we shouldn't modify the base one,
+    // we'll need a way to create a modified one.
+    // For now, let's just manually update RegionSettings from the base region.
+    
+    RegionSettings baseSettings = baseRegion.getSettings();
+    
+    RTPWorld<?> world = (RTPWorld<?>) regionParams.getOrDefault(RegionKeys.world.name(), baseSettings.world());
+    Shape<?> shape = (Shape<?>) regionParams.getOrDefault(RegionKeys.shape.name(), baseSettings.shape());
+    VerticalAdjustor<?> vert = (VerticalAdjustor<?>) regionParams.getOrDefault(RegionKeys.vert.name(), baseSettings.vert());
+    boolean worldBorderOverride = (boolean) regionParams.getOrDefault(RegionKeys.worldBorderOverride.name(), baseSettings.worldBorderOverride());
+    boolean requirePermission = (boolean) regionParams.getOrDefault(RegionKeys.requirePermission.name(), baseSettings.requirePermission());
+    long cacheCap = ((Number) regionParams.getOrDefault(RegionKeys.cacheCap.name(), baseSettings.cacheCap())).longValue();
+    double price = ((Number) regionParams.getOrDefault(RegionKeys.price.name(), baseSettings.price())).doubleValue();
+    String override = String.valueOf(regionParams.getOrDefault(RegionKeys.override.name(), baseSettings.override()));
 
-    // todo: fill in factory values
+    RegionSettings newSettings = new RegionSettings(
+            "temp",
+            world,
+            shape,
+            vert,
+            worldBorderOverride,
+            requirePermission,
+            cacheCap,
+            price,
+            override,
+            baseSettings.detailedRegionInit()
+    );
 
-    Region clone = baseRegion.clone();
-    clone.setData(data);
-    return clone;
+    return new Region("temp", newSettings);
   }
 
   public Region getRegion(RTPPlayer player) {

@@ -7,6 +7,8 @@ import io.github.dailystruggle.rtp.common.configuration.enums.*;
 import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.selection.region.RegionConfigLoader;
+import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import java.io.File;
 import java.util.*;
@@ -239,16 +241,13 @@ public class Configs {
     }
 
     for (ConfigParser<RegionKeys> regionConfig : regions.configParserFactory.map.values()) {
-      EnumMap<RegionKeys, Object> data = regionConfig.getData();
-      String name = regionConfig.name.replace(".yml", "");
-      if (detailed_region_init) {
-        RTP.log(Level.INFO, "&00FFFF[RTP] [" + name + "] creating teleport region...");
-      }
+      RegionSettings settings = RegionConfigLoader.load(regionConfig);
+      String name = settings.name();
 
-      Region region = new Region(regionConfig.name.replace(".yml", ""), data);
+      Region region = new Region(name, settings);
 
       RTP.selectionAPI.permRegionLookup.put(region.name, region);
-      if (detailed_region_init) {
+      if (settings.detailedRegionInit()) {
         RTP.log(
             Level.INFO,
             "&00FFFF[RTP] [" + name + "] successfully created teleport region - " + region.name);

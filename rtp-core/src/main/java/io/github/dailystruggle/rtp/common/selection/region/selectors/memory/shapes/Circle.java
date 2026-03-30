@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
+import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
@@ -83,6 +84,30 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
 
     x = x - cx;
     z = z - cz;
+
+    double rotation = ((Math.atan(((double) z) / x) / (2 * Math.PI)) + 1) % 0.25;
+
+    if ((z < 0) && (x < 0)) {
+      rotation += 0.5;
+    } else if (z < 0) {
+      rotation += 0.75;
+    } else if (x < 0) {
+      rotation += 0.25;
+    }
+
+    double radius = ((long) (Math.sqrt(x * x + z * z)));
+
+    return (radius * radius - cr * cr) * Math.PI + rotation * (2 * radius * Math.PI);
+  }
+
+  @Override
+  public double xzToLocation(MutableRTPCoords coords) {
+    long cr = getNumber(GenericMemoryShapeParams.centerRadius, 64L).longValue();
+    long cx = getNumber(GenericMemoryShapeParams.centerX, 0L).longValue();
+    long cz = getNumber(GenericMemoryShapeParams.centerZ, 0L).longValue();
+
+    long x = coords.x - cx;
+    long z = coords.z - cz;
 
     double rotation = ((Math.atan(((double) z) / x) / (2 * Math.PI)) + 1) % 0.25;
 

@@ -43,7 +43,7 @@ public final class LoadChunks extends RTPRunnable {
     long radius2 = perf.getNumber(PerformanceKeys.viewDistanceTeleport, 0L).longValue();
     long max = (radius2 * radius2 * 4) + (4 * radius2) + 1;
 
-    ChunkSet chunkSet = this.region.chunks(coords, radius2);
+    ChunkSet chunkSet = this.region.chunkManager.chunks(coords, radius2);
 
     TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.uuid());
     if (teleportData == null) {
@@ -66,7 +66,7 @@ public final class LoadChunks extends RTPRunnable {
     if (max > chunkSet.chunks.size()) {
       RTPWorld<?> world = RTP.serverAccessor.getRTPWorld(coords.worldName());
       chunkSet.keep(false, world);
-      chunkSet = teleportData.targetRegion.chunks(coords, radius2);
+      chunkSet = teleportData.targetRegion.chunkManager.chunks(coords, radius2);
       chunkSet.keep(true, world);
       modified = true;
     }
@@ -77,7 +77,7 @@ public final class LoadChunks extends RTPRunnable {
     try {
       preActions.forEach(consumer -> consumer.accept(this));
 
-      ChunkSet chunkSet = this.region.locAssChunks.get(coords);
+      ChunkSet chunkSet = this.region.chunkManager.locAssChunks.get(coords);
       chunkSet.complete.thenRun(
           () -> {
             long start = System.currentTimeMillis();
@@ -95,10 +95,12 @@ public final class LoadChunks extends RTPRunnable {
             long toTicks = remainingTime / 50;
 
             RTP.scheduler.scheduleTeleport(player, doTeleport, toTicks);
+            region.inFlightCalculations.incrementAndGet();
             postActions.forEach(consumer -> consumer.accept(this));
           });
     } catch (Throwable throwable) {
       throwable.printStackTrace();
+      region.inFlightCalculations.decrementAndGet();
       new RTPTeleportCancel(player.uuid()).run();
     }
   }

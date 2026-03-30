@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.tasks;
 
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
@@ -9,6 +10,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
@@ -106,17 +108,20 @@ public class FillTask extends RTPRunnable {
     long range = Double.valueOf(shape.getRange()).longValue();
     long pos;
     long limit = fillIncrement.get();
+    MutableRTPCoords cursor = new MutableRTPCoords(region.getWorld().name(), 0, 0, 0);
     for (pos = start; pos < range && pos < start + limit; pos++) {
       if (pause.get() || isCancelled()) {
         isRunning.set(false);
         return;
       }
 
-      if (shape.isKnownBad(pos)) {
+      int[] select = shape.locationToXZ(pos);
+      cursor.setXZ(select[0], select[1]);
+      if (shape.isKnownBad(cursor)) {
         continue;
       }
 
-      CompletableFuture<Boolean> future = testPos(region, pos);
+      CompletableFuture<Boolean> future = testPos(region, pos, cursor);
 
       long finalPos = pos;
       future.thenAccept(
@@ -207,9 +212,10 @@ public class FillTask extends RTPRunnable {
    *
    * @param region the region
    * @param pos the location index
+   * @param cursor mutable coordinates cursor
    * @return a future that completes with true if the location is valid
    */
-  public CompletableFuture<Boolean> testPos(Region region, final long pos) {
+  public CompletableFuture<Boolean> testPos(Region region, final long pos, MutableRTPCoords cursor) {
     Set<String> defaultBiomes;
 
     ConfigParser<PerformanceKeys> performance =
@@ -265,10 +271,8 @@ public class FillTask extends RTPRunnable {
         Boolean.parseBoolean(
             performance.getConfigValue(PerformanceKeys.biomeRecall, false).toString());
 
-    int[] select = shape.locationToXZ(pos);
-
     String currBiome =
-        world.getBiome(select[0] * 16 + 7, (vert.maxY() + vert.minY()) / 2, select[1] * 16 + 7);
+        world.getBiome(cursor.x * 16 + 7, (vert.maxY() + vert.minY()) / 2, cursor.z * 16 + 7);
 
     if (!defaultBiomes.contains(currBiome)) {
       if (biomeRecall) {
@@ -282,7 +286,7 @@ public class FillTask extends RTPRunnable {
         .isInside()
         .apply(
             new RTPLocation(
-                world, select[0] * 16, (vert.maxY() + vert.minY()) / 2, select[1] * 16))) {
+                world, cursor.x * 16, (vert.maxY() + vert.minY()) / 2, cursor.z * 16))) {
       shape.addBadLocation(pos);
       return CompletableFuture.completedFuture(false);
     }
@@ -292,7 +296,7 @@ public class FillTask extends RTPRunnable {
     }
 
     CompletableFuture<Long> cfChunk =
-        RTP.serverAccessor.getChunkManager().getChunkAtAsync(world, select[0], select[1]);
+        RTP.serverAccessor.getChunkManager().getChunkAtAsync(world, cursor.x, cursor.z);
 
     CompletableFuture<Boolean> res = new CompletableFuture<>();
     cfChunk.thenAccept(
@@ -382,7 +386,7 @@ public class FillTask extends RTPRunnable {
               return;
             }
 
-            if (pass) pass = Region.checkGlobalRegionVerifiers(coords);
+            if (pass) pass = GlobalRegionVerifiers.checkGlobalRegionVerifiers(coords);
 
             if (pass) {
               if (biomeRecall) shape.addBiomeLocation(pos, currBiome1);

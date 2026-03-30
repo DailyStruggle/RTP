@@ -4,6 +4,7 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
+import io.github.dailystruggle.rtp.api.selection.GenerationContext;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -55,6 +56,7 @@ public class OnEventTeleports implements Listener {
     SetupTeleport setupTeleport =
         new SetupTeleport(rtpPlayer, rtpPlayer, RTP.selectionAPI.getRegion(rtpPlayer), null);
     setupTeleport.setDelay(10);
+    setupTeleport.region().inFlightCalculations.incrementAndGet();
     RTP.getInstance().setupTeleportPipeline.add(setupTeleport);
   }
 
@@ -128,10 +130,10 @@ public class OnEventTeleports implements Listener {
     Region region = RTP.selectionAPI.getRegion(RTP.serverAccessor.getPlayer(player.getUniqueId()));
 
     // I don't know how this can happen, but in case player dies twice, don't reprocess
-    if (region.fastLocations.containsKey(id)) return;
+    if (region.queueManager.fastLocations.containsKey(id)) return;
 
     CompletableFuture<Map.Entry<RTPCoords, Long>> future = new CompletableFuture<>();
-    region.fastLocations.put(id, future);
+    region.queueManager.fastLocations.put(id, future);
 
     if (RTP.getInstance().latestTeleportData.containsKey(id)) {
       RTP.getInstance().priorTeleportData.put(id, RTP.getInstance().latestTeleportData.get(id));
@@ -142,14 +144,14 @@ public class OnEventTeleports implements Listener {
     RTP.getInstance().latestTeleportData.put(id, teleportData);
     region.miscPipeline.add(
         () -> {
+          GenerationContext context = new GenerationContext(
+                  RTP.serverAccessor.getSender(RTPAPI.serverId),
+                  RTP.serverAccessor.getPlayer(player.getUniqueId()),
+                  null);
           Map.Entry<RTPCoords, Long> location = null;
           int i = 0;
           for (; location == null && i < 10; i++) {
-            location =
-                region.getLocation(
-                    RTP.serverAccessor.getSender(RTPAPI.serverId),
-                    RTP.serverAccessor.getPlayer(player.getUniqueId()),
-                    null);
+            location = region.getLocation(context);
           }
           if (location == null) {
             RTP.log(Level.WARNING, "#0080FF[RTP] failed to generate respawn location");
@@ -177,7 +179,7 @@ public class OnEventTeleports implements Listener {
 
     Region region = RTP.selectionAPI.getRegion(RTP.serverAccessor.getPlayer(player.getUniqueId()));
     ConcurrentHashMap<UUID, CompletableFuture<Map.Entry<RTPCoords, Long>>> respawnLocations =
-        region.fastLocations;
+        region.queueManager.fastLocations;
     if (!respawnLocations.containsKey(player.getUniqueId())) {
       RTPTeleportCancel.refund(player.getUniqueId());
       return;
@@ -185,17 +187,17 @@ public class OnEventTeleports implements Listener {
 
     CompletableFuture<Map.Entry<RTPCoords, Long>> future =
         respawnLocations.get(player.getUniqueId());
-    region.fastLocations.remove(player.getUniqueId());
+    region.queueManager.fastLocations.remove(player.getUniqueId());
 
     if (event.isAnchorSpawn() || event.isBedSpawn()) {
       if (future.isDone()) {
         try {
-          region.locationQueue.add(future.get());
+          region.queueManager.locationQueue.add(future.get());
         } catch (InterruptedException | ExecutionException ignored) {
 
         }
       } else {
-        future.thenAccept(rtpLocationLongEntry -> region.locationQueue.add(rtpLocationLongEntry));
+        future.thenAccept(rtpLocationLongEntry -> region.queueManager.locationQueue.add(rtpLocationLongEntry));
       }
       RTPTeleportCancel.refund(player.getUniqueId());
       return;
@@ -265,6 +267,7 @@ public class OnEventTeleports implements Listener {
               new SetupTeleport(
                   RTP.serverAccessor.getSender(RTPAPI.serverId), rtpPlayer, region, null);
           RTP.getInstance().latestTeleportData.get(player.getUniqueId()).nextTask = setupTeleport;
+          setupTeleport.region().inFlightCalculations.incrementAndGet();
           RTP.getInstance().setupTeleportPipeline.add(setupTeleport);
         });
   }

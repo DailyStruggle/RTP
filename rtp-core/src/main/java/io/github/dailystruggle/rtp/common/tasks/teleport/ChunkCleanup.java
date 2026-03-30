@@ -41,7 +41,7 @@ public final class ChunkCleanup extends RTPRunnable {
   public void run() {
     try {
       preActions.forEach(consumer -> consumer.accept(this));
-      ChunkSet chunkSet = region.locAssChunks.get(coords);
+      ChunkSet chunkSet = region.chunkManager.locAssChunks.get(coords);
       if (chunkSet == null) return;
       RTPWorld<?> rtpWorld = region.getWorld();
 
@@ -90,7 +90,7 @@ public final class ChunkCleanup extends RTPRunnable {
             }
           });
         }
-        region.removeChunks(coords);
+        region.chunkManager.removeChunks(coords);
         postActions.forEach(consumer -> consumer.accept(this));
       });
     } catch (Exception e) {
