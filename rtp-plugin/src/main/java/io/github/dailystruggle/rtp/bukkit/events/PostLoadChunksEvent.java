@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.bukkit.events;
 
-import io.github.dailystruggle.rtp.common.tasks.teleport.LoadChunks;
+import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import org.bukkit.Bukkit;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
@@ -8,9 +8,9 @@ import org.jetbrains.annotations.NotNull;
 
 public class PostLoadChunksEvent extends Event {
   private static final HandlerList HANDLERS_LIST = new HandlerList();
-  private final LoadChunks loadChunks;
+  private final TeleportPipelineTask loadChunks;
 
-  public PostLoadChunksEvent(LoadChunks loadChunks) {
+  public PostLoadChunksEvent(TeleportPipelineTask loadChunks) {
     super(!Bukkit.isPrimaryThread());
     this.loadChunks = loadChunks;
   }
@@ -24,7 +24,7 @@ public class PostLoadChunksEvent extends Event {
     return HANDLERS_LIST;
   }
 
-  public LoadChunks getLoadChunks() {
+  public TeleportPipelineTask getLoadChunks() {
     return loadChunks;
   }
 }

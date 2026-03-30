@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.bukkit.events;
 
-import io.github.dailystruggle.rtp.common.tasks.teleport.DoTeleport;
+import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import org.bukkit.Bukkit;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.Event;
@@ -9,10 +9,10 @@ import org.jetbrains.annotations.NotNull;
 
 public class PreTeleportEvent extends Event implements Cancellable {
   private static final HandlerList HANDLERS_LIST = new HandlerList();
-  private final DoTeleport doTeleport;
+  private final TeleportPipelineTask doTeleport;
   private boolean cancelled = false;
 
-  public PreTeleportEvent(DoTeleport doTeleport) {
+  public PreTeleportEvent(TeleportPipelineTask doTeleport) {
     super(!Bukkit.isPrimaryThread());
     this.doTeleport = doTeleport;
   }
@@ -36,7 +36,7 @@ public class PreTeleportEvent extends Event implements Cancellable {
     cancelled = cancel;
   }
 
-  public DoTeleport getDoTeleport() {
+  public TeleportPipelineTask getDoTeleport() {
     return doTeleport;
   }
 }

@@ -15,7 +15,7 @@ import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.GenerationResult;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
-import io.github.dailystruggle.rtp.common.tasks.teleport.SetupTeleport;
+import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
 import java.util.HashMap;
 import java.util.Map;
@@ -54,11 +54,10 @@ public class OnEventTeleports implements Listener {
     RTP.getInstance().latestTeleportData.remove(player.getUniqueId());
     io.github.dailystruggle.rtp.api.entity.RTPPlayer rtpPlayer =
         RTP.serverAccessor.getPlayer(player.getUniqueId());
-    SetupTeleport setupTeleport =
-        new SetupTeleport(rtpPlayer, rtpPlayer, RTP.selectionAPI.getRegion(rtpPlayer), null);
-    setupTeleport.setDelay(10);
-    setupTeleport.region().inFlightCalculations.incrementAndGet();
-    RTP.getInstance().setupTeleportPipeline.add(setupTeleport);
+    TeleportPipelineTask pipelineTask = new TeleportPipelineTask(new GenerationContext(rtpPlayer, rtpPlayer, null), RTP.selectionAPI.getRegion(rtpPlayer));
+    pipelineTask.setDelay(10);
+    pipelineTask.region().inFlightCalculations.incrementAndGet();
+    pipelineTask.run();
   }
 
   @EventHandler(priority = EventPriority.NORMAL)
@@ -266,12 +265,12 @@ public class OnEventTeleports implements Listener {
             RTP.log(
                 Level.INFO, "#0080FF[RTP] teleporting player:" + player.getName() + " on respawn");
           RTPPlayer rtpPlayer = RTP.serverAccessor.getPlayer(player.getUniqueId());
-          SetupTeleport setupTeleport =
-              new SetupTeleport(
-                  RTP.serverAccessor.getSender(RTPAPI.serverId), rtpPlayer, region, null);
-          RTP.getInstance().latestTeleportData.get(player.getUniqueId()).nextTask = setupTeleport;
-          setupTeleport.region().inFlightCalculations.incrementAndGet();
-          RTP.getInstance().setupTeleportPipeline.add(setupTeleport);
+          TeleportPipelineTask pipelineTask =
+              new TeleportPipelineTask(
+                  new GenerationContext(RTP.serverAccessor.getSender(RTPAPI.serverId), rtpPlayer, null), region);
+          RTP.getInstance().latestTeleportData.get(player.getUniqueId()).nextTask = pipelineTask;
+          pipelineTask.region().inFlightCalculations.incrementAndGet();
+          pipelineTask.run();
         });
   }
 

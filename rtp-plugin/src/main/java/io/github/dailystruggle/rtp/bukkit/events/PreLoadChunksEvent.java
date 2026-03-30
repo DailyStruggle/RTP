@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.bukkit.events;
 
-import io.github.dailystruggle.rtp.common.tasks.teleport.LoadChunks;
+import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import org.bukkit.Bukkit;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.Event;
@@ -9,10 +9,10 @@ import org.jetbrains.annotations.NotNull;
 
 public class PreLoadChunksEvent extends Event implements Cancellable {
   private static final HandlerList HANDLERS_LIST = new HandlerList();
-  private final LoadChunks loadChunks;
+  private final TeleportPipelineTask loadChunks;
   private boolean cancelled = false;
 
-  public PreLoadChunksEvent(LoadChunks loadChunks) {
+  public PreLoadChunksEvent(TeleportPipelineTask loadChunks) {
     super(!Bukkit.isPrimaryThread());
     this.loadChunks = loadChunks;
   }
@@ -36,7 +36,7 @@ public class PreLoadChunksEvent extends Event implements Cancellable {
     cancelled = cancel;
   }
 
-  public LoadChunks getLoadChunks() {
+  public TeleportPipelineTask getLoadChunks() {
     return loadChunks;
   }
 }

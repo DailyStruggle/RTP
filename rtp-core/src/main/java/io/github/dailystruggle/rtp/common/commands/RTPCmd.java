@@ -7,6 +7,7 @@ import io.github.dailystruggle.rtp.api.economy.RTPEconomy;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.api.selection.GenerationContext;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.*;
@@ -16,7 +17,7 @@ import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
-import io.github.dailystruggle.rtp.common.tasks.teleport.SetupTeleport;
+import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
@@ -431,8 +432,8 @@ public interface RTPCmd extends BaseRTPCmd {
 
       // todo: vert params
 
-      SetupTeleport setupTeleport = new SetupTeleport(sender, player, region, biomes);
-      data.nextTask = setupTeleport;
+      TeleportPipelineTask pipelineTask = new TeleportPipelineTask(new GenerationContext(sender, player, biomes), region);
+      data.nextTask = pipelineTask;
 
       long delay = (toggleTargetPerms) ? player.delay() : sender.delay();
       data.delay = delay;
@@ -447,10 +448,10 @@ public interface RTPCmd extends BaseRTPCmd {
 
       if (syncLoading) {
         region.inFlightCalculations.incrementAndGet();
-        setupTeleport.run();
+        pipelineTask.run();
       } else {
         region.inFlightCalculations.incrementAndGet();
-        RTP.getInstance().setupTeleportPipeline.add(setupTeleport);
+        RTP.scheduler.runTaskAsynchronously(pipelineTask);
       }
     }
 

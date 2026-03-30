@@ -108,11 +108,7 @@ public class ReloadCmd extends BaseRTPCmdImpl {
 
       RTP.getInstance().miscSyncTasks.start();
       RTP.getInstance().miscAsyncTasks.start();
-      RTP.getInstance().setupTeleportPipeline.start();
-      RTP.getInstance().loadChunksPipeline.start();
-      RTP.getInstance().teleportPipeline.start();
       RTP.getInstance().startupTasks.start();
-      RTP.getInstance().getChunkPipeline.start();
     }
 
     return true;

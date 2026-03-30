@@ -261,10 +261,6 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
       RTP rtp = RTP.getInstance();
       if (rtp == null) return;
 
-      if (rtp.setupTeleportPipeline != null) rtp.setupTeleportPipeline.execute();
-      if (rtp.loadChunksPipeline != null) rtp.loadChunksPipeline.execute();
-      if (rtp.teleportPipeline != null) rtp.teleportPipeline.execute();
-      if (rtp.chunkCleanupPipeline != null) rtp.chunkCleanupPipeline.execute();
       if (rtp.miscSyncTasks != null) rtp.miscSyncTasks.execute();
       if (rtp.miscAsyncTasks != null) rtp.miscAsyncTasks.execute();
       if (rtp.cancelTasks != null) rtp.cancelTasks.execute();
