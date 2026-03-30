@@ -46,6 +46,7 @@ public class FillResumeCmd extends FillSubCmd {
       }
 
       fillTask.pause.set(false);
+      RTP.scheduler.runTaskAsynchronously(fillTask);
 
       if (parser == null) continue;
       String msg = String.valueOf(parser.getConfigValue(MessagesKeys.fillResume, ""));

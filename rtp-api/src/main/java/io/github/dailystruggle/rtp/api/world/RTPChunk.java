@@ -83,6 +83,13 @@ public abstract class RTPChunk<T> {
   public abstract boolean isGenerated();
 
   /**
+   * Check if the chunk is loaded
+   *
+   * @return true if loaded, false otherwise
+   */
+  public abstract boolean isLoaded();
+
+  /**
    * Set whether the chunk should be kept loaded
    *
    * @param keep true to keep loaded, false otherwise

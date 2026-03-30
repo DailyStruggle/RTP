@@ -46,49 +46,55 @@ public class Square_Normal extends MemoryShape<NormalDistributionParams> {
     super(NormalDistributionParams.class, newName, defaults);
   }
 
-  private static int[] squareOct2Coords(long radius, double perimeterStep) {
-    int[] res = new int[2];
+  private static void squareOct2Coords(long radius, double perimeterStep, MutableRTPCoords output) {
+    int x, z;
     // getFromString how far to go from a corner
     double shortStep = perimeterStep % radius;
 
     if (perimeterStep < radius * 4) {
       if (perimeterStep < radius * 2) {
         if (perimeterStep < radius) { // octant 1, from 0 to pi/4
-          res[0] = (int) radius;
-          res[1] = (int) shortStep;
+          x = (int) radius;
+          z = (int) shortStep;
         } else { // octant 2, from pi/4 to pi/2
-          res[0] = (int) (radius - shortStep);
-          res[1] = (int) radius;
+          x = (int) (radius - shortStep);
+          z = (int) radius;
         }
       } else {
         if (perimeterStep < radius * 3) { // octant 3
-          res[0] = (int) -shortStep;
-          res[1] = (int) radius;
+          x = (int) -shortStep;
+          z = (int) radius;
         } else { // octant 4
-          res[0] = (int) -radius;
-          res[1] = (int) (radius - shortStep);
+          x = (int) -radius;
+          z = (int) (radius - shortStep);
         }
       }
     } else {
       if (perimeterStep < radius * 6) {
         if (perimeterStep < radius * 5) { // octant 5
-          res[0] = (int) -radius;
-          res[1] = (int) -shortStep;
+          x = (int) -radius;
+          z = (int) -shortStep;
         } else { // octant 6
-          res[0] = (int) -(radius - shortStep);
-          res[1] = (int) -radius;
+          x = (int) -(radius - shortStep);
+          z = (int) -radius;
         }
       } else {
         if (perimeterStep < radius * 7) { // octant 7
-          res[0] = (int) shortStep;
-          res[1] = (int) -radius;
+          x = (int) shortStep;
+          z = (int) -radius;
         } else { // octant 8
-          res[0] = (int) radius;
-          res[1] = (int) -(radius - shortStep);
+          x = (int) radius;
+          z = (int) -(radius - shortStep);
         }
       }
     }
-    return res;
+    output.setXZ(x, z);
+  }
+
+  private static int[] squareOct2Coords(long radius, double perimeterStep) {
+    MutableRTPCoords output = new MutableRTPCoords(0, 0);
+    squareOct2Coords(radius, perimeterStep, output);
+    return new int[] {output.x, output.z};
   }
 
   @Override
@@ -230,11 +236,17 @@ public class Square_Normal extends MemoryShape<NormalDistributionParams> {
 
   @Override
   public int[] locationToXZ(long location) {
+    MutableRTPCoords output = new MutableRTPCoords(0, 0);
+    locationToXZ(location, output);
+    return new int[] {output.x, output.z};
+  }
+
+  @Override
+  public void locationToXZ(long location, MutableRTPCoords output) {
     long cr = getNumber(NormalDistributionParams.centerRadius, 64L).longValue();
     long cx = getNumber(NormalDistributionParams.centerX, 0L).longValue();
     long cz = getNumber(NormalDistributionParams.centerZ, 0L).longValue();
 
-    int[] res;
     // getFromString a distance from the center
     double radius = Math.sqrt(location + cr * cr * 4) / 2;
 
@@ -244,11 +256,8 @@ public class Square_Normal extends MemoryShape<NormalDistributionParams> {
 
     long r = (long) radius;
 
-    res = squareOct2Coords(r, perimeterStep);
-    res[0] += cx;
-    res[1] += cz;
-
-    return res;
+    squareOct2Coords(r, perimeterStep, output);
+    output.setXZ(output.x + (int) cx, output.z + (int) cz);
   }
 
   @Override

@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
+import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -40,6 +41,8 @@ public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E
   }
 
   public abstract @Nullable RTPCoords adjust(@NotNull RTPChunk input);
+
+  public abstract boolean adjust(@NotNull RTPChunk input, @NotNull MutableRTPCoords output);
 
   public abstract boolean testPlacement(@NotNull RTPCoords coords);
 

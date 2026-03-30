@@ -4,7 +4,6 @@ import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
-import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 
 import java.util.Map;
@@ -29,9 +28,10 @@ public class RegionCacheTask extends RTPRunnable {
         final long cacheCap = region.getSettings().cacheCap();
         final long playerQueueSize = region.queueManager.playerQueue.size();
         final long totalCap = Math.max(cacheCap, playerQueueSize);
-        Map.Entry<RTPCoords, Long> pair = LocationGenerator.getLocation(region, (java.util.Set<String>) null);
-        if (pair != null) {
-            RTPCoords coords = pair.getKey();
+        GenerationResult res = LocationGenerator.getLocation(region, (java.util.Set<String>) null);
+        if (res != null) {
+            final RTPCoords coords = res.coords();
+            final Map.Entry<RTPCoords, Long> pair = new java.util.AbstractMap.SimpleEntry<>(coords, res.attempts());
             if (coords == null) {
                 region.inFlightCalculations.decrementAndGet();
                 if (region.cachePipeline.size() + region.queueManager.locationQueue.size() + region.inFlightCalculations.get() < totalCap) {
@@ -41,11 +41,16 @@ public class RegionCacheTask extends RTPRunnable {
                 return;
             }
 
-            ConfigParser<PerformanceKeys> perf =
-                    (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
-            long radius = perf.getNumber(PerformanceKeys.viewDistanceSelect, 0L).longValue();
-
-            ChunkSet chunkSet = region.chunkManager.chunks(coords, radius);
+            final ChunkSet chunkSet;
+            if (res.verifiedChunks() != null) {
+                chunkSet = res.verifiedChunks();
+                region.chunkManager.locAssChunks.put(coords, chunkSet);
+            } else {
+                ConfigParser<PerformanceKeys> perf =
+                        (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+                long radius = perf.getNumber(PerformanceKeys.viewDistanceSelect, 0L).longValue();
+                chunkSet = region.chunkManager.chunks(coords, radius);
+            }
 
             chunkSet.whenComplete(
                     aBoolean -> {

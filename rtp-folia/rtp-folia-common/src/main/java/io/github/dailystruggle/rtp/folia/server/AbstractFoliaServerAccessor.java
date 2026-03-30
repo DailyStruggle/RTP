@@ -9,8 +9,6 @@ import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.tasks.teleport.DoTeleport;
-import io.github.dailystruggle.rtp.common.tasks.teleport.LoadChunks;
 import io.github.dailystruggle.rtp.folia.entity.FoliaRTPCommandSender;
 import io.github.dailystruggle.rtp.folia.entity.FoliaRTPPlayer;
 import io.github.dailystruggle.rtp.folia.world.FoliaRTPWorld;

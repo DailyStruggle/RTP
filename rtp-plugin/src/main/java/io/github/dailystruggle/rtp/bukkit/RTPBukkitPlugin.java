@@ -7,6 +7,8 @@ import io.github.dailystruggle.rtp.bukkit.commands.RTPCmdBukkit;
 import io.github.dailystruggle.rtp.bukkit.events.*;
 import io.github.dailystruggle.rtp.bukkit.spigotListeners.*;
 import io.github.dailystruggle.rtp.spigot.server.AsyncTeleportProcessing;
+import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.tasks.ChunkUnloadProcessor;
 import io.github.dailystruggle.rtp.spigot.server.DatabaseProcessing;
 import io.github.dailystruggle.rtp.spigot.server.FillTaskProcessing;
 import io.github.dailystruggle.rtp.spigot.server.SyncTeleportProcessing;
@@ -14,7 +16,6 @@ import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.ChunkyBorderChecker;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.PAPI_expansion;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.VaultChecker;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
@@ -239,6 +240,9 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     RTP.scheduler.runTaskLater(this::setupEffects, 1);
 
     RTP.scheduler.runTaskTimer(new TPS(), 0, 1);
+    if (!isFolia()) {
+      RTP.scheduler.runTaskTimer(new ChunkUnloadProcessor(), 1, 1);
+    }
 
     SendMessage.sendMessage(Bukkit.getConsoleSender(), "");
 

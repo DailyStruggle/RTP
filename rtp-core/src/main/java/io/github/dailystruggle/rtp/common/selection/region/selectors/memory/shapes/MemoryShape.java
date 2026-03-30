@@ -25,10 +25,13 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
   protected volatile long[] badKeysCache = new long[0];
   protected volatile long[] badPrefixSumsCache = new long[0];
-  protected ConcurrentHashMap<String, long[]> biomeKeysCache = new ConcurrentHashMap<>();
-  protected ConcurrentHashMap<String, long[]> biomePrefixSumsCache = new ConcurrentHashMap<>();
+  protected volatile ConcurrentHashMap<String, long[]> biomeKeysCache = new ConcurrentHashMap<>();
+  protected volatile ConcurrentHashMap<String, long[]> biomePrefixSumsCache =
+      new ConcurrentHashMap<>();
   protected volatile boolean badLocationsDirty = true;
   protected volatile boolean biomeLocationsDirty = true;
+  protected final java.util.concurrent.atomic.AtomicBoolean isRebuilding =
+      new java.util.concurrent.atomic.AtomicBoolean(false);
 
   /**
    * Constructor for MemoryShape
@@ -76,6 +79,14 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   public abstract int[] locationToXZ(long location);
 
   /**
+   * Convert a location value to xz coordinates and store in the output object
+   *
+   * @param location the location value
+   * @param output the output object
+   */
+  public abstract void locationToXZ(long location, MutableRTPCoords output);
+
+  /**
    * Check if a location is known to be bad (e.g. invalid teleport target)
    *
    * @param x the x coordinate
@@ -103,9 +114,16 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @return true if known bad, false otherwise
    */
   public boolean isKnownBad(long location) {
-    Map.Entry<Long, Long> lower = badLocations.floorEntry(location);
-    if (lower != null) {
-      return (location < (lower.getKey() + lower.getValue()));
+    long[] sums = badPrefixSumsCache;
+    long[] keys = badKeysCache;
+    int idx = Arrays.binarySearch(keys, location);
+    if (idx >= 0) return true;
+    int floorIdx = -(idx + 1) - 1;
+    if (floorIdx >= 0 && floorIdx < sums.length) {
+      long key = keys[floorIdx];
+      long sum = sums[floorIdx];
+      long prevSum = (floorIdx > 0) ? sums[floorIdx - 1] : 0L;
+      return location < (key + (sum - prevSum));
     }
     return false;
   }
@@ -333,43 +351,54 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     biomeLocationsDirty = true;
   }
 
-  protected synchronized void rebuildCacheIfNeeded() {
-    if (badLocationsDirty) {
-      int size = badLocations.size();
-      long[] newKeys = new long[size];
-      long[] newSums = new long[size];
-      long currentSum = 0;
-      int i = 0;
-      for (Map.Entry<Long, Long> entry : badLocations.entrySet()) {
-        newKeys[i] = entry.getKey();
-        currentSum += entry.getValue();
-        newSums[i] = currentSum;
-        i++;
-      }
-      badKeysCache = newKeys;
-      badPrefixSumsCache = newSums;
-      badLocationsDirty = false;
-    }
-
-    if (biomeLocationsDirty) {
-      for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> biomeEntry : biomeLocations.entrySet()) {
-        String biome = biomeEntry.getKey();
-        ConcurrentSkipListMap<Long, Long> map = biomeEntry.getValue();
-        int size = map.size();
-        long[] newKeys = new long[size];
-        long[] newSums = new long[size];
-        long currentSum = 0;
-        int i = 0;
-        for (Map.Entry<Long, Long> entry : map.entrySet()) {
-          newKeys[i] = entry.getKey();
-          currentSum += entry.getValue();
-          newSums[i] = currentSum;
-          i++;
+  protected void rebuildCacheIfNeeded() {
+    if (!badLocationsDirty && !biomeLocationsDirty) return;
+    if (isRebuilding.compareAndSet(false, true)) {
+      try {
+        if (badLocationsDirty) {
+          int size = badLocations.size();
+          long[] newKeys = new long[size];
+          long[] newSums = new long[size];
+          long currentSum = 0;
+          int i = 0;
+          for (Map.Entry<Long, Long> entry : badLocations.entrySet()) {
+            newKeys[i] = entry.getKey();
+            currentSum += entry.getValue();
+            newSums[i] = currentSum;
+            i++;
+          }
+          badKeysCache = newKeys;
+          badPrefixSumsCache = newSums;
+          badLocationsDirty = false;
         }
-        biomeKeysCache.put(biome, newKeys);
-        biomePrefixSumsCache.put(biome, newSums);
+
+        if (biomeLocationsDirty) {
+          ConcurrentHashMap<String, long[]> newBiomeKeysCache = new ConcurrentHashMap<>();
+          ConcurrentHashMap<String, long[]> newBiomePrefixSumsCache = new ConcurrentHashMap<>();
+          for (Map.Entry<String, ConcurrentSkipListMap<Long, Long>> biomeEntry : biomeLocations.entrySet()) {
+            String biome = biomeEntry.getKey();
+            ConcurrentSkipListMap<Long, Long> map = biomeEntry.getValue();
+            int size = map.size();
+            long[] newKeys = new long[size];
+            long[] newSums = new long[size];
+            long currentSum = 0;
+            int i = 0;
+            for (Map.Entry<Long, Long> entry : map.entrySet()) {
+              newKeys[i] = entry.getKey();
+              currentSum += entry.getValue();
+              newSums[i] = currentSum;
+              i++;
+            }
+            newBiomeKeysCache.put(biome, newKeys);
+            newBiomePrefixSumsCache.put(biome, newSums);
+          }
+          biomeKeysCache = newBiomeKeysCache;
+          biomePrefixSumsCache = newBiomePrefixSumsCache;
+          biomeLocationsDirty = false;
+        }
+      } finally {
+        isRebuilding.set(false);
       }
-      biomeLocationsDirty = false;
     }
   }
 

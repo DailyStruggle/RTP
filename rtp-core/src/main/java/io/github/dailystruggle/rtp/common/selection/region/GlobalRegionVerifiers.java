@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
+import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import java.util.ArrayList;
@@ -63,5 +64,9 @@ public class GlobalRegionVerifiers {
         }
         regionVerifiersLock.release();
         return true;
+    }
+
+    public static boolean checkGlobalRegionVerifiers(MutableRTPCoords location) {
+        return checkGlobalRegionVerifiers(location.toImmutable());
     }
 }

@@ -18,7 +18,6 @@ import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionConfigLoader;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
-import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -112,11 +111,10 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
     if (msg != null) msg = filenamePattern.matcher(msg).replaceAll(parser.name);
     serverAccessor.sendMessage(RTPAPI.serverId, senderId, msg);
 
-    // CommandsAPI.commandPipeline.clear();
-
     MultiConfigParser<?> newParser =
         new MultiConfigParser<>(parser.myClass, parser.name, "1.0", parser.pluginDirectory);
     if (parser.myClass.equals(RegionKeys.class)) {
+      @SuppressWarnings("unchecked")
       MultiConfigParser<RegionKeys> regions = (MultiConfigParser<RegionKeys>) newParser;
       RTP.selectionAPI.permRegionLookup.clear();
       for (ConfigParser<RegionKeys> regionConfig : regions.configParserFactory.map.values()) {
@@ -125,7 +123,7 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
         RTP.selectionAPI.permRegionLookup.put(region.name, region);
       }
     } else if (parser.myClass.equals(WorldKeys.class)) {
-      for (RTPWorld world : serverAccessor.getRTPWorlds()) {
+      for (RTPWorld<?> world : serverAccessor.getRTPWorlds()) {
         newParser.getParser(world.name());
       }
     }

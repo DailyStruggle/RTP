@@ -115,27 +115,28 @@ public class Circle_Normal extends MemoryShape<NormalDistributionParams> {
 
   @Override
   public int[] locationToXZ(long location) {
+    MutableRTPCoords output = new MutableRTPCoords(0, 0);
+    locationToXZ(location, output);
+    return new int[] {output.x, output.z};
+  }
+
+  @Override
+  public void locationToXZ(long location, MutableRTPCoords output) {
     long cr = getNumber(NormalDistributionParams.centerRadius, 64L).longValue();
     long cx = getNumber(NormalDistributionParams.centerX, 0L).longValue();
     long cz = getNumber(NormalDistributionParams.centerZ, 0L).longValue();
-
-    int[] res = new int[2];
 
     // get a distance from the center
     double radius = Math.sqrt(location / Math.PI + cr * cr);
 
     // get a % around the curve, convert to radians
     double rotation = (radius - (int) radius + 0.000069) * 2 * Math.PI;
-    // rotation = ( (0.875 )*2*Math.PI );
 
     double cosRes = Math.cos(rotation);
     double sinRes = Math.sin(rotation);
 
     // polar to cartesian
-    res[0] = (int) (radius * cosRes + cx);
-    res[1] = (int) (radius * sinRes + cz);
-
-    return res;
+    output.setXZ((int) (radius * cosRes + cx), (int) (radius * sinRes + cz));
   }
 
   @Override

@@ -36,11 +36,9 @@ public final class RTPTeleportCancel extends RTPRunnable {
     if (data == null) return;
     if (data.completed) return;
 
-    //        if( data.selectedCoords!=null && data.targetRegion!=null && ( data.biomes==null ||
-    // data.biomes.size()==0) ) {
-    //            data.targetRegion.locationQueue.add( new AbstractMap.SimpleEntry<>(
-    // data.selectedCoords, data.attempts) );
-    //        }
+    if (data.selectedCoords != null && data.targetRegion != null) {
+      RTP.getInstance().chunkCleanupPipeline.add(new ChunkCleanup(data.selectedCoords, data.targetRegion));
+    }
 
     // reset player data
     TeleportData repData = RTP.getInstance().priorTeleportData.get(playerId);

@@ -15,6 +15,7 @@ import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.ChunkSet;
+import io.github.dailystruggle.rtp.common.selection.region.GenerationResult;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import java.util.ArrayList;
@@ -26,8 +27,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.logging.Level;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 public final class TeleportPipelineTask extends RTPRunnable {
   public enum Phase {
@@ -132,14 +131,14 @@ public final class TeleportPipelineTask extends RTPRunnable {
       teleportData.nextTask = this;
       teleportData.targetRegion = region;
 
-      Map.Entry<RTPCoords, Long> pair = region.getLocation(context);
-      if (pair == null) {
+      GenerationResult res = region.getLocation(context);
+      if (res == null) {
         region.inFlightCalculations.decrementAndGet();
         return;
       }
 
-      coords = pair.getKey();
-      long attempts = pair.getValue();
+      coords = res.coords();
+      long attempts = res.attempts();
 
       if (coords == null) {
         teleportData.attempts = attempts;

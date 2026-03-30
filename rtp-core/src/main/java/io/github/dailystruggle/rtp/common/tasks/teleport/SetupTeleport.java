@@ -10,6 +10,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.selection.region.GenerationResult;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import java.util.*;
@@ -89,13 +90,13 @@ public final class SetupTeleport extends RTPRunnable {
       RTP.getInstance().latestTeleportData.put(player.uuid(), teleportData);
 
       GenerationContext context = new GenerationContext(sender, player, biomes);
-      Map.Entry<RTPCoords, Long> pair = this.region.getLocation(context);
-      if (pair == null) { // player gets put on region queue
+      GenerationResult res = this.region.getLocation(context);
+      if (res == null) { // player gets put on region queue
         // decrement because a new Cache task will be added via Region.queue or already exists
         region.inFlightCalculations.decrementAndGet();
         return;
-      } else if (pair.getKey() == null) {
-        teleportData.attempts = pair.getValue();
+      } else if (res.coords() == null) {
+        teleportData.attempts = res.attempts();
         String msg = langParser.getConfigValue(MessagesKeys.unsafe, "").toString();
         RTP.serverAccessor.sendMessage(sender.uuid(), player.uuid(), msg);
         postActions.forEach(consumer -> consumer.accept(this, false));
@@ -109,10 +110,10 @@ public final class SetupTeleport extends RTPRunnable {
         region.inFlightCalculations.decrementAndGet();
         return;
       }
-      LoadChunks loadChunks = new LoadChunks(this.sender, this.player, pair.getKey(), this.region);
+      LoadChunks loadChunks = new LoadChunks(this.sender, this.player, res.coords(), this.region);
       teleportData.nextTask = loadChunks;
-      teleportData.selectedCoords = pair.getKey();
-      teleportData.attempts = pair.getValue();
+      teleportData.selectedCoords = res.coords();
+      teleportData.attempts = res.attempts();
 
       boolean sync = syncLoading;
       if (!syncLoading) {

@@ -2,8 +2,11 @@ package io.github.dailystruggle.rtp.spigot.world;
 
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.common.RTP;
+import java.util.Set;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
+import org.bukkit.HeightMap;
 
 public final class BukkitRTPChunk extends RTPChunk<Chunk> {
   public BukkitRTPChunk(Chunk chunk) {
@@ -31,10 +34,14 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
   }
 
   @Override
+  public boolean isLoaded() {
+    return chunk.isLoaded();
+  }
+
+  @Override
   public void keep(boolean keep) {
     chunk.getWorld().setChunkForceLoaded(chunk.getX(), chunk.getZ(), keep);
   }
-
 
   @Override
   public boolean isAir(int x, int y, int z) {
@@ -52,11 +59,11 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
     z = Math.max(0, Math.min(15, z));
     int globalX = (chunk.getX() << 4) + x;
     int globalZ = (chunk.getZ() << 4) + z;
-    return chunk.getWorld().getHighestBlockYAt(globalX, globalZ, org.bukkit.HeightMap.MOTION_BLOCKING_NO_LEAVES);
+    return chunk.getWorld().getHighestBlockYAt(globalX, globalZ, HeightMap.MOTION_BLOCKING_NO_LEAVES);
   }
 
   @Override
-  public boolean isSafe(int x, int y, int z, java.util.Set<String> unsafeBlocks) {
+  public boolean isSafe(int x, int y, int z, Set<String> unsafeBlocks) {
     String materialName = chunk.getBlock(x & 0xF, y, z & 0xF).getType().name();
     return !unsafeBlocks.contains(materialName);
   }
@@ -65,8 +72,8 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
   public void unload() {
     if (Bukkit.isPrimaryThread()) chunk.unload(false);
     else {
-      Bukkit.getScheduler()
-          .runTask(Bukkit.getPluginManager().getPlugin("RTP"), () -> chunk.unload(false));
+      RTP instance = RTP.getInstance();
+      if (instance != null) instance.chunksToUnload.offer(this);
     }
   }
 }

@@ -4,9 +4,17 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers;
-import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.softdepends.*;
+import io.github.dailystruggle.rtp.softdepends.FactionsChecker;
+import io.github.dailystruggle.rtp.softdepends.GriefDefenderChecker;
+import io.github.dailystruggle.rtp.softdepends.GriefPreventionChecker;
+import io.github.dailystruggle.rtp.softdepends.HuskTownsChecker;
+import io.github.dailystruggle.rtp.softdepends.LandsChecker;
+import io.github.dailystruggle.rtp.softdepends.RedProtectChecker;
+import io.github.dailystruggle.rtp.softdepends.TownyAdvancedChecker;
+import io.github.dailystruggle.rtp.softdepends.WorldGuardChecker;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /** Main class for RTPClaimPluginIntegrations addon */
@@ -53,7 +61,7 @@ public final class RTPClaimPluginIntegrations extends JavaPlugin {
 
     GlobalRegionVerifiers.addGlobalRegionVerifier(
         rtpLocation -> {
-          org.bukkit.World world = org.bukkit.Bukkit.getWorld(rtpLocation.worldName());
+          World world = Bukkit.getWorld(rtpLocation.worldName());
           if (world == null) return false;
           Location location =
               new Location(world, rtpLocation.x(), rtpLocation.y(), rtpLocation.z());

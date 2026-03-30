@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.jump;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
+import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -57,7 +58,14 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
 
   @Override
   public @Nullable RTPCoords adjust(@NotNull RTPChunk chunk) {
-    if (chunk == null) return null;
+    MutableRTPCoords output = new MutableRTPCoords(chunk.getWorld().name(), 0, 0, 0);
+    if (adjust(chunk, output)) return output.toImmutable();
+    return null;
+  }
+
+  @Override
+  public boolean adjust(@NotNull RTPChunk chunk, @NotNull MutableRTPCoords output) {
+    if (chunk == null) return false;
 
     int maxY = getNumber(JumpAdjustorKeys.maxY, 256L).intValue();
     int minY = getNumber(JumpAdjustorKeys.minY, 0L).intValue();
@@ -122,7 +130,7 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
             maxY = i;
             break;
           }
-          if (i > maxY - it_len) return null;
+          if (i > maxY - it_len) return false;
           oldY = i;
         }
       }
@@ -137,11 +145,14 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
             && chunk.isSafe(x, i + 1, z, unsafeBlocks)
             && chunk.isSafe(x, i, z, unsafeBlocks)
             && chunk.isSafe(x, i - 1, z, unsafeBlocks)) {
-          return new RTPCoords(chunk.getWorld().name(), globalX, i, globalZ);
+          output.setWorldName(chunk.getWorld().name());
+          output.setXZ(globalX, globalZ);
+          output.setY(i);
+          return true;
         }
       }
     }
-    return null;
+    return false;
   }
 
   @Override

@@ -11,7 +11,7 @@ public class RegionQueueManager {
     private final Region region;
 
     public final ConcurrentLinkedQueue<Map.Entry<RTPCoords, Long>> locationQueue = new ConcurrentLinkedQueue<>();
-    
+
     /** When reserving/recycling locations for specific players, I want to guard against */
     public final ConcurrentHashMap<UUID, ConcurrentLinkedQueue<Map.Entry<RTPCoords, Long>>>
             perPlayerLocationQueue = new ConcurrentHashMap<>();
