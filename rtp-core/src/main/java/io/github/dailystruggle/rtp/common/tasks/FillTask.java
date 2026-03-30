@@ -337,31 +337,35 @@ public class FillTask extends RTPRunnable {
           }
 
           // todo: waterlogged check
-          RTPChunk<?> chunk1;
-          Map<Long, RTPChunk<?>> chunks = new HashMap<>();
-          long initialKey = ((long) chunk.x() & 0xFFFFFFFFL) | (((long) chunk.z() & 0xFFFFFFFFL) << 32);
-          chunks.put(initialKey, chunk);
+          RTPChunk<?>[] localChunks = new RTPChunk[(safetyRadius * 2 + 1) * (safetyRadius * 2 + 1)];
+          int centerChunkX = chunk.x();
+          int centerChunkZ = chunk.z();
+          int L = safetyRadius * 2 + 1;
+          localChunks[safetyRadius * L + safetyRadius] = chunk;
           chunk.keep(true);
           try {
             for (int x = coords.x() - safetyRadius; x < coords.x() + safetyRadius && pass; x++) {
-              int chunkX = Math.floorDiv(x, 16);
-              int xx = Math.floorMod(x, 16);
+              int chunkX = x >> 4;
+              int xx = x & 15;
+              int dcX = chunkX - centerChunkX;
 
               for (int z = coords.z() - safetyRadius;
                   z < coords.z() + safetyRadius && pass;
                   z++) {
-                int chunkZ = Math.floorDiv(z, 16);
-                int zz = Math.floorMod(z, 16);
+                int chunkZ = z >> 4;
+                int zz = z & 15;
+                int dcZ = chunkZ - centerChunkZ;
 
-                long neighborKey = ((long) chunkX & 0xFFFFFFFFL) | (((long) chunkZ & 0xFFFFFFFFL) << 32);
-                if (chunks.containsKey(neighborKey)) chunk1 = chunks.get(neighborKey);
-                else {
+                int index = (dcX + safetyRadius) * L + (dcZ + safetyRadius);
+                RTPChunk<?> chunk1 = localChunks[index];
+                if (chunk1 == null) {
+                  long neighborKey = ((long) chunkX & 0xFFFFFFFFL) | (((long) chunkZ & 0xFFFFFFFFL) << 32);
                   chunk1 = region.getWorld().getCachedChunk(neighborKey);
                   if (chunk1 == null) {
                     pass = false;
                     break;
                   }
-                  chunks.put(neighborKey, chunk1);
+                  localChunks[index] = chunk1;
                   chunk1.keep(true);
                 }
 
@@ -375,7 +379,7 @@ public class FillTask extends RTPRunnable {
               }
             }
           } finally {
-            for (RTPChunk usedChunk : chunks.values()) {
+            for (RTPChunk usedChunk : localChunks) {
               if (usedChunk != null) usedChunk.keep(false);
             }
           }

@@ -113,7 +113,8 @@ public class LocationGenerator {
                                     if (list.get(0) instanceof String) {
                                         List<String> stringList = (List<String>) list;
                                         boolean same = true;
-                                        for (String s : stringList) {
+                                        for (int j = 0; j < stringList.size(); j++) {
+                                            String s = stringList.get(j);
                                             if (!unsafeBlocks.contains(s)) {
                                                 same = false;
                                                 break;
@@ -144,46 +145,27 @@ public class LocationGenerator {
 
                     // todo: waterlogged check
                     int safe = safetyRadius.get();
-                    Map<Long, RTPChunk> chunks = new HashMap<>();
-                    long initialChunkKey = ((long) chunk.x() & 0xFFFFFFFFL) | (((long) chunk.z() & 0xFFFFFFFFL) << 32);
-                    chunks.put(initialChunkKey, chunk);
+                    RTPChunk[] localChunks = new RTPChunk[(safe * 2 + 1) * (safe * 2 + 1)];
+                    int centerChunkX = chunk.x();
+                    int centerChunkZ = chunk.z();
+                    int L = safe * 2 + 1;
+                    localChunks[safe * L + safe] = chunk;
                     chunk.keep(true);
                 try {
                     safetyCheck:
                     for (int x = left.x() - safe; x < left.x() + safe; x++) {
-                        int xx = x;
-                        int dx = Math.abs(xx / 16);
-                        int chunkX = chunk.x();
-
-                        if (xx < 0) {
-                            chunkX -= dx + 1;
-                            if (xx % 16 == 0) xx += 16 * dx;
-                            else xx += 16 * (dx + 1);
-                        } else if (xx >= 16) {
-                            chunkX += dx;
-                            xx -= 16 * dx;
-                        }
+                        int chunkX = x >> 4;
+                        int xx = x & 15;
+                        int dcX = chunkX - centerChunkX;
 
                         for (int z = left.z() - safe; z < left.z() + safe; z++) {
-                            int zz = z;
+                            int chunkZ = z >> 4;
+                            int zz = z & 15;
+                            int dcZ = chunkZ - centerChunkZ;
 
-                            int dz = Math.abs(zz / 16);
-
-                            int chunkZ = chunk.z();
-
-                            if (zz < 0) {
-                                chunkZ -= dz + 1;
-                                if (zz % 16 == 0) zz += 16 * dz;
-                                else zz += 16 * (dz + 1);
-                            } else if (zz >= 16) {
-                                chunkZ += dz;
-                                zz -= 16 * dz;
-                            }
-
-                            long chunkKey1 = ((long) chunkX & 0xFFFFFFFFL) | (((long) chunkZ & 0xFFFFFFFFL) << 32);
-                            RTPChunk chunk1;
-                            if (chunks.containsKey(chunkKey1)) chunk1 = chunks.get(chunkKey1);
-                            else {
+                            int index = (dcX + safe) * L + (dcZ + safe);
+                            RTPChunk chunk1 = localChunks[index];
+                            if (chunk1 == null) {
                                 try {
                                     Long key =
                                             RTP.serverAccessor
@@ -191,7 +173,7 @@ public class LocationGenerator {
                                                     .getChunkAtAsync(world, chunkX, chunkZ)
                                                     .get();
                                     chunk1 = world.getCachedChunk(key);
-                                    chunks.put(chunkKey1, chunk1);
+                                    localChunks[index] = chunk1;
                                     if (chunk1 != null) chunk1.keep(true);
                                 } catch (InterruptedException | ExecutionException e) {
                                     pass = false;
@@ -214,7 +196,7 @@ public class LocationGenerator {
                         }
                     }
                 } finally {
-                    for (RTPChunk usedChunk : chunks.values()) {
+                    for (RTPChunk usedChunk : localChunks) {
                         if (usedChunk != null) usedChunk.keep(false);
                     }
                 }
@@ -264,7 +246,9 @@ public class LocationGenerator {
                                 player.getLocation().z());
                 RTP.getInstance().latestTeleportData.put(playerId, data);
             }
-            Region.onPlayerQueuePush.forEach(consumer -> consumer.accept(region, playerId));
+            for (int j = 0; j < Region.onPlayerQueuePush.size(); j++) {
+                Region.onPlayerQueuePush.get(j).accept(region, playerId);
+            }
             region.queueManager.playerQueue.offer(playerId);
             data.queueLocation = region.queueManager.playerQueue.size();
             RTP.serverAccessor.sendMessage(playerId, MessagesKeys.queueUpdate);
@@ -360,6 +344,7 @@ public class LocationGenerator {
 
         Map<FailTypes, Map<String, Long>> failMap = new EnumMap<>(FailTypes.class);
         for (FailTypes f : FailTypes.values()) failMap.put(f, new HashMap<>());
+        long worldBorderFails = 0;
         List<Map.Entry<Long, Long>> selections = new ArrayList<>();
 
         int finalX = 0, finalY = 0, finalZ = 0;
@@ -466,8 +451,8 @@ public class LocationGenerator {
                     selections.add(new AbstractMap.SimpleEntry<>((long) select[0], (long) select[1]));
                 }
 
-                String key = "biome=" + currBiome;
                 if (verbose) {
+                    String key = "biome=" + currBiome;
                     failMap
                             .get(FailTypes.biome)
                             .compute(
@@ -488,12 +473,12 @@ public class LocationGenerator {
                     .apply(
                             new RTPLocation(
                                     world, cursor.x * 16, (vert.maxY() + vert.minY()) / 2, cursor.z * 16))) {
-                new IllegalStateException(
-                        "worldborder check failed. region/selection is likely outside the worldborder")
-                        .printStackTrace();
+                if (verbose) {
+                    new IllegalStateException(
+                            "worldborder check failed. region/selection is likely outside the worldborder")
+                            .printStackTrace();
+                }
                 maxAttempts++;
-                Long worldBorderFails =
-                        failMap.get(FailTypes.worldBorder).getOrDefault("OUTSIDE_BORDER", 0L);
                 worldBorderFails++;
                 if (worldBorderFails > 1000) {
                     new IllegalStateException(
@@ -501,7 +486,9 @@ public class LocationGenerator {
                             .printStackTrace();
                     return new AbstractMap.SimpleEntry<>(null, i);
                 }
-                failMap.get(FailTypes.worldBorder).put("OUTSIDE_BORDER", worldBorderFails);
+                if (verbose) {
+                    failMap.get(FailTypes.worldBorder).put("OUTSIDE_BORDER", worldBorderFails);
+                }
                 continue;
             }
 
@@ -557,46 +544,27 @@ public class LocationGenerator {
                 boolean pass = true;
 
                 // todo: waterlogged check
-                RTPChunk chunk1;
-                Map<Long, RTPChunk> chunks = new HashMap<>();
-                long initialChunkKey = ((long) chunk.x() & 0xFFFFFFFFL) | (((long) chunk.z() & 0xFFFFFFFFL) << 32);
-                chunks.put(initialChunkKey, chunk);
+                RTPChunk[] localChunks = new RTPChunk[(safetyRadius * 2 + 1) * (safetyRadius * 2 + 1)];
+                int centerChunkX = chunk.x();
+                int centerChunkZ = chunk.z();
+                int L = safetyRadius * 2 + 1;
+                localChunks[safetyRadius * L + safetyRadius] = chunk;
                 chunk.keep(true);
                 try {
                     safetyCheck:
                     for (int x = finalX - safetyRadius; x < finalX + safetyRadius; x++) {
-                        int xx = x;
-                        int dx = Math.abs(xx / 16);
-                        int chunkX = chunk.x();
-
-                        if (xx < 0) {
-                            chunkX -= dx + 1;
-                            if (xx % 16 == 0) xx += 16 * dx;
-                            else xx += 16 * (dx + 1);
-                        } else if (xx >= 16) {
-                            chunkX += dx;
-                            xx -= 16 * dx;
-                        }
+                        int chunkX = x >> 4;
+                        int xx = x & 15;
+                        int dcX = chunkX - centerChunkX;
 
                         for (int z = finalZ - safetyRadius; z < finalZ + safetyRadius; z++) {
-                            int zz = z;
+                            int chunkZ = z >> 4;
+                            int zz = z & 15;
+                            int dcZ = chunkZ - centerChunkZ;
 
-                            int dz = Math.abs(zz / 16);
-
-                            int chunkZ = chunk.z();
-
-                            if (zz < 0) {
-                                chunkZ -= dz + 1;
-                                if (zz % 16 == 0) zz += 16 * dz;
-                                else zz += 16 * (dz + 1);
-                            } else if (zz >= 16) {
-                                chunkZ += dz;
-                                zz -= 16 * dz;
-                            }
-
-                            long chunkKey = ((long) chunkX & 0xFFFFFFFFL) | (((long) chunkZ & 0xFFFFFFFFL) << 32);
-                            if (chunks.containsKey(chunkKey)) chunk1 = chunks.get(chunkKey);
-                            else {
+                            int index = (dcX + safetyRadius) * L + (dcZ + safetyRadius);
+                            RTPChunk chunk1 = localChunks[index];
+                            if (chunk1 == null) {
                                 try {
                                     Long key =
                                             RTP.serverAccessor
@@ -604,7 +572,7 @@ public class LocationGenerator {
                                                     .getChunkAtAsync(region.getWorld(), chunkX, chunkZ)
                                                     .get();
                                     chunk1 = region.getWorld().getCachedChunk(key);
-                                    chunks.put(chunkKey, chunk1);
+                                    localChunks[index] = chunk1;
                                     if (chunk1 != null) chunk1.keep(true);
                                 } catch (InterruptedException | ExecutionException e) {
                                     RTP.log(Level.WARNING, e.getMessage(), e);
@@ -628,7 +596,7 @@ public class LocationGenerator {
                         }
                     }
                 } finally {
-                    for (RTPChunk usedChunk : chunks.values()) {
+                    for (RTPChunk usedChunk : localChunks) {
                         if (usedChunk != null) usedChunk.keep(false);
                     }
                 }

@@ -125,6 +125,12 @@ public class RTP {
         TimeUnit.SECONDS);
 
     io.github.dailystruggle.rtp.common.tools.PerformanceTracker.start(scheduler);
+    scheduler.runTaskTimerAsynchronously(
+        () -> {
+          if (databaseAccessor != null) databaseAccessor.flushDirtyCache();
+        },
+        6000,
+        6000);
   }
 
   public static void addShape(Shape<?> shape) {
@@ -205,7 +211,10 @@ public class RTP {
       new RTPTeleportCancel(e.getKey()).run();
     }
 
-    instance.databaseAccessor.stop.set(true);
+    if (instance.databaseAccessor != null) {
+      instance.databaseAccessor.flushDirtyCache();
+      instance.databaseAccessor.stop.set(true);
+    }
 
     instance.chunkCleanupPipeline.stop();
     instance.miscAsyncTasks.stop();

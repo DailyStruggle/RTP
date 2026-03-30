@@ -92,7 +92,8 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
       lastUpdate.set(t);
     }
 
-    for (List<Integer> xz : testCoords) {
+    for (int j = 0; j < testCoords.size(); j++) {
+      List<Integer> xz = testCoords.get(j);
       int x = xz.get(0);
       int z = xz.get(1);
       int globalX = (chunk.x() << 4) + x;
@@ -219,7 +220,8 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
             Collections.shuffle(trials);
 
             // try each
-            for (int i : trials) {
+            for (int k = 0; k < trials.size(); k++) {
+              int i = trials.get(k);
               int skylight = 15;
               if (requireSkyLight) skylight = chunk.getSkyLight(x, i + 1, z);
               if (skylight > 7
@@ -239,7 +241,8 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
 
   @Override
   public boolean testPlacement(@NotNull RTPCoords coords) {
-    for (Predicate<RTPCoords> rtpLocationPredicate : verifiers) {
+    for (int i = 0; i < verifiers.size(); i++) {
+      Predicate<RTPCoords> rtpLocationPredicate = verifiers.get(i);
       if (!rtpLocationPredicate.test(coords)) return false;
     }
     return true;

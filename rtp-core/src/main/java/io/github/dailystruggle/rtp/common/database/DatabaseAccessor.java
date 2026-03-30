@@ -45,6 +45,9 @@ public abstract class DatabaseAccessor<D> {
   protected ConcurrentLinkedQueue<Map.Entry<String, Map<TableObj, TableObj>>> writeQueue =
       new ConcurrentLinkedQueue<>();
 
+  /** Thread-safe cache for dirty/unsaved rows keyed by composite key: tableName + ":" + primaryKey */
+  protected final ConcurrentHashMap<String, Map<String, Object>> dirtyCache = new ConcurrentHashMap<>();
+
   /** Default constructor for DatabaseAccessor */
   protected DatabaseAccessor() {}
 
@@ -243,6 +246,72 @@ public abstract class DatabaseAccessor<D> {
       pairs.put(tableKey, tableValue);
     }
     writeQueue.add(new AbstractMap.SimpleEntry<>(tableName, pairs));
+  }
+
+  /**
+   * Cache a row's data without writing to the database. The row is stored using a
+   * composite key of the form {@code tableName + ":" + primaryKey}.
+   *
+   * The primary key is inferred from common identifiers, in order of preference:
+   * "id", "uuid", "key", "primaryKey", "senderId", "name". If none are present,
+   * a deterministic fallback based on {@code data.hashCode()} is used.
+   *
+   * @param tableName the table name
+   * @param data the row data to cache
+   */
+  public void cacheValue(String tableName, Map<String, Object> data) {
+    if (tableName == null || tableName.isEmpty()) return;
+    if (data == null || data.isEmpty()) return;
+
+    String primaryKey = null;
+    // Preferred keys in order
+    String[] preferredKeys = new String[] {"id", "uuid", "key", "primaryKey", "senderId", "name"};
+    for (String k : preferredKeys) {
+      if (data.containsKey(k) && data.get(k) != null) {
+        primaryKey = String.valueOf(data.get(k));
+        break;
+      }
+    }
+    if (primaryKey == null) {
+      // Fallback: deterministic composite of the data map
+      primaryKey = String.valueOf(data.hashCode());
+    }
+
+    String compositeKey = tableName + ":" + primaryKey;
+    // Store/replace the cached row atomically
+    dirtyCache.put(compositeKey, new HashMap<>(data));
+  }
+
+  /**
+   * Write all cached/dirty rows to the database and clear the cache.
+   *
+   * Each entry in {@code dirtyCache} is identified by a composite key
+   * {@code tableName:primaryKey}. The table name is extracted, and
+   * {@code setValue(tableName, Map<?, ?> keyValuePairs)} is used for the write.
+   */
+  public void flushDirtyCache() {
+    if (dirtyCache.isEmpty()) return;
+
+    Iterator<Map.Entry<String, Map<String, Object>>> iterator = dirtyCache.entrySet().iterator();
+    while (iterator.hasNext()) {
+      Map.Entry<String, Map<String, Object>> entry = iterator.next();
+      String compositeKey = entry.getKey();
+      Map<String, Object> data = entry.getValue();
+
+      // Parse tableName from the composite key (tableName:primaryKey)
+      int separatorIndex = compositeKey.indexOf(':');
+      if (separatorIndex == -1) {
+        iterator.remove();
+        continue;
+      }
+      String tableName = compositeKey.substring(0, separatorIndex);
+
+      // Call the existing setValue method to perform the I/O write
+      setValue(tableName, data);
+
+      // Remove the entry to prevent memory leaks and redundant writes
+      iterator.remove();
+    }
   }
 
   /**
