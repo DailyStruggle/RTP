@@ -320,6 +320,17 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     return data.getOrDefault(key, def);
   }
 
+  public Map<String, Object> getMap(E key) {
+    Object o = getData(key);
+    if (o instanceof ConfigurationSection) {
+      return ((ConfigurationSection) o).getMapValues(false);
+    }
+    if (o instanceof Map) {
+      return (Map<String, Object>) o;
+    }
+    return new HashMap<>();
+  }
+
   /**
    * server function for saving a plugin config file from package
    *

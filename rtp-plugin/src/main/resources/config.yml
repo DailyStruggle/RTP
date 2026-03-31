@@ -19,3 +19,20 @@ playerCommands:
 
 #DO NOT TOUCH VERSION NUMBER
 version: "3.0"
+
+database:
+  # Available types: yaml, sqlite, mysql, postgresql
+  type: "sqlite"
+  # Network database credentials (ignored if type is yaml or sqlite)
+  host: "127.0.0.1"
+  port: 3306
+  name: "rtp"
+  username: "root"
+  password: "password"
+
+network:
+  redis:
+    enabled: false
+    host: "127.0.0.1"
+    port: 6379
+    password: ""

@@ -33,6 +33,7 @@ public class RegionConfigLoader {
         boolean worldBorderOverride = (boolean) regionParser.getConfigValue(RegionKeys.worldBorderOverride, false);
         boolean requirePermission = (boolean) regionParser.getConfigValue(RegionKeys.requirePermission, false);
         long cacheCap = ((Number) regionParser.getConfigValue(RegionKeys.cacheCap, 10L)).longValue();
+        int activeChunkCap = ((Number) regionParser.getConfigValue(RegionKeys.activeChunkCap, 3)).intValue();
         double price = ((Number) regionParser.getConfigValue(RegionKeys.price, 0.0)).doubleValue();
         long spatialResolution = ((Number) regionParser.getConfigValue(RegionKeys.spatialResolution, 1L)).longValue();
         String override = String.valueOf(regionParser.getConfigValue(RegionKeys.override, "default"));
@@ -59,6 +60,7 @@ public class RegionConfigLoader {
                 worldBorderOverride,
                 requirePermission,
                 cacheCap,
+                activeChunkCap,
                 price,
                 spatialResolution,
                 override,

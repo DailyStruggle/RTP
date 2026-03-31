@@ -76,11 +76,6 @@ public final class ChunkSet {
    * @param consumer the action to perform
    */
   public void whenComplete(Consumer<Boolean> consumer) {
-    if (complete.isDone()) {
-      consumer.accept(complete.getNow(false));
-      return;
-    }
-
     complete.thenAccept(consumer);
   }
 }

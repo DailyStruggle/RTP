@@ -1,4 +1,4 @@
-package io.github.dailystruggle.rtp.common.commands.update;
+package io.github.dailystruggle.rtp.common.commands.config;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -12,8 +12,8 @@ import java.util.Map;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
-public class UpdateCmd extends BaseRTPCmdImpl {
-  public UpdateCmd(@Nullable CommandsAPICommand parent) {
+public class ConfigCmd extends BaseRTPCmdImpl {
+  public ConfigCmd(@Nullable CommandsAPICommand parent) {
     super(parent);
 
     RTP.getInstance().miscAsyncTasks.add(new RTPRunnable(this::addCommands, 5));
@@ -21,12 +21,12 @@ public class UpdateCmd extends BaseRTPCmdImpl {
 
   @Override
   public String name() {
-    return "update";
+    return "config";
   }
 
   @Override
   public String permission() {
-    return "rtp.update";
+    return "rtp.config";
   }
 
   @Override
@@ -45,13 +45,13 @@ public class UpdateCmd extends BaseRTPCmdImpl {
     for (ConfigParser<?> value : configs.configParserMap.values()) {
       String name = value.name.replace(".yml", "");
       if (getCommandLookup().containsKey(name)) continue;
-      addSubCommand(new SubUpdateCmd(this, value.name, value));
+      addSubCommand(new SubConfigCmd(this, value.name, value));
     }
 
     for (Map.Entry<Class<?>, MultiConfigParser<?>> e : configs.multiConfigParserMap.entrySet()) {
       MultiConfigParser<? extends Enum<?>> value = e.getValue();
       if (getCommandLookup().containsKey(value.name)) continue;
-      addSubCommand(new SubUpdateCmd(this, value.name, value));
+      addSubCommand(new SubConfigCmd(this, value.name, value));
     }
   }
 }

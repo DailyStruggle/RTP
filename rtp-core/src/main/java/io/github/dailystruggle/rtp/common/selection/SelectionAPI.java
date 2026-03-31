@@ -164,6 +164,7 @@ public class SelectionAPI {
     boolean worldBorderOverride = (boolean) regionParams.getOrDefault(RegionKeys.worldBorderOverride.name(), baseSettings.worldBorderOverride());
     boolean requirePermission = (boolean) regionParams.getOrDefault(RegionKeys.requirePermission.name(), baseSettings.requirePermission());
     long cacheCap = ((Number) regionParams.getOrDefault(RegionKeys.cacheCap.name(), baseSettings.cacheCap())).longValue();
+    int activeChunkCap = ((Number) regionParams.getOrDefault(RegionKeys.activeChunkCap.name(), baseSettings.activeChunkCap())).intValue();
     double price = ((Number) regionParams.getOrDefault(RegionKeys.price.name(), baseSettings.price())).doubleValue();
     long spatialResolution = ((Number) regionParams.getOrDefault(RegionKeys.spatialResolution.name(), baseSettings.spatialResolution())).longValue();
     String override = String.valueOf(regionParams.getOrDefault(RegionKeys.override.name(), baseSettings.override()));
@@ -176,6 +177,7 @@ public class SelectionAPI {
             worldBorderOverride,
             requirePermission,
             cacheCap,
+            activeChunkCap,
             price,
             spatialResolution,
             override,

@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -48,6 +49,13 @@ public class RegionQueueManager {
     public void queue(UUID id) {
         perPlayerLocationQueue.putIfAbsent(id, new ConcurrentLinkedQueue<>());
         region.miscPipeline.add(new RegionCacheTask(region, id));
+    }
+
+    /**
+     * onPlayerPop - logic to run after a player is popped from the queue
+     */
+    public void onPlayerPop() {
+
     }
 
     /**

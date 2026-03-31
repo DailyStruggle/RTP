@@ -1,4 +1,4 @@
-package io.github.dailystruggle.rtp.common.commands.update.list;
+package io.github.dailystruggle.rtp.common.commands.config.list;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
@@ -45,7 +45,7 @@ public class ListCmd extends BaseRTPCmdImpl {
 
   @Override
   public String permission() {
-    return "rtp.update";
+    return "rtp.config";
   }
 
   @Override

@@ -44,9 +44,8 @@ public interface RTPCmd extends BaseRTPCmd {
 
     for (String arg : args) {
       if (!arg.contains(String.valueOf(CommandsAPI.parameterDelimiter))) {
-        CompletableFuture<Boolean> future =
-            onCommand(senderId, sender::hasPermission, sender::sendMessage, args);
-        return (future.getNow(false));
+        onCommand(senderId, sender::hasPermission, sender::sendMessage, args);
+        return true;
       }
     }
 
@@ -89,15 +88,19 @@ public interface RTPCmd extends BaseRTPCmd {
 
     if (!senderId.equals(CommandsAPI.serverId)) RTP.getInstance().processingPlayers.add(senderId);
 
-    CompletableFuture<Boolean> b = new CompletableFuture<>();
     try {
-      b = onCommand(senderId, sender::hasPermission, sender::sendMessage, args);
+      onCommand(senderId, sender::hasPermission, sender::sendMessage, args)
+          .whenComplete((aBoolean, throwable) -> {
+            if (throwable != null) {
+              RTP.log(Level.WARNING, throwable.getMessage(), throwable);
+            }
+            RTP.getInstance().processingPlayers.remove(senderId);
+          });
     } catch (Throwable throwable) {
       RTP.log(Level.WARNING, throwable.getMessage(), throwable);
-      b.complete(false);
+      RTP.getInstance().processingPlayers.remove(senderId);
     }
-    RTP.getInstance().processingPlayers.remove(senderId);
-    return b.getNow(false);
+    return true;
   }
 
   // async command component

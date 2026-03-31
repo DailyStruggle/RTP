@@ -18,8 +18,12 @@ import io.github.dailystruggle.rtp.bukkit.tools.softdepends.PAPI_expansion;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.VaultChecker;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
+import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
+import io.github.dailystruggle.rtp.common.database.options.MySQLDatabaseAccessor;
+import io.github.dailystruggle.rtp.common.database.options.PostgreSQLDatabaseAccessor;
 import io.github.dailystruggle.rtp.common.database.options.SQLiteDatabaseAccessor;
+import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
@@ -201,9 +205,63 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         onDisable();
         return;
       }
-      rtp.databaseAccessor =
-          new SQLiteDatabaseAccessor(
-              "jdbc:sqlite:" + databaseDirectory.getAbsolutePath() + File.separator + "RTP.db");
+      ConfigParser<ConfigKeys> configParser =
+          (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
+      Map<String, Object> databaseMap = configParser.getMap(ConfigKeys.database);
+
+      String type = String.valueOf(databaseMap.getOrDefault("type", "sqlite"));
+      String host = String.valueOf(databaseMap.getOrDefault("host", "127.0.0.1"));
+      int port = ((Number) databaseMap.getOrDefault("port", 3306)).intValue();
+      String name = String.valueOf(databaseMap.getOrDefault("name", "rtp"));
+      String username = String.valueOf(databaseMap.getOrDefault("username", "root"));
+      String password = String.valueOf(databaseMap.getOrDefault("password", "password"));
+
+      File dbStateFile = new File(databaseDirectory, ".db_state");
+      String previousType;
+      if (dbStateFile.exists()) {
+        try {
+          previousType = new String(java.nio.file.Files.readAllBytes(dbStateFile.toPath())).trim();
+        } catch (Exception e) {
+          previousType = type;
+        }
+      } else {
+        File teleportDataDir = new File(databaseDirectory, "teleportData");
+        String[] list = teleportDataDir.list((dir, filename) -> filename.endsWith(".yml"));
+        if (teleportDataDir.exists()
+            && teleportDataDir.isDirectory()
+            && list != null
+            && list.length > 0) {
+          previousType = "yaml";
+        } else {
+          previousType = type;
+        }
+      }
+
+      switch (type.toLowerCase()) {
+        case "yaml":
+          rtp.databaseAccessor = new YamlFileDatabase(databaseDirectory);
+          break;
+        case "mysql":
+          rtp.databaseAccessor = new MySQLDatabaseAccessor(host, port, name, username, password);
+          break;
+        case "postgresql":
+          rtp.databaseAccessor =
+              new PostgreSQLDatabaseAccessor(host, port, name, username, password);
+          break;
+        case "sqlite":
+        default:
+          rtp.databaseAccessor =
+              new SQLiteDatabaseAccessor(
+                  "jdbc:sqlite:" + databaseDirectory.getAbsolutePath() + File.separator + "RTP.db");
+          break;
+      }
+
+      RTP.handleMigration(previousType, type);
+      try {
+        java.nio.file.Files.write(dbStateFile.toPath(), type.getBytes());
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
 
       RTP.scheduler.runTaskLater(() -> RTP.getInstance().databaseAccessor.startup(), 1);
     }

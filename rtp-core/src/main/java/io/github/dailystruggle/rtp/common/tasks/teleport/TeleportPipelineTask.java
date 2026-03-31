@@ -295,7 +295,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
     RTPPlayer player = player();
     if (player == null) {
-      region.inFlightCalculations.decrementAndGet();
+      runCleanup();
       return;
     }
     UUID playerId = player.uuid();
@@ -313,29 +313,24 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
       CompletableFuture<Boolean> setLocation = player.setLocation(location);
 
-      Map<String, Object> dataMap = DatabaseAccessor.toColumns(teleportData);
-      dataMap.put("playerName", player.name());
-      Map<String, Object> saveMap = new HashMap<>();
-      if (RTP.getInstance().databaseAccessor instanceof YamlFileDatabase) {
-        saveMap.put(playerId.toString(), dataMap);
-      } else {
-        saveMap.put("UUID", playerId.toString());
-        saveMap.putAll(dataMap);
-      }
-      RTP.getInstance().databaseAccessor.cacheValue("teleportData", saveMap);
+      RTP.getInstance().databaseAccessor.cacheValue(teleportData);
       region.inFlightCalculations.decrementAndGet();
 
-      setLocation.thenAccept(
-          aBoolean -> {
-            if (aBoolean) {
+      setLocation.whenComplete(
+          (aBoolean, throwable) -> {
+            if (aBoolean != null && aBoolean) {
               RTP.serverAccessor.sendMessage(playerId, ConfigCache.teleportMessage);
             } else {
               RTP.serverAccessor.sendMessage(playerId, ConfigCache.unsafe);
             }
+
+            currentPhase = Phase.CLEANUP;
+            RTP.scheduler.runTask(this);
           });
 
       teleportPostActions.forEach(consumer -> consumer.accept(this));
-    } finally {
+    } catch (Exception e) {
+      RTP.log(Level.SEVERE, "Error in runTeleport", e);
       currentPhase = Phase.CLEANUP;
       RTP.scheduler.runTask(this);
     }
@@ -343,25 +338,17 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
   private void runCleanup() {
     cleanupPreActions.forEach(consumer -> consumer.accept(this));
-    if (isCancelled()) {
-      if (region != null) region.inFlightCalculations.decrementAndGet();
-    }
-    if (region == null || coords == null) return;
-    ChunkSet chunkSet = region.chunkManager.getChunkSet(coords);
-    if (chunkSet == null) return;
-    RTPWorld<?> rtpWorld = region.getWorld();
+    try {
+      if (region == null || coords == null) return;
+      ChunkSet chunkSet = region.chunkManager.getChunkSet(coords);
+      if (chunkSet == null) return;
+      RTPWorld<?> rtpWorld = region.getWorld();
 
-    Consumer<Boolean> cleanupAction =
-        (success) -> {
-          chunkSet.keep(false, rtpWorld);
-          region.chunkManager.removeChunks(coords);
-          cleanupPostActions.forEach(consumer -> consumer.accept(this));
-        };
-
-    if (chunkSet.complete.isDone()) {
-      cleanupAction.accept(chunkSet.complete.getNow(false));
-    } else {
-      chunkSet.complete.thenAccept(cleanupAction);
+      chunkSet.keep(false, rtpWorld);
+      region.chunkManager.removeChunks(coords);
+      cleanupPostActions.forEach(consumer -> consumer.accept(this));
+    } finally {
+      if (region != null) region.inFlightCalculations.getAndDecrement();
     }
   }
 
