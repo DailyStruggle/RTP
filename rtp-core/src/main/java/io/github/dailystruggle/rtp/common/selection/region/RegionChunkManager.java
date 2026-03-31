@@ -12,11 +12,70 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class RegionChunkManager {
-    private Region region;
-    public ConcurrentHashMap<RTPCoords, ChunkSet> locAssChunks = new ConcurrentHashMap<>();
+    private final Region region;
+    public final ConcurrentHashMap<Long, ChunkSet> locAssChunks = new ConcurrentHashMap<>();
+    final ConcurrentHashMap<Long, Integer> ticketCounts = new ConcurrentHashMap<>();
 
     public RegionChunkManager(Region region) {
         this.region = region;
+    }
+
+    long getChunkKey(int cx, int cz) {
+        return ((long) cx & 0xFFFFFFFFL) | ((long) cz << 32);
+    }
+
+    public ChunkSet getChunkSet(RTPCoords coords) {
+        return locAssChunks.get(getChunkKey(coords.x() >> 4, coords.z() >> 4));
+    }
+
+    public void putChunkSet(RTPCoords coords, ChunkSet chunkSet) {
+        locAssChunks.put(getChunkKey(coords.x() >> 4, coords.z() >> 4), chunkSet);
+    }
+
+    public void removeChunkSet(RTPCoords coords) {
+        locAssChunks.remove(getChunkKey(coords.x() >> 4, coords.z() >> 4));
+    }
+
+    public ChunkSet addTicket(int cx, int cz) {
+        long key = getChunkKey(cx, cz);
+        ticketCounts.compute(key, (k, v) -> (v == null) ? 1 : v + 1);
+        return locAssChunks.computeIfAbsent(key, k -> {
+            List<CompletableFuture<Long>> chunks = new ArrayList<>();
+            chunks.add(RTP.serverAccessor.getChunkManager().getChunkAtAsync(region.getWorld(), cx, cz));
+            ChunkSet chunkSet = new ChunkSet(chunks, new CompletableFuture<>());
+            chunkSet.keep(true, region.getWorld());
+            return chunkSet;
+        });
+    }
+
+    public ChunkSet addTicket(RTPCoords coords) {
+        return addTicket(coords.x() >> 4, coords.z() >> 4);
+    }
+
+    public void removeTicket(int cx, int cz) {
+        long key = getChunkKey(cx, cz);
+        ticketCounts.computeIfPresent(key, (k, v) -> {
+            if (v <= 1) {
+                ChunkSet chunkSet = locAssChunks.remove(key);
+                if (chunkSet != null) {
+                    chunkSet.keep(false, region.getWorld());
+                }
+                return null;
+            }
+            return v - 1;
+        });
+    }
+
+    public void removeTicket(RTPCoords coords) {
+        removeTicket(coords.x() >> 4, coords.z() >> 4);
+    }
+
+    public void runAt(int cx, int cz, Runnable runnable) {
+        RTP.scheduler.runTask(region.getWorld(), cx, cz, runnable);
+    }
+
+    public Object runAtFixedRate(int cx, int cz, Runnable runnable, long delay, long period) {
+        return RTP.scheduler.runTaskTimer(region.getWorld(), cx, cz, runnable, delay, period);
     }
 
     /**
@@ -27,18 +86,17 @@ public class RegionChunkManager {
      * @return set of chunks
      */
     public ChunkSet chunks(RTPCoords coords, long radius) {
+        int cx = coords.x() >> 4;
+        int cz = coords.z() >> 4;
+        long chunkKey = getChunkKey(cx, cz);
+
         long sz = (radius * 2 + 1) * (radius * 2 + 1);
-        if (locAssChunks.containsKey(coords)) {
-            ChunkSet chunkSet = locAssChunks.get(coords);
+        if (locAssChunks.containsKey(chunkKey)) {
+            ChunkSet chunkSet = locAssChunks.get(chunkKey);
             if (chunkSet.chunks.size() >= sz) return chunkSet;
             chunkSet.keep(false, region.getWorld());
-            locAssChunks.remove(coords);
+            locAssChunks.remove(chunkKey);
         }
-
-        int cx = coords.x();
-        int cz = coords.z();
-        cx = (cx > 0) ? cx / 16 : cx / 16 - 1;
-        cz = (cz > 0) ? cz / 16 : cz / 16 - 1;
 
         List<CompletableFuture<Long>> chunks = new ArrayList<>();
 
@@ -63,7 +121,7 @@ public class RegionChunkManager {
 
         ChunkSet chunkSet = new ChunkSet(chunks, new CompletableFuture<>());
         chunkSet.keep(true, rtpWorld);
-        locAssChunks.put(coords, chunkSet);
+        locAssChunks.put(chunkKey, chunkSet);
         return chunkSet;
     }
 
@@ -73,9 +131,13 @@ public class RegionChunkManager {
      * @param coords coordinates to remove chunks for
      */
     public void removeChunks(RTPCoords coords) {
-        if (!locAssChunks.containsKey(coords)) return;
-        ChunkSet chunkSet = locAssChunks.get(coords);
+        int cx = coords.x() >> 4;
+        int cz = coords.z() >> 4;
+        long chunkKey = getChunkKey(cx, cz);
+
+        if (!locAssChunks.containsKey(chunkKey)) return;
+        ChunkSet chunkSet = locAssChunks.get(chunkKey);
         chunkSet.keep(false, region.getWorld());
-        locAssChunks.remove(coords);
+        locAssChunks.remove(chunkKey);
     }
 }

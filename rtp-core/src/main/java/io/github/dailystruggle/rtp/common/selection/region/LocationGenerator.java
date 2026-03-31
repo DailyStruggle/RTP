@@ -83,8 +83,8 @@ public class LocationGenerator {
                 boolean pass = true;
 
                 RTPWorld<?> world = region.getWorld();
-                int cx = (left.x() > 0) ? left.x() / 16 : left.x() / 16 - 1;
-                int cz = (left.z() > 0) ? left.z() / 16 : left.z() / 16 - 1;
+                int cx = left.x() >> 4;
+                int cz = left.z() >> 4;
                 CompletableFuture<Long> chunkAt =
                         RTP.serverAccessor.getChunkManager().getChunkAtAsync(world, cx, cz);
                 RTPChunk chunk;
@@ -207,7 +207,7 @@ public class LocationGenerator {
 
                     if (!pass) continue;
                     if (!GlobalRegionVerifiers.checkGlobalRegionVerifiers(left)) continue;
-                    chunkSet = region.chunkManager.locAssChunks.get(left);
+                    chunkSet = region.chunkManager.getChunkSet(left);
                     success = true;
                     return new GenerationResult(left, pair.getValue(), chunkSet);
                 } finally {
@@ -223,7 +223,7 @@ public class LocationGenerator {
             if (left == null) continue;
             boolean pass = GlobalRegionVerifiers.checkGlobalRegionVerifiers(left);
             if (pass) {
-                chunkSet = region.chunkManager.locAssChunks.get(left);
+                chunkSet = region.chunkManager.getChunkSet(left);
                 return new GenerationResult(left, pair.getValue(), chunkSet);
             }
         }
@@ -409,7 +409,10 @@ public class LocationGenerator {
             } else {
                 select = shape.select();
             }
-            cursor.setXZ(select[0], select[1]);
+
+            int blockX = (select[0] << 4) + 8;
+            int blockZ = (select[1] << 4) + 8;
+            cursor.setXZ(blockX, blockZ);
             if (verbose) {
                 //                if( shape instanceof MemoryShape ) selections.add( new
                 // AbstractMap.SimpleEntry<>( (long ) selections.size(), l) );
@@ -419,7 +422,7 @@ public class LocationGenerator {
             }
 
             String currBiome =
-                    world.getBiome(select[0] * 16 + 7, (vert.minY() + vert.maxY()) / 2, select[1] * 16 + 7);
+                    world.getBiome(blockX, (vert.minY() + vert.maxY()) / 2, blockZ);
 
             for (;
                  biomeChecks < maxBiomeChecks && !biomeNames.contains(currBiome);
@@ -427,7 +430,7 @@ public class LocationGenerator {
                 if (shape instanceof MemoryShape) {
                     MemoryShape<?> memoryShape = (MemoryShape<?>) shape;
                     if (defaultBiomes && biomeRecall) {
-                        memoryShape.addBadLocation(l);
+                        memoryShape.addBadLocation(l, 1L);
                     }
                     if (biomeRecall && !defaultBiomes) {
                         List<Map.Entry<Long, Long>> biomes = new ArrayList<>();
@@ -461,7 +464,10 @@ public class LocationGenerator {
                 } else {
                     select = shape.select();
                 }
-                cursor.setXZ(select[0], select[1]);
+
+                blockX = (select[0] << 4) + 8;
+                blockZ = (select[1] << 4) + 8;
+                cursor.setXZ(blockX, blockZ);
 
                 if (verbose) {
                     //                if( shape instanceof MemoryShape ) selections.add( new
@@ -483,7 +489,7 @@ public class LocationGenerator {
                                     });
                 }
                 currBiome =
-                        world.getBiome(select[0] * 16 + 7, (vert.minY() + vert.maxY()) / 2, select[1] * 16 + 7);
+                        world.getBiome(blockX, (vert.minY() + vert.maxY()) / 2, blockZ);
             }
             if (biomeChecks >= maxBiomeChecks) break;
 
@@ -492,7 +498,7 @@ public class LocationGenerator {
                     .isInside()
                     .apply(
                             new RTPLocation(
-                                    world, cursor.x * 16, (vert.maxY() + vert.minY()) / 2, cursor.z * 16))) {
+                                    world, blockX, (vert.maxY() + vert.minY()) / 2, blockZ))) {
                 if (verbose) {
                     new IllegalStateException(
                             "worldborder check failed. region/selection is likely outside the worldborder")
@@ -531,7 +537,7 @@ public class LocationGenerator {
                 RTPCoords res = vert.adjust(chunk);
                 if (res == null) {
                     if (defaultBiomes && shape instanceof MemoryShape && biomeRecall) {
-                        ((MemoryShape<?>) shape).addBadLocation(l);
+                        ((MemoryShape<?>) shape).addBadLocation(l, 1L);
                     }
                     if (verbose) {
                         failMap
@@ -550,7 +556,7 @@ public class LocationGenerator {
                     biomeChecks++;
                     maxAttempts++;
                     if (defaultBiomes && shape instanceof MemoryShape && biomeRecall) {
-                        ((MemoryShape<?>) shape).addBadLocation(l);
+                        ((MemoryShape<?>) shape).addBadLocation(l, 1L);
                     }
 
                     if (verbose) {
@@ -636,7 +642,7 @@ public class LocationGenerator {
                                         "location=" + "(" + finalX + "," + finalY + "," + finalZ,
                                         (s, aLong) -> (aLong == null) ? 1L : ++aLong);
                     if (shape instanceof MemoryShape) {
-                        ((MemoryShape<?>) shape).addBadLocation(l);
+                        ((MemoryShape<?>) shape).addBadLocation(l, 1L);
                     }
                     continue;
                 }
@@ -710,6 +716,7 @@ public class LocationGenerator {
 
         if (!locationFound) return new GenerationResult(null, i, null);
         cursor.setXZ(finalX, finalZ);
+        cursor.setY(finalY);
         RTPCoords resCoords = cursor.toImmutable();
 
         long viewDistanceRadius = performance.getNumber(PerformanceKeys.viewDistanceSelect, 0L).longValue();

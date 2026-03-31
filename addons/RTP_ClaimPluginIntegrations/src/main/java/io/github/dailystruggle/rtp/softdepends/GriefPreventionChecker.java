@@ -32,14 +32,8 @@ public class GriefPreventionChecker {
     if (!exists) return false;
     try {
       if (getGriefPrevention() == null) return false;
-      int chunkX =
-          (location.getBlockX() >= 0 || (location.getBlockX() % 16 == 0))
-              ? (location.getBlockX() / 16)
-              : (location.getBlockX() / 16) - 1;
-      int chunkZ =
-          (location.getBlockZ() >= 0 || (location.getBlockZ() % 16 == 0))
-              ? (location.getBlockZ() / 16)
-              : (location.getBlockZ() / 16) - 1;
+      int chunkX = location.getBlockX() >> 4;
+      int chunkZ = location.getBlockZ() >> 4;
       Collection<Claim> claims = GriefPrevention.instance.dataStore.getClaims(chunkX, chunkZ);
       return !claims.isEmpty();
     } catch (Throwable t) {

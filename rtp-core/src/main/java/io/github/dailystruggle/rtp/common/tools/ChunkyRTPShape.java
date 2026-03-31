@@ -48,7 +48,7 @@ public class ChunkyRTPShape extends Rectangle {
 
     int i = 0;
     while (!shape.isBounding(xz[0], xz[1])) {
-      addBadLocation(res);
+      addBadLocation(res, 1L);
       res = super.rand();
       xz = locationToXZ(res);
       i++;

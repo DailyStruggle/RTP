@@ -257,7 +257,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
       return;
     }
 
-    ChunkSet chunkSet = this.region.chunkManager.locAssChunks.get(coords);
+    ChunkSet chunkSet = this.region.chunkManager.getChunkSet(coords);
     if (chunkSet == null) {
       currentPhase = Phase.TELEPORT;
       RTP.scheduler.runTask(this);
@@ -347,7 +347,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
       if (region != null) region.inFlightCalculations.decrementAndGet();
     }
     if (region == null || coords == null) return;
-    ChunkSet chunkSet = region.chunkManager.locAssChunks.get(coords);
+    ChunkSet chunkSet = region.chunkManager.getChunkSet(coords);
     if (chunkSet == null) return;
     RTPWorld<?> rtpWorld = region.getWorld();
 

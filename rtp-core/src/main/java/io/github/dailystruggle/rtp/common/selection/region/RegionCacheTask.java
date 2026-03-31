@@ -41,7 +41,7 @@ public class RegionCacheTask extends RTPRunnable {
             final ChunkSet chunkSet;
             if (res.verifiedChunks() != null) {
                 chunkSet = res.verifiedChunks();
-                region.chunkManager.locAssChunks.put(coords, chunkSet);
+                region.chunkManager.putChunkSet(coords, chunkSet);
             } else {
                 chunkSet = region.chunkManager.chunks(coords, this.selectRadius);
             }
@@ -61,7 +61,7 @@ public class RegionCacheTask extends RTPRunnable {
                             }
                         } else {
                             chunkSet.keep(false, region.getWorld());
-                            region.chunkManager.locAssChunks.remove(coords);
+                            region.chunkManager.removeChunkSet(coords);
                         }
                         region.inFlightCalculations.decrementAndGet();
                     });

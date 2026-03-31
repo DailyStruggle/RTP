@@ -34,13 +34,13 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   protected final java.util.concurrent.locks.ReentrantLock writeLock = new ReentrantLock();
 
   protected final java.util.concurrent.atomic.AtomicReference<
-          java.util.concurrent.ConcurrentHashMap<Long, Boolean>>
+          java.util.concurrent.ConcurrentHashMap<Long, Long>>
       pendingBadLocations =
           new java.util.concurrent.atomic.AtomicReference<>(
               new java.util.concurrent.ConcurrentHashMap<>());
   protected final java.util.concurrent.atomic.AtomicReference<
           java.util.concurrent.ConcurrentHashMap<
-              String, java.util.concurrent.ConcurrentHashMap<Long, Boolean>>>
+              String, java.util.concurrent.ConcurrentHashMap<Long, Long>>>
       pendingBiomeLocations =
           new java.util.concurrent.atomic.AtomicReference<>(
               new java.util.concurrent.ConcurrentHashMap<>());
@@ -259,9 +259,8 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     }
   }
 
-  public void addBadLocation(Long location) {
-    pendingBadLocations.get().put(location, true);
-    badLocationSum.incrementAndGet();
+  public void addBadLocation(long location, long width) {
+    pendingBadLocations.get().put(location, width);
     badLocationsDirty = true;
   }
 
@@ -269,7 +268,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     pendingBiomeLocations
         .get()
         .computeIfAbsent(biome, b -> new ConcurrentHashMap<>())
-        .put(location, true);
+        .put(location, 1L);
     biomeLocationsDirty = true;
   }
 
@@ -311,9 +310,9 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     if (!badLocationsDirty && !biomeLocationsDirty) return;
     if (isRebuilding.compareAndSet(false, true)) {
       try {
-        ConcurrentHashMap<Long, Boolean> localPendingBad =
+        ConcurrentHashMap<Long, Long> localPendingBad =
             pendingBadLocations.getAndSet(new ConcurrentHashMap<>());
-        ConcurrentHashMap<String, ConcurrentHashMap<Long, Boolean>> localPendingBiome =
+        ConcurrentHashMap<String, ConcurrentHashMap<Long, Long>> localPendingBiome =
             pendingBiomeLocations.getAndSet(new ConcurrentHashMap<>());
         ConcurrentHashMap<String, ConcurrentHashMap<Long, Boolean>> localPendingBiomeRemovals =
             pendingBiomeRemovals.getAndSet(new ConcurrentHashMap<>());
@@ -329,48 +328,87 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         long[] currentBadSums = badPrefixSumsCache;
 
         // 5. Merge values from capturedBad into local data with RLE compression
-        TreeMap<Long, Long> badMap = new TreeMap<>();
-        for (int i = 0; i < currentBadKeys.length; i++) {
-          long prevSum = (i > 0) ? currentBadSums[i - 1] : 0L;
-          badMap.put(currentBadKeys[i], currentBadSums[i] - prevSum);
+        long[] pendingKeys = new long[localPendingBad.size()];
+        int pIdx = 0;
+        for (Long loc : localPendingBad.keySet()) {
+            pendingKeys[pIdx++] = loc;
+        }
+        Arrays.sort(pendingKeys);
+
+        long[] mergedKeys = new long[currentBadKeys.length + pendingKeys.length];
+        long[] mergedLengths = new long[currentBadKeys.length + pendingKeys.length];
+        int mergeIndex = 0;
+
+        int i = 0; // currentBadKeys index
+        int j = 0; // pendingKeys index
+
+        long currentStart = -1;
+        long currentLength = -1;
+
+        while (i < currentBadKeys.length || j < pendingKeys.length) {
+          long nextKey;
+          long nextLength;
+
+          if (i < currentBadKeys.length && j < pendingKeys.length) {
+            if (currentBadKeys[i] <= pendingKeys[j]) {
+              nextKey = currentBadKeys[i];
+              long prevSum = (i > 0) ? currentBadSums[i - 1] : 0L;
+              nextLength = currentBadSums[i] - prevSum;
+              i++;
+            } else {
+              nextKey = pendingKeys[j];
+              nextLength = localPendingBad.get(nextKey);
+              j++;
+            }
+          } else if (i < currentBadKeys.length) {
+            nextKey = currentBadKeys[i];
+            long prevSum = (i > 0) ? currentBadSums[i - 1] : 0L;
+            nextLength = currentBadSums[i] - prevSum;
+            i++;
+          } else {
+            nextKey = pendingKeys[j];
+            nextLength = localPendingBad.get(nextKey);
+            j++;
+          }
+
+          if (nextKey < 0) continue;
+
+          if (currentStart == -1) {
+            currentStart = nextKey;
+            currentLength = nextLength;
+          } else {
+            if (nextKey <= currentStart + currentLength) {
+              currentLength = Math.max(currentLength, nextKey + nextLength - currentStart);
+            } else {
+              mergedKeys[mergeIndex] = currentStart;
+              mergedLengths[mergeIndex] = currentLength;
+              mergeIndex++;
+              currentStart = nextKey;
+              currentLength = nextLength;
+            }
+          }
         }
 
-        for (Long loc : localPendingBad.keySet()) {
-          if (loc < 0) continue;
-          Map.Entry<Long, Long> floor = badMap.floorEntry(loc);
-          if (floor != null && loc < floor.getKey() + floor.getValue()) continue;
-
-          Map.Entry<Long, Long> ceiling = badMap.ceilingEntry(loc);
-          if (floor != null && loc == floor.getKey() + floor.getValue()) {
-            badMap.put(floor.getKey(), floor.getValue() + 1);
-            floor = badMap.floorEntry(loc); // update floor after merge
-          } else {
-            badMap.put(loc, 1L);
-            floor = badMap.floorEntry(loc);
-          }
-
-          if (ceiling != null && floor.getKey() + floor.getValue() >= ceiling.getKey()) {
-            badMap.put(floor.getKey(), floor.getValue() + ceiling.getValue());
-            badMap.remove(ceiling.getKey());
-          }
+        if (currentStart != -1) {
+            mergedKeys[mergeIndex] = currentStart;
+            mergedLengths[mergeIndex] = currentLength;
+            mergeIndex++;
         }
 
         // Build newKeys and newSums local arrays
-        int newSize = badMap.size();
-        long[] newKeys = new long[newSize];
-        long[] newSums = new long[newSize];
+        long[] newKeys = new long[mergeIndex];
+        long[] newSums = new long[mergeIndex];
         long runningSum = 0;
-        int idx = 0;
-        for (Map.Entry<Long, Long> entry : badMap.entrySet()) {
-          newKeys[idx] = entry.getKey();
-          runningSum += entry.getValue();
-          newSums[idx] = runningSum;
-          idx++;
+        for (int k = 0; k < mergeIndex; k++) {
+          newKeys[k] = mergedKeys[k];
+          runningSum += mergedLengths[k];
+          newSums[k] = runningSum;
         }
 
         // 7. Perform bottom-up swap
         this.badKeysCache = newKeys;
         this.badPrefixSumsCache = newSums;
+        this.badLocationSum.set(newSums.length > 0 ? newSums[newSums.length - 1] : 0L);
         this.badLocationsDirty = false;
 
         // Biome logic (similar to bad locations but per biome)
@@ -385,62 +423,139 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
           affectedBiomes.addAll(localPendingBiomeRemovals.keySet());
 
           for (String biome : affectedBiomes) {
-            TreeMap<Long, Long> bMap = new TreeMap<>();
-            long[] bKeys = biomeKeysCache.get(biome);
-            long[] bSums = biomePrefixSumsCache.get(biome);
-            if (bKeys != null && bSums != null) {
-              for (int i = 0; i < bKeys.length; i++) {
-                long prevSum = (i > 0) ? bSums[i - 1] : 0L;
-                bMap.put(bKeys[i], bSums[i] - prevSum);
-              }
+            long[] currentBiomeKeys = biomeKeysCache.getOrDefault(biome, new long[0]);
+            long[] currentBiomePrefixSums = biomePrefixSumsCache.getOrDefault(biome, new long[0]);
+
+            ConcurrentHashMap<Long, Long> additions = localPendingBiome.getOrDefault(biome, new ConcurrentHashMap<>());
+            ConcurrentHashMap<Long, Boolean> removals = localPendingBiomeRemovals.getOrDefault(biome, new ConcurrentHashMap<>());
+
+            long[] pendingBiomeKeys = new long[additions.size()];
+            long[] pendingBiomeLengths = new long[additions.size()];
+            int pbIdx = 0;
+            for (Map.Entry<Long, Long> entry : additions.entrySet()) {
+              pendingBiomeKeys[pbIdx] = entry.getKey();
+              pendingBiomeLengths[pbIdx] = entry.getValue();
+              pbIdx++;
             }
 
-            // Additions
-            ConcurrentHashMap<Long, Boolean> additions = localPendingBiome.get(biome);
-            if (additions != null) {
-              for (Long loc : additions.keySet()) {
-                Map.Entry<Long, Long> floor = bMap.floorEntry(loc);
-                if (floor != null && loc < floor.getKey() + floor.getValue()) continue;
-                Map.Entry<Long, Long> ceiling = bMap.ceilingEntry(loc);
-                if (floor != null && loc == floor.getKey() + floor.getValue()) {
-                  bMap.put(floor.getKey(), floor.getValue() + 1);
-                  floor = bMap.floorEntry(loc);
+            // Sort keys while maintaining length mappings
+            // Using a simple sort for keys and then reordering lengths based on sorted keys
+            // Since we need to sort parallel arrays, we can use an index array or just sort pairs.
+            // For simplicity and to follow "primitive linear merge", let's use a quick sort for parallel arrays.
+            sortParallelArrays(pendingBiomeKeys, pendingBiomeLengths, 0, pendingBiomeKeys.length - 1);
+
+            long[] mKeys = new long[currentBiomeKeys.length + pendingBiomeKeys.length];
+            long[] mLengths = new long[currentBiomeKeys.length + pendingBiomeKeys.length];
+            int mIdx = 0;
+
+            int bi = 0;
+            int bj = 0;
+            long cStart = -1;
+            long cLength = -1;
+
+            while (bi < currentBiomeKeys.length || bj < pendingBiomeKeys.length) {
+              long nKey;
+              long nLength;
+
+              if (bi < currentBiomeKeys.length && bj < pendingBiomeKeys.length) {
+                if (currentBiomeKeys[bi] <= pendingBiomeKeys[bj]) {
+                  nKey = currentBiomeKeys[bi];
+                  long prevSum = (bi > 0) ? currentBiomePrefixSums[bi - 1] : 0L;
+                  nLength = currentBiomePrefixSums[bi] - prevSum;
+                  bi++;
                 } else {
-                  bMap.put(loc, 1L);
-                  floor = bMap.floorEntry(loc);
+                  nKey = pendingBiomeKeys[bj];
+                  nLength = pendingBiomeLengths[bj];
+                  bj++;
                 }
-                if (ceiling != null && floor.getKey() + floor.getValue() >= ceiling.getKey()) {
-                  bMap.put(floor.getKey(), floor.getValue() + ceiling.getValue());
-                  bMap.remove(ceiling.getKey());
+              } else if (bi < currentBiomeKeys.length) {
+                nKey = currentBiomeKeys[bi];
+                long prevSum = (bi > 0) ? currentBiomePrefixSums[bi - 1] : 0L;
+                nLength = currentBiomePrefixSums[bi] - prevSum;
+                bi++;
+              } else {
+                nKey = pendingBiomeKeys[bj];
+                nLength = pendingBiomeLengths[bj];
+                bj++;
+              }
+
+              if (nKey < 0) continue;
+
+              if (cStart == -1) {
+                cStart = nKey;
+                cLength = nLength;
+              } else {
+                if (nKey <= cStart + cLength) {
+                  cLength = Math.max(cLength, nKey + nLength - cStart);
+                } else {
+                  mKeys[mIdx] = cStart;
+                  mLengths[mIdx] = cLength;
+                  mIdx++;
+                  cStart = nKey;
+                  cLength = nLength;
                 }
               }
             }
-
-            // Removals
-            ConcurrentHashMap<Long, Boolean> removals = localPendingBiomeRemovals.get(biome);
-            if (removals != null) {
-              for (Long loc : removals.keySet()) {
-                Map.Entry<Long, Long> floor = bMap.floorEntry(loc);
-                if (floor != null && loc < floor.getKey() + floor.getValue()) {
-                  long key = floor.getKey();
-                  long val = floor.getValue();
-                  bMap.remove(key);
-                  if (loc > key) bMap.put(key, loc - key);
-                  if (loc + 1 < key + val) bMap.put(loc + 1, (key + val) - (loc + 1));
-                }
-              }
+            if (cStart != -1) {
+              mKeys[mIdx] = cStart;
+              mLengths[mIdx] = cLength;
+              mIdx++;
             }
 
-            int bSize = bMap.size();
-            long[] nbKeys = new long[bSize];
-            long[] nbSums = new long[bSize];
+            // Handle removals
+            if (!removals.isEmpty()) {
+              long[] sortedRemovals = new long[removals.size()];
+              int rIdx = 0;
+              for (Long rLoc : removals.keySet()) {
+                sortedRemovals[rIdx++] = rLoc;
+              }
+              Arrays.sort(sortedRemovals);
+
+              long[] postRemovalKeys = new long[mIdx + sortedRemovals.length]; 
+              long[] postRemovalLengths = new long[mIdx + sortedRemovals.length];
+              int prIdx = 0;
+
+              int currentSpanIdx = 0;
+              int currentRemIdx = 0;
+
+              while (currentSpanIdx < mIdx) {
+                long spanStart = mKeys[currentSpanIdx];
+                long spanEnd = spanStart + mLengths[currentSpanIdx];
+
+                long lastStart = spanStart;
+                while (currentRemIdx < sortedRemovals.length && sortedRemovals[currentRemIdx] < spanEnd) {
+                  long rLoc = sortedRemovals[currentRemIdx];
+                  if (rLoc >= lastStart) {
+                    if (rLoc > lastStart) {
+                      postRemovalKeys[prIdx] = lastStart;
+                      postRemovalLengths[prIdx] = rLoc - lastStart;
+                      prIdx++;
+                    }
+                    lastStart = rLoc + 1;
+                  }
+                  currentRemIdx++;
+                }
+
+                if (lastStart < spanEnd) {
+                  postRemovalKeys[prIdx] = lastStart;
+                  postRemovalLengths[prIdx] = spanEnd - lastStart;
+                  prIdx++;
+                }
+                currentSpanIdx++;
+              }
+
+              mKeys = postRemovalKeys;
+              mIdx = prIdx;
+              mLengths = postRemovalLengths;
+            }
+
+            long[] nbKeys = new long[mIdx];
+            long[] nbSums = new long[mIdx];
             long bRunningSum = 0;
-            int bIdx = 0;
-            for (Map.Entry<Long, Long> entry : bMap.entrySet()) {
-              nbKeys[bIdx] = entry.getKey();
-              bRunningSum += entry.getValue();
-              nbSums[bIdx] = bRunningSum;
-              bIdx++;
+            for (int k = 0; k < mIdx; k++) {
+              nbKeys[k] = mKeys[k];
+              bRunningSum += mLengths[k];
+              nbSums[k] = bRunningSum;
             }
             newBiomeKeysCache.put(biome, nbKeys);
             newBiomePrefixSumsCache.put(biome, nbSums);
@@ -461,6 +576,29 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @return the random location value
    */
   public abstract long rand();
+
+  private void sortParallelArrays(long[] keys, long[] lengths, int left, int right) {
+    if (left >= right) return;
+    int pivotIdx = left + (right - left) / 2;
+    long pivot = keys[pivotIdx];
+    int i = left, j = right;
+    while (i <= j) {
+      while (keys[i] < pivot) i++;
+      while (keys[j] > pivot) j--;
+      if (i <= j) {
+        long tempKey = keys[i];
+        keys[i] = keys[j];
+        keys[j] = tempKey;
+        long tempLen = lengths[i];
+        lengths[i] = lengths[j];
+        lengths[j] = tempLen;
+        i++;
+        j--;
+      }
+    }
+    if (left < j) sortParallelArrays(keys, lengths, left, j);
+    if (i < right) sortParallelArrays(keys, lengths, i, right);
+  }
 
   @Override
   public MemoryShape<E> clone() {

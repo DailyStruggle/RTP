@@ -237,7 +237,7 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
       u = Boolean.parseBoolean(String.valueOf(unique));
       data.put(GenericMemoryShapeParams.uniquePlacements, u);
     }
-    if (u) addBadLocation(location);
+    if (u) addBadLocation(location, 1L);
 
     return location;
   }
