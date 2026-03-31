@@ -422,7 +422,7 @@ public class FillTask extends RTPRunnable {
               if (pass) pass = GlobalRegionVerifiers.checkGlobalRegionVerifiers(localCursor);
 
               if (pass) {
-                if (biomeRecall) shape.addBiomeLocation(pos, currBiome1);
+                if (biomeRecall) shape.addBiomeLocation(pos, region.getSettings().spatialResolution(), currBiome1);
                 res.complete(true);
               } else {
                 shape.addBadLocation(pos, region.getSettings().spatialResolution());

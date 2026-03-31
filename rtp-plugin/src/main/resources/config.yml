@@ -21,9 +21,9 @@ playerCommands:
 version: "3.0"
 
 database:
-  # Available types: yaml, sqlite, mysql, postgresql
+  # Available types: yaml, sqlite, h2, mysql, postgresql
   type: "sqlite"
-  # Network database credentials (ignored if type is yaml or sqlite)
+  # Network database credentials (ignored if type is yaml, sqlite or h2)
   host: "127.0.0.1"
   port: 3306
   name: "rtp"

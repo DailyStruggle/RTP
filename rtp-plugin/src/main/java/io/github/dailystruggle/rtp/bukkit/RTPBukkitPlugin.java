@@ -20,6 +20,7 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
+import io.github.dailystruggle.rtp.common.database.options.H2DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.database.options.MySQLDatabaseAccessor;
 import io.github.dailystruggle.rtp.common.database.options.PostgreSQLDatabaseAccessor;
 import io.github.dailystruggle.rtp.common.database.options.SQLiteDatabaseAccessor;
@@ -240,6 +241,9 @@ public final class RTPBukkitPlugin extends JavaPlugin {
       switch (type.toLowerCase()) {
         case "yaml":
           rtp.databaseAccessor = new YamlFileDatabase(databaseDirectory);
+          break;
+        case "h2":
+          rtp.databaseAccessor = new H2DatabaseAccessor();
           break;
         case "mysql":
           rtp.databaseAccessor = new MySQLDatabaseAccessor(host, port, name, username, password);

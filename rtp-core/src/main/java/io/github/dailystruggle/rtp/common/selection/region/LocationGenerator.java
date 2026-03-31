@@ -114,13 +114,11 @@ public class LocationGenerator {
                         ConfigParser<SafetyKeys> safety =
                                 (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
                         Object value = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
-                        if (value instanceof Collection) {
-                            Collection<?> collection = (Collection<?>) value;
-                            if (((Collection<?>) value).isEmpty()) unsafeBlocks.clear();
-                            else if (((Collection<?>) value).size() == unsafeBlocks.size()) {
-                                if (value instanceof List<?>) {
-                                    List<?> list = (List<?>) value;
-                                    if (list.get(0) instanceof String) {
+                        if (value instanceof Collection<?> collection) {
+                            if (collection.isEmpty()) unsafeBlocks.clear();
+                            else if (collection.size() == unsafeBlocks.size()) {
+                                if (value instanceof List<?> list) {
+                                    if (list.get(0) instanceof String firstElement) {
                                         List<String> stringList = (List<String>) list;
                                         boolean same = true;
                                         for (int j = 0; j < stringList.size(); j++) {
@@ -163,12 +161,12 @@ public class LocationGenerator {
                     chunk.keep(true);
                 try {
                     safetyCheck:
-                    for (int x = left.x() - safe; x < left.x() + safe; x++) {
+                    for (int x = left.x() - safe; x <= left.x() + safe; x++) {
                         int chunkX = x >> 4;
                         int xx = x & 15;
                         int dcX = chunkX - centerChunkX;
 
-                        for (int z = left.z() - safe; z < left.z() + safe; z++) {
+                        for (int z = left.z() - safe; z <= left.z() + safe; z++) {
                             int chunkZ = z >> 4;
                             int zz = z & 15;
                             int dcZ = chunkZ - centerChunkZ;
@@ -196,7 +194,7 @@ public class LocationGenerator {
                                 break safetyCheck;
                             }
 
-                            for (int y = left.y() - safe; y < left.y() + safe; y++) {
+                            for (int y = left.y() - safe; y <= left.y() + safe; y++) {
                                 if (y > world.getMaxHeight() || y < world.getMinHeight()) continue;
                                 if (!chunk1.isSafe(xx, y, zz, unsafeBlocks)) {
                                     pass = false;
@@ -298,12 +296,12 @@ public class LocationGenerator {
         if (biomeNames == null || biomeNames.isEmpty()) {
             defaultBiomes = true;
             o = safety.getConfigValue(SafetyKeys.biomeWhitelist, false);
-            boolean whitelist = (o instanceof Boolean) ? (Boolean) o : Boolean.parseBoolean(o.toString());
+            boolean whitelist = (o instanceof Boolean b) ? b : Boolean.parseBoolean(o.toString());
 
             o = safety.getConfigValue(SafetyKeys.biomes, null);
             List<String> biomeList =
-                    (o instanceof List)
-                            ? ((List<?>) o).stream().map(Object::toString).collect(Collectors.toList())
+                    (o instanceof List<?> list)
+                            ? list.stream().map(Object::toString).toList()
                             : null;
             Set<String> biomeSet =
                     (biomeList == null)
@@ -326,8 +324,8 @@ public class LocationGenerator {
         boolean verbose = false;
         if (logging != null) {
             o = logging.getConfigValue(LoggingKeys.selection_failure, false);
-            if (o instanceof Boolean) {
-                verbose = (Boolean) o;
+            if (o instanceof Boolean b) {
+                verbose = b;
             } else {
                 verbose = Boolean.parseBoolean(o.toString());
             }
@@ -347,8 +345,8 @@ public class LocationGenerator {
 
         o = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
         Set<String> unsafeBlocks =
-                (o instanceof Collection)
-                        ? ((Collection<?>) o)
+                (o instanceof Collection<?> collection)
+                        ? collection
                         .stream().map(o1 -> o1.toString().toUpperCase()).collect(Collectors.toSet())
                         : new HashSet<>();
 
@@ -383,8 +381,7 @@ public class LocationGenerator {
         for (; i <= maxAttempts; i++) {
             long l = -1;
             int[] select;
-            if (shape instanceof MemoryShape) {
-                MemoryShape<?> memoryShape = (MemoryShape<?>) shape;
+            if (shape instanceof MemoryShape<?> memoryShape) {
                 if (biomeRecall && !defaultBiomes) {
                     List<Map.Entry<Long, Long>> biomes = new ArrayList<>();
                     for (String biomeName : biomeNames) {
@@ -436,8 +433,7 @@ public class LocationGenerator {
             for (;
                  biomeChecks < maxBiomeChecks && !biomeNames.contains(currBiome);
                  biomeChecks++, maxAttempts++, i++) {
-                if (shape instanceof MemoryShape) {
-                    MemoryShape<?> memoryShape = (MemoryShape<?>) shape;
+                if (shape instanceof MemoryShape<?> memoryShape) {
                     if (defaultBiomes && biomeRecall) {
                         memoryShape.addBadLocation(l, resolution);
                     }
@@ -664,7 +660,7 @@ public class LocationGenerator {
                 }
 
                 if (shape instanceof MemoryShape && l > 0) {
-                    ((MemoryShape<?>) shape).addBiomeLocation(l, currBiome);
+                    ((MemoryShape<?>) shape).addBiomeLocation(l, resolution, currBiome);
                 }
                 locationFound = true;
                 break;

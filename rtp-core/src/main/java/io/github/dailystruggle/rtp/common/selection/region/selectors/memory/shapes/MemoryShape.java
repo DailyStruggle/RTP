@@ -3,6 +3,10 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
+import jdk.incubator.vector.LongVector;
+import jdk.incubator.vector.VectorOperators;
+import jdk.incubator.vector.VectorSpecies;
+import jdk.incubator.vector.VectorShuffle;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -16,6 +20,7 @@ import java.util.logging.Level;
  * @param <E> enum for configuration values
  */
 public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
+  private static final VectorSpecies<Long> SPECIES = LongVector.SPECIES_PREFERRED;
   public AtomicLong fillIter = new AtomicLong(0L);
 
   protected volatile long[] badKeysCache = new long[0];
@@ -132,14 +137,59 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @return true if known bad, false otherwise
    */
   public boolean isKnownBad(long location) {
+    if (spatialResolution > 1) {
+      MutableRTPCoords coords = new MutableRTPCoords(0, 0);
+      locationToXZ(location, coords);
+      if ((spatialResolution & (spatialResolution - 1)) == 0) {
+        int shift = Long.numberOfTrailingZeros(spatialResolution);
+        coords.x >>= shift;
+        coords.z >>= shift;
+      } else {
+        coords.x /= (int) spatialResolution;
+        coords.z /= (int) spatialResolution;
+      }
+      location = xzToLocation(coords);
+    }
     if (pendingBadLocations.get().containsKey(location)) return true;
     long[] sums = badPrefixSumsCache;
     long[] keys = badKeysCache;
-    int idx = Arrays.binarySearch(keys, location);
-    if (idx >= 0) return true;
-    int floorIdx = -(idx + 1) - 1;
+    if (keys.length == 0) return false;
+
+    int floorIdx = -1;
+    int k = 0;
+    int bound = SPECIES.loopBound(keys.length);
+    if (bound > 0) {
+      LongVector vLocation = LongVector.broadcast(SPECIES, location);
+      for (; k < bound; k += SPECIES.length()) {
+        LongVector vKeys = LongVector.fromArray(SPECIES, keys, k);
+        var mask = vKeys.compare(VectorOperators.LE, vLocation);
+        if (mask.anyTrue()) {
+          // Update floorIdx to the highest index in this vector where key <= location
+          // mask.lastTrue() gives the relative index in the vector
+          floorIdx = k + mask.lastTrue();
+        } else {
+          // Since keys are sorted, if no key in this batch is <= location, 
+          // all subsequent keys will also be > location.
+          break;
+        }
+      }
+    }
+
+    // Process remaining elements if not already found in vectorized part or if there are leftovers
+    // or if we need to search further in the remaining scalar part.
+    // Actually, if floorIdx was found in vector part, and the next vector failed, 
+    // we don't need to check leftovers unless k < keys.length.
+    for (; k < keys.length; k++) {
+      if (keys[k] <= location) {
+        floorIdx = k;
+      } else {
+        break;
+      }
+    }
+
     if (floorIdx >= 0 && floorIdx < sums.length) {
       long key = keys[floorIdx];
+      if (key == location) return true;
       long sum = sums[floorIdx];
       long prevSum = (floorIdx > 0) ? sums[floorIdx - 1] : 0L;
       return location < (key + (sum - prevSum));
@@ -257,15 +307,41 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   public void addBadLocation(long location, long width) {
+    if (spatialResolution > 1) {
+      MutableRTPCoords coords = new MutableRTPCoords(0, 0);
+      locationToXZ(location, coords);
+      if ((spatialResolution & (spatialResolution - 1)) == 0) {
+        int shift = Long.numberOfTrailingZeros(spatialResolution);
+        coords.x >>= shift;
+        coords.z >>= shift;
+      } else {
+        coords.x /= (int) spatialResolution;
+        coords.z /= (int) spatialResolution;
+      }
+      location = xzToLocation(coords);
+    }
     pendingBadLocations.get().put(location, width);
     badLocationsDirty = true;
   }
 
-  public void addBiomeLocation(Long location, String biome) {
+  public void addBiomeLocation(Long location, long width, String biome) {
+    if (spatialResolution > 1) {
+      MutableRTPCoords coords = new MutableRTPCoords(0, 0);
+      locationToXZ(location, coords);
+      if ((spatialResolution & (spatialResolution - 1)) == 0) {
+        int shift = Long.numberOfTrailingZeros(spatialResolution);
+        coords.x >>= shift;
+        coords.z >>= shift;
+      } else {
+        coords.x /= (int) spatialResolution;
+        coords.z /= (int) spatialResolution;
+      }
+      location = xzToLocation(coords);
+    }
     pendingBiomeLocations
         .get()
         .computeIfAbsent(biome, b -> new ConcurrentHashMap<>())
-        .put(location, 1L);
+        .put(location, width);
     biomeLocationsDirty = true;
   }
 
@@ -449,7 +525,20 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
             long[] nbKeys = new long[mIdx];
             long[] nbSums = new long[mIdx];
             long bRunningSum = 0;
-            for (int k = 0; k < mIdx; k++) {
+            int k = 0;
+            int bound = SPECIES.loopBound(mIdx);
+            for (; k < bound; k += SPECIES.length()) {
+              LongVector keyVec = LongVector.fromArray(SPECIES, mKeys, k);
+              keyVec.intoArray(nbKeys, k);
+              LongVector lenVec = LongVector.fromArray(SPECIES, mLengths, k);
+              for (int m = 1; m < SPECIES.length(); m <<= 1) {
+                lenVec = lenVec.add(lenVec.rearrange(VectorShuffle.iota(SPECIES, -m, 1, false), SPECIES.broadcast(0L)));
+              }
+              lenVec = lenVec.add(bRunningSum);
+              lenVec.intoArray(nbSums, k);
+              bRunningSum = nbSums[k + SPECIES.length() - 1];
+            }
+            for (; k < mIdx; k++) {
               nbKeys[k] = mKeys[k];
               bRunningSum += mLengths[k];
               nbSums[k] = bRunningSum;
@@ -532,7 +621,20 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
             long[] finalMappedKeys = new long[mappedIdx];
             long[] finalMappedPrefixSums = new long[mappedIdx];
             long runningSumMapped = 0;
-            for (int k = 0; k < mappedIdx; k++) {
+            int k = 0;
+            int bound = SPECIES.loopBound(mappedIdx);
+            for (; k < bound; k += SPECIES.length()) {
+              LongVector keyVec = LongVector.fromArray(SPECIES, mergedMappedKeys, k);
+              keyVec.intoArray(finalMappedKeys, k);
+              LongVector lenVec = LongVector.fromArray(SPECIES, mergedMappedLengths, k);
+              for (int m = 1; m < SPECIES.length(); m <<= 1) {
+                lenVec = lenVec.add(lenVec.rearrange(VectorShuffle.iota(SPECIES, -m, 1, false), SPECIES.broadcast(0L)));
+              }
+              lenVec = lenVec.add(runningSumMapped);
+              lenVec.intoArray(finalMappedPrefixSums, k);
+              runningSumMapped = finalMappedPrefixSums[k + SPECIES.length() - 1];
+            }
+            for (; k < mappedIdx; k++) {
               finalMappedKeys[k] = mergedMappedKeys[k];
               runningSumMapped += mergedMappedLengths[k];
               finalMappedPrefixSums[k] = runningSumMapped;
@@ -625,7 +727,20 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         long[] newKeys = new long[mergeIndex];
         long[] newSums = new long[mergeIndex];
         long runningSum = 0;
-        for (int k = 0; k < mergeIndex; k++) {
+        int k = 0;
+        int bound = SPECIES.loopBound(mergeIndex);
+        for (; k < bound; k += SPECIES.length()) {
+          LongVector keyVec = LongVector.fromArray(SPECIES, mergedKeys, k);
+          keyVec.intoArray(newKeys, k);
+          LongVector lenVec = LongVector.fromArray(SPECIES, mergedLengths, k);
+          for (int m = 1; m < SPECIES.length(); m <<= 1) {
+            lenVec = lenVec.add(lenVec.rearrange(VectorShuffle.iota(SPECIES, -m, 1, false), SPECIES.broadcast(0L)));
+          }
+          lenVec = lenVec.add(runningSum);
+          lenVec.intoArray(newSums, k);
+          runningSum = newSums[k + SPECIES.length() - 1];
+        }
+        for (; k < mergeIndex; k++) {
           newKeys[k] = mergedKeys[k];
           runningSum += mergedLengths[k];
           newSums[k] = runningSum;

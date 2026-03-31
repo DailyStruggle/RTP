@@ -100,8 +100,8 @@ public class RTP {
     miscAsyncTasks = (RTPTaskPipe) serverAccessor.createTaskPipe();
     startupTasks = (RTPTaskPipe) serverAccessor.createTaskPipe();
     cancelTasks = (RTPTaskPipe) serverAccessor.createTaskPipe();
-    if (cancelTasks instanceof TimeBoundTaskPipe) {
-      ((TimeBoundTaskPipe) cancelTasks).setAvailableTime(Long.MAX_VALUE);
+    if (cancelTasks instanceof TimeBoundTaskPipe timeBoundTaskPipe) {
+      timeBoundTaskPipe.setAvailableTime(Long.MAX_VALUE);
     }
     RTPAPI.serverAccessor = serverAccessor;
     instance = this;
@@ -122,18 +122,20 @@ public class RTP {
 
       Map<String, Object> networkMap = configParser.getMap(ConfigKeys.network);
       Object redisObj = networkMap.get("redis");
-      if (redisObj instanceof Map) {
-        Map<String, Object> redisMap = (Map<String, Object>) redisObj;
-        boolean enabled = Boolean.parseBoolean(String.valueOf(redisMap.getOrDefault("enabled", "false")));
+      if (redisObj instanceof Map<?, ?> redisMap) {
+        Object enabledObj = redisMap.get("enabled");
+        boolean enabled = Boolean.parseBoolean(String.valueOf(enabledObj != null ? enabledObj : "false"));
         if (enabled) {
-          String host = String.valueOf(redisMap.getOrDefault("host", "127.0.0.1"));
-          int port = ((Number) redisMap.getOrDefault("port", 6379)).intValue();
-          String password = String.valueOf(redisMap.getOrDefault("password", ""));
+          Object hostObj = redisMap.get("host");
+          String host = String.valueOf(hostObj != null ? hostObj : "127.0.0.1");
+          Object portObj = redisMap.get("port");
+          int port = portObj instanceof Number ? ((Number) portObj).intValue() : 6379;
+          Object passwordObj = redisMap.get("password");
+          String password = String.valueOf(passwordObj != null ? passwordObj : "");
           this.redisManager = new io.github.dailystruggle.rtp.common.network.RedisManager(host, port, password);
           this.redisManager.initializeAsync();
         }
-      } else if (redisObj instanceof ConfigurationSection) {
-        ConfigurationSection redisSection = (ConfigurationSection) redisObj;
+      } else if (redisObj instanceof ConfigurationSection redisSection) {
         boolean enabled = redisSection.getBoolean("enabled", false);
         if (enabled) {
           String host = redisSection.getString("host", "127.0.0.1");
@@ -163,8 +165,8 @@ public class RTP {
         6000);
     scheduler.runTaskTimerAsynchronously(
         () -> {
-          if (databaseAccessor instanceof AbstractSQLDatabaseAccessor) {
-            ((AbstractSQLDatabaseAccessor) databaseAccessor).flush();
+          if (databaseAccessor instanceof AbstractSQLDatabaseAccessor sqlDatabaseAccessor) {
+            sqlDatabaseAccessor.flush();
           }
         },
         60,
@@ -174,6 +176,7 @@ public class RTP {
   public static void handleMigration(String previousState, String currentState) {
     if (previousState.equalsIgnoreCase("yaml") &&
         (currentState.equalsIgnoreCase("sqlite") ||
+            currentState.equalsIgnoreCase("h2") ||
             currentState.equalsIgnoreCase("mysql") ||
             currentState.equalsIgnoreCase("postgresql"))) {
       serverAccessor.log(Level.INFO, "&aDatabase engine change detected. Initiating background migration from YAML to SQL...");
@@ -190,8 +193,8 @@ public class RTP {
           for (Map.Entry<String, Object> entry : mapValues.entrySet()) {
             Object val = entry.getValue();
             Map<String, Object> dataMap;
-            if (val instanceof Map) dataMap = (Map<String, Object>) val;
-            else if (val instanceof ConfigurationSection) dataMap = ((ConfigurationSection) val).getMapValues(false);
+            if (val instanceof Map<?, ?> map) dataMap = (Map<String, Object>) map;
+            else if (val instanceof ConfigurationSection section) dataMap = section.getMapValues(false);
             else continue;
 
             try {
@@ -231,8 +234,8 @@ public class RTP {
                   records.add(mapValues);
                 } else {
                   for (Object val : mapValues.values()) {
-                    if (val instanceof Map) records.add((Map<String, Object>) val);
-                    else if (val instanceof ConfigurationSection) records.add(((ConfigurationSection) val).getMapValues(false));
+                    if (val instanceof Map<?, ?> map) records.add((Map<String, Object>) map);
+                    else if (val instanceof ConfigurationSection section) records.add(section.getMapValues(false));
                   }
                 }
 
@@ -353,8 +356,8 @@ public class RTP {
     }
 
     if (instance.databaseAccessor != null) {
-      if (instance.databaseAccessor instanceof AbstractSQLDatabaseAccessor) {
-        ((AbstractSQLDatabaseAccessor) instance.databaseAccessor).flush();
+      if (instance.databaseAccessor instanceof AbstractSQLDatabaseAccessor sqlDatabaseAccessor) {
+        sqlDatabaseAccessor.flush();
       }
       instance.databaseAccessor.flushDirtyCache();
       instance.databaseAccessor.stop.set(true);
