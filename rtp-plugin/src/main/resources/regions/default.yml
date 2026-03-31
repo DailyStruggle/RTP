@@ -48,6 +48,6 @@ activeChunkCap: 3
 # vault price for player to use this region
 price: 0.0
 # granularity of bad-location cache
-spatialResolution: 1
+spatialResolution: 3
 
 version: "1.0"

@@ -1,8 +1,5 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
-import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import java.util.Iterator;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -11,14 +8,14 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public class RegionQueueManager {
     private final Region region;
 
-    public final ConcurrentLinkedQueue<Map.Entry<RTPCoords, Long>> locationQueue = new ConcurrentLinkedQueue<>();
+    public final LockFreeLocationBuffer locationQueue = new LockFreeLocationBuffer(1024);
 
     /** When reserving/recycling locations for specific players, I want to guard against */
-    public final ConcurrentHashMap<UUID, ConcurrentLinkedQueue<Map.Entry<RTPCoords, Long>>>
+    public final ConcurrentHashMap<UUID, ConcurrentLinkedQueue<CachedLocation>>
             perPlayerLocationQueue = new ConcurrentHashMap<>();
 
     /** */
-    public final ConcurrentHashMap<UUID, CompletableFuture<Map.Entry<RTPCoords, Long>>> fastLocations =
+    public final ConcurrentHashMap<UUID, CompletableFuture<CachedLocation>> fastLocations =
             new ConcurrentHashMap<>();
 
     public final ConcurrentLinkedQueue<UUID> playerQueue = new ConcurrentLinkedQueue<>();
@@ -33,9 +30,9 @@ public class RegionQueueManager {
      * @param id player uuid
      * @return future location and number of attempts
      */
-    public CompletableFuture<Map.Entry<RTPCoords, Long>> fastQueue(UUID id) {
+    public CompletableFuture<CachedLocation> fastQueue(UUID id) {
         if (fastLocations.containsKey(id)) return fastLocations.get(id);
-        CompletableFuture<Map.Entry<RTPCoords, Long>> res = new CompletableFuture<>();
+        CompletableFuture<CachedLocation> res = new CompletableFuture<>();
         fastLocations.put(id, res);
         region.miscPipeline.add(new RegionCacheTask(region, id));
         return res;
@@ -66,7 +63,7 @@ public class RegionQueueManager {
      */
     public long getTotalQueueLength(UUID uuid) {
         long res = locationQueue.size();
-        ConcurrentLinkedQueue<Map.Entry<RTPCoords, Long>> queue =
+        ConcurrentLinkedQueue<CachedLocation> queue =
                 perPlayerLocationQueue.get(uuid);
         if (queue != null) res += queue.size();
         if (fastLocations.containsKey(uuid)) res++;
@@ -90,7 +87,7 @@ public class RegionQueueManager {
      */
     public long getPersonalQueueLength(UUID uuid) {
         long res = 0;
-        ConcurrentLinkedQueue<Map.Entry<RTPCoords, Long>> queue =
+        ConcurrentLinkedQueue<CachedLocation> queue =
                 perPlayerLocationQueue.get(uuid);
         if (queue != null) res += queue.size();
         if (fastLocations.containsKey(uuid)) res++;

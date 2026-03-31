@@ -7,7 +7,10 @@ import jdk.incubator.vector.LongVector;
 import jdk.incubator.vector.VectorOperators;
 import jdk.incubator.vector.VectorSpecies;
 import jdk.incubator.vector.VectorShuffle;
-import java.io.*;
+import java.io.File;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -155,7 +158,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
           // mask.lastTrue() gives the relative index in the vector
           floorIdx = k + mask.lastTrue();
         } else {
-          // Since keys are sorted, if no key in this batch is <= location, 
+          // Since keys are sorted, if no key in this batch is <= location,
           // all subsequent keys will also be > location.
           break;
         }
@@ -164,7 +167,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
     // Process remaining elements if not already found in vectorized part or if there are leftovers
     // or if we need to search further in the remaining scalar part.
-    // Actually, if floorIdx was found in vector part, and the next vector failed, 
+    // Actually, if floorIdx was found in vector part, and the next vector failed,
     // we don't need to check leftovers unless k < keys.length.
     for (; k < keys.length; k++) {
       if (keys[k] <= location) {
@@ -191,40 +194,80 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     String dirPath =
         pluginDir.getAbsolutePath() + File.separator + "database" + File.separator + "regionData";
     String filePath = dirPath + File.separator + fileName;
-    File dir = new File(dirPath);
-    File file = new File(filePath);
 
-    if (!dir.exists()) {
-      boolean mkdirs = dir.mkdirs();
-      if (!mkdirs) throw new IllegalStateException("failed to make directory");
+    // Snapshot under write lock to avoid concurrent modifications
+    long[] sBadKeys;
+    long[] sBadSums;
+    Map<String, long[]> sBiomeKeys;
+    Map<String, long[]> sBiomeSums;
+    long sFillIter;
+
+    writeLock.lock();
+    try {
+      sFillIter = fillIter.get();
+      sBadKeys = Arrays.copyOf(badKeysCache, badKeysCache.length);
+      sBadSums = Arrays.copyOf(badPrefixSumsCache, badPrefixSumsCache.length);
+      sBiomeKeys = new HashMap<>(biomeKeysCache.size());
+      sBiomeSums = new HashMap<>(biomePrefixSumsCache.size());
+      for (Map.Entry<String, long[]> e : biomeKeysCache.entrySet()) {
+        sBiomeKeys.put(e.getKey(), Arrays.copyOf(e.getValue(), e.getValue().length));
+      }
+      for (Map.Entry<String, long[]> e : biomePrefixSumsCache.entrySet()) {
+        sBiomeSums.put(e.getKey(), Arrays.copyOf(e.getValue(), e.getValue().length));
+      }
+    } finally {
+      writeLock.unlock();
     }
 
-    try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file)))) {
-      out.writeUTF(worldName);
-      out.writeLong(fillIter.get());
+    // Build a binary payload (big-endian) without any synchronous disk I/O here
+    byte[] worldBytes = worldName.getBytes(StandardCharsets.UTF_8);
+    int size = 0;
+    size += 4 + worldBytes.length; // world name length + bytes
+    size += 8; // fillIter
+    size += 4; // bad array length
+    size += sBadKeys.length * 16; // key + delta per entry
+    size += 4; // biome map size
+    for (Map.Entry<String, long[]> e : sBiomeKeys.entrySet()) {
+      byte[] bName = e.getKey().getBytes(StandardCharsets.UTF_8);
+      long[] keys = e.getValue();
+      size += 4 + bName.length; // biome name length + bytes
+      size += 4; // inner size
+      size += keys.length * 16; // key + delta
+    }
 
-      out.writeInt(badKeysCache.length);
-      for (int i = 0; i < badKeysCache.length; i++) {
-        out.writeLong(badKeysCache[i]);
-        long prevSum = (i > 0) ? badPrefixSumsCache[i - 1] : 0L;
-        out.writeLong(badPrefixSumsCache[i] - prevSum);
-      }
+    ByteBuffer buf = ByteBuffer.allocate(size).order(ByteOrder.BIG_ENDIAN);
+    buf.putInt(worldBytes.length).put(worldBytes);
+    buf.putLong(sFillIter);
 
-      out.writeInt(biomeKeysCache.size());
-      for (Map.Entry<String, long[]> entry : biomeKeysCache.entrySet()) {
-        String biome = entry.getKey();
-        out.writeUTF(biome);
-        long[] keys = entry.getValue();
-        long[] sums = biomePrefixSumsCache.get(biome);
-        out.writeInt(keys.length);
-        for (int i = 0; i < keys.length; i++) {
-          out.writeLong(keys[i]);
-          long prevSum = (i > 0) ? sums[i - 1] : 0L;
-          out.writeLong(sums[i] - prevSum);
-        }
+    buf.putInt(sBadKeys.length);
+    long prev = 0L;
+    for (int i = 0; i < sBadKeys.length; i++) {
+      buf.putLong(sBadKeys[i]);
+      long delta = sBadSums[i] - prev;
+      buf.putLong(delta);
+      prev = sBadSums[i];
+    }
+
+    buf.putInt(sBiomeKeys.size());
+    for (Map.Entry<String, long[]> e : sBiomeKeys.entrySet()) {
+      String biome = e.getKey();
+      byte[] bName = biome.getBytes(StandardCharsets.UTF_8);
+      buf.putInt(bName.length).put(bName);
+      long[] keys = e.getValue();
+      long[] sums = sBiomeSums.getOrDefault(biome, new long[0]);
+      buf.putInt(keys.length);
+      long p = 0L;
+      for (int i = 0; i < keys.length; i++) {
+        buf.putLong(keys[i]);
+        long d = (i < sums.length ? sums[i] : p) - p;
+        buf.putLong(d);
+        p = (i < sums.length ? sums[i] : p);
       }
-    } catch (IOException e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
+    }
+
+    // Enqueue background write via the core database accessor's queue
+    if (RTP.getInstance() != null && RTP.getInstance().databaseAccessor != null) {
+      RTP.getInstance().databaseAccessor.saveFile(filePath, buf.array());
     }
   }
 
@@ -240,57 +283,83 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
             + "regionData"
             + File.separator
             + fileName;
-    File file = new File(filePath);
-    if (!file.exists()) {
-      return;
-    }
 
-    try (DataInputStream in = new DataInputStream(new BufferedInputStream(new FileInputStream(file)))) {
-      String readWorldName = in.readUTF();
-      if (!readWorldName.equals(worldName)) return;
+    if (RTP.getInstance() == null || RTP.getInstance().databaseAccessor == null) return;
 
-      fillIter.set(in.readLong());
+    RTP.getInstance()
+        .databaseAccessor
+        .loadFile(filePath)
+        .thenAccept(
+            optBytes -> {
+              if (!optBytes.isPresent()) return;
+              byte[] data = optBytes.get();
+              try {
+                ByteBuffer buf = ByteBuffer.wrap(data).order(ByteOrder.BIG_ENDIAN);
+                int wLen = buf.getInt();
+                if (wLen < 0 || wLen > buf.remaining()) return;
+                byte[] w = new byte[wLen];
+                buf.get(w);
+                String readWorld = new String(w, StandardCharsets.UTF_8);
+                if (!readWorld.equals(worldName)) return;
 
-      int badSize = in.readInt();
-      long[] newBadKeys = new long[badSize];
-      long[] newBadSums = new long[badSize];
-      long currentSum = 0;
-      for (int i = 0; i < badSize; i++) {
-        long k = in.readLong();
-        long v = in.readLong();
-        newBadKeys[i] = k;
-        currentSum += v;
-        newBadSums[i] = currentSum;
-      }
-      this.badKeysCache = newBadKeys;
-      this.badPrefixSumsCache = newBadSums;
+                long fIter = buf.getLong();
 
-      int biomeSize = in.readInt();
-      ConcurrentHashMap<String, long[]> newBiomeKeysCache = new ConcurrentHashMap<>();
-      ConcurrentHashMap<String, long[]> newBiomePrefixSumsCache = new ConcurrentHashMap<>();
-      for (int i = 0; i < biomeSize; i++) {
-        String biome = in.readUTF();
-        int innerSize = in.readInt();
-        long[] keys = new long[innerSize];
-        long[] sums = new long[innerSize];
-        long currentBiomeSum = 0;
-        for (int j = 0; j < innerSize; j++) {
-          long k = in.readLong();
-          long v = in.readLong();
-          keys[j] = k;
-          currentBiomeSum += v;
-          sums[j] = currentBiomeSum;
-        }
-        newBiomeKeysCache.put(biome, keys);
-        newBiomePrefixSumsCache.put(biome, sums);
-      }
-      this.biomeKeysCache = newBiomeKeysCache;
-      this.biomePrefixSumsCache = newBiomePrefixSumsCache;
-      this.badLocationsDirty = true;
-      this.biomeLocationsDirty = true;
-    } catch (IOException e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
-    }
+                int badSize = buf.getInt();
+                if (badSize < 0 || badSize > (buf.remaining() / 16)) return;
+                long[] newBadKeys = new long[badSize];
+                long[] newBadSums = new long[badSize];
+                long running = 0L;
+                for (int i = 0; i < badSize; i++) {
+                  long k = buf.getLong();
+                  long d = buf.getLong();
+                  newBadKeys[i] = k;
+                  running += d;
+                  newBadSums[i] = running;
+                }
+
+                int biomeSize = buf.getInt();
+                if (biomeSize < 0) return;
+                ConcurrentHashMap<String, long[]> newBiomeKeysCache = new ConcurrentHashMap<>();
+                ConcurrentHashMap<String, long[]> newBiomePrefixSumsCache = new ConcurrentHashMap<>();
+                for (int i = 0; i < biomeSize; i++) {
+                  int nLen = buf.getInt();
+                  if (nLen < 0 || nLen > buf.remaining()) return;
+                  byte[] nb = new byte[nLen];
+                  buf.get(nb);
+                  String biome = new String(nb, StandardCharsets.UTF_8);
+                  int inner = buf.getInt();
+                  if (inner < 0 || inner > (buf.remaining() / 16)) return;
+                  long[] keys = new long[inner];
+                  long[] sums = new long[inner];
+                  long r = 0L;
+                  for (int j = 0; j < inner; j++) {
+                    long k = buf.getLong();
+                    long d = buf.getLong();
+                    keys[j] = k;
+                    r += d;
+                    sums[j] = r;
+                  }
+                  newBiomeKeysCache.put(biome, keys);
+                  newBiomePrefixSumsCache.put(biome, sums);
+                }
+
+                // Apply under write lock
+                writeLock.lock();
+                try {
+                  fillIter.set(fIter);
+                  badKeysCache = newBadKeys;
+                  badPrefixSumsCache = newBadSums;
+                  biomeKeysCache = newBiomeKeysCache;
+                  biomePrefixSumsCache = newBiomePrefixSumsCache;
+                  badLocationsDirty = true;
+                  biomeLocationsDirty = true;
+                } finally {
+                  writeLock.unlock();
+                }
+              } catch (Throwable t) {
+                RTP.log(Level.WARNING, t.getMessage(), t);
+              }
+            });
   }
 
   public void addBadLocation(long location, long width) {

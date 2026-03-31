@@ -6,10 +6,6 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 public class RegionCacheTask extends RTPRunnable {
@@ -33,13 +29,10 @@ public class RegionCacheTask extends RTPRunnable {
     public void run() {
         int activeChunkCap = region.getSettings().activeChunkCap();
         if (activeChunkCap > 0) {
-            List<Map.Entry<RTPCoords, Long>> snapshot = new ArrayList<>(activeChunkCap);
-            Iterator<Map.Entry<RTPCoords, Long>> iterator = region.queueManager.locationQueue.iterator();
-            for (int i = 0; i < activeChunkCap && iterator.hasNext(); i++) {
-                snapshot.add(iterator.next());
-            }
-            for (Map.Entry<RTPCoords, Long> entry : snapshot) {
-                region.chunkManager.addTicket(entry.getKey());
+            for (int i = 0; i < activeChunkCap; i++) {
+                CachedLocation loc = region.queueManager.locationQueue.get(i);
+                if (loc == null) break;
+                region.chunkManager.addTicket(loc.getCoords());
             }
         }
 
@@ -47,7 +40,7 @@ public class RegionCacheTask extends RTPRunnable {
         GenerationResult res = LocationGenerator.getLocation(region, (java.util.Set<String>) null);
         if (res != null) {
             final RTPCoords coords = res.coords();
-            final Map.Entry<RTPCoords, Long> pair = new java.util.AbstractMap.SimpleEntry<>(coords, res.attempts());
+            final CachedLocation pair = CachedLocationPool.acquire(coords, res.attempts());
             if (coords == null) {
                 region.inFlightCalculations.decrementAndGet();
                 return;
@@ -66,17 +59,31 @@ public class RegionCacheTask extends RTPRunnable {
                         if (aBoolean) {
                             if (playerId == null) {
                                 region.queueManager.locationQueue.offer(pair);
+                                if (region.queueManager.locationQueue.size() > region.getSettings().activeChunkCap()) {
+                                    RTP.scheduler.runTask(region.getWorld(), coords.x() >> 4, coords.z() >> 4, () -> {
+                                        chunkSet.keep(false, region.getWorld());
+                                    });
+                                }
                             } else if (region.queueManager.fastLocations.containsKey(playerId)
                                     && !region.queueManager.fastLocations.get(playerId).isDone()) {
                                 region.queueManager.fastLocations.get(playerId).complete(pair);
                             } else {
                                 region.queueManager.perPlayerLocationQueue.putIfAbsent(
                                         playerId, new java.util.concurrent.ConcurrentLinkedQueue<>());
-                                region.queueManager.perPlayerLocationQueue.get(playerId).offer(pair);
+                                java.util.concurrent.ConcurrentLinkedQueue<CachedLocation> q = region.queueManager.perPlayerLocationQueue.get(playerId);
+                                q.offer(pair);
+                                if (q.size() > region.getSettings().activeChunkCap()) {
+                                    RTP.scheduler.runTask(region.getWorld(), coords.x() >> 4, coords.z() >> 4, () -> {
+                                        chunkSet.keep(false, region.getWorld());
+                                    });
+                                }
                             }
                         } else {
-                            chunkSet.keep(false, region.getWorld());
+                            RTP.scheduler.runTask(region.getWorld(), coords.x() >> 4, coords.z() >> 4, () -> {
+                                chunkSet.keep(false, region.getWorld());
+                            });
                             region.chunkManager.removeChunkSet(coords);
+                            CachedLocationPool.release(pair);
                         }
                         region.inFlightCalculations.decrementAndGet();
                     });

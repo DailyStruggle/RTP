@@ -109,18 +109,18 @@ public class Region extends FactoryValue<RegionKeys> {
       RTPPlayer player = RTP.serverAccessor.getPlayer(playerId);
       if (player == null) continue;
 
-      Map.Entry<RTPCoords, Long> pair = queueManager.locationQueue.poll();
+      CachedLocation pair = queueManager.locationQueue.poll();
       if (pair == null) {
         queueManager.playerQueue.offer(playerId);
         continue;
       }
       queueManager.onPlayerPop();
 
-      teleportData.attempts = pair.getValue();
-      teleportData.selectedCoords = pair.getKey();
+      teleportData.attempts = pair.getAttempts();
+      teleportData.selectedCoords = pair.getCoords();
 
       RTPCommandSender sender = RTP.serverAccessor.getSender(CommandsAPI.serverId);
-      TeleportPipelineTask pipelineTask = new TeleportPipelineTask(new GenerationContext(sender, player, null), this, pair.getKey());
+      TeleportPipelineTask pipelineTask = new TeleportPipelineTask(new GenerationContext(sender, player, null), this, pair.getCoords());
       teleportData.nextTask = pipelineTask;
       RTP.scheduler.runTaskAsynchronously(pipelineTask);
 
@@ -226,15 +226,18 @@ public class Region extends FactoryValue<RegionKeys> {
     cachePipeline.stop();
     cachePipeline.clear();
 
-    for (Map.Entry<RTPCoords, Long> pair : queueManager.locationQueue) {
-      chunkManager.removeChunks(pair.getKey());
+    CachedLocation pair;
+    while ((pair = queueManager.locationQueue.poll()) != null) {
+      chunkManager.removeChunks(pair.getCoords());
+      CachedLocationPool.release(pair);
     }
     queueManager.locationQueue.clear();
 
-    for (java.util.concurrent.ConcurrentLinkedQueue<Map.Entry<RTPCoords, Long>> queue :
+    for (java.util.concurrent.ConcurrentLinkedQueue<CachedLocation> queue :
         queueManager.perPlayerLocationQueue.values()) {
-      for (Map.Entry<RTPCoords, Long> pair : queue) {
-        chunkManager.removeChunks(pair.getKey());
+      while ((pair = queue.poll()) != null) {
+        chunkManager.removeChunks(pair.getCoords());
+        CachedLocationPool.release(pair);
       }
     }
     queueManager.perPlayerLocationQueue.clear();
@@ -283,7 +286,7 @@ public class Region extends FactoryValue<RegionKeys> {
    * @param id player uuid
    * @return future location and number of attempts
    */
-  public CompletableFuture<Map.Entry<RTPCoords, Long>> fastQueue(UUID id) {
+  public CompletableFuture<CachedLocation> fastQueue(UUID id) {
     return queueManager.fastQueue(id);
   }
 
@@ -348,15 +351,23 @@ public class Region extends FactoryValue<RegionKeys> {
             settings.override(),
             settings.detailedRegionInit()
         );
-        for (Map.Entry<UUID, java.util.concurrent.ConcurrentLinkedQueue<Map.Entry<RTPCoords, Long>>>
+        for (Map.Entry<UUID, java.util.concurrent.ConcurrentLinkedQueue<CachedLocation>>
             entry : queueManager.perPlayerLocationQueue.entrySet()) {
-          java.util.concurrent.ConcurrentLinkedQueue<Map.Entry<RTPCoords, Long>> value =
+          java.util.concurrent.ConcurrentLinkedQueue<CachedLocation> value =
               entry.getValue();
-          for (Map.Entry<RTPCoords, Long> entry1 : value) chunkManager.removeChunks(entry1.getKey());
+          CachedLocation pair;
+          while ((pair = value.poll()) != null) {
+            chunkManager.removeChunks(pair.getCoords());
+            CachedLocationPool.release(pair);
+          }
           value.clear();
         }
         queueManager.perPlayerLocationQueue.clear();
-        for (Map.Entry<RTPCoords, Long> entry : queueManager.locationQueue) chunkManager.removeChunks(entry.getKey());
+        CachedLocation pair;
+        while ((pair = queueManager.locationQueue.poll()) != null) {
+          chunkManager.removeChunks(pair.getCoords());
+          CachedLocationPool.release(pair);
+        }
         queueManager.locationQueue.clear();
       }
     }

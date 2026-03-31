@@ -170,16 +170,16 @@ public class PostgreSQLDatabaseAccessor extends AbstractSQLDatabaseAccessor {
     // However, MySQL's REPLACE INTO works without a PK if there's no unique constraint (it just inserts).
     // But usually REPLACE INTO is used with PK.
     // If there's no PK, ON CONFLICT requires a constraint name or column list that has a unique index.
-    
+
     // Let's re-examine MySQLDatabaseAccessor schema: it doesn't define a PK either.
     // "senderId VARCHAR(36)"
-    
+
     // If there is no unique constraint, we can't easily use ON CONFLICT.
     // MySQL's REPLACE INTO: "REPLACE works exactly like INSERT, except that if an old row in the table has the same value as a new row for a PRIMARY KEY or a UNIQUE index, the old row is deleted before the new row is inserted."
-    
+
     // If the schema provided in the task doesn't have a PK, maybe I should just use INSERT.
     // But the task is to implement the accessor.
-    
+
     String sql;
     if (tableName.equalsIgnoreCase("rtp_teleport_data")) {
       sql = "INSERT INTO " + tableName + " (" + columns + ") VALUES (" + values + ") " +
