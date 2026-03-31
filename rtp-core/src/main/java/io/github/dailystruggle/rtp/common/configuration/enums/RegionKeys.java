@@ -8,6 +8,7 @@ public enum RegionKeys {
   requirePermission,
   cacheCap,
   price,
+  spatialResolution,
   override,
   version
 }

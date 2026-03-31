@@ -13,6 +13,7 @@ public record RegionSettings(
     boolean requirePermission,
     long cacheCap,
     double price,
+    long spatialResolution,
     String override,
     boolean detailedRegionInit
 ) {}

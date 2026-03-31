@@ -268,6 +268,10 @@ public class Square_Normal extends MemoryShape<NormalDistributionParams> {
 
   @Override
   public long rand() {
+    flushAndRebuild();
+    long[] sums = badPrefixSumsCache;
+    long badSum = (sums.length > 0) ? sums[sums.length - 1] : 0L;
+
     long radius = getNumber(NormalDistributionParams.radius, 256L).longValue();
     long cr = getNumber(NormalDistributionParams.centerRadius, 64L).longValue();
     double mean = getNumber(NormalDistributionParams.mean, 0.5).doubleValue();
@@ -276,7 +280,7 @@ public class Square_Normal extends MemoryShape<NormalDistributionParams> {
 
     boolean expand =
         Boolean.parseBoolean(data.getOrDefault(NormalDistributionParams.expand, false).toString());
-    if (!expand) range -= badLocationSum.get();
+    if (!expand) range -= badSum;
 
     mean = Math.abs(mean) % 1.0; // ensure mean 0.0-1.0
     deviation = Math.abs(deviation); // ensure deviation>0
@@ -315,12 +319,11 @@ public class Square_Normal extends MemoryShape<NormalDistributionParams> {
 
     long location;
     if (mode.equalsIgnoreCase("ACCUMULATE")) {
-      flushAndRebuild();
       long target = (long) res;
-      int index = java.util.Arrays.binarySearch(badPrefixSumsCache, target);
+      int index = java.util.Arrays.binarySearch(sums, target);
       if (index < 0) index = -index - 1;
 
-      if (index > 0) target += badPrefixSumsCache[index - 1];
+      if (index > 0) target += sums[index - 1];
       location = target;
     } else {
       location = (long) res;
@@ -335,7 +338,6 @@ public class Square_Normal extends MemoryShape<NormalDistributionParams> {
         {
           if (isKnownBad(location)) {
             long[] keys = badKeysCache;
-            long[] sums = badPrefixSumsCache;
             int idx = Arrays.binarySearch(keys, location);
             int floorIdx = (idx >= 0) ? idx : -(idx + 1) - 1;
 
@@ -373,7 +375,7 @@ public class Square_Normal extends MemoryShape<NormalDistributionParams> {
       u = Boolean.parseBoolean(String.valueOf(unique));
       data.put(NormalDistributionParams.uniquePlacements, u);
     }
-    if (u) addBadLocation(location, 1L);
+    if (u) addBadLocation(location, spatialResolution);
 
     return location;
   }

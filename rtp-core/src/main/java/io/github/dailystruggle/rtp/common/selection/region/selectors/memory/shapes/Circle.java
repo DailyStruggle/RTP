@@ -166,25 +166,28 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
 
   @Override
   public long rand() {
+    flushAndRebuild();
+    long[] sums = badPrefixSumsCache;
+    long badSum = (sums.length > 0) ? sums[sums.length - 1] : 0L;
+
     double range = getRange();
     boolean expand = (boolean) data.getOrDefault(GenericMemoryShapeParams.expand, false);
     String mode =
         data.getOrDefault(GenericMemoryShapeParams.mode, "ACCUMULATE").toString().toUpperCase();
 
-    if ((!expand) && mode.equalsIgnoreCase("ACCUMULATE")) range -= badLocationSum.get();
-    else if (expand && !mode.equalsIgnoreCase("ACCUMULATE")) range += badLocationSum.get();
+    if ((!expand) && mode.equalsIgnoreCase("ACCUMULATE")) range -= badSum;
+    else if (expand && !mode.equalsIgnoreCase("ACCUMULATE")) range += badSum;
 
     double weight = getNumber(GenericMemoryShapeParams.weight, 1.0).doubleValue();
     double res = (range) * Math.pow(ThreadLocalRandom.current().nextDouble(), weight);
 
     long location;
     if (mode.equalsIgnoreCase("ACCUMULATE")) {
-      flushAndRebuild();
       long target = (long) res;
-      int index = java.util.Arrays.binarySearch(badPrefixSumsCache, target);
+      int index = java.util.Arrays.binarySearch(sums, target);
       if (index < 0) index = -index - 1;
 
-      if (index > 0) target += badPrefixSumsCache[index - 1];
+      if (index > 0) target += sums[index - 1];
       location = target;
     } else {
       location = (long) res;
@@ -199,7 +202,6 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
         {
           if (isKnownBad(location)) {
             long[] keys = badKeysCache;
-            long[] sums = badPrefixSumsCache;
             int idx = Arrays.binarySearch(keys, location);
             int floorIdx = (idx >= 0) ? idx : -(idx + 1) - 1;
 
@@ -237,7 +239,7 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
       u = Boolean.parseBoolean(String.valueOf(unique));
       data.put(GenericMemoryShapeParams.uniquePlacements, u);
     }
-    if (u) addBadLocation(location, 1L);
+    if (u) addBadLocation(location, spatialResolution);
 
     return location;
   }

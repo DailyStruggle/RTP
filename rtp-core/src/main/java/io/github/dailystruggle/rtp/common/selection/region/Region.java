@@ -49,6 +49,7 @@ public class Region extends FactoryValue<RegionKeys> {
     this.miscPipeline = (RTPTaskPipe) RTP.serverAccessor.createTaskPipe();
 
     Shape<?> shape = settings.shape();
+    shape.spatialResolution = settings.spatialResolution();
 
     if (shape instanceof MemoryShape<?>) {
       long iter = ((MemoryShape<?>) shape).fillIter.get();
@@ -75,6 +76,7 @@ public class Region extends FactoryValue<RegionKeys> {
 
   public void setSettings(RegionSettings settings) {
     this.settings = settings;
+    settings.shape().spatialResolution = settings.spatialResolution();
     long cacheCap = settings.cacheCap();
     long playerQueueSize = queueManager.playerQueue.size();
     long totalCap = Math.max(cacheCap, playerQueueSize);
@@ -267,6 +269,7 @@ public class Region extends FactoryValue<RegionKeys> {
     res.put("requirePermission", String.valueOf(settings.requirePermission()));
     res.put("cacheCap", String.valueOf(settings.cacheCap()));
     res.put("price", String.valueOf(settings.price()));
+    res.put("spatialResolution", String.valueOf(settings.spatialResolution()));
     res.put("override", settings.override());
     return res;
   }
@@ -338,6 +341,7 @@ public class Region extends FactoryValue<RegionKeys> {
             settings.requirePermission(),
             settings.cacheCap(),
             settings.price(),
+            settings.spatialResolution(),
             settings.override(),
             settings.detailedRegionInit()
         );

@@ -19,6 +19,7 @@ import org.jetbrains.annotations.NotNull;
  */
 public abstract class Shape<E extends Enum<E>> extends FactoryValue<E> {
   public final String name;
+  public long spatialResolution = 1L;
 
   protected final List<BiPredicate<GenerationContext, RTPCoords>> verifiers = new ArrayList<>();
   protected final List<BiPredicate<GenerationContext, MutableRTPCoords>> verifiersMutable = new ArrayList<>();

@@ -293,7 +293,7 @@ public class FillTask extends RTPRunnable {
 
     if (!defaultBiomes.contains(currBiome)) {
       if (biomeRecall) {
-        shape.addBadLocation(pos, 1L);
+        shape.addBadLocation(pos, region.getSettings().spatialResolution());
         return CompletableFuture.completedFuture(false);
       }
     }
@@ -303,7 +303,7 @@ public class FillTask extends RTPRunnable {
         .apply(
             new RTPLocation(
                 world, blockX, (vert.maxY() + vert.minY()) / 2, blockZ))) {
-      shape.addBadLocation(pos, 1L);
+      shape.addBadLocation(pos, region.getSettings().spatialResolution());
       return CompletableFuture.completedFuture(false);
     }
 
@@ -325,7 +325,7 @@ public class FillTask extends RTPRunnable {
     cfChunk.thenAccept(
         chunkKey -> {
           if (chunkKey == null) {
-            shape.addBadLocation(pos, 1L);
+            shape.addBadLocation(pos, region.getSettings().spatialResolution());
             res.complete(false);
             return;
           }
@@ -345,7 +345,7 @@ public class FillTask extends RTPRunnable {
           localCursor.setWorldName(world.name());
           try {
           if (!vert.adjust(chunk, localCursor)) {
-            if (biomeRecall) shape.addBadLocation(pos, 1L);
+            if (biomeRecall) shape.addBadLocation(pos, region.getSettings().spatialResolution());
             res.complete(false);
             return;
           }
@@ -353,7 +353,7 @@ public class FillTask extends RTPRunnable {
           String currBiome1 = world.getBiome(localCursor.x, localCursor.y, localCursor.z);
           if (!defaultBiomes.contains(currBiome1)) {
             if (biomeRecall) {
-              shape.addBadLocation(pos, 1L);
+              shape.addBadLocation(pos, region.getSettings().spatialResolution());
               res.complete(false);
               return;
             }
@@ -361,7 +361,7 @@ public class FillTask extends RTPRunnable {
 
           boolean pass = localCursor.y < vert.maxY();
           if (!pass) {
-            shape.addBadLocation(pos, 1L);
+            shape.addBadLocation(pos, region.getSettings().spatialResolution());
             res.complete(false);
             return;
           }
@@ -424,7 +424,7 @@ public class FillTask extends RTPRunnable {
               if (biomeRecall) shape.addBiomeLocation(pos, currBiome1);
               res.complete(true);
             } else {
-              shape.addBadLocation(pos, 1L);
+              shape.addBadLocation(pos, region.getSettings().spatialResolution());
               res.complete(false);
             }
           } finally {

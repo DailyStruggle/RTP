@@ -13,6 +13,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
@@ -277,6 +278,7 @@ public class LocationGenerator {
      */
     @Nullable
     public static GenerationResult getLocation(Region region, @Nullable Set<String> biomeNames) {
+        long resolution = Math.max(1L, region.getNumber(RegionKeys.spatialResolution, 1L).longValue());
 
         boolean defaultBiomes = false;
         ConfigParser<PerformanceKeys> performance =
@@ -430,7 +432,7 @@ public class LocationGenerator {
                 if (shape instanceof MemoryShape) {
                     MemoryShape<?> memoryShape = (MemoryShape<?>) shape;
                     if (defaultBiomes && biomeRecall) {
-                        memoryShape.addBadLocation(l, 1L);
+                        memoryShape.addBadLocation(l, resolution);
                     }
                     if (biomeRecall && !defaultBiomes) {
                         List<Map.Entry<Long, Long>> biomes = new ArrayList<>();
@@ -537,7 +539,7 @@ public class LocationGenerator {
                 RTPCoords res = vert.adjust(chunk);
                 if (res == null) {
                     if (defaultBiomes && shape instanceof MemoryShape && biomeRecall) {
-                        ((MemoryShape<?>) shape).addBadLocation(l, 1L);
+                        ((MemoryShape<?>) shape).addBadLocation(l, resolution);
                     }
                     if (verbose) {
                         failMap
@@ -556,7 +558,7 @@ public class LocationGenerator {
                     biomeChecks++;
                     maxAttempts++;
                     if (defaultBiomes && shape instanceof MemoryShape && biomeRecall) {
-                        ((MemoryShape<?>) shape).addBadLocation(l, 1L);
+                        ((MemoryShape<?>) shape).addBadLocation(l, resolution);
                     }
 
                     if (verbose) {
@@ -642,7 +644,7 @@ public class LocationGenerator {
                                         "location=" + "(" + finalX + "," + finalY + "," + finalZ,
                                         (s, aLong) -> (aLong == null) ? 1L : ++aLong);
                     if (shape instanceof MemoryShape) {
-                        ((MemoryShape<?>) shape).addBadLocation(l, 1L);
+                        ((MemoryShape<?>) shape).addBadLocation(l, resolution);
                     }
                     continue;
                 }
