@@ -39,13 +39,18 @@ public class RegionChunkManager {
     public ChunkSet addTicket(int cx, int cz) {
         long key = getChunkKey(cx, cz);
         ticketCounts.compute(key, (k, v) -> (v == null) ? 1 : v + 1);
-        return locAssChunks.computeIfAbsent(key, k -> {
-            List<CompletableFuture<Long>> chunks = new ArrayList<>();
-            chunks.add(RTP.serverAccessor.getChunkManager().getChunkAtAsync(region.getWorld(), cx, cz));
-            ChunkSet chunkSet = new ChunkSet(chunks, new CompletableFuture<>());
-            chunkSet.keep(true, region.getWorld());
-            return chunkSet;
-        });
+        try {
+            return locAssChunks.computeIfAbsent(key, k -> {
+                List<CompletableFuture<Long>> chunks = new ArrayList<>();
+                chunks.add(RTP.serverAccessor.getChunkManager().getChunkAtAsync(region.getWorld(), cx, cz));
+                ChunkSet chunkSet = new ChunkSet(chunks, new CompletableFuture<>());
+                chunkSet.keep(true, region.getWorld());
+                return chunkSet;
+            });
+        } catch (Exception e) {
+            removeTicket(cx, cz);
+            throw e;
+        }
     }
 
     public ChunkSet addTicket(RTPCoords coords) {
@@ -93,7 +98,10 @@ public class RegionChunkManager {
         long sz = (radius * 2 + 1) * (radius * 2 + 1);
         if (locAssChunks.containsKey(chunkKey)) {
             ChunkSet chunkSet = locAssChunks.get(chunkKey);
-            if (chunkSet.chunks.size() >= sz) return chunkSet;
+            if (chunkSet.chunks.size() >= sz) {
+                ticketCounts.compute(chunkKey, (k, v) -> (v == null) ? 1 : v + 1);
+                return chunkSet;
+            }
             chunkSet.keep(false, region.getWorld());
             locAssChunks.remove(chunkKey);
         }
@@ -109,20 +117,26 @@ public class RegionChunkManager {
         RTPWorld<?> rtpWorld = region.getWorld();
         if (rtpWorld == null) return null;
 
-        for (long i = -radius; i <= radius; i++) {
-            for (long j = -radius; j <= radius; j++) {
-                CompletableFuture<Long> cfChunk =
-                        RTP.serverAccessor
-                                .getChunkManager()
-                                .getChunkAtAsync(rtpWorld, (int) (cx + i), (int) (cz + j));
-                chunks.add(cfChunk);
+        ticketCounts.compute(chunkKey, (k, v) -> (v == null) ? 1 : v + 1);
+        try {
+            for (long i = -radius; i <= radius; i++) {
+                for (long j = -radius; j <= radius; j++) {
+                    CompletableFuture<Long> cfChunk =
+                            RTP.serverAccessor
+                                    .getChunkManager()
+                                    .getChunkAtAsync(rtpWorld, (int) (cx + i), (int) (cz + j));
+                    chunks.add(cfChunk);
+                }
             }
-        }
 
-        ChunkSet chunkSet = new ChunkSet(chunks, new CompletableFuture<>());
-        chunkSet.keep(true, rtpWorld);
-        locAssChunks.put(chunkKey, chunkSet);
-        return chunkSet;
+            ChunkSet chunkSet = new ChunkSet(chunks, new CompletableFuture<>());
+            chunkSet.keep(true, rtpWorld);
+            locAssChunks.put(chunkKey, chunkSet);
+            return chunkSet;
+        } catch (Exception e) {
+            removeTicket(cx, cz);
+            throw e;
+        }
     }
 
     /**

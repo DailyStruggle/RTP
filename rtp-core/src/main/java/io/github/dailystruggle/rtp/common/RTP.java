@@ -7,12 +7,15 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
+import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
+import io.github.dailystruggle.rtp.common.database.options.AbstractSQLDatabaseAccessor;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
@@ -23,10 +26,15 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdj
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.jump.JumpAdjustor;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
 import io.github.dailystruggle.rtp.common.tasks.FillTask;
+import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.common.tasks.TimeBoundTaskPipe;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tools.ChunkyChecker;
+import org.simpleyaml.configuration.ConfigurationSection;
+import org.simpleyaml.configuration.file.YamlFile;
+
+import java.io.File;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -82,6 +90,7 @@ public class RTP {
   public final ConcurrentHashMap<UUID, Long> invulnerablePlayers = new ConcurrentHashMap<>();
   public final ConcurrentLinkedQueue<RTPChunk<?>> chunksToUnload = new ConcurrentLinkedQueue<>();
   public DatabaseAccessor<?> databaseAccessor;
+  public io.github.dailystruggle.rtp.common.network.RedisManager redisManager;
 
   public RTP() {
     if (serverAccessor == null) throw new IllegalStateException("null serverAccessor");
@@ -107,6 +116,35 @@ public class RTP {
 
     configs = new Configs(serverAccessor.getPluginDirectory());
 
+    startupTasks.add(new RTPRunnable(() -> {
+      ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) configs.getParser(ConfigKeys.class);
+      if (configParser == null) return;
+
+      Map<String, Object> networkMap = configParser.getMap(ConfigKeys.network);
+      Object redisObj = networkMap.get("redis");
+      if (redisObj instanceof Map) {
+        Map<String, Object> redisMap = (Map<String, Object>) redisObj;
+        boolean enabled = Boolean.parseBoolean(String.valueOf(redisMap.getOrDefault("enabled", "false")));
+        if (enabled) {
+          String host = String.valueOf(redisMap.getOrDefault("host", "127.0.0.1"));
+          int port = ((Number) redisMap.getOrDefault("port", 6379)).intValue();
+          String password = String.valueOf(redisMap.getOrDefault("password", ""));
+          this.redisManager = new io.github.dailystruggle.rtp.common.network.RedisManager(host, port, password);
+          this.redisManager.initializeAsync();
+        }
+      } else if (redisObj instanceof ConfigurationSection) {
+        ConfigurationSection redisSection = (ConfigurationSection) redisObj;
+        boolean enabled = redisSection.getBoolean("enabled", false);
+        if (enabled) {
+          String host = redisSection.getString("host", "127.0.0.1");
+          int port = redisSection.getInt("port", 6379);
+          String password = redisSection.getString("password", "");
+          this.redisManager = new io.github.dailystruggle.rtp.common.network.RedisManager(host, port, password);
+          this.redisManager.initializeAsync();
+        }
+      }
+    }, 10));
+
     ChunkyChecker.loadChunky();
 
     diagnosticTimer = Executors.newSingleThreadScheduledExecutor();
@@ -123,6 +161,117 @@ public class RTP {
         },
         6000,
         6000);
+    scheduler.runTaskTimerAsynchronously(
+        () -> {
+          if (databaseAccessor instanceof AbstractSQLDatabaseAccessor) {
+            ((AbstractSQLDatabaseAccessor) databaseAccessor).flush();
+          }
+        },
+        60,
+        60);
+  }
+
+  public static void handleMigration(String previousState, String currentState) {
+    if (previousState.equalsIgnoreCase("yaml") &&
+        (currentState.equalsIgnoreCase("sqlite") ||
+            currentState.equalsIgnoreCase("mysql") ||
+            currentState.equalsIgnoreCase("postgresql"))) {
+      serverAccessor.log(Level.INFO, "&aDatabase engine change detected. Initiating background migration from YAML to SQL...");
+      getInstance().miscAsyncTasks.add(new RTPRunnable(() -> {
+        File pluginDir = serverAccessor.getPluginDirectory();
+        File databaseDir = new File(pluginDir, "database");
+
+        // 1. Migrate teleportData.yml
+        io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase yamlDb = new io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase(databaseDir);
+        Map<String, YamlFile> lookup = yamlDb.connect();
+        YamlFile teleportFile = lookup.get("teleportData.yml");
+        if (teleportFile != null) {
+          Map<String, Object> mapValues = teleportFile.getMapValues(false);
+          for (Map.Entry<String, Object> entry : mapValues.entrySet()) {
+            Object val = entry.getValue();
+            Map<String, Object> dataMap;
+            if (val instanceof Map) dataMap = (Map<String, Object>) val;
+            else if (val instanceof ConfigurationSection) dataMap = ((ConfigurationSection) val).getMapValues(false);
+            else continue;
+
+            try {
+              TeleportData teleportData = new TeleportData();
+              teleportData.sender = serverAccessor.getSender(UUID.fromString(dataMap.get("senderId").toString()));
+              teleportData.time = ((Number) dataMap.getOrDefault("time", 0L)).longValue();
+              Object oWorld = dataMap.get("originalWorldName");
+              if (oWorld != null) teleportData.originalCoords = new RTPCoords(oWorld.toString(), ((Number) dataMap.get("originalX")).intValue(), ((Number) dataMap.get("originalY")).intValue(), ((Number) dataMap.get("originalZ")).intValue());
+              Object sWorld = dataMap.get("selectedWorldName");
+              if (sWorld != null) teleportData.selectedCoords = new RTPCoords(sWorld.toString(), ((Number) dataMap.get("selectedX")).intValue(), ((Number) dataMap.get("selectedY")).intValue(), ((Number) dataMap.get("selectedZ")).intValue());
+              teleportData.attempts = ((Number) dataMap.getOrDefault("attempts", 0)).longValue();
+              teleportData.cost = ((Number) dataMap.getOrDefault("cost", 0.0)).doubleValue();
+              teleportData.targetRegion = selectionAPI.getRegion(dataMap.getOrDefault("region", "default").toString());
+              teleportData.completed = true;
+
+              if (getInstance().databaseAccessor instanceof AbstractSQLDatabaseAccessor sqlDb) {
+                sqlDb.cacheValue(teleportData);
+              }
+            } catch (Exception ignored) {}
+          }
+        }
+
+        // 2. Migrate individual UUID.yml files in teleportData directory
+        File teleportDataDir = new File(databaseDir, "teleportData");
+        if (teleportDataDir.exists() && teleportDataDir.isDirectory()) {
+          File[] files = teleportDataDir.listFiles((dir, filename) -> filename.endsWith(".yml"));
+          if (files != null) {
+            for (File file : files) {
+              try {
+                YamlFile yamlFile = new YamlFile(file);
+                yamlFile.load();
+                Map<String, Object> mapValues = yamlFile.getMapValues(false);
+
+                List<Map<String, Object>> records = new ArrayList<>();
+                if (mapValues.containsKey("senderId") || mapValues.containsKey("time") || mapValues.containsKey("selectedX")) {
+                  mapValues.putIfAbsent("senderId", file.getName().substring(0, file.getName().lastIndexOf('.')));
+                  records.add(mapValues);
+                } else {
+                  for (Object val : mapValues.values()) {
+                    if (val instanceof Map) records.add((Map<String, Object>) val);
+                    else if (val instanceof ConfigurationSection) records.add(((ConfigurationSection) val).getMapValues(false));
+                  }
+                }
+
+                boolean success = false;
+                for (Map<String, Object> dataMap : records) {
+                  try {
+                    TeleportData teleportData = new TeleportData();
+                    Object senderIdObj = dataMap.get("senderId");
+                    if (senderIdObj == null) continue;
+                    teleportData.sender = serverAccessor.getSender(UUID.fromString(senderIdObj.toString()));
+                    teleportData.time = ((Number) dataMap.getOrDefault("time", 0L)).longValue();
+                    Object oWorld = dataMap.get("originalWorldName");
+                    if (oWorld != null) teleportData.originalCoords = new RTPCoords(oWorld.toString(), ((Number) dataMap.get("originalX")).intValue(), ((Number) dataMap.get("originalY")).intValue(), ((Number) dataMap.get("originalZ")).intValue());
+                    Object sWorld = dataMap.get("selectedWorldName");
+                    if (sWorld != null) teleportData.selectedCoords = new RTPCoords(sWorld.toString(), ((Number) dataMap.get("selectedX")).intValue(), ((Number) dataMap.get("selectedY")).intValue(), ((Number) dataMap.get("selectedZ")).intValue());
+                    teleportData.attempts = ((Number) dataMap.getOrDefault("attempts", 0)).longValue();
+                    teleportData.cost = ((Number) dataMap.getOrDefault("cost", 0.0)).doubleValue();
+                    teleportData.targetRegion = selectionAPI.getRegion(dataMap.getOrDefault("region", "default").toString());
+                    teleportData.completed = true;
+
+                    if (getInstance().databaseAccessor instanceof AbstractSQLDatabaseAccessor sqlDb) {
+                      sqlDb.cacheValue(teleportData);
+                      success = true;
+                    }
+                  } catch (Exception ignored) {}
+                }
+                if (success) {
+                  file.renameTo(new File(file.getAbsolutePath() + ".migrated"));
+                }
+              } catch (Exception ignored) {}
+            }
+          }
+        }
+
+        if (getInstance().databaseAccessor instanceof AbstractSQLDatabaseAccessor sqlDb) {
+          sqlDb.flush();
+        }
+      }, 0));
+    }
   }
 
   public static void addShape(Shape<?> shape) {
@@ -204,6 +353,9 @@ public class RTP {
     }
 
     if (instance.databaseAccessor != null) {
+      if (instance.databaseAccessor instanceof AbstractSQLDatabaseAccessor) {
+        ((AbstractSQLDatabaseAccessor) instance.databaseAccessor).flush();
+      }
       instance.databaseAccessor.flushDirtyCache();
       instance.databaseAccessor.stop.set(true);
     }
@@ -229,6 +381,10 @@ public class RTP {
     instance.processingPlayers.clear();
 
     FillTask.kill();
+
+    if (instance.redisManager != null) {
+      instance.redisManager.shutdown();
+    }
 
     serverAccessor.stop();
   }

@@ -31,8 +31,8 @@ permissions:
   rtp.reload:
     description: allow player to use /rtp reload
     default: op
-  rtp.update:
-    description: allow player to use /rtp update
+  rtp.config:
+    description: allow player to use /rtp config
     default: op
   rtp.fill:
     description: allow player to start fill tasks
@@ -136,7 +136,7 @@ permissions:
       rtp.see: true
       rtp.use: true
       rtp.reload: true
-      rtp.update: true
+      rtp.config: true
       rtp.noCooldown: true
       rtp.noDelay: true
       rtp.noDelay.chunks: true

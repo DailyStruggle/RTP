@@ -12,6 +12,7 @@ public record RegionSettings(
     boolean worldBorderOverride,
     boolean requirePermission,
     long cacheCap,
+    int activeChunkCap,
     double price,
     long spatialResolution,
     String override,

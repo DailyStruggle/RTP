@@ -5,149 +5,92 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import java.io.File;
-import java.io.IOException;
 import java.sql.*;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 import org.jetbrains.annotations.NotNull;
 
-public class SQLiteDatabaseAccessor extends DatabaseAccessor<Connection> {
-  private final String url;
+public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
+  private final String sqliteUrl;
+  private Connection connection;
 
   public SQLiteDatabaseAccessor(String url) {
-    this.url = url;
+    File pluginDir = RTP.serverAccessor.getPluginDirectory();
+    File databaseFile = new File(pluginDir, "database" + File.separator + "rtp.db");
+    if (!databaseFile.getParentFile().exists()) {
+      databaseFile.getParentFile().mkdirs();
+    }
+    this.sqliteUrl = "jdbc:sqlite:" + databaseFile.getAbsolutePath();
+    try {
+      this.connection = DriverManager.getConnection(sqliteUrl);
+      try (Statement statement = connection.createStatement()) {
+        statement.execute("PRAGMA journal_mode=WAL;");
+        statement.execute("PRAGMA synchronous=NORMAL;");
+        String schema =
+            "CREATE TABLE IF NOT EXISTS rtp_teleport_data ("
+                + "senderName TEXT, "
+                + "senderId TEXT, "
+                + "time INTEGER, "
+                + "delay INTEGER, "
+                + "selectedX INTEGER, "
+                + "selectedY INTEGER, "
+                + "selectedZ INTEGER, "
+                + "selectedWorldName TEXT, "
+                + "selectedWorldId TEXT, "
+                + "originalX INTEGER, "
+                + "originalY INTEGER, "
+                + "originalZ INTEGER, "
+                + "originalWorldName TEXT, "
+                + "originalWorldId TEXT, "
+                + "region TEXT, "
+                + "cost REAL, "
+                + "attempts INTEGER"
+                + ");";
+        statement.execute(schema);
+      }
+    } catch (SQLException e) {
+      RTP.log(Level.WARNING, e.getMessage(), e);
+    }
   }
 
   @Override
   public String name() {
-    return url;
+    return sqliteUrl;
   }
 
   @Override
-  public @NotNull Connection connect() {
-    Connection res;
-
-    String filePath = url.substring(url.lastIndexOf(":") + 1);
-    File databaseFile = new File(filePath);
-    try {
-      if (!databaseFile.exists()) {
-        databaseFile.getParentFile().mkdirs();
-        databaseFile.createNewFile();
+  public Connection getConnection() throws SQLException {
+    if (connection == null || connection.isClosed()) {
+      connection = DriverManager.getConnection(sqliteUrl);
+      try (Statement statement = connection.createStatement()) {
+        statement.execute("PRAGMA journal_mode=WAL;");
+        statement.execute("PRAGMA synchronous=NORMAL;");
       }
-      res = DriverManager.getConnection(url);
-    } catch (SQLException | IOException e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
-      return null;
     }
-    return res;
+    return connection;
   }
 
-  @Override
-  public void processQueries(long availableTime) {
-    if (readQueue.isEmpty() && writeQueue.isEmpty()) return;
-    if (stop.get()) return;
-    Connection database = connect();
-    if (database == null) return;
-    if (stop.get()) {
-      disconnect(database);
-      return;
-    }
-    long dt;
-    long start = System.nanoTime();
-
-    while (!writeQueue.isEmpty()) {
-      if (stop.get()) {
-        disconnect(database);
-        return;
-      }
-      Map.Entry<String, Map<TableObj, TableObj>> writeRequest = writeQueue.poll();
-      if (writeRequest == null) throw new IllegalStateException("invalid database write request");
-      if (writeRequest.getValue() == null)
-        throw new IllegalStateException("invalid database write request");
-      if (writeRequest.getValue().isEmpty())
-        throw new IllegalStateException("invalid database write request");
-
-      long localStart = System.nanoTime();
-      try {
-        write(database, writeRequest.getKey(), writeRequest.getValue());
-      } catch (Exception e) {
-        writeQueue.add(writeRequest);
-        disconnect(database);
-        return;
-      }
-      long localStop = System.nanoTime();
-
-      if (localStop < localStart) localStart = -(Long.MAX_VALUE - localStart);
-      long diff = localStop - localStart;
-      if (avgTimeWrite == 0) avgTimeWrite = diff;
-      else avgTimeWrite = ((avgTimeWrite * 7) / 8) + (diff / 8);
-
-      if (localStop < start) start = -(Long.MAX_VALUE - start); // overflow correction
-      dt = localStop - start;
-      if (dt + avgTimeWrite > availableTime) break;
-    }
-
-    while (!readQueue.isEmpty()) {
-      if (stop.get()) {
-        disconnect(database);
-        return;
-      }
-      Map.Entry<
-              String,
-              Map.Entry<
-                  Map.Entry<TableObj, TableObj>, CompletableFuture<Optional<Map<String, Object>>>>>
-          readRequest = readQueue.poll();
-      if (readRequest == null) throw new IllegalStateException("null database read request");
-
-      long localStart = System.nanoTime();
-      Map.Entry<TableObj, TableObj> keyObj = readRequest.getValue().getKey();
-      Map.Entry<String, Object> lookup =
-          new AbstractMap.SimpleEntry<>(
-              keyObj.getKey().object.toString(), keyObj.getValue().object);
-      Optional<Map<String, Object>> read;
-      try {
-        read = read(database, readRequest.getKey(), lookup);
-      } catch (Exception e) {
-        readQueue.add(readRequest);
-        disconnect(database);
-        return;
-      }
-
-      readRequest.getValue().getValue().complete(read);
-      long localStop = System.nanoTime();
-
-      if (localStop < localStart) localStart = -(Long.MAX_VALUE - localStart);
-      long diff = localStop - localStart;
-      if (avgTimeRead == 0) avgTimeRead = diff;
-      else avgTimeRead = ((avgTimeRead * 7) / 8) + (diff / 8);
-
-      if (localStop < start) start = -(Long.MAX_VALUE - start); // overflow correction
-      dt = localStop - start;
-      if (dt + avgTimeRead > availableTime) break;
-    }
-
-    disconnect(database);
-  }
 
   @Override
   public void startup() {
     DriverManager.setLoginTimeout(30);
-    Connection connection = connect();
+    Connection connection;
+    try {
+      connection = getConnection();
+    } catch (SQLException e) {
+      RTP.log(Level.WARNING, e.getMessage(), e);
+      return;
+    }
+
     @NotNull
     Optional<Map<String, Object>> read =
         read(connection, "referenceData", new AbstractMap.SimpleEntry<>("UUID", new UUID(0, 0)));
     if (!read.isPresent()) {
-      try {
-        connection.close();
-      } catch (SQLException e) {
-        RTP.log(Level.WARNING, e.getMessage(), e);
-      }
       return;
     }
 
     // get full table
-    String tableName = "teleportData";
+    String tableName = "rtp_teleport_data";
     String sql = "SELECT * FROM " + tableName;
     Statement statement;
 
@@ -157,7 +100,6 @@ public class SQLiteDatabaseAccessor extends DatabaseAccessor<Connection> {
       try {
         statement.execute(sql);
       } catch (SQLException e) {
-        connection.close();
         return;
       }
 
@@ -166,18 +108,16 @@ public class SQLiteDatabaseAccessor extends DatabaseAccessor<Connection> {
       try {
         resultSet = statement.getResultSet();
       } catch (SQLException e) {
-        connection.close();
         return;
       }
 
       if (resultSet == null) {
-        connection.close();
         return;
       }
 
       // each data
       while (resultSet.next()) {
-        String uuidStr = resultSet.getString("UUID");
+        String uuidStr = resultSet.getString("senderId");
         if (uuidStr == null) continue;
 
         UUID uuid = UUID.fromString(uuidStr);
@@ -205,12 +145,6 @@ public class SQLiteDatabaseAccessor extends DatabaseAccessor<Connection> {
       throwables.printStackTrace();
     } catch (IllegalArgumentException ignored) {
 
-    }
-
-    try {
-      connection.close();
-    } catch (SQLException e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
     }
   }
 
@@ -262,6 +196,11 @@ public class SQLiteDatabaseAccessor extends DatabaseAccessor<Connection> {
     }
 
     return Optional.empty();
+  }
+
+  @Override
+  protected String getInsertStatement() {
+    return "INSERT OR IGNORE INTO rtp_teleport_data (senderName, senderId, time, delay, selectedX, selectedY, selectedZ, selectedWorldName, selectedWorldId, originalX, originalY, originalZ, originalWorldName, originalWorldId, region, cost, attempts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
   }
 
   @Override
@@ -446,12 +385,4 @@ public class SQLiteDatabaseAccessor extends DatabaseAccessor<Connection> {
     }
   }
 
-  @Override
-  public void disconnect(Connection connection) {
-    try {
-      connection.close();
-    } catch (SQLException e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
-    }
-  }
 }

@@ -114,6 +114,7 @@ public class Region extends FactoryValue<RegionKeys> {
         queueManager.playerQueue.offer(playerId);
         continue;
       }
+      queueManager.onPlayerPop();
 
       teleportData.attempts = pair.getValue();
       teleportData.selectedCoords = pair.getKey();
@@ -268,6 +269,7 @@ public class Region extends FactoryValue<RegionKeys> {
     res.put("worldBorderOverride", String.valueOf(settings.worldBorderOverride()));
     res.put("requirePermission", String.valueOf(settings.requirePermission()));
     res.put("cacheCap", String.valueOf(settings.cacheCap()));
+    res.put("activeChunkCap", String.valueOf(settings.activeChunkCap()));
     res.put("price", String.valueOf(settings.price()));
     res.put("spatialResolution", String.valueOf(settings.spatialResolution()));
     res.put("override", settings.override());
@@ -340,6 +342,7 @@ public class Region extends FactoryValue<RegionKeys> {
             settings.worldBorderOverride(),
             settings.requirePermission(),
             settings.cacheCap(),
+            settings.activeChunkCap(),
             settings.price(),
             settings.spatialResolution(),
             settings.override(),

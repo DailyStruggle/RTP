@@ -547,7 +547,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
           this.biomeKeysCache = newBiomeKeysCache;
           this.biomePrefixSumsCache = newBiomePrefixSumsCache;
         }
-        this.biomeLocationsDirty = false;
+        this.biomeLocationsDirty = (!pendingBiomeLocations.get().isEmpty() || !pendingBiomeRemovals.get().isEmpty());
 
         // 4. Read current volatile arrays
         long[] currentBadKeys = badKeysCache;
@@ -633,7 +633,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
         this.badKeysCache = newKeys;
         this.badPrefixSumsCache = newSums;
-        this.badLocationsDirty = false;
+        this.badLocationsDirty = !pendingBadLocations.get().isEmpty();
       } finally {
         isRebuilding.set(false);
       }

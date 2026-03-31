@@ -1,23 +1,28 @@
-package io.github.dailystruggle.rtp.common.commands.update;
+package io.github.dailystruggle.rtp.common.commands.config;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.parameters.*;
 import io.github.dailystruggle.rtp.common.commands.reload.ReloadCmd;
-import io.github.dailystruggle.rtp.common.commands.update.list.ListCmd;
+import io.github.dailystruggle.rtp.common.commands.config.list.ListCmd;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
+import io.github.dailystruggle.rtp.common.database.options.AbstractSQLDatabaseAccessor;
+import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
+import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
+import java.io.File;
 import java.io.IOException;
 import java.util.*;
 import java.util.function.Predicate;
@@ -28,12 +33,12 @@ import org.simpleyaml.configuration.ConfigurationSection;
 import org.simpleyaml.configuration.MemorySection;
 import org.simpleyaml.configuration.file.YamlFile;
 
-public class SubUpdateCmd extends BaseRTPCmdImpl {
+public class SubConfigCmd extends BaseRTPCmdImpl {
 
   private final String name;
   private final FactoryValue<?> factoryValue;
 
-  public SubUpdateCmd(
+  public SubConfigCmd(
       @Nullable CommandsAPICommand parent, String name, FactoryValue<?> factoryValue) {
     super(parent);
     this.name = name.toLowerCase();
@@ -48,7 +53,7 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
 
   @Override
   public String permission() {
-    return "rtp.update";
+    return "rtp.config";
   }
 
   @Override
@@ -143,6 +148,13 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
 
         if (key == null || value == null) continue;
         if (!getParameterLookup().containsKey(key.toLowerCase())) continue;
+
+        if (configParser.myClass.equals(io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.class) && key.equalsIgnoreCase("database.type")) {
+          Object oldValue = ((ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys>)configParser).getConfigValue(io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.database, "yaml");
+          String oldStr = String.valueOf(oldValue);
+          String newStr = value.toString();
+          RTP.handleMigration(oldStr, newStr);
+        }
 
         // todo: shape and vert updates
         if (key.equalsIgnoreCase("shape")) {
@@ -263,7 +275,7 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
       for (String target : add) {
         parser.addParser(target);
         ConfigParser<?> configParser = parser.getParser(target);
-        SubUpdateCmd subUpdateCmd = new SubUpdateCmd(this, configParser.name, configParser);
+        SubConfigCmd subUpdateCmd = new SubConfigCmd(this, configParser.name, configParser);
         subUpdateCmd.addParameters();
         addSubCommand(subUpdateCmd);
       }
@@ -356,11 +368,11 @@ public class SubUpdateCmd extends BaseRTPCmdImpl {
         Object entryValue = e.getValue();
         if (entryValue instanceof FactoryValue)
           addSubCommand(
-              new SubUpdateCmd(this, e.getKey().toString(), (FactoryValue<?>) entryValue));
+              new SubConfigCmd(this, e.getKey().toString(), (FactoryValue<?>) entryValue));
       }
       addParameter(
           "add",
-          new CommandParameter("rtp.update", "add a file", (uuid, s) -> true) {
+          new CommandParameter("rtp.config", "add a file", (uuid, s) -> true) {
             @Override
             public Set<String> values() {
               return new HashSet<>();

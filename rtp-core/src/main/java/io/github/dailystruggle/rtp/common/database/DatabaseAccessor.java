@@ -196,24 +196,26 @@ public abstract class DatabaseAccessor<D> {
     @NotNull CompletableFuture<Optional<Map<TableObj, TableObj>>> future = getTable(tableName);
 
     TableObj tableKey = new TableObj(key);
-    Map<TableObj, TableObj> table;
     if (!future.isDone()) {
       future.thenAccept(tableKeyEntryMap -> setValue(tableName, key, value));
       return;
     }
-    Optional<Map<TableObj, TableObj>> now = future.getNow(Optional.empty());
-    if (!now.isPresent()) {
-      table = new ConcurrentHashMap<>();
-      localTables.put(tableName, table);
-    } else {
-      table = now.get();
-    }
+    future.thenAccept(
+        now -> {
+          Map<TableObj, TableObj> table;
+          if (!now.isPresent()) {
+            table = new ConcurrentHashMap<>();
+            localTables.put(tableName, table);
+          } else {
+            table = now.get();
+          }
 
-    TableObj tableValue = new TableObj(value);
-    table.put(tableKey, tableValue);
-    Map<TableObj, TableObj> write = new HashMap<>();
-    write.put(tableKey, tableValue);
-    writeQueue.add(new AbstractMap.SimpleEntry<>(tableName, write));
+          TableObj tableValue = new TableObj(value);
+          table.put(tableKey, tableValue);
+          Map<TableObj, TableObj> write = new HashMap<>();
+          write.put(tableKey, tableValue);
+          writeQueue.add(new AbstractMap.SimpleEntry<>(tableName, write));
+        });
   }
 
   /**
@@ -223,29 +225,30 @@ public abstract class DatabaseAccessor<D> {
    * @param keyValuePairs the key-value pairs to set
    */
   public void setValue(String tableName, Map<?, ?> keyValuePairs) {
-    @NotNull CompletableFuture<Optional<Map<TableObj, TableObj>>> future = getTable(tableName);
+    getTable(tableName)
+        .thenAccept(
+            now -> {
+              Map<TableObj, TableObj> pairs = new HashMap<>();
+              for (Map.Entry<?, ?> entry : keyValuePairs.entrySet()) {
+                Object key = entry.getKey();
+                Object value = entry.getValue();
 
-    Map<TableObj, TableObj> pairs = new HashMap<>();
-    for (Map.Entry<?, ?> entry : keyValuePairs.entrySet()) {
-      Object key = entry.getKey();
-      Object value = entry.getValue();
+                TableObj tableKey = new TableObj(key);
+                Map<TableObj, TableObj> table;
 
-      TableObj tableKey = new TableObj(key);
-      Map<TableObj, TableObj> table;
+                if (!now.isPresent()) {
+                  table = new ConcurrentHashMap<>();
+                  localTables.put(tableName, table);
+                } else {
+                  table = now.get();
+                }
 
-      Optional<Map<TableObj, TableObj>> now = future.getNow(Optional.empty());
-      if (!now.isPresent()) {
-        table = new ConcurrentHashMap<>();
-        localTables.put(tableName, table);
-      } else {
-        table = now.get();
-      }
-
-      TableObj tableValue = new TableObj(value);
-      table.put(tableKey, tableValue);
-      pairs.put(tableKey, tableValue);
-    }
-    writeQueue.add(new AbstractMap.SimpleEntry<>(tableName, pairs));
+                TableObj tableValue = new TableObj(value);
+                table.put(tableKey, tableValue);
+                pairs.put(tableKey, tableValue);
+              }
+              writeQueue.add(new AbstractMap.SimpleEntry<>(tableName, pairs));
+            });
   }
 
   /**
@@ -283,6 +286,25 @@ public abstract class DatabaseAccessor<D> {
   }
 
   /**
+   * Cache a row's data without writing to the database. The row is stored using a
+   * composite key of the form {@code tableName + ":" + primaryKey}.
+   *
+   * The primary key is inferred from common identifiers, in order of preference:
+   * "id", "uuid", "key", "primaryKey", "senderId", "name". If none are present,
+   * a deterministic fallback based on {@code data.hashCode()} is used.
+   *
+   * @param data the row data to cache
+   */
+  public void cacheValue(TeleportData data) {
+    cacheValue("teleportData", toColumns(data));
+  }
+
+  /**
+   * Write all queued operations to the database.
+   */
+  public void flush() {}
+
+  /**
    * Write all cached/dirty rows to the database and clear the cache.
    *
    * Each entry in {@code dirtyCache} is identified by a composite key
@@ -290,6 +312,7 @@ public abstract class DatabaseAccessor<D> {
    * {@code setValue(tableName, Map<?, ?> keyValuePairs)} is used for the write.
    */
   public void flushDirtyCache() {
+    flush();
     if (dirtyCache.isEmpty()) return;
 
     Iterator<Map.Entry<String, Map<String, Object>>> iterator = dirtyCache.entrySet().iterator();

@@ -221,6 +221,14 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, YamlFile>> {
   }
 
   @Override
+  public void cacheValue(TeleportData data) {
+    Map<String, Object> dataMap = toColumns(data);
+    Map<String, Object> saveMap = new HashMap<>();
+    saveMap.put(data.sender.uuid().toString(), dataMap);
+    cacheValue("teleportData", saveMap);
+  }
+
+  @Override
   public void startup() {
     Map<String, YamlFile> lookup = connect();
     @NotNull

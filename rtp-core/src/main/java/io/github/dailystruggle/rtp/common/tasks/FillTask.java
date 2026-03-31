@@ -340,95 +340,99 @@ public class FillTask extends RTPRunnable {
           }
 
           chunk.keep(true);
-          RTPChunk<?>[] localChunks = new RTPChunk[(safetyRadius * 2 + 1) * (safetyRadius * 2 + 1)];
-          MutableRTPCoords localCursor = new MutableRTPCoords(blockX, blockZ);
-          localCursor.setWorldName(world.name());
           try {
-          if (!vert.adjust(chunk, localCursor)) {
-            if (biomeRecall) shape.addBadLocation(pos, region.getSettings().spatialResolution());
-            res.complete(false);
-            return;
-          }
+            RTPChunk<?>[] localChunks = new RTPChunk[(safetyRadius * 2 + 1) * (safetyRadius * 2 + 1)];
+            MutableRTPCoords localCursor = new MutableRTPCoords(blockX, blockZ);
+            localCursor.setWorldName(world.name());
+            try {
+              if (!vert.adjust(chunk, localCursor)) {
+                if (biomeRecall) shape.addBadLocation(pos, region.getSettings().spatialResolution());
+                res.complete(false);
+                return;
+              }
 
-          String currBiome1 = world.getBiome(localCursor.x, localCursor.y, localCursor.z);
-          if (!defaultBiomes.contains(currBiome1)) {
-            if (biomeRecall) {
-              shape.addBadLocation(pos, region.getSettings().spatialResolution());
-              res.complete(false);
-              return;
-            }
-          }
-
-          boolean pass = localCursor.y < vert.maxY();
-          if (!pass) {
-            shape.addBadLocation(pos, region.getSettings().spatialResolution());
-            res.complete(false);
-            return;
-          }
-
-          // todo: waterlogged check
-          int centerChunkX = chunk.x();
-          int centerChunkZ = chunk.z();
-          int L = safetyRadius * 2 + 1;
-          localChunks[safetyRadius * L + safetyRadius] = chunk;
-          chunk.keep(true);
-          try {
-            for (int x = localCursor.x - safetyRadius; x < localCursor.x + safetyRadius && pass; x++) {
-              int chunkX = x >> 4;
-              int xx = x & 15;
-              int dcX = chunkX - centerChunkX;
-
-              for (int z = localCursor.z - safetyRadius; z < localCursor.z + safetyRadius && pass; z++) {
-                int chunkZ = z >> 4;
-                int zz = z & 15;
-                int dcZ = chunkZ - centerChunkZ;
-
-                int index = (dcX + safetyRadius) * L + (dcZ + safetyRadius);
-                RTPChunk<?> chunk1 = localChunks[index];
-                if (chunk1 == null) {
-                  long neighborKey =
-                      ((long) chunkX & 0xFFFFFFFFL) | (((long) chunkZ & 0xFFFFFFFFL) << 32);
-                  chunk1 = region.getWorld().getCachedChunk(neighborKey);
-                  if (chunk1 == null) {
-                    pass = false;
-                    break;
-                  }
-                  localChunks[index] = chunk1;
-                  chunk1.keep(true);
+              String currBiome1 = world.getBiome(localCursor.x, localCursor.y, localCursor.z);
+              if (!defaultBiomes.contains(currBiome1)) {
+                if (biomeRecall) {
+                  shape.addBadLocation(pos, region.getSettings().spatialResolution());
+                  res.complete(false);
+                  return;
                 }
+              }
 
-                for (int y = localCursor.y - safetyRadius; y < localCursor.y + safetyRadius && pass; y++) {
-                  if (!chunk1.isSafe(xx, y, zz, unsafeBlocks)) {
-                    pass = false;
+              boolean pass = localCursor.y < vert.maxY();
+              if (!pass) {
+                shape.addBadLocation(pos, region.getSettings().spatialResolution());
+                res.complete(false);
+                return;
+              }
+
+              // todo: waterlogged check
+              int centerChunkX = chunk.x();
+              int centerChunkZ = chunk.z();
+              int L = safetyRadius * 2 + 1;
+              localChunks[safetyRadius * L + safetyRadius] = chunk;
+              chunk.keep(true);
+              try {
+                for (int x = localCursor.x - safetyRadius; x <= localCursor.x + safetyRadius && pass; x++) {
+                  int chunkX = x >> 4;
+                  int xx = x & 15;
+                  int dcX = chunkX - centerChunkX;
+
+                  for (int z = localCursor.z - safetyRadius; z <= localCursor.z + safetyRadius && pass; z++) {
+                    int chunkZ = z >> 4;
+                    int zz = z & 15;
+                    int dcZ = chunkZ - centerChunkZ;
+
+                    int index = (dcX + safetyRadius) * L + (dcZ + safetyRadius);
+                    RTPChunk<?> chunk1 = localChunks[index];
+                    if (chunk1 == null) {
+                      long neighborKey =
+                          ((long) chunkX & 0xFFFFFFFFL) | (((long) chunkZ & 0xFFFFFFFFL) << 32);
+                      chunk1 = region.getWorld().getCachedChunk(neighborKey);
+                      if (chunk1 == null) {
+                        pass = false;
+                        break;
+                      }
+                      localChunks[index] = chunk1;
+                      chunk1.keep(true);
+                    }
+
+                    for (int y = localCursor.y - safetyRadius; y <= localCursor.y + safetyRadius && pass; y++) {
+                      if (!chunk1.isSafe(xx, y, zz, unsafeBlocks)) {
+                        pass = false;
+                      }
+                    }
+                  }
+                }
+              } finally {
+                for (int i = 0; i < localChunks.length; i++) {
+                  if (localChunks[i] != null) {
+                    localChunks[i].keep(false);
+                    localChunks[i] = null;
                   }
                 }
               }
-            }
-          } finally {
-            for (int i = 0; i < localChunks.length; i++) {
-              if (localChunks[i] != null) {
-                localChunks[i].keep(false);
-                localChunks[i] = null;
+
+              if (isCancelled()) {
+                res.complete(false);
+                return;
               }
-            }
-          }
 
-            if (isCancelled()) {
-              res.complete(false);
-              return;
-            }
+              if (pass) pass = GlobalRegionVerifiers.checkGlobalRegionVerifiers(localCursor);
 
-            if (pass) pass = GlobalRegionVerifiers.checkGlobalRegionVerifiers(localCursor);
-
-            if (pass) {
-              if (biomeRecall) shape.addBiomeLocation(pos, currBiome1);
-              res.complete(true);
-            } else {
-              shape.addBadLocation(pos, region.getSettings().spatialResolution());
-              res.complete(false);
+              if (pass) {
+                if (biomeRecall) shape.addBiomeLocation(pos, currBiome1);
+                res.complete(true);
+              } else {
+                shape.addBadLocation(pos, region.getSettings().spatialResolution());
+                res.complete(false);
+              }
+            } finally {
+              chunk.keep(false);
             }
-          } finally {
-            chunk.keep(false);
+          } catch (Exception e) {
+            res.complete(false);
           }
         });
     return res;

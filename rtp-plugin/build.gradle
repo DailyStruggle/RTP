@@ -41,6 +41,7 @@ shadowJar {
     relocate 'org.bstats', 'io.github.dailystruggle.rtp.bstats'
     relocate 'io.github.dailystruggle.commandsapi', 'io.github.dailystruggle.rtp.commandsapi'
     relocate 'io.github.dailystruggle.effectsapi', 'io.github.dailystruggle.rtp.effectsapi'
+    relocate 'com.zaxxer.hikari', 'io.github.dailystruggle.rtp.hikari'
     relocate 'org.yaml.snakeyaml', 'io.github.dailystruggle.rtp.snakeyaml'
     relocate 'me.carleslc.Simple-YAML', 'io.github.dailystruggle.rtp.Simple-Yaml'
 }

@@ -6,6 +6,9 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -28,6 +31,18 @@ public class RegionCacheTask extends RTPRunnable {
 
     @Override
     public void run() {
+        int activeChunkCap = region.getSettings().activeChunkCap();
+        if (activeChunkCap > 0) {
+            List<Map.Entry<RTPCoords, Long>> snapshot = new ArrayList<>(activeChunkCap);
+            Iterator<Map.Entry<RTPCoords, Long>> iterator = region.queueManager.locationQueue.iterator();
+            for (int i = 0; i < activeChunkCap && iterator.hasNext(); i++) {
+                snapshot.add(iterator.next());
+            }
+            for (Map.Entry<RTPCoords, Long> entry : snapshot) {
+                region.chunkManager.addTicket(entry.getKey());
+            }
+        }
+
         region.inFlightCalculations.incrementAndGet();
         GenerationResult res = LocationGenerator.getLocation(region, (java.util.Set<String>) null);
         if (res != null) {

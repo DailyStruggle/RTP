@@ -86,18 +86,25 @@ public class LocationGenerator {
                 RTPWorld<?> world = region.getWorld();
                 int cx = left.x() >> 4;
                 int cz = left.z() >> 4;
-                CompletableFuture<Long> chunkAt =
-                        RTP.serverAccessor.getChunkManager().getChunkAtAsync(world, cx, cz);
+                ChunkSet ticket = region.chunkManager.addTicket(cx, cz);
                 RTPChunk chunk;
                 try {
+                    CompletableFuture<Long> chunkAt = ticket.chunks.get(0);
                     Long chunkKey = chunkAt.get();
-                    if (chunkKey == null) continue;
+                    if (chunkKey == null) {
+                        region.chunkManager.removeTicket(cx, cz);
+                        continue;
+                    }
                     chunk = world.getCachedChunk(chunkKey);
                 } catch (InterruptedException | ExecutionException e) {
                     RTP.log(Level.WARNING, e.getMessage(), e);
+                    region.chunkManager.removeTicket(cx, cz);
                     continue;
                 }
-                if (chunk == null) continue;
+                if (chunk == null) {
+                    region.chunkManager.removeTicket(cx, cz);
+                    continue;
+                }
 
                 try {
 
@@ -212,7 +219,7 @@ public class LocationGenerator {
                     success = true;
                     return new GenerationResult(left, pair.getValue(), chunkSet);
                 } finally {
-                    if (!success) chunk.unload();
+                    if (!success) region.chunkManager.removeTicket(cx, cz);
                 }
             }
         }
@@ -520,20 +527,27 @@ public class LocationGenerator {
                 continue;
             }
 
-            CompletableFuture<Long> cfChunk =
-                    RTP.serverAccessor.getChunkManager().getChunkAtAsync(world, select[0], select[1]);
-            RTP.futures.add(cfChunk);
-
+            int cx = select[0];
+            int cz = select[1];
+            ChunkSet ticket = region.chunkManager.addTicket(cx, cz);
             RTPChunk<?> chunk;
             try {
+                CompletableFuture<Long> cfChunk = ticket.chunks.get(0);
                 Long key = cfChunk.get();
-                if (key == null) continue;
+                if (key == null) {
+                    region.chunkManager.removeTicket(cx, cz);
+                    continue;
+                }
                 chunk = world.getCachedChunk(key);
             } catch (InterruptedException | ExecutionException e) {
                 RTP.log(Level.WARNING, e.getMessage(), e);
+                region.chunkManager.removeTicket(cx, cz);
                 continue;
             }
-            if (chunk == null) continue;
+            if (chunk == null) {
+                region.chunkManager.removeTicket(cx, cz);
+                continue;
+            }
 
             try {
                 RTPCoords res = vert.adjust(chunk);
@@ -614,7 +628,7 @@ public class LocationGenerator {
                                 break safetyCheck;
                             }
 
-                            for (int y = finalY - safetyRadius; y < finalY + safetyRadius; y++) {
+                            for (int y = finalY - safetyRadius; y <= finalY + safetyRadius; y++) {
                                 if (y > region.getWorld().getMaxHeight() || y < region.getWorld().getMinHeight()) continue;
                                 if (!chunk1.isSafe(xx, y, zz, unsafeBlocks)) {
                                     pass = false;
@@ -655,7 +669,7 @@ public class LocationGenerator {
                 locationFound = true;
                 break;
             } finally {
-                if (!locationFound) chunk.unload();
+                if (!locationFound) region.chunkManager.removeTicket(cx, cz);
             }
         }
 

@@ -14,6 +14,10 @@ public enum ConfigKeys {
   consoleCommands,
   /** Commands to run as player */
   playerCommands,
+  /** Database configuration */
+  database,
+  /** Network configuration */
+  network,
   /** Configuration version */
   version
 }
