@@ -244,6 +244,7 @@ public class LocationGenerator {
             TeleportData data = RTP.getInstance().latestTeleportData.get(playerId);
             if (data == null) {
                 data = new TeleportData();
+                io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(data, "TeleportData-" + playerId.toString(), 120000L);
                 data.sender = (sender != null) ? sender : player;
                 data.completed = false;
                 data.time = System.currentTimeMillis();

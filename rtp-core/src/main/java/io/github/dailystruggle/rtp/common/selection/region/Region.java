@@ -23,7 +23,6 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
-import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 public class Region extends FactoryValue<RegionKeys> {
@@ -63,10 +62,10 @@ public class Region extends FactoryValue<RegionKeys> {
     final long cacheCap = settings.cacheCap();
     final long playerQueueSize = queueManager.playerQueue.size();
     final long totalCap = Math.max(cacheCap, playerQueueSize);
+    long deficit = totalCap - (cachePipeline.size() + queueManager.locationQueue.size() + inFlightCalculations.get());
 
-    for (long i = cachePipeline.size() + inFlightCalculations.get(); i < totalCap; i++) {
+    for (long i = 0; i < deficit; i++) {
       cachePipeline.add(new RegionCacheTask(this));
-      inFlightCalculations.incrementAndGet();
     }
   }
 
@@ -79,9 +78,9 @@ public class Region extends FactoryValue<RegionKeys> {
     long cacheCap = settings.cacheCap();
     long playerQueueSize = queueManager.playerQueue.size();
     long totalCap = Math.max(cacheCap, playerQueueSize);
-    for (long i = cachePipeline.size() + inFlightCalculations.get(); i < totalCap; i++) {
+    long deficit = totalCap - (cachePipeline.size() + queueManager.locationQueue.size() + inFlightCalculations.get());
+    for (long i = 0; i < deficit; i++) {
       cachePipeline.add(new RegionCacheTask(this));
-      inFlightCalculations.incrementAndGet();
     }
   }
 
@@ -137,6 +136,7 @@ public class Region extends FactoryValue<RegionKeys> {
         RTP.getInstance().processingPlayers.add(id);
         if (data == null) {
           data = new TeleportData();
+          io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(data, "TeleportData-" + id.toString(), 120000L);
           data.completed = false;
           data.sender = RTP.serverAccessor.getSender(CommandsAPI.serverId);
           data.time = System.currentTimeMillis();
@@ -155,23 +155,20 @@ public class Region extends FactoryValue<RegionKeys> {
       }
     }
 
-    currentAvailable -= (System.nanoTime() - start);
+    currentAvailable = availableTime - (System.nanoTime() - start);
     if (currentAvailable <= 0) return;
 
     boolean miscFinished = miscPipeline.execute(currentAvailable);
     if (!miscFinished) return;
-    currentAvailable -= (System.nanoTime() - start);
+    currentAvailable = availableTime - (System.nanoTime() - start);
     if (currentAvailable <= 0) return;
 
-    long cacheCap = settings.cacheCap();
-    cacheCap = Math.max(cacheCap, queueManager.playerQueue.size());
+    long totalCap = Math.max(settings.cacheCap(), queueManager.playerQueue.size());
     if (!isRefillingCache.compareAndSet(false, true)) return;
     try {
-      if (queueManager.locationQueue.size() + inFlightCalculations.get() >= cacheCap) return;
-      while (cachePipeline.size() + queueManager.locationQueue.size() + inFlightCalculations.get()
-          < cacheCap + queueManager.playerQueue.size()) {
+      long deficit = totalCap - (cachePipeline.size() + queueManager.locationQueue.size() + inFlightCalculations.get());
+      for (long i = 0; i < deficit; i++) {
         cachePipeline.add(new RegionCacheTask(this));
-        inFlightCalculations.incrementAndGet();
       }
       cachePipeline.execute(currentAvailable);
     } finally {

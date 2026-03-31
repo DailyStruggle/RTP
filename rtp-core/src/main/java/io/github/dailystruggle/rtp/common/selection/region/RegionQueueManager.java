@@ -47,7 +47,6 @@ public class RegionQueueManager {
      */
     public void queue(UUID id) {
         perPlayerLocationQueue.putIfAbsent(id, new ConcurrentLinkedQueue<>());
-        region.inFlightCalculations.incrementAndGet();
         region.miscPipeline.add(new RegionCacheTask(region, id));
     }
 

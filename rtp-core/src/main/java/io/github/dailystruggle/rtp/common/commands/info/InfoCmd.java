@@ -13,6 +13,8 @@ import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tools.ParseString;
+import io.github.dailystruggle.rtp.common.selection.region.ChunkSet;
+import io.github.dailystruggle.rtp.common.tools.PerformanceTracker;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
@@ -50,6 +52,9 @@ public class InfoCmd extends BaseRTPCmdImpl {
     regionDataLookup.put("shape", region -> region.getShape().name);
     regionDataLookup.put("cacheCap", region -> region.getNumber(RegionKeys.cacheCap, 0).toString());
     regionDataLookup.put("cached", region -> String.valueOf(region.queueManager.getPublicQueueLength()));
+    regionDataLookup.put("locationQueue", region -> String.valueOf(region.queueManager.locationQueue.size()));
+    regionDataLookup.put("locAssChunks", region -> String.valueOf(region.chunkManager.locAssChunks.size()));
+    regionDataLookup.put("inFlightCalculations", region -> String.valueOf(region.inFlightCalculations.get()));
     regionDataLookup.put(
         "worldBorderOverride",
         region -> {
@@ -132,9 +137,27 @@ public class InfoCmd extends BaseRTPCmdImpl {
           .forEach(
               region -> {
                 String msg = regions.replaceAll("\\[region]", region.name);
+                msg = msg.replaceAll("\\[locationQueue]", String.valueOf(region.queueManager.locationQueue.size()));
+                msg = msg.replaceAll("\\[locAssChunks]", String.valueOf(region.chunkManager.locAssChunks.size()));
+                msg = msg.replaceAll("\\[inFlightCalculations]", String.valueOf(region.inFlightCalculations.get()));
                 RTP.serverAccessor.sendMessageAndSuggest(
                     callerId, msg, "rtp info region:" + region.name);
               });
+
+      RTP rtp = RTP.getInstance();
+      long activeTickets = ChunkSet.ACTIVE_CHUNK_TICKETS.get();
+      long totalLoads = ChunkSet.TOTAL_CHUNK_LOADS.get();
+      double leakRate = (totalLoads > 0) ? ((double) activeTickets / totalLoads) * 100.0 : 0.0;
+
+      RTP.serverAccessor.sendMessage(callerId, "&7Global Active Chunk Tickets: &f" + activeTickets);
+      RTP.serverAccessor.sendMessage(callerId, "&7Active Teleport State Machines: &f" + rtp.latestTeleportData.size());
+      RTP.serverAccessor.sendMessage(callerId, "&7Current Plugin MSPT: &f" + String.format("%.4f", PerformanceTracker.pluginMSPT));
+      RTP.serverAccessor.sendMessage(callerId, "&7Lifetime Chunks Loaded: &f" + totalLoads);
+      RTP.serverAccessor.sendMessage(callerId, "&7Current Chunk Leak Rate: &f" + String.format("%.4f%%", leakRate));
+
+      RTP.serverAccessor.sendMessage(callerId, "&7--- Diagnostic Disclaimer ---");
+      RTP.serverAccessor.sendMessage(callerId, "&7Diagnostic Note: If the server's total orphaned chunk count exceeds this plugin's lifetime loads ([" + totalLoads + "]), this plugin is not the sole source of the memory leak.");
+
       return true;
     }
 

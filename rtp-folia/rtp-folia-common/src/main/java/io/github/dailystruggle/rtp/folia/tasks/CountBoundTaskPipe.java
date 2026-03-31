@@ -24,9 +24,11 @@ public class CountBoundTaskPipe extends RTPTaskPipe {
     }
 
     @Override
-    public boolean execute(long ignoredTime) {
+    public boolean execute(long availableTime) {
         if (stop) return true;
-        for (int i = 0; i < maxTasksPerTick; i++) {
+        long start = System.nanoTime();
+        long dt = 0;
+        for (int i = 0; i < maxTasksPerTick && dt < availableTime; i++) {
             Runnable runnable = runnables.poll();
             if (runnable == null) break;
 
@@ -36,10 +38,9 @@ public class CountBoundTaskPipe extends RTPTaskPipe {
             }
 
             if (rtpLocation == null) {
-                Bukkit.getAsyncScheduler().runNow(plugin, scheduledTask -> {
-                    if (runnable instanceof RTPRunnable) ((RTPRunnable) runnable).runWithTracking();
-                    else runnable.run();
-                });
+                if (runnable instanceof RTPRunnable) ((RTPRunnable) runnable).runWithTracking();
+                else runnable.run();
+                dt = System.nanoTime() - start;
             } else {
                 if (rtpLocation.world() instanceof FoliaRTPWorld) {
                     World world = ((FoliaRTPWorld) rtpLocation.world()).world();

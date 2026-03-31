@@ -6,7 +6,6 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shap
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
@@ -375,7 +374,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         this.badLocationsDirty = false;
 
         // Biome logic (similar to bad locations but per biome)
-        // Note: The issue description primarily focuses on the bad locations, 
+        // Note: The issue description primarily focuses on the bad locations,
         // but we should maintain consistency for biomes if they were dirty.
         if (!localPendingBiome.isEmpty() || !localPendingBiomeRemovals.isEmpty()) {
           ConcurrentHashMap<String, long[]> newBiomeKeysCache = new ConcurrentHashMap<>(biomeKeysCache);

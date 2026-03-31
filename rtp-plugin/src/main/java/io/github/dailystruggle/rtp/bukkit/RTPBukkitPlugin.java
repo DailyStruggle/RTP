@@ -22,7 +22,6 @@ import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.database.options.SQLiteDatabaseAccessor;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.tasks.TPS;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import java.io.File;
@@ -237,7 +236,6 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     RTP.scheduler.runTaskLater(this::setupIntegrations, 1);
     RTP.scheduler.runTaskLater(this::setupEffects, 1);
 
-    RTP.scheduler.runTaskTimer(new TPS(), 0, 1);
     if (!isFolia()) {
       RTP.scheduler.runTaskTimer(new ChunkUnloadProcessor(), 1, 1);
     }

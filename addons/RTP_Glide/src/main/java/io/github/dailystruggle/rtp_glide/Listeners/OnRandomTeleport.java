@@ -35,7 +35,7 @@ public final class OnRandomTeleport implements Listener {
    */
   @EventHandler(priority = EventPriority.NORMAL)
   public void onRandomTeleport(PostTeleportEvent event) {
-    RTPWorld rtpWorld = event.getDoTeleport().location().world();
+    RTPWorld rtpWorld = event.getDoTeleport().region().getWorld();
     World world = Bukkit.getWorld(rtpWorld.id());
     Player player = Bukkit.getPlayer(event.getDoTeleport().player().uuid());
     if (world == null || world.getEnvironment().equals(World.Environment.NETHER)) return;

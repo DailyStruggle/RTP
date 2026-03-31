@@ -4,7 +4,7 @@ import java.lang.ref.WeakReference;
 
 /** Class for tracking objects with a weak reference and an expected lifespan. */
 public class TrackedObject {
-  private final WeakReference<Object> weakReference;
+  private final WeakReference<Object> targetRef;
   private final String label;
   private final long maxExpectedLifespan;
   private final long creationTime;
@@ -15,7 +15,7 @@ public class TrackedObject {
    * @param maxExpectedLifespan the expected maximum lifespan in milliseconds
    */
   public TrackedObject(Object target, String label, long maxExpectedLifespan) {
-    this.weakReference = new WeakReference<>(target);
+    this.targetRef = new WeakReference<>(target);
     this.label = label;
     this.maxExpectedLifespan = maxExpectedLifespan;
     this.creationTime = System.currentTimeMillis();
@@ -26,14 +26,14 @@ public class TrackedObject {
    */
   public boolean isLeaking() {
     return (System.currentTimeMillis() - creationTime > maxExpectedLifespan)
-        && (weakReference.get() != null);
+        && (targetRef.get() != null);
   }
 
   /**
    * @return true if the object has been garbage collected
    */
   public boolean isCollected() {
-    return weakReference.get() == null;
+    return targetRef.get() == null;
   }
 
   /**

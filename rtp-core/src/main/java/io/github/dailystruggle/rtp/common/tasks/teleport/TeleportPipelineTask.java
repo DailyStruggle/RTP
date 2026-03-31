@@ -4,7 +4,6 @@ import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.selection.GenerationContext;
-import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
@@ -110,7 +109,8 @@ public final class TeleportPipelineTask extends RTPRunnable {
   @Override
   public void run() {
     if (isCancelled()) {
-      if (region != null) region.inFlightCalculations.decrementAndGet();
+      currentPhase = Phase.CLEANUP;
+      runCleanup();
       return;
     }
     switch (currentPhase) {
@@ -132,7 +132,8 @@ public final class TeleportPipelineTask extends RTPRunnable {
   private void runSetup() {
     setupPreActions.forEach(consumer -> consumer.accept(this));
     if (isCancelled()) {
-      if (region != null) region.inFlightCalculations.decrementAndGet();
+      currentPhase = Phase.CLEANUP;
+      runCleanup();
       return;
     }
 
@@ -152,6 +153,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
       teleportData = RTP.getInstance().latestTeleportData.get(playerId);
       if (teleportData == null) {
         teleportData = new TeleportData();
+        io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(teleportData, "TeleportData-" + playerId.toString(), 120000L);
         teleportData.sender = (context.sender() != null) ? context.sender() : player;
         teleportData.completed = false;
         teleportData.time = System.currentTimeMillis();
@@ -216,7 +218,8 @@ public final class TeleportPipelineTask extends RTPRunnable {
   private void runLoad() {
     loadPreActions.forEach(consumer -> consumer.accept(this));
     if (isCancelled()) {
-      region.inFlightCalculations.decrementAndGet();
+      currentPhase = Phase.CLEANUP;
+      runCleanup();
       return;
     }
 
@@ -230,6 +233,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
       teleportData = RTP.getInstance().latestTeleportData.get(playerId);
       if (teleportData == null) {
         teleportData = new TeleportData();
+        io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(teleportData, "TeleportData-" + playerId.toString(), 120000L);
         teleportData.sender = (context.sender() != null) ? context.sender() : player;
         teleportData.completed = false;
         teleportData.time = System.currentTimeMillis();
@@ -284,7 +288,8 @@ public final class TeleportPipelineTask extends RTPRunnable {
   private void runTeleport() {
     teleportPreActions.forEach(consumer -> consumer.accept(this));
     if (isCancelled()) {
-      region.inFlightCalculations.decrementAndGet();
+      currentPhase = Phase.CLEANUP;
+      runCleanup();
       return;
     }
 
@@ -338,6 +343,9 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
   private void runCleanup() {
     cleanupPreActions.forEach(consumer -> consumer.accept(this));
+    if (isCancelled()) {
+      if (region != null) region.inFlightCalculations.decrementAndGet();
+    }
     if (region == null || coords == null) return;
     ChunkSet chunkSet = region.chunkManager.locAssChunks.get(coords);
     if (chunkSet == null) return;

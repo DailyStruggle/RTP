@@ -356,6 +356,18 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   }
 
   @Override
+  public double getTPS(int ticks) {
+    try {
+      Object server = Bukkit.getServer();
+      java.lang.reflect.Field field = server.getClass().getField("recentTps");
+      double[] tps = (double[]) field.get(server);
+      return tps[0];
+    } catch (Exception e) {
+      return 20.0;
+    }
+  }
+
+  @Override
   public void setBiomeGetter(Function<RTPLocation, String> getter) {
     BukkitRTPWorld.setBiomeGetter(
         location ->
