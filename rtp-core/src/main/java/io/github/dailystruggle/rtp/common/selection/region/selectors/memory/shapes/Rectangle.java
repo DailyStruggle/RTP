@@ -57,7 +57,7 @@ public class Rectangle extends MemoryShape<RectangleParams> {
   }
 
   @Override
-  public double xzToLocation(long x, long z) {
+  public long xzToLocation(long x, long z) {
     long degrees = getNumber(RectangleParams.rotation, 0L).longValue();
     long cx = getNumber(RectangleParams.centerX, 0L).longValue();
     long cz = getNumber(RectangleParams.centerZ, 0L).longValue();
@@ -76,7 +76,7 @@ public class Rectangle extends MemoryShape<RectangleParams> {
   }
 
   @Override
-  public double xzToLocation(MutableRTPCoords coords) {
+  public long xzToLocation(MutableRTPCoords coords) {
     long degrees = getNumber(RectangleParams.rotation, 0L).longValue();
     long cx = getNumber(RectangleParams.centerX, 0L).longValue();
     long cz = getNumber(RectangleParams.centerZ, 0L).longValue();

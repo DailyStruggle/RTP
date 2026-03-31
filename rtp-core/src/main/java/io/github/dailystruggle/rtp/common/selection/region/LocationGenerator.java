@@ -580,12 +580,12 @@ public class LocationGenerator {
                 chunk.keep(true);
                 try {
                     safetyCheck:
-                    for (int x = finalX - safetyRadius; x < finalX + safetyRadius; x++) {
+                    for (int x = finalX - safetyRadius; x <= finalX + safetyRadius; x++) {
                         int chunkX = x >> 4;
                         int xx = x & 15;
                         int dcX = chunkX - centerChunkX;
 
-                        for (int z = finalZ - safetyRadius; z < finalZ + safetyRadius; z++) {
+                        for (int z = finalZ - safetyRadius; z <= finalZ + safetyRadius; z++) {
                             int chunkZ = z >> 4;
                             int zz = z & 15;
                             int dcZ = chunkZ - centerChunkZ;

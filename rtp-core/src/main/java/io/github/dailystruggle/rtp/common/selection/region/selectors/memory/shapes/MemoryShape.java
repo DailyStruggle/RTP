@@ -78,7 +78,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @param z the z coordinate
    * @return the location value
    */
-  public abstract double xzToLocation(long x, long z);
+  public abstract long xzToLocation(long x, long z);
 
   /**
    * Convert xz coordinates to a location value
@@ -86,7 +86,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @param coords the coordinates
    * @return the location value
    */
-  public abstract double xzToLocation(MutableRTPCoords coords);
+  public abstract long xzToLocation(MutableRTPCoords coords);
 
   /**
    * Convert a location value to xz coordinates
@@ -313,6 +313,242 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         ConcurrentHashMap<String, ConcurrentHashMap<Long, Boolean>> localPendingBiomeRemovals =
             pendingBiomeRemovals.getAndSet(new ConcurrentHashMap<>());
 
+        // Biome logic (similar to bad locations but per biome)
+        if (!localPendingBiome.isEmpty() || !localPendingBiomeRemovals.isEmpty()) {
+          ConcurrentHashMap<String, long[]> newBiomeKeysCache = new ConcurrentHashMap<>(biomeKeysCache);
+          ConcurrentHashMap<String, long[]> newBiomePrefixSumsCache = new ConcurrentHashMap<>(biomePrefixSumsCache);
+
+          Set<String> affectedBiomes = new HashSet<>();
+          affectedBiomes.addAll(localPendingBiome.keySet());
+          affectedBiomes.addAll(localPendingBiomeRemovals.keySet());
+
+          for (String biome : affectedBiomes) {
+            long[] currentBiomeKeys = biomeKeysCache.getOrDefault(biome, new long[0]);
+            long[] currentBiomePrefixSums = biomePrefixSumsCache.getOrDefault(biome, new long[0]);
+
+            ConcurrentHashMap<Long, Long> additions = localPendingBiome.getOrDefault(biome, new ConcurrentHashMap<>());
+            ConcurrentHashMap<Long, Boolean> removals = localPendingBiomeRemovals.getOrDefault(biome, new ConcurrentHashMap<>());
+
+            long[] pendingBiomeKeys = new long[additions.size()];
+            long[] pendingBiomeLengths = new long[additions.size()];
+            int pbIdx = 0;
+            for (Map.Entry<Long, Long> entry : additions.entrySet()) {
+              pendingBiomeKeys[pbIdx] = entry.getKey();
+              pendingBiomeLengths[pbIdx] = entry.getValue();
+              pbIdx++;
+            }
+
+            // Sort keys while maintaining length mappings
+            sortParallelArrays(pendingBiomeKeys, pendingBiomeLengths, 0, pendingBiomeKeys.length - 1);
+
+            long[] mKeys = new long[currentBiomeKeys.length + pendingBiomeKeys.length];
+            long[] mLengths = new long[currentBiomeKeys.length + pendingBiomeKeys.length];
+            int mIdx = 0;
+
+            int bi = 0;
+            int bj = 0;
+            long cStart = -1;
+            long cLength = -1;
+
+            while (bi < currentBiomeKeys.length || bj < pendingBiomeKeys.length) {
+              long nKey;
+              long nLength;
+
+              if (bi < currentBiomeKeys.length && bj < pendingBiomeKeys.length) {
+                if (currentBiomeKeys[bi] <= pendingBiomeKeys[bj]) {
+                  nKey = currentBiomeKeys[bi];
+                  long prevSum = (bi > 0) ? currentBiomePrefixSums[bi - 1] : 0L;
+                  nLength = currentBiomePrefixSums[bi] - prevSum;
+                  bi++;
+                } else {
+                  nKey = pendingBiomeKeys[bj];
+                  nLength = pendingBiomeLengths[bj];
+                  bj++;
+                }
+              } else if (bi < currentBiomeKeys.length) {
+                nKey = currentBiomeKeys[bi];
+                long prevSum = (bi > 0) ? currentBiomePrefixSums[bi - 1] : 0L;
+                nLength = currentBiomePrefixSums[bi] - prevSum;
+                bi++;
+              } else {
+                nKey = pendingBiomeKeys[bj];
+                nLength = pendingBiomeLengths[bj];
+                bj++;
+              }
+
+              if (nKey < 0) continue;
+
+              if (cStart == -1) {
+                cStart = nKey;
+                cLength = nLength;
+              } else {
+                if (nKey <= cStart + cLength) {
+                  cLength = Math.max(cLength, nKey + nLength - cStart);
+                } else {
+                  mKeys[mIdx] = cStart;
+                  mLengths[mIdx] = cLength;
+                  mIdx++;
+                  cStart = nKey;
+                  cLength = nLength;
+                }
+              }
+            }
+            if (cStart != -1) {
+              mKeys[mIdx] = cStart;
+              mLengths[mIdx] = cLength;
+              mIdx++;
+            }
+
+            // Handle removals
+            if (!removals.isEmpty()) {
+              long[] sortedRemovals = new long[removals.size()];
+              int rIdx = 0;
+              for (Long rLoc : removals.keySet()) {
+                sortedRemovals[rIdx++] = rLoc;
+              }
+              Arrays.sort(sortedRemovals);
+
+              long[] postRemovalKeys = new long[mIdx + sortedRemovals.length];
+              long[] postRemovalLengths = new long[mIdx + sortedRemovals.length];
+              int prIdx = 0;
+
+              int currentSpanIdx = 0;
+              int currentRemIdx = 0;
+
+              while (currentSpanIdx < mIdx) {
+                long spanStart = mKeys[currentSpanIdx];
+                long spanEnd = spanStart + mLengths[currentSpanIdx];
+
+                long lastStart = spanStart;
+                while (currentRemIdx < sortedRemovals.length && sortedRemovals[currentRemIdx] < spanEnd) {
+                  long rLoc = sortedRemovals[currentRemIdx];
+                  if (rLoc >= lastStart) {
+                    if (rLoc > lastStart) {
+                      postRemovalKeys[prIdx] = lastStart;
+                      postRemovalLengths[prIdx] = rLoc - lastStart;
+                      prIdx++;
+                    }
+                    lastStart = rLoc + 1;
+                  }
+                  currentRemIdx++;
+                }
+
+                if (lastStart < spanEnd) {
+                  postRemovalKeys[prIdx] = lastStart;
+                  postRemovalLengths[prIdx] = spanEnd - lastStart;
+                  prIdx++;
+                }
+                currentSpanIdx++;
+              }
+
+              mKeys = postRemovalKeys;
+              mIdx = prIdx;
+              mLengths = postRemovalLengths;
+            }
+
+            long[] nbKeys = new long[mIdx];
+            long[] nbSums = new long[mIdx];
+            long bRunningSum = 0;
+            for (int k = 0; k < mIdx; k++) {
+              nbKeys[k] = mKeys[k];
+              bRunningSum += mLengths[k];
+              nbSums[k] = bRunningSum;
+            }
+            newBiomeKeysCache.put(biome, nbKeys);
+            newBiomePrefixSumsCache.put(biome, nbSums);
+          }
+
+          // 1. Collect all intervals from every biome entry into a temporary list of primitive arrays.
+          List<long[]> allKeysList = new ArrayList<>();
+          List<long[]> allLengthsList = new ArrayList<>();
+          for (Map.Entry<String, long[]> entry : newBiomeKeysCache.entrySet()) {
+            long[] keys = entry.getValue();
+            if (keys.length == 0) continue;
+            long[] sums = newBiomePrefixSumsCache.get(entry.getKey());
+            long[] lengths = new long[keys.length];
+            for (int k = 0; k < keys.length; k++) {
+              long prev = (k > 0) ? sums[k - 1] : 0L;
+              lengths[k] = sums[k] - prev;
+            }
+            allKeysList.add(keys);
+            allLengthsList.add(lengths);
+          }
+
+          // 2. Perform a multi-way primitive merge
+          int numBiomes = allKeysList.size();
+          if (numBiomes > 0) {
+            int[] indices = new int[numBiomes];
+            PriorityQueue<Integer> pq = new PriorityQueue<>(Comparator.comparingLong(idx -> allKeysList.get(idx)[indices[idx]]));
+
+            int totalPotentialIntervals = 0;
+            for (int k = 0; k < numBiomes; k++) {
+              pq.add(k);
+              totalPotentialIntervals += allKeysList.get(k).length;
+            }
+
+            long[] mergedMappedKeys = new long[totalPotentialIntervals];
+            long[] mergedMappedLengths = new long[totalPotentialIntervals];
+            int mappedIdx = 0;
+
+            long currentStartMapped = -1;
+            long currentLengthMapped = -1;
+
+            while (!pq.isEmpty()) {
+              int bIdx = pq.poll();
+              int iIdx = indices[bIdx];
+
+              long nextKey = allKeysList.get(bIdx)[iIdx];
+              long nextLength = allLengthsList.get(bIdx)[iIdx];
+
+              indices[bIdx]++;
+              if (indices[bIdx] < allKeysList.get(bIdx).length) {
+                pq.add(bIdx);
+              }
+
+              // 3. Use the same interval union math
+              if (currentStartMapped == -1) {
+                currentStartMapped = nextKey;
+                currentLengthMapped = nextLength;
+              } else {
+                if (nextKey <= currentStartMapped + currentLengthMapped) {
+                  currentLengthMapped = Math.max(currentLengthMapped, nextKey + nextLength - currentStartMapped);
+                } else {
+                  mergedMappedKeys[mappedIdx] = currentStartMapped;
+                  mergedMappedLengths[mappedIdx] = currentLengthMapped;
+                  mappedIdx++;
+                  currentStartMapped = nextKey;
+                  currentLengthMapped = nextLength;
+                }
+              }
+            }
+
+            if (currentStartMapped != -1) {
+              mergedMappedKeys[mappedIdx] = currentStartMapped;
+              mergedMappedLengths[mappedIdx] = currentLengthMapped;
+              mappedIdx++;
+            }
+
+            // 4. Build the final biomeMappedKeysCache and biomeMappedPrefixSumsCache
+            long[] finalMappedKeys = new long[mappedIdx];
+            long[] finalMappedPrefixSums = new long[mappedIdx];
+            long runningSumMapped = 0;
+            for (int k = 0; k < mappedIdx; k++) {
+              finalMappedKeys[k] = mergedMappedKeys[k];
+              runningSumMapped += mergedMappedLengths[k];
+              finalMappedPrefixSums[k] = runningSumMapped;
+            }
+            this.biomeMappedKeysCache = finalMappedKeys;
+            this.biomeMappedPrefixSumsCache = finalMappedPrefixSums;
+          } else {
+            this.biomeMappedKeysCache = new long[0];
+            this.biomeMappedPrefixSumsCache = new long[0];
+          }
+
+          this.biomeKeysCache = newBiomeKeysCache;
+          this.biomePrefixSumsCache = newBiomePrefixSumsCache;
+        }
+        this.biomeLocationsDirty = false;
+
         // 4. Read current volatile arrays
         long[] currentBadKeys = badKeysCache;
         long[] currentBadSums = badPrefixSumsCache;
@@ -395,164 +631,9 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
           newSums[k] = runningSum;
         }
 
-        // 7. Perform bottom-up swap
         this.badKeysCache = newKeys;
         this.badPrefixSumsCache = newSums;
         this.badLocationsDirty = false;
-
-        // Biome logic (similar to bad locations but per biome)
-        // Note: The issue description primarily focuses on the bad locations,
-        // but we should maintain consistency for biomes if they were dirty.
-        if (!localPendingBiome.isEmpty() || !localPendingBiomeRemovals.isEmpty()) {
-          ConcurrentHashMap<String, long[]> newBiomeKeysCache = new ConcurrentHashMap<>(biomeKeysCache);
-          ConcurrentHashMap<String, long[]> newBiomePrefixSumsCache = new ConcurrentHashMap<>(biomePrefixSumsCache);
-
-          Set<String> affectedBiomes = new HashSet<>();
-          affectedBiomes.addAll(localPendingBiome.keySet());
-          affectedBiomes.addAll(localPendingBiomeRemovals.keySet());
-
-          for (String biome : affectedBiomes) {
-            long[] currentBiomeKeys = biomeKeysCache.getOrDefault(biome, new long[0]);
-            long[] currentBiomePrefixSums = biomePrefixSumsCache.getOrDefault(biome, new long[0]);
-
-            ConcurrentHashMap<Long, Long> additions = localPendingBiome.getOrDefault(biome, new ConcurrentHashMap<>());
-            ConcurrentHashMap<Long, Boolean> removals = localPendingBiomeRemovals.getOrDefault(biome, new ConcurrentHashMap<>());
-
-            long[] pendingBiomeKeys = new long[additions.size()];
-            long[] pendingBiomeLengths = new long[additions.size()];
-            int pbIdx = 0;
-            for (Map.Entry<Long, Long> entry : additions.entrySet()) {
-              pendingBiomeKeys[pbIdx] = entry.getKey();
-              pendingBiomeLengths[pbIdx] = entry.getValue();
-              pbIdx++;
-            }
-
-            // Sort keys while maintaining length mappings
-            // Using a simple sort for keys and then reordering lengths based on sorted keys
-            // Since we need to sort parallel arrays, we can use an index array or just sort pairs.
-            // For simplicity and to follow "primitive linear merge", let's use a quick sort for parallel arrays.
-            sortParallelArrays(pendingBiomeKeys, pendingBiomeLengths, 0, pendingBiomeKeys.length - 1);
-
-            long[] mKeys = new long[currentBiomeKeys.length + pendingBiomeKeys.length];
-            long[] mLengths = new long[currentBiomeKeys.length + pendingBiomeKeys.length];
-            int mIdx = 0;
-
-            int bi = 0;
-            int bj = 0;
-            long cStart = -1;
-            long cLength = -1;
-
-            while (bi < currentBiomeKeys.length || bj < pendingBiomeKeys.length) {
-              long nKey;
-              long nLength;
-
-              if (bi < currentBiomeKeys.length && bj < pendingBiomeKeys.length) {
-                if (currentBiomeKeys[bi] <= pendingBiomeKeys[bj]) {
-                  nKey = currentBiomeKeys[bi];
-                  long prevSum = (bi > 0) ? currentBiomePrefixSums[bi - 1] : 0L;
-                  nLength = currentBiomePrefixSums[bi] - prevSum;
-                  bi++;
-                } else {
-                  nKey = pendingBiomeKeys[bj];
-                  nLength = pendingBiomeLengths[bj];
-                  bj++;
-                }
-              } else if (bi < currentBiomeKeys.length) {
-                nKey = currentBiomeKeys[bi];
-                long prevSum = (bi > 0) ? currentBiomePrefixSums[bi - 1] : 0L;
-                nLength = currentBiomePrefixSums[bi] - prevSum;
-                bi++;
-              } else {
-                nKey = pendingBiomeKeys[bj];
-                nLength = pendingBiomeLengths[bj];
-                bj++;
-              }
-
-              if (nKey < 0) continue;
-
-              if (cStart == -1) {
-                cStart = nKey;
-                cLength = nLength;
-              } else {
-                if (nKey <= cStart + cLength) {
-                  cLength = Math.max(cLength, nKey + nLength - cStart);
-                } else {
-                  mKeys[mIdx] = cStart;
-                  mLengths[mIdx] = cLength;
-                  mIdx++;
-                  cStart = nKey;
-                  cLength = nLength;
-                }
-              }
-            }
-            if (cStart != -1) {
-              mKeys[mIdx] = cStart;
-              mLengths[mIdx] = cLength;
-              mIdx++;
-            }
-
-            // Handle removals
-            if (!removals.isEmpty()) {
-              long[] sortedRemovals = new long[removals.size()];
-              int rIdx = 0;
-              for (Long rLoc : removals.keySet()) {
-                sortedRemovals[rIdx++] = rLoc;
-              }
-              Arrays.sort(sortedRemovals);
-
-              long[] postRemovalKeys = new long[mIdx + sortedRemovals.length]; 
-              long[] postRemovalLengths = new long[mIdx + sortedRemovals.length];
-              int prIdx = 0;
-
-              int currentSpanIdx = 0;
-              int currentRemIdx = 0;
-
-              while (currentSpanIdx < mIdx) {
-                long spanStart = mKeys[currentSpanIdx];
-                long spanEnd = spanStart + mLengths[currentSpanIdx];
-
-                long lastStart = spanStart;
-                while (currentRemIdx < sortedRemovals.length && sortedRemovals[currentRemIdx] < spanEnd) {
-                  long rLoc = sortedRemovals[currentRemIdx];
-                  if (rLoc >= lastStart) {
-                    if (rLoc > lastStart) {
-                      postRemovalKeys[prIdx] = lastStart;
-                      postRemovalLengths[prIdx] = rLoc - lastStart;
-                      prIdx++;
-                    }
-                    lastStart = rLoc + 1;
-                  }
-                  currentRemIdx++;
-                }
-
-                if (lastStart < spanEnd) {
-                  postRemovalKeys[prIdx] = lastStart;
-                  postRemovalLengths[prIdx] = spanEnd - lastStart;
-                  prIdx++;
-                }
-                currentSpanIdx++;
-              }
-
-              mKeys = postRemovalKeys;
-              mIdx = prIdx;
-              mLengths = postRemovalLengths;
-            }
-
-            long[] nbKeys = new long[mIdx];
-            long[] nbSums = new long[mIdx];
-            long bRunningSum = 0;
-            for (int k = 0; k < mIdx; k++) {
-              nbKeys[k] = mKeys[k];
-              bRunningSum += mLengths[k];
-              nbSums[k] = bRunningSum;
-            }
-            newBiomeKeysCache.put(biome, nbKeys);
-            newBiomePrefixSumsCache.put(biome, nbSums);
-          }
-          this.biomeKeysCache = newBiomeKeysCache;
-          this.biomePrefixSumsCache = newBiomePrefixSumsCache;
-        }
-        this.biomeLocationsDirty = false;
       } finally {
         isRebuilding.set(false);
       }

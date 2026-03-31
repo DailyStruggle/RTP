@@ -103,7 +103,7 @@ public class Square extends MemoryShape<GenericMemoryShapeParams> {
   }
 
   @Override
-  public double xzToLocation(long x, long z) {
+  public long xzToLocation(long x, long z) {
     long cr = getNumber(GenericMemoryShapeParams.centerRadius, 64L).longValue();
     long cx = getNumber(GenericMemoryShapeParams.centerX, 0L).longValue();
     long cz = getNumber(GenericMemoryShapeParams.centerZ, 0L).longValue();
@@ -168,7 +168,7 @@ public class Square extends MemoryShape<GenericMemoryShapeParams> {
   }
 
   @Override
-  public double xzToLocation(MutableRTPCoords coords) {
+  public long xzToLocation(MutableRTPCoords coords) {
     long cr = getNumber(GenericMemoryShapeParams.centerRadius, 64L).longValue();
     long cx = getNumber(GenericMemoryShapeParams.centerX, 0L).longValue();
     long cz = getNumber(GenericMemoryShapeParams.centerZ, 0L).longValue();
