@@ -4,10 +4,14 @@ import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 /** A set of chunks that are being loaded */
 public final class ChunkSet {
+  public static final AtomicLong ACTIVE_CHUNK_TICKETS = new AtomicLong(0);
+  public static final java.util.concurrent.atomic.AtomicLong TOTAL_CHUNK_LOADS = new AtomicLong(0);
+
   /** List of futures for the chunk keys in the set */
   public final List<CompletableFuture<Long>> chunks;
 
@@ -23,6 +27,7 @@ public final class ChunkSet {
    * @param complete the future that completes when all chunks are loaded
    */
   public ChunkSet(List<CompletableFuture<Long>> chunks, CompletableFuture<Boolean> complete) {
+    TOTAL_CHUNK_LOADS.addAndGet(chunks.size());
     this.chunks = chunks;
     this.complete = complete;
 
@@ -36,6 +41,9 @@ public final class ChunkSet {
    * @param keep true to keep loaded, false otherwise
    */
   public void keep(boolean keep, RTPWorld<?> world) {
+    if (keep) ACTIVE_CHUNK_TICKETS.addAndGet(chunks.size());
+    else ACTIVE_CHUNK_TICKETS.addAndGet(-chunks.size());
+
     this.isKept = keep;
     chunks.forEach(
         chunk -> {

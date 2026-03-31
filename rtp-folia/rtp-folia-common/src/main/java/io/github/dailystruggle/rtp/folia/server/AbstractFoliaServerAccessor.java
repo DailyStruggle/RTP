@@ -309,6 +309,15 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
+  public double getTPS(int ticks) {
+    try {
+      return 20.0;
+    } catch (Exception e) {
+      return 20.0;
+    }
+  }
+
+  @Override
   public void setBiomeGetter(Function<RTPLocation, String> getter) {
     FoliaRTPWorld.setBiomeGetter(
         location ->

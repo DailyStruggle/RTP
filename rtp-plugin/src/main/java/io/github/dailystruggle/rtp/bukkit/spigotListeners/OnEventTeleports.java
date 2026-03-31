@@ -141,6 +141,7 @@ public class OnEventTeleports implements Listener {
 
     // prep location so it's ready when they respawn or shortly after
     TeleportData teleportData = new TeleportData();
+    io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(teleportData, "TeleportData-" + id.toString(), 120000L);
     RTP.getInstance().latestTeleportData.put(id, teleportData);
     region.miscPipeline.add(
         () -> {
@@ -208,6 +209,7 @@ public class OnEventTeleports implements Listener {
     TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
     if (teleportData == null) {
       teleportData = new TeleportData();
+      io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(teleportData, "TeleportData-" + player.getUniqueId().toString(), 120000L);
       RTP.getInstance().latestTeleportData.put(player.getUniqueId(), teleportData);
     }
     teleportData.completed = true;

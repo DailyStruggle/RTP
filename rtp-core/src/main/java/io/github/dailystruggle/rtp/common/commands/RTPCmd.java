@@ -234,6 +234,7 @@ public interface RTPCmd extends BaseRTPCmd {
       }
 
       data = new TeleportData();
+      io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(data, "TeleportData-" + player.uuid().toString(), 120000L);
       data.sender = sender;
       RTP.getInstance().latestTeleportData.put(player.uuid(), data);
 

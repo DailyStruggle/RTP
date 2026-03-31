@@ -37,7 +37,6 @@ public class TeleportData implements Cloneable {
   public boolean written = false;
 
   public TeleportData() {
-    io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(this, "TeleportData", 600000L);
   }
 
   @Override

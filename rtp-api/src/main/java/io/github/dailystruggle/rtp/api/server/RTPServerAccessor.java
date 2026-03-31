@@ -106,4 +106,6 @@ public interface RTPServerAccessor {
   Object createTaskPipe();
 
   Object createCachePipe();
+  
+  double getTPS(int ticks);
 }

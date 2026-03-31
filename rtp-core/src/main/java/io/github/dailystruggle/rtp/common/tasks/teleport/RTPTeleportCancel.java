@@ -37,11 +37,7 @@ public final class RTPTeleportCancel extends RTPRunnable {
     if (data.completed) return;
 
     if (data.selectedCoords != null && data.targetRegion != null) {
-      if (data.nextTask instanceof TeleportPipelineTask) {
-        TeleportPipelineTask task = (TeleportPipelineTask) data.nextTask;
-        task.setPhase(TeleportPipelineTask.Phase.CLEANUP);
-        task.run();
-      }
+      data.targetRegion.chunkManager.removeChunks(data.selectedCoords);
     }
 
     // reset player data

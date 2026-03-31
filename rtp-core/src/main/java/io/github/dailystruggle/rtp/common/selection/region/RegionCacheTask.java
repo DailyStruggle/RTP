@@ -12,32 +12,29 @@ import java.util.UUID;
 public class RegionCacheTask extends RTPRunnable {
     private final Region region;
     private final UUID playerId;
+    private final long selectRadius;
 
     public RegionCacheTask(Region region) {
         this.region = region;
         this.playerId = null;
+        this.selectRadius = ((ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class)).getNumber(PerformanceKeys.viewDistanceSelect, 0L).longValue();
     }
 
     public RegionCacheTask(Region region, UUID playerId) {
         this.region = region;
         this.playerId = playerId;
+        this.selectRadius = ((ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class)).getNumber(PerformanceKeys.viewDistanceSelect, 0L).longValue();
     }
 
     @Override
     public void run() {
-        final long cacheCap = region.getSettings().cacheCap();
-        final long playerQueueSize = region.queueManager.playerQueue.size();
-        final long totalCap = Math.max(cacheCap, playerQueueSize);
+        region.inFlightCalculations.incrementAndGet();
         GenerationResult res = LocationGenerator.getLocation(region, (java.util.Set<String>) null);
         if (res != null) {
             final RTPCoords coords = res.coords();
             final Map.Entry<RTPCoords, Long> pair = new java.util.AbstractMap.SimpleEntry<>(coords, res.attempts());
             if (coords == null) {
                 region.inFlightCalculations.decrementAndGet();
-                if (region.cachePipeline.size() + region.queueManager.locationQueue.size() + region.inFlightCalculations.get() < totalCap) {
-                    region.cachePipeline.add(new RegionCacheTask(region));
-                    region.inFlightCalculations.incrementAndGet();
-                }
                 return;
             }
 
@@ -46,15 +43,11 @@ public class RegionCacheTask extends RTPRunnable {
                 chunkSet = res.verifiedChunks();
                 region.chunkManager.locAssChunks.put(coords, chunkSet);
             } else {
-                ConfigParser<PerformanceKeys> perf =
-                        (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
-                long radius = perf.getNumber(PerformanceKeys.viewDistanceSelect, 0L).longValue();
-                chunkSet = region.chunkManager.chunks(coords, radius);
+                chunkSet = region.chunkManager.chunks(coords, this.selectRadius);
             }
 
             chunkSet.whenComplete(
                     aBoolean -> {
-                        region.inFlightCalculations.decrementAndGet();
                         if (aBoolean) {
                             if (playerId == null) {
                                 region.queueManager.locationQueue.offer(pair);
@@ -70,13 +63,10 @@ public class RegionCacheTask extends RTPRunnable {
                             chunkSet.keep(false, region.getWorld());
                             region.chunkManager.locAssChunks.remove(coords);
                         }
+                        region.inFlightCalculations.decrementAndGet();
                     });
         } else {
             region.inFlightCalculations.decrementAndGet();
-        }
-        if (region.cachePipeline.size() + region.queueManager.locationQueue.size() + region.inFlightCalculations.get() < totalCap) {
-            region.cachePipeline.add(new RegionCacheTask(region));
-            region.inFlightCalculations.incrementAndGet();
         }
     }
 }
