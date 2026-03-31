@@ -191,14 +191,14 @@ public class MemoryShapeTest {
     @Test
     public void testBiomeMapping() {
         TestShape shape = new TestShape();
-        shape.addBiomeLocation(10L, "ocean");
-        shape.addBiomeLocation(15L, "ocean"); // Contiguous [10, 11) and [15, 16) if resolution=1
+        shape.addBiomeLocation(10L, 1L, "ocean");
+        shape.addBiomeLocation(15L, 1L, "ocean"); // Contiguous [10, 11) and [15, 16) if resolution=1
 
         // Wait, addBiomeLocation(location, biome) uses width=1 implicitly?
         // Let's check MemoryShape.addBiomeLocation
 
-        shape.addBiomeLocation(20L, "forest");
-        shape.addBiomeLocation(21L, "forest");
+        shape.addBiomeLocation(20L, 1L, "forest");
+        shape.addBiomeLocation(21L, 1L, "forest");
 
         shape.flushAndRebuild();
 
@@ -224,8 +224,8 @@ public class MemoryShapeTest {
     @Test
     public void testOverlappingBiomes() {
         TestShape shape = new TestShape();
-        shape.addBiomeLocation(10L, "ocean"); // ocean: [10, 11)
-        shape.addBiomeLocation(10L, "forest"); // forest: [10, 11)
+        shape.addBiomeLocation(10L, 1L, "ocean"); // ocean: [10, 11)
+        shape.addBiomeLocation(10L, 1L, "forest"); // forest: [10, 11)
 
         shape.flushAndRebuild();
 
