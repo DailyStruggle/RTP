@@ -154,6 +154,14 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     try {
       FactoryValue<E> clone = (FactoryValue<E>) super.clone();
       clone.data = data.clone();
+      for (Map.Entry<E, Object> entry : clone.data.entrySet()) {
+        Object value = entry.getValue();
+        if (value instanceof FactoryValue<?>) {
+          entry.setValue(((FactoryValue<?>) value).clone());
+        } else if (value instanceof Map) {
+          entry.setValue(new HashMap<>((Map<?, ?>) value));
+        }
+      }
       return clone;
     } catch (CloneNotSupportedException e) {
       RTP.log(Level.WARNING, e.getMessage(), e);

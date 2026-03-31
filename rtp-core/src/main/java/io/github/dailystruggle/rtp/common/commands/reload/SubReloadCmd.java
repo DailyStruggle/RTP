@@ -116,6 +116,9 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
     if (parser.myClass.equals(RegionKeys.class)) {
       @SuppressWarnings("unchecked")
       MultiConfigParser<RegionKeys> regions = (MultiConfigParser<RegionKeys>) newParser;
+      for (Region r : RTP.selectionAPI.permRegionLookup.values()) {
+        r.shutDown();
+      }
       RTP.selectionAPI.permRegionLookup.clear();
       for (ConfigParser<RegionKeys> regionConfig : regions.configParserFactory.map.values()) {
         RegionSettings settings = RegionConfigLoader.load(regionConfig);

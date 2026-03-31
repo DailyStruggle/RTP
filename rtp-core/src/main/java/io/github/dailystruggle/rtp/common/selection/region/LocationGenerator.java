@@ -73,16 +73,22 @@ public class LocationGenerator {
 
         boolean custom = biomeNames != null && !biomeNames.isEmpty();
 
-        if (!custom && region.queueManager.perPlayerLocationQueue.containsKey(playerId)) {
-            java.util.concurrent.ConcurrentLinkedQueue<CachedLocation> playerLocationQueue =
-                    region.queueManager.perPlayerLocationQueue.get(playerId);
-            boolean success = false;
-            while (!playerLocationQueue.isEmpty()) {
-                pair = playerLocationQueue.poll();
-                if (pair == null || pair.getCoords() == null) continue;
-                RTPCoords left = pair.getCoords();
-                boolean pass = true;
+        if (!custom) {
+            CompletableFuture<CachedLocation> poll = region.queueManager.poll(playerId);
+            if (poll != null) {
+                try {
+                    pair = poll.get();
+                } catch (InterruptedException | ExecutionException e) {
+                    RTP.log(Level.WARNING, e.getMessage(), e);
+                    pair = null;
+                }
+            }
+        }
 
+        if (!custom && pair != null) {
+            RTPCoords left = pair.getCoords();
+            if (left != null) {
+                boolean pass = true;
                 RTPWorld<?> world = region.getWorld();
                 int cx = left.x() >> 4;
                 int cz = left.z() >> 4;
@@ -93,148 +99,137 @@ public class LocationGenerator {
                     Long chunkKey = chunkAt.get();
                     if (chunkKey == null) {
                         region.chunkManager.removeTicket(cx, cz);
-                        continue;
+                        pass = false;
+                    } else {
+                        chunk = world.getCachedChunk(chunkKey);
+                        if (chunk == null) {
+                            region.chunkManager.removeTicket(cx, cz);
+                            pass = false;
+                        } else {
+                            // verify
+                            try {
+                                long t = System.currentTimeMillis();
+                                long dt = t - lastUpdate.get();
+                                if (dt > 5000 || dt < 0) {
+                                    ConfigParser<SafetyKeys> safety =
+                                            (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+                                    Object value = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
+                                    if (value instanceof Collection<?> collection) {
+                                        if (collection.isEmpty()) unsafeBlocks.clear();
+                                        else if (collection.size() == unsafeBlocks.size()) {
+                                            if (value instanceof List<?> list) {
+                                                if (list.get(0) instanceof String firstElement) {
+                                                    List<String> stringList = (List<String>) list;
+                                                    boolean same = true;
+                                                    for (int j = 0; j < stringList.size(); j++) {
+                                                        String s = stringList.get(j);
+                                                        if (!unsafeBlocks.contains(s)) {
+                                                            same = false;
+                                                            break;
+                                                        }
+                                                    }
+                                                    if (!same) {
+                                                        unsafeBlocks.clear();
+                                                        unsafeBlocks.addAll(
+                                                                list.stream().map(Object::toString).collect(Collectors.toSet()));
+                                                    }
+                                                } else {
+                                                    unsafeBlocks.clear();
+                                                    unsafeBlocks.addAll(
+                                                            list.stream().map(Object::toString).collect(Collectors.toSet()));
+                                                }
+                                            }
+                                        }
+
+                                        unsafeBlocks.addAll(
+                                                collection.stream()
+                                                        .filter(Objects::nonNull)
+                                                        .map(Object::toString)
+                                                        .collect(Collectors.toSet()));
+                                    }
+                                    lastUpdate.set(t);
+                                    safetyRadius.set(safety.getNumber(SafetyKeys.safetyRadius, 0).intValue());
+                                }
+
+                                // todo: waterlogged check
+                                int safe = safetyRadius.get();
+                                RTPChunk[] localChunks = new RTPChunk[(safe * 2 + 1) * (safe * 2 + 1)];
+                                int centerChunkX = chunk.x();
+                                int centerChunkZ = chunk.z();
+                                int L = safe * 2 + 1;
+                                localChunks[safe * L + safe] = chunk;
+                                chunk.keep(true);
+                                try {
+                                    safetyCheck:
+                                    for (int x = left.x() - safe; x <= left.x() + safe; x++) {
+                                        int chunkX = x >> 4;
+                                        int xx = x & 15;
+                                        int dcX = chunkX - centerChunkX;
+
+                                        for (int z = left.z() - safe; z <= left.z() + safe; z++) {
+                                            int chunkZ = z >> 4;
+                                            int zz = z & 15;
+                                            int dcZ = chunkZ - centerChunkZ;
+
+                                            int index = (dcX + safe) * L + (dcZ + safe);
+                                            RTPChunk chunk1 = localChunks[index];
+                                            if (chunk1 == null) {
+                                                try {
+                                                    Long key =
+                                                            RTP.serverAccessor
+                                                                    .getChunkManager()
+                                                                    .getChunkAtAsync(world, chunkX, chunkZ)
+                                                                    .get();
+                                                    chunk1 = world.getCachedChunk(key);
+                                                    localChunks[index] = chunk1;
+                                                    if (chunk1 != null) chunk1.keep(true);
+                                                } catch (InterruptedException | ExecutionException e) {
+                                                    pass = false;
+                                                    break safetyCheck;
+                                                }
+                                            }
+
+                                            if (chunk1 == null) {
+                                                pass = false;
+                                                break safetyCheck;
+                                            }
+
+                                            for (int y = left.y() - safe; y <= left.y() + safe; y++) {
+                                                if (y > world.getMaxHeight() || y < world.getMinHeight()) continue;
+                                                if (!chunk1.isSafe(xx, y, zz, unsafeBlocks)) {
+                                                    pass = false;
+                                                    break safetyCheck;
+                                                }
+                                            }
+                                        }
+                                    }
+                                } finally {
+                                    if (!pass) {
+                                        for (RTPChunk usedChunk : localChunks) {
+                                            if (usedChunk != null) usedChunk.keep(false);
+                                        }
+                                    }
+                                }
+                            } catch (Exception e) {
+                                pass = false;
+                                RTP.log(Level.WARNING, e.getMessage(), e);
+                            }
+                        }
                     }
-                    chunk = world.getCachedChunk(chunkKey);
                 } catch (InterruptedException | ExecutionException e) {
                     RTP.log(Level.WARNING, e.getMessage(), e);
                     region.chunkManager.removeTicket(cx, cz);
-                    continue;
-                }
-                if (chunk == null) {
-                    region.chunkManager.removeTicket(cx, cz);
-                    continue;
+                    pass = false;
                 }
 
-                try {
-
-                    long t = System.currentTimeMillis();
-                    long dt = t - lastUpdate.get();
-                    if (dt > 5000 || dt < 0) {
-                        ConfigParser<SafetyKeys> safety =
-                                (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
-                        Object value = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
-                        if (value instanceof Collection<?> collection) {
-                            if (collection.isEmpty()) unsafeBlocks.clear();
-                            else if (collection.size() == unsafeBlocks.size()) {
-                                if (value instanceof List<?> list) {
-                                    if (list.get(0) instanceof String firstElement) {
-                                        List<String> stringList = (List<String>) list;
-                                        boolean same = true;
-                                        for (int j = 0; j < stringList.size(); j++) {
-                                            String s = stringList.get(j);
-                                            if (!unsafeBlocks.contains(s)) {
-                                                same = false;
-                                                break;
-                                            }
-                                        }
-                                        if (!same) {
-                                            unsafeBlocks.clear();
-                                            unsafeBlocks.addAll(
-                                                    list.stream().map(Object::toString).collect(Collectors.toSet()));
-                                        }
-                                    } else {
-                                        unsafeBlocks.clear();
-                                        unsafeBlocks.addAll(
-                                                list.stream().map(Object::toString).collect(Collectors.toSet()));
-                                    }
-                                }
-                            }
-
-                            unsafeBlocks.addAll(
-                                    collection.stream()
-                                            .filter(Objects::nonNull)
-                                            .map(Object::toString)
-                                            .collect(Collectors.toSet()));
-                        }
-                        lastUpdate.set(t);
-                        safetyRadius.set(safety.getNumber(SafetyKeys.safetyRadius, 0).intValue());
-                    }
-
-                    // todo: waterlogged check
-                    int safe = safetyRadius.get();
-                    RTPChunk[] localChunks = new RTPChunk[(safe * 2 + 1) * (safe * 2 + 1)];
-                    int centerChunkX = chunk.x();
-                    int centerChunkZ = chunk.z();
-                    int L = safe * 2 + 1;
-                    localChunks[safe * L + safe] = chunk;
-                    chunk.keep(true);
-                try {
-                    safetyCheck:
-                    for (int x = left.x() - safe; x <= left.x() + safe; x++) {
-                        int chunkX = x >> 4;
-                        int xx = x & 15;
-                        int dcX = chunkX - centerChunkX;
-
-                        for (int z = left.z() - safe; z <= left.z() + safe; z++) {
-                            int chunkZ = z >> 4;
-                            int zz = z & 15;
-                            int dcZ = chunkZ - centerChunkZ;
-
-                            int index = (dcX + safe) * L + (dcZ + safe);
-                            RTPChunk chunk1 = localChunks[index];
-                            if (chunk1 == null) {
-                                try {
-                                    Long key =
-                                            RTP.serverAccessor
-                                                    .getChunkManager()
-                                                    .getChunkAtAsync(world, chunkX, chunkZ)
-                                                    .get();
-                                    chunk1 = world.getCachedChunk(key);
-                                    localChunks[index] = chunk1;
-                                    if (chunk1 != null) chunk1.keep(true);
-                                } catch (InterruptedException | ExecutionException e) {
-                                    pass = false;
-                                    break safetyCheck;
-                                }
-                            }
-
-                            if (chunk1 == null) {
-                                pass = false;
-                                break safetyCheck;
-                            }
-
-                            for (int y = left.y() - safe; y <= left.y() + safe; y++) {
-                                if (y > world.getMaxHeight() || y < world.getMinHeight()) continue;
-                                if (!chunk1.isSafe(xx, y, zz, unsafeBlocks)) {
-                                    pass = false;
-                                    break safetyCheck;
-                                }
-                            }
-                        }
-                    }
-                } finally {
-                    if (!pass) {
-                        for (RTPChunk usedChunk : localChunks) {
-                            if (usedChunk != null) usedChunk.keep(false);
-                        }
-                    }
-                }
-
-                    if (!pass) continue;
-                    if (!GlobalRegionVerifiers.checkGlobalRegionVerifiers(left)) continue;
+                if (pass && GlobalRegionVerifiers.checkGlobalRegionVerifiers(left)) {
                     chunkSet = region.chunkManager.getChunkSet(left);
-                    success = true;
                     GenerationResult res = new GenerationResult(left, pair.getAttempts(), chunkSet);
                     CachedLocationPool.release(pair);
                     return res;
-                } finally {
-                    if (!success) region.chunkManager.removeTicket(cx, cz);
+                } else {
+                    region.chunkManager.removeTicket(cx, cz);
                 }
-            }
-        }
-
-        while (!custom && !region.queueManager.locationQueue.isEmpty()) {
-            pair = region.queueManager.locationQueue.poll();
-            if (pair == null) continue;
-            RTPCoords left = pair.getCoords();
-            if (left == null) continue;
-            boolean pass = GlobalRegionVerifiers.checkGlobalRegionVerifiers(left);
-            if (pass) {
-                chunkSet = region.chunkManager.getChunkSet(left);
-                GenerationResult res = new GenerationResult(left, pair.getAttempts(), chunkSet);
-                CachedLocationPool.release(pair);
-                return res;
             }
         }
 

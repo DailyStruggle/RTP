@@ -9,7 +9,14 @@ import java.util.function.BiFunction;
 public class IntegerParameter extends CommandParameter {
   public IntegerParameter(
       String permission, String description, BiFunction<UUID, String, Boolean> isRelevant) {
-    super(permission, description, isRelevant);
+    super(permission, description, (uuid, s) -> {
+      try {
+        Long.parseLong(s);
+      } catch (NumberFormatException e) {
+        return false;
+      }
+      return isRelevant.apply(uuid, s);
+    });
   }
 
   @Override

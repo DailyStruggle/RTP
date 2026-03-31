@@ -138,6 +138,12 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
     name = name.toUpperCase();
     if (configParserFactory.contains(name)) return configParserFactory.map.get(name);
     else {
+      if (!name.endsWith(".YML")) name = name + ".YML";
+      String worldName = name.replace(".YML", "");
+      if (RTP.serverAccessor.getRTPWorld(worldName) == null) {
+        return (ConfigParser<E>) configParserFactory.getOrDefault("DEFAULT.YML");
+      }
+
       ConfigParser<E> parser = (ConfigParser<E>) configParserFactory.getOrDefault(name);
       configParserFactory.add(name, parser);
       return parser;
@@ -153,6 +159,10 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
     if (!parser.myClass.equals(myClass)) throw new IllegalStateException("mismatched parser class");
     ConfigParser<E> eConfigParser = (ConfigParser<E>) parser;
     configParserFactory.add(parser.name, eConfigParser);
+  }
+
+  public void removeParser(String name) {
+    configParserFactory.remove(name);
   }
 
   public void addAll(String... keys) {

@@ -19,6 +19,12 @@ public class Factory<T extends FactoryValue<?>> {
     map.put(name.toUpperCase(), value);
   }
 
+  public void remove(String name) {
+    name = name.toUpperCase();
+    if (!name.endsWith(".YML")) name = name + ".YML";
+    map.remove(name);
+  }
+
   public Enumeration<String> list() {
     return map.keys();
   }

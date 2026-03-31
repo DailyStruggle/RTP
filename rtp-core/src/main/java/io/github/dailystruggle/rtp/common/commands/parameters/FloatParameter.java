@@ -9,7 +9,14 @@ import java.util.function.BiFunction;
 public class FloatParameter extends CommandParameter {
   public FloatParameter(
       String permission, String description, BiFunction<UUID, String, Boolean> isRelevant) {
-    super(permission, description, isRelevant);
+    super(permission, description, (uuid, s) -> {
+      try {
+        Double.parseDouble(s);
+      } catch (NumberFormatException e) {
+        return false;
+      }
+      return isRelevant.apply(uuid, s);
+    });
   }
 
   @Override

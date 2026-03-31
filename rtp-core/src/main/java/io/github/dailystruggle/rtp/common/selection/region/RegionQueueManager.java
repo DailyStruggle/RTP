@@ -56,6 +56,30 @@ public class RegionQueueManager {
     }
 
     /**
+     * poll - get a location for a player from the queue, prioritizing fastLocations, then perPlayerLocationQueue, then locationQueue
+     * @param uuid player uuid
+     * @return location or null if none available
+     */
+    public CompletableFuture<CachedLocation> poll(UUID uuid) {
+        if (fastLocations.containsKey(uuid)) {
+            return fastLocations.remove(uuid);
+        }
+
+        ConcurrentLinkedQueue<CachedLocation> playerQueue = perPlayerLocationQueue.get(uuid);
+        if (playerQueue != null && !playerQueue.isEmpty()) {
+            CachedLocation loc = playerQueue.poll();
+            if (loc != null) return CompletableFuture.completedFuture(loc);
+        }
+
+        if (!locationQueue.isEmpty()) {
+            CachedLocation loc = locationQueue.poll();
+            if (loc != null) return CompletableFuture.completedFuture(loc);
+        }
+
+        return null;
+    }
+
+    /**
      * getTotalQueueLength - get combined length of public and private queues
      *
      * @param uuid player uuid
@@ -92,5 +116,12 @@ public class RegionQueueManager {
         if (queue != null) res += queue.size();
         if (fastLocations.containsKey(uuid)) res++;
         return res;
+    }
+
+    public void shutDown() {
+        locationQueue.clear();
+        perPlayerLocationQueue.clear();
+        fastLocations.clear();
+        playerQueue.clear();
     }
 }

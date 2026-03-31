@@ -61,16 +61,15 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
 
-    RTP.stop();
-    RTP.serverAccessor.stop();
+    ConfigParser<MessagesKeys> lang =
+            (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+    String updateMsg = String.valueOf(lang.getConfigValue(MessagesKeys.updating, ""));
+    if (updateMsg != null) updateMsg = updateMsg.replace("[filename]", factoryValue.name);
+    RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, updateMsg);
 
-    if (factoryValue instanceof ConfigParser) {
-      ConfigParser<?> configParser = (ConfigParser<?>) factoryValue;
-      ConfigParser<MessagesKeys> lang =
-          (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-      String msg = String.valueOf(lang.getConfigValue(MessagesKeys.updating, ""));
-      if (msg != null) msg = msg.replace("[filename]", factoryValue.name);
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg);
+    RTP.scheduler.runTaskAsynchronously(() -> {
+      if (factoryValue instanceof ConfigParser) {
+        ConfigParser<?> configParser = (ConfigParser<?>) factoryValue;
 
       if (parameterValues.containsKey("world") && configParser.myClass.equals(RegionKeys.class))
         vertFixBlock:
@@ -249,9 +248,9 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
         ex.printStackTrace();
       }
 
-      msg = String.valueOf(lang.getConfigValue(MessagesKeys.updated, ""));
-      if (msg != null) msg = msg.replace("[filename]", configParser.name);
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg);
+      String updatedMsg = String.valueOf(lang.getConfigValue(MessagesKeys.updated, ""));
+      if (updatedMsg != null) updatedMsg = updatedMsg.replace("[filename]", configParser.name);
+      RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, updatedMsg);
     } else if (factoryValue instanceof MultiConfigParser) {
       MultiConfigParser<?> parser = (MultiConfigParser<?>) this.factoryValue;
       List<String> remove = parameterValues.getOrDefault("remove", new ArrayList<>());
@@ -276,9 +275,10 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
       }
     }
 
-    CommandsAPICommand reload =
-        RTP.baseCommand.getCommandLookup().getOrDefault("reload", new ReloadCmd(RTP.baseCommand));
-    reload.onCommand(callerId, new HashMap<>(), null);
+      CommandsAPICommand reload =
+              RTP.baseCommand.getCommandLookup().getOrDefault("reload", new ReloadCmd(RTP.baseCommand));
+      reload.onCommand(callerId, new HashMap<>(), null);
+    });
     return true;
   }
 

@@ -18,6 +18,9 @@ dependencies {
 
     compileOnly 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
     testImplementation 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
+    testImplementation 'com.github.seeseemelk:MockBukkit-v1.21:3.111.0'
+    testImplementation 'dev.folia:folia-api:1.20.1-R0.1-SNAPSHOT'
+    testImplementation project(':rtp-folia:rtp-folia-common')
 
     // Optional/Soft dependencies
     compileOnly 'com.github.MilkBowl:VaultAPI:1.7.1'
