@@ -161,11 +161,13 @@ public class FillTask extends RTPRunnable {
     long range = Double.valueOf(shape.getRange()).longValue();
     long pos;
     long limit = fillIncrement.get();
+    long step = Math.max(1L, region.getSettings().spatialResolution());
+    long limitEnd = start + (limit * step);
     MutableRTPCoords cursor = new MutableRTPCoords(0, 0);
     cursor.setWorldName(region.getWorld().name());
 
     java.util.HashSet<Long> testedChunks = new HashSet<>();
-    for (pos = start; pos < range && pos < start + limit; pos++) {
+    for (pos = start; pos < range && pos < limitEnd; pos += step) {
       if (pause.get() || isCancelled()) {
         isRunning.set(false);
         return;
