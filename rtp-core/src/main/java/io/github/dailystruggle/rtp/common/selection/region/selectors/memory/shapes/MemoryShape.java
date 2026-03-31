@@ -137,19 +137,6 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @return true if known bad, false otherwise
    */
   public boolean isKnownBad(long location) {
-    if (spatialResolution > 1) {
-      MutableRTPCoords coords = new MutableRTPCoords(0, 0);
-      locationToXZ(location, coords);
-      if ((spatialResolution & (spatialResolution - 1)) == 0) {
-        int shift = Long.numberOfTrailingZeros(spatialResolution);
-        coords.x >>= shift;
-        coords.z >>= shift;
-      } else {
-        coords.x /= (int) spatialResolution;
-        coords.z /= (int) spatialResolution;
-      }
-      location = xzToLocation(coords);
-    }
     if (pendingBadLocations.get().containsKey(location)) return true;
     long[] sums = badPrefixSumsCache;
     long[] keys = badKeysCache;
@@ -307,37 +294,11 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   public void addBadLocation(long location, long width) {
-    if (spatialResolution > 1) {
-      MutableRTPCoords coords = new MutableRTPCoords(0, 0);
-      locationToXZ(location, coords);
-      if ((spatialResolution & (spatialResolution - 1)) == 0) {
-        int shift = Long.numberOfTrailingZeros(spatialResolution);
-        coords.x >>= shift;
-        coords.z >>= shift;
-      } else {
-        coords.x /= (int) spatialResolution;
-        coords.z /= (int) spatialResolution;
-      }
-      location = xzToLocation(coords);
-    }
     pendingBadLocations.get().put(location, width);
     badLocationsDirty = true;
   }
 
   public void addBiomeLocation(Long location, long width, String biome) {
-    if (spatialResolution > 1) {
-      MutableRTPCoords coords = new MutableRTPCoords(0, 0);
-      locationToXZ(location, coords);
-      if ((spatialResolution & (spatialResolution - 1)) == 0) {
-        int shift = Long.numberOfTrailingZeros(spatialResolution);
-        coords.x >>= shift;
-        coords.z >>= shift;
-      } else {
-        coords.x /= (int) spatialResolution;
-        coords.z /= (int) spatialResolution;
-      }
-      location = xzToLocation(coords);
-    }
     pendingBiomeLocations
         .get()
         .computeIfAbsent(biome, b -> new ConcurrentHashMap<>())
