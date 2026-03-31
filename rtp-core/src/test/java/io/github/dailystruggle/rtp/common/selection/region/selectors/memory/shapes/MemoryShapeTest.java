@@ -59,6 +59,11 @@ public class MemoryShapeTest {
         public long[] getBadPrefixSumsCache() {
             return badPrefixSumsCache;
         }
+
+        public long getBadSum() {
+            long[] sums = badPrefixSumsCache;
+            return (sums.length > 0) ? sums[sums.length - 1] : 0L;
+        }
     }
 
     @Test
@@ -69,7 +74,7 @@ public class MemoryShapeTest {
 
         shape.flushAndRebuild();
 
-        assertEquals(5, shape.badLocationSum.get());
+        assertEquals(5, shape.getBadSum());
         assertEquals(1, shape.getBadKeysCache().length);
         assertEquals(10, shape.getBadKeysCache()[0]);
         assertEquals(5, shape.getBadPrefixSumsCache()[0]);
@@ -83,7 +88,7 @@ public class MemoryShapeTest {
 
         shape.flushAndRebuild();
 
-        assertEquals(10, shape.badLocationSum.get());
+        assertEquals(10, shape.getBadSum());
         assertEquals(2, shape.getBadKeysCache().length);
         assertEquals(10, shape.getBadKeysCache()[0]);
         assertEquals(30, shape.getBadKeysCache()[1]);
@@ -99,7 +104,7 @@ public class MemoryShapeTest {
 
         shape.flushAndRebuild();
 
-        assertEquals(10, shape.badLocationSum.get());
+        assertEquals(10, shape.getBadSum());
         assertEquals(1, shape.getBadKeysCache().length);
         assertEquals(10, shape.getBadKeysCache()[0]);
         assertEquals(10, shape.getBadPrefixSumsCache()[0]);
@@ -114,7 +119,7 @@ public class MemoryShapeTest {
         shape.flushAndRebuild();
 
         // [10, 15) and [12, 17) -> [10, 17) length 7
-        assertEquals(7, shape.badLocationSum.get());
+        assertEquals(7, shape.getBadSum());
         assertEquals(1, shape.getBadKeysCache().length);
         assertEquals(10, shape.getBadKeysCache()[0]);
         assertEquals(7, shape.getBadPrefixSumsCache()[0]);
@@ -129,7 +134,7 @@ public class MemoryShapeTest {
         shape.flushAndRebuild();
 
         // [10, 30) and [15, 17) -> [10, 30) length 20
-        assertEquals(20, shape.badLocationSum.get());
+        assertEquals(20, shape.getBadSum());
         assertEquals(1, shape.getBadKeysCache().length);
         assertEquals(10, shape.getBadKeysCache()[0]);
         assertEquals(20, shape.getBadPrefixSumsCache()[0]);
@@ -143,7 +148,7 @@ public class MemoryShapeTest {
 
         shape.clear();
 
-        assertEquals(0, shape.badLocationSum.get());
+        assertEquals(0, shape.getBadSum());
         assertEquals(0, shape.getBadKeysCache().length);
         assertEquals(0, shape.getBadPrefixSumsCache().length);
         assertTrue(shape.badLocationsDirty);

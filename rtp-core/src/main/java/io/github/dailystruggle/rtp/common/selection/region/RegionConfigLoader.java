@@ -34,6 +34,7 @@ public class RegionConfigLoader {
         boolean requirePermission = (boolean) regionParser.getConfigValue(RegionKeys.requirePermission, false);
         long cacheCap = ((Number) regionParser.getConfigValue(RegionKeys.cacheCap, 10L)).longValue();
         double price = ((Number) regionParser.getConfigValue(RegionKeys.price, 0.0)).doubleValue();
+        long spatialResolution = ((Number) regionParser.getConfigValue(RegionKeys.spatialResolution, 1L)).longValue();
         String override = String.valueOf(regionParser.getConfigValue(RegionKeys.override, "default"));
 
         if (shape instanceof MemoryShape<?>) {
@@ -59,6 +60,7 @@ public class RegionConfigLoader {
                 requirePermission,
                 cacheCap,
                 price,
+                spatialResolution,
                 override,
                 detailedRegionInit
         );

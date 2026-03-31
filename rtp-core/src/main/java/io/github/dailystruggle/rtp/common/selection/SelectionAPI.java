@@ -165,6 +165,7 @@ public class SelectionAPI {
     boolean requirePermission = (boolean) regionParams.getOrDefault(RegionKeys.requirePermission.name(), baseSettings.requirePermission());
     long cacheCap = ((Number) regionParams.getOrDefault(RegionKeys.cacheCap.name(), baseSettings.cacheCap())).longValue();
     double price = ((Number) regionParams.getOrDefault(RegionKeys.price.name(), baseSettings.price())).doubleValue();
+    long spatialResolution = ((Number) regionParams.getOrDefault(RegionKeys.spatialResolution.name(), baseSettings.spatialResolution())).longValue();
     String override = String.valueOf(regionParams.getOrDefault(RegionKeys.override.name(), baseSettings.override()));
 
     RegionSettings newSettings = new RegionSettings(
@@ -176,6 +177,7 @@ public class SelectionAPI {
             requirePermission,
             cacheCap,
             price,
+            spatialResolution,
             override,
             baseSettings.detailedRegionInit()
     );

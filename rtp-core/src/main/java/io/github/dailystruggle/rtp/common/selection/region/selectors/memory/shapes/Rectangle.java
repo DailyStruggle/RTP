@@ -196,7 +196,7 @@ public class Rectangle extends MemoryShape<RectangleParams> {
       u = Boolean.parseBoolean(String.valueOf(unique));
       data.put(RectangleParams.uniquePlacements, u);
     }
-    if (u) addBadLocation(location, 1L);
+    if (u) addBadLocation(location, spatialResolution);
 
     return location;
   }

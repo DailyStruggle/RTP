@@ -16,7 +16,6 @@ import java.util.logging.Level;
  * @param <E> enum for configuration values
  */
 public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
-  public AtomicLong badLocationSum = new AtomicLong(0L);
   public AtomicLong fillIter = new AtomicLong(0L);
 
   protected volatile long[] badKeysCache = new long[0];
@@ -63,6 +62,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       throws IllegalArgumentException {
     super(eClass, name, data);
   }
+
 
   /**
    * Get the range of the shape
@@ -212,8 +212,6 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       String readWorldName = in.readUTF();
       if (!readWorldName.equals(worldName)) return;
 
-      badLocationSum.set(0);
-
       fillIter.set(in.readLong());
 
       int badSize = in.readInt();
@@ -226,7 +224,6 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         newBadKeys[i] = k;
         currentSum += v;
         newBadSums[i] = currentSum;
-        this.badLocationSum.addAndGet(v);
       }
       this.badKeysCache = newBadKeys;
       this.badPrefixSumsCache = newBadSums;
@@ -279,7 +276,6 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     biomePrefixSumsCache = new ConcurrentHashMap<>();
     biomeMappedKeysCache = new long[0];
     biomeMappedPrefixSumsCache = new long[0];
-    badLocationSum.set(0);
     badLocationsDirty = true;
     biomeLocationsDirty = true;
   }
@@ -316,12 +312,6 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
             pendingBiomeLocations.getAndSet(new ConcurrentHashMap<>());
         ConcurrentHashMap<String, ConcurrentHashMap<Long, Boolean>> localPendingBiomeRemovals =
             pendingBiomeRemovals.getAndSet(new ConcurrentHashMap<>());
-
-        if (localPendingBad.isEmpty()
-            && localPendingBiome.isEmpty()
-            && localPendingBiomeRemovals.isEmpty()) {
-          return;
-        }
 
         // 4. Read current volatile arrays
         long[] currentBadKeys = badKeysCache;
@@ -408,7 +398,6 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         // 7. Perform bottom-up swap
         this.badKeysCache = newKeys;
         this.badPrefixSumsCache = newSums;
-        this.badLocationSum.set(newSums.length > 0 ? newSums[newSums.length - 1] : 0L);
         this.badLocationsDirty = false;
 
         // Biome logic (similar to bad locations but per biome)
@@ -562,8 +551,8 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
           }
           this.biomeKeysCache = newBiomeKeysCache;
           this.biomePrefixSumsCache = newBiomePrefixSumsCache;
-          this.biomeLocationsDirty = false;
         }
+        this.biomeLocationsDirty = false;
       } finally {
         isRebuilding.set(false);
       }
@@ -603,7 +592,6 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   @Override
   public MemoryShape<E> clone() {
     MemoryShape<E> shape = (MemoryShape<E>) super.clone();
-    shape.badLocationSum = new AtomicLong(0);
     shape.fillIter = new AtomicLong(0);
     shape.badKeysCache = new long[0];
     shape.badPrefixSumsCache = new long[0];
