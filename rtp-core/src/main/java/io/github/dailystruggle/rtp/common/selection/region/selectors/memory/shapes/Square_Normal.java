@@ -104,7 +104,7 @@ public class Square_Normal extends MemoryShape<NormalDistributionParams> {
   }
 
   @Override
-  public double xzToLocation(long x, long z) {
+  public long xzToLocation(long x, long z) {
     long cr = getNumber(NormalDistributionParams.centerRadius, 64L).longValue();
     long cx = getNumber(NormalDistributionParams.centerX, 0L).longValue();
     long cz = getNumber(NormalDistributionParams.centerZ, 0L).longValue();
@@ -169,7 +169,7 @@ public class Square_Normal extends MemoryShape<NormalDistributionParams> {
   }
 
   @Override
-  public double xzToLocation(MutableRTPCoords coords) {
+  public long xzToLocation(MutableRTPCoords coords) {
     long cr = getNumber(NormalDistributionParams.centerRadius, 64L).longValue();
     long cx = getNumber(NormalDistributionParams.centerX, 0L).longValue();
     long cz = getNumber(NormalDistributionParams.centerZ, 0L).longValue();

@@ -65,7 +65,7 @@ public class Circle_Normal extends MemoryShape<NormalDistributionParams> {
   }
 
   @Override
-  public double xzToLocation(long x, long z) {
+  public long xzToLocation(long x, long z) {
     long cr = getNumber(NormalDistributionParams.centerRadius, 64L).longValue();
     long cx = getNumber(NormalDistributionParams.centerX, 0L).longValue();
     long cz = getNumber(NormalDistributionParams.centerZ, 0L).longValue();
@@ -85,11 +85,11 @@ public class Circle_Normal extends MemoryShape<NormalDistributionParams> {
 
     double radius = ((long) (Math.sqrt(x * x + z * z)));
 
-    return (radius * radius - cr * cr) * Math.PI + rotation * (2 * radius * Math.PI);
+    return (long) ((radius * radius - cr * cr) * Math.PI + rotation * (2 * radius * Math.PI));
   }
 
   @Override
-  public double xzToLocation(MutableRTPCoords coords) {
+  public long xzToLocation(MutableRTPCoords coords) {
     long cr = getNumber(NormalDistributionParams.centerRadius, 64L).longValue();
     long cx = getNumber(NormalDistributionParams.centerX, 0L).longValue();
     long cz = getNumber(NormalDistributionParams.centerZ, 0L).longValue();
@@ -109,7 +109,7 @@ public class Circle_Normal extends MemoryShape<NormalDistributionParams> {
 
     double radius = ((long) (Math.sqrt(x * x + z * z)));
 
-    return (radius * radius - cr * cr) * Math.PI + rotation * (2 * radius * Math.PI);
+    return (long)(((radius * radius - cr * cr) * Math.PI) + rotation * (2 * radius * Math.PI));
   }
 
   @Override
