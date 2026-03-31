@@ -42,8 +42,8 @@ public class LandsChecker {
     try {
       int x = location.getBlockX();
       int z = location.getBlockZ();
-      int chunkX = (x > 0) ? x / 16 : x / 16 - 1;
-      int chunkZ = (z > 0) ? z / 16 : z / 16 - 1;
+      int chunkX = x >> 4;
+      int chunkZ = z >> 4;
       return landsIntegration.isClaimed(
           Objects.requireNonNull(location.getWorld()), chunkX, chunkZ);
     } catch (Throwable t) {

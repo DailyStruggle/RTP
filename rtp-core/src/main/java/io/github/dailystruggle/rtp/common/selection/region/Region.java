@@ -236,7 +236,7 @@ public class Region extends FactoryValue<RegionKeys> {
     }
     queueManager.perPlayerLocationQueue.clear();
 
-    chunkManager.locAssChunks.forEach((coords, chunkSet) -> chunkSet.keep(false, getWorld()));
+    chunkManager.locAssChunks.forEach((key, chunkSet) -> chunkSet.keep(false, getWorld()));
     chunkManager.locAssChunks.clear();
   }
 

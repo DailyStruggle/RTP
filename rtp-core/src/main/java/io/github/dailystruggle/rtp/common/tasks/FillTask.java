@@ -172,7 +172,7 @@ public class FillTask extends RTPRunnable {
       }
 
       shape.locationToXZ(pos, cursor);
-      long chunkKey = ((long)(cursor.x >> 4) & 0xFFFFFFFFL) | (((long)(cursor.z >> 4) & 0xFFFFFFFFL) << 32);
+      long chunkKey = ((long) (cursor.x >> 4) & 0xFFFFFFFFL) | (((long) (cursor.z >> 4) & 0xFFFFFFFFL) << 32);
       if (!testedChunks.add(chunkKey)) {
         continue;
       }
@@ -289,11 +289,11 @@ public class FillTask extends RTPRunnable {
     RTPWorld world = region.getWorld();
 
     String currBiome =
-        world.getBiome(cx * 16 + 7, (vert.maxY() + vert.minY()) / 2, cz * 16 + 7);
+        world.getBiome(blockX, (vert.maxY() + vert.minY()) / 2, blockZ);
 
     if (!defaultBiomes.contains(currBiome)) {
       if (biomeRecall) {
-        shape.addBadLocation(pos);
+        shape.addBadLocation(pos, 1L);
         return CompletableFuture.completedFuture(false);
       }
     }
@@ -302,8 +302,8 @@ public class FillTask extends RTPRunnable {
         .isInside()
         .apply(
             new RTPLocation(
-                world, cx * 16, (vert.maxY() + vert.minY()) / 2, cz * 16))) {
-      shape.addBadLocation(pos);
+                world, blockX, (vert.maxY() + vert.minY()) / 2, blockZ))) {
+      shape.addBadLocation(pos, 1L);
       return CompletableFuture.completedFuture(false);
     }
 
@@ -325,7 +325,7 @@ public class FillTask extends RTPRunnable {
     cfChunk.thenAccept(
         chunkKey -> {
           if (chunkKey == null) {
-            shape.addBadLocation(pos);
+            shape.addBadLocation(pos, 1L);
             res.complete(false);
             return;
           }
@@ -345,7 +345,7 @@ public class FillTask extends RTPRunnable {
           localCursor.setWorldName(world.name());
           try {
           if (!vert.adjust(chunk, localCursor)) {
-            if (biomeRecall) shape.addBadLocation(pos);
+            if (biomeRecall) shape.addBadLocation(pos, 1L);
             res.complete(false);
             return;
           }
@@ -353,7 +353,7 @@ public class FillTask extends RTPRunnable {
           String currBiome1 = world.getBiome(localCursor.x, localCursor.y, localCursor.z);
           if (!defaultBiomes.contains(currBiome1)) {
             if (biomeRecall) {
-              shape.addBadLocation(pos);
+              shape.addBadLocation(pos, 1L);
               res.complete(false);
               return;
             }
@@ -361,7 +361,7 @@ public class FillTask extends RTPRunnable {
 
           boolean pass = localCursor.y < vert.maxY();
           if (!pass) {
-            shape.addBadLocation(pos);
+            shape.addBadLocation(pos, 1L);
             res.complete(false);
             return;
           }
@@ -424,7 +424,7 @@ public class FillTask extends RTPRunnable {
               if (biomeRecall) shape.addBiomeLocation(pos, currBiome1);
               res.complete(true);
             } else {
-              shape.addBadLocation(pos);
+              shape.addBadLocation(pos, 1L);
               res.complete(false);
             }
           } finally {

@@ -70,4 +70,27 @@ public interface RTPScheduler {
    * @param task the task to run
    */
   void runTask(io.github.dailystruggle.rtp.api.world.RTPLocation location, Runnable task);
+
+  /**
+   * Run a task on a specific region
+   *
+   * @param world the world
+   * @param cx chunk x
+   * @param cz chunk z
+   * @param task the task to run
+   */
+  void runTask(io.github.dailystruggle.rtp.api.world.RTPWorld<?> world, int cx, int cz, Runnable task);
+
+  /**
+   * Run a task timer on a specific region
+   *
+   * @param world the world
+   * @param cx chunk x
+   * @param cz chunk z
+   * @param task the task to run
+   * @param delay the delay in ticks
+   * @param period the period in ticks
+   * @return a task ID or object that can be used to cancel the task
+   */
+  Object runTaskTimer(io.github.dailystruggle.rtp.api.world.RTPWorld<?> world, int cx, int cz, Runnable task, long delay, long period);
 }

@@ -41,6 +41,26 @@ public class FoliaSchedulerImpl implements RTPScheduler {
   }
 
   @Override
+  public void runTask(io.github.dailystruggle.rtp.api.world.RTPWorld<?> world, int cx, int cz, Runnable task) {
+    if (world instanceof FoliaRTPWorld) {
+      World bukkitWorld = ((FoliaRTPWorld) world).world();
+      Bukkit.getRegionScheduler().run(plugin, bukkitWorld, cx, cz, scheduledTask -> task.run());
+    } else {
+      runTask(task);
+    }
+  }
+
+  @Override
+  public Object runTaskTimer(io.github.dailystruggle.rtp.api.world.RTPWorld<?> world, int cx, int cz, Runnable task, long delay, long period) {
+    if (world instanceof FoliaRTPWorld) {
+      World bukkitWorld = ((FoliaRTPWorld) world).world();
+      return Bukkit.getRegionScheduler().runAtFixedRate(plugin, bukkitWorld, cx, cz, scheduledTask -> task.run(), Math.max(1, delay), Math.max(1, period));
+    } else {
+      return runTaskTimer(task, delay, period);
+    }
+  }
+
+  @Override
   public void runTaskLater(Runnable task, long delay) {
     Bukkit.getGlobalRegionScheduler()
         .runDelayed(plugin, scheduledTask -> task.run(), Math.max(1, delay));
