@@ -45,11 +45,59 @@ public abstract class DatabaseAccessor<D> {
   protected ConcurrentLinkedQueue<Map.Entry<String, Map<TableObj, TableObj>>> writeQueue =
       new ConcurrentLinkedQueue<>();
 
+  /** Queue for background file write operations */
+  protected final ConcurrentLinkedQueue<FileWriteRequest> fileWriteQueue =
+      new ConcurrentLinkedQueue<>();
+
+  /** Queue for background file read operations */
+  protected final ConcurrentLinkedQueue<FileReadRequest> fileReadQueue =
+      new ConcurrentLinkedQueue<>();
+
   /** Thread-safe cache for dirty/unsaved rows keyed by composite key: tableName + ":" + primaryKey */
   protected final ConcurrentHashMap<String, Map<String, Object>> dirtyCache = new ConcurrentHashMap<>();
 
   /** Default constructor for DatabaseAccessor */
   protected DatabaseAccessor() {}
+
+  /** Simple container describing a file write request */
+  protected static final class FileWriteRequest {
+    public final String path;
+    public final byte[] data;
+
+    public FileWriteRequest(String path, byte[] data) {
+      this.path = path;
+      this.data = data;
+    }
+  }
+
+  /** Simple container describing a file read request */
+  protected static final class FileReadRequest {
+    public final String path;
+    public final CompletableFuture<Optional<byte[]>> result;
+
+    public FileReadRequest(String path, CompletableFuture<Optional<byte[]>> result) {
+      this.path = path;
+      this.result = result;
+    }
+  }
+
+  /** Enqueue an asynchronous background file write */
+  public void saveFile(String absolutePath, byte[] payload) {
+    if (absolutePath == null || absolutePath.isEmpty() || payload == null) return;
+    fileWriteQueue.add(new FileWriteRequest(absolutePath, payload));
+  }
+
+  /** Enqueue an asynchronous background file read */
+  @NotNull
+  public CompletableFuture<Optional<byte[]>> loadFile(String absolutePath) {
+    CompletableFuture<Optional<byte[]>> fut = new CompletableFuture<>();
+    if (absolutePath == null || absolutePath.isEmpty()) {
+      fut.complete(Optional.empty());
+      return fut;
+    }
+    fileReadQueue.add(new FileReadRequest(absolutePath, fut));
+    return fut;
+  }
 
   /**
    * Convert an object to a map of column names and values
@@ -343,6 +391,53 @@ public abstract class DatabaseAccessor<D> {
    * @param availableTime the time available for processing in nanoseconds
    */
   public void processQueries(long availableTime) {
+    // Process file I/O tasks first — they don't require a database connection
+    if (!fileWriteQueue.isEmpty() || !fileReadQueue.isEmpty()) {
+      long start = System.nanoTime();
+      long dt;
+
+      // Drain file writes within time budget
+      while (!fileWriteQueue.isEmpty()) {
+        if (stop.get()) return;
+        FileWriteRequest req = fileWriteQueue.poll();
+        if (req == null) continue;
+        long localStart = System.nanoTime();
+        try {
+          java.nio.file.Path p = java.nio.file.Paths.get(req.path);
+          java.nio.file.Files.createDirectories(p.getParent());
+          java.nio.file.Files.write(p, req.data);
+        } catch (Exception ignored) {
+          // Intentionally ignore to avoid blocking the queue; callers can retry later if needed
+        }
+        long localStop = System.nanoTime();
+        if (localStop < start) start = -(Long.MAX_VALUE - start); // overflow correction
+        dt = localStop - start;
+        if (dt > availableTime) break;
+      }
+
+      // Drain file reads within time budget
+      while (!fileReadQueue.isEmpty()) {
+        if (stop.get()) return;
+        FileReadRequest req = fileReadQueue.poll();
+        if (req == null) continue;
+        long localStart = System.nanoTime();
+        try {
+          java.nio.file.Path p = java.nio.file.Paths.get(req.path);
+          if (!java.nio.file.Files.exists(p)) {
+            req.result.complete(Optional.empty());
+          } else {
+            req.result.complete(Optional.of(java.nio.file.Files.readAllBytes(p)));
+          }
+        } catch (Exception e) {
+          req.result.complete(Optional.empty());
+        }
+        long localStop = System.nanoTime();
+        if (localStop < start) start = -(Long.MAX_VALUE - start); // overflow correction
+        dt = localStop - start;
+        if (dt > availableTime) break;
+      }
+    }
+
     if (readQueue.isEmpty() && writeQueue.isEmpty()) return;
     D database = connect();
     if (database == null) return;

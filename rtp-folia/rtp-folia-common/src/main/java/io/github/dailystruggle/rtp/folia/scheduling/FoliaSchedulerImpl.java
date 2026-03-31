@@ -31,32 +31,38 @@ public class FoliaSchedulerImpl implements RTPScheduler {
   @Override
   public void runTask(io.github.dailystruggle.rtp.api.world.RTPLocation location, Runnable task) {
     RTPWorld<?> rtpWorld = location.world();
-    if (rtpWorld instanceof FoliaRTPWorld) {
+    if (rtpWorld instanceof FoliaRTPWorld && rtpWorld.world() != null) {
       World world = ((FoliaRTPWorld) rtpWorld).world();
       Bukkit.getRegionScheduler()
           .run(plugin, world, (int) location.x() >> 4, (int) location.z() >> 4, scheduledTask -> task.run());
+    } else if (rtpWorld == null || rtpWorld.world() == null) {
+      runTaskAsynchronously(task);
     } else {
-      runTask(task);
+      throw new IllegalArgumentException("World [" + rtpWorld.name() + "] is not a Folia world");
     }
   }
 
   @Override
   public void runTask(io.github.dailystruggle.rtp.api.world.RTPWorld<?> world, int cx, int cz, Runnable task) {
-    if (world instanceof FoliaRTPWorld) {
+    if (world instanceof FoliaRTPWorld && world.world() != null) {
       World bukkitWorld = ((FoliaRTPWorld) world).world();
       Bukkit.getRegionScheduler().run(plugin, bukkitWorld, cx, cz, scheduledTask -> task.run());
+    } else if (world == null || world.world() == null) {
+      runTaskAsynchronously(task);
     } else {
-      runTask(task);
+      throw new IllegalArgumentException("World [" + world.name() + "] is not a Folia world");
     }
   }
 
   @Override
   public Object runTaskTimer(io.github.dailystruggle.rtp.api.world.RTPWorld<?> world, int cx, int cz, Runnable task, long delay, long period) {
-    if (world instanceof FoliaRTPWorld) {
+    if (world instanceof FoliaRTPWorld && world.world() != null) {
       World bukkitWorld = ((FoliaRTPWorld) world).world();
       return Bukkit.getRegionScheduler().runAtFixedRate(plugin, bukkitWorld, cx, cz, scheduledTask -> task.run(), Math.max(1, delay), Math.max(1, period));
+    } else if (world == null || world.world() == null) {
+      return runTaskTimerAsynchronously(task, delay, period);
     } else {
-      return runTaskTimer(task, delay, period);
+      throw new IllegalArgumentException("World [" + world.name() + "] is not a Folia world");
     }
   }
 

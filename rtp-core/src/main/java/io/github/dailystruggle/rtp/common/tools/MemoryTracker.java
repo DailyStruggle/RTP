@@ -61,7 +61,7 @@ public class MemoryTracker {
 
       for (Region region : RTP.selectionAPI.permRegionLookup.values()) {
         totalLocationQueueSize += region.queueManager.locationQueue.size();
-        for (var queue : region.queueManager.perPlayerLocationQueue.values()) {
+        for (java.util.concurrent.ConcurrentLinkedQueue<io.github.dailystruggle.rtp.common.selection.region.CachedLocation> queue : region.queueManager.perPlayerLocationQueue.values()) {
           totalPerPlayerLocationQueueSize += queue.size();
         }
         totalLocAssChunksSize += region.chunkManager.locAssChunks.size();

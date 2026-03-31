@@ -64,7 +64,7 @@ public class LocationGenerator {
      */
     public static GenerationResult getLocation(
             Region region, RTPCommandSender sender, RTPPlayer player, @Nullable Set<String> biomeNames) {
-        Map.Entry<RTPCoords, Long> pair = null;
+        CachedLocation pair = null;
         ChunkSet chunkSet = null;
 
         region.getShape(); // validate shape before using cache
@@ -74,13 +74,13 @@ public class LocationGenerator {
         boolean custom = biomeNames != null && !biomeNames.isEmpty();
 
         if (!custom && region.queueManager.perPlayerLocationQueue.containsKey(playerId)) {
-            java.util.concurrent.ConcurrentLinkedQueue<Map.Entry<RTPCoords, Long>> playerLocationQueue =
+            java.util.concurrent.ConcurrentLinkedQueue<CachedLocation> playerLocationQueue =
                     region.queueManager.perPlayerLocationQueue.get(playerId);
             boolean success = false;
             while (!playerLocationQueue.isEmpty()) {
                 pair = playerLocationQueue.poll();
-                if (pair == null || pair.getKey() == null) continue;
-                RTPCoords left = pair.getKey();
+                if (pair == null || pair.getCoords() == null) continue;
+                RTPCoords left = pair.getCoords();
                 boolean pass = true;
 
                 RTPWorld<?> world = region.getWorld();
@@ -215,7 +215,9 @@ public class LocationGenerator {
                     if (!GlobalRegionVerifiers.checkGlobalRegionVerifiers(left)) continue;
                     chunkSet = region.chunkManager.getChunkSet(left);
                     success = true;
-                    return new GenerationResult(left, pair.getValue(), chunkSet);
+                    GenerationResult res = new GenerationResult(left, pair.getAttempts(), chunkSet);
+                    CachedLocationPool.release(pair);
+                    return res;
                 } finally {
                     if (!success) region.chunkManager.removeTicket(cx, cz);
                 }
@@ -225,25 +227,28 @@ public class LocationGenerator {
         while (!custom && !region.queueManager.locationQueue.isEmpty()) {
             pair = region.queueManager.locationQueue.poll();
             if (pair == null) continue;
-            RTPCoords left = pair.getKey();
+            RTPCoords left = pair.getCoords();
             if (left == null) continue;
             boolean pass = GlobalRegionVerifiers.checkGlobalRegionVerifiers(left);
             if (pass) {
                 chunkSet = region.chunkManager.getChunkSet(left);
-                return new GenerationResult(left, pair.getValue(), chunkSet);
+                GenerationResult res = new GenerationResult(left, pair.getAttempts(), chunkSet);
+                CachedLocationPool.release(pair);
+                return res;
             }
         }
 
         if (custom || sender.hasPermission("rtp.unqueued")) {
             GenerationResult res = getLocation(region, biomeNames);
             if (res != null) {
-                pair = new AbstractMap.SimpleEntry<>(res.coords(), res.attempts());
                 chunkSet = res.verifiedChunks();
                 long attempts = res.attempts();
+                RTPCoords coords = res.coords();
                 TeleportData data = RTP.getInstance().latestTeleportData.get(playerId);
                 if (data != null && !data.completed) {
                     data.attempts = attempts;
                 }
+                return new GenerationResult(coords, attempts, chunkSet);
             }
         } else {
             RTP.getInstance().processingPlayers.add(playerId);
@@ -271,7 +276,7 @@ public class LocationGenerator {
             data.queueLocation = region.queueManager.playerQueue.size();
             RTP.serverAccessor.sendMessage(playerId, MessagesKeys.queueUpdate);
         }
-        return new GenerationResult((pair != null) ? pair.getKey() : null, (pair != null) ? pair.getValue() : 1, chunkSet);
+        return new GenerationResult(null, 1, chunkSet);
     }
 
     /**

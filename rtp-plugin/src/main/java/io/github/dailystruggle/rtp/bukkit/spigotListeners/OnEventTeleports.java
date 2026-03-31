@@ -132,7 +132,7 @@ public class OnEventTeleports implements Listener {
     // I don't know how this can happen, but in case player dies twice, don't reprocess
     if (region.queueManager.fastLocations.containsKey(id)) return;
 
-    CompletableFuture<Map.Entry<RTPCoords, Long>> future = new CompletableFuture<>();
+    CompletableFuture<io.github.dailystruggle.rtp.common.selection.region.CachedLocation> future = new CompletableFuture<>();
     region.queueManager.fastLocations.put(id, future);
 
     if (RTP.getInstance().latestTeleportData.containsKey(id)) {
@@ -159,15 +159,15 @@ public class OnEventTeleports implements Listener {
             return;
           }
 
-          Map.Entry<RTPCoords, Long> location = new java.util.AbstractMap.SimpleEntry<>(res.coords(), res.attempts());
+          io.github.dailystruggle.rtp.common.selection.region.CachedLocation location = io.github.dailystruggle.rtp.common.selection.region.CachedLocationPool.acquire(res.coords(), res.attempts());
 
-          if (location.getKey() == null) {
+          if (location.getCoords() == null) {
             return;
           }
 
-          RTPCoords coords = location.getKey();
+          RTPCoords coords = location.getCoords();
           teleportData.selectedCoords = coords;
-          teleportData.attempts = location.getValue();
+          teleportData.attempts = location.getAttempts();
 
           future.complete(location);
         });
@@ -181,14 +181,14 @@ public class OnEventTeleports implements Listener {
     respawningPlayers.remove(player.getUniqueId());
 
     Region region = RTP.selectionAPI.getRegion(RTP.serverAccessor.getPlayer(player.getUniqueId()));
-    ConcurrentHashMap<UUID, CompletableFuture<Map.Entry<RTPCoords, Long>>> respawnLocations =
+    ConcurrentHashMap<UUID, CompletableFuture<io.github.dailystruggle.rtp.common.selection.region.CachedLocation>> respawnLocations =
         region.queueManager.fastLocations;
     if (!respawnLocations.containsKey(player.getUniqueId())) {
       RTPTeleportCancel.refund(player.getUniqueId());
       return;
     }
 
-    CompletableFuture<Map.Entry<RTPCoords, Long>> future =
+    CompletableFuture<io.github.dailystruggle.rtp.common.selection.region.CachedLocation> future =
         respawnLocations.get(player.getUniqueId());
     region.queueManager.fastLocations.remove(player.getUniqueId());
 
@@ -200,7 +200,7 @@ public class OnEventTeleports implements Listener {
 
         }
       } else {
-        future.thenAccept(rtpLocationLongEntry -> region.queueManager.locationQueue.add(rtpLocationLongEntry));
+        future.thenAccept(cachedLocation -> region.queueManager.locationQueue.add(cachedLocation));
       }
       RTPTeleportCancel.refund(player.getUniqueId());
       return;
@@ -227,7 +227,7 @@ public class OnEventTeleports implements Listener {
     }
 
     if (future.isDone()) {
-      Map.Entry<RTPCoords, Long> location;
+      io.github.dailystruggle.rtp.common.selection.region.CachedLocation location;
       try {
         location = future.get();
       } catch (InterruptedException | ExecutionException e) {
@@ -241,12 +241,12 @@ public class OnEventTeleports implements Listener {
         return;
       }
 
-      if (location.getKey() == null) {
+      if (location.getCoords() == null) {
         RTPTeleportCancel.refund(player.getUniqueId());
         return;
       }
 
-      RTPCoords rtpCoords = location.getKey();
+      RTPCoords rtpCoords = location.getCoords();
 
       RTPWorld rtpWorld = region.getWorld();
       org.bukkit.World world = Bukkit.getWorld(rtpWorld.id());
