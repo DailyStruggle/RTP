@@ -9,7 +9,10 @@ import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionConfigLoader;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
+import io.github.dailystruggle.rtp.common.tasks.FillTask;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
+import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
+import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import java.io.File;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -184,47 +187,68 @@ public class Configs {
   public boolean reload() {
     this.fileDatabase.processQueries(Long.MAX_VALUE);
     this.fileDatabase.connect();
-    configParserMap.clear();
-    multiConfigParserMap.clear();
     reloadAction();
     return true;
   }
 
   /** Action to perform during reload */
   protected void reloadAction() {
+    for (Region r : RTP.selectionAPI.permRegionLookup.values()) {
+      r.shutDown();
+    }
+    RTP.selectionAPI.permRegionLookup.clear();
+
+    for (Region r : RTP.selectionAPI.tempRegions.values()) {
+      r.shutDown();
+    }
+    RTP.selectionAPI.tempRegions.clear();
+
+    FillTask.kill();
+
+    RTP.getInstance().processingPlayers.clear();
+
+    for (Map.Entry<UUID, TeleportData> e : RTP.getInstance().latestTeleportData.entrySet()) {
+      TeleportData data = e.getValue();
+      if (data == null || data.completed) continue;
+      new RTPTeleportCancel(e.getKey()).run();
+    }
+
+    Map<Class<?>, ConfigParser<?>> newConfigParserMap = new ConcurrentHashMap<>();
+    Map<Class<?>, MultiConfigParser<?>> newMultiConfigParserMap = new ConcurrentHashMap<>();
+
     ConfigParser<LoggingKeys> logging =
         new ConfigParser<>(LoggingKeys.class, "logging.yml", "1.0", pluginDirectory, fileDatabase);
-    putParser(logging);
+    newConfigParserMap.put(LoggingKeys.class, logging);
 
     ConfigParser<MessagesKeys> lang =
         new ConfigParser<>(
             MessagesKeys.class, "messages.yml", "1.0", pluginDirectory, fileDatabase);
-    putParser(lang);
+    newConfigParserMap.put(MessagesKeys.class, lang);
 
     ConfigParser<ConfigKeys> config =
         new ConfigParser<>(ConfigKeys.class, "config.yml", "3.0", pluginDirectory, fileDatabase);
-    putParser(config);
+    newConfigParserMap.put(ConfigKeys.class, config);
 
     ConfigParser<EconomyKeys> economy =
         new ConfigParser<>(EconomyKeys.class, "economy.yml", "1.0", pluginDirectory, fileDatabase);
-    putParser(economy);
+    newConfigParserMap.put(EconomyKeys.class, economy);
 
     ConfigParser<PerformanceKeys> performance =
         new ConfigParser<>(
             PerformanceKeys.class, "performance.yml", "1.0", pluginDirectory, fileDatabase);
-    putParser(performance);
+    newConfigParserMap.put(PerformanceKeys.class, performance);
 
     ConfigParser<SafetyKeys> safety =
         new ConfigParser<>(SafetyKeys.class, "safety", "1.0", pluginDirectory, fileDatabase);
-    putParser(safety);
+    newConfigParserMap.put(SafetyKeys.class, safety);
 
     MultiConfigParser<RegionKeys> regions =
         new MultiConfigParser<>(RegionKeys.class, "regions", "1.0", pluginDirectory);
-    putParser(regions);
+    newMultiConfigParserMap.put(RegionKeys.class, regions);
 
     MultiConfigParser<WorldKeys> worlds =
         new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", pluginDirectory);
-    putParser(worlds);
+    newMultiConfigParserMap.put(WorldKeys.class, worlds);
 
     for (RTPWorld world : RTP.serverAccessor.getRTPWorlds()) {
       worlds.addParser(world.name());
@@ -257,10 +281,13 @@ public class Configs {
           .add(
               new RTPRunnable(
                   () -> {
-                    RTP.selectionAPI.permRegionLookup.get(region.name).getShape().select();
+                    Region r = RTP.selectionAPI.permRegionLookup.get(region.name);
+                    if (r != null) r.getShape().select();
                   },
                   60));
     }
+    this.configParserMap = newConfigParserMap;
+    this.multiConfigParserMap = newMultiConfigParserMap;
     if (!onReload.isEmpty()) onReload.forEach(Runnable::run);
   }
 }

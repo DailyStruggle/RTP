@@ -13,7 +13,14 @@ import java.util.function.BiFunction;
 public class ShapeParameter extends CommandParameter {
   public ShapeParameter(
       String permission, String description, BiFunction<UUID, String, Boolean> isRelevant) {
-    super(permission, description, isRelevant);
+    super(
+        permission,
+        description,
+        (uuid, s) -> {
+          Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+          if (!factory.map.containsKey(s.toUpperCase())) return false;
+          return isRelevant.apply(uuid, s);
+        });
     Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
     factory.map.forEach((s, shape1) -> put(shape1.name, shape1.getParameters()));
   }

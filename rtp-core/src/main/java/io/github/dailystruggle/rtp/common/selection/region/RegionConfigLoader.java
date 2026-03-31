@@ -27,15 +27,19 @@ public class RegionConfigLoader {
             }
         }
 
-        RTPWorld<?> world = (RTPWorld<?>) regionParser.getConfigValue(RegionKeys.world, null);
-        Shape<?> shape = (Shape<?>) regionParser.getConfigValue(RegionKeys.shape, null);
-        VerticalAdjustor<?> vert = (VerticalAdjustor<?>) regionParser.getConfigValue(RegionKeys.vert, null);
-        boolean worldBorderOverride = (boolean) regionParser.getConfigValue(RegionKeys.worldBorderOverride, false);
-        boolean requirePermission = (boolean) regionParser.getConfigValue(RegionKeys.requirePermission, false);
-        long cacheCap = ((Number) regionParser.getConfigValue(RegionKeys.cacheCap, 10L)).longValue();
-        int activeChunkCap = ((Number) regionParser.getConfigValue(RegionKeys.activeChunkCap, 3)).intValue();
-        double price = ((Number) regionParser.getConfigValue(RegionKeys.price, 0.0)).doubleValue();
-        long spatialResolution = ((Number) regionParser.getConfigValue(RegionKeys.spatialResolution, 1L)).longValue();
+        RTPWorld<?> world = (regionParser.getConfigValue(RegionKeys.world, null) instanceof RTPWorld<?>) 
+                ? (RTPWorld<?>) regionParser.getConfigValue(RegionKeys.world, null) : null;
+        Shape<?> shape = (regionParser.getConfigValue(RegionKeys.shape, null) instanceof Shape<?>) 
+                ? (Shape<?>) regionParser.getConfigValue(RegionKeys.shape, null) : null;
+        VerticalAdjustor<?> vert = (regionParser.getConfigValue(RegionKeys.vert, null) instanceof VerticalAdjustor<?>) 
+                ? (VerticalAdjustor<?>) regionParser.getConfigValue(RegionKeys.vert, null) : null;
+
+        boolean worldBorderOverride = getBoolean(regionParser.getConfigValue(RegionKeys.worldBorderOverride, false));
+        boolean requirePermission = getBoolean(regionParser.getConfigValue(RegionKeys.requirePermission, false));
+        long cacheCap = getNumber(regionParser.getConfigValue(RegionKeys.cacheCap, 10L)).longValue();
+        int activeChunkCap = getNumber(regionParser.getConfigValue(RegionKeys.activeChunkCap, 3)).intValue();
+        double price = getNumber(regionParser.getConfigValue(RegionKeys.price, 0.0)).doubleValue();
+        long spatialResolution = getNumber(regionParser.getConfigValue(RegionKeys.spatialResolution, 1L)).longValue();
         String override = String.valueOf(regionParser.getConfigValue(RegionKeys.override, "default"));
 
         if (shape instanceof MemoryShape<?>) {
@@ -66,5 +70,21 @@ public class RegionConfigLoader {
                 override,
                 detailedRegionInit
         );
+    }
+
+    private static boolean getBoolean(Object o) {
+        if (o instanceof Boolean) return (boolean) o;
+        if (o == null) return false;
+        return Boolean.parseBoolean(o.toString());
+    }
+
+    private static Number getNumber(Object o) {
+        if (o instanceof Number) return (Number) o;
+        if (o == null) return 0;
+        try {
+            return Double.parseDouble(o.toString());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 }

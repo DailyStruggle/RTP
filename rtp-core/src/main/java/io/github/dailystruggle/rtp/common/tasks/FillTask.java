@@ -173,6 +173,14 @@ public class FillTask extends RTPRunnable {
         return;
       }
 
+      if (region.queueManager.getPublicQueueLength() >= region.getSettings().cacheCap()) {
+        break;
+      }
+
+      if (region.chunkManager.locAssChunks.size() >= region.getSettings().activeChunkCap()) {
+        break;
+      }
+
       shape.locationToXZ(pos, cursor);
       long chunkKey = ((long) (cursor.x >> 4) & 0xFFFFFFFFL) | (((long) (cursor.z >> 4) & 0xFFFFFFFFL) << 32);
       if (!testedChunks.add(chunkKey)) {

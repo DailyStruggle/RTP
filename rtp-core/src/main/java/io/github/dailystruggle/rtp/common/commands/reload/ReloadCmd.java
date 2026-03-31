@@ -65,23 +65,23 @@ public class ReloadCmd extends BaseRTPCmdImpl {
   @Override
   public boolean onCommand(
       UUID senderId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
+    if (nextCommand != null) return true;
+
     RTP.reloading.set(true);
 
-    if (nextCommand == null) {
-      RTP.stop();
+    ConfigParser<MessagesKeys> lang =
+            (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+    if (lang != null) {
+      String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloading, ""));
+      if (msg != null)
+        msg =
+                filenamePattern
+                        .matcher(msg)
+                        .replaceAll("configs"); // msg = msg.replaceAll( "\\[filename]", "configs" );
+      RTP.serverAccessor.sendMessage(RTPAPI.serverId, senderId, msg);
+    }
 
-      ConfigParser<MessagesKeys> lang =
-          (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-      if (lang != null) {
-        String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloading, ""));
-        if (msg != null)
-          msg =
-              filenamePattern
-                  .matcher(msg)
-                  .replaceAll("configs"); // msg = msg.replaceAll( "\\[filename]", "configs" );
-        RTP.serverAccessor.sendMessage(RTPAPI.serverId, senderId, msg);
-      }
-
+    RTP.scheduler.runTaskAsynchronously(() -> {
       boolean b = RTP.configs.reload();
       if (!b) throw new IllegalStateException("reload failed");
 
@@ -89,27 +89,21 @@ public class ReloadCmd extends BaseRTPCmdImpl {
         String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloaded, ""));
         if (msg != null)
           msg =
-              filenamePattern
-                  .matcher(msg)
-                  .replaceAll("configs"); // msg.replaceAll( "\\[filename]", "configs" );
+                  filenamePattern
+                          .matcher(msg)
+                          .replaceAll("configs"); // msg.replaceAll( "\\[filename]", "configs" );
         RTP.serverAccessor.sendMessage(senderId, msg);
       }
 
-      RTP.serverAccessor.start();
-
       RTP.getInstance()
-          .miscSyncTasks
-          .add(
-              new RTPRunnable(
-                  () -> {
-                    RTP.reloading.set(false);
-                  },
-                  1));
-
-      RTP.getInstance().miscSyncTasks.start();
-      RTP.getInstance().miscAsyncTasks.start();
-      RTP.getInstance().startupTasks.start();
-    }
+              .miscSyncTasks
+              .add(
+                      new RTPRunnable(
+                              () -> {
+                                RTP.reloading.set(false);
+                              },
+                              1));
+    });
 
     return true;
   }

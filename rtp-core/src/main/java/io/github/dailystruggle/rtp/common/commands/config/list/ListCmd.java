@@ -60,34 +60,36 @@ public class ListCmd extends BaseRTPCmdImpl {
     addCommands();
 
     ConfigParser<MessagesKeys> lang =
-        (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-    String msg = String.valueOf(lang.getConfigValue(MessagesKeys.updating, ""));
-    if (msg != null) msg = msg.replace("[filename]", name);
-    RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId, msg);
+            (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+    String updateMsg = String.valueOf(lang.getConfigValue(MessagesKeys.updating, ""));
+    if (updateMsg != null) updateMsg = updateMsg.replace("[filename]", name);
+    RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId, updateMsg);
 
-    List<String> stringList = file.getStringList(key);
+    RTP.scheduler.runTaskAsynchronously(() -> {
+      List<String> stringList = file.getStringList(key);
 
-    List<String> add = parameterValues.get("add");
-    if (add != null) {
-      stringList.addAll(add);
-    }
+      List<String> add = parameterValues.get("add");
+      if (add != null) {
+        stringList.addAll(add);
+      }
 
-    List<String> remove = parameterValues.get("remove");
-    if (remove != null) {
-      stringList.removeAll(remove);
-    }
+      List<String> remove = parameterValues.get("remove");
+      if (remove != null) {
+        stringList.removeAll(remove);
+      }
 
-    file.set(key, stringList);
-    try {
-      file.save();
-    } catch (IOException e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
-      return true;
-    }
+      file.set(key, stringList);
+      try {
+        file.save();
+      } catch (IOException e) {
+        RTP.log(Level.WARNING, e.getMessage(), e);
+        return;
+      }
 
-    msg = String.valueOf(lang.getConfigValue(MessagesKeys.updated, ""));
-    if (msg != null) msg = msg.replace("[filename]", name);
-    RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId, msg);
+      String updatedMsg = String.valueOf(lang.getConfigValue(MessagesKeys.updated, ""));
+      if (updatedMsg != null) updatedMsg = updatedMsg.replace("[filename]", name);
+      RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId, updatedMsg);
+    });
 
     return true;
   }
