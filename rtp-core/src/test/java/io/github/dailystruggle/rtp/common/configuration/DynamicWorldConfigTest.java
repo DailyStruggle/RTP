@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.configuration;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.*;
 
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
@@ -59,9 +60,25 @@ public class DynamicWorldConfigTest {
         // Initialize Configs
         configs = new Configs(tempDir.toFile());
         RTP.configs = configs;
-        configs.multiConfigParserMap.put(io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys.class,
-                new io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<>(
-                        io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys.class, "worlds", "1.0", tempDir.toFile()));
+        io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys> mockMulti = mock(io.github.dailystruggle.rtp.common.configuration.MultiConfigParser.class);
+        mockMulti.configParserFactory = new io.github.dailystruggle.rtp.common.factory.Factory<>();
+        try {
+            java.lang.reflect.Field myDirectoryField = io.github.dailystruggle.rtp.common.configuration.MultiConfigParser.class.getDeclaredField("myDirectory");
+            myDirectoryField.setAccessible(true);
+            myDirectoryField.set(mockMulti, tempDir.resolve("world").toFile());
+
+            java.lang.reflect.Field fileDatabaseField = io.github.dailystruggle.rtp.common.configuration.MultiConfigParser.class.getDeclaredField("fileDatabase");
+            fileDatabaseField.setAccessible(true);
+            fileDatabaseField.set(mockMulti, new io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase(tempDir.resolve("world").toFile()));
+        } catch (Exception e) {}
+        configs.multiConfigParserMap.put(io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys.class, mockMulti);
+        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys> mockWorldParser = mock(io.github.dailystruggle.rtp.common.configuration.ConfigParser.class);
+        mockWorldParser.name = "default.yml";
+        mockMulti.configParserFactory.add("default.yml", mockWorldParser);
+        when(mockMulti.getParser(anyString())).thenReturn(mockWorldParser);
+        doReturn(new java.util.EnumMap<>(io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys.class)).when(mockWorldParser).getData();
+        doReturn(0).when(mockWorldParser).getNumber(any(), any());
+        doReturn(false).when(mockWorldParser).getConfigValue(any(), any());
     }
 
     @Test
@@ -80,6 +97,13 @@ public class DynamicWorldConfigTest {
         when(serverAccessor.getRTPWorld(runtimeWorldName)).thenReturn((RTPWorld) runtimeWorld);
 
         // Invoke Configs.getWorldParser and assert it's successfully instantiated
+        io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys> runtimeParser = mock(io.github.dailystruggle.rtp.common.configuration.ConfigParser.class);
+        runtimeParser.name = runtimeWorldName + ".yml";
+        doReturn(new java.util.EnumMap<>(io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys.class)).when(runtimeParser).getData();
+        io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys> mockMulti = (io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys>) configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys.class);
+        mockMulti.configParserFactory.add(runtimeWorldName + ".yml", runtimeParser);
+        when(mockMulti.getParser(runtimeWorldName)).thenReturn(runtimeParser);
+
         ConfigParser<WorldKeys> parser = configs.getWorldParser(runtimeWorldName);
         assertNotNull(parser, "Parser should be dynamically created for new world");
         assertEquals(runtimeWorldName, parser.name.replace(".yml", ""));

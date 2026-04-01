@@ -16,6 +16,9 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys;
+import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,7 +44,14 @@ public class OnPlayerQuitTest {
         when(serverAccessor.createCachePipe()).thenReturn(mock(RTPTaskPipe.class));
         when(serverAccessor.createTaskPipe()).thenReturn(mock(RTPTaskPipe.class));
         when(serverAccessor.getChunkManager()).thenReturn(mock(RTPChunkManager.class));
+        when(serverAccessor.getPluginDirectory()).thenReturn(new java.io.File("build/tmp/test"));
         new RTP();
+        ConfigParser mockEco = mock(ConfigParser.class);
+        when(mockEco.getConfigValue(any(), any())).thenReturn(true);
+        RTP.configs.configParserMap.put(EconomyKeys.class, mockEco);
+        ConfigParser mockMsg = mock(ConfigParser.class);
+        when(mockMsg.getConfigValue(any(), any())).thenReturn("");
+        RTP.configs.configParserMap.put(MessagesKeys.class, mockMsg);
     }
 
     @Test
@@ -61,6 +71,7 @@ public class OnPlayerQuitTest {
         RTPCoords coords = new RTPCoords("world", 100, 64, 100);
         RTPWorld rtpWorld = mock(RTPWorld.class);
         when(rtpWorld.name()).thenReturn("world");
+        when(rtpWorld.id()).thenReturn(UUID.randomUUID());
 
         RegionSettings settings = new RegionSettings(
             "default",

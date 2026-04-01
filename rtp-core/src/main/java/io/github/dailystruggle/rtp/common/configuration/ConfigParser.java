@@ -439,6 +439,10 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     set(k, value);
   }
 
+  public void setConfigValue(String key, Object value) {
+    set(key, value);
+  }
+
   /**
    * Save the configuration to disk
    *

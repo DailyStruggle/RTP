@@ -6,8 +6,9 @@ public interface RTPScheduler {
    * Run a task asynchronously
    *
    * @param task the task to run
+   * @return the tracked task
    */
-  void runTaskAsynchronously(Runnable task);
+  TrackedRTPTask runTaskAsynchronously(Runnable task);
 
   /**
    * Run a task on the primary thread

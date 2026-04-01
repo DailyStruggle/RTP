@@ -58,4 +58,5 @@ dependencies {
 
 test {
     useJUnitPlatform()
+    jvmArgs += ['--add-modules', 'jdk.incubator.vector']
 }
