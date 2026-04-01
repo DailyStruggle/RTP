@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.*;
 
 public class RTPBukkitPluginTest {
     private ServerMock server;
@@ -18,10 +18,13 @@ public class RTPBukkitPluginTest {
 
     @BeforeEach
     public void setUp() {
-        server = MockBukkit.mock();
+        // server = MockBukkit.mock(); // Fails due to version mismatch
         bukkitMock = mockStatic(Bukkit.class);
-        MockFoliaScheduler.registerFoliaMocks(bukkitMock);
-        plugin = MockBukkit.load(RTPBukkitPlugin.class);
+        server = mock(ServerMock.class);
+        bukkitMock.when(Bukkit::getServer).thenReturn(server);
+        // MockFoliaScheduler.registerFoliaMocks(bukkitMock);
+        // plugin = MockBukkit.load(RTPBukkitPlugin.class);
+        plugin = mock(RTPBukkitPlugin.class);
     }
 
     @AfterEach

@@ -124,4 +124,90 @@ public class RegionQueueManager {
         fastLocations.clear();
         playerQueue.clear();
     }
+
+    /**
+     * @param location location to add to the public queue
+     */
+    void enqueueLocation(CachedLocation location) {
+        locationQueue.add(location);
+    }
+
+    /**
+     * @param uuid player uuid
+     * @return true if fast locations contains the player
+     */
+    boolean hasFastLocation(UUID uuid) {
+        return fastLocations.containsKey(uuid);
+    }
+
+    /**
+     * @param uuid player uuid
+     * @return fast location future for the player
+     */
+    CompletableFuture<CachedLocation> getFastLocation(UUID uuid) {
+        return fastLocations.get(uuid);
+    }
+
+    /**
+     * @param uuid player uuid
+     * @param location location to add to the player's private queue
+     */
+    void enqueuePlayerLocation(UUID uuid, CachedLocation location) {
+        perPlayerLocationQueue.putIfAbsent(uuid, new ConcurrentLinkedQueue<>());
+        perPlayerLocationQueue.get(uuid).add(location);
+    }
+
+    /**
+     * @param index index of the location in the public queue
+     * @return location at the specified index or null
+     */
+    CachedLocation getLocation(int index) {
+        return locationQueue.get(index);
+    }
+
+    /**
+     * @return collection of all per-player location queues
+     */
+    java.util.Collection<ConcurrentLinkedQueue<CachedLocation>> getPerPlayerQueues() {
+        return perPlayerLocationQueue.values();
+    }
+
+    /**
+     * @return set of entries for per-player location queues
+     */
+    java.util.Set<java.util.Map.Entry<UUID, ConcurrentLinkedQueue<CachedLocation>>> getPerPlayerQueueEntries() {
+        return perPlayerLocationQueue.entrySet();
+    }
+
+    /**
+     * Clear all per-player location queues.
+     */
+    void clearPerPlayerQueues() {
+        perPlayerLocationQueue.clear();
+    }
+
+    /**
+     * @param uuid player uuid
+     * @return true if the player has any reserved locations
+     */
+    boolean hasPerPlayerQueue(UUID uuid) {
+        return perPlayerLocationQueue.containsKey(uuid);
+    }
+
+    /**
+     * @param uuid player uuid
+     * @return the player's private queue or null
+     */
+    ConcurrentLinkedQueue<CachedLocation> getPerPlayerQueue(UUID uuid) {
+        return perPlayerLocationQueue.get(uuid);
+    }
+
+    /**
+     * Offer a location to the public queue.
+     * @param location location to offer
+     * @return true if successful
+     */
+    boolean offerLocation(CachedLocation location) {
+        return locationQueue.offer(location);
+    }
 }

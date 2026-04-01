@@ -48,18 +48,29 @@ public class MockFoliaScheduler implements RTPScheduler {
     }
 
     @Override
-    public void runTaskAsynchronously(Runnable task) {
-        if (isMockBukkit()) {
-            Bukkit.getScheduler().runTaskAsynchronously(plugin, task);
-        } else {
-            task.run();
+    public io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask runTaskAsynchronously(Runnable task) {
+        String taskId = java.util.UUID.randomUUID().toString();
+        io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask trackedTask = new io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask(task instanceof io.github.dailystruggle.rtp.common.tasks.RTPRunnable ? (io.github.dailystruggle.rtp.common.tasks.RTPRunnable) task : new io.github.dailystruggle.rtp.common.tasks.RTPRunnable() {
+            @Override
+            public void run() {
+                task.run();
+            }
+        }, taskId);
+        if (io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor != null) {
+            io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor.registerAction(trackedTask);
         }
+        if (isMockBukkit()) {
+            Bukkit.getScheduler().runTaskAsynchronously(plugin, trackedTask);
+        } else {
+            trackedTask.run();
+        }
+        return trackedTask;
     }
 
     @Override
     public void runTask(Runnable task) {
         if (isMockBukkit()) {
-            Bukkit.getScheduler().runTask(plugin, task);
+            Bukkit.getGlobalRegionScheduler().run(plugin, scheduledTask -> task.run());
         } else {
             task.run();
         }
@@ -68,7 +79,7 @@ public class MockFoliaScheduler implements RTPScheduler {
     @Override
     public void runTaskLater(Runnable task, long delay) {
         if (isMockBukkit()) {
-            Bukkit.getScheduler().runTaskLater(plugin, task, delay);
+            Bukkit.getGlobalRegionScheduler().runDelayed(plugin, scheduledTask -> task.run(), delay);
         } else {
             tasks.add(new MockTask(task, currentTime.get() + delay, -1));
         }
@@ -77,7 +88,7 @@ public class MockFoliaScheduler implements RTPScheduler {
     @Override
     public Object runTaskTimer(Runnable task, long delay, long period) {
         if (isMockBukkit()) {
-            return Bukkit.getScheduler().runTaskTimer(plugin, task, delay, period);
+            return Bukkit.getGlobalRegionScheduler().runAtFixedRate(plugin, (scheduledTask) -> task.run(), delay, period);
         } else {
             MockTask mockTask = new MockTask(task, currentTime.get() + delay, period);
             tasks.add(mockTask);

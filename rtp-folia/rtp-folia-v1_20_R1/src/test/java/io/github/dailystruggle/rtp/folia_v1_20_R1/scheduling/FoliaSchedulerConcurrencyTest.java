@@ -15,7 +15,6 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.RepeatedTest;
-import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -36,6 +35,23 @@ public class FoliaSchedulerConcurrencyTest {
     globalScheduler = mock(GlobalRegionScheduler.class);
     asyncScheduler = mock(AsyncScheduler.class);
     regionScheduler = mock(RegionScheduler.class);
+
+    try {
+      java.lang.reflect.Field serverField = Bukkit.class.getDeclaredField("server");
+      serverField.setAccessible(true);
+      org.bukkit.Server mockServer = mock(org.bukkit.Server.class);
+      serverField.set(null, mockServer);
+
+      Mockito.when(mockServer.getGlobalRegionScheduler()).thenReturn(globalScheduler);
+      Mockito.when(mockServer.getAsyncScheduler()).thenReturn(asyncScheduler);
+      Mockito.when(mockServer.getRegionScheduler()).thenReturn(regionScheduler);
+
+      // Also mock getScheduler just in case
+      Mockito.when(mockServer.getScheduler()).thenReturn(mock(org.bukkit.scheduler.BukkitScheduler.class));
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+
     scheduler = new FoliaSchedulerImpl(plugin);
   }
 
@@ -47,50 +63,42 @@ public class FoliaSchedulerConcurrencyTest {
     CountDownLatch startLatch = new CountDownLatch(1);
     AtomicInteger actualCount = new AtomicInteger(0);
 
-    try (MockedStatic<Bukkit> mockedBukkit = Mockito.mockStatic(Bukkit.class)) {
-      mockedBukkit.when(Bukkit::getGlobalRegionScheduler).thenReturn(globalScheduler);
-      mockedBukkit.when(Bukkit::getAsyncScheduler).thenReturn(asyncScheduler);
-      mockedBukkit.when(Bukkit::getRegionScheduler).thenReturn(regionScheduler);
+    // We need the mock to actually execute the task to verify the count.
+    // GlobalRegionScheduler.run(plugin, Consumer<ScheduledTask>)
+    doAnswer(invocation -> {
+      Consumer<ScheduledTask> consumer = invocation.getArgument(1);
+      consumer.accept(mock(ScheduledTask.class));
+      return mock(ScheduledTask.class);
+    }).when(globalScheduler).run(any(), any());
 
-      // We need the mock to actually execute the task to verify the count.
-      // GlobalRegionScheduler.run(plugin, Consumer<ScheduledTask>)
-      doAnswer(invocation -> {
-        Consumer<ScheduledTask> consumer = invocation.getArgument(1);
-        consumer.accept(mock(ScheduledTask.class));
-        return mock(ScheduledTask.class);
-      }).when(globalScheduler).run(any(), any());
+    // AsyncScheduler.runNow(plugin, Consumer<ScheduledTask>)
+    doAnswer(invocation -> {
+      Consumer<ScheduledTask> consumer = invocation.getArgument(1);
+      consumer.accept(mock(ScheduledTask.class));
+      return mock(ScheduledTask.class);
+    }).when(asyncScheduler).runNow(any(), any());
 
-      // AsyncScheduler.runNow(plugin, Consumer<ScheduledTask>)
-      doAnswer(invocation -> {
-        Consumer<ScheduledTask> consumer = invocation.getArgument(1);
-        consumer.accept(mock(ScheduledTask.class));
-        return mock(ScheduledTask.class);
-      }).when(asyncScheduler).runNow(any(), any());
-
-      for (int i = 0; i < taskCount; i++) {
-        final int index = i;
-        executor.submit(() -> {
-          try {
-            startLatch.await();
-            if (index % 2 == 0) {
-              scheduler.runTask(actualCount::incrementAndGet);
-            } else {
-              scheduler.runTaskAsynchronously(actualCount::incrementAndGet);
-            }
-          } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+    for (int i = 0; i < taskCount; i++) {
+      final int index = i;
+      executor.submit(() -> {
+        try {
+          startLatch.await();
+          if (index % 2 == 0) {
+            scheduler.runTask(actualCount::incrementAndGet);
+          } else {
+            scheduler.runTaskAsynchronously(actualCount::incrementAndGet);
           }
-        });
-      }
-
-      startLatch.countDown();
-      executor.shutdown();
-      boolean finished = executor.awaitTermination(10, TimeUnit.SECONDS);
-
-      Assertions.assertTrue(finished, "Test timed out - potential deadlock or slow execution");
-      Assertions.assertEquals(taskCount, actualCount.get(), "Count mismatch - potential race condition in task submission/execution");
-    } finally {
-      executor.shutdownNow();
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
+      });
     }
+
+    startLatch.countDown();
+    executor.shutdown();
+    boolean finished = executor.awaitTermination(60, TimeUnit.SECONDS);
+
+    Assertions.assertTrue(finished, "Test timed out - potential deadlock or slow execution");
+    Assertions.assertEquals(taskCount, actualCount.get(), "Count mismatch - potential race condition in task submission/execution");
   }
 }

@@ -53,4 +53,12 @@ subprojects {
     test {
         useJUnitPlatform()
     }
+
+    apply plugin: 'jacoco'
+    jacoco { toolVersion = "0.8.11" }
+    tasks.withType(Test) { finalizedBy jacocoTestReport }
+    jacocoTestReport {
+        dependsOn test
+        reports { html.required = true }
+    }
 }

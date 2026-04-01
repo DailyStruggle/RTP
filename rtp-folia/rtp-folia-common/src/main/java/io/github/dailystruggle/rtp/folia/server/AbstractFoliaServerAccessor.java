@@ -349,6 +349,11 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
+  public io.github.dailystruggle.rtp.api.scheduling.RTPScheduler getScheduler() {
+    return io.github.dailystruggle.rtp.common.RTP.scheduler;
+  }
+
+  @Override
   public double getTPS(int ticks) {
     try {
       return 20.0;

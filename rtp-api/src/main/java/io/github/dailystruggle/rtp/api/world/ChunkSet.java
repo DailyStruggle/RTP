@@ -5,7 +5,6 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Consumer;
 
 /** A set of chunks that are being loaded */
 public final class ChunkSet {
@@ -98,7 +97,7 @@ public final class ChunkSet {
    *
    * @param consumer the action to perform
    */
-  public void whenComplete(Consumer<Boolean> consumer) {
-    complete.thenAccept(consumer);
+  public java.util.concurrent.CompletableFuture<Void> whenComplete(java.util.function.Consumer<Boolean> consumer) {
+    return complete.thenAccept(consumer);
   }
 }

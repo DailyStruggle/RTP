@@ -19,8 +19,19 @@ public class FoliaSchedulerImpl implements RTPScheduler {
   }
 
   @Override
-  public void runTaskAsynchronously(Runnable task) {
-    Bukkit.getAsyncScheduler().runNow(plugin, scheduledTask -> task.run());
+  public TrackedRTPTask runTaskAsynchronously(Runnable task) {
+    String taskId = UUID.randomUUID().toString();
+    TrackedRTPTask trackedTask = new TrackedRTPTask(task instanceof io.github.dailystruggle.rtp.common.tasks.RTPRunnable ? (io.github.dailystruggle.rtp.common.tasks.RTPRunnable) task : new io.github.dailystruggle.rtp.common.tasks.RTPRunnable() {
+      @Override
+      public void run() {
+        task.run();
+      }
+    }, taskId);
+    if (RTPAPI.serverAccessor != null) {
+      RTPAPI.serverAccessor.registerAction(trackedTask);
+    }
+    Bukkit.getAsyncScheduler().runNow(plugin, scheduledTask -> trackedTask.run());
+    return trackedTask;
   }
 
   @Override

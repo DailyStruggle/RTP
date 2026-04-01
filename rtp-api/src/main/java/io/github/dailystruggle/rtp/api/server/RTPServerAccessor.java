@@ -145,5 +145,7 @@ public interface RTPServerAccessor {
 
   Object createCachePipe();
 
+  io.github.dailystruggle.rtp.api.scheduling.RTPScheduler getScheduler();
+
   double getTPS(int ticks);
 }
