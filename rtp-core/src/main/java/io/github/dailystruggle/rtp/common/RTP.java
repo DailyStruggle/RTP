@@ -58,6 +58,8 @@ public class RTP {
   /** only one of each of these objects */
   public static Configs configs;
 
+  public static final UUID serverId = RTPAPI.serverId;
+
   public static RTPServerAccessor serverAccessor;
   public static RTPScheduler scheduler;
   public static RTPEconomy economy = null;

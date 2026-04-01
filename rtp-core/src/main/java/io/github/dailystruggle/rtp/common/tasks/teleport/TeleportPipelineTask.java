@@ -257,6 +257,9 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
       ChunkSet chunkSet = this.region.chunkManager.getChunkSet(coords);
       if (chunkSet == null) {
+        chunkSet = RTP.serverAccessor.getChunkManager().getChunkSet(coords);
+      }
+      if (chunkSet == null) {
         currentPhase = Phase.TELEPORT;
         RTP.scheduler.runTask(this);
         return;

@@ -33,6 +33,9 @@ public class ConfigCmdTest {
     @BeforeEach
     void setUp() throws IOException {
         RTPServerAccessor serverAccessor = mock(RTPServerAccessor.class);
+        io.github.dailystruggle.rtp.api.entity.RTPPlayer console = mock(io.github.dailystruggle.rtp.api.entity.RTPPlayer.class);
+        when(console.uuid()).thenReturn(RTP.serverId);
+        when(serverAccessor.getConsolePlayer()).thenReturn(console);
         RTPScheduler scheduler = mock(RTPScheduler.class);
 
         RTP.serverAccessor = serverAccessor;
