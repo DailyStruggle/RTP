@@ -38,7 +38,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   protected final Set<RegionKey> activeProcessors = ConcurrentHashMap.newKeySet();
   protected Function<String, ?> shapeFunction = (s) -> null;
   protected Function<String, ?> worldBorderFunction = (s) -> null;
-  protected Function<RTPWorld<?>, Set<String>> biomes = (rtpWorld) -> new HashSet<>();
+  protected Function<RTPWorld<?>, Set<String>> biomes = FoliaRTPWorld::getBiomes;
 
   public AbstractFoliaServerAccessor() {
     for (World world : Bukkit.getWorlds()) {
@@ -272,6 +272,11 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   @Override
   public @NotNull Set<String> getBiomes(RTPWorld<?> rtpWorld) {
     return biomes.apply(rtpWorld);
+  }
+
+  @Override
+  public @NotNull Set<String> getBiomes() {
+    return biomes.apply(null);
   }
 
   @Override

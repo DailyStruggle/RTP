@@ -37,6 +37,7 @@ public class ConfigCmd extends BaseRTPCmdImpl {
   @Override
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
+    if (nextCommand != null) return nextCommand.onCommand(callerId, parameterValues, null);
     return true;
   }
 

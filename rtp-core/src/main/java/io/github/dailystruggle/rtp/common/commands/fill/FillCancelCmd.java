@@ -32,7 +32,7 @@ public class FillCancelCmd extends FillSubCmd {
   @Override
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
-    if (nextCommand != null) return true;
+    if (nextCommand != null) return nextCommand.onCommand(callerId, parameterValues, null);
 
     List<Region> regions = getRegions(callerId, parameterValues.get("region"));
     for (Region region : regions) {

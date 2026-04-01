@@ -17,6 +17,9 @@ spotless {
 }
 
 allprojects {
+    group = 'io.github.dailystruggle'
+    version = '2.0.18'
+
     repositories {
         mavenCentral()
         maven { url 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
@@ -60,5 +63,12 @@ subprojects {
     jacocoTestReport {
         dependsOn test
         reports { html.required = true }
+    }
+
+    processResources {
+        inputs.property "version", project.version
+        filesMatching("plugin.yml") {
+            expand "version": project.version
+        }
     }
 }

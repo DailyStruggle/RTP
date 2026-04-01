@@ -98,6 +98,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
   /** whenever bukkit feels like enabling this plugin */
   @Override
   public void onEnable() {
+    Bukkit.getLogger().info("[DEBUG_LOG] RTPBukkitPlugin.onEnable() starting...");
     metrics = new Metrics(this, 12277);
 
     if (instance == null) {
@@ -276,10 +277,24 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     RTPCmdBukkit mainCommand = new RTPCmdBukkit(this);
     RTP.baseCommand = mainCommand;
 
-    Objects.requireNonNull(getCommand("rtp")).setExecutor(mainCommand);
-    Objects.requireNonNull(getCommand("rtp")).setTabCompleter(mainCommand);
-    Objects.requireNonNull(getCommand("wild")).setExecutor(mainCommand);
-    Objects.requireNonNull(getCommand("wild")).setTabCompleter(mainCommand);
+    Bukkit.getLogger().info("[DEBUG_LOG] RTPBukkitPlugin registering commands...");
+    org.bukkit.command.PluginCommand rtpCommand = getCommand("rtp");
+    if (rtpCommand != null) {
+      rtpCommand.setExecutor(mainCommand);
+      rtpCommand.setTabCompleter(mainCommand);
+      Bukkit.getLogger().info("[DEBUG_LOG] Registered /rtp");
+    } else {
+      Bukkit.getLogger().severe("[DEBUG_LOG] FAILED TO REGISTER /rtp - getCommand(\"rtp\") returned null!");
+    }
+
+    org.bukkit.command.PluginCommand wildCommand = getCommand("wild");
+    if (wildCommand != null) {
+      wildCommand.setExecutor(mainCommand);
+      wildCommand.setTabCompleter(mainCommand);
+      Bukkit.getLogger().info("[DEBUG_LOG] Registered /wild");
+    } else {
+      Bukkit.getLogger().severe("[DEBUG_LOG] FAILED TO REGISTER /wild - getCommand(\"wild\") returned null!");
+    }
 
     RTP.scheduler.runTaskLater(
         () -> {
@@ -311,6 +326,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
       new PAPI_expansion().register();
     }
+    Bukkit.getLogger().info("[DEBUG_LOG] RTPBukkitPlugin.onEnable() finished.");
   }
 
   /** whenever bukkit feels like disabling this plugin */
@@ -362,11 +378,13 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     }
 
     try {
-      Map<String, Object> referenceData = new HashMap<>();
-      referenceData.put("time", System.currentTimeMillis());
-      referenceData.put("UUID", new UUID(0, 0).toString());
-      RTP.getInstance().databaseAccessor.setValue("referenceData", referenceData);
-      RTP.getInstance().databaseAccessor.processQueries(Long.MAX_VALUE);
+      if (RTP.getInstance() != null && RTP.getInstance().databaseAccessor != null) {
+        Map<String, Object> referenceData = new HashMap<>();
+        referenceData.put("time", System.currentTimeMillis());
+        referenceData.put("UUID", new UUID(0, 0).toString());
+        RTP.getInstance().databaseAccessor.setValue("referenceData", referenceData);
+        RTP.getInstance().databaseAccessor.processQueries(Long.MAX_VALUE);
+      }
     } catch (NoClassDefFoundError ignored) {
       // catch plugin replaced, no use for old logs
     }

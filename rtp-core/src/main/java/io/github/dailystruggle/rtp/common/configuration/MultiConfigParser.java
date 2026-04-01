@@ -7,6 +7,7 @@ import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import java.io.File;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Level;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import org.jetbrains.annotations.NotNull;
@@ -49,7 +50,11 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
 
     File d = new File(myDirectory.getAbsolutePath() + File.separator + "default.yml");
     if (!d.exists()) {
-      saveResourceFromJar(name + File.separator + "default.yml", true);
+      try {
+        saveResourceFromJar(name + File.separator + "default.yml", true);
+      } catch (IllegalArgumentException e) {
+        RTP.log(Level.WARNING, e.getMessage(), e);
+      }
     }
 
     File langMap =
@@ -99,7 +104,11 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
 
     File d = new File(myDirectory.getAbsolutePath() + File.separator + "default.yml");
     if (!d.exists()) {
-      saveResourceFromJar(name + File.separator + "default.yml", true);
+      try {
+        saveResourceFromJar(name + File.separator + "default.yml", true);
+      } catch (IllegalArgumentException e) {
+        RTP.log(Level.WARNING, e.getMessage(), e);
+      }
     }
 
     File langMap =
@@ -141,18 +150,20 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
       if (!name.endsWith(".YML")) name = name + ".YML";
       String worldName = name.replace(".YML", "");
       if (RTP.serverAccessor.getRTPWorld(worldName) == null) {
-        return (ConfigParser<E>) configParserFactory.getOrDefault("DEFAULT.YML");
+        ConfigParser<E> parser = (ConfigParser<E>) configParserFactory.getOrDefault("DEFAULT.YML");
+        if (parser != null) return parser;
+        return new ConfigParser<>(myClass, name, version, myDirectory, langMap, fileDatabase);
       }
 
       ConfigParser<E> parser = (ConfigParser<E>) configParserFactory.getOrDefault(name);
-      configParserFactory.add(name, parser);
+      if (parser != null) configParserFactory.add(name, parser);
       return parser;
     }
   }
 
   public void addParser(String name) {
     ConfigParser<E> value = (ConfigParser<E>) configParserFactory.construct(name);
-    configParserFactory.add(name, value);
+    if (value != null) configParserFactory.add(name, value);
   }
 
   public void addParser(ConfigParser<?> parser) {

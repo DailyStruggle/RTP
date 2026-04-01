@@ -24,7 +24,6 @@ import java.util.concurrent.Semaphore;
 import java.util.function.Predicate;
 import java.util.logging.Level;
 import org.bukkit.Bukkit;
-import org.bukkit.block.Biome;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -92,18 +91,13 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
 
     addParameter(
         "biome",
-        new EnumParameter<>(
+        new io.github.dailystruggle.rtp.common.commands.parameters.BiomeParameter(
             "rtp.biome",
-            "select a world to teleport to",
-            (sender, s) -> {
-              try {
-                Biome.valueOf(s.toUpperCase());
-              } catch (IllegalArgumentException badBiome) {
-                return false;
-              }
+            "select a biome to teleport to",
+            (uuid, s) -> {
+              RTPCommandSender sender = RTP.serverAccessor.getSender(uuid);
               return sender.hasPermission("rtp.biome.*") || sender.hasPermission("rtp.biome." + s);
-            },
-            Biome.class));
+            }));
 
     // target player parameter
     // filter by player exists and player permission
@@ -153,12 +147,17 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
   }
 
   @Override
-  public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+  public boolean onCommand(CommandSender sender, org.bukkit.command.Command command, String label, String[] args) {
+    System.out.println("[DEBUG_LOG] RTPCmdBukkit.onCommand called label=" + label);
+    Bukkit.getLogger().info("[DEBUG_LOG] RTPCmdBukkit.onCommand(CommandSender, ...) called with label: " + label + " and args: " + java.util.Arrays.toString(args));
     boolean valid = true;
     for (Predicate<CommandSender> commandSenderPredicate : senderChecks) {
       valid &= commandSenderPredicate.test(sender);
     }
-    if (!valid) return false;
+    if (!valid) {
+      Bukkit.getLogger().info("[DEBUG_LOG] RTPCmdBukkit.onCommand(CommandSender, ...) sender checks failed.");
+      return false;
+    }
     return onCommand(
         RTP.serverAccessor.getSender(
             sender instanceof Player
@@ -171,14 +170,51 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
 
   @Override
   public boolean onCommand(
+      UUID senderId,
+      Map<String, List<String>> parameterValues,
+      CommandsAPICommand nextCommand) {
+    Bukkit.getLogger().info("[DEBUG_LOG] RTPCmdBukkit.onCommand(UUID, ...) called for senderId: " + senderId + ", nextCommand: " + (nextCommand != null ? nextCommand.getClass().getName() : "null"));
+    if (nextCommand != null) return nextCommand.onCommand(senderId, parameterValues, null);
+
+    boolean valid = true;
+    CommandSender sender =
+        senderId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)
+            ? Bukkit.getConsoleSender()
+            : Bukkit.getPlayer(senderId);
+    if (sender == null) {
+        Bukkit.getLogger().info("[DEBUG_LOG] RTPCmdBukkit.onCommand(UUID, ...) sender is null.");
+        return false;
+    }
+
+    for (Predicate<CommandSender> commandSenderPredicate : senderChecks) {
+      valid &= commandSenderPredicate.test(sender);
+    }
+    if (!valid) {
+      Bukkit.getLogger().info("[DEBUG_LOG] RTPCmdBukkit.onCommand(UUID, ...) sender checks failed.");
+      return false;
+    }
+
+    return compute(senderId, parameterValues, nextCommand);
+  }
+
+  @Override
+  public boolean onCommand(
       CommandSender sender,
       Map<String, List<String>> parameterValues,
       CommandsAPICommand nextCommand) {
+    Bukkit.getLogger().info("[DEBUG_LOG] RTPCmdBukkit.onCommand(CommandSender, Map, ...) called, nextCommand: " + (nextCommand != null ? nextCommand.getClass().getName() : "null"));
+    if (nextCommand != null) return nextCommand.onCommand(
+            sender instanceof Player ? ((Player) sender).getUniqueId() : io.github.dailystruggle.rtp.api.RTPAPI.serverId,
+            parameterValues, null);
+
     boolean valid = true;
     for (Predicate<CommandSender> commandSenderPredicate : senderChecks) {
       valid &= commandSenderPredicate.test(sender);
     }
-    if (!valid) return false;
+    if (!valid) {
+      Bukkit.getLogger().info("[DEBUG_LOG] RTPCmdBukkit.onCommand(CommandSender, Map, ...) sender checks failed.");
+      return false;
+    }
     UUID uuid =
         sender instanceof Player
             ? ((Player) sender).getUniqueId()

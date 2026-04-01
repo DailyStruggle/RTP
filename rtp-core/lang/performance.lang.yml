@@ -1,0 +1,14 @@
+period: period
+viewDistanceSelect: viewDistanceSelect
+biomeRecall: biomeRecall
+version: version
+maxAttempts: maxAttempts
+biomeRecallForced: biomeRecallForced
+onEventParsing: onEventParsing
+timeit: timeit
+checkChunks: checkChunks
+postTeleportQueueing: postTeleportQueueing
+syncLoading: syncLoading
+effectParsing: effectParsing
+viewDistanceTeleport: viewDistanceTeleport
+minTPS: minTPS

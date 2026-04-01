@@ -1,0 +1,11 @@
+event_changeworld: event_changeworld
+event_respawn: event_respawn
+detailed_reload: detailed_reload
+teleport: teleport
+event_join: event_join
+selection_failure: selection_failure
+event_teleport: event_teleport
+version: version
+detailed_region_init: detailed_region_init
+command: command
+event_move: event_move

@@ -64,7 +64,7 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
   @Override
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
-    if (nextCommand != null) return true;
+    if (nextCommand != null) return nextCommand.onCommand(callerId, parameterValues, null);
     return subReload(callerId, RTP.configs.getParser(configClass));
   }
 

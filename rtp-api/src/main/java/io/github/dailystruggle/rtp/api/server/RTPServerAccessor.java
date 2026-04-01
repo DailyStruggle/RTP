@@ -111,6 +111,7 @@ public interface RTPServerAccessor {
   }
 
   Set<String> getBiomes(RTPWorld<?> rtpWorld);
+  Set<String> getBiomes();
 
   boolean isPrimaryThread();
 
