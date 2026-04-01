@@ -1,7 +1,5 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
-import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
@@ -10,7 +8,6 @@ import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.io.File;
 import java.util.*;
@@ -32,7 +29,7 @@ public class ConfigsReloadTest {
         mockServerAccessor = mock(RTPServerAccessor.class);
         tempDir = new File("target/test-configs-reload");
         if (!tempDir.exists()) tempDir.mkdirs();
-        
+
         when(mockServerAccessor.getPluginDirectory()).thenReturn(tempDir);
         when(mockServerAccessor.createTaskPipe()).thenReturn(mock(RTPTaskPipe.class));
         when(mockServerAccessor.getRTPWorlds()).thenReturn(new ArrayList<>());
@@ -47,7 +44,7 @@ public class ConfigsReloadTest {
     public void testConcurrentReloadAndRead() throws InterruptedException {
         // 1. Construct an integration test that initializes a mock Configs instance with 10 dummy regions
         Configs configs = RTP.configs;
-        
+
         // Add dummy regions to selectionAPI.permRegionLookup
         for (int i = 0; i < 10; i++) {
             String name = "region" + i;

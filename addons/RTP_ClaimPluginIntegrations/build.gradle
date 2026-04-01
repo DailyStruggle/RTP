@@ -23,6 +23,12 @@ repositories {
 }
 
 dependencies {
+    testImplementation project(':rtp-api')
+    testImplementation project(':rtp-core')
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
+    testImplementation 'org.mockito:mockito-core:5.5.0'
+    testImplementation 'org.mockito:mockito-inline:5.2.0'
+
     compileOnly 'org.spigotmc:spigot-api:1.16.5-R0.1-SNAPSHOT'
     compileOnly project(':rtp-api')
     compileOnly project(':rtp-core')

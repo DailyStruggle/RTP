@@ -3,7 +3,9 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
+import jdk.incubator.vector.IntVector;
 import jdk.incubator.vector.LongVector;
+import jdk.incubator.vector.VectorMask;
 import jdk.incubator.vector.VectorOperators;
 import jdk.incubator.vector.VectorSpecies;
 import jdk.incubator.vector.VectorShuffle;
@@ -24,8 +26,6 @@ import java.util.logging.Level;
  */
 public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   private static final VectorSpecies<Long> SPECIES = LongVector.SPECIES_PREFERRED;
-  public AtomicLong fillIter = new AtomicLong(0L);
-
   protected volatile long[] badKeysCache = new long[0];
   protected volatile long[] badPrefixSumsCache = new long[0];
   protected volatile ConcurrentHashMap<String, long[]> biomeKeysCache = new ConcurrentHashMap<>();
@@ -39,6 +39,9 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   protected final java.util.concurrent.atomic.AtomicBoolean isRebuilding =
       new java.util.concurrent.atomic.AtomicBoolean(false);
   protected final java.util.concurrent.locks.ReentrantLock writeLock = new ReentrantLock();
+  protected final AtomicLong fillStride = new AtomicLong(-1L);
+  private final AtomicLong totalBadCount = new AtomicLong(0L);
+  private final AtomicLong totalBiomeCount = new AtomicLong(0L);
 
   protected final java.util.concurrent.atomic.AtomicReference<
           java.util.concurrent.ConcurrentHashMap<Long, Long>>
@@ -103,6 +106,25 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @return an array containing x and z coordinates
    */
   public abstract int[] locationToXZ(long location);
+
+  /**
+   * Determine if points are within the shape using SIMD
+   *
+   * @param xVec the x coordinates (in chunks)
+   * @param zVec the z coordinates (in chunks)
+   * @param mask the lane mask
+   * @return a mask with lanes set for points within the shape
+   */
+  public VectorMask<Integer> contains(IntVector xVec, IntVector zVec, VectorMask<Integer> mask) {
+    int length = mask.length();
+    boolean[] result = new boolean[length];
+    for (int i = 0; i < length; i++) {
+      if (mask.laneIsSet(i)) {
+        result[i] = contains(xVec.lane(i), zVec.lane(i));
+      }
+    }
+    return VectorMask.fromArray(xVec.species(), result, 0);
+  }
 
   /**
    * Convert a location value to xz coordinates and store in the output object
@@ -200,11 +222,9 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     long[] sBadSums;
     Map<String, long[]> sBiomeKeys;
     Map<String, long[]> sBiomeSums;
-    long sFillIter;
 
     writeLock.lock();
     try {
-      sFillIter = fillIter.get();
       sBadKeys = Arrays.copyOf(badKeysCache, badKeysCache.length);
       sBadSums = Arrays.copyOf(badPrefixSumsCache, badPrefixSumsCache.length);
       sBiomeKeys = new HashMap<>(biomeKeysCache.size());
@@ -223,7 +243,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     byte[] worldBytes = worldName.getBytes(StandardCharsets.UTF_8);
     int size = 0;
     size += 4 + worldBytes.length; // world name length + bytes
-    size += 8; // fillIter
+    size += 8; // fillStride
     size += 4; // bad array length
     size += sBadKeys.length * 16; // key + delta per entry
     size += 4; // biome map size
@@ -237,7 +257,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
     ByteBuffer buf = ByteBuffer.allocate(size).order(ByteOrder.BIG_ENDIAN);
     buf.putInt(worldBytes.length).put(worldBytes);
-    buf.putLong(sFillIter);
+    buf.putLong(fillStride.get());
 
     buf.putInt(sBadKeys.length);
     long prev = 0L;
@@ -302,7 +322,11 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
                 String readWorld = new String(w, StandardCharsets.UTF_8);
                 if (!readWorld.equals(worldName)) return;
 
-                long fIter = buf.getLong();
+                if (buf.remaining() >= 8) {
+                  fillStride.set(buf.getLong());
+                } else {
+                  fillStride.set(-1L);
+                }
 
                 int badSize = buf.getInt();
                 if (badSize < 0 || badSize > (buf.remaining() / 16)) return;
@@ -346,7 +370,6 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
                 // Apply under write lock
                 writeLock.lock();
                 try {
-                  fillIter.set(fIter);
                   badKeysCache = newBadKeys;
                   badPrefixSumsCache = newBadSums;
                   biomeKeysCache = newBiomeKeysCache;
@@ -376,6 +399,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   public void clear() {
+    fillStride.set(-1L);
     badKeysCache = new long[0];
     badPrefixSumsCache = new long[0];
     biomeKeysCache = new ConcurrentHashMap<>();
@@ -408,10 +432,31 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     biomeLocationsDirty = true;
   }
 
-  protected void flushAndRebuild() {
+  /**
+   * Get the sum of all bad location segments
+   *
+   * @return the sum of all bad location segments
+   */
+  public long getEffectiveBadCount() {
+    return totalBadCount.get();
+  }
+
+  /**
+   * Get the sum of all good location segments
+   *
+   * @return the sum of all good location segments
+   */
+  public long getEffectiveGoodCount() {
+    return totalBiomeCount.get();
+  }
+
+  public void flushAndRebuild(long spatialResolution) {
+    this.spatialResolution = spatialResolution;
     if (!badLocationsDirty && !biomeLocationsDirty) return;
     if (isRebuilding.compareAndSet(false, true)) {
       try {
+        long currentBadSum = 0L;
+        long currentBiomeSum = 0L;
         ConcurrentHashMap<Long, Long> localPendingBad =
             pendingBadLocations.getAndSet(new ConcurrentHashMap<>());
         ConcurrentHashMap<String, ConcurrentHashMap<Long, Long>> localPendingBiome =
@@ -488,7 +533,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
                 cStart = nKey;
                 cLength = nLength;
               } else {
-                if (nKey <= cStart + cLength) {
+                if (nKey <= cStart + cLength + spatialResolution) {
                   cLength = Math.max(cLength, nKey + nLength - cStart);
                 } else {
                   mKeys[mIdx] = cStart;
@@ -629,11 +674,12 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
                 currentStartMapped = nextKey;
                 currentLengthMapped = nextLength;
               } else {
-                if (nextKey <= currentStartMapped + currentLengthMapped) {
+                if (nextKey <= currentStartMapped + currentLengthMapped + spatialResolution) {
                   currentLengthMapped = Math.max(currentLengthMapped, nextKey + nextLength - currentStartMapped);
                 } else {
                   mergedMappedKeys[mappedIdx] = currentStartMapped;
                   mergedMappedLengths[mappedIdx] = currentLengthMapped;
+                  currentBiomeSum += currentLengthMapped;
                   mappedIdx++;
                   currentStartMapped = nextKey;
                   currentLengthMapped = nextLength;
@@ -644,6 +690,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
             if (currentStartMapped != -1) {
               mergedMappedKeys[mappedIdx] = currentStartMapped;
               mergedMappedLengths[mappedIdx] = currentLengthMapped;
+              currentBiomeSum += currentLengthMapped;
               mappedIdx++;
             }
 
@@ -678,6 +725,8 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
           this.biomeKeysCache = newBiomeKeysCache;
           this.biomePrefixSumsCache = newBiomePrefixSumsCache;
+        } else {
+          currentBiomeSum = (biomeMappedPrefixSumsCache.length > 0) ? biomeMappedPrefixSumsCache[biomeMappedPrefixSumsCache.length-1] : 0L;
         }
         this.biomeLocationsDirty = (!pendingBiomeLocations.get().isEmpty() || !pendingBiomeRemovals.get().isEmpty());
 
@@ -735,11 +784,12 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
             currentStart = nextKey;
             currentLength = nextLength;
           } else {
-            if (nextKey <= currentStart + currentLength) {
+            if (nextKey <= currentStart + currentLength + spatialResolution) {
               currentLength = Math.max(currentLength, nextKey + nextLength - currentStart);
             } else {
               mergedKeys[mergeIndex] = currentStart;
               mergedLengths[mergeIndex] = currentLength;
+              currentBadSum += currentLength;
               mergeIndex++;
               currentStart = nextKey;
               currentLength = nextLength;
@@ -750,6 +800,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         if (currentStart != -1) {
             mergedKeys[mergeIndex] = currentStart;
             mergedLengths[mergeIndex] = currentLength;
+            currentBadSum += currentLength;
             mergeIndex++;
         }
 
@@ -779,6 +830,9 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         this.badKeysCache = newKeys;
         this.badPrefixSumsCache = newSums;
         this.badLocationsDirty = !pendingBadLocations.get().isEmpty();
+
+        totalBadCount.set(currentBadSum);
+        totalBiomeCount.set(currentBiomeSum);
       } finally {
         isRebuilding.set(false);
       }
@@ -818,7 +872,6 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   @Override
   public MemoryShape<E> clone() {
     MemoryShape<E> shape = (MemoryShape<E>) super.clone();
-    shape.fillIter = new AtomicLong(0);
     shape.badKeysCache = new long[0];
     shape.badPrefixSumsCache = new long[0];
     shape.biomeKeysCache = new ConcurrentHashMap<>();

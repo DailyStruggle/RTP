@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.selection.GenerationContext;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
+import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
@@ -13,7 +14,6 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
-import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
@@ -222,7 +222,7 @@ public class LocationGenerator {
                     pass = false;
                 }
 
-                if (pass && GlobalRegionVerifiers.checkGlobalRegionVerifiers(left)) {
+                if (pass && GlobalRegionVerifiers.checkGlobalRegionVerifiers(left).join()) {
                     chunkSet = region.chunkManager.getChunkSet(left);
                     GenerationResult res = new GenerationResult(left, pair.getAttempts(), chunkSet);
                     CachedLocationPool.release(pair);
@@ -283,7 +283,7 @@ public class LocationGenerator {
      */
     @Nullable
     public static GenerationResult getLocation(Region region, @Nullable Set<String> biomeNames) {
-        long resolution = Math.max(1L, region.getNumber(RegionKeys.spatialResolution, 1L).longValue());
+        long resolution = Math.max(1L, region.getSettings().spatialResolution());
 
         boolean defaultBiomes = false;
         ConfigParser<PerformanceKeys> performance =
@@ -382,6 +382,7 @@ public class LocationGenerator {
             long l = -1;
             int[] select;
             if (shape instanceof MemoryShape<?> memoryShape) {
+                memoryShape.flushAndRebuild(resolution);
                 if (biomeRecall && !defaultBiomes) {
                     List<Map.Entry<Long, Long>> biomes = new ArrayList<>();
                     for (String biomeName : biomeNames) {
@@ -641,7 +642,7 @@ public class LocationGenerator {
                     }
                 }
 
-                pass &= GlobalRegionVerifiers.checkGlobalRegionVerifiers(cursor.toImmutable());
+                pass &= GlobalRegionVerifiers.checkGlobalRegionVerifiers(cursor.toImmutable()).join();
 
                 if (!pass) {
                     for (RTPChunk usedChunk : localChunks) {

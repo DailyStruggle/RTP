@@ -13,7 +13,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.io.File;
 import java.nio.file.Path;
 import java.util.ArrayList;
 
@@ -29,10 +28,10 @@ public class DynamicWorldConfigTest {
     void setUp() {
         serverAccessor = mock(RTPServerAccessor.class);
         scheduler = mock(RTPScheduler.class);
-        
+
         RTP.serverAccessor = serverAccessor;
         RTP.scheduler = scheduler;
-        
+
         when(serverAccessor.getPluginDirectory()).thenReturn(tempDir.toFile());
         when(serverAccessor.getRTPWorlds()).thenReturn(new ArrayList<>());
         when(serverAccessor.createTaskPipe()).thenReturn(mock(RTPTaskPipe.class));
@@ -41,7 +40,7 @@ public class DynamicWorldConfigTest {
         RTPWorld<?> defaultWorld = mock(RTPWorld.class);
         when(defaultWorld.name()).thenReturn("world");
         when(serverAccessor.getRTPWorld("world")).thenReturn((RTPWorld) defaultWorld);
-        
+
         ArrayList<RTPWorld<?>> worlds = new ArrayList<>();
         worlds.add(defaultWorld);
         when(serverAccessor.getRTPWorlds()).thenReturn(worlds);
@@ -53,10 +52,10 @@ public class DynamicWorldConfigTest {
     @Test
     void testDynamicWorldLoading() {
         String runtimeWorldName = "runtime_generated_dimension";
-        
+
         // Ensure it doesn't exist yet in the accessor
         when(serverAccessor.getRTPWorld(runtimeWorldName)).thenReturn(null);
-        
+
         // Assert getWorldParser returns null if world not in accessor
         assertNull(configs.getWorldParser(runtimeWorldName));
 
@@ -74,7 +73,7 @@ public class DynamicWorldConfigTest {
         MultiConfigParser<WorldKeys> multiConfigParser = (MultiConfigParser<WorldKeys>) configs.getParser(WorldKeys.class);
         assertNotNull(multiConfigParser);
         assertTrue(multiConfigParser.configParserFactory.contains(runtimeWorldName.toUpperCase() + ".YML"));
-        
+
         // Assert it can be retrieved again
         assertSame(parser, configs.getWorldParser(runtimeWorldName));
     }

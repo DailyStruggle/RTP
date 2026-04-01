@@ -6,7 +6,6 @@ import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
@@ -74,18 +73,18 @@ public class MultiConfigParserIsolationTest {
     @Test
     void testInvalidWorldReturnsNullOrFallbacksGracefully() {
         System.out.println("[DEBUG_LOG] Starting testInvalidWorldReturnsNullOrFallbacksGracefully");
-        // The requirement says getWorldParser("invalid_world") strictly returns null 
+        // The requirement says getWorldParser("invalid_world") strictly returns null
         // or falls back gracefully without generating a blank, orphaned config file.
-        
+
         // Let's check current behavior of Configs.getWorldParser
         ConfigParser<WorldKeys> invalid = RTP.configs.getWorldParser("invalid_world");
         System.out.println("[DEBUG_LOG] invalid parser name: " + (invalid != null ? invalid.name : "null"));
-        
+
         // My fix makes it return the default parser instead of null if it's not found on the server.
         // This is a "graceful fallback".
         assertNotNull(invalid);
         assertTrue(invalid.name.equalsIgnoreCase("default.yml"), "Expected default.yml for invalid world, got: " + invalid.name);
-        
+
         File invalidFile = tempDir.resolve("worlds/invalid_world.yml").toFile();
         System.out.println("[DEBUG_LOG] invalidFile exists: " + invalidFile.exists());
         assertFalse(invalidFile.exists(), "Orphaned config file was created for invalid world!");

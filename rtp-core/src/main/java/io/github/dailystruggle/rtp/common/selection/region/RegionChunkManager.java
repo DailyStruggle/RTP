@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
+import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -29,11 +30,17 @@ public class RegionChunkManager {
     }
 
     public void putChunkSet(RTPCoords coords, ChunkSet chunkSet) {
-        locAssChunks.put(getChunkKey(coords.x() >> 4, coords.z() >> 4), chunkSet);
+        int cx = coords.x() >> 4;
+        int cz = coords.z() >> 4;
+        ChunkSet.register(region.getWorld(), cx, cz, chunkSet);
+        locAssChunks.put(getChunkKey(cx, cz), chunkSet);
     }
 
     public void removeChunkSet(RTPCoords coords) {
-        locAssChunks.remove(getChunkKey(coords.x() >> 4, coords.z() >> 4));
+        int cx = coords.x() >> 4;
+        int cz = coords.z() >> 4;
+        ChunkSet.unregister(region.getWorld(), cx, cz);
+        locAssChunks.remove(getChunkKey(cx, cz));
     }
 
     public ChunkSet addTicket(int cx, int cz) {
@@ -44,6 +51,7 @@ public class RegionChunkManager {
                 List<CompletableFuture<Long>> chunks = new ArrayList<>();
                 chunks.add(RTP.serverAccessor.getChunkManager().getChunkAtAsync(region.getWorld(), cx, cz));
                 ChunkSet chunkSet = new ChunkSet(chunks, new CompletableFuture<>());
+                ChunkSet.register(region.getWorld(), cx, cz, chunkSet);
                 chunkSet.keep(true, region.getWorld());
                 return chunkSet;
             });
@@ -63,7 +71,9 @@ public class RegionChunkManager {
             if (v <= 1) {
                 ChunkSet chunkSet = locAssChunks.remove(key);
                 if (chunkSet != null) {
-                    chunkSet.keep(false, region.getWorld());
+                    ChunkSet.unregister(region.getWorld(), cx, cz);
+                    RTPWorld<?> world = region.getWorld();
+                    RTP.scheduler.runTask(world, cx, cz, () -> chunkSet.keep(false, world));
                 }
                 return null;
             }
@@ -103,6 +113,7 @@ public class RegionChunkManager {
                 return chunkSet;
             }
             chunkSet.keep(false, region.getWorld());
+            ChunkSet.unregister(region.getWorld(), cx, cz);
             locAssChunks.remove(chunkKey);
         }
 
@@ -130,6 +141,7 @@ public class RegionChunkManager {
             }
 
             ChunkSet chunkSet = new ChunkSet(chunks, new CompletableFuture<>());
+            ChunkSet.register(rtpWorld, cx, cz, chunkSet);
             chunkSet.keep(true, rtpWorld);
             locAssChunks.put(chunkKey, chunkSet);
             return chunkSet;
@@ -150,8 +162,10 @@ public class RegionChunkManager {
         long chunkKey = getChunkKey(cx, cz);
 
         if (!locAssChunks.containsKey(chunkKey)) return;
-        ChunkSet chunkSet = locAssChunks.get(chunkKey);
-        chunkSet.keep(false, region.getWorld());
-        locAssChunks.remove(chunkKey);
+        ChunkSet chunkSet = locAssChunks.remove(chunkKey);
+        if (chunkSet == null) return;
+        ChunkSet.unregister(region.getWorld(), cx, cz);
+        RTPWorld<?> world = region.getWorld();
+        RTP.scheduler.runTask(world, cx, cz, () -> chunkSet.keep(false, world));
     }
 }

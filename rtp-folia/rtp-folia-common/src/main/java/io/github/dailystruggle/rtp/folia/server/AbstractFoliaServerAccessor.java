@@ -52,6 +52,16 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
+  public @NotNull String getPluginVersion() {
+    return Bukkit.getPluginManager().getPlugin("RTP").getDescription().getVersion();
+  }
+
+  @Override
+  public @NotNull String getPlatform() {
+    return "Folia";
+  }
+
+  @Override
   public Integer getServerIntVersion() {
     String version = Bukkit.getBukkitVersion().split("-")[0];
     String[] parts = version.split("\\.");
@@ -161,10 +171,11 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public void sendMessage(UUID target, MessagesKeys msgType) {
+  public void sendMessage(UUID target, MessagesKeys msgType, String tag) {
     ConfigParser<MessagesKeys> lang =
         (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
     String message = lang.getConfigValue(msgType, "").toString();
+    message = tagMessage(message, tag);
     if (target.equals(RTPAPI.serverId)) {
       Bukkit.getConsoleSender().sendMessage(message);
       return;
@@ -174,10 +185,11 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public void sendMessage(UUID target1, UUID target2, MessagesKeys msgType) {
+  public void sendMessage(UUID target1, UUID target2, MessagesKeys msgType, String tag) {
     ConfigParser<MessagesKeys> lang =
         (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
     String message = lang.getConfigValue(msgType, "").toString();
+    message = tagMessage(message, tag);
     Player p1 = Bukkit.getPlayer(target1);
     if (target1.equals(RTPAPI.serverId)) {
       Bukkit.getConsoleSender().sendMessage(message);
@@ -187,7 +199,8 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public void sendMessage(UUID target, String message) {
+  public void sendMessage(UUID target, String message, String tag) {
+    message = tagMessage(message, tag);
     if (target.equals(RTPAPI.serverId)) {
       Bukkit.getConsoleSender().sendMessage(message);
       return;
@@ -198,17 +211,34 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
 
   @Override
   public void sendMessageAndSuggest(UUID target, String message, String suggestion) {
+    message = tagMessage(message, null);
     // Folia implementation
   }
 
   @Override
-  public void sendMessage(UUID target1, UUID target2, String message) {
+  public void sendMessage(UUID target1, UUID target2, String message, String tag) {
+    message = tagMessage(message, tag);
     Player p1 = Bukkit.getPlayer(target1);
     if (target1.equals(RTPAPI.serverId)) {
       Bukkit.getConsoleSender().sendMessage(message);
     } else if (p1 != null) {
       p1.sendMessage(message);
     }
+  }
+
+  @Override
+  public void sendMessage(RTPCommandSender target, String message, String hover, String click, String tag) {
+    // Folia implementation
+  }
+
+  @Override
+  public String format(@Nullable UUID player, String text) {
+    return text;
+  }
+
+  @Override
+  public String formatNoColor(@Nullable UUID player, String text) {
+    return text;
   }
 
   @Override
@@ -222,11 +252,16 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public void announce(String msg, String permission) {
+  public void announce(String msg, String permission, String tag) {
+    msg = tagMessage(msg, tag);
     Bukkit.broadcast(msg, permission);
     if (!permission.equalsIgnoreCase("rtp.see")) {
       Bukkit.getConsoleSender().sendMessage(msg);
     }
+  }
+
+  private String tagMessage(String message, @Nullable String tag) {
+    return io.github.dailystruggle.rtp.common.commands.help.SendMessage.tagMessage(message, tag);
   }
 
   @Override

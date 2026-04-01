@@ -2,8 +2,6 @@ package io.github.dailystruggle.rtp.common.commands.parameters;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.factory.Factory;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 

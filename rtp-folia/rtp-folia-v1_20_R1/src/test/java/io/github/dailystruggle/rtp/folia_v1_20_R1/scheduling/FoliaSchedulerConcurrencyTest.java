@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.folia_v1_20_R1.scheduling;
 
-import io.github.dailystruggle.rtp.folia_v1_20_R1.scheduling.FoliaSchedulerImpl;
 import io.papermc.paper.threadedregions.scheduler.AsyncScheduler;
 import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
 import io.papermc.paper.threadedregions.scheduler.RegionScheduler;

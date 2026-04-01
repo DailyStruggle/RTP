@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp_glide.configuration;
 
-import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
+import io.github.dailystruggle.rtp.spigot.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp_glide.RTP_Glide;
 import java.io.File;

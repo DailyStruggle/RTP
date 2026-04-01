@@ -130,6 +130,15 @@ public abstract class Shape<E extends Enum<E>> extends FactoryValue<E> {
     return (Shape<E>) super.clone();
   }
 
+  /**
+   * Determine if a point is within the shape
+   *
+   * @param x the x coordinate (in chunks)
+   * @param z the z coordinate (in chunks)
+   * @return true if the point is within the shape, false otherwise
+   */
+  public abstract boolean contains(int x, int z);
+
   @SuppressWarnings("unchecked")
   @Override
   public boolean equals(Object o) {

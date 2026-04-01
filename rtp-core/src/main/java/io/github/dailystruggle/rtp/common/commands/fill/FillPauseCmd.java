@@ -45,11 +45,11 @@ public class FillPauseCmd extends FillSubCmd {
         String msg = String.valueOf(parser.getConfigValue(MessagesKeys.fillNotRunning, ""));
         if (msg == null || msg.isEmpty()) continue;
         msg = msg.replace("[region]", region.name);
-        RTP.serverAccessor.announce(msg, "rtp.fill");
+        RTP.serverAccessor.announce(msg, "rtp.fill", "FILL");
         continue;
       }
 
-      fillTask.pause.set(true);
+      fillTask.pause();
       MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
       shape.save(region.name, region.getWorld().name());
 
@@ -57,7 +57,7 @@ public class FillPauseCmd extends FillSubCmd {
       String msg = String.valueOf(parser.getConfigValue(MessagesKeys.fillPause, ""));
       if (msg == null || msg.isEmpty()) continue;
       msg = msg.replace("[region]", region.name);
-      RTP.serverAccessor.announce(msg, "rtp.fill");
+      RTP.serverAccessor.announce(msg, "rtp.fill", "FILL");
     }
     return true;
   }

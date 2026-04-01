@@ -82,10 +82,10 @@ public class RTP {
   public final ConcurrentHashMap<UUID, TeleportData> priorTeleportData = new ConcurrentHashMap<>();
   public final ConcurrentHashMap<UUID, TeleportData> latestTeleportData = new ConcurrentHashMap<>();
   public final ConcurrentSkipListSet<UUID> processingPlayers = new ConcurrentSkipListSet<>();
-  public final RTPTaskPipe miscSyncTasks;
-  public final RTPTaskPipe miscAsyncTasks;
-  public final RTPTaskPipe startupTasks;
-  public final RTPTaskPipe cancelTasks;
+  public RTPTaskPipe miscSyncTasks;
+  public RTPTaskPipe miscAsyncTasks;
+  public RTPTaskPipe startupTasks;
+  public RTPTaskPipe cancelTasks;
   public final Map<String, FillTask> fillTasks = new ConcurrentHashMap<>();
   public final ConcurrentHashMap<UUID, Long> invulnerablePlayers = new ConcurrentHashMap<>();
   public final ConcurrentLinkedQueue<RTPChunk<?>> chunksToUnload = new ConcurrentLinkedQueue<>();

@@ -1,4 +1,4 @@
-package io.github.dailystruggle.rtp.bukkit.tools.softdepends;
+package io.github.dailystruggle.rtp.spigot.tools.softdepends;
 
 import me.clip.placeholderapi.PlaceholderAPI;
 import me.clip.placeholderapi.PlaceholderAPIPlugin;

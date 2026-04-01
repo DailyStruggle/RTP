@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.commands.info;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
@@ -13,7 +14,8 @@ import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tools.ParseString;
-import io.github.dailystruggle.rtp.common.selection.region.ChunkSet;
+import io.github.dailystruggle.rtp.api.world.ChunkSet;
+import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.tools.PerformanceTracker;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -123,14 +125,14 @@ public class InfoCmd extends BaseRTPCmdImpl {
       String regionHeader = lang.getConfigValue(MessagesKeys.infoRegionHeader, "").toString();
       String regions = lang.getConfigValue(MessagesKeys.infoRegion, "").toString();
 
-      RTP.serverAccessor.sendMessage(callerId, title);
-      RTP.serverAccessor.sendMessage(callerId, chunks);
-      RTP.serverAccessor.sendMessage(callerId, worldHeader);
+      RTP.serverAccessor.sendMessage(callerId, title, "INFO");
+      RTP.serverAccessor.sendMessage(callerId, chunks, "INFO");
+      RTP.serverAccessor.sendMessage(callerId, worldHeader, "INFO");
       for (RTPWorld world : RTP.serverAccessor.getRTPWorlds()) {
         String msg = worlds.replaceAll("\\[world]", world.name());
         RTP.serverAccessor.sendMessageAndSuggest(callerId, msg, "rtp info world:" + world.name());
       }
-      RTP.serverAccessor.sendMessage(callerId, regionHeader);
+      RTP.serverAccessor.sendMessage(callerId, regionHeader, "INFO");
       RTP.selectionAPI
           .permRegionLookup
           .values()
@@ -149,16 +151,14 @@ public class InfoCmd extends BaseRTPCmdImpl {
       long totalLoads = ChunkSet.TOTAL_CHUNK_LOADS.get();
       double leakRate = (totalLoads > 0) ? ((double) activeTickets / totalLoads) * 100.0 : 0.0;
 
-      RTP.serverAccessor.sendMessage(callerId, "&7Global Active Chunk Tickets: &f" + activeTickets);
-      RTP.serverAccessor.sendMessage(callerId, "&7Active Teleport State Machines: &f" + rtp.latestTeleportData.size());
-      RTP.serverAccessor.sendMessage(callerId, "&7Current Plugin MSPT: &f" + String.format("%.4f", PerformanceTracker.pluginMSPT));
-      RTP.serverAccessor.sendMessage(callerId, "&7Lifetime Chunks Loaded: &f" + totalLoads);
-      RTP.serverAccessor.sendMessage(callerId, "&7Current Chunk Leak Rate: &f" + String.format("%.4f%%", leakRate));
+      RTP.serverAccessor.sendMessage(callerId, "&7Global Active Chunk Tickets: &f" + activeTickets, "INFO");
+      RTP.serverAccessor.sendMessage(callerId, "&7Active Teleport State Machines: &f" + rtp.latestTeleportData.size(), "INFO");
+      RTP.serverAccessor.sendMessage(callerId, "&7Current Plugin MSPT: &f" + String.format("%.4f", PerformanceTracker.pluginMSPT), "INFO");
+      RTP.serverAccessor.sendMessage(callerId, "&7Lifetime Chunks Loaded: &f" + totalLoads, "INFO");
+      RTP.serverAccessor.sendMessage(callerId, "&7Current Chunk Leak Rate: &f" + String.format("%.4f%%", leakRate), "INFO");
 
-      RTP.serverAccessor.sendMessage(callerId, "&7--- Diagnostic Disclaimer ---");
-      RTP.serverAccessor.sendMessage(callerId, "&7Diagnostic Note: If the server's total orphaned chunk count exceeds this plugin's lifetime loads ([" + totalLoads + "]), this plugin is not the sole source of the memory leak.");
-
-      return true;
+      RTP.serverAccessor.sendMessage(callerId, "&7--- Diagnostic Disclaimer ---", "INFO");
+      RTP.serverAccessor.sendMessage(callerId, "&7Diagnostic Note: If the server's total orphaned chunk count exceeds this plugin's lifetime loads ([" + totalLoads + "]), this plugin is not the sole source of the memory leak.", "INFO");
     }
 
     Set<Character> front = new HashSet<>(Arrays.asList('[', '%'));
@@ -196,7 +196,7 @@ public class InfoCmd extends BaseRTPCmdImpl {
                       return s;
                     })
                 .collect(Collectors.toList());
-        strings.forEach(s -> RTP.serverAccessor.sendMessage(callerId, s));
+        strings.forEach(s -> RTP.serverAccessor.sendMessage(callerId, s, "INFO"));
       }
     }
 
@@ -231,8 +231,15 @@ public class InfoCmd extends BaseRTPCmdImpl {
                       return s;
                     })
                 .collect(Collectors.toList());
-        strings.forEach(s -> RTP.serverAccessor.sendMessage(callerId, s));
+        strings.forEach(s -> RTP.serverAccessor.sendMessage(callerId, s, "INFO"));
       }
+    }
+
+    RTPCommandSender sender = RTP.serverAccessor.getSender(callerId);
+    if (sender.hasPermission("rtp.admin") || sender.hasPermission("rtp.support")) {
+      RTP.serverAccessor.sendMessage(callerId, "&7--- DRM Information ---", "INFO");
+      RTP.serverAccessor.sendMessage(callerId, "&7Downloader ID: &f" + RTPAPI.DOWNLOADER_ID, "INFO");
+      RTP.serverAccessor.sendMessage(callerId, "&7Download Nonce: &f" + RTPAPI.DOWNLOAD_NONCE, "INFO");
     }
 
     return true;

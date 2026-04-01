@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.common.selection.region;
 import static org.mockito.Mockito.*;
 
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
+import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -96,7 +97,7 @@ public class RegionQueueManagerTest {
 
         java.util.concurrent.CompletableFuture<CachedLocation> fastFuture = new java.util.concurrent.CompletableFuture<>();
         queueManager.fastLocations.put(uuid, fastFuture);
-        
+
         java.util.concurrent.ConcurrentLinkedQueue<CachedLocation> pQueue = new java.util.concurrent.ConcurrentLinkedQueue<>();
         pQueue.add(new CachedLocation(playerLoc, 1L));
         queueManager.perPlayerLocationQueue.put(uuid, pQueue);
@@ -137,28 +138,28 @@ public class RegionQueueManagerTest {
     @Test
     void testChunkTicketTransfer() {
         // This test validates that LocationGenerator.getLocation transfers chunk ticket management
-        // In our implementation, chunkManager.addTicket is called, and if successful, 
+        // In our implementation, chunkManager.addTicket is called, and if successful,
         // the ChunkSet is returned in GenerationResult.
         // We mock Region, RTPPlayer, etc. to trigger LocationGenerator.getLocation
-        
+
         // Ensure no verifiers are present to avoid static method complications
         GlobalRegionVerifiers.clearGlobalRegionVerifiers();
 
         io.github.dailystruggle.rtp.api.entity.RTPPlayer player = mock(io.github.dailystruggle.rtp.api.entity.RTPPlayer.class);
         java.util.UUID uuid = java.util.UUID.randomUUID();
         when(player.uuid()).thenReturn(uuid);
-        
+
         RTPCoords coords = new RTPCoords("world", 64, 64, 64);
         queueManager.locationQueue.add(new CachedLocation(coords, 1L));
-        
+
         // Mocking for LocationGenerator.getLocation
         when(region.getWorld()).thenReturn(mock(io.github.dailystruggle.rtp.api.world.RTPWorld.class));
-        
+
         // Mocking chunk loading
         java.util.concurrent.CompletableFuture<Long> chunkFuture = java.util.concurrent.CompletableFuture.completedFuture(1L);
         java.util.List<java.util.concurrent.CompletableFuture<Long>> chunks = java.util.Collections.singletonList(chunkFuture);
         ChunkSet mockChunkSet = new ChunkSet(chunks, new java.util.concurrent.CompletableFuture<>());
-        
+
         when(chunkManager.addTicket(anyInt(), anyInt())).thenReturn(mockChunkSet);
         when(chunkManager.getChunkSet(any())).thenReturn(mockChunkSet);
         io.github.dailystruggle.rtp.api.world.RTPChunk mockChunk = mock(io.github.dailystruggle.rtp.api.world.RTPChunk.class);
@@ -166,7 +167,7 @@ public class RegionQueueManagerTest {
         when(mockChunk.x()).thenReturn(4);
         when(mockChunk.z()).thenReturn(4);
         when(mockChunk.isSafe(anyInt(), anyInt(), anyInt(), any())).thenReturn(true);
-        
+
         // Mocking RTP configs to avoid NullPointerException in LocationGenerator
         io.github.dailystruggle.rtp.common.configuration.Configs configs = mock(io.github.dailystruggle.rtp.common.configuration.Configs.class);
         io.github.dailystruggle.rtp.common.RTP.configs = configs;
@@ -191,7 +192,7 @@ public class RegionQueueManagerTest {
 
         // Execution
         GenerationResult result = LocationGenerator.getLocation(region, null, player, null);
-        
+
         // Verification
         assert result != null;
         assert result.coords().equals(coords);

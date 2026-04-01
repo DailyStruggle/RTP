@@ -1,11 +1,14 @@
 package io.github.dailystruggle.rtp.common.commands.fill;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
+import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
@@ -46,7 +49,7 @@ public class FillStartCmd extends FillSubCmd {
         String msg = String.valueOf(parser.getConfigValue(MessagesKeys.fillRunning, ""));
         if (msg == null || msg.isEmpty()) continue;
         msg = msg.replace("[region]", region.name);
-        RTP.serverAccessor.announce(msg, "rtp.fill");
+        RTP.serverAccessor.announce(msg, "rtp.fill", "FILL");
         continue;
       }
 
@@ -59,11 +62,17 @@ public class FillStartCmd extends FillSubCmd {
         String msg = String.valueOf(parser.getConfigValue(MessagesKeys.badArg, ""));
         if (msg == null || msg.isEmpty()) continue;
         msg = msg.replace("[arg]", "region:" + region.name);
-        RTP.serverAccessor.sendMessage(callerId, msg);
+        RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg, "FILL");
         continue;
       }
 
       shape.clear();
+      FillTask.delete(region.name);
+      MultiConfigParser<RegionKeys> multiConfigParser = (MultiConfigParser<RegionKeys>) RTP.configs.getParser(RegionKeys.class);
+      if (multiConfigParser != null) {
+        ConfigParser<RegionKeys> regionConfig = multiConfigParser.getParser(region.name);
+        shape.spatialResolution = regionConfig.getNumber(RegionKeys.spatialResolution, 1L).longValue();
+      }
 
       FillTask task = new FillTask(region, 0L);
       RTP.getInstance().fillTasks.put(region.name, task);
@@ -72,7 +81,7 @@ public class FillStartCmd extends FillSubCmd {
       String msg = String.valueOf(parser.getConfigValue(MessagesKeys.fillStart, ""));
       if (msg == null || msg.isEmpty()) continue;
       msg = msg.replace("[region]", region.name);
-      RTP.serverAccessor.announce(msg, "rtp.fill");
+      RTP.serverAccessor.announce(msg, "rtp.fill", "FILL");
     }
 
     return true;

@@ -14,7 +14,10 @@ import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
+import java.io.File;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -30,12 +33,15 @@ public class FillTask extends RTPRunnable {
   private static final AtomicLong cps = new AtomicLong(128);
   private static final BigInteger increment_big = new BigInteger("1");
   private final Region region;
-  private long start;
+  private final AtomicLong fillIter;
   private final CompletableFuture<Boolean> done = new CompletableFuture<>();
-  private final AtomicLong completionCounter = new AtomicLong();
+  private long currentOffset = 0L;
 
   /** Whether the task is currently paused */
   public AtomicBoolean pause = new AtomicBoolean(false);
+
+  private static final int MAX_PENDING_CHUNKS = 50;
+  private final AtomicLong pendingChunks = new AtomicLong();
 
   private BigInteger cps_all = new BigInteger("0");
   private BigInteger cps_divisor = new BigInteger("0");
@@ -52,7 +58,11 @@ public class FillTask extends RTPRunnable {
    */
   public FillTask(Region region, long start) {
     this.region = region;
-    this.start = start;
+    this.fillIter = new AtomicLong(start);
+    long[] progress = loadProgress(region.name);
+    if (progress != null) {
+      if (progress.length > 3) this.currentOffset = progress[3];
+    }
 
     if (fillIncrement.get() <= 0) {
       long cpu = Runtime.getRuntime().availableProcessors();
@@ -73,9 +83,13 @@ public class FillTask extends RTPRunnable {
    */
   public FillTask(Region region, long start, BigInteger cps_all, BigInteger divisor) {
     this.region = region;
-    this.start = start;
+    this.fillIter = new AtomicLong(start);
     this.cps_all = cps_all;
     this.cps_divisor = divisor;
+    long[] progress = loadProgress(region.name);
+    if (progress != null) {
+      if (progress.length > 3) this.currentOffset = progress[3];
+    }
 
     if (fillIncrement.get() <= 0) {
       long cpu = Runtime.getRuntime().availableProcessors();
@@ -96,6 +110,7 @@ public class FillTask extends RTPRunnable {
   public void run() {
     if (!isRunning.compareAndSet(false, true)) return;
     if (pause.get() || isCancelled() || fillIncrement.get() <= 0) {
+      if (pause.get() || isCancelled()) save();
       isRunning.set(false);
       return;
     }
@@ -161,72 +176,83 @@ public class FillTask extends RTPRunnable {
     long range = Double.valueOf(shape.getRange()).longValue();
     long pos;
     long limit = fillIncrement.get();
-    long step = Math.max(1L, region.getSettings().spatialResolution());
-    long limitEnd = start + (limit * step);
+    long stride = Math.max(1L, shape.spatialResolution);
+    long currentStart = fillIter.get();
+    if (currentStart == 0) {
+      currentStart = currentOffset;
+    }
+    long limitEnd = currentStart + (limit * stride);
     MutableRTPCoords cursor = new MutableRTPCoords(0, 0);
     cursor.setWorldName(region.getWorld().name());
 
+    long activeChecks = 0;
     java.util.HashSet<Long> testedChunks = new HashSet<>();
-    for (pos = start; pos < range && pos < limitEnd; pos += step) {
+    for (pos = currentStart; pos < range && pos < limitEnd; pos += stride) {
       if (pause.get() || isCancelled()) {
+        save();
         isRunning.set(false);
         return;
+      }
+
+      shape.locationToXZ(pos, cursor);
+      if (shape.isKnownBad(cursor)) {
+        continue;
       }
 
       if (region.queueManager.getPublicQueueLength() >= region.getSettings().cacheCap()) {
         break;
       }
 
-      if (region.chunkManager.locAssChunks.size() >= region.getSettings().activeChunkCap()) {
+      if (pendingChunks.get() >= MAX_PENDING_CHUNKS) {
         break;
       }
 
-      shape.locationToXZ(pos, cursor);
       long chunkKey = ((long) (cursor.x >> 4) & 0xFFFFFFFFL) | (((long) (cursor.z >> 4) & 0xFFFFFFFFL) << 32);
       if (!testedChunks.add(chunkKey)) {
         continue;
       }
-      if (shape.isKnownBad(cursor)) {
-        continue;
-      }
 
-      CompletableFuture<Boolean> future = testPos(region, pos, cursor.x, cursor.z, safetyRadius, unsafeBlocks, defaultBiomes, biomeRecall, border);
-
-      try {
-        Boolean valid = future.join();
-        if (valid) {
-          completionCounter.incrementAndGet();
-        }
-      } catch (CancellationException e) {
-        done.complete(false);
-      } catch (CompletionException e) {
-        RTP.log(Level.WARNING, e.getMessage(), e);
-      }
+      final long currentPos = pos;
+      activeChecks++;
+      pendingChunks.incrementAndGet();
+      testPos(region, currentPos, cursor.x, cursor.z, safetyRadius, unsafeBlocks, defaultBiomes, biomeRecall, border)
+          .whenComplete((valid, ex) -> {
+            pendingChunks.decrementAndGet();
+            if (ex != null) {
+              if (!(ex instanceof CancellationException)) {
+                RTP.log(Level.WARNING, ex.getMessage(), ex);
+              }
+            }
+          });
     }
 
     final long finalPos1 = pos;
-    long completedChecks = finalPos1 - start;
     long dt = TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - timingStart);
     if (dt <= 0) dt = 1;
-    long cps_local = (long) (((double) completedChecks) / (dt));
+    long cps_local = (long) (((double) activeChecks) / (dt));
     cps_all = cps_all.add(new BigInteger(String.valueOf(cps_local)));
     cps_divisor = cps_divisor.add(increment_big);
     cps.set((cps.get() * 7 / 8) + cps_local / 8);
 
-    long numLoadsRemaining = range - finalPos1;
-    if (numLoadsRemaining < 0 || numLoadsRemaining > range) numLoadsRemaining = 0;
-    long cps_val = cps_all.divide(cps_divisor).longValue();
-    if (cps_val <= 0) cps_val = 1;
-    long estRemaining = numLoadsRemaining / cps_val;
+    long totalRemainingPoints = (range - finalPos1) + (Math.max(0, shape.spatialResolution - 1 - currentOffset) * range);
+    if (totalRemainingPoints < 0) totalRemainingPoints = 0;
+    long effectiveBad = shape.getEffectiveBadCount();
+    long totalEvaluated = shape.getEffectiveGoodCount() + effectiveBad;
+    double badDensity = (double) effectiveBad / (double) Math.max(1, totalEvaluated);
+    long estimatedActivePointsRemaining = (long) (totalRemainingPoints * (1.0 - badDensity));
+
+    long currentPointsPerSecond = cps_all.divide(cps_divisor).longValue();
+    if (currentPointsPerSecond <= 0) currentPointsPerSecond = 1;
+    long etaSeconds = estimatedActivePointsRemaining / currentPointsPerSecond;
 
     ConfigParser<MessagesKeys> langParser =
         (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
     String msg = langParser.getConfigValue(MessagesKeys.fillStatus, "").toString();
     if (msg != null && !msg.isEmpty()) {
-      long days = TimeUnit.SECONDS.toDays(estRemaining);
-      long hours = TimeUnit.SECONDS.toHours(estRemaining) % 24;
-      long minutes = TimeUnit.SECONDS.toMinutes(estRemaining) % 60;
-      long seconds = estRemaining % 60;
+      long days = TimeUnit.SECONDS.toDays(etaSeconds);
+      long hours = TimeUnit.SECONDS.toHours(etaSeconds) % 24;
+      long minutes = TimeUnit.SECONDS.toMinutes(etaSeconds) % 60;
+      long seconds = etaSeconds % 60;
 
       String replacement = "";
       if (days > 0)
@@ -248,20 +274,103 @@ public class FillTask extends RTPRunnable {
       RTP.serverAccessor.announce(msg, "rtp.fill");
     }
 
-    shape.fillIter.set(finalPos1);
+    fillIter.set(finalPos1);
+    save();
     shape.save(region.name, region.getWorld().name());
     region.getWorld().save();
 
-    start = finalPos1;
     if (finalPos1 < range && !isCancelled() && !pause.get()) {
       if (RTP.getInstance().fillTasks.get(region.name) == this) {
+        isRunning.set(false);
+        shape.flushAndRebuild(shape.spatialResolution);
         RTP.scheduler.runTaskAsynchronously(this);
       }
     } else if (finalPos1 >= range) {
+      if (currentOffset < shape.spatialResolution - 1) {
+        currentOffset++;
+        fillIter.set(0);
+        save();
+        shape.save(region.name, region.getWorld().name());
+        isRunning.set(false);
+        shape.flushAndRebuild(shape.spatialResolution);
+        RTP.scheduler.runTaskAsynchronously(this);
+        return;
+      }
       RTP.getInstance().fillTasks.remove(region.name, this);
+      delete();
       done.complete(true);
     }
-    isRunning.set(false);
+  }
+
+  public void save() {
+    File pluginDir = RTP.serverAccessor.getPluginDirectory();
+    File dir = new File(pluginDir, "database" + File.separator + "regionData");
+    if (!dir.exists()) dir.mkdirs();
+    File file = new File(dir, region.name + ".fill");
+
+    try (java.io.FileOutputStream out = new java.io.FileOutputStream(file)) {
+      ByteBuffer buf = ByteBuffer.allocate(25).order(ByteOrder.BIG_ENDIAN);
+      buf.putLong(fillIter.get());
+      buf.putLong(region.getShape().spatialResolution);
+      buf.putLong(currentOffset);
+      buf.put((byte) 0);
+      out.write(buf.array());
+    } catch (java.io.IOException e) {
+      RTP.log(Level.WARNING, e.getMessage(), e);
+    }
+  }
+
+  public static long[] loadProgress(String regionName) {
+    File pluginDir = RTP.serverAccessor.getPluginDirectory();
+    File file =
+        new File(
+            pluginDir,
+            "database" + File.separator + "regionData" + File.separator + regionName + ".fill");
+    if (!file.exists()) return null;
+
+    try (java.io.FileInputStream in = new java.io.FileInputStream(file)) {
+      byte[] bytes = new byte[25];
+      int read = in.read(bytes);
+      if (read >= 16) {
+        ByteBuffer buf = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN);
+        long iter = buf.getLong();
+        long stride = buf.getLong();
+        long offset = 0;
+        long isFine = 0;
+        if (read >= 24) {
+          offset = buf.getLong();
+          if (read >= 25) {
+            isFine = bytes[24] & 0xFF;
+          }
+        } else if (read == 17) {
+          isFine = bytes[16] & 0xFF;
+        } else if (stride == 1) {
+          isFine = 1;
+        }
+        return new long[] {iter, stride, isFine, offset, 0L, 0L};
+      }
+    } catch (java.io.IOException e) {
+      // ignore
+    }
+    return null;
+  }
+
+  public void delete() {
+    File pluginDir = RTP.serverAccessor.getPluginDirectory();
+    File file =
+        new File(
+            pluginDir,
+            "database" + File.separator + "regionData" + File.separator + region.name + ".fill");
+    if (file.exists()) file.delete();
+  }
+
+  public static void delete(String regionName) {
+    File pluginDir = RTP.serverAccessor.getPluginDirectory();
+    File file =
+        new File(
+            pluginDir,
+            "database" + File.separator + "regionData" + File.separator + regionName + ".fill");
+    if (file.exists()) file.delete();
   }
 
   /**
@@ -303,7 +412,7 @@ public class FillTask extends RTPRunnable {
 
     if (!defaultBiomes.contains(currBiome)) {
       if (biomeRecall) {
-        shape.addBadLocation(pos, region.getSettings().spatialResolution());
+        shape.addBadLocation(pos, 1L);
         return CompletableFuture.completedFuture(false);
       }
     }
@@ -313,7 +422,7 @@ public class FillTask extends RTPRunnable {
         .apply(
             new RTPLocation(
                 world, blockX, (vert.maxY() + vert.minY()) / 2, blockZ))) {
-      shape.addBadLocation(pos, region.getSettings().spatialResolution());
+      shape.addBadLocation(pos, 1L);
       return CompletableFuture.completedFuture(false);
     }
 
@@ -335,7 +444,7 @@ public class FillTask extends RTPRunnable {
     cfChunk.thenAccept(
         chunkKey -> {
           if (chunkKey == null) {
-            shape.addBadLocation(pos, region.getSettings().spatialResolution());
+            shape.addBadLocation(pos, 1L);
             res.complete(false);
             return;
           }
@@ -356,7 +465,7 @@ public class FillTask extends RTPRunnable {
             localCursor.setWorldName(world.name());
             try {
               if (!vert.adjust(chunk, localCursor)) {
-                if (biomeRecall) shape.addBadLocation(pos, region.getSettings().spatialResolution());
+                if (biomeRecall) shape.addBadLocation(pos, 1L);
                 res.complete(false);
                 return;
               }
@@ -364,7 +473,7 @@ public class FillTask extends RTPRunnable {
               String currBiome1 = world.getBiome(localCursor.x, localCursor.y, localCursor.z);
               if (!defaultBiomes.contains(currBiome1)) {
                 if (biomeRecall) {
-                  shape.addBadLocation(pos, region.getSettings().spatialResolution());
+                  shape.addBadLocation(pos, 1L);
                   res.complete(false);
                   return;
                 }
@@ -372,7 +481,7 @@ public class FillTask extends RTPRunnable {
 
               boolean pass = localCursor.y < vert.maxY();
               if (!pass) {
-                shape.addBadLocation(pos, region.getSettings().spatialResolution());
+                shape.addBadLocation(pos, 1L);
                 res.complete(false);
                 return;
               }
@@ -429,13 +538,13 @@ public class FillTask extends RTPRunnable {
                 return;
               }
 
-              if (pass) pass = GlobalRegionVerifiers.checkGlobalRegionVerifiers(localCursor);
+              if (pass) pass = GlobalRegionVerifiers.checkGlobalRegionVerifiers(localCursor).join();
 
               if (pass) {
-                if (biomeRecall) shape.addBiomeLocation(pos, region.getSettings().spatialResolution(), currBiome1);
+                if (biomeRecall) shape.addBiomeLocation(pos, 1L, currBiome1);
                 res.complete(true);
               } else {
-                shape.addBadLocation(pos, region.getSettings().spatialResolution());
+                shape.addBadLocation(pos, 1L);
                 res.complete(false);
               }
             } finally {
@@ -448,6 +557,13 @@ public class FillTask extends RTPRunnable {
     return res;
   }
 
+  public void pause() {
+    pause.set(true);
+    MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
+    shape.flushAndRebuild(shape.spatialResolution);
+    save();
+  }
+
   @Override
   public void setCancelled(boolean cancelled) {
     if (cancelled) {
@@ -456,6 +572,9 @@ public class FillTask extends RTPRunnable {
       } catch (CancellationException | CompletionException ignored) {
 
       }
+      MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
+      shape.flushAndRebuild(shape.spatialResolution);
+      save();
     }
     super.setCancelled(cancelled);
   }

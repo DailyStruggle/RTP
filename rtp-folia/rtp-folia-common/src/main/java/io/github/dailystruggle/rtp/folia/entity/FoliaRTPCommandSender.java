@@ -3,13 +3,14 @@ package io.github.dailystruggle.rtp.folia.entity;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.common.commands.help.SendMessage;
+import io.github.dailystruggle.rtp.spigot.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
@@ -68,7 +69,8 @@ public class FoliaRTPCommandSender implements RTPCommandSender {
   @Override
   public void performCommand(@Nullable RTPPlayer player, String command) {
     CommandSender sender = this.sender;
-    command = SendMessage.formatNoColor(player, command);
+    OfflinePlayer bukkitPlayer = (player != null) ? Bukkit.getOfflinePlayer(player.uuid()) : null;
+    command = SendMessage.formatNoColor(bukkitPlayer, command);
     final String finalCommand = command;
     Bukkit.getGlobalRegionScheduler()
         .run(

@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import java.io.File;
+import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -36,6 +37,10 @@ public interface RTPServerAccessor {
 
   String getServerVersion();
 
+  String getPluginVersion();
+
+  String getPlatform();
+
   Integer getServerIntVersion();
 
   RTPWorld<?> getRTPWorld(String name);
@@ -56,21 +61,51 @@ public interface RTPServerAccessor {
 
   File getPluginDirectory();
 
-  void sendMessage(UUID target, MessagesKeys msgType);
+  void sendMessage(UUID target, MessagesKeys msgType, String tag);
 
-  void sendMessage(UUID target1, UUID target2, MessagesKeys msgType);
+  default void sendMessage(UUID target, MessagesKeys msgType) {
+    sendMessage(target, msgType, null);
+  }
 
-  void sendMessage(UUID target, String message);
+  void sendMessage(UUID target1, UUID target2, MessagesKeys msgType, String tag);
+
+  default void sendMessage(UUID target1, UUID target2, MessagesKeys msgType) {
+    sendMessage(target1, target2, msgType, null);
+  }
+
+  void sendMessage(UUID target, String message, String tag);
+
+  default void sendMessage(UUID target, String message) {
+    sendMessage(target, message, null);
+  }
 
   void sendMessageAndSuggest(UUID target, String message, String suggestion);
 
-  void sendMessage(UUID sender, UUID target, String message);
+  void sendMessage(UUID sender, UUID target, String message, String tag);
+
+  default void sendMessage(UUID sender, UUID target, String message) {
+    sendMessage(sender, target, message, null);
+  }
+
+  void sendMessage(RTPCommandSender target, String message, String hover, String click, String tag);
+
+  default void sendMessage(RTPCommandSender target, String message, String hover, String click) {
+    sendMessage(target, message, hover, click, null);
+  }
+
+  String format(@Nullable UUID player, String text);
+
+  String formatNoColor(@Nullable UUID player, String text);
 
   void log(Level level, String msg);
 
   void log(Level level, String msg, Throwable throwable);
 
-  void announce(String msg, String permission);
+  void announce(String msg, String permission, String tag);
+
+  default void announce(String msg, String permission) {
+    announce(msg, permission, null);
+  }
 
   Set<String> getBiomes(RTPWorld<?> rtpWorld);
 

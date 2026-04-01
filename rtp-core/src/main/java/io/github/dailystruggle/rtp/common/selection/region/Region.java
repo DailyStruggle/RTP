@@ -30,9 +30,9 @@ public class Region extends FactoryValue<RegionKeys> {
   public static final List<BiConsumer<Region, UUID>> onPlayerQueuePop = new ArrayList<>();
   private final AtomicBoolean isRefillingCache = new AtomicBoolean(false);
 
-  public final RegionQueueManager queueManager = new RegionQueueManager(this);
-  public final RegionChunkManager chunkManager = new RegionChunkManager(this);
-  public final AtomicInteger inFlightCalculations =
+  public RegionQueueManager queueManager = new RegionQueueManager(this);
+  public RegionChunkManager chunkManager = new RegionChunkManager(this);
+  public AtomicInteger inFlightCalculations =
       new AtomicInteger(0);
 
   public RTPTaskPipe cachePipeline;
@@ -45,6 +45,7 @@ public class Region extends FactoryValue<RegionKeys> {
     super(RegionKeys.class, name);
     this.name = name;
     this.settings = settings;
+    this.set(RegionKeys.spatialResolution, settings.spatialResolution());
     this.cachePipeline = (RTPTaskPipe) RTP.serverAccessor.createCachePipe();
     this.miscPipeline = (RTPTaskPipe) RTP.serverAccessor.createTaskPipe();
 
@@ -52,11 +53,14 @@ public class Region extends FactoryValue<RegionKeys> {
     shape.spatialResolution = settings.spatialResolution();
 
     if (shape instanceof MemoryShape<?>) {
-      long iter = ((MemoryShape<?>) shape).fillIter.get();
-      if (iter > 0 && iter < Double.valueOf(((MemoryShape<?>) shape).getRange()).longValue()) {
-        FillTask task = new FillTask(this, iter);
-        RTP.getInstance().fillTasks.put(name, task);
-        RTP.scheduler.runTaskAsynchronously(task);
+      long[] progress = FillTask.loadProgress(name);
+      if (progress != null) {
+        long iter = progress[0];
+        if (iter > 0 && iter < Double.valueOf(((MemoryShape<?>) shape).getRange()).longValue()) {
+          FillTask task = new FillTask(this, iter);
+          RTP.getInstance().fillTasks.put(name, task);
+          RTP.scheduler.runTaskAsynchronously(task);
+        }
       }
     }
 
@@ -76,6 +80,7 @@ public class Region extends FactoryValue<RegionKeys> {
 
   public void setSettings(RegionSettings settings) {
     this.settings = settings;
+    this.set(RegionKeys.spatialResolution, settings.spatialResolution());
     settings.shape().spatialResolution = settings.spatialResolution();
     long cacheCap = settings.cacheCap();
     long playerQueueSize = queueManager.playerQueue.size();
