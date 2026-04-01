@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
+import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
@@ -26,8 +27,11 @@ public class MultiConfigParserIsolationTest {
     @BeforeEach
     void setUp() throws IOException {
         RTPServerAccessor serverAccessor = mock(RTPServerAccessor.class);
+        RTPScheduler scheduler = mock(RTPScheduler.class);
         when(serverAccessor.getPluginDirectory()).thenReturn(tempDir.toFile());
+        when(serverAccessor.createTaskPipe()).thenReturn(mock(io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe.class));
         RTP.serverAccessor = serverAccessor;
+        RTP.scheduler = scheduler;
 
         // Mock worlds
         when(serverAccessor.getRTPWorld("world")).thenReturn(mock(io.github.dailystruggle.rtp.api.world.RTPWorld.class));
@@ -38,6 +42,14 @@ public class MultiConfigParserIsolationTest {
         Files.createDirectories(worldsDir);
         Path defaultYaml = worldsDir.resolve("default.yml");
         Files.writeString(defaultYaml, "requirePermission: false\nregion: default\noverride: none\nversion: 1.0\n");
+
+        RTP rtp = new RTP() {};
+        try {
+            java.lang.reflect.Field instanceField = RTP.class.getDeclaredField("instance");
+            instanceField.setAccessible(true);
+            instanceField.set(null, rtp);
+        } catch (Exception e) {}
+        RTP.selectionAPI = new io.github.dailystruggle.rtp.common.selection.SelectionAPI();
 
         // Initialize Configs and MultiConfigParser
         RTP.configs = new Configs(tempDir.toFile());
@@ -80,10 +92,7 @@ public class MultiConfigParserIsolationTest {
         ConfigParser<WorldKeys> invalid = RTP.configs.getWorldParser("invalid_world");
         System.out.println("[DEBUG_LOG] invalid parser name: " + (invalid != null ? invalid.name : "null"));
 
-        // My fix makes it return the default parser instead of null if it's not found on the server.
-        // This is a "graceful fallback".
-        assertNotNull(invalid);
-        assertTrue(invalid.name.equalsIgnoreCase("default.yml"), "Expected default.yml for invalid world, got: " + invalid.name);
+        assertNull(invalid, "Expected null for unregistered/invalid world");
 
         File invalidFile = tempDir.resolve("worlds/invalid_world.yml").toFile();
         System.out.println("[DEBUG_LOG] invalidFile exists: " + invalidFile.exists());

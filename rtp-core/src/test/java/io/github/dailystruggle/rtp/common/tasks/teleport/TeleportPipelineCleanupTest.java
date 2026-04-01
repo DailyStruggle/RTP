@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.tasks.teleport;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doReturn;
 
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
@@ -74,9 +75,11 @@ public class TeleportPipelineCleanupTest {
 
         UUID playerId = UUID.randomUUID();
         when(player.uuid()).thenReturn(playerId);
+        doReturn(true).when(player).isOnline();
         when(player.getLocation()).thenReturn(new RTPLocation(world, 0, 64, 0));
         when(player.delay()).thenReturn(0L);
         when(world.name()).thenReturn("world");
+        doReturn(java.util.UUID.randomUUID()).when(world).id();
         when(serverAccessor.getRTPWorld("world")).thenReturn(world);
         when(region.getWorld()).thenReturn(world);
 
@@ -95,8 +98,8 @@ public class TeleportPipelineCleanupTest {
         when(configs.getParser(PerformanceKeys.class)).thenReturn(performanceConfig);
         when(configs.getParser(MessagesKeys.class)).thenReturn(messagesConfig);
         when(configs.getParser(ConfigKeys.class)).thenReturn(configKeysConfig);
-        when(performanceConfig.getNumber(any(), any())).thenReturn(0L);
-        when(messagesConfig.getConfigValue(any(), any())).thenReturn("");
+        doReturn(0L).when(performanceConfig).getNumber(any(), any());
+        doReturn("").when(messagesConfig).getConfigValue(any(), any());
 
         context = new GenerationContext(player, player, null);
     }

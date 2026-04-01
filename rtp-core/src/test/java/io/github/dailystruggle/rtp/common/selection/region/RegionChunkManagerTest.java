@@ -25,6 +25,8 @@ public class RegionChunkManagerTest {
     void setUp() {
         region = mock(Region.class);
         world = mock(RTPWorld.class);
+        when(world.name()).thenReturn("testWorld");
+        when(world.id()).thenReturn(java.util.UUID.randomUUID());
         when(region.getWorld()).thenReturn((RTPWorld) world);
 
         chunkManager = new RegionChunkManager(region);

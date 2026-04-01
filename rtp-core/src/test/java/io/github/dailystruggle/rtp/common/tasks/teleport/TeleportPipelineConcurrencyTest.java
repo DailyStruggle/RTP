@@ -39,6 +39,7 @@ public class TeleportPipelineConcurrencyTest {
         RTP.scheduler = mockScheduler;
         RTP.serverAccessor = mockServerAccessor;
 
+        RTP.selectionAPI = new io.github.dailystruggle.rtp.common.selection.SelectionAPI();
         rtp = new RTP();
         mockRegion = mock(Region.class);
 
@@ -75,9 +76,11 @@ public class TeleportPipelineConcurrencyTest {
             RTPPlayer mockPlayer = mock(RTPPlayer.class);
             UUID uuid = UUID.randomUUID();
             when(mockPlayer.uuid()).thenReturn(uuid);
+            doReturn(true).when(mockPlayer).isOnline();
             RTPLocation mockLoc = mock(RTPLocation.class);
             RTPWorld mockWorld = mock(RTPWorld.class);
             when(mockWorld.name()).thenReturn("world");
+            doReturn(java.util.UUID.randomUUID()).when(mockWorld).id();
             when(mockLoc.world()).thenReturn(mockWorld);
             when(mockPlayer.getLocation()).thenReturn(mockLoc);
             players.add(mockPlayer);

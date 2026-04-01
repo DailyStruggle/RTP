@@ -19,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doReturn;
 
 public class RegionConfigLoaderTest {
     private MockedStatic<RTP> rtpMockedStatic;
@@ -34,7 +35,7 @@ public class RegionConfigLoaderTest {
         RTP.configs = mockConfigs;
         when(mockConfigs.getParser(LoggingKeys.class)).thenReturn(mockLoggingParser);
         // Default logging value
-        when(mockLoggingParser.getConfigValue(eq(LoggingKeys.detailed_region_init), any())).thenReturn(false);
+        doReturn(false).when(mockLoggingParser).getConfigValue(eq(LoggingKeys.detailed_region_init), any());
     }
 
     @AfterEach
@@ -50,7 +51,7 @@ public class RegionConfigLoaderTest {
 
         // Setup mock to return malformed value for the specific key, and defaults for others
         setupDefaultMocks(mockRegionParser);
-        when(mockRegionParser.getConfigValue(eq(key), any())).thenReturn(malformedValue);
+        doReturn(malformedValue).when(mockRegionParser).getConfigValue(eq(key), any());
 
         RegionSettings settings = assertDoesNotThrow(() -> RegionConfigLoader.load(mockRegionParser),
                 "RegionConfigLoader.load should not throw exception for " + description);
@@ -61,16 +62,16 @@ public class RegionConfigLoaderTest {
     }
 
     private void setupDefaultMocks(ConfigParser<RegionKeys> parser) {
-        when(parser.getConfigValue(eq(RegionKeys.world), any())).thenReturn(null);
-        when(parser.getConfigValue(eq(RegionKeys.shape), any())).thenReturn(null);
-        when(parser.getConfigValue(eq(RegionKeys.vert), any())).thenReturn(null);
-        when(parser.getConfigValue(eq(RegionKeys.worldBorderOverride), any())).thenReturn(false);
-        when(parser.getConfigValue(eq(RegionKeys.requirePermission), any())).thenReturn(false);
-        when(parser.getConfigValue(eq(RegionKeys.cacheCap), any())).thenReturn(10L);
-        when(parser.getConfigValue(eq(RegionKeys.activeChunkCap), any())).thenReturn(3);
-        when(parser.getConfigValue(eq(RegionKeys.price), any())).thenReturn(0.0);
-        when(parser.getConfigValue(eq(RegionKeys.spatialResolution), any())).thenReturn(1L);
-        when(parser.getConfigValue(eq(RegionKeys.override), any())).thenReturn("default");
+        doReturn(null).when(parser).getConfigValue(eq(RegionKeys.world), any());
+        doReturn(null).when(parser).getConfigValue(eq(RegionKeys.shape), any());
+        doReturn(null).when(parser).getConfigValue(eq(RegionKeys.vert), any());
+        doReturn(false).when(parser).getConfigValue(eq(RegionKeys.worldBorderOverride), any());
+        doReturn(false).when(parser).getConfigValue(eq(RegionKeys.requirePermission), any());
+        doReturn(10L).when(parser).getConfigValue(eq(RegionKeys.cacheCap), any());
+        doReturn(3).when(parser).getConfigValue(eq(RegionKeys.activeChunkCap), any());
+        doReturn(0.0).when(parser).getConfigValue(eq(RegionKeys.price), any());
+        doReturn(1L).when(parser).getConfigValue(eq(RegionKeys.spatialResolution), any());
+        doReturn("default").when(parser).getConfigValue(eq(RegionKeys.override), any());
     }
 
     private Object getSettingValue(RegionSettings settings, RegionKeys key) {

@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.tasks;
 
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doReturn;
 
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
@@ -62,6 +63,7 @@ public class FillTaskBackpressureTest {
         qmField.set(region, mock(RegionQueueManager.class));
 
         when(world.name()).thenReturn("testWorld");
+        doReturn(java.util.UUID.randomUUID()).when(world).id();
         when(serverAccessor.getChunkManager()).thenReturn(apiChunkManager);
         when(serverAccessor.createTaskPipe()).thenReturn(mock(RTPTaskPipe.class));
         when(serverAccessor.getPluginDirectory()).thenReturn(new java.io.File("."));
@@ -77,12 +79,12 @@ public class FillTaskBackpressureTest {
         ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) configs.getParser(SafetyKeys.class);
         ConfigParser<MessagesKeys> messages = (ConfigParser<MessagesKeys>) configs.getParser(MessagesKeys.class);
 
-        when(performance.getConfigValue(any(), any())).thenReturn(false);
-        when(safety.getConfigValue(eq(SafetyKeys.biomeWhitelist), any())).thenReturn(true);
-        when(safety.getConfigValue(eq(SafetyKeys.biomes), any())).thenReturn(java.util.Collections.singletonList("plains"));
-        when(safety.getConfigValue(eq(SafetyKeys.unsafeBlocks), any())).thenReturn(new java.util.ArrayList<String>());
-        when(safety.getNumber(any(), any())).thenReturn(0);
-        when(messages.getConfigValue(any(), any())).thenReturn("");
+        doReturn(false).when(performance).getConfigValue(any(), any());
+        doReturn(true).when(safety).getConfigValue(eq(SafetyKeys.biomeWhitelist), any());
+        doReturn(java.util.Collections.singletonList("PLAINS")).when(safety).getConfigValue(eq(SafetyKeys.biomes), any());
+        doReturn(new java.util.ArrayList<String>()).when(safety).getConfigValue(eq(SafetyKeys.unsafeBlocks), any());
+        doReturn(0).when(safety).getNumber(any(), any());
+        doReturn("").when(messages).getConfigValue(any(), any());
 
         when(world.getBiome(anyInt(), anyInt(), anyInt())).thenReturn("plains");
         when(shape.getRange()).thenReturn(1000.0);

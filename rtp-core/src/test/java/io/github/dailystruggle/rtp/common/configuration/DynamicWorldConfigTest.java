@@ -45,8 +45,20 @@ public class DynamicWorldConfigTest {
         worlds.add(defaultWorld);
         when(serverAccessor.getRTPWorlds()).thenReturn(worlds);
 
+        RTP rtp = new RTP() {};
+        try {
+            java.lang.reflect.Field instanceField = RTP.class.getDeclaredField("instance");
+            instanceField.setAccessible(true);
+            instanceField.set(null, rtp);
+        } catch (Exception e) {}
+        RTP.selectionAPI = new io.github.dailystruggle.rtp.common.selection.SelectionAPI();
+
         // Initialize Configs
         configs = new Configs(tempDir.toFile());
+        RTP.configs = configs;
+        configs.multiConfigParserMap.put(io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys.class,
+                new io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<>(
+                        io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys.class, "worlds", "1.0", tempDir.toFile()));
     }
 
     @Test

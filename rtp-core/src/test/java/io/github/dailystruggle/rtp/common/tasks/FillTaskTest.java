@@ -20,12 +20,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
-import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -92,11 +92,11 @@ public class FillTaskTest {
 
         when(configs.getParser(PerformanceKeys.class)).thenReturn(performance);
         when(configs.getParser(SafetyKeys.class)).thenReturn(safety);
-        when(performance.getConfigValue(any(), any())).thenReturn(false);
-        when(safety.getConfigValue(SafetyKeys.biomeWhitelist, false)).thenReturn(false);
-        when(safety.getConfigValue(SafetyKeys.biomes, new ArrayList<String>())).thenReturn(new ArrayList<String>());
-        when(safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<String>())).thenReturn(new ArrayList<String>());
-        when(safety.getNumber(SafetyKeys.safetyRadius, 0)).thenReturn(0);
+        doReturn(false).when(performance).getConfigValue(any(), any());
+        doReturn(false).when(safety).getConfigValue(eq(io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.biomeWhitelist), any());
+        doReturn(new java.util.ArrayList<String>()).when(safety).getConfigValue(eq(io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.biomes), any());
+        doReturn(new java.util.ArrayList<String>()).when(safety).getConfigValue(eq(io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.unsafeBlocks), any());
+        doReturn(0).when(safety).getNumber(any(), any());
 
         when(shape.getRange()).thenReturn(1000.0);
         when(settings.spatialResolution()).thenReturn(1L);

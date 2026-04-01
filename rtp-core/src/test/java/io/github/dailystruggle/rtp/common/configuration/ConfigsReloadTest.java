@@ -37,6 +37,7 @@ public class ConfigsReloadTest {
         RTP.scheduler = mockScheduler;
         RTP.serverAccessor = mockServerAccessor;
 
+        RTP.selectionAPI = new io.github.dailystruggle.rtp.common.selection.SelectionAPI();
         rtp = new RTP();
     }
 

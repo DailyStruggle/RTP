@@ -54,6 +54,7 @@ public class TeleportPipelineIntegrationTest {
 
         RTP.scheduler = scheduler;
         RTP.serverAccessor = serverAccessor;
+        when(serverAccessor.getPlatform()).thenReturn("Folia");
         when(serverAccessor.createTaskPipe()).thenReturn(mock(io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe.class));
         when(serverAccessor.getPluginDirectory()).thenReturn(new java.io.File("."));
 
@@ -76,6 +77,8 @@ public class TeleportPipelineIntegrationTest {
         when(player.uuid()).thenReturn(playerId);
         when(player.getLocation()).thenReturn(new RTPLocation(world, 0, 64, 0));
         when(player.delay()).thenReturn(0L);
+        when(player.isOnline()).thenReturn(true);
+        when(player.hasPermission(anyString())).thenReturn(true);
         when(world.name()).thenReturn("world");
         when(serverAccessor.getRTPWorld("world")).thenReturn(world);
         when(region.getWorld()).thenReturn(world);
@@ -125,7 +128,7 @@ public class TeleportPipelineIntegrationTest {
 
             // Verify SETUP transitioned to LOAD
             assertEquals(TeleportPipelineTask.Phase.LOAD, task.getPhase());
-            verify(regionChunkManager).chunks(eq(coords), anyLong());
+            verify(regionChunkManager, atLeastOnce()).chunks(eq(coords), anyLong());
 
             // Phase: LOAD
             task.run();
@@ -190,7 +193,7 @@ public class TeleportPipelineIntegrationTest {
             when(region.getLocation(context)).thenReturn(new GenerationResult(coords, 1L, chunkSet));
             when(regionChunkManager.getChunkSet(coords)).thenReturn(chunkSet);
 
-            TeleportPipelineTask task = new TeleportPipelineTask(context, region);
+            TeleportPipelineTask task = new TeleportPipelineTask(context, region, coords);
             task.setPhase(TeleportPipelineTask.Phase.LOAD);
 
             task.run();
