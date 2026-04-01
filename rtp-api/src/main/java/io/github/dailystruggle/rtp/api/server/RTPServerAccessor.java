@@ -55,6 +55,9 @@ public interface RTPServerAccessor {
 
   RTPPlayer getPlayer(String name);
 
+  @Nullable
+  RTPPlayer getConsolePlayer();
+
   RTPCommandSender getSender(UUID uuid);
 
   long overTime();

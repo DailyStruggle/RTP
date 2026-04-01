@@ -27,6 +27,9 @@ public class DynamicWorldConfigTest {
     @BeforeEach
     void setUp() {
         serverAccessor = mock(RTPServerAccessor.class);
+        io.github.dailystruggle.rtp.api.entity.RTPPlayer console = mock(io.github.dailystruggle.rtp.api.entity.RTPPlayer.class);
+        when(console.uuid()).thenReturn(RTP.serverId);
+        when(serverAccessor.getConsolePlayer()).thenReturn(console);
         scheduler = mock(RTPScheduler.class);
 
         RTP.serverAccessor = serverAccessor;

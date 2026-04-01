@@ -51,6 +51,7 @@ public class TeleportCancelTicketTest {
         RTP.serverAccessor = serverAccessor;
         when(serverAccessor.createTaskPipe()).thenReturn(mock(io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe.class));
         when(serverAccessor.getPluginDirectory()).thenReturn(new java.io.File("."));
+        when(serverAccessor.getChunkManager()).thenReturn(mock(io.github.dailystruggle.rtp.api.world.RTPChunkManager.class));
 
         rtp = new RTP();
         RTP.selectionAPI = new io.github.dailystruggle.rtp.common.selection.SelectionAPI();

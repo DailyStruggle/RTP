@@ -192,6 +192,7 @@ public class TeleportPipelineIntegrationTest {
 
             when(region.getLocation(context)).thenReturn(new GenerationResult(coords, 1L, chunkSet));
             when(regionChunkManager.getChunkSet(coords)).thenReturn(chunkSet);
+            when(rtpChunkManager.getChunkSet(coords)).thenReturn(chunkSet);
 
             TeleportPipelineTask task = new TeleportPipelineTask(context, region, coords);
             task.setPhase(TeleportPipelineTask.Phase.LOAD);

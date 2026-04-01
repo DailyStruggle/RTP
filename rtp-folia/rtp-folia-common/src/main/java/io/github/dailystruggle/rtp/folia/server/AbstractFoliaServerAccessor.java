@@ -153,6 +153,11 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
+  public @Nullable RTPPlayer getConsolePlayer() {
+    return getPlayer(RTPAPI.serverId);
+  }
+
+  @Override
   public @NotNull RTPCommandSender getSender(UUID uuid) {
     if (uuid.equals(RTPAPI.serverId)) return new FoliaRTPCommandSender(Bukkit.getConsoleSender());
     Player player = Bukkit.getPlayer(uuid);

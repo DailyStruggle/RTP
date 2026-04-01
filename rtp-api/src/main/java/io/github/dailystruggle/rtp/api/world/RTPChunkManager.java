@@ -23,4 +23,12 @@ public interface RTPChunkManager {
    * @return the chunk set, or null if it doesn't exist
    */
   ChunkSet getChunkSet(RTPWorld<?> world, int x, int z);
+
+  /**
+   * Get a chunk set at the specified coordinates
+   *
+   * @param coords the coordinates
+   * @return the chunk set, or null if it doesn't exist
+   */
+  ChunkSet getChunkSet(RTPCoords coords);
 }

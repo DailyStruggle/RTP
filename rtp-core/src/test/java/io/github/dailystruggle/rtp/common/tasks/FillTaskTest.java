@@ -21,11 +21,9 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -40,11 +38,12 @@ public class FillTaskTest {
     private Configs configs;
     private ConfigParser<PerformanceKeys> performance;
     private ConfigParser<SafetyKeys> safety;
+    private ConfigParser<io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys> messages;
     private RegionChunkManager chunkManager;
     private RegionQueueManager queueManager;
 
     @BeforeEach
-    void setUp() throws NoSuchFieldException, IllegalAccessException {
+    void setUp() throws Exception {
         region = mock(Region.class);
         settings = mock(RegionSettings.class);
         shape = mock(MemoryShape.class);
@@ -55,14 +54,15 @@ public class FillTaskTest {
         configs = mock(Configs.class);
         performance = mock(ConfigParser.class);
         safety = mock(ConfigParser.class);
-        chunkManager = mock(RegionChunkManager.class);
+        messages = mock(ConfigParser.class);
+        chunkManager = new RegionChunkManager(region);
         queueManager = new RegionQueueManager(region);
 
         when(region.getSettings()).thenReturn(settings);
         when(region.getShape()).thenReturn((Shape) shape);
         when(region.getVert()).thenReturn((VerticalAdjustor) vert);
         when(region.getWorld()).thenReturn(world);
-        when(region.name).thenReturn("testRegion");
+        region.name = "testRegion";
 
         // Set final field chunkManager and queueManager for testing
         Field cmField = Region.class.getDeclaredField("chunkManager");
@@ -88,30 +88,43 @@ public class FillTaskTest {
 
         WorldBorder border = mock(WorldBorder.class);
         when(serverAccessor.getWorldBorder(anyString())).thenReturn(border);
+        when(serverAccessor.getBiomes(any())).thenReturn(new java.util.HashSet<>());
+        when(serverAccessor.getPluginDirectory()).thenReturn(new java.io.File("target/test-data"));
         when(border.isInside()).thenReturn(loc -> true);
 
         when(configs.getParser(PerformanceKeys.class)).thenReturn(performance);
         when(configs.getParser(SafetyKeys.class)).thenReturn(safety);
-        doReturn(false).when(performance).getConfigValue(any(), any());
-        doReturn(false).when(safety).getConfigValue(eq(io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.biomeWhitelist), any());
-        doReturn(new java.util.ArrayList<String>()).when(safety).getConfigValue(eq(io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.biomes), any());
-        doReturn(new java.util.ArrayList<String>()).when(safety).getConfigValue(eq(io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.unsafeBlocks), any());
-        doReturn(0).when(safety).getNumber(any(), any());
+        when(configs.getParser(io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys.class)).thenReturn(messages);
+
+        // Minimal, robust stubbing to prevent NPEs in FillTask.run()
+        // Using thenAnswer to return the provided default value (second argument)
+        when(performance.getConfigValue(any(), any())).thenAnswer(inv -> inv.getArgument(1));
+        when(safety.getConfigValue(any(), any())).thenAnswer(inv -> inv.getArgument(1));
+        when(safety.getNumber(any(), any())).thenAnswer(inv -> inv.getArgument(1));
+        when(messages.getConfigValue(any(), any())).thenAnswer(inv -> inv.getArgument(1));
 
         when(shape.getRange()).thenReturn(1000.0);
         when(settings.spatialResolution()).thenReturn(1L);
 
-        // RTP singleton setup
-        RTP rtp = new RTP() {
-            {
-                serverAccessor = FillTaskTest.this.serverAccessor;
-                scheduler = FillTaskTest.this.scheduler;
-                configs = FillTaskTest.this.configs;
-            }
-        };
         RTP.serverAccessor = serverAccessor;
         RTP.scheduler = scheduler;
         RTP.configs = configs;
+
+        // Mock RTP instance instead of creating it to avoid initialization issues
+        RTP rtp = mock(RTP.class);
+
+        // Manually initialize fields used by FillTask
+        Field ftField = RTP.class.getDeclaredField("fillTasks");
+        ftField.setAccessible(true);
+        ftField.set(rtp, new java.util.concurrent.ConcurrentHashMap<String, FillTask>());
+
+        Field ltdField = RTP.class.getDeclaredField("latestTeleportData");
+        ltdField.setAccessible(true);
+        ltdField.set(rtp, new java.util.concurrent.ConcurrentHashMap<java.util.UUID, io.github.dailystruggle.rtp.common.playerData.TeleportData>());
+
+        Field ppField = RTP.class.getDeclaredField("processingPlayers");
+        ppField.setAccessible(true);
+        ppField.set(rtp, new java.util.concurrent.ConcurrentSkipListSet<java.util.UUID>());
 
         Field instanceField = RTP.class.getDeclaredField("instance");
         instanceField.setAccessible(true);
@@ -130,13 +143,7 @@ public class FillTaskTest {
         FillTask fillTask = new FillTask(region, 0);
 
         // Mock fillIncrement to a large value to try and fill more than cacheCap
-        try {
-            Field fiField = FillTask.class.getDeclaredField("fillIncrement");
-            fiField.setAccessible(true);
-            ((AtomicLong) fiField.get(fillTask)).set(100);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        FillTask.fillIncrement.set(100);
 
         // Run the task
         fillTask.run();
@@ -160,13 +167,7 @@ public class FillTaskTest {
         FillTask fillTask = new FillTask(region, 0);
 
         // Mock fillIncrement to a large value to try and fill more than activeChunkCap
-        try {
-            Field fiField = FillTask.class.getDeclaredField("fillIncrement");
-            fiField.setAccessible(true);
-            ((AtomicLong) fiField.get(fillTask)).set(100);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        FillTask.fillIncrement.set(100);
 
         // Run the task
         fillTask.run();
