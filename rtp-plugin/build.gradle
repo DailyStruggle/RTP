@@ -58,3 +58,5 @@ shadowJar {
 artifacts {
     archives shadowJar
 }
+
+assemble.dependsOn shadowJar

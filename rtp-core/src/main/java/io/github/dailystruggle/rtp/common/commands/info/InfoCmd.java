@@ -114,6 +114,8 @@ public class InfoCmd extends BaseRTPCmdImpl {
   @Override
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
+    if (nextCommand != null) return nextCommand.onCommand(callerId, parameterValues, null);
+
     ConfigParser<MessagesKeys> lang =
         (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
 

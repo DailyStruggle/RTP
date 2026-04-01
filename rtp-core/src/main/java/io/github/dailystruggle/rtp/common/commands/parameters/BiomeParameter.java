@@ -26,7 +26,7 @@ public class BiomeParameter extends CommandParameter {
   // todo: store and update
   @Override
   public Set<String> values() {
-    return RTP.selectionAPI.regionNames();
+    return RTP.serverAccessor.getBiomes();
   }
 
   @Override

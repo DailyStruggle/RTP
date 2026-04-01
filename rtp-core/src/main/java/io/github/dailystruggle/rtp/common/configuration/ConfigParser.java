@@ -209,18 +209,16 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     // todo: apply translation to loads and saves
     try {
       loadLangFile(langFile);
-    } catch (IOException e) {
+    } catch (IOException | IllegalArgumentException e) {
       RTP.log(Level.WARNING, e.getMessage(), e);
-      return;
     }
 
     File f = new File(pluginDirectory + File.separator + this.name);
     if (!f.exists()) {
       try {
         saveResource(this.name, true);
-      } catch (IOException e) {
+      } catch (IOException | IllegalArgumentException e) {
         RTP.log(Level.WARNING, e.getMessage(), e);
-        return;
       }
     }
     //        loadResource( f );
@@ -228,6 +226,11 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     cachedLookup = fileDatabase.cachedLookup;
     if (cachedLookup.get() == null || !cachedLookup.get().containsKey(name)) fileDatabase.connect();
     YamlFile yamlFile = cachedLookup.get().get(name);
+
+    if (yamlFile == null) {
+      data.clear();
+      return;
+    }
 
     String versionStr = yamlFile.getMapValues(false).getOrDefault("version", "1.0").toString();
 
@@ -252,7 +255,11 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     }
 
     if (update) {
-      update();
+      try {
+        update();
+      } catch (Exception e) {
+        RTP.log(Level.WARNING, e.getMessage(), e);
+      }
       f = new File(pluginDirectory, this.name);
       //            loadResource( f );
     }

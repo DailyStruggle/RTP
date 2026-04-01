@@ -1,0 +1,11 @@
+safetyRadius: safetyRadius
+biomeWhitelist: biomeWhitelist
+airBlocks: airBlocks
+biomes: biomes
+unsafeBlocks: unsafeBlocks
+platformRadius: platformRadius
+platformAirHeight: platformAirHeight
+platformMaterial: platformMaterial
+invulnerabilityTime: invulnerabilityTime
+version: version
+platformDepth: platformDepth

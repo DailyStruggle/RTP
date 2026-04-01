@@ -1,5 +1,5 @@
 name: RTP_Domain
-version: '${project.version}'
+version: '${version}'
 main: io.io.github.dailystruggle.rtp_domain.RTP_Domain
 api-version: 1.17
 authors: [ leaf26 ]

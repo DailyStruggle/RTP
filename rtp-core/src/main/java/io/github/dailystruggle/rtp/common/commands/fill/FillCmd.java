@@ -39,15 +39,8 @@ public class FillCmd extends BaseRTPCmdImpl {
   @Override
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
-    if (nextCommand != null) {
-      if (parameterValues != null && !parameterValues.isEmpty()) {
-        nextCommand.onCommand(callerId, parameterValues, null);
-        return false;
-      }
-      return true;
-    }
+    if (nextCommand != null) return nextCommand.onCommand(callerId, parameterValues, null);
 
-    fillResumeCmd.onCommand(callerId, parameterValues, nextCommand);
-    return false;
+    return fillResumeCmd.onCommand(callerId, parameterValues, null);
   }
 }

@@ -34,6 +34,7 @@ public interface RTPCmd extends BaseRTPCmd {
   // synchronous command component
   default boolean onCommand(
       RTPCommandSender sender, CommandsAPICommand command, String label, String[] args) {
+    RTP.log(Level.INFO, "[DEBUG_LOG] RTPCmd.onCommand called for sender: " + sender.name() + ", label: " + label + ", args: " + java.util.Arrays.toString(args));
     UUID senderId = sender.uuid();
 
     if (RTP.reloading.get()) {
@@ -43,7 +44,9 @@ public interface RTPCmd extends BaseRTPCmd {
 
     for (String arg : args) {
       if (!arg.contains(String.valueOf(CommandsAPI.parameterDelimiter))) {
-        onCommand(senderId, sender::hasPermission, sender::sendMessage, args);
+        RTP.log(Level.INFO, "[DEBUG_LOG] RTPCmd.onCommand - arg '" + arg + "' is likely a subcommand. Calling library onCommand.");
+        java.util.concurrent.CompletableFuture<Boolean> future = onCommand(senderId, sender::hasPermission, sender::sendMessage, args);
+        future.thenAccept(result -> RTP.log(Level.INFO, "[DEBUG_LOG] RTPCmd.onCommand - library onCommand returned: " + result));
         return true;
       }
     }
@@ -105,8 +108,9 @@ public interface RTPCmd extends BaseRTPCmd {
   // async command component
   default boolean compute(
       UUID senderId, Map<String, List<String>> rtpArgs, CommandsAPICommand nextCommand) {
+    RTP.log(Level.INFO, "[DEBUG_LOG] RTPCmd.compute called for senderId: " + senderId + ", nextCommand: " + (nextCommand != null ? nextCommand.getClass().getName() : "null") + ", rtpArgs: " + rtpArgs);
     if (nextCommand != null) {
-      return true;
+      return nextCommand.onCommand(senderId, rtpArgs, null);
     }
 
     RTPCommandSender sender = RTP.serverAccessor.getSender(senderId);
@@ -259,7 +263,8 @@ public interface RTPCmd extends BaseRTPCmd {
         ConfigParser<WorldKeys> worldParser = RTP.configs.getWorldParser(worldName);
 
         if (worldParser == null) {
-          // todo: message world not exist
+          String msg = (String) langParser.getConfigValue(MessagesKeys.badArg, "world:" + worldName);
+          RTP.serverAccessor.sendMessage(senderId, msg, "TP");
           RTP.getInstance().processingPlayers.remove(senderId);
           return true;
         }
@@ -273,13 +278,21 @@ public interface RTPCmd extends BaseRTPCmd {
       try {
         region = selectionAPI.getRegionOrDefault(regionName);
       } catch (IllegalArgumentException | IllegalStateException exception) {
+        String msg = (String) langParser.getConfigValue(MessagesKeys.badArg, "region:" + regionName);
+        RTP.serverAccessor.sendMessage(senderId, msg, "TP");
         RTP.getInstance().processingPlayers.remove(senderId);
         RTP.getInstance().latestTeleportData.remove(senderId);
         return true;
       }
 
       RTPWorld rtpWorld = region.getWorld();
-      Objects.requireNonNull(rtpWorld);
+      if (rtpWorld == null) {
+        String msg = (String) langParser.getConfigValue(MessagesKeys.badArg, "region:" + regionName);
+        RTP.serverAccessor.sendMessage(senderId, msg, "TP");
+        RTP.getInstance().processingPlayers.remove(senderId);
+        RTP.getInstance().latestTeleportData.remove(senderId);
+        return true;
+      }
 
       // check for wbo
       boolean doWBO = false;

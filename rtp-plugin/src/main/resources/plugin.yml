@@ -1,5 +1,5 @@
 name: RTP
-version: '${project.version}'
+version: '${version}'
 main: io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin
 api-version: 1.13
 authors: [ leaf26 ]

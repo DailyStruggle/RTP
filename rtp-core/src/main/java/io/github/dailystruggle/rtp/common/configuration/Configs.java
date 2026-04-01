@@ -44,10 +44,11 @@ public class Configs {
    * @param pluginDirectory the plugin directory
    */
   public Configs(File pluginDirectory) {
+    RTP.configs = this;
     this.pluginDirectory = pluginDirectory;
-    RTP.getInstance().startupTasks.add(new RTPRunnable(this::reloadAction, 5));
     this.fileDatabase = new YamlFileDatabase(pluginDirectory);
     this.fileDatabase.connect();
+    reloadAction();
     //        this.fileDatabase.disconnect( connect );
   }
 
@@ -254,6 +255,9 @@ public class Configs {
       worlds.addParser(world.name());
     }
 
+    this.configParserMap = newConfigParserMap;
+    this.multiConfigParserMap = newMultiConfigParserMap;
+
     boolean detailed_region_init = true;
     if (logging != null) {
       Object o = logging.getConfigValue(LoggingKeys.detailed_region_init, false);
@@ -286,8 +290,6 @@ public class Configs {
                   },
                   60));
     }
-    this.configParserMap = newConfigParserMap;
-    this.multiConfigParserMap = newMultiConfigParserMap;
     if (!onReload.isEmpty()) onReload.forEach(Runnable::run);
   }
 }

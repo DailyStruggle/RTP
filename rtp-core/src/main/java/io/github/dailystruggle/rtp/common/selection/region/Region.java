@@ -50,7 +50,7 @@ public class Region extends FactoryValue<RegionKeys> {
     this.miscPipeline = (RTPTaskPipe) RTP.serverAccessor.createTaskPipe();
 
     Shape<?> shape = settings.shape();
-    shape.spatialResolution = settings.spatialResolution();
+    if (shape != null) shape.spatialResolution = settings.spatialResolution();
 
     if (shape instanceof MemoryShape<?>) {
       long[] progress = FillTask.loadProgress(name);
@@ -81,7 +81,7 @@ public class Region extends FactoryValue<RegionKeys> {
   public void setSettings(RegionSettings settings) {
     this.settings = settings;
     this.set(RegionKeys.spatialResolution, settings.spatialResolution());
-    settings.shape().spatialResolution = settings.spatialResolution();
+    if (settings.shape() != null) settings.shape().spatialResolution = settings.spatialResolution();
     long cacheCap = settings.cacheCap();
     long playerQueueSize = queueManager.playerQueue.size();
     long totalCap = Math.max(cacheCap, playerQueueSize);
