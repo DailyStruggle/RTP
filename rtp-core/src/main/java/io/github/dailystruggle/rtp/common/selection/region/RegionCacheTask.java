@@ -26,12 +26,14 @@ public class RegionCacheTask extends RTPRunnable {
     private final long selectRadius;
 
     public RegionCacheTask(Region region) {
+        super(600000L);
         this.region = region;
         this.playerId = null;
         this.selectRadius = ((ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class)).getNumber(PerformanceKeys.viewDistanceSelect, 0L).longValue();
     }
 
     public RegionCacheTask(Region region, UUID playerId) {
+        super(600000L);
         this.region = region;
         this.playerId = playerId;
         this.selectRadius = ((ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class)).getNumber(PerformanceKeys.viewDistanceSelect, 0L).longValue();
@@ -52,7 +54,7 @@ public class RegionCacheTask extends RTPRunnable {
 
         if (isCancelled()) return;
         region.inFlightCalculations.incrementAndGet();
-        CompletableFuture.supplyAsync(() -> LocationGenerator.getLocation(region, (java.util.Set<String>) null), RTP.getInstance().miscAsyncTasks::add)
+        CompletableFuture.supplyAsync(() -> LocationGenerator.getLocation(region, (java.util.Set<String>) null), this.region.miscPipeline::add)
                 .thenAccept(res -> {
                     if (res != null) {
                         if (isCancelled()) {

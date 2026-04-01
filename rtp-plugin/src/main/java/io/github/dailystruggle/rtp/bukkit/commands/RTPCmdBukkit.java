@@ -24,7 +24,6 @@ import java.util.concurrent.Semaphore;
 import java.util.function.Predicate;
 import java.util.logging.Level;
 import org.bukkit.Bukkit;
-import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
