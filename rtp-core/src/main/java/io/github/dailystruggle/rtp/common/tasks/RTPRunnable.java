@@ -20,28 +20,29 @@ public class RTPRunnable implements Runnable, RTPCancellable, RTPDelayable {
   private Runnable runnable;
 
   public RTPRunnable() {
-    io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(
-        this, this.getClass().getSimpleName(), 300000L);
-    runnable = null;
+    this(300000L);
   }
 
   public RTPRunnable(Runnable runnable) {
-    io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(
-        this, this.getClass().getSimpleName(), 300000L);
+    this(300000L);
     this.runnable = runnable;
   }
 
   public RTPRunnable(Runnable runnable, long delay) {
-    io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(
-        this, this.getClass().getSimpleName(), 300000L);
+    this(300000L);
     this.runnable = runnable;
     this.delay = delay;
   }
 
   public RTPRunnable(int delay) {
-    io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(
-        this, this.getClass().getSimpleName(), 300000L);
+    this(300000L);
     this.delay = delay;
+  }
+
+  protected RTPRunnable(long maxLifespan) {
+    io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(
+        this, this.getClass().getSimpleName(), maxLifespan);
+    runnable = null;
   }
 
   @Override

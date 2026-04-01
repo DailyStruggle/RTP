@@ -173,6 +173,9 @@ public class RTP {
         },
         60,
         60);
+
+    scheduler.runTaskTimer(() -> miscSyncTasks.execute(TimeUnit.MILLISECONDS.toNanos(1)), 1, 1);
+    scheduler.runTaskTimerAsynchronously(() -> miscAsyncTasks.execute(TimeUnit.MILLISECONDS.toNanos(1)), 1, 1);
   }
 
   public static void handleMigration(String previousState, String currentState) {

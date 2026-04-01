@@ -19,20 +19,27 @@ public class RTPRunnable implements Runnable, RTPCancellable, RTPDelayable {
   private Runnable runnable;
 
   public RTPRunnable() {
-    runnable = null;
+    this(300000L);
   }
 
   public RTPRunnable(Runnable runnable) {
+    this(300000L);
     this.runnable = runnable;
   }
 
   public RTPRunnable(Runnable runnable, long delay) {
+    this(300000L);
     this.runnable = runnable;
     this.delay = delay;
   }
 
   public RTPRunnable(int delay) {
+    this(300000L);
     this.delay = (long) delay;
+  }
+
+  protected RTPRunnable(long maxLifespan) {
+    runnable = null;
   }
 
   @Override
