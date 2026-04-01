@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.tasks.teleport;
 
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.selection.GenerationContext;
+import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
@@ -10,8 +11,10 @@ import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.selection.region.CachedLocation;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.selection.region.RegionChunkManager;
 import io.github.dailystruggle.rtp.common.selection.region.RegionQueueManager;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.RepeatedTest;
 
@@ -20,7 +23,6 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
 public class TeleportPipelineConcurrencyTest {
@@ -38,13 +40,34 @@ public class TeleportPipelineConcurrencyTest {
 
         RTP.scheduler = mockScheduler;
         RTP.serverAccessor = mockServerAccessor;
-
         RTP.selectionAPI = new io.github.dailystruggle.rtp.common.selection.SelectionAPI();
         rtp = new RTP();
         mockRegion = mock(Region.class);
 
-        // Mock region settings and methods needed by TeleportPipelineTask
         when(mockRegion.getShape()).thenReturn(mock(Shape.class));
+
+        // Inject dependencies into mockRegion to prevent NPEs during task.run()
+        RegionChunkManager mockChunkManager = mock(RegionChunkManager.class);
+        ChunkSet mockChunkSet = new ChunkSet(Collections.emptyList(), CompletableFuture.completedFuture(true));
+        when(mockChunkManager.getChunkSet(any())).thenReturn(mockChunkSet);
+
+        try {
+            java.lang.reflect.Field field = Region.class.getDeclaredField("chunkManager");
+            field.setAccessible(true);
+            field.set(mockRegion, mockChunkManager);
+
+            java.lang.reflect.Field ifcField = Region.class.getDeclaredField("inFlightCalculations");
+            ifcField.setAccessible(true);
+            ifcField.set(mockRegion, new AtomicInteger(0));
+        } catch (Exception ignored) {}
+
+        // Progress the pipeline state automatically to prevent thread hangs
+        doAnswer(invocation -> {
+            TeleportPipelineTask task = invocation.getArgument(1);
+            task.setPhase(TeleportPipelineTask.Phase.CLEANUP);
+            task.run();
+            return null;
+        }).when(mockScheduler).scheduleTeleport(any(), any(), anyLong());
     }
 
     @RepeatedTest(50)
@@ -56,11 +79,7 @@ public class TeleportPipelineConcurrencyTest {
         CountDownLatch doneLatch = new CountDownLatch(playerCount);
 
         RegionQueueManager queueManager = new RegionQueueManager(mockRegion);
-        // We can't set mockRegion.queueManager because it's final,
-        // but we can make it so that anything using mockRegion uses this queueManager if we mock the right things.
-        // Actually, for this test we are using queueManager directly in our worker threads.
 
-        // Pre-populate queue with 100 unique locations
         List<RTPCoords> expectedCoords = new ArrayList<>();
         for (int i = 0; i < playerCount; i++) {
             RTPCoords coords = new RTPCoords("world", i, 64, i);
@@ -91,16 +110,15 @@ public class TeleportPipelineConcurrencyTest {
             executor.submit(() -> {
                 try {
                     startLatch.await();
-
                     GenerationContext context = new GenerationContext(player, player, null);
-
                     CompletableFuture<CachedLocation> pollFuture = queueManager.poll(player.uuid());
+
                     if (pollFuture != null) {
                         CachedLocation loc = pollFuture.get();
                         if (loc != null) {
                             assignedCoords.put(player.uuid(), loc.getCoords());
-                            // Simulate task instantiation
-                            new TeleportPipelineTask(context, mockRegion, loc.getCoords());
+                            TeleportPipelineTask task = new TeleportPipelineTask(context, mockRegion, loc.getCoords());
+                            task.run(); // Execute the pipeline
                         } else {
                             failures.incrementAndGet();
                         }
@@ -119,9 +137,9 @@ public class TeleportPipelineConcurrencyTest {
         doneLatch.await(10, TimeUnit.SECONDS);
         executor.shutdownNow();
 
-        assertEquals(0, failures.get(), "There were failures during concurrent polling");
-        assertEquals(playerCount, assignedCoords.size(), "Not all players were assigned a coordinate");
-        assertEquals(new HashSet<>(expectedCoords), new HashSet<>(assignedCoords.values()), "Assigned coordinates are not unique or don't match expected");
-        assertEquals(0, queueManager.locationQueue.size(), "Queue was not fully emptied");
+        Assertions.assertEquals(0, failures.get(), "There were failures during concurrent polling");
+        Assertions.assertEquals(playerCount, assignedCoords.size(), "Not all players were assigned a coordinate");
+        Assertions.assertEquals(new HashSet<>(expectedCoords), new HashSet<>(assignedCoords.values()), "Assigned coordinates are not unique");
+        Assertions.assertEquals(0, queueManager.locationQueue.size(), "Queue was not fully emptied");
     }
 }
