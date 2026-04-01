@@ -65,7 +65,7 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
             (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
     String updateMsg = String.valueOf(lang.getConfigValue(MessagesKeys.updating, ""));
     if (updateMsg != null) updateMsg = updateMsg.replace("[filename]", factoryValue.name);
-    RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, updateMsg);
+    RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, updateMsg, "CFG");
 
     RTP.scheduler.runTaskAsynchronously(() -> {
       if (factoryValue instanceof ConfigParser) {
@@ -156,7 +156,10 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
               (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
           if (factory == null) continue;
           Shape<?> shape = (Shape<?>) factory.get(value.toString());
-          if (shape == null) msgBadParameter(callerId, key, value.toString());
+          if (shape == null) {
+            msgBadParameter(callerId, key, value.toString(), "CFG");
+            continue;
+          }
 
           EnumMap<?, Object> data = shape.getData();
 
@@ -199,7 +202,10 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
               (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
           if (factory == null) continue;
           VerticalAdjustor<?> vert = (VerticalAdjustor<?>) factory.get(value.toString());
-          if (vert == null) msgBadParameter(callerId, key, value.toString());
+          if (vert == null) {
+            msgBadParameter(callerId, key, value.toString(), "CFG");
+            continue;
+          }
 
           EnumMap<? extends Enum<?>, Object> vertData = vert.getData();
 
@@ -250,7 +256,7 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
 
       String updatedMsg = String.valueOf(lang.getConfigValue(MessagesKeys.updated, ""));
       if (updatedMsg != null) updatedMsg = updatedMsg.replace("[filename]", configParser.name);
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, updatedMsg);
+      RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, updatedMsg, "CFG");
     } else if (factoryValue instanceof MultiConfigParser) {
       MultiConfigParser<?> parser = (MultiConfigParser<?>) this.factoryValue;
       List<String> remove = parameterValues.getOrDefault("remove", new ArrayList<>());

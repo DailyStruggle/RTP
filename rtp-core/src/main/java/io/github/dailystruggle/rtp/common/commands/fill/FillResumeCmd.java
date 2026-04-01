@@ -52,7 +52,7 @@ public class FillResumeCmd extends FillSubCmd {
       String msg = String.valueOf(parser.getConfigValue(MessagesKeys.fillResume, ""));
       if (msg == null || msg.isEmpty()) continue;
       msg = msg.replace("[region]", region.name);
-      RTP.serverAccessor.announce(msg, "rtp.fill");
+      RTP.serverAccessor.announce(msg, "rtp.fill", "FILL");
     }
     return true;
   }

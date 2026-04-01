@@ -30,7 +30,7 @@ public class RegionConfigLoaderTest {
         rtpMockedStatic = mockStatic(RTP.class);
         mockConfigs = mock(Configs.class);
         mockLoggingParser = mock(ConfigParser.class);
-        
+
         RTP.configs = mockConfigs;
         when(mockConfigs.getParser(LoggingKeys.class)).thenReturn(mockLoggingParser);
         // Default logging value

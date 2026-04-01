@@ -4,6 +4,9 @@ import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams;
+import jdk.incubator.vector.IntVector;
+import jdk.incubator.vector.VectorMask;
+import jdk.incubator.vector.VectorOperators;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
@@ -76,6 +79,50 @@ public class Rectangle extends MemoryShape<RectangleParams> {
   }
 
   @Override
+  public boolean contains(int x, int z) {
+    long cx = getNumber(RectangleParams.centerX, 0L).longValue() >> 4;
+    long cz = getNumber(RectangleParams.centerZ, 0L).longValue() >> 4;
+    long width = getNumber(RectangleParams.width, 256L).longValue() >> 4;
+    long height = getNumber(RectangleParams.height, 256L).longValue() >> 4;
+    long degrees = getNumber(RectangleParams.rotation, 0L).longValue();
+
+    if (degrees == 0) {
+      return Math.abs(x - cx) <= width / 2 && Math.abs(z - cz) <= height / 2;
+    }
+
+    // shift point back to origin:
+    int dx = (int) (x - cx);
+    int dz = (int) (z - cz);
+
+    int[] input = new int[] {dx, dz};
+    input = rotate(input, -degrees);
+
+    return Math.abs(input[0]) <= width / 2 && Math.abs(input[1]) <= height / 2;
+  }
+
+  @Override
+  public VectorMask<Integer> contains(IntVector xVec, IntVector zVec, VectorMask<Integer> mask) {
+    long cx = getNumber(RectangleParams.centerX, 0L).longValue() >> 4;
+    long cz = getNumber(RectangleParams.centerZ, 0L).longValue() >> 4;
+    long width = getNumber(RectangleParams.width, 256L).longValue() >> 4;
+    long height = getNumber(RectangleParams.height, 256L).longValue() >> 4;
+    long degrees = getNumber(RectangleParams.rotation, 0L).longValue();
+
+    if (degrees == 0) {
+      IntVector cxVec = IntVector.broadcast(xVec.species(), (int) cx);
+      IntVector czVec = IntVector.broadcast(xVec.species(), (int) cz);
+      IntVector dx = xVec.sub(cxVec).abs();
+      IntVector dz = zVec.sub(czVec).abs();
+      return dx.compare(VectorOperators.LE, (int) (width / 2))
+              .and(dz.compare(VectorOperators.LE, (int) (height / 2)))
+              .and(mask);
+    }
+
+    // Fallback to default MemoryShape implementation for rotated rectangles (SIMD rotation is complex)
+    return super.contains(xVec, zVec, mask);
+  }
+
+  @Override
   public long xzToLocation(MutableRTPCoords coords) {
     long degrees = getNumber(RectangleParams.rotation, 0L).longValue();
     long cx = getNumber(RectangleParams.centerX, 0L).longValue();
@@ -130,6 +177,7 @@ public class Rectangle extends MemoryShape<RectangleParams> {
 
   @Override
   public long rand() {
+    flushAndRebuild(spatialResolution);
     String mode = data.getOrDefault(RectangleParams.mode, "ACCUMULATE").toString();
 
     double range = getRange();
@@ -138,7 +186,6 @@ public class Rectangle extends MemoryShape<RectangleParams> {
 
     long location;
     if (mode.equalsIgnoreCase("ACCUMULATE")) {
-      flushAndRebuild();
       long target = (long) res;
       int index = java.util.Arrays.binarySearch(badPrefixSumsCache, target);
       if (index < 0) index = -index - 1;

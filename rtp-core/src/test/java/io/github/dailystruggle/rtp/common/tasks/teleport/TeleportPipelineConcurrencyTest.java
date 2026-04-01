@@ -8,16 +8,12 @@ import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
-import io.github.dailystruggle.rtp.common.configuration.Configs;
-import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.CachedLocation;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionQueueManager;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.RepeatedTest;
-import org.mockito.MockedStatic;
-import org.mockito.Mockito;
 
 import java.io.File;
 import java.util.*;
@@ -25,7 +21,6 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 public class TeleportPipelineConcurrencyTest {
@@ -46,7 +41,7 @@ public class TeleportPipelineConcurrencyTest {
 
         rtp = new RTP();
         mockRegion = mock(Region.class);
-        
+
         // Mock region settings and methods needed by TeleportPipelineTask
         when(mockRegion.getShape()).thenReturn(mock(Shape.class));
     }
@@ -58,12 +53,12 @@ public class TeleportPipelineConcurrencyTest {
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
         CountDownLatch startLatch = new CountDownLatch(1);
         CountDownLatch doneLatch = new CountDownLatch(playerCount);
-        
+
         RegionQueueManager queueManager = new RegionQueueManager(mockRegion);
-        // We can't set mockRegion.queueManager because it's final, 
+        // We can't set mockRegion.queueManager because it's final,
         // but we can make it so that anything using mockRegion uses this queueManager if we mock the right things.
         // Actually, for this test we are using queueManager directly in our worker threads.
-        
+
         // Pre-populate queue with 100 unique locations
         List<RTPCoords> expectedCoords = new ArrayList<>();
         for (int i = 0; i < playerCount; i++) {
@@ -93,9 +88,9 @@ public class TeleportPipelineConcurrencyTest {
             executor.submit(() -> {
                 try {
                     startLatch.await();
-                    
+
                     GenerationContext context = new GenerationContext(player, player, null);
-                    
+
                     CompletableFuture<CachedLocation> pollFuture = queueManager.poll(player.uuid());
                     if (pollFuture != null) {
                         CachedLocation loc = pollFuture.get();

@@ -4,6 +4,7 @@ import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.selection.GenerationContext;
+import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
@@ -11,8 +12,8 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
-import io.github.dailystruggle.rtp.common.selection.region.ChunkSet;
 import io.github.dailystruggle.rtp.common.selection.region.GenerationResult;
+import io.github.dailystruggle.rtp.common.tools.SupportLogger;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import java.util.ArrayList;
@@ -177,7 +178,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
       if (coords == null) {
         teleportData.attempts = attempts;
-        RTP.serverAccessor.sendMessage(sender().uuid(), player.uuid(), ConfigCache.unsafe);
+        RTP.serverAccessor.sendMessage(sender().uuid(), player.uuid(), ConfigCache.unsafe, "TP");
         region.inFlightCalculations.decrementAndGet();
         RTPTeleportCancel.refund(player.uuid());
         return;
@@ -187,7 +188,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
       teleportData.attempts = attempts;
       success = true;
     } catch (Exception e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
+      SupportLogger.logException(Level.WARNING, "Error in runSetup", e);
       region.inFlightCalculations.decrementAndGet();
       new RTPTeleportCancel(player.uuid()).run();
     } finally {
@@ -219,66 +220,77 @@ public final class TeleportPipelineTask extends RTPRunnable {
       return;
     }
 
-    if (teleportData == null) {
-      RTPPlayer player = context.player();
-      if (player == null) {
+    try {
+      if (teleportData == null) {
+        RTPPlayer player = context.player();
+        if (player == null) {
+          if (region != null) region.inFlightCalculations.decrementAndGet();
+          return;
+        }
+        UUID playerId = player.uuid();
+        teleportData = RTP.getInstance().latestTeleportData.get(playerId);
+        if (teleportData == null) {
+          teleportData = new TeleportData();
+          io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(teleportData, "TeleportData-" + playerId.toString(), 120000L);
+          teleportData.sender = (context.sender() != null) ? context.sender() : player;
+          teleportData.completed = false;
+          teleportData.time = System.currentTimeMillis();
+          teleportData.delay = teleportData.sender.delay();
+          teleportData.targetRegion = region;
+          teleportData.originalCoords =
+              new RTPCoords(
+                  player.getLocation().world().name(),
+                  player.getLocation().x(),
+                  player.getLocation().y(),
+                  player.getLocation().z());
+          RTP.getInstance().latestTeleportData.put(playerId, teleportData);
+        }
+        teleportData.nextTask = this;
+        teleportData.targetRegion = region;
+        teleportData.selectedCoords = coords;
+      }
+
+      if (region == null || coords == null) {
         if (region != null) region.inFlightCalculations.decrementAndGet();
         return;
       }
-      UUID playerId = player.uuid();
-      teleportData = RTP.getInstance().latestTeleportData.get(playerId);
-      if (teleportData == null) {
-        teleportData = new TeleportData();
-        io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(teleportData, "TeleportData-" + playerId.toString(), 120000L);
-        teleportData.sender = (context.sender() != null) ? context.sender() : player;
-        teleportData.completed = false;
-        teleportData.time = System.currentTimeMillis();
-        teleportData.delay = teleportData.sender.delay();
-        teleportData.targetRegion = region;
-        teleportData.originalCoords =
-            new RTPCoords(
-                player.getLocation().world().name(),
-                player.getLocation().x(),
-                player.getLocation().y(),
-                player.getLocation().z());
-        RTP.getInstance().latestTeleportData.put(playerId, teleportData);
+
+      ChunkSet chunkSet = this.region.chunkManager.getChunkSet(coords);
+      if (chunkSet == null) {
+        currentPhase = Phase.TELEPORT;
+        RTP.scheduler.runTask(this);
+        return;
       }
-      teleportData.nextTask = this;
-      teleportData.targetRegion = region;
-      teleportData.selectedCoords = coords;
-    }
 
-    if (region == null || coords == null) {
+      chunkSet.complete.whenComplete(
+          (aBoolean, throwable) -> {
+            if (throwable != null) {
+              SupportLogger.logException(Level.SEVERE, "Error in runLoad", throwable);
+              region.inFlightCalculations.decrementAndGet();
+              return;
+            }
+
+            if (isCancelled()) {
+              region.inFlightCalculations.decrementAndGet();
+              return;
+            }
+
+            long start = System.currentTimeMillis();
+            long lastTime = teleportData.time;
+            long delay = sender().delay();
+            long dT = (start - lastTime);
+            long remainingTime = delay - dT;
+            long toTicks = remainingTime / 50;
+            if (toTicks < 0) toTicks = 0;
+
+            loadPostActions.forEach(consumer -> consumer.accept(this));
+            currentPhase = Phase.TELEPORT;
+            RTP.scheduler.scheduleTeleport(player(), this, toTicks);
+          });
+    } catch (Exception e) {
+      SupportLogger.logException(Level.SEVERE, "Error in runLoad", e);
       if (region != null) region.inFlightCalculations.decrementAndGet();
-      return;
     }
-
-    ChunkSet chunkSet = this.region.chunkManager.getChunkSet(coords);
-    if (chunkSet == null) {
-      currentPhase = Phase.TELEPORT;
-      RTP.scheduler.runTask(this);
-      return;
-    }
-
-    chunkSet.complete.thenRun(
-        () -> {
-          if (isCancelled()) {
-            region.inFlightCalculations.decrementAndGet();
-            return;
-          }
-
-          long start = System.currentTimeMillis();
-          long lastTime = teleportData.time;
-          long delay = sender().delay();
-          long dT = (start - lastTime);
-          long remainingTime = delay - dT;
-          long toTicks = remainingTime / 50;
-          if (toTicks < 0) toTicks = 0;
-
-          loadPostActions.forEach(consumer -> consumer.accept(this));
-          currentPhase = Phase.TELEPORT;
-          RTP.scheduler.scheduleTeleport(player(), this, toTicks);
-        });
   }
 
   private void runTeleport() {
@@ -315,9 +327,9 @@ public final class TeleportPipelineTask extends RTPRunnable {
       setLocation.whenComplete(
           (aBoolean, throwable) -> {
             if (aBoolean != null && aBoolean) {
-              RTP.serverAccessor.sendMessage(playerId, ConfigCache.teleportMessage);
+              RTP.serverAccessor.sendMessage(playerId, ConfigCache.teleportMessage, "TP");
             } else {
-              RTP.serverAccessor.sendMessage(playerId, ConfigCache.unsafe);
+              RTP.serverAccessor.sendMessage(playerId, ConfigCache.unsafe, "TP");
             }
 
             currentPhase = Phase.CLEANUP;
@@ -326,7 +338,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
       teleportPostActions.forEach(consumer -> consumer.accept(this));
     } catch (Exception e) {
-      RTP.log(Level.SEVERE, "Error in runTeleport", e);
+      SupportLogger.logException(Level.SEVERE, "Error in runTeleport", e);
       currentPhase = Phase.CLEANUP;
       RTP.scheduler.runTask(this);
     }
@@ -335,6 +347,10 @@ public final class TeleportPipelineTask extends RTPRunnable {
   private void runCleanup() {
     cleanupPreActions.forEach(consumer -> consumer.accept(this));
     try {
+      if (player() != null) {
+        RTP.getInstance().latestTeleportData.remove(player().uuid());
+        RTP.getInstance().invulnerablePlayers.remove(player().uuid());
+      }
       if (region == null || coords == null) return;
       ChunkSet chunkSet = region.chunkManager.getChunkSet(coords);
       if (chunkSet == null) return;

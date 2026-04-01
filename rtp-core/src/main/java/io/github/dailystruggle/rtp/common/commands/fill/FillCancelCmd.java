@@ -7,7 +7,6 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.tasks.FillTask;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,21 +44,19 @@ public class FillCancelCmd extends FillSubCmd {
         String msg = String.valueOf(parser.getConfigValue(MessagesKeys.fillNotRunning, ""));
         if (msg == null || msg.isEmpty()) continue;
         msg = msg.replace("[region]", region.name);
-        RTP.serverAccessor.announce(msg, "rtp.fill");
+        RTP.serverAccessor.announce(msg, "rtp.fill", "FILL");
         continue;
       }
 
       fillTask.setCancelled(true);
-      fillTask.pause.set(true);
-      MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
-      shape.fillIter.set(0L);
-      shape.save(region.name, region.getWorld().name());
+      fillTask.pause();
+      FillTask.delete(region.name);
       RTP.getInstance().fillTasks.remove(region.name);
       if (parser == null) continue;
       String msg = String.valueOf(parser.getConfigValue(MessagesKeys.fillCancel, ""));
       if (msg == null || msg.isEmpty()) continue;
       msg = msg.replace("[region]", region.name);
-      RTP.serverAccessor.announce(msg, "rtp.fill");
+      RTP.serverAccessor.announce(msg, "rtp.fill", "FILL");
     }
 
     return true;

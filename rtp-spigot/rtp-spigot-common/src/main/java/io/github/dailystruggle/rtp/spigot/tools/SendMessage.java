@@ -1,10 +1,9 @@
-package io.github.dailystruggle.rtp.bukkit.tools;
+package io.github.dailystruggle.rtp.spigot.tools;
 
-import io.github.dailystruggle.commandsapi.common.CommandsAPI;
+import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
-import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
-import io.github.dailystruggle.rtp.bukkit.tools.softdepends.PAPIChecker;
+import io.github.dailystruggle.rtp.spigot.tools.softdepends.PAPIChecker;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
@@ -35,7 +34,6 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
-import xyz.tozymc.spigot.api.title.TitleApi;
 
 public class SendMessage {
   public static final Map<String, Function<UUID, String>> placeholders = new ConcurrentHashMap<>();
@@ -45,13 +43,11 @@ public class SendMessage {
   private static ConfigParser<MessagesKeys> lang = null;
 
   static {
-    Bukkit.getScheduler()
-        .runTaskLater(
-            RTPBukkitPlugin.getInstance(),
-            () -> {
-              lang = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-            },
-            2);
+    RTP.scheduler.runTaskLater(
+        () -> {
+          lang = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+        },
+        2);
 
     placeholders.put(
         "delay",
@@ -440,7 +436,7 @@ public class SendMessage {
     if (message == null || message.isEmpty()) return;
     if (sender instanceof Player) sendMessage((Player) sender, message);
     else {
-      message = format(Bukkit.getOfflinePlayer(CommandsAPI.serverId), message);
+      message = format(Bukkit.getOfflinePlayer(RTPAPI.serverId), message);
       if (RTP.serverAccessor.getServerIntVersion() > 12) {
         BaseComponent[] components = TextComponent.fromLegacyText(message);
         sender.spigot().sendMessage(components);
@@ -463,7 +459,7 @@ public class SendMessage {
 
     OfflinePlayer player;
     if (sender instanceof Player) player = (OfflinePlayer) sender;
-    else player = Bukkit.getOfflinePlayer(CommandsAPI.serverId).getPlayer();
+    else player = Bukkit.getOfflinePlayer(RTPAPI.serverId).getPlayer();
 
     message = format(player, message);
 
@@ -496,7 +492,7 @@ public class SendMessage {
         Player bukkitPlayer = Bukkit.getPlayer(sender.uuid());
         if (bukkitPlayer != null) {
           bukkitPlayer.spigot().sendMessage(textComponents);
-        } else if (sender.uuid().equals(CommandsAPI.serverId)) {
+        } else if (sender.uuid().equals(RTPAPI.serverId)) {
           Bukkit.getConsoleSender().spigot().sendMessage(textComponents);
         }
       }
@@ -507,7 +503,7 @@ public class SendMessage {
     if (text == null) return "";
 
     // get uuid to be referenced by placeholder getters
-    UUID uuid = (player != null) ? player.getUniqueId() : CommandsAPI.serverId;
+    UUID uuid = (player != null) ? player.getUniqueId() : RTPAPI.serverId;
 
     // create a container for placeholder getter results
     // initialize with the same size as the placeholder getter map to skip reallocation
@@ -581,7 +577,7 @@ public class SendMessage {
     if (text == null) return "";
 
     // get uuid to be referenced by placeholder getters
-    UUID uuid = (player != null) ? player.getUniqueId() : CommandsAPI.serverId;
+    UUID uuid = (player != null) ? player.getUniqueId() : RTPAPI.serverId;
 
     // create a container for placeholder getter results
     // initialize with the same size as the placeholder getter map to skip reallocation
@@ -619,7 +615,7 @@ public class SendMessage {
     if (text == null) return "";
 
     // get uuid to be referenced by placeholder getters
-    UUID uuid = (player != null) ? player.getUniqueId() : CommandsAPI.serverId;
+    UUID uuid = (player != null) ? player.getUniqueId() : RTPAPI.serverId;
 
     // create a container for placeholder getter results
     // initialize with the same size as the placeholder getter map to skip reallocation
@@ -820,18 +816,13 @@ public class SendMessage {
       subtitle = format(player, subtitle);
     }
 
-    if (RTP.serverAccessor.getServerIntVersion() < 18)
-      TitleApi.sendTitle(player, title, subtitle, in, stay, out);
-    else player.sendTitle(title, subtitle, in, stay, out);
+    player.sendTitle(title, subtitle, in, stay, out);
   }
 
   public static void actionbar(Player player, String bar) {
     if (bar == null || bar.isEmpty()) return;
     bar = Hex2Color(ChatColor.translateAlternateColorCodes('&', bar));
-    if (RTP.serverAccessor.getServerIntVersion() < 18) TitleApi.sendActionbar(player, bar);
-    else {
-      BaseComponent[] components = TextComponent.fromLegacyText(bar);
-      player.spigot().sendMessage(ChatMessageType.ACTION_BAR, components);
-    }
+    BaseComponent[] components = TextComponent.fromLegacyText(bar);
+    player.spigot().sendMessage(ChatMessageType.ACTION_BAR, components);
   }
 }

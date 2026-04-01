@@ -15,22 +15,15 @@ import io.papermc.paper.threadedregions.scheduler.AsyncScheduler;
 import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
 import io.papermc.paper.threadedregions.scheduler.RegionScheduler;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
-import org.mockito.Mockito;
 
 class FoliaSchedulerTest {
   private JavaPlugin plugin;
@@ -48,13 +41,13 @@ class FoliaSchedulerTest {
     asyncScheduler = org.mockito.Mockito.mock(AsyncScheduler.class);
     regionScheduler = org.mockito.Mockito.mock(RegionScheduler.class);
     scheduler = new FoliaSchedulerImpl(plugin);
-    
+
     serverAccessor = org.mockito.Mockito.mock(RTPServerAccessor.class);
     RTPTaskPipe taskPipe = org.mockito.Mockito.mock(RTPTaskPipe.class);
     org.mockito.Mockito.when(serverAccessor.createTaskPipe()).thenReturn(taskPipe);
-    
+
     mockFoliaScheduler = new MockFoliaScheduler();
-    
+
     RTP.serverAccessor = serverAccessor;
     RTP.scheduler = mockFoliaScheduler;
     RTPAPI.serverAccessor = serverAccessor;

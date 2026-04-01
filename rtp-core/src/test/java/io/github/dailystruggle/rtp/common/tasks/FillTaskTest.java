@@ -13,19 +13,16 @@ import io.github.dailystruggle.rtp.common.selection.region.*;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
-import io.github.dailystruggle.rtp.common.selection.region.ChunkSet;
+import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.common.selection.region.CachedLocation;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentMatchers;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.*;
@@ -131,7 +128,7 @@ public class FillTaskTest {
         }
 
         FillTask fillTask = new FillTask(region, 0);
-        
+
         // Mock fillIncrement to a large value to try and fill more than cacheCap
         try {
             Field fiField = FillTask.class.getDeclaredField("fillIncrement");
@@ -145,7 +142,7 @@ public class FillTaskTest {
         fillTask.run();
 
         // Assert that locationQueue size does not exceed cacheCap
-        assertTrue(queueManager.locationQueue.size() <= cacheCap, 
+        assertTrue(queueManager.locationQueue.size() <= cacheCap,
             "locationQueue size (" + queueManager.locationQueue.size() + ") exceeded cacheCap (" + cacheCap + ")");
     }
 

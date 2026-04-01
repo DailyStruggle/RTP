@@ -99,7 +99,7 @@ public class MockFoliaScheduler implements RTPScheduler {
                 ((BukkitTask) task).cancel();
             }
         }
-        
+
         if (task instanceof MockTask) {
             ((MockTask) task).cancelled = true;
         }
@@ -133,7 +133,7 @@ public class MockFoliaScheduler implements RTPScheduler {
     public void tick(long ticks) {
         currentTime.addAndGet(ticks);
         List<MockTask> toRun = new ArrayList<>();
-        
+
         List<MockTask> tasksCopy = new ArrayList<>(tasks);
         for (MockTask task : tasksCopy) {
             if (task.cancelled) {

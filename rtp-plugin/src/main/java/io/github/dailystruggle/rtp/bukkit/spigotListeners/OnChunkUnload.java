@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.bukkit.spigotListeners;
 
+import io.github.dailystruggle.rtp.api.world.ChunkSet;
+import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import org.bukkit.Chunk;
 import org.bukkit.World;
@@ -12,12 +14,23 @@ import org.bukkit.event.world.ChunkUnloadEvent;
 public class OnChunkUnload implements Listener {
   @EventHandler(priority = EventPriority.NORMAL)
   public void onChunkUnload(ChunkUnloadEvent event) {
+    if (!(event instanceof Cancellable)) return;
+
     Chunk chunk = event.getChunk();
     World world = chunk.getWorld();
     int x = chunk.getX();
     int z = chunk.getZ();
-    if (event instanceof Cancellable
-        && RTP.serverAccessor.getRTPWorld(world.getUID()).isForceLoaded(x, z)) {
+
+    RTPWorld<?> rtpWorld = RTP.serverAccessor.getRTPWorld(world.getUID());
+    if (rtpWorld == null) return;
+
+    if (rtpWorld.isForceLoaded(x, z)) {
+      ((Cancellable) event).setCancelled(true);
+      return;
+    }
+
+    ChunkSet chunkSet = RTP.serverAccessor.getChunkManager().getChunkSet(rtpWorld, x, z);
+    if (chunkSet != null && chunkSet.keep()) {
       ((Cancellable) event).setCancelled(true);
     }
   }

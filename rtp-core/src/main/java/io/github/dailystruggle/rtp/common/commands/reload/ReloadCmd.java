@@ -78,7 +78,7 @@ public class ReloadCmd extends BaseRTPCmdImpl {
                 filenamePattern
                         .matcher(msg)
                         .replaceAll("configs"); // msg = msg.replaceAll( "\\[filename]", "configs" );
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, senderId, msg);
+      RTP.serverAccessor.sendMessage(RTPAPI.serverId, senderId, msg, "RLD");
     }
 
     RTP.scheduler.runTaskAsynchronously(() -> {
@@ -92,7 +92,7 @@ public class ReloadCmd extends BaseRTPCmdImpl {
                   filenamePattern
                           .matcher(msg)
                           .replaceAll("configs"); // msg.replaceAll( "\\[filename]", "configs" );
-        RTP.serverAccessor.sendMessage(senderId, msg);
+        RTP.serverAccessor.sendMessage(RTPAPI.serverId, senderId, msg, "RLD");
       }
 
       RTP.getInstance()

@@ -12,7 +12,7 @@ import io.github.dailystruggle.rtp.common.tasks.ChunkUnloadProcessor;
 import io.github.dailystruggle.rtp.spigot.server.DatabaseProcessing;
 import io.github.dailystruggle.rtp.spigot.server.FillTaskProcessing;
 import io.github.dailystruggle.rtp.spigot.server.SyncTeleportProcessing;
-import io.github.dailystruggle.rtp.bukkit.tools.SendMessage;
+import io.github.dailystruggle.rtp.spigot.tools.SendMessage;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.ChunkyBorderChecker;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.PAPI_expansion;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.VaultChecker;

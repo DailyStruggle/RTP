@@ -72,10 +72,13 @@ public class MemoryShapeTest {
         @Override
         public long rand() { return 0; }
 
+        @Override
+        public boolean contains(int x, int z) { return true; }
+
         // Expose protected method for testing
         @Override
-        public void flushAndRebuild() {
-            super.flushAndRebuild();
+        public void flushAndRebuild(long spatialResolution) {
+            super.flushAndRebuild(spatialResolution);
         }
 
         public long[] getBadKeysCache() {
@@ -106,7 +109,8 @@ public class MemoryShapeTest {
         shape.addBadLocation(10, 5);
         assertTrue(shape.badLocationsDirty);
 
-        shape.flushAndRebuild();
+        shape.flushAndRebuild(shape.spatialResolution);
+        assertEquals(5, shape.getEffectiveBadCount());
 
         assertEquals(5, shape.getBadSum());
         assertEquals(1, shape.getBadKeysCache().length);
@@ -120,7 +124,7 @@ public class MemoryShapeTest {
         shape.addBadLocation(10, 5);
         shape.addBadLocation(30, 5);
 
-        shape.flushAndRebuild();
+        shape.flushAndRebuild(shape.spatialResolution);
 
         assertEquals(10, shape.getBadSum());
         assertEquals(2, shape.getBadKeysCache().length);
@@ -136,7 +140,7 @@ public class MemoryShapeTest {
         shape.addBadLocation(10, 5);
         shape.addBadLocation(15, 5);
 
-        shape.flushAndRebuild();
+        shape.flushAndRebuild(shape.spatialResolution);
 
         assertEquals(10, shape.getBadSum());
         assertEquals(1, shape.getBadKeysCache().length);
@@ -150,7 +154,7 @@ public class MemoryShapeTest {
         shape.addBadLocation(10, 5);
         shape.addBadLocation(12, 5);
 
-        shape.flushAndRebuild();
+        shape.flushAndRebuild(shape.spatialResolution);
 
         // [10, 15) and [12, 17) -> [10, 17) length 7
         assertEquals(7, shape.getBadSum());
@@ -165,7 +169,7 @@ public class MemoryShapeTest {
         shape.addBadLocation(10, 20);
         shape.addBadLocation(15, 2);
 
-        shape.flushAndRebuild();
+        shape.flushAndRebuild(shape.spatialResolution);
 
         // [10, 30) and [15, 17) -> [10, 30) length 20
         assertEquals(20, shape.getBadSum());
@@ -178,7 +182,7 @@ public class MemoryShapeTest {
     public void testClear() {
         TestShape shape = new TestShape();
         shape.addBadLocation(10, 5);
-        shape.flushAndRebuild();
+        shape.flushAndRebuild(shape.spatialResolution);
 
         shape.clear();
 
@@ -200,7 +204,7 @@ public class MemoryShapeTest {
         shape.addBiomeLocation(20L, 1L, "forest");
         shape.addBiomeLocation(21L, 1L, "forest");
 
-        shape.flushAndRebuild();
+        shape.flushAndRebuild(shape.spatialResolution);
 
         // Biome mapped should be union of all.
         // Assuming default resolution 1.
@@ -219,6 +223,8 @@ public class MemoryShapeTest {
         assertEquals(1, mappedSums[0]);
         assertEquals(2, mappedSums[1]);
         assertEquals(4, mappedSums[2]);
+
+        assertEquals(4, shape.getEffectiveGoodCount());
     }
 
     @Test
@@ -227,11 +233,34 @@ public class MemoryShapeTest {
         shape.addBiomeLocation(10L, 1L, "ocean"); // ocean: [10, 11)
         shape.addBiomeLocation(10L, 1L, "forest"); // forest: [10, 11)
 
-        shape.flushAndRebuild();
+        shape.flushAndRebuild(shape.spatialResolution);
 
         long[] mappedKeys = shape.getBiomeMappedKeysCache();
         assertEquals(1, mappedKeys.length);
         assertEquals(10, mappedKeys[0]);
         assertEquals(1, shape.getBiomeMappedPrefixSumsCache()[0]);
+        assertEquals(1, shape.getEffectiveGoodCount());
+    }
+
+    @Test
+    public void testGapBridging() {
+        TestShape shape = new TestShape();
+        shape.addBadLocation(10, 3); // [10, 13)
+        shape.addBadLocation(15, 3); // [15, 18)
+
+        // With resolution 1, they should NOT merge (13+1 = 14 < 15)
+        shape.flushAndRebuild(1);
+        assertEquals(2, shape.getBadKeysCache().length);
+        assertEquals(6, shape.getBadSum());
+        assertEquals(6, shape.getEffectiveBadCount());
+
+        // With resolution 3, they SHOULD merge (13+3 = 16 >= 15)
+        // [10, 13) and [15, 18) -> [10, 18) length 8
+        shape.badLocationsDirty = true; // force rebuild
+        shape.flushAndRebuild(3);
+        assertEquals(1, shape.getBadKeysCache().length);
+        assertEquals(10, shape.getBadKeysCache()[0]);
+        assertEquals(8, shape.getBadSum());
+        assertEquals(8, shape.getEffectiveBadCount());
     }
 }

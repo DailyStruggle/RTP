@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.paper.world;
 
+import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPChunkManager;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.spigot.world.BukkitRTPWorld;
@@ -14,5 +15,10 @@ public class PaperRTPChunkManager implements RTPChunkManager {
     }
 
     return ((BukkitRTPWorld) world).getChunkAt(x, z);
+  }
+
+  @Override
+  public ChunkSet getChunkSet(RTPWorld<?> world, int x, int z) {
+    return ChunkSet.getGlobal(world, x, z);
   }
 }

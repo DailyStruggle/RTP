@@ -31,6 +31,7 @@ import java.util.stream.Collectors;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
@@ -111,6 +112,36 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       } else version = versionPattern.matcher(version).replaceAll("");
     }
     return version;
+  }
+
+  @Override
+  public @NotNull String getPluginVersion() {
+    return Bukkit.getPluginManager().getPlugin("RTP").getDescription().getVersion();
+  }
+
+  @Override
+  public @NotNull String getPlatform() {
+    if (isFolia()) return "Folia";
+    if (isPaper()) return "Paper";
+    return "Spigot";
+  }
+
+  private boolean isPaper() {
+    try {
+      Class.forName("com.destroystokyo.paper.PaperConfig");
+      return true;
+    } catch (ClassNotFoundException e) {
+      return false;
+    }
+  }
+
+  private boolean isFolia() {
+    try {
+      Class.forName("io.papermc.paper.threadedregions.RegionizedServer");
+      return true;
+    } catch (ClassNotFoundException e) {
+      return false;
+    }
   }
 
   @Override
@@ -229,10 +260,11 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public void sendMessage(UUID target, MessagesKeys msgType) {
+  public void sendMessage(UUID target, MessagesKeys msgType, String tag) {
     ConfigParser<MessagesKeys> lang =
         (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
     String message = lang.getConfigValue(msgType, "").toString();
+    message = tagMessage(message, tag);
     if (target.equals(RTPAPI.serverId)) {
       Bukkit.getConsoleSender().sendMessage(message);
       return;
@@ -242,10 +274,11 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public void sendMessage(UUID target1, UUID target2, MessagesKeys msgType) {
+  public void sendMessage(UUID target1, UUID target2, MessagesKeys msgType, String tag) {
     ConfigParser<MessagesKeys> lang =
         (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
     String message = lang.getConfigValue(msgType, "").toString();
+    message = tagMessage(message, tag);
     Player p1 = Bukkit.getPlayer(target1);
     if (target1.equals(RTPAPI.serverId)) {
       Bukkit.getConsoleSender().sendMessage(message);
@@ -255,7 +288,8 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public void sendMessage(UUID target, String message) {
+  public void sendMessage(UUID target, String message, String tag) {
+    message = tagMessage(message, tag);
     if (target.equals(RTPAPI.serverId)) {
       Bukkit.getConsoleSender().sendMessage(message);
       return;
@@ -266,11 +300,13 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   @Override
   public void sendMessageAndSuggest(UUID target, String message, String suggestion) {
+    message = tagMessage(message, null);
     // Implementation
   }
 
   @Override
-  public void sendMessage(UUID target1, UUID target2, String message) {
+  public void sendMessage(UUID target1, UUID target2, String message, String tag) {
+    message = tagMessage(message, tag);
     if (target1.equals(RTPAPI.serverId)) {
       Bukkit.getConsoleSender().sendMessage(message);
     } else {
@@ -280,21 +316,43 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   }
 
   @Override
+  public void sendMessage(RTPCommandSender target, String message, String hover, String click, String tag) {
+    io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(target, tagMessage(message, tag), hover, click);
+  }
+
+  @Override
+  public String format(@Nullable UUID player, String text) {
+    OfflinePlayer bukkitPlayer = (player != null) ? Bukkit.getOfflinePlayer(player) : null;
+    return io.github.dailystruggle.rtp.spigot.tools.SendMessage.format(bukkitPlayer, text);
+  }
+
+  @Override
+  public String formatNoColor(@Nullable UUID player, String text) {
+    OfflinePlayer bukkitPlayer = (player != null) ? Bukkit.getOfflinePlayer(player) : null;
+    return io.github.dailystruggle.rtp.spigot.tools.SendMessage.formatNoColor(bukkitPlayer, text);
+  }
+
+  @Override
   public void log(Level level, String msg) {
-    Bukkit.getLogger().log(level, msg);
+    io.github.dailystruggle.rtp.spigot.tools.SendMessage.log(level, msg);
   }
 
   @Override
   public void log(Level level, String msg, Throwable throwable) {
-    Bukkit.getLogger().log(level, msg, throwable);
+    io.github.dailystruggle.rtp.spigot.tools.SendMessage.log(level, msg, throwable);
   }
 
   @Override
-  public void announce(String msg, String permission) {
+  public void announce(String msg, String permission, String tag) {
+    msg = tagMessage(msg, tag);
     Bukkit.broadcast(msg, permission);
     if (!permission.equalsIgnoreCase("rtp.see")) {
       Bukkit.getConsoleSender().sendMessage(msg);
     }
+  }
+
+  private String tagMessage(String message, @Nullable String tag) {
+    return io.github.dailystruggle.rtp.common.commands.help.SendMessage.tagMessage(message, tag);
   }
 
   @Override

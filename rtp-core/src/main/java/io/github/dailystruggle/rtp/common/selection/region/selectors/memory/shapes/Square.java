@@ -4,6 +4,9 @@ import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+import jdk.incubator.vector.IntVector;
+import jdk.incubator.vector.VectorMask;
+import jdk.incubator.vector.VectorOperators;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
@@ -168,6 +171,31 @@ public class Square extends MemoryShape<GenericMemoryShapeParams> {
   }
 
   @Override
+  public boolean contains(int x, int z) {
+    long rChunks = getNumber(GenericMemoryShapeParams.radius, 0L).longValue() >> 4;
+    long rxc = getNumber(GenericMemoryShapeParams.centerX, 0L).longValue() >> 4;
+    long rzc = getNumber(GenericMemoryShapeParams.centerZ, 0L).longValue() >> 4;
+    return Math.abs(x - rxc) <= rChunks && Math.abs(z - rzc) <= rChunks;
+  }
+
+  @Override
+  public VectorMask<Integer> contains(IntVector xVec, IntVector zVec, VectorMask<Integer> mask) {
+    long rChunks = getNumber(GenericMemoryShapeParams.radius, 0L).longValue() >> 4;
+    long rxc = getNumber(GenericMemoryShapeParams.centerX, 0L).longValue() >> 4;
+    long rzc = getNumber(GenericMemoryShapeParams.centerZ, 0L).longValue() >> 4;
+
+    IntVector rxcVec = IntVector.broadcast(xVec.species(), (int) rxc);
+    IntVector rzcVec = IntVector.broadcast(xVec.species(), (int) rzc);
+
+    IntVector dx = xVec.sub(rxcVec).abs();
+    IntVector dz = zVec.sub(rzcVec).abs();
+
+    return dx.compare(VectorOperators.LE, (int) rChunks)
+            .and(dz.compare(VectorOperators.LE, (int) rChunks))
+            .and(mask);
+  }
+
+  @Override
   public long xzToLocation(MutableRTPCoords coords) {
     long cr = getNumber(GenericMemoryShapeParams.centerRadius, 64L).longValue();
     long cx = getNumber(GenericMemoryShapeParams.centerX, 0L).longValue();
@@ -266,7 +294,7 @@ public class Square extends MemoryShape<GenericMemoryShapeParams> {
 
   @Override
   public long rand() {
-    flushAndRebuild();
+    flushAndRebuild(spatialResolution);
     long[] sums = badPrefixSumsCache;
     long badSum = (sums.length > 0) ? sums[sums.length - 1] : 0L;
 

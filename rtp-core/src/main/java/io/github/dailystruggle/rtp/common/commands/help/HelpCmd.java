@@ -64,7 +64,7 @@ public class HelpCmd extends BaseRTPCmdImpl {
     ConfigParser<MessagesKeys> lang =
         (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
     if (!sender.hasPermission("rtp.see")) {
-      RTP.serverAccessor.sendMessage(callerId, MessagesKeys.noPerms);
+      RTP.serverAccessor.sendMessage(callerId, MessagesKeys.noPerms, "HELP");
       return true;
     }
 
@@ -72,7 +72,7 @@ public class HelpCmd extends BaseRTPCmdImpl {
     String hover = "/rtp";
     String click = "/rtp";
 
-    SendMessage.sendMessage(sender, msg, hover, click);
+    RTP.serverAccessor.sendMessage(sender, msg, hover, click, "HELP");
 
     for (CommandsAPICommand entry : RTP.baseCommand.getCommandLookup().values()) {
       if (sender.hasPermission(entry.permission())) {
@@ -89,7 +89,7 @@ public class HelpCmd extends BaseRTPCmdImpl {
         hover = "/rtp " + arg;
         click = "/rtp " + arg;
 
-        SendMessage.sendMessage(sender, msg, hover, click);
+        RTP.serverAccessor.sendMessage(sender, msg, hover, click, "HELP");
       }
     }
     return true;

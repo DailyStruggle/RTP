@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.common.commands.config;
 
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -50,7 +49,7 @@ public class ConfigCmdTest {
     void testConfigCommandUpdatesRuntimeAndDisk() throws IOException {
         // 1. Identify the SubConfigCmd for "performance"
         SubConfigCmd subConfigCmd = (SubConfigCmd) configCmd.getCommandLookup().get("performance");
-        
+
         // 2. Prepare parameter map to set viewDistanceSelect to 10
         Map<String, List<String>> parameterValues = new HashMap<>();
         parameterValues.put("argument", Collections.singletonList(PerformanceKeys.viewDistanceSelect.name()));
@@ -71,7 +70,7 @@ public class ConfigCmdTest {
         File performanceFile = new File(tempDir.toFile(), "performance.yml");
         YamlFile yamlFile = new YamlFile(performanceFile);
         yamlFile.load();
-        
+
         Object diskValue = yamlFile.get(PerformanceKeys.viewDistanceSelect.name());
         assertEquals(10, ((Number) diskValue).intValue(), "Disk storage should be updated to 10");
     }

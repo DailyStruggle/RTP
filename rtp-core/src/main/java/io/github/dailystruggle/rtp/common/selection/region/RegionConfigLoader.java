@@ -27,11 +27,11 @@ public class RegionConfigLoader {
             }
         }
 
-        RTPWorld<?> world = (regionParser.getConfigValue(RegionKeys.world, null) instanceof RTPWorld<?>) 
+        RTPWorld<?> world = (regionParser.getConfigValue(RegionKeys.world, null) instanceof RTPWorld<?>)
                 ? (RTPWorld<?>) regionParser.getConfigValue(RegionKeys.world, null) : null;
-        Shape<?> shape = (regionParser.getConfigValue(RegionKeys.shape, null) instanceof Shape<?>) 
+        Shape<?> shape = (regionParser.getConfigValue(RegionKeys.shape, null) instanceof Shape<?>)
                 ? (Shape<?>) regionParser.getConfigValue(RegionKeys.shape, null) : null;
-        VerticalAdjustor<?> vert = (regionParser.getConfigValue(RegionKeys.vert, null) instanceof VerticalAdjustor<?>) 
+        VerticalAdjustor<?> vert = (regionParser.getConfigValue(RegionKeys.vert, null) instanceof VerticalAdjustor<?>)
                 ? (VerticalAdjustor<?>) regionParser.getConfigValue(RegionKeys.vert, null) : null;
 
         boolean worldBorderOverride = getBoolean(regionParser.getConfigValue(RegionKeys.worldBorderOverride, false));
@@ -40,6 +40,7 @@ public class RegionConfigLoader {
         int activeChunkCap = getNumber(regionParser.getConfigValue(RegionKeys.activeChunkCap, 3)).intValue();
         double price = getNumber(regionParser.getConfigValue(RegionKeys.price, 0.0)).doubleValue();
         long spatialResolution = getNumber(regionParser.getConfigValue(RegionKeys.spatialResolution, 1L)).longValue();
+        if (shape != null) shape.spatialResolution = spatialResolution;
         String override = String.valueOf(regionParser.getConfigValue(RegionKeys.override, "default"));
 
         if (shape instanceof MemoryShape<?>) {
@@ -48,12 +49,6 @@ public class RegionConfigLoader {
             }
             String worldName = (world != null) ? world.name() : "null";
             ((MemoryShape<?>) shape).load(name + ".bin", worldName);
-
-            long iter = ((MemoryShape<?>) shape).fillIter.get();
-            if (iter > 0 && iter < Double.valueOf(((MemoryShape<?>) shape).getRange()).longValue()) {
-                // This part is a bit tricky since it modifies a global map.
-                // However, the original code did it in the constructor.
-            }
         }
 
         return new RegionSettings(
