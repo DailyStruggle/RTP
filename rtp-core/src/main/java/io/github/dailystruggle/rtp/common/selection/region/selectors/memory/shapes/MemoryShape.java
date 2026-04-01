@@ -8,7 +8,6 @@ import jdk.incubator.vector.LongVector;
 import jdk.incubator.vector.VectorMask;
 import jdk.incubator.vector.VectorOperators;
 import jdk.incubator.vector.VectorSpecies;
-import jdk.incubator.vector.VectorShuffle;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -600,23 +599,10 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
             long[] nbKeys = new long[mIdx];
             long[] nbSums = new long[mIdx];
             long bRunningSum = 0;
-            int k = 0;
-            int bound = SPECIES.loopBound(mIdx);
-            for (; k < bound; k += SPECIES.length()) {
-              LongVector keyVec = LongVector.fromArray(SPECIES, mKeys, k);
-              keyVec.intoArray(nbKeys, k);
-              LongVector lenVec = LongVector.fromArray(SPECIES, mLengths, k);
-              for (int m = 1; m < SPECIES.length(); m <<= 1) {
-                lenVec = lenVec.add(lenVec.rearrange(VectorShuffle.iota(SPECIES, -m, 1, false), SPECIES.broadcast(0L)));
-              }
-              lenVec = lenVec.add(bRunningSum);
-              lenVec.intoArray(nbSums, k);
-              bRunningSum = nbSums[k + SPECIES.length() - 1];
-            }
-            for (; k < mIdx; k++) {
-              nbKeys[k] = mKeys[k];
-              bRunningSum += mLengths[k];
-              nbSums[k] = bRunningSum;
+            for (int k = 0; k < mIdx; k++) {
+                nbKeys[k] = mKeys[k];
+                bRunningSum += mLengths[k];
+                nbSums[k] = bRunningSum;
             }
             newBiomeKeysCache.put(biome, nbKeys);
             newBiomePrefixSumsCache.put(biome, nbSums);
@@ -698,20 +684,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
             long[] finalMappedKeys = new long[mappedIdx];
             long[] finalMappedPrefixSums = new long[mappedIdx];
             long runningSumMapped = 0;
-            int k = 0;
-            int bound = SPECIES.loopBound(mappedIdx);
-            for (; k < bound; k += SPECIES.length()) {
-              LongVector keyVec = LongVector.fromArray(SPECIES, mergedMappedKeys, k);
-              keyVec.intoArray(finalMappedKeys, k);
-              LongVector lenVec = LongVector.fromArray(SPECIES, mergedMappedLengths, k);
-              for (int m = 1; m < SPECIES.length(); m <<= 1) {
-                lenVec = lenVec.add(lenVec.rearrange(VectorShuffle.iota(SPECIES, -m, 1, false), SPECIES.broadcast(0L)));
-              }
-              lenVec = lenVec.add(runningSumMapped);
-              lenVec.intoArray(finalMappedPrefixSums, k);
-              runningSumMapped = finalMappedPrefixSums[k + SPECIES.length() - 1];
-            }
-            for (; k < mappedIdx; k++) {
+            for (int k = 0; k < mappedIdx; k++) {
               finalMappedKeys[k] = mergedMappedKeys[k];
               runningSumMapped += mergedMappedLengths[k];
               finalMappedPrefixSums[k] = runningSumMapped;
@@ -808,20 +781,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         long[] newKeys = new long[mergeIndex];
         long[] newSums = new long[mergeIndex];
         long runningSum = 0;
-        int k = 0;
-        int bound = SPECIES.loopBound(mergeIndex);
-        for (; k < bound; k += SPECIES.length()) {
-          LongVector keyVec = LongVector.fromArray(SPECIES, mergedKeys, k);
-          keyVec.intoArray(newKeys, k);
-          LongVector lenVec = LongVector.fromArray(SPECIES, mergedLengths, k);
-          for (int m = 1; m < SPECIES.length(); m <<= 1) {
-            lenVec = lenVec.add(lenVec.rearrange(VectorShuffle.iota(SPECIES, -m, 1, false), SPECIES.broadcast(0L)));
-          }
-          lenVec = lenVec.add(runningSum);
-          lenVec.intoArray(newSums, k);
-          runningSum = newSums[k + SPECIES.length() - 1];
-        }
-        for (; k < mergeIndex; k++) {
+        for (int k = 0; k < mergeIndex; k++) {
           newKeys[k] = mergedKeys[k];
           runningSum += mergedLengths[k];
           newSums[k] = runningSum;

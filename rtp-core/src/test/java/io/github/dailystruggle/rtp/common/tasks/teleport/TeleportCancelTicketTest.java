@@ -27,7 +27,6 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class TeleportCancelTicketTest {
     private RTP rtp;
@@ -51,8 +50,10 @@ public class TeleportCancelTicketTest {
         RTP.scheduler = scheduler;
         RTP.serverAccessor = serverAccessor;
         when(serverAccessor.createTaskPipe()).thenReturn(mock(io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe.class));
+        when(serverAccessor.getPluginDirectory()).thenReturn(new java.io.File("."));
 
         rtp = new RTP();
+        RTP.selectionAPI = new io.github.dailystruggle.rtp.common.selection.SelectionAPI();
         region = mock(Region.class);
         // Use a real RegionChunkManager
         regionChunkManager = new RegionChunkManager(region);
@@ -64,10 +65,6 @@ public class TeleportCancelTicketTest {
         economyConfig = mock(ConfigParser.class);
 
         RTP.configs = configs;
-        configs.configParserMap = new ConcurrentHashMap<>();
-        configs.configParserMap.put(PerformanceKeys.class, performanceConfig);
-        configs.configParserMap.put(MessagesKeys.class, messagesConfig);
-        configs.configParserMap.put(EconomyKeys.class, economyConfig);
 
         UUID playerId = UUID.randomUUID();
         when(player.uuid()).thenReturn(playerId);

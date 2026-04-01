@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doReturn;
 
 public class TeleportPipelineAsyncContextTest {
     private RTP rtp;
@@ -64,9 +65,11 @@ public class TeleportPipelineAsyncContextTest {
 
         UUID playerId = UUID.randomUUID();
         when(player.uuid()).thenReturn(playerId);
+        doReturn(true).when(player).isOnline();
         when(player.name()).thenReturn("TestPlayer");
         when(player.delay()).thenReturn(0L);
         when(world.name()).thenReturn("world");
+        doReturn(java.util.UUID.randomUUID()).when(world).id();
         when(serverAccessor.getRTPWorld("world")).thenReturn(world);
         when(region.getWorld()).thenReturn(world);
 
@@ -86,8 +89,8 @@ public class TeleportPipelineAsyncContextTest {
         ConfigParser<MessagesKeys> messagesConfig = mock(ConfigParser.class);
         when(configs.getParser(PerformanceKeys.class)).thenReturn(performanceConfig);
         when(configs.getParser(MessagesKeys.class)).thenReturn(messagesConfig);
-        when(performanceConfig.getNumber(any(), any())).thenReturn(0L);
-        when(messagesConfig.getConfigValue(any(), any())).thenReturn("");
+        doReturn(0L).when(performanceConfig).getNumber(any(), any());
+        doReturn("").when(messagesConfig).getConfigValue(any(), any());
 
         // Mock getLocation to throw exception if not on main thread
         when(player.getLocation()).thenAnswer(invocation -> {

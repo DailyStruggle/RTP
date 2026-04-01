@@ -12,9 +12,20 @@ import io.github.dailystruggle.rtp.api.world.RTPChunkManager;
 import io.github.dailystruggle.rtp.common.RTP;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 public class LoadChunksTest {
+  @BeforeEach
+  public void setUp() {
+    RTPServerAccessor serverAccessor = mock(RTPServerAccessor.class);
+    RTPChunkManager chunkManager = mock(RTPChunkManager.class);
+    when(serverAccessor.getChunkManager()).thenReturn(chunkManager);
+    when(chunkManager.getChunkAtAsync(any(), anyInt(), anyInt()))
+        .thenReturn(CompletableFuture.completedFuture(1L));
+    RTP.serverAccessor = serverAccessor;
+  }
+
   @Test
   public void testFutureCompletion() throws Exception {
     // This is a simplified test to demonstrate the future completion check

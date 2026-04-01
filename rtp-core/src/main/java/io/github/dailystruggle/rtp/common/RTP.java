@@ -45,7 +45,7 @@ public class RTP {
   public static final ConcurrentLinkedQueue<CompletableFuture<?>> futures =
       new ConcurrentLinkedQueue<>();
 
-  public static final SelectionAPI selectionAPI = new SelectionAPI();
+  public static SelectionAPI selectionAPI = new SelectionAPI();
 
   public static EnumMap<factoryNames, Factory<?>> factoryMap = new EnumMap<>(factoryNames.class);
 

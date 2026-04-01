@@ -410,7 +410,7 @@ public class FillTask extends RTPRunnable {
     String currBiome =
         world.getBiome(blockX, (vert.maxY() + vert.minY()) / 2, blockZ);
 
-    if (!defaultBiomes.contains(currBiome)) {
+    if (!defaultBiomes.contains(currBiome.toUpperCase())) {
       if (biomeRecall) {
         shape.addBadLocation(pos, 1L);
         return CompletableFuture.completedFuture(false);
@@ -471,7 +471,7 @@ public class FillTask extends RTPRunnable {
               }
 
               String currBiome1 = world.getBiome(localCursor.x, localCursor.y, localCursor.z);
-              if (!defaultBiomes.contains(currBiome1)) {
+              if (!defaultBiomes.contains(currBiome1.toUpperCase())) {
                 if (biomeRecall) {
                   shape.addBadLocation(pos, 1L);
                   res.complete(false);

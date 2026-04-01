@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doReturn;
 
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
@@ -173,8 +174,8 @@ public class RegionQueueManagerTest {
         io.github.dailystruggle.rtp.common.RTP.configs = configs;
         io.github.dailystruggle.rtp.common.configuration.ConfigParser safetyParser = mock(io.github.dailystruggle.rtp.common.configuration.ConfigParser.class);
         when(configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.class)).thenReturn(safetyParser);
-        when(safetyParser.getConfigValue(any(), any())).thenReturn(new java.util.ArrayList<>());
-        when(safetyParser.getNumber(any(), any())).thenReturn(0);
+        doReturn(new java.util.ArrayList<>()).when(safetyParser).getConfigValue(any(), any());
+        doReturn(0).when(safetyParser).getNumber(any(), any());
 
         io.github.dailystruggle.rtp.api.server.RTPServerAccessor serverAccessor = mock(io.github.dailystruggle.rtp.api.server.RTPServerAccessor.class);
         io.github.dailystruggle.rtp.common.RTP.serverAccessor = serverAccessor;

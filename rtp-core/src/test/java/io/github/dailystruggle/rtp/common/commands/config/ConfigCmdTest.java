@@ -1,11 +1,13 @@
 package io.github.dailystruggle.rtp.common.commands.config;
 
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
+import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
+import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -17,6 +19,7 @@ import java.nio.file.Path;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -35,13 +38,22 @@ public class ConfigCmdTest {
         RTP.serverAccessor = serverAccessor;
         RTP.scheduler = scheduler;
         when(serverAccessor.getPluginDirectory()).thenReturn(tempDir.toFile());
+        when(serverAccessor.createTaskPipe()).thenReturn(mock(RTPTaskPipe.class));
+        when(serverAccessor.getSender(any())).thenReturn(mock(io.github.dailystruggle.rtp.api.entity.RTPCommandSender.class));
 
-        new RTP();
+        RTP rtp = new RTP() {};
+        try {
+            java.lang.reflect.Field instanceField = RTP.class.getDeclaredField("instance");
+            instanceField.setAccessible(true);
+            instanceField.set(null, rtp);
+        } catch (Exception e) {}
+        RTP.selectionAPI = new io.github.dailystruggle.rtp.common.selection.SelectionAPI();
+
         configs = new Configs(tempDir.toFile());
         RTP.configs = configs;
         configs.reload();
 
-        configCmd = new ConfigCmd(null);
+        configCmd = new ConfigCmd(mock(CommandsAPICommand.class));
         configCmd.addCommands();
     }
 
