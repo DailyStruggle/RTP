@@ -33,12 +33,10 @@ dependencies {
 }
 
 tasks.withType(JavaCompile) {
-    options.compilerArgs += ["--add-modules", "jdk.incubator.vector"]
 }
 
 test {
     useJUnitPlatform()
-    jvmArgs += ["--add-modules", "jdk.incubator.vector"]
 }
 
 shadowJar {

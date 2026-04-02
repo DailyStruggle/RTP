@@ -157,9 +157,9 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
   @NotNull
   public ConfigParser<E> getParser(String name) {
     name = name.toUpperCase();
+    if (!name.endsWith(".YML")) name = name + ".YML";
     if (configParserFactory.contains(name)) return configParserFactory.map.get(name);
     else {
-      if (!name.endsWith(".YML")) name = name + ".YML";
       String worldName = name.replace(".YML", "");
       if (RTP.serverAccessor.getRTPWorld(worldName) == null) {
         ConfigParser<E> parser = (ConfigParser<E>) configParserFactory.getOrDefault("DEFAULT.YML");

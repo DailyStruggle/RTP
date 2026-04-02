@@ -143,7 +143,6 @@ public class Region extends FactoryValue<RegionKeys> {
         queueManager.playerQueue.offer(playerId);
         continue;
       }
-      queueManager.onPlayerPop();
 
       teleportData.attempts = pair.getAttempts();
       teleportData.selectedCoords = pair.getCoords();

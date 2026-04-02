@@ -6,8 +6,6 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 
 import java.util.ArrayList;
@@ -37,17 +35,20 @@ public class RegionCacheTask extends RTPRunnable {
     @Override
     public void run() {
         if (isCancelled()) return;
+
         int activeChunkCap = region.getSettings().activeChunkCap();
         if (activeChunkCap > 0) {
             for (int i = 0; i < activeChunkCap; i++) {
                 if (isCancelled()) return;
                 CachedLocation loc = region.queueManager.locationQueue.get(i);
                 if (loc == null) break;
-                region.chunkManager.addTicket(loc.getCoords());
+                ChunkSet chunkSet = region.chunkManager.getChunkSet(loc.getCoords());
+                if (chunkSet == null || !chunkSet.keep()) {
+                    region.chunkManager.addTicket(loc.getCoords());
+                }
             }
         }
 
-        if (isCancelled()) return;
         region.inFlightCalculations.incrementAndGet();
         GenerationResult res = LocationGenerator.getLocation(region, (java.util.Set<String>) null);
 
@@ -111,8 +112,10 @@ public class RegionCacheTask extends RTPRunnable {
                     region.chunkManager.removeTicket(coords);
 
                     if (playerId == null) {
-                        if (region.queueManager.locationQueue.size() < region.getSettings().activeChunkCap()) {
-                            region.chunkManager.addTicket(coords); // Center only
+                        if (region.queueManager.locationQueue.size() < region.getSettings().cacheCap()) {
+                            if (region.queueManager.locationQueue.size() < region.getSettings().activeChunkCap()) {
+                                region.chunkManager.addTicket(coords); // Center only
+                            }
                             region.queueManager.locationQueue.offer(pair);
                         } else {
                             CachedLocationPool.release(pair);

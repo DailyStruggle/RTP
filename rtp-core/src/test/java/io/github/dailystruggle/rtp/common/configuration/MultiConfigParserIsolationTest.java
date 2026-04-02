@@ -62,10 +62,8 @@ public class MultiConfigParserIsolationTest {
     void testStateIsolationBetweenWorlds() {
 
         // 1. Get world_nether and world
-        ConfigParser<WorldKeys> nether = worldParser.getParser("world_nether");
-        ConfigParser<WorldKeys> overworld = worldParser.getParser("world");
-
-
+        ConfigParser<WorldKeys> nether = RTP.configs.getWorldParser("world_nether");
+        ConfigParser<WorldKeys> overworld = RTP.configs.getWorldParser("world");
 
         assertNotNull(nether);
         assertNotNull(overworld);

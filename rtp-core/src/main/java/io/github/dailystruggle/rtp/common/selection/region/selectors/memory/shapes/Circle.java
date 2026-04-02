@@ -75,6 +75,8 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
     return (radius - cr) * (radius + cr) * Math.PI;
   }
 
+
+
   @Override
   public long xzToLocation(long x, long z) {
     long cr = getNumber(GenericMemoryShapeParams.centerRadius, 64L).longValue();

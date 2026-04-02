@@ -3,11 +3,6 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
-import jdk.incubator.vector.IntVector;
-import jdk.incubator.vector.LongVector;
-import jdk.incubator.vector.VectorMask;
-import jdk.incubator.vector.VectorOperators;
-import jdk.incubator.vector.VectorSpecies;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -24,7 +19,6 @@ import java.util.logging.Level;
  * @param <E> enum for configuration values
  */
 public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
-  private static final VectorSpecies<Long> SPECIES = LongVector.SPECIES_PREFERRED;
   protected volatile long[] badKeysCache = new long[0];
   protected volatile long[] badPrefixSumsCache = new long[0];
   protected volatile ConcurrentHashMap<String, long[]> biomeKeysCache = new ConcurrentHashMap<>();
@@ -106,24 +100,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    */
   public abstract int[] locationToXZ(long location);
 
-  /**
-   * Determine if points are within the shape using SIMD
-   *
-   * @param xVec the x coordinates (in chunks)
-   * @param zVec the z coordinates (in chunks)
-   * @param mask the lane mask
-   * @return a mask with lanes set for points within the shape
-   */
-  public VectorMask<Integer> contains(IntVector xVec, IntVector zVec, VectorMask<Integer> mask) {
-    int length = mask.length();
-    boolean[] result = new boolean[length];
-    for (int i = 0; i < length; i++) {
-      if (mask.laneIsSet(i)) {
-        result[i] = contains(xVec.lane(i), zVec.lane(i));
-      }
-    }
-    return VectorMask.fromArray(xVec.species(), result, 0);
-  }
+
 
   /**
    * Convert a location value to xz coordinates and store in the output object
@@ -167,30 +144,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     if (keys.length == 0) return false;
 
     int floorIdx = -1;
-    int k = 0;
-    int bound = SPECIES.loopBound(keys.length);
-    if (bound > 0) {
-      LongVector vLocation = LongVector.broadcast(SPECIES, location);
-      for (; k < bound; k += SPECIES.length()) {
-        LongVector vKeys = LongVector.fromArray(SPECIES, keys, k);
-        var mask = vKeys.compare(VectorOperators.LE, vLocation);
-        if (mask.anyTrue()) {
-          // Update floorIdx to the highest index in this vector where key <= location
-          // mask.lastTrue() gives the relative index in the vector
-          floorIdx = k + mask.lastTrue();
-        } else {
-          // Since keys are sorted, if no key in this batch is <= location,
-          // all subsequent keys will also be > location.
-          break;
-        }
-      }
-    }
-
-    // Process remaining elements if not already found in vectorized part or if there are leftovers
-    // or if we need to search further in the remaining scalar part.
-    // Actually, if floorIdx was found in vector part, and the next vector failed,
-    // we don't need to check leftovers unless k < keys.length.
-    for (; k < keys.length; k++) {
+    for (int k = 0; k < keys.length; k++) {
       if (keys[k] <= location) {
         floorIdx = k;
       } else {
@@ -831,8 +785,26 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
   @Override
   public boolean contains(int x, int z) {
-    long l = xzToLocation(x,z);
-    return l >= 0 && l < getRange();
+    long l = xzToLocation(x, z);
+    long range = (long) getRange();
+
+    boolean expand = false;
+    for (Map.Entry<E, Object> entry : data.entrySet()) {
+      if (entry.getKey().name().equalsIgnoreCase("expand")) {
+        Object val = entry.getValue();
+        if (val instanceof Boolean) expand = (Boolean) val;
+        else if (val != null) expand = Boolean.parseBoolean(val.toString());
+        break;
+      }
+    }
+
+    if (expand) {
+      long[] sums = badPrefixSumsCache;
+      long badSum = (sums.length > 0) ? sums[sums.length - 1] : 0L;
+      range += badSum;
+    }
+
+    return l >= 0 && l < range;
   }
 
   @Override
