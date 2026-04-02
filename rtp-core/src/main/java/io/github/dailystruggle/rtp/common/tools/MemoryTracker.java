@@ -19,16 +19,28 @@ public class MemoryTracker {
   }
 
   /**
+   * Resets the lifespan timer for a specifically tracked object
+   */
+  public static void updateTracking(UUID trackingId) {
+    if (trackingId == null) return;
+    TrackedObject obj = trackedObjects.get(trackingId);
+    if (obj != null) {
+      obj.reset();
+    }
+  }
+
+  /**
    * Start tracking an object.
    *
    * @param target the object to track
    * @param label a descriptive name or ID
    * @param maxLifespan the expected maximum lifespan in milliseconds
    */
-  public static void track(Object target, String label, long maxLifespan) {
+  public static UUID track(Object target, String label, long maxLifespan) {
     UUID uuid = UUID.randomUUID();
     TrackedObject trackedObject = new TrackedObject(target, label, maxLifespan);
     trackedObjects.put(uuid, trackedObject);
+    return uuid; // Now returns the reference ID
   }
 
   public static void runDiagnostics() {

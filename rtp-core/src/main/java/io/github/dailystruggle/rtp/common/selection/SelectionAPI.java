@@ -31,6 +31,7 @@ public class SelectionAPI {
   public final ConcurrentHashMap<UUID, Region> tempRegions = new ConcurrentHashMap<>();
   public final ConcurrentHashMap<String, Region> permRegionLookup = new ConcurrentHashMap<>();
   private final Factory<Region> regionFactory = new Factory<>();
+  public Factory<Shape<?>> shapeFactory;
 
   /**
    * getFromString a region by name

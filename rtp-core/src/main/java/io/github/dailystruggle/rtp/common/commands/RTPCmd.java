@@ -34,7 +34,6 @@ public interface RTPCmd extends BaseRTPCmd {
   // synchronous command component
   default boolean onCommand(
       RTPCommandSender sender, CommandsAPICommand command, String label, String[] args) {
-    RTP.log(Level.INFO, "[DEBUG_LOG] RTPCmd.onCommand called for sender: " + sender.name() + ", label: " + label + ", args: " + java.util.Arrays.toString(args));
     UUID senderId = sender.uuid();
 
     if (RTP.reloading.get()) {
@@ -44,9 +43,14 @@ public interface RTPCmd extends BaseRTPCmd {
 
     for (String arg : args) {
       if (!arg.contains(String.valueOf(CommandsAPI.parameterDelimiter))) {
-        RTP.log(Level.INFO, "[DEBUG_LOG] RTPCmd.onCommand - arg '" + arg + "' is likely a subcommand. Calling library onCommand.");
         java.util.concurrent.CompletableFuture<Boolean> future = onCommand(senderId, sender::hasPermission, sender::sendMessage, args);
-        future.thenAccept(result -> RTP.log(Level.INFO, "[DEBUG_LOG] RTPCmd.onCommand - library onCommand returned: " + result));
+
+        future.whenComplete((result, throwable) -> {
+          if (throwable != null) {
+            RTP.log(Level.WARNING, "[DEBUG_LOG] RTPCmd.onCommand - library onCommand threw an exception:", throwable);
+          }
+        });
+
         return true;
       }
     }
@@ -108,7 +112,10 @@ public interface RTPCmd extends BaseRTPCmd {
   // async command component
   default boolean compute(
       UUID senderId, Map<String, List<String>> rtpArgs, CommandsAPICommand nextCommand) {
-    RTP.log(Level.INFO, "[DEBUG_LOG] RTPCmd.compute called for senderId: " + senderId + ", nextCommand: " + (nextCommand != null ? nextCommand.getClass().getName() : "null") + ", rtpArgs: " + rtpArgs);
+    if (senderId.equals(new java.util.UUID(0, 0)) && !rtpArgs.containsKey("player")) {
+      RTP.serverAccessor.sendMessage(senderId, MessagesKeys.consoleCmdNotAllowed);
+      return true;
+    }
     if (nextCommand != null) {
       return nextCommand.onCommand(senderId, rtpArgs, null);
     }

@@ -12,7 +12,6 @@ import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.logging.Level;
 import java.util.regex.Pattern;
 import org.jetbrains.annotations.Nullable;
 
@@ -66,7 +65,6 @@ public class ReloadCmd extends BaseRTPCmdImpl {
   @Override
   public boolean onCommand(
       UUID senderId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
-    RTP.log(Level.INFO, "[DEBUG_LOG] ReloadCmd.onCommand called for senderId: " + senderId + ", nextCommand: " + (nextCommand != null ? nextCommand.getClass().getName() : "null"));
     if (nextCommand != null) return nextCommand.onCommand(senderId, parameterValues, null);
 
     RTP.reloading.set(true);

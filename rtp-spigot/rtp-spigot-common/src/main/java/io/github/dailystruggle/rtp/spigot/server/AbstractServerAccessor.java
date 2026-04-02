@@ -266,7 +266,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   @Override
   public void sendMessage(UUID target, MessagesKeys msgType, String tag) {
-    Bukkit.getLogger().info("[DEBUG_LOG] AbstractServerAccessor.sendMessage(UUID, MessagesKeys, String) called for target: " + target + ", tag: " + tag + ", msgType: " + msgType);
+
     ConfigParser<MessagesKeys> lang =
         (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
     String message = lang.getConfigValue(msgType, "").toString();
@@ -281,7 +281,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   @Override
   public void sendMessage(UUID target1, UUID target2, MessagesKeys msgType, String tag) {
-    Bukkit.getLogger().info("[DEBUG_LOG] AbstractServerAccessor.sendMessage(UUID, UUID, MessagesKeys, String) called for targets: " + target1 + ", " + target2 + ", tag: " + tag + ", msgType: " + msgType);
+
     ConfigParser<MessagesKeys> lang =
         (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
     String message = lang.getConfigValue(msgType, "").toString();
@@ -302,7 +302,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   @Override
   public void sendMessage(UUID target, String message, String tag) {
-    Bukkit.getLogger().info("[DEBUG_LOG] AbstractServerAccessor.sendMessage(UUID, String, String) called for target: " + target + ", tag: " + tag + ", message: " + message);
+
     message = tagMessage(message, tag);
     if (target.equals(RTPAPI.serverId)) {
       Bukkit.getConsoleSender().sendMessage(message);
@@ -320,7 +320,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   @Override
   public void sendMessage(UUID target1, UUID target2, String message, String tag) {
-    Bukkit.getLogger().info("[DEBUG_LOG] AbstractServerAccessor.sendMessage(UUID, UUID, String, String) called for targets: " + target1 + ", " + target2 + ", tag: " + tag + ", message: " + message);
+
     message = tagMessage(message, tag);
     if (target1.equals(RTPAPI.serverId)) {
       Bukkit.getConsoleSender().sendMessage(message);
@@ -338,7 +338,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   @Override
   public void sendMessage(RTPCommandSender target, String message, String hover, String click, String tag) {
-    Bukkit.getLogger().info("[DEBUG_LOG] AbstractServerAccessor.sendMessage(RTPCommandSender, String, ...) called for target: " + target.name() + ", tag: " + tag + ", message: " + message);
+
     io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(target, tagMessage(message, tag), hover, click);
   }
 

@@ -13,7 +13,6 @@ import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 public class HelpCmd extends BaseRTPCmdImpl {
@@ -61,7 +60,6 @@ public class HelpCmd extends BaseRTPCmdImpl {
   @Override
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
-    RTP.log(Level.INFO, "[DEBUG_LOG] HelpCmd.onCommand called for callerId: " + callerId + ", nextCommand: " + (nextCommand != null ? nextCommand.getClass().getName() : "null"));
     if (nextCommand != null) return nextCommand.onCommand(callerId, parameterValues, null);
 
     RTPCommandSender sender = RTP.serverAccessor.getSender(callerId);
@@ -73,7 +71,6 @@ public class HelpCmd extends BaseRTPCmdImpl {
     }
 
     String msg = lang.getConfigValue(MessagesKeys.rtp, "").toString();
-    RTP.log(Level.INFO, "[DEBUG_LOG] HelpCmd.onCommand - msg for MessagesKeys.rtp: '" + msg + "'");
     String hover = "/rtp";
     String click = "/rtp";
 

@@ -98,7 +98,6 @@ public final class RTPBukkitPlugin extends JavaPlugin {
   /** whenever bukkit feels like enabling this plugin */
   @Override
   public void onEnable() {
-    Bukkit.getLogger().info("[DEBUG_LOG] RTPBukkitPlugin.onEnable() starting...");
     metrics = new Metrics(this, 12277);
 
     if (instance == null) {
@@ -207,6 +206,9 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         onDisable();
         return;
       }
+
+      RTP.configs.reloadAction();
+
       ConfigParser<ConfigKeys> configParser =
           (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
       Map<String, Object> databaseMap = configParser.getMap(ConfigKeys.database);
@@ -277,23 +279,23 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     RTPCmdBukkit mainCommand = new RTPCmdBukkit(this);
     RTP.baseCommand = mainCommand;
 
-    Bukkit.getLogger().info("[DEBUG_LOG] RTPBukkitPlugin registering commands...");
+
     org.bukkit.command.PluginCommand rtpCommand = getCommand("rtp");
     if (rtpCommand != null) {
       rtpCommand.setExecutor(mainCommand);
       rtpCommand.setTabCompleter(mainCommand);
-      Bukkit.getLogger().info("[DEBUG_LOG] Registered /rtp");
+
     } else {
-      Bukkit.getLogger().severe("[DEBUG_LOG] FAILED TO REGISTER /rtp - getCommand(\"rtp\") returned null!");
+
     }
 
     org.bukkit.command.PluginCommand wildCommand = getCommand("wild");
     if (wildCommand != null) {
       wildCommand.setExecutor(mainCommand);
       wildCommand.setTabCompleter(mainCommand);
-      Bukkit.getLogger().info("[DEBUG_LOG] Registered /wild");
+
     } else {
-      Bukkit.getLogger().severe("[DEBUG_LOG] FAILED TO REGISTER /wild - getCommand(\"wild\") returned null!");
+
     }
 
     RTP.scheduler.runTaskLater(
@@ -326,7 +328,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
       new PAPI_expansion().register();
     }
-    Bukkit.getLogger().info("[DEBUG_LOG] RTPBukkitPlugin.onEnable() finished.");
+
   }
 
   /** whenever bukkit feels like disabling this plugin */

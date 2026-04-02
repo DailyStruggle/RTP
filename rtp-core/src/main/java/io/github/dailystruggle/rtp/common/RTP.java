@@ -73,6 +73,7 @@ public class RTP {
 
   static {
     Factory<Shape<?>> shapeFactory = new Factory<>();
+    selectionAPI.shapeFactory = shapeFactory;
     factoryMap.put(factoryNames.shape, shapeFactory);
 
     Factory<VerticalAdjustor<?>> verticalAdjustorFactory = new Factory<>();

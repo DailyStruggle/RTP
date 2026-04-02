@@ -50,13 +50,6 @@ newWorld: "&b[P0] detected a new world '[world]'"
 # world doesn't exist in bukkit
 invalidWorld: "&e[P0] could not find world '[world]'"
 
-#configuration updates
-updatingWorlds: "&b[P0] updating worlds configuration..."
-updatedWorlds: "&b[P0] updated worlds configuration!"
-
-updatingRegions: "&b[P0] updating regions configuration..."
-updatedRegions: "&b[P0] updated regions configuration!"
-
 # plugin reload text
 reloading: "&b[P0] loading [filename]..."
 reloaded: "&b[P0] successfully loaded [filename]."
@@ -67,12 +60,11 @@ updated: "&a[P0] successfully updated [filename]."
 # placeholder: [arg] - the argument attempted
 badArg: "&c[P0] invalid command argument [arg]"
 
+# when the console tries to run a command meant only for players
+consoleCmdNotAllowed: "&c[P0] You must be an in-game player to execute this command."
+
 # user doesn't have permission for the command requested
 noPerms: "&eI'm sorry, but you do not have permission to perform this command. Please contact the server administrators if you believe that this is in error."
-
-# user tried to wake a world that doesn't send messages to their location, without perms
-# placeholder: [world] - the world attempted in the command
-noGlobalPerms: "&eYou don't have permission to teleport to [world] from your location"
 
 fillStart: "&a[P0] fill task started for region [region]"
 fillCancel: "&e[P0] fill task cancelled for region [region]"
