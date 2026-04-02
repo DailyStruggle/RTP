@@ -23,6 +23,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
+import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 public class Region extends FactoryValue<RegionKeys> {
@@ -40,6 +41,7 @@ public class Region extends FactoryValue<RegionKeys> {
   protected RTPWorld<?> savedWorld = null;
 
   private RegionSettings settings;
+  public Shape<?> shape;
 
   public Region(String name, RegionSettings settings) {
     super(RegionKeys.class, name);
@@ -49,14 +51,33 @@ public class Region extends FactoryValue<RegionKeys> {
     this.cachePipeline = (RTPTaskPipe) RTP.serverAccessor.createCachePipe();
     this.miscPipeline = (RTPTaskPipe) RTP.serverAccessor.createTaskPipe();
 
-    Shape<?> shape = settings.shape();
-    if (shape != null) shape.spatialResolution = settings.spatialResolution();
+    this.shape = settings.shape();
+    if (this.shape == null) {
+      this.shape = (Shape<?>) RTP.selectionAPI.shapeFactory.get("SQUARE");
+      RTP.log(Level.WARNING, "Shape for region " + name + " was invalid. Falling back to SQUARE.");
+      this.settings = new RegionSettings(
+          settings.name(),
+          settings.world(),
+          this.shape,
+          settings.vert(),
+          settings.worldBorderOverride(),
+          settings.requirePermission(),
+          settings.cacheCap(),
+          settings.activeChunkCap(),
+          settings.price(),
+          settings.spatialResolution(),
+          settings.override(),
+          settings.detailedRegionInit()
+      );
+    }
 
-    if (shape instanceof MemoryShape<?>) {
+    if (this.shape != null) this.shape.spatialResolution = settings.spatialResolution();
+
+    if (this.shape instanceof MemoryShape<?>) {
       long[] progress = FillTask.loadProgress(name);
       if (progress != null) {
         long iter = progress[0];
-        if (iter > 0 && iter < Double.valueOf(((MemoryShape<?>) shape).getRange()).longValue()) {
+        if (iter > 0 && iter < Double.valueOf(((MemoryShape<?>) this.shape).getRange()).longValue()) {
           FillTask task = new FillTask(this, iter);
           RTP.getInstance().fillTasks.put(name, task);
           RTP.scheduler.runTaskAsynchronously(task);
@@ -80,8 +101,9 @@ public class Region extends FactoryValue<RegionKeys> {
 
   public void setSettings(RegionSettings settings) {
     this.settings = settings;
+    this.shape = settings.shape();
     this.set(RegionKeys.spatialResolution, settings.spatialResolution());
-    if (settings.shape() != null) settings.shape().spatialResolution = settings.spatialResolution();
+    if (this.shape != null) this.shape.spatialResolution = settings.spatialResolution();
     long cacheCap = settings.cacheCap();
     long playerQueueSize = queueManager.playerQueue.size();
     long totalCap = Math.max(cacheCap, playerQueueSize);
@@ -175,6 +197,7 @@ public class Region extends FactoryValue<RegionKeys> {
     if (!isRefillingCache.compareAndSet(false, true)) return;
     try {
       long deficit = totalCap - (cachePipeline.size() + queueManager.locationQueue.size() + inFlightCalculations.get());
+      RTP.log(java.util.logging.Level.INFO, "[RTP-Debug] Region " + name + " cache deficit: " + deficit + " | inFlight: " + inFlightCalculations.get() + " | cachePipeline size: " + cachePipeline.size());
       for (long i = 0; i < deficit; i++) {
         cachePipeline.add(new RegionCacheTask(this));
       }
@@ -336,11 +359,12 @@ public class Region extends FactoryValue<RegionKeys> {
   public Shape<?> getShape() {
     boolean wbo = settings.worldBorderOverride();
     RTPWorld<?> world = getWorld();
-    Shape<?> shape = settings.shape();
+    Shape<?> shape = this.shape;
 
     if (wbo) {
       Shape<?> worldShape = ((WorldBorder) RTP.serverAccessor.getWorldBorder(world.name())).getShape().get();
       if (!worldShape.equals(shape)) {
+        this.shape = worldShape;
         shape = worldShape;
         settings = new RegionSettings(
             settings.name(),

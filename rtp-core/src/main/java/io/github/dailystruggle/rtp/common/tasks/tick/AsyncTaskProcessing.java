@@ -31,6 +31,10 @@ public final class AsyncTaskProcessing extends RTPRunnable {
 
   @Override
   public void run() {
+    if (trackingId != null) {
+      io.github.dailystruggle.rtp.common.tools.MemoryTracker.updateTracking(trackingId);
+    }
+
     try {
       futuresSemaphore.acquire();
       List<CompletableFuture<?>> futures = new ArrayList<>(RTP.futures.size());

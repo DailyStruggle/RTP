@@ -1,9 +1,12 @@
 package io.github.dailystruggle.rtp.common.tasks;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
+import java.util.UUID;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class RTPRunnable implements Runnable, RTPCancellable, RTPDelayable {
+  protected UUID trackingId;
+
   public void runWithTracking() {
     long start = System.nanoTime();
     try {
@@ -40,8 +43,8 @@ public class RTPRunnable implements Runnable, RTPCancellable, RTPDelayable {
   }
 
   protected RTPRunnable(long maxLifespan) {
-    io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(
-        this, this.getClass().getSimpleName(), maxLifespan);
+    this.trackingId = io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(
+            this, this.getClass().getSimpleName(), maxLifespan);
     runnable = null;
   }
 
@@ -79,6 +82,9 @@ public class RTPRunnable implements Runnable, RTPCancellable, RTPDelayable {
 
   @Override
   public void run() {
+    if (trackingId != null) {
+      io.github.dailystruggle.rtp.common.tools.MemoryTracker.updateTracking(trackingId);
+    }
     if (runnable != null) runnable.run();
   }
 }

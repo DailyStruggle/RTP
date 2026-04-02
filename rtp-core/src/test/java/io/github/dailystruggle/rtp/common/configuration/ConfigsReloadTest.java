@@ -111,7 +111,7 @@ public class ConfigsReloadTest {
         // 3. Assert that configParserMap and multiConfigParserMap do not retain stale references
         // Actually the issue is about NPEs during rapid reload and preventing memory leaks.
         // If it's atomic, NPEs should be minimized/eliminated.
-        System.out.println("[DEBUG_LOG] npeCount: " + npeCount.get());
+
         assertEquals(0, npeCount.get(), "Expected zero NPEs during rapid reload with atomic swapping");
     }
 }

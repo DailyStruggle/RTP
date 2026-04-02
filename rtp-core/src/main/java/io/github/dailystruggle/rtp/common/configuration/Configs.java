@@ -48,7 +48,6 @@ public class Configs {
     this.pluginDirectory = pluginDirectory;
     this.fileDatabase = new YamlFileDatabase(pluginDirectory);
     this.fileDatabase.connect();
-    reloadAction();
     //        this.fileDatabase.disconnect( connect );
   }
 
@@ -193,7 +192,7 @@ public class Configs {
   }
 
   /** Action to perform during reload */
-  protected void reloadAction() {
+  public void reloadAction() {
     for (Region r : RTP.selectionAPI.permRegionLookup.values()) {
       r.shutDown();
     }
@@ -285,8 +284,8 @@ public class Configs {
           .add(
               new RTPRunnable(
                   () -> {
-                    Region r = RTP.selectionAPI.permRegionLookup.get(region.name);
-                    if (r != null) r.getShape().select();
+                    if (region.getShape() == null) return;
+                    region.getShape().select();
                   },
                   60));
     }

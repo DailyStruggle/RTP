@@ -147,14 +147,14 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
 
   @Override
   public boolean onCommand(CommandSender sender, org.bukkit.command.Command command, String label, String[] args) {
-    System.out.println("[DEBUG_LOG] RTPCmdBukkit.onCommand called label=" + label);
-    Bukkit.getLogger().info("[DEBUG_LOG] RTPCmdBukkit.onCommand(CommandSender, ...) called with label: " + label + " and args: " + java.util.Arrays.toString(args));
+
+
     boolean valid = true;
     for (Predicate<CommandSender> commandSenderPredicate : senderChecks) {
       valid &= commandSenderPredicate.test(sender);
     }
     if (!valid) {
-      Bukkit.getLogger().info("[DEBUG_LOG] RTPCmdBukkit.onCommand(CommandSender, ...) sender checks failed.");
+
       return false;
     }
     return onCommand(
@@ -172,7 +172,7 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
       UUID senderId,
       Map<String, List<String>> parameterValues,
       CommandsAPICommand nextCommand) {
-    Bukkit.getLogger().info("[DEBUG_LOG] RTPCmdBukkit.onCommand(UUID, ...) called for senderId: " + senderId + ", nextCommand: " + (nextCommand != null ? nextCommand.getClass().getName() : "null"));
+
     if (nextCommand != null) return nextCommand.onCommand(senderId, parameterValues, null);
 
     boolean valid = true;
@@ -181,7 +181,7 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
             ? Bukkit.getConsoleSender()
             : Bukkit.getPlayer(senderId);
     if (sender == null) {
-        Bukkit.getLogger().info("[DEBUG_LOG] RTPCmdBukkit.onCommand(UUID, ...) sender is null.");
+
         return false;
     }
 
@@ -189,7 +189,7 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
       valid &= commandSenderPredicate.test(sender);
     }
     if (!valid) {
-      Bukkit.getLogger().info("[DEBUG_LOG] RTPCmdBukkit.onCommand(UUID, ...) sender checks failed.");
+
       return false;
     }
 
@@ -201,7 +201,7 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
       CommandSender sender,
       Map<String, List<String>> parameterValues,
       CommandsAPICommand nextCommand) {
-    Bukkit.getLogger().info("[DEBUG_LOG] RTPCmdBukkit.onCommand(CommandSender, Map, ...) called, nextCommand: " + (nextCommand != null ? nextCommand.getClass().getName() : "null"));
+
     if (nextCommand != null) return nextCommand.onCommand(
             sender instanceof Player ? ((Player) sender).getUniqueId() : io.github.dailystruggle.rtp.api.RTPAPI.serverId,
             parameterValues, null);
@@ -211,7 +211,7 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
       valid &= commandSenderPredicate.test(sender);
     }
     if (!valid) {
-      Bukkit.getLogger().info("[DEBUG_LOG] RTPCmdBukkit.onCommand(CommandSender, Map, ...) sender checks failed.");
+
       return false;
     }
     UUID uuid =

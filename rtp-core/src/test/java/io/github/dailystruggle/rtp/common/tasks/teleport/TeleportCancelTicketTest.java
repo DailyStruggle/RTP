@@ -132,7 +132,7 @@ public class TeleportCancelTicketTest {
 
     @Test
     void testCancelledPipelineReleasesChunkTickets() {
-        System.out.println("[DEBUG_LOG] Starting testCancelledPipelineReleasesChunkTickets");
+
         try (MockedStatic<RTP> rtpStatic = mockStatic(RTP.class)) {
             rtpStatic.when(RTP::getInstance).thenReturn(rtp);
 
@@ -170,7 +170,7 @@ public class TeleportCancelTicketTest {
             // Actually, for this test, let's just ensure it's in "kept" state.
             mockChunkSet.keep(true, world);
             verify(mockChunkSet, atLeastOnce()).keep(true, world);
-            System.out.println("[DEBUG_LOG] Verified keep(true) applied to mockChunkSet");
+
 
             // Initialize teleport data for the player
             TeleportData teleportData = new TeleportData();
@@ -181,21 +181,21 @@ public class TeleportCancelTicketTest {
             rtp.latestTeleportData.put(player.uuid(), teleportData);
 
             // Trigger cancellation via RTPTeleportCancel (Instruction 2)
-            System.out.println("[DEBUG_LOG] Triggering RTPTeleportCancel");
+
             new RTPTeleportCancel(player.uuid()).run();
 
             // The task should now be cancelled
             assertTrue(task.isCancelled());
-            System.out.println("[DEBUG_LOG] Verified task is cancelled");
+
 
             // Assert via Mockito that the cancellation strictly notified the server to drop the ticket (Instruction 3)
             // It should have been called by RTPTeleportCancel.refund() -> regionChunkManager.removeChunks()
             verify(mockChunkSet, atLeastOnce()).keep(false, world);
-            System.out.println("[DEBUG_LOG] Verified keep(false) was called during cancellation");
+
 
             // Even if we run the task now, it should go to cleanup but not call keep(false) again if already released
             task.run();
-            System.out.println("[DEBUG_LOG] Ran task after cancellation");
+
         }
     }
 }
