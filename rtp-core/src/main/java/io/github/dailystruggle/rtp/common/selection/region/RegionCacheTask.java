@@ -9,9 +9,6 @@ import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
-import jdk.incubator.vector.IntVector;
-import jdk.incubator.vector.VectorMask;
-import jdk.incubator.vector.VectorSpecies;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,8 +16,6 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 public class RegionCacheTask extends RTPRunnable {
-    private static final VectorSpecies<Integer> SPECIES = IntVector.SPECIES_PREFERRED;
-    private static final int[] IOTA_ARRAY = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
     private final Region region;
     private final UUID playerId;
     private final long selectRadius;
@@ -89,40 +84,11 @@ public class RegionCacheTask extends RTPRunnable {
                     }
 
                     List<CompletableFuture<Long>> chunks = new ArrayList<>((int) sz);
-                    Shape<?> shape = region.getShape();
                     RTPWorld<?> world = region.getWorld();
 
-                    if (shape instanceof MemoryShape<?> memoryShape) {
-                        IntVector iota = IntVector.fromArray(SPECIES, IOTA_ARRAY, 0);
-
-                        for (int i = -radius; i <= radius; i++) {
-                            IntVector xVec = IntVector.broadcast(SPECIES, cx + i);
-
-                            for (int j = -radius; j <= radius; j += SPECIES.length()) {
-                                VectorMask<Integer> loopMask = SPECIES.indexInRange(j, radius + 1);
-                                IntVector zVec = iota.add(cz + j);
-
-                                VectorMask<Integer> mask = memoryShape.contains(xVec, zVec, loopMask);
-
-                                if (mask.anyTrue()) {
-                                    for (int k = 0; k < SPECIES.length(); k++) {
-                                        if (mask.laneIsSet(k)) {
-                                            chunks.add(RTP.serverAccessor.getChunkManager().getChunkAtAsync(world, cx + i, cz + j + k));
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        for (int i = -radius; i <= radius; i++) {
-                            for (int j = -radius; j <= radius; j += SPECIES.length()) {
-                                VectorMask<Integer> loopMask = SPECIES.indexInRange(j, radius + 1);
-                                for (int k = 0; k < SPECIES.length(); k++) {
-                                    if (loopMask.laneIsSet(k) && shape.contains(cx + i, cz + j + k)) {
-                                        chunks.add(RTP.serverAccessor.getChunkManager().getChunkAtAsync(world, cx + i, cz + j + k));
-                                    }
-                                }
-                            }
+                    for (int i = -radius; i <= radius; i++) {
+                        for (int j = -radius; j <= radius; j ++) {
+                            chunks.add(RTP.serverAccessor.getChunkManager().getChunkAtAsync(world, cx + i, cz + j));
                         }
                     }
 
@@ -134,48 +100,31 @@ public class RegionCacheTask extends RTPRunnable {
                 }
             }
 
-            chunkSet.whenComplete(
-                    aBoolean -> {
-                        if (isCancelled()) {
-                            RTP.scheduler.runTask(region.getWorld(), coords.x() >> 4, coords.z() >> 4, () -> {
-                                chunkSet.keep(false, region.getWorld());
-                            });
-                            region.chunkManager.removeChunkSet(coords);
-                            CachedLocationPool.release(pair);
-                            region.inFlightCalculations.decrementAndGet();
-                            return;
-                        }
-                        if (aBoolean) {
-                            if (playerId == null) {
-                                region.queueManager.locationQueue.offer(pair);
-                                if (region.queueManager.locationQueue.size() > region.getSettings().activeChunkCap()) {
-                                    RTP.scheduler.runTask(region.getWorld(), coords.x() >> 4, coords.z() >> 4, () -> {
-                                        chunkSet.keep(false, region.getWorld());
-                                    });
-                                }
-                            } else if (region.queueManager.fastLocations.containsKey(playerId)
-                                    && !region.queueManager.fastLocations.get(playerId).isDone()) {
-                                region.queueManager.fastLocations.get(playerId).complete(pair);
-                            } else {
-                                region.queueManager.perPlayerLocationQueue.putIfAbsent(
-                                        playerId, new java.util.concurrent.ConcurrentLinkedQueue<>());
-                                java.util.concurrent.ConcurrentLinkedQueue<CachedLocation> q = region.queueManager.perPlayerLocationQueue.get(playerId);
-                                q.offer(pair);
-                                if (q.size() > region.getSettings().activeChunkCap()) {
-                                    RTP.scheduler.runTask(region.getWorld(), coords.x() >> 4, coords.z() >> 4, () -> {
-                                        chunkSet.keep(false, region.getWorld());
-                                    });
-                                }
-                            }
+            chunkSet.whenComplete(aBoolean -> {
+                try {
+                    if (isCancelled() || !aBoolean) {
+                        region.chunkManager.removeTicket(coords); // Release entire radius
+                        CachedLocationPool.release(pair);
+                        return;
+                    }
+
+                    region.chunkManager.removeTicket(coords);
+
+                    if (playerId == null) {
+                        if (region.queueManager.locationQueue.size() < region.getSettings().activeChunkCap()) {
+                            region.chunkManager.addTicket(coords); // Center only
+                            region.queueManager.locationQueue.offer(pair);
                         } else {
-                            RTP.scheduler.runTask(region.getWorld(), coords.x() >> 4, coords.z() >> 4, () -> {
-                                chunkSet.keep(false, region.getWorld());
-                            });
-                            region.chunkManager.removeChunkSet(coords);
                             CachedLocationPool.release(pair);
                         }
-                        region.inFlightCalculations.decrementAndGet();
-                    });
+                    } else {
+                        region.chunkManager.addTicket(coords);
+                        region.queueManager.enqueuePlayerLocation(playerId, pair);
+                    }
+                } finally {
+                    region.inFlightCalculations.decrementAndGet();
+                }
+            });
         } else {
             region.inFlightCalculations.decrementAndGet();
         }
