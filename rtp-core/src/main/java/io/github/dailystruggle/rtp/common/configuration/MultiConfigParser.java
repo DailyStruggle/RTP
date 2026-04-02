@@ -92,6 +92,18 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
     Map<String, YamlFile> connect = this.fileDatabase.connect();
     this.fileDatabase.disconnect(connect);
 
+    try {
+      File[] files = myDirectory.listFiles();
+      if (files == null) {
+//        System.out.println("[RTP-DEBUG] MultiConfig: listFiles() returned null for " + myDirectory.getAbsolutePath());
+      }
+
+//      System.out.println("[RTP-DEBUG] MultiConfig: Loaded " + files.length + " files for " + name);
+
+    } catch (Throwable T) {
+      T.printStackTrace();
+    }
+
     this.langMap =
         new File(
             pluginDirectory.getAbsolutePath()

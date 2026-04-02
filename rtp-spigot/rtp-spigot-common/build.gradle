@@ -6,7 +6,7 @@ dependencies {
     api project(':rtp-api')
     api project(':rtp-core')
     compileOnly 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
-    compileOnly 'io.papermc:paperlib:1.0.7'
+    implementation 'io.papermc:paperlib:1.0.7'
     compileOnly 'me.clip:placeholderapi:2.11.6'
     implementation 'xyz.tozymc.spigot:title-api:1.0'
     implementation 'io.github.dailystruggle:CommandsAPI:1.0.0-RELEASE'

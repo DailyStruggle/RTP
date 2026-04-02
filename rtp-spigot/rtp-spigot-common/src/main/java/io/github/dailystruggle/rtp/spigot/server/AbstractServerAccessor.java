@@ -266,79 +266,63 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   @Override
   public void sendMessage(UUID target, MessagesKeys msgType, String tag) {
-
     ConfigParser<MessagesKeys> lang =
-        (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+            (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
     String message = lang.getConfigValue(msgType, "").toString();
-    message = tagMessage(message, tag);
-    if (target.equals(RTPAPI.serverId)) {
-      Bukkit.getConsoleSender().sendMessage(message);
-      return;
-    }
-    Player player = Bukkit.getPlayer(target);
-    if (player != null) player.sendMessage(message);
+    sendMessage(target, message, tag);
   }
 
   @Override
   public void sendMessage(UUID target1, UUID target2, MessagesKeys msgType, String tag) {
-
     ConfigParser<MessagesKeys> lang =
-        (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+            (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
     String message = lang.getConfigValue(msgType, "").toString();
-    message = tagMessage(message, tag);
-    if (target1.equals(RTPAPI.serverId)) {
-      Bukkit.getConsoleSender().sendMessage(message);
-    } else {
-      Player p1 = Bukkit.getPlayer(target1);
-      if (p1 != null) p1.sendMessage(message);
-    }
-    if (target2.equals(RTPAPI.serverId)) {
-      Bukkit.getConsoleSender().sendMessage(message);
-    } else {
-      Player p2 = Bukkit.getPlayer(target2);
-      if (p2 != null && !target2.equals(target1)) p2.sendMessage(message);
-    }
+    sendMessage(target1, target2, message, tag);
   }
 
   @Override
   public void sendMessage(UUID target, String message, String tag) {
-
     message = tagMessage(message, tag);
     if (target.equals(RTPAPI.serverId)) {
-      Bukkit.getConsoleSender().sendMessage(message);
+      io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(Bukkit.getConsoleSender(), message);
       return;
     }
     Player player = Bukkit.getPlayer(target);
-    if (player != null) player.sendMessage(message);
+    if (player != null) io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(player, message);
   }
 
   @Override
   public void sendMessageAndSuggest(UUID target, String message, String suggestion) {
     message = tagMessage(message, null);
-    // Implementation
+    RTPCommandSender sender = getSender(target);
+    // Routes the suggestion safely as a click event via your formatting pipeline
+    io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(sender, message, "", suggestion);
   }
 
   @Override
   public void sendMessage(UUID target1, UUID target2, String message, String tag) {
-
     message = tagMessage(message, tag);
+
     if (target1.equals(RTPAPI.serverId)) {
-      Bukkit.getConsoleSender().sendMessage(message);
+      io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(Bukkit.getConsoleSender(), message);
     } else {
       Player p1 = Bukkit.getPlayer(target1);
-      if (p1 != null) p1.sendMessage(message);
+      if (p1 != null) io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(p1, message);
     }
+
+    // Prevent double sending if target1 and target2 are the exact same entity
+    if (target1.equals(target2)) return;
+
     if (target2.equals(RTPAPI.serverId)) {
-      Bukkit.getConsoleSender().sendMessage(message);
+      io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(Bukkit.getConsoleSender(), message);
     } else {
       Player p2 = Bukkit.getPlayer(target2);
-      if (p2 != null && !target2.equals(target1)) p2.sendMessage(message);
+      if (p2 != null) io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(p2, message);
     }
   }
 
   @Override
   public void sendMessage(RTPCommandSender target, String message, String hover, String click, String tag) {
-
     io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(target, tagMessage(message, tag), hover, click);
   }
 

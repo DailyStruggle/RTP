@@ -117,7 +117,7 @@ public interface RTPCmd extends BaseRTPCmd {
       return true;
     }
     if (nextCommand != null) {
-      return nextCommand.onCommand(senderId, rtpArgs, null);
+      return true;
     }
 
     RTPCommandSender sender = RTP.serverAccessor.getSender(senderId);

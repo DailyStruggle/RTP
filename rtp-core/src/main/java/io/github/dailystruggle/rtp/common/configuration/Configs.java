@@ -267,7 +267,9 @@ public class Configs {
       }
     }
 
+//    System.out.println("[RTP-DEBUG] Configs: Starting region loop. Map size: " + regions.configParserFactory.map.size());
     for (ConfigParser<RegionKeys> regionConfig : regions.configParserFactory.map.values()) {
+//      System.out.println("[RTP-DEBUG] Configs: Processing region: " + regionConfig.name);
       RegionSettings settings = RegionConfigLoader.load(regionConfig);
       String name = settings.name();
 
