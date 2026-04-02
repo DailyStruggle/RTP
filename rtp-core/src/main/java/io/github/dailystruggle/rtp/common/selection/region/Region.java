@@ -123,6 +123,8 @@ public class Region extends FactoryValue<RegionKeys> {
     long start = System.nanoTime();
     long currentAvailable = availableTime;
 
+//    System.out.println("[RTP-DEBUG] Region '" + name + "' execute() STARTED. Initial budget: " + availableTime + "ns");
+
     while (!queueManager.locationQueue.isEmpty() && !queueManager.playerQueue.isEmpty()) {
       UUID playerId = queueManager.playerQueue.poll();
       if (playerId == null) break;
@@ -173,11 +175,11 @@ public class Region extends FactoryValue<RegionKeys> {
           data.delay = sender.delay();
           data.targetRegion = this;
           data.originalCoords =
-              new RTPCoords(
-                  player.getLocation().world().name(),
-                  player.getLocation().x(),
-                  player.getLocation().y(),
-                  player.getLocation().z());
+                  new RTPCoords(
+                          player.getLocation().world().name(),
+                          player.getLocation().x(),
+                          player.getLocation().y(),
+                          player.getLocation().z());
           RTP.getInstance().latestTeleportData.put(id, data);
         }
         data.queueLocation = i;
@@ -186,21 +188,33 @@ public class Region extends FactoryValue<RegionKeys> {
     }
 
     currentAvailable = availableTime - (System.nanoTime() - start);
-    if (currentAvailable <= 0) return;
+    if (currentAvailable <= 0) {
+//      System.out.println("[RTP-DEBUG] Region '" + name + "' ABORT 1: Out of time after player queue processing. (Remaining: " + currentAvailable + "ns)");
+      return;
+    }
 
-    boolean miscFinished = miscPipeline.execute(currentAvailable);
-    if (!miscFinished) return;
+//    System.out.println("[RTP-DEBUG] Region '" + name + "' processing miscPipeline. Budget: " + currentAvailable + "ns");
+    miscPipeline.execute(currentAvailable);
+
     currentAvailable = availableTime - (System.nanoTime() - start);
-    if (currentAvailable <= 0) return;
+//    System.out.println("[RTP-DEBUG] Region '" + name + "' finished miscPipeline. Remaining budget for cache: " + currentAvailable + "ns");
 
     long totalCap = Math.max(settings.cacheCap(), queueManager.playerQueue.size());
-    if (!isRefillingCache.compareAndSet(false, true)) return;
+
+    if (!isRefillingCache.compareAndSet(false, true)) {
+//      System.out.println("[RTP-DEBUG] Region '" + name + "' ABORT 2: isRefillingCache lock is currently held by another thread.");
+      return;
+    }
+
     try {
       long deficit = totalCap - (cachePipeline.size() + queueManager.locationQueue.size() + inFlightCalculations.get());
-      RTP.log(java.util.logging.Level.INFO, "[RTP-Debug] Region " + name + " cache deficit: " + deficit + " | inFlight: " + inFlightCalculations.get() + " | cachePipeline size: " + cachePipeline.size());
+//      System.out.println("[RTP-DEBUG] Region '" + name + "' caching phase. Deficit: " + deficit + " | inFlight: " + inFlightCalculations.get() + " | cachePipeSize: " + cachePipeline.size());
+
       for (long i = 0; i < deficit; i++) {
         cachePipeline.add(new RegionCacheTask(this));
       }
+
+//      System.out.println("[RTP-DEBUG] Region '" + name + "' executing cachePipeline with budget: " + currentAvailable + "ns");
       cachePipeline.execute(currentAvailable);
     } finally {
       isRefillingCache.set(false);

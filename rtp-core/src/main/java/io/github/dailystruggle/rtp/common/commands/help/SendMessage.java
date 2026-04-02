@@ -8,6 +8,6 @@ public class SendMessage {
         if (message == null || message.isEmpty()) return message;
         String sig = SupportInfo.getSig();
         if (tag == null || tag.isEmpty()) tag = "MSG";
-        return message + " \u00A78(" + sig + ":" + tag + ")";
+        return message + " §8(" + sig + ":" + tag + ")";
     }
 }

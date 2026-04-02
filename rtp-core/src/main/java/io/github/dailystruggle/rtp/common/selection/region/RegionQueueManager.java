@@ -34,7 +34,6 @@ public class RegionQueueManager {
         if (fastLocations.containsKey(id)) return fastLocations.get(id);
         CompletableFuture<CachedLocation> res = new CompletableFuture<>();
         fastLocations.put(id, res);
-        region.miscPipeline.add(new RegionCacheTask(region, id));
         return res;
     }
 

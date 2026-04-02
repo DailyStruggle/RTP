@@ -108,6 +108,10 @@ public class FillTask extends RTPRunnable {
 
   @Override
   public void run() {
+    if (trackingId != null) {
+      io.github.dailystruggle.rtp.common.tools.MemoryTracker.updateTracking(trackingId);
+    }
+
     if (!isRunning.compareAndSet(false, true)) return;
     if (pause.get() || isCancelled() || fillIncrement.get() <= 0) {
       if (pause.get() || isCancelled()) save();

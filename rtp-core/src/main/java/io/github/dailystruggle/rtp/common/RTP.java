@@ -80,6 +80,16 @@ public class RTP {
     factoryMap.put(factoryNames.vert, verticalAdjustorFactory);
     factoryMap.put(factoryNames.singleConfig, new Factory<ConfigParser<?>>());
     factoryMap.put(factoryNames.multiConfig, new Factory<MultiConfigParser<?>>());
+
+    // --- INJECT IMPLEMENTATIONS INTO THE API ---
+    // This safely routes RTPAPI calls directly to the RTP core methods
+    io.github.dailystruggle.rtp.api.RTPAPI.shapeAdder = shapeObj -> {
+      if (shapeObj instanceof Shape<?>) addShape((Shape<?>) shapeObj);
+    };
+
+    io.github.dailystruggle.rtp.api.RTPAPI.vertAdder = vertObj -> {
+      if (vertObj instanceof VerticalAdjustor<?>) addVerticalAdjustor((VerticalAdjustor<?>) vertObj);
+    };
   }
 
   public final ConcurrentHashMap<UUID, TeleportData> priorTeleportData = new ConcurrentHashMap<>();
@@ -175,8 +185,12 @@ public class RTP {
         60,
         60);
 
-    scheduler.runTaskTimer(() -> miscSyncTasks.execute(TimeUnit.MILLISECONDS.toNanos(1)), 1, 1);
-    scheduler.runTaskTimerAsynchronously(() -> miscAsyncTasks.execute(TimeUnit.MILLISECONDS.toNanos(1)), 1, 1);
+    long syncTime = TimeUnit.MILLISECONDS.toNanos(5);
+    scheduler.runTaskTimer(new io.github.dailystruggle.rtp.common.tasks.tick.SyncTaskProcessing(syncTime), 1, 1);
+
+    long asyncTime = TimeUnit.MILLISECONDS.toNanos(25); // Bumped to 5ms since async has more headroom
+    scheduler.runTaskTimerAsynchronously(new io.github.dailystruggle.rtp.common.tasks.tick.AsyncTaskProcessing(asyncTime), 1, 1);
+
   }
 
   public static void handleMigration(String previousState, String currentState) {

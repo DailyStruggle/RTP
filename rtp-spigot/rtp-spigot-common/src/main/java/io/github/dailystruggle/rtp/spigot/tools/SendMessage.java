@@ -730,9 +730,9 @@ public class SendMessage {
     while (matcher1.find()) {
       String hexColor = text.substring(matcher1.start(), matcher1.end());
       String bukkitColor;
-      StringBuilder bukkitColorCode = new StringBuilder("\u00A7x");
+      StringBuilder bukkitColorCode = new StringBuilder("§x");
       for (int i = hexColor.indexOf('#') + 1; i < hexColor.length(); i++) {
-        bukkitColorCode.append("\u00A7").append(hexColor.charAt(i));
+        bukkitColorCode.append("§").append(hexColor.charAt(i));
       }
       bukkitColor = bukkitColorCode.toString().toLowerCase();
       text = text.replaceAll(hexColor, bukkitColor);

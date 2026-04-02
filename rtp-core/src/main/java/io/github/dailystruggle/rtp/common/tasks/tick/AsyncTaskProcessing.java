@@ -31,6 +31,8 @@ public final class AsyncTaskProcessing extends RTPRunnable {
 
   @Override
   public void run() {
+//    System.out.println("[RTP-DEBUG] AsyncTaskProcessing: Tick started.");
+
     if (trackingId != null) {
       io.github.dailystruggle.rtp.common.tools.MemoryTracker.updateTracking(trackingId);
     }
@@ -61,12 +63,15 @@ public final class AsyncTaskProcessing extends RTPRunnable {
     long period = 0;
     if (RTP.configs != null) {
       ConfigParser<PerformanceKeys> perf =
-          (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+              (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
       if (perf != null) period = perf.getNumber(PerformanceKeys.period, 0).longValue();
     }
 
     List<Region> regions = new ArrayList<>(RTP.selectionAPI.permRegionLookup.values());
     int size = regions.size();
+
+//    System.out.println("[RTP-DEBUG] AsyncTaskProcessing: Found " + size + " regions. Period: " + period);
+
     if (size == 0) return;
     if (period < size) period = size;
 
@@ -77,10 +82,15 @@ public final class AsyncTaskProcessing extends RTPRunnable {
       stepSemaphore.acquire();
       if (betweenTime <= 0) betweenStep = 0;
       else betweenStep = AsyncTaskProcessing.betweenStep.incrementAndGet() % betweenTime;
+
       step = AsyncTaskProcessing.step.get();
       if (betweenStep == 0) step = (step + 1) % size;
+
       AsyncTaskProcessing.betweenStep.set(betweenStep);
       AsyncTaskProcessing.step.set(step);
+
+//      System.out.println("[RTP-DEBUG] AsyncTaskProcessing: Math calculated -> betweenTime: " + betweenTime + " | betweenStep: " + betweenStep + " | step: " + step);
+
     } catch (InterruptedException e) {
       RTP.log(Level.WARNING, e.getMessage(), e);
       return;
@@ -92,7 +102,10 @@ public final class AsyncTaskProcessing extends RTPRunnable {
     if (betweenStep == 0) {
       if (isCancelled()) return;
       if (regions.size() < step) return;
+
       Region region = regions.get((int) step);
+//      System.out.println("[RTP-DEBUG] AsyncTaskProcessing: Invoking execute() for region: " + region.name);
+
       region.execute(availableTime - (System.nanoTime() - start));
     }
   }
