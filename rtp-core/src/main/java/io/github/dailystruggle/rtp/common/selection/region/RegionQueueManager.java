@@ -48,13 +48,6 @@ public class RegionQueueManager {
     }
 
     /**
-     * onPlayerPop - logic to run after a player is popped from the queue
-     */
-    public void onPlayerPop() {
-
-    }
-
-    /**
      * poll - get a location for a player from the queue, prioritizing fastLocations, then perPlayerLocationQueue, then locationQueue
      * @param uuid player uuid
      * @return location or null if none available

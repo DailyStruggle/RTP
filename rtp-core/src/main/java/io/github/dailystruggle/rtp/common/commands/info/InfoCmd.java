@@ -52,7 +52,7 @@ public class InfoCmd extends BaseRTPCmdImpl {
     regionDataLookup.put("region", region -> region.name);
     regionDataLookup.put("world", region -> region.getWorld().name());
     regionDataLookup.put("shape", region -> region.getShape().name);
-    regionDataLookup.put("cacheCap", region -> region.getNumber(RegionKeys.cacheCap, 0).toString());
+    regionDataLookup.put("cacheCap", region -> String.valueOf(region.getSettings().cacheCap()));
     regionDataLookup.put("cached", region -> String.valueOf(region.queueManager.getPublicQueueLength()));
     regionDataLookup.put("locationQueue", region -> String.valueOf(region.queueManager.locationQueue.size()));
     regionDataLookup.put("locAssChunks", region -> String.valueOf(region.chunkManager.locAssChunks.size()));

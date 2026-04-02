@@ -31,55 +31,6 @@ public class RegionQueueManagerTest {
     }
 
     @Test
-    void testOnPlayerPopWarmsUpCorrectLocation() {
-        when(settings.activeChunkCap()).thenReturn(3);
-
-        RTPCoords loc0 = new RTPCoords("world", 0, 0, 0);
-        RTPCoords loc1 = new RTPCoords("world", 16, 0, 16);
-        RTPCoords loc2 = new RTPCoords("world", 32, 0, 32);
-        RTPCoords loc3 = new RTPCoords("world", 48, 0, 48);
-
-        queueManager.locationQueue.add(new CachedLocation(loc0, 1L));
-        queueManager.locationQueue.add(new CachedLocation(loc1, 1L));
-        queueManager.locationQueue.add(new CachedLocation(loc2, 1L));
-        queueManager.locationQueue.add(new CachedLocation(loc3, 1L));
-
-        queueManager.locationQueue.poll();
-        queueManager.onPlayerPop();
-
-        verifyNoInteractions(chunkManager);
-    }
-
-    @Test
-    void testOnPlayerPopWithSmallQueue() {
-        when(settings.activeChunkCap()).thenReturn(5);
-
-        RTPCoords loc0 = new RTPCoords("world", 0, 0, 0);
-        RTPCoords loc1 = new RTPCoords("world", 16, 0, 16);
-        RTPCoords loc2 = new RTPCoords("world", 32, 0, 32);
-
-        queueManager.locationQueue.add(new CachedLocation(loc0, 1L));
-        queueManager.locationQueue.add(new CachedLocation(loc1, 1L));
-        queueManager.locationQueue.add(new CachedLocation(loc2, 1L));
-
-        queueManager.locationQueue.poll();
-        queueManager.onPlayerPop();
-
-        verifyNoInteractions(chunkManager);
-    }
-
-    @Test
-    void testOnPlayerPopWithZeroCap() {
-        when(settings.activeChunkCap()).thenReturn(0);
-        RTPCoords loc0 = new RTPCoords("world", 0, 0, 0);
-        queueManager.locationQueue.add(new CachedLocation(loc0, 1L));
-        queueManager.locationQueue.poll();
-        queueManager.onPlayerPop();
-
-        verifyNoInteractions(chunkManager);
-    }
-
-    @Test
     void testPriorityPolling() {
         java.util.UUID uuid = java.util.UUID.randomUUID();
         RTPCoords fastLoc = new RTPCoords("world", 1, 1, 1);

@@ -3,9 +3,7 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.NormalDistributionParams;
-import jdk.incubator.vector.IntVector;
-import jdk.incubator.vector.VectorMask;
-import jdk.incubator.vector.VectorOperators;
+
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
@@ -171,30 +169,9 @@ public class Square_Normal extends MemoryShape<NormalDistributionParams> {
     return ((radius * radius - cr * cr) * 4) + perimeterStep;
   }
 
-  @Override
-  public boolean contains(int x, int z) {
-    long rChunks = getNumber(NormalDistributionParams.radius, 0L).longValue() >> 4;
-    long rxc = getNumber(NormalDistributionParams.centerX, 0L).longValue() >> 4;
-    long rzc = getNumber(NormalDistributionParams.centerZ, 0L).longValue() >> 4;
-    return Math.abs(x - rxc) <= rChunks && Math.abs(z - rzc) <= rChunks;
-  }
 
-  @Override
-  public VectorMask<Integer> contains(IntVector xVec, IntVector zVec, VectorMask<Integer> mask) {
-    long rChunks = getNumber(NormalDistributionParams.radius, 0L).longValue() >> 4;
-    long rxc = getNumber(NormalDistributionParams.centerX, 0L).longValue() >> 4;
-    long rzc = getNumber(NormalDistributionParams.centerZ, 0L).longValue() >> 4;
 
-    IntVector rxcVec = IntVector.broadcast(xVec.species(), (int) rxc);
-    IntVector rzcVec = IntVector.broadcast(xVec.species(), (int) rzc);
 
-    IntVector dx = xVec.sub(rxcVec).abs();
-    IntVector dz = zVec.sub(rzcVec).abs();
-
-    return dx.compare(VectorOperators.LE, (int) rChunks)
-            .and(dz.compare(VectorOperators.LE, (int) rChunks))
-            .and(mask);
-  }
 
   @Override
   public long xzToLocation(MutableRTPCoords coords) {
