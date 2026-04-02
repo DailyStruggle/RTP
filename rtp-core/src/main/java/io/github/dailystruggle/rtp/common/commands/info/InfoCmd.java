@@ -148,10 +148,28 @@ public class InfoCmd extends BaseRTPCmdImpl {
                     callerId, msg, "rtp info region:" + region.name);
               });
 
-      RTP rtp = RTP.getInstance();
-      long activeTickets = ChunkSet.ACTIVE_CHUNK_TICKETS.get();
-      long totalLoads = ChunkSet.TOTAL_CHUNK_LOADS.get();
-      double leakRate = (totalLoads > 0) ? ((double) activeTickets / totalLoads) * 100.0 : 0.0;
+
+        RTP rtp = RTP.getInstance();
+        long activeTickets = ChunkSet.ACTIVE_CHUNK_TICKETS.get();
+        long totalLoads = ChunkSet.TOTAL_CHUNK_LOADS.get();
+
+        long totalExpectedTickets = 0;
+        long totalActiveChunkCap = 0;
+
+        List<Region> allRegions = new ArrayList<>(RTP.selectionAPI.permRegionLookup.values());
+        allRegions.addAll(RTP.selectionAPI.tempRegions.values());
+
+        for (Region region : allRegions) {
+            totalActiveChunkCap += region.getSettings().activeChunkCap();
+            for (ChunkSet chunkSet : region.chunkManager.locAssChunks.values()) {
+                if (chunkSet.keep()) {
+                    totalExpectedTickets += chunkSet.chunks.size();
+                }
+            }
+        }
+
+        long discrepancy = activeTickets - totalExpectedTickets;
+        double leakRate = (totalLoads > 0) ? ((double) Math.max(0, discrepancy) / totalLoads) * 100.0 : 0.0;
 
       RTP.serverAccessor.sendMessage(callerId, "&7Global Active Chunk Tickets: &f" + activeTickets, "INFO");
       RTP.serverAccessor.sendMessage(callerId, "&7Active Teleport State Machines: &f" + rtp.latestTeleportData.size(), "INFO");

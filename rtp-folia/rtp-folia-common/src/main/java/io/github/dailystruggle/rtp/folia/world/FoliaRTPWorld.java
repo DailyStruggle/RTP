@@ -3,15 +3,17 @@ package io.github.dailystruggle.rtp.folia.world;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import java.util.Arrays;
-import java.util.Objects;
-import java.util.Set;
-import java.util.UUID;
+
+import java.lang.ref.WeakReference;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
 import org.bukkit.Bukkit;
+import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.block.Biome;
@@ -42,9 +44,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   private final UUID id;
   private final String name;
 
-  private final long[] cachedKeys = new long[256];
-  private final org.bukkit.Chunk[] cachedChunks = new org.bukkit.Chunk[256];
-  private int cachePointer = 0;
+  private final ConcurrentHashMap<Long, WeakReference<Chunk>> chunkCache = new ConcurrentHashMap<>();
 
   public FoliaRTPWorld(World world) {
     super(world);
@@ -70,9 +70,8 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   }
 
   public void cacheChunk(int x, int z, org.bukkit.Chunk chunk) {
-    int index = cachePointer++ & 255;
-    cachedKeys[index] = ((long) x & 0xffffffffL | ((long) z << 32));
-    cachedChunks[index] = chunk;
+    long key = ((long) x & 0xffffffffL | ((long) z << 32));
+    chunkCache.put(key, new WeakReference<>(chunk));
   }
 
   @Override
@@ -99,12 +98,15 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
 
   @Override
   public RTPChunk<?> getCachedChunk(long key) {
-    for (int i = 0; i < 256; i++) {
-      if (cachedKeys[i] == key) {
-        return new FoliaRTPChunk(cachedChunks[i]);
-      }
+    WeakReference<Chunk> ref = chunkCache.get(key);
+    if (ref == null) return null;
+
+    org.bukkit.Chunk chunk = ref.get();
+    if (chunk == null || !chunk.isLoaded()) {
+      chunkCache.remove(key); // Cleanup stale reference
+      return null;
     }
-    return null;
+    return new FoliaRTPChunk(chunk);
   }
 
   @Override
@@ -119,7 +121,13 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
 
   @Override
   public void forgetChunks() {
-    // Implementation
+    // Explicitly un-force-load everything we know about before clearing
+    chunkCache.forEach((key, ref) -> {
+      int cx = (int) (key & 0xffffffffL);
+      int cz = (int) (key >> 32);
+      world.setChunkForceLoaded(cx, cz, false);
+    });
+    chunkCache.clear();
   }
 
   @Override
@@ -155,5 +163,10 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   @Override
   public int getMinHeight() {
     return world.getMinHeight();
+  }
+
+  @Override
+  public int getCacheSize() {
+    return chunkCache.size();
   }
 }

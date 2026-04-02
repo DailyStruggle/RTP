@@ -125,6 +125,13 @@ public abstract class RTPWorld<T> {
    */
   public abstract int getMinHeight();
 
+  /**
+   * Get the number of chunks currently held in the cache
+   *
+   * @return the cache size
+   */
+  public abstract int getCacheSize();
+
   @Override
   public boolean equals(Object obj) {
     if (obj == this) return true;

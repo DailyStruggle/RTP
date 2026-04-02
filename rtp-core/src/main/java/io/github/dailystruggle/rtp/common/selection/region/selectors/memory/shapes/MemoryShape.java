@@ -830,6 +830,12 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   @Override
+  public boolean contains(int x, int z) {
+    long l = xzToLocation(x,z);
+    return l >= 0 && l < getRange();
+  }
+
+  @Override
   public MemoryShape<E> clone() {
     MemoryShape<E> shape = (MemoryShape<E>) super.clone();
     shape.badKeysCache = new long[0];

@@ -3,6 +3,10 @@ package io.github.dailystruggle.rtp.common.tools;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
+
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
@@ -64,49 +68,53 @@ public class MemoryTracker {
 
     RTP rtp = RTP.getInstance();
     if (rtp != null) {
-      int processingPlayersSize = rtp.processingPlayers.size();
-      int latestTeleportDataSize = rtp.latestTeleportData.size();
-
       long totalLocationQueueSize = 0;
       long totalPerPlayerLocationQueueSize = 0;
-      long totalLocAssChunksSize = 0;
+      long totalExpectedTickets = 0;
+      long totalCacheCap = 0;
+      long totalActiveChunkCap = 0;
 
-      for (Region region : RTP.selectionAPI.permRegionLookup.values()) {
+      // Combine permanent and temporary regions for full visibility
+      List<Region> allRegions = new ArrayList<>(RTP.selectionAPI.permRegionLookup.values());
+      allRegions.addAll(RTP.selectionAPI.tempRegions.values());
+
+      for (Region region : allRegions) {
+        RegionSettings settings = region.getSettings();
+        totalCacheCap += settings.cacheCap();
+        totalActiveChunkCap += settings.activeChunkCap();
+
         totalLocationQueueSize += region.queueManager.locationQueue.size();
         for (java.util.concurrent.ConcurrentLinkedQueue<io.github.dailystruggle.rtp.common.selection.region.CachedLocation> queue : region.queueManager.perPlayerLocationQueue.values()) {
           totalPerPlayerLocationQueueSize += queue.size();
         }
-        totalLocAssChunksSize += region.chunkManager.locAssChunks.size();
-      }
 
-      LOGGER.log(
-          Level.INFO,
-          "[RTP] Diagnostic check: processingPlayers={0}, latestTeleportData={1}, locationQueue={2}, perPlayerLocationQueue={3}, locAssChunks={4}",
-          new Object[] {
-            processingPlayersSize,
-            latestTeleportDataSize,
-            totalLocationQueueSize,
-            totalPerPlayerLocationQueueSize,
-            totalLocAssChunksSize
-          });
+        // Only count chunks if the ChunkSet is actually keeping them loaded
+        for (ChunkSet chunkSet : region.chunkManager.locAssChunks.values()) {
+          if (chunkSet.keep()) {
+            totalExpectedTickets += chunkSet.chunks.size();
+          }
+        }
+      }
 
       long activeTickets = ChunkSet.ACTIVE_CHUNK_TICKETS.get();
       long totalLoads = ChunkSet.TOTAL_CHUNK_LOADS.get();
+      long discrepancy = activeTickets - totalExpectedTickets;
 
-      if (activeTickets > 0 && rtp.processingPlayers.isEmpty()) {
-        double leakRate = (totalLoads > 0) ? ((double) activeTickets / totalLoads) * 100.0 : 0.0;
+      LOGGER.log(
+              Level.INFO,
+              "[RTP] Diagnostic: Locations=[Queue:{0}/{1}, PerPlayer:{2}], Chunks=[Active:{3}, Expected:{4}, Cap:{5}, Discrepancy:{6}]",
+              new Object[] {
+                      totalLocationQueueSize, totalCacheCap, totalPerPlayerLocationQueueSize,
+                      activeTickets, totalExpectedTickets, totalActiveChunkCap, discrepancy
+              });
+
+      // Focus leak detection on the positive discrepancy (orphaned tickets)
+      if (discrepancy > 0 && rtp.processingPlayers.isEmpty()) {
+        double leakRate = (totalLoads > 0) ? ((double) discrepancy / totalLoads) * 100.0 : 0.0;
         LOGGER.log(
-            Level.SEVERE,
-            "[RTP] Chunk Ticket Leak Detected! Active: "
-                + activeTickets
-                + " | Lifetime Loads: "
-                + totalLoads
-                + " | Leak Rate: "
-                + String.format("%.4f%%", leakRate)
-                + ". A high rate indicates an internal plugin failure; a low rate indicates external event interference. "
-                + "Diagnostic Note: If the server's total orphaned chunk count exceeds this plugin's lifetime loads (["
-                + totalLoads
-                + "]), this plugin is not the sole source of the memory leak.");
+                Level.SEVERE,
+                "[RTP] Leak Alert: {0} orphaned chunk tickets detected. Leak Rate: {1}%.",
+                new Object[] { discrepancy, String.format("%.4f", leakRate) });
       }
     }
   }

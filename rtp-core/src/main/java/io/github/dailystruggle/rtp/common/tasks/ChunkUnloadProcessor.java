@@ -8,7 +8,7 @@ public class ChunkUnloadProcessor implements Runnable {
   public void run() {
     RTP instance = RTP.getInstance();
     if (instance == null) return;
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 50; i++) {
       RTPChunk<?> chunk = instance.chunksToUnload.poll();
       if (chunk == null) break;
       if (chunk.isLoaded()) {

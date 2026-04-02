@@ -186,9 +186,7 @@ public class SendMessage {
               .getRTPWorlds()
               .forEach(
                   world -> {
-                    org.bukkit.World bukkitWorld = Bukkit.getWorld(world.id());
-                    if (bukkitWorld == null) return;
-                    c.addAndGet(bukkitWorld.getLoadedChunks().length);
+                    c.addAndGet(world.getCacheSize());
                   });
           return String.valueOf(c.get());
         });
