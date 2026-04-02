@@ -173,7 +173,7 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
       Map<String, List<String>> parameterValues,
       CommandsAPICommand nextCommand) {
 
-    if (nextCommand != null) return nextCommand.onCommand(senderId, parameterValues, null);
+    if (nextCommand != null) return true;
 
     boolean valid = true;
     CommandSender sender =
@@ -202,9 +202,7 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
       Map<String, List<String>> parameterValues,
       CommandsAPICommand nextCommand) {
 
-    if (nextCommand != null) return nextCommand.onCommand(
-            sender instanceof Player ? ((Player) sender).getUniqueId() : io.github.dailystruggle.rtp.api.RTPAPI.serverId,
-            parameterValues, null);
+    if (nextCommand != null) return true;
 
     boolean valid = true;
     for (Predicate<CommandSender> commandSenderPredicate : senderChecks) {
