@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.selection.GenerationContext;
+import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -198,7 +199,10 @@ public class Region extends FactoryValue<RegionKeys> {
     currentAvailable = availableTime - (System.nanoTime() - start);
 //    System.out.println("[RTP-DEBUG] Region '" + name + "' finished miscPipeline. Remaining budget for cache: " + currentAvailable + "ns");
 
-    long totalCap = Math.max(settings.cacheCap(), queueManager.playerQueue.size());
+//    long totalCap = Math.max(settings.cacheCap(), queueManager.playerQueue.size());
+    long cacheCap = settings.cacheCap();
+    long activeCap = settings.activeChunkCap();
+    long totalCap = Math.max(Math.min(cacheCap, activeCap), queueManager.playerQueue.size());
 
     if (!isRefillingCache.compareAndSet(false, true)) {
 //      System.out.println("[RTP-DEBUG] Region '" + name + "' ABORT 2: isRefillingCache lock is currently held by another thread.");
@@ -217,6 +221,29 @@ public class Region extends FactoryValue<RegionKeys> {
       cachePipeline.execute(currentAvailable);
     } finally {
       isRefillingCache.set(false);
+    }
+
+    int activeChunkCap = settings.activeChunkCap();
+    if (activeChunkCap >= 0) {
+      int qSize = queueManager.locationQueue.size();
+      for (int i = 0; i < qSize; i++) {
+        CachedLocation loc = queueManager.locationQueue.get(i);
+        if (loc == null) continue;
+
+        ChunkSet chunkSet = chunkManager.getChunkSet(loc.getCoords());
+
+        if (i < activeChunkCap) {
+          // Enforce tickets ON for the top tier
+          if (chunkSet == null || !chunkSet.keep()) {
+            chunkManager.addTicket(loc.getCoords());
+          }
+        } else {
+          // Enforce tickets OFF for everything beyond the cap
+          if (chunkSet != null && chunkSet.keep()) {
+            chunkManager.removeTicket(loc.getCoords());
+          }
+        }
+      }
     }
   }
 
@@ -283,7 +310,12 @@ public class Region extends FactoryValue<RegionKeys> {
     }
     queueManager.perPlayerLocationQueue.clear();
 
-    chunkManager.locAssChunks.forEach((key, chunkSet) -> chunkSet.keep(false, getWorld()));
+    chunkManager.locAssChunks.forEach((key, chunkSet) -> {
+      int cx = (int) (key & 0xFFFFFFFFL);
+      int cz = (int) (key >>> 32);
+      chunkSet.keep(false, getWorld());
+      ChunkSet.unregister(getWorld(), cx, cz);
+    });
     chunkManager.locAssChunks.clear();
   }
 

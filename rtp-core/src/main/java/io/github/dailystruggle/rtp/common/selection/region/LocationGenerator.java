@@ -93,7 +93,7 @@ public class LocationGenerator {
                 int cx = left.x() >> 4;
                 int cz = left.z() >> 4;
                 ChunkSet ticket = region.chunkManager.addTicket(cx, cz);
-                RTPChunk chunk;
+                RTPChunk<?>chunk;
                 try {
                     CompletableFuture<Long> chunkAt = ticket.chunks.get(0);
                     Long chunkKey = chunkAt.get();
@@ -172,7 +172,7 @@ public class LocationGenerator {
                                             int dcZ = chunkZ - centerChunkZ;
 
                                             int index = (dcX + safe) * L + (dcZ + safe);
-                                            RTPChunk chunk1 = localChunks[index];
+                                            RTPChunk<?>chunk1 = localChunks[index];
                                             if (chunk1 == null) {
                                                 try {
                                                     Long key =
@@ -204,10 +204,8 @@ public class LocationGenerator {
                                         }
                                     }
                                 } finally {
-                                    if (!pass) {
-                                        for (RTPChunk usedChunk : localChunks) {
-                                            if (usedChunk != null) usedChunk.keep(false);
-                                        }
+                                    for (RTPChunk<?>usedChunk : localChunks) {
+                                        if (usedChunk != null) usedChunk.keep(false);
                                     }
                                 }
                             } catch (Exception e) {
@@ -529,7 +527,7 @@ public class LocationGenerator {
             ChunkSet ticket = region.chunkManager.addTicket(cx, cz);
             RTPChunk<?> chunk;
             try {
-                CompletableFuture<Long> cfChunk = ticket.chunks.get(0);
+                CompletableFuture<Long> cfChunk = ticket.chunks.getFirst();
                 Long key = cfChunk.get();
                 if (key == null) {
                     region.chunkManager.removeTicket(cx, cz);
@@ -583,7 +581,7 @@ public class LocationGenerator {
                 boolean pass = true;
 
                 // todo: waterlogged check
-                RTPChunk[] localChunks = new RTPChunk[(safetyRadius * 2 + 1) * (safetyRadius * 2 + 1)];
+                RTPChunk<?>[] localChunks = new RTPChunk[(safetyRadius * 2 + 1) * (safetyRadius * 2 + 1)];
                 int centerChunkX = chunk.x();
                 int centerChunkZ = chunk.z();
                 int L = safetyRadius * 2 + 1;
@@ -602,7 +600,7 @@ public class LocationGenerator {
                             int dcZ = chunkZ - centerChunkZ;
 
                             int index = (dcX + safetyRadius) * L + (dcZ + safetyRadius);
-                            RTPChunk chunk1 = localChunks[index];
+                            RTPChunk<?>chunk1 = localChunks[index];
                             if (chunk1 == null) {
                                 try {
                                     Long key =
@@ -636,7 +634,7 @@ public class LocationGenerator {
                     }
                 } finally {
                     if (!pass) {
-                        for (RTPChunk usedChunk : localChunks) {
+                        for (RTPChunk<?>usedChunk : localChunks) {
                             if (usedChunk != null) usedChunk.keep(false);
                         }
                     }
@@ -645,7 +643,7 @@ public class LocationGenerator {
                 pass &= GlobalRegionVerifiers.checkGlobalRegionVerifiers(cursor.toImmutable()).join();
 
                 if (!pass) {
-                    for (RTPChunk usedChunk : localChunks) {
+                    for (RTPChunk<?>usedChunk : localChunks) {
                         if (usedChunk != null) usedChunk.keep(false);
                     }
                     if (verbose)
@@ -664,6 +662,11 @@ public class LocationGenerator {
                     ((MemoryShape<?>) shape).addBiomeLocation(l, resolution, currBiome);
                 }
                 locationFound = true;
+
+                for (RTPChunk<?> usedChunk : localChunks) {
+                    if (usedChunk != null) usedChunk.keep(false);
+                }
+
                 break;
             } finally {
                 if (!locationFound) region.chunkManager.removeTicket(cx, cz);
