@@ -40,7 +40,9 @@ public class RegionChunkManager {
         int cx = coords.x() >> 4;
         int cz = coords.z() >> 4;
         ChunkSet.unregister(region.getWorld(), cx, cz);
-        locAssChunks.remove(getChunkKey(cx, cz));
+        ChunkSet removed = locAssChunks.remove(getChunkKey(cx, cz));
+        RTPWorld<?> world = region.getWorld();
+        RTP.scheduler.runTask(world, cx, cz, () -> removed.keep(false, world));
     }
 
     public ChunkSet addTicket(int cx, int cz) {
@@ -166,6 +168,7 @@ public class RegionChunkManager {
         if (chunkSet == null) return;
         ChunkSet.unregister(region.getWorld(), cx, cz);
         RTPWorld<?> world = region.getWorld();
-        RTP.scheduler.runTask(world, cx, cz, () -> chunkSet.keep(false, world));
+        if( RTP.serverAccessor.isPrimaryThread() ) chunkSet.keep(false, world);
+        else RTP.scheduler.runTask(world, cx, cz, () -> chunkSet.keep(false, world));
     }
 }

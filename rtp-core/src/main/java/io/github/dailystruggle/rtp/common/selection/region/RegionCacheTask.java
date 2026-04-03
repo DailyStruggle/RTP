@@ -4,7 +4,6 @@ import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 
@@ -22,14 +21,14 @@ public class RegionCacheTask extends RTPRunnable {
         super(600000L);
         this.region = region;
         this.playerId = null;
-        this.selectRadius = ((ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class)).getNumber(PerformanceKeys.viewDistanceSelect, 0L).longValue();
+        this.selectRadius = RTP.configs.getParser(PerformanceKeys.class).getNumber(PerformanceKeys.viewDistanceSelect, 0L).longValue();
     }
 
     public RegionCacheTask(Region region, UUID playerId) {
         super(600000L);
         this.region = region;
         this.playerId = playerId;
-        this.selectRadius = ((ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class)).getNumber(PerformanceKeys.viewDistanceSelect, 0L).longValue();
+        this.selectRadius = RTP.configs.getParser(PerformanceKeys.class).getNumber(PerformanceKeys.viewDistanceSelect, 0L).longValue();
     }
 
     @Override
@@ -46,6 +45,19 @@ public class RegionCacheTask extends RTPRunnable {
                 if (chunkSet == null || !chunkSet.keep()) {
                     region.chunkManager.addTicket(loc.getCoords());
                 }
+            }
+        }
+
+        int queueSize = region.queueManager.locationQueue.size();
+        for (int i = Math.max(0, activeChunkCap); i < queueSize; i++) {
+            if (isCancelled()) return;
+            CachedLocation loc = region.queueManager.locationQueue.get(i);
+            if (loc == null) continue;
+
+            ChunkSet chunkSet = region.chunkManager.getChunkSet(loc.getCoords());
+
+            if (chunkSet != null && chunkSet.keep()) {
+                region.chunkManager.removeTicket(loc.getCoords());
             }
         }
 
