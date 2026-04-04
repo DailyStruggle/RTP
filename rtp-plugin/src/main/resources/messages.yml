@@ -76,7 +76,13 @@ fillStatus: "&a[P0] completed [chunks] / [totalChunks] chunks for region [region
 
 #info command
 infoTitle: "&a======RTP Info======"
-infoChunks: "#D4AF37Chunks currently loaded by RTP: [chunks]"
+infoTickets: "&7Global Active Chunk Tickets: &f[tickets]"
+infoTeleports: "&7Active Teleport State Machines: &f[teleports]"
+infoMSPT: "&7Current Plugin MSPT: &f[mspt]"
+infoTotalLoads: "&7Lifetime Chunks Loaded: &f[loads]"
+infoLeakRate: "&7Current Chunk Leak Rate: &f[leakRate]"
+infoDisclaimerHeader: "&7--- Diagnostic Disclaimer ---"
+infoDisclaimer: "&7Diagnostic Note: If the server's total orphaned chunk count exceeds this plugin's lifetime loads ([loads]), this plugin is not the sole source of the memory leak."
 infoWorldHeader: "#008080Worlds:"
 infoWorld: "  #21ADA8[world]"
 infoRegionHeader: "#63C5DARegions:"

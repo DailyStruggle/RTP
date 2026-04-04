@@ -16,7 +16,6 @@ import io.github.dailystruggle.rtp.common.tools.ParseString;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -177,19 +176,49 @@ public class SendMessage {
           if (teleportData == null) return "0";
           return String.valueOf(teleportData.queueLocation);
         });
-    placeholders.put(
-        "chunks",
-        uuid -> {
-          if (RTP.getInstance() == null) return "0";
-          AtomicInteger c = new AtomicInteger();
-          RTP.serverAccessor
-              .getRTPWorlds()
-              .forEach(
-                  world -> {
-                    c.addAndGet(world.getCacheSize());
-                  });
-          return String.valueOf(c.get());
-        });
+      placeholders.put(
+              "tickets",
+              uuid -> String.valueOf(io.github.dailystruggle.rtp.api.world.ChunkSet.ACTIVE_CHUNK_TICKETS.get()));
+
+      placeholders.put(
+              "teleports",
+              uuid -> {
+                  if (RTP.getInstance() == null) return "0";
+                  return String.valueOf(RTP.getInstance().latestTeleportData.size());
+              });
+
+      placeholders.put(
+              "mspt",
+              uuid -> String.format("%.4f", io.github.dailystruggle.rtp.common.tools.PerformanceTracker.pluginMSPT));
+
+      placeholders.put(
+              "loads",
+              uuid -> String.valueOf(io.github.dailystruggle.rtp.api.world.ChunkSet.TOTAL_CHUNK_LOADS.get()));
+
+      placeholders.put(
+              "leakRate",
+              uuid -> {
+                  long activeTickets = io.github.dailystruggle.rtp.api.world.ChunkSet.ACTIVE_CHUNK_TICKETS.get();
+                  long totalLoads = io.github.dailystruggle.rtp.api.world.ChunkSet.TOTAL_CHUNK_LOADS.get();
+
+                  long totalExpectedTickets = 0;
+                  if (RTP.selectionAPI != null) {
+                      List<Region> allRegions = new ArrayList<>(RTP.selectionAPI.permRegionLookup.values());
+                      allRegions.addAll(RTP.selectionAPI.tempRegions.values());
+
+                      for (Region region : allRegions) {
+                          for (io.github.dailystruggle.rtp.api.world.ChunkSet chunkSet : region.chunkManager.locAssChunks.values()) {
+                              if (chunkSet.keep()) {
+                                  totalExpectedTickets += chunkSet.chunks.size();
+                              }
+                          }
+                      }
+                  }
+
+                  long discrepancy = activeTickets - totalExpectedTickets;
+                  double leakRate = (totalLoads > 0) ? ((double) Math.max(0, discrepancy) / totalLoads) * 100.0 : 0.0;
+                  return String.format("%.4f%%", leakRate);
+              });
     placeholders.put(
         "attempts",
         uuid -> {

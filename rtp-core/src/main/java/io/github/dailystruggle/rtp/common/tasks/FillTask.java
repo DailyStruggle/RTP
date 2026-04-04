@@ -190,7 +190,6 @@ public class FillTask extends RTPRunnable {
     cursor.setWorldName(region.getWorld().name());
 
     long activeChecks = 0;
-    java.util.HashSet<Long> testedChunks = new HashSet<>();
     for (pos = currentStart; pos < range && pos < limitEnd; pos += stride) {
       if (pause.get() || isCancelled()) {
         save();
@@ -203,17 +202,20 @@ public class FillTask extends RTPRunnable {
         continue;
       }
 
-      if (region.queueManager.getPublicQueueLength() >= region.getSettings().cacheCap()) {
-        break;
-      }
-
       if (pendingChunks.get() >= MAX_PENDING_CHUNKS) {
-        break;
-      }
+        // Wait here until a background chunk check finishes and decrements the counter
+        while (pendingChunks.get() >= MAX_PENDING_CHUNKS && !isCancelled() && !pause.get()) {
+          try {
+            Thread.sleep(10);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            break;
+          }
 
-      long chunkKey = ((long) (cursor.x >> 4) & 0xFFFFFFFFL) | (((long) (cursor.z >> 4) & 0xFFFFFFFFL) << 32);
-      if (!testedChunks.add(chunkKey)) {
-        continue;
+          if (isCancelled() || pause.get()) {
+            break;
+          }
+        }
       }
 
       final long currentPos = pos;
@@ -230,58 +232,70 @@ public class FillTask extends RTPRunnable {
           });
     }
 
+    // Ensure all pending chunk checks from this batch complete before finishing the iteration
+    while (pendingChunks.get() > 0 && !isCancelled() && !pause.get()) {
+      try {
+        Thread.sleep(10);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        break;
+      }
+    }
+
     final long finalPos1 = pos;
-    long dt = TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - timingStart);
-    if (dt <= 0) dt = 1;
-    long cps_local = (long) (((double) activeChecks) / (dt));
-    cps_all = cps_all.add(new BigInteger(String.valueOf(cps_local)));
-    cps_divisor = cps_divisor.add(increment_big);
-    cps.set((cps.get() * 7 / 8) + cps_local / 8);
+    if (activeChecks > 0) {
+      long dt = TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - timingStart);
+      if (dt <= 0) dt = 1;
+      long cps_local = (long) (((double) activeChecks) / (dt));
+      cps_all = cps_all.add(new BigInteger(String.valueOf(cps_local)));
+      cps_divisor = cps_divisor.add(increment_big);
+      cps.set((cps.get() * 7 / 8) + cps_local / 8);
 
-    long totalRemainingPoints = (range - finalPos1) + (Math.max(0, shape.spatialResolution - 1 - currentOffset) * range);
-    if (totalRemainingPoints < 0) totalRemainingPoints = 0;
-    long effectiveBad = shape.getEffectiveBadCount();
-    long totalEvaluated = shape.getEffectiveGoodCount() + effectiveBad;
-    double badDensity = (double) effectiveBad / (double) Math.max(1, totalEvaluated);
-    long estimatedActivePointsRemaining = (long) (totalRemainingPoints * (1.0 - badDensity));
+      long totalRemainingPoints = (range - finalPos1) + (Math.max(0, shape.spatialResolution - 1 - currentOffset) * range);
+      if (totalRemainingPoints < 0) totalRemainingPoints = 0;
+      long effectiveBad = shape.getEffectiveBadCount();
+      long totalEvaluated = shape.getEffectiveGoodCount() + effectiveBad;
+      double badDensity = (double) effectiveBad / (double) Math.max(1, totalEvaluated);
+      long estimatedActivePointsRemaining = (long) (totalRemainingPoints * (1.0 - badDensity));
 
-    long currentPointsPerSecond = cps_all.divide(cps_divisor).longValue();
-    if (currentPointsPerSecond <= 0) currentPointsPerSecond = 1;
-    long etaSeconds = estimatedActivePointsRemaining / currentPointsPerSecond;
+      long currentPointsPerSecond = cps_all.divide(cps_divisor).longValue();
+      if (currentPointsPerSecond <= 0) currentPointsPerSecond = 1;
+      long etaSeconds = estimatedActivePointsRemaining / currentPointsPerSecond;
 
-    ConfigParser<MessagesKeys> langParser =
-        (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-    String msg = langParser.getConfigValue(MessagesKeys.fillStatus, "").toString();
-    if (msg != null && !msg.isEmpty()) {
-      long days = TimeUnit.SECONDS.toDays(etaSeconds);
-      long hours = TimeUnit.SECONDS.toHours(etaSeconds) % 24;
-      long minutes = TimeUnit.SECONDS.toMinutes(etaSeconds) % 60;
-      long seconds = etaSeconds % 60;
+      ConfigParser<MessagesKeys> langParser =
+          (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+      String msg = langParser.getConfigValue(MessagesKeys.fillStatus, "").toString();
+      if (msg != null && !msg.isEmpty()) {
+        long days = TimeUnit.SECONDS.toDays(etaSeconds);
+        long hours = TimeUnit.SECONDS.toHours(etaSeconds) % 24;
+        long minutes = TimeUnit.SECONDS.toMinutes(etaSeconds) % 60;
+        long seconds = etaSeconds % 60;
 
-      String replacement = "";
-      if (days > 0)
-        replacement += days + langParser.getConfigValue(MessagesKeys.days, "").toString() + " ";
-      if (hours > 0)
-        replacement += hours + langParser.getConfigValue(MessagesKeys.hours, "").toString() + " ";
-      if (minutes > 0)
-        replacement +=
-            minutes + langParser.getConfigValue(MessagesKeys.minutes, "").toString() + " ";
-      if (seconds > 0)
-        replacement += seconds + langParser.getConfigValue(MessagesKeys.seconds, "").toString();
+        String replacement = "";
+        if (days > 0)
+          replacement += days + langParser.getConfigValue(MessagesKeys.days, "").toString() + " ";
+        if (hours > 0)
+          replacement += hours + langParser.getConfigValue(MessagesKeys.hours, "").toString() + " ";
+        if (minutes > 0)
+          replacement +=
+                  minutes + langParser.getConfigValue(MessagesKeys.minutes, "").toString() + " ";
+        if (seconds > 0)
+          replacement += seconds + langParser.getConfigValue(MessagesKeys.seconds, "").toString();
 
-      msg = msg.replace("[chunks]", String.valueOf(finalPos1));
-      msg = msg.replace("[totalChunks]", String.valueOf(range));
-      msg = msg.replace("[cps]", String.valueOf(cps_local));
-      msg = msg.replace("[eta]", replacement);
-      msg = msg.replace("[region]", region.name);
+        msg = msg.replace("[chunks]", String.valueOf(finalPos1));
+        msg = msg.replace("[totalChunks]", String.valueOf(range));
+        msg = msg.replace("[cps]", String.valueOf(cps_local));
+        msg = msg.replace("[eta]", replacement);
+        msg = msg.replace("[region]", region.name);
 
-      RTP.serverAccessor.announce(msg, "rtp.fill");
+        RTP.serverAccessor.announce(msg, "rtp.fill");
+      }
     }
 
     fillIter.set(finalPos1);
     save();
     shape.save(region.name, region.getWorld().name());
-    region.getWorld().save();
+    RTP.scheduler.runTask(() -> region.getWorld().save());
 
     if (finalPos1 < range && !isCancelled() && !pause.get()) {
       if (RTP.getInstance().fillTasks.get(region.name) == this) {
@@ -434,130 +448,157 @@ public class FillTask extends RTPRunnable {
       return CompletableFuture.completedFuture(false);
     }
 
-    CompletableFuture<Long> cfChunk =
-        RTP.serverAccessor
-            .getChunkManager()
-            .getChunkAtAsync(world, cx, cz)
-            .orTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
-            .exceptionally(
-                ex -> {
-                  return null;
-                });
-
     CompletableFuture<Boolean> res = new CompletableFuture<>();
-    cfChunk.thenAccept(
-        chunkKey -> {
-          if (chunkKey == null) {
-            shape.addBadLocation(pos, 1L);
-            res.complete(false);
-            return;
-          }
-          if (isCancelled()) {
-            res.complete(false);
-            return;
-          }
-          RTPChunk<?> chunk = world.getCachedChunk(chunkKey);
-          if (chunk == null) {
-            res.complete(false);
-            return;
-          }
 
-          chunk.keep(true);
-          try {
-            RTPChunk<?>[] localChunks = new RTPChunk[(safetyRadius * 2 + 1) * (safetyRadius * 2 + 1)];
-            MutableRTPCoords localCursor = new MutableRTPCoords(blockX, blockZ);
-            localCursor.setWorldName(world.name());
-            try {
-              if (!vert.adjust(chunk, localCursor)) {
-                if (biomeRecall) shape.addBadLocation(pos, 1L);
-                res.complete(false);
-                return;
-              }
+    Runnable chunkLoader = new Runnable() {
+      @Override
+      public void run() {
+        if (isCancelled() || pause.get()) {
+          res.complete(false);
+          return;
+        }
 
-              String currBiome1 = world.getBiome(localCursor.x, localCursor.y, localCursor.z);
-              if (!defaultBiomes.contains(currBiome1.toUpperCase())) {
-                if (biomeRecall) {
-                  shape.addBadLocation(pos, 1L);
-                  res.complete(false);
-                  return;
-                }
-              }
+        RTP.serverAccessor
+                .getChunkManager()
+                .getChunkAtAsync(world, cx, cz)
+                .orTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+                .exceptionally(
+                        ex -> {
+                          return null;
+                        }).thenAccept(chunkKey -> {
 
-              boolean pass = localCursor.y < vert.maxY();
-              if (!pass) {
-                shape.addBadLocation(pos, 1L);
-                res.complete(false);
-                return;
-              }
-
-              // todo: waterlogged check
-              int centerChunkX = chunk.x();
-              int centerChunkZ = chunk.z();
-              int L = safetyRadius * 2 + 1;
-              localChunks[safetyRadius * L + safetyRadius] = chunk;
-              chunk.keep(true);
-              try {
-                for (int x = localCursor.x - safetyRadius; x <= localCursor.x + safetyRadius && pass; x++) {
-                  int chunkX = x >> 4;
-                  int xx = x & 15;
-                  int dcX = chunkX - centerChunkX;
-
-                  for (int z = localCursor.z - safetyRadius; z <= localCursor.z + safetyRadius && pass; z++) {
-                    int chunkZ = z >> 4;
-                    int zz = z & 15;
-                    int dcZ = chunkZ - centerChunkZ;
-
-                    int index = (dcX + safetyRadius) * L + (dcZ + safetyRadius);
-                    RTPChunk<?> chunk1 = localChunks[index];
-                    if (chunk1 == null) {
-                      long neighborKey =
-                          ((long) chunkX & 0xFFFFFFFFL) | (((long) chunkZ & 0xFFFFFFFFL) << 32);
-                      chunk1 = region.getWorld().getCachedChunk(neighborKey);
-                      if (chunk1 == null) {
-                        pass = false;
-                        break;
-                      }
-                      localChunks[index] = chunk1;
-                      chunk1.keep(true);
+                  if (chunkKey == null) {
+                    if (!isCancelled() && !pause.get()) {
+                      // Retry instead of logging a bad location
+                      RTP.scheduler.runTaskAsynchronously(this);
+                    } else {
+                      res.complete(false);
                     }
+                    return;
+                  }
 
-                    for (int y = localCursor.y - safetyRadius; y <= localCursor.y + safetyRadius && pass; y++) {
-                      if (!chunk1.isSafe(xx, y, zz, unsafeBlocks)) {
-                        pass = false;
-                      }
+                  if (isCancelled() || pause.get()) {
+                    res.complete(false);
+                    return;
+                  }
+
+                  RTPChunk<?> chunk = world.getCachedChunk(chunkKey);
+
+                  // Condition 2: The chunk unloaded instantly before we could cache it
+                  if (chunk == null) {
+                    if (!isCancelled() && !pause.get()) {
+                      // Retry the load sequence
+                      RTP.scheduler.runTaskAsynchronously(this);
+                    } else {
+                      res.complete(false);
                     }
+                    return;
                   }
-                }
-              } finally {
-                for (int i = 0; i < localChunks.length; i++) {
-                  if (localChunks[i] != null) {
-                    localChunks[i].keep(false);
-                    localChunks[i] = null;
+
+                  // Chunk successfully loaded. Proceed with verification.
+                  chunk.keep(true);
+                  try {
+                    RTPChunk<?>[] localChunks = new RTPChunk[(safetyRadius * 2 + 1) * (safetyRadius * 2 + 1)];
+                    MutableRTPCoords localCursor = new MutableRTPCoords(blockX, blockZ);
+                    localCursor.setWorldName(world.name());
+
+
+                    try {
+                      if (!vert.adjust(chunk, localCursor)) {
+                        if (biomeRecall) shape.addBadLocation(pos, 1L);
+                        res.complete(false);
+                        return;
+                      }
+
+                      String currBiome1 = world.getBiome(localCursor.x, localCursor.y, localCursor.z);
+                      if (!defaultBiomes.contains(currBiome1.toUpperCase())) {
+                        if (biomeRecall) {
+                          shape.addBadLocation(pos, 1L);
+                          res.complete(false);
+                          return;
+                        }
+                      }
+
+                      boolean pass = localCursor.y < vert.maxY();
+                      if (!pass) {
+                        shape.addBadLocation(pos, 1L);
+                        res.complete(false);
+                        return;
+                      }
+
+                      // todo: waterlogged check
+                      int centerChunkX = chunk.x();
+                      int centerChunkZ = chunk.z();
+                      int L = safetyRadius * 2 + 1;
+                      localChunks[safetyRadius * L + safetyRadius] = chunk;
+                      chunk.keep(true);
+                      try {
+                        for (int x = localCursor.x - safetyRadius; x <= localCursor.x + safetyRadius && pass; x++) {
+                          int chunkX = x >> 4;
+                          int xx = x & 15;
+                          int dcX = chunkX - centerChunkX;
+
+                          for (int z = localCursor.z - safetyRadius; z <= localCursor.z + safetyRadius && pass; z++) {
+                            int chunkZ = z >> 4;
+                            int zz = z & 15;
+                            int dcZ = chunkZ - centerChunkZ;
+
+                            int index = (dcX + safetyRadius) * L + (dcZ + safetyRadius);
+                            RTPChunk<?> chunk1 = localChunks[index];
+                            if (chunk1 == null) {
+                              long neighborKey =
+                                      ((long) chunkX & 0xFFFFFFFFL) | (((long) chunkZ & 0xFFFFFFFFL) << 32);
+                              chunk1 = region.getWorld().getCachedChunk(neighborKey);
+                              if (chunk1 == null) {
+                                pass = false;
+                                break;
+                              }
+                              localChunks[index] = chunk1;
+                              chunk1.keep(true);
+                            }
+
+                            for (int y = localCursor.y - safetyRadius; y <= localCursor.y + safetyRadius && pass; y++) {
+                              if (!chunk1.isSafe(xx, y, zz, unsafeBlocks)) {
+                                pass = false;
+                              }
+                            }
+                          }
+                        }
+                      } finally {
+                        for (int i = 0; i < localChunks.length; i++) {
+                          if (localChunks[i] != null) {
+                            localChunks[i].keep(false);
+                            localChunks[i] = null;
+                          }
+                        }
+                      }
+
+                      if (isCancelled()) {
+                        res.complete(false);
+                        return;
+                      }
+
+                      if (pass) pass = GlobalRegionVerifiers.checkGlobalRegionVerifiers(localCursor).join();
+
+                      if (pass) {
+                        if (biomeRecall) shape.addBiomeLocation(pos, 1L, currBiome1);
+                        res.complete(true);
+                      } else {
+                        shape.addBadLocation(pos, 1L);
+                        res.complete(false);
+                      }
+                    } finally {
+                      chunk.keep(false);
+                    }
+                  } catch (Exception e) {
+                    res.complete(false);
                   }
-                }
-              }
+                });
+      }
+    };
 
-              if (isCancelled()) {
-                res.complete(false);
-                return;
-              }
+    chunkLoader.run();
 
-              if (pass) pass = GlobalRegionVerifiers.checkGlobalRegionVerifiers(localCursor).join();
-
-              if (pass) {
-                if (biomeRecall) shape.addBiomeLocation(pos, 1L, currBiome1);
-                res.complete(true);
-              } else {
-                shape.addBadLocation(pos, 1L);
-                res.complete(false);
-              }
-            } finally {
-              chunk.keep(false);
-            }
-          } catch (Exception e) {
-            res.complete(false);
-          }
-        });
     return res;
   }
 

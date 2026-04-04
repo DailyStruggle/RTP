@@ -351,10 +351,14 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   @Override
   public void announce(String msg, String permission, String tag) {
     msg = tagMessage(msg, tag);
-    Bukkit.broadcast(msg, permission);
-    if (!permission.equalsIgnoreCase("rtp.see")) {
-      Bukkit.getConsoleSender().sendMessage(msg);
+    for (Player player : Bukkit.getOnlinePlayers()) {
+      if (player.hasPermission(permission)) {
+        io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(player, msg);
+      }
     }
+
+    // Route to console via the formatting pipeline
+    io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(Bukkit.getConsoleSender(), msg);
   }
 
   private String tagMessage(String message, @Nullable String tag) {

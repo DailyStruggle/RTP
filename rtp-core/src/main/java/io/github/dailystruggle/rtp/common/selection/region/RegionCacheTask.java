@@ -72,6 +72,7 @@ public class RegionCacheTask extends RTPRunnable {
             final RTPCoords coords = res.coords();
             final CachedLocation pair = CachedLocationPool.acquire(coords, res.attempts());
             if (coords == null) {
+                CachedLocationPool.release(pair);
                 region.inFlightCalculations.decrementAndGet();
                 return;
             }
@@ -110,6 +111,15 @@ public class RegionCacheTask extends RTPRunnable {
                     region.chunkManager.ticketCounts.compute(chunkKey, (k, v) -> (v == null) ? 1 : v + 1);
                     region.chunkManager.putChunkSet(coords, chunkSet);
                     chunkSet.keep(true, world);
+
+                    // Force-fail the chunk load if the server hangs for more than 30 seconds.
+                    // This breaks the reference chain, drops the tickets, and frees the inFlight counter.
+                    final ChunkSet finalSet = chunkSet;
+                    RTP.scheduler.runTaskLater(() -> {
+                        if (finalSet.complete != null && !finalSet.complete.isDone()) {
+                            finalSet.complete.complete(false);
+                        }
+                    }, 600L); // 600 ticks = 30 seconds
                 }
             }
 
@@ -138,10 +148,12 @@ public class RegionCacheTask extends RTPRunnable {
                     }
                 } finally {
                     region.inFlightCalculations.decrementAndGet();
+                    io.github.dailystruggle.rtp.common.tools.MemoryTracker.untrack(RegionCacheTask.this);
                 }
             });
         } else {
             region.inFlightCalculations.decrementAndGet();
+            io.github.dailystruggle.rtp.common.tools.MemoryTracker.untrack(this);
         }
     }
 }

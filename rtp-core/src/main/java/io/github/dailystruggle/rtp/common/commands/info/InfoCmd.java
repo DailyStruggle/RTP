@@ -16,7 +16,6 @@ import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tools.ParseString;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.common.tools.PerformanceTracker;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
@@ -121,14 +120,21 @@ public class InfoCmd extends BaseRTPCmdImpl {
 
     if (parameterValues.isEmpty()) {
       String title = lang.getConfigValue(MessagesKeys.infoTitle, "").toString();
-      String chunks = lang.getConfigValue(MessagesKeys.infoChunks, "").toString();
       String worldHeader = lang.getConfigValue(MessagesKeys.infoWorldHeader, "").toString();
+
+      String infoTickets = lang.getConfigValue(MessagesKeys.infoTickets, "").toString();
+      String infoTeleports = lang.getConfigValue(MessagesKeys.infoTeleports, "").toString();
+      String infoMSPT = lang.getConfigValue(MessagesKeys.infoMSPT, "").toString();
+      String infoTotalLoads = lang.getConfigValue(MessagesKeys.infoTotalLoads, "").toString();
+      String infoLeakRate = lang.getConfigValue(MessagesKeys.infoLeakRate, "").toString();
+      String infoDisclaimerHeader = lang.getConfigValue(MessagesKeys.infoDisclaimerHeader, "").toString();
+      String infoDisclaimer = lang.getConfigValue(MessagesKeys.infoDisclaimer, "").toString();
+
       String worlds = lang.getConfigValue(MessagesKeys.infoWorld, "").toString();
       String regionHeader = lang.getConfigValue(MessagesKeys.infoRegionHeader, "").toString();
       String regions = lang.getConfigValue(MessagesKeys.infoRegion, "").toString();
 
       RTP.serverAccessor.sendMessage(callerId, title, "INFO");
-      RTP.serverAccessor.sendMessage(callerId, chunks, "INFO");
       RTP.serverAccessor.sendMessage(callerId, worldHeader, "INFO");
       for (RTPWorld world : RTP.serverAccessor.getRTPWorlds()) {
         String msg = worlds.replaceAll("\\[world]", world.name());
@@ -154,13 +160,11 @@ public class InfoCmd extends BaseRTPCmdImpl {
         long totalLoads = ChunkSet.TOTAL_CHUNK_LOADS.get();
 
         long totalExpectedTickets = 0;
-        long totalActiveChunkCap = 0;
 
         List<Region> allRegions = new ArrayList<>(RTP.selectionAPI.permRegionLookup.values());
         allRegions.addAll(RTP.selectionAPI.tempRegions.values());
 
         for (Region region : allRegions) {
-            totalActiveChunkCap += region.getSettings().activeChunkCap();
             for (ChunkSet chunkSet : region.chunkManager.locAssChunks.values()) {
                 if (chunkSet.keep()) {
                     totalExpectedTickets += chunkSet.chunks.size();
@@ -168,17 +172,15 @@ public class InfoCmd extends BaseRTPCmdImpl {
             }
         }
 
-        long discrepancy = activeTickets - totalExpectedTickets;
-        double leakRate = (totalLoads > 0) ? ((double) Math.max(0, discrepancy) / totalLoads) * 100.0 : 0.0;
+        // Print localized diagnostics
+        if (!infoTickets.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoTickets, "INFO");
+        if (!infoTeleports.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoTeleports, "INFO");
+        if (!infoMSPT.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoMSPT, "INFO");
+        if (!infoTotalLoads.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoTotalLoads, "INFO");
+        if (!infoLeakRate.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoLeakRate, "INFO");
 
-      RTP.serverAccessor.sendMessage(callerId, "&7Global Active Chunk Tickets: &f" + activeTickets, "INFO");
-      RTP.serverAccessor.sendMessage(callerId, "&7Active Teleport State Machines: &f" + rtp.latestTeleportData.size(), "INFO");
-      RTP.serverAccessor.sendMessage(callerId, "&7Current Plugin MSPT: &f" + String.format("%.4f", PerformanceTracker.pluginMSPT), "INFO");
-      RTP.serverAccessor.sendMessage(callerId, "&7Lifetime Chunks Loaded: &f" + totalLoads, "INFO");
-      RTP.serverAccessor.sendMessage(callerId, "&7Current Chunk Leak Rate: &f" + String.format("%.4f%%", leakRate), "INFO");
-
-      RTP.serverAccessor.sendMessage(callerId, "&7--- Diagnostic Disclaimer ---", "INFO");
-      RTP.serverAccessor.sendMessage(callerId, "&7Diagnostic Note: If the server's total orphaned chunk count exceeds this plugin's lifetime loads ([" + totalLoads + "]), this plugin is not the sole source of the memory leak.", "INFO");
+        if (!infoDisclaimerHeader.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoDisclaimerHeader, "INFO");
+        if (!infoDisclaimer.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoDisclaimer, "INFO");
     }
 
     Set<Character> front = new HashSet<>(Arrays.asList('[', '%'));
@@ -186,7 +188,7 @@ public class InfoCmd extends BaseRTPCmdImpl {
 
     List<String> worldNames = parameterValues.get("world");
     if (worldNames != null) {
-      Object worldInfoObj = lang.getConfigValue(MessagesKeys.worldInfo, "");
+      Object worldInfoObj = lang.getConfigValue(MessagesKeys.infoWorld, "");
       if (!(worldInfoObj instanceof List)) return true;
       List<String> worldInfo =
           ((List<?>) worldInfoObj).stream().map(String::valueOf).collect(Collectors.toList());
@@ -222,7 +224,7 @@ public class InfoCmd extends BaseRTPCmdImpl {
 
     List<String> regionNames = parameterValues.get("region");
     if (regionNames != null) {
-      Object regionInfoObj = lang.getConfigValue(MessagesKeys.regionInfo, "");
+      Object regionInfoObj = lang.getConfigValue(MessagesKeys.infoRegion, "");
       if (!(regionInfoObj instanceof List)) return true;
       List<String> regionInfo =
           ((List<?>) regionInfoObj).stream().map(String::valueOf).collect(Collectors.toList());

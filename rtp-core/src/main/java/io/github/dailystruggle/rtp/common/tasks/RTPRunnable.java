@@ -66,6 +66,7 @@ public class RTPRunnable implements Runnable, RTPCancellable, RTPDelayable {
   public void setCancelled(boolean cancel) {
     cancelled.set(cancel);
     if (cancel && trackingId != null) {
+      io.github.dailystruggle.rtp.common.tools.MemoryTracker.untrack(trackingId);
       trackingId = null;
     }
   }

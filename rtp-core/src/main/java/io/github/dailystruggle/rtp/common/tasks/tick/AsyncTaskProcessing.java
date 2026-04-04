@@ -55,22 +55,29 @@ public final class AsyncTaskProcessing extends RTPRunnable {
     if (isCancelled()) return;
     long start = System.nanoTime();
 
-    RTP.getInstance().cancelTasks.execute(Long.MAX_VALUE);
-    if (isCancelled()) return;
-    RTP.getInstance().miscAsyncTasks.execute(availableTime - (System.nanoTime() - start));
-    if (isCancelled()) return;
-
+    long currentAvailableTime = availableTime; // fallback
     long period = 0;
+
     if (RTP.configs != null) {
       ConfigParser<PerformanceKeys> perf =
               (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
-      if (perf != null) period = perf.getNumber(PerformanceKeys.period, 0).longValue();
+      if (perf != null) {
+        period = perf.getNumber(PerformanceKeys.period, 0).longValue();
+
+        long configMs = perf.getNumber(PerformanceKeys.asyncAllottedTime, 10).longValue();
+        // Cap async time to prevent saturating the background thread pool
+        configMs = Math.min(configMs, 25);
+        currentAvailableTime = java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(configMs);
+      }
     }
+
+    RTP.getInstance().cancelTasks.execute(Long.MAX_VALUE);
+    if (isCancelled()) return;
+    RTP.getInstance().miscAsyncTasks.execute(currentAvailableTime - (System.nanoTime() - start));
+    if (isCancelled()) return;
 
     List<Region> regions = new ArrayList<>(RTP.selectionAPI.permRegionLookup.values());
     int size = regions.size();
-
-//    System.out.println("[RTP-DEBUG] AsyncTaskProcessing: Found " + size + " regions. Period: " + period);
 
     if (size == 0) return;
     if (period < size) period = size;
@@ -106,7 +113,7 @@ public final class AsyncTaskProcessing extends RTPRunnable {
       Region region = regions.get((int) step);
 //      System.out.println("[RTP-DEBUG] AsyncTaskProcessing: Invoking execute() for region: " + region.name);
 
-      region.execute(availableTime - (System.nanoTime() - start));
+      region.execute(currentAvailableTime - (System.nanoTime() - start));
     }
   }
 }
