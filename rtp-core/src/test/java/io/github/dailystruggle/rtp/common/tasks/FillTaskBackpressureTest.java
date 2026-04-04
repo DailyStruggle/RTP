@@ -111,19 +111,28 @@ public class FillTaskBackpressureTest {
 
     @Test
     void testFillTaskBackpressure() throws Exception {
-        // 1. Mock getChunkAtAsync to return uncompleted futures
-        // We use a custom Answer to return uncompleted futures
         when(apiChunkManager.getChunkAtAsync(any(), anyInt(), anyInt())).thenAnswer(invocation -> new CompletableFuture<Long>());
 
         FillTask fillTask = new FillTask(region, 0);
 
-        // Mock fillIncrement to a large value
         Field fiField = FillTask.class.getDeclaredField("fillIncrement");
         fiField.setAccessible(true);
         ((AtomicLong) fiField.get(fillTask)).set(1000);
 
+        // --- NEW: Cancel the task after 500ms to break the infinite sleep loop ---
+        new Thread(() -> {
+            try {
+                // Give the task enough time to hit the 50 chunk limit
+                Thread.sleep(500);
+                fillTask.setCancelled(true);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }).start();
+        // -------------------------------------------------------------------------
+
         // 2. Execute FillTask.run()
-        // It should terminate when pendingChunks reaches 50
+        // It will block for ~500ms, then cleanly exit when the watchdog cancels it
         fillTask.run();
 
         // 3. Assert that pendingChunks reaches exactly 50
@@ -132,8 +141,6 @@ public class FillTaskBackpressureTest {
         AtomicLong pendingChunks = (AtomicLong) pcField.get(fillTask);
 
         assert pendingChunks.get() == 50 : "Expected pendingChunks to be exactly 50, but was " + pendingChunks.get();
-
-        // Also verify that getChunkAtAsync was called 50 times
         verify(apiChunkManager, times(50)).getChunkAtAsync(any(), anyInt(), anyInt());
     }
 }

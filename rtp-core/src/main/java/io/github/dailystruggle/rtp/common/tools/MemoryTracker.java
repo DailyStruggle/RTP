@@ -47,6 +47,15 @@ public class MemoryTracker {
     return uuid; // Now returns the reference ID
   }
 
+  /** Forcefully deregisters an object from the leak tracker immediately */
+  public static void untrack(Object target) {
+    if (target == null) return;
+    trackedObjects.entrySet().removeIf(entry -> {
+      TrackedObject tracked = entry.getValue();
+      return tracked.isCollected() || tracked.matches(target);
+    });
+  }
+
   public static void runDiagnostics() {
     trackedObjects
         .entrySet()
@@ -116,6 +125,12 @@ public class MemoryTracker {
                 "[RTP] Leak Alert: {0} orphaned chunk tickets detected. Leak Rate: {1}%.",
                 new Object[] { discrepancy, String.format("%.4f", leakRate) });
       }
+    }
+  }
+
+  public static void untrack(UUID trackingId) {
+    if (trackingId != null) {
+      trackedObjects.remove(trackingId);
     }
   }
 }

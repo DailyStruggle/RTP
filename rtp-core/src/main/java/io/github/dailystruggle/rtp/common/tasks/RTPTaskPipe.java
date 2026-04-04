@@ -46,9 +46,10 @@ public abstract class RTPTaskPipe {
 
   public void stop() {
     runnables.forEach(
-        runnable -> {
-          if (runnable instanceof RTPRunnable) ((RTPRunnable) runnable).setCancelled(true);
-        });
+            runnable -> {
+              if (runnable instanceof RTPRunnable) ((RTPRunnable) runnable).setCancelled(true);
+            });
     stop = true;
+    runnables.clear(); // Add this line to drop the strong references
   }
 }

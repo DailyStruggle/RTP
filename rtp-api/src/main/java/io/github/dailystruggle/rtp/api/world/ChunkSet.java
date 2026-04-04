@@ -49,7 +49,13 @@ public final class ChunkSet {
     this.complete = complete;
 
     CompletableFuture.allOf(chunks.toArray(new CompletableFuture[0]))
-        .thenRun(() -> this.complete.complete(true));
+            .whenComplete((res, err) -> {
+              if (err != null) {
+                this.complete.complete(false);
+              } else {
+                this.complete.complete(true);
+              }
+            });
   }
 
   /**

@@ -30,6 +30,11 @@ public class TrackedObject {
     return targetRef.get() == null;
   }
 
+  public boolean matches(Object target) {
+    Object ref = targetRef.get();
+    return ref != null && ref == target;
+  }
+
   public long getLeakDuration() {
     long delta = System.currentTimeMillis() - lastActivityTime;
     if (delta > maxExpectedLifespan) {
