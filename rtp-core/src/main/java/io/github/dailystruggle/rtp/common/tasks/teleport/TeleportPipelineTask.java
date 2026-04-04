@@ -207,7 +207,11 @@ public final class TeleportPipelineTask extends RTPRunnable {
           chunkSet.keep(true, world);
         }
 
-        RTP.scheduler.runTaskAsynchronously(this);
+        if (chunkSet.complete.isDone()) {
+          this.run(); // Instantly advance to the LOAD phase on the same thread
+        } else {
+          RTP.scheduler.runTaskAsynchronously(this);
+        }
       }
     }
   }
@@ -250,6 +254,10 @@ public final class TeleportPipelineTask extends RTPRunnable {
         teleportData.selectedCoords = coords;
       }
 
+      if (coords == null && teleportData.selectedCoords != null) {
+        coords = teleportData.selectedCoords;
+      }
+
       if (region == null || coords == null) {
         if (region != null) region.inFlightCalculations.decrementAndGet();
         return;
@@ -288,7 +296,13 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
             loadPostActions.forEach(consumer -> consumer.accept(this));
             currentPhase = Phase.TELEPORT;
-            RTP.scheduler.scheduleTeleport(player(), this, toTicks);
+            if (toTicks <= 0 && RTP.serverAccessor.isPrimaryThread()) {
+              currentPhase = Phase.TELEPORT;
+              this.run(); // Instantly fire the teleport on the current thread
+            } else {
+              currentPhase = Phase.TELEPORT;
+              RTP.scheduler.scheduleTeleport(player(), this, toTicks);
+            }
           });
     } catch (Exception e) {
       SupportLogger.logException(Level.SEVERE, "Error in runLoad", e);

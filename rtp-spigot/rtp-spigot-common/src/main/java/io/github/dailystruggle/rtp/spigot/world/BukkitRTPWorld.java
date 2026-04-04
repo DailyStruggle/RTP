@@ -3,7 +3,6 @@ package io.github.dailystruggle.rtp.spigot.world;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.papermc.lib.PaperLib;
 
 import java.lang.ref.WeakReference;
 import java.util.*;
@@ -12,6 +11,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import io.papermc.lib.PaperLib;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
@@ -86,7 +87,7 @@ public final class BukkitRTPWorld extends RTPWorld<World> {
 
   @Override
   public CompletableFuture<Long> getChunkAt(int cx, int cz) {
-    return PaperLib.getChunkAtAsync(world, cx, cz)
+    return PaperLib.getChunkAtAsync(world, cx, cz, true)
         .thenApply(
             chunk -> {
               if (chunk == null) return null;
