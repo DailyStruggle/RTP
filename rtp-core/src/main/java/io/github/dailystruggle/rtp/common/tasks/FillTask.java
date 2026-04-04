@@ -244,9 +244,9 @@ public class FillTask extends RTPRunnable {
 
     final long finalPos1 = pos;
     if (activeChecks > 0) {
-      long dt = TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - timingStart);
-      if (dt <= 0) dt = 1;
-      long cps_local = (long) (((double) activeChecks) / (dt));
+      long dtMillis = System.currentTimeMillis() - timingStart;
+      if (dtMillis <= 0) dtMillis = 1;
+      long cps_local = (activeChecks * 1000L) / dtMillis;
       cps_all = cps_all.add(new BigInteger(String.valueOf(cps_local)));
       cps_divisor = cps_divisor.add(increment_big);
       cps.set((cps.get() * 7 / 8) + cps_local / 8);
@@ -431,8 +431,8 @@ public class FillTask extends RTPRunnable {
     if (!defaultBiomes.contains(currBiome.toUpperCase())) {
       if (biomeRecall) {
         shape.addBadLocation(pos, 1L);
-        return CompletableFuture.completedFuture(false);
       }
+      return CompletableFuture.completedFuture(false);
     }
 
     if (!border
@@ -514,9 +514,9 @@ public class FillTask extends RTPRunnable {
                       if (!defaultBiomes.contains(currBiome1.toUpperCase())) {
                         if (biomeRecall) {
                           shape.addBadLocation(pos, 1L);
-                          res.complete(false);
-                          return;
                         }
+                        res.complete(false);
+                        return;
                       }
 
                       boolean pass = localCursor.y < vert.maxY();

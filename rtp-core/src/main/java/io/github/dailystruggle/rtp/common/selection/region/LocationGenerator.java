@@ -73,23 +73,23 @@ public class LocationGenerator {
 
         boolean custom = biomeNames != null && !biomeNames.isEmpty();
 
-        if (!custom) {
+        while (!custom) {
             CompletableFuture<CachedLocation> poll = region.queueManager.poll(playerId);
-            if (poll != null) {
-                try {
-                    pair = poll.get();
-                } catch (InterruptedException | ExecutionException e) {
-                    RTP.log(Level.WARNING, e.getMessage(), e);
-                    pair = null;
-                }
+            if (poll == null) {
+                break;
             }
-        }
+            try {
+                pair = poll.get();
+            } catch (InterruptedException | ExecutionException e) {
+                RTP.log(Level.WARNING, e.getMessage(), e);
+                pair = null;
+            }
 
-        if (!custom && pair != null) {
-            RTPCoords left = pair.getCoords();
-            if (left != null) {
-                boolean pass = true;
-                RTPWorld<?> world = region.getWorld();
+            if (pair != null) {
+                RTPCoords left = pair.getCoords();
+                if (left != null) {
+                    boolean pass = true;
+                    RTPWorld<?> world = region.getWorld();
                 int cx = left.x() >> 4;
                 int cz = left.z() >> 4;
                 ChunkSet ticket = region.chunkManager.addTicket(cx, cz);
@@ -118,7 +118,7 @@ public class LocationGenerator {
                                         if (collection.isEmpty()) unsafeBlocks.clear();
                                         else if (collection.size() == unsafeBlocks.size()) {
                                             if (value instanceof List<?> list) {
-                                                if (list.get(0) instanceof String firstElement) {
+                                                if (list.get(0) instanceof String) {
                                                     List<String> stringList = (List<String>) list;
                                                     boolean same = true;
                                                     for (int j = 0; j < stringList.size(); j++) {
@@ -230,6 +230,7 @@ public class LocationGenerator {
                 }
             }
         }
+        }
 
         if (custom || sender.hasPermission("rtp.unqueued")) {
             GenerationResult res = getLocation(region, biomeNames);
@@ -269,7 +270,7 @@ public class LocationGenerator {
             data.queueLocation = region.queueManager.playerQueue.size();
             RTP.serverAccessor.sendMessage(playerId, MessagesKeys.queueUpdate);
         }
-        return new GenerationResult(null, 1, chunkSet);
+        return null;
     }
 
     /**

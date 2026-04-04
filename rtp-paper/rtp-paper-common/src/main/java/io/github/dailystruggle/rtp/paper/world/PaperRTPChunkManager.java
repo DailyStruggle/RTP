@@ -13,9 +13,23 @@ public class PaperRTPChunkManager implements RTPChunkManager {
   public CompletableFuture<Long> getChunkAtAsync(RTPWorld<?> world, int x, int z) {
     if (!(world instanceof BukkitRTPWorld)) {
       return CompletableFuture.failedFuture(
-          new IllegalArgumentException("World is not a BukkitRTPWorld"));
+              new IllegalArgumentException("World is not a BukkitRTPWorld"));
     }
 
+    // 1. Calculate the standard chunk key
+    long key = ((long) x & 0xffffffffL | ((long) z << 32));
+
+    // 2. Check if the chunk set exists and has an active keep() ticket
+    ChunkSet chunkSet = ChunkSet.getGlobal(world, x, z);
+    if (chunkSet != null && chunkSet.keep()) {
+      // 3. Verify the chunk is actually in the world's memory cache
+      if (world.getCachedChunk(key) != null) {
+        // Return an instantly resolved future, bypassing the async scheduler entirely
+        return CompletableFuture.completedFuture(key);
+      }
+    }
+
+    // 4. Fallback to standard async fetching if it's not cached or not kept
     return ((BukkitRTPWorld) world).getChunkAt(x, z);
   }
 
