@@ -197,22 +197,23 @@ public class FillTask extends RTPRunnable {
         return;
       }
 
-      shape.locationToXZ(pos, cursor);
-      if (shape.isKnownBad(cursor)) {
+      // Check the native 1D index first to save translation overhead
+      if (shape.isKnownBad(pos)) {
         continue;
       }
 
+      // Translate only if the location is not known to be bad
+      shape.locationToXZ(pos, cursor);
+
+      int centerBlockX = (cursor.x << 4) + 8;
+      int centerBlockZ = (cursor.z << 4) + 8;
+
       if (pendingChunks.get() >= MAX_PENDING_CHUNKS) {
-        // Wait here until a background chunk check finishes and decrements the counter
         while (pendingChunks.get() >= MAX_PENDING_CHUNKS && !isCancelled() && !pause.get()) {
           try {
             Thread.sleep(10);
           } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            break;
-          }
-
-          if (isCancelled() || pause.get()) {
             break;
           }
         }
@@ -221,15 +222,14 @@ public class FillTask extends RTPRunnable {
       final long currentPos = pos;
       activeChecks++;
       pendingChunks.incrementAndGet();
-      testPos(region, currentPos, cursor.x, cursor.z, safetyRadius, unsafeBlocks, defaultBiomes, biomeRecall, border)
-          .whenComplete((valid, ex) -> {
-            pendingChunks.decrementAndGet();
-            if (ex != null) {
-              if (!(ex instanceof CancellationException)) {
-                RTP.log(Level.WARNING, ex.getMessage(), ex);
-              }
-            }
-          });
+
+      testPos(region, currentPos, centerBlockX, centerBlockZ, safetyRadius, unsafeBlocks, defaultBiomes, biomeRecall, border)
+              .whenComplete((valid, ex) -> {
+                pendingChunks.decrementAndGet();
+                if (ex != null && !(ex instanceof CancellationException)) {
+                  RTP.log(Level.WARNING, ex.getMessage(), ex);
+                }
+              });
     }
 
     // Ensure all pending chunk checks from this batch complete before finishing the iteration
@@ -406,15 +406,18 @@ public class FillTask extends RTPRunnable {
    * @return a future that completes with true if the location is valid
    */
   public CompletableFuture<Boolean> testPos(
-      Region region,
-      final long pos,
-      final int blockX,
-      final int blockZ,
-      int safetyRadius,
-      Set<String> unsafeBlocks,
-      Set<String> defaultBiomes,
-      boolean biomeRecall,
-      WorldBorder border) {
+          Region region,
+          final long pos,
+          final int blockX,
+          final int blockZ,
+          int safetyRadius,
+          Set<String> unsafeBlocks,
+          Set<String> defaultBiomes,
+          boolean biomeRecall,
+          WorldBorder border) {
+
+    safetyRadius = Math.min(safetyRadius, 7);
+
     int cx = blockX >> 4;
     int cz = blockZ >> 4;
     MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
@@ -426,20 +429,16 @@ public class FillTask extends RTPRunnable {
     RTPWorld world = region.getWorld();
 
     String currBiome =
-        world.getBiome(blockX, (vert.maxY() + vert.minY()) / 2, blockZ);
+            world.getBiome(blockX, (vert.maxY() + vert.minY()) / 2, blockZ);
 
     if (!defaultBiomes.contains(currBiome.toUpperCase())) {
-      if (biomeRecall) {
-        shape.addBadLocation(pos, 1L);
-      }
+      if (biomeRecall) shape.addBadLocation(pos, 1L);
       return CompletableFuture.completedFuture(false);
     }
 
     if (!border
-        .isInside()
-        .apply(
-            new RTPLocation(
-                world, blockX, (vert.maxY() + vert.minY()) / 2, blockZ))) {
+            .isInside()
+            .apply(new RTPLocation(world, blockX, (vert.maxY() + vert.minY()) / 2, blockZ))) {
       shape.addBadLocation(pos, 1L);
       return CompletableFuture.completedFuture(false);
     }
@@ -450,7 +449,10 @@ public class FillTask extends RTPRunnable {
 
     CompletableFuture<Boolean> res = new CompletableFuture<>();
 
+    int finalSafetyRadius = safetyRadius;
     Runnable chunkLoader = new Runnable() {
+      int retries = 0;
+
       @Override
       public void run() {
         if (isCancelled() || pause.get()) {
@@ -458,18 +460,22 @@ public class FillTask extends RTPRunnable {
           return;
         }
 
+        // Hard-cap retries to prevent thread starvation deadlocks
+        if (retries > 3) {
+          res.complete(false);
+          return;
+        }
+        retries++;
+
         RTP.serverAccessor
                 .getChunkManager()
                 .getChunkAtAsync(world, cx, cz)
                 .orTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
-                .exceptionally(
-                        ex -> {
-                          return null;
-                        }).thenAccept(chunkKey -> {
+                .exceptionally(ex -> null)
+                .thenAccept(chunkKey -> {
 
                   if (chunkKey == null) {
                     if (!isCancelled() && !pause.get()) {
-                      // Retry instead of logging a bad location
                       RTP.scheduler.runTaskAsynchronously(this);
                     } else {
                       res.complete(false);
@@ -484,10 +490,8 @@ public class FillTask extends RTPRunnable {
 
                   RTPChunk<?> chunk = world.getCachedChunk(chunkKey);
 
-                  // Condition 2: The chunk unloaded instantly before we could cache it
                   if (chunk == null) {
                     if (!isCancelled() && !pause.get()) {
-                      // Retry the load sequence
                       RTP.scheduler.runTaskAsynchronously(this);
                     } else {
                       res.complete(false);
@@ -495,103 +499,75 @@ public class FillTask extends RTPRunnable {
                     return;
                   }
 
-                  // Chunk successfully loaded. Proceed with verification.
                   chunk.keep(true);
                   try {
-                    RTPChunk<?>[] localChunks = new RTPChunk[(safetyRadius * 2 + 1) * (safetyRadius * 2 + 1)];
                     MutableRTPCoords localCursor = new MutableRTPCoords(blockX, blockZ);
                     localCursor.setWorldName(world.name());
 
-
-                    try {
-                      if (!vert.adjust(chunk, localCursor)) {
-                        if (biomeRecall) shape.addBadLocation(pos, 1L);
-                        res.complete(false);
-                        return;
-                      }
-
-                      String currBiome1 = world.getBiome(localCursor.x, localCursor.y, localCursor.z);
-                      if (!defaultBiomes.contains(currBiome1.toUpperCase())) {
-                        if (biomeRecall) {
-                          shape.addBadLocation(pos, 1L);
-                        }
-                        res.complete(false);
-                        return;
-                      }
-
-                      boolean pass = localCursor.y < vert.maxY();
-                      if (!pass) {
-                        shape.addBadLocation(pos, 1L);
-                        res.complete(false);
-                        return;
-                      }
-
-                      // todo: waterlogged check
-                      int centerChunkX = chunk.x();
-                      int centerChunkZ = chunk.z();
-                      int L = safetyRadius * 2 + 1;
-                      localChunks[safetyRadius * L + safetyRadius] = chunk;
-                      chunk.keep(true);
-                      try {
-                        for (int x = localCursor.x - safetyRadius; x <= localCursor.x + safetyRadius && pass; x++) {
-                          int chunkX = x >> 4;
-                          int xx = x & 15;
-                          int dcX = chunkX - centerChunkX;
-
-                          for (int z = localCursor.z - safetyRadius; z <= localCursor.z + safetyRadius && pass; z++) {
-                            int chunkZ = z >> 4;
-                            int zz = z & 15;
-                            int dcZ = chunkZ - centerChunkZ;
-
-                            int index = (dcX + safetyRadius) * L + (dcZ + safetyRadius);
-                            RTPChunk<?> chunk1 = localChunks[index];
-                            if (chunk1 == null) {
-                              long neighborKey =
-                                      ((long) chunkX & 0xFFFFFFFFL) | (((long) chunkZ & 0xFFFFFFFFL) << 32);
-                              chunk1 = region.getWorld().getCachedChunk(neighborKey);
-                              if (chunk1 == null) {
-                                pass = false;
-                                break;
-                              }
-                              localChunks[index] = chunk1;
-                              chunk1.keep(true);
-                            }
-
-                            for (int y = localCursor.y - safetyRadius; y <= localCursor.y + safetyRadius && pass; y++) {
-                              if (!chunk1.isSafe(xx, y, zz, unsafeBlocks)) {
-                                pass = false;
-                              }
-                            }
-                          }
-                        }
-                      } finally {
-                        for (int i = 0; i < localChunks.length; i++) {
-                          if (localChunks[i] != null) {
-                            localChunks[i].keep(false);
-                            localChunks[i] = null;
-                          }
-                        }
-                      }
-
-                      if (isCancelled()) {
-                        res.complete(false);
-                        return;
-                      }
-
-                      if (pass) pass = GlobalRegionVerifiers.checkGlobalRegionVerifiers(localCursor).join();
-
-                      if (pass) {
-                        if (biomeRecall) shape.addBiomeLocation(pos, 1L, currBiome1);
-                        res.complete(true);
-                      } else {
-                        shape.addBadLocation(pos, 1L);
-                        res.complete(false);
-                      }
-                    } finally {
-                      chunk.keep(false);
+                    if (!vert.adjust(chunk, localCursor)) {
+                      RTP.log(Level.INFO, "[RTP-DEBUG] vert.adjust failed for pos=" + pos);
+                      if (biomeRecall) shape.addBadLocation(pos, 1L);
+                      res.complete(false);
+                      return;
                     }
+
+                    String currBiome1 = world.getBiome(localCursor.x, localCursor.y, localCursor.z);
+                    if (!defaultBiomes.contains(currBiome1.toUpperCase())) {
+                      RTP.log(Level.INFO, "[RTP-DEBUG] Inner defaultBiomes check failed for pos=" + pos);
+                      if (biomeRecall) shape.addBadLocation(pos, 1L);
+                      res.complete(false);
+                      return;
+                    }
+
+                    boolean pass = localCursor.y < vert.maxY();
+                    if (!pass) {
+                      RTP.log(Level.INFO, "[RTP-DEBUG] localCursor.y >= vert.maxY() failed for pos=" + pos);
+                      shape.addBadLocation(pos, 1L);
+                      res.complete(false);
+                      return;
+                    }
+
+                    int localX = localCursor.x & 15;
+                    int localZ = localCursor.z & 15;
+
+                    int minX = Math.max(0, localX - finalSafetyRadius);
+                    int maxX = Math.min(15, localX + finalSafetyRadius);
+                    int minZ = Math.max(0, localZ - finalSafetyRadius);
+                    int maxZ = Math.min(15, localZ + finalSafetyRadius);
+
+                    for (int xx = minX; xx <= maxX && pass; xx++) {
+                      for (int zz = minZ; zz <= maxZ && pass; zz++) {
+                        for (int y = localCursor.y - finalSafetyRadius; y <= localCursor.y + finalSafetyRadius && pass; y++) {
+                          if (!chunk.isSafe(xx, y, zz, unsafeBlocks)) {
+                            pass = false;
+                            RTP.log(Level.INFO, "[RTP-DEBUG] chunk.isSafe failed at local coords xx=" + xx + ", y=" + y + ", zz=" + zz);
+                          }
+                        }
+                      }
+                    }
+
+                    if (isCancelled() || pause.get()) {
+                      res.complete(false);
+                      return;
+                    }
+
+                    if (pass) pass = GlobalRegionVerifiers.checkGlobalRegionVerifiers(localCursor).join();
+
+                    if (pass) {
+                      RTP.log(Level.INFO, "[RTP-DEBUG] Location PASSED checks: pos=" + pos);
+                      if (biomeRecall) shape.addBiomeLocation(pos, 1L, currBiome1);
+                      res.complete(true);
+                    } else {
+                      RTP.log(Level.INFO, "[RTP-DEBUG] Location FAILED region verification: pos=" + pos);
+                      shape.addBadLocation(pos, 1L);
+                      res.complete(false);
+                    }
+
                   } catch (Exception e) {
+                    RTP.log(Level.WARNING, "[RTP-DEBUG] Exception thrown during chunk verification for pos=" + pos, e);
                     res.complete(false);
+                  } finally {
+                    chunk.keep(false);
                   }
                 });
       }
