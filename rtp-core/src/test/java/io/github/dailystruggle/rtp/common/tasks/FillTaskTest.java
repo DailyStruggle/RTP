@@ -103,7 +103,7 @@ public class FillTaskTest {
         when(safety.getNumber(any(), any())).thenAnswer(inv -> inv.getArgument(1));
         when(messages.getConfigValue(any(), any())).thenAnswer(inv -> inv.getArgument(1));
 
-        when(shape.getRange()).thenReturn(1000.0);
+        when(shape.getRange()).thenReturn(1000L);
         when(settings.spatialResolution()).thenReturn(1L);
 
         RTP.serverAccessor = serverAccessor;

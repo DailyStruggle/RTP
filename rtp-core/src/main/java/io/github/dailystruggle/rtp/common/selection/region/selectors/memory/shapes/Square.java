@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 
+import java.math.BigInteger;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
@@ -97,7 +98,7 @@ public class Square extends MemoryShape<GenericMemoryShapeParams> {
   }
 
   @Override
-  public double getRange() {
+  public long getRange() {
     long radius = getNumber(GenericMemoryShapeParams.radius, 256L).longValue();
     long cr = getNumber(GenericMemoryShapeParams.centerRadius, 64L).longValue();
     return (radius - cr) * (radius + cr) * 4;
@@ -254,7 +255,12 @@ public class Square extends MemoryShape<GenericMemoryShapeParams> {
     double radius = Math.sqrt(location + cr * cr * 4) / 2;
 
     // getFromString how far to step around the square
-    double theta = radius - (long) radius;
+    BigInteger bigLocation = BigInteger.valueOf(location);
+    BigInteger bigMaxLong = BigInteger.valueOf(Long.MAX_VALUE);
+    BigInteger bigRange = BigInteger.valueOf(getRange());
+    long bamAngle = bigLocation.multiply(bigMaxLong).divide(bigRange).longValue();
+    double theta = ((double) bamAngle / Long.MAX_VALUE);
+
     double perimeterStep = 8 * (radius * theta);
 
     long r = (long) radius;

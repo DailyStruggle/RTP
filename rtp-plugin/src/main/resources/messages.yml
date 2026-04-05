@@ -66,13 +66,13 @@ consoleCmdNotAllowed: "&c[P0] You must be an in-game player to execute this comm
 # user doesn't have permission for the command requested
 noPerms: "&eI'm sorry, but you do not have permission to perform this command. Please contact the server administrators if you believe that this is in error."
 
-fillStart: "&a[P0] fill task started for region [region]"
-fillCancel: "&e[P0] fill task cancelled for region [region]"
-fillPause: "#A020F0[P0] fill task paused for region [region]"
-fillResume: "#10A5F5[P0] fill task resumed for region [region]"
-fillRunning: "&c[P0] fill task already running for region [region]"
-fillNotRunning: "&c[rtp] fill task not running for region [region]"
-fillStatus: "&a[P0] completed [chunks] / [totalChunks] chunks for region [region]. [cps] cps. ETA: [eta]"
+fillStart: "&a[P0] fill task started for regions: [fill_regions]"
+fillCancel: "&e[P0] fill task cancelled for regions: [fill_regions]"
+fillPause: "#A020F0[P0] fill task paused for regions: [fill_regions]"
+fillResume: "#10A5F5[P0] fill task resumed for regions: [fill_regions]"
+fillRunning: "&c[P0] fill task already running for regions: [fill_regions]"
+fillNotRunning: "&c[rtp] fill task not running for regions: [fill_regions]"
+fillStatus: "&a[P0] completed [fill_chunks] / [fill_totalChunks] chunks for regions: [fill_regions]. [fill_cps] cps. ETA: [fill_eta]"
 
 #info command
 infoTitle: "&a======RTP Info======"

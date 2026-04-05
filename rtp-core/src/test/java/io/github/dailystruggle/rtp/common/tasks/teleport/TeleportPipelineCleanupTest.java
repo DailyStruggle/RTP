@@ -121,24 +121,20 @@ public class TeleportPipelineCleanupTest {
 
             TeleportPipelineTask task = new TeleportPipelineTask(context, region);
 
-            // 1. Initialize and push through SETUP and TELEPORT phases
+            // 1. Initialize and push through SETUP
             task.setPhase(TeleportPipelineTask.Phase.SETUP);
             task.run(); // runSetup - populates latestTeleportData
 
             assertTrue(rtp.latestTeleportData.containsKey(player.uuid()), "latestTeleportData should be populated after SETUP");
 
+            // 2. Advance to TELEPORT
+            // This now automatically executes the CLEANUP sequence inline
             task.setPhase(TeleportPipelineTask.Phase.TELEPORT);
-            task.run(); // runTeleport - populates invulnerablePlayers
+            task.run();
 
-            assertTrue(rtp.invulnerablePlayers.containsKey(player.uuid()), "invulnerablePlayers should be populated after TELEPORT");
-
-            // 2. Manually transition to CLEANUP
-            task.setPhase(TeleportPipelineTask.Phase.CLEANUP);
-            task.run(); // runCleanup
-
-            // 3. Assert cleared
-            assertFalse(rtp.latestTeleportData.containsKey(player.uuid()), "latestTeleportData should be cleared after CLEANUP");
-            assertFalse(rtp.invulnerablePlayers.containsKey(player.uuid()), "invulnerablePlayers should be cleared after CLEANUP");
+            // 3. Assert cleared (Intermediate invulnerability checks removed as it is instantly wiped)
+            assertFalse(rtp.latestTeleportData.containsKey(player.uuid()), "latestTeleportData should be cleared after automatic CLEANUP");
+            assertFalse(rtp.invulnerablePlayers.containsKey(player.uuid()), "invulnerablePlayers should be cleared after automatic CLEANUP");
         }
     }
 

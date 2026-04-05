@@ -73,7 +73,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    *
    * @return the range
    */
-  public abstract double getRange();
+  public abstract long getRange();
 
   /**
    * Convert xz coordinates to a location value
