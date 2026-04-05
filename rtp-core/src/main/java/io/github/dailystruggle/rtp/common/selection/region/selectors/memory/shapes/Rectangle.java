@@ -51,7 +51,7 @@ public class Rectangle extends MemoryShape<RectangleParams> {
   }
 
   @Override
-  public double getRange() {
+  public long getRange() {
     long w = getNumber(RectangleParams.width, 256L).longValue();
     long h = getNumber(RectangleParams.height, 256L).longValue();
     return w * h;

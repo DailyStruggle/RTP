@@ -449,6 +449,71 @@ public class SendMessage {
           return world.getBiome(
               data.selectedCoords.x(), data.selectedCoords.y(), data.selectedCoords.z());
         });
+      placeholders.put(
+              "fill_chunks",
+              uuid -> {
+                  if (RTP.getInstance() == null) return "0";
+                  long total = 0;
+                  for (io.github.dailystruggle.rtp.common.tasks.FillTask task : RTP.getInstance().fillTasks.values()) {
+                      total += task.latestAbsolutePos;
+                  }
+                  return String.valueOf(total);
+              });
+      placeholders.put(
+              "fill_totalChunks",
+              uuid -> {
+                  if (RTP.getInstance() == null) return "0";
+                  long total = 0;
+                  for (io.github.dailystruggle.rtp.common.tasks.FillTask task : RTP.getInstance().fillTasks.values()) {
+                      total += task.latestAbsoluteTotal;
+                  }
+                  return String.valueOf(total);
+              });
+      placeholders.put(
+              "fill_cps",
+              uuid -> {
+                  if (RTP.getInstance() == null) return "0";
+                  long total = 0;
+                  for (io.github.dailystruggle.rtp.common.tasks.FillTask task : RTP.getInstance().fillTasks.values()) {
+                      total += task.latestCps;
+                  }
+                  return String.valueOf(total);
+              });
+      placeholders.put(
+              "fill_regions",
+              uuid -> {
+                  if (RTP.getInstance() == null) return "";
+                  return String.join(", ", RTP.getInstance().fillTasks.keySet());
+              });
+      placeholders.put(
+              "fill_eta",
+              uuid -> {
+                  if (RTP.getInstance() == null) return "0";
+                  long maxEta = 0;
+                  for (io.github.dailystruggle.rtp.common.tasks.FillTask task : RTP.getInstance().fillTasks.values()) {
+                      // Returns the ETA of the longest-running active task
+                      if (task.latestEtaSeconds > maxEta) maxEta = task.latestEtaSeconds;
+                  }
+
+                  ConfigParser<MessagesKeys> langParser =
+                          (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+                  long days = TimeUnit.SECONDS.toDays(maxEta);
+                  long hours = TimeUnit.SECONDS.toHours(maxEta) % 24;
+                  long minutes = TimeUnit.SECONDS.toMinutes(maxEta) % 60;
+                  long seconds = maxEta % 60;
+
+                  String replacement = "";
+                  if (days > 0)
+                      replacement += days + langParser.getConfigValue(MessagesKeys.days, "").toString() + " ";
+                  if (hours > 0)
+                      replacement += hours + langParser.getConfigValue(MessagesKeys.hours, "").toString() + " ";
+                  if (minutes > 0)
+                      replacement += minutes + langParser.getConfigValue(MessagesKeys.minutes, "").toString() + " ";
+                  if (seconds > 0)
+                      replacement += seconds + langParser.getConfigValue(MessagesKeys.seconds, "").toString();
+
+                  return replacement;
+              });
   }
 
   public static void sendMessage(CommandSender target1, CommandSender target2, String message) {

@@ -46,7 +46,7 @@ public class MemoryShapeTest {
         }
 
         @Override
-        public double getRange() { return 100; }
+        public long getRange() { return 100; }
 
         @Override
         public long xzToLocation(long x, long z) { return 0; }

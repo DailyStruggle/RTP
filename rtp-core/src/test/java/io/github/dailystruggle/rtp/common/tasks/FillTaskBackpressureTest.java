@@ -87,7 +87,7 @@ public class FillTaskBackpressureTest {
         doReturn("").when(messages).getConfigValue(any(), any());
 
         when(world.getBiome(anyInt(), anyInt(), anyInt())).thenReturn("plains");
-        when(shape.getRange()).thenReturn(1000.0);
+        when(shape.getRange()).thenReturn(1000L);
         doAnswer(invocation -> {
             long l = invocation.getArgument(0);
             MutableRTPCoords c = invocation.getArgument(1);
@@ -111,7 +111,9 @@ public class FillTaskBackpressureTest {
 
     @Test
     void testFillTaskBackpressure() throws Exception {
-        when(apiChunkManager.getChunkAtAsync(any(), anyInt(), anyInt())).thenAnswer(invocation -> new CompletableFuture<Long>());
+        // 1. Simulate a server environment where chunks take forever to load
+        when(apiChunkManager.getChunkAtAsync(any(), anyInt(), anyInt()))
+                .thenAnswer(invocation -> new CompletableFuture<Long>());
 
         FillTask fillTask = new FillTask(region, 0);
 
@@ -119,28 +121,11 @@ public class FillTaskBackpressureTest {
         fiField.setAccessible(true);
         ((AtomicLong) fiField.get(fillTask)).set(1000);
 
-        // --- NEW: Cancel the task after 500ms to break the infinite sleep loop ---
-        new Thread(() -> {
-            try {
-                // Give the task enough time to hit the 50 chunk limit
-                Thread.sleep(500);
-                fillTask.setCancelled(true);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }).start();
-        // -------------------------------------------------------------------------
-
         // 2. Execute FillTask.run()
-        // It will block for ~500ms, then cleanly exit when the watchdog cancels it
         fillTask.run();
 
-        // 3. Assert that pendingChunks reaches exactly 50
-        Field pcField = FillTask.class.getDeclaredField("pendingChunks");
-        pcField.setAccessible(true);
-        AtomicLong pendingChunks = (AtomicLong) pcField.get(fillTask);
-
-        assert pendingChunks.get() == 50 : "Expected pendingChunks to be exactly 50, but was " + pendingChunks.get();
+        // 3. Assert that the loop successfully broke due to backpressure
+        // before attempting to queue the full 1000 locations.
         verify(apiChunkManager, times(50)).getChunkAtAsync(any(), anyInt(), anyInt());
     }
 }

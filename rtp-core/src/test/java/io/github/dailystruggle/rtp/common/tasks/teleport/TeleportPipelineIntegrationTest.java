@@ -115,6 +115,9 @@ public class TeleportPipelineIntegrationTest {
             ChunkSet chunkSet = new ChunkSet(new ArrayList<>(), complete);
             complete.complete(true);
 
+            // Mock primary thread so the pipeline evaluates synchronously inline
+            when(serverAccessor.isPrimaryThread()).thenReturn(true);
+
             when(region.getLocation(context)).thenReturn(new GenerationResult(coords, 1L, chunkSet));
             when(regionChunkManager.chunks(eq(coords), anyLong())).thenReturn(chunkSet);
             when(regionChunkManager.getChunkSet(coords)).thenReturn(chunkSet);
@@ -122,29 +125,21 @@ public class TeleportPipelineIntegrationTest {
 
             TeleportPipelineTask task = new TeleportPipelineTask(context, region);
 
-            // Phase: SETUP
             assertEquals(TeleportPipelineTask.Phase.SETUP, task.getPhase());
+
+            // 1. Because mocked futures are pre-completed, a single run() call
+            // natively chains SETUP -> LOAD -> TELEPORT -> CLEANUP
             task.run();
 
-            // Verify SETUP transitioned to LOAD
+            // 2. Verify all interactions cascaded exactly once without forced re-runs
             verify(regionChunkManager, atLeastOnce()).chunks(eq(coords), anyLong());
+            verify(player, times(1)).setLocation(any());
 
-            // Phase: LOAD
-            task.run();
-            // runLoad triggers scheduleTeleport when chunkSet is complete.
-            // In our case it's already complete.
-            verify(scheduler).scheduleTeleport(eq(player), eq(task), anyLong());
+            // Verify CLEANUP was executed cleanly and exactly once
+            verify(regionChunkManager, times(1)).removeChunks(eq(coords));
 
-            // Manually advance to TELEPORT
-            task.setPhase(TeleportPipelineTask.Phase.TELEPORT);
-            task.run();
-
-            // Verify TELEPORT transitions to CLEANUP
+            // 3. Verify it settled safely in the final phase
             assertEquals(TeleportPipelineTask.Phase.CLEANUP, task.getPhase());
-
-            // Phase: CLEANUP
-            task.run();
-            verify(regionChunkManager).removeChunks(eq(coords));
         }
     }
 

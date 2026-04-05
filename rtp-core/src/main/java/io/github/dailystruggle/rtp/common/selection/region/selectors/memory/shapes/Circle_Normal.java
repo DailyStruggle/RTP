@@ -3,6 +3,8 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.NormalDistributionParams;
+
+import java.math.BigInteger;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
@@ -58,10 +60,10 @@ public class Circle_Normal extends MemoryShape<NormalDistributionParams> {
   }
 
   @Override
-  public double getRange() {
+  public long getRange() {
     long radius = getNumber(NormalDistributionParams.radius, 256L).longValue();
     long cr = getNumber(NormalDistributionParams.centerRadius, 64L).longValue();
-    return (radius - cr) * (radius + cr) * Math.PI;
+    return (long) ((radius - cr) * (radius + cr) * Math.PI);
   }
 
   @Override
@@ -129,11 +131,17 @@ public class Circle_Normal extends MemoryShape<NormalDistributionParams> {
     long cx = getNumber(NormalDistributionParams.centerX, 0L).longValue();
     long cz = getNumber(NormalDistributionParams.centerZ, 0L).longValue();
 
+    long range = getRange();
+    BigInteger bigLocation = BigInteger.valueOf(location);
+    BigInteger bigMaxLong = BigInteger.valueOf(Long.MAX_VALUE);
+    BigInteger bigRange = BigInteger.valueOf(range);
+
     // get a distance from the center
     double radius = Math.sqrt(location / Math.PI + cr * cr);
 
     // get a % around the curve, convert to radians
-    double rotation = (radius - (int) radius + 0.000069) * 2 * Math.PI;
+    long bamAngle = bigLocation.multiply(bigMaxLong).divide(bigRange).longValue();
+    double rotation = ((double) bamAngle / Long.MAX_VALUE) * (2.0D * Math.PI);
 
     double cosRes = Math.cos(rotation);
     double sinRes = Math.sin(rotation);

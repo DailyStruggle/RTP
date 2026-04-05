@@ -16,7 +16,7 @@ import java.util.logging.Logger;
 public class MemoryTracker {
   private static final Logger LOGGER = Logger.getLogger(MemoryTracker.class.getName());
   private static final ConcurrentHashMap<UUID, TrackedObject> trackedObjects =
-      new ConcurrentHashMap<>();
+          new ConcurrentHashMap<>();
 
   private MemoryTracker() {
     // Private constructor for utility class
@@ -58,28 +58,46 @@ public class MemoryTracker {
 
   public static void runDiagnostics() {
     trackedObjects
-        .entrySet()
-        .removeIf(
-            entry -> {
-              TrackedObject tracked = entry.getValue();
-              if (tracked.isCollected()) {
-                return true;
-              }
-              if (tracked.isLeaking()) {
-                long leakDuration = tracked.getLeakDuration();
-                LOGGER.log(
-                    Level.SEVERE,
-                    "[RTP] Memory leak detected for object: {0}. Alive {1}ms past its expected lifespan.",
-                    new Object[] {tracked.getLabel(), leakDuration});
-              }
-              return false;
-            });
+            .entrySet()
+            .removeIf(
+                    entry -> {
+                      TrackedObject tracked = entry.getValue();
+                      if (tracked.isCollected()) {
+                        return true;
+                      }
+                      if (tracked.isLeaking()) {
+                        long leakDuration = tracked.getLeakDuration();
+                        String label = tracked.getLabel();
+
+                        // Unpack TrackedRTPTask to display the specific Runnable class leaking
+                        Object target = tracked.getTarget();
+                        if (target instanceof io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask) {
+                          io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask tTask =
+                                  (io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask) target;
+                          if (tTask.getTask() != null) {
+                            String innerName = tTask.getTask().getClass().getSimpleName();
+                            // Fallback for anonymous classes or lambdas (e.g., FillTask$1)
+                            if (innerName == null || innerName.isEmpty()) {
+                              String fullName = tTask.getTask().getClass().getName();
+                              innerName = fullName.substring(fullName.lastIndexOf('.') + 1);
+                            }
+                            label = "TrackedRTPTask[" + innerName + "]";
+                          }
+                        }
+
+                        LOGGER.log(
+                                Level.SEVERE,
+                                "[RTP] Memory leak detected for object: {0}. Alive {1}ms past its expected lifespan.",
+                                new Object[] {label, leakDuration});
+                      }
+                      return false;
+                    });
 
     RTP rtp = RTP.getInstance();
     if (rtp != null) {
       long totalLocationQueueSize = 0;
       long totalPerPlayerLocationQueueSize = 0;
-      long totalExpectedTickets = 0;
+      long trackedTickets = 0;
       long totalCacheCap = 0;
       long totalActiveChunkCap = 0;
 
@@ -100,24 +118,27 @@ public class MemoryTracker {
         // Only count chunks if the ChunkSet is actually keeping them loaded
         for (ChunkSet chunkSet : region.chunkManager.locAssChunks.values()) {
           if (chunkSet.keep()) {
-            totalExpectedTickets += chunkSet.chunks.size();
+            trackedTickets += chunkSet.chunks.size();
           }
         }
       }
 
       long activeTickets = ChunkSet.ACTIVE_CHUNK_TICKETS.get();
       long totalLoads = ChunkSet.TOTAL_CHUNK_LOADS.get();
-      long discrepancy = activeTickets - totalExpectedTickets;
+
+      // Enforce the cap on expected tickets to reveal locAssChunks hoarding
+      long expectedTickets = Math.min(trackedTickets, totalActiveChunkCap);
+      long discrepancy = activeTickets - expectedTickets;
 
       LOGGER.log(
               Level.INFO,
               "[RTP] Diagnostic: Locations=[Queue:{0}/{1}, PerPlayer:{2}], Chunks=[Active:{3}, Expected:{4}, Cap:{5}, Discrepancy:{6}]",
               new Object[] {
                       totalLocationQueueSize, totalCacheCap, totalPerPlayerLocationQueueSize,
-                      activeTickets, totalExpectedTickets, totalActiveChunkCap, discrepancy
+                      activeTickets, expectedTickets, totalActiveChunkCap, discrepancy
               });
 
-      // Focus leak detection on the positive discrepancy (orphaned tickets)
+      // Focus leak detection on the positive discrepancy (orphaned tickets + cap overflows)
       if (discrepancy > 0 && rtp.processingPlayers.isEmpty()) {
         double leakRate = (totalLoads > 0) ? ((double) discrepancy / totalLoads) * 100.0 : 0.0;
         LOGGER.log(

@@ -5,6 +5,8 @@ import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+
+import java.math.BigInteger;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
@@ -68,11 +70,11 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
   }
 
   @Override
-  public double getRange() {
+  public long getRange() {
     long radius = getNumber(GenericMemoryShapeParams.radius, 256L).longValue();
     long cr = getNumber(GenericMemoryShapeParams.centerRadius, 64L).longValue();
 
-    return (radius - cr) * (radius + cr) * Math.PI;
+    return (long) ((radius - cr) * (radius + cr) * Math.PI);
   }
 
 
@@ -138,11 +140,17 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
     long cx = getNumber(GenericMemoryShapeParams.centerX, 0L).longValue();
     long cz = getNumber(GenericMemoryShapeParams.centerZ, 0L).longValue();
 
+    long range = (long) getRange();
+    BigInteger bigLocation = BigInteger.valueOf(location);
+    BigInteger bigMaxLong = BigInteger.valueOf(Long.MAX_VALUE);
+    BigInteger bigRange = BigInteger.valueOf(range);
+
     // get a distance from the center
     double radius = Math.sqrt(location / Math.PI + cr * cr);
 
     // get a % around the curve, convert to radians
-    double rotation = (radius - (int) radius + 0.000069) * 2 * Math.PI;
+    long bamAngle = bigLocation.multiply(bigMaxLong).divide(bigRange).longValue();
+    double rotation = ((double) bamAngle / Long.MAX_VALUE) * (2.0D * Math.PI);
 
     double cosRes = Math.cos(rotation);
     double sinRes = Math.sin(rotation);
