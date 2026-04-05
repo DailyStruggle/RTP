@@ -16,6 +16,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
+import io.github.dailystruggle.rtp.common.tools.MessageTagger;
 import io.github.dailystruggle.rtp.spigot.entity.BukkitRTPCommandSender;
 import io.github.dailystruggle.rtp.spigot.entity.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.spigot.world.BukkitRTPWorld;
@@ -362,7 +363,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   }
 
   private String tagMessage(String message, @Nullable String tag) {
-    return io.github.dailystruggle.rtp.common.commands.help.SendMessage.tagMessage(message, tag);
+    return MessageTagger.tagMessage(message, tag);
   }
 
   @Override

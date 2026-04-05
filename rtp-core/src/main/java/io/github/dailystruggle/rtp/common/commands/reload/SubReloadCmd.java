@@ -88,13 +88,13 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
 
     String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloading, ""));
     if (msg != null) msg = filenamePattern.matcher(msg).replaceAll(parser.name);
-    serverAccessor.sendMessage(RTPAPI.serverId, senderId, msg, "RLD");
+    serverAccessor.sendMessage(RTPAPI.serverId, senderId, msg);
 
     parser.check(parser.version, parser.pluginDirectory, null);
 
     msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloaded, ""));
     if (msg != null) msg = filenamePattern.matcher(msg).replaceAll(parser.name);
-    serverAccessor.sendMessage(RTPAPI.serverId, senderId, msg, "RLD");
+    serverAccessor.sendMessage(RTPAPI.serverId, senderId, msg);
 
     return true;
   }
@@ -109,7 +109,7 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
 
     String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloading, ""));
     if (msg != null) msg = filenamePattern.matcher(msg).replaceAll(parser.name);
-    serverAccessor.sendMessage(RTPAPI.serverId, senderId, msg, "RLD");
+    serverAccessor.sendMessage(RTPAPI.serverId, senderId, msg);
 
     MultiConfigParser<?> newParser =
         new MultiConfigParser<>(parser.myClass, parser.name, "1.0", parser.pluginDirectory);
@@ -135,7 +135,7 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
 
     msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloaded, ""));
     if (msg != null) msg = filenamePattern.matcher(msg).replaceAll(parser.name);
-    serverAccessor.sendMessage(RTPAPI.serverId, commandSender.uuid(), msg, "RLD");
+    serverAccessor.sendMessage(RTPAPI.serverId, commandSender.uuid(), msg);
 
     return true;
   }

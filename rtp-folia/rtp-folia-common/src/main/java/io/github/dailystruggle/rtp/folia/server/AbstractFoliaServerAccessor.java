@@ -9,6 +9,7 @@ import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.tools.MessageTagger;
 import io.github.dailystruggle.rtp.folia.entity.FoliaRTPCommandSender;
 import io.github.dailystruggle.rtp.folia.entity.FoliaRTPPlayer;
 import io.github.dailystruggle.rtp.folia.world.FoliaRTPWorld;
@@ -266,7 +267,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   private String tagMessage(String message, @Nullable String tag) {
-    return io.github.dailystruggle.rtp.common.commands.help.SendMessage.tagMessage(message, tag);
+    return MessageTagger.tagMessage(message, tag);
   }
 
   @Override

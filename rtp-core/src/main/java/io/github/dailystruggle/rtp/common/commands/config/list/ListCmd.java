@@ -63,7 +63,7 @@ public class ListCmd extends BaseRTPCmdImpl {
             (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
     String updateMsg = String.valueOf(lang.getConfigValue(MessagesKeys.updating, ""));
     if (updateMsg != null) updateMsg = updateMsg.replace("[filename]", name);
-    RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId, updateMsg, "CFG");
+    RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId, updateMsg);
 
     RTP.scheduler.runTaskAsynchronously(() -> {
       List<String> stringList = file.getStringList(key);
@@ -88,7 +88,7 @@ public class ListCmd extends BaseRTPCmdImpl {
 
       String updatedMsg = String.valueOf(lang.getConfigValue(MessagesKeys.updated, ""));
       if (updatedMsg != null) updatedMsg = updatedMsg.replace("[filename]", name);
-      RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId, updatedMsg, "CFG");
+      RTP.serverAccessor.sendMessage(CommandsAPI.serverId, callerId, updatedMsg);
     });
 
     return true;

@@ -62,7 +62,7 @@ public class FillStartCmd extends FillSubCmd {
         String msg = String.valueOf(parser.getConfigValue(MessagesKeys.badArg, ""));
         if (msg == null || msg.isEmpty()) continue;
         msg = msg.replace("[arg]", "region:" + region.name);
-        RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg, "FILL");
+        RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg);
         continue;
       }
 

@@ -60,14 +60,19 @@ public class TeleportCancelTicketTest {
         when(serverAccessor.getChunkManager()).thenReturn(mockChunkManager);
         java.util.concurrent.CompletableFuture<Long> mockFuture = new java.util.concurrent.CompletableFuture<>();
         mockFuture.complete(1L);
-        io.github.dailystruggle.rtp.api.world.ChunkSet mockChunkSet = mock(io.github.dailystruggle.rtp.api.world.ChunkSet.class);
-        try {
-            java.lang.reflect.Field completeField = io.github.dailystruggle.rtp.api.world.ChunkSet.class.getDeclaredField("complete");
-            completeField.setAccessible(true);
-            completeField.set(mockChunkSet, java.util.concurrent.CompletableFuture.completedFuture(true));
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+//        io.github.dailystruggle.rtp.api.world.ChunkSet mockChunkSet = mock(io.github.dailystruggle.rtp.api.world.ChunkSet.class);
+//        try {
+//            java.lang.reflect.Field completeField = io.github.dailystruggle.rtp.api.world.ChunkSet.class.getDeclaredField("complete");
+//            completeField.setAccessible(true);
+//            completeField.set(mockChunkSet, java.util.concurrent.CompletableFuture.completedFuture(true));
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
+        java.util.concurrent.CompletableFuture<Boolean> complete = new java.util.concurrent.CompletableFuture<>();
+        complete.complete(true);
+
+        io.github.dailystruggle.rtp.api.world.ChunkSet realChunkSet = new io.github.dailystruggle.rtp.api.world.ChunkSet(new java.util.ArrayList<>(), complete);
+        io.github.dailystruggle.rtp.api.world.ChunkSet mockChunkSet = spy(realChunkSet);
         when(mockChunkManager.getChunkSet(any())).thenReturn(mockChunkSet);
 
         rtp = new RTP();
@@ -137,23 +142,33 @@ public class TeleportCancelTicketTest {
             rtpStatic.when(RTP::getInstance).thenReturn(rtp);
 
             RTPCoords coords = new RTPCoords("world", 100, 64, 100);
-            io.github.dailystruggle.rtp.api.world.ChunkSet mockChunkSet = mock(io.github.dailystruggle.rtp.api.world.ChunkSet.class);
-            try {
-                java.lang.reflect.Field completeField = io.github.dailystruggle.rtp.api.world.ChunkSet.class.getDeclaredField("complete");
-                completeField.setAccessible(true);
-                completeField.set(mockChunkSet, java.util.concurrent.CompletableFuture.completedFuture(true));
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+
+            // 1. Use the spy instantiation to prevent NPEs during internal iterations
+            java.util.concurrent.CompletableFuture<Boolean> complete = new java.util.concurrent.CompletableFuture<>();
+            complete.complete(true);
+            io.github.dailystruggle.rtp.api.world.ChunkSet realChunkSet = new io.github.dailystruggle.rtp.api.world.ChunkSet(new java.util.ArrayList<>(), complete);
+            io.github.dailystruggle.rtp.api.world.ChunkSet mockChunkSet = spy(realChunkSet);
+
             // Put the mock ChunkSet into the real RegionChunkManager
             regionChunkManager.putChunkSet(coords, mockChunkSet);
 
-            // Start in SETUP phase (Instruction 1)
+            // 2. Initialize teleport data for the player FIRST
+            TeleportData teleportData = new TeleportData();
+            teleportData.sender = player;
+            teleportData.targetRegion = region;
+            teleportData.selectedCoords = coords;
+            rtp.latestTeleportData.put(player.uuid(), teleportData);
+
+            // 3. NOW instantiate the task so its constructor captures the valid TeleportData
             TeleportPipelineTask task = new TeleportPipelineTask(context);
-            // We need to set region and coords which are private, but constructor handles it
-            // Wait, constructor TeleportPipelineTask(context) doesn't set region.
-            // Let's use reflection to set them or use the other constructor.
+            teleportData.nextTask = task; // RTPTeleportCancel needs this
+
+            // We need to set teleportData, region, and coords which are private...
             try {
+                java.lang.reflect.Field teleportDataField = TeleportPipelineTask.class.getDeclaredField("teleportData");
+                teleportDataField.setAccessible(true);
+                teleportDataField.set(task, teleportData);
+
                 java.lang.reflect.Field regionField = TeleportPipelineTask.class.getDeclaredField("region");
                 regionField.setAccessible(true);
                 regionField.set(task, region);
@@ -165,37 +180,21 @@ public class TeleportCancelTicketTest {
                 e.printStackTrace();
             }
 
-            // Verify the ChunkSet has keep(true) applied (Instruction 1)
-            // Instead of manually calling it, let's see if we can trigger it.
-            // Actually, for this test, let's just ensure it's in "kept" state.
+            // Verify the ChunkSet has keep(true) applied initially
             mockChunkSet.keep(true, world);
             verify(mockChunkSet, atLeastOnce()).keep(true, world);
 
-
-            // Initialize teleport data for the player
-            TeleportData teleportData = new TeleportData();
-            teleportData.sender = player;
-            teleportData.targetRegion = region;
-            teleportData.selectedCoords = coords;
-            teleportData.nextTask = task; // RTPTeleportCancel needs this
-            rtp.latestTeleportData.put(player.uuid(), teleportData);
-
-            // Trigger cancellation via RTPTeleportCancel (Instruction 2)
-
+            // Trigger cancellation via RTPTeleportCancel
             new RTPTeleportCancel(player.uuid()).run();
 
             // The task should now be cancelled
             assertTrue(task.isCancelled());
 
-
-            // Assert via Mockito that the cancellation strictly notified the server to drop the ticket (Instruction 3)
-            // It should have been called by RTPTeleportCancel.refund() -> regionChunkManager.removeChunks()
+            // Assert via Mockito that the cancellation strictly notified the server to drop the ticket
             verify(mockChunkSet, atLeastOnce()).keep(false, world);
-
 
             // Even if we run the task now, it should go to cleanup but not call keep(false) again if already released
             task.run();
-
         }
     }
 }

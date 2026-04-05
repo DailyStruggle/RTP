@@ -85,6 +85,15 @@ public class OnPlayerQuitTest {
         GenerationContext context = new GenerationContext(rtpPlayer, rtpPlayer, null);
         TeleportPipelineTask task = new TeleportPipelineTask(context, region, coords);
 
+        // INJECT: Manually bind the teleport data so it survives skipping Phase.SETUP
+        try {
+            java.lang.reflect.Field teleportDataField = TeleportPipelineTask.class.getDeclaredField("teleportData");
+            teleportDataField.setAccessible(true);
+            teleportDataField.set(task, data);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
         data.nextTask = task;
         data.completed = false;
         rtp.latestTeleportData.put(uuid, data);

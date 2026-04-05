@@ -75,4 +75,24 @@ public class LockFreeLocationBuffer {
     public boolean isEmpty() {
         return tail.get() == head.get();
     }
+
+    public CachedLocation peek() {
+        long currentHead;
+        long currentTail;
+        CachedLocation location;
+
+        do {
+            currentHead = head.get();
+            currentTail = tail.get();
+
+            // If head has caught up to tail, the queue is genuinely empty
+            if (currentHead >= currentTail) {
+                return null;
+            }
+
+            location = buffer.get((int) (currentHead & mask));
+        } while (location == null);
+
+        return location;
+    }
 }

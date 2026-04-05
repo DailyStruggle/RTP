@@ -134,13 +134,13 @@ public class InfoCmd extends BaseRTPCmdImpl {
       String regionHeader = lang.getConfigValue(MessagesKeys.infoRegionHeader, "").toString();
       String regions = lang.getConfigValue(MessagesKeys.infoRegion, "").toString();
 
-      RTP.serverAccessor.sendMessage(callerId, title, "INFO");
-      RTP.serverAccessor.sendMessage(callerId, worldHeader, "INFO");
+      RTP.serverAccessor.sendMessage(callerId, title);
+      RTP.serverAccessor.sendMessage(callerId, worldHeader);
       for (RTPWorld world : RTP.serverAccessor.getRTPWorlds()) {
         String msg = worlds.replaceAll("\\[world]", world.name());
         RTP.serverAccessor.sendMessageAndSuggest(callerId, msg, "rtp info world:" + world.name());
       }
-      RTP.serverAccessor.sendMessage(callerId, regionHeader, "INFO");
+      RTP.serverAccessor.sendMessage(callerId, regionHeader);
       RTP.selectionAPI
           .permRegionLookup
           .values()
@@ -173,14 +173,14 @@ public class InfoCmd extends BaseRTPCmdImpl {
         }
 
         // Print localized diagnostics
-        if (!infoTickets.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoTickets, "INFO");
-        if (!infoTeleports.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoTeleports, "INFO");
-        if (!infoMSPT.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoMSPT, "INFO");
-        if (!infoTotalLoads.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoTotalLoads, "INFO");
-        if (!infoLeakRate.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoLeakRate, "INFO");
+        if (!infoTickets.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoTickets);
+        if (!infoTeleports.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoTeleports);
+        if (!infoMSPT.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoMSPT);
+        if (!infoTotalLoads.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoTotalLoads);
+        if (!infoLeakRate.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoLeakRate);
 
-        if (!infoDisclaimerHeader.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoDisclaimerHeader, "INFO");
-        if (!infoDisclaimer.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoDisclaimer, "INFO");
+        if (!infoDisclaimerHeader.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoDisclaimerHeader);
+        if (!infoDisclaimer.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoDisclaimer);
     }
 
     Set<Character> front = new HashSet<>(Arrays.asList('[', '%'));
@@ -218,7 +218,7 @@ public class InfoCmd extends BaseRTPCmdImpl {
                       return s;
                     })
                 .collect(Collectors.toList());
-        strings.forEach(s -> RTP.serverAccessor.sendMessage(callerId, s, "INFO"));
+        strings.forEach(s -> RTP.serverAccessor.sendMessage(callerId, s));
       }
     }
 
@@ -253,15 +253,15 @@ public class InfoCmd extends BaseRTPCmdImpl {
                       return s;
                     })
                 .collect(Collectors.toList());
-        strings.forEach(s -> RTP.serverAccessor.sendMessage(callerId, s, "INFO"));
+        strings.forEach(s -> RTP.serverAccessor.sendMessage(callerId, s));
       }
     }
 
     RTPCommandSender sender = RTP.serverAccessor.getSender(callerId);
     if (sender.hasPermission("rtp.admin") || sender.hasPermission("rtp.support")) {
-      RTP.serverAccessor.sendMessage(callerId, "&7--- DRM Information ---", "INFO");
-      RTP.serverAccessor.sendMessage(callerId, "&7Downloader ID: &f" + RTPAPI.DOWNLOADER_ID, "INFO");
-      RTP.serverAccessor.sendMessage(callerId, "&7Download Nonce: &f" + RTPAPI.DOWNLOAD_NONCE, "INFO");
+      RTP.serverAccessor.sendMessage(callerId, "&7--- DRM Information ---");
+      RTP.serverAccessor.sendMessage(callerId, "&7Downloader ID: &f" + RTPAPI.DOWNLOADER_ID);
+      RTP.serverAccessor.sendMessage(callerId, "&7Download Nonce: &f" + RTPAPI.DOWNLOAD_NONCE);
     }
 
     return true;
