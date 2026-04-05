@@ -350,14 +350,14 @@ public final class TeleportPipelineTask extends RTPRunnable {
             }
 
             currentPhase = Phase.CLEANUP;
-            RTP.scheduler.runTask(this);
+            RTP.scheduler.runTaskAsynchronously(this);
           });
 
       teleportPostActions.forEach(consumer -> consumer.accept(this));
     } catch (Exception e) {
       SupportLogger.logException(Level.SEVERE, "Error in runTeleport", e);
       currentPhase = Phase.CLEANUP;
-      RTP.scheduler.runTask(this);
+      RTP.scheduler.runTaskAsynchronously(this);
     }
   }
 
