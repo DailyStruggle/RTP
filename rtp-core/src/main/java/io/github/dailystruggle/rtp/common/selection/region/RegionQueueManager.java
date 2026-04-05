@@ -43,6 +43,7 @@ public class RegionQueueManager {
      * @param id player uuid
      */
     public void queue(UUID id) {
+        playerQueue.add(id);
         perPlayerLocationQueue.putIfAbsent(id, new ConcurrentLinkedQueue<>());
         region.miscPipeline.add(new RegionCacheTask(region, id));
     }
