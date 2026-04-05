@@ -106,6 +106,8 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
   @Override
   public void run() {
+    RTP.serverAccessor.sendMessage(context.player().uuid(),"RUN");
+
     if (isCancelled()) {
       currentPhase = Phase.CLEANUP;
       runCleanup();
@@ -128,6 +130,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
   }
 
   private void runSetup() {
+    RTP.serverAccessor.sendMessage(context.player().uuid(),"SETUP");
     setupPreActions.forEach(consumer -> consumer.accept(this));
     if (isCancelled()) {
       currentPhase = Phase.CLEANUP;
@@ -171,6 +174,13 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
       GenerationResult res = region.getLocation(context);
       if (res == null) {
+        // If the player was successfully queued, gracefully halt this thread.
+        // Region.execute() will spawn a new pipeline task when a location is ready.
+        if (RTP.getInstance().processingPlayers.contains(playerId)) {
+          return;
+        }
+
+        // Otherwise, generation failed entirely (e.g., custom biome search failed).
         currentPhase = Phase.CLEANUP;
         runCleanup();
         return;
@@ -223,14 +233,15 @@ public final class TeleportPipelineTask extends RTPRunnable {
   }
 
   private void runLoad() {
-    loadPreActions.forEach(consumer -> consumer.accept(this));
-    if (isCancelled()) {
-      currentPhase = Phase.CLEANUP;
-      runCleanup();
-      return;
-    }
-
+    RTP.serverAccessor.sendMessage(context.player().uuid(),"LOAD");
     try {
+      loadPreActions.forEach(consumer -> consumer.accept(this));
+      if (isCancelled()) {
+        currentPhase = Phase.CLEANUP;
+        runCleanup();
+        return;
+      }
+
       if (teleportData == null) {
         RTPPlayer player = context.player();
         if (player == null) {
@@ -282,6 +293,8 @@ public final class TeleportPipelineTask extends RTPRunnable {
         return;
       }
 
+      RTP.serverAccessor.sendMessage(player().uuid(), MessagesKeys.chunkLoading);
+
       chunkSet.complete.whenComplete(
               (aBoolean, throwable) -> {
                 if (throwable != null || (aBoolean != null && !aBoolean)) {
@@ -323,6 +336,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
   }
 
   private void runTeleport() {
+    RTP.serverAccessor.sendMessage(context.player().uuid(),"TELEPORT");
     teleportPreActions.forEach(consumer -> consumer.accept(this));
     if (isCancelled()) {
       currentPhase = Phase.CLEANUP;
@@ -376,6 +390,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
   }
 
   private void runCleanup() {
+    RTP.serverAccessor.sendMessage(context.player().uuid(),"CLEANUP");
     cleanupPreActions.forEach(consumer -> consumer.accept(this));
     try {
       if (player() != null) {
