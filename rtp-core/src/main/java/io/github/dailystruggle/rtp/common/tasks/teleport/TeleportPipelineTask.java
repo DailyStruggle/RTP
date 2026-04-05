@@ -181,7 +181,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
       if (coords == null) {
         teleportData.attempts = attempts;
-        RTP.serverAccessor.sendMessage(sender().uuid(), player.uuid(), ConfigCache.unsafe, "TP");
+        RTP.serverAccessor.sendMessage(sender().uuid(), player.uuid(), ConfigCache.unsafe);
         RTPTeleportCancel.refund(player.uuid());
         currentPhase = Phase.CLEANUP;
         runCleanup();
@@ -284,8 +284,10 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
       chunkSet.complete.whenComplete(
               (aBoolean, throwable) -> {
-                if (throwable != null) {
-                  SupportLogger.logException(Level.SEVERE, "Error in runLoad", throwable);
+                if (throwable != null || (aBoolean != null && !aBoolean)) {
+                  if (throwable != null) {
+                    SupportLogger.logException(Level.SEVERE, "Error in runLoad", throwable);
+                  }
                   currentPhase = Phase.CLEANUP;
                   this.run();
                   return;
@@ -337,7 +339,9 @@ public final class TeleportPipelineTask extends RTPRunnable {
     UUID playerId = player.uuid();
 
     try {
-      RTPWorld<?> world = region.getWorld();
+      // REPLACE Lines 240-241 in runTeleport() with:
+      RTPWorld<?> world = RTP.serverAccessor.getRTPWorld(coords.worldName());
+      if (world == null) world = region.getWorld();
       RTPLocation location = new RTPLocation(world, coords.x(), coords.y(), coords.z());
       location.world().platform(location);
       RTP.getInstance().invulnerablePlayers.put(playerId, System.currentTimeMillis());
@@ -353,9 +357,9 @@ public final class TeleportPipelineTask extends RTPRunnable {
       setLocation.whenComplete(
               (aBoolean, throwable) -> {
                 if (aBoolean != null && aBoolean) {
-                  RTP.serverAccessor.sendMessage(playerId, ConfigCache.teleportMessage, "TP");
+                  RTP.serverAccessor.sendMessage(playerId, ConfigCache.teleportMessage);
                 } else {
-                  RTP.serverAccessor.sendMessage(playerId, ConfigCache.unsafe, "TP");
+                  RTP.serverAccessor.sendMessage(playerId, ConfigCache.unsafe);
                 }
 
                 currentPhase = Phase.CLEANUP;
@@ -379,7 +383,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
         TeleportData data = RTP.getInstance().latestTeleportData.get(pid);
 
         // Strict reference verification prevents overwriting subsequent requests
-        if (data == this.teleportData) {
+        if (data == this.teleportData && !data.completed) {
           RTP.getInstance().latestTeleportData.remove(pid);
         }
         RTP.getInstance().invulnerablePlayers.remove(pid);

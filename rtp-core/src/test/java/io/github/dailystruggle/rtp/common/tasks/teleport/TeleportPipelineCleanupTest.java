@@ -133,7 +133,7 @@ public class TeleportPipelineCleanupTest {
             task.run();
 
             // 3. Assert cleared (Intermediate invulnerability checks removed as it is instantly wiped)
-            assertFalse(rtp.latestTeleportData.containsKey(player.uuid()), "latestTeleportData should be cleared after automatic CLEANUP");
+            assertTrue(rtp.latestTeleportData.containsKey(player.uuid()), "latestTeleportData must be RETAINED after successful teleport for cooldowns");
             assertFalse(rtp.invulnerablePlayers.containsKey(player.uuid()), "invulnerablePlayers should be cleared after automatic CLEANUP");
         }
     }

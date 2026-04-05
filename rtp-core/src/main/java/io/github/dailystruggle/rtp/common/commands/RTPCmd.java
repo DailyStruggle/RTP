@@ -37,7 +37,7 @@ public interface RTPCmd extends BaseRTPCmd {
     UUID senderId = sender.uuid();
 
     if (RTP.reloading.get()) {
-      RTP.serverAccessor.sendMessage(senderId, "&4busy", "TP");
+      RTP.serverAccessor.sendMessage(senderId, "&4busy");
       return true;
     }
 
@@ -58,7 +58,7 @@ public interface RTPCmd extends BaseRTPCmd {
     // ------------------------D--------------------------------------------------------------------------------------
     // guard command perms with custom message
     if (!sender.hasPermission("rtp.use")) {
-      RTP.serverAccessor.sendMessage(senderId, MessagesKeys.noPerms, "TP");
+      RTP.serverAccessor.sendMessage(senderId, MessagesKeys.noPerms);
       return true;
     }
 
@@ -78,17 +78,15 @@ public interface RTPCmd extends BaseRTPCmd {
       if (dt < 0) dt = Long.MAX_VALUE + dt;
 
       if (dt < sender.cooldown()) {
-        RTP.serverAccessor.sendMessage(senderId, MessagesKeys.cooldownMessage, "TP");
+        RTP.serverAccessor.sendMessage(senderId, MessagesKeys.cooldownMessage);
         return true;
       } else if (senderData.completed) { // resolve command bugs preemptively
         RTP.getInstance().processingPlayers.remove(senderId);
       }
-    } else { // resolve command bugs preemptively
-      RTP.getInstance().processingPlayers.remove(senderId);
     }
 
     if (RTP.getInstance().processingPlayers.contains(senderId)) {
-      RTP.serverAccessor.sendMessage(senderId, MessagesKeys.alreadyTeleporting, "TP");
+      RTP.serverAccessor.sendMessage(senderId, MessagesKeys.alreadyTeleporting);
       return true;
     }
 
@@ -99,8 +97,8 @@ public interface RTPCmd extends BaseRTPCmd {
           .whenComplete((aBoolean, throwable) -> {
             if (throwable != null) {
               RTP.log(Level.WARNING, throwable.getMessage(), throwable);
+              RTP.getInstance().processingPlayers.remove(senderId);
             }
-            RTP.getInstance().processingPlayers.remove(senderId);
           });
     } catch (Throwable throwable) {
       RTP.log(Level.WARNING, throwable.getMessage(), throwable);
@@ -170,7 +168,7 @@ public interface RTPCmd extends BaseRTPCmd {
           String msg =
               (String)
                   langParser.getConfigValue(MessagesKeys.badArg, "player:" + rtpArgs.get("player"));
-          RTP.serverAccessor.sendMessage(senderId, msg, "TP");
+          RTP.serverAccessor.sendMessage(senderId, msg);
           continue;
         }
 
@@ -210,7 +208,7 @@ public interface RTPCmd extends BaseRTPCmd {
       if ((bal - price) < floor) {
         String s = langParser.getConfigValue(MessagesKeys.notEnoughMoney, "").toString();
         s = s.replace("[money]", String.valueOf(price));
-        RTP.serverAccessor.sendMessage(senderId, s, "TP");
+        RTP.serverAccessor.sendMessage(senderId, s);
         RTP.getInstance().processingPlayers.remove(senderId);
         return true;
       }
@@ -271,7 +269,7 @@ public interface RTPCmd extends BaseRTPCmd {
 
         if (worldParser == null) {
           String msg = (String) langParser.getConfigValue(MessagesKeys.badArg, "world:" + worldName);
-          RTP.serverAccessor.sendMessage(senderId, msg, "TP");
+          RTP.serverAccessor.sendMessage(senderId, msg);
           RTP.getInstance().processingPlayers.remove(senderId);
           return true;
         }
@@ -286,7 +284,7 @@ public interface RTPCmd extends BaseRTPCmd {
         region = selectionAPI.getRegionOrDefault(regionName);
       } catch (IllegalArgumentException | IllegalStateException exception) {
         String msg = (String) langParser.getConfigValue(MessagesKeys.badArg, "region:" + regionName);
-        RTP.serverAccessor.sendMessage(senderId, msg, "TP");
+        RTP.serverAccessor.sendMessage(senderId, msg);
         RTP.getInstance().processingPlayers.remove(senderId);
         RTP.getInstance().latestTeleportData.remove(senderId);
         return true;
@@ -295,7 +293,7 @@ public interface RTPCmd extends BaseRTPCmd {
       RTPWorld rtpWorld = region.getWorld();
       if (rtpWorld == null) {
         String msg = (String) langParser.getConfigValue(MessagesKeys.badArg, "region:" + regionName);
-        RTP.serverAccessor.sendMessage(senderId, msg, "TP");
+        RTP.serverAccessor.sendMessage(senderId, msg);
         RTP.getInstance().processingPlayers.remove(senderId);
         RTP.getInstance().latestTeleportData.remove(senderId);
         return true;
@@ -329,7 +327,7 @@ public interface RTPCmd extends BaseRTPCmd {
         if (economy.bal(senderId) - data.cost < floor) {
           String s = langParser.getConfigValue(MessagesKeys.notEnoughMoney, "").toString();
           s = s.replace("[money]", String.valueOf(price));
-          RTP.serverAccessor.sendMessage(senderId, s, "TP");
+          RTP.serverAccessor.sendMessage(senderId, s);
           RTP.getInstance().processingPlayers.remove(senderId);
           return true;
         }
@@ -338,7 +336,7 @@ public interface RTPCmd extends BaseRTPCmd {
         if (!take) {
           String s = langParser.getConfigValue(MessagesKeys.notEnoughMoney, "").toString();
           s = s.replace("[money]", String.valueOf(price));
-          RTP.serverAccessor.sendMessage(senderId, s, "TP");
+          RTP.serverAccessor.sendMessage(senderId, s);
           RTP.getInstance().processingPlayers.remove(senderId);
           return true;
         }
@@ -359,7 +357,7 @@ public interface RTPCmd extends BaseRTPCmd {
         if (economy.bal(player.uuid()) - data.cost < floor) {
           String s = langParser.getConfigValue(MessagesKeys.notEnoughMoney, "").toString();
           s = s.replace("[money]", String.valueOf(price));
-          RTP.serverAccessor.sendMessage(senderId, player.uuid(), s, "TP");
+          RTP.serverAccessor.sendMessage(senderId, player.uuid(), s);
           RTP.getInstance().processingPlayers.remove(senderId);
           return true;
         }
@@ -368,7 +366,7 @@ public interface RTPCmd extends BaseRTPCmd {
         if (!take) {
           String s = langParser.getConfigValue(MessagesKeys.notEnoughMoney, "").toString();
           s = s.replace("[money]", String.valueOf(price));
-          RTP.serverAccessor.sendMessage(senderId, player.uuid(), s, "TP");
+          RTP.serverAccessor.sendMessage(senderId, player.uuid(), s);
           RTP.getInstance().processingPlayers.remove(senderId);
           return true;
         }
@@ -462,7 +460,7 @@ public interface RTPCmd extends BaseRTPCmd {
       data.delay = delay;
       if (delay > 0) {
         String msg = langParser.getConfigValue(MessagesKeys.delayMessage, "").toString();
-        RTP.serverAccessor.sendMessage(senderId, player.uuid(), msg, "TP");
+        RTP.serverAccessor.sendMessage(senderId, player.uuid(), msg);
       }
 
       if (!syncLoading) {

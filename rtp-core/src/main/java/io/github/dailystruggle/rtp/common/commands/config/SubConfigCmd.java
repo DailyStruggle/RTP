@@ -65,7 +65,7 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
             (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
     String updateMsg = String.valueOf(lang.getConfigValue(MessagesKeys.updating, ""));
     if (updateMsg != null) updateMsg = updateMsg.replace("[filename]", factoryValue.name);
-    RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, updateMsg, "CFG");
+    RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, updateMsg);
 
     RTP.scheduler.runTaskAsynchronously(() -> {
       if (factoryValue instanceof ConfigParser) {
@@ -256,7 +256,7 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
 
       String updatedMsg = String.valueOf(lang.getConfigValue(MessagesKeys.updated, ""));
       if (updatedMsg != null) updatedMsg = updatedMsg.replace("[filename]", configParser.name);
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, updatedMsg, "CFG");
+      RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, updatedMsg);
     } else if (factoryValue instanceof MultiConfigParser) {
       MultiConfigParser<?> parser = (MultiConfigParser<?>) this.factoryValue;
       List<String> remove = parameterValues.getOrDefault("remove", new ArrayList<>());
