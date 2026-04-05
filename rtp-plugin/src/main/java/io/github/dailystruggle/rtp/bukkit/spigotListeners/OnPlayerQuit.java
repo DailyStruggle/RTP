@@ -22,8 +22,12 @@ public final class OnPlayerQuit implements Listener {
     if (data != null && !data.completed) {
       if (data.nextTask instanceof TeleportPipelineTask task) {
         task.setCancelled(true);
-        RTP.scheduler.runTask(
-            task.region().getWorld(), task.coords().x() >> 4, task.coords().z() >> 4, task);
+        if (task.coords() != null) {
+          RTP.scheduler.runTask(
+                  task.region().getWorld(), task.coords().x() >> 4, task.coords().z() >> 4, task);
+        } else {
+          RTP.scheduler.runTask(task);
+        }
       }
     }
 

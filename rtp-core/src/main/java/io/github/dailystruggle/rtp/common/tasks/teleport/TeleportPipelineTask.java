@@ -376,12 +376,13 @@ public final class TeleportPipelineTask extends RTPRunnable {
                   RTP.serverAccessor.sendMessage(playerId, ConfigCache.unsafe);
                 }
 
+                teleportPostActions.forEach(consumer -> consumer.accept(this));
+
                 currentPhase = Phase.CLEANUP;
                 // Execute inline to satisfy synchronous test assertions and close the race condition
                 this.run();
               });
 
-      teleportPostActions.forEach(consumer -> consumer.accept(this));
     } catch (Exception e) {
       SupportLogger.logException(Level.SEVERE, "Error in runTeleport", e);
       currentPhase = Phase.CLEANUP;
@@ -393,6 +394,11 @@ public final class TeleportPipelineTask extends RTPRunnable {
     RTP.serverAccessor.sendMessage(context.player().uuid(),"CLEANUP");
     cleanupPreActions.forEach(consumer -> consumer.accept(this));
     try {
+      // Explicitly untrack the data to prevent false positive leak alerts
+      if (this.teleportData != null) {
+        io.github.dailystruggle.rtp.common.tools.MemoryTracker.untrack(this.teleportData);
+      }
+
       if (player() != null) {
         UUID pid = player().uuid();
         TeleportData data = RTP.getInstance().latestTeleportData.get(pid);

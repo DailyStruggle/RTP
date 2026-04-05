@@ -81,6 +81,17 @@ public class RegionCacheTask extends RTPRunnable {
             if (res.verifiedChunks() != null) {
                 chunkSet = res.verifiedChunks();
                 region.chunkManager.putChunkSet(coords, chunkSet);
+
+                // Trigger chunk load and future completion
+                chunkSet.keep(true, region.getWorld());
+
+                // Force-fail the chunk load if the server hangs for more than 30 seconds
+                final ChunkSet finalSet = chunkSet;
+                RTP.scheduler.runTaskLater(() -> {
+                    if (finalSet.complete != null && !finalSet.complete.isDone()) {
+                        finalSet.complete.complete(false);
+                    }
+                }, 600L); // 600 ticks = 30 seconds
             } else {
                 int cx = coords.x() >> 4;
                 int cz = coords.z() >> 4;

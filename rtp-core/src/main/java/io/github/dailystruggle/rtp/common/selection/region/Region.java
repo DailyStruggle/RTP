@@ -126,28 +126,40 @@ public class Region extends FactoryValue<RegionKeys> {
 
 //    System.out.println("[RTP-DEBUG] Region '" + name + "' execute() STARTED. Initial budget: " + availableTime + "ns");
 
-    while (!queueManager.locationQueue.isEmpty() && !queueManager.playerQueue.isEmpty()) {
-      // 1. Peek the location to ensure it transitions to the active tier properly
-      CachedLocation pair = queueManager.locationQueue.peek();
-      if (pair == null) break;
+    while (!queueManager.playerQueue.isEmpty()) {
+      UUID playerId = queueManager.playerQueue.peek();
+      if (playerId == null) break;
+
+      ConcurrentLinkedQueue<CachedLocation> privateQueue = queueManager.getPerPlayerQueue(playerId);
+      CachedLocation pair = null;
+      boolean isPrivate = false;
+
+      // Prioritize private queue (biome searches/specific requests) over public queue
+      if (privateQueue != null && !privateQueue.isEmpty()) {
+        pair = privateQueue.peek();
+        isPrivate = true;
+      } else if (!queueManager.locationQueue.isEmpty()) {
+        pair = queueManager.locationQueue.peek();
+      }
+
+      if (pair == null) {
+        // Break if neither private nor public locations are ready
+        break;
+      }
 
       ChunkSet chunkSet = chunkManager.getChunkSet(pair.getCoords());
       if (chunkSet == null || !chunkSet.keep() || !chunkSet.complete.isDone()) {
         // Location is still in the backlog or actively loading.
-        // Break the loop so the cache phase below can assign tickets and load it.
         break;
       }
 
       if (chunkSet.complete.isCompletedExceptionally()) {
-        // Failsafe: Chunk failed to load. Discard location so the queue doesn't permanently hang.
-        queueManager.locationQueue.poll();
+        // Failsafe: Chunk failed to load.
+        if (isPrivate) privateQueue.poll();
+        else queueManager.locationQueue.poll();
         chunkManager.removeTicket(pair.getCoords());
         continue;
       }
-
-      // 2. Location is fully loaded and locked in memory. Verify the player.
-      UUID playerId = queueManager.playerQueue.peek();
-      if (playerId == null) break;
 
       TeleportData teleportData = RTP.getInstance().latestTeleportData.get(playerId);
       if (teleportData == null || teleportData.completed) {
@@ -163,7 +175,8 @@ public class Region extends FactoryValue<RegionKeys> {
       }
 
       // 3. Both are ready. Poll them to finalize the pairing.
-      queueManager.locationQueue.poll();
+      if (isPrivate) privateQueue.poll();
+      else queueManager.locationQueue.poll();
       queueManager.playerQueue.poll();
 
       teleportData.attempts = pair.getAttempts();

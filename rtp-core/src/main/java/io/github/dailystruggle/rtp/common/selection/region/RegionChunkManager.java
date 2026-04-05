@@ -163,6 +163,8 @@ public class RegionChunkManager {
         int cz = coords.z() >> 4;
         long chunkKey = getChunkKey(cx, cz);
 
+        ticketCounts.computeIfPresent(chunkKey, (k, v) -> (v <= 1) ? null : v - 1);
+
         if (!locAssChunks.containsKey(chunkKey)) return;
         ChunkSet chunkSet = locAssChunks.remove(chunkKey);
         if (chunkSet == null) return;
