@@ -172,6 +172,7 @@ public class Region extends FactoryValue<RegionKeys> {
       RTPCommandSender sender = RTP.serverAccessor.getSender(CommandsAPI.serverId);
       TeleportPipelineTask pipelineTask = new TeleportPipelineTask(new GenerationContext(sender, player, null), this, pair.getCoords());
       teleportData.nextTask = pipelineTask;
+      pipelineTask.setPhase(TeleportPipelineTask.Phase.LOAD);
       RTP.scheduler.runTaskAsynchronously(pipelineTask);
 
       RTP.getInstance().latestTeleportData.put(playerId, teleportData);

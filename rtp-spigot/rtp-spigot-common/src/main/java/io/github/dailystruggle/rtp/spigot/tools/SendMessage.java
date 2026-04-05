@@ -184,7 +184,7 @@ public class SendMessage {
               "teleports",
               uuid -> {
                   if (RTP.getInstance() == null) return "0";
-                  return String.valueOf(RTP.getInstance().latestTeleportData.size());
+                  return String.valueOf(RTP.getInstance().latestTeleportData.values().stream().filter(teleportData -> !teleportData.completed).count());
               });
 
       placeholders.put(
