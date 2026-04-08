@@ -8,20 +8,32 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public class RegionQueueManager {
     private final Region region;
 
-    public final LockFreeLocationBuffer locationQueue = new LockFreeLocationBuffer(1024);
+    // Hot Queue: Chunks are loaded, verified, and actively have keep(true) applied
+    public final LockFreeLocationBuffer keptLocations;
+
+    // Cold Queue: Chunks are verified and safe, but have been released to save RAM
+    public final LockFreeLocationBuffer unkeptLocations;
 
     /** When reserving/recycling locations for specific players, I want to guard against */
-    public final ConcurrentHashMap<UUID, ConcurrentLinkedQueue<CachedLocation>>
+    public final ConcurrentHashMap<UUID, ConcurrentLinkedQueue<RTPLocation>>
             perPlayerLocationQueue = new ConcurrentHashMap<>();
 
     /** */
-    public final ConcurrentHashMap<UUID, CompletableFuture<CachedLocation>> fastLocations =
+    public final ConcurrentHashMap<UUID, CompletableFuture<RTPLocation>> fastLocations =
             new ConcurrentHashMap<>();
 
     public final ConcurrentLinkedQueue<UUID> playerQueue = new ConcurrentLinkedQueue<>();
 
     public RegionQueueManager(Region region) {
         this.region = region;
+        RegionSettings settings = region.getSettings();
+        if(settings!=null) {
+            this.unkeptLocations = new LockFreeLocationBuffer((int) settings.cacheCap());
+            this.keptLocations = new LockFreeLocationBuffer(settings.activeChunkCap());
+        } else {
+            this.unkeptLocations = new LockFreeLocationBuffer(1024);
+            this.keptLocations = new LockFreeLocationBuffer(1024);
+        }
     }
 
     /**
@@ -30,9 +42,9 @@ public class RegionQueueManager {
      * @param id player uuid
      * @return future location and number of attempts
      */
-    public CompletableFuture<CachedLocation> fastQueue(UUID id) {
+    public CompletableFuture<RTPLocation> fastQueue(UUID id) {
         if (fastLocations.containsKey(id)) return fastLocations.get(id);
-        CompletableFuture<CachedLocation> res = new CompletableFuture<>();
+        CompletableFuture<RTPLocation> res = new CompletableFuture<>();
         fastLocations.put(id, res);
         return res;
     }
@@ -53,19 +65,19 @@ public class RegionQueueManager {
      * @param uuid player uuid
      * @return location or null if none available
      */
-    public CompletableFuture<CachedLocation> poll(UUID uuid) {
+    public CompletableFuture<RTPLocation> poll(UUID uuid) {
         if (fastLocations.containsKey(uuid)) {
             return fastLocations.remove(uuid);
         }
 
-        ConcurrentLinkedQueue<CachedLocation> playerQueue = perPlayerLocationQueue.get(uuid);
+        ConcurrentLinkedQueue<RTPLocation> playerQueue = perPlayerLocationQueue.get(uuid);
         if (playerQueue != null && !playerQueue.isEmpty()) {
-            CachedLocation loc = playerQueue.poll();
+            RTPLocation loc = playerQueue.poll();
             if (loc != null) return CompletableFuture.completedFuture(loc);
         }
 
-        if (!locationQueue.isEmpty()) {
-            CachedLocation loc = locationQueue.poll();
+        if (!keptLocations.isEmpty()) {
+            RTPLocation loc = keptLocations.poll();
             if (loc != null) return CompletableFuture.completedFuture(loc);
         }
 
@@ -79,8 +91,8 @@ public class RegionQueueManager {
      * @return combined queue length
      */
     public long getTotalQueueLength(UUID uuid) {
-        long res = locationQueue.size();
-        ConcurrentLinkedQueue<CachedLocation> queue =
+        long res = keptLocations.size() + unkeptLocations.size();
+        ConcurrentLinkedQueue<RTPLocation> queue =
                 perPlayerLocationQueue.get(uuid);
         if (queue != null) res += queue.size();
         if (fastLocations.containsKey(uuid)) res++;
@@ -93,7 +105,7 @@ public class RegionQueueManager {
      * @return public queue length
      */
     public long getPublicQueueLength() {
-        return locationQueue.size();
+        return keptLocations.size() + unkeptLocations.size();
     }
 
     /**
@@ -104,7 +116,7 @@ public class RegionQueueManager {
      */
     public long getPersonalQueueLength(UUID uuid) {
         long res = 0;
-        ConcurrentLinkedQueue<CachedLocation> queue =
+        ConcurrentLinkedQueue<RTPLocation> queue =
                 perPlayerLocationQueue.get(uuid);
         if (queue != null) res += queue.size();
         if (fastLocations.containsKey(uuid)) res++;
@@ -112,7 +124,8 @@ public class RegionQueueManager {
     }
 
     public void shutDown() {
-        locationQueue.clear();
+        keptLocations.clear();
+        unkeptLocations.clear();
         perPlayerLocationQueue.clear();
         fastLocations.clear();
         playerQueue.clear();
@@ -121,8 +134,8 @@ public class RegionQueueManager {
     /**
      * @param location location to add to the public queue
      */
-    void enqueueLocation(CachedLocation location) {
-        locationQueue.add(location);
+    void enqueueLocation(RTPLocation location) {
+        unkeptLocations.add(location);
     }
 
     /**
@@ -137,7 +150,7 @@ public class RegionQueueManager {
      * @param uuid player uuid
      * @return fast location future for the player
      */
-    CompletableFuture<CachedLocation> getFastLocation(UUID uuid) {
+    CompletableFuture<RTPLocation> getFastLocation(UUID uuid) {
         return fastLocations.get(uuid);
     }
 
@@ -145,7 +158,7 @@ public class RegionQueueManager {
      * @param uuid player uuid
      * @param location location to add to the player's private queue
      */
-    void enqueuePlayerLocation(UUID uuid, CachedLocation location) {
+    void enqueuePlayerLocation(UUID uuid, RTPLocation location) {
         perPlayerLocationQueue.putIfAbsent(uuid, new ConcurrentLinkedQueue<>());
         perPlayerLocationQueue.get(uuid).add(location);
     }
@@ -154,21 +167,21 @@ public class RegionQueueManager {
      * @param index index of the location in the public queue
      * @return location at the specified index or null
      */
-    CachedLocation getLocation(int index) {
-        return locationQueue.get(index);
+    RTPLocation getLocation(int index) {
+        return keptLocations.get(index);
     }
 
     /**
      * @return collection of all per-player location queues
      */
-    java.util.Collection<ConcurrentLinkedQueue<CachedLocation>> getPerPlayerQueues() {
+    java.util.Collection<ConcurrentLinkedQueue<RTPLocation>> getPerPlayerQueues() {
         return perPlayerLocationQueue.values();
     }
 
     /**
      * @return set of entries for per-player location queues
      */
-    java.util.Set<java.util.Map.Entry<UUID, ConcurrentLinkedQueue<CachedLocation>>> getPerPlayerQueueEntries() {
+    java.util.Set<java.util.Map.Entry<UUID, ConcurrentLinkedQueue<RTPLocation>>> getPerPlayerQueueEntries() {
         return perPlayerLocationQueue.entrySet();
     }
 
@@ -191,7 +204,7 @@ public class RegionQueueManager {
      * @param uuid player uuid
      * @return the player's private queue or null
      */
-    ConcurrentLinkedQueue<CachedLocation> getPerPlayerQueue(UUID uuid) {
+    ConcurrentLinkedQueue<RTPLocation> getPerPlayerQueue(UUID uuid) {
         return perPlayerLocationQueue.get(uuid);
     }
 
@@ -200,7 +213,7 @@ public class RegionQueueManager {
      * @param location location to offer
      * @return true if successful
      */
-    boolean offerLocation(CachedLocation location) {
-        return locationQueue.offer(location);
+    boolean offerLocation(RTPLocation location) {
+        return unkeptLocations.offer(location);
     }
 }

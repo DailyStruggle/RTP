@@ -13,6 +13,7 @@ import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.GenerationResult;
+import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
@@ -132,7 +133,7 @@ public class OnEventTeleports implements Listener {
     // I don't know how this can happen, but in case player dies twice, don't reprocess
     if (region.queueManager.fastLocations.containsKey(id)) return;
 
-    CompletableFuture<io.github.dailystruggle.rtp.common.selection.region.CachedLocation> future = new CompletableFuture<>();
+    CompletableFuture<RTPLocation> future = new CompletableFuture<>();
     region.queueManager.fastLocations.put(id, future);
 
     if (RTP.getInstance().latestTeleportData.containsKey(id)) {
@@ -159,15 +160,15 @@ public class OnEventTeleports implements Listener {
             return;
           }
 
-          io.github.dailystruggle.rtp.common.selection.region.CachedLocation location = io.github.dailystruggle.rtp.common.selection.region.CachedLocationPool.acquire(res.coords(), res.attempts());
+          RTPLocation location = new RTPLocation(res.coords(), res.attempts());
 
-          if (location.getCoords() == null) {
+          if (location.coords() == null) {
             return;
           }
 
-          RTPCoords coords = location.getCoords();
+          RTPCoords coords = location.coords();
           teleportData.selectedCoords = coords;
-          teleportData.attempts = location.getAttempts();
+          teleportData.attempts = location.attempts();
 
           future.complete(location);
         });
@@ -181,26 +182,26 @@ public class OnEventTeleports implements Listener {
     respawningPlayers.remove(player.getUniqueId());
 
     Region region = RTP.selectionAPI.getRegion(RTP.serverAccessor.getPlayer(player.getUniqueId()));
-    ConcurrentHashMap<UUID, CompletableFuture<io.github.dailystruggle.rtp.common.selection.region.CachedLocation>> respawnLocations =
+    ConcurrentHashMap<UUID, CompletableFuture<RTPLocation>> respawnLocations =
         region.queueManager.fastLocations;
     if (!respawnLocations.containsKey(player.getUniqueId())) {
       RTPTeleportCancel.refund(player.getUniqueId());
       return;
     }
 
-    CompletableFuture<io.github.dailystruggle.rtp.common.selection.region.CachedLocation> future =
+    CompletableFuture<RTPLocation> future =
         respawnLocations.get(player.getUniqueId());
     region.queueManager.fastLocations.remove(player.getUniqueId());
 
     if (event.isAnchorSpawn() || event.isBedSpawn()) {
       if (future.isDone()) {
         try {
-          region.queueManager.locationQueue.add(future.get());
+          region.queueManager.keptLocations.add(future.get());
         } catch (InterruptedException | ExecutionException ignored) {
 
         }
       } else {
-        future.thenAccept(cachedLocation -> region.queueManager.locationQueue.add(cachedLocation));
+        future.thenAccept(cachedLocation -> region.queueManager.keptLocations.add(cachedLocation));
       }
       RTPTeleportCancel.refund(player.getUniqueId());
       return;
@@ -227,7 +228,7 @@ public class OnEventTeleports implements Listener {
     }
 
     if (future.isDone()) {
-      io.github.dailystruggle.rtp.common.selection.region.CachedLocation location;
+      RTPLocation location;
       try {
         location = future.get();
       } catch (InterruptedException | ExecutionException e) {
@@ -241,12 +242,12 @@ public class OnEventTeleports implements Listener {
         return;
       }
 
-      if (location.getCoords() == null) {
+      if (location.coords() == null) {
         RTPTeleportCancel.refund(player.getUniqueId());
         return;
       }
 
-      RTPCoords rtpCoords = location.getCoords();
+      RTPCoords rtpCoords = location.coords();
 
       RTPWorld rtpWorld = region.getWorld();
       org.bukkit.World world = Bukkit.getWorld(rtpWorld.id());

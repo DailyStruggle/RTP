@@ -12,6 +12,7 @@ import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import java.io.File;
@@ -169,7 +170,7 @@ public class FillTask extends RTPRunnable {
       Set<String> set = new HashSet<>();
       for (String s : biomes) {
         if (!biomeSet.contains(s.toUpperCase())) {
-          set.add(s);
+          set.add(s.toUpperCase());
         }
       }
       defaultBiomes = set;
@@ -285,6 +286,7 @@ public class FillTask extends RTPRunnable {
         fillIter.set(0);
         save();
         shape.save(region.name, region.getWorld().name());
+        shape.exportDebugJson(region.name, region.getWorld().name());
         isRunning.set(false);
         shape.flushAndRebuild(shape.spatialResolution);
         if (!isCancelled() && !pause.get()) {
@@ -338,7 +340,8 @@ public class FillTask extends RTPRunnable {
     try (java.io.FileOutputStream out = new java.io.FileOutputStream(file)) {
       ByteBuffer buf = ByteBuffer.allocate(25).order(ByteOrder.BIG_ENDIAN);
       buf.putLong(fillIter.get());
-      buf.putLong(region.getShape().spatialResolution);
+      Shape<?> shape = region.getShape();
+      if (shape instanceof MemoryShape memoryShape) {buf.putLong(memoryShape.spatialResolution);}
       buf.putLong(currentOffset);
       buf.put((byte) 0);
       out.write(buf.array());
@@ -455,13 +458,15 @@ public class FillTask extends RTPRunnable {
 
       String currBiome = world.getBiome(blockX, (vert.maxY() + vert.minY()) / 2, blockZ);
 
+      if(biomeRecall) shape.addBiomeLocation(pos, 1L, currBiome.toUpperCase());
+
       if (!defaultBiomes.contains(currBiome.toUpperCase())) {
-        if (biomeRecall) shape.addBadLocation(pos, 1L);
+        shape.addBadLocation(pos);
         return CompletableFuture.completedFuture(false);
       }
 
       if (!border.isInside().apply(new RTPLocation(world, blockX, (vert.maxY() + vert.minY()) / 2, blockZ))) {
-        shape.addBadLocation(pos, 1L);
+        shape.addBadLocation(pos);
         return CompletableFuture.completedFuture(false);
       }
 
@@ -477,6 +482,8 @@ public class FillTask extends RTPRunnable {
               .whenComplete((chunkKey, throwable) -> {
                 try {
                   if (throwable != null || chunkKey == null || isCancelled() || pause.get()) {
+                    if(chunkKey == null || throwable != null) shape.addBadLocation(pos);
+                    if(throwable != null) RTP.log(Level.WARNING, "Failed to get chunk for " + pos + " in " + region.name, throwable);
                     res.complete(false);
                     return;
                   }
@@ -486,6 +493,7 @@ public class FillTask extends RTPRunnable {
                   // If the chunk is a "Ghost Chunk" and fails to cache instantly,
                   // skip the coordinate completely to prevent thread starvation.
                   if (chunk == null) {
+                    shape.addBadLocation(pos);
                     res.complete(false);
                     return;
                   }
@@ -495,22 +503,23 @@ public class FillTask extends RTPRunnable {
                     MutableRTPCoords localCursor = new MutableRTPCoords(blockX, blockZ);
                     localCursor.setWorldName(world.name());
 
+                    if (biomeRecall) shape.addBiomeLocation(pos, 1, currBiome);
                     if (!vert.adjust(chunk, localCursor)) {
-                      if (biomeRecall) shape.addBadLocation(pos, 1L);
+                      shape.addBadLocation(pos);
                       res.complete(false);
                       return;
                     }
 
                     String currBiome1 = world.getBiome(localCursor.x, localCursor.y, localCursor.z);
                     if (!defaultBiomes.contains(currBiome1.toUpperCase())) {
-                      if (biomeRecall) shape.addBadLocation(pos, 1L);
+                      shape.addBadLocation(pos);
                       res.complete(false);
                       return;
                     }
 
                     boolean pass = localCursor.y < vert.maxY();
                     if (!pass) {
-                      shape.addBadLocation(pos, 1L);
+                      shape.addBadLocation(pos);
                       res.complete(false);
                       return;
                     }
@@ -541,10 +550,9 @@ public class FillTask extends RTPRunnable {
                     if (pass) pass = GlobalRegionVerifiers.checkGlobalRegionVerifiers(localCursor).join();
 
                     if (pass) {
-                      if (biomeRecall) shape.addBiomeLocation(pos, 1L, currBiome1);
                       res.complete(true);
                     } else {
-                      shape.addBadLocation(pos, 1L);
+                      shape.addBadLocation(pos);
                       res.complete(false);
                     }
 
@@ -552,6 +560,8 @@ public class FillTask extends RTPRunnable {
                     chunk.keep(false);
                   }
                 } catch (Throwable t) {
+                  shape.addBadLocation(pos);
+                  RTP.log(Level.WARNING, "Failed to fill chunk for " + pos + " in " + region.name, t);
                   res.complete(false);
                 }
               });

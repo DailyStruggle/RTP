@@ -14,7 +14,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
-import io.github.dailystruggle.rtp.common.selection.region.CachedLocation;
+import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -137,7 +137,7 @@ public class FillTaskTest {
         when(settings.cacheCap()).thenReturn((long) cacheCap);
         when(settings.activeChunkCap()).thenReturn(2);
         for (int i = 0; i < cacheCap; i++) {
-            queueManager.locationQueue.offer(mock(CachedLocation.class));
+            queueManager.keptLocations.offer(mock(RTPLocation.class));
         }
 
         FillTask fillTask = new FillTask(region, 0);
@@ -149,8 +149,8 @@ public class FillTaskTest {
         fillTask.run();
 
         // Assert that locationQueue size does not exceed cacheCap
-        assertTrue(queueManager.locationQueue.size() <= cacheCap,
-            "locationQueue size (" + queueManager.locationQueue.size() + ") exceeded cacheCap (" + cacheCap + ")");
+        assertTrue(queueManager.keptLocations.size() <= cacheCap,
+            "locationQueue size (" + queueManager.keptLocations.size() + ") exceeded cacheCap (" + cacheCap + ")");
     }
 
     @Test

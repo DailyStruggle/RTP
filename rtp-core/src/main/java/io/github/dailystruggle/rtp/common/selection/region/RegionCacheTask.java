@@ -39,25 +39,25 @@ public class RegionCacheTask extends RTPRunnable {
         if (activeChunkCap > 0) {
             for (int i = 0; i < activeChunkCap; i++) {
                 if (isCancelled()) return;
-                CachedLocation loc = region.queueManager.locationQueue.get(i);
+                RTPLocation loc = region.queueManager.keptLocations.get(i);
                 if (loc == null) break;
-                ChunkSet chunkSet = region.chunkManager.getChunkSet(loc.getCoords());
+                ChunkSet chunkSet = region.chunkManager.getChunkSet(loc.coords());
                 if (chunkSet == null || !chunkSet.keep()) {
-                    region.chunkManager.addTicket(loc.getCoords());
+                    region.chunkManager.addTicket(loc.coords());
                 }
             }
         }
 
-        int queueSize = region.queueManager.locationQueue.size();
+        int queueSize = region.queueManager.keptLocations.size();
         for (int i = Math.max(0, activeChunkCap); i < queueSize; i++) {
             if (isCancelled()) return;
-            CachedLocation loc = region.queueManager.locationQueue.get(i);
+            RTPLocation loc = region.queueManager.keptLocations.get(i);
             if (loc == null) continue;
 
-            ChunkSet chunkSet = region.chunkManager.getChunkSet(loc.getCoords());
+            ChunkSet chunkSet = region.chunkManager.getChunkSet(loc.coords());
 
             if (chunkSet != null && chunkSet.keep()) {
-                region.chunkManager.removeTicket(loc.getCoords());
+                region.chunkManager.removeTicket(loc.coords());
             }
         }
 
@@ -70,9 +70,8 @@ public class RegionCacheTask extends RTPRunnable {
                 return;
             }
             final RTPCoords coords = res.coords();
-            final CachedLocation pair = CachedLocationPool.acquire(coords, res.attempts());
+            final RTPLocation pair = new RTPLocation(coords, res.attempts());
             if (coords == null) {
-                CachedLocationPool.release(pair);
                 region.inFlightCalculations.decrementAndGet();
                 return;
             }
@@ -138,20 +137,17 @@ public class RegionCacheTask extends RTPRunnable {
                 try {
                     if (isCancelled() || !aBoolean) {
                         region.chunkManager.removeTicket(coords); // Release entire radius
-                        CachedLocationPool.release(pair);
                         return;
                     }
 
                     region.chunkManager.removeTicket(coords);
 
                     if (playerId == null) {
-                        if (region.queueManager.locationQueue.size() < region.getSettings().cacheCap()) {
-                            if (region.queueManager.locationQueue.size() < region.getSettings().activeChunkCap()) {
+                        if (region.queueManager.keptLocations.size() < region.getSettings().cacheCap()) {
+                            if (region.queueManager.keptLocations.size() < region.getSettings().activeChunkCap()) {
                                 region.chunkManager.addTicket(coords); // Center only
                             }
-                            region.queueManager.locationQueue.offer(pair);
-                        } else {
-                            CachedLocationPool.release(pair);
+                            region.queueManager.keptLocations.offer(pair);
                         }
                     } else {
                         region.chunkManager.addTicket(coords);

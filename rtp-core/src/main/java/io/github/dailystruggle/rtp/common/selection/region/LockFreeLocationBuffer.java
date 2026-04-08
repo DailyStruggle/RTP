@@ -1,10 +1,13 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
+import io.github.dailystruggle.rtp.common.RTP;
+
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReferenceArray;
+import java.util.logging.Level;
 
 public class LockFreeLocationBuffer {
-    private final AtomicReferenceArray<CachedLocation> buffer;
+    private final AtomicReferenceArray<RTPLocation> buffer;
     private final int mask;
     private final AtomicLong head = new AtomicLong(0);
     private final AtomicLong tail = new AtomicLong(0);
@@ -16,7 +19,7 @@ public class LockFreeLocationBuffer {
         this.mask = actualCapacity - 1;
     }
 
-    public boolean offer(CachedLocation location) {
+    public boolean offer(RTPLocation location) {
         if (location == null) return false;
         long currentTail;
         long currentHead;
@@ -32,9 +35,9 @@ public class LockFreeLocationBuffer {
         return true;
     }
 
-    public void add(CachedLocation location) {
+    public void add(RTPLocation location) {
         if (!offer(location)) {
-            throw new IllegalStateException("Buffer is full");
+            RTP.serverAccessor.log(Level.SEVERE,"Buffer is full");
         }
     }
 
@@ -42,10 +45,10 @@ public class LockFreeLocationBuffer {
         while (poll() != null);
     }
 
-    public CachedLocation poll() {
+    public RTPLocation poll() {
         long currentHead;
         long currentTail;
-        CachedLocation location;
+        RTPLocation location;
         do {
             currentHead = head.get();
             currentTail = tail.get();
@@ -59,7 +62,7 @@ public class LockFreeLocationBuffer {
         return location;
     }
 
-    public CachedLocation get(int index) {
+    public RTPLocation get(int index) {
         long currentHead = head.get();
         long currentTail = tail.get();
         if (index < 0 || currentHead + index >= currentTail) {
@@ -76,10 +79,10 @@ public class LockFreeLocationBuffer {
         return tail.get() == head.get();
     }
 
-    public CachedLocation peek() {
+    public RTPLocation peek() {
         long currentHead;
         long currentTail;
-        CachedLocation location;
+        RTPLocation location;
 
         do {
             currentHead = head.get();
