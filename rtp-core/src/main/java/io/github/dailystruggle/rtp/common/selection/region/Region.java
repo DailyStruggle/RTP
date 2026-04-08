@@ -72,7 +72,7 @@ public class Region extends FactoryValue<RegionKeys> {
       );
     }
 
-    if (this.shape != null) this.shape.spatialResolution = settings.spatialResolution();
+    if (this.shape != null && this.shape instanceof MemoryShape<?> memoryShape) memoryShape.spatialResolution = settings.spatialResolution();
 
     if (this.shape instanceof MemoryShape<?>) {
       long[] progress = FillTask.loadProgress(name);
@@ -89,7 +89,7 @@ public class Region extends FactoryValue<RegionKeys> {
     final long cacheCap = settings.cacheCap();
     final long playerQueueSize = queueManager.playerQueue.size();
     final long totalCap = Math.max(cacheCap, playerQueueSize);
-    long deficit = totalCap - (cachePipeline.size() + queueManager.locationQueue.size() + inFlightCalculations.get());
+    long deficit = totalCap - (cachePipeline.size() + queueManager.keptLocations.size() + inFlightCalculations.get());
 
     for (long i = 0; i < deficit; i++) {
       cachePipeline.add(new RegionCacheTask(this));
@@ -104,11 +104,11 @@ public class Region extends FactoryValue<RegionKeys> {
     this.settings = settings;
     this.shape = settings.shape();
     this.set(RegionKeys.spatialResolution, settings.spatialResolution());
-    if (this.shape != null) this.shape.spatialResolution = settings.spatialResolution();
+    if (this.shape != null && this.shape instanceof MemoryShape<?> memoryShape) memoryShape.spatialResolution = settings.spatialResolution();
     long cacheCap = settings.cacheCap();
     long playerQueueSize = queueManager.playerQueue.size();
     long totalCap = Math.max(cacheCap, playerQueueSize);
-    long deficit = totalCap - (cachePipeline.size() + queueManager.locationQueue.size() + inFlightCalculations.get());
+    long deficit = totalCap - (cachePipeline.size() + queueManager.keptLocations.size() + inFlightCalculations.get());
     for (long i = 0; i < deficit; i++) {
       cachePipeline.add(new RegionCacheTask(this));
     }
@@ -126,20 +126,47 @@ public class Region extends FactoryValue<RegionKeys> {
 
 //    System.out.println("[RTP-DEBUG] Region '" + name + "' execute() STARTED. Initial budget: " + availableTime + "ns");
 
+    // Region.java - inside execute()
+    long activeCap = settings.activeChunkCap();
+    long currentHot = queueManager.keptLocations.size();
+    long deficit = activeCap - (currentHot + inFlightCalculations.get());
+
+    for (int i = 0; i < deficit; i++) {
+      RTPLocation coldLoc = queueManager.unkeptLocations.poll();
+      if (coldLoc == null) break;
+
+      inFlightCalculations.incrementAndGet();
+      ChunkSet chunkSet = chunkManager.addTicket(coldLoc.coords());
+
+      chunkSet.complete.whenComplete((success, throwable) -> {
+        try {
+          if (success != null && success) {
+            chunkSet.keep(true, getWorld());
+            queueManager.keptLocations.offer(coldLoc);
+          } else {
+            chunkManager.removeTicket(coldLoc.coords());
+
+          }
+        } finally {
+          inFlightCalculations.decrementAndGet();
+        }
+      });
+    }
+
     while (!queueManager.playerQueue.isEmpty()) {
       UUID playerId = queueManager.playerQueue.peek();
       if (playerId == null) break;
 
-      ConcurrentLinkedQueue<CachedLocation> privateQueue = queueManager.getPerPlayerQueue(playerId);
-      CachedLocation pair = null;
+      ConcurrentLinkedQueue<RTPLocation> privateQueue = queueManager.getPerPlayerQueue(playerId);
+      RTPLocation pair = null;
       boolean isPrivate = false;
 
       // Prioritize private queue (biome searches/specific requests) over public queue
       if (privateQueue != null && !privateQueue.isEmpty()) {
         pair = privateQueue.peek();
         isPrivate = true;
-      } else if (!queueManager.locationQueue.isEmpty()) {
-        pair = queueManager.locationQueue.peek();
+      } else if (!queueManager.keptLocations.isEmpty()) {
+        pair = queueManager.keptLocations.peek();
       }
 
       if (pair == null) {
@@ -147,7 +174,7 @@ public class Region extends FactoryValue<RegionKeys> {
         break;
       }
 
-      ChunkSet chunkSet = chunkManager.getChunkSet(pair.getCoords());
+      ChunkSet chunkSet = chunkManager.getChunkSet(pair.coords());
       if (chunkSet == null || !chunkSet.keep() || !chunkSet.complete.isDone()) {
         // Location is still in the backlog or actively loading.
         break;
@@ -156,8 +183,8 @@ public class Region extends FactoryValue<RegionKeys> {
       if (chunkSet.complete.isCompletedExceptionally()) {
         // Failsafe: Chunk failed to load.
         if (isPrivate) privateQueue.poll();
-        else queueManager.locationQueue.poll();
-        chunkManager.removeTicket(pair.getCoords());
+        else queueManager.keptLocations.poll();
+        chunkManager.removeTicket(pair.coords());
         continue;
       }
 
@@ -176,14 +203,14 @@ public class Region extends FactoryValue<RegionKeys> {
 
       // 3. Both are ready. Poll them to finalize the pairing.
       if (isPrivate) privateQueue.poll();
-      else queueManager.locationQueue.poll();
-      queueManager.playerQueue.poll();
+      else queueManager.keptLocations.poll();
+      UUID playerID = queueManager.playerQueue.poll();
 
-      teleportData.attempts = pair.getAttempts();
-      teleportData.selectedCoords = pair.getCoords();
+      teleportData.attempts = pair.attempts();
+      teleportData.selectedCoords = pair.coords();
 
       RTPCommandSender sender = RTP.serverAccessor.getSender(CommandsAPI.serverId);
-      TeleportPipelineTask pipelineTask = new TeleportPipelineTask(new GenerationContext(sender, player, null), this, pair.getCoords());
+      TeleportPipelineTask pipelineTask = new TeleportPipelineTask(new GenerationContext(sender, player, null), this, pair.coords());
       teleportData.nextTask = pipelineTask;
       pipelineTask.setPhase(TeleportPipelineTask.Phase.LOAD);
       RTP.scheduler.runTaskAsynchronously(pipelineTask);
@@ -236,7 +263,6 @@ public class Region extends FactoryValue<RegionKeys> {
 
 //    long totalCap = Math.max(settings.cacheCap(), queueManager.playerQueue.size());
     long cacheCap = settings.cacheCap();
-    long activeCap = settings.activeChunkCap();
     long totalCap = Math.max(Math.min(cacheCap, activeCap), queueManager.playerQueue.size());
 
     if (!isRefillingCache.compareAndSet(false, true)) {
@@ -245,7 +271,7 @@ public class Region extends FactoryValue<RegionKeys> {
     }
 
     try {
-      long deficit = totalCap - (cachePipeline.size() + queueManager.locationQueue.size() + inFlightCalculations.get());
+      deficit = totalCap - (cachePipeline.size() + queueManager.keptLocations.size() + queueManager.unkeptLocations.size() + inFlightCalculations.get());
 //      System.out.println("[RTP-DEBUG] Region '" + name + "' caching phase. Deficit: " + deficit + " | inFlight: " + inFlightCalculations.get() + " | cachePipeSize: " + cachePipeline.size());
 
       for (long i = 0; i < deficit; i++) {
@@ -257,29 +283,6 @@ public class Region extends FactoryValue<RegionKeys> {
     } finally {
       isRefillingCache.set(false);
     }
-
-    int activeChunkCap = settings.activeChunkCap();
-    if (activeChunkCap >= 0) {
-      int qSize = queueManager.locationQueue.size();
-      for (int i = 0; i < qSize; i++) {
-        CachedLocation loc = queueManager.locationQueue.get(i);
-        if (loc == null) continue;
-
-        ChunkSet chunkSet = chunkManager.getChunkSet(loc.getCoords());
-
-        if (i < activeChunkCap) {
-          // Enforce tickets ON for the top tier
-          if (chunkSet == null || !chunkSet.keep()) {
-            chunkManager.addTicket(loc.getCoords());
-          }
-        } else {
-          // Enforce tickets OFF for everything beyond the cap
-          if (chunkSet != null && chunkSet.keep()) {
-            chunkManager.removeTicket(loc.getCoords());
-          }
-        }
-      }
-    }
   }
 
   /**
@@ -289,7 +292,7 @@ public class Region extends FactoryValue<RegionKeys> {
    * @return true if location is ready
    */
   public boolean hasLocation(@Nullable UUID uuid) {
-    boolean res = !queueManager.locationQueue.isEmpty();
+    boolean res = !queueManager.keptLocations.isEmpty();
     res |= (uuid != null) && (queueManager.perPlayerLocationQueue.containsKey(uuid));
     return res;
   }
@@ -324,23 +327,36 @@ public class Region extends FactoryValue<RegionKeys> {
 
     if (shape instanceof MemoryShape<?>) {
       ((MemoryShape<?>) shape).save(this.name + ".bin", world.name());
+      ((MemoryShape<?>) shape).exportDebugJson(this.name, world.name());
     }
 
     cachePipeline.stop();
     cachePipeline.clear();
 
-    CachedLocation pair;
-    while ((pair = queueManager.locationQueue.poll()) != null) {
-      chunkManager.removeChunks(pair.getCoords());
-      CachedLocationPool.release(pair);
-    }
-    queueManager.locationQueue.clear();
+    RTPLocation pair;
+    while ((pair = queueManager.keptLocations.poll()) != null) {
+      chunkManager.removeChunks(pair.coords());
 
-    for (java.util.concurrent.ConcurrentLinkedQueue<CachedLocation> queue :
+    }
+    queueManager.keptLocations.clear();
+
+    while ((pair = queueManager.unkeptLocations.poll()) != null) {
+      chunkManager.removeChunks(pair.coords());
+
+    }
+    queueManager.unkeptLocations.clear();
+
+    while ((pair = queueManager.keptLocations.poll()) != null) {
+      chunkManager.removeChunks(pair.coords());
+
+    }
+    queueManager.keptLocations.clear();
+
+    for (java.util.concurrent.ConcurrentLinkedQueue<RTPLocation> queue :
         queueManager.perPlayerLocationQueue.values()) {
       while ((pair = queue.poll()) != null) {
-        chunkManager.removeChunks(pair.getCoords());
-        CachedLocationPool.release(pair);
+        chunkManager.removeChunks(pair.coords());
+
       }
     }
     queueManager.perPlayerLocationQueue.clear();
@@ -394,7 +410,7 @@ public class Region extends FactoryValue<RegionKeys> {
    * @param id player uuid
    * @return future location and number of attempts
    */
-  public CompletableFuture<CachedLocation> fastQueue(UUID id) {
+  public CompletableFuture<RTPLocation> fastQueue(UUID id) {
     return queueManager.fastQueue(id);
   }
 
@@ -460,24 +476,24 @@ public class Region extends FactoryValue<RegionKeys> {
             settings.override(),
             settings.detailedRegionInit()
         );
-        for (Map.Entry<UUID, java.util.concurrent.ConcurrentLinkedQueue<CachedLocation>>
+        for (Map.Entry<UUID, java.util.concurrent.ConcurrentLinkedQueue<RTPLocation>>
             entry : queueManager.perPlayerLocationQueue.entrySet()) {
-          java.util.concurrent.ConcurrentLinkedQueue<CachedLocation> value =
+          java.util.concurrent.ConcurrentLinkedQueue<RTPLocation> value =
               entry.getValue();
-          CachedLocation pair;
+          RTPLocation pair;
           while ((pair = value.poll()) != null) {
-            chunkManager.removeChunks(pair.getCoords());
-            CachedLocationPool.release(pair);
+            chunkManager.removeChunks(pair.coords());
+
           }
           value.clear();
         }
         queueManager.perPlayerLocationQueue.clear();
-        CachedLocation pair;
-        while ((pair = queueManager.locationQueue.poll()) != null) {
-          chunkManager.removeChunks(pair.getCoords());
-          CachedLocationPool.release(pair);
+        RTPLocation pair;
+        while ((pair = queueManager.keptLocations.poll()) != null) {
+          chunkManager.removeChunks(pair.coords());
+
         }
-        queueManager.locationQueue.clear();
+        queueManager.keptLocations.clear();
       }
     }
     return shape;

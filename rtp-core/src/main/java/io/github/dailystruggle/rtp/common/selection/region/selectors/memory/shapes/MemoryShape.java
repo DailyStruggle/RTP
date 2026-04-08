@@ -19,6 +19,7 @@ import java.util.logging.Level;
  * @param <E> enum for configuration values
  */
 public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
+  public long spatialResolution = 1L;
   protected volatile long[] badKeysCache = new long[0];
   protected volatile long[] badPrefixSumsCache = new long[0];
   protected volatile ConcurrentHashMap<String, long[]> biomeKeysCache = new ConcurrentHashMap<>();
@@ -35,6 +36,8 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   protected final AtomicLong fillStride = new AtomicLong(-1L);
   private final AtomicLong totalBadCount = new AtomicLong(0L);
   private final AtomicLong totalBiomeCount = new AtomicLong(0L);
+
+  protected volatile ConcurrentHashMap<Long, Long> rebuildingBadLocations = null;
 
   protected final java.util.concurrent.atomic.AtomicReference<
           java.util.concurrent.ConcurrentHashMap<Long, Long>>
@@ -139,6 +142,10 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    */
   public boolean isKnownBad(long location) {
     if (pendingBadLocations.get().containsKey(location)) return true;
+
+    ConcurrentHashMap<Long, Long> rebuilding = rebuildingBadLocations;
+    if (rebuilding != null && rebuilding.containsKey(location)) return true;
+
     long[] sums = badPrefixSumsCache;
     long[] keys = badKeysCache;
     if (keys.length == 0) return false;
@@ -244,6 +251,84 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     }
   }
 
+  public void exportDebugJson(String fileName, String worldName) {
+    if (!fileName.endsWith(".json")) fileName = fileName + ".json";
+
+    // 1. Snapshot under write lock to avoid concurrent modifications
+    long[] sBadKeys;
+    long[] sBadSums;
+    java.util.Map<String, long[]> sBiomeKeys;
+    java.util.Map<String, long[]> sBiomeSums;
+
+    writeLock.lock();
+    try {
+      sBadKeys = java.util.Arrays.copyOf(badKeysCache, badKeysCache.length);
+      sBadSums = java.util.Arrays.copyOf(badPrefixSumsCache, badPrefixSumsCache.length);
+      sBiomeKeys = new java.util.HashMap<>(biomeKeysCache.size());
+      sBiomeSums = new java.util.HashMap<>(biomePrefixSumsCache.size());
+      for (java.util.Map.Entry<String, long[]> e : biomeKeysCache.entrySet()) {
+        sBiomeKeys.put(e.getKey(), java.util.Arrays.copyOf(e.getValue(), e.getValue().length));
+      }
+      for (java.util.Map.Entry<String, long[]> e : biomePrefixSumsCache.entrySet()) {
+        sBiomeSums.put(e.getKey(), java.util.Arrays.copyOf(e.getValue(), e.getValue().length));
+      }
+    } finally {
+      writeLock.unlock();
+    }
+
+    // 2. Convert Bad Location prefix sums back to discrete lengths
+    java.util.List<java.util.Map<String, Long>> badList = new java.util.ArrayList<>();
+    long prev = 0L;
+    for (int i = 0; i < sBadKeys.length; i++) {
+      java.util.Map<String, Long> entry = new java.util.LinkedHashMap<>();
+      entry.put("start", sBadKeys[i]);
+      entry.put("length", sBadSums[i] - prev);
+      badList.add(entry);
+      prev = sBadSums[i];
+    }
+
+    // 3. Convert Biome Location prefix sums back to discrete lengths
+    java.util.Map<String, java.util.List<java.util.Map<String, Long>>> biomeMap = new java.util.LinkedHashMap<>();
+    for (java.util.Map.Entry<String, long[]> e : sBiomeKeys.entrySet()) {
+      String biome = e.getKey();
+      long[] keys = e.getValue();
+      long[] sums = sBiomeSums.getOrDefault(biome, new long[0]);
+
+      java.util.List<java.util.Map<String, Long>> bList = new java.util.ArrayList<>();
+      long p = 0L;
+      for (int i = 0; i < keys.length; i++) {
+        java.util.Map<String, Long> entry = new java.util.LinkedHashMap<>();
+        entry.put("start", keys[i]);
+        long currentSum = (i < sums.length ? sums[i] : p);
+        entry.put("length", currentSum - p);
+        bList.add(entry);
+        p = currentSum;
+      }
+      biomeMap.put(biome, bList);
+    }
+
+    // 4. Construct Root JSON Object
+    java.util.Map<String, Object> root = new java.util.LinkedHashMap<>();
+    root.put("world", worldName);
+    root.put("fillStride", fillStride.get());
+    root.put("spatialResolution", spatialResolution);
+    root.put("badLocations", badList);
+    root.put("biomeLocations", biomeMap);
+
+    // 5. Write to File
+    java.io.File pluginDir = io.github.dailystruggle.rtp.common.RTP.serverAccessor.getPluginDirectory();
+    java.io.File outDir = new java.io.File(pluginDir, "database" + java.io.File.separator + "regionData" + java.io.File.separator + "debug");
+    if (!outDir.exists()) outDir.mkdirs();
+    java.io.File outFile = new java.io.File(outDir, fileName);
+
+    try (java.io.FileWriter writer = new java.io.FileWriter(outFile)) {
+      com.google.gson.Gson gson = new com.google.gson.GsonBuilder().setPrettyPrinting().create();
+      gson.toJson(root, writer);
+    } catch (java.io.IOException ex) {
+      io.github.dailystruggle.rtp.common.RTP.log(java.util.logging.Level.WARNING, "Failed to write debug JSON: " + ex.getMessage(), ex);
+    }
+  }
+
   public void load(String fileName, String worldName) {
     if (!fileName.endsWith(".bin")) fileName = fileName + ".bin";
 
@@ -338,8 +423,8 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
             });
   }
 
-  public void addBadLocation(long location, long width) {
-    pendingBadLocations.get().put(location, width);
+  public void addBadLocation(long location) {
+    pendingBadLocations.get().put(location, 1L);
     badLocationsDirty = true;
   }
 
@@ -416,6 +501,8 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
             pendingBiomeLocations.getAndSet(new ConcurrentHashMap<>());
         ConcurrentHashMap<String, ConcurrentHashMap<Long, Boolean>> localPendingBiomeRemovals =
             pendingBiomeRemovals.getAndSet(new ConcurrentHashMap<>());
+
+        this.rebuildingBadLocations = localPendingBad;
 
         // Biome logic (similar to bad locations but per biome)
         if (!localPendingBiome.isEmpty() || !localPendingBiomeRemovals.isEmpty()) {
@@ -741,8 +828,11 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
           newSums[k] = runningSum;
         }
 
+
         this.badKeysCache = newKeys;
         this.badPrefixSumsCache = newSums;
+        this.rebuildingBadLocations = null; // Clear the reference only after the arrays update
+
         this.badLocationsDirty = !pendingBadLocations.get().isEmpty();
 
         totalBadCount.set(currentBadSum);

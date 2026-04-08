@@ -79,7 +79,7 @@ public final class RTPTeleportCancel extends RTPRunnable {
     data.nextTask.setCancelled(true);
 
     // dump location back onto the pile
-    //        if( data.selectedCoords!=null ) data.targetRegion.locationQueue.add( new
+    //        if( data.selectedCoords!=null ) data.targetRegion.keptLocations.add( new
     // AbstractMap.SimpleEntry<>( data.selectedCoords,data.attempts) );
 
     refund(playerId);

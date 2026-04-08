@@ -67,6 +67,7 @@ public class FillStartCmd extends FillSubCmd {
       }
 
       shape.clear();
+      shape.save(region.name, region.getWorld().name());
       FillTask.delete(region.name);
       MultiConfigParser<RegionKeys> multiConfigParser = (MultiConfigParser<RegionKeys>) RTP.configs.getParser(RegionKeys.class);
       if (multiConfigParser != null) {

@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.tools;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
+import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 
@@ -110,8 +111,8 @@ public class MemoryTracker {
         totalCacheCap += settings.cacheCap();
         totalActiveChunkCap += settings.activeChunkCap();
 
-        totalLocationQueueSize += region.queueManager.locationQueue.size();
-        for (java.util.concurrent.ConcurrentLinkedQueue<io.github.dailystruggle.rtp.common.selection.region.CachedLocation> queue : region.queueManager.perPlayerLocationQueue.values()) {
+        totalLocationQueueSize += region.queueManager.keptLocations.size();
+        for (java.util.concurrent.ConcurrentLinkedQueue<RTPLocation> queue : region.queueManager.perPlayerLocationQueue.values()) {
           totalPerPlayerLocationQueueSize += queue.size();
         }
 

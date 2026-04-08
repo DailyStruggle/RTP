@@ -385,7 +385,7 @@ public class Square_Normal extends MemoryShape<NormalDistributionParams> {
       u = Boolean.parseBoolean(String.valueOf(unique));
       data.put(NormalDistributionParams.uniquePlacements, u);
     }
-    if (u) addBadLocation(location, spatialResolution);
+    if (u) addBadLocation(location);
 
     return location;
   }

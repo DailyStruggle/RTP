@@ -106,11 +106,42 @@ public class MemoryShapeTest {
     @Test
     public void testSingleInsertion() {
         TestShape shape = new TestShape();
-        shape.addBadLocation(10, 5);
+        shape.addBadLocation(10);
         assertTrue(shape.badLocationsDirty);
 
         shape.flushAndRebuild(shape.spatialResolution);
-        assertEquals(5, shape.getEffectiveBadCount());
+        assertEquals(1, shape.getEffectiveBadCount());
+
+        assertEquals(1, shape.getBadSum());
+        assertEquals(1, shape.getBadKeysCache().length);
+        assertEquals(10, shape.getBadKeysCache()[0]);
+        assertEquals(1, shape.getBadPrefixSumsCache()[0]);
+    }
+
+    @Test
+    public void testNonOverlappingInsertions() {
+        TestShape shape = new TestShape();
+        shape.addBadLocation(10);
+        shape.addBadLocation(30);
+
+        shape.flushAndRebuild(shape.spatialResolution);
+
+        assertEquals(2, shape.getBadSum());
+        assertEquals(2, shape.getBadKeysCache().length);
+        assertEquals(10, shape.getBadKeysCache()[0]);
+        assertEquals(30, shape.getBadKeysCache()[1]);
+        assertEquals(1, shape.getBadPrefixSumsCache()[0]);
+        assertEquals(2, shape.getBadPrefixSumsCache()[1]);
+    }
+
+    @Test
+    public void testContiguousMerge() {
+        TestShape shape = new TestShape();
+        shape.addBadLocation(10);
+        shape.addBadLocation(14);
+        shape.addBadLocation(12);
+
+        shape.flushAndRebuild(shape.spatialResolution);
 
         assertEquals(5, shape.getBadSum());
         assertEquals(1, shape.getBadKeysCache().length);
@@ -119,69 +150,38 @@ public class MemoryShapeTest {
     }
 
     @Test
-    public void testNonOverlappingInsertions() {
-        TestShape shape = new TestShape();
-        shape.addBadLocation(10, 5);
-        shape.addBadLocation(30, 5);
-
-        shape.flushAndRebuild(shape.spatialResolution);
-
-        assertEquals(10, shape.getBadSum());
-        assertEquals(2, shape.getBadKeysCache().length);
-        assertEquals(10, shape.getBadKeysCache()[0]);
-        assertEquals(30, shape.getBadKeysCache()[1]);
-        assertEquals(5, shape.getBadPrefixSumsCache()[0]);
-        assertEquals(10, shape.getBadPrefixSumsCache()[1]);
-    }
-
-    @Test
-    public void testContiguousMerge() {
-        TestShape shape = new TestShape();
-        shape.addBadLocation(10, 5);
-        shape.addBadLocation(15, 5);
-
-        shape.flushAndRebuild(shape.spatialResolution);
-
-        assertEquals(10, shape.getBadSum());
-        assertEquals(1, shape.getBadKeysCache().length);
-        assertEquals(10, shape.getBadKeysCache()[0]);
-        assertEquals(10, shape.getBadPrefixSumsCache()[0]);
-    }
-
-    @Test
     public void testOverlapReconciliation() {
         TestShape shape = new TestShape();
-        shape.addBadLocation(10, 5);
-        shape.addBadLocation(12, 5);
+        shape.addBadLocation(10);
+        shape.addBadLocation(12);
 
         shape.flushAndRebuild(shape.spatialResolution);
 
         // [10, 15) and [12, 17) -> [10, 17) length 7
-        assertEquals(7, shape.getBadSum());
+        assertEquals(3, shape.getBadSum());
         assertEquals(1, shape.getBadKeysCache().length);
         assertEquals(10, shape.getBadKeysCache()[0]);
-        assertEquals(7, shape.getBadPrefixSumsCache()[0]);
+        assertEquals(3, shape.getBadPrefixSumsCache()[0]);
     }
 
     @Test
     public void testCompleteSubsumption() {
         TestShape shape = new TestShape();
-        shape.addBadLocation(10, 20);
-        shape.addBadLocation(15, 2);
+        shape.addBadLocation(10);
+        shape.addBadLocation(15);
 
         shape.flushAndRebuild(shape.spatialResolution);
 
-        // [10, 30) and [15, 17) -> [10, 30) length 20
-        assertEquals(20, shape.getBadSum());
-        assertEquals(1, shape.getBadKeysCache().length);
+        assertEquals(2, shape.getBadSum());
+        assertEquals(2, shape.getBadKeysCache().length);
         assertEquals(10, shape.getBadKeysCache()[0]);
-        assertEquals(20, shape.getBadPrefixSumsCache()[0]);
+        assertEquals(1, shape.getBadPrefixSumsCache()[0]);
     }
 
     @Test
     public void testClear() {
         TestShape shape = new TestShape();
-        shape.addBadLocation(10, 5);
+        shape.addBadLocation(10);
         shape.flushAndRebuild(shape.spatialResolution);
 
         shape.clear();
@@ -245,22 +245,20 @@ public class MemoryShapeTest {
     @Test
     public void testGapBridging() {
         TestShape shape = new TestShape();
-        shape.addBadLocation(10, 3); // [10, 13)
-        shape.addBadLocation(15, 3); // [15, 18)
+        shape.addBadLocation(10);
+        shape.addBadLocation(16);
+        shape.addBadLocation(13);
 
-        // With resolution 1, they should NOT merge (13+1 = 14 < 15)
         shape.flushAndRebuild(1);
-        assertEquals(2, shape.getBadKeysCache().length);
-        assertEquals(6, shape.getBadSum());
-        assertEquals(6, shape.getEffectiveBadCount());
+        assertEquals(3, shape.getBadKeysCache().length);
+        assertEquals(3, shape.getBadSum());
+        assertEquals(3, shape.getEffectiveBadCount());
 
-        // With resolution 3, they SHOULD merge (13+3 = 16 >= 15)
-        // [10, 13) and [15, 18) -> [10, 18) length 8
         shape.badLocationsDirty = true; // force rebuild
         shape.flushAndRebuild(3);
         assertEquals(1, shape.getBadKeysCache().length);
         assertEquals(10, shape.getBadKeysCache()[0]);
-        assertEquals(8, shape.getBadSum());
-        assertEquals(8, shape.getEffectiveBadCount());
+        assertEquals(7, shape.getBadSum());
+        assertEquals(7, shape.getEffectiveBadCount());
     }
 }

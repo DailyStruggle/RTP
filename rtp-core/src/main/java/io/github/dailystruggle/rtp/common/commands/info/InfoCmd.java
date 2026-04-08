@@ -53,7 +53,7 @@ public class InfoCmd extends BaseRTPCmdImpl {
     regionDataLookup.put("shape", region -> region.getShape().name);
     regionDataLookup.put("cacheCap", region -> String.valueOf(region.getSettings().cacheCap()));
     regionDataLookup.put("cached", region -> String.valueOf(region.queueManager.getPublicQueueLength()));
-    regionDataLookup.put("locationQueue", region -> String.valueOf(region.queueManager.locationQueue.size()));
+    regionDataLookup.put("locationQueue", region -> String.valueOf(region.queueManager.keptLocations.size()));
     regionDataLookup.put("locAssChunks", region -> String.valueOf(region.chunkManager.locAssChunks.size()));
     regionDataLookup.put("inFlightCalculations", region -> String.valueOf(region.inFlightCalculations.get()));
     regionDataLookup.put(
@@ -147,7 +147,7 @@ public class InfoCmd extends BaseRTPCmdImpl {
           .forEach(
               region -> {
                 String msg = regions.replaceAll("\\[region]", region.name);
-                msg = msg.replaceAll("\\[locationQueue]", String.valueOf(region.queueManager.locationQueue.size()));
+                msg = msg.replaceAll("\\[locationQueue]", String.valueOf(region.queueManager.keptLocations.size()));
                 msg = msg.replaceAll("\\[locAssChunks]", String.valueOf(region.chunkManager.locAssChunks.size()));
                 msg = msg.replaceAll("\\[inFlightCalculations]", String.valueOf(region.inFlightCalculations.get()));
                 RTP.serverAccessor.sendMessageAndSuggest(
