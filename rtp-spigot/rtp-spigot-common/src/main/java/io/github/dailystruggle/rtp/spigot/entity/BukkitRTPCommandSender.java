@@ -3,11 +3,15 @@ package io.github.dailystruggle.rtp.spigot.entity;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
+import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.spigot.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
@@ -35,17 +39,33 @@ public class BukkitRTPCommandSender implements RTPCommandSender {
 
   @Override
   public void sendMessage(String message) {
-    sender.sendMessage(message);
+    SendMessage.sendMessage( sender, message );
   }
 
   @Override
   public long cooldown() {
-    return ParsePermissions.getInt(uuid(), "rtp.cooldown.");
+    if ( sender.hasPermission( "rtp.nocooldown") ) return 0;
+    if ( sender.hasPermission( "rtp.noCooldown") ) return 0;
+
+    int cooldown = ParsePermissions.getInt( this, "rtp.cooldown." );
+    if ( cooldown < 0 ) {
+      ConfigParser<ConfigKeys> configParser = ( ConfigParser<ConfigKeys> ) RTP.configs.getParser( ConfigKeys.class );
+      cooldown = configParser.getNumber( ConfigKeys.teleportCooldown, 0 ).intValue();
+    }
+    return TimeUnit.SECONDS.toMillis( cooldown );
   }
 
   @Override
   public long delay() {
-    return ParsePermissions.getInt(uuid(), "rtp.delay.");
+    if ( sender.hasPermission( "rtp.nodelay") ) return 0;
+    if ( sender.hasPermission( "rtp.noDelay") ) return 0;
+
+    int delay = ParsePermissions.getInt( new BukkitRTPCommandSender( sender ), "rtp.delay." );
+    if ( delay < 0 ) {
+      ConfigParser<ConfigKeys> configParser = ( ConfigParser<ConfigKeys> ) RTP.configs.getParser( ConfigKeys.class );
+      delay = configParser.getNumber( ConfigKeys.teleportDelay, 0 ).intValue();
+    }
+    return TimeUnit.SECONDS.toMillis( delay );
   }
 
   @Override

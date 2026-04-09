@@ -1,5 +1,10 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
+import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
+import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
+
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -56,6 +61,7 @@ public class RegionQueueManager {
      */
     public void queue(UUID id) {
         playerQueue.add(id);
+        RTP.getInstance().queuedPlayers.add(id);
         perPlayerLocationQueue.putIfAbsent(id, new ConcurrentLinkedQueue<>());
         region.miscPipeline.add(new RegionCacheTask(region, id, Long.MAX_VALUE));
     }
@@ -70,15 +76,37 @@ public class RegionQueueManager {
             return fastLocations.remove(uuid);
         }
 
-        ConcurrentLinkedQueue<RTPLocation> playerQueue = perPlayerLocationQueue.get(uuid);
-        if (playerQueue != null && !playerQueue.isEmpty()) {
-            RTPLocation loc = playerQueue.poll();
-            if (loc != null) return CompletableFuture.completedFuture(loc);
+        ConcurrentLinkedQueue<RTPLocation> playerLocationQueue = perPlayerLocationQueue.get(uuid);
+        if (playerLocationQueue != null && !playerLocationQueue.isEmpty()) {
+            RTPLocation loc = playerLocationQueue.poll();
+            if (loc != null) {
+                RTP.getInstance().queuedPlayers.remove(uuid);
+                RTP.getInstance().invulnerablePlayers.remove(uuid);
+                RTP.getInstance().processingPlayers.remove(uuid);
+
+                TeleportData data = RTP.getInstance().latestTeleportData.get(uuid);
+                if (data != null && !data.completed) {
+                    if (data.nextTask instanceof TeleportPipelineTask task) {
+                        task.setCancelled(true);
+                        if (task.coords() != null) {
+                            RTP.scheduler.runTask(
+                                    task.region().getWorld(), task.coords().x() >> 4, task.coords().z() >> 4, task);
+                        } else {
+                            RTP.scheduler.runTask(task);
+                        }
+                    }
+                }
+
+                new RTPTeleportCancel(uuid).run();
+                return CompletableFuture.completedFuture(loc);
+            }
         }
 
         if (!keptLocations.isEmpty()) {
             RTPLocation loc = keptLocations.poll();
-            if (loc != null) return CompletableFuture.completedFuture(loc);
+            if (loc != null) {
+                return CompletableFuture.completedFuture(loc);
+            }
         }
 
         return null;
@@ -129,6 +157,7 @@ public class RegionQueueManager {
         perPlayerLocationQueue.clear();
         fastLocations.clear();
         playerQueue.clear();
+        RTP.getInstance().queuedPlayers.clear();
     }
 
     /**

@@ -7,6 +7,7 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;

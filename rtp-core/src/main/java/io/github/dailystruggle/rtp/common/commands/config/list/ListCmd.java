@@ -6,7 +6,7 @@ import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
+
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -14,6 +14,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
 import java.util.logging.Level;
+
+import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import org.jetbrains.annotations.Nullable;
 import org.simpleyaml.configuration.file.YamlFile;
 

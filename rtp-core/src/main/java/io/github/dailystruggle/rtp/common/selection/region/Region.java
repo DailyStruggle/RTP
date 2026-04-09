@@ -19,6 +19,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdj
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.common.tasks.FillTask;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
+import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import java.util.*;
 import java.util.concurrent.*;
@@ -150,6 +151,31 @@ public class Region extends FactoryValue<RegionKeys> {
       UUID playerId = queueManager.playerQueue.peek();
       if (playerId == null) break;
 
+      // Hoist the offline check here to purge dead requests instantly
+      RTPPlayer player = RTP.serverAccessor.getPlayer(playerId);
+      if (player == null) {
+        queueManager.playerQueue.poll();
+        RTP.getInstance().processingPlayers.remove(playerId);
+        RTP.getInstance().queuedPlayers.remove(playerId);
+        RTP.getInstance().invulnerablePlayers.remove(playerId);
+
+        TeleportData data = RTP.getInstance().latestTeleportData.get(playerId);
+        if (data != null && !data.completed) {
+          if (data.nextTask instanceof TeleportPipelineTask task) {
+            task.setCancelled(true);
+            if (task.coords() != null) {
+              RTP.scheduler.runTask(
+                      task.region().getWorld(), task.coords().x() >> 4, task.coords().z() >> 4, task);
+            } else {
+              RTP.scheduler.runTask(task);
+            }
+          }
+        }
+
+        RTP.scheduler.runTask(new RTPTeleportCancel(playerId));
+        continue;
+      }
+
       ConcurrentLinkedQueue<RTPLocation> privateQueue = queueManager.getPerPlayerQueue(playerId);
       RTPLocation pair = null;
       boolean isPrivate = false;
@@ -185,19 +211,30 @@ public class Region extends FactoryValue<RegionKeys> {
       if (teleportData == null || teleportData.completed) {
         queueManager.playerQueue.poll(); // Discard invalid player
         RTP.getInstance().processingPlayers.remove(playerId);
-        continue;
-      }
+        RTP.getInstance().queuedPlayers.remove(playerId);
+        RTP.getInstance().invulnerablePlayers.remove(playerId);
 
-      RTPPlayer player = RTP.serverAccessor.getPlayer(playerId);
-      if (player == null) {
-        queueManager.playerQueue.poll(); // Discard disconnected player
+        TeleportData data = RTP.getInstance().latestTeleportData.get(playerId);
+        if (data != null && !data.completed) {
+          if (data.nextTask instanceof TeleportPipelineTask task) {
+            task.setCancelled(true);
+            if (task.coords() != null) {
+              RTP.scheduler.runTask(
+                      task.region().getWorld(), task.coords().x() >> 4, task.coords().z() >> 4, task);
+            } else {
+              RTP.scheduler.runTask(task);
+            }
+          }
+        }
+
+        new RTPTeleportCancel(playerId).run();
         continue;
       }
 
       // 3. Both are ready. Poll them to finalize the pairing.
       if (isPrivate) privateQueue.poll();
       else queueManager.keptLocations.poll();
-      UUID playerID = queueManager.playerQueue.poll();
+      queueManager.playerQueue.poll();
 
       teleportData.attempts = pair.attempts();
       teleportData.selectedCoords = pair.coords();

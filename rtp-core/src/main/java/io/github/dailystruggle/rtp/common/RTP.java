@@ -49,6 +49,8 @@ public class RTP {
 
   public static EnumMap<factoryNames, Factory<?>> factoryMap = new EnumMap<>(factoryNames.class);
 
+  public final Set<UUID> queuedPlayers = ConcurrentHashMap.newKeySet();
+
   /**
    * minimum number of teleportations to executeAsyncTasks per gametick, to prevent bottlenecking
    * during lag spikes

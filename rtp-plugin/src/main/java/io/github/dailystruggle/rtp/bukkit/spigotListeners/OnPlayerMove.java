@@ -12,11 +12,12 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerMoveEvent;
 
 public final class OnPlayerMove implements Listener {
-  private double cancelDistanceSquared = 2;
 
-  @EventHandler(priority = EventPriority.LOW)
+    @EventHandler(priority = EventPriority.LOW)
   public void onPlayerMove(PlayerMoveEvent event) {
     UUID id = event.getPlayer().getUniqueId();
+    if (RTP.getInstance().queuedPlayers.contains(id)) return;
+
     org.bukkit.Location from = event.getFrom();
     org.bukkit.Location to = event.getTo();
     if (to == null || (from.getX() == to.getX() && from.getY() == to.getY() && from.getZ() == to.getZ())) {
@@ -26,7 +27,7 @@ public final class OnPlayerMove implements Listener {
     TeleportData data = RTP.getInstance().latestTeleportData.get(id);
     if (data == null || data.completed) return;
 
-    cancelDistanceSquared = Math.pow(RTP.configs.getParser(ConfigKeys.class).getNumber(ConfigKeys.cancelDistance, 0).doubleValue(), 2);
+    double cancelDistanceSquared = Math.pow(RTP.configs.getParser(ConfigKeys.class).getNumber(ConfigKeys.cancelDistance, 2).doubleValue(), 2);
 
     RTPCoords originalCoords = data.originalCoords;
     if (originalCoords == null) {
