@@ -86,15 +86,6 @@ public class Region extends FactoryValue<RegionKeys> {
         }
       }
     }
-
-    final long cacheCap = settings.cacheCap();
-    final long playerQueueSize = queueManager.playerQueue.size();
-    final long totalCap = Math.max(cacheCap, playerQueueSize);
-    long deficit = totalCap - (cachePipeline.size() + queueManager.keptLocations.size() + inFlightCalculations.get());
-
-    for (long i = 0; i < deficit; i++) {
-      cachePipeline.add(new RegionCacheTask(this));
-    }
   }
 
   public RegionSettings getSettings() {
@@ -106,13 +97,6 @@ public class Region extends FactoryValue<RegionKeys> {
     this.shape = settings.shape();
     this.set(RegionKeys.spatialResolution, settings.spatialResolution());
     if (this.shape != null && this.shape instanceof MemoryShape<?> memoryShape) memoryShape.spatialResolution = settings.spatialResolution();
-    long cacheCap = settings.cacheCap();
-    long playerQueueSize = queueManager.playerQueue.size();
-    long totalCap = Math.max(cacheCap, playerQueueSize);
-    long deficit = totalCap - (cachePipeline.size() + queueManager.keptLocations.size() + inFlightCalculations.get());
-    for (long i = 0; i < deficit; i++) {
-      cachePipeline.add(new RegionCacheTask(this));
-    }
   }
 
 
@@ -143,7 +127,16 @@ public class Region extends FactoryValue<RegionKeys> {
         try {
           if (success != null && success) {
             ChunkReservation reservation = new ChunkReservation(chunkSet, getWorld(), RTP.serverAccessor.getChunkManager());
-            queueManager.keptLocations.offer(new RTPLocation(coldLoc.coords(), coldLoc.attempts(), reservation));
+
+            boolean added = queueManager.keptLocations.offer(
+                    new RTPLocation(coldLoc.coords(), coldLoc.attempts(), reservation)
+            );
+
+            if (!added) {
+              reservation.close();
+              queueManager.unkeptLocations.offer(coldLoc);
+              chunkManager.removeTicket(coldLoc.coords());
+            }
           } else {
             chunkManager.removeTicket(coldLoc.coords());
           }
@@ -275,7 +268,7 @@ public class Region extends FactoryValue<RegionKeys> {
 //      System.out.println("[RTP-DEBUG] Region '" + name + "' caching phase. Deficit: " + deficit + " | inFlight: " + inFlightCalculations.get() + " | cachePipeSize: " + cachePipeline.size());
 
       for (long i = 0; i < deficit; i++) {
-        cachePipeline.add(new RegionCacheTask(this));
+        cachePipeline.add(new RegionCacheTask(this, availableTime - (System.nanoTime() - start)));
       }
 
 //      System.out.println("[RTP-DEBUG] Region '" + name + "' executing cachePipeline with budget: " + currentAvailable + "ns");

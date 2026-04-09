@@ -187,6 +187,9 @@ public final class TeleportPipelineTask extends RTPRunnable {
         // If the player was successfully queued, gracefully halt this thread.
         // Region.execute() will spawn a new pipeline task when a location is ready.
         if (RTP.getInstance().processingPlayers.contains(playerId)) {
+          if (region != null && handledInFlight.compareAndSet(false, true)) {
+            region.inFlightCalculations.getAndDecrement();
+          }
           return;
         }
 
@@ -297,7 +300,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
       if (chunkSet == null) {
         // Fallback to coordinates-based lookup at the region level if available.
         // RTPChunkManager no longer supports direct coordinate-based lookups.
-        chunkSet = null; 
+        chunkSet = null;
       }
       if (chunkSet == null) {
         currentPhase = Phase.TELEPORT;
@@ -313,7 +316,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
                   this.run();
                   return;
                 }
-                
+
                 if (aBoolean == null || !aBoolean) {
                   currentPhase = Phase.CLEANUP;
                   this.run();

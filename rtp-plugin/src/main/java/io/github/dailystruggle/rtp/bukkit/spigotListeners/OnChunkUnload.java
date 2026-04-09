@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.bukkit.spigotListeners;
 
-import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import org.bukkit.Chunk;

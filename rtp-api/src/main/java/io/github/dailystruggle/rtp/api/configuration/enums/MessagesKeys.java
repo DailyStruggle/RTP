@@ -46,6 +46,8 @@ public enum MessagesKeys {
   infoWorld,
   infoRegionHeader,
   infoRegion,
+  worldInfo,
+  regionInfo,
   rtp,
   help,
   reload,

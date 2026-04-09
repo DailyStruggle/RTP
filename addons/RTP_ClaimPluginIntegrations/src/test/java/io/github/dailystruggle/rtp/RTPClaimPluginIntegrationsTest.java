@@ -80,7 +80,7 @@ public class RTPClaimPluginIntegrationsTest {
             region.chunkManager = mock(RegionChunkManager.class);
             region.inFlightCalculations = new java.util.concurrent.atomic.AtomicInteger(0);
 
-            RegionCacheTask task = new RegionCacheTask(region);
+            RegionCacheTask task = new RegionCacheTask(region, null, Long.MAX_VALUE);
 
             // 4. Measure time of task execution
             AtomicLong duration = new AtomicLong();

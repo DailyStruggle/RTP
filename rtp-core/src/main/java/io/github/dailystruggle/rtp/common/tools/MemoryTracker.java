@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.common.tools;
 
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPChunkManager;
 import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
@@ -113,13 +112,33 @@ public class MemoryTracker {
         totalActiveChunkCap += settings.activeChunkCap();
 
         totalLocationQueueSize += region.queueManager.keptLocations.size();
-        for (java.util.concurrent.ConcurrentLinkedQueue<RTPLocation> queue : region.queueManager.perPlayerLocationQueue.values()) {
+        for (java.util.concurrent.ConcurrentLinkedQueue<RTPLocation> queue : region.queueManager.getPerPlayerQueues()) {
           totalPerPlayerLocationQueueSize += queue.size();
         }
 
-        // Only count chunks if the ChunkSet is actually keeping them loaded
+        // 1. Count temporary in-flight generation chunks
         for (io.github.dailystruggle.rtp.api.world.ChunkReservation reservation : region.chunkManager.locAssChunks.values()) {
-          trackedTickets += reservation.getChunkSet().chunks().size();
+          if (reservation != null && reservation.getChunkSet() != null) {
+            trackedTickets += reservation.getChunkSet().chunks().size();
+          }
+        }
+
+        // 2. Count chunks locked in the public hot queue
+        int keptSize = region.queueManager.keptLocations.size();
+        for (int i = 0; i < keptSize; i++) {
+          RTPLocation loc = region.queueManager.keptLocations.get(i);
+          if (loc != null && loc.reservation() != null && loc.reservation().getChunkSet() != null) {
+            trackedTickets += loc.reservation().getChunkSet().chunks().size();
+          }
+        }
+
+        // 3. Count chunks locked in private queues
+        for (java.util.concurrent.ConcurrentLinkedQueue<RTPLocation> queue : region.queueManager.getPerPlayerQueues()) {
+          for (RTPLocation loc : queue) {
+            if (loc != null && loc.reservation() != null && loc.reservation().getChunkSet() != null) {
+              trackedTickets += loc.reservation().getChunkSet().chunks().size();
+            }
+          }
         }
       }
 
