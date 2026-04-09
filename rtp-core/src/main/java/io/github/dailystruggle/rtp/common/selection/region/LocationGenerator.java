@@ -267,7 +267,8 @@ public class LocationGenerator {
             for (int j = 0; j < Region.onPlayerQueuePush.size(); j++) {
                 Region.onPlayerQueuePush.get(j).accept(region, playerId);
             }
-            region.queueManager.playerQueue.offer(playerId);
+            region.queueManager.playerQueue.add(playerId);
+            RTP.getInstance().queuedPlayers.add(playerId);
             data.queueLocation = region.queueManager.playerQueue.size();
             RTP.serverAccessor.sendMessage(playerId, MessagesKeys.queueUpdate);
         }

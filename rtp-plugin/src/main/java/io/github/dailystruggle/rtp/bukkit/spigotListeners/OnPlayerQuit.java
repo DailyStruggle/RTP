@@ -15,6 +15,8 @@ public final class OnPlayerQuit implements Listener {
   @EventHandler(priority = EventPriority.LOWEST)
   public void onPlayerQuit(PlayerQuitEvent event) {
     UUID uuid = event.getPlayer().getUniqueId();
+    if (RTP.getInstance().queuedPlayers.contains(uuid)) return;
+
     RTP.getInstance().invulnerablePlayers.remove(uuid);
     RTP.getInstance().processingPlayers.remove(uuid);
 

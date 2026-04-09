@@ -55,6 +55,7 @@ public class TrackedRTPTask extends RTPRunnable {
       if (io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor != null) {
         io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor.removeAction(trackingId);
       }
+      RTPRunnable.untrackHook.accept(this);
     }
   }
 

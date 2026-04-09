@@ -3,13 +3,13 @@ package io.github.dailystruggle.rtp.spigot.tools;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
+import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.spigot.tools.softdepends.PAPIChecker;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
 import io.github.dailystruggle.rtp.common.tools.ParseString;
@@ -317,7 +317,7 @@ public class SendMessage {
                 player, lang.getConfigValue(MessagesKeys.PLAYER_AVAILABLE, "").toString());
           }
 
-          RTPRunnable nextTask = data.nextTask;
+            RTPRunnable nextTask = data.nextTask;
           if (nextTask instanceof TeleportPipelineTask) {
             TeleportPipelineTask task = (TeleportPipelineTask) nextTask;
             switch (task.getPhase()) {

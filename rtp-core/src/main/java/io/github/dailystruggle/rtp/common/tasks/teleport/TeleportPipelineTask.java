@@ -14,9 +14,10 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.GenerationResult;
+import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tools.SupportLogger;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -413,6 +414,11 @@ public final class TeleportPipelineTask extends RTPRunnable {
         io.github.dailystruggle.rtp.common.tools.MemoryTracker.untrack(this.teleportData);
       }
 
+      // Add untracking for the pipeline task itself
+      if (this.trackingId != null) {
+        io.github.dailystruggle.rtp.common.tools.MemoryTracker.untrack(this.trackingId);
+      }
+
       if (player() != null) {
         UUID pid = player().uuid();
         TeleportData data = RTP.getInstance().latestTeleportData.get(pid);
@@ -431,11 +437,10 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
       if (reservation != null) {
         reservation.close();
-      } else {
-        ChunkSet chunkSet = region.chunkManager.getChunkSet(coords);
-        if (chunkSet != null) {
-          RTP.serverAccessor.getChunkManager().keep(chunkSet, false, rtpWorld);
-        }
+      }
+      ChunkSet chunkSet = region.chunkManager.getChunkSet(coords);
+      if (chunkSet != null) {
+        RTP.serverAccessor.getChunkManager().keep(chunkSet, false, rtpWorld);
       }
       region.chunkManager.removeChunks(coords);
       cleanupPostActions.forEach(consumer -> consumer.accept(this));

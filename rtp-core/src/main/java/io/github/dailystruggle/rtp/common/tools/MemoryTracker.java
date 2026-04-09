@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.api.world.RTPChunkManager;
 import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
+import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,6 +19,11 @@ public class MemoryTracker {
   private static final Logger LOGGER = Logger.getLogger(MemoryTracker.class.getName());
   private static final ConcurrentHashMap<UUID, TrackedObject> trackedObjects =
           new ConcurrentHashMap<>();
+
+  static {
+    // Inject the core untrack logic into the API
+    RTPRunnable.untrackHook = MemoryTracker::untrack;
+  }
 
   private MemoryTracker() {
     // Private constructor for utility class
@@ -72,14 +78,17 @@ public class MemoryTracker {
 
                         // Unpack TrackedRTPTask to display the specific Runnable class leaking
                         Object target = tracked.getTarget();
+                        Object actualTask = target; // Store reference to the unwrapped task
+
                         if (target instanceof io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask) {
                           io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask tTask =
                                   (io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask) target;
                           if (tTask.getTask() != null) {
-                            String innerName = tTask.getTask().getClass().getSimpleName();
-                            // Fallback for anonymous classes or lambdas (e.g., FillTask$1)
+                            actualTask = tTask.getTask();
+                            String innerName = actualTask.getClass().getSimpleName();
+                            // Fallback for anonymous classes or lambdas
                             if (innerName == null || innerName.isEmpty()) {
-                              String fullName = tTask.getTask().getClass().getName();
+                              String fullName = actualTask.getClass().getName();
                               innerName = fullName.substring(fullName.lastIndexOf('.') + 1);
                             }
                             label = "TrackedRTPTask[" + innerName + "]";
@@ -90,6 +99,19 @@ public class MemoryTracker {
                                 Level.SEVERE,
                                 "[RTP] Memory leak detected for object: {0}. Alive {1}ms past its expected lifespan.",
                                 new Object[] {label, leakDuration});
+
+                        // Active Cleanup Injection
+                        if (actualTask instanceof io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask pipelineTask) {
+                          // Force the abandoned pipeline into its CLEANUP phase
+                          pipelineTask.setCancelled(true);
+
+                          // Schedule it on the primary thread to safely release chunks
+                          RTP.scheduler.runTask(pipelineTask);
+
+                          // Return true to instantly purge it from the tracker
+                          // to prevent infinite log looping
+                          return true;
+                        }
                       }
                       return false;
                     });
@@ -162,8 +184,50 @@ public class MemoryTracker {
         double leakRate = (totalLoads > 0) ? ((double) discrepancy / totalLoads) * 100.0 : 0.0;
         LOGGER.log(
                 Level.SEVERE,
-                "[RTP] Leak Alert: {0} orphaned chunk tickets detected. Leak Rate: {1}%.",
+                "[RTP] Leak Alert: {0} orphaned chunk tickets detected. Leak Rate: {1}%. Executing GC...",
                 new Object[] { discrepancy, String.format("%.4f", leakRate) });
+
+        for (Region sweepRegion : allRegions) {
+          // Gate the sweep to prevent race conditions with asynchronous location generation
+          if (sweepRegion.inFlightCalculations.get() > 0) continue;
+
+          // Store Long chunk keys instead of RTPCoords objects
+          java.util.Set<Long> keepAliveKeys = new java.util.HashSet<>();
+
+          // 1. Map public fast queue coordinates
+          int keptSize = sweepRegion.queueManager.keptLocations.size();
+          for (int i = 0; i < keptSize; i++) {
+            RTPLocation loc = sweepRegion.queueManager.keptLocations.get(i);
+            if (loc != null && loc.coords() != null) keepAliveKeys.add(loc.coords().getChunkKey());
+          }
+
+          // 2. Map private fast queue coordinates
+          for (java.util.concurrent.ConcurrentLinkedQueue<RTPLocation> queue : sweepRegion.queueManager.getPerPlayerQueues()) {
+            for (RTPLocation loc : queue) {
+              if (loc != null && loc.coords() != null) keepAliveKeys.add(loc.coords().getChunkKey());
+            }
+          }
+
+          // 3. Map pipeline teleport destinations
+          for (io.github.dailystruggle.rtp.common.playerData.TeleportData data : RTP.getInstance().latestTeleportData.values()) {
+            if (data != null && data.selectedCoords != null && !data.completed && data.targetRegion == sweepRegion) {
+              keepAliveKeys.add(data.selectedCoords.getChunkKey());
+            }
+          }
+
+          // 4. Audit locAssChunks and forcefully close unmapped reservations
+          sweepRegion.chunkManager.locAssChunks.entrySet().removeIf(entry -> {
+            Long coordsKey = entry.getKey();
+            io.github.dailystruggle.rtp.api.world.ChunkReservation reservation = entry.getValue();
+
+            // Compare Long to Long
+            if (!keepAliveKeys.contains(coordsKey)) {
+              if (reservation != null) reservation.close();
+              return true;
+            }
+            return false;
+          });
+        }
       }
     }
   }
