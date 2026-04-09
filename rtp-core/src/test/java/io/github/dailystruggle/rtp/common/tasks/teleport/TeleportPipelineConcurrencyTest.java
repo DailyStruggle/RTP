@@ -47,14 +47,15 @@ public class TeleportPipelineConcurrencyTest {
                 mock(VerticalAdjustor.class),
                 false,
                 false,
-                10,
-                3,
+                128,
+                128,
                 0.0D,
                 3,
                 "default",
                 true
         );
         mockRegion.setSettings(settings);
+        when(mockRegion.getSettings()).thenReturn(settings);
 
         when(mockRegion.getShape()).thenReturn(mock(Shape.class));
 

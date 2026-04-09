@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
+import io.github.dailystruggle.rtp.api.world.ChunkReservation;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
@@ -41,9 +42,12 @@ public class RegionCacheTask extends RTPRunnable {
                 if (isCancelled()) return;
                 RTPLocation loc = region.queueManager.keptLocations.get(i);
                 if (loc == null) break;
-                ChunkSet chunkSet = region.chunkManager.getChunkSet(loc.coords());
-                if (chunkSet == null || !chunkSet.keep()) {
-                    region.chunkManager.addTicket(loc.coords());
+                if (loc.reservation() == null) {
+                    ChunkSet chunkSet = region.chunkManager.getChunkSet(loc.coords());
+                    if (chunkSet != null) {
+                        ChunkReservation reservation = new ChunkReservation(chunkSet, region.getWorld(), RTP.serverAccessor.getChunkManager());
+                        region.queueManager.keptLocations.set(i, new RTPLocation(loc.coords(), loc.attempts(), reservation));
+                    }
                 }
             }
         }
@@ -54,10 +58,9 @@ public class RegionCacheTask extends RTPRunnable {
             RTPLocation loc = region.queueManager.keptLocations.get(i);
             if (loc == null) continue;
 
-            ChunkSet chunkSet = region.chunkManager.getChunkSet(loc.coords());
-
-            if (chunkSet != null && chunkSet.keep()) {
-                region.chunkManager.removeTicket(loc.coords());
+            if (loc.reservation() != null) {
+                loc.reservation().close();
+                region.queueManager.keptLocations.set(i, new RTPLocation(loc.coords(), loc.attempts(), null));
             }
         }
 
@@ -81,14 +84,11 @@ public class RegionCacheTask extends RTPRunnable {
                 chunkSet = res.verifiedChunks();
                 region.chunkManager.putChunkSet(coords, chunkSet);
 
-                // Trigger chunk load and future completion
-                chunkSet.keep(true, region.getWorld());
-
                 // Force-fail the chunk load if the server hangs for more than 30 seconds
                 final ChunkSet finalSet = chunkSet;
                 RTP.scheduler.runTaskLater(() -> {
-                    if (finalSet.complete != null && !finalSet.complete.isDone()) {
-                        finalSet.complete.complete(false);
+                    if (finalSet.complete() != null && !finalSet.complete().isDone()) {
+                        finalSet.complete().complete(false);
                     }
                 }, 600L); // 600 ticks = 30 seconds
             } else {
@@ -98,8 +98,8 @@ public class RegionCacheTask extends RTPRunnable {
                 int radius = (int) this.selectRadius;
                 long sz = (radius * 2L + 1) * (radius * 2L + 1);
 
-                ChunkSet existing = region.chunkManager.locAssChunks.get(chunkKey);
-                if (existing != null && existing.chunks.size() >= sz) {
+                ChunkSet existing = region.chunkManager.getChunkSet(coords);
+                if (existing != null && existing.chunks().size() >= sz) {
                     region.chunkManager.ticketCounts.compute(chunkKey, (k, v) -> (v == null) ? 1 : v + 1);
                     chunkSet = existing;
                 } else {
@@ -117,23 +117,21 @@ public class RegionCacheTask extends RTPRunnable {
                     }
 
                     chunkSet = new ChunkSet(chunks, new CompletableFuture<>());
-                    ChunkSet.register(world, cx, cz, chunkSet);
                     region.chunkManager.ticketCounts.compute(chunkKey, (k, v) -> (v == null) ? 1 : v + 1);
                     region.chunkManager.putChunkSet(coords, chunkSet);
-                    chunkSet.keep(true, world);
 
                     // Force-fail the chunk load if the server hangs for more than 30 seconds.
                     // This breaks the reference chain, drops the tickets, and frees the inFlight counter.
                     final ChunkSet finalSet = chunkSet;
                     RTP.scheduler.runTaskLater(() -> {
-                        if (finalSet.complete != null && !finalSet.complete.isDone()) {
-                            finalSet.complete.complete(false);
+                        if (finalSet.complete() != null && !finalSet.complete().isDone()) {
+                            finalSet.complete().complete(false);
                         }
                     }, 600L); // 600 ticks = 30 seconds
                 }
             }
 
-            chunkSet.whenComplete(aBoolean -> {
+            RTP.serverAccessor.getChunkManager().whenComplete(chunkSet, aBoolean -> {
                 try {
                     if (isCancelled() || !aBoolean) {
                         region.chunkManager.removeTicket(coords); // Release entire radius
@@ -144,14 +142,17 @@ public class RegionCacheTask extends RTPRunnable {
 
                     if (playerId == null) {
                         if (region.queueManager.keptLocations.size() < region.getSettings().cacheCap()) {
+                            RTPLocation finalPair = pair;
                             if (region.queueManager.keptLocations.size() < region.getSettings().activeChunkCap()) {
-                                region.chunkManager.addTicket(coords); // Center only
+                                ChunkReservation reservation = new ChunkReservation(chunkSet, region.getWorld(), RTP.serverAccessor.getChunkManager());
+                                finalPair = new RTPLocation(coords, res.attempts(), reservation);
                             }
-                            region.queueManager.keptLocations.offer(pair);
+                            region.queueManager.keptLocations.offer(finalPair);
                         }
                     } else {
-                        region.chunkManager.addTicket(coords);
-                        region.queueManager.enqueuePlayerLocation(playerId, pair);
+                        ChunkReservation reservation = new ChunkReservation(chunkSet, region.getWorld(), RTP.serverAccessor.getChunkManager());
+                        RTPLocation finalPair = new RTPLocation(coords, res.attempts(), reservation);
+                        region.queueManager.enqueuePlayerLocation(playerId, finalPair);
                     }
                 } finally {
                     region.inFlightCalculations.decrementAndGet();

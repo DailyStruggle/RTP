@@ -161,7 +161,7 @@ public class FillTaskTest {
         when(settings.activeChunkCap()).thenReturn(activeChunkCap);
 
         for (int i = 0; i < activeChunkCap; i++) {
-            chunkManager.locAssChunks.put((long) i, mock(ChunkSet.class));
+            chunkManager.locAssChunks.put((long) i, mock(io.github.dailystruggle.rtp.api.world.ChunkReservation.class));
         }
 
         FillTask fillTask = new FillTask(region, 0);

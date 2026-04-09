@@ -178,7 +178,7 @@ public class SendMessage {
         });
       placeholders.put(
               "tickets",
-              uuid -> String.valueOf(io.github.dailystruggle.rtp.api.world.ChunkSet.ACTIVE_CHUNK_TICKETS.get()));
+              uuid -> String.valueOf(io.github.dailystruggle.rtp.api.world.RTPChunkManager.ACTIVE_CHUNK_TICKETS.get()));
 
       placeholders.put(
               "teleports",
@@ -193,13 +193,13 @@ public class SendMessage {
 
       placeholders.put(
               "loads",
-              uuid -> String.valueOf(io.github.dailystruggle.rtp.api.world.ChunkSet.TOTAL_CHUNK_LOADS.get()));
+              uuid -> String.valueOf(io.github.dailystruggle.rtp.api.world.RTPChunkManager.TOTAL_CHUNK_LOADS.get()));
 
       placeholders.put(
               "leakRate",
               uuid -> {
-                  long activeTickets = io.github.dailystruggle.rtp.api.world.ChunkSet.ACTIVE_CHUNK_TICKETS.get();
-                  long totalLoads = io.github.dailystruggle.rtp.api.world.ChunkSet.TOTAL_CHUNK_LOADS.get();
+                  long activeTickets = io.github.dailystruggle.rtp.api.world.RTPChunkManager.ACTIVE_CHUNK_TICKETS.get();
+                  long totalLoads = io.github.dailystruggle.rtp.api.world.RTPChunkManager.TOTAL_CHUNK_LOADS.get();
 
                   long totalExpectedTickets = 0;
                   if (RTP.selectionAPI != null) {
@@ -207,10 +207,8 @@ public class SendMessage {
                       allRegions.addAll(RTP.selectionAPI.tempRegions.values());
 
                       for (Region region : allRegions) {
-                          for (io.github.dailystruggle.rtp.api.world.ChunkSet chunkSet : region.chunkManager.locAssChunks.values()) {
-                              if (chunkSet.keep()) {
-                                  totalExpectedTickets += chunkSet.chunks.size();
-                              }
+                          for (io.github.dailystruggle.rtp.api.world.ChunkReservation reservation : region.chunkManager.locAssChunks.values()) {
+                              totalExpectedTickets += reservation.getChunkSet().chunks().size();
                           }
                       }
                   }

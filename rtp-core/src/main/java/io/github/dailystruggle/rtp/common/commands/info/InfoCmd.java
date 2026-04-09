@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.common.commands.info;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
+import io.github.dailystruggle.rtp.api.world.RTPChunkManager;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
@@ -156,8 +157,8 @@ public class InfoCmd extends BaseRTPCmdImpl {
 
 
         RTP rtp = RTP.getInstance();
-        long activeTickets = ChunkSet.ACTIVE_CHUNK_TICKETS.get();
-        long totalLoads = ChunkSet.TOTAL_CHUNK_LOADS.get();
+        long activeTickets = RTPChunkManager.ACTIVE_CHUNK_TICKETS.get();
+        long totalLoads = RTPChunkManager.TOTAL_CHUNK_LOADS.get();
 
         long totalExpectedTickets = 0;
 
@@ -165,10 +166,8 @@ public class InfoCmd extends BaseRTPCmdImpl {
         allRegions.addAll(RTP.selectionAPI.tempRegions.values());
 
         for (Region region : allRegions) {
-            for (ChunkSet chunkSet : region.chunkManager.locAssChunks.values()) {
-                if (chunkSet.keep()) {
-                    totalExpectedTickets += chunkSet.chunks.size();
-                }
+            for (io.github.dailystruggle.rtp.api.world.ChunkReservation reservation : region.chunkManager.locAssChunks.values()) {
+                totalExpectedTickets += reservation.getChunkSet().chunks().size();
             }
         }
 

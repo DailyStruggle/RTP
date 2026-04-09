@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
+import io.github.dailystruggle.rtp.api.world.RTPChunkManager;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
@@ -73,7 +74,6 @@ public class TeleportCancelTicketTest {
 
         io.github.dailystruggle.rtp.api.world.ChunkSet realChunkSet = new io.github.dailystruggle.rtp.api.world.ChunkSet(new java.util.ArrayList<>(), complete);
         io.github.dailystruggle.rtp.api.world.ChunkSet mockChunkSet = spy(realChunkSet);
-        when(mockChunkManager.getChunkSet(any())).thenReturn(mockChunkSet);
 
         rtp = new RTP();
         RTP.selectionAPI = new io.github.dailystruggle.rtp.common.selection.SelectionAPI();
@@ -181,8 +181,9 @@ public class TeleportCancelTicketTest {
             }
 
             // Verify the ChunkSet has keep(true) applied initially
-            mockChunkSet.keep(true, world);
-            verify(mockChunkSet, atLeastOnce()).keep(true, world);
+            RTPChunkManager chunkManager = RTP.serverAccessor.getChunkManager();
+            chunkManager.keep(mockChunkSet, true, world);
+            verify(chunkManager, atLeastOnce()).keep(mockChunkSet, true, world);
 
             // Trigger cancellation via RTPTeleportCancel
             new RTPTeleportCancel(player.uuid()).run();
@@ -191,7 +192,7 @@ public class TeleportCancelTicketTest {
             assertTrue(task.isCancelled());
 
             // Assert via Mockito that the cancellation strictly notified the server to drop the ticket
-            verify(mockChunkSet, atLeastOnce()).keep(false, world);
+            verify(chunkManager, atLeastOnce()).keep(mockChunkSet, false, world);
 
             // Even if we run the task now, it should go to cleanup but not call keep(false) again if already released
             task.run();

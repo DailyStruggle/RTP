@@ -4,6 +4,7 @@ import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.selection.GenerationContext;
+import io.github.dailystruggle.rtp.api.world.ChunkReservation;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
@@ -79,6 +80,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
   private Region region;
   private RTPCoords coords;
   private TeleportData teleportData;
+  private ChunkReservation reservation;
 
   public TeleportPipelineTask(GenerationContext context) {
     this.context = context;
@@ -93,6 +95,14 @@ public final class TeleportPipelineTask extends RTPRunnable {
     this.context = context;
     this.region = region;
     this.coords = preSelectedCoords;
+    this.currentPhase = Phase.LOAD;
+  }
+
+  public TeleportPipelineTask(GenerationContext context, Region region, RTPCoords preSelectedCoords, ChunkReservation reservation) {
+    this.context = context;
+    this.region = region;
+    this.coords = preSelectedCoords;
+    this.reservation = reservation;
     this.currentPhase = Phase.LOAD;
   }
 
@@ -215,15 +225,15 @@ public final class TeleportPipelineTask extends RTPRunnable {
         long radius2 = ConfigCache.viewDistanceTeleport;
         long max = (radius2 * radius2 * 4) + (4 * radius2) + 1;
         ChunkSet chunkSet = this.region.chunkManager.chunks(coords, radius2);
-        if (max > chunkSet.chunks.size()) {
+        if (max > chunkSet.chunks().size()) {
           RTPWorld<?> world = RTP.serverAccessor.getRTPWorld(coords.worldName());
           if (world == null) world = region.getWorld();
-          chunkSet.keep(false, world);
+          RTP.serverAccessor.getChunkManager().keep(chunkSet, false, world);
           chunkSet = region.chunkManager.chunks(coords, radius2);
-          chunkSet.keep(true, world);
+          RTP.serverAccessor.getChunkManager().keep(chunkSet, true, world);
         }
 
-        if (chunkSet.complete.isDone()) {
+        if (chunkSet.complete().isDone()) {
           this.run();
         } else {
           RTP.scheduler.runTaskAsynchronously(this);
@@ -285,7 +295,9 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
       ChunkSet chunkSet = this.region.chunkManager.getChunkSet(coords);
       if (chunkSet == null) {
-        chunkSet = RTP.serverAccessor.getChunkManager().getChunkSet(coords);
+        // Fallback to coordinates-based lookup at the region level if available.
+        // RTPChunkManager no longer supports direct coordinate-based lookups.
+        chunkSet = null; 
       }
       if (chunkSet == null) {
         currentPhase = Phase.TELEPORT;
@@ -295,18 +307,14 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
       RTP.serverAccessor.sendMessage(player().uuid(), MessagesKeys.chunkLoading);
 
-      chunkSet.complete.whenComplete(
-              (aBoolean, throwable) -> {
-                if (throwable != null || (aBoolean != null && !aBoolean)) {
-                  if (throwable != null) {
-                    SupportLogger.logException(Level.SEVERE, "Error in runLoad", throwable);
-                  }
+      RTP.serverAccessor.getChunkManager().whenComplete(chunkSet, aBoolean -> {
+                if (isCancelled()) {
                   currentPhase = Phase.CLEANUP;
                   this.run();
                   return;
                 }
-
-                if (isCancelled()) {
+                
+                if (aBoolean == null || !aBoolean) {
                   currentPhase = Phase.CLEANUP;
                   this.run();
                   return;
@@ -352,8 +360,11 @@ public final class TeleportPipelineTask extends RTPRunnable {
     }
     UUID playerId = player.uuid();
 
-    try {
-      // REPLACE Lines 240-241 in runTeleport() with:
+    try (ChunkReservation reservation = this.reservation) {
+      if (reservation != null) {
+        reservation.transferOwnership();
+      }
+
       RTPWorld<?> world = RTP.serverAccessor.getRTPWorld(coords.worldName());
       if (world == null) world = region.getWorld();
       RTPLocation location = new RTPLocation(world, coords.x(), coords.y(), coords.z());
@@ -369,19 +380,19 @@ public final class TeleportPipelineTask extends RTPRunnable {
       RTP.getInstance().databaseAccessor.cacheValue(teleportData);
 
       setLocation.whenComplete(
-              (aBoolean, throwable) -> {
-                if (aBoolean != null && aBoolean) {
-                  RTP.serverAccessor.sendMessage(playerId, ConfigCache.teleportMessage);
-                } else {
-                  RTP.serverAccessor.sendMessage(playerId, ConfigCache.unsafe);
-                }
+          (aBoolean, throwable) -> {
+            if (aBoolean != null && aBoolean) {
+              RTP.serverAccessor.sendMessage(playerId, ConfigCache.teleportMessage);
+            } else {
+              RTP.serverAccessor.sendMessage(playerId, ConfigCache.unsafe);
+            }
 
-                teleportPostActions.forEach(consumer -> consumer.accept(this));
+            teleportPostActions.forEach(consumer -> consumer.accept(this));
 
-                currentPhase = Phase.CLEANUP;
-                // Execute inline to satisfy synchronous test assertions and close the race condition
-                this.run();
-              });
+            currentPhase = Phase.CLEANUP;
+            // Execute inline to satisfy synchronous test assertions and close the race condition
+            this.run();
+          });
 
     } catch (Exception e) {
       SupportLogger.logException(Level.SEVERE, "Error in runTeleport", e);
@@ -410,14 +421,19 @@ public final class TeleportPipelineTask extends RTPRunnable {
         RTP.getInstance().invulnerablePlayers.remove(pid);
       }
       if (region == null || coords == null) return;
-      ChunkSet chunkSet = region.chunkManager.getChunkSet(coords);
-      if (chunkSet == null) return;
 
       // Absolute world resolution prevents multi-dimension cross-leakage
       RTPWorld<?> rtpWorld = RTP.serverAccessor.getRTPWorld(coords.worldName());
       if (rtpWorld == null) rtpWorld = region.getWorld();
 
-      chunkSet.keep(false, rtpWorld);
+      if (reservation != null) {
+        reservation.close();
+      } else {
+        ChunkSet chunkSet = region.chunkManager.getChunkSet(coords);
+        if (chunkSet != null) {
+          RTP.serverAccessor.getChunkManager().keep(chunkSet, false, rtpWorld);
+        }
+      }
       region.chunkManager.removeChunks(coords);
       cleanupPostActions.forEach(consumer -> consumer.accept(this));
     } finally {

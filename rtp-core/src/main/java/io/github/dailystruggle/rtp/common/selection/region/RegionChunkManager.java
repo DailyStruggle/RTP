@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
+import io.github.dailystruggle.rtp.api.world.ChunkReservation;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
@@ -14,7 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class RegionChunkManager {
     private final Region region;
-    public final ConcurrentHashMap<Long, ChunkSet> locAssChunks = new ConcurrentHashMap<>();
+    public final ConcurrentHashMap<Long, ChunkReservation> locAssChunks = new ConcurrentHashMap<>();
     final ConcurrentHashMap<Long, Integer> ticketCounts = new ConcurrentHashMap<>();
 
     public RegionChunkManager(Region region) {
@@ -26,37 +27,36 @@ public class RegionChunkManager {
     }
 
     public ChunkSet getChunkSet(RTPCoords coords) {
-        return locAssChunks.get(getChunkKey(coords.x() >> 4, coords.z() >> 4));
+        ChunkReservation reservation = locAssChunks.get(getChunkKey(coords.x() >> 4, coords.z() >> 4));
+        return (reservation == null) ? null : reservation.getChunkSet();
     }
 
     public void putChunkSet(RTPCoords coords, ChunkSet chunkSet) {
         int cx = coords.x() >> 4;
         int cz = coords.z() >> 4;
-        ChunkSet.register(region.getWorld(), cx, cz, chunkSet);
-        locAssChunks.put(getChunkKey(cx, cz), chunkSet);
+        locAssChunks.put(getChunkKey(cx, cz), new ChunkReservation(chunkSet, region.getWorld(), RTP.serverAccessor.getChunkManager()));
     }
 
     public void removeChunkSet(RTPCoords coords) {
         int cx = coords.x() >> 4;
         int cz = coords.z() >> 4;
-        ChunkSet.unregister(region.getWorld(), cx, cz);
-        ChunkSet removed = locAssChunks.remove(getChunkKey(cx, cz));
-        RTPWorld<?> world = region.getWorld();
-        RTP.scheduler.runTask(world, cx, cz, () -> removed.keep(false, world));
+        ChunkReservation removed = locAssChunks.remove(getChunkKey(cx, cz));
+        if (removed != null) {
+            removed.close();
+        }
     }
 
     public ChunkSet addTicket(int cx, int cz) {
         long key = getChunkKey(cx, cz);
         ticketCounts.compute(key, (k, v) -> (v == null) ? 1 : v + 1);
         try {
-            return locAssChunks.computeIfAbsent(key, k -> {
+            ChunkReservation reservation = locAssChunks.computeIfAbsent(key, k -> {
                 List<CompletableFuture<Long>> chunks = new ArrayList<>();
                 chunks.add(RTP.serverAccessor.getChunkManager().getChunkAtAsync(region.getWorld(), cx, cz));
                 ChunkSet chunkSet = new ChunkSet(chunks, new CompletableFuture<>());
-                ChunkSet.register(region.getWorld(), cx, cz, chunkSet);
-                chunkSet.keep(true, region.getWorld());
-                return chunkSet;
+                return new ChunkReservation(chunkSet, region.getWorld(), RTP.serverAccessor.getChunkManager());
             });
+            return reservation.getChunkSet();
         } catch (Exception e) {
             removeTicket(cx, cz);
             throw e;
@@ -71,11 +71,9 @@ public class RegionChunkManager {
         long key = getChunkKey(cx, cz);
         ticketCounts.computeIfPresent(key, (k, v) -> {
             if (v <= 1) {
-                ChunkSet chunkSet = locAssChunks.remove(key);
+                ChunkReservation chunkSet = locAssChunks.remove(key);
                 if (chunkSet != null) {
-                    ChunkSet.unregister(region.getWorld(), cx, cz);
-                    RTPWorld<?> world = region.getWorld();
-                    RTP.scheduler.runTask(world, cx, cz, () -> chunkSet.keep(false, world));
+                    chunkSet.close();
                 }
                 return null;
             }
@@ -109,13 +107,13 @@ public class RegionChunkManager {
 
         long sz = (radius * 2 + 1) * (radius * 2 + 1);
         if (locAssChunks.containsKey(chunkKey)) {
-            ChunkSet chunkSet = locAssChunks.get(chunkKey);
-            if (chunkSet.chunks.size() >= sz) {
+            ChunkReservation reservation = locAssChunks.get(chunkKey);
+            ChunkSet chunkSet = reservation.getChunkSet();
+            if (chunkSet.chunks().size() >= sz) {
                 ticketCounts.compute(chunkKey, (k, v) -> (v == null) ? 1 : v + 1);
                 return chunkSet;
             }
-            chunkSet.keep(false, region.getWorld());
-            ChunkSet.unregister(region.getWorld(), cx, cz);
+            reservation.close();
             locAssChunks.remove(chunkKey);
         }
 
@@ -143,9 +141,8 @@ public class RegionChunkManager {
             }
 
             ChunkSet chunkSet = new ChunkSet(chunks, new CompletableFuture<>());
-            ChunkSet.register(rtpWorld, cx, cz, chunkSet);
-            chunkSet.keep(true, rtpWorld);
-            locAssChunks.put(chunkKey, chunkSet);
+            ChunkReservation reservation = new ChunkReservation(chunkSet, rtpWorld, RTP.serverAccessor.getChunkManager());
+            locAssChunks.put(chunkKey, reservation);
             return chunkSet;
         } catch (Exception e) {
             removeTicket(cx, cz);
@@ -166,11 +163,8 @@ public class RegionChunkManager {
         ticketCounts.computeIfPresent(chunkKey, (k, v) -> (v <= 1) ? null : v - 1);
 
         if (!locAssChunks.containsKey(chunkKey)) return;
-        ChunkSet chunkSet = locAssChunks.remove(chunkKey);
-        if (chunkSet == null) return;
-        ChunkSet.unregister(region.getWorld(), cx, cz);
-        RTPWorld<?> world = region.getWorld();
-        if( RTP.serverAccessor.isPrimaryThread() ) chunkSet.keep(false, world);
-        else RTP.scheduler.runTask(world, cx, cz, () -> chunkSet.keep(false, world));
+        ChunkReservation reservation = locAssChunks.remove(chunkKey);
+        if (reservation == null) return;
+        reservation.close();
     }
 }

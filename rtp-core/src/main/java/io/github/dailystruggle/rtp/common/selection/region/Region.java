@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.selection.GenerationContext;
+import io.github.dailystruggle.rtp.api.world.ChunkReservation;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
@@ -138,14 +139,13 @@ public class Region extends FactoryValue<RegionKeys> {
       inFlightCalculations.incrementAndGet();
       ChunkSet chunkSet = chunkManager.addTicket(coldLoc.coords());
 
-      chunkSet.complete.whenComplete((success, throwable) -> {
+      chunkSet.complete().whenComplete((success, throwable) -> {
         try {
           if (success != null && success) {
-            chunkSet.keep(true, getWorld());
-            queueManager.keptLocations.offer(coldLoc);
+            ChunkReservation reservation = new ChunkReservation(chunkSet, getWorld(), RTP.serverAccessor.getChunkManager());
+            queueManager.keptLocations.offer(new RTPLocation(coldLoc.coords(), coldLoc.attempts(), reservation));
           } else {
             chunkManager.removeTicket(coldLoc.coords());
-
           }
         } finally {
           inFlightCalculations.decrementAndGet();
@@ -175,12 +175,12 @@ public class Region extends FactoryValue<RegionKeys> {
       }
 
       ChunkSet chunkSet = chunkManager.getChunkSet(pair.coords());
-      if (chunkSet == null || !chunkSet.keep() || !chunkSet.complete.isDone()) {
+      if (chunkSet == null || chunkSet.complete() == null || !chunkSet.complete().isDone()) {
         // Location is still in the backlog or actively loading.
         break;
       }
 
-      if (chunkSet.complete.isCompletedExceptionally()) {
+      if (chunkSet.complete().isCompletedExceptionally()) {
         // Failsafe: Chunk failed to load.
         if (isPrivate) privateQueue.poll();
         else queueManager.keptLocations.poll();
@@ -210,7 +210,7 @@ public class Region extends FactoryValue<RegionKeys> {
       teleportData.selectedCoords = pair.coords();
 
       RTPCommandSender sender = RTP.serverAccessor.getSender(CommandsAPI.serverId);
-      TeleportPipelineTask pipelineTask = new TeleportPipelineTask(new GenerationContext(sender, player, null), this, pair.coords());
+      TeleportPipelineTask pipelineTask = new TeleportPipelineTask(new GenerationContext(sender, player, null), this, pair.coords(), pair.reservation());
       teleportData.nextTask = pipelineTask;
       pipelineTask.setPhase(TeleportPipelineTask.Phase.LOAD);
       RTP.scheduler.runTaskAsynchronously(pipelineTask);
@@ -335,37 +335,27 @@ public class Region extends FactoryValue<RegionKeys> {
 
     RTPLocation pair;
     while ((pair = queueManager.keptLocations.poll()) != null) {
+      if (pair.reservation() != null) pair.reservation().close();
       chunkManager.removeChunks(pair.coords());
-
     }
     queueManager.keptLocations.clear();
 
     while ((pair = queueManager.unkeptLocations.poll()) != null) {
       chunkManager.removeChunks(pair.coords());
-
     }
     queueManager.unkeptLocations.clear();
-
-    while ((pair = queueManager.keptLocations.poll()) != null) {
-      chunkManager.removeChunks(pair.coords());
-
-    }
-    queueManager.keptLocations.clear();
 
     for (java.util.concurrent.ConcurrentLinkedQueue<RTPLocation> queue :
         queueManager.perPlayerLocationQueue.values()) {
       while ((pair = queue.poll()) != null) {
+        if (pair.reservation() != null) pair.reservation().close();
         chunkManager.removeChunks(pair.coords());
-
       }
     }
     queueManager.perPlayerLocationQueue.clear();
 
-    chunkManager.locAssChunks.forEach((key, chunkSet) -> {
-      int cx = (int) (key & 0xFFFFFFFFL);
-      int cz = (int) (key >>> 32);
-      chunkSet.keep(false, getWorld());
-      ChunkSet.unregister(getWorld(), cx, cz);
+    chunkManager.locAssChunks.forEach((key, reservation) -> {
+      reservation.close();
     });
     chunkManager.locAssChunks.clear();
   }

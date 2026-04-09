@@ -127,12 +127,13 @@ public class OnPlayerQuitTest {
         ArgumentCaptor<Runnable> runnableCaptor = ArgumentCaptor.forClass(Runnable.class);
         verify(scheduler, atLeastOnce()).runTask(eq(rtpWorld), anyInt(), anyInt(), runnableCaptor.capture());
 
-        // We want to specifically check the one that calls chunkSet.keep(false)
+        // We want to specifically check the one that calls RTPChunkManager.keep(chunkSet, false, rtpWorld)
+        RTPChunkManager chunkManager = serverAccessor.getChunkManager();
         boolean foundCleanup = false;
         for (Runnable runnable : runnableCaptor.getAllValues()) {
             runnable.run();
             try {
-                verify(chunkSet).keep(false, rtpWorld);
+                verify(chunkManager).keep(chunkSet, false, rtpWorld);
                 foundCleanup = true;
                 break;
             } catch (AssertionError e) {
@@ -141,7 +142,7 @@ public class OnPlayerQuitTest {
         }
 
         if (!foundCleanup) {
-            throw new AssertionError("chunkSet.keep(false) was not invoked via a regional task.");
+            throw new AssertionError("RTPChunkManager.keep(chunkSet, false, rtpWorld) was not invoked via a regional task.");
         }
     }
 }

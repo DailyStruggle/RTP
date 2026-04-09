@@ -17,16 +17,4 @@ public class FoliaRTPChunkManager implements RTPChunkManager {
 
     return ((FoliaRTPWorld) world).getChunkAt(x, z);
   }
-
-  @Override
-  public ChunkSet getChunkSet(RTPWorld<?> world, int x, int z) {
-    return ChunkSet.getGlobal(world, x, z);
-  }
-
-  @Override
-  public ChunkSet getChunkSet(RTPCoords coords) {
-    RTPWorld<?> world = RTP.serverAccessor.getRTPWorld(coords.worldName());
-    if (world == null) return null;
-    return getChunkSet(world, coords.x() >> 4, coords.z() >> 4);
-  }
 }
