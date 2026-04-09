@@ -15,7 +15,6 @@ import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tools.ParseString;
-import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -187,7 +186,7 @@ public class InfoCmd extends BaseRTPCmdImpl {
 
     List<String> worldNames = parameterValues.get("world");
     if (worldNames != null) {
-      Object worldInfoObj = lang.getConfigValue(MessagesKeys.infoWorld, "");
+      Object worldInfoObj = lang.getConfigValue(MessagesKeys.worldInfo, "");
       if (!(worldInfoObj instanceof List)) return true;
       List<String> worldInfo =
           ((List<?>) worldInfoObj).stream().map(String::valueOf).collect(Collectors.toList());
@@ -223,7 +222,7 @@ public class InfoCmd extends BaseRTPCmdImpl {
 
     List<String> regionNames = parameterValues.get("region");
     if (regionNames != null) {
-      Object regionInfoObj = lang.getConfigValue(MessagesKeys.infoRegion, "");
+      Object regionInfoObj = lang.getConfigValue(MessagesKeys.regionInfo, "");
       if (!(regionInfoObj instanceof List)) return true;
       List<String> regionInfo =
           ((List<?>) regionInfoObj).stream().map(String::valueOf).collect(Collectors.toList());

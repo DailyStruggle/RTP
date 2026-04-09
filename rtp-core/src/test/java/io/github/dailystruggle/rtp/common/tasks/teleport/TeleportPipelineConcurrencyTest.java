@@ -8,6 +8,7 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
+import io.github.dailystruggle.rtp.api.world.RTPChunkManager;
 import io.github.dailystruggle.rtp.common.selection.region.*;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
@@ -19,6 +20,7 @@ import java.io.File;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 import static org.mockito.Mockito.*;
 
@@ -34,6 +36,15 @@ public class TeleportPipelineConcurrencyTest {
         mockServerAccessor = mock(RTPServerAccessor.class);
         when(mockServerAccessor.getPluginDirectory()).thenReturn(new File("target/test-data"));
         when(mockServerAccessor.createTaskPipe()).thenReturn(mock(io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe.class));
+
+        // Mock the chunk manager to prevent NPEs during LOAD and CLEANUP phases
+        RTPChunkManager mockRtpChunkManager = mock(RTPChunkManager.class);
+        doAnswer(invocation -> {
+            Consumer<Boolean> callback = invocation.getArgument(1);
+            callback.accept(true);
+            return CompletableFuture.completedFuture(true);
+        }).when(mockRtpChunkManager).whenComplete(any(), any());
+        when(mockServerAccessor.getChunkManager()).thenReturn(mockRtpChunkManager);
 
         RTP.scheduler = mockScheduler;
         RTP.serverAccessor = mockServerAccessor;

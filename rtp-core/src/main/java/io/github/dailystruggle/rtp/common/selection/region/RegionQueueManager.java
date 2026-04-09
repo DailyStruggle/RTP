@@ -57,7 +57,7 @@ public class RegionQueueManager {
     public void queue(UUID id) {
         playerQueue.add(id);
         perPlayerLocationQueue.putIfAbsent(id, new ConcurrentLinkedQueue<>());
-        region.miscPipeline.add(new RegionCacheTask(region, id));
+        region.miscPipeline.add(new RegionCacheTask(region, id, Long.MAX_VALUE));
     }
 
     /**
@@ -174,7 +174,7 @@ public class RegionQueueManager {
     /**
      * @return collection of all per-player location queues
      */
-    java.util.Collection<ConcurrentLinkedQueue<RTPLocation>> getPerPlayerQueues() {
+    public java.util.Collection<ConcurrentLinkedQueue<RTPLocation>> getPerPlayerQueues() {
         return perPlayerLocationQueue.values();
     }
 

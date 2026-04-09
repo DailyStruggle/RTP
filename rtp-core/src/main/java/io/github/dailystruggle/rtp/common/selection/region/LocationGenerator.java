@@ -679,11 +679,10 @@ public class LocationGenerator {
 
                 break;
             } finally {
-                if (!locationFound) region.chunkManager.removeTicket(cx, cz);
+                region.chunkManager.removeTicket(cx, cz);
             }
         }
 
-        //        if ( verbose ) {
         if (verbose && i >= maxAttempts || i > maxAttemptsBase * Region.maxBiomeChecksPerGen) {
             RTP.log(
                     Level.INFO,
