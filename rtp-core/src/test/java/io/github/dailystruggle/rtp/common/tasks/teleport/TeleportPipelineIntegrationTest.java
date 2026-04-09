@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.tasks.teleport;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
@@ -71,6 +72,8 @@ public class TeleportPipelineIntegrationTest {
         RTP.configs = configs;
 
         when(serverAccessor.getChunkManager()).thenReturn(rtpChunkManager);
+        doCallRealMethod().when(rtpChunkManager).whenComplete(any(), any());
+        doCallRealMethod().when(rtpChunkManager).keep(any(), anyBoolean(), any());
         rtp.databaseAccessor = mock(DatabaseAccessor.class);
 
         UUID playerId = UUID.randomUUID();
@@ -118,7 +121,7 @@ public class TeleportPipelineIntegrationTest {
             // Mock primary thread so the pipeline evaluates synchronously inline
             when(serverAccessor.isPrimaryThread()).thenReturn(true);
 
-            when(region.getLocation(context)).thenReturn(new GenerationResult(coords, 1L, chunkSet));
+            when(region.getLocation(context)).thenReturn(new GenerationResult(coords, 1L, chunkSet, null));
             when(regionChunkManager.chunks(eq(coords), anyLong())).thenReturn(chunkSet);
             when(regionChunkManager.getChunkSet(coords)).thenReturn(chunkSet);
             when(player.setLocation(any())).thenReturn(CompletableFuture.completedFuture(true));
@@ -151,7 +154,7 @@ public class TeleportPipelineIntegrationTest {
             RTPCoords coords = new RTPCoords("world", 100, 64, 100);
             ChunkSet chunkSet = new ChunkSet(new ArrayList<>(), new CompletableFuture<>());
 
-            when(region.getLocation(context)).thenReturn(new GenerationResult(coords, 1L, null));
+            when(region.getLocation(context)).thenReturn(new GenerationResult(coords, 1L, null, null));
             when(regionChunkManager.chunks(eq(coords), anyLong())).thenReturn(chunkSet);
             when(regionChunkManager.getChunkSet(coords)).thenReturn(chunkSet);
 
@@ -182,9 +185,8 @@ public class TeleportPipelineIntegrationTest {
             ChunkSet chunkSet = new ChunkSet(new ArrayList<>(), complete);
             complete.complete(true);
 
-            when(region.getLocation(context)).thenReturn(new GenerationResult(coords, 1L, chunkSet));
+            when(region.getLocation(context)).thenReturn(new GenerationResult(coords, 1L, chunkSet, null));
             when(regionChunkManager.getChunkSet(coords)).thenReturn(chunkSet);
-            when(rtpChunkManager.getChunkSet(coords)).thenReturn(chunkSet);
 
             TeleportPipelineTask task = new TeleportPipelineTask(context, region, coords);
             task.setPhase(TeleportPipelineTask.Phase.LOAD);

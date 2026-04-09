@@ -94,7 +94,7 @@ public class LocationGenerator {
                 ChunkSet ticket = region.chunkManager.addTicket(cx, cz);
                 RTPChunk<?>chunk;
                 try {
-                    CompletableFuture<Long> chunkAt = ticket.chunks.get(0);
+                    CompletableFuture<Long> chunkAt = ticket.chunks().get(0);
                     Long chunkKey = chunkAt.get();
                     chunk = (chunkKey != null) ? world.getCachedChunk(chunkKey) : null;
 
@@ -225,7 +225,7 @@ public class LocationGenerator {
 
                 if (pass && GlobalRegionVerifiers.checkGlobalRegionVerifiers(left).join()) {
                     chunkSet = region.chunkManager.getChunkSet(left);
-                    GenerationResult res = new GenerationResult(left, pair.attempts(), chunkSet);
+                    GenerationResult res = new GenerationResult(left, pair.attempts(), chunkSet, pair.reservation());
 
                     return res;
                 }
@@ -529,7 +529,7 @@ public class LocationGenerator {
             ChunkSet ticket = region.chunkManager.addTicket(cx, cz);
             RTPChunk<?> chunk;
             try {
-                CompletableFuture<Long> cfChunk = ticket.chunks.getFirst();
+                CompletableFuture<Long> cfChunk = ticket.chunks().get(0);
                 // Bounded fetch
                 Long key = cfChunk.get(5, java.util.concurrent.TimeUnit.SECONDS);
                 chunk = (key != null) ? world.getCachedChunk(key) : null;

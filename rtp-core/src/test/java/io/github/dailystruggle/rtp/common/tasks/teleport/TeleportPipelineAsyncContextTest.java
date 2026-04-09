@@ -7,6 +7,7 @@ import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.selection.GenerationContext;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
+import io.github.dailystruggle.rtp.api.world.RTPChunkManager;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
@@ -47,6 +48,9 @@ public class TeleportPipelineAsyncContextTest {
         mainThread = Thread.currentThread();
         scheduler = mock(RTPScheduler.class);
         serverAccessor = mock(RTPServerAccessor.class);
+        RTPChunkManager chunkManager = mock(RTPChunkManager.class);
+        when(serverAccessor.getChunkManager()).thenReturn(chunkManager);
+        doCallRealMethod().when(chunkManager).whenComplete(any(), any());
         RTP.scheduler = scheduler;
         RTP.serverAccessor = serverAccessor;
 

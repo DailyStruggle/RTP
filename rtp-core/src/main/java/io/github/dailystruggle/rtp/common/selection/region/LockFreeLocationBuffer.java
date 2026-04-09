@@ -71,6 +71,15 @@ public class LockFreeLocationBuffer {
         return buffer.get((int) ((currentHead + index) & mask));
     }
 
+    public void set(int index, RTPLocation location) {
+        long currentHead = head.get();
+        long currentTail = tail.get();
+        if (index < 0 || currentHead + index >= currentTail) {
+            return;
+        }
+        buffer.set((int) ((currentHead + index) & mask), location);
+    }
+
     public int size() {
         return (int) (tail.get() - head.get());
     }

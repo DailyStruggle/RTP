@@ -26,12 +26,6 @@ public class OnChunkUnload implements Listener {
 
     if (rtpWorld.isForceLoaded(x, z)) {
       ((Cancellable) event).setCancelled(true);
-      return;
-    }
-
-    ChunkSet chunkSet = RTP.serverAccessor.getChunkManager().getChunkSet(rtpWorld, x, z);
-    if (chunkSet != null && chunkSet.keep()) {
-      ((Cancellable) event).setCancelled(true);
     }
   }
 }

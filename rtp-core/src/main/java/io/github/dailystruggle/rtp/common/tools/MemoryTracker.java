@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.tools;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
+import io.github.dailystruggle.rtp.api.world.RTPChunkManager;
 import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
@@ -117,15 +118,13 @@ public class MemoryTracker {
         }
 
         // Only count chunks if the ChunkSet is actually keeping them loaded
-        for (ChunkSet chunkSet : region.chunkManager.locAssChunks.values()) {
-          if (chunkSet.keep()) {
-            trackedTickets += chunkSet.chunks.size();
-          }
+        for (io.github.dailystruggle.rtp.api.world.ChunkReservation reservation : region.chunkManager.locAssChunks.values()) {
+          trackedTickets += reservation.getChunkSet().chunks().size();
         }
       }
 
-      long activeTickets = ChunkSet.ACTIVE_CHUNK_TICKETS.get();
-      long totalLoads = ChunkSet.TOTAL_CHUNK_LOADS.get();
+      long activeTickets = RTPChunkManager.ACTIVE_CHUNK_TICKETS.get();
+      long totalLoads = RTPChunkManager.TOTAL_CHUNK_LOADS.get();
 
       // Enforce the cap on expected tickets to reveal locAssChunks hoarding
       long expectedTickets = Math.min(trackedTickets, totalActiveChunkCap);

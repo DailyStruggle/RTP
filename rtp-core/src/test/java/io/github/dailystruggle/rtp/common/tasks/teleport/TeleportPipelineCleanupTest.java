@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.tasks.teleport;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doReturn;
 
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
@@ -71,6 +72,8 @@ public class TeleportPipelineCleanupTest {
         RTP.configs = configs;
 
         when(serverAccessor.getChunkManager()).thenReturn(rtpChunkManager);
+        doCallRealMethod().when(rtpChunkManager).whenComplete(any(), any());
+        doCallRealMethod().when(rtpChunkManager).keep(any(), anyBoolean(), any());
         rtp.databaseAccessor = mock(DatabaseAccessor.class);
 
         UUID playerId = UUID.randomUUID();
