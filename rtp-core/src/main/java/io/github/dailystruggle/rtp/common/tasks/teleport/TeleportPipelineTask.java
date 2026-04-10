@@ -140,7 +140,6 @@ public final class TeleportPipelineTask extends RTPRunnable {
   }
 
   private void runSetup() {
-    RTP.serverAccessor.sendMessage(context.player().uuid(),"SETUP");
     setupPreActions.forEach(consumer -> consumer.accept(this));
     if (isCancelled()) {
       currentPhase = Phase.CLEANUP;

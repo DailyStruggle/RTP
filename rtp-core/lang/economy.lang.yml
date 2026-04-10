@@ -1,6 +1,6 @@
 balanceFloor: balanceFloor
 price: price
-otherPrice: otherPrice
+priceOther: priceOther
 refundOnCancel: refundOnCancel
 biomePrice: biomePrice
 paramsPrice: paramsPrice

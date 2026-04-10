@@ -7,7 +7,7 @@ public enum EconomyKeys {
   /** The price for a random teleport */
   price,
   /** The price for teleporting another player */
-  otherPrice,
+  priceOther,
   /** The price for using parameters */
   paramsPrice,
   /** The price for selecting a biome */

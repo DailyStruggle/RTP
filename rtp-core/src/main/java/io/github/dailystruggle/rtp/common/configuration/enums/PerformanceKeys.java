@@ -10,11 +10,10 @@ public enum PerformanceKeys {
   viewDistanceTeleport,
   postTeleportQueueing,
   syncLoading,
-  checkChunks,
+  checkOnChunkLoads,
   onEventParsing,
   effectParsing,
   biomeRecall,
   biomeRecallForced,
-  timeit,
   version
 }

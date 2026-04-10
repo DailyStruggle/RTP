@@ -5,8 +5,7 @@ version: version
 maxAttempts: maxAttempts
 biomeRecallForced: biomeRecallForced
 onEventParsing: onEventParsing
-timeit: timeit
-checkChunks: checkChunks
+checkOnChunkLoads: checkOnChunkLoads
 postTeleportQueueing: postTeleportQueueing
 syncLoading: syncLoading
 effectParsing: effectParsing
