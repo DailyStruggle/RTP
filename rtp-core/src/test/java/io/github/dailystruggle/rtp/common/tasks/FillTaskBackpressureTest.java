@@ -121,11 +121,18 @@ public class FillTaskBackpressureTest {
         fiField.setAccessible(true);
         ((AtomicLong) fiField.get(fillTask)).set(1000);
 
-        // 2. Execute FillTask.run()
-        fillTask.run();
+        // 2. Execute FillTask.run() in a separate thread so the Semaphore can block it naturally
+        Thread taskThread = new Thread(fillTask::run);
+        taskThread.start();
 
-        // 3. Assert that the loop successfully broke due to backpressure
-        // before attempting to queue the full 1000 locations.
+        // 3. Wait 500ms for the loop to saturate the 50-chunk gate and block
+        Thread.sleep(500);
+
+        // 4. Assert that the loop correctly paused at exactly 50 concurrent requests
         verify(apiChunkManager, times(50)).getChunkAtAsync(any(), anyInt(), anyInt());
+
+        // 5. Clean up the blocking thread to end the test instantly
+        fillTask.setCancelled(true);
+        taskThread.interrupt();
     }
 }

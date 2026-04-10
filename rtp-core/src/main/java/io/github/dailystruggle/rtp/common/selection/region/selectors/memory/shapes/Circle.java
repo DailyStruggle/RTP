@@ -140,23 +140,34 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
     long cx = getNumber(GenericMemoryShapeParams.centerX, 0L).longValue();
     long cz = getNumber(GenericMemoryShapeParams.centerZ, 0L).longValue();
 
-    long range = (long) getRange();
-    BigInteger bigLocation = BigInteger.valueOf(location);
-    BigInteger bigMaxLong = BigInteger.valueOf(Long.MAX_VALUE);
-    BigInteger bigRange = BigInteger.valueOf(range);
+    // 1. Determine the current integer "Ring" (Radius R)
+    double preciseRadius = Math.sqrt((double) location / Math.PI + cr * cr);
+    long R = (long) preciseRadius;
 
-    // get a distance from the center
-    double radius = Math.sqrt(location / Math.PI + cr * cr);
+    // 2. Calculate the "Start Location" of this ring (where x=R, z=0)
+    // We use BigInteger to maintain precision at the world border.
+    BigInteger bigR = BigInteger.valueOf(R);
+    BigInteger bigCR = BigInteger.valueOf(cr);
 
-    // get a % around the curve, convert to radians
-    long bamAngle = bigLocation.multiply(bigMaxLong).divide(bigRange).longValue();
-    double rotation = ((double) bamAngle / Long.MAX_VALUE) * (2.0D * Math.PI);
+    // StartLoc = PI * (R^2 - CR^2)
+    // Since location is already area-scaled, we use the raw squared units.
+    BigInteger startLoc = bigR.multiply(bigR).subtract(bigCR.multiply(bigCR));
+
+    // 3. Get the Remaining Length and Total Ring Circumference
+    BigInteger currentLocation = BigInteger.valueOf((long)(location / Math.PI));
+    BigInteger remainingLength = currentLocation.subtract(startLoc);
+    BigInteger totalRingLength = bigR.shiftLeft(1).add(BigInteger.ONE); // (R+1)^2 - R^2 = 2R + 1
+
+    // 4. Proportion of the step to the circumference
+    // This double has the full 53-bit mantissa dedicated to the rotation.
+    double proportion = remainingLength.doubleValue() / totalRingLength.doubleValue();
+    double rotation = (proportion + 0.000069) * 2.0 * Math.PI;
 
     double cosRes = Math.cos(rotation);
     double sinRes = Math.sin(rotation);
 
-    // polar to cartesian
-    output.setXZ((int) (radius * cosRes + cx), (int) (radius * sinRes + cz));
+    // 5. Polar to Cartesian
+    output.setXZ((int) (R * cosRes + cx + 0.5), (int) (R * sinRes + cz + 0.5));
   }
 
   @Override
@@ -189,19 +200,55 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
     else if (expand && !mode.equalsIgnoreCase("ACCUMULATE")) range += badSum;
 
     double weight = getNumber(GenericMemoryShapeParams.weight, 1.0).doubleValue();
-    double res = (range) * Math.pow(ThreadLocalRandom.current().nextDouble(), weight);
+    double nextDouble = ThreadLocalRandom.current().nextDouble();
+    double res = (range) * Math.pow(nextDouble, weight);
+
+    RTP.log(
+        Level.INFO,
+        "[RTP] Circle.rand() - name:"
+            + name
+            + ", range:"
+            + range
+            + ", badSum:"
+            + badSum
+            + ", expand:"
+            + expand
+            + ", mode:"
+            + mode
+            + ", weight:"
+            + weight
+            + ", nextDouble:"
+            + nextDouble
+            + ", res:"
+            + res);
 
     long location;
     if (mode.equalsIgnoreCase("ACCUMULATE")) {
       long target = (long) res;
-      int index = java.util.Arrays.binarySearch(sums, target);
-      if (index < 0) index = -index - 1;
+      long currentBadSum = 0;
 
-      if (index > 0) target += sums[index - 1];
-      location = target;
+      // We iterate until the number of bad spots preceding our physical guess stabilizes.
+      while (true) {
+        // Search Physical Keys using a Physical Guess (Target + Current Shift)
+        int index = java.util.Arrays.binarySearch(badKeysCache, target + currentBadSum);
+        if (index < 0) index = -index - 1;
+
+        // Find the total bad area before this physical point
+        long newBadSum = (index > 0) ? sums[index - 1] : 0;
+
+        // If the bad count is stable, we have found the correct Physical Coordinate
+        if (newBadSum == currentBadSum) break;
+        currentBadSum = newBadSum;
+      }
+      location = target + currentBadSum;
+      RTP.log(
+          Level.INFO,
+          "[RTP] Circle.rand() ACCUMULATE - target:" + target + ", final currentBadSum:" + currentBadSum);
     } else {
       location = (long) res;
     }
+
+    RTP.log(Level.INFO, "[RTP] Circle.rand() - final location:" + location);
 
     switch (mode) {
       case "ACCUMULATE":
@@ -229,11 +276,14 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
               if (location - lowerGood < upperGood - location) location = lowerGood;
               else location = upperGood;
             }
+            RTP.log(Level.INFO, "[RTP] Circle.rand() NEAREST - new location:" + location);
           }
+          return location;
         }
       case "REROLL":
         {
           if (isKnownBad(location)) {
+            RTP.log(Level.INFO, "[RTP] Circle.rand() REROLL - bad location, returning -1");
             return -1;
           }
         }

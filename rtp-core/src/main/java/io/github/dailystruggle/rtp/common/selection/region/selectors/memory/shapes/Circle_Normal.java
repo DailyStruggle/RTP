@@ -2,12 +2,14 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.NormalDistributionParams;
 
 import java.math.BigInteger;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 /** Normal circle shape for region selection */
@@ -125,29 +127,42 @@ public class Circle_Normal extends MemoryShape<NormalDistributionParams> {
     return new int[] {output.x, output.z};
   }
 
+
+
   @Override
   public void locationToXZ(long location, MutableRTPCoords output) {
     long cr = getNumber(NormalDistributionParams.centerRadius, 64L).longValue();
     long cx = getNumber(NormalDistributionParams.centerX, 0L).longValue();
     long cz = getNumber(NormalDistributionParams.centerZ, 0L).longValue();
 
-    long range = getRange();
-    BigInteger bigLocation = BigInteger.valueOf(location);
-    BigInteger bigMaxLong = BigInteger.valueOf(Long.MAX_VALUE);
-    BigInteger bigRange = BigInteger.valueOf(range);
+    // 1. Determine the current integer "Ring" (Radius R)
+    double preciseRadius = Math.sqrt((double) location / Math.PI + cr * cr);
+    long R = (long) preciseRadius;
 
-    // get a distance from the center
-    double radius = Math.sqrt(location / Math.PI + cr * cr);
+    // 2. Calculate the "Start Location" of this ring (where x=R, z=0)
+    // We use BigInteger to maintain precision at the world border.
+    BigInteger bigR = BigInteger.valueOf(R);
+    BigInteger bigCR = BigInteger.valueOf(cr);
 
-    // get a % around the curve, convert to radians
-    long bamAngle = bigLocation.multiply(bigMaxLong).divide(bigRange).longValue();
-    double rotation = ((double) bamAngle / Long.MAX_VALUE) * (2.0D * Math.PI);
+    // StartLoc = PI * (R^2 - CR^2)
+    // Since location is already area-scaled, we use the raw squared units.
+    BigInteger startLoc = bigR.multiply(bigR).subtract(bigCR.multiply(bigCR));
+
+    // 3. Get the Remaining Length and Total Ring Circumference
+    BigInteger currentLocation = BigInteger.valueOf((long)(location / Math.PI));
+    BigInteger remainingLength = currentLocation.subtract(startLoc);
+    BigInteger totalRingLength = bigR.shiftLeft(1).add(BigInteger.ONE); // (R+1)^2 - R^2 = 2R + 1
+
+    // 4. Proportion of the step to the circumference
+    // This double has the full 53-bit mantissa dedicated to the rotation.
+    double proportion = remainingLength.doubleValue() / totalRingLength.doubleValue();
+    double rotation = (proportion + 0.000069) * 2.0 * Math.PI;
 
     double cosRes = Math.cos(rotation);
     double sinRes = Math.sin(rotation);
 
-    // polar to cartesian
-    output.setXZ((int) (radius * cosRes + cx), (int) (radius * sinRes + cz));
+    // 5. Polar to Cartesian
+    output.setXZ((int) (preciseRadius * cosRes + cx + 0.5), (int) (preciseRadius * sinRes + cz + 0.5));
   }
 
   @Override
@@ -213,6 +228,7 @@ public class Circle_Normal extends MemoryShape<NormalDistributionParams> {
     // an approximation of the necessary exponent for 1d to 2d mapping
     // 0.5-1.0 depending on cr, so it shouldn't escape bounds
     double exponent = (1 + ((double) cr) / ((double) radius)) * 0.5;
+    double originalGaussian = gaussian;
     gaussian = Math.pow(gaussian, 1.0 / exponent);
 
     // expand to fit
@@ -221,17 +237,47 @@ public class Circle_Normal extends MemoryShape<NormalDistributionParams> {
     String mode =
         data.getOrDefault(NormalDistributionParams.mode, "ACCUMULATE").toString().toUpperCase();
 
+    RTP.log(
+        Level.INFO,
+        "[RTP] Circle_Normal.rand() - name:"
+            + name
+            + ", radius:"
+            + radius
+            + ", centerRadius:"
+            + cr
+            + ", mean:"
+            + mean
+            + ", deviation:"
+            + deviation
+            + ", range:"
+            + range
+            + ", badSum:"
+            + badSum
+            + ", expand:"
+            + expand
+            + ", mode:"
+            + mode
+            + ", gaussian(before pow):"
+            + originalGaussian
+            + ", gaussian(after pow):"
+            + gaussian
+            + ", res:"
+            + res);
+
     long location;
     if (mode.equalsIgnoreCase("ACCUMULATE")) {
       long target = (long) res;
-      int index = java.util.Arrays.binarySearch(sums, target);
+      int index = java.util.Arrays.binarySearch(badKeysCache, target);
       if (index < 0) index = -index - 1;
 
       if (index > 0) target += sums[index - 1];
       location = target;
+      RTP.log(Level.INFO, "[RTP] Circle_Normal.rand() ACCUMULATE - target:" + target);
     } else {
       location = (long) res;
     }
+
+    RTP.log(Level.INFO, "[RTP] Circle_Normal.rand() - final location:" + location);
 
     switch (mode) {
       case "ACCUMULATE":
@@ -259,11 +305,13 @@ public class Circle_Normal extends MemoryShape<NormalDistributionParams> {
               if (location - lowerGood < upperGood - location) location = lowerGood;
               else location = upperGood;
             }
+            RTP.log(Level.INFO, "[RTP] Circle_Normal.rand() NEAREST - new location:" + location);
           }
         }
       case "REROLL":
         {
           if (isKnownBad(location)) {
+            RTP.log(Level.INFO, "[RTP] Circle_Normal.rand() REROLL - bad location, returning -1");
             return -1;
           }
         }

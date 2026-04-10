@@ -167,4 +167,9 @@ public class RegionChunkManager {
         if (reservation == null) return;
         reservation.close();
     }
+
+    // RegionChunkManager.java
+    ChunkReservation getReservation(RTPCoords coords) {
+        return locAssChunks.get(getChunkKey(coords.x() >> 4, coords.z() >> 4));
+    }
 }

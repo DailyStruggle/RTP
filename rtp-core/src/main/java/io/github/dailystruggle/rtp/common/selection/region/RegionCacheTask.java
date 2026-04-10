@@ -125,6 +125,10 @@ public class RegionCacheTask extends RTPRunnable {
                 }
 
                 if (res != null && res.coords() != null) {
+                    if (res.verifiedChunks() != null) {
+                        region.chunkManager.removeChunks(res.coords());
+                    }
+
                     RTPLocation coldLoc = new RTPLocation(res.coords(), res.attempts(), null);
                     boolean added = region.queueManager.unkeptLocations.offer(coldLoc);
                     if (!added) {

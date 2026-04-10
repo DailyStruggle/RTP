@@ -6,7 +6,6 @@ import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.spigot.tools.SendMessage;
 import io.github.dailystruggle.rtp.spigot.world.BukkitRTPWorld;
-import io.papermc.lib.PaperLib;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -87,8 +86,24 @@ public final class BukkitRTPPlayer implements RTPPlayer {
     double x = to.x() + 0.5;
     double y = to.y();
     double z = to.z() + 0.5;
+    Location location = new Location(world, x, y, z);
 
-    return PaperLib.teleportAsync(player, new Location(world, x, y, z));
+    // Graceful fallback for pure Spigot servers running 1.18.2 or older
+    CompletableFuture<Boolean> future = new CompletableFuture<>();
+    Runnable tpTask = () -> future.complete(player.teleport(location));
+
+    // Legacy Spigot mandates that entity teleportation occurs on the main thread
+    if (org.bukkit.Bukkit.isPrimaryThread()) {
+      tpTask.run();
+    } else {
+      org.bukkit.plugin.Plugin plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("RTP");
+      if (plugin != null) {
+        org.bukkit.Bukkit.getScheduler().runTask(plugin, tpTask);
+      } else {
+        future.complete(false);
+      }
+    }
+    return future;
   }
 
   @Override

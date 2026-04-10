@@ -252,20 +252,31 @@ public class Square_Normal extends MemoryShape<NormalDistributionParams> {
     long cx = getNumber(NormalDistributionParams.centerX, 0L).longValue();
     long cz = getNumber(NormalDistributionParams.centerZ, 0L).longValue();
 
-    // getFromString a distance from the center
-    double radius = Math.sqrt(location + cr * cr * 4) / 2;
+    // 1. Determine the integer Radius R
+    double preciseRadius = Math.sqrt(location + cr * cr * 4) / 2.0;
+    long R = (long) preciseRadius;
 
-    // getFromString how far to step around the square
-    BigInteger bigLocation = BigInteger.valueOf(location);
-    BigInteger bigMaxLong = BigInteger.valueOf(Long.MAX_VALUE);
-    BigInteger bigRange = BigInteger.valueOf(getRange());
-    long bamAngle = bigLocation.multiply(bigMaxLong).divide(bigRange).longValue();
-    double theta = ((double) bamAngle / Long.MAX_VALUE);
-    double perimeterStep = 8 * (radius * theta);
+    // 2. Calculate Start Location (x=R, z=0 -> perimeterStep = 0)
+    BigInteger bigR = BigInteger.valueOf(R);
+    BigInteger bigCR = BigInteger.valueOf(cr);
 
-    long r = (long) radius;
+    // StartLoc = (R^2 - CR^2) * 4
+    BigInteger startLoc = bigR.multiply(bigR).subtract(bigCR.multiply(bigCR)).shiftLeft(2);
 
-    squareOct2Coords(r, perimeterStep, output);
+    // 3. Remaining Length and Ring Width (Perimeter growth in location units)
+    BigInteger currentLoc = BigInteger.valueOf(location);
+    BigInteger remainingLength = currentLoc.subtract(startLoc);
+    // Width = ((R+1)^2 - R^2) * 4 = 4 * (2R + 1)
+    BigInteger ringWidth = bigR.shiftLeft(1).add(BigInteger.ONE).shiftLeft(2);
+
+    // 4. Proportion around the current square ring
+    double theta = (remainingLength.doubleValue() / ringWidth.doubleValue()) + 0.000069;
+
+    // 5. Perimeter Step
+    double perimeterStep = 8.0 * (preciseRadius * (theta % 1.0));
+
+    // 6. Map to Cartesian
+    squareOct2Coords(R, perimeterStep, output);
     output.setXZ(output.x + (int) cx, output.z + (int) cz);
   }
 
@@ -330,7 +341,7 @@ public class Square_Normal extends MemoryShape<NormalDistributionParams> {
     long location;
     if (mode.equalsIgnoreCase("ACCUMULATE")) {
       long target = (long) res;
-      int index = java.util.Arrays.binarySearch(sums, target);
+      int index = java.util.Arrays.binarySearch(badKeysCache, target);
       if (index < 0) index = -index - 1;
 
       if (index > 0) target += sums[index - 1];

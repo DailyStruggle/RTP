@@ -3,29 +3,40 @@ package io.github.dailystruggle.rtp.paper.world;
 import io.github.dailystruggle.rtp.api.world.RTPChunkManager;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.spigot.world.BukkitRTPWorld;
+import org.bukkit.World;
+
 import java.util.concurrent.CompletableFuture;
 
 public class PaperRTPChunkManager implements RTPChunkManager {
   @Override
   public CompletableFuture<Long> getChunkAtAsync(RTPWorld<?> world, int x, int z) {
-    if (!(world instanceof BukkitRTPWorld)) {
+    if (!(world instanceof BukkitRTPWorld bukkitWorld)) {
       return CompletableFuture.failedFuture(
               new IllegalArgumentException("World is not a BukkitRTPWorld"));
     }
 
-    // 1. Calculate the standard chunk key
-    long key = ((long) x & 0xffffffffL | ((long) z << 32));
+      long key = ((long) x & 0xffffffffL | ((long) z << 32));
 
-    // 2. Check if the chunk set exists and has an active keep() ticket
-    if (world.isForceLoaded(x, z)) {
-      // 3. Verify the chunk is actually in the world's memory cache
-      if (world.getCachedChunk(key) != null) {
-        // Return an instantly resolved future, bypassing the async scheduler entirely
+    if (bukkitWorld.isForceLoaded(x, z)) {
+      if (bukkitWorld.getCachedChunk(key) != null) {
         return CompletableFuture.completedFuture(key);
       }
     }
 
-    // 4. Fallback to standard async fetching if it's not cached or not kept
-    return ((BukkitRTPWorld) world).getChunkAt(x, z);
+    World spigotWorld = bukkitWorld.world();
+    CompletableFuture<Long> future = new CompletableFuture<>();
+
+    // The Bukkit Consumer strictly blocks execution until ChunkStatus.FULL is achieved
+    spigotWorld.getChunkAtAsync(x, z, true, chunk -> {
+      if (chunk == null) {
+        future.complete(null);
+        return;
+      }
+
+      bukkitWorld.cacheChunk(x, z, chunk);
+      future.complete(key);
+    });
+
+    return future;
   }
 }

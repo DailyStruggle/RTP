@@ -126,8 +126,8 @@ public class RTP {
     RTPAPI.addShape(new Rectangle());
     RTPAPI.addShape(new Circle_Normal());
     RTPAPI.addShape(new Square_Normal());
-    new LinearAdjustor(new ArrayList<>()); // todo: make this work
-    new JumpAdjustor(new ArrayList<>());
+    RTPAPI.addVerticalAdjustor(new LinearAdjustor(new ArrayList<>())); // todo: make this work
+    RTPAPI.addVerticalAdjustor(new JumpAdjustor(new ArrayList<>()));
 
     configs = new Configs(serverAccessor.getPluginDirectory());
 

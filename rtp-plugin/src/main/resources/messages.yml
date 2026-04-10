@@ -72,7 +72,7 @@ fillPause: "#A020F0[P0] fill task paused for regions: [fill_regions]"
 fillResume: "#10A5F5[P0] fill task resumed for regions: [fill_regions]"
 fillRunning: "&c[P0] fill task already running for regions: [fill_regions]"
 fillNotRunning: "&c[rtp] fill task not running for regions: [fill_regions]"
-fillStatus: "&a[P0] completed [fill_chunks] / [fill_totalChunks] chunks for regions: [fill_regions]. [fill_cps] cps. ETA: [fill_eta]"
+fillStatus: "&a[P0] completed [fill_chunks] / [fill_totalChunks] chunks for regions: [fill_regions]. [fill_cps] cps. Land Percentage: [fill_landPercentage]%. ETA: [fill_eta]"
 
 #info command
 infoTitle: "&a======RTP Info======"

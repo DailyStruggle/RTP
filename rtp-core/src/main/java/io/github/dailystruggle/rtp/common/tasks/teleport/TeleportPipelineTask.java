@@ -12,6 +12,7 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.GenerationResult;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
@@ -391,10 +392,28 @@ public final class TeleportPipelineTask extends RTPRunnable {
               RTP.serverAccessor.sendMessage(playerId, ConfigCache.unsafe);
             }
 
+            // Null-safe fetch to prevent silent CompletableFuture crashes in test environments
+            long duration = 0L;
+            ConfigParser<SafetyKeys> safetyParser = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+            if (safetyParser != null) {
+              Number num = safetyParser.getNumber(SafetyKeys.invulnerabilityTime, 0L);
+              if (num != null) {
+                duration = num.longValue();
+              }
+            }
+
+            if (duration > 0) {
+              RTP.getInstance().invulnerablePlayers.put(playerId, System.currentTimeMillis());
+              RTP.scheduler.runTaskLater(() -> {
+                RTP.getInstance().invulnerablePlayers.remove(playerId);
+              }, duration * 20L);
+            } else {
+              RTP.getInstance().invulnerablePlayers.remove(playerId);
+            }
+
             teleportPostActions.forEach(consumer -> consumer.accept(this));
 
             currentPhase = Phase.CLEANUP;
-            // Execute inline to satisfy synchronous test assertions and close the race condition
             this.run();
           });
 
@@ -427,7 +446,6 @@ public final class TeleportPipelineTask extends RTPRunnable {
         if (data == this.teleportData && !data.completed) {
           RTP.getInstance().latestTeleportData.remove(pid);
         }
-        RTP.getInstance().invulnerablePlayers.remove(pid);
       }
       if (region == null || coords == null) return;
 
@@ -448,6 +466,9 @@ public final class TeleportPipelineTask extends RTPRunnable {
       // Atomic gating prevents double-decrements on concurrent thread crashes
       if (region != null && handledInFlight.compareAndSet(false, true)) {
         region.inFlightCalculations.getAndDecrement();
+      }
+      if (this.teleportData != null && this.teleportData.nextTask == this) {
+        this.teleportData.nextTask = null;
       }
     }
   }
