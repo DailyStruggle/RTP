@@ -19,7 +19,6 @@ include 'rtp-folia:rtp-folia-v26_1_R1'
 include 'rtp-plugin'
 
 include 'addons:RTP_Iris_integration'
-include 'addons:RTP_MixedSeedFix'
 include 'addons:RTP_Glide'
 include 'addons:RTP_ClaimPluginIntegrations'
 // include 'addons:RTP_Domain'

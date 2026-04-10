@@ -401,15 +401,20 @@ public class LocationGenerator {
                         int nextInt = ThreadLocalRandom.current().nextInt(biomes.size());
                         entry = biomes.get(nextInt);
                         l = entry.getKey() + ThreadLocalRandom.current().nextLong(entry.getValue());
+                        RTP.log(Level.INFO, "[RTP] LocationGenerator - biomeRecall initial l=" + l);
                     } else if (biomeRecallForced) {
                         new IllegalStateException(
                                 "[RTP] invalid state, biome recall enabled but biomes are not in memory - "
                                         + Arrays.toString(biomeNames.toArray()))
                                 .printStackTrace();
                         return new GenerationResult(null, i, null);
-                    } else l = memoryShape.rand();
+                    } else {
+                        l = memoryShape.rand();
+                        RTP.log(Level.INFO, "[RTP] LocationGenerator - memoryShape.rand() (initial) returned l=" + l);
+                    }
                 } else {
                     l = memoryShape.rand();
+                    RTP.log(Level.INFO, "[RTP] LocationGenerator - memoryShape.rand() (initial, no biomeRecall) returned l=" + l);
                 }
 
                 select = memoryShape.locationToXZ(l);
@@ -456,15 +461,20 @@ public class LocationGenerator {
                             int nextInt = ThreadLocalRandom.current().nextInt(biomes.size());
                             entry = biomes.get(nextInt);
                             l = entry.getKey() + ThreadLocalRandom.current().nextLong(entry.getValue());
+                            RTP.log(Level.INFO, "[RTP] LocationGenerator - biomeRecall loop l=" + l);
                         } else if (biomeRecallForced) {
                             new IllegalStateException(
                                     "[RTP] invalid state, biome recall enabled but biomes are not in memory - "
                                             + Arrays.toString(biomeNames.toArray()))
                                     .printStackTrace();
                             return new GenerationResult(null, i, null);
-                        } else l = memoryShape.rand();
+                        } else {
+                            l = memoryShape.rand();
+                            RTP.log(Level.INFO, "[RTP] LocationGenerator - memoryShape.rand() (loop) returned l=" + l);
+                        }
                     } else {
                         l = memoryShape.rand();
+                        RTP.log(Level.INFO, "[RTP] LocationGenerator - memoryShape.rand() (loop, no biomeRecall) returned l=" + l);
                     }
 
                     select = memoryShape.locationToXZ(l);

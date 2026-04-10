@@ -127,7 +127,7 @@ public class Region extends FactoryValue<RegionKeys> {
       chunkSet.complete().whenComplete((success, throwable) -> {
         try {
           if (success != null && success) {
-            ChunkReservation reservation = new ChunkReservation(chunkSet, getWorld(), RTP.serverAccessor.getChunkManager());
+            ChunkReservation reservation = chunkManager.getReservation(coldLoc.coords());
 
             boolean added = queueManager.keptLocations.offer(
                     new RTPLocation(coldLoc.coords(), coldLoc.attempts(), reservation)

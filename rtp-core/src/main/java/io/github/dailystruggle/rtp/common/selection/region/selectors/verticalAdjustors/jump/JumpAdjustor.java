@@ -65,7 +65,7 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
 
   @Override
   public boolean adjust(@NotNull RTPChunk chunk, @NotNull MutableRTPCoords output) {
-    if (chunk == null) return false;
+    if (chunk == null) throw new NullPointerException("Chunk cannot be null");
 
     int maxY = getNumber(JumpAdjustorKeys.maxY, 256L).intValue();
     int minY = getNumber(JumpAdjustorKeys.minY, 0L).intValue();

@@ -51,8 +51,6 @@ shadowJar {
     relocate 'org.yaml.snakeyaml', 'io.github.dailystruggle.rtp.snakeyaml'
     relocate 'me.carleslc.Simple-YAML', 'io.github.dailystruggle.rtp.Simple-Yaml'
     relocate 'org.h2', 'io.github.dailystruggle.rtp.h2'
-
-    relocate 'io.papermc.lib', 'io.github.dailystruggle.rtp.paperlib'
 }
 
 artifacts {

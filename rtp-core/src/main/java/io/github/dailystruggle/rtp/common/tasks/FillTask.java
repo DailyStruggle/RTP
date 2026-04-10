@@ -80,6 +80,12 @@ public class FillTask extends RTPRunnable {
       // try for 5 seconds between messages
       fillIncrement.set(cps.get() * 5);
     }
+
+    if(start == 0) {
+      if (region.shape instanceof MemoryShape<?> memoryShape) {
+        memoryShape.clear();
+      }
+    }
   }
 
   /**
@@ -139,6 +145,7 @@ public class FillTask extends RTPRunnable {
     MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
     VerticalAdjustor<?> vert = region.getVert();
     if (vert == null) {
+      RTP.log(Level.WARNING, "null vert");
       isRunning.set(false);
       return;
     }
@@ -201,7 +208,9 @@ public class FillTask extends RTPRunnable {
     cursor.setWorldName(region.getWorld().name());
 
     long activeChecks = 0;
-    List<CompletableFuture<Boolean>> futures = new ArrayList<>();
+
+    // 1. Initialize the sliding window gate
+    Semaphore inFlightGate = new Semaphore(MAX_PENDING_CHUNKS);
 
     for (pos = currentStart; pos < range && pos < limitEnd; pos += stride) {
       if (pause.get() || isCancelled()) {
@@ -209,40 +218,47 @@ public class FillTask extends RTPRunnable {
       }
 
       if (shape.isKnownBad(pos)) {
-        continue;
+        // Temporarily disabled: Force re-evaluation of locations falsely marked bad by the void bug
+        // continue;
+      }
+
+      // 2. Throttle the loop natively.
+      try {
+        inFlightGate.acquire();
+      } catch (InterruptedException e) {
+        break;
       }
 
       shape.locationToXZ(pos, cursor);
-
       int centerBlockX = (cursor.x << 4) + 8;
       int centerBlockZ = (cursor.z << 4) + 8;
-
       final long currentPos = pos;
       activeChecks++;
 
-      CompletableFuture<Boolean> posFuture = testPos(region, currentPos, centerBlockX, centerBlockZ, safetyRadius, unsafeBlocks, defaultBiomes, biomeRecall, border);
+      try {
+        CompletableFuture<Boolean> posFuture = testPos(region, currentPos, centerBlockX, centerBlockZ, safetyRadius, unsafeBlocks, defaultBiomes, biomeRecall, border);
 
-      // Native Backpressure: Only track queries that actually hit the disk/chunk manager.
-      // Math-rejected queries complete instantly and are ignored here.
-      if (!posFuture.isDone()) {
-        futures.add(posFuture);
-        if (futures.size() >= MAX_PENDING_CHUNKS) {
-          pos += stride; // Include this block in the completed tally
-          break;
-        }
+        // 3. Release the permit on asynchronous completion
+        posFuture.whenComplete((res, err) -> inFlightGate.release());
+      } catch (Exception e) {
+        // Failsafe: Release the permit instantly if a synchronous error occurs
+        inFlightGate.release();
+        shape.addBadLocation(currentPos);
+        RTP.log(Level.WARNING, "Synchronous calculation failure at " + currentPos, e);
       }
     }
 
     final long finalPos1 = pos;
     final long finalActiveChecks = activeChecks;
 
-    // Handle instant-math resolutions natively, or chain the batch to wait for I/O asynchronously
-    if (futures.isEmpty()) {
-      wrapUpBatch(finalPos1, finalActiveChecks, timingStart, range, shape, limitEnd);
-    } else {
-      CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-              .whenComplete((v, t) -> wrapUpBatch(finalPos1, finalActiveChecks, timingStart, range, shape, limitEnd));
-    }
+    // 4. Drain the gate to wait for the final trailing chunks of the iteration to complete
+    try {
+      inFlightGate.acquire(MAX_PENDING_CHUNKS);
+      inFlightGate.release(MAX_PENDING_CHUNKS);
+    } catch (InterruptedException ignored) {}
+
+    // 5. Execute synchronously on the async thread, avoiding detached callback contexts
+    wrapUpBatch(finalPos1, finalActiveChecks, timingStart, range, shape, limitEnd);
   }
 
   private void wrapUpBatch(long finalPos1, long activeChecks, long timingStart, long range, MemoryShape<?> shape, long limitEnd) {
@@ -256,19 +272,30 @@ public class FillTask extends RTPRunnable {
 
       long etaSeconds = getEtaSeconds(range, finalPos1, shape);
 
+      // --- NEW LAND PERCENTAGE CALCULATION ---
+      long good = shape.getEffectiveGoodCount();
+      long bad = shape.getEffectiveBadCount();
+      double totalEvaluated = (double) good + bad;
+      double landPercentage = (totalEvaluated > 0) ? (good * 100.0 / totalEvaluated) : 0.0;
+      // ---------------------------------------
+
       this.latestAbsolutePos = ((currentOffset * range) + finalPos1) / Math.max(1L, shape.spatialResolution);
       this.latestAbsoluteTotal = range;
       this.latestCps = cps_local;
       this.latestEtaSeconds = etaSeconds;
 
       long now = System.currentTimeMillis();
-      // Rate-limit disk saves and console broadcasts to preserve server I/O
-      if (now - lastSaveTime > 5000 || finalPos1 >= range || finalPos1 >= limitEnd || pause.get() || isCancelled()) {
+      if (now - lastSaveTime > 5000 || finalPos1 >= range || pause.get() || isCancelled()) {
         lastSaveTime = now;
 
         ConfigParser<MessagesKeys> langParser = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
         String msg = langParser.getConfigValue(MessagesKeys.fillStatus, "").toString();
+
         if (msg != null && !msg.isEmpty()) {
+          // Replace the placeholder with the formatted number
+          if (msg.contains("[fill_landPercentage]")) {
+            msg = msg.replace("[fill_landPercentage]", String.format("%.2f", landPercentage));
+          }
           RTP.serverAccessor.announce(msg, "rtp.fill", "");
         }
 
@@ -417,20 +444,6 @@ public class FillTask extends RTPRunnable {
    * @param border world border for the current world
    * @return a future that completes with true if the location is valid
    */
-  /**
-   * Test if a location within a region is valid for teleportation
-   *
-   * @param region the region
-   * @param pos the location index
-   * @param blockX block x coordinate
-   * @param blockZ block z coordinate
-   * @param safetyRadius safety radius for chunk verification
-   * @param unsafeBlocks set of unsafe block names
-   * @param defaultBiomes set of allowed biomes
-   * @param biomeRecall whether to record bad locations for biomes
-   * @param border world border for the current world
-   * @return a future that completes with true if the location is valid
-   */
   public CompletableFuture<Boolean> testPos(
           Region region,
           final long pos,
@@ -442,7 +455,6 @@ public class FillTask extends RTPRunnable {
           boolean biomeRecall,
           WorldBorder border) {
 
-    // Master try-catch guarantees synchronous exceptions don't abandon the pendingChunks barrier
     try {
       safetyRadius = Math.min(safetyRadius, 7);
 
@@ -451,20 +463,22 @@ public class FillTask extends RTPRunnable {
       MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
       if (shape == null) return CompletableFuture.completedFuture(false);
 
+      if(shape.isKnownBad(pos)) { return CompletableFuture.completedFuture(false); }
+
       VerticalAdjustor<?> vert = region.getVert();
       if (vert == null) return CompletableFuture.completedFuture(false);
 
-      RTPWorld world = region.getWorld();
+      RTPWorld<?> world = region.getWorld();
 
-      String currBiome = world.getBiome(blockX, (vert.maxY() + vert.minY()) / 2, blockZ);
-
-      if(biomeRecall) shape.addBiomeLocation(pos, 1L, currBiome.toUpperCase());
-
-      if (!defaultBiomes.contains(currBiome.toUpperCase())) {
+      String midBiome = world.getBiome(blockX, (vert.maxY() + vert.minY()) / 2, blockZ).toUpperCase();
+      if (!defaultBiomes.contains(midBiome)) {
         shape.addBadLocation(pos);
+        if (biomeRecall) shape.addBiomeLocation(pos, 1, midBiome);
         return CompletableFuture.completedFuture(false);
       }
 
+      // Fast mathematical rejection ONLY for World Border.
+      // Mathematical biome check is completely removed to force chunk generation.
       if (!border.isInside().apply(new RTPLocation(world, blockX, (vert.maxY() + vert.minY()) / 2, blockZ))) {
         shape.addBadLocation(pos);
         return CompletableFuture.completedFuture(false);
@@ -477,21 +491,26 @@ public class FillTask extends RTPRunnable {
       CompletableFuture<Boolean> res = new CompletableFuture<>();
       int finalSafetyRadius = safetyRadius;
 
+      // Unconditional chunk generation request
       RTP.serverAccessor.getChunkManager().getChunkAtAsync(world, cx, cz)
               .orTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
               .whenComplete((chunkKey, throwable) -> {
                 try {
                   if (throwable != null || chunkKey == null || isCancelled() || pause.get()) {
-                    if(chunkKey == null || throwable != null) shape.addBadLocation(pos);
-                    if(throwable != null) RTP.log(Level.WARNING, "Failed to get chunk for " + pos + " in " + region.name, throwable);
+                    if (throwable != null) {
+                      RTP.log(Level.WARNING, "[FillTask] Chunk generation exception at " + pos, throwable);
+                    } else if (chunkKey == null) {
+                      RTP.log(Level.WARNING, "[FillTask] INSTANT BYPASS: Chunk manager returned a null chunkKey for " + pos);
+                    } else if (isCancelled()) {
+                    } else if (pause.get()) {
+                    } else {
+                      RTP.log(Level.WARNING, "[FillTask] undetermined failure at " + pos);
+                    }
                     res.complete(false);
                     return;
                   }
 
                   RTPChunk<?> chunk = world.getCachedChunk(chunkKey);
-
-                  // If the chunk is a "Ghost Chunk" and fails to cache instantly,
-                  // skip the coordinate completely to prevent thread starvation.
                   if (chunk == null) {
                     shape.addBadLocation(pos);
                     res.complete(false);
@@ -503,15 +522,18 @@ public class FillTask extends RTPRunnable {
                     MutableRTPCoords localCursor = new MutableRTPCoords(blockX, blockZ);
                     localCursor.setWorldName(world.name());
 
-                    if (biomeRecall) shape.addBiomeLocation(pos, 1, currBiome);
                     if (!vert.adjust(chunk, localCursor)) {
                       shape.addBadLocation(pos);
                       res.complete(false);
                       return;
                     }
 
-                    String currBiome1 = world.getBiome(localCursor.x, localCursor.y, localCursor.z);
-                    if (!defaultBiomes.contains(currBiome1.toUpperCase())) {
+                    // PHYSICAL BIOME CHECK: Evaluated directly from the generated 3D block array
+                    String actualBiome = world.getBiome(localCursor.x, localCursor.y, localCursor.z);
+
+                    if (biomeRecall) shape.addBiomeLocation(pos, 1, actualBiome);
+
+                    if (!defaultBiomes.contains(actualBiome.toUpperCase())) {
                       shape.addBadLocation(pos);
                       res.complete(false);
                       return;
@@ -560,8 +582,8 @@ public class FillTask extends RTPRunnable {
                     chunk.keep(false);
                   }
                 } catch (Throwable t) {
+                  RTP.log(Level.SEVERE, "[FillTask] Async validation crashed internally at location " + pos, t);
                   shape.addBadLocation(pos);
-                  RTP.log(Level.WARNING, "Failed to fill chunk for " + pos + " in " + region.name, t);
                   res.complete(false);
                 }
               });
@@ -569,7 +591,7 @@ public class FillTask extends RTPRunnable {
       return res;
 
     } catch (Throwable t) {
-      // Returns an instant failure to safely decrement pendingChunks if logic crashes
+      RTP.log(Level.SEVERE, "[FillTask] Synchronous abort at testPos for location " + pos, t);
       return CompletableFuture.completedFuture(false);
     }
   }

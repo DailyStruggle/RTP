@@ -12,7 +12,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import io.papermc.lib.PaperLib;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
@@ -87,13 +86,32 @@ public final class BukkitRTPWorld extends RTPWorld<World> {
 
   @Override
   public CompletableFuture<Long> getChunkAt(int cx, int cz) {
-    return PaperLib.getChunkAtAsync(world, cx, cz, true)
-        .thenApply(
-            chunk -> {
-              if (chunk == null) return null;
-              cacheChunk(cx, cz, chunk);
-              return ((long) cx & 0xffffffffL | ((long) cz << 32));
-            });
+    CompletableFuture<Long> future = new CompletableFuture<>();
+
+    Runnable loadChunkTask = () -> {
+      try {
+        // world.getChunkAt() is strictly synchronous and guarantees ChunkStatus.FULL
+        org.bukkit.Chunk chunk = world.getChunkAt(cx, cz);
+        cacheChunk(cx, cz, chunk);
+        future.complete(((long) cx & 0xffffffffL | ((long) cz << 32)));
+      } catch (Throwable t) {
+        future.complete(null); // Safely fail the future if generation crashes
+      }
+    };
+
+    // Spigot mandates that synchronous chunk generation must occur on the primary thread
+    if (org.bukkit.Bukkit.isPrimaryThread()) {
+      loadChunkTask.run();
+    } else {
+      org.bukkit.plugin.Plugin plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("RTP");
+      if (plugin != null) {
+        org.bukkit.Bukkit.getScheduler().runTask(plugin, loadChunkTask);
+      } else {
+        future.complete(null);
+      }
+    }
+
+    return future;
   }
 
   @Override
