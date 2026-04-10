@@ -207,7 +207,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         return;
       }
 
-      RTP.configs.reloadAction();
+      RTP.configs.reloadConfigs();
 
       ConfigParser<ConfigKeys> configParser =
           (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
@@ -269,6 +269,8 @@ public final class RTPBukkitPlugin extends JavaPlugin {
       } catch (Exception e) {
         e.printStackTrace();
       }
+
+      RTP.configs.reloadRegions();
 
       RTP.scheduler.runTaskLater(() -> RTP.getInstance().databaseAccessor.startup(), 1);
     }

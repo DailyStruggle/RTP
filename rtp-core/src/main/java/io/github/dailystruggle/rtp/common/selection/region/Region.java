@@ -293,7 +293,7 @@ public class Region extends FactoryValue<RegionKeys> {
 
 //    long totalCap = Math.max(settings.cacheCap(), queueManager.playerQueue.size());
     long cacheCap = settings.cacheCap();
-    long totalCap = Math.max(Math.min(cacheCap, activeCap), queueManager.playerQueue.size());
+    long totalCap = Math.max(cacheCap + activeCap, queueManager.playerQueue.size());
 
     if (!isRefillingCache.compareAndSet(false, true)) {
 //      System.out.println("[RTP-DEBUG] Region '" + name + "' ABORT 2: isRefillingCache lock is currently held by another thread.");

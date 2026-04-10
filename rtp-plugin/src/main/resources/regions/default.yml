@@ -42,9 +42,9 @@ requirePermission: false
 #if no perms, try this one
 override: "default"
 #max length for the location queue per world, 0 disables normal region processing
-cacheCap: 10
+cacheCap: 50
 #max number of chunks to keep actively loaded in memory for zero-latency teleports
-activeChunkCap: 3
+activeChunkCap: 10
 # vault price for player to use this region
 price: 0.0
 # granularity of bad-location cache

@@ -118,8 +118,6 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
   @Override
   public void run() {
-    RTP.serverAccessor.sendMessage(context.player().uuid(),"RUN");
-
     if (isCancelled()) {
       currentPhase = Phase.CLEANUP;
       runCleanup();
@@ -248,7 +246,6 @@ public final class TeleportPipelineTask extends RTPRunnable {
   }
 
   private void runLoad() {
-    RTP.serverAccessor.sendMessage(context.player().uuid(),"LOAD");
     try {
       loadPreActions.forEach(consumer -> consumer.accept(this));
       if (isCancelled()) {
@@ -310,7 +307,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
         return;
       }
 
-      RTP.serverAccessor.sendMessage(player().uuid(), MessagesKeys.chunkLoading);
+      if(!chunkSet.complete().isDone()) RTP.serverAccessor.sendMessage(player().uuid(), MessagesKeys.chunkLoading);
 
       RTP.serverAccessor.getChunkManager().whenComplete(chunkSet, aBoolean -> {
                 if (isCancelled()) {
@@ -349,7 +346,6 @@ public final class TeleportPipelineTask extends RTPRunnable {
   }
 
   private void runTeleport() {
-    RTP.serverAccessor.sendMessage(context.player().uuid(),"TELEPORT");
     teleportPreActions.forEach(consumer -> consumer.accept(this));
     if (isCancelled()) {
       currentPhase = Phase.CLEANUP;
@@ -425,7 +421,6 @@ public final class TeleportPipelineTask extends RTPRunnable {
   }
 
   private void runCleanup() {
-    RTP.serverAccessor.sendMessage(context.player().uuid(),"CLEANUP");
     cleanupPreActions.forEach(consumer -> consumer.accept(this));
     try {
       // Explicitly untrack the data to prevent false positive leak alerts

@@ -200,27 +200,7 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
     else if (expand && !mode.equalsIgnoreCase("ACCUMULATE")) range += badSum;
 
     double weight = getNumber(GenericMemoryShapeParams.weight, 1.0).doubleValue();
-    double nextDouble = ThreadLocalRandom.current().nextDouble();
-    double res = (range) * Math.pow(nextDouble, weight);
-
-    RTP.log(
-        Level.INFO,
-        "[RTP] Circle.rand() - name:"
-            + name
-            + ", range:"
-            + range
-            + ", badSum:"
-            + badSum
-            + ", expand:"
-            + expand
-            + ", mode:"
-            + mode
-            + ", weight:"
-            + weight
-            + ", nextDouble:"
-            + nextDouble
-            + ", res:"
-            + res);
+    double res = (range) * Math.pow(ThreadLocalRandom.current().nextDouble(), weight);
 
     long location;
     if (mode.equalsIgnoreCase("ACCUMULATE")) {
@@ -231,7 +211,15 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
       while (true) {
         // Search Physical Keys using a Physical Guess (Target + Current Shift)
         int index = java.util.Arrays.binarySearch(badKeysCache, target + currentBadSum);
-        if (index < 0) index = -index - 1;
+
+        if (index < 0) {
+          // Point is between keys (or after all keys). Invert insertion point.
+          index = -index - 1;
+        } else {
+          // Exact match: the coordinate sits exactly on the start of a bad interval.
+          // Force the index forward to include this interval's bad sum.
+          index = index + 1;
+        }
 
         // Find the total bad area before this physical point
         long newBadSum = (index > 0) ? sums[index - 1] : 0;
@@ -241,14 +229,9 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
         currentBadSum = newBadSum;
       }
       location = target + currentBadSum;
-      RTP.log(
-          Level.INFO,
-          "[RTP] Circle.rand() ACCUMULATE - target:" + target + ", final currentBadSum:" + currentBadSum);
     } else {
       location = (long) res;
     }
-
-    RTP.log(Level.INFO, "[RTP] Circle.rand() - final location:" + location);
 
     switch (mode) {
       case "ACCUMULATE":
@@ -276,14 +259,12 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
               if (location - lowerGood < upperGood - location) location = lowerGood;
               else location = upperGood;
             }
-            RTP.log(Level.INFO, "[RTP] Circle.rand() NEAREST - new location:" + location);
           }
           return location;
         }
       case "REROLL":
         {
           if (isKnownBad(location)) {
-            RTP.log(Level.INFO, "[RTP] Circle.rand() REROLL - bad location, returning -1");
             return -1;
           }
         }

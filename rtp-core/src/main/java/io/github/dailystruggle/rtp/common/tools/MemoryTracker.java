@@ -131,9 +131,11 @@ public class MemoryTracker {
       for (Region region : allRegions) {
         RegionSettings settings = region.getSettings();
         totalCacheCap += settings.cacheCap();
+        totalCacheCap += settings.activeChunkCap();
         totalActiveChunkCap += settings.activeChunkCap();
 
         totalLocationQueueSize += region.queueManager.keptLocations.size();
+        totalLocationQueueSize += region.queueManager.unkeptLocations.size();
         for (java.util.concurrent.ConcurrentLinkedQueue<RTPLocation> queue : region.queueManager.getPerPlayerQueues()) {
           totalPerPlayerLocationQueueSize += queue.size();
         }

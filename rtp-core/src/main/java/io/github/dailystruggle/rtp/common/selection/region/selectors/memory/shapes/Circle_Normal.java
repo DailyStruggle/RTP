@@ -2,14 +2,12 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.NormalDistributionParams;
 
 import java.math.BigInteger;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 /** Normal circle shape for region selection */
@@ -228,7 +226,6 @@ public class Circle_Normal extends MemoryShape<NormalDistributionParams> {
     // an approximation of the necessary exponent for 1d to 2d mapping
     // 0.5-1.0 depending on cr, so it shouldn't escape bounds
     double exponent = (1 + ((double) cr) / ((double) radius)) * 0.5;
-    double originalGaussian = gaussian;
     gaussian = Math.pow(gaussian, 1.0 / exponent);
 
     // expand to fit
@@ -237,47 +234,36 @@ public class Circle_Normal extends MemoryShape<NormalDistributionParams> {
     String mode =
         data.getOrDefault(NormalDistributionParams.mode, "ACCUMULATE").toString().toUpperCase();
 
-    RTP.log(
-        Level.INFO,
-        "[RTP] Circle_Normal.rand() - name:"
-            + name
-            + ", radius:"
-            + radius
-            + ", centerRadius:"
-            + cr
-            + ", mean:"
-            + mean
-            + ", deviation:"
-            + deviation
-            + ", range:"
-            + range
-            + ", badSum:"
-            + badSum
-            + ", expand:"
-            + expand
-            + ", mode:"
-            + mode
-            + ", gaussian(before pow):"
-            + originalGaussian
-            + ", gaussian(after pow):"
-            + gaussian
-            + ", res:"
-            + res);
-
     long location;
     if (mode.equalsIgnoreCase("ACCUMULATE")) {
       long target = (long) res;
-      int index = java.util.Arrays.binarySearch(badKeysCache, target);
-      if (index < 0) index = -index - 1;
+      long currentBadSum = 0;
 
-      if (index > 0) target += sums[index - 1];
-      location = target;
-      RTP.log(Level.INFO, "[RTP] Circle_Normal.rand() ACCUMULATE - target:" + target);
+      // We iterate until the number of bad spots preceding our physical guess stabilizes.
+      while (true) {
+        // Search Physical Keys using a Physical Guess (Target + Current Shift)
+        int index = java.util.Arrays.binarySearch(badKeysCache, target + currentBadSum);
+
+        if (index < 0) {
+          // Point is between keys (or after all keys). Invert insertion point.
+          index = -index - 1;
+        } else {
+          // Exact match: the coordinate sits exactly on the start of a bad interval.
+          // Force the index forward to include this interval's bad sum.
+          index = index + 1;
+        }
+
+        // Find the total bad area before this physical point
+        long newBadSum = (index > 0) ? sums[index - 1] : 0;
+
+        // If the bad count is stable, we have found the correct Physical Coordinate
+        if (newBadSum == currentBadSum) break;
+        currentBadSum = newBadSum;
+      }
+      location = target + currentBadSum;
     } else {
       location = (long) res;
     }
-
-    RTP.log(Level.INFO, "[RTP] Circle_Normal.rand() - final location:" + location);
 
     switch (mode) {
       case "ACCUMULATE":
@@ -305,13 +291,11 @@ public class Circle_Normal extends MemoryShape<NormalDistributionParams> {
               if (location - lowerGood < upperGood - location) location = lowerGood;
               else location = upperGood;
             }
-            RTP.log(Level.INFO, "[RTP] Circle_Normal.rand() NEAREST - new location:" + location);
           }
         }
       case "REROLL":
         {
           if (isKnownBad(location)) {
-            RTP.log(Level.INFO, "[RTP] Circle_Normal.rand() REROLL - bad location, returning -1");
             return -1;
           }
         }
