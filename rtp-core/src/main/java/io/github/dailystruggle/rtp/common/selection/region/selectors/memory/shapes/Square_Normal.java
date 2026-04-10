@@ -341,11 +341,30 @@ public class Square_Normal extends MemoryShape<NormalDistributionParams> {
     long location;
     if (mode.equalsIgnoreCase("ACCUMULATE")) {
       long target = (long) res;
-      int index = java.util.Arrays.binarySearch(badKeysCache, target);
-      if (index < 0) index = -index - 1;
+      long currentBadSum = 0;
 
-      if (index > 0) target += sums[index - 1];
-      location = target;
+      // We iterate until the number of bad spots preceding our physical guess stabilizes.
+      while (true) {
+        // Search Physical Keys using a Physical Guess (Target + Current Shift)
+        int index = java.util.Arrays.binarySearch(badKeysCache, target + currentBadSum);
+
+        if (index < 0) {
+          // Point is between keys (or after all keys). Invert insertion point.
+          index = -index - 1;
+        } else {
+          // Exact match: the coordinate sits exactly on the start of a bad interval.
+          // Force the index forward to include this interval's bad sum.
+          index = index + 1;
+        }
+
+        // Find the total bad area before this physical point
+        long newBadSum = (index > 0) ? sums[index - 1] : 0;
+
+        // If the bad count is stable, we have found the correct Physical Coordinate
+        if (newBadSum == currentBadSum) break;
+        currentBadSum = newBadSum;
+      }
+      location = target + currentBadSum;
     } else {
       location = (long) res;
     }

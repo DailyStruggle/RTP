@@ -191,20 +191,9 @@ public class Configs {
     return true;
   }
 
-  /** Action to perform during reload */
-  public void reloadAction() {
-    for (Region r : RTP.selectionAPI.permRegionLookup.values()) {
-      r.shutDown();
-    }
-    RTP.selectionAPI.permRegionLookup.clear();
-
-    for (Region r : RTP.selectionAPI.tempRegions.values()) {
-      r.shutDown();
-    }
-    RTP.selectionAPI.tempRegions.clear();
-
+  // 1. Isolate Configuration Parsing
+  public void reloadConfigs() {
     FillTask.kill();
-
     RTP.getInstance().processingPlayers.clear();
 
     for (Map.Entry<UUID, TeleportData> e : RTP.getInstance().latestTeleportData.entrySet()) {
@@ -217,37 +206,35 @@ public class Configs {
     Map<Class<?>, MultiConfigParser<?>> newMultiConfigParserMap = new ConcurrentHashMap<>();
 
     ConfigParser<LoggingKeys> logging =
-        new ConfigParser<>(LoggingKeys.class, "logging.yml", "1.0", pluginDirectory, fileDatabase);
+            new ConfigParser<>(LoggingKeys.class, "logging.yml", "1.0", pluginDirectory, fileDatabase);
     newConfigParserMap.put(LoggingKeys.class, logging);
 
     ConfigParser<MessagesKeys> lang =
-        new ConfigParser<>(
-            MessagesKeys.class, "messages.yml", "1.0", pluginDirectory, fileDatabase);
+            new ConfigParser<>(MessagesKeys.class, "messages.yml", "1.0", pluginDirectory, fileDatabase);
     newConfigParserMap.put(MessagesKeys.class, lang);
 
     ConfigParser<ConfigKeys> config =
-        new ConfigParser<>(ConfigKeys.class, "config.yml", "3.0", pluginDirectory, fileDatabase);
+            new ConfigParser<>(ConfigKeys.class, "config.yml", "3.0", pluginDirectory, fileDatabase);
     newConfigParserMap.put(ConfigKeys.class, config);
 
     ConfigParser<EconomyKeys> economy =
-        new ConfigParser<>(EconomyKeys.class, "economy.yml", "1.0", pluginDirectory, fileDatabase);
+            new ConfigParser<>(EconomyKeys.class, "economy.yml", "1.0", pluginDirectory, fileDatabase);
     newConfigParserMap.put(EconomyKeys.class, economy);
 
     ConfigParser<PerformanceKeys> performance =
-        new ConfigParser<>(
-            PerformanceKeys.class, "performance.yml", "1.0", pluginDirectory, fileDatabase);
+            new ConfigParser<>(PerformanceKeys.class, "performance.yml", "1.0", pluginDirectory, fileDatabase);
     newConfigParserMap.put(PerformanceKeys.class, performance);
 
     ConfigParser<SafetyKeys> safety =
-        new ConfigParser<>(SafetyKeys.class, "safety", "1.0", pluginDirectory, fileDatabase);
+            new ConfigParser<>(SafetyKeys.class, "safety", "1.0", pluginDirectory, fileDatabase);
     newConfigParserMap.put(SafetyKeys.class, safety);
 
     MultiConfigParser<RegionKeys> regions =
-        new MultiConfigParser<>(RegionKeys.class, "regions", "1.0", pluginDirectory);
+            new MultiConfigParser<>(RegionKeys.class, "regions", "1.0", pluginDirectory);
     newMultiConfigParserMap.put(RegionKeys.class, regions);
 
     MultiConfigParser<WorldKeys> worlds =
-        new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", pluginDirectory);
+            new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", pluginDirectory);
     newMultiConfigParserMap.put(WorldKeys.class, worlds);
 
     for (RTPWorld world : RTP.serverAccessor.getRTPWorlds()) {
@@ -256,6 +243,26 @@ public class Configs {
 
     this.configParserMap = newConfigParserMap;
     this.multiConfigParserMap = newMultiConfigParserMap;
+  }
+
+  // 2. Isolate Region Instantiation
+  public void reloadRegions() {
+    for (Region r : RTP.selectionAPI.permRegionLookup.values()) {
+      r.shutDown();
+    }
+    RTP.selectionAPI.permRegionLookup.clear();
+
+    for (Region r : RTP.selectionAPI.tempRegions.values()) {
+      r.shutDown();
+    }
+    RTP.selectionAPI.tempRegions.clear();
+
+    MultiConfigParser<RegionKeys> regions =
+            (MultiConfigParser<RegionKeys>) this.multiConfigParserMap.get(RegionKeys.class);
+    if (regions == null) return;
+
+    ConfigParser<LoggingKeys> logging =
+            (ConfigParser<LoggingKeys>) this.configParserMap.get(LoggingKeys.class);
 
     boolean detailed_region_init = true;
     if (logging != null) {
@@ -267,30 +274,34 @@ public class Configs {
       }
     }
 
-//    System.out.println("[RTP-DEBUG] Configs: Starting region loop. Map size: " + regions.configParserFactory.map.size());
     for (ConfigParser<RegionKeys> regionConfig : regions.configParserFactory.map.values()) {
-//      System.out.println("[RTP-DEBUG] Configs: Processing region: " + regionConfig.name);
       RegionSettings settings = RegionConfigLoader.load(regionConfig);
       String name = settings.name();
 
       Region region = new Region(name, settings);
 
       RTP.selectionAPI.permRegionLookup.put(region.name, region);
-      if (settings.detailedRegionInit()) {
+      if (detailed_region_init) {
         RTP.log(
-            Level.INFO,
-            "&00FFFF[RTP] [" + name + "] successfully created teleport region - " + region.name);
+                Level.INFO,
+                "&00FFFF[RTP] [" + name + "] successfully created teleport region - " + region.name);
       }
       RTP.getInstance()
-          .miscAsyncTasks
-          .add(
-              new RTPRunnable(
-                  () -> {
-                    if (region.getShape() == null) return;
-                    region.getShape().select();
-                  },
-                  60));
+              .miscAsyncTasks
+              .add(
+                      new RTPRunnable(
+                              () -> {
+                                if (region.getShape() == null) return;
+                                region.getShape().select();
+                              },
+                              60));
     }
+  }
+
+  // 3. Preserve original method for standard reload commands
+  public void reloadAction() {
+    reloadConfigs();
+    reloadRegions();
     if (!onReload.isEmpty()) onReload.forEach(Runnable::run);
   }
 }

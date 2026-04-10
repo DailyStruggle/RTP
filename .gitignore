@@ -121,3 +121,4 @@ src/test/java/commonTestImpl/TestRTPServerAccessor.java
 /.gradle/
 /build/
 /gradle/
+rtp-core/database/regionData/testRegion.fill
