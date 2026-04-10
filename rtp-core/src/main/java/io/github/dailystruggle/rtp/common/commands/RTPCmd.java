@@ -197,7 +197,7 @@ public interface RTPCmd extends BaseRTPCmd {
           if (player.uuid().equals(senderId))
             price += eco.getNumber(EconomyKeys.price, 0.0).doubleValue();
           else if (player.hasPermission("rtp.notme")) continue;
-          else price += eco.getNumber(EconomyKeys.otherPrice, 0.0).doubleValue();
+          else price += eco.getNumber(EconomyKeys.priceOther, 0.0).doubleValue();
           if (shapeNames != null || vertNames != null)
             price += eco.getNumber(EconomyKeys.paramsPrice, 0.0).doubleValue();
           if (biomeList != null) price += eco.getNumber(EconomyKeys.biomePrice, 0.0).doubleValue();
@@ -316,7 +316,7 @@ public interface RTPCmd extends BaseRTPCmd {
         if (player.uuid().equals(senderId))
           data.cost += eco.getNumber(EconomyKeys.price, 0.0).doubleValue();
         else if (player.hasPermission("rtp.notme")) continue;
-        else data.cost += eco.getNumber(EconomyKeys.otherPrice, 0.0).doubleValue();
+        else data.cost += eco.getNumber(EconomyKeys.priceOther, 0.0).doubleValue();
         if (shapeNames != null || vertNames != null || doWBO)
           data.cost += eco.getNumber(EconomyKeys.paramsPrice, 0.0).doubleValue();
         if (biomeList != null)

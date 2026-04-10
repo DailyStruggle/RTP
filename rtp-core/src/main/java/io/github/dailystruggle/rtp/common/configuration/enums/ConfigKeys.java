@@ -8,8 +8,6 @@ public enum ConfigKeys {
   teleportCooldown,
   /** Distance to cancel teleportation */
   cancelDistance,
-  /** Logging configuration */
-  logging,
   /** Commands to run as console */
   consoleCommands,
   /** Commands to run as player */
