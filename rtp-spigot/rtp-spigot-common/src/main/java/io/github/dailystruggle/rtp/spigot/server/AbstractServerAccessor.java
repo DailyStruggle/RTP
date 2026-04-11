@@ -4,14 +4,15 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
+import io.github.dailystruggle.rtp.api.selection.ILocationGenerator;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
+import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
@@ -47,45 +48,31 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   protected String version = null;
   protected Integer intVersion = null;
   protected Function<RTPWorld<?>, Set<String>> biomes = BukkitRTPWorld::getBiomes;
-  protected Function<String, WorldBorder> worldBorderFunction =
-      s -> {
-        RTPWorld<?> rtpWorld = getRTPWorld(s);
-        if (rtpWorld instanceof BukkitRTPWorld) {
-          World world = ((BukkitRTPWorld) rtpWorld).world();
-          org.bukkit.WorldBorder worldBorder = world.getWorldBorder();
-          return new WorldBorder(
-              () -> {
-                Shape<?> shape = (Shape<?>) RTP.serverAccessor.getShape(s);
-                if (shape == null || !shape.name.equalsIgnoreCase("SQUARE"))
-                  shape = (Shape<?>) RTP.factoryMap.get(RTP.factoryNames.shape).get("SQUARE");
-                Square square = (Square) shape;
-                square.set(
-                    GenericMemoryShapeParams.radius, ((long) worldBorder.getSize() * 0.9) / 32);
-                square.set(GenericMemoryShapeParams.centerRadius, 0L);
-                square.set(
-                    GenericMemoryShapeParams.centerX, worldBorder.getCenter().getBlockX() / 16);
-                square.set(
-                    GenericMemoryShapeParams.centerZ, worldBorder.getCenter().getBlockZ() / 16);
-                square.set(GenericMemoryShapeParams.expand, false);
-                square.set(GenericMemoryShapeParams.weight, 1);
-                square.set(GenericMemoryShapeParams.mode, Mode.NEAREST);
-                square.set(GenericMemoryShapeParams.uniquePlacements, false);
-                return shape;
-              },
-              rtpLocation -> {
-                if (getServerIntVersion() > 10)
-                  return worldBorder.isInside(
-                      new Location(world, rtpLocation.x(), rtpLocation.y(), rtpLocation.z()));
-                Location center = worldBorder.getCenter();
-                double radius = worldBorder.getSize() / 2;
-                RTPLocation c =
-                    new RTPLocation(
-                        rtpWorld, center.getBlockX(), center.getBlockY(), center.getBlockZ());
-                return c.distanceSquaredXZ(rtpLocation) < Math.pow(radius, 2);
-              });
-        }
-        return null;
-      };
+  protected Function<String, ?> worldBorderFunction = this::createNativeWorldBorder;
+  private final Map<String, WorldBorder> nativeWorldBorderCache = new ConcurrentHashMap<>();
+
+  protected WorldBorder createNativeWorldBorder(String worldName) {
+    return nativeWorldBorderCache.computeIfAbsent(worldName, s -> {
+      RTPWorld<?> rtpWorld = getRTPWorld(s);
+      if (!(rtpWorld instanceof BukkitRTPWorld)) return null;
+      World world = ((BukkitRTPWorld) rtpWorld).world();
+      org.bukkit.WorldBorder worldBorder = world.getWorldBorder();
+      return new WorldBorder(
+          () -> {
+            Shape<?> shape = (Shape<?>) RTP.factoryMap.get(RTP.factoryNames.shape).get("SQUARE");
+            if (shape instanceof Square square) {
+              square.set(GenericMemoryShapeParams.radius, (long) (worldBorder.getSize() / 32.0));
+              square.set(GenericMemoryShapeParams.centerX, (long) (worldBorder.getCenter().getBlockX() / 16.0));
+              square.set(GenericMemoryShapeParams.centerZ, (long) (worldBorder.getCenter().getBlockZ() / 16.0));
+            }
+            return shape;
+          },
+          rtpLocation -> {
+            Location location = new Location(world, rtpLocation.x(), rtpLocation.y(), rtpLocation.z());
+            return world.getWorldBorder().isInside(location);
+          });
+    });
+  }
 
   public AbstractServerAccessor() {
     shapeFunction =
@@ -218,7 +205,9 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   @Override
   public @Nullable Object getWorldBorder(String worldName) {
-    return worldBorderFunction.apply(worldName);
+    Object res = worldBorderFunction.apply(worldName);
+    if (res == null) res = createNativeWorldBorder(worldName);
+    return res;
   }
 
   @Override
@@ -427,6 +416,11 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   @Override
   public RTPTaskPipe createCachePipe() {
     return new TimeBoundTaskPipe();
+  }
+
+  @Override
+  public ILocationGenerator getLocationGenerator() {
+    return new LocationGenerator();
   }
 
   @Override

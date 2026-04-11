@@ -11,24 +11,23 @@ public class FoliaRegionProcessor implements Runnable {
     private final RegionKey key;
     private final ConcurrentLinkedQueue<RTPRunnable> queue;
     private final Set<RegionKey> activeProcessors;
-    private final long availableTime; // Default: 5000000L for 5ms
+    private final int maxTasksPerTick;
 
     public FoliaRegionProcessor(Plugin plugin, RegionKey key, ConcurrentLinkedQueue<RTPRunnable> queue, Set<RegionKey> activeProcessors) {
-        this(plugin, key, queue, activeProcessors, 5000000L);
+        this(plugin, key, queue, activeProcessors, 20);
     }
 
-    public FoliaRegionProcessor(Plugin plugin, RegionKey key, ConcurrentLinkedQueue<RTPRunnable> queue, Set<RegionKey> activeProcessors, long availableTime) {
+    public FoliaRegionProcessor(Plugin plugin, RegionKey key, ConcurrentLinkedQueue<RTPRunnable> queue, Set<RegionKey> activeProcessors, int maxTasksPerTick) {
         this.plugin = plugin;
         this.key = key;
         this.queue = queue;
         this.activeProcessors = activeProcessors;
-        this.availableTime = availableTime;
+        this.maxTasksPerTick = maxTasksPerTick;
     }
 
     @Override
     public void run() {
-        long start = System.nanoTime();
-        while (System.nanoTime() - start < availableTime) {
+        for (int i = 0; i < maxTasksPerTick; i++) {
             RTPRunnable task = queue.poll();
             if (task == null) break;
             task.runWithTracking();
