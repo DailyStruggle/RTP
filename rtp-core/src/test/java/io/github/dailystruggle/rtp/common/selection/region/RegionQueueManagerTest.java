@@ -2,8 +2,12 @@ package io.github.dailystruggle.rtp.common.selection.region;
 
 import static org.mockito.Mockito.*;
 
+import io.github.dailystruggle.rtp.api.selection.GenerationResult;
+import io.github.dailystruggle.rtp.api.selection.ILocationGenerator;
+import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
+import io.github.dailystruggle.rtp.common.RTP;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,6 +23,35 @@ public class RegionQueueManagerTest {
         region = mock(Region.class);
         settings = mock(RegionSettings.class);
         chunkManager = mock(RegionChunkManager.class);
+
+        RTPServerAccessor serverAccessor = mock(RTPServerAccessor.class);
+        RTP.serverAccessor = serverAccessor;
+        ILocationGenerator locationGenerator = mock(ILocationGenerator.class);
+        when(serverAccessor.getLocationGenerator()).thenReturn(locationGenerator);
+
+        RTP rtp = mock(RTP.class);
+        try {
+            java.lang.reflect.Field field;
+            field = RTP.class.getDeclaredField("queuedPlayers");
+            field.setAccessible(true);
+            field.set(rtp, new java.util.concurrent.ConcurrentHashMap<java.util.UUID, Boolean>().keySet(true));
+
+            field = RTP.class.getDeclaredField("invulnerablePlayers");
+            field.setAccessible(true);
+            field.set(rtp, new java.util.concurrent.ConcurrentHashMap<>());
+
+            field = RTP.class.getDeclaredField("processingPlayers");
+            field.setAccessible(true);
+            field.set(rtp, new java.util.concurrent.ConcurrentSkipListSet<>());
+
+            field = RTP.class.getDeclaredField("latestTeleportData");
+            field.setAccessible(true);
+            field.set(rtp, new java.util.concurrent.ConcurrentHashMap<>());
+
+            java.lang.reflect.Field instanceField = RTP.class.getDeclaredField("instance");
+            instanceField.setAccessible(true);
+            instanceField.set(null, rtp);
+        } catch (Exception ignored) {}
 
         when(region.getSettings()).thenReturn(settings);
         try {
@@ -98,6 +131,9 @@ public class RegionQueueManagerTest {
         java.util.List<java.util.concurrent.CompletableFuture<Long>> chunks = java.util.Collections.singletonList(chunkFuture);
         ChunkSet mockChunkSet = new ChunkSet(chunks, new java.util.concurrent.CompletableFuture<>());
 
+        io.github.dailystruggle.rtp.api.selection.GenerationContext context = new io.github.dailystruggle.rtp.api.selection.GenerationContext(null, player, null);
+        when(region.getLocation(eq(context))).thenReturn(new GenerationResult(coords, 1L, mockChunkSet));
+
         when(chunkManager.addTicket(anyInt(), anyInt())).thenReturn(mockChunkSet);
         when(chunkManager.getChunkSet(any())).thenReturn(mockChunkSet);
         io.github.dailystruggle.rtp.api.world.RTPChunk mockChunk = mock(io.github.dailystruggle.rtp.api.world.RTPChunk.class);
@@ -113,11 +149,14 @@ public class RegionQueueManagerTest {
         doReturn(new java.util.ArrayList<>()).when(safetyParser).getConfigValue(any(), any());
         doReturn(0).when(safetyParser).getNumber(any(), any());
 
-        io.github.dailystruggle.rtp.api.server.RTPServerAccessor serverAccessor = mock(io.github.dailystruggle.rtp.api.server.RTPServerAccessor.class);
-        io.github.dailystruggle.rtp.common.RTP.serverAccessor = serverAccessor;
+        io.github.dailystruggle.rtp.api.server.RTPServerAccessor serverAccessor = RTP.serverAccessor;
         io.github.dailystruggle.rtp.api.world.RTPChunkManager apiChunkManager = mock(io.github.dailystruggle.rtp.api.world.RTPChunkManager.class);
         when(serverAccessor.getChunkManager()).thenReturn(apiChunkManager);
         when(apiChunkManager.getChunkAtAsync(any(), anyInt(), anyInt())).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(1L));
+
+        ILocationGenerator locationGenerator = serverAccessor.getLocationGenerator();
+        when(locationGenerator.getLocation(any(), any(), any(), any())).thenReturn(new GenerationResult(coords, 1L, mockChunkSet));
+        when(region.getLocation(any(io.github.dailystruggle.rtp.api.selection.GenerationContext.class))).thenReturn(new GenerationResult(coords, 1L, mockChunkSet));
 
         try {
             java.lang.reflect.Field field = Region.class.getDeclaredField("queueManager");
@@ -125,7 +164,7 @@ public class RegionQueueManagerTest {
             field.set(region, queueManager);
         } catch (Exception ignored) {}
 
-        GenerationResult result = LocationGenerator.getLocation(region, null, player, null);
+        GenerationResult result = LocationGenerator.getLocation(region, context);
 
         Assertions.assertNotNull(result, "GenerationResult should not be null");
         Assertions.assertEquals(coords, result.coords());

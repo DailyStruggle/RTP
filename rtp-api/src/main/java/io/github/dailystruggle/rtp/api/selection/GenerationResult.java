@@ -1,4 +1,4 @@
-package io.github.dailystruggle.rtp.common.selection.region;
+package io.github.dailystruggle.rtp.api.selection;
 
 import io.github.dailystruggle.rtp.api.world.ChunkReservation;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;

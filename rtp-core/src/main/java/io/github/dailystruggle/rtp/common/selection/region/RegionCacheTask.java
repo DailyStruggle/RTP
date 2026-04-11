@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.common.selection.region;
 import io.github.dailystruggle.rtp.api.world.ChunkReservation;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
+import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
@@ -47,7 +48,7 @@ public class RegionCacheTask extends RTPRunnable {
             region.inFlightCalculations.incrementAndGet();
             GenerationResult res;
             try {
-                res = LocationGenerator.getLocation(region, (java.util.Set<String>) null);
+                res = RTP.serverAccessor.getLocationGenerator().getLocation(region, (java.util.Set<String>) null);
             } catch (Exception e) {
                 region.inFlightCalculations.decrementAndGet();
                 MemoryTracker.untrack(this);
@@ -119,7 +120,7 @@ public class RegionCacheTask extends RTPRunnable {
                 region.inFlightCalculations.incrementAndGet();
                 GenerationResult res;
                 try {
-                    res = LocationGenerator.getLocation(region, (java.util.Set<String>) null);
+                    res = RTP.serverAccessor.getLocationGenerator().getLocation(region, (java.util.Set<String>) null);
                 } finally {
                     region.inFlightCalculations.decrementAndGet();
                 }

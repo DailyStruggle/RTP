@@ -4,6 +4,7 @@ import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask;
+import io.github.dailystruggle.rtp.api.selection.ILocationGenerator;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import java.io.File;
 import org.jetbrains.annotations.Nullable;
@@ -147,6 +148,8 @@ public interface RTPServerAccessor {
   Object createCachePipe();
 
   io.github.dailystruggle.rtp.api.scheduling.RTPScheduler getScheduler();
+
+  ILocationGenerator getLocationGenerator();
 
   double getTPS(int ticks);
 }

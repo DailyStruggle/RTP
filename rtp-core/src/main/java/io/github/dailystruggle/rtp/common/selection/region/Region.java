@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.selection.GenerationContext;
+import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.api.world.ChunkReservation;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
@@ -334,7 +335,7 @@ public class Region extends FactoryValue<RegionKeys> {
    * @return location and number of attempts
    */
   public GenerationResult getLocation(GenerationContext context) {
-    return LocationGenerator.getLocation(this, context);
+    return RTP.serverAccessor.getLocationGenerator().getLocation(this, context);
   }
 
   /**
@@ -344,7 +345,7 @@ public class Region extends FactoryValue<RegionKeys> {
    * @return location and number of attempts
    */
   public GenerationResult getLocation(@Nullable Set<String> biomeNames) {
-    return LocationGenerator.generateLocation(this, new GenerationContext(null, null, biomeNames));
+    return RTP.serverAccessor.getLocationGenerator().generateLocation(this, new GenerationContext(null, null, biomeNames));
   }
 
   /** shutDown - save and clear data */

@@ -21,7 +21,7 @@ import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionChunkManager;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
-import io.github.dailystruggle.rtp.common.selection.region.GenerationResult;
+import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

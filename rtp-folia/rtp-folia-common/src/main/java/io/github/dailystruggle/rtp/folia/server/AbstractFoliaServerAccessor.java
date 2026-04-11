@@ -4,6 +4,7 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
+import io.github.dailystruggle.rtp.api.selection.ILocationGenerator;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
@@ -12,11 +13,16 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.tools.MessageTagger;
 import io.github.dailystruggle.rtp.folia.entity.FoliaRTPCommandSender;
 import io.github.dailystruggle.rtp.folia.entity.FoliaRTPPlayer;
+import io.github.dailystruggle.rtp.folia.world.FoliaLocationGenerator;
 import io.github.dailystruggle.rtp.folia.world.FoliaRTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.folia.tasks.CountBoundTaskPipe;
 import io.github.dailystruggle.rtp.folia.tasks.FoliaRegionProcessor;
 import io.github.dailystruggle.rtp.folia.tasks.RegionKey;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
+import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import java.io.File;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -38,7 +44,31 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   protected final ConcurrentHashMap<RegionKey, ConcurrentLinkedQueue<io.github.dailystruggle.rtp.common.tasks.RTPRunnable>> regionQueues = new ConcurrentHashMap<>();
   protected final Set<RegionKey> activeProcessors = ConcurrentHashMap.newKeySet();
   protected Function<String, ?> shapeFunction = (s) -> null;
-  protected Function<String, ?> worldBorderFunction = (s) -> null;
+  protected Function<String, ?> worldBorderFunction = this::createNativeWorldBorder;
+  private final Map<String, WorldBorder> nativeWorldBorderCache = new ConcurrentHashMap<>();
+
+  protected WorldBorder createNativeWorldBorder(String worldName) {
+    return nativeWorldBorderCache.computeIfAbsent(worldName, s -> {
+      RTPWorld<?> rtpWorld = getRTPWorld(s);
+      if (!(rtpWorld instanceof FoliaRTPWorld)) return null;
+      World world = ((FoliaRTPWorld) rtpWorld).world();
+      org.bukkit.WorldBorder worldBorder = world.getWorldBorder();
+      return new WorldBorder(
+          () -> {
+            Shape<?> shape = (Shape<?>) RTP.factoryMap.get(RTP.factoryNames.shape).get("SQUARE");
+            if (shape instanceof Square square) {
+              square.set(GenericMemoryShapeParams.radius, (long) (worldBorder.getSize() / 32.0));
+              square.set(GenericMemoryShapeParams.centerX, (long) (worldBorder.getCenter().getBlockX() / 16.0));
+              square.set(GenericMemoryShapeParams.centerZ, (long) (worldBorder.getCenter().getBlockZ() / 16.0));
+            }
+            return shape;
+          },
+          rtpLocation -> {
+            Location location = new Location(world, rtpLocation.x(), rtpLocation.y(), rtpLocation.z());
+            return world.getWorldBorder().isInside(location);
+          });
+    });
+  }
   protected Function<RTPWorld<?>, Set<String>> biomes = FoliaRTPWorld::getBiomes;
 
   public AbstractFoliaServerAccessor() {
@@ -109,7 +139,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
         World world = Bukkit.getWorld(key.worldId());
         if (world != null) {
           Location bukkitLoc = new Location(world, key.regionX() << 9, 0, key.regionZ() << 9);
-          FoliaRegionProcessor processor = new FoliaRegionProcessor(bukkitPlugin, key, regionQueues.get(key), activeProcessors, 5000000L);
+          FoliaRegionProcessor processor = new FoliaRegionProcessor(bukkitPlugin, key, regionQueues.get(key), activeProcessors);
           Bukkit.getRegionScheduler().run(bukkitPlugin, bukkitLoc, scheduledTask -> processor.run());
         }
       }
@@ -128,7 +158,9 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
 
   @Override
   public @Nullable Object getWorldBorder(String worldName) {
-    return worldBorderFunction.apply(worldName);
+    Object res = worldBorderFunction.apply(worldName);
+    if (res == null) res = createNativeWorldBorder(worldName);
+    return res;
   }
 
   @Override
@@ -352,6 +384,11 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   @Override
   public RTPTaskPipe createCachePipe() {
     return new CountBoundTaskPipe((Plugin) plugin, 20);
+  }
+
+  @Override
+  public ILocationGenerator getLocationGenerator() {
+    return new FoliaLocationGenerator();
   }
 
   @Override
