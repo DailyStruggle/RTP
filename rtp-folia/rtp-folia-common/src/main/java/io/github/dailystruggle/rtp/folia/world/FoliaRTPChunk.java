@@ -3,6 +3,8 @@ package io.github.dailystruggle.rtp.folia.world;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import java.util.Set;
+
+import io.github.dailystruggle.rtp.common.RTP;
 import org.bukkit.Chunk;
 import org.bukkit.HeightMap;
 
@@ -38,7 +40,7 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
 
   @Override
   public void keep(boolean keep) {
-    chunk.getWorld().setChunkForceLoaded(chunk.getX(), chunk.getZ(), keep);
+    RTP.scheduler.runTask(getWorld(), x(), z(), () -> chunk.getWorld().setChunkForceLoaded(chunk.getX(), chunk.getZ(), keep));
   }
 
   @Override

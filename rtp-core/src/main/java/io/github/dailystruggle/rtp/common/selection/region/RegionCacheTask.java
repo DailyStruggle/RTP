@@ -41,110 +41,110 @@ public class RegionCacheTask extends RTPRunnable {
     public void run() {
         if (isCancelled()) return;
 
-        long startNanos = System.nanoTime();
-
-        // 1. Handle Private/Player-Specific Tasks (Bypass Backlog)
-        if (playerId != null) {
-            region.inFlightCalculations.incrementAndGet();
-            GenerationResult res;
-            try {
-                res = RTP.serverAccessor.getLocationGenerator().getLocation(region, (java.util.Set<String>) null);
-            } catch (Exception e) {
-                region.inFlightCalculations.decrementAndGet();
+        if (playerId == null) {
+            long cacheCap = region.getSettings().cacheCap();
+            if (region.queueManager.unkeptLocations.size() >= cacheCap) {
                 MemoryTracker.untrack(this);
                 return;
             }
 
-            if (res != null && res.coords() != null) {
-                RTPCoords coords = res.coords();
-                ChunkSet chunkSet = res.verifiedChunks();
-
-                if (chunkSet == null) {
-                    int cx = coords.x() >> 4;
-                    int cz = coords.z() >> 4;
-                    int radius = (int) this.selectRadius;
-                    long sz = (radius * 2L + 1) * (radius * 2L + 1);
-
-                    List<CompletableFuture<Long>> chunks = new ArrayList<>((int) sz);
-                    RTPWorld<?> world = region.getWorld();
-
-                    for (int i = -radius; i <= radius; i++) {
-                        for (int j = -radius; j <= radius; j ++) {
-                            chunks.add(RTP.serverAccessor.getChunkManager().getChunkAtAsync(world, cx + i, cz + j));
-                        }
-                    }
-                    chunkSet = new ChunkSet(chunks, new CompletableFuture<>());
-                    region.chunkManager.putChunkSet(coords, chunkSet);
-
-                    final ChunkSet finalSet = chunkSet;
-                    RTP.scheduler.runTaskLater(() -> {
-                        if (finalSet.complete() != null && !finalSet.complete().isDone()) {
-                            finalSet.complete().complete(false);
-                        }
-                    }, 600L); // 30-second failsafe
-                }
-
-                ChunkSet finalChunkSet = chunkSet;
-                RTP.serverAccessor.getChunkManager().whenComplete(chunkSet, success -> {
-                    try {
-                        if (isCancelled() || success == null || !success) {
-                            region.chunkManager.removeTicket(coords);
-                            return;
-                        }
-                        region.chunkManager.removeTicket(coords);
-                        ChunkReservation reservation = new ChunkReservation(finalChunkSet, region.getWorld(), RTP.serverAccessor.getChunkManager());
-                        RTPLocation finalPair = new RTPLocation(coords, res.attempts(), reservation);
-                        region.queueManager.enqueuePlayerLocation(playerId, finalPair);
-                    } finally {
-                        region.inFlightCalculations.decrementAndGet();
-                        MemoryTracker.untrack(this);
-                    }
-                });
-            } else {
-                region.inFlightCalculations.decrementAndGet();
+            // 2. THROTTLE: Cap the number of concurrent asynchronous generations allowed per region.
+            // When the TaskPipe rapidly loops 60 times in a tick, 58 of them will cleanly abort here,
+            // naturally pacing the generation to 2 chunks at a time.
+            if (region.inFlightCalculations.get() > 2) {
                 MemoryTracker.untrack(this);
+                return;
             }
-            return;
         }
 
-        // 2. Handle Public Tasks: Rapidly generate unkept locations
+        region.inFlightCalculations.incrementAndGet();
+        CompletableFuture<GenerationResult> locationFuture = RTP.serverAccessor.getLocationGenerator().getLocation(region, (java.util.Set<String>) null);
+
+        locationFuture = locationFuture.exceptionally(e -> {
+            if (playerId != null) {
+                RTP.log(java.util.logging.Level.SEVERE, "Failed to generate location for player " + playerId, e);
+            } else {
+                RTP.log(java.util.logging.Level.SEVERE, "Failed to generate location", e);
+            }
+            region.inFlightCalculations.decrementAndGet();
+            MemoryTracker.untrack(this);
+            return null;
+        });
+
+        if (locationFuture.isDone()) {
+            processResult(locationFuture.join());
+        } else {
+            locationFuture.thenAccept(this::processResult);
+        }
+    }
+
+    private void processResult(GenerationResult res) {
+        if (res == null) return;
         try {
-            long cacheCap = region.getSettings().cacheCap();
+            if (playerId != null) {
+                if (res.coords() != null) {
+                    RTPCoords coords = res.coords();
+                    ChunkSet chunkSet = res.verifiedChunks();
 
-            while (!isCancelled()) {
-                long currentTotal = region.queueManager.unkeptLocations.size();
-                if (currentTotal >= cacheCap) {
-                    break;
-                }
+                    if (chunkSet == null) {
+                        int cx = coords.x() >> 4;
+                        int cz = coords.z() >> 4;
+                        int radius = (int) this.selectRadius;
+                        long sz = (radius * 2L + 1) * (radius * 2L + 1);
 
-                region.inFlightCalculations.incrementAndGet();
-                GenerationResult res;
-                try {
-                    res = RTP.serverAccessor.getLocationGenerator().getLocation(region, (java.util.Set<String>) null);
-                } finally {
+                        List<CompletableFuture<Long>> chunks = new ArrayList<>((int) sz);
+                        RTPWorld<?> world = region.getWorld();
+
+                        for (int i = -radius; i <= radius; i++) {
+                            for (int j = -radius; j <= radius; j++) {
+                                chunks.add(RTP.serverAccessor.getChunkManager().getChunkAtAsync(world, cx + i, cz + j));
+                            }
+                        }
+                        chunkSet = new ChunkSet(chunks, new CompletableFuture<>());
+                        region.chunkManager.putChunkSet(coords, chunkSet);
+
+                        final ChunkSet finalSet = chunkSet;
+                        RTP.scheduler.runTaskLater(() -> {
+                            if (finalSet.complete() != null && !finalSet.complete().isDone()) {
+                                finalSet.complete().complete(false);
+                            }
+                        }, 600L); // 30-second failsafe
+                    }
+
+                    ChunkSet finalChunkSet = chunkSet;
+                    RTP.serverAccessor.getChunkManager().whenComplete(chunkSet, success -> {
+                        try {
+                            if (isCancelled() || success == null || !success) {
+                                region.chunkManager.removeTicket(coords);
+                                return;
+                            }
+                            region.chunkManager.removeTicket(coords);
+                            ChunkReservation reservation = new ChunkReservation(finalChunkSet, region.getWorld(), RTP.serverAccessor.getChunkManager());
+                            RTPLocation finalPair = new RTPLocation(coords, res.attempts(), reservation);
+                            region.queueManager.enqueuePlayerLocation(playerId, finalPair);
+                        } finally {
+                            region.inFlightCalculations.decrementAndGet();
+                            MemoryTracker.untrack(this);
+                        }
+                    });
+                } else {
                     region.inFlightCalculations.decrementAndGet();
+                    MemoryTracker.untrack(this);
                 }
-
-                if (res != null && res.coords() != null) {
+            } else {
+                region.inFlightCalculations.decrementAndGet();
+                if (res.coords() != null) {
                     if (res.verifiedChunks() != null) {
                         region.chunkManager.removeChunks(res.coords());
                     }
 
                     RTPLocation coldLoc = new RTPLocation(res.coords(), res.attempts(), null);
-                    boolean added = region.queueManager.unkeptLocations.offer(coldLoc);
-                    if (!added) {
-                        break; // Backlog physical bounds reached
-                    }
-                } else {
-                    break; // Failed to generate a valid coordinate (e.g., bad config)
+                    region.queueManager.unkeptLocations.offer(coldLoc);
                 }
-
-                if (System.nanoTime() - startNanos >= maxNanos) {
-                    break; // Time budget exceeded, yield thread back to pipeline
-                }
+                MemoryTracker.untrack(this);
             }
-        } finally {
-            MemoryTracker.untrack(this);
+        } catch (Exception e) {
+            RTP.log(java.util.logging.Level.SEVERE, "Error in processResult", e);
         }
     }
 }

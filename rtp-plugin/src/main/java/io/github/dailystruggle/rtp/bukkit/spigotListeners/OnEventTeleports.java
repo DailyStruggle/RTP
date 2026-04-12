@@ -153,7 +153,7 @@ public class OnEventTeleports implements Listener {
           GenerationResult res = null;
           int i = 0;
           for (; res == null && i < 10; i++) {
-            res = region.getLocation(context);
+            res = RTP.serverAccessor.getLocationGenerator().getLocation(region, context).join();
           }
           if (res == null) {
             RTP.log(Level.WARNING, "#0080FF[RTP] failed to generate respawn location");

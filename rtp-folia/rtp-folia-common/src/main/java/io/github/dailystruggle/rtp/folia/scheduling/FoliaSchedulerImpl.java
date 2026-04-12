@@ -42,10 +42,14 @@ public class FoliaSchedulerImpl implements RTPScheduler {
   @Override
   public void runTask(io.github.dailystruggle.rtp.api.world.RTPLocation location, Runnable task) {
     RTPWorld<?> rtpWorld = location.world();
-    if (rtpWorld instanceof FoliaRTPWorld && rtpWorld.world() != null) {
-      World world = ((FoliaRTPWorld) rtpWorld).world();
-      Bukkit.getRegionScheduler()
-          .run(plugin, world, (int) location.x() >> 4, (int) location.z() >> 4, scheduledTask -> task.run());
+    if (rtpWorld instanceof FoliaRTPWorld foliaRTPWorld && rtpWorld.world() != null) {
+      if (org.bukkit.Bukkit.isOwnedByCurrentRegion(foliaRTPWorld.world(), location.x() >> 4, location.z() >> 4)) {
+        // The current thread already owns the region! Execute immediately to save overhead.
+        task.run();
+      } else {
+        // We are on the wrong thread; bounce it to the correct Region Scheduler
+        Bukkit.getRegionScheduler().run(plugin, foliaRTPWorld.world(), location.x() >> 4, location.z() >> 4, st -> task.run());
+      }
     } else if (rtpWorld == null || rtpWorld.world() == null) {
       runTaskAsynchronously(task);
     } else {
@@ -55,9 +59,14 @@ public class FoliaSchedulerImpl implements RTPScheduler {
 
   @Override
   public void runTask(io.github.dailystruggle.rtp.api.world.RTPWorld<?> world, int cx, int cz, Runnable task) {
-    if (world instanceof FoliaRTPWorld && world.world() != null) {
-      World bukkitWorld = ((FoliaRTPWorld) world).world();
-      Bukkit.getRegionScheduler().run(plugin, bukkitWorld, cx, cz, scheduledTask -> task.run());
+    if (world instanceof FoliaRTPWorld foliaRTPWorld && world.world() != null) {
+      if (org.bukkit.Bukkit.isOwnedByCurrentRegion(foliaRTPWorld.world(), cx, cz)) {
+        // The current thread already owns the region! Execute immediately to save overhead.
+        task.run();
+      } else {
+        // We are on the wrong thread; bounce it to the correct Region Scheduler
+        Bukkit.getRegionScheduler().run(plugin, foliaRTPWorld.world(), cx, cz, st -> task.run());
+      }
     } else if (world == null || world.world() == null) {
       runTaskAsynchronously(task);
     } else {

@@ -132,8 +132,6 @@ public class RegionQueueManagerTest {
         ChunkSet mockChunkSet = new ChunkSet(chunks, new java.util.concurrent.CompletableFuture<>());
 
         io.github.dailystruggle.rtp.api.selection.GenerationContext context = new io.github.dailystruggle.rtp.api.selection.GenerationContext(null, player, null);
-        when(region.getLocation(eq(context))).thenReturn(new GenerationResult(coords, 1L, mockChunkSet));
-
         when(chunkManager.addTicket(anyInt(), anyInt())).thenReturn(mockChunkSet);
         when(chunkManager.getChunkSet(any())).thenReturn(mockChunkSet);
         io.github.dailystruggle.rtp.api.world.RTPChunk mockChunk = mock(io.github.dailystruggle.rtp.api.world.RTPChunk.class);
@@ -155,8 +153,7 @@ public class RegionQueueManagerTest {
         when(apiChunkManager.getChunkAtAsync(any(), anyInt(), anyInt())).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(1L));
 
         ILocationGenerator locationGenerator = serverAccessor.getLocationGenerator();
-        when(locationGenerator.getLocation(any(), any(), any(), any())).thenReturn(new GenerationResult(coords, 1L, mockChunkSet));
-        when(region.getLocation(any(io.github.dailystruggle.rtp.api.selection.GenerationContext.class))).thenReturn(new GenerationResult(coords, 1L, mockChunkSet));
+        when(locationGenerator.getLocation(any(), any(), any(), any())).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(new GenerationResult(coords, 1L, mockChunkSet)));
 
         try {
             java.lang.reflect.Field field = Region.class.getDeclaredField("queueManager");

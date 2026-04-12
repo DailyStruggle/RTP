@@ -1,10 +1,12 @@
 package io.github.dailystruggle.rtp.folia.tasks;
 
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
+import io.github.dailystruggle.rtp.spigot.tools.SendMessage;
 import org.bukkit.plugin.Plugin;
 
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.logging.Level;
 
 public class FoliaRegionProcessor implements Runnable {
     private final Plugin plugin;
@@ -30,7 +32,13 @@ public class FoliaRegionProcessor implements Runnable {
         for (int i = 0; i < maxTasksPerTick; i++) {
             RTPRunnable task = queue.poll();
             if (task == null) break;
-            task.runWithTracking();
+
+            // Wrap task execution to prevent pipeline crashes from unhandled exceptions
+            try {
+                task.runWithTracking();
+            } catch (Exception e) {
+                SendMessage.log(Level.SEVERE, "Error executing task in region processor: " + task, e);
+            }
         }
 
         if (queue.isEmpty()) {

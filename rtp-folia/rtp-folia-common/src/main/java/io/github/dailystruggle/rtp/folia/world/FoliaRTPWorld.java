@@ -12,6 +12,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import io.github.dailystruggle.rtp.common.RTP;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
@@ -111,12 +112,12 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
 
   @Override
   public void keepChunkAt(int cx, int cz) {
-    world.setChunkForceLoaded(cx, cz, true);
+    RTP.scheduler.runTask(this, cx, cz, () -> {world.setChunkForceLoaded(cx, cz, true);});
   }
 
   @Override
   public void forgetChunkAt(int cx, int cz) {
-    world.setChunkForceLoaded(cx, cz, false);
+    RTP.scheduler.runTask(this, cx, cz, () -> {world.setChunkForceLoaded(cx, cz, false);});
   }
 
   @Override
@@ -143,11 +144,6 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   @Override
   public boolean isInactive() {
     return Bukkit.getWorld(id) == null;
-  }
-
-  @Override
-  public boolean isForceLoaded(int cx, int cz) {
-    return world.isChunkForceLoaded(cx, cz);
   }
 
   @Override

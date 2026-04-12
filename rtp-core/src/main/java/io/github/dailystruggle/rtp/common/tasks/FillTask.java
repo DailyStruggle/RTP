@@ -301,7 +301,6 @@ public class FillTask extends RTPRunnable {
 
         save();
         shape.save(region.name, region.getWorld().name());
-        RTP.scheduler.runTask(() -> region.getWorld().save());
       }
     }
 
@@ -368,7 +367,7 @@ public class FillTask extends RTPRunnable {
       ByteBuffer buf = ByteBuffer.allocate(25).order(ByteOrder.BIG_ENDIAN);
       buf.putLong(fillIter.get());
       Shape<?> shape = region.getShape();
-      if (shape instanceof MemoryShape memoryShape) {buf.putLong(memoryShape.spatialResolution);}
+      if (shape instanceof MemoryShape<?> memoryShape) {buf.putLong(memoryShape.spatialResolution);}
       buf.putLong(currentOffset);
       buf.put((byte) 0);
       out.write(buf.array());
@@ -493,7 +492,7 @@ public class FillTask extends RTPRunnable {
 
       // Unconditional chunk generation request
       RTP.serverAccessor.getChunkManager().getChunkAtAsync(world, cx, cz)
-              .orTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+              .orTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
               .whenComplete((chunkKey, throwable) -> {
                 try {
                   if (throwable != null || chunkKey == null || isCancelled() || pause.get()) {
@@ -501,88 +500,91 @@ public class FillTask extends RTPRunnable {
                       RTP.log(Level.WARNING, "[FillTask] Chunk generation exception at " + pos, throwable);
                     } else if (chunkKey == null) {
                       RTP.log(Level.WARNING, "[FillTask] INSTANT BYPASS: Chunk manager returned a null chunkKey for " + pos);
-                    } else if (isCancelled()) {
-                    } else if (pause.get()) {
                     } else {
-                      RTP.log(Level.WARNING, "[FillTask] undetermined failure at " + pos);
+                        if (!isCancelled() && !pause.get()) {
+                          RTP.log(Level.WARNING, "[FillTask] undetermined failure at " + pos);
+                        }
                     }
-                    res.complete(false);
+                      res.complete(false);
                     return;
                   }
 
-                  RTPChunk<?> chunk = world.getCachedChunk(chunkKey);
-                  if (chunk == null) {
-                    shape.addBadLocation(pos);
-                    res.complete(false);
-                    return;
-                  }
+                  RTPLocation targetLoc = new RTPLocation(world, blockX, 0, blockZ);
+                  RTP.serverAccessor.getScheduler().runTask(targetLoc, () -> {
+                    try {
+                      RTPChunk<?> chunk = world.getCachedChunk(chunkKey);
+                      if (chunk == null) {
+                        shape.addBadLocation(pos);
+                        res.complete(false);
+                        return;
+                      }
 
-                  chunk.keep(true);
-                  try {
-                    MutableRTPCoords localCursor = new MutableRTPCoords(blockX, blockZ);
-                    localCursor.setWorldName(world.name());
+                      MutableRTPCoords localCursor = new MutableRTPCoords(blockX, blockZ);
+                      localCursor.setWorldName(world.name());
 
-                    if (!vert.adjust(chunk, localCursor)) {
-                      shape.addBadLocation(pos);
-                      res.complete(false);
-                      return;
-                    }
+                      if (!vert.adjust(chunk, localCursor)) {
+                        shape.addBadLocation(pos);
+                        res.complete(false);
+                        return;
+                      }
 
-                    // PHYSICAL BIOME CHECK: Evaluated directly from the generated 3D block array
-                    String actualBiome = world.getBiome(localCursor.x, localCursor.y, localCursor.z);
+                      // PHYSICAL BIOME CHECK: Evaluated directly from the generated 3D block array
+                      String actualBiome = world.getBiome(localCursor.x, localCursor.y, localCursor.z);
 
-                    if (biomeRecall) shape.addBiomeLocation(pos, 1, actualBiome);
+                      if (biomeRecall) shape.addBiomeLocation(pos, 1, actualBiome);
 
-                    if (!defaultBiomes.contains(actualBiome.toUpperCase())) {
-                      shape.addBadLocation(pos);
-                      res.complete(false);
-                      return;
-                    }
+                      if (!defaultBiomes.contains(actualBiome.toUpperCase())) {
+                        shape.addBadLocation(pos);
+                        res.complete(false);
+                        return;
+                      }
 
-                    boolean pass = localCursor.y < vert.maxY();
-                    if (!pass) {
-                      shape.addBadLocation(pos);
-                      res.complete(false);
-                      return;
-                    }
+                      boolean pass = localCursor.y < vert.maxY();
+                      if (!pass) {
+                        shape.addBadLocation(pos);
+                        res.complete(false);
+                        return;
+                      }
 
-                    int localX = localCursor.x & 15;
-                    int localZ = localCursor.z & 15;
+                      int localX = localCursor.x & 15;
+                      int localZ = localCursor.z & 15;
 
-                    int minX = Math.max(0, localX - finalSafetyRadius);
-                    int maxX = Math.min(15, localX + finalSafetyRadius);
-                    int minZ = Math.max(0, localZ - finalSafetyRadius);
-                    int maxZ = Math.min(15, localZ + finalSafetyRadius);
+                      int minX = Math.max(0, localX - finalSafetyRadius);
+                      int maxX = Math.min(15, localX + finalSafetyRadius);
+                      int minZ = Math.max(0, localZ - finalSafetyRadius);
+                      int maxZ = Math.min(15, localZ + finalSafetyRadius);
 
-                    for (int xx = minX; xx <= maxX && pass; xx++) {
-                      for (int zz = minZ; zz <= maxZ && pass; zz++) {
-                        for (int y = localCursor.y - finalSafetyRadius; y <= localCursor.y + finalSafetyRadius && pass; y++) {
-                          if (!chunk.isSafe(xx, y, zz, unsafeBlocks)) {
-                            pass = false;
+                      for (int xx = minX; xx <= maxX && pass; xx++) {
+                        for (int zz = minZ; zz <= maxZ && pass; zz++) {
+                          for (int y = localCursor.y - finalSafetyRadius; y <= localCursor.y + finalSafetyRadius && pass; y++) {
+                            if (!chunk.isSafe(xx, y, zz, unsafeBlocks)) {
+                              pass = false;
+                            }
                           }
                         }
                       }
-                    }
 
-                    if (isCancelled() || pause.get()) {
-                      res.complete(false);
-                      return;
-                    }
+                      if (isCancelled() || pause.get()) {
+                        res.complete(false);
+                        return;
+                      }
 
-                    if (pass) pass = GlobalRegionVerifiers.checkGlobalRegionVerifiers(localCursor).join();
+                      if (pass) pass = GlobalRegionVerifiers.checkGlobalRegionVerifiers(localCursor).join();
 
-                    if (pass) {
-                      res.complete(true);
-                    } else {
+                      if (pass) {
+                        res.complete(true);
+                      } else {
+                        shape.addBadLocation(pos);
+                        res.complete(false);
+                      }
+                    } catch (Throwable t) {
+                      RTP.log(Level.SEVERE, "[FillTask] Validation crashed on Region Thread at location " + pos, t);
                       shape.addBadLocation(pos);
                       res.complete(false);
                     }
-
-                  } finally {
-                    chunk.keep(false);
-                  }
+                  });
                 } catch (Throwable t) {
-                  RTP.log(Level.SEVERE, "[FillTask] Async validation crashed internally at location " + pos, t);
+                  RTP.log(Level.SEVERE, "[FillTask] Async callback crashed at location " + pos, t);
                   shape.addBadLocation(pos);
                   res.complete(false);
                 }

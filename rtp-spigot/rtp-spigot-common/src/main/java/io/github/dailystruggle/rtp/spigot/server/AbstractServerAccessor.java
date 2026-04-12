@@ -189,11 +189,6 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   public abstract @NotNull io.github.dailystruggle.rtp.api.world.RTPChunkManager getChunkManager();
 
   @Override
-  public void executeTask(io.github.dailystruggle.rtp.common.tasks.RTPRunnable task) {
-    task.runWithTracking();
-  }
-
-  @Override
   public @Nullable Object getShape(String name) {
     return shapeFunction.apply(name);
   }
@@ -391,9 +386,9 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
     org.bukkit.plugin.java.JavaPlugin javaPlugin = (org.bukkit.plugin.java.JavaPlugin) plugin;
 
     new io.github.dailystruggle.rtp.spigot.server.SyncTeleportProcessing().runTaskTimer(javaPlugin, 0, 1);
-    new io.github.dailystruggle.rtp.spigot.server.AsyncTeleportProcessing(javaPlugin).runTaskTimer(javaPlugin, 0, 1);
-    new io.github.dailystruggle.rtp.spigot.server.FillTaskProcessing(javaPlugin).runTaskTimer(javaPlugin, 0, 1);
-    new io.github.dailystruggle.rtp.spigot.server.DatabaseProcessing(javaPlugin).runTaskTimer(javaPlugin, 0, 1);
+    new io.github.dailystruggle.rtp.spigot.server.AsyncTeleportProcessing(javaPlugin).runTaskTimerAsynchronously(javaPlugin, 0, 1);
+    new io.github.dailystruggle.rtp.spigot.server.FillTaskProcessing(javaPlugin).runTaskTimerAsynchronously(javaPlugin, 0, 1);
+    new io.github.dailystruggle.rtp.spigot.server.DatabaseProcessing(javaPlugin).runTaskTimerAsynchronously(javaPlugin, 0, 1);
   }
 
   @Override

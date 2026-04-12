@@ -484,33 +484,51 @@ public class SendMessage {
                   return String.join(", ", RTP.getInstance().fillTasks.keySet());
               });
       placeholders.put(
-              "fill_eta",
+              "fill_eta", // Verify if this needs to be "[fill_eta]" based on your other map entries!
               uuid -> {
-                  if (RTP.getInstance() == null) return "0";
-                  long maxEta = 0;
-                  for (io.github.dailystruggle.rtp.common.tasks.FillTask task : RTP.getInstance().fillTasks.values()) {
-                      // Returns the ETA of the longest-running active task
-                      if (task.latestEtaSeconds > maxEta) maxEta = task.latestEtaSeconds;
+                  try {
+                      if (RTP.getInstance() == null) return "0s";
+
+                      long maxEta = 0;
+                      for (io.github.dailystruggle.rtp.common.tasks.FillTask task : RTP.getInstance().fillTasks.values()) {
+                          if (task.latestEtaSeconds > maxEta) maxEta = task.latestEtaSeconds;
+                      }
+
+                      ConfigParser<MessagesKeys> langParser =
+                              (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+
+                      if (langParser == null) return String.valueOf(maxEta) + "s";
+
+                      long days = java.util.concurrent.TimeUnit.SECONDS.toDays(maxEta);
+                      long hours = java.util.concurrent.TimeUnit.SECONDS.toHours(maxEta) % 24;
+                      long minutes = java.util.concurrent.TimeUnit.SECONDS.toMinutes(maxEta) % 60;
+                      long seconds = maxEta % 60;
+
+                      StringBuilder replacement = new StringBuilder();
+
+                      // Use String.valueOf() to completely eliminate the risk of NullPointerExceptions
+                      if (days > 0) {
+                          replacement.append(days).append(String.valueOf(langParser.getConfigValue(MessagesKeys.days, ""))).append(" ");
+                      }
+                      if (hours > 0) {
+                          replacement.append(hours).append(String.valueOf(langParser.getConfigValue(MessagesKeys.hours, ""))).append(" ");
+                      }
+                      if (minutes > 0) {
+                          replacement.append(minutes).append(String.valueOf(langParser.getConfigValue(MessagesKeys.minutes, ""))).append(" ");
+                      }
+
+                      // Guarantee a non-empty return string so the engine doesn't reject it
+                      if (seconds > 0 || replacement.isEmpty()) {
+                          replacement.append(seconds).append(String.valueOf(langParser.getConfigValue(MessagesKeys.seconds, "")));
+                      }
+
+                      return replacement.toString().trim();
+
+                  } catch (Exception e) {
+                      // If it fails again, this will print the exact reason to your console instead of silently leaving the text un-parsed.
+                      io.github.dailystruggle.rtp.common.RTP.log(java.util.logging.Level.WARNING, "Placeholder resolution failed for fill_eta", e);
+                      return "0s";
                   }
-
-                  ConfigParser<MessagesKeys> langParser =
-                          (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-                  long days = TimeUnit.SECONDS.toDays(maxEta);
-                  long hours = TimeUnit.SECONDS.toHours(maxEta) % 24;
-                  long minutes = TimeUnit.SECONDS.toMinutes(maxEta) % 60;
-                  long seconds = maxEta % 60;
-
-                  String replacement = "";
-                  if (days > 0)
-                      replacement += days + langParser.getConfigValue(MessagesKeys.days, "").toString() + " ";
-                  if (hours > 0)
-                      replacement += hours + langParser.getConfigValue(MessagesKeys.hours, "").toString() + " ";
-                  if (minutes > 0)
-                      replacement += minutes + langParser.getConfigValue(MessagesKeys.minutes, "").toString() + " ";
-                  if (seconds > 0)
-                      replacement += seconds + langParser.getConfigValue(MessagesKeys.seconds, "").toString();
-
-                  return replacement;
               });
   }
 

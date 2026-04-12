@@ -99,16 +99,7 @@ public abstract class RTPWorld<T> {
     return !isInactive();
   }
 
-  /**
-   * Check if a chunk is force loaded
-   *
-   * @param cx the x coordinate of the chunk
-   * @param cz the z coordinate of the chunk
-   * @return true if force loaded, false otherwise
-   */
-  public abstract boolean isForceLoaded(int cx, int cz);
-
-  /** Save world data */
+    /** Save world data */
   public abstract void save();
 
   /**
