@@ -12,6 +12,7 @@ import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
@@ -52,7 +53,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
     public static long viewDistanceTeleport = 0;
 
     static {
-      RTP.configs.onReload(ConfigCache::reload);
+      Configs.onReload(ConfigCache::reload);
       if (!RTP.reloading.get()) reload();
     }
 
@@ -181,66 +182,102 @@ public final class TeleportPipelineTask extends RTPRunnable {
       teleportData.nextTask = this;
       teleportData.targetRegion = region;
 
-      GenerationResult res = region.getLocation(context);
-      if (res == null) {
-        // If the player was successfully queued, gracefully halt this thread.
-        // Region.execute() will spawn a new pipeline task when a location is ready.
-        if (RTP.getInstance().processingPlayers.contains(playerId)) {
-          if (region != null && handledInFlight.compareAndSet(false, true)) {
-            region.inFlightCalculations.getAndDecrement();
-          }
-          return;
-        }
-
-        // Otherwise, generation failed entirely (e.g., custom biome search failed).
-        currentPhase = Phase.CLEANUP;
-        runCleanup();
-        return;
+      CompletableFuture<GenerationResult> locationFuture = RTP.serverAccessor.getLocationGenerator().getLocation(region, context);
+      if (locationFuture.isDone()) {
+        processGenerationResult(locationFuture.join());
+      } else {
+        locationFuture.thenAccept(this::processGenerationResult).exceptionally(e -> {
+          SupportLogger.logException(Level.WARNING, "Error in getLocationFuture", e);
+          return null;
+        });
       }
-
-      coords = res.coords();
-      long attempts = res.attempts();
-
-      if (coords == null) {
-        teleportData.attempts = attempts;
-        RTP.serverAccessor.sendMessage(sender().uuid(), player.uuid(), ConfigCache.unsafe);
-        RTPTeleportCancel.refund(player.uuid());
-        currentPhase = Phase.CLEANUP;
-        runCleanup();
-        return;
-      }
-
-      teleportData.selectedCoords = coords;
-      teleportData.attempts = attempts;
-      success = true;
     } catch (Exception e) {
       SupportLogger.logException(Level.WARNING, "Error in runSetup", e);
       new RTPTeleportCancel(player.uuid()).run();
       currentPhase = Phase.CLEANUP;
       runCleanup();
-    } finally {
-      boolean finalSuccess = success;
-      setupPostActions.forEach(consumer -> consumer.accept(this, finalSuccess));
-      if (success) {
-        currentPhase = Phase.LOAD;
+    }
+  }
 
-        long radius2 = ConfigCache.viewDistanceTeleport;
-        long max = (radius2 * radius2 * 4) + (4 * radius2) + 1;
-        ChunkSet chunkSet = this.region.chunkManager.chunks(coords, radius2);
-        if (max > chunkSet.chunks().size()) {
-          RTPWorld<?> world = RTP.serverAccessor.getRTPWorld(coords.worldName());
-          if (world == null) world = region.getWorld();
-          RTP.serverAccessor.getChunkManager().keep(chunkSet, false, world);
-          chunkSet = region.chunkManager.chunks(coords, radius2);
-          RTP.serverAccessor.getChunkManager().keep(chunkSet, true, world);
+  private void processGenerationResult(GenerationResult res) {
+    try {
+      RTPPlayer player = context.player();
+      if (player == null) {
+        currentPhase = Phase.CLEANUP;
+        runCleanup();
+        return;
+      }
+      UUID playerId = player.uuid();
+
+      boolean success = false;
+      try {
+        if (res == null) {
+          // If the player was successfully queued, gracefully halt this thread.
+          // Region.execute() will spawn a new pipeline task when a location is ready.
+          if (RTP.getInstance().processingPlayers.contains(playerId)) {
+            if (region != null && handledInFlight.compareAndSet(false, true)) {
+              region.inFlightCalculations.getAndDecrement();
+            }
+            return;
+          }
+
+          // Otherwise, generation failed entirely (e.g., custom biome search failed).
+          currentPhase = Phase.CLEANUP;
+          runCleanup();
+          return;
         }
 
-        if (chunkSet.complete().isDone()) {
-          this.run();
-        } else {
-          RTP.scheduler.runTaskAsynchronously(this);
+        coords = res.coords();
+        long attempts = res.attempts();
+
+        if (coords == null) {
+          teleportData.attempts = attempts;
+          RTP.serverAccessor.sendMessage(sender().uuid(), player.uuid(), ConfigCache.unsafe);
+          RTPTeleportCancel.refund(player.uuid());
+          currentPhase = Phase.CLEANUP;
+          runCleanup();
+          return;
+        }
+
+        teleportData.selectedCoords = coords;
+        teleportData.attempts = attempts;
+        success = true;
+      } catch (Exception e) {
+        SupportLogger.logException(Level.WARNING, "Error in runSetup", e);
+        new RTPTeleportCancel(player.uuid()).run();
+        currentPhase = Phase.CLEANUP;
+        runCleanup();
+      } finally {
+        boolean finalSuccess = success;
+        setupPostActions.forEach(consumer -> consumer.accept(this, finalSuccess));
+        if (success) {
+          currentPhase = Phase.LOAD;
+
+          long radius2 = ConfigCache.viewDistanceTeleport;
+          long max = (radius2 * radius2 * 4) + (4 * radius2) + 1;
+          ChunkSet chunkSet = this.region.chunkManager.chunks(coords, radius2);
+          RTPWorld<?> rtpWorld = RTP.serverAccessor.getRTPWorld(coords.worldName());
+          if (max > chunkSet.chunks().size()) {
+            RTPWorld<?> world = rtpWorld;
+            if (world == null) world = region.getWorld();
+            RTP.serverAccessor.getChunkManager().keep(chunkSet, false, world);
+            chunkSet = region.chunkManager.chunks(coords, radius2);
+            RTP.serverAccessor.getChunkManager().keep(chunkSet, true, world);
+          }
+
+          if (chunkSet.complete().isDone()) {
+            RTP.scheduler.runTask(rtpWorld, coords.x() >> 4, coords.z() >> 4, this);
+          } else {
+            RTP.scheduler.runTaskAsynchronously(this);
+          }
         }
       }
+    } catch (Exception e) {
+      SupportLogger.logException(Level.SEVERE, "Error in processGenerationResult", e);
+      new RTPTeleportCancel(player().uuid()).run();
+      currentPhase = Phase.CLEANUP;
+      runCleanup();
+      RTP.getInstance().processingPlayers.remove(player().uuid());
     }
   }
 
@@ -295,11 +332,8 @@ public final class TeleportPipelineTask extends RTPRunnable {
       }
 
       ChunkSet chunkSet = this.region.chunkManager.getChunkSet(coords);
-      if (chunkSet == null) {
-        // Fallback to coordinates-based lookup at the region level if available.
-        // RTPChunkManager no longer supports direct coordinate-based lookups.
-        chunkSet = null;
-      }
+      // Fallback to coordinates-based lookup at the region level if available.
+      // RTPChunkManager no longer supports direct coordinate-based lookups.
       if (chunkSet == null) {
         currentPhase = Phase.TELEPORT;
         RTP.scheduler.runTask(this);

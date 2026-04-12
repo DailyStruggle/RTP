@@ -23,6 +23,7 @@ import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionChunkManager;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
+import io.github.dailystruggle.rtp.api.selection.ILocationGenerator;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,6 +44,7 @@ public class TeleportPipelineCleanupTest {
     private RTPPlayer player;
     private RTPWorld world;
     private GenerationContext context;
+    private ILocationGenerator locationGenerator;
     private Configs configs;
     private ConfigParser<PerformanceKeys> performanceConfig;
     private ConfigParser<MessagesKeys> messagesConfig;
@@ -53,9 +55,11 @@ public class TeleportPipelineCleanupTest {
         scheduler = mock(RTPScheduler.class);
         serverAccessor = mock(RTPServerAccessor.class);
         rtpChunkManager = mock(RTPChunkManager.class);
+        locationGenerator = mock(ILocationGenerator.class);
 
         RTP.scheduler = scheduler;
         RTP.serverAccessor = serverAccessor;
+        when(serverAccessor.getLocationGenerator()).thenReturn(locationGenerator);
         when(serverAccessor.createTaskPipe()).thenReturn(mock(io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe.class));
         when(serverAccessor.getPluginDirectory()).thenReturn(new java.io.File("."));
 
@@ -117,7 +121,7 @@ public class TeleportPipelineCleanupTest {
             ChunkSet chunkSet = new ChunkSet(new ArrayList<>(), complete);
             complete.complete(true);
 
-            when(region.getLocation(context)).thenReturn(new GenerationResult(coords, 1L, chunkSet));
+            when(locationGenerator.getLocation(region, context)).thenReturn(CompletableFuture.completedFuture(new GenerationResult(coords, 1L, chunkSet)));
             when(regionChunkManager.chunks(eq(coords), anyLong())).thenReturn(chunkSet);
             when(regionChunkManager.getChunkSet(coords)).thenReturn(chunkSet);
             when(player.setLocation(any())).thenReturn(CompletableFuture.completedFuture(true));
@@ -149,7 +153,7 @@ public class TeleportPipelineCleanupTest {
             RTPCoords coords = new RTPCoords("world", 100, 64, 100);
             ChunkSet chunkSet = new ChunkSet(new ArrayList<>(), new CompletableFuture<>());
 
-            when(region.getLocation(context)).thenReturn(new GenerationResult(coords, 1L, chunkSet));
+            when(locationGenerator.getLocation(region, context)).thenReturn(CompletableFuture.completedFuture(new GenerationResult(coords, 1L, chunkSet)));
             when(regionChunkManager.chunks(eq(coords), anyLong())).thenReturn(chunkSet);
             when(regionChunkManager.getChunkSet(coords)).thenReturn(chunkSet);
 

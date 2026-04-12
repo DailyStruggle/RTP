@@ -31,12 +31,6 @@ import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public class LocationGenerator implements ILocationGenerator {
-    @Override
-    public CompletableFuture<GenerationResult> getLocation(GenerationContext context) {
-        RTPWorld<?> rtpWorld = context.player().getLocation().world();
-        Region region = RTP.selectionAPI.getRegion(rtpWorld);
-        return CompletableFuture.completedFuture(getLocation(region, context));
-    }
     private static final Set<String> unsafeBlocks = new ConcurrentSkipListSet<>();
     private static final AtomicLong lastUpdate = new AtomicLong(0);
     private static final AtomicInteger safetyRadius = new AtomicInteger(0);
@@ -53,28 +47,28 @@ public class LocationGenerator implements ILocationGenerator {
     }
 
     @Override
-    public GenerationResult getLocation(Object region, GenerationContext context) {
-        if (!(region instanceof Region)) return null;
-        return getLocation((Region) region, context);
+    public CompletableFuture<GenerationResult> getLocation(Object region, GenerationContext context) {
+        if (!(region instanceof Region)) return CompletableFuture.completedFuture(null);
+        return CompletableFuture.completedFuture(getLocation((Region) region, context));
     }
 
     @Override
-    public GenerationResult generateLocation(Object region, GenerationContext context) {
-        if (!(region instanceof Region)) return null;
-        return generateLocation((Region) region, context);
+    public CompletableFuture<GenerationResult> generateLocation(Object region, GenerationContext context) {
+        if (!(region instanceof Region)) return CompletableFuture.completedFuture(null);
+        return CompletableFuture.completedFuture(generateLocation((Region) region, context));
     }
 
     @Override
-    public GenerationResult getLocation(
+    public CompletableFuture<GenerationResult> getLocation(
             Object region, RTPCommandSender sender, RTPPlayer player, @Nullable Set<String> biomeNames) {
-        if (!(region instanceof Region)) return null;
-        return getLocation((Region) region, sender, player, biomeNames);
+        if (!(region instanceof Region)) return CompletableFuture.completedFuture(null);
+        return CompletableFuture.completedFuture(getLocation((Region) region, sender, player, biomeNames));
     }
 
     @Override
-    public GenerationResult getLocation(Object region, Set<String> biomeNames) {
-        if (!(region instanceof Region)) return null;
-        return getLocation((Region) region, biomeNames);
+    public CompletableFuture<GenerationResult> getLocation(Object region, Set<String> biomeNames) {
+        if (!(region instanceof Region)) return CompletableFuture.completedFuture(null);
+        return CompletableFuture.completedFuture(getLocation((Region) region, biomeNames));
     }
 
     public static GenerationResult getLocation(Region region, GenerationContext context) {

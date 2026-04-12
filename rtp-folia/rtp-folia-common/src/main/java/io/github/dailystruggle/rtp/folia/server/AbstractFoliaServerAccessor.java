@@ -17,7 +17,6 @@ import io.github.dailystruggle.rtp.folia.world.FoliaLocationGenerator;
 import io.github.dailystruggle.rtp.folia.world.FoliaRTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.folia.tasks.CountBoundTaskPipe;
-import io.github.dailystruggle.rtp.folia.tasks.FoliaRegionProcessor;
 import io.github.dailystruggle.rtp.folia.tasks.RegionKey;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
@@ -92,16 +91,24 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
     return "Folia";
   }
 
+  protected Integer intVersion = null;
   @Override
   public Integer getServerIntVersion() {
-    String version = Bukkit.getBukkitVersion().split("-")[0];
-    String[] parts = version.split("\\.");
-    if (parts.length < 2) return 0;
-    try {
-      return Integer.parseInt(parts[1]);
-    } catch (NumberFormatException e) {
-      return 0;
+    if (intVersion == null) {
+      String v = getServerVersion();
+      if (v.contains("1_13")) intVersion = 13;
+      else if (v.contains("1_14")) intVersion = 14;
+      else if (v.contains("1_15")) intVersion = 15;
+      else if (v.contains("1_16")) intVersion = 16;
+      else if (v.contains("1_17")) intVersion = 17;
+      else if (v.contains("1_18")) intVersion = 18;
+      else if (v.contains("1_19")) intVersion = 19;
+      else if (v.contains("1_20")) intVersion = 20;
+      else if (v.contains("1_21")) intVersion = 21;
+      else if (v.contains("26_1")) intVersion = 26;
+      else intVersion = 13;
     }
+    return intVersion;
   }
 
   @Override
@@ -120,31 +127,6 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
 
   @Override
   public abstract io.github.dailystruggle.rtp.api.world.RTPChunkManager getChunkManager();
-
-  @Override
-  public void executeTask(io.github.dailystruggle.rtp.common.tasks.RTPRunnable task) {
-    if (!(plugin instanceof Plugin bukkitPlugin)) {
-      RTP.scheduler.runTaskAsynchronously(task::runWithTracking);
-      return;
-    }
-
-    RTPLocation rtpLoc = task.getLocation();
-    RegionKey key = RegionKey.from(rtpLoc);
-
-    if (key == null) {
-      Bukkit.getAsyncScheduler().runNow(bukkitPlugin, scheduledTask -> task.runWithTracking());
-    } else {
-      regionQueues.computeIfAbsent(key, k -> new ConcurrentLinkedQueue<>()).add(task);
-      if (activeProcessors.add(key)) {
-        World world = Bukkit.getWorld(key.worldId());
-        if (world != null) {
-          Location bukkitLoc = new Location(world, key.regionX() << 9, 0, key.regionZ() << 9);
-          FoliaRegionProcessor processor = new FoliaRegionProcessor(bukkitPlugin, key, regionQueues.get(key), activeProcessors);
-          Bukkit.getRegionScheduler().run(bukkitPlugin, bukkitLoc, scheduledTask -> processor.run());
-        }
-      }
-    }
-  }
 
   @Override
   public @Nullable Object getShape(String name) {
@@ -240,18 +222,21 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   public void sendMessage(UUID target, String message, String tag) {
     message = tagMessage(message, tag);
     if (target.equals(RTPAPI.serverId)) {
-      Bukkit.getConsoleSender().sendMessage(message);
+      io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(Bukkit.getConsoleSender(), message);
       return;
     }
     Player player = Bukkit.getPlayer(target);
-    if (player != null) player.sendMessage(message);
+    if (player != null) io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(player, message);
   }
 
   @Override
   public void sendMessageAndSuggest(UUID target, String message, String suggestion) {
     message = tagMessage(message, null);
-    // Folia implementation
+    RTPCommandSender sender = getSender(target);
+    // Routes the suggestion safely as a click event via your formatting pipeline
+    io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(sender, message, "", suggestion);
   }
+
 
   @Override
   public void sendMessage(UUID target1, UUID target2, String message, String tag) {
@@ -266,7 +251,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
 
   @Override
   public void sendMessage(RTPCommandSender target, String message, String hover, String click, String tag) {
-    // Folia implementation
+    io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(target, tagMessage(message, tag), hover, click);
   }
 
   @Override
@@ -292,10 +277,14 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   @Override
   public void announce(String msg, String permission, String tag) {
     msg = tagMessage(msg, tag);
-    Bukkit.broadcast(msg, permission);
-    if (!permission.equalsIgnoreCase("rtp.see")) {
-      Bukkit.getConsoleSender().sendMessage(msg);
+    for (Player player : Bukkit.getOnlinePlayers()) {
+      if (player.hasPermission(permission)) {
+        io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(player, msg);
+      }
     }
+
+    // Route to console via the formatting pipeline
+    io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(Bukkit.getConsoleSender(), msg);
   }
 
   private String tagMessage(String message, @Nullable String tag) {
@@ -332,36 +321,43 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   @Override
   public void start(Object plugin) {
     this.plugin = plugin;
-    if (!(plugin instanceof org.bukkit.plugin.java.JavaPlugin)) return;
-    org.bukkit.plugin.java.JavaPlugin javaPlugin = (org.bukkit.plugin.java.JavaPlugin) plugin;
+    if (!(plugin instanceof org.bukkit.plugin.java.JavaPlugin javaPlugin)) return;
 
+      // 1. GLOBAL SYNC THREAD: Only handle strict tick-bound sync tasks and cancellations
     org.bukkit.Bukkit.getGlobalRegionScheduler().runAtFixedRate(javaPlugin, scheduledTask -> {
       RTP rtp = RTP.getInstance();
       if (rtp == null) return;
 
       if (rtp.miscSyncTasks != null) rtp.miscSyncTasks.execute();
-      if (rtp.miscAsyncTasks != null) rtp.miscAsyncTasks.execute();
       if (rtp.cancelTasks != null) rtp.cancelTasks.execute();
-
-      if (RTP.selectionAPI != null) {
-        for (io.github.dailystruggle.rtp.common.selection.region.Region region : RTP.selectionAPI.permRegionLookup.values()) {
-          region.execute(Long.MAX_VALUE);
-        }
-      }
-
-      // Also process fill and database tasks as they are normally processed on Spigot via their own tasks
-      if (rtp.fillTasks != null) {
-        for (io.github.dailystruggle.rtp.common.tasks.FillTask fillTask : rtp.fillTasks.values()) {
-          if (!fillTask.isRunning()) {
-            rtp.scheduler.runTaskAsynchronously(fillTask);
-          }
-        }
-      }
-
-      if (rtp.databaseAccessor != null) {
-        rtp.scheduler.runTaskAsynchronously(() -> rtp.databaseAccessor.processQueries(Long.MAX_VALUE));
-      }
     }, 1, 1);
+
+    final io.github.dailystruggle.rtp.common.tasks.tick.AsyncTaskProcessing asyncTaskProcessing =
+            new io.github.dailystruggle.rtp.common.tasks.tick.AsyncTaskProcessing(25_000_000L);
+
+    // 2. ASYNC WORKER POOL: Handle region cache evaluation, selection API computation, and DB queries
+    // 50 milliseconds roughly equates to 1 tick (20 TPS)
+    org.bukkit.Bukkit.getAsyncScheduler().runAtFixedRate(javaPlugin, scheduledTask -> {
+      RTP rtp = RTP.getInstance();
+      if (rtp == null) return;
+
+      if (rtp.miscAsyncTasks != null) rtp.miscAsyncTasks.execute();
+
+      if (RTP.selectionAPI != null) RTP.selectionAPI.compute();
+
+      asyncTaskProcessing.run();
+
+      for (io.github.dailystruggle.rtp.common.tasks.FillTask fillTask : rtp.fillTasks.values()) {
+          if (!fillTask.isRunning()) {
+              RTP.scheduler.runTaskAsynchronously(fillTask);
+          }
+      }
+
+        if (rtp.databaseAccessor != null) {
+        // Since we are already on an async thread, we can execute queries directly
+        rtp.databaseAccessor.processQueries(Long.MAX_VALUE);
+      }
+    }, 50, 50, java.util.concurrent.TimeUnit.MILLISECONDS);
   }
 
   @Override
@@ -383,7 +379,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
 
   @Override
   public RTPTaskPipe createCachePipe() {
-    return new CountBoundTaskPipe((Plugin) plugin, 20);
+    return new CountBoundTaskPipe((Plugin) plugin, 2);
   }
 
   @Override

@@ -11,6 +11,7 @@ import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.selection.GenerationContext;
+import io.github.dailystruggle.rtp.api.selection.ILocationGenerator;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
@@ -38,6 +39,7 @@ public class TeleportCancelTicketTest {
     private RTPPlayer player;
     private RTPWorld world;
     private GenerationContext context;
+    private ILocationGenerator locationGenerator;
     private Configs configs;
     private ConfigParser<PerformanceKeys> performanceConfig;
     private ConfigParser<MessagesKeys> messagesConfig;
@@ -47,8 +49,11 @@ public class TeleportCancelTicketTest {
     void setUp() {
         scheduler = mock(RTPScheduler.class);
         serverAccessor = mock(RTPServerAccessor.class);
+        locationGenerator = mock(ILocationGenerator.class);
 
         RTP.scheduler = scheduler;
+        RTP.serverAccessor = serverAccessor;
+        when(serverAccessor.getLocationGenerator()).thenReturn(locationGenerator);
         doAnswer(invocation -> {
             Runnable runnable = invocation.getArgument(3);
             runnable.run();
@@ -83,8 +88,8 @@ public class TeleportCancelTicketTest {
         player = mock(RTPPlayer.class);
         world = mock(RTPWorld.class);
         RTPCoords mockCoords = new RTPCoords("world", 0, 0, 0);
-        GenerationResult mockLocation = new GenerationResult(mockCoords, 1L, mockChunkSet);
-        when(region.getLocation(any(GenerationContext.class))).thenReturn(mockLocation);
+        java.util.concurrent.CompletableFuture<GenerationResult> mockLocation = java.util.concurrent.CompletableFuture.completedFuture(new GenerationResult(mockCoords, 1L, mockChunkSet));
+        when(locationGenerator.getLocation(eq(region), any(GenerationContext.class))).thenReturn(mockLocation);
         configs = mock(Configs.class);
         performanceConfig = mock(ConfigParser.class);
         messagesConfig = mock(ConfigParser.class);

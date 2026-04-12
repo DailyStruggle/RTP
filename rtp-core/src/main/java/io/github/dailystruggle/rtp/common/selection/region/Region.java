@@ -280,17 +280,7 @@ public class Region extends FactoryValue<RegionKeys> {
       }
     }
 
-    currentAvailable = availableTime - (System.nanoTime() - start);
-    if (currentAvailable <= 0) {
-//      System.out.println("[RTP-DEBUG] Region '" + name + "' ABORT 1: Out of time after player queue processing. (Remaining: " + currentAvailable + "ns)");
-      return;
-    }
-
-//    System.out.println("[RTP-DEBUG] Region '" + name + "' processing miscPipeline. Budget: " + currentAvailable + "ns");
-    miscPipeline.execute(currentAvailable);
-
-    currentAvailable = availableTime - (System.nanoTime() - start);
-//    System.out.println("[RTP-DEBUG] Region '" + name + "' finished miscPipeline. Remaining budget for cache: " + currentAvailable + "ns");
+    miscPipeline.execute(availableTime - (System.nanoTime() - start));
 
 //    long totalCap = Math.max(settings.cacheCap(), queueManager.playerQueue.size());
     long cacheCap = settings.cacheCap();
@@ -310,7 +300,7 @@ public class Region extends FactoryValue<RegionKeys> {
       }
 
 //      System.out.println("[RTP-DEBUG] Region '" + name + "' executing cachePipeline with budget: " + currentAvailable + "ns");
-      cachePipeline.execute(currentAvailable);
+      cachePipeline.execute(availableTime - (System.nanoTime() - start));
     } finally {
       isRefillingCache.set(false);
     }
@@ -328,15 +318,6 @@ public class Region extends FactoryValue<RegionKeys> {
     return res;
   }
 
-  /**
-   * getLocation - get a location from cache or generate one
-   *
-   * @param context generation context
-   * @return location and number of attempts
-   */
-  public GenerationResult getLocation(GenerationContext context) {
-    return RTP.serverAccessor.getLocationGenerator().getLocation(this, context);
-  }
 
   /**
    * getLocation - generate a location with biome requirements
@@ -344,7 +325,7 @@ public class Region extends FactoryValue<RegionKeys> {
    * @param biomeNames set of biomes to filter by
    * @return location and number of attempts
    */
-  public GenerationResult getLocation(@Nullable Set<String> biomeNames) {
+  public CompletableFuture<GenerationResult> getLocation(@Nullable Set<String> biomeNames) {
     return RTP.serverAccessor.getLocationGenerator().generateLocation(this, new GenerationContext(null, null, biomeNames));
   }
 

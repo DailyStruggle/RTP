@@ -133,8 +133,6 @@ public interface RTPServerAccessor {
               io.github.dailystruggle.rtp.api.world.RTPWorld<?>, java.util.Set<String>>
           getter);
 
-  void executeTask(io.github.dailystruggle.rtp.common.tasks.RTPRunnable task);
-
   Object getWorldBorder(String worldName);
 
   Object getShape(String name);

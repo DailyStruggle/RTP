@@ -63,7 +63,6 @@ public class RegionQueueManager {
         playerQueue.add(id);
         RTP.getInstance().queuedPlayers.add(id);
         perPlayerLocationQueue.putIfAbsent(id, new ConcurrentLinkedQueue<>());
-        region.miscPipeline.add(new RegionCacheTask(region, id, Long.MAX_VALUE));
     }
 
     /**

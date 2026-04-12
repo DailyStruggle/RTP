@@ -165,7 +165,6 @@ public final class BukkitRTPWorld extends RTPWorld<World> {
     return Bukkit.getWorld(id) == null;
   }
 
-  @Override
   public boolean isForceLoaded(int cx, int cz) {
     return world.isChunkForceLoaded(cx, cz);
   }

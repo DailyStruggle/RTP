@@ -28,10 +28,6 @@ public abstract class RTPTaskPipe {
     return runnables.size();
   }
 
-  public long avgTime() {
-    return avgTime;
-  }
-
   public void add(Runnable runnable) {
     runnables.add(runnable);
   }

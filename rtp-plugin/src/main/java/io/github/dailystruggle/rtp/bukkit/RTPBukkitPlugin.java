@@ -414,8 +414,6 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     Bukkit.getPluginManager().registerEvents(new OnPlayerRespawn(), this);
     Bukkit.getPluginManager().registerEvents(new OnPlayerTeleport(), this);
     Bukkit.getPluginManager().registerEvents(new OnWorldLoadUnload(), this);
-    if (RTP.serverAccessor.getServerIntVersion() < 13)
-      Bukkit.getPluginManager().registerEvents(new OnChunkUnload(), this);
 
     if (RTP.serverAccessor.getServerIntVersion() > 12) EffectsAPI.init(this);
   }

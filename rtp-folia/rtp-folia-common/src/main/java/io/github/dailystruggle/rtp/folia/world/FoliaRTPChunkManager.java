@@ -14,10 +14,8 @@ public class FoliaRTPChunkManager implements RTPChunkManager {
 
     long key = ((long) x & 0xffffffffL | ((long) z << 32));
 
-    if (foliaRTPWorld.isForceLoaded(x, z)) {
-      if (foliaRTPWorld.getCachedChunk(key) != null) {
-        return CompletableFuture.completedFuture(key);
-      }
+    if (foliaRTPWorld.getCachedChunk(key) != null) {
+      return CompletableFuture.completedFuture(key);
     }
 
     return foliaRTPWorld.world().getChunkAtAsyncUrgently(x, z).thenApply(chunk -> {

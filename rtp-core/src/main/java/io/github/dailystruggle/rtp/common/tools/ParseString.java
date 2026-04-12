@@ -15,6 +15,8 @@ public class ParseString {
           String s = builder.toString();
           builder = null;
           if (placeholders.contains(s)) res.add(s);
+        } else if (front.contains(c)) {
+          builder = new StringBuilder();
         } else {
           builder.append(c);
         }
