@@ -160,7 +160,7 @@ public class OnEventTeleports implements Listener {
             return;
           }
 
-          RTPLocation location = new RTPLocation(res.coords(), res.attempts());
+          RTPLocation location = new RTPLocation(res.coords(), res.attempts(), res.reservation());
 
           if (location.coords() == null) {
             return;

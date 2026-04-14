@@ -25,7 +25,7 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
 
   @Override
   public RTPWorld<?> getWorld() {
-    return new BukkitRTPWorld(chunk.getWorld());
+    return RTP.serverAccessor.getRTPWorld(chunk.getWorld().getUID());
   }
 
   @Override

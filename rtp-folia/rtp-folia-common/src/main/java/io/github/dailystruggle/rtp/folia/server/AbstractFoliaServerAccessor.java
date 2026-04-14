@@ -126,9 +126,6 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public abstract io.github.dailystruggle.rtp.api.world.RTPChunkManager getChunkManager();
-
-  @Override
   public @Nullable Object getShape(String name) {
     return shapeFunction.apply(name);
   }
@@ -193,29 +190,17 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   @Override
   public void sendMessage(UUID target, MessagesKeys msgType, String tag) {
     ConfigParser<MessagesKeys> lang =
-        (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+            (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
     String message = lang.getConfigValue(msgType, "").toString();
-    message = tagMessage(message, tag);
-    if (target.equals(RTPAPI.serverId)) {
-      Bukkit.getConsoleSender().sendMessage(message);
-      return;
-    }
-    Player player = Bukkit.getPlayer(target);
-    if (player != null) player.sendMessage(message);
+    sendMessage(target, message, tag);
   }
 
   @Override
   public void sendMessage(UUID target1, UUID target2, MessagesKeys msgType, String tag) {
     ConfigParser<MessagesKeys> lang =
-        (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+            (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
     String message = lang.getConfigValue(msgType, "").toString();
-    message = tagMessage(message, tag);
-    Player p1 = Bukkit.getPlayer(target1);
-    if (target1.equals(RTPAPI.serverId)) {
-      Bukkit.getConsoleSender().sendMessage(message);
-    } else if (p1 != null) {
-      p1.sendMessage(message);
-    }
+    sendMessage(target1, target2, message, tag);
   }
 
   @Override
@@ -241,11 +226,22 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   @Override
   public void sendMessage(UUID target1, UUID target2, String message, String tag) {
     message = tagMessage(message, tag);
-    Player p1 = Bukkit.getPlayer(target1);
+
     if (target1.equals(RTPAPI.serverId)) {
-      Bukkit.getConsoleSender().sendMessage(message);
-    } else if (p1 != null) {
-      p1.sendMessage(message);
+      io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(Bukkit.getConsoleSender(), message);
+    } else {
+      Player p1 = Bukkit.getPlayer(target1);
+      if (p1 != null) io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(p1, message);
+    }
+
+    // Prevent double sending if target1 and target2 are the exact same entity
+    if (target1.equals(target2)) return;
+
+    if (target2.equals(RTPAPI.serverId)) {
+      io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(Bukkit.getConsoleSender(), message);
+    } else {
+      Player p2 = Bukkit.getPlayer(target2);
+      if (p2 != null) io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(p2, message);
     }
   }
 
@@ -311,7 +307,9 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   private Object plugin;
 
   @Override
-  public void stop() {}
+  public void stop() {
+    for (RTPWorld<?> rtpWorld : worldMap.values()) {rtpWorld.forgetChunks();}
+  }
 
   @Override
   public void start() {
@@ -321,43 +319,6 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   @Override
   public void start(Object plugin) {
     this.plugin = plugin;
-    if (!(plugin instanceof org.bukkit.plugin.java.JavaPlugin javaPlugin)) return;
-
-      // 1. GLOBAL SYNC THREAD: Only handle strict tick-bound sync tasks and cancellations
-    org.bukkit.Bukkit.getGlobalRegionScheduler().runAtFixedRate(javaPlugin, scheduledTask -> {
-      RTP rtp = RTP.getInstance();
-      if (rtp == null) return;
-
-      if (rtp.miscSyncTasks != null) rtp.miscSyncTasks.execute();
-      if (rtp.cancelTasks != null) rtp.cancelTasks.execute();
-    }, 1, 1);
-
-    final io.github.dailystruggle.rtp.common.tasks.tick.AsyncTaskProcessing asyncTaskProcessing =
-            new io.github.dailystruggle.rtp.common.tasks.tick.AsyncTaskProcessing(25_000_000L);
-
-    // 2. ASYNC WORKER POOL: Handle region cache evaluation, selection API computation, and DB queries
-    // 50 milliseconds roughly equates to 1 tick (20 TPS)
-    org.bukkit.Bukkit.getAsyncScheduler().runAtFixedRate(javaPlugin, scheduledTask -> {
-      RTP rtp = RTP.getInstance();
-      if (rtp == null) return;
-
-      if (rtp.miscAsyncTasks != null) rtp.miscAsyncTasks.execute();
-
-      if (RTP.selectionAPI != null) RTP.selectionAPI.compute();
-
-      asyncTaskProcessing.run();
-
-      for (io.github.dailystruggle.rtp.common.tasks.FillTask fillTask : rtp.fillTasks.values()) {
-          if (!fillTask.isRunning()) {
-              RTP.scheduler.runTaskAsynchronously(fillTask);
-          }
-      }
-
-        if (rtp.databaseAccessor != null) {
-        // Since we are already on an async thread, we can execute queries directly
-        rtp.databaseAccessor.processQueries(Long.MAX_VALUE);
-      }
-    }, 50, 50, java.util.concurrent.TimeUnit.MILLISECONDS);
   }
 
   @Override
@@ -378,8 +339,13 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public RTPTaskPipe createCachePipe() {
+  public Object createCachePipe() {
     return new CountBoundTaskPipe((Plugin) plugin, 2);
+  }
+
+  @Override
+  public Object getPlugin() {
+    return plugin;
   }
 
   @Override

@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.tools;
 
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.api.world.RTPChunkManager;
+import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
@@ -141,11 +141,7 @@ public class MemoryTracker {
         }
 
         // 1. Count temporary in-flight generation chunks
-        for (io.github.dailystruggle.rtp.api.world.ChunkReservation reservation : region.chunkManager.locAssChunks.values()) {
-          if (reservation != null && reservation.getChunkSet() != null) {
-            trackedTickets += reservation.getChunkSet().chunks().size();
-          }
-        }
+        // (Tracking removed)
 
         // 2. Count chunks locked in the public hot queue
         int keptSize = region.queueManager.keptLocations.size();
@@ -166,8 +162,16 @@ public class MemoryTracker {
         }
       }
 
-      long activeTickets = RTPChunkManager.ACTIVE_CHUNK_TICKETS.get();
-      long totalLoads = RTPChunkManager.TOTAL_CHUNK_LOADS.get();
+      long activeTickets = 0;
+      long totalLoads = 0;
+      long serverForced = 0;
+      long pluginForced = 0;
+      for (RTPWorld<?> world : RTP.serverAccessor.getRTPWorlds()) {
+        activeTickets += world.activeChunkTickets.get();
+        totalLoads += world.totalChunkLoads.get();
+        serverForced += world.getServerForceLoadedCount();
+        pluginForced += world.numForceLoaded();
+      }
 
       // Enforce the cap on expected tickets to reveal locAssChunks hoarding
       long expectedTickets = Math.min(trackedTickets, totalActiveChunkCap);
@@ -175,10 +179,10 @@ public class MemoryTracker {
 
       LOGGER.log(
               Level.INFO,
-              "[RTP] Diagnostic: Locations=[Queue:{0}/{1}, PerPlayer:{2}], Chunks=[Active:{3}, Expected:{4}, Cap:{5}, Discrepancy:{6}]",
+              "[RTP] Diagnostic: Locations=[Queue:{0}/{1}, PerPlayer:{2}], Chunks=[Tickets:{3}, Expected:{4}, PluginForced:{5}, ServerForced:{6}, Discrepancy:{7}]",
               new Object[] {
                       totalLocationQueueSize, totalCacheCap, totalPerPlayerLocationQueueSize,
-                      activeTickets, expectedTickets, totalActiveChunkCap, discrepancy
+                      activeTickets, expectedTickets, pluginForced, serverForced, discrepancy
               });
 
       // Focus leak detection on the positive discrepancy (orphaned tickets + cap overflows)
@@ -218,17 +222,7 @@ public class MemoryTracker {
           }
 
           // 4. Audit locAssChunks and forcefully close unmapped reservations
-          sweepRegion.chunkManager.locAssChunks.entrySet().removeIf(entry -> {
-            Long coordsKey = entry.getKey();
-            io.github.dailystruggle.rtp.api.world.ChunkReservation reservation = entry.getValue();
-
-            // Compare Long to Long
-            if (!keepAliveKeys.contains(coordsKey)) {
-              if (reservation != null) reservation.close();
-              return true;
-            }
-            return false;
-          });
+          // (Tracking removed)
         }
       }
     }

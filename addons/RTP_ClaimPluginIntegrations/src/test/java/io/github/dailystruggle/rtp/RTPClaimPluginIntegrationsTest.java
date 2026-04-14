@@ -77,7 +77,6 @@ public class RTPClaimPluginIntegrationsTest {
             when(settings.activeChunkCap()).thenReturn(1);
             when(region.getSettings()).thenReturn(settings);
             region.queueManager = new RegionQueueManager(region);
-            region.chunkManager = mock(RegionChunkManager.class);
             region.inFlightCalculations = new java.util.concurrent.atomic.AtomicInteger(0);
 
             RegionCacheTask task = new RegionCacheTask(region, null, Long.MAX_VALUE);

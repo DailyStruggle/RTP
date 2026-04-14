@@ -72,10 +72,8 @@ public class FoliaRTPCommandSender implements RTPCommandSender {
     OfflinePlayer bukkitPlayer = (player != null) ? Bukkit.getOfflinePlayer(player.uuid()) : null;
     command = SendMessage.formatNoColor(bukkitPlayer, command);
     final String finalCommand = command;
-    Bukkit.getGlobalRegionScheduler()
-        .run(
-            Bukkit.getPluginManager().getPlugin("RTP"),
-            scheduledTask -> Bukkit.dispatchCommand(sender, finalCommand));
+    io.github.dailystruggle.rtp.common.RTP.serverAccessor.getScheduler()
+        .runTask(() -> Bukkit.dispatchCommand(sender, finalCommand));
   }
 
   @Override

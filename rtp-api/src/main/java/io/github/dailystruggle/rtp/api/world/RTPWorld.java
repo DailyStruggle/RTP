@@ -1,12 +1,20 @@
 package io.github.dailystruggle.rtp.api.world;
 
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /** Class representing a world in the server */
 public abstract class RTPWorld<T> {
   protected final T world;
+
+  public final AtomicLong activeChunkTickets = new AtomicLong(0);
+  public final AtomicLong totalChunkLoads = new AtomicLong(0);
+  protected final Map<Long, AtomicInteger> chunkTickets = new ConcurrentHashMap<>();
 
   protected RTPWorld(T world) {
     this.world = world;
@@ -40,12 +48,78 @@ public abstract class RTPWorld<T> {
   public abstract CompletableFuture<Long> getChunkAt(int chunkX, int chunkZ);
 
   /**
+   * Get the chunk at the specified coordinates asynchronously
+   *
+   * @param cx the x coordinate of the chunk
+   * @param cz the z coordinate of the chunk
+   * @return a future that completes with the chunk set
+   */
+  public abstract CompletableFuture<ChunkSet> getChunkAtAsync(int cx, int cz);
+
+  /**
+   * Set the force-loaded state of a chunk
+   *
+   * @param cx the x coordinate of the chunk
+   * @param cz the z coordinate of the chunk
+   * @param forceLoad true to force-load, false otherwise
+   */
+  public final void setForceLoaded(int cx, int cz, boolean forceLoad) {
+    long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
+    if (forceLoad) {
+      activeChunkTickets.incrementAndGet();
+      chunkTickets.compute(key, (k, v) -> {
+        if (v == null) {
+          setForceLoadedImpl(cx, cz, true);
+          return new AtomicInteger(1);
+        }
+        v.incrementAndGet();
+        return v;
+      });
+    } else {
+      chunkTickets.compute(key, (k, v) -> {
+        if (v == null) return null;
+        activeChunkTickets.decrementAndGet();
+        if (v.decrementAndGet() <= 0) {
+          setForceLoadedImpl(cx, cz, false);
+          return null;
+        }
+        return v;
+      });
+    }
+  }
+
+  /**
+   * Internal implementation for setting force-loaded state
+   *
+   * @param cx the x coordinate of the chunk
+   * @param cz the z coordinate of the chunk
+   * @param forceLoad true to force-load, false otherwise
+   */
+  protected abstract void setForceLoadedImpl(int cx, int cz, boolean forceLoad);
+
+  /**
+   * Get the number of chunks currently force-loaded by the server
+   *
+   * @return the number of force-loaded chunks
+   */
+  public abstract long getServerForceLoadedCount();
+
+  /**
    * Get a cached chunk by its key
    *
    * @param key the chunk key
    * @return the chunk, or null if not cached
    */
   public abstract RTPChunk<?> getCachedChunk(long key);
+
+  /**
+   * Get the number of chunks currently force-loaded by the plugin
+   *
+   * @return the number of force-loaded chunks
+   */
+  public final long numForceLoaded() {
+    return chunkTickets.size();
+  }
 
   /**
    * Keep a chunk loaded

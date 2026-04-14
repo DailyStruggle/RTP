@@ -77,6 +77,8 @@ public final class AsyncTaskProcessing extends RTPRunnable {
     RTP.getInstance().miscAsyncTasks.execute(currentAvailableTime - (System.nanoTime() - start));
     if (isCancelled()) return;
 
+    RTP.selectionAPI.compute();
+
     List<Region> regions = new ArrayList<>(RTP.selectionAPI.permRegionLookup.values());
     int size = regions.size();
 
@@ -109,12 +111,14 @@ public final class AsyncTaskProcessing extends RTPRunnable {
     // step computation according to period
     if (betweenStep == 0) {
       if (isCancelled()) return;
-      if (regions.size() < step) return;
+      if (step >= regions.size()) return;
 
       Region region = regions.get((int) step);
-//      System.out.println("[RTP-DEBUG] AsyncTaskProcessing: Invoking execute() for region: " + region.name);
-
-      region.execute(currentAvailableTime - (System.nanoTime() - start));
+      try {
+        region.execute(currentAvailableTime - (System.nanoTime() - start));
+      } catch (Exception e) {
+        RTP.log(Level.SEVERE, "Error executing processing for region: " + region.name, e);
+      }
     }
   }
 }

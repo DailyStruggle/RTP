@@ -257,10 +257,12 @@ public class Configs {
     }
     RTP.selectionAPI.tempRegions.clear();
 
+    @SuppressWarnings("unchecked")
     MultiConfigParser<RegionKeys> regions =
             (MultiConfigParser<RegionKeys>) this.multiConfigParserMap.get(RegionKeys.class);
     if (regions == null) return;
 
+    @SuppressWarnings("unchecked")
     ConfigParser<LoggingKeys> logging =
             (ConfigParser<LoggingKeys>) this.configParserMap.get(LoggingKeys.class);
 

@@ -36,7 +36,11 @@ public class FoliaSchedulerImpl implements RTPScheduler {
 
   @Override
   public void runTask(Runnable task) {
-    Bukkit.getGlobalRegionScheduler().run(plugin, scheduledTask -> task.run());
+    if (org.bukkit.Bukkit.isGlobalTickThread()) {
+      task.run();
+    } else {
+      Bukkit.getGlobalRegionScheduler().run(plugin, scheduledTask -> task.run());
+    }
   }
 
   @Override
@@ -87,27 +91,50 @@ public class FoliaSchedulerImpl implements RTPScheduler {
   }
 
   @Override
+  public void runTaskLater(io.github.dailystruggle.rtp.api.world.RTPWorld<?> world, int cx, int cz, Runnable task, long delay) {
+    if (world instanceof FoliaRTPWorld && world.world() != null) {
+      World bukkitWorld = ((FoliaRTPWorld) world).world();
+      Bukkit.getRegionScheduler().runDelayed(plugin, bukkitWorld, cx, cz, scheduledTask -> task.run(), Math.max(1, delay));
+    } else if (world == null || world.world() == null) {
+      runTaskLater(task, delay);
+    } else {
+      throw new IllegalArgumentException("World [" + world.name() + "] is not a Folia world");
+    }
+  }
+
+  @Override
   public void runTaskLater(Runnable task, long delay) {
     Bukkit.getGlobalRegionScheduler()
         .runDelayed(plugin, scheduledTask -> task.run(), Math.max(1, delay));
   }
 
   @Override
-  public Object runTaskTimer(Runnable task, long delay, long period) {
-    return Bukkit.getGlobalRegionScheduler()
-        .runAtFixedRate(
-            plugin, scheduledTask -> task.run(), Math.max(1, delay), Math.max(1, period));
+  public Object runTaskTimer(Runnable runnable, long delay, long period) {
+    // Convert Bukkit ticks to Folia's expected tick format safely (minimum 1 tick)
+    long safeDelay = Math.max(1, delay);
+    long safePeriod = Math.max(1, period);
+
+    return org.bukkit.Bukkit.getGlobalRegionScheduler().runAtFixedRate(
+            plugin,
+            scheduledTask -> runnable.run(),
+            safeDelay,
+            safePeriod
+    );
   }
 
   @Override
-  public Object runTaskTimerAsynchronously(Runnable task, long delay, long period) {
-    return Bukkit.getAsyncScheduler()
-        .runAtFixedRate(
+  public Object runTaskTimerAsynchronously(Runnable runnable, long delay, long period) {
+    // Convert Bukkit ticks to milliseconds (1 tick = 50ms)
+    long delayMs = Math.max(1, delay * 50);
+    long periodMs = Math.max(1, period * 50);
+
+    return org.bukkit.Bukkit.getAsyncScheduler().runAtFixedRate(
             plugin,
-            scheduledTask -> task.run(),
-            Math.max(1, delay) * 50,
-            Math.max(1, period) * 50,
-            java.util.concurrent.TimeUnit.MILLISECONDS);
+            scheduledTask -> runnable.run(),
+            delayMs,
+            periodMs,
+            java.util.concurrent.TimeUnit.MILLISECONDS
+    );
   }
 
   @Override

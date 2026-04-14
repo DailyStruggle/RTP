@@ -6,7 +6,10 @@ import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -145,6 +148,56 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
    * @return the SQL statement
    */
   protected abstract String getInsertStatement();
+
+  @Override
+  public void delete(Connection connection, String tableName, Map.Entry<String, Object> lookup) {
+    String sql = "DELETE FROM " + tableName + " WHERE " + lookup.getKey() + " = ?";
+    try (PreparedStatement statement = connection.prepareStatement(sql)) {
+      statement.setObject(1, lookup.getValue());
+      statement.executeUpdate();
+    } catch (SQLException e) {
+      RTP.log(Level.WARNING, "Failed to execute delete query: " + sql, e);
+    }
+  }
+
+  @Override
+  public List<StoredLocation> loadCachedLocations(String regionName) {
+    List<StoredLocation> res = new ArrayList<>();
+    try (Connection connection = getConnection()) {
+      String sql = "SELECT * FROM rtp_cached_locations WHERE region = ?";
+      try (PreparedStatement statement = connection.prepareStatement(sql)) {
+        statement.setString(1, regionName);
+        try (ResultSet resultSet = statement.executeQuery()) {
+          boolean hasPlayerUuid = false;
+          try {
+            resultSet.findColumn("player_uuid");
+            hasPlayerUuid = true;
+          } catch (SQLException ignored) {}
+
+          while (resultSet.next()) {
+            String id = resultSet.getString("UUID");
+            String worldName = resultSet.getString("world");
+            int x = resultSet.getInt("x");
+            int y = resultSet.getInt("y");
+            int z = resultSet.getInt("z");
+            int attempts = resultSet.getInt("attempts");
+            String playerUuidStr = hasPlayerUuid ? resultSet.getString("player_uuid") : "shared";
+
+            UUID playerUuid = null;
+            if (playerUuidStr != null && !playerUuidStr.equalsIgnoreCase("shared")) {
+              try {
+                playerUuid = UUID.fromString(playerUuidStr);
+              } catch (IllegalArgumentException ignored) {}
+            }
+            res.add(new StoredLocation(id, regionName, worldName, x, y, z, attempts, playerUuid));
+          }
+        }
+      }
+    } catch (SQLException e) {
+      // If table doesn't exist, it's fine, just return empty list
+    }
+    return res;
+  }
 
   @Override
   public Connection connect() {

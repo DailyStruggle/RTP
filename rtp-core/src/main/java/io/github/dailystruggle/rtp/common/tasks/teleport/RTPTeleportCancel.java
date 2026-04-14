@@ -38,7 +38,7 @@ public final class RTPTeleportCancel extends RTPRunnable {
     if (data.completed) return;
 
     if (data.selectedCoords != null && data.targetRegion != null) {
-      data.targetRegion.chunkManager.removeChunks(data.selectedCoords);
+      // (Reservation cleanup handled by task cancellation)
     }
 
     // reset player data

@@ -15,6 +15,9 @@ import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 
 public final class FoliaRTPPlayer implements RTPPlayer {
   private final Player player;
@@ -89,11 +92,66 @@ public final class FoliaRTPPlayer implements RTPPlayer {
   @Override
   public CompletableFuture<Boolean> setLocation(RTPLocation to) {
     World world = ((FoliaRTPWorld) to.world()).world();
-    double x = to.x() + 0.5;
-    double y = to.y();
-    double z = to.z() + 0.5;
 
-    return player.teleportAsync(new Location(world, x, y, z));
+    // Step 1: Prepare the Destination
+    // Create an org.bukkit.Location directly from the cached RTPLocation.
+    // Because the coordinates are already pre-centered by the generation pipeline, do not add any offsets to X, Y, or Z.
+    // Just apply the player's current yaw and pitch to the new location.
+    double x = to.x();
+    double y = to.y();
+    double z = to.z();
+    Location destinationLocation = new Location(world, x, y, z, player.getLocation().getYaw(), player.getLocation().getPitch());
+
+    // Step 2: Fire the Initial Teleport
+    // Call player.teleportAsync(destinationLocation). This allows Folia's native engine to instantly transfer
+    // the player's entity object to the destination Region Thread without waiting for a scheduler tick.
+    return player.teleportAsync(destinationLocation).thenCompose(success -> {
+      // Step 3: Hijack the Callback
+      // If success is false or the player is offline, immediately call rtpLoc.getReservation().close() to prevent memory leaks and return.
+      if (!success || !player.isOnline()) {
+        if (to.getReservation() != null) to.getReservation().close();
+        return CompletableFuture.completedFuture(false);
+      }
+
+      // Extract the chunkX (rtpLoc.getBlockX() >> 4) and chunkZ (rtpLoc.getBlockZ() >> 4).
+      int chunkX = to.getBlockX() >> 4;
+      int chunkZ = to.getBlockZ() >> 4;
+
+      CompletableFuture<Boolean> completionFuture = new CompletableFuture<>();
+
+      // Step 4: Define the Build and Secure Task
+      Runnable buildPlatformTask = () -> {
+        try {
+          // Call to.world().platform(to); to physically build the blocks on the destination region.
+          // This also handles reservation closure in the Folia implementation.
+          to.world().platform(to);
+
+          // Jump to the Entity Scheduler using: player.getScheduler().run(...)
+          player.getScheduler().run((Plugin) RTP.getInstance().getPlugin(), task -> {
+            // Inside the Entity Scheduler task: Set player.setFallDistance(0.0f), apply SLOW_FALLING (60 ticks) and BLINDNESS (40 ticks),
+            // and perform a micro-rubberband by calling player.teleportAsync(destinationLocation) again to snap them safely onto the newly built platform.
+            player.setFallDistance(0.0f);
+            PotionEffect currentSlowFalling = player.getPotionEffect(PotionEffectType.SLOW_FALLING);
+            if (currentSlowFalling == null || currentSlowFalling.getDuration() < 60) {
+              player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, 60, 1));
+            }
+            PotionEffect currentBlindness = player.getPotionEffect(PotionEffectType.BLINDNESS);
+            if (currentBlindness == null || currentBlindness.getDuration() < 40) {
+              player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 40, 1));
+            }
+            player.teleportAsync(destinationLocation).thenAccept(s -> completionFuture.complete(true));
+          }, null);
+        } catch (Exception e) {
+          completionFuture.complete(false);
+          if (to.getReservation() != null) to.getReservation().close();
+        }
+      };
+
+      // Step 5: The 0-Tick Execution Check
+      // To bypass the 50ms RegionScheduler delay, use the RTP scheduler which checks for current region ownership.
+      RTP.serverAccessor.getScheduler().runTask(to.world(), chunkX, chunkZ, buildPlatformTask);
+      return completionFuture;
+    });
   }
 
   @Override

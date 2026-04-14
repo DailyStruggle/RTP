@@ -6,7 +6,6 @@ package io.github.dailystruggle.rtp.api.world;
 public class ChunkReservation implements AutoCloseable {
   private final ChunkSet chunkSet;
   private final RTPWorld<?> world;
-  private final RTPChunkManager chunkManager;
   private boolean transferred = false;
 
   /**
@@ -14,13 +13,20 @@ public class ChunkReservation implements AutoCloseable {
    *
    * @param chunkSet the chunk set to reserve
    * @param world the world the chunks are in
-   * @param chunkManager the chunk manager to use for ticket management
    */
-  public ChunkReservation(ChunkSet chunkSet, RTPWorld<?> world, RTPChunkManager chunkManager) {
+  public ChunkReservation(ChunkSet chunkSet, RTPWorld<?> world) {
     this.chunkSet = chunkSet;
     this.world = world;
-    this.chunkManager = chunkManager;
-    this.chunkManager.keep(chunkSet, true, world);
+    this.keep(true);
+  }
+
+  /**
+   * Keep or release the chunk tickets for this reservation.
+   *
+   * @param keep true to keep, false to release
+   */
+  public void keep(boolean keep) {
+    world.setForceLoaded(chunkSet.getX(), chunkSet.getZ(), keep);
   }
 
   /**
@@ -39,7 +45,8 @@ public class ChunkReservation implements AutoCloseable {
   @Override
   public void close() {
     if (!transferred) {
-      chunkManager.keep(chunkSet, false, world);
+      this.keep(false);
+      this.transferred = true;
     }
   }
 
