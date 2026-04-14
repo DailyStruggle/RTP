@@ -6,11 +6,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.selection.GenerationContext;
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.api.selection.ILocationGenerator;
-import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
-import io.github.dailystruggle.rtp.api.world.RTPChunk;
-import io.github.dailystruggle.rtp.api.world.ChunkSet;
-import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.api.world.*;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
@@ -116,80 +112,64 @@ public class LocationGenerator implements ILocationGenerator {
                 if (left != null) {
                     boolean pass = true;
                     RTPWorld<?> world = region.getWorld();
-                int cx = left.x() >> 4;
-                int cz = left.z() >> 4;
-                ChunkSet ticket = region.chunkManager.addTicket(cx, cz);
-                RTPChunk<?>chunk;
-                try {
-                    CompletableFuture<Long> chunkAt = ticket.chunks().get(0);
-                    Long chunkKey = chunkAt.get();
-                    chunk = (chunkKey != null) ? world.getCachedChunk(chunkKey) : null;
-
-                    if (chunk == null) {
-                        chunkKey = RTP.serverAccessor.getChunkManager().getChunkAtAsync(world, cx, cz).get(5, java.util.concurrent.TimeUnit.SECONDS);
-                        if (chunkKey != null) {
-                            chunk = world.getCachedChunk(chunkKey);
+                    int cx = left.x() >> 4;
+                    int cz = left.z() >> 4;
+                    ChunkSet ticket;
+                    ChunkReservation reservation = pair.reservation();
+                    boolean temporaryReservation = false;
+                    if (reservation != null) {
+                        ticket = reservation.getChunkSet();
+                    } else {
+                        try {
+                            ticket = world.getChunkAtAsync(cx, cz).get();
+                            reservation = new ChunkReservation(ticket, world);
+                            temporaryReservation = true;
+                        } catch (InterruptedException | ExecutionException e) {
+                            return new GenerationResult(null, 1, null);
                         }
                     }
 
-                    if (chunk == null) {
-                        region.chunkManager.removeTicket(cx, cz);
-                        pass = false;
-                    } else {
-                        // verify
-                        try {
-                            long t = System.currentTimeMillis();
-                            long dt = t - lastUpdate.get();
-                            if (dt > 5000 || dt < 0) {
-                                ConfigParser<SafetyKeys> safety =
-                                        (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
-                                Object value = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
-                                if (value instanceof Collection<?> collection) {
-                                    if (collection.isEmpty()) unsafeBlocks.clear();
-                                    else if (collection.size() == unsafeBlocks.size()) {
-                                        if (value instanceof List<?> list) {
-                                            if (list.get(0) instanceof String) {
-                                                List<String> stringList = (List<String>) list;
-                                                boolean same = true;
-                                                for (int j = 0; j < stringList.size(); j++) {
-                                                    String s = stringList.get(j);
-                                                    if (!unsafeBlocks.contains(s)) {
-                                                        same = false;
-                                                        break;
-                                                    }
-                                                }
-                                                if (!same) {
-                                                    unsafeBlocks.clear();
-                                                    unsafeBlocks.addAll(
-                                                            list.stream().map(Object::toString).collect(Collectors.toSet()));
-                                                }
-                                            } else {
-                                                unsafeBlocks.clear();
-                                                unsafeBlocks.addAll(
-                                                        list.stream().map(Object::toString).collect(Collectors.toSet()));
-                                            }
-                                        }
-                                    }
+                    try {
+                        CompletableFuture<Long> chunkAt = ticket.chunks().getFirst();
+                        Long chunkKey = chunkAt.get();
+                        RTPChunk<?> chunk = (chunkKey != null) ? world.getCachedChunk(chunkKey) : null;
 
-                                    unsafeBlocks.addAll(
-                                            collection.stream()
-                                                    .filter(Objects::nonNull)
-                                                    .map(Object::toString)
-                                                    .collect(Collectors.toSet()));
-                                }
-                                lastUpdate.set(t);
-                                safetyRadius.set(safety.getNumber(SafetyKeys.safetyRadius, 0).intValue());
+                        if (chunk == null) {
+                            chunkKey = world.getChunkAt(cx, cz).get(5, java.util.concurrent.TimeUnit.SECONDS);
+                            if (chunkKey != null) {
+                                chunk = world.getCachedChunk(chunkKey);
                             }
+                        }
 
-                            // todo: waterlogged check
-                            int safe = safetyRadius.get();
-                            RTPChunk[] localChunks = new RTPChunk[(safe * 2 + 1) * (safe * 2 + 1)];
-                            int centerChunkX = chunk.x();
-                            int centerChunkZ = chunk.z();
-                            int L = safe * 2 + 1;
-                            localChunks[safe * L + safe] = chunk;
-                            chunk.keep(true);
+                        if (chunk == null) {
+                            pass = false;
+                        } else {
+                            // verify
                             try {
+                                long t = System.currentTimeMillis();
+                                long dt = t - lastUpdate.get();
+                                if (dt > 5000 || dt < 0) {
+                                    ConfigParser<SafetyKeys> safety =
+                                            (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+                                    Object value = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
+                                    if (value instanceof Collection<?> collection) {
+                                        unsafeBlocks.clear();
+                                        unsafeBlocks.addAll(
+                                                collection.stream()
+                                                        .filter(Objects::nonNull)
+                                                        .map(Object::toString)
+                                                        .collect(Collectors.toSet()));
+                                    }
+                                    lastUpdate.set(t);
+                                    safetyRadius.set(safety.getNumber(SafetyKeys.safetyRadius, 0).intValue());
+                                }
+
+                                int safe = safetyRadius.get();
+                                int L = safe * 2 + 1;
+                                RTPChunk[] localChunks = new RTPChunk[L * L];
+                                int centerChunkX = chunk.x();
+                                int centerChunkZ = chunk.z();
+                                localChunks[safe * L + safe] = chunk;
                                 safetyCheck:
                                 for (int x = left.x() - safe; x <= left.x() + safe; x++) {
                                     int chunkX = x >> 4;
@@ -202,17 +182,12 @@ public class LocationGenerator implements ILocationGenerator {
                                         int dcZ = chunkZ - centerChunkZ;
 
                                         int index = (dcX + safe) * L + (dcZ + safe);
-                                        RTPChunk<?>chunk1 = localChunks[index];
+                                        RTPChunk<?> chunk1 = localChunks[index];
                                         if (chunk1 == null) {
                                             try {
-                                                Long key =
-                                                        RTP.serverAccessor
-                                                                .getChunkManager()
-                                                                .getChunkAtAsync(world, chunkX, chunkZ)
-                                                                .get();
+                                                Long key = world.getChunkAt(chunkX, chunkZ).get();
                                                 chunk1 = world.getCachedChunk(key);
                                                 localChunks[index] = chunk1;
-                                                if (chunk1 != null) chunk1.keep(true);
                                             } catch (InterruptedException | ExecutionException e) {
                                                 pass = false;
                                                 break safetyCheck;
@@ -233,31 +208,24 @@ public class LocationGenerator implements ILocationGenerator {
                                         }
                                     }
                                 }
-                            } finally {
-                                for (RTPChunk<?>usedChunk : localChunks) {
-                                    if (usedChunk != null) usedChunk.keep(false);
-                                }
+                            } catch (Exception e) {
+                                pass = false;
+                                RTP.log(Level.WARNING, e.getMessage(), e);
                             }
-                        } catch (Exception e) {
-                            pass = false;
-                            RTP.log(Level.WARNING, e.getMessage(), e);
+                        }
+
+                        if (pass && GlobalRegionVerifiers.checkGlobalRegionVerifiers(left).join()) {
+                            return new GenerationResult(left, pair.attempts(), reservation.transferOwnership(), reservation);
+                        }
+                    } catch (InterruptedException | ExecutionException | TimeoutException e) {
+                        RTP.log(Level.WARNING, e.getMessage(), e);
+                    } finally {
+                        if (reservation != null) {
+                            reservation.close();
                         }
                     }
-                } catch (InterruptedException | ExecutionException | TimeoutException e) {
-                    RTP.log(Level.WARNING, e.getMessage(), e);
-                    pass = false;
-                } finally {
-                    region.chunkManager.removeTicket(cx, cz);
-                }
-
-                if (pass && GlobalRegionVerifiers.checkGlobalRegionVerifiers(left).join()) {
-                    chunkSet = region.chunkManager.getChunkSet(left);
-                    GenerationResult res = new GenerationResult(left, pair.attempts(), chunkSet, pair.reservation());
-
-                    return res;
                 }
             }
-        }
         }
 
         if (custom || sender.hasPermission("rtp.unqueued")) {
@@ -387,7 +355,7 @@ public class LocationGenerator implements ILocationGenerator {
         if (!defaultBiomes) maxBiomeChecks *= 10;
         long biomeChecks = 0L;
 
-        RTPWorld world = region.getWorld();
+        RTPWorld<?> world = region.getWorld();
 
         Map<FailTypes, Map<String, Long>> failMap = new EnumMap<>(FailTypes.class);
         for (FailTypes f : FailTypes.values()) failMap.put(f, new HashMap<>());
@@ -554,7 +522,12 @@ public class LocationGenerator implements ILocationGenerator {
 
             int cx = select[0];
             int cz = select[1];
-            ChunkSet ticket = region.chunkManager.addTicket(cx, cz);
+            ChunkSet ticket;
+            try {
+                ticket = world.getChunkAtAsync(cx, cz).get();
+            } catch (InterruptedException | ExecutionException e) {
+                continue;
+            }
             RTPChunk<?> chunk;
             try {
                 CompletableFuture<Long> cfChunk = ticket.chunks().get(0);
@@ -562,23 +535,23 @@ public class LocationGenerator implements ILocationGenerator {
                 Long key = cfChunk.get(5, java.util.concurrent.TimeUnit.SECONDS);
                 chunk = (key != null) ? world.getCachedChunk(key) : null;
 
-                // Bounded fallback fetch
                 if (chunk == null) {
-                    key = RTP.serverAccessor.getChunkManager()
-                            .getChunkAtAsync(world, cx, cz)
-                            .get(5, java.util.concurrent.TimeUnit.SECONDS);
+                    try {
+                        key = (Long) world.getChunkAt(cx, cz)
+                                .get(5, java.util.concurrent.TimeUnit.SECONDS);
+                    } catch (InterruptedException | ExecutionException | TimeoutException e) {
+                        key = null;
+                    }
                     if (key != null) {
                         chunk = world.getCachedChunk(key);
                     }
                 }
             } catch (java.util.concurrent.TimeoutException | InterruptedException | ExecutionException e) {
                 RTP.log(Level.WARNING, "Chunk load timed out or failed at " + cx + ", " + cz);
-                region.chunkManager.removeTicket(cx, cz);
                 continue;
             }
 
             if (chunk == null) {
-                region.chunkManager.removeTicket(cx, cz);
                 continue;
             }
 
@@ -624,56 +597,42 @@ public class LocationGenerator implements ILocationGenerator {
                 int centerChunkZ = chunk.z();
                 int L = safetyRadius * 2 + 1;
                 localChunks[safetyRadius * L + safetyRadius] = chunk;
-                chunk.keep(true);
-                try {
-                    safetyCheck:
-                    for (int x = finalX - safetyRadius; x <= finalX + safetyRadius; x++) {
-                        int chunkX = x >> 4;
-                        int xx = x & 15;
-                        int dcX = chunkX - centerChunkX;
+                safetyCheck:
+                for (int x = finalX - safetyRadius; x <= finalX + safetyRadius; x++) {
+                    int chunkX = x >> 4;
+                    int xx = x & 15;
+                    int dcX = chunkX - centerChunkX;
 
-                        for (int z = finalZ - safetyRadius; z <= finalZ + safetyRadius; z++) {
-                            int chunkZ = z >> 4;
-                            int zz = z & 15;
-                            int dcZ = chunkZ - centerChunkZ;
+                    for (int z = finalZ - safetyRadius; z <= finalZ + safetyRadius; z++) {
+                        int chunkZ = z >> 4;
+                        int zz = z & 15;
+                        int dcZ = chunkZ - centerChunkZ;
 
-                            int index = (dcX + safetyRadius) * L + (dcZ + safetyRadius);
-                            RTPChunk<?>chunk1 = localChunks[index];
-                            if (chunk1 == null) {
-                                try {
-                                    Long key =
-                                            RTP.serverAccessor
-                                                    .getChunkManager()
-                                                    .getChunkAtAsync(region.getWorld(), chunkX, chunkZ)
-                                                    .get();
-                                    chunk1 = region.getWorld().getCachedChunk(key);
-                                    localChunks[index] = chunk1;
-                                    if (chunk1 != null) chunk1.keep(true);
-                                } catch (InterruptedException | ExecutionException e) {
-                                    RTP.log(Level.WARNING, e.getMessage(), e);
-                                    pass = false;
-                                    break safetyCheck;
-                                }
-                            }
-
-                            if (chunk1 == null) {
+                        int index = (dcX + safetyRadius) * L + (dcZ + safetyRadius);
+                        RTPChunk<?>chunk1 = localChunks[index];
+                        if (chunk1 == null) {
+                            try {
+                                Long key = (Long) world.getChunkAt(chunkX, chunkZ).get();
+                                chunk1 = region.getWorld().getCachedChunk(key);
+                                localChunks[index] = chunk1;
+                            } catch (InterruptedException | ExecutionException e) {
+                                RTP.log(Level.WARNING, e.getMessage(), e);
                                 pass = false;
                                 break safetyCheck;
                             }
-
-                            for (int y = finalY - safetyRadius; y <= finalY + safetyRadius; y++) {
-                                if (y > region.getWorld().getMaxHeight() || y < region.getWorld().getMinHeight()) continue;
-                                if (!chunk1.isSafe(xx, y, zz, unsafeBlocks)) {
-                                    pass = false;
-                                    break safetyCheck;
-                                }
-                            }
                         }
-                    }
-                } finally {
-                    if (!pass) {
-                        for (RTPChunk<?>usedChunk : localChunks) {
-                            if (usedChunk != null) usedChunk.keep(false);
+
+                        if (chunk1 == null) {
+                            pass = false;
+                            break safetyCheck;
+                        }
+
+                        for (int y = finalY - safetyRadius; y <= finalY + safetyRadius; y++) {
+                            if (y > region.getWorld().getMaxHeight() || y < region.getWorld().getMinHeight()) continue;
+                            if (!chunk1.isSafe(xx, y, zz, unsafeBlocks)) {
+                                pass = false;
+                                break safetyCheck;
+                            }
                         }
                     }
                 }
@@ -681,9 +640,6 @@ public class LocationGenerator implements ILocationGenerator {
                 pass &= GlobalRegionVerifiers.checkGlobalRegionVerifiers(cursor.toImmutable()).join();
 
                 if (!pass) {
-                    for (RTPChunk<?>usedChunk : localChunks) {
-                        if (usedChunk != null) usedChunk.keep(false);
-                    }
                     if (verbose)
                         failMap
                                 .get(FailTypes.misc)
@@ -701,13 +657,9 @@ public class LocationGenerator implements ILocationGenerator {
                 }
                 locationFound = true;
 
-                for (RTPChunk<?> usedChunk : localChunks) {
-                    if (usedChunk != null) usedChunk.keep(false);
-                }
-
                 break;
             } finally {
-                region.chunkManager.removeTicket(cx, cz);
+                // ticket cleanup if needed
             }
         }
 
@@ -773,7 +725,16 @@ public class LocationGenerator implements ILocationGenerator {
         RTPCoords resCoords = cursor.toImmutable();
 
         long viewDistanceRadius = performance.getNumber(PerformanceKeys.viewDistanceSelect, 0L).longValue();
-        ChunkSet verifiedChunks = region.chunkManager.chunks(resCoords, Math.max(safetyRadius, (int) viewDistanceRadius));
+        int radius = Math.max(safetyRadius, (int) viewDistanceRadius);
+        int cx = resCoords.x() >> 4;
+        int cz = resCoords.z() >> 4;
+        List<CompletableFuture<Long>> chunks = new ArrayList<>();
+        for (int x = -radius; x <= radius; x++) {
+            for (int z = -radius; z <= radius; z++) {
+                chunks.add(world.getChunkAt(cx + x, cz + z));
+            }
+        }
+        ChunkSet verifiedChunks = new ChunkSet(world, cx, cz, chunks, new CompletableFuture<>());
 
         return new GenerationResult(resCoords, i, verifiedChunks);
     }

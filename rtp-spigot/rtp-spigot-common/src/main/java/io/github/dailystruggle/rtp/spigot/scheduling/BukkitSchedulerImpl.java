@@ -33,7 +33,13 @@ public class BukkitSchedulerImpl implements RTPScheduler {
 
   @Override
   public void runTask(Runnable task) {
-    Bukkit.getScheduler().runTask(plugin, task);
+    // If we are already on the main thread, execute instantly (0ms delay)
+    if (org.bukkit.Bukkit.isPrimaryThread()) {
+      task.run();
+    } else {
+      // Otherwise, queue it for the next tick (~50ms delay)
+      org.bukkit.Bukkit.getScheduler().runTask(plugin, task);
+    }
   }
 
   @Override
@@ -49,6 +55,11 @@ public class BukkitSchedulerImpl implements RTPScheduler {
   @Override
   public Object runTaskTimer(io.github.dailystruggle.rtp.api.world.RTPWorld<?> world, int cx, int cz, Runnable task, long delay, long period) {
     return runTaskTimer(task, delay, period);
+  }
+
+  @Override
+  public void runTaskLater(io.github.dailystruggle.rtp.api.world.RTPWorld<?> world, int cx, int cz, Runnable task, long delay) {
+    runTaskLater(task, delay);
   }
 
   @Override

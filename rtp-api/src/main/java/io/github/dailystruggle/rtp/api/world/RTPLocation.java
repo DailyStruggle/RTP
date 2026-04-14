@@ -7,12 +7,38 @@ public final class RTPLocation implements Cloneable {
   private final int x;
   private final int y;
   private final int z;
+  private ChunkReservation reservation;
 
   public RTPLocation(RTPWorld<?> world, int x, int y, int z) {
+    this(world, x, y, z, null);
+  }
+
+  public RTPLocation(RTPWorld<?> world, int x, int y, int z, ChunkReservation reservation) {
     this.world = world;
     this.x = x;
     this.y = y;
     this.z = z;
+    this.reservation = reservation;
+  }
+
+  public int getBlockX() {
+    return x;
+  }
+
+  public int getBlockY() {
+    return y;
+  }
+
+  public int getBlockZ() {
+    return z;
+  }
+
+  public ChunkReservation getReservation() {
+    return reservation;
+  }
+
+  public void setReservation(ChunkReservation reservation) {
+    this.reservation = reservation;
   }
 
   public long distanceSquared(RTPLocation that) {
@@ -33,9 +59,11 @@ public final class RTPLocation implements Cloneable {
   @Override
   public RTPLocation clone() {
     try {
-      return (RTPLocation) super.clone();
+      RTPLocation clone = (RTPLocation) super.clone();
+      clone.reservation = this.reservation;
+      return clone;
     } catch (CloneNotSupportedException e) {
-      return new RTPLocation(world, x, y, z);
+      return new RTPLocation(world, x, y, z, reservation);
     }
   }
 

@@ -12,6 +12,7 @@ import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
+import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
@@ -36,7 +37,6 @@ public class Region extends FactoryValue<RegionKeys> {
   private final AtomicBoolean isRefillingCache = new AtomicBoolean(false);
 
   public RegionQueueManager queueManager = new RegionQueueManager(this);
-  public RegionChunkManager chunkManager = new RegionChunkManager(this);
   public AtomicInteger inFlightCalculations =
       new AtomicInteger(0);
 
@@ -88,6 +88,12 @@ public class Region extends FactoryValue<RegionKeys> {
         }
       }
     }
+
+    // Hydrate locations from database
+    if (RTP.getInstance().databaseAccessor != null) {
+      List<DatabaseAccessor.StoredLocation> storedLocations = RTP.getInstance().databaseAccessor.loadCachedLocations(name);
+      hydrateCacheFromDatabase(storedLocations);
+    }
   }
 
   public RegionSettings getSettings() {
@@ -99,6 +105,55 @@ public class Region extends FactoryValue<RegionKeys> {
     this.shape = settings.shape();
     this.set(RegionKeys.spatialResolution, settings.spatialResolution());
     if (this.shape != null && this.shape instanceof MemoryShape<?> memoryShape) memoryShape.spatialResolution = settings.spatialResolution();
+  }
+
+  /**
+   * Hydrates the cache by asynchronously loading chunks and applying force-load tickets.
+   * This ensures compliance with thread rules (especially on Folia) during startup.
+   *
+   * @param storedLocations the list of locations to hydrate from the database
+   */
+  public void hydrateCacheFromDatabase(List<DatabaseAccessor.StoredLocation> storedLocations) {
+    RTPWorld<?> world = getWorld();
+    if (world == null) return;
+    for (DatabaseAccessor.StoredLocation stored : storedLocations) {
+      int cx = stored.getX() >> 4;
+      int cz = stored.getZ() >> 4;
+
+      // 1. Asynchronously fetch the chunk to bring it back into server memory
+      world.getChunkAtAsync(cx, cz).thenAccept(chunkSet -> {
+        try {
+          // 2. Recreate the reservation using your new RTPWorld wrapper
+          ChunkReservation reservation = new ChunkReservation(chunkSet, world);
+
+          // 3. Rebuild the RTPLocation object
+          RTPCoords coords = new RTPCoords(stored.getWorldName(), stored.getX(), stored.getY(), stored.getZ());
+          RTPLocation recoveredLoc = new RTPLocation(coords, stored.getAttempts(), reservation);
+
+          // 4. Push it directly back into the LockFreeLocationBuffer (or player queue)
+          boolean enqueued;
+          UUID playerUuid = stored.getPlayerId();
+          if (playerUuid == null) {
+            enqueued = this.queueManager.keptLocations.offer(recoveredLoc);
+          } else {
+            // Push directly to player queue to avoid database re-save during hydration
+            this.queueManager.perPlayerLocationQueue.computeIfAbsent(playerUuid, k -> new ConcurrentLinkedQueue<>()).add(recoveredLoc);
+            enqueued = true;
+          }
+
+          if (enqueued) {
+            // 5. Re-apply the secure Global Region force-load ticket!
+            reservation.keep(true);
+          } else {
+            // If the cache is somehow full, drop the ticket and delete from DB
+            reservation.close();
+            RTP.getInstance().databaseAccessor.removeCachedLocation(stored.getId());
+          }
+        } catch (Exception e) {
+          RTP.log(Level.WARNING, "Failed to hydrate cached location: " + e.getMessage(), e);
+        }
+      });
+    }
   }
 
 
@@ -123,28 +178,34 @@ public class Region extends FactoryValue<RegionKeys> {
       if (coldLoc == null) break;
 
       inFlightCalculations.incrementAndGet();
-      ChunkSet chunkSet = chunkManager.addTicket(coldLoc.coords());
+      int cx = coldLoc.coords().x() >> 4;
+      int cz = coldLoc.coords().z() >> 4;
 
-      chunkSet.complete().whenComplete((success, throwable) -> {
-        try {
-          if (success != null && success) {
-            ChunkReservation reservation = chunkManager.getReservation(coldLoc.coords());
+      getWorld().getChunkAtAsync(cx, cz).thenAccept(chunkSet -> {
+        chunkSet.complete().whenComplete((success, throwable) -> {
+          try {
+            if (success != null && success) {
+              ChunkReservation reservation = new ChunkReservation(chunkSet, getWorld());
 
-            boolean added = queueManager.keptLocations.offer(
-                    new RTPLocation(coldLoc.coords(), coldLoc.attempts(), reservation)
-            );
+              boolean added = queueManager.keptLocations.offer(
+                      new RTPLocation(coldLoc.coords(), coldLoc.attempts(), reservation)
+              );
 
-            if (!added) {
-              reservation.close();
+              if (!added) {
+                reservation.close();
+                queueManager.unkeptLocations.offer(coldLoc);
+              }
+            } else {
               queueManager.unkeptLocations.offer(coldLoc);
-              chunkManager.removeTicket(coldLoc.coords());
             }
-          } else {
-            chunkManager.removeTicket(coldLoc.coords());
+          } finally {
+            inFlightCalculations.decrementAndGet();
           }
-        } finally {
-          inFlightCalculations.decrementAndGet();
-        }
+        });
+      }).exceptionally(throwable -> {
+        inFlightCalculations.decrementAndGet();
+        queueManager.unkeptLocations.offer(coldLoc);
+        return null;
       });
     }
 
@@ -194,7 +255,7 @@ public class Region extends FactoryValue<RegionKeys> {
         break;
       }
 
-      ChunkSet chunkSet = chunkManager.getChunkSet(pair.coords());
+      ChunkSet chunkSet = (pair.reservation() != null) ? pair.reservation().getChunkSet() : null;
       if (chunkSet == null || chunkSet.complete() == null || !chunkSet.complete().isDone()) {
         // Location is still in the backlog or actively loading.
         break;
@@ -204,7 +265,7 @@ public class Region extends FactoryValue<RegionKeys> {
         // Failsafe: Chunk failed to load.
         if (isPrivate) privateQueue.poll();
         else queueManager.keptLocations.poll();
-        chunkManager.removeTicket(pair.coords());
+        if (pair.reservation() != null) pair.reservation().close();
         continue;
       }
 
@@ -348,12 +409,11 @@ public class Region extends FactoryValue<RegionKeys> {
     RTPLocation pair;
     while ((pair = queueManager.keptLocations.poll()) != null) {
       if (pair.reservation() != null) pair.reservation().close();
-      chunkManager.removeChunks(pair.coords());
     }
     queueManager.keptLocations.clear();
 
     while ((pair = queueManager.unkeptLocations.poll()) != null) {
-      chunkManager.removeChunks(pair.coords());
+      if (pair.reservation() != null) pair.reservation().close();
     }
     queueManager.unkeptLocations.clear();
 
@@ -361,15 +421,9 @@ public class Region extends FactoryValue<RegionKeys> {
         queueManager.perPlayerLocationQueue.values()) {
       while ((pair = queue.poll()) != null) {
         if (pair.reservation() != null) pair.reservation().close();
-        chunkManager.removeChunks(pair.coords());
       }
     }
     queueManager.perPlayerLocationQueue.clear();
-
-    chunkManager.locAssChunks.forEach((key, reservation) -> {
-      reservation.close();
-    });
-    chunkManager.locAssChunks.clear();
   }
 
   @Override
@@ -484,16 +538,14 @@ public class Region extends FactoryValue<RegionKeys> {
               entry.getValue();
           RTPLocation pair;
           while ((pair = value.poll()) != null) {
-            chunkManager.removeChunks(pair.coords());
-
+            if (pair.reservation() != null) pair.reservation().close();
           }
           value.clear();
         }
         queueManager.perPlayerLocationQueue.clear();
         RTPLocation pair;
         while ((pair = queueManager.keptLocations.poll()) != null) {
-          chunkManager.removeChunks(pair.coords());
-
+          if (pair.reservation() != null) pair.reservation().close();
         }
         queueManager.keptLocations.clear();
       }

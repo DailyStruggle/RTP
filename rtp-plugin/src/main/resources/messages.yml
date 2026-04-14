@@ -84,26 +84,28 @@ infoLeakRate: "&7Current Chunk Leak Rate: &f[leakRate]"
 infoDisclaimerHeader: "&7--- Diagnostic Disclaimer ---"
 infoDisclaimer: "&7Diagnostic Note: If the server's total orphaned chunk count exceeds this plugin's lifetime loads ([loads]), this plugin is not the sole source of the memory leak."
 infoWorldHeader: "#008080Worlds:"
+infoConsoleWorldHeader: "&7--- Worlds ---"
 infoWorld: "  #21ADA8[world]"
 infoRegionHeader: "#63C5DARegions:"
+infoConsoleRegionHeader: "&7--- Regions ---"
 infoRegion: "  #52B2BF[region]"
 
 #sub-info
 worldInfo:
   - "#21ADA8[world]:"
-  - "#99EEBB  name: [name]"
-  - "#99EEBB  region: [region]"
-  - "#99EEBB  requirePermission: [requirePermission]"
-  - "#99EEBB  override: [override]"
+  - "#99EEBB  - region: [region]"
+  - "#99EEBB  - requirePermission: [requirePermission]"
+  - "#99EEBB  - override: [override]"
 
 regionInfo:
   - "#52B2BF[region]:"
-  - "#58CCED  world: [world]"
-  - "#58CCED  shape: [shape]"
-  - "#58CCED  requirePermission: [requirePermission]"
-  - "#58CCED  worldBorderOverride: [worldBorderOverride]"
-  - "#58CCED  cacheCap: [cacheCap]"
-  - "#58CCED  cached: [cached]"
+  - "#58CCED  - world: [world]"
+  - "#58CCED  - shape: [shape]"
+  - "#58CCED  - requirePermission: [requirePermission]"
+  - "#58CCED  - worldBorderOverride: [worldBorderOverride]"
+  - "#58CCED  - cacheCap: [cacheCap]"
+  - "#58CCED  - cached: [cached]"
+  - "#58CCED  - keptCache: [keptCache]"
 
 #command descriptions
 rtp: "&b/rtp - teleport to a random location"

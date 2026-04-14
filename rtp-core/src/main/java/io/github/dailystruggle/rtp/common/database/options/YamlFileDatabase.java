@@ -211,6 +211,68 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, YamlFile>> {
   }
 
   @Override
+  public void delete(Map<String, YamlFile> database, String tableName, Map.Entry<String, Object> lookup) {
+    if (!tableName.endsWith(".yml")) tableName = tableName + ".yml";
+    YamlFile file = database.get(tableName);
+    if (file == null || !file.exists()) return;
+
+    try {
+      file.loadWithComments();
+      if (lookup.getKey().equalsIgnoreCase("UUID") || lookup.getKey().equalsIgnoreCase("id")) {
+          file.remove(String.valueOf(lookup.getValue()));
+      } else {
+          file.remove(lookup.getKey());
+      }
+      file.save();
+    } catch (IOException e) {
+      RTP.log(Level.WARNING, e.getMessage(), e);
+    }
+  }
+
+  @Override
+  public List<StoredLocation> loadCachedLocations(String regionName) {
+    List<StoredLocation> res = new ArrayList<>();
+    Map<String, YamlFile> db = connect();
+    YamlFile file = db.get("rtp_cached_locations.yml");
+    if (file == null || !file.exists()) return res;
+
+    try {
+      file.loadWithComments();
+      Map<String, Object> values = file.getMapValues(false);
+      for (Map.Entry<String, Object> entry : values.entrySet()) {
+        String id = entry.getKey();
+        Object obj = entry.getValue();
+        ConfigurationSection section;
+        if (obj instanceof ConfigurationSection) {
+            section = (ConfigurationSection) obj;
+        } else continue;
+
+        String rowRegion = section.getString("region");
+        if (!regionName.equalsIgnoreCase(rowRegion)) continue;
+
+        String worldName = section.getString("world");
+        int x = section.getInt("x");
+        int y = section.getInt("y");
+        int z = section.getInt("z");
+        int attempts = section.getInt("attempts");
+        String playerUuidStr = section.getString("player_uuid");
+
+        UUID playerUuid = null;
+        if (playerUuidStr != null && !playerUuidStr.equalsIgnoreCase("shared")) {
+          try {
+            playerUuid = UUID.fromString(playerUuidStr);
+          } catch (IllegalArgumentException ignored) {}
+        }
+
+        res.add(new StoredLocation(id, regionName, worldName, x, y, z, attempts, playerUuid));
+      }
+    } catch (IOException e) {
+      RTP.log(Level.WARNING, e.getMessage(), e);
+    }
+    return res;
+  }
+
+  @Override
   public void setValue(String tableName, Map<?, ?> keyValuePairs) {
     super.setValue(tableName, keyValuePairs);
     Map<TableObj, TableObj> writeValues = new HashMap<>();

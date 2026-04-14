@@ -491,7 +491,7 @@ public class FillTask extends RTPRunnable {
       int finalSafetyRadius = safetyRadius;
 
       // Unconditional chunk generation request
-      RTP.serverAccessor.getChunkManager().getChunkAtAsync(world, cx, cz)
+      world.getChunkAt(cx, cz)
               .orTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
               .whenComplete((chunkKey, throwable) -> {
                 try {

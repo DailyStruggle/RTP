@@ -14,6 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Abstract class for database accessors
@@ -44,6 +45,52 @@ public abstract class DatabaseAccessor<D> {
   /** Queue for write operations */
   protected ConcurrentLinkedQueue<Map.Entry<String, Map<TableObj, TableObj>>> writeQueue =
       new ConcurrentLinkedQueue<>();
+
+  /** Container for a database deletion request */
+  protected static final class DeleteRequest {
+    public final String tableName;
+    public final Map.Entry<String, Object> lookup;
+
+    public DeleteRequest(String tableName, Map.Entry<String, Object> lookup) {
+      this.tableName = tableName;
+      this.lookup = lookup;
+    }
+  }
+
+  /** Container describing a stored cached location */
+  public static final class StoredLocation {
+    private final String id;
+    private final String regionName;
+    private final String worldName;
+    private final int x;
+    private final int y;
+    private final int z;
+    private final int attempts;
+    @Nullable private final UUID playerId;
+
+    public StoredLocation(String id, String regionName, String worldName, int x, int y, int z, int attempts, @Nullable UUID playerId) {
+      this.id = id;
+      this.regionName = regionName;
+      this.worldName = worldName;
+      this.x = x;
+      this.y = y;
+      this.z = z;
+      this.attempts = attempts;
+      this.playerId = playerId;
+    }
+
+    public String getId() { return id; }
+    public String getRegionName() { return regionName; }
+    public String getWorldName() { return worldName; }
+    public int getX() { return x; }
+    public int getY() { return y; }
+    public int getZ() { return z; }
+    public int getAttempts() { return attempts; }
+    @Nullable public UUID getPlayerId() { return playerId; }
+  }
+
+  /** Queue for background deletion operations */
+  protected final ConcurrentLinkedQueue<DeleteRequest> deleteQueue = new ConcurrentLinkedQueue<>();
 
   /** Queue for background file write operations */
   protected final ConcurrentLinkedQueue<FileWriteRequest> fileWriteQueue =
@@ -158,6 +205,13 @@ public abstract class DatabaseAccessor<D> {
       res.put("region", targetRegion.name);
       res.put("cost", teleportData.cost);
       res.put("attempts", teleportData.attempts);
+    } else if (obj instanceof io.github.dailystruggle.rtp.common.selection.region.RTPLocation) {
+      io.github.dailystruggle.rtp.common.selection.region.RTPLocation location = (io.github.dailystruggle.rtp.common.selection.region.RTPLocation) obj;
+      res.put("world", location.coords().worldName());
+      res.put("x", location.coords().x());
+      res.put("y", location.coords().y());
+      res.put("z", location.coords().z());
+      res.put("attempts", location.attempts());
     }
 
     return res;
@@ -348,9 +402,58 @@ public abstract class DatabaseAccessor<D> {
   }
 
   /**
+   * Save a cached location to the database
+   *
+   * @param regionName the name of the region
+   * @param location the location to save
+   * @param playerUuid the UUID of the player for whom the location is cached, or null for the shared cache
+   */
+  public void saveCachedLocation(String regionName, io.github.dailystruggle.rtp.common.selection.region.RTPLocation location, @Nullable UUID playerUuid) {
+    Map<String, Object> columns = toColumns(location);
+    columns.put("region", regionName);
+    columns.put("player_uuid", (playerUuid != null) ? playerUuid.toString() : "shared");
+    // use a unique key for the cacheValue/setValue
+    String key = regionName + ":" + location.coords().worldName() + ":" + location.coords().x() + ":" + location.coords().y() + ":" + location.coords().z();
+    columns.put("UUID", key);
+
+    Map<String, Object> data = new HashMap<>();
+    data.put(key, columns);
+    cacheValue("rtp_cached_locations", data);
+  }
+
+  /**
+   * Delete a cached location from the database
+   *
+   * @param regionName the name of the region
+   * @param location the location to delete
+   */
+  public void deleteCachedLocation(String regionName, io.github.dailystruggle.rtp.common.selection.region.RTPLocation location) {
+    String key = regionName + ":" + location.coords().worldName() + ":" + location.coords().x() + ":" + location.coords().y() + ":" + location.coords().z();
+    removeCachedLocation(key);
+  }
+
+  /**
+   * Delete a cached location from the database by its unique identifier
+   *
+   * @param id the unique identifier of the cached location
+   */
+  public void removeCachedLocation(String id) {
+    Map.Entry<String, Object> lookup = new AbstractMap.SimpleEntry<>("UUID", id);
+    deleteQueue.add(new DeleteRequest("rtp_cached_locations", lookup));
+  }
+
+  /**
    * Write all queued operations to the database.
    */
   public void flush() {}
+
+  /**
+   * Load cached locations from the database for a specific region.
+   *
+   * @param regionName the name of the region
+   * @return a list of stored locations for that region
+   */
+  public abstract List<StoredLocation> loadCachedLocations(String regionName);
 
   /**
    * Write all cached/dirty rows to the database and clear the cache.
@@ -466,6 +569,26 @@ public abstract class DatabaseAccessor<D> {
       if (dt + avgTimeWrite > availableTime) break;
     }
 
+    while (!deleteQueue.isEmpty()) {
+      if (stop.get()) return;
+      DeleteRequest deleteRequest = deleteQueue.poll();
+      if (deleteRequest == null) continue;
+
+      long localStart = System.nanoTime();
+      delete(database, deleteRequest.tableName, deleteRequest.lookup);
+      long localStop = System.nanoTime();
+
+      if (localStop < localStart) localStart = -(Long.MAX_VALUE - localStart);
+      long diff = localStop - localStart;
+      // We'll use write timing for delete as well
+      if (avgTimeWrite == 0) avgTimeWrite = diff;
+      else avgTimeWrite = ((avgTimeWrite * 7) / 8) + (diff / 8);
+
+      if (localStop < start) start = -(Long.MAX_VALUE - start); // overflow correction
+      dt = localStop - start;
+      if (dt + avgTimeWrite > availableTime) break;
+    }
+
     while (!readQueue.isEmpty()) {
       if (stop.get()) return;
       Map.Entry<
@@ -529,6 +652,15 @@ public abstract class DatabaseAccessor<D> {
    * @param keyValuePairs the key-value pairs to write
    */
   public abstract void write(D d, String tableName, Map<TableObj, TableObj> keyValuePairs);
+
+  /**
+   * Delete values from the database
+   *
+   * @param d the database connection
+   * @param tableName the name of the table
+   * @param lookup the key-value pair to look up for deletion
+   */
+  public abstract void delete(D d, String tableName, Map.Entry<String, Object> lookup);
 
   /**
    * Disconnect from the database

@@ -186,9 +186,6 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public abstract @NotNull io.github.dailystruggle.rtp.api.world.RTPChunkManager getChunkManager();
-
-  @Override
   public @Nullable Object getShape(String name) {
     return shapeFunction.apply(name);
   }
@@ -372,6 +369,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   @Override
   public void stop() {
     // Implementation
+    for (RTPWorld<?> rtpWorld : worldMap.values()) {rtpWorld.forgetChunks();}
   }
 
   @Override
@@ -382,13 +380,6 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   @Override
   public void start(Object plugin) {
     this.plugin = plugin;
-    if (!(plugin instanceof org.bukkit.plugin.java.JavaPlugin)) return;
-    org.bukkit.plugin.java.JavaPlugin javaPlugin = (org.bukkit.plugin.java.JavaPlugin) plugin;
-
-    new io.github.dailystruggle.rtp.spigot.server.SyncTeleportProcessing().runTaskTimer(javaPlugin, 0, 1);
-    new io.github.dailystruggle.rtp.spigot.server.AsyncTeleportProcessing(javaPlugin).runTaskTimerAsynchronously(javaPlugin, 0, 1);
-    new io.github.dailystruggle.rtp.spigot.server.FillTaskProcessing(javaPlugin).runTaskTimerAsynchronously(javaPlugin, 0, 1);
-    new io.github.dailystruggle.rtp.spigot.server.DatabaseProcessing(javaPlugin).runTaskTimerAsynchronously(javaPlugin, 0, 1);
   }
 
   @Override
@@ -409,8 +400,13 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public RTPTaskPipe createCachePipe() {
+  public Object createCachePipe() {
     return new TimeBoundTaskPipe();
+  }
+
+  @Override
+  public Object getPlugin() {
+    return plugin;
   }
 
   @Override

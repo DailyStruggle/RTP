@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.folia.world;
 
+import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
@@ -13,9 +14,12 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Biome;
 import org.jetbrains.annotations.NotNull;
@@ -87,6 +91,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
 
   @Override
   public CompletableFuture<Long> getChunkAt(int cx, int cz) {
+    totalChunkLoads.incrementAndGet();
     return world
         .getChunkAtAsync(cx, cz, true)
         .thenApply(
@@ -95,6 +100,31 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
               cacheChunk(cx, cz, chunk);
               return ((long) cx & 0xffffffffL | ((long) cz << 32));
             });
+  }
+
+  @Override
+  public CompletableFuture<ChunkSet> getChunkAtAsync(int cx, int cz) {
+    totalChunkLoads.incrementAndGet();
+    return world.getChunkAtAsync(cx, cz).thenApply(chunk -> {
+      cacheChunk(cx, cz, chunk);
+      return new ChunkSet(this, cx, cz, Collections.singletonList(CompletableFuture.completedFuture(((long) cx & 0xffffffffL | ((long) cz << 32)))), new CompletableFuture<>());
+    });
+  }
+
+  @Override
+  protected void setForceLoadedImpl(int cx, int cz, boolean forceLoad) {
+    RTP.serverAccessor.getScheduler().runTask(() -> {
+      try {
+        world.setChunkForceLoaded(cx, cz, forceLoad);
+      } catch (Exception e) {
+        // Silently catch exceptions from lingering async tasks attempting to fire after shutdown
+      }
+    });
+  }
+
+  @Override
+  public long getServerForceLoadedCount() {
+    return world.getForceLoadedChunks().size();
   }
 
   @Override
@@ -110,23 +140,32 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
     return new FoliaRTPChunk(chunk);
   }
 
+
   @Override
   public void keepChunkAt(int cx, int cz) {
-    RTP.scheduler.runTask(this, cx, cz, () -> {world.setChunkForceLoaded(cx, cz, true);});
+    RTP.scheduler.runTask(this, cx, cz, () -> {
+      chunkCache.put(((long) cx & 0xffffffffL | ((long) cz << 32)), new WeakReference<>(world.getChunkAt(cx, cz)));
+      setForceLoaded(cx, cz, true);
+    });
   }
 
   @Override
   public void forgetChunkAt(int cx, int cz) {
-    RTP.scheduler.runTask(this, cx, cz, () -> {world.setChunkForceLoaded(cx, cz, false);});
+    RTP.scheduler.runTask(this, cx, cz, () -> {
+      setForceLoaded(cx, cz, false);
+      chunkCache.remove(((long) cx & 0xffffffffL | ((long) cz << 32)));
+    });
   }
 
   @Override
   public void forgetChunks() {
     // Explicitly un-force-load everything we know about before clearing
-    chunkCache.forEach((key, ref) -> {
+    chunkTickets.forEach((key, count) -> {
       int cx = (int) (key & 0xffffffffL);
       int cz = (int) (key >> 32);
-      world.setChunkForceLoaded(cx, cz, false);
+      while (count.get() > 0) {
+        setForceLoaded(cx, cz, false);
+      }
     });
     chunkCache.clear();
   }
@@ -138,7 +177,35 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
 
   @Override
   public void platform(RTPLocation location) {
-    // Implementation
+    try {
+      ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+      int radius = safety.getNumber(SafetyKeys.platformRadius, 0).intValue();
+      int airHeight = safety.getNumber(SafetyKeys.platformAirHeight, 0).intValue();
+      int depth = safety.getNumber(SafetyKeys.platformDepth, 0).intValue();
+      Material material;
+      try {
+        material = Material.valueOf(safety.getConfigValue(SafetyKeys.platformMaterial, "GLASS").toString().toUpperCase());
+      } catch (IllegalArgumentException e) {
+        material = Material.GLASS;
+      }
+
+      int lx = location.getBlockX();
+      int ly = location.getBlockY();
+      int lz = location.getBlockZ();
+
+      for (int dx = -radius; dx <= radius; dx++) {
+        for (int dz = -radius; dz <= radius; dz++) {
+          for (int dy = -depth; dy < 0; dy++) {
+            world.getBlockAt(lx + dx, ly + dy, lz + dz).setType(material);
+          }
+          for (int dy = 0; dy < airHeight; dy++) {
+            world.getBlockAt(lx + dx, ly + dy, lz + dz).setType(Material.AIR);
+          }
+        }
+      }
+    } finally {
+      if (location.getReservation() != null) location.getReservation().close();
+    }
   }
 
   @Override

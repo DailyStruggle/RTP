@@ -94,4 +94,15 @@ public interface RTPScheduler {
    * @return a task ID or object that can be used to cancel the task
    */
   Object runTaskTimer(io.github.dailystruggle.rtp.api.world.RTPWorld<?> world, int cx, int cz, Runnable task, long delay, long period);
+
+  /**
+   * Run a task on a specific region later
+   *
+   * @param world the world
+   * @param cx chunk x
+   * @param cz chunk z
+   * @param task the task to run
+   * @param delay the delay in ticks
+   */
+  void runTaskLater(io.github.dailystruggle.rtp.api.world.RTPWorld<?> world, int cx, int cz, Runnable task, long delay);
 }

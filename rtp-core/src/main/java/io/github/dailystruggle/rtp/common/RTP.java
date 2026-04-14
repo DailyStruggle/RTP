@@ -65,6 +65,10 @@ public class RTP {
   public static RTPServerAccessor serverAccessor;
   public static RTPScheduler scheduler;
   public static RTPEconomy economy = null;
+
+  public static final ThreadLocal<RTPWorld> worldContext = new ThreadLocal<>();
+  public static final ThreadLocal<Region> regionContext = new ThreadLocal<>();
+
   public static TreeCommand baseCommand;
   public static AtomicBoolean reloading = new AtomicBoolean(false);
 
@@ -72,6 +76,7 @@ public class RTP {
   private static RTP instance;
 
   private static ScheduledExecutorService diagnosticTimer;
+  private static final List<Object> trackedTasks = new ArrayList<>();
 
   static {
     Factory<Shape<?>> shapeFactory = new Factory<>();
@@ -172,26 +177,26 @@ public class RTP {
         TimeUnit.SECONDS);
 
     io.github.dailystruggle.rtp.common.tools.PerformanceTracker.start(scheduler);
-    scheduler.runTaskTimerAsynchronously(
+    trackedTasks.add(scheduler.runTaskTimerAsynchronously(
         () -> {
           if (databaseAccessor != null) databaseAccessor.flushDirtyCache();
         },
         6000,
-        6000);
-    scheduler.runTaskTimerAsynchronously(
+        6000));
+    trackedTasks.add(scheduler.runTaskTimerAsynchronously(
         () -> {
           if (databaseAccessor instanceof AbstractSQLDatabaseAccessor sqlDatabaseAccessor) {
             sqlDatabaseAccessor.flush();
           }
         },
         60,
-        60);
+        60));
 
     long syncTime = TimeUnit.MILLISECONDS.toNanos(5);
-    scheduler.runTaskTimer(new io.github.dailystruggle.rtp.common.tasks.tick.SyncTaskProcessing(syncTime), 1, 1);
+    trackedTasks.add(scheduler.runTaskTimer(new io.github.dailystruggle.rtp.common.tasks.tick.SyncTaskProcessing(syncTime), 1, 1));
 
     long asyncTime = TimeUnit.MILLISECONDS.toNanos(25); // Bumped to 5ms since async has more headroom
-    scheduler.runTaskTimerAsynchronously(new io.github.dailystruggle.rtp.common.tasks.tick.AsyncTaskProcessing(asyncTime), 1, 1);
+    trackedTasks.add(scheduler.runTaskTimerAsynchronously(new io.github.dailystruggle.rtp.common.tasks.tick.AsyncTaskProcessing(asyncTime), 1, 1));
 
   }
 
@@ -312,6 +317,10 @@ public class RTP {
     return instance;
   }
 
+  public Object getPlugin() {
+    return serverAccessor.getPlugin();
+  }
+
   public static void log(Level level, String str) {
     serverAccessor.log(level, str);
   }
@@ -387,6 +396,11 @@ public class RTP {
 
     instance.miscAsyncTasks.stop();
     instance.miscSyncTasks.stop();
+
+    for (Object task : trackedTasks) {
+      scheduler.cancelTask(task);
+    }
+    trackedTasks.clear();
 
     for (Region r : selectionAPI.permRegionLookup.values()) {
       r.shutDown();

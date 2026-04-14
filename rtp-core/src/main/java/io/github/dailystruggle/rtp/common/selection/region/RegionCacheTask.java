@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
-import io.github.dailystruggle.rtp.api.world.ChunkReservation;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
@@ -97,11 +96,10 @@ public class RegionCacheTask extends RTPRunnable {
 
                         for (int i = -radius; i <= radius; i++) {
                             for (int j = -radius; j <= radius; j++) {
-                                chunks.add(RTP.serverAccessor.getChunkManager().getChunkAtAsync(world, cx + i, cz + j));
+                                chunks.add(world.getChunkAt(cx + i, cz + j));
                             }
                         }
-                        chunkSet = new ChunkSet(chunks, new CompletableFuture<>());
-                        region.chunkManager.putChunkSet(coords, chunkSet);
+                        chunkSet = new ChunkSet(world, cx, cz, chunks, new CompletableFuture<>());
 
                         final ChunkSet finalSet = chunkSet;
                         RTP.scheduler.runTaskLater(() -> {
@@ -111,16 +109,9 @@ public class RegionCacheTask extends RTPRunnable {
                         }, 600L); // 30-second failsafe
                     }
 
-                    ChunkSet finalChunkSet = chunkSet;
-                    RTP.serverAccessor.getChunkManager().whenComplete(chunkSet, success -> {
+                    chunkSet.complete().thenAccept(success -> {
                         try {
-                            if (isCancelled() || success == null || !success) {
-                                region.chunkManager.removeTicket(coords);
-                                return;
-                            }
-                            region.chunkManager.removeTicket(coords);
-                            ChunkReservation reservation = new ChunkReservation(finalChunkSet, region.getWorld(), RTP.serverAccessor.getChunkManager());
-                            RTPLocation finalPair = new RTPLocation(coords, res.attempts(), reservation);
+                            RTPLocation finalPair = new RTPLocation(coords, res.attempts(), res.reservation());
                             region.queueManager.enqueuePlayerLocation(playerId, finalPair);
                         } finally {
                             region.inFlightCalculations.decrementAndGet();
@@ -134,10 +125,7 @@ public class RegionCacheTask extends RTPRunnable {
             } else {
                 region.inFlightCalculations.decrementAndGet();
                 if (res.coords() != null) {
-                    if (res.verifiedChunks() != null) {
-                        region.chunkManager.removeChunks(res.coords());
-                    }
-
+                    if (res.reservation() != null) res.reservation().close();
                     RTPLocation coldLoc = new RTPLocation(res.coords(), res.attempts(), null);
                     region.queueManager.unkeptLocations.offer(coldLoc);
                 }

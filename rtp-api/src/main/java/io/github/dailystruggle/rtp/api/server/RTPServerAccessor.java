@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask;
 import io.github.dailystruggle.rtp.api.selection.ILocationGenerator;
+import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import java.io.File;
 import org.jetbrains.annotations.Nullable;
@@ -47,8 +48,6 @@ public interface RTPServerAccessor {
   RTPWorld<?> getRTPWorld(String name);
 
   RTPWorld<?> getRTPWorld(UUID id);
-
-  io.github.dailystruggle.rtp.api.world.RTPChunkManager getChunkManager();
 
   List<RTPWorld<?>> getRTPWorlds();
 
@@ -144,6 +143,12 @@ public interface RTPServerAccessor {
   Object createTaskPipe();
 
   Object createCachePipe();
+
+  Object getPlugin();
+
+  default void shapePlatform(RTPLocation location) {
+    location.world().platform(location);
+  }
 
   io.github.dailystruggle.rtp.api.scheduling.RTPScheduler getScheduler();
 

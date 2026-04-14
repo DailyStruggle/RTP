@@ -4,6 +4,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReferenceArray;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 
 public class LockFreeLocationBuffer {
@@ -12,11 +13,19 @@ public class LockFreeLocationBuffer {
     private final AtomicLong head = new AtomicLong(0);
     private final AtomicLong tail = new AtomicLong(0);
 
+    private Consumer<RTPLocation> onAdd = null;
+    private Consumer<RTPLocation> onRemove = null;
+
     public LockFreeLocationBuffer(int capacity) {
         int actualCapacity = 1;
         while (actualCapacity < capacity) actualCapacity <<= 1;
         this.buffer = new AtomicReferenceArray<>(actualCapacity);
         this.mask = actualCapacity - 1;
+    }
+
+    public void setCallbacks(Consumer<RTPLocation> onAdd, Consumer<RTPLocation> onRemove) {
+        this.onAdd = onAdd;
+        this.onRemove = onRemove;
     }
 
     public boolean offer(RTPLocation location) {
@@ -28,10 +37,11 @@ public class LockFreeLocationBuffer {
             currentHead = head.get();
             if (currentTail - currentHead >= buffer.length()) {
                 return false;
-            }
+              }
         } while (!tail.compareAndSet(currentTail, currentTail + 1));
 
         buffer.set((int) (currentTail & mask), location);
+        if (onAdd != null) onAdd.accept(location);
         return true;
     }
 
@@ -42,7 +52,12 @@ public class LockFreeLocationBuffer {
     }
 
     public void clear() {
-        while (poll() != null);
+        RTPLocation location;
+        while ((location = poll()) != null) {
+            if (location.reservation() != null) {
+                location.reservation().close();
+            }
+        }
     }
 
     public RTPLocation poll() {
@@ -59,6 +74,7 @@ public class LockFreeLocationBuffer {
         } while (location == null || !head.compareAndSet(currentHead, currentHead + 1));
 
         buffer.set((int) (currentHead & mask), null);
+        if (onRemove != null) onRemove.accept(location);
         return location;
     }
 

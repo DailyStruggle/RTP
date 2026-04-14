@@ -4,10 +4,9 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /** A set of chunks that are being loaded */
-public record ChunkSet(List<CompletableFuture<Long>> chunks, CompletableFuture<Boolean> complete) {
-  public ChunkSet {
-    RTPChunkManager.TOTAL_CHUNK_LOADS.addAndGet(chunks.size());
+public record ChunkSet(RTPWorld<?> world, int x, int z, List<CompletableFuture<Long>> chunks, CompletableFuture<Boolean> complete) {
 
+  public ChunkSet {
     CompletableFuture.allOf(chunks.toArray(new CompletableFuture[0]))
         .whenComplete(
             (res, err) -> {
@@ -17,5 +16,13 @@ public record ChunkSet(List<CompletableFuture<Long>> chunks, CompletableFuture<B
                 complete.complete(true);
               }
             });
+  }
+
+  public int getX() {
+    return x;
+  }
+
+  public int getZ() {
+    return z;
   }
 }

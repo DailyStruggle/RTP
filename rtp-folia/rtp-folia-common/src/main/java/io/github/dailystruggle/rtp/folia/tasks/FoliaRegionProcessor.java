@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.folia.tasks;
 
+import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.spigot.tools.SendMessage;
 import org.bukkit.plugin.Plugin;
@@ -45,17 +47,15 @@ public class FoliaRegionProcessor implements Runnable {
             activeProcessors.remove(key);
             // Double-check in case a task was injected during removal
             if (!queue.isEmpty() && activeProcessors.add(key)) {
-                org.bukkit.World world = org.bukkit.Bukkit.getWorld(key.worldId());
+                RTPWorld<?> world = RTP.serverAccessor.getRTPWorld(key.worldId());
                 if (world != null) {
-                    org.bukkit.Location loc = new org.bukkit.Location(world, key.regionX() << 9, 0, key.regionZ() << 9);
-                    org.bukkit.Bukkit.getRegionScheduler().runDelayed(plugin, loc, scheduledTask -> this.run(), 1L);
+                    RTP.serverAccessor.getScheduler().runTaskLater(world, key.regionX() << 5, key.regionZ() << 5, this, 1L);
                 }
             }
         } else {
-            org.bukkit.World world = org.bukkit.Bukkit.getWorld(key.worldId());
+            RTPWorld<?> world = RTP.serverAccessor.getRTPWorld(key.worldId());
             if (world != null) {
-                org.bukkit.Location loc = new org.bukkit.Location(world, key.regionX() << 9, 0, key.regionZ() << 9);
-                org.bukkit.Bukkit.getRegionScheduler().runDelayed(plugin, loc, scheduledTask -> this.run(), 1L);
+                RTP.serverAccessor.getScheduler().runTaskLater(world, key.regionX() << 5, key.regionZ() << 5, this, 1L);
             } else {
                 activeProcessors.remove(key);
             }

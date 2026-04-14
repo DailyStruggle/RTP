@@ -39,6 +39,19 @@ public class RegionQueueManager {
             this.unkeptLocations = new LockFreeLocationBuffer(1024);
             this.keptLocations = new LockFreeLocationBuffer(1024);
         }
+
+        this.keptLocations.setCallbacks(
+            location -> {
+                if (RTP.getInstance().databaseAccessor != null) {
+                    RTP.getInstance().databaseAccessor.saveCachedLocation(region.name, location, null);
+                }
+            },
+            location -> {
+                if (RTP.getInstance().databaseAccessor != null) {
+                    RTP.getInstance().databaseAccessor.deleteCachedLocation(region.name, location);
+                }
+            }
+        );
     }
 
     /**
@@ -79,6 +92,9 @@ public class RegionQueueManager {
         if (playerLocationQueue != null && !playerLocationQueue.isEmpty()) {
             RTPLocation loc = playerLocationQueue.poll();
             if (loc != null) {
+                if (RTP.getInstance().databaseAccessor != null) {
+                    RTP.getInstance().databaseAccessor.deleteCachedLocation(region.name, loc);
+                }
                 RTP.getInstance().queuedPlayers.remove(uuid);
                 RTP.getInstance().invulnerablePlayers.remove(uuid);
                 RTP.getInstance().processingPlayers.remove(uuid);
@@ -153,7 +169,23 @@ public class RegionQueueManager {
     public void shutDown() {
         keptLocations.clear();
         unkeptLocations.clear();
+        perPlayerLocationQueue.forEach((uuid, queue) -> {
+            RTPLocation loc;
+            while ((loc = queue.poll()) != null) {
+                if (loc.reservation() != null) loc.reservation().close();
+            }
+        });
         perPlayerLocationQueue.clear();
+        fastLocations.forEach((uuid, future) -> {
+            if (future.isDone()) {
+                try {
+                    RTPLocation loc = future.get();
+                    if (loc != null && loc.reservation() != null) loc.reservation().close();
+                } catch (Exception ignored) {}
+            } else {
+                future.complete(null);
+            }
+        });
         fastLocations.clear();
         playerQueue.clear();
         RTP.getInstance().queuedPlayers.clear();
@@ -189,6 +221,9 @@ public class RegionQueueManager {
     void enqueuePlayerLocation(UUID uuid, RTPLocation location) {
         perPlayerLocationQueue.putIfAbsent(uuid, new ConcurrentLinkedQueue<>());
         perPlayerLocationQueue.get(uuid).add(location);
+        if (RTP.getInstance().databaseAccessor != null) {
+            RTP.getInstance().databaseAccessor.saveCachedLocation(region.name, location, uuid);
+        }
     }
 
     /**

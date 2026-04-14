@@ -25,7 +25,7 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
 
   @Override
   public RTPWorld<?> getWorld() {
-    return new FoliaRTPWorld(chunk.getWorld());
+    return RTP.serverAccessor.getRTPWorld(chunk.getWorld().getUID());
   }
 
   @Override
@@ -40,7 +40,9 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
 
   @Override
   public void keep(boolean keep) {
-    RTP.scheduler.runTask(getWorld(), x(), z(), () -> chunk.getWorld().setChunkForceLoaded(chunk.getX(), chunk.getZ(), keep));
+    RTP.serverAccessor.getScheduler().runTask(() -> {
+      chunk.getWorld().setChunkForceLoaded(chunk.getX(), chunk.getZ(), keep);
+    });
   }
 
   @Override

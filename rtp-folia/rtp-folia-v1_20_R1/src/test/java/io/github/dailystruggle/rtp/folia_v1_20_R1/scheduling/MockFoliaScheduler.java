@@ -141,6 +141,11 @@ public class MockFoliaScheduler implements RTPScheduler {
         return runTaskTimer(task, delay, period);
     }
 
+    @Override
+    public void runTaskLater(RTPWorld<?> world, int cx, int cz, Runnable task, long delay) {
+        runTaskLater(task, delay);
+    }
+
     public void tick(long ticks) {
         currentTime.addAndGet(ticks);
         List<MockTask> toRun = new ArrayList<>();

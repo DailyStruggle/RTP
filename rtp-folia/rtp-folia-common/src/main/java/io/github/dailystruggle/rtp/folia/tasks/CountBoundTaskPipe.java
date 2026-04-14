@@ -1,12 +1,9 @@
 package io.github.dailystruggle.rtp.folia.tasks;
 
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
-import io.github.dailystruggle.rtp.folia.world.FoliaRTPWorld;
-import org.bukkit.Bukkit;
-import org.bukkit.Location;
-import org.bukkit.World;
 import org.bukkit.plugin.Plugin;
 
 public class CountBoundTaskPipe extends RTPTaskPipe {
@@ -42,19 +39,10 @@ public class CountBoundTaskPipe extends RTPTaskPipe {
                 else runnable.run();
                 dt = System.nanoTime() - start;
             } else {
-                if (rtpLocation.world() instanceof FoliaRTPWorld) {
-                    World world = ((FoliaRTPWorld) rtpLocation.world()).world();
-                    Location loc = new Location(world, rtpLocation.x(), rtpLocation.y(), rtpLocation.z());
-                    Bukkit.getRegionScheduler().run(plugin, loc, scheduledTask -> {
-                        if (runnable instanceof RTPRunnable) ((RTPRunnable) runnable).runWithTracking();
-                        else runnable.run();
-                    });
-                } else {
-                    Bukkit.getGlobalRegionScheduler().run(plugin, scheduledTask -> {
-                        if (runnable instanceof RTPRunnable) ((RTPRunnable) runnable).runWithTracking();
-                        else runnable.run();
-                    });
-                }
+                RTP.serverAccessor.getScheduler().runTask(rtpLocation, () -> {
+                    if (runnable instanceof RTPRunnable) ((RTPRunnable) runnable).runWithTracking();
+                    else runnable.run();
+                });
             }
         }
         return runnables.isEmpty();

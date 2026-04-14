@@ -64,10 +64,9 @@ public class FoliaLocationGenerator implements ILocationGenerator {
                 // If a cached location is available, instantly map it to a GenerationResult.
                 return poll.thenCompose(cachedLoc -> {
                     if (cachedLoc != null && cachedLoc.coords() != null) {
-                        // We intentionally pass null for ChunkSet here, as Folia handles
-                        // final safety/loading natively during the TELEPORT phase.
+                        // pass the reservation along so the pipeline can close it.
                         return CompletableFuture.completedFuture(
-                                new GenerationResult(cachedLoc.coords(), cachedLoc.attempts(), null)
+                                new GenerationResult(cachedLoc.coords(), cachedLoc.attempts(), null, cachedLoc.reservation())
                         );
                     }
                     // If the poll completed with null (cache miss/error), fallback to generation
@@ -281,120 +280,149 @@ public class FoliaLocationGenerator implements ILocationGenerator {
 
                     // Request the chunk. We break the while loop by returning,
                     // which cleanly suspends this worker thread until the future fires.
-                    RTP.serverAccessor.getChunkManager().getChunkAtAsync(world, cx, cz).thenAccept(chunkKey -> {
-                        if (chunkKey == null) {
-                            this.i++;
-                            reschedule(false);
-                            return;
-                        }
+                    world.getChunkAtAsync(cx, cz).thenAccept(chunkSet -> {
+                        try {
+                            if (chunkSet == null) {
+                                this.i++;
+                                reschedule(false);
+                                return;
+                            }
 
-                        // THE TRAFFIC COP: Route the internal block checks to the Region Thread
-                        io.github.dailystruggle.rtp.api.world.RTPLocation targetLoc =
-                                new io.github.dailystruggle.rtp.api.world.RTPLocation(world, blockX, 0, blockZ);
+                            // THE TRAFFIC COP: Route the internal block checks to the Region Thread
+                            io.github.dailystruggle.rtp.api.world.RTPLocation targetLoc =
+                                    new io.github.dailystruggle.rtp.api.world.RTPLocation(world, blockX, 0, blockZ);
 
-                        RTP.serverAccessor.getScheduler().runTask(targetLoc, () -> {
-                            try {
-                                RTPChunk<?> chunk = world.getCachedChunk(chunkKey);
-                                if (chunk == null) {
-                                    this.i++;
-                                    reschedule(false);
-                                    return;
-                                }
-
-                                MutableRTPCoords res = new MutableRTPCoords(world.name(), 0, 0, 0);
-                                if (!state.vert.adjust(chunk, res)) {
-                                    if (state.defaultBiomes && state.shape instanceof MemoryShape && state.biomeRecall) {
-                                        ((MemoryShape<?>) state.shape).addBadLocation(finalL);
+                            RTP.serverAccessor.getScheduler().runTask(targetLoc, () -> {
+                                try {
+                                    long chunkKey = ((long) cx & 0xffffffffL | ((long) cz << 32));
+                                    RTPChunk<?> chunk = world.getCachedChunk(chunkKey);
+                                    if (chunk == null) {
+                                        this.i++;
+                                        reschedule(false);
+                                        return;
                                     }
-                                    this.i++;
-                                    reschedule(false); // Safely queues async, because we are guaranteed to be on a TickThread here
-                                    return;
-                                }
 
-                                int finalX = res.x;
-                                int finalY = res.y;
-                                int finalZ = res.z;
-                                String resBiome = world.getBiome(finalX, finalY, finalZ).toUpperCase();
-
-                                if (!state.biomeNames.contains(resBiome)) {
-                                    if (state.defaultBiomes && state.shape instanceof MemoryShape && state.biomeRecall) {
-                                        ((MemoryShape<?>) state.shape).addBadLocation(finalL);
-                                    }
-                                    this.i++;
-                                    this.biomeChecks++;
-                                    reschedule(false);
-                                    return;
-                                }
-
-                                int safe = state.safetyRadius;
-                                if (safe <= 0) {
-                                    GlobalRegionVerifiers.checkGlobalRegionVerifiers(res.toImmutable()).thenAccept(pass -> {
-                                        if (pass) {
-                                            if (state.shape instanceof MemoryShape && finalL > 0) {
-                                                ((MemoryShape<?>) state.shape).addBiomeLocation(finalL, state.resolution, resBiome);
-                                            }
-                                            long viewDistanceRadius = state.performance.getNumber(PerformanceKeys.viewDistanceSelect, 0L).longValue();
-
-                                            // SUCCESS! Pass it up the pipeline.
-                                            resultFuture.complete(new GenerationResult(res.toImmutable(), i, null));
-                                        } else {
-                                            if (state.shape instanceof MemoryShape) {
-                                                ((MemoryShape<?>) state.shape).addBadLocation(finalL);
-                                            }
-                                            this.i++;
-                                            reschedule(false);
+                                    MutableRTPCoords res = new MutableRTPCoords(world.name(), 0, 0, 0);
+                                    if (!state.vert.adjust(chunk, res)) {
+                                        if (state.defaultBiomes && state.shape instanceof MemoryShape && state.biomeRecall) {
+                                            ((MemoryShape<?>) state.shape).addBadLocation(finalL);
                                         }
-                                    });
-                                    return;
-                                }
-
-                                List<CompletableFuture<Long>> chunkFutures = new ArrayList<>();
-                                int minCx = (finalX - safe) >> 4;
-                                int maxCx = (finalX + safe) >> 4;
-                                int minCz = (finalZ - safe) >> 4;
-                                int maxCz = (finalZ + safe) >> 4;
-
-                                for (int x = minCx; x <= maxCx; x++) {
-                                    for (int z = minCz; z <= maxCz; z++) {
-                                        chunkFutures.add(RTP.serverAccessor.getChunkManager().getChunkAtAsync(world, x, z));
+                                        this.i++;
+                                        reschedule(false); // Safely queues async, because we are guaranteed to be on a TickThread here
+                                        return;
                                     }
-                                }
 
-                                CompletableFuture.allOf(chunkFutures.toArray(new CompletableFuture[0])).thenAccept(v -> {
-                                    boolean allSafe = true;
-                                    for (int x = finalX - safe; x <= finalX + safe; x++) {
-                                        int ccx = x >> 4;
-                                        int xx = x & 15;
-                                        for (int z = finalZ - safe; z <= finalZ + safe; z++) {
-                                            int ccz = z >> 4;
-                                            int zz = z & 15;
-                                            long key = ((long) ccx & 0xffffffffL) | (((long) ccz & 0xffffffffL) << 32);
-                                            RTPChunk<?> chunk1 = world.getCachedChunk(key);
-                                            if (chunk1 == null) {
-                                                allSafe = false;
-                                                break;
-                                            }
-                                            for (int y = finalY - safe; y <= finalY + safe; y++) {
-                                                if (y > world.getMaxHeight() || y < world.getMinHeight()) continue;
-                                                if (!chunk1.isSafe(xx, y, zz, state.unsafeBlocks)) {
-                                                    allSafe = false;
-                                                    break;
-                                                }
-                                            }
-                                            if (!allSafe) break;
+                                    int finalX = res.x;
+                                    int finalY = res.y;
+                                    int finalZ = res.z;
+                                    String resBiome = world.getBiome(finalX, finalY, finalZ).toUpperCase();
+
+                                    if (!state.biomeNames.contains(resBiome)) {
+                                        if (state.defaultBiomes && state.shape instanceof MemoryShape && state.biomeRecall) {
+                                            ((MemoryShape<?>) state.shape).addBadLocation(finalL);
                                         }
-                                        if (!allSafe) break;
+                                        this.i++;
+                                        this.biomeChecks++;
+                                        reschedule(false);
+                                        return;
                                     }
 
-                                    if (allSafe) {
+                                    int safe = state.safetyRadius;
+                                    if (safe <= 0) {
                                         GlobalRegionVerifiers.checkGlobalRegionVerifiers(res.toImmutable()).thenAccept(pass -> {
-                                            if (pass) {
-                                                if (state.shape instanceof MemoryShape && finalL > 0) {
-                                                    ((MemoryShape<?>) state.shape).addBiomeLocation(finalL, state.resolution, resBiome);
+                                            try {
+                                                if (pass) {
+                                                    if (state.shape instanceof MemoryShape && finalL > 0) {
+                                                        ((MemoryShape<?>) state.shape).addBiomeLocation(finalL, state.resolution, resBiome);
+                                                    }
+
+                                                    // SUCCESS! Pass it up the pipeline.
+                                                    resultFuture.complete(new GenerationResult(res.toImmutable(), i, null));
+                                                } else {
+                                                    if (state.shape instanceof MemoryShape) {
+                                                        ((MemoryShape<?>) state.shape).addBadLocation(finalL);
+                                                    }
+                                                    this.i++;
+                                                    reschedule(false);
                                                 }
-                                                long viewDistanceRadius = state.performance.getNumber(PerformanceKeys.viewDistanceSelect, 0L).longValue();
-                                                ChunkSet verifiedChunks = state.region.chunkManager.chunks(res.toImmutable(), Math.max(state.safetyRadius, (int) viewDistanceRadius));
-                                                resultFuture.complete(new GenerationResult(res.toImmutable(), i, verifiedChunks));
+                                            } catch (Exception e) {
+                                                io.github.dailystruggle.rtp.common.tools.SupportLogger.logException(Level.SEVERE, "Error in GlobalRegionVerifiers callback", e);
+                                                this.i++;
+                                                reschedule(false);
+                                            }
+                                        });
+                                        return;
+                                    }
+
+                                    List<CompletableFuture<Long>> chunkFutures = new ArrayList<>();
+                                    int minCx = (finalX - safe) >> 4;
+                                    int maxCx = (finalX + safe) >> 4;
+                                    int minCz = (finalZ - safe) >> 4;
+                                    int maxCz = (finalZ + safe) >> 4;
+
+                                    for (int x = minCx; x <= maxCx; x++) {
+                                        for (int z = minCz; z <= maxCz; z++) {
+                                            chunkFutures.add(world.getChunkAt(x, z));
+                                        }
+                                    }
+
+                                    CompletableFuture.allOf(chunkFutures.toArray(new CompletableFuture[0])).thenAccept(v -> {
+                                        try {
+                                            boolean allSafe = true;
+                                            for (int x = finalX - safe; x <= finalX + safe; x++) {
+                                                int ccx = x >> 4;
+                                                int xx = x & 15;
+                                                for (int z = finalZ - safe; z <= finalZ + safe; z++) {
+                                                    int ccz = z >> 4;
+                                                    int zz = z & 15;
+                                                    long key = ((long) ccx & 0xffffffffL) | (((long) ccz & 0xffffffffL) << 32);
+                                                    RTPChunk<?> chunk1 = world.getCachedChunk(key);
+                                                    if (chunk1 == null) {
+                                                        allSafe = false;
+                                                        break;
+                                                    }
+                                                    for (int y = finalY - safe; y <= finalY + safe; y++) {
+                                                        if (y > world.getMaxHeight() || y < world.getMinHeight()) continue;
+                                                        if (!chunk1.isSafe(xx, y, zz, state.unsafeBlocks)) {
+                                                            allSafe = false;
+                                                            break;
+                                                        }
+                                                    }
+                                                    if (!allSafe) break;
+                                                }
+                                                if (!allSafe) break;
+                                            }
+
+                                            if (allSafe) {
+                                                GlobalRegionVerifiers.checkGlobalRegionVerifiers(res.toImmutable()).thenAccept(pass -> {
+                                                    try {
+                                                        if (pass) {
+                                                            if (state.shape instanceof MemoryShape && finalL > 0) {
+                                                                ((MemoryShape<?>) state.shape).addBiomeLocation(finalL, state.resolution, resBiome);
+                                                            }
+                                                            long viewDistanceRadius = state.performance.getNumber(PerformanceKeys.viewDistanceSelect, 0L).longValue();
+                                                            int radius = Math.max(state.safetyRadius, (int) viewDistanceRadius);
+                                                            List<CompletableFuture<Long>> chunks = new ArrayList<>();
+                                                            for (int x = -radius; x <= radius; x++) {
+                                                                for (int z = -radius; z <= radius; z++) {
+                                                                    chunks.add(world.getChunkAt((finalX >> 4) + x, (finalZ >> 4) + z));
+                                                                }
+                                                            }
+                                                            ChunkSet verifiedChunks = new ChunkSet(world, finalX >> 4, finalZ >> 4, chunks, new CompletableFuture<>());
+                                                            resultFuture.complete(new GenerationResult(res.toImmutable(), i, verifiedChunks));
+                                                        } else {
+                                                            if (state.shape instanceof MemoryShape) {
+                                                                ((MemoryShape<?>) state.shape).addBadLocation(finalL);
+                                                            }
+                                                            this.i++;
+                                                            reschedule(false);
+                                                        }
+                                                    } catch (Exception e) {
+                                                        io.github.dailystruggle.rtp.common.tools.SupportLogger.logException(Level.SEVERE, "Error in nested GlobalRegionVerifiers callback", e);
+                                                        this.i++;
+                                                        reschedule(false);
+                                                    }
+                                                });
                                             } else {
                                                 if (state.shape instanceof MemoryShape) {
                                                     ((MemoryShape<?>) state.shape).addBadLocation(finalL);
@@ -402,21 +430,24 @@ public class FoliaLocationGenerator implements ILocationGenerator {
                                                 this.i++;
                                                 reschedule(false);
                                             }
-                                        });
-                                    } else {
-                                        if (state.shape instanceof MemoryShape) {
-                                            ((MemoryShape<?>) state.shape).addBadLocation(finalL);
+                                        } catch (Exception e) {
+                                            io.github.dailystruggle.rtp.common.tools.SupportLogger.logException(Level.SEVERE, "Error in chunkFutures callback", e);
+                                            this.i++;
+                                            reschedule(false);
                                         }
-                                        this.i++;
-                                        reschedule(false);
-                                    }
-                                });
+                                    });
 
-                            } catch (Exception e) {
-                                SendMessage.log(Level.SEVERE, "Failed to generate location!", e);
-                                resultFuture.complete(null);
-                            }
-                        });
+                                } catch (Exception e) {
+                                    SendMessage.log(Level.SEVERE, "Failed to generate location!", e);
+                                    this.i++;
+                                    reschedule(false);
+                                }
+                            });
+                        } catch (Exception e) {
+                            SendMessage.log(Level.SEVERE, "Failed to generate location in getChunkAtAsync callback!", e);
+                            this.i++;
+                            reschedule(false);
+                        }
                     });
 
                     // SUSPEND the while loop cleanly! It will resume asynchronously when the chunk loads.
