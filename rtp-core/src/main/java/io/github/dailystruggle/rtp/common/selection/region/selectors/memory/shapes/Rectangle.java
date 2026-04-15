@@ -7,7 +7,6 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shap
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 /** Rectangle shape for region selection */
@@ -160,7 +159,7 @@ public class Rectangle extends MemoryShape<RectangleParams> {
 
     double range = getRange();
 
-    double res = (range) * (ThreadLocalRandom.current().nextDouble());
+    double res = (range) * (rng().nextDouble());
 
     long location;
     if (mode.equalsIgnoreCase("ACCUMULATE")) {

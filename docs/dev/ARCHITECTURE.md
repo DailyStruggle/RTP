@@ -1,6 +1,10 @@
-# Project Architecture
+﻿# Project Architecture
 
-For a high-level overview of the plugin's fail-safe guarantees and bounded execution architecture, see [System Architecture and Safety-Critical Design](DESIGN.md).
+For a high-level overview of the plugin's reliability guarantees and bounded execution architecture, see [System Architecture and High-Reliability Design](DESIGN.md).
+For the full requirements-to-code traceability matrix (Req ID → design decision → implementing class → test), see [TRACEABILITY.md](TRACEABILITY.md).
+For actor definitions and stakeholder goals, see [STAKEHOLDERS.md](STAKEHOLDERS.md).
+For term definitions, see [GLOSSARY.md](GLOSSARY.md).
+For the rationale behind key architectural decisions (why, not just what), see [Architecture Decision Records](../adr/README.md).
 
 The RTP (Random Teleport) plugin is built with a multi-module architecture to ensure scalability, ease of maintenance, and compatibility with various server software environments such as Spigot, Paper, and Folia.
 
@@ -21,6 +25,20 @@ These modules implement platform-specific features to maximize performance on th
 
 ### Addons
 * **addons**: A directory containing subprojects that integrate RTP with external plugins. These examples (e.g., `RTP_ClaimPluginIntegrations`, `RTP_Glide`, `RTP_Iris_integration`) demonstrate how to utilize `rtp-api` to extend the plugin's capabilities.
+
+## Module Dependency Graph
+
+```mermaid
+graph TD
+    rtp-api --> rtp-core
+    rtp-core --> rtp-plugin
+    rtp-plugin --> rtp-spigot
+    rtp-plugin --> rtp-paper
+    rtp-plugin --> rtp-folia
+    rtp-api --> addons
+```
+
+> **Dependency rule:** `rtp-core` and `rtp-api` must never import platform-specific classes (Bukkit, Spigot, Paper, Folia). This is enforced by the `core_must_not_depend_on_platform_apis` ArchUnit test in `RTPArchitectureTest`.
 
 ## Key Concepts
 

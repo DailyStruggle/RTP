@@ -1,4 +1,4 @@
-# Contributing to RTP
+﻿# Contributing to RTP
 
 Thank you for your interest in contributing to the RTP plugin! To ensure a smooth workflow and safe changes, please adhere to the following guidelines.
 
@@ -48,7 +48,60 @@ We use JUnit for testing and Jacoco for coverage reports.
 2. **Use the API**: If your change could be implemented via `rtp-api` without modifying core code, consider writing an addon instead.
 3. **Keep performance in mind**: RTP pre-calculates many teleports asynchronously to avoid server lag. Ensure that any new geometry or validation checks are thread-safe and performant.
 
+## Adding or Changing Requirements
+
+RTP uses a structured requirements workflow enforced by CI. If you add or modify a requirement, all four steps below must be completed **in the same commit** or the pipeline will fail.
+
+1. **Add the requirement** to the correct `docs/REQUIREMENTS.md` file (or the relevant submodule `REQUIREMENTS.md`) with the next sequential ID in its category (e.g., `REQ-CORE-F-008`). Format:
+   ```
+   - **REQ-CORE-F-008 — Short Title:** The system must ...
+   ```
+2. **Add a row** to `docs/dev/TRACEABILITY.md` in the matching section:
+
+   | Req ID | Description | Design Ref | Implementing Class(es) | Test(s) |
+   |---|---|---|---|---|
+   | REQ-CORE-F-008 | Short title | docs/DESIGN.md §X | `ClassName.java` | `TestClass#method` |
+
+   Use `— (pending)` for columns that don't exist yet.
+
+3. **Update `docs/DESIGN.md`** if the requirement introduces a new architectural decision.
+4. **Write or update a test.** For architectural rules, add a rule to `RTPArchitectureTest.java`. For behavioral requirements, add a unit or integration test. For platform-specific behavior that cannot be automated, note `— (manual)` in the Test column.
+
+The CI `Traceability Check` stage runs `check_traceability.sh` before the build and will fail with a list of untraced IDs if step 2 is skipped.
+
+For the full ID scheme and category reference, see [REQUIREMENTS.md](docs/dev/REQUIREMENTS.md).
+For term definitions used in requirements, see [GLOSSARY.md](docs/dev/GLOSSARY.md).
+For actor and stakeholder context, see [STAKEHOLDERS.md](docs/dev/STAKEHOLDERS.md).
+
 ## Pull Requests
-* Provide a clear and descriptive title for your PR.
-* Explain the problem being solved and how your changes address it.
-* Mention any related issues.
+
+A PR template is provided at `.github/PULL_REQUEST_TEMPLATE.md` and will be pre-filled automatically when you open a PR on GitHub.
+
+### Branch Naming
+
+| Type | Pattern | Example |
+|------|---------|---------|
+| Bug fix | `fix/<short-description>` | `fix/chunk-leak-on-reload` |
+| New feature | `feature/<short-description>` | `feature/rectangle-shape` |
+| Documentation | `docs/<short-description>` | `docs/adr-paperlib-removal` |
+| Release prep | `release/<version>` | `release/3.0.0` |
+
+### Definition of Ready to Merge
+
+A PR is ready to merge when **all** of the following are true:
+1. All CI checks pass (build, Spotless, traceability check, tests).
+2. `CHANGELOG.md` has an entry under `[Unreleased]`.
+3. Any new or modified REQ-IDs have a row in `docs/dev/TRACEABILITY.md`.
+4. If the change breaks `rtp-api` compatibility, `docs/MIGRATION.md` is updated.
+
+### Semantic Versioning Policy
+
+RTP follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The version number is `MAJOR.MINOR.PATCH`:
+
+| Change type | Version bump | Example |
+|-------------|-------------|---------|
+| Breaking change to `rtp-api` public interface | **MAJOR** | `3.x.x` → `4.0.0` |
+| New feature, new config key, new command | **MINOR** | `3.0.x` → `3.1.0` |
+| Bug fix, performance improvement, documentation | **PATCH** | `3.0.0` → `3.0.1` |
+
+> **Addon developers:** A MAJOR bump means your addon must be recompiled and may require source changes. MINOR and PATCH bumps are always backward-compatible with existing addons compiled against the same MAJOR version.

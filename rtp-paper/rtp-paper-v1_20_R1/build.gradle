@@ -6,6 +6,8 @@ dependencies {
     implementation project(':rtp-paper:rtp-paper-common')
     compileOnly 'io.papermc.paper:paper-api:1.20.1-R0.1-SNAPSHOT'
     testImplementation 'io.papermc.paper:paper-api:1.20.1-R0.1-SNAPSHOT'
+    testImplementation testFixtures(project(':rtp-core'))
+    testImplementation 'com.github.seeseemelk:MockBukkit-v1.20:3.93.2'
 }
 
 test {

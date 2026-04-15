@@ -1,12 +1,14 @@
-# RTP System Architecture and Safety-Critical Design
+﻿# RTP System Architecture and High-Reliability Design
+
+> **Note:** In the context of this architecture, **RTP** holds a dual meaning: **R**andom **T**ele**P**ort and **R**eal-**T**ime **P**rocess. This reflects the core design philosophy that the plugin's codebase should be structured and analyzed with the rigor of highly reliable server software.
 
 ## System Overview and Operational Guarantees
-RTP (Random Teleport) is engineered to provide strictly bounded, high-performance random teleportation by decoupling location generation from user execution. Unlike traditional plugins that execute unbounded location searches synchronously (which introduces unpredictable latency and server instability), RTP guarantees O(1) constant-time response for end-users via an asynchronous, strictly managed queue system.
+The system is engineered to provide strictly bounded, high-performance random teleportation by decoupling location generation from user execution. Unlike traditional plugins that execute unbounded location searches synchronously (which introduces unpredictable latency and server instability), RTP guarantees O(1) constant-time response for end-users via an asynchronous, strictly managed queue system.
 
 ## Core Architectural Components
 
 ### 1. Asynchronous Queue-Based Pre-Generation
-The core fail-safe mechanism of RTP is its `RegionQueueManager`. The system maintains a rigorous pipeline of pre-calculated, verified teleport locations.
+The core reliability mechanism of RTP is its `RegionQueueManager`. The system maintains a rigorous pipeline of pre-calculated, verified teleport locations.
 - **Constant-Time Execution**: End-user teleport requests are fulfilled instantly from the pre-verified queue, ensuring zero blocking on the main server thread.
 - **Bounded Computation Overhead**: The system asynchronously replenishes the queue within strict computational bounds, preventing server CPU spikes.
 - **State Isolation**: Both global and isolated per-user queues are maintained to prevent resource starvation and handle concurrent high-frequency requests reliably.
@@ -17,9 +19,9 @@ RTP employs platform-specific adapters to ensure strict thread safety and optima
 - **`rtp-paper`**: Leverages asynchronous chunk loading APIs to prevent main-thread deadlocks.
 - **`rtp-folia`**: Implements strictly isolated region-based multithreading, guaranteeing thread safety and data integrity during concurrent state mutations.
 
-### 3. Deterministic Spatial Algorithms (Worst-Case Execution Time Guarantees)
-RTP replaces unbounded random geometric selections with deterministic algorithms to ensure predictable Worst-Case Execution Time (WCET):
-- **Archimedean Spirals**: A custom 1D sequence mapping (using Archimedean spirals for CIRCLE and SQUARE shapes) is employed rather than naive 2D rerolling or image compression algorithms. This directly mitigates two critical failure modes in traditional implementations:
+### 3. Deterministic Spatial Algorithms (Strict Execution Time Bounds)
+RTP replaces unbounded random geometric selections with deterministic algorithms to ensure predictable maximum execution times:
+- **Archimedean Spirals**: A custom 1D sequence mapping (using Archimedean spirals for CIRCLE and SQUARE shapes) is employed rather than naive 2D rerolling or image compression algorithms. The rationale for this choice — including alternatives considered and the original mathematical proof authored by the plugin's sole developer — is recorded in [ADR-001](../adr/ADR-001-archimedean-spiral-1d-mapping.md). This directly mitigates two critical failure modes in traditional implementations:
   - **Distribution Skew (Clustering)**: Traditional algorithms inherently skew towards outer bounds. The 1D mapping ensures mathematically verified, perfectly uniform spatial distribution.
   - **Non-Deterministic Execution (Unbounded Rerolling)**: Naive algorithms "reroll" upon hitting invalid sectors (e.g., oceans, protected regions), which causes execution time to decay exponentially as invalid space increases. By mapping 2D space to a 1D sequence, RTP preemptively subtracts "bad sectors" from the pool. This guarantees deterministic, stable computation time, completely eliminating the risk of infinite loops or execution timeouts.
 - **Stateful Memory Tracking**: The `MemoryShape` caching system persistently tracks invalid regions, ensuring the system never wastes cycles validating known bad states, maintaining algorithmic efficiency and deterministic behavior over time.
@@ -40,4 +42,4 @@ To guarantee system stability and prevent server exhaustion, RTP employs a rigor
 
 ## Extensibility and API Boundaries
 The `rtp-api` module provides a strict, defined interface for external integrations:
-- **Safe Extensibility**: Developers can inject custom `Shape` algorithms or claim-plugin validations (e.g., GriefPrevention) via the API without modifying or compromising the safety guarantees of the `rtp-core` module.
+- **Safe Extensibility**: Developers can inject custom `Shape` algorithms or claim-plugin validations (e.g., GriefPrevention) via the API without modifying or compromising the reliability guarantees of the `rtp-core` module.

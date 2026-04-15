@@ -21,12 +21,34 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public class LocationGenerator implements ILocationGenerator {
+
+    /**
+     * RNG used for biome-recall entry selection. Defaults to {@link ThreadLocalRandom#current()}
+     * at call time. Inject a seeded {@link Random} via {@link #setRng(Random)} in tests to make
+     * location selection fully deterministic.
+     */
+    static Random rng = null;
+
+    /** Returns the active RNG, falling back to {@link ThreadLocalRandom#current()}. */
+    static Random rng() {
+        return rng != null ? rng : ThreadLocalRandom.current();
+    }
+
+    /**
+     * Injects a deterministic RNG. Pass {@code null} to restore {@link ThreadLocalRandom}
+     * behaviour. Intended for unit tests only.
+     */
+    public static void setRng(Random rng) {
+        LocationGenerator.rng = rng;
+    }
+
     private static final Set<String> unsafeBlocks = new ConcurrentSkipListSet<>();
     private static final AtomicLong lastUpdate = new AtomicLong(0);
     private static final AtomicInteger safetyRadius = new AtomicInteger(0);
@@ -393,9 +415,9 @@ public class LocationGenerator implements ILocationGenerator {
                     }
                     Map.Entry<Long, Long> entry;
                     if (biomes.size() > 0) {
-                        int nextInt = ThreadLocalRandom.current().nextInt(biomes.size());
-                        entry = biomes.get(nextInt);
-                        l = entry.getKey() + ThreadLocalRandom.current().nextLong(entry.getValue());
+                        int nextInt = rng().nextInt(biomes.size());
+                            entry = biomes.get(nextInt);
+                            l = entry.getKey() + (long) (rng().nextDouble() * entry.getValue());
                     } else if (biomeRecallForced) {
                         new IllegalStateException(
                                 "[RTP] invalid state, biome recall enabled but biomes are not in memory - "
@@ -448,9 +470,9 @@ public class LocationGenerator implements ILocationGenerator {
                         }
                         Map.Entry<Long, Long> entry;
                         if (biomes.size() > 0) {
-                            int nextInt = ThreadLocalRandom.current().nextInt(biomes.size());
+                            int nextInt = rng().nextInt(biomes.size());
                             entry = biomes.get(nextInt);
-                            l = entry.getKey() + ThreadLocalRandom.current().nextLong(entry.getValue());
+                            l = entry.getKey() + (long) (rng().nextDouble() * entry.getValue());
                         } else if (biomeRecallForced) {
                             new IllegalStateException(
                                     "[RTP] invalid state, biome recall enabled but biomes are not in memory - "

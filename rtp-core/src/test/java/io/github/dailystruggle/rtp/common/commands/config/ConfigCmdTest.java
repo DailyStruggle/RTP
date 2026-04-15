@@ -1,14 +1,12 @@
 package io.github.dailystruggle.rtp.common.commands.config;
 
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
-import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
-import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
+import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -37,31 +35,7 @@ public class ConfigCmdTest {
 
     @BeforeEach
     void setUp() throws IOException {
-        RTPServerAccessor serverAccessor = mock(RTPServerAccessor.class);
-        io.github.dailystruggle.rtp.api.entity.RTPPlayer console = mock(io.github.dailystruggle.rtp.api.entity.RTPPlayer.class);
-        when(console.uuid()).thenReturn(RTP.serverId);
-        when(serverAccessor.getConsolePlayer()).thenReturn(console);
-        RTPScheduler scheduler = mock(RTPScheduler.class);
-        when(serverAccessor.getScheduler()).thenReturn(scheduler);
-        io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask mockTask = mock(io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask.class);
-        when(scheduler.runTaskAsynchronously(any(Runnable.class))).thenAnswer(invocation -> {
-            Runnable runnable = invocation.getArgument(0);
-            runnable.run();
-            return mockTask;
-        });
-
-        RTP.serverAccessor = serverAccessor;
-        RTP.scheduler = scheduler;
-        when(serverAccessor.getPluginDirectory()).thenReturn(tempDir.toFile());
-        when(serverAccessor.createTaskPipe()).thenReturn(mock(RTPTaskPipe.class));
-        when(serverAccessor.getSender(any())).thenReturn(mock(io.github.dailystruggle.rtp.api.entity.RTPCommandSender.class));
-
-        RTP rtp = new RTP() {};
-        try {
-            java.lang.reflect.Field instanceField = RTP.class.getDeclaredField("instance");
-            instanceField.setAccessible(true);
-            instanceField.set(null, rtp);
-        } catch (Exception e) {}
+        RTPTestSetup.install(tempDir.toFile());
         RTP.selectionAPI = new io.github.dailystruggle.rtp.common.selection.SelectionAPI();
 
         configs = new Configs(tempDir.toFile());

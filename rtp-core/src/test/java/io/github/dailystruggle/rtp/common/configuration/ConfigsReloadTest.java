@@ -1,11 +1,10 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
-import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.configuration.enums.*;
+import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -18,25 +17,15 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 public class ConfigsReloadTest {
-    private RTPScheduler mockScheduler;
-    private RTPServerAccessor mockServerAccessor;
     private RTP rtp;
     private File tempDir;
 
     @BeforeEach
     public void setUp() {
-        mockScheduler = mock(RTPScheduler.class);
-        mockServerAccessor = mock(RTPServerAccessor.class);
         tempDir = new File("target/test-configs-reload");
         if (!tempDir.exists()) tempDir.mkdirs();
-
-        when(mockServerAccessor.getPluginDirectory()).thenReturn(tempDir);
-        when(mockServerAccessor.createTaskPipe()).thenReturn(mock(RTPTaskPipe.class));
-        when(mockServerAccessor.getRTPWorlds()).thenReturn(new ArrayList<>());
-
-        RTP.scheduler = mockScheduler;
-        RTP.serverAccessor = mockServerAccessor;
-
+        MockRTPServerAccessor accessor = RTPTestSetup.install(tempDir);
+        accessor.clearWorlds(); // this test requires an empty world list, matching the original behaviour
         RTP.selectionAPI = new io.github.dailystruggle.rtp.common.selection.SelectionAPI();
         rtp = new RTP();
     }

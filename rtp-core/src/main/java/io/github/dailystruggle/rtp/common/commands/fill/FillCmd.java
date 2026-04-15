@@ -14,6 +14,7 @@ public class FillCmd extends BaseRTPCmdImpl {
   public FillCmd(@Nullable CommandsAPICommand parent) {
     super(parent);
     addSubCommand(new FillStartCmd(this));
+    addSubCommand(new FillResetCmd(this));
     addSubCommand(new FillPauseCmd(this));
     addSubCommand(fillResumeCmd);
     addSubCommand(new FillCancelCmd(this));

@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+
+    <!-- RANK 1-9 PRE-EXISTING ("Scary") findings present before SpotBugs enforcement. -->
+
+    <!-- NP_NULL_ON_SOME_PATH rank-6: ReloadCmd.addCommands -->
+    <Match>
+        <Class name="io.github.dailystruggle.rtp.common.commands.reload.ReloadCmd"/>
+        <Method name="addCommands"/>
+        <Bug pattern="NP_NULL_ON_SOME_PATH"/>
+    </Match>
+
+    <!-- MF_CLASS_MASKS_FIELD rank-6: ConfigParser shadows FactoryValue fields -->
+    <Match>
+        <Class name="io.github.dailystruggle.rtp.common.configuration.ConfigParser"/>
+        <Bug pattern="MF_CLASS_MASKS_FIELD"/>
+    </Match>
+
+    <!-- NP_NONNULL_RETURN_VIOLATION rank-6: AbstractSQLDatabaseAccessor.connect -->
+    <Match>
+        <Class name="io.github.dailystruggle.rtp.common.database.options.AbstractSQLDatabaseAccessor"/>
+        <Method name="connect"/>
+        <Bug pattern="NP_NONNULL_RETURN_VIOLATION"/>
+    </Match>
+
+    <!-- NP_NULL_ON_SOME_PATH rank-6: Factory.getOrDefault -->
+    <Match>
+        <Class name="io.github.dailystruggle.rtp.common.factory.Factory"/>
+        <Method name="getOrDefault"/>
+        <Bug pattern="NP_NULL_ON_SOME_PATH"/>
+    </Match>
+
+    <!-- BC_IMPOSSIBLE_CAST rank-9: FactoryValue.getNumber (generic-erasure) -->
+    <Match>
+        <Class name="io.github.dailystruggle.rtp.common.factory.FactoryValue"/>
+        <Method name="getNumber"/>
+        <Bug pattern="BC_IMPOSSIBLE_CAST"/>
+    </Match>
+
+    <!-- RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE rank-9: LocationGenerator.getLocation -->
+    <Match>
+        <Class name="io.github.dailystruggle.rtp.common.selection.region.LocationGenerator"/>
+        <Method name="getLocation"/>
+        <Bug pattern="RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE"/>
+    </Match>
+
+    <!-- MF_CLASS_MASKS_FIELD rank-6: VerticalAdjustor shadows FactoryValue field -->
+    <Match>
+        <Class name="io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor"/>
+        <Bug pattern="MF_CLASS_MASKS_FIELD"/>
+    </Match>
+
+    <!-- RANK 10-20 PRE-EXISTING ("Troubling/Of Concern") findings. -->
+
+    <!-- DE_MIGHT_IGNORE rank-14: RTP migration lambda -->
+    <Match>
+        <Class name="io.github.dailystruggle.rtp.common.RTP"/>
+        <Bug pattern="DE_MIGHT_IGNORE"/>
+    </Match>
+
+    <!-- DLS_DEAD_LOCAL_STORE rank-15: ConfigParser.check -->
+    <Match>
+        <Class name="io.github.dailystruggle.rtp.common.configuration.ConfigParser"/>
+        <Method name="check"/>
+        <Bug pattern="DLS_DEAD_LOCAL_STORE"/>
+    </Match>
+
+    <!-- DM_DEFAULT_ENCODING rank-19: MemoryShape.exportDebugJson -->
+    <Match>
+        <Class name="io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape"/>
+        <Method name="exportDebugJson"/>
+        <Bug pattern="DM_DEFAULT_ENCODING"/>
+    </Match>
+
+    <!-- HE_EQUALS_USE_HASHCODE rank-14: Region.equals -->
+    <Match>
+        <Class name="io.github.dailystruggle.rtp.common.selection.region.Region"/>
+        <Method name="equals"/>
+        <Bug pattern="HE_EQUALS_USE_HASHCODE"/>
+    </Match>
+
+    <!-- MS_SHOULD_BE_FINAL rank-16: RTP mutable static fields -->
+    <Match>
+        <Class name="io.github.dailystruggle.rtp.common.RTP"/>
+        <Bug pattern="MS_SHOULD_BE_FINAL"/>
+    </Match>
+
+    <!-- REC_CATCH_EXCEPTION rank-15: RTP migration lambda -->
+    <Match>
+        <Class name="io.github.dailystruggle.rtp.common.RTP"/>
+        <Bug pattern="REC_CATCH_EXCEPTION"/>
+    </Match>
+
+    <!-- ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD rank-15: Configs constructor -->
+    <Match>
+        <Class name="io.github.dailystruggle.rtp.common.configuration.Configs"/>
+        <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD"/>
+    </Match>
+
+    <!-- UC_USELESS_CONDITION rank-14: LinearAdjustor.adjust -->
+    <Match>
+        <Class name="io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor"/>
+        <Method name="adjust"/>
+        <Bug pattern="UC_USELESS_CONDITION"/>
+    </Match>
+
+</FindBugsFilter>
