@@ -31,6 +31,7 @@ import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.common.tasks.TimeBoundTaskPipe;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tools.ChunkyChecker;
+import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
 import org.simpleyaml.configuration.ConfigurationSection;
 import org.simpleyaml.configuration.file.YamlFile;
 
@@ -40,7 +41,22 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 
-/** class to hold relevant API functions, outside of Bukkit functionality */
+/**
+ * Core class for the RTP (Random Teleport) plugin.
+ * This class serves as the central hub for the plugin's platform-agnostic logic, separating
+ * the core functionality from Bukkit/Spigot/Paper-specific APIs.
+ *
+ * <p>Key responsibilities include:
+ * <ul>
+ *   <li>Managing the selection API (Shapes, Vertical Adjustors).</li>
+ *   <li>Maintaining references to server accessors, schedulers, and economy integrations.</li>
+ *   <li>Tracking queued players and teleport data.</li>
+ *   <li>Handling synchronization and task pipelining across the plugin.</li>
+ * </ul>
+ *
+ * <p>This class acts as a singleton, accessible via {@link #getInstance()}, and delegates
+ * platform-specific operations to the injected `serverAccessor` and `scheduler`.
+ */
 public class RTP {
   public static final ConcurrentLinkedQueue<CompletableFuture<?>> futures =
       new ConcurrentLinkedQueue<>();
@@ -169,17 +185,17 @@ public class RTP {
 
     ChunkyChecker.loadChunky();
 
-    diagnosticTimer = Executors.newSingleThreadScheduledExecutor();
-    diagnosticTimer.scheduleAtFixedRate(
-        io.github.dailystruggle.rtp.common.tools.MemoryTracker::runDiagnostics,
-        60,
-        60,
-        TimeUnit.SECONDS);
+    trackedTasks.add(scheduler.runTaskTimerAsynchronously(
+            MemoryTracker::runDiagnostics,
+      1200L,
+      1200L));
 
     io.github.dailystruggle.rtp.common.tools.PerformanceTracker.start(scheduler);
     trackedTasks.add(scheduler.runTaskTimerAsynchronously(
         () -> {
-          if (databaseAccessor != null) databaseAccessor.flushDirtyCache();
+          if (databaseAccessor != null) {
+            databaseAccessor.flushDirtyCache();
+          }
         },
         6000,
         6000));

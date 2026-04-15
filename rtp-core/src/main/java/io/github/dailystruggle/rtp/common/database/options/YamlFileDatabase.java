@@ -255,6 +255,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, YamlFile>> {
         int y = section.getInt("y");
         int z = section.getInt("z");
         int attempts = section.getInt("attempts");
+        long seed = section.getLong("seed", 0L);
         String playerUuidStr = section.getString("player_uuid");
 
         UUID playerUuid = null;
@@ -264,7 +265,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, YamlFile>> {
           } catch (IllegalArgumentException ignored) {}
         }
 
-        res.add(new StoredLocation(id, regionName, worldName, x, y, z, attempts, playerUuid));
+        res.add(new StoredLocation(id, regionName, worldName, x, y, z, attempts, seed, playerUuid));
       }
     } catch (IOException e) {
       RTP.log(Level.WARNING, e.getMessage(), e);
@@ -293,6 +294,39 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, YamlFile>> {
   @Override
   public void startup() {
     Map<String, YamlFile> lookup = connect();
+
+    // Purge stale locations
+    YamlFile cachedFile = lookup.get("rtp_cached_locations.yml");
+    if (cachedFile != null) {
+      try {
+        cachedFile.loadWithComments();
+        long threshold = System.currentTimeMillis() - (7 * 24 * 60 * 60 * 1000L);
+        Map<String, Object> values = cachedFile.getMapValues(false);
+        List<String> toRemove = new ArrayList<>();
+        for (Map.Entry<String, Object> entry : values.entrySet()) {
+          Object obj = entry.getValue();
+          if (obj instanceof ConfigurationSection section) {
+            String playerUuidStr = section.getString("player_uuid");
+            if (playerUuidStr != null && !playerUuidStr.equalsIgnoreCase("shared")) {
+              long timestamp = section.getLong("timestamp", 0L);
+              if (timestamp < threshold) {
+                toRemove.add(entry.getKey());
+              }
+            }
+          }
+        }
+        if (!toRemove.isEmpty()) {
+          for (String key : toRemove) cachedFile.set(key, null);
+          cachedFile.save();
+          if (isSystemDatabaseLoggingEnabled()) {
+            RTP.log(Level.INFO, "Purged " + toRemove.size() + " stale cached locations from the database.");
+          }
+        }
+      } catch (IOException e) {
+        RTP.log(Level.WARNING, e.getMessage(), e);
+      }
+    }
+
     @NotNull
     Optional<Map<String, Object>> read =
         read(lookup, "referenceData", new AbstractMap.SimpleEntry<>("referenceTime", 0L));

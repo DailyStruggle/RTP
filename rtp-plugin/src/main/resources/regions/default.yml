@@ -1,53 +1,80 @@
-#case-sensitive name of target world this region is in
-# placeholder: [num] - world index according to bukkit, 0 is usually a main world
+# --- Region Configuration ---
+# Regions define the area and behavior for random teleportation.
+
+# Target World
+# case-sensitive name of target world this region is in.
+# Special placeholder: [num] - world index according to bukkit, 0 is usually the main world.
 world: "[0]"
-#override shape with vanilla worldborder settings
+
+# World Border Synchronization
+# If true, use the vanilla /worldborder radius for this region.
 worldBorderOverride: false
+
+# Selection Area (Shape)
 shape:
-  #shape of bounds
-  # each shape may use different optional input parameters, so update accordingly
+  # Available shapes: CIRCLE, SQUARE, RECTANGLE, etc.
   name: "CIRCLE"
-  #what selection adjustment method to use
-  # ACCUMULATE - accumulate all bad sectors up to the initial selection ( even distribution, slow at large radii )
-  # NEAREST - try nearest non-hit ( possible clustering, but fast )
-  # REROLL - reroll early on a known hit ( even distribution, non-deterministic time, but still fast )
-  # NONE - don't check if it's a known hit, just load and try ( best for massive radii, >50k )
+
+  # Selection Logic Mode
+  # ACCUMULATE - even distribution, handles bad sectors, slower at very large radii.
+  # NEAREST    - tries closest non-blocked spot, possible clustering, fast.
+  # REROLL     - re-selects early on known bad spots, even distribution, fast.
+  # NONE       - no pre-check, best for massive radii (>50,000 blocks).
   mode: "ACCUMULATE"
-  #outer radius of selection in chunks
+
+  # Selection Radius (Chunks)
   radius: 256
-  #donut hole in center, where players shouldn't land
+  # Inner Radius (Donut Hole) - players won't land within this radius from the center.
   centerRadius: 64
-  #center position, using chunk x-z coordinates
+  # Center Coordinates (Chunk X and Z)
   centerX: 0
   centerZ: 0
-  #shift players towards or away from the center, by exponent
-  # rand()^( x ), given rand() is between 0 and 1
-  # bigger is closer, smaller is farther
+
+  # Distribution Weight
+  # Formula: rand()^(weight). 
+  # >1.0 shifts towards center, <1.0 shifts towards edge.
   weight: 1.0
-  #prevent nearby placements by adding selected chunks to the region's list of bad chunks
+
+  # Unique Placements
+  # If true, once a location is used, it's marked as "bad" to prevent repeated landings.
   uniquePlacements: false
-  #expand region as locations are removed, keeping a constant number of possible placements
+
+  # Auto-Expansion
+  # If true, the region radius expands as locations are used up.
   expand: false
+
+# Vertical Selection (Height)
 vert:
+  # Available: JUMP, LINEAR, etc.
   name: "JUMP"
-  #height range for placement, set lower for more caves and ravines
+  # Height range for placement.
   minY: 32
   maxY: 255
-  #initial length to adjust
+  # Vertical search step size.
   step: 16
-  #ensure above ground by checking light level
+  # Require daylight at the destination (above ground).
   requireSkyLight: false
-#check rtp.regions.[region] node on command
+
+# Permissions & Requirements
+# Require 'rtp.regions.<regionName>' permission to use.
 requirePermission: false
-#if no perms, try this one
+# If a player lacks permission, they are redirected to this region.
 override: "default"
-#max length for the location queue per world, 0 disables normal region processing
+
+# Location Caching
+# Maximum number of safe locations to pre-calculate and store in the database.
+# Set to 0 to disable background caching for this region.
 cacheCap: 50
-#max number of chunks to keep actively loaded in memory for zero-latency teleports
+# Maximum chunks to keep loaded for zero-latency teleportation.
 activeChunkCap: 10
-# vault price for player to use this region
+
+# Vault Economy Cost
+# Price to use this specific region.
 price: 0.0
-# granularity of bad-location cache
+
+# Database Precision
+# Precision level for storing bad-location data.
 spatialResolution: 3
 
+# DO NOT TOUCH VERSION NUMBER
 version: "1.0"

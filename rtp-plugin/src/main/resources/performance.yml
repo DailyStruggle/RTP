@@ -1,58 +1,64 @@
-#how many rerolls before stopping
-# impact: high
+# --- RTP Performance Settings ---
+# Fine-tune the plugin for server performance.
+
+# Maximum Search Attempts
+# How many times the plugin will search for a safe location before stopping.
+# Impact: HIGH - Higher values can significantly increase CPU usage per request.
 maxAttempts: 10
 
-#what radius, in chunks, around the destination to pre-load
-# number of chunks loaded is ( 1 + 2*viewDistance )^2
-# set higher to pre-load a larger radius
-# impact: high
+# Destination Pre-loading (Chunks)
+# The radius of chunks to pre-load around the destination.
+# Number of chunks loaded is ( 1 + 2 * radius )^2.
+# Impact: HIGH - Setting this too high can cause significant lag spikes on teleport.
 viewDistanceSelect: 0
 viewDistanceTeleport: 0
 
-#number of gameticks between searching for new locations in each region ( 20 gameticks is 1 second )
-# The number of selections processed will depend on past selections and an estimated remaining time in the gametick.
-# Selection tasks for the different regions will rotate
-# impact: medium
+# Selection Frequency (Game Ticks)
+# Time between searching for new locations to refill the region caches.
+# ( 20 gameticks = 1 second ).
+# Impact: MEDIUM - Lower values refill caches faster but use more CPU.
 period: 100
 
-#maximum amount of time allotted to tasks per gametick
-# 0-50
-# impact: difficult to measure
+# Task Time Allotment (Milliseconds)
+# Maximum time (ms) to spend on RTP tasks per game tick. 
+# Range: 0 - 50.
+# Impact: MEDIUM - Higher values allow faster processing at the risk of tick time.
 syncAllottedTime: 50
 asyncAllottedTime: 50
 
-#minimum TPS requirement before trying to queue a new location
-# must be a number between 0 and 20 exclusive
-# impact: low
+# Minimum TPS Requirement
+# Minimum server TPS before queuing a new location for the cache.
+# Range: 0.0 - 20.0.
+# Impact: LOW - Prevents the plugin from adding lag when the server is struggling.
 minTPS: 19.0
 
-#whether to run a queue task after each rtp in addition to the timer
-# impact: medium
+# Post-Teleport Queueing
+# If true, the plugin will try to refill the location cache immediately after an RTP.
+# Impact: MEDIUM
 postTeleportQueueing: false
 
-#whether to use synchronous chunk loading on command for selection
-# not recommended for server performance, but it's good for testing
-# impact: high
+# Synchronous Loading
+# Use synchronous chunk loading for location selection.
+# Impact: HIGH - NOT RECOMMENDED! Can cause significant server hangs.
 syncLoading: false
 
-#on startup, whether to enable permissions parsing for onEvent permissions
-# incompatible with *.* permission
-# impact: medium
+# Permission Parsing (Startup)
+# onEventParsing: Incompatible with broad *.* permissions.
+# Impact: MEDIUM (onEvent) / LOW (effect)
 onEventParsing: false
-
-#on startup, whether to enable permissions parsing for effect permissions-
-# impact: low
 effectParsing: true
 
-#reuse biome locations when biome is specified
-# impact: depends on use case
+# Biome Selection Cache
+# biomeRecall: Reuse previously found biome locations.
+# biomeRecallForced: Only use biomes that have already been discovered and cached.
+# Impact: LOW to MEDIUM
 biomeRecall: true
-
-#temporary option to refuse biomes not visited yet
 biomeRecallForced: false
 
-#have each region check all in-range chunks on chunk load
-# impact: high
+# Passive Chunk Check
+# Check for safe locations within all loaded chunks in range of a region.
+# Impact: HIGH - Can significantly increase server load on chunk load events.
 checkOnChunkLoads: false
 
+# DO NOT TOUCH VERSION NUMBER
 version: "1.0"

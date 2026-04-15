@@ -11,6 +11,7 @@ import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
@@ -43,6 +44,7 @@ public class Region extends FactoryValue<RegionKeys> {
   public RTPTaskPipe cachePipeline;
   public RTPTaskPipe miscPipeline;
   protected RTPWorld<?> savedWorld = null;
+  private long lastValidationTime = 0;
 
   private RegionSettings settings;
   public Shape<?> shape;
@@ -92,7 +94,16 @@ public class Region extends FactoryValue<RegionKeys> {
     // Hydrate locations from database
     if (RTP.getInstance().databaseAccessor != null) {
       List<DatabaseAccessor.StoredLocation> storedLocations = RTP.getInstance().databaseAccessor.loadCachedLocations(name);
-      hydrateCacheFromDatabase(storedLocations);
+      if (storedLocations.size() > 0) {
+        hydrateCacheFromDatabase(storedLocations);
+        ConfigParser<MessagesKeys> messages = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+        String msg = messages.getConfigValue(MessagesKeys.locationLoaded, "").toString();
+        if (!msg.isEmpty()) {
+          msg = msg.replace("[amount]", String.valueOf(storedLocations.size()));
+          msg = msg.replace("[region]", name);
+          RTP.log(Level.INFO, msg);
+        }
+      }
     }
   }
 
@@ -107,52 +118,30 @@ public class Region extends FactoryValue<RegionKeys> {
     if (this.shape != null && this.shape instanceof MemoryShape<?> memoryShape) memoryShape.spatialResolution = settings.spatialResolution();
   }
 
-  /**
-   * Hydrates the cache by asynchronously loading chunks and applying force-load tickets.
-   * This ensures compliance with thread rules (especially on Folia) during startup.
-   *
-   * @param storedLocations the list of locations to hydrate from the database
-   */
   public void hydrateCacheFromDatabase(List<DatabaseAccessor.StoredLocation> storedLocations) {
-    RTPWorld<?> world = getWorld();
-    if (world == null) return;
+    long currentSeed = getWorld().getSeed();
     for (DatabaseAccessor.StoredLocation stored : storedLocations) {
-      int cx = stored.getX() >> 4;
-      int cz = stored.getZ() >> 4;
+      if (stored.getSeed() != 0L && stored.getSeed() != currentSeed) {
+        // The world was wiped and repopulated with a different seed.
+        // This location is no longer safe. Delete it and skip.
+        RTP.getInstance().databaseAccessor.removeCachedLocation(stored.getId());
+        continue;
+      }
 
-      // 1. Asynchronously fetch the chunk to bring it back into server memory
-      world.getChunkAtAsync(cx, cz).thenAccept(chunkSet -> {
-        try {
-          // 2. Recreate the reservation using your new RTPWorld wrapper
-          ChunkReservation reservation = new ChunkReservation(chunkSet, world);
+      RTPCoords coords = new RTPCoords(stored.getWorldName(), stored.getX(), stored.getY(), stored.getZ());
+      // Reconstruct as an unkept location stub (null reservation)
+      RTPLocation recoveredLoc = new RTPLocation(coords, stored.getAttempts(), null);
 
-          // 3. Rebuild the RTPLocation object
-          RTPCoords coords = new RTPCoords(stored.getWorldName(), stored.getX(), stored.getY(), stored.getZ());
-          RTPLocation recoveredLoc = new RTPLocation(coords, stored.getAttempts(), reservation);
-
-          // 4. Push it directly back into the LockFreeLocationBuffer (or player queue)
-          boolean enqueued;
-          UUID playerUuid = stored.getPlayerId();
-          if (playerUuid == null) {
-            enqueued = this.queueManager.keptLocations.offer(recoveredLoc);
-          } else {
-            // Push directly to player queue to avoid database re-save during hydration
-            this.queueManager.perPlayerLocationQueue.computeIfAbsent(playerUuid, k -> new ConcurrentLinkedQueue<>()).add(recoveredLoc);
-            enqueued = true;
-          }
-
-          if (enqueued) {
-            // 5. Re-apply the secure Global Region force-load ticket!
-            reservation.keep(true);
-          } else {
-            // If the cache is somehow full, drop the ticket and delete from DB
-            reservation.close();
-            RTP.getInstance().databaseAccessor.removeCachedLocation(stored.getId());
-          }
-        } catch (Exception e) {
-          RTP.log(Level.WARNING, "Failed to hydrate cached location: " + e.getMessage(), e);
+      // Feed into the queues for the region execution loop to handle
+      if (stored.getPlayerId() == null) {
+        if (this.queueManager.unkeptLocations.size() < settings.cacheCap()) {
+          this.queueManager.unkeptLocations.offer(recoveredLoc);
+        } else {
+          RTP.getInstance().databaseAccessor.removeCachedLocation(stored.getId());
         }
-      });
+      } else {
+        this.queueManager.perPlayerLocationQueue.computeIfAbsent(stored.getPlayerId(), k -> new java.util.concurrent.ConcurrentLinkedQueue<>()).add(recoveredLoc);
+      }
     }
   }
 
@@ -163,6 +152,12 @@ public class Region extends FactoryValue<RegionKeys> {
    * @param availableTime available time in nanoseconds
    */
   public void execute(long availableTime) {
+    long now = System.currentTimeMillis();
+    if (now - lastValidationTime > 60000) {
+      this.queueManager.validateTickets(getWorld());
+      lastValidationTime = now;
+    }
+
     long start = System.nanoTime();
     long currentAvailable = availableTime;
 
@@ -253,6 +248,16 @@ public class Region extends FactoryValue<RegionKeys> {
       if (pair == null) {
         // Break if neither private nor public locations are ready
         break;
+      }
+
+      // If the location has no reservation, it's a stub that needs hydration.
+      // Move it to unkeptLocations so the deficit loop picks it up.
+      if (pair.reservation() == null) {
+        if (isPrivate) privateQueue.poll();
+        else queueManager.keptLocations.poll();
+
+        queueManager.unkeptLocations.offer(pair);
+        continue;
       }
 
       ChunkSet chunkSet = (pair.reservation() != null) ? pair.reservation().getChunkSet() : null;
@@ -406,24 +411,7 @@ public class Region extends FactoryValue<RegionKeys> {
     cachePipeline.stop();
     cachePipeline.clear();
 
-    RTPLocation pair;
-    while ((pair = queueManager.keptLocations.poll()) != null) {
-      if (pair.reservation() != null) pair.reservation().close();
-    }
-    queueManager.keptLocations.clear();
-
-    while ((pair = queueManager.unkeptLocations.poll()) != null) {
-      if (pair.reservation() != null) pair.reservation().close();
-    }
-    queueManager.unkeptLocations.clear();
-
-    for (java.util.concurrent.ConcurrentLinkedQueue<RTPLocation> queue :
-        queueManager.perPlayerLocationQueue.values()) {
-      while ((pair = queue.poll()) != null) {
-        if (pair.reservation() != null) pair.reservation().close();
-      }
-    }
-    queueManager.perPlayerLocationQueue.clear();
+    queueManager.shutDown();
   }
 
   @Override

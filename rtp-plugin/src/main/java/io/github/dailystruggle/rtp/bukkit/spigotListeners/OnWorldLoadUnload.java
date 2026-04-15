@@ -43,8 +43,25 @@ public class OnWorldLoadUnload implements Listener {
         });
 
         for (String regionName : regionsToShutdown) {
-            Region region = RTP.selectionAPI.permRegionLookup.remove(regionName);
+            Region region = RTP.selectionAPI.permRegionLookup.get(regionName);
             if (region != null) {
+                // Manually clear queues and close reservations without deleting from DB
+                region.queueManager.keptLocations.setCallbacks(null, null); // Disable DB removal
+
+                io.github.dailystruggle.rtp.common.selection.region.RTPLocation loc;
+                while ((loc = region.queueManager.keptLocations.poll()) != null) {
+                    if (loc.reservation() != null) loc.reservation().close();
+                }
+
+                region.queueManager.perPlayerLocationQueue.forEach((uuid, queue) -> {
+                    io.github.dailystruggle.rtp.common.selection.region.RTPLocation pLoc;
+                    while ((pLoc = queue.poll()) != null) {
+                        if (pLoc.reservation() != null) pLoc.reservation().close();
+                    }
+                });
+                region.queueManager.perPlayerLocationQueue.clear();
+
+                RTP.selectionAPI.permRegionLookup.remove(regionName);
                 region.shutDown();
             }
         }

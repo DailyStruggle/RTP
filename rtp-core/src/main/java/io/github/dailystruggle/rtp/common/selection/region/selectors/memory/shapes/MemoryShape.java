@@ -14,7 +14,18 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 
 /**
- * Abstract class for shapes that store data in memory
+ * Abstract class for shapes that store data in memory.
+ * 
+ * <p>This class implements the "learning algorithm" of the RTP plugin. It maintains
+ * caches of known "bad" locations (e.g., oceans, lava) and known biome locations.
+ * By keeping track of this data in memory (and persisting it via the database),
+ * the shape avoids randomly selecting previously checked invalid coordinates.
+ * 
+ * <p>It relies on custom implementations of Archimedean spirals (used in CIRCLE and SQUARE shapes)
+ * to map 2D coordinate spaces into 1D sequences. This algorithm was specifically chosen over 
+ * alternatives like image compression algorithms because it enables the use of efficient 1D data 
+ * structures (like parallel arrays for keys and prefix sums) to perform extremely fast spatial 
+ * lookups and binary searches when generating random points.
  *
  * @param <E> enum for configuration values
  */
@@ -520,13 +531,17 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
             ConcurrentHashMap<Long, Long> additions = localPendingBiome.getOrDefault(biome, new ConcurrentHashMap<>());
             ConcurrentHashMap<Long, Boolean> removals = localPendingBiomeRemovals.getOrDefault(biome, new ConcurrentHashMap<>());
 
-            long[] pendingBiomeKeys = new long[additions.size()];
-            long[] pendingBiomeLengths = new long[additions.size()];
+            java.util.List<java.util.Map.Entry<Long, Long>> tempBiomeEntries = new java.util.ArrayList<>();
+            for (java.util.Map.Entry<Long, Long> entry : additions.entrySet()) {
+                tempBiomeEntries.add(entry);
+            }
+            long[] pendingBiomeKeys = new long[tempBiomeEntries.size()];
+            long[] pendingBiomeLengths = new long[tempBiomeEntries.size()];
             int pbIdx = 0;
-            for (Map.Entry<Long, Long> entry : additions.entrySet()) {
-              pendingBiomeKeys[pbIdx] = entry.getKey();
-              pendingBiomeLengths[pbIdx] = entry.getValue();
-              pbIdx++;
+            for (java.util.Map.Entry<Long, Long> entry : tempBiomeEntries) {
+                pendingBiomeKeys[pbIdx] = entry.getKey();
+                pendingBiomeLengths[pbIdx] = entry.getValue();
+                pbIdx++;
             }
 
             // Sort keys while maintaining length mappings
@@ -592,10 +607,13 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
             // Handle removals
             if (!removals.isEmpty()) {
-              long[] sortedRemovals = new long[removals.size()];
-              int rIdx = 0;
+              java.util.List<Long> tempRemovals = new java.util.ArrayList<>();
               for (Long rLoc : removals.keySet()) {
-                sortedRemovals[rIdx++] = rLoc;
+                tempRemovals.add(rLoc);
+              }
+              long[] sortedRemovals = new long[tempRemovals.size()];
+              for (int k = 0; k < tempRemovals.size(); k++) {
+                sortedRemovals[k] = tempRemovals.get(k);
               }
               Arrays.sort(sortedRemovals);
 
@@ -749,10 +767,13 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         long[] currentBadSums = badPrefixSumsCache;
 
         // 5. Merge values from capturedBad into local data with RLE compression
-        long[] pendingKeys = new long[localPendingBad.size()];
-        int pIdx = 0;
+        java.util.List<Long> tempBadKeys = new java.util.ArrayList<>();
         for (Long loc : localPendingBad.keySet()) {
-            pendingKeys[pIdx++] = loc;
+            tempBadKeys.add(loc);
+        }
+        long[] pendingKeys = new long[tempBadKeys.size()];
+        for (int k = 0; k < tempBadKeys.size(); k++) {
+            pendingKeys[k] = tempBadKeys.get(k);
         }
         Arrays.sort(pendingKeys);
 

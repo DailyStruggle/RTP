@@ -98,11 +98,21 @@ public abstract class RTPWorld<T> {
   protected abstract void setForceLoadedImpl(int cx, int cz, boolean forceLoad);
 
   /**
+   * Re-apply the force-loaded state without affecting the ticket counter
+   *
+   * @param cx the x coordinate of the chunk
+   * @param cz the z coordinate of the chunk
+   */
+  public final void refreshForceLoaded(int cx, int cz) {
+    setForceLoadedImpl(cx, cz, true);
+  }
+
+  /**
    * Get the number of chunks currently force-loaded by the server
    *
    * @return the number of force-loaded chunks
    */
-  public abstract long getServerForceLoadedCount();
+  public abstract java.util.concurrent.CompletableFuture<Integer> getServerForceLoadedCount();
 
   /**
    * Get a cached chunk by its key
@@ -196,6 +206,13 @@ public abstract class RTPWorld<T> {
    * @return the cache size
    */
   public abstract int getCacheSize();
+
+  /**
+   * Get the world seed
+   *
+   * @return the seed
+   */
+  public abstract long getSeed();
 
   @Override
   public boolean equals(Object obj) {

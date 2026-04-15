@@ -1,22 +1,32 @@
-#selection and teleportation safety options
+# --- RTP Safety Configuration ---
+# Configures how the plugin determines if a teleport location is "safe".
 
-#how long to prevent damage, in seconds
+# Invulnerability (Seconds)
+# Duration of invulnerability granted to the player after teleporting.
+# Prevents damage from fire, drowning, or falls upon arrival.
 invulnerabilityTime: 5
 
-#radius, in blocks, to check for safe blocks
+# Safety Check Radius (Blocks)
+# Radius around the target block to check for dangerous conditions.
+# Larger values ensure more safety but can make finding a spot harder.
 safetyRadius: 0
 
-#create a platform on random teleport
-# replaces non-solid and unsafe blocks with the center block
-# radius less than 0 will turn this off
+# Landing Platforms
+# Creates a landing platform at the teleport destination.
+# centre block is chosen based on the block type at the location.
+# Set platformRadius to -1 to disable platforms.
 platformRadius: 0
 platformDepth: 1
-#break blocks above platform to make air ( may cause lighting bugs )
+
+# Height of air to ensure above the platform.
+# May cause lighting issues if set too high.
 platformAirHeight: 2
-#if no solid block under player, use this
+
+# Default block type for the platform if no solid block exists.
 platformMaterial: GLASS
 
-#what materials are considered "air"
+# Air Blocks
+# Material types considered as "air" or walkable space.
 airBlocks:
   # Base Air & Technical
   - AIR

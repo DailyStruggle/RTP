@@ -113,9 +113,17 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
 
   @Override
   protected void setForceLoadedImpl(int cx, int cz, boolean forceLoad) {
+    org.bukkit.plugin.Plugin plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("RTP");
+    if (plugin == null || !plugin.isEnabled()) return;
     RTP.serverAccessor.getScheduler().runTask(() -> {
       try {
-        world.setChunkForceLoaded(cx, cz, forceLoad);
+        if (forceLoad) {
+          if (!world.getPluginChunkTickets(cx, cz).contains(plugin)) {
+            world.addPluginChunkTicket(cx, cz, plugin);
+          }
+        } else {
+          world.removePluginChunkTicket(cx, cz, plugin);
+        }
       } catch (Exception e) {
         // Silently catch exceptions from lingering async tasks attempting to fire after shutdown
       }
@@ -123,8 +131,28 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   }
 
   @Override
-  public long getServerForceLoadedCount() {
-    return world.getForceLoadedChunks().size();
+  public java.util.concurrent.CompletableFuture<Integer> getServerForceLoadedCount() {
+    java.util.concurrent.CompletableFuture<Integer> future = new java.util.concurrent.CompletableFuture<>();
+    io.github.dailystruggle.rtp.common.RTP.serverAccessor.getScheduler().runTask(() -> {
+      org.bukkit.plugin.Plugin plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("RTP");
+      if (plugin == null) {
+        future.complete(0);
+        return;
+      }
+
+      try {
+        int count = 0;
+        for (org.bukkit.Chunk chunk : world.getForceLoadedChunks()) {
+          if (chunk.getPluginChunkTickets().contains(plugin)) {
+            count++;
+          }
+        }
+        future.complete(count);
+      } catch (Exception e) {
+        future.complete(-1); // Fallback in case of unexpected global region failure
+      }
+    });
+    return future;
   }
 
   @Override
@@ -231,5 +259,10 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   @Override
   public int getCacheSize() {
     return chunkCache.size();
+  }
+
+  @Override
+  public long getSeed() {
+    return world.getSeed();
   }
 }

@@ -11,3 +11,5 @@ syncLoading: syncLoading
 effectParsing: effectParsing
 viewDistanceTeleport: viewDistanceTeleport
 minTPS: minTPS
+syncAllottedTime: syncAllottedTime
+asyncAllottedTime: asyncAllottedTime

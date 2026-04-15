@@ -3,8 +3,10 @@ package io.github.dailystruggle.rtp.common.database;
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
+import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import java.io.File;
@@ -13,6 +15,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -66,9 +69,10 @@ public abstract class DatabaseAccessor<D> {
     private final int y;
     private final int z;
     private final int attempts;
+    private final long seed;
     @Nullable private final UUID playerId;
 
-    public StoredLocation(String id, String regionName, String worldName, int x, int y, int z, int attempts, @Nullable UUID playerId) {
+    public StoredLocation(String id, String regionName, String worldName, int x, int y, int z, int attempts, long seed, @Nullable UUID playerId) {
       this.id = id;
       this.regionName = regionName;
       this.worldName = worldName;
@@ -76,6 +80,7 @@ public abstract class DatabaseAccessor<D> {
       this.y = y;
       this.z = z;
       this.attempts = attempts;
+      this.seed = seed;
       this.playerId = playerId;
     }
 
@@ -86,6 +91,7 @@ public abstract class DatabaseAccessor<D> {
     public int getY() { return y; }
     public int getZ() { return z; }
     public int getAttempts() { return attempts; }
+    public long getSeed() { return seed; }
     @Nullable public UUID getPlayerId() { return playerId; }
   }
 
@@ -105,6 +111,23 @@ public abstract class DatabaseAccessor<D> {
 
   /** Default constructor for DatabaseAccessor */
   protected DatabaseAccessor() {}
+
+  public boolean isSystemDatabaseLoggingEnabled() {
+    if (RTP.configs != null) {
+      io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys> logging =
+          (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys>)
+              RTP.configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys.class);
+      if (logging != null) {
+        Object o = logging.getConfigValue(io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys.system_database, false);
+        if (o instanceof Boolean) {
+          return (Boolean) o;
+        } else if (o != null) {
+          return Boolean.parseBoolean(o.toString());
+        }
+      }
+    }
+    return false;
+  }
 
   /** Simple container describing a file write request */
   protected static final class FileWriteRequest {
@@ -212,6 +235,9 @@ public abstract class DatabaseAccessor<D> {
       res.put("y", location.coords().y());
       res.put("z", location.coords().z());
       res.put("attempts", location.attempts());
+      res.put("timestamp", System.currentTimeMillis());
+      RTPWorld<?> world = RTP.serverAccessor.getRTPWorld(location.coords().worldName());
+      if (world != null) res.put("seed", world.getSeed());
     }
 
     return res;
@@ -466,6 +492,8 @@ public abstract class DatabaseAccessor<D> {
     flush();
     if (dirtyCache.isEmpty()) return;
 
+    Map<String, Integer> saveCounts = new HashMap<>();
+
     Iterator<Map.Entry<String, Map<String, Object>>> iterator = dirtyCache.entrySet().iterator();
     while (iterator.hasNext()) {
       Map.Entry<String, Map<String, Object>> entry = iterator.next();
@@ -480,11 +508,28 @@ public abstract class DatabaseAccessor<D> {
       }
       String tableName = compositeKey.substring(0, separatorIndex);
 
+      if (tableName.equalsIgnoreCase("rtp_cached_locations")) {
+        String regionName = String.valueOf(data.get("region"));
+        saveCounts.put(regionName, saveCounts.getOrDefault(regionName, 0) + 1);
+      }
+
       // Call the existing setValue method to perform the I/O write
       setValue(tableName, data);
 
       // Remove the entry to prevent memory leaks and redundant writes
       iterator.remove();
+    }
+
+    if (!saveCounts.isEmpty() && isSystemDatabaseLoggingEnabled()) {
+      ConfigParser<MessagesKeys> messages = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+      String msgBase = messages.getConfigValue(MessagesKeys.locationSaved, "").toString();
+      if (!msgBase.isEmpty()) {
+        for (Map.Entry<String, Integer> countEntry : saveCounts.entrySet()) {
+          String msg = msgBase.replace("[amount]", String.valueOf(countEntry.getValue()))
+                  .replace("[region]", countEntry.getKey());
+          RTP.log(Level.INFO, msg);
+        }
+      }
     }
   }
 

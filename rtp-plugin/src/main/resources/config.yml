@@ -1,38 +1,50 @@
-#basic UX configuration
+# --- RTP Core Configuration ---
 
-#time, in seconds, to delay teleportation
-# allows server some time to preload the chunks
+# Teleportation Delay (Seconds)
+# The time a player must wait before the teleport occurs.
+# This gives the server time to pre-load the destination chunks.
 teleportDelay: 2
 
-#how far a player can move before teleportation cancels, in meters/blocks
+# Movement Cancellation (Blocks)
+# If a player moves more than this distance during the teleport delay, 
+# the teleportation will be cancelled. Set to -1 to disable.
 cancelDistance: 2
 
-#attempt cooldown, in seconds, to prevent spam
+# Teleportation Cooldown (Seconds)
+# The time a player must wait between successful RTP uses.
 teleportCooldown: 300
 
-#list of commands to run after any teleportation
-# e.g.
-#consoleCommands:
-#  - "say Someone Teleported!"
+# Post-Teleport Commands
+# List of commands to execute after a successful teleport.
+# [player] placeholder can be used for the player's name.
 consoleCommands:
+#  - "say [player] has just randomly teleported!"
 playerCommands:
+#  - "me is now in a new place!"
 
-#DO NOT TOUCH VERSION NUMBER
-version: "3.0"
-
+# --- Database Settings ---
+# Where to store cached locations and player data.
 database:
   # Available types: yaml, sqlite, h2, mysql, postgresql
+  # - yaml/sqlite/h2: Local files (no additional setup required)
+  # - mysql/postgresql: Remote database (requires credentials below)
   type: "sqlite"
-  # Network database credentials (ignored if type is yaml, sqlite or h2)
+  
+  # Network database credentials (ignored for local database types)
   host: "127.0.0.1"
   port: 3306
   name: "rtp"
   username: "root"
   password: "password"
 
+# --- Network & Synchronization ---
+# Redis is used for multi-server synchronization of cached locations.
 network:
   redis:
     enabled: false
     host: "127.0.0.1"
     port: 6379
     password: ""
+
+# DO NOT TOUCH VERSION NUMBER
+version: "3.0"

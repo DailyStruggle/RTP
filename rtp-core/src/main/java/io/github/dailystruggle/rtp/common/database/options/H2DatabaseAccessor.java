@@ -44,6 +44,20 @@ public class H2DatabaseAccessor extends AbstractSQLDatabaseAccessor {
                 + "attempts INT"
                 + ");";
         statement.execute(schema);
+        schema =
+                "CREATE TABLE IF NOT EXISTS rtp_cached_locations ("
+                        + "UUID VARCHAR(255) PRIMARY KEY, "
+                        + "world TEXT, "
+                        + "x INT, "
+                        + "y INT, "
+                        + "z INT, "
+                        + "attempts INT, "
+                        + "region TEXT, "
+                        + "player_uuid VARCHAR(36), "
+                        + "timestamp BIGINT, "
+                        + "seed BIGINT"
+                        + ");";
+        statement.execute(schema);
       }
     } catch (SQLException e) {
       RTP.log(Level.WARNING, e.getMessage(), e);
@@ -101,6 +115,8 @@ public class H2DatabaseAccessor extends AbstractSQLDatabaseAccessor {
       RTP.log(Level.WARNING, e.getMessage(), e);
     } catch (IllegalArgumentException ignored) {
     }
+
+    purgeStaleLocations();
   }
 
   @Override

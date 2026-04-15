@@ -11,5 +11,7 @@ public enum LoggingKeys {
   event_move,
   event_teleport,
   selection_failure,
+  system_memory_tracker,
+  system_database,
   version
 }

@@ -1,0 +1,4 @@
+region: region
+requirePermission: requirePermission
+override: override
+version: version

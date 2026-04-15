@@ -129,19 +129,48 @@ public final class BukkitRTPWorld extends RTPWorld<World> {
 
   @Override
   protected void setForceLoadedImpl(int cx, int cz, boolean forceLoad) {
+    org.bukkit.plugin.Plugin plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("RTP");
+    if (plugin == null || !plugin.isEnabled()) return;
     if (org.bukkit.Bukkit.isPrimaryThread()) {
-      world.setChunkForceLoaded(cx, cz, forceLoad);
-    } else {
-      org.bukkit.plugin.Plugin plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("RTP");
-      if (plugin != null) {
-        org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> world.setChunkForceLoaded(cx, cz, forceLoad));
+      if (forceLoad) {
+        if (!world.getPluginChunkTickets(cx, cz).contains(plugin)) {
+          world.addPluginChunkTicket(cx, cz, plugin);
+        }
+      } else {
+        world.removePluginChunkTicket(cx, cz, plugin);
       }
+    } else {
+      org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+        if (forceLoad) {
+          if (!world.getPluginChunkTickets(cx, cz).contains(plugin)) {
+            world.addPluginChunkTicket(cx, cz, plugin);
+          }
+        } else {
+          world.removePluginChunkTicket(cx, cz, plugin);
+        }
+      });
     }
   }
 
   @Override
-  public long getServerForceLoadedCount() {
-    return world.getForceLoadedChunks().size();
+  public java.util.concurrent.CompletableFuture<Integer> getServerForceLoadedCount() {
+    java.util.concurrent.CompletableFuture<Integer> future = new java.util.concurrent.CompletableFuture<>();
+    io.github.dailystruggle.rtp.common.RTP.serverAccessor.getScheduler().runTask(() -> {
+      org.bukkit.plugin.Plugin plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("RTP");
+      if (plugin == null) {
+        future.complete(0);
+        return;
+      }
+
+      int count = 0;
+      for (org.bukkit.Chunk chunk : world.getForceLoadedChunks()) {
+        if (chunk.getPluginChunkTickets().contains(plugin)) {
+          count++;
+        }
+      }
+      future.complete(count);
+    });
+    return future;
   }
 
   @Override
@@ -249,7 +278,13 @@ public final class BukkitRTPWorld extends RTPWorld<World> {
     return world.getMinHeight();
   }
 
+  @Override
   public int getCacheSize() {
     return chunkCache.size();
+  }
+
+  @Override
+  public long getSeed() {
+    return world.getSeed();
   }
 }

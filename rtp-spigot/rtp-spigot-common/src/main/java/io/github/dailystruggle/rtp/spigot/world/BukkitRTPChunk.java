@@ -40,7 +40,16 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
 
   @Override
   public void keep(boolean keep) {
-    chunk.getWorld().setChunkForceLoaded(chunk.getX(), chunk.getZ(), keep);
+    org.bukkit.plugin.Plugin plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("RTP");
+    if (plugin == null || !plugin.isEnabled()) return;
+
+    if (keep) {
+      if (!chunk.getPluginChunkTickets().contains(plugin)) {
+        chunk.addPluginChunkTicket(plugin);
+      }
+    } else {
+      chunk.removePluginChunkTicket(plugin);
+    }
   }
 
   @Override
