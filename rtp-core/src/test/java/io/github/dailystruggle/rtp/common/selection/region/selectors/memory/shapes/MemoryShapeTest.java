@@ -2,8 +2,8 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
-import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import org.junit.jupiter.api.Test;
 
@@ -16,15 +16,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class MemoryShapeTest {
     static {
-        RTP.serverAccessor = (RTPServerAccessor) java.lang.reflect.Proxy.newProxyInstance(
-                RTPServerAccessor.class.getClassLoader(),
-                new Class[]{RTPServerAccessor.class},
-                (proxy, method, args) -> {
-                    if (method.getName().equals("getPluginDirectory")) {
-                        return new java.io.File("target/test-data");
-                    }
-                    return null;
-                });
+        MockRTPServerAccessor accessor = new MockRTPServerAccessor(new java.io.File("target/test-data"));
+        RTP.serverAccessor = accessor;
+        io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
     }
 
     private static class TestShape extends MemoryShape<GenericMemoryShapeParams> {

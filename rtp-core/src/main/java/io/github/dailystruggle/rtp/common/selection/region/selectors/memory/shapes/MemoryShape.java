@@ -8,6 +8,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
@@ -15,16 +16,16 @@ import java.util.logging.Level;
 
 /**
  * Abstract class for shapes that store data in memory.
- * 
+ *
  * <p>This class implements the "learning algorithm" of the RTP plugin. It maintains
  * caches of known "bad" locations (e.g., oceans, lava) and known biome locations.
  * By keeping track of this data in memory (and persisting it via the database),
  * the shape avoids randomly selecting previously checked invalid coordinates.
- * 
+ *
  * <p>It relies on custom implementations of Archimedean spirals (used in CIRCLE and SQUARE shapes)
- * to map 2D coordinate spaces into 1D sequences. This algorithm was specifically chosen over 
- * alternatives like image compression algorithms because it enables the use of efficient 1D data 
- * structures (like parallel arrays for keys and prefix sums) to perform extremely fast spatial 
+ * to map 2D coordinate spaces into 1D sequences. This algorithm was specifically chosen over
+ * alternatives like image compression algorithms because it enables the use of efficient 1D data
+ * structures (like parallel arrays for keys and prefix sums) to perform extremely fast spatial
  * lookups and binary searches when generating random points.
  *
  * @param <E> enum for configuration values
@@ -67,6 +68,33 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       pendingBiomeRemovals =
           new java.util.concurrent.atomic.AtomicReference<>(
               new java.util.concurrent.ConcurrentHashMap<>());
+
+  /**
+   * RNG source used by {@link #rand()} and all subclass overrides.
+   *
+   * <p>Defaults to {@link ThreadLocalRandom#current()} at call time, giving production behaviour
+   * identical to before this field was introduced. Tests can inject a seeded {@link Random} via
+   * {@link #setRng(Random)} to make location selection fully deterministic.
+   */
+  protected Random rng = null;
+
+  /**
+   * Returns the RNG to use for this shape. Falls back to {@link ThreadLocalRandom#current()} when
+   * no explicit RNG has been set so that production code is unaffected.
+   */
+  protected final Random rng() {
+    return rng != null ? rng : ThreadLocalRandom.current();
+  }
+
+  /**
+   * Injects a deterministic RNG. Intended for unit tests only.
+   *
+   * @param rng the {@link Random} instance to use; pass {@code null} to restore
+   *     {@link ThreadLocalRandom} behaviour.
+   */
+  public final void setRng(Random rng) {
+    this.rng = rng;
+  }
 
   /**
    * Constructor for MemoryShape

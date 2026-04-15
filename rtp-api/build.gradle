@@ -2,8 +2,47 @@ plugins {
     id 'java-library'
 }
 
+configurations {
+    checkerFramework
+}
+
 dependencies {
     compileOnly 'org.jetbrains:annotations:24.1.0'
+    // Checker Framework processor — runs during compileJava only, not shipped in the JAR.
+    // checker-qual (the annotation classes) is inherited from the root subprojects block.
+    checkerFramework 'org.checkerframework:checker:3.42.0'
+}
+
+// Wire the Resource Leak Checker into javac for rtp-api production sources.
+// This enforces that every @MustCall("close") variable (i.e. ChunkReservation)
+// is closed on all execution paths, equivalent to a static malloc/free balance proof.
+tasks.withType(JavaCompile).configureEach { task ->
+    if (task.name == 'compileJava') {
+        task.options.annotationProcessorPath = configurations.checkerFramework
+        task.options.compilerArgs += [
+            '-processor', 'org.checkerframework.checker.resourceleak.ResourceLeakChecker',
+            // Start in warning mode so existing code is assessed before violations block CI.
+            // Change to '-Awarns=false' (or remove) to make violations hard errors.
+            '-Awarns',
+            // Suppress noise from unannotated third-party APIs (Bukkit, Paper, Folia).
+            '-AstubWarnIfNotFound=false',
+        ]
+        // The Checker Framework annotation processor accesses internal javac APIs that are
+        // encapsulated by the Java module system in JDK 9+. These --add-opens flags are the
+        // standard workaround documented by the Checker Framework for JDK 17+ / JDK 21.
+        task.options.forkOptions.jvmArgs += [
+            '--add-opens=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED',
+            '--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED',
+            '--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED',
+            '--add-opens=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED',
+            '--add-opens=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED',
+            '--add-opens=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED',
+            '--add-opens=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED',
+            '--add-opens=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED',
+            '--add-opens=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED',
+        ]
+        task.options.fork = true
+    }
 }
 
 test {

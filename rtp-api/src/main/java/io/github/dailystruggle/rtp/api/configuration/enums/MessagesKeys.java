@@ -30,6 +30,7 @@ public enum MessagesKeys {
   noPerms,
   invalidWorld,
   fillStart,
+  fillReset,
   fillCancel,
   fillPause,
   fillResume,

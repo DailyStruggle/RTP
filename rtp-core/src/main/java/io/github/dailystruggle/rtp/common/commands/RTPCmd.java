@@ -20,12 +20,35 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shap
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 
 public interface RTPCmd extends BaseRTPCmd {
+
+  /**
+   * RNG used by {@link #pickOne}. Defaults to {@link ThreadLocalRandom#current()} at call time.
+   * Tests can inject a seeded {@link Random} via {@link #setRng(Random)} to make region selection
+   * deterministic.
+   */
+  AtomicReference<Random> RNG_REF = new AtomicReference<>(null);
+
+  /** Returns the active RNG, falling back to {@link ThreadLocalRandom#current()}. */
+  static Random rng() {
+    Random r = RNG_REF.get();
+    return r != null ? r : ThreadLocalRandom.current();
+  }
+
+  /**
+   * Injects a deterministic RNG. Pass {@code null} to restore {@link ThreadLocalRandom} behaviour.
+   * Intended for unit tests only.
+   */
+  static void setRng(Random rng) {
+    RNG_REF.set(rng);
+  }
+
   static String pickOne(List<String> param, String d) {
     if (param == null || param.isEmpty()) return d;
-    int sel = ThreadLocalRandom.current().nextInt(param.size());
+    int sel = rng().nextInt(param.size());
     return param.get(sel);
   }
 

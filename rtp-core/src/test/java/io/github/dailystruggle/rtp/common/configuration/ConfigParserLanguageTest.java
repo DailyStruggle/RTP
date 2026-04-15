@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
+import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -36,6 +37,10 @@ public class ConfigParserLanguageTest {
         when(serverAccessor.createTaskPipe()).thenReturn(mock(io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe.class));
         RTP.serverAccessor = serverAccessor;
         RTP.scheduler = scheduler;
+
+        // Clear any accessor left by a prior test so the write-once guard in
+        // RTPAPI.setServerAccessor() does not reject this test's mock instance.
+        RTPAPI.serverAccessor = null;
 
         RTP rtp = new RTP() {};
         try {

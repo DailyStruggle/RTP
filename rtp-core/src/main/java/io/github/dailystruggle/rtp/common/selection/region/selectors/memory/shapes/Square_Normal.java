@@ -7,7 +7,6 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shap
 import java.math.BigInteger;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 public class Square_Normal extends MemoryShape<NormalDistributionParams> {
@@ -312,7 +311,7 @@ public class Square_Normal extends MemoryShape<NormalDistributionParams> {
     double gaussian;
     do {
       // approximately -4 to 4
-      gaussian = ThreadLocalRandom.current().nextGaussian();
+      gaussian = rng().nextGaussian();
 
       // correct to -0.5 to 0.5
       gaussian = gaussian / 8;

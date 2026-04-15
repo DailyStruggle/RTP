@@ -46,6 +46,11 @@ subprojects {
 
     dependencies {
         compileOnly 'org.jetbrains:annotations:24.1.0'
+        // Checker Framework qualifier annotations (compile-time only; not shipped in JARs).
+        // The Resource Leak Checker reads @MustCall, @Owning, and @EnsuresCalledMethods
+        // from this artifact during annotation processing.
+        compileOnly 'org.checkerframework:checker-qual:3.42.0'
+        testCompileOnly 'org.checkerframework:checker-qual:3.42.0'
         testImplementation platform('org.junit:junit-bom:5.10.0')
         testImplementation 'org.junit.jupiter:junit-jupiter'
         testImplementation 'org.mockito:mockito-core:5.5.0'

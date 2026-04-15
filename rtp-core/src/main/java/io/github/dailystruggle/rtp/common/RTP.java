@@ -139,7 +139,7 @@ public class RTP {
     if (cancelTasks instanceof TimeBoundTaskPipe timeBoundTaskPipe) {
       timeBoundTaskPipe.setAvailableTime(Long.MAX_VALUE);
     }
-    RTPAPI.serverAccessor = serverAccessor;
+    RTPAPI.setServerAccessor(serverAccessor);
     instance = this;
 
     RTPAPI.addShape(new Circle());

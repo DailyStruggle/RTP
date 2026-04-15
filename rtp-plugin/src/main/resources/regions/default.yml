@@ -16,7 +16,7 @@ shape:
   name: "CIRCLE"
 
   # Selection Logic Mode
-  # ACCUMULATE - even distribution, handles bad sectors, slower at very large radii.
+  # ACCUMULATE - even distribution; accumulates all sectors up to the current point to compute a shift, with distances precomputed at region load. Recommended default.
   # NEAREST    - tries closest non-blocked spot, possible clustering, fast.
   # REROLL     - re-selects early on known bad spots, even distribution, fast.
   # NONE       - no pre-check, best for massive radii (>50,000 blocks).

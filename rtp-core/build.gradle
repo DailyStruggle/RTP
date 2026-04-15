@@ -1,5 +1,7 @@
 plugins {
     id 'java-library'
+    id 'java-test-fixtures'
+    id 'com.github.spotbugs' version '6.0.18'
 }
 
 dependencies {
@@ -14,13 +16,21 @@ dependencies {
     implementation 'io.github.dailystruggle:EffectsAPI:1.0.1-BETA01'
     implementation 'com.google.guava:guava:33.2.1-jre'
     implementation 'com.zaxxer:HikariCP:5.1.0'
+    // Jedis must remain 'implementation': RedisManager (rtp-core) directly instantiates
+    // JedisPool/Jedis.  Extraction to rtp-persistence-redis is tracked in the backlog.
     implementation 'redis.clients:jedis:5.1.2'
-    implementation 'org.postgresql:postgresql:42.7.2'
+    // PostgreSQL driver is loaded at runtime via JDBC ServiceLoader; no org.postgresql.*
+    // imports exist in core source, so 'compileOnly' correctly excludes it from the
+    // bundled JAR.  Servers that need PostgreSQL supply the driver independently.
+    compileOnly 'org.postgresql:postgresql:42.7.2'
+    testRuntimeOnly 'org.postgresql:postgresql:42.7.2'
     implementation 'com.h2database:h2:2.2.224'
     compileOnly 'org.jetbrains:annotations:24.1.0'
+    testFixturesCompileOnly 'org.jetbrains:annotations:24.1.0'
     compileOnly 'org.popcraft:chunky-common:1.3.111'
     testImplementation 'org.popcraft:chunky-common:1.3.111'
     testRuntimeOnly 'org.xerial:sqlite-jdbc:3.45.1.0'
+    testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'
 }
 
 tasks.withType(JavaCompile) {
@@ -29,3 +39,48 @@ tasks.withType(JavaCompile) {
 test {
     useJUnitPlatform()
 }
+
+// Enforce a minimum instruction-coverage floor so that coverage regressions
+// (e.g. deleting tests) are caught by CI.  The threshold is deliberately
+// conservative (10%) to match today's baseline; raise it incrementally as
+// the test suite grows.  Wire into the standard Gradle 'check' lifecycle so
+// ./gradlew check fails the build on regression.
+jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            limit {
+                counter = 'INSTRUCTION'
+                value   = 'COVEREDRATIO'
+                minimum = 0.10
+            }
+        }
+    }
+}
+check.dependsOn jacocoTestCoverageVerification
+
+// Static analysis: SpotBugs catches null-dereference, improper synchronisation,
+// and incorrect volatile/atomic usage — common failure modes in concurrent Java.
+// effort='max' enables the deepest analysis pass.
+// reportLevel='high' makes only HIGH-priority bugs block the build;
+// MEDIUM/LOW findings still appear in the HTML report for review.
+spotbugs {
+    effort = 'max'
+    reportLevel = 'high'
+    ignoreFailures = false
+    excludeFilter = file('spotbugs-exclude.xml')
+}
+spotbugsMain {
+    reports {
+        html {
+            required = true
+            outputLocation = layout.buildDirectory.file('reports/spotbugs/main.html')
+        }
+        xml {
+            required = true
+            outputLocation = layout.buildDirectory.file('reports/spotbugs/main.xml')
+        }
+    }
+}
+// Don't run SpotBugs on test or testFixtures sources (avoids noise from test-only mock classes).
+spotbugsTest.enabled = false
+spotbugsTestFixtures.enabled = false

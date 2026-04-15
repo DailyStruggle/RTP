@@ -1,9 +1,10 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
-import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
-import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
+import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
+import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -14,8 +15,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 public class MultiConfigParserIsolationTest {
 
@@ -26,16 +25,9 @@ public class MultiConfigParserIsolationTest {
 
     @BeforeEach
     void setUp() throws IOException {
-        RTPServerAccessor serverAccessor = mock(RTPServerAccessor.class);
-        RTPScheduler scheduler = mock(RTPScheduler.class);
-        when(serverAccessor.getPluginDirectory()).thenReturn(tempDir.toFile());
-        when(serverAccessor.createTaskPipe()).thenReturn(mock(io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe.class));
-        RTP.serverAccessor = serverAccessor;
-        RTP.scheduler = scheduler;
-
-        // Mock worlds
-        when(serverAccessor.getRTPWorld("world")).thenReturn(mock(io.github.dailystruggle.rtp.api.world.RTPWorld.class));
-        when(serverAccessor.getRTPWorld("world_nether")).thenReturn(mock(io.github.dailystruggle.rtp.api.world.RTPWorld.class));
+        MockRTPServerAccessor accessor = RTPTestSetup.install(tempDir.toFile());
+        // "world" is registered by default; add "world_nether" for this test
+        accessor.addWorld(new MockRTPWorld("world_nether"));
 
         // Create default.yml in worlds directory to act as template
         Path worldsDir = tempDir.resolve("worlds");
@@ -43,19 +35,12 @@ public class MultiConfigParserIsolationTest {
         Path defaultYaml = worldsDir.resolve("default.yml");
         Files.writeString(defaultYaml, "requirePermission: false\nregion: default\noverride: none\nversion: 1.0\n");
 
-        RTP rtp = new RTP() {};
-        try {
-            java.lang.reflect.Field instanceField = RTP.class.getDeclaredField("instance");
-            instanceField.setAccessible(true);
-            instanceField.set(null, rtp);
-        } catch (Exception e) {}
         RTP.selectionAPI = new io.github.dailystruggle.rtp.common.selection.SelectionAPI();
 
         // Initialize Configs and MultiConfigParser
         RTP.configs = new Configs(tempDir.toFile());
         worldParser = new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", tempDir.toFile());
         RTP.configs.putParser(worldParser);
-
     }
 
     @Test

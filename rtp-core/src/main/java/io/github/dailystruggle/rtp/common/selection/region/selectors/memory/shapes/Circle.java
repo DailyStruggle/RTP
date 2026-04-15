@@ -9,7 +9,6 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shap
 import java.math.BigInteger;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 
@@ -200,7 +199,7 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
     else if (expand && !mode.equalsIgnoreCase("ACCUMULATE")) range += badSum;
 
     double weight = getNumber(GenericMemoryShapeParams.weight, 1.0).doubleValue();
-    double res = (range) * Math.pow(ThreadLocalRandom.current().nextDouble(), weight);
+    double res = (range) * Math.pow(rng().nextDouble(), weight);
 
     long location;
     if (mode.equalsIgnoreCase("ACCUMULATE")) {

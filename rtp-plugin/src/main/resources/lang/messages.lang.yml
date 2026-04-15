@@ -45,6 +45,7 @@ reloaded: reloaded
 PLAYER_LOADING: PLAYER_LOADING
 unsafe: unsafe
 fillStart: fillStart
+fillReset: fillReset
 title: title
 actionbar: actionbar
 badArg: badArg

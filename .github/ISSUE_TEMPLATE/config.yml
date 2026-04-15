@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: SpigotMC Resource Page (reviews, releases, wiki)
+    url: https://www.spigotmc.org/resources/rtp.94812/
+    about: Check for existing wiki answers, download the latest release, or leave a review.
+  - name: Documentation — Server Admins
+    url: https://github.com/DailyStruggle/RTP/blob/main/docs/FOR_SERVER_ADMINS.md
+    about: Quick-start guide, command reference, configuration, FAQ, and runbook.
+  - name: Documentation — Addon Developers
+    url: https://github.com/DailyStruggle/RTP/blob/main/docs/FOR_ADDON_DEVELOPERS.md
+    about: API guide, architecture overview, and ADRs for extending RTP.
