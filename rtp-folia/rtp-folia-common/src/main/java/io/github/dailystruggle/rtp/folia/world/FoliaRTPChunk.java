@@ -40,8 +40,16 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
 
   @Override
   public void keep(boolean keep) {
+    org.bukkit.plugin.Plugin plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("RTP");
+    if (plugin == null || !plugin.isEnabled()) return;
     RTP.serverAccessor.getScheduler().runTask(() -> {
-      chunk.getWorld().setChunkForceLoaded(chunk.getX(), chunk.getZ(), keep);
+      if (keep) {
+        if (!chunk.getPluginChunkTickets().contains(plugin)) {
+          chunk.addPluginChunkTicket(plugin);
+        }
+      } else {
+        chunk.removePluginChunkTicket(plugin);
+      }
     });
   }
 

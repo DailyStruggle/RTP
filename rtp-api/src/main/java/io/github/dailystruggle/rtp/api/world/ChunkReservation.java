@@ -30,6 +30,15 @@ public class ChunkReservation implements AutoCloseable {
   }
 
   /**
+   * Re-apply the force-loaded state without affecting the ticket counter
+   */
+  public void refresh() {
+    if (world != null) {
+      world.refreshForceLoaded(chunkSet.getX(), chunkSet.getZ());
+    }
+  }
+
+  /**
    * Transfer ownership of the ChunkSet, preventing the reservation from releasing tickets when closed.
    *
    * @return the reserved ChunkSet

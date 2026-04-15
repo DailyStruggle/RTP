@@ -14,12 +14,26 @@ The goal of this plugin is function over form,
 * adjustment of region and world settings by command or by config file
 * adjustment of all plugin messages, except for utility logs
 
-## Build Instructions
+## Documentation
 
-This codebase was put together in Intellij IDEA. You can open the base directory as a project, trust the sources, and
-build as-is with maven.
+To help new developers understand our codebase and make safe changes, please refer to our documentation files:
+- [Requirements Overview](REQUIREMENTS.md) - High-level functional, non-functional (safety & performance), and system requirements for the plugin.
+- [System Architecture and Safety-Critical Design](DESIGN.md) - Overview of the plugin's fail-safe design, bounded execution guarantees, queue systems, and deterministic algorithms.
+- [Architecture Overview](ARCHITECTURE.md) - Learn about the multi-module structure, platform adapters, and core logic.
+- [Contributing Guidelines](CONTRIBUTING.md) - Find setup instructions, code formatting rules, and testing guidelines.
 
-more detailed instructions can be found here - https://github.com/DailyStruggle/RTP/wiki/Compiling-and-Editing
+## Project and Directory Structure
+
+To help you navigate the repository, here is a brief overview of the Gradle projects and root directories:
+
+- **`rtp-api/`** - The API interface and shared models. External integrations and addons should compile against this module.
+- **`rtp-core/`** - The platform-agnostic core logic. Handles region management, shape algorithms, queues, database, and memory tracking.
+- **`rtp-plugin/`** - The main entry point for the plugin. Manages configurations, commands, and bridges the core logic with the appropriate platform adapter.
+- **`rtp-spigot/`**, **`rtp-paper/`**, **`rtp-folia/`** - Platform-specific adapter modules to maximize performance and compatibility across different server types.
+- **`addons/`** - Example subprojects demonstrating how to extend RTP via its API (e.g., Iris generation, Glide integration, claim plugin checks).
+- **`lang/`** - Default localization, messages, and language files for the plugin.
+- **`Python Test Scripts/`** - Python scripts utilized for external testing and visualizing random distribution models and geometric math.
+- **`gradle/`** - Gradle wrapper files ensuring a consistent build environment across machines.
 
 ## Shapes
 

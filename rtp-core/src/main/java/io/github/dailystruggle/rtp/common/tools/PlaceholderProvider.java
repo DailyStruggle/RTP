@@ -179,7 +179,7 @@ public class PlaceholderProvider {
                 uuid -> {
                     long res = 0;
                     for (RTPWorld<?> world : RTP.serverAccessor.getRTPWorlds()) {
-                        res += world.getServerForceLoadedCount();
+                        res += world.getServerForceLoadedCount().join();
                     }
                     return String.valueOf(res);
                 });
@@ -584,7 +584,7 @@ public class PlaceholderProvider {
 
         placeholders.put("serverForced", uuid -> {
             RTPWorld world = RTP.worldContext.get();
-            if (world != null) return String.valueOf(world.getServerForceLoadedCount());
+            if (world != null) return String.valueOf(world.getServerForceLoadedCount().join());
             return "0";
         });
 

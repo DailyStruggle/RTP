@@ -46,6 +46,20 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
                 + "attempts INTEGER"
                 + ");";
         statement.execute(schema);
+        schema =
+                "CREATE TABLE IF NOT EXISTS rtp_cached_locations ("
+                        + "UUID TEXT PRIMARY KEY, "
+                        + "world TEXT, "
+                        + "x INTEGER, "
+                        + "y INTEGER, "
+                        + "z INTEGER, "
+                        + "attempts INTEGER, "
+                        + "region TEXT, "
+                        + "player_uuid TEXT, "
+                        + "timestamp INTEGER, "
+                        + "seed BIGINT"
+                        + ");";
+        statement.execute(schema);
       }
     } catch (SQLException e) {
       RTP.log(Level.WARNING, e.getMessage(), e);
@@ -145,6 +159,8 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
     } catch (IllegalArgumentException ignored) {
 
     }
+
+    purgeStaleLocations();
   }
 
   @Override

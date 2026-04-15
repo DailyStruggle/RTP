@@ -10,6 +10,20 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+/**
+ * Manages the generation and distribution of pre-calculated teleport locations for a specific region.
+ *
+ * <p>This class is the core of the plugin's "instant teleport" feature. Instead of finding a location
+ * when a player executes a command, this manager maintains queues of valid locations.
+ *
+ * <ul>
+ *   <li><b>Hot Queue (keptLocations):</b> Chunks are currently loaded in server memory and ready for immediate use.</li>
+ *   <li><b>Cold Queue (unkeptLocations):</b> Locations have been verified as safe, but their chunks have been released to save RAM.</li>
+ *   <li><b>Per-Player Queue:</b> Specific locations reserved or recycled for individual players.</li>
+ * </ul>
+ *
+ * <p>By asynchronously replenishing these queues, the plugin guarantees zero-latency teleports.
+ */
 public class RegionQueueManager {
     private final Region region;
 
@@ -167,6 +181,7 @@ public class RegionQueueManager {
     }
 
     public void shutDown() {
+        keptLocations.setCallbacks(null, null); // Disable DB removal during shutdown
         keptLocations.clear();
         unkeptLocations.clear();
         perPlayerLocationQueue.forEach((uuid, queue) -> {
@@ -278,5 +293,29 @@ public class RegionQueueManager {
      */
     boolean offerLocation(RTPLocation location) {
         return unkeptLocations.offer(location);
+    }
+
+    public void validateTickets(io.github.dailystruggle.rtp.api.world.RTPWorld<?> world) {
+        if (world == null) return;
+
+        // Sweep the fast queue to recover any dropped tickets
+        for (int i = 0; i < keptLocations.size(); i++) {
+            io.github.dailystruggle.rtp.common.selection.region.RTPLocation loc = keptLocations.get(i);
+            if (loc == null || loc.reservation() == null) continue;
+
+            int cx = loc.coords().x() >> 4;
+            int cz = loc.coords().z() >> 4;
+
+            // Asynchronously guarantee the chunk is still loaded.
+            // Re-calling refresh() is idempotent and will restore the plugin ticket
+            // if an admin command stripped it, without blocking Folia tick threads.
+            world.getChunkAtAsync(cx, cz).thenAccept(chunkSet -> {
+                try {
+                    loc.reservation().refresh();
+                } catch (Exception e) {
+                    io.github.dailystruggle.rtp.common.RTP.log(java.util.logging.Level.WARNING, "Failed to recover chunk ticket: " + e.getMessage(), e);
+                }
+            });
+        }
     }
 }

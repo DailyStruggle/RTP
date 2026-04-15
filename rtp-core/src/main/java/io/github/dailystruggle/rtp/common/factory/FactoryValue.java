@@ -294,10 +294,26 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
 
     YamlFile langYaml = new YamlFile(langFile);
     if (!langFile.exists()) {
-      for (String key : keys()) { // default data, to guard exceptions
-        langYaml.set(key, key);
+      try {
+        java.io.InputStream in = RTP.class.getClassLoader().getResourceAsStream("lang/" + subDir + "/" + langFile.getName());
+        if (in != null) {
+          java.io.FileOutputStream out = new java.io.FileOutputStream(langFile);
+          byte[] buf = new byte[1024];
+          int len;
+          while ((len = in.read(buf)) > 0) {
+            out.write(buf, 0, len);
+          }
+          out.close();
+          in.close();
+        }
+      } catch (Exception ignored) {}
+
+      if (!langFile.exists()) {
+        for (String key : keys()) { // default data, to guard exceptions
+          langYaml.set(key, key);
+        }
+        langYaml.save(langFile);
       }
-      langYaml.save(langFile);
     }
 
     langYaml.loadWithComments();

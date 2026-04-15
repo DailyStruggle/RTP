@@ -184,12 +184,30 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     language_mapping.clear();
     reverse_language_mapping.clear();
     if (!langFile.exists()) {
-      for (String key : keys()) { // default data, to guard exceptions
-        langYaml.set(key, key);
-        language_mapping.put(key, key);
-        reverse_language_mapping.put(key, key);
+      try {
+        java.io.InputStream in = RTP.class.getClassLoader().getResourceAsStream("lang/" + langFile.getName());
+        if (in != null) {
+          java.io.FileOutputStream out = new java.io.FileOutputStream(langFile);
+          byte[] buf = new byte[1024];
+          int len;
+          while ((len = in.read(buf)) > 0) {
+            out.write(buf, 0, len);
+          }
+          out.close();
+          in.close();
+        } else {
+          saveResourceFromJar("lang" + File.separator + langFile.getName(), false);
+        }
+      } catch (Exception ignored) {
       }
-      langYaml.save();
+      if (!langFile.exists()) {
+        for (String key : keys()) { // default data, to guard exceptions
+          langYaml.set(key, key);
+          language_mapping.put(key, key);
+          reverse_language_mapping.put(key, key);
+        }
+        langYaml.save();
+      }
     }
 
     langYaml.loadWithComments();
@@ -266,7 +284,9 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
 
     data.clear();
     for (E v : myClass.getEnumConstants()) {
-      Object fromString = yamlFile.get(v.name());
+      Object name = language_mapping.get(v.name());
+      if (name == null) name = v.name();
+      Object fromString = yamlFile.get(name.toString());
       if (fromString != null) {
         data.put(v, fromString);
       }

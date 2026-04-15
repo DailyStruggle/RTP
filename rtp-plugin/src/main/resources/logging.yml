@@ -1,19 +1,35 @@
-#toggle logs for specific occasions
-# these logs are not configurable due to scale
+# --- Plugin Logging Toggles ---
+# Enable/disable logs for various plugin activities.
+
+# Detailed System Logs
+# detailed_reload: log all files/sections reloaded
+# detailed_region_init: log initialization of each region
 detailed_reload: false
 detailed_region_init: false
+
+# Basic Activity Logs
+# command: log player-executed RTP commands
+# teleport: log actual teleportation events
 command: false
 teleport: true
 
-event_changeworld: true
-event_join: true
-event_respawn: true
-event_move: true
-event_teleport: true
+# Automatic/Event-based RTP Logs
+# Logs for RTP triggered by events:
+event_changeworld: true # When player changes world
+event_join: true        # When player joins the server
+event_respawn: true     # When player respawns
+event_move: true        # When player moves (if movement-based RTP is active)
+event_teleport: true    # When player teleports (if teleport-triggered RTP is active)
 
-#output detailed info when any selection fails,
-#  including failure rates and sometimes parameters for debugging
+# Debugging Selection Failures
+# Logs detailed info when a safe location selection fails,
+# including failure rates and search parameters.
 selection_failure: true
 
-#DO NOT TOUCH VERSION NUMBER
+# System Logs
+# Logs related to background tasks and database operations
+system_memory_tracker: false
+system_database: false
+
+# DO NOT TOUCH VERSION NUMBER
 version: "1.0"

@@ -85,11 +85,7 @@ public class SendMessage {
 
       if (!hover.isEmpty()) {
         BaseComponent[] hoverComponents = TextComponent.fromLegacyText(format(player, hover));
-        //noinspection deprecation
-        HoverEvent hoverEvent =
-            (RTP.serverAccessor.getServerIntVersion() >= 16)
-                ? new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(hoverComponents))
-                : new HoverEvent(HoverEvent.Action.SHOW_TEXT, hoverComponents);
+        HoverEvent hoverEvent = new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(hoverComponents));
         for (BaseComponent component : textComponents) {
           component.setHoverEvent(hoverEvent);
         }
@@ -182,7 +178,7 @@ public class SendMessage {
     Matcher matcher2 = hexColorPattern2.matcher(text);
     while (matcher2.find()) {
       String hexColor = text.substring(matcher2.start(), matcher2.end());
-      String shortColor = "#" + hexColor.replaceAll("&", "");
+      String shortColor = "#" + hexColor.replace("&", "");
       text = text.replaceAll(hexColor, shortColor);
     }
 
@@ -238,7 +234,7 @@ public class SendMessage {
       }
     } else {
       Logger logger = Bukkit.getLogger();
-      if (logger != null) logger.log(level, message);
+      logger.log(level, message);
     }
   }
 
@@ -257,10 +253,12 @@ public class SendMessage {
       spigot.sendMessage(TextComponent.fromLegacyText(ChatColor.RED + format(null, message)));
     else {
       Logger logger = Bukkit.getLogger();
-      if (logger != null) logger.log(level, message);
+      logger.log(level, message);
     }
 
-    throwable.printStackTrace();
+    if (throwable != null) {
+      Bukkit.getLogger().log(level, message, throwable);
+    }
   }
 
   public static void title(

@@ -1,11 +1,18 @@
-#autofilled per-world settings
-#world name according to bukkit
-#which region to use by default, when in this world
+# --- World Configuration ---
+# Configures default RTP behavior for a specific world.
+
+# Default Region
+# The region to use by default when a player is in this world.
 region: "default"
-#check rtp.worlds.[world] node on command
+
+# Permissions & Requirements
+# If true, requires 'rtp.worlds.<worldName>' permission to RTP in this world.
 requirePermission: false
-#if no perm for this world, attempt this world instead
-# placeholder: [num] - world index according to bukkit, 0 is usually a main world
+
+# Redirection Override
+# If a player lacks permission, attempt RTP in this world instead.
+# Special placeholder: [num] - world index according to bukkit, 0 is usually the main world.
 override: "[0]"
 
+# DO NOT TOUCH VERSION NUMBER
 version: "1.0"

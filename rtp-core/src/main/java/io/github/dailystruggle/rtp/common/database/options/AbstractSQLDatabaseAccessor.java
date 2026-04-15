@@ -169,9 +169,14 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
         statement.setString(1, regionName);
         try (ResultSet resultSet = statement.executeQuery()) {
           boolean hasPlayerUuid = false;
+          boolean hasSeed = false;
           try {
             resultSet.findColumn("player_uuid");
             hasPlayerUuid = true;
+          } catch (SQLException ignored) {}
+          try {
+            resultSet.findColumn("seed");
+            hasSeed = true;
           } catch (SQLException ignored) {}
 
           while (resultSet.next()) {
@@ -181,6 +186,7 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
             int y = resultSet.getInt("y");
             int z = resultSet.getInt("z");
             int attempts = resultSet.getInt("attempts");
+            long seed = hasSeed ? resultSet.getLong("seed") : 0L;
             String playerUuidStr = hasPlayerUuid ? resultSet.getString("player_uuid") : "shared";
 
             UUID playerUuid = null;
@@ -189,7 +195,7 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
                 playerUuid = UUID.fromString(playerUuidStr);
               } catch (IllegalArgumentException ignored) {}
             }
-            res.add(new StoredLocation(id, regionName, worldName, x, y, z, attempts, playerUuid));
+            res.add(new StoredLocation(id, regionName, worldName, x, y, z, attempts, seed, playerUuid));
           }
         }
       }
@@ -197,6 +203,27 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
       // If table doesn't exist, it's fine, just return empty list
     }
     return res;
+  }
+
+  /**
+   * Purge stale cached locations from the database.
+   * Stale locations are those bound to a specific player and older than 7 days.
+   */
+  public void purgeStaleLocations() {
+    try (Connection connection = getConnection()) {
+      // 7 days in milliseconds
+      long threshold = System.currentTimeMillis() - (7 * 24 * 60 * 60 * 1000L);
+      String sql = "DELETE FROM rtp_cached_locations WHERE player_uuid <> 'shared' AND (timestamp < ? OR timestamp IS NULL)";
+      try (PreparedStatement statement = connection.prepareStatement(sql)) {
+        statement.setLong(1, threshold);
+        int deleted = statement.executeUpdate();
+        if (deleted > 0 && isSystemDatabaseLoggingEnabled()) {
+          RTP.log(Level.INFO, "Purged " + deleted + " stale cached locations from the database.");
+        }
+      }
+    } catch (SQLException e) {
+      // Table might not exist yet, or timestamp column might be missing
+    }
   }
 
   @Override

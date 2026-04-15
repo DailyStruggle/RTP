@@ -24,6 +24,8 @@ public enum MessagesKeys {
   updating,
   updated,
   badArg,
+  locationSaved,
+  locationLoaded,
   consoleCmdNotAllowed,
   noPerms,
   invalidWorld,

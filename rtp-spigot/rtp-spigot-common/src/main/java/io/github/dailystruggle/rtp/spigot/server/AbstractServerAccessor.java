@@ -79,7 +79,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
         s -> {
           World world = Bukkit.getWorld(s);
           if (world == null) return null;
-          Region region = RTP.selectionAPI.getRegion(getRTPWorld(world.getUID()));
+          Region region = RTP.selectionAPI.getRegion(Objects.requireNonNull(getRTPWorld(world.getUID())));
           if (region == null) throw new IllegalStateException();
           Object o = region.getData(RegionKeys.shape);
           if (!(o instanceof Shape<?>)) throw new IllegalStateException();
@@ -104,7 +104,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   @Override
   public @NotNull String getPluginVersion() {
-    return Bukkit.getPluginManager().getPlugin("RTP").getDescription().getVersion();
+    return Objects.requireNonNull(Bukkit.getPluginManager().getPlugin("RTP")).getDescription().getVersion();
   }
 
   @Override
@@ -243,7 +243,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   @Override
   public @NotNull File getPluginDirectory() {
-    return Bukkit.getPluginManager().getPlugin("RTP").getDataFolder();
+    return Objects.requireNonNull(Bukkit.getPluginManager().getPlugin("RTP")).getDataFolder();
   }
 
   @Override
@@ -379,18 +379,19 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   @Override
   public void start(Object plugin) {
-    this.plugin = plugin;
+    this.plugin = Objects.requireNonNull(plugin);
   }
 
   @Override
+  @SuppressWarnings("unchecked")
   public boolean setShapeFunction(Function<String, ?> shapeFunction) {
-    this.shapeFunction = (Function<String, Shape<?>>) shapeFunction;
+      this.shapeFunction = (Function<String, Shape<?>>) shapeFunction;
     return true;
   }
 
   @Override
   public boolean setWorldBorderFunction(Function<String, ?> function) {
-    this.worldBorderFunction = (Function<String, WorldBorder>) function;
+    this.worldBorderFunction = function;
     return true;
   }
 
@@ -437,7 +438,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
         location ->
             getter.apply(
                 new RTPLocation(
-                    getRTPWorld(location.getWorld().getUID()),
+                    getRTPWorld(Objects.requireNonNull(location.getWorld()).getUID()),
                     location.getBlockX(),
                     location.getBlockY(),
                     location.getBlockZ())));

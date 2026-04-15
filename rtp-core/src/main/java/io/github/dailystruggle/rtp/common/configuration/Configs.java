@@ -35,8 +35,6 @@ public class Configs {
   /** Map of multi-configuration parsers */
   public Map<Class<?>, MultiConfigParser<?>> multiConfigParserMap = new ConcurrentHashMap<>();
 
-  /** The language file for world-specific translations */
-  protected File worldLangMap;
 
   /**
    * Constructor for Configs
@@ -139,7 +137,7 @@ public class Configs {
               worldName,
               "1.0",
               multiConfigParser.myDirectory,
-              worldLangMap,
+              multiConfigParser.langMap,
               multiConfigParser.fileDatabase));
     }
 
@@ -171,7 +169,7 @@ public class Configs {
               worldName,
               "1.0",
               multiConfigParser.myDirectory,
-              worldLangMap,
+              multiConfigParser.langMap,
               multiConfigParser.fileDatabase));
     }
 

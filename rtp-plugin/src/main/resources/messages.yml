@@ -2,43 +2,58 @@
 # supports bukkit color codes and hex color codes
 # supports PlaceholderAPI references
 
-#list of additional placeholders
+################################################################################
+# Section 1: General Configuration
+################################################################################
+# list of additional placeholders
 # format: Pn - where n is the index in this list
 placeholders:
   - "[RTP]" #P0
 
-#when teleporting, say this
+################################################################################
+# Section 2: Teleportation
+################################################################################
+# when teleporting, say this
 alreadyTeleporting: "&e[P0] you're already teleporting!"
 delayMessage: "&e[P0] Teleporting in [delay]. Don't move"
 chunkLoading: "&e[P0] Loading chunks! please wait..."
 teleportMessage: "&e[P0] Teleported in [attempts] attempts, in [processingTime]"
 
-#if teleport is cancel
+# if teleport is cancelled
 teleportCancel: "&e[P0] Teleport cancelled!"
 
-#if no safe places after reaching max attempts
+# if no safe places after reaching max attempts
+# placeholder: [attempts] - the maximum number of attempts
 unsafe: "&e[P0] could not find a safe location within [attempts] attempts"
 
 # when the player is on cooldown
+# placeholder: [remainingCooldown] - the remaining time
 cooldownMessage: "&e[P0] You can't teleport again for [remainingCooldown]"
 
-#if the region doesn't have any locations queued and the player doesn't have rtp.unqueued permission
+# if the region doesn't have any locations queued and the player doesn't have rtp.unqueued permission
 noLocationsQueued: "#f5eb73[P0] no locations ready at this time"
 
-#when the line shifts
+# when the queue line shifts
+# placeholder: [spot] - the current position in line
 queueUpdate: "#2636ef[P0] your spot in line: [spot]"
 
-#if the player doesn't have enough money to teleport in the region
+# if the player doesn't have enough money to teleport in the region
 # placeholder: [money] - how much money is required for the command
 notEnoughMoney: "&e[P0] you need at least $[money] for that."
 
-# for time placeholders, what to call days, hours, minutes, seconds
+################################################################################
+# Section 3: Time Formatting
+################################################################################
+# for time placeholders, what to call days, hours, minutes, seconds, and milliseconds
 days: "d"
 hours: "h"
 minutes: "m"
 seconds: "s"
 millis: "ms"
 
+################################################################################
+# Section 4: System & Management
+################################################################################
 # a configuration file 'version' is lower than the latest
 # placeholder: [filename] - name of file, including file extension
 oldFile: "&b[P0] old [filename] detected. Updating"
@@ -48,9 +63,11 @@ oldFile: "&b[P0] old [filename] detected. Updating"
 newWorld: "&b[P0] detected a new world '[world]'"
 
 # world doesn't exist in bukkit
+# placeholder: [world] - the world name
 invalidWorld: "&e[P0] could not find world '[world]'"
 
-# plugin reload text
+# plugin reload/update text
+# placeholder: [filename] - name of file
 reloading: "&b[P0] loading [filename]..."
 reloaded: "&b[P0] successfully loaded [filename]."
 updating: "&a[P0] updating [filename]..."
@@ -66,15 +83,33 @@ consoleCmdNotAllowed: "&c[P0] You must be an in-game player to execute this comm
 # user doesn't have permission for the command requested
 noPerms: "&eI'm sorry, but you do not have permission to perform this command. Please contact the server administrators if you believe that this is in error."
 
+################################################################################
+# Section 5: Administrative Logs
+################################################################################
+# logged when locations are saved/loaded from database
+# placeholder: [amount] - number of locations
+# placeholder: [region] - name of region
+locationSaved: "&e[P0] Successfully saved [amount] locations for [region]"
+locationLoaded: "&e[P0] Successfully loaded [amount] locations for [region]"
+
+################################################################################
+# Section 6: Fill Command
+################################################################################
+# messages related to the fill command
+# placeholder: [fill_regions] - list of regions
 fillStart: "&a[P0] fill task started for regions: [fill_regions]"
 fillCancel: "&e[P0] fill task cancelled for regions: [fill_regions]"
 fillPause: "#A020F0[P0] fill task paused for regions: [fill_regions]"
 fillResume: "#10A5F5[P0] fill task resumed for regions: [fill_regions]"
 fillRunning: "&c[P0] fill task already running for regions: [fill_regions]"
 fillNotRunning: "&c[rtp] fill task not running for regions: [fill_regions]"
+# placeholder: [fill_chunks], [fill_totalChunks], [fill_cps], [fill_landPercentage], [fill_eta]
 fillStatus: "&a[P0] completed [fill_chunks] / [fill_totalChunks] chunks for regions: [fill_regions]. [fill_cps] cps. Land Percentage: [fill_landPercentage]%. ETA: [fill_eta]"
 
-#info command
+################################################################################
+# Section 7: Info Command
+################################################################################
+# messages related to the info command
 infoTitle: "&a======RTP Info======"
 infoTickets: "&7Global Active Chunk Tickets: &f[tickets]"
 infoTeleports: "&7Active Teleport State Machines: &f[teleports]"
@@ -90,7 +125,8 @@ infoRegionHeader: "#63C5DARegions:"
 infoConsoleRegionHeader: "&7--- Regions ---"
 infoRegion: "  #52B2BF[region]"
 
-#sub-info
+# sub-info listings
+# placeholders: [world], [region], [requirePermission], [override], [shape], [worldBorderOverride], [cacheCap], [cached], [keptCache]
 worldInfo:
   - "#21ADA8[world]:"
   - "#99EEBB  - region: [region]"
@@ -107,20 +143,29 @@ regionInfo:
   - "#58CCED  - cached: [cached]"
   - "#58CCED  - keptCache: [keptCache]"
 
-#command descriptions
+################################################################################
+# Section 8: Command Descriptions
+################################################################################
+# shown in help command
 rtp: "&b/rtp - teleport to a random location"
 help: "&b/rtp help - see this"
 reload: "&b/rtp reload - reload config files"
 fill: "&b/rtp fill - try all possible region placements to improve load times"
 
-#player teleport status placeholders for PAPI
+################################################################################
+# Section 9: PlaceholderAPI Support
+################################################################################
+# status placeholders for players
 PLAYER_AVAILABLE: "&aAVAILABLE"
 PLAYER_COOLDOWN: "&eON COOLDOWN"
 PLAYER_SETUP: "&bPICKING A LOCATION"
 PLAYER_LOADING: "&bLOADING CHUNKS"
 PLAYER_TELEPORTING: "&bTELEPORTING"
 
-#show title
+################################################################################
+# Section 10: Visuals
+################################################################################
+# title settings
 # remove or set title to "" to disable
 # PlaceholderAPI is recommended for coordinates
 title: "&aTeleported!"
@@ -129,6 +174,10 @@ fadeIn: 20
 stay: 20
 fadeOut: 20
 
+# actionbar setting
 actionbar: ""
 
+################################################################################
+# Section 11: Metadata
+################################################################################
 version: "1.0"

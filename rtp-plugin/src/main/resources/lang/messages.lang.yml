@@ -18,7 +18,15 @@ delayMessage: delayMessage
 PLAYER_TELEPORTING: PLAYER_TELEPORTING
 alreadyTeleporting: alreadyTeleporting
 invalidWorld: invalidWorld
-infoChunks: infoChunks
+infoTickets: infoTickets
+infoTeleports: infoTeleports
+infoMSPT: infoMSPT
+infoTotalLoads: infoTotalLoads
+infoLeakRate: infoLeakRate
+infoDisclaimerHeader: infoDisclaimerHeader
+infoDisclaimer: infoDisclaimer
+infoConsoleWorldHeader: infoConsoleWorldHeader
+infoConsoleRegionHeader: infoConsoleRegionHeader
 minutes: minutes
 teleportCancel: teleportCancel
 infoWorldHeader: infoWorldHeader
@@ -40,6 +48,8 @@ fillStart: fillStart
 title: title
 actionbar: actionbar
 badArg: badArg
+locationSaved: locationSaved
+locationLoaded: locationLoaded
 reload: reload
 fadeIn: fadeIn
 infoRegionHeader: infoRegionHeader

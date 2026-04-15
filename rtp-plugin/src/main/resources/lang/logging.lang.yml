@@ -4,6 +4,8 @@ detailed_reload: detailed_reload
 teleport: teleport
 event_join: event_join
 selection_failure: selection_failure
+system_memory_tracker: system_memory_tracker
+system_database: system_database
 event_teleport: event_teleport
 version: version
 detailed_region_init: detailed_region_init

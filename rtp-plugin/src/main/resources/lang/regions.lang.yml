@@ -1,0 +1,11 @@
+world: world
+worldBorderOverride: worldBorderOverride
+shape: shape
+vert: vert
+requirePermission: requirePermission
+cacheCap: cacheCap
+activeChunkCap: activeChunkCap
+price: price
+spatialResolution: spatialResolution
+override: override
+version: version
