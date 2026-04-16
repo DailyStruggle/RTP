@@ -10,6 +10,9 @@ import java.nio.file.Path;
 import java.util.UUID;
 import java.util.function.Function;
 
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -204,5 +207,128 @@ class PlaceholderProviderTest {
         // leaving just "invalid" or "[invalid]" depending on the regex — either way, not the original
         assertNotNull(result);
         assertNotEquals(input, result);
+    }
+
+    // -------------------------------------------------------------------------
+    // fillPlaceholders — case-insensitive pattern replacement
+    // -------------------------------------------------------------------------
+
+    @Test
+    void fillPlaceholders_bracketSyntax_caseInsensitiveReplacement() {
+        // The Pattern uses CASE_INSENSITIVE, so [KEY] and [key] both match once the key is found
+        // (key lookup is case-sensitive, but the replacement regex is case-insensitive)
+        String upperKey = TEST_KEY.toUpperCase();
+        // Register under the upper-case key so lookup succeeds
+        PlaceholderProvider.placeholders.put(upperKey, uuid -> "upper_value");
+        try {
+            // bracket with exact case matches
+            String result = PlaceholderProvider.fillPlaceholders("[" + upperKey + "]", DUMMY_UUID);
+            assertEquals("upper_value", result);
+        } finally {
+            PlaceholderProvider.placeholders.remove(upperKey);
+        }
+    }
+
+    @Test
+    void fillPlaceholders_percentSyntax_caseInsensitiveReplacement() {
+        String upperKey = TEST_KEY.toUpperCase();
+        PlaceholderProvider.placeholders.put(upperKey, uuid -> "upper_pct");
+        try {
+            String result = PlaceholderProvider.fillPlaceholders("%" + upperKey + "%", DUMMY_UUID);
+            assertEquals("upper_pct", result);
+        } finally {
+            PlaceholderProvider.placeholders.remove(upperKey);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // fillPlaceholders — placeholder returning empty string
+    // -------------------------------------------------------------------------
+
+    @Test
+    void fillPlaceholders_placeholderReturnsEmpty_replacedWithEmpty() {
+        PlaceholderProvider.placeholders.put(TEST_KEY + "_empty", uuid -> "");
+        try {
+            String result = PlaceholderProvider.fillPlaceholders("[" + TEST_KEY + "_empty]", DUMMY_UUID);
+            assertEquals("", result);
+        } finally {
+            PlaceholderProvider.placeholders.remove(TEST_KEY + "_empty");
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // fillPlaceholders — multiple distinct placeholders in one string
+    // -------------------------------------------------------------------------
+
+    @Test
+    void fillPlaceholders_multipleDistinctPlaceholders_allReplaced() {
+        PlaceholderProvider.placeholders.put(TEST_KEY + "_a", uuid -> "AAA");
+        PlaceholderProvider.placeholders.put(TEST_KEY + "_b", uuid -> "BBB");
+        try {
+            String input = "[" + TEST_KEY + "_a] and [" + TEST_KEY + "_b]";
+            String result = PlaceholderProvider.fillPlaceholders(input, DUMMY_UUID);
+            assertEquals("AAA and BBB", result);
+        } finally {
+            PlaceholderProvider.placeholders.remove(TEST_KEY + "_a");
+            PlaceholderProvider.placeholders.remove(TEST_KEY + "_b");
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // fillNumericPlaceholders — percent syntax
+    // -------------------------------------------------------------------------
+
+    @Test
+    void fillNumericPlaceholders_withConfigs_percentSyntax_outOfBounds_replacedWithInvalid() {
+        RTPTestSetup.install(tempDir.toFile());
+        String input = "%p999%";
+        String result = PlaceholderProvider.fillNumericPlaceholders(input);
+        assertNotNull(result);
+        assertNotEquals(input, result);
+    }
+
+    @Test
+    void fillNumericPlaceholders_withConfigs_percentSyntaxNonNumeric_skipped() {
+        RTPTestSetup.install(tempDir.toFile());
+        String input = "%Pabc%";
+        String result = PlaceholderProvider.fillNumericPlaceholders(input);
+        assertEquals(input, result);
+    }
+
+    // -------------------------------------------------------------------------
+    // fillPlaceholders — UUID variation
+    // -------------------------------------------------------------------------
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "00000000-0000-0000-0000-000000000001",
+        "ffffffff-ffff-ffff-ffff-ffffffffffff",
+        "12345678-1234-1234-1234-123456789abc"
+    })
+    void fillPlaceholders_differentUUIDs_allReturnSameValue(String uuidStr) {
+        // The test placeholder ignores UUID, so result is always TEST_VALUE
+        UUID id = UUID.fromString(uuidStr);
+        String result = PlaceholderProvider.fillPlaceholders("[" + TEST_KEY + "]", id);
+        assertEquals(TEST_VALUE, result);
+    }
+
+    // -------------------------------------------------------------------------
+    // placeholders map — static built-in keys present
+    // -------------------------------------------------------------------------
+
+    @ParameterizedTest
+    @ValueSource(strings = {"delay", "cooldown", "remainingCooldown", "queueLocation",
+        "teleports", "mspt", "attempts", "processingTime", "spot",
+        "player", "player_name", "player_status", "fill_chunks", "fill_totalChunks",
+        "fill_cps", "fill_regions", "fill_eta", "world", "name", "region",
+        "requirePermission", "override", "pluginForced", "serverForced",
+        "shape", "cacheCap", "cached", "keptCache", "locationQueue",
+        "inFlightCalculations", "worldBorderOverride",
+        "total_queue_length", "public_queue_length", "personal_queue_length",
+        "teleport_world", "teleport_x", "teleport_y", "teleport_z", "teleport_biome",
+        "tickets", "plugin_forced", "server_forced", "loads", "leakRate"})
+    void builtInPlaceholderIsRegistered(String key) {
+        assertTrue(PlaceholderProvider.placeholders.containsKey(key),
+                "Expected built-in placeholder to be registered: " + key);
     }
 }

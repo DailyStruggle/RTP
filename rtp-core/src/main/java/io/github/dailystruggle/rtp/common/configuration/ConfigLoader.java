@@ -55,6 +55,17 @@ public interface ConfigLoader {
    */
   default void saveResourceFromJar(@NotNull String resourcePath, boolean replace) {
     resourcePath = resourcePath.replace('\\', '/');
+
+    // Short-circuit: if the file already exists and we are not replacing, nothing to do.
+    File earlyCheck = new File(getMainDirectory(), resourcePath);
+    if (earlyCheck.exists() && !replace) {
+      RTP.log(
+          java.util.logging.Level.WARNING,
+          "Could not save " + earlyCheck.getName() + " to " + earlyCheck
+              + " because " + earlyCheck.getName() + " already exists.");
+      return;
+    }
+
     InputStream in = getResourceFromJar(resourcePath);
     if (in == null) {
       throw new IllegalArgumentException(

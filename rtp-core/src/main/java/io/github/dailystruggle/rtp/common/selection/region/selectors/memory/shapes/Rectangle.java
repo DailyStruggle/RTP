@@ -83,6 +83,8 @@ public class Rectangle extends MemoryShape<RectangleParams> {
     long height = getNumber(RectangleParams.height, 256L).longValue() >> 4;
     long degrees = getNumber(RectangleParams.rotation, 0L).longValue();
 
+    if (width == 0 || height == 0) return false;
+
     if (degrees == 0) {
       return Math.abs(x - cx) <= width / 2 && Math.abs(z - cz) <= height / 2;
     }

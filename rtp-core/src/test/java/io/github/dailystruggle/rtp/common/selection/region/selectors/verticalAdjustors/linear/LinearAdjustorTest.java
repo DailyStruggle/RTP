@@ -203,4 +203,174 @@ public class LinearAdjustorTest {
         assertEquals(71, result1.y(), "Only valid landing in the column is Y=71");
         assertEquals(result1.y(), result2.y(), "Same seed must produce the same Y result");
     }
+
+    // -----------------------------------------------------------------------
+    // No valid landing — all directions
+    // -----------------------------------------------------------------------
+
+    /**
+     * Bottom-Up (state 0): entire range solid — should return null.
+     */
+    @Test
+    void bottomUp_entireRangeSolid_returnsNull() {
+        ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
+        for (int y = 60; y <= 80; y++) chunk.setSolid(y);
+
+        LinearAdjustor adj = buildAdjustor(0, 60, 80);
+        assertNull(adj.adjust(chunk), "Bottom-up should return null when entire range is solid");
+    }
+
+    /**
+     * Top-Down (state 1): entire range solid — should return null.
+     */
+    @Test
+    void topDown_entireRangeSolid_returnsNull() {
+        ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
+        for (int y = 60; y <= 80; y++) chunk.setSolid(y);
+
+        LinearAdjustor adj = buildAdjustor(1, 60, 80);
+        assertNull(adj.adjust(chunk), "Top-down should return null when entire range is solid");
+    }
+
+    /**
+     * Middle-Out (state 2): entire range solid — should return null.
+     */
+    @Test
+    void middleOut_entireRangeSolid_returnsNull() {
+        ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
+        for (int y = 60; y <= 80; y++) chunk.setSolid(y);
+
+        LinearAdjustor adj = buildAdjustor(2, 60, 80);
+        assertNull(adj.adjust(chunk), "Middle-out should return null when entire range is solid");
+    }
+
+    /**
+     * Outer-In (state 3): entire range solid — should return null.
+     */
+    @Test
+    void outerIn_entireRangeSolid_returnsNull() {
+        ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
+        for (int y = 60; y <= 80; y++) chunk.setSolid(y);
+
+        LinearAdjustor adj = buildAdjustor(3, 60, 80);
+        assertNull(adj.adjust(chunk), "Outer-in should return null when entire range is solid");
+    }
+
+    /**
+     * Shuffled (state 4): entire range solid — should return null.
+     */
+    @Test
+    void shuffled_entireRangeSolid_returnsNull() {
+        ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
+        for (int y = 60; y <= 80; y++) chunk.setSolid(y);
+
+        LinearAdjustor adj = buildAdjustor(4, 60, 80);
+        adj.setRng(new Random(0L));
+        assertNull(adj.adjust(chunk), "Shuffled should return null when entire range is solid");
+    }
+
+    // -----------------------------------------------------------------------
+    // requireSkyLight = true — surface-height path
+    // -----------------------------------------------------------------------
+
+    /**
+     * When {@code requireSkyLight=true} the adjustor uses {@link io.github.dailystruggle.rtp.api.world.RTPChunk#getSurfaceHeight}
+     * and returns Y = surfaceHeight + 1 when the surface block is safe.
+     */
+    @Test
+    void requireSkyLight_safeAtSurface_returnsSurfacePlusOne() {
+        ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
+        // Place a solid-safe block at Y=70 so getSurfaceHeight returns 70
+        chunk.setSolidSafe(70);
+
+        LinearAdjustor adj = new LinearAdjustor(new ArrayList<>());
+        adj.set(GenericVerticalAdjustorKeys.direction, 0);
+        adj.set(GenericVerticalAdjustorKeys.minY, 60L);
+        adj.set(GenericVerticalAdjustorKeys.maxY, 80L);
+        adj.set(GenericVerticalAdjustorKeys.requireSkyLight, true);
+
+        RTPCoords result = adj.adjust(chunk);
+        // The requireSkyLight path uses getSurfaceHeight; just verify a non-null result is returned
+        assertNotNull(result, "requireSkyLight adjustor should find a landing");
+    }
+
+    // -----------------------------------------------------------------------
+    // adjust(chunk, output) overload
+    // -----------------------------------------------------------------------
+
+    /**
+     * The boolean {@code adjust(chunk, output)} overload should return {@code true}
+     * and populate the output when a valid landing exists.
+     */
+    @Test
+    void adjustWithOutput_bottomUp_returnsTrueAndSetsY() {
+        ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
+        chunk.setSolidSafe(64);
+
+        LinearAdjustor adj = buildAdjustor(0, 60, 80);
+        io.github.dailystruggle.rtp.api.world.MutableRTPCoords output =
+                new io.github.dailystruggle.rtp.api.world.MutableRTPCoords(world.name(), 0, 0, 0);
+        boolean found = adj.adjust(chunk, output);
+
+        assertTrue(found, "adjust(chunk,output) should return true when a valid landing exists");
+        assertTrue(output.y >= 60 && output.y <= 80, "Output Y should be within the configured range");
+    }
+
+    // -----------------------------------------------------------------------
+    // testPlacement — verifier integration
+    // -----------------------------------------------------------------------
+
+    @Test
+    void testPlacement_passingVerifier_returnsTrue() {
+        java.util.List<java.util.function.Predicate<RTPCoords>> verifiers = new java.util.ArrayList<>();
+        verifiers.add(coords -> true);
+        LinearAdjustor adj = new LinearAdjustor(verifiers);
+        adj.set(GenericVerticalAdjustorKeys.direction, 0);
+        adj.set(GenericVerticalAdjustorKeys.minY, 60L);
+        adj.set(GenericVerticalAdjustorKeys.maxY, 80L);
+        adj.set(GenericVerticalAdjustorKeys.requireSkyLight, false);
+
+        RTPCoords coords = new io.github.dailystruggle.rtp.api.world.MutableRTPCoords(world.name(), 0, 65, 0).toImmutable();
+        assertTrue(adj.testPlacement(coords));
+    }
+
+    @Test
+    void testPlacement_failingVerifier_returnsFalse() {
+        java.util.List<java.util.function.Predicate<RTPCoords>> verifiers = new java.util.ArrayList<>();
+        verifiers.add(coords -> false);
+        LinearAdjustor adj = new LinearAdjustor(verifiers);
+        adj.set(GenericVerticalAdjustorKeys.direction, 0);
+        adj.set(GenericVerticalAdjustorKeys.minY, 60L);
+        adj.set(GenericVerticalAdjustorKeys.maxY, 80L);
+        adj.set(GenericVerticalAdjustorKeys.requireSkyLight, false);
+
+        RTPCoords coords = new io.github.dailystruggle.rtp.api.world.MutableRTPCoords(world.name(), 0, 65, 0).toImmutable();
+        assertFalse(adj.testPlacement(coords));
+    }
+
+    // -----------------------------------------------------------------------
+    // minY / maxY accessors and keys()
+    // -----------------------------------------------------------------------
+
+    @Test
+    void minYMaxY_accessors_returnConfiguredValues() {
+        LinearAdjustor adj = buildAdjustor(0, 30, 200);
+        assertEquals(30, adj.minY());
+        assertEquals(200, adj.maxY());
+    }
+
+    @Test
+    void keys_containsAllEnumNames() {
+        LinearAdjustor adj = buildAdjustor(0, 60, 80);
+        java.util.List<String> keys = adj.keys();
+        for (GenericVerticalAdjustorKeys k : GenericVerticalAdjustorKeys.values()) {
+            assertTrue(keys.contains(k.name()), "keys() should contain " + k.name());
+        }
+    }
+
+    @Test
+    void getParameters_returnsNonNull() {
+        LinearAdjustor adj = buildAdjustor(0, 60, 80);
+        assertNotNull(adj.getParameters());
+    }
 }

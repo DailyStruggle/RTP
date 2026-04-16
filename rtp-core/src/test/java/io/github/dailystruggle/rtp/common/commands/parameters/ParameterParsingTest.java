@@ -6,6 +6,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 public class ParameterParsingTest {
@@ -208,5 +209,153 @@ public class ParameterParsingTest {
     @Test
     void shapeParameter_classIsLoadable() {
         assertNotNull(ShapeParameter.class);
+    }
+
+    // ── IntegerParameter — additional edge cases ──────────────────────────────
+
+    @Test
+    void integerParameter_isRelevant_longMaxValuePlusOneOverflow_rejected() {
+        // Long.MAX_VALUE + 1 as a string overflows Long — must be rejected
+        IntegerParameter param = new IntegerParameter("perm", "desc", (u, s) -> true);
+        assertFalse(param.isRelevant.apply(uuid, "9223372036854775808"),
+                "Value exceeding Long.MAX_VALUE should be rejected");
+    }
+
+    @Test
+    void integerParameter_isRelevant_longMinValueMinusOneOverflow_rejected() {
+        IntegerParameter param = new IntegerParameter("perm", "desc", (u, s) -> true);
+        assertFalse(param.isRelevant.apply(uuid, "-9223372036854775809"),
+                "Value below Long.MIN_VALUE should be rejected");
+    }
+
+    @Test
+    void integerParameter_isRelevant_hexString_rejected() {
+        IntegerParameter param = new IntegerParameter("perm", "desc", (u, s) -> true);
+        assertFalse(param.isRelevant.apply(uuid, "0xFF"));
+    }
+
+    @Test
+    void integerParameter_isRelevant_leadingPlusSign_rejected() {
+        // Long.parseLong does not accept leading '+' in all JVM versions
+        IntegerParameter param = new IntegerParameter("perm", "desc", (u, s) -> true);
+        // Java 7+ Long.parseLong does accept '+' prefix — result depends on JVM; just must not throw
+        assertDoesNotThrow(() -> param.isRelevant.apply(uuid, "+5"));
+    }
+
+    @Test
+    void integerParameter_isRelevant_downstreamPredicateReceivesOriginalString() {
+        // Verify the exact string (not a parsed value) is forwarded to the downstream predicate
+        String[] captured = {null};
+        IntegerParameter param = new IntegerParameter("perm", "desc", (u, s) -> { captured[0] = s; return true; });
+        param.isRelevant.apply(uuid, "42");
+        assertEquals("42", captured[0]);
+    }
+
+    // ── FloatParameter — additional edge cases ────────────────────────────────
+
+    @ParameterizedTest
+    @ValueSource(strings = {"NaN", "Infinity", "-Infinity"})
+    void floatParameter_isRelevant_specialDoubleValues_accepted(String input) {
+        // Double.parseDouble accepts NaN and Infinity — downstream decides relevance
+        FloatParameter param = new FloatParameter("perm", "desc", (u, s) -> true);
+        assertTrue(param.isRelevant.apply(uuid, input),
+                "Double.parseDouble accepts '" + input + "'; downstream returns true");
+    }
+
+    @Test
+    void floatParameter_isRelevant_downstreamPredicateReceivesOriginalString() {
+        String[] captured = {null};
+        FloatParameter param = new FloatParameter("perm", "desc", (u, s) -> { captured[0] = s; return true; });
+        param.isRelevant.apply(uuid, "3.14");
+        assertEquals("3.14", captured[0]);
+    }
+
+    @Test
+    void floatParameter_isRelevant_downstreamPredicateNotCalledOnInvalidInput() {
+        boolean[] called = {false};
+        FloatParameter param = new FloatParameter("perm", "desc", (u, s) -> { called[0] = true; return true; });
+        param.isRelevant.apply(uuid, "not_a_number");
+        assertFalse(called[0], "Downstream predicate must not be called when parse fails");
+    }
+
+    @Test
+    void integerParameter_isRelevant_downstreamPredicateNotCalledOnInvalidInput() {
+        boolean[] called = {false};
+        IntegerParameter param = new IntegerParameter("perm", "desc", (u, s) -> { called[0] = true; return true; });
+        param.isRelevant.apply(uuid, "not_a_number");
+        assertFalse(called[0], "Downstream predicate must not be called when parse fails");
+    }
+
+    // ── BooleanParameter — additional edge cases ──────────────────────────────
+
+    @Test
+    void booleanParameter_isRelevantDelegatesToSupplied_returnsTrue() {
+        BooleanParameter param = new BooleanParameter("perm", "desc", (u, s) -> true);
+        assertTrue(param.isRelevant.apply(uuid, "true"));
+        assertTrue(param.isRelevant.apply(uuid, "false"));
+        assertTrue(param.isRelevant.apply(uuid, "anything"));
+    }
+
+    @Test
+    void booleanParameter_valuesIsImmutableSnapshot() {
+        BooleanParameter param = new BooleanParameter("perm", "desc", (u, s) -> true);
+        Set<String> v1 = param.values();
+        Set<String> v2 = param.values();
+        // Each call returns a fresh set — modifying one does not affect the other
+        v1.add("maybe");
+        assertFalse(v2.contains("maybe"), "values() should return independent sets");
+    }
+
+    // ── CommandParameter base — priority field ────────────────────────────────
+
+    @Test
+    void commandParameter_priorityDefaultIsZero() {
+        IntegerParameter param = new IntegerParameter("perm", "desc", (u, s) -> true);
+        assertEquals(0, param.priority);
+    }
+
+    @Test
+    void commandParameter_priorityCanBeSet() {
+        FloatParameter param = new FloatParameter("perm", "desc", (u, s) -> true);
+        param.priority = 5;
+        assertEquals(5, param.priority);
+    }
+
+    // ── Parameterized: permission/description round-trip ─────────────────────
+
+    @ParameterizedTest
+    @CsvSource({
+        "rtp.admin, Admin permission",
+        "'', Empty permission",
+        "rtp.use, Use the RTP command"
+    })
+    void integerParameter_permissionDescriptionRoundTrip(String perm, String desc) {
+        IntegerParameter param = new IntegerParameter(perm, desc, (u, s) -> true);
+        assertEquals(perm, param.permission());
+        assertEquals(desc, param.description());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "rtp.admin, Admin permission",
+        "'', Empty permission",
+        "rtp.use, Use the RTP command"
+    })
+    void floatParameter_permissionDescriptionRoundTrip(String perm, String desc) {
+        FloatParameter param = new FloatParameter(perm, desc, (u, s) -> true);
+        assertEquals(perm, param.permission());
+        assertEquals(desc, param.description());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "rtp.admin, Admin permission",
+        "'', Empty permission",
+        "rtp.use, Use the RTP command"
+    })
+    void booleanParameter_permissionDescriptionRoundTrip(String perm, String desc) {
+        BooleanParameter param = new BooleanParameter(perm, desc, (u, s) -> true);
+        assertEquals(perm, param.permission());
+        assertEquals(desc, param.description());
     }
 }

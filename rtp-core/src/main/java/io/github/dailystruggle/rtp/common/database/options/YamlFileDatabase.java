@@ -241,11 +241,8 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, YamlFile>> {
       Map<String, Object> values = file.getMapValues(false);
       for (Map.Entry<String, Object> entry : values.entrySet()) {
         String id = entry.getKey();
-        Object obj = entry.getValue();
-        ConfigurationSection section;
-        if (obj instanceof ConfigurationSection) {
-            section = (ConfigurationSection) obj;
-        } else continue;
+        ConfigurationSection section = file.getConfigurationSection(id);
+        if (section == null) continue;
 
         String rowRegion = section.getString("region");
         if (!regionName.equalsIgnoreCase(rowRegion)) continue;

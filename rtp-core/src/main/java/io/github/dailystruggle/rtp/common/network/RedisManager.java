@@ -12,6 +12,11 @@ public class RedisManager {
     private final JedisPool pool;
     private final String rpcChannel = "rtp:rpc";
 
+    // Package-private constructor for unit testing with a pre-built pool
+    RedisManager(JedisPool pool) {
+        this.pool = pool;
+    }
+
     public RedisManager(String host, int port, String password) {
         JedisPoolConfig poolConfig = new JedisPoolConfig();
         poolConfig.setMaxTotal(16);
