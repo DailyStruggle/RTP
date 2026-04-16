@@ -119,7 +119,6 @@ run/
 src/test/java/commonTestImpl/TestRTPServerAccessor.java
 /.gradle/
 /build/
-/gradle/
 rtp-core/database/regionData/testRegion.fill
 tmp.txt
 test_output.txt
