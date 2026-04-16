@@ -16,6 +16,7 @@ java {
 repositories {
     mavenCentral()
     maven { url 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
+    maven { url 'https://jitpack.io' }
 }
 
 dependencies {
@@ -27,8 +28,7 @@ dependencies {
 
     implementation 'io.github.dailystruggle:CommandsAPI:1.0.0-RELEASE'
 
-    // Binds the local jar file to the compile classpath
-    compileOnly files('lib/Iris-3.9.1-1.20.1-1.21.11.jar')
+    compileOnly 'com.github.VolmitSoftware:Iris:25fa2553'
 }
 
 test {
