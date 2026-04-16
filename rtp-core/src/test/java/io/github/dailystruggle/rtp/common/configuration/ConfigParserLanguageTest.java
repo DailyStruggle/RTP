@@ -238,11 +238,110 @@ public class ConfigParserLanguageTest {
     }
 
     // --- null value in YAML ---
-
     @Test
     void testNullYamlValueNotStored() throws IOException {
         // YAML null (~) should not be stored in data map
         ConfigParser<TestKeys> parser = buildParser("alpha: ~\nversion: 1.0\n");
         assertNull(parser.getData(TestKeys.alpha), "Null YAML value should not be stored (getData returns null)");
+    }
+
+    // -----------------------------------------------------------------------
+    // getMainDirectory() and getClassLoader()
+    // -----------------------------------------------------------------------
+
+    @Test
+    void testGetMainDirectoryReturnsPluginDirectory() throws IOException {
+        ConfigParser<TestKeys> parser = buildParser("alpha: 1\nversion: 1.0\n");
+        assertEquals(tempDir.toFile().getAbsolutePath(),
+                parser.getMainDirectory().getAbsolutePath(),
+                "getMainDirectory() should return the plugin directory");
+    }
+
+    @Test
+    void testGetClassLoaderReturnsNonNull() throws IOException {
+        ConfigParser<TestKeys> parser = buildParser("alpha: 1\nversion: 1.0\n");
+        assertNotNull(parser.getClassLoader(), "getClassLoader() should return a non-null ClassLoader");
+    }
+
+    // -----------------------------------------------------------------------
+    // getMap() — nested map value stored in YAML
+    // -----------------------------------------------------------------------
+
+    @Test
+    void testGetMapReturnsEntriesForNestedSection() throws IOException {
+        // alpha holds a nested map section
+        ConfigParser<TestKeys> parser = buildParser(
+                "alpha:\n  key1: val1\n  key2: val2\nversion: 1.0\n");
+        java.util.Map<String, Object> map = parser.getMap(TestKeys.alpha);
+        assertNotNull(map);
+        assertFalse(map.isEmpty(), "getMap on a nested section should return its entries");
+        assertTrue(map.containsKey("key1"), "getMap should contain key1");
+        assertEquals("val1", map.get("key1"));
+    }
+
+    // -----------------------------------------------------------------------
+    // set(String, Object) — valid and invalid key
+    // -----------------------------------------------------------------------
+
+    @Test
+    void testSetStringKeyValid() throws IOException {
+        ConfigParser<TestKeys> parser = buildParser("alpha: 1\nbeta: 2\nversion: 1.0\n");
+        parser.set("alpha", 42);
+        assertEquals(42, parser.getData(TestKeys.alpha),
+                "set(String,Object) with valid key should update the value");
+    }
+
+    @Test
+    void testSetStringKeyInvalidThrows() throws IOException {
+        ConfigParser<TestKeys> parser = buildParser("alpha: 1\nversion: 1.0\n");
+        assertThrows(IllegalArgumentException.class,
+                () -> parser.set("no_such_key", "value"),
+                "set(String,Object) with unknown key should throw IllegalArgumentException");
+    }
+
+    // -----------------------------------------------------------------------
+    // saveResource() — overwrite=false does not replace existing file
+    // -----------------------------------------------------------------------
+
+    @Test
+    void testSaveResourceNoOverwriteKeepsExistingFile() throws IOException {
+        // Build parser first (writes test.yml), then overwrite with sentinel content
+        ConfigParser<TestKeys> parser = buildParser("alpha: 1\nversion: 1.0\n");
+
+        // Now stamp the sentinel — saveResource(overwrite=false) must not touch it
+        java.nio.file.Path target = tempDir.resolve("test.yml");
+        Files.writeString(target, "alpha: SENTINEL\nversion: 1.0\n");
+
+        parser.saveResource("test.yml", false);
+
+        String content = Files.readString(target);
+        assertTrue(content.contains("SENTINEL"),
+                "saveResource(overwrite=false) should not overwrite an existing file");
+    }
+
+    // -----------------------------------------------------------------------
+    // getConfigValue() — null stored value returns default
+    // -----------------------------------------------------------------------
+
+    @Test
+    void testGetConfigValueNullStoredReturnsDefault() throws IOException {
+        ConfigParser<TestKeys> parser = buildParser("alpha: ~\nversion: 1.0\n");
+        Object result = parser.getConfigValue(TestKeys.alpha, "default_val");
+        assertEquals("default_val", result,
+                "getConfigValue should return default when stored value is null");
+    }
+
+    // -----------------------------------------------------------------------
+    // keys() — all enum names present
+    // -----------------------------------------------------------------------
+
+    @Test
+    void testKeysContainsAllEnumNames() throws IOException {
+        ConfigParser<TestKeys> parser = buildParser("alpha: 1\nversion: 1.0\n");
+        java.util.Collection<String> keys = parser.keys();
+        for (TestKeys k : TestKeys.values()) {
+            assertTrue(keys.contains(k.name()),
+                    "keys() should contain enum name: " + k.name());
+        }
     }
 }

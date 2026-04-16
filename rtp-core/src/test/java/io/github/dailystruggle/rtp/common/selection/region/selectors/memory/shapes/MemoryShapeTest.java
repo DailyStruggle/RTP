@@ -58,7 +58,7 @@ public class MemoryShapeTest {
         public Map<String, CommandParameter> getParameters() { return null; }
 
         @Override
-        public Collection<String> keys() { return null; }
+        public Collection<String> keys() { return java.util.Collections.emptyList(); }
 
         @Override
         public int[] select() { return new int[]{0, 0}; }

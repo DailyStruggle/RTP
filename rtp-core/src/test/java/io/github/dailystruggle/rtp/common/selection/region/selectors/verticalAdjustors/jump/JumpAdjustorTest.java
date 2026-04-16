@@ -180,4 +180,147 @@ public class JumpAdjustorTest {
 
         assertNull(result, "JumpAdjustor should return null when there is no solid floor");
     }
+
+    // -----------------------------------------------------------------------
+    // adjust(chunk, output) overload — direct boolean form
+    // -----------------------------------------------------------------------
+
+    /**
+     * Exercises the {@code adjust(chunk, output)} overload directly.
+     * A solid-safe floor at Y=64 should produce {@code true} and populate the output.
+     */
+    @Test
+    void adjustWithOutput_solidFloor_returnsTrueAndSetsY() {
+        ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
+        chunk.setSolidSafe(64);
+
+        JumpAdjustor adj = buildAdjustor(60, 80, 1);
+        io.github.dailystruggle.rtp.api.world.MutableRTPCoords output =
+                new io.github.dailystruggle.rtp.api.world.MutableRTPCoords(world.name(), 0, 0, 0);
+        boolean found = adj.adjust(chunk, output);
+
+        assertTrue(found, "adjust(chunk,output) should return true when a valid landing exists");
+        assertEquals(65, output.y, "Output Y should be 65 (one above solid-safe floor at Y=64)");
+    }
+
+    /**
+     * Exercises the {@code adjust(chunk, output)} overload when no valid landing exists.
+     */
+    @Test
+    void adjustWithOutput_noValidLanding_returnsFalse() {
+        ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
+        for (int y = 60; y <= 80; y++) chunk.setSolid(y);
+
+        JumpAdjustor adj = buildAdjustor(60, 80, 1);
+        io.github.dailystruggle.rtp.api.world.MutableRTPCoords output =
+                new io.github.dailystruggle.rtp.api.world.MutableRTPCoords(world.name(), 0, 0, 0);
+        boolean found = adj.adjust(chunk, output);
+
+        assertFalse(found, "adjust(chunk,output) should return false when no valid landing exists");
+    }
+
+    // -----------------------------------------------------------------------
+    // Phase 2 — step > 2 (binary-search phase)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Phase 2 active (step=16): a solid-safe floor at Y=64 with air above.
+     * Phase 2 narrows the window; Phase 3 then finds Y=65.
+     */
+    @Test
+    void phase2_largeStep_narrowsWindowAndFindsLanding() {
+        // With step=16 the binary-search phase narrows the window; place the
+        // solid-safe block at the very bottom so it is always found.
+        ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
+        chunk.setSolidSafe(60); // solid at 60, air at 61+
+
+        JumpAdjustor adj = buildAdjustor(60, 100, 16);
+        RTPCoords result = adj.adjust(chunk);
+
+        assertNotNull(result, "Phase-2 adjustor should find a valid landing");
+        assertEquals(61, result.y(), "Landing should be Y=61 above the solid-safe floor at Y=60");
+    }
+
+    /**
+     * Phase 2 active (step=8): entire range is solid — Phase 2 should exhaust the window
+     * and return false (null from the nullable overload).
+     */
+    @Test
+    void phase2_largeStep_entireRangeSolid_returnsNull() {
+        ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
+        for (int y = 60; y <= 100; y++) chunk.setSolid(y);
+
+        JumpAdjustor adj = buildAdjustor(60, 100, 8);
+        RTPCoords result = adj.adjust(chunk);
+
+        assertNull(result, "Phase-2 adjustor should return null when entire range is solid");
+    }
+
+    // -----------------------------------------------------------------------
+    // testPlacement — verifier integration
+    // -----------------------------------------------------------------------
+
+    /**
+     * {@code testPlacement} with an always-passing verifier returns {@code true}.
+     */
+    @Test
+    void testPlacement_passingVerifier_returnsTrue() {
+        java.util.List<java.util.function.Predicate<RTPCoords>> verifiers = new java.util.ArrayList<>();
+        verifiers.add(coords -> true);
+        JumpAdjustor adj = new JumpAdjustor(verifiers);
+        adj.set(JumpAdjustorKeys.minY, 60L);
+        adj.set(JumpAdjustorKeys.maxY, 80L);
+        adj.set(JumpAdjustorKeys.step, 1L);
+        adj.set(JumpAdjustorKeys.requireSkyLight, false);
+
+        RTPCoords coords = new io.github.dailystruggle.rtp.api.world.MutableRTPCoords(world.name(), 0, 65, 0).toImmutable();
+        assertTrue(adj.testPlacement(coords), "testPlacement should return true when all verifiers pass");
+    }
+
+    /**
+     * {@code testPlacement} with an always-failing verifier returns {@code false}.
+     */
+    @Test
+    void testPlacement_failingVerifier_returnsFalse() {
+        java.util.List<java.util.function.Predicate<RTPCoords>> verifiers = new java.util.ArrayList<>();
+        verifiers.add(coords -> false);
+        JumpAdjustor adj = new JumpAdjustor(verifiers);
+        adj.set(JumpAdjustorKeys.minY, 60L);
+        adj.set(JumpAdjustorKeys.maxY, 80L);
+        adj.set(JumpAdjustorKeys.step, 1L);
+        adj.set(JumpAdjustorKeys.requireSkyLight, false);
+
+        RTPCoords coords = new io.github.dailystruggle.rtp.api.world.MutableRTPCoords(world.name(), 0, 65, 0).toImmutable();
+        assertFalse(adj.testPlacement(coords), "testPlacement should return false when a verifier fails");
+    }
+
+    // -----------------------------------------------------------------------
+    // minY / maxY accessors
+    // -----------------------------------------------------------------------
+
+    @Test
+    void minYMaxY_accessors_returnConfiguredValues() {
+        JumpAdjustor adj = buildAdjustor(30, 200, 1);
+        assertEquals(30, adj.minY(), "minY() should return the configured minimum Y");
+        assertEquals(200, adj.maxY(), "maxY() should return the configured maximum Y");
+    }
+
+    // -----------------------------------------------------------------------
+    // keys() and getParameters()
+    // -----------------------------------------------------------------------
+
+    @Test
+    void keys_returnsAllEnumNames() {
+        JumpAdjustor adj = buildAdjustor(60, 80, 1);
+        java.util.Collection<String> keys = adj.keys();
+        for (JumpAdjustorKeys k : JumpAdjustorKeys.values()) {
+            assertTrue(keys.contains(k.name()), "keys() should contain " + k.name());
+        }
+    }
+
+    @Test
+    void getParameters_returnsNonNull() {
+        JumpAdjustor adj = buildAdjustor(60, 80, 1);
+        assertNotNull(adj.getParameters(), "getParameters() should not return null");
+    }
 }

@@ -67,7 +67,7 @@ subprojects {
     tasks.withType(Test) { finalizedBy jacocoTestReport }
     jacocoTestReport {
         dependsOn test
-        reports { html.required = true }
+        reports { html.required = true; xml.required = true }
     }
 
     processResources {
