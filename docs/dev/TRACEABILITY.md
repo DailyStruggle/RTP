@@ -87,11 +87,11 @@ This document connects each requirement to the design decision that motivated it
 | REQ-SPIGOT-F-001 | Synchronous chunk loading | DESIGN.md §2 — rtp-spigot | `rtp-spigot` adapter (Bukkit chunk API) | `BukkitSchedulerImplTest` (`runTask_onPrimaryThread_executesImmediately`, `runTaskAsynchronously_dispatchesTask_andCompletes`) |
 | REQ-SPIGOT-F-002 | Rate-limited sync tasks | DESIGN.md §1 — Bounded Computation Overhead | `TimeBoundTaskPipe` (spigot binding) | Manual verification required (TimeBoundTaskPipe core logic covered by `SLATest`) |
 | REQ-SPIGOT-F-003 | Platform event routing | ARCHITECTURE.md — rtp-spigot | Spigot event listeners → `rtp-core` handlers | Manual verification required |
-| REQ-SPIGOT-ARCH-001 | `addPluginChunkTicket` over `setForceLoaded` | DESIGN.md §6 — Chunk Allocation Management | `rtp-spigot` chunk reservation impl | Manual verification required |
+| REQ-SPIGOT-ARCH-001 | `addPluginChunkTicket` over `setForceLoaded` | DESIGN.md §6 — Chunk Allocation Management | `rtp-spigot` chunk reservation impl | `ChunkTicketLifecycleTest` (`ticket_is_held_during_reservation_and_released_on_close`) |
 | REQ-SPIGOT-ARCH-002 | Plugin-owned ticket leak prevention | DESIGN.md §6 — Chunk Allocation Management | `rtp-spigot` chunk reservation impl | Manual verification required |
 | REQ-SPIGOT-ARCH-003 | `TimeBoundTaskPipe` for main-thread ops | DESIGN.md §1 — Bounded Computation Overhead | `TimeBoundTaskPipe` | `BukkitSchedulerImplTest` (`runTask_onPrimaryThread_executesImmediately`) |
 | REQ-SPIGOT-ARCH-004 | Wall-clock time bounding | DESIGN.md §1 — Bounded Computation Overhead | `TimeBoundTaskPipe` (nanosecond budget) | `BukkitSchedulerImplTest` (`runTaskTimer_returnsNonNullBukkitTaskHandle`, `cancelTask_preventsScheduledTaskFromRunning`) |
-| REQ-SPIGOT-ARCH-005 | Ticket lifecycle pairing | DESIGN.md §6 — Chunk Allocation Management | `rtp-spigot` `removePluginChunkTicket` call sites | Manual verification required |
+| REQ-SPIGOT-ARCH-005 | Ticket lifecycle pairing | DESIGN.md §6 — Chunk Allocation Management | `rtp-spigot` `removePluginChunkTicket` call sites | `ChunkTicketLifecycleTest` (`ticket_is_held_during_reservation_and_released_on_close`, `ticket_is_released_even_when_validator_throws`) |
 | REQ-SPIGOT-ARCH-006 | Forced reclamation on disconnect | DESIGN.md §6 — Orphaned Allocation Recovery | `MemoryTracker` + spigot cleanup listener | Manual verification required |
 
 ---
@@ -103,11 +103,11 @@ This document connects each requirement to the design decision that motivated it
 | REQ-PAPER-F-001 | `getChunkAtAsync` for non-blocking load | DESIGN.md §2 — rtp-paper | `rtp-paper` async chunk impl | — |
 | REQ-PAPER-F-002 | Callback/future-only, no sync waits | DESIGN.md §2 — rtp-paper | `rtp-paper` async chunk impl | `RTPArchitectureTest` (`no_blocking_future_calls_in_core_or_api`) |
 | REQ-PAPER-F-003 | Paper-specific API prioritization | DESIGN.md §2 — rtp-paper | `rtp-paper` adapter | `ServerAccessorImplTest` (`getBiomes_returnsNonEmptyUpperCaseSet` — asserts `Registry.BIOME` path) |
-| REQ-PAPER-ARCH-001 | `addPluginChunkTicket` over `setForceLoaded` | DESIGN.md §6 — Chunk Allocation Management | `rtp-paper` chunk reservation impl | — |
+| REQ-PAPER-ARCH-001 | `addPluginChunkTicket` over `setForceLoaded` | DESIGN.md §6 — Chunk Allocation Management | `rtp-paper` chunk reservation impl | `ChunkTicketLifecycleTest` (`ticket_is_held_during_reservation_and_released_on_close`) |
 | REQ-PAPER-ARCH-002 | Plugin-owned ticket leak prevention | DESIGN.md §6 — Chunk Allocation Management | `rtp-paper` chunk reservation impl | — |
 | REQ-PAPER-ARCH-003 | `TimeBoundTaskPipe` for main-thread ops | DESIGN.md §1 — Bounded Computation Overhead | `TimeBoundTaskPipe` (paper binding) | `ServerAccessorImplTest` (`paperScheduler_runTask_executesOnPrimaryThread`) |
 | REQ-PAPER-ARCH-004 | Wall-clock time bounding | DESIGN.md §1 — Bounded Computation Overhead | `TimeBoundTaskPipe` (nanosecond budget) | — |
-| REQ-PAPER-ARCH-005 | Ticket lifecycle pairing | DESIGN.md §6 — Chunk Allocation Management | `rtp-paper` `removePluginChunkTicket` call sites | — |
+| REQ-PAPER-ARCH-005 | Ticket lifecycle pairing | DESIGN.md §6 — Chunk Allocation Management | `rtp-paper` `removePluginChunkTicket` call sites | `ChunkTicketLifecycleTest` (`ticket_is_held_during_reservation_and_released_on_close`, `ticket_is_released_even_when_validator_throws`) |
 | REQ-PAPER-ARCH-006 | Forced reclamation on disconnect | DESIGN.md §6 — Orphaned Allocation Recovery | `MemoryTracker` + paper cleanup listener | — |
 
 ---
@@ -140,10 +140,10 @@ This document connects each requirement to the design decision that motivated it
 | Root / System | 21 | 9 (REQ-RTP-F-001 `SLATest`+`RegionPipelineTest`, REQ-RTP-F-006/007 `RegionPipelineTest`, REQ-RTP-F-008, REQ-RTP-NF-002, REQ-RTP-SYS-001 via build, REQ-RTP-S-004 `FailureModeTest`+`RegionPipelineTest`, REQ-RTP-S-005, REQ-RTP-S-006 `RTPAPIGuardTest`) |
 | rtp-api | 8 | 4 (REQ-API-NF-002, REQ-API-ARCH-002, REQ-API-ARCH-003 `RTPAPIGuardTest`, REQ-API-ARCH-004) |
 | rtp-core | 18 | 11 (REQ-CORE-F-001 `FailureModeTest`+`RegionPipelineTest`, REQ-CORE-F-003–005, REQ-CORE-ARCH-001–002, REQ-CORE-ARCH-009–010; REQ-CORE-F-003/004 also covered end-to-end by `RegionPipelineTest`) |
-| rtp-spigot | 9 | 2 (REQ-SPIGOT-F-001, REQ-SPIGOT-ARCH-003/004 via `BukkitSchedulerImplTest`) |
-| rtp-paper | 9 | 3 (REQ-PAPER-F-002 via architecture rule, REQ-PAPER-F-003 and REQ-PAPER-ARCH-003 via `ServerAccessorImplTest`) |
+| rtp-spigot | 9 | 4 (REQ-SPIGOT-F-001, REQ-SPIGOT-ARCH-001/005 via `ChunkTicketLifecycleTest`, REQ-SPIGOT-ARCH-003/004 via `BukkitSchedulerImplTest`) |
+| rtp-paper | 9 | 5 (REQ-PAPER-F-002 via architecture rule, REQ-PAPER-F-003 and REQ-PAPER-ARCH-003 via `ServerAccessorImplTest`, REQ-PAPER-ARCH-001/005 via `ChunkTicketLifecycleTest`) |
 | rtp-folia | 14 | 1 (REQ-FOLIA-F-002 via architecture rule) |
-| **Total** | **69** | **~35** |
+| **Total** | **69** | **~39** |
 
 > **Deterministic RNG seam:** `MemoryShape.setRng(Random)`, `LocationGenerator.setRng(Random)`, and `RTPCmd.setRng(Random)` allow any test to inject a seeded `java.util.Random` and eliminate RNG as a source of flakiness. `DeterministicShapeTest` (12 tests) exercises this seam for `Circle`, `Square`, and `Rectangle`. The biome-recall path in `LocationGenerator` uses the same seam.
 
@@ -152,6 +152,6 @@ This document connects each requirement to the design decision that motivated it
 > **Gap:** The adapter modules (spigot, paper, folia) have low but growing automated test coverage.
 > MockBukkit is now integrated into `rtp-spigot-common` and `rtp-paper-v1_20_R1`; the mock support classes have been promoted to a shared `java-test-fixtures` source set in `rtp-core`.
 > The remaining highest-value automation steps are:
-> 1. Automate chunk ticket lifecycle (REQ-SPIGOT-ARCH-001/005, REQ-PAPER-ARCH-001/005) — requires mocking `World.addPluginChunkTicket`/`removePluginChunkTicket` via MockBukkit.
+> 1. ~~Automate chunk ticket lifecycle (REQ-SPIGOT-ARCH-001/005, REQ-PAPER-ARCH-001/005)~~ **Done** — `ChunkTicketLifecycleTest` (2 tests) uses `TrackedMockWorld` to assert tickets are held during validation and released (including on exception) via `ChunkReservation` try-with-resources.
 > 2. Extend MockBukkit coverage to `rtp-spigot-v1_20_R1`, `rtp-paper-v1_21_R1`, and `rtp-paper-v26_1_R1` using the same `testFixtures` pattern.
 > 3. Folia mock infrastructure and economy delegation (REQ-FOLIA-ARCH-007–009) require a dedicated Folia mock server or a Folia-compatible MockBukkit fork.

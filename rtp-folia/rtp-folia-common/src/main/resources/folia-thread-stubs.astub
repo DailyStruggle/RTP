@@ -1,0 +1,76 @@
+// Checker Framework stub file for Folia scheduler APIs.
+// This file teaches the FoliaThreadChecker the thread-affinity contracts of Folia's built-in
+// scheduler methods without requiring Folia source code on the annotation-processor classpath.
+//
+// Stub syntax reference: https://checkerframework.org/manual/#stub
+
+import io.github.dailystruggle.rtp.folia.thread.RegionThread;
+import io.github.dailystruggle.rtp.folia.thread.AsyncThread;
+import io.github.dailystruggle.rtp.folia.thread.GlobalRegionThread;
+
+package io.papermc.paper.threadedregions.scheduler;
+
+// ---------------------------------------------------------------------------
+// RegionScheduler — lambdas submitted here run on a @RegionThread
+// ---------------------------------------------------------------------------
+interface RegionScheduler {
+    @RegionThread ScheduledTask run(
+            org.bukkit.plugin.Plugin plugin,
+            org.bukkit.World world,
+            int chunkX,
+            int chunkZ,
+            java.util.function.Consumer<ScheduledTask> task);
+
+    @RegionThread ScheduledTask runDelayed(
+            org.bukkit.plugin.Plugin plugin,
+            org.bukkit.World world,
+            int chunkX,
+            int chunkZ,
+            java.util.function.Consumer<ScheduledTask> task,
+            long delayTicks);
+
+    @RegionThread ScheduledTask runAtFixedRate(
+            org.bukkit.plugin.Plugin plugin,
+            org.bukkit.World world,
+            int chunkX,
+            int chunkZ,
+            java.util.function.Consumer<ScheduledTask> task,
+            long initialDelayTicks,
+            long periodTicks);
+}
+
+// ---------------------------------------------------------------------------
+// AsyncScheduler — lambdas submitted here run on an @AsyncThread
+// ---------------------------------------------------------------------------
+interface AsyncScheduler {
+    @AsyncThread ScheduledTask runNow(
+            org.bukkit.plugin.Plugin plugin,
+            java.util.function.Consumer<ScheduledTask> task);
+
+    @AsyncThread ScheduledTask runAtFixedRate(
+            org.bukkit.plugin.Plugin plugin,
+            java.util.function.Consumer<ScheduledTask> task,
+            long initialDelay,
+            long period,
+            java.util.concurrent.TimeUnit timeUnit);
+}
+
+// ---------------------------------------------------------------------------
+// GlobalRegionScheduler — lambdas submitted here run on a @GlobalRegionThread
+// ---------------------------------------------------------------------------
+interface GlobalRegionScheduler {
+    @GlobalRegionThread ScheduledTask run(
+            org.bukkit.plugin.Plugin plugin,
+            java.util.function.Consumer<ScheduledTask> task);
+
+    @GlobalRegionThread ScheduledTask runDelayed(
+            org.bukkit.plugin.Plugin plugin,
+            java.util.function.Consumer<ScheduledTask> task,
+            long delayTicks);
+
+    @GlobalRegionThread ScheduledTask runAtFixedRate(
+            org.bukkit.plugin.Plugin plugin,
+            java.util.function.Consumer<ScheduledTask> task,
+            long initialDelayTicks,
+            long periodTicks);
+}

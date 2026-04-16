@@ -1,5 +1,4 @@
 plugins {
-    id 'java'
     id 'com.gradleup.shadow'
 }
 
@@ -30,13 +29,6 @@ dependencies {
 
     implementation 'org.bstats:bstats-bukkit:3.0.3'
     implementation 'xyz.tozymc.spigot:title-api:1.0'
-}
-
-tasks.withType(JavaCompile) {
-}
-
-test {
-    useJUnitPlatform()
 }
 
 shadowJar {

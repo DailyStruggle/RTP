@@ -93,16 +93,7 @@ public final class BukkitRTPPlayer implements RTPPlayer {
     Runnable tpTask = () -> future.complete(player.teleport(location));
 
     // Legacy Spigot mandates that entity teleportation occurs on the main thread
-    if (org.bukkit.Bukkit.isPrimaryThread()) {
-      tpTask.run();
-    } else {
-      org.bukkit.plugin.Plugin plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("RTP");
-      if (plugin != null) {
-        org.bukkit.Bukkit.getScheduler().runTask(plugin, tpTask);
-      } else {
-        future.complete(false);
-      }
-    }
+    RTP.scheduler.runTask(tpTask);
     return future;
   }
 

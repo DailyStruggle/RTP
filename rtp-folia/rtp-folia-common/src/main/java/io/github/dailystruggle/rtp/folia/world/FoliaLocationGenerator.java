@@ -19,6 +19,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdj
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.spigot.tools.SendMessage;
 
+import io.github.dailystruggle.rtp.folia.thread.AsyncThread;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
@@ -28,6 +29,7 @@ import java.util.stream.Collectors;
 public class FoliaLocationGenerator implements ILocationGenerator {
 
     @Override
+    @AsyncThread
     public CompletableFuture<GenerationResult> getLocation(Object region, GenerationContext context) {
         if (!(region instanceof Region r)) return CompletableFuture.completedFuture(null);
         UUID playerId = (context.player() != null) ? context.player().uuid() : null;
@@ -35,6 +37,7 @@ public class FoliaLocationGenerator implements ILocationGenerator {
     }
 
     @Override
+    @AsyncThread
     public CompletableFuture<GenerationResult> generateLocation(Object region, GenerationContext context) {
         if (!(region instanceof Region r)) return CompletableFuture.completedFuture(null);
         // generateLocation explicitly bypasses the cache (used by RegionCacheTask to fill queues)
@@ -42,6 +45,7 @@ public class FoliaLocationGenerator implements ILocationGenerator {
     }
 
     @Override
+    @AsyncThread
     public CompletableFuture<GenerationResult> getLocation(Object region, RTPCommandSender sender, RTPPlayer player, Set<String> biomeNames) {
         if (!(region instanceof Region r)) return CompletableFuture.completedFuture(null);
         UUID playerId = (player != null) ? player.uuid() : null;
@@ -49,12 +53,14 @@ public class FoliaLocationGenerator implements ILocationGenerator {
     }
 
     @Override
+    @AsyncThread
     public CompletableFuture<GenerationResult> getLocation(Object region, Set<String> biomeNames) {
         if (!(region instanceof Region r)) return CompletableFuture.completedFuture(null);
         return executeSearch(r, biomeNames); // No player provided, bypass cache
     }
 
     // Natively routes the request through the cache before falling back to generation
+    @AsyncThread
     private CompletableFuture<GenerationResult> getLocationAsync(Region region, Set<String> biomeNames, UUID playerId) {
         boolean custom = biomeNames != null && !biomeNames.isEmpty();
 
@@ -80,6 +86,7 @@ public class FoliaLocationGenerator implements ILocationGenerator {
     }
 
     // Rename your old getLocationAsync wrapper to executeSearch
+    @AsyncThread
     private CompletableFuture<GenerationResult> executeSearch(Region region, Set<String> biomeNames) {
         long resolution = Math.max(1L, region.getSettings().spatialResolution());
 
@@ -192,6 +199,7 @@ public class FoliaLocationGenerator implements ILocationGenerator {
         private long i;
         private long biomeChecks;
 
+        @AsyncThread
         public LocationSearchTask(State state, CompletableFuture<GenerationResult> resultFuture, long i, long biomeChecks) {
             this.state = state;
             this.resultFuture = resultFuture;
@@ -200,6 +208,7 @@ public class FoliaLocationGenerator implements ILocationGenerator {
         }
 
         // Pass a flag telling the task if it is currently safe to loop inline
+        @AsyncThread
         private void reschedule(boolean isCurrentlyAsync) {
             if (isCurrentlyAsync) {
                 // We know we are on the async pool. Execute instantly to save overhead.
@@ -212,6 +221,7 @@ public class FoliaLocationGenerator implements ILocationGenerator {
         }
 
         @Override
+        @AsyncThread
         public void run() {
             try {
                 // Use a while loop to instantly handle math failures without deep recursion
@@ -254,6 +264,7 @@ public class FoliaLocationGenerator implements ILocationGenerator {
                     int blockX = (select[0] << 4) + 8;
                     int blockZ = (select[1] << 4) + 8;
                     RTPWorld<?> world = state.region.getWorld();
+                    // TODO: THREAD-VIOLATION - Requires async bridge: getBiome() is @RegionThread but called here on @AsyncThread
                     String currBiome = world.getBiome(blockX, (state.vert.minY() + state.vert.maxY()) / 2, blockZ).toUpperCase();
 
                     // Instantly retry on the current thread! No recursion, no queueing.

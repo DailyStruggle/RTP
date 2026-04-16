@@ -14,10 +14,12 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
+import io.github.dailystruggle.rtp.folia.thread.RegionThread;
 
 public class FoliaRTPCommandSender implements RTPCommandSender {
   protected final CommandSender sender;
 
+  @RegionThread
   public FoliaRTPCommandSender(CommandSender sender) {
     this.sender = sender;
   }
@@ -29,21 +31,25 @@ public class FoliaRTPCommandSender implements RTPCommandSender {
   }
 
   @Override
+  @RegionThread
   public boolean hasPermission(String permission) {
     return sender.hasPermission(permission);
   }
 
   @Override
+  @RegionThread
   public void sendMessage(String message) {
     sender.sendMessage(message);
   }
 
   @Override
+  @RegionThread
   public long cooldown() {
     return ParsePermissions.getInt(uuid(), "rtp.cooldown.");
   }
 
   @Override
+  @RegionThread
   public long delay() {
     return ParsePermissions.getInt(uuid(), "rtp.delay.");
   }
@@ -54,6 +60,7 @@ public class FoliaRTPCommandSender implements RTPCommandSender {
   }
 
   @Override
+  @RegionThread
   public Set<String> getEffectivePermissions() {
     return sender.getEffectivePermissions().stream()
         .map(
@@ -67,6 +74,7 @@ public class FoliaRTPCommandSender implements RTPCommandSender {
   }
 
   @Override
+  @RegionThread
   public void performCommand(@Nullable RTPPlayer player, String command) {
     CommandSender sender = this.sender;
     OfflinePlayer bukkitPlayer = (player != null) ? Bukkit.getOfflinePlayer(player.uuid()) : null;
@@ -77,6 +85,7 @@ public class FoliaRTPCommandSender implements RTPCommandSender {
   }
 
   @Override
+  @RegionThread
   public RTPCommandSender clone() {
     return new FoliaRTPCommandSender(sender);
   }

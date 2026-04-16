@@ -37,6 +37,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import io.github.dailystruggle.rtp.folia.thread.GlobalRegionThread;
 
 public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   protected final Map<UUID, FoliaRTPWorld> worldMap = new ConcurrentHashMap<>();
@@ -70,6 +71,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
   protected Function<RTPWorld<?>, Set<String>> biomes = FoliaRTPWorld::getBiomes;
 
+  @GlobalRegionThread
   public AbstractFoliaServerAccessor() {
     for (World world : Bukkit.getWorlds()) {
       worldMap.put(world.getUID(), new FoliaRTPWorld(world));
@@ -77,24 +79,27 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
+  @GlobalRegionThread
   public String getServerVersion() {
     return Bukkit.getVersion();
   }
 
   @Override
+  @GlobalRegionThread
   public @NotNull String getPluginVersion() {
     return Bukkit.getPluginManager().getPlugin("RTP").getDescription().getVersion();
   }
 
   @Override
-  public @NotNull String getPlatform() {
+  public @NotNull String getPlatform() { // @AnyThread — returns constant String
     return "Folia";
   }
 
   protected Integer intVersion = null;
   @Override
-  public Integer getServerIntVersion() {
+  public Integer getServerIntVersion() { // @AnyThread — pure parse/cache of version string
     if (intVersion == null) {
+      // TODO: THREAD-VIOLATION - Requires async bridge; calls @GlobalRegionThread getServerVersion() from unannotated context
       String v = getServerVersion();
       if (v.contains("1_13")) intVersion = 13;
       else if (v.contains("1_14")) intVersion = 14;
@@ -112,6 +117,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
+  @GlobalRegionThread
   public @Nullable RTPWorld<?> getRTPWorld(String name) {
     World world = Bukkit.getWorld(name);
     if (world == null) return null;
@@ -119,6 +125,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
+  @GlobalRegionThread
   public @Nullable RTPWorld<?> getRTPWorld(UUID id) {
     World world = Bukkit.getWorld(id);
     if (world == null) return null;
@@ -126,16 +133,17 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public @Nullable Object getShape(String name) {
+  public @Nullable Object getShape(String name) { // @AnyThread — delegates to pure function
     return shapeFunction.apply(name);
   }
 
   @Override
-  public boolean isPrimaryThread() {
+  public boolean isPrimaryThread() { // @AnyThread — pure boolean check
     return false;
   }
 
   @Override
+  @GlobalRegionThread
   public @Nullable Object getWorldBorder(String worldName) {
     Object res = worldBorderFunction.apply(worldName);
     if (res == null) res = createNativeWorldBorder(worldName);
@@ -143,6 +151,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
+  @GlobalRegionThread
   public @NotNull List<RTPWorld<?>> getRTPWorlds() {
     return Bukkit.getWorlds().stream()
         .map(world -> getRTPWorld(world.getUID()))
@@ -151,6 +160,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
+  @GlobalRegionThread
   public @Nullable RTPPlayer getPlayer(UUID uuid) {
     Player player = Bukkit.getPlayer(uuid);
     if (player == null) return null;
@@ -158,6 +168,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
+  @GlobalRegionThread
   public @Nullable RTPPlayer getPlayer(String name) {
     Player player = Bukkit.getPlayer(name);
     if (player == null) return null;
@@ -178,7 +189,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public long overTime() {
+  public long overTime() { // @AnyThread — returns constant
     return 0;
   }
 
@@ -217,6 +228,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   @Override
   public void sendMessageAndSuggest(UUID target, String message, String suggestion) {
     message = tagMessage(message, null);
+    // TODO: THREAD-VIOLATION - Requires async bridge; calls @GlobalRegionThread getSender() from @RegionThread context
     RTPCommandSender sender = getSender(target);
     // Routes the suggestion safely as a click event via your formatting pipeline
     io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(sender, message, "", suggestion);
@@ -251,22 +263,22 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public String format(@Nullable UUID player, String text) {
+  public String format(@Nullable UUID player, String text) { // @AnyThread — pure text formatting
     return text;
   }
 
   @Override
-  public String formatNoColor(@Nullable UUID player, String text) {
+  public String formatNoColor(@Nullable UUID player, String text) { // @AnyThread — pure text formatting
     return text;
   }
 
   @Override
-  public void log(Level level, String msg) {
+  public void log(Level level, String msg) { // @AnyThread — thread-safe logger
     Bukkit.getLogger().log(level, msg);
   }
 
   @Override
-  public void log(Level level, String msg, Throwable throwable) {
+  public void log(Level level, String msg, Throwable throwable) { // @AnyThread — thread-safe logger
     Bukkit.getLogger().log(level, msg, throwable);
   }
 
@@ -288,17 +300,17 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public @NotNull Set<String> getBiomes(RTPWorld<?> rtpWorld) {
+  public @NotNull Set<String> getBiomes(RTPWorld<?> rtpWorld) { // @AnyThread — delegates to pure function
     return biomes.apply(rtpWorld);
   }
 
   @Override
-  public @NotNull Set<String> getBiomes() {
+  public @NotNull Set<String> getBiomes() { // @AnyThread — delegates to pure function
     return biomes.apply(null);
   }
 
   @Override
-  public @NotNull Set<String> materials() {
+  public @NotNull Set<String> materials() { // @AnyThread — pure enum enumeration
     return Arrays.stream(Material.values())
         .map(material -> material.name().toUpperCase())
         .collect(Collectors.toSet());
@@ -307,59 +319,62 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   private Object plugin;
 
   @Override
+  @GlobalRegionThread
   public void stop() {
     for (RTPWorld<?> rtpWorld : worldMap.values()) {rtpWorld.forgetChunks();}
   }
 
   @Override
+  @GlobalRegionThread
   public void start() {
     start(plugin);
   }
 
   @Override
+  @GlobalRegionThread
   public void start(Object plugin) {
     this.plugin = plugin;
   }
 
   @Override
-  public boolean setShapeFunction(Function<String, ?> shapeFunction) {
+  public boolean setShapeFunction(Function<String, ?> shapeFunction) { // @AnyThread — sets a pure function field
     this.shapeFunction = shapeFunction;
     return true;
   }
 
   @Override
-  public boolean setWorldBorderFunction(Function<String, ?> function) {
+  public boolean setWorldBorderFunction(Function<String, ?> function) { // @AnyThread — sets a pure function field
     this.worldBorderFunction = function;
     return true;
   }
 
   @Override
-  public RTPTaskPipe createTaskPipe() {
+  public RTPTaskPipe createTaskPipe() { // @AnyThread — factory method, no Bukkit state
     return new CountBoundTaskPipe((Plugin) plugin, 10);
   }
 
   @Override
-  public Object createCachePipe() {
+  public Object createCachePipe() { // @AnyThread — factory method, no Bukkit state
     return new CountBoundTaskPipe((Plugin) plugin, 2);
   }
 
   @Override
-  public Object getPlugin() {
+  public Object getPlugin() { // @AnyThread — returns stored field
     return plugin;
   }
 
   @Override
-  public ILocationGenerator getLocationGenerator() {
+  public ILocationGenerator getLocationGenerator() { // @AnyThread — factory method
     return new FoliaLocationGenerator();
   }
 
   @Override
-  public io.github.dailystruggle.rtp.api.scheduling.RTPScheduler getScheduler() {
+  public io.github.dailystruggle.rtp.api.scheduling.RTPScheduler getScheduler() { // @AnyThread — returns stored field
     return io.github.dailystruggle.rtp.common.RTP.scheduler;
   }
 
   @Override
-  public double getTPS(int ticks) {
+  public double getTPS(int ticks) { // @AnyThread — returns constant
     try {
       return 20.0;
     } catch (Exception e) {
@@ -368,11 +383,12 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public void setBiomeGetter(Function<RTPLocation, String> getter) {
+  public void setBiomeGetter(Function<RTPLocation, String> getter) { // @AnyThread — sets a pure function field
     FoliaRTPWorld.setBiomeGetter(
         location ->
             getter.apply(
                 new RTPLocation(
+                    // TODO: THREAD-VIOLATION - Requires async bridge; calls @GlobalRegionThread getRTPWorld() from unannotated lambda context
                     getRTPWorld(location.getWorld().getUID()),
                     location.getBlockX(),
                     location.getBlockY(),
@@ -380,7 +396,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public void setBiomesGetter(Function<RTPWorld<?>, Set<String>> getter) {
+  public void setBiomesGetter(Function<RTPWorld<?>, Set<String>> getter) { // @AnyThread — sets a pure function field
     this.biomes = getter;
     FoliaRTPWorld.setBiomesGetter(getter);
   }

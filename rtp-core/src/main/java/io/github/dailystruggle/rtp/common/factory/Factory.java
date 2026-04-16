@@ -16,7 +16,9 @@ public class Factory<T extends FactoryValue<?>> {
   public final ConcurrentHashMap<String, T> map = new ConcurrentHashMap<>();
 
   public void add(String name, T value) {
-    map.put(name.toUpperCase(), value);
+    name = name.toUpperCase();
+    if (!name.endsWith(".YML")) name = name + ".YML";
+    map.put(name, value);
   }
 
   public void remove(String name) {
@@ -63,7 +65,9 @@ public class Factory<T extends FactoryValue<?>> {
 
   @Nullable
   public FactoryValue<?> get(String name) {
-    T t = map.get(name.toUpperCase());
+    name = name.toUpperCase();
+    if (!name.endsWith(".YML")) name = name + ".YML";
+    T t = map.get(name);
     if (t == null) return null;
     return t.clone();
   }
@@ -71,6 +75,7 @@ public class Factory<T extends FactoryValue<?>> {
   @NotNull
   public FactoryValue<?> getOrDefault(String name) {
     name = name.toUpperCase();
+    if (!name.endsWith(".YML")) name = name + ".YML";
     // guard constructor
     T value = map.get(name);
     if (value == null) {

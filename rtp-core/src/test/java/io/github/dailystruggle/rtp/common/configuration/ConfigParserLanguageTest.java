@@ -14,7 +14,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -26,6 +26,7 @@ public class ConfigParserLanguageTest {
     public enum TestKeys {
         alpha,
         beta,
+        gamma,
         version
     }
 
@@ -49,6 +50,26 @@ public class ConfigParserLanguageTest {
             instanceField.set(null, rtp);
         } catch (Exception ignored) {}
     }
+
+    private ConfigParser<TestKeys> buildParser(String yamlContent) throws IOException {
+        return buildParser(yamlContent, null);
+    }
+
+    private ConfigParser<TestKeys> buildParser(String yamlContent, File langFile) throws IOException {
+        File configFile = tempDir.resolve("test.yml").toFile();
+        Files.writeString(configFile.toPath(), yamlContent);
+        YamlFileDatabase fileDatabase = new YamlFileDatabase(tempDir.toFile());
+        return new ConfigParser<>(
+                TestKeys.class,
+                "test",
+                "1.0",
+                tempDir.toFile(),
+                langFile,
+                fileDatabase
+        );
+    }
+
+    // --- original test ---
 
     @Test
     void testAlternateLanguageMapping() throws IOException {
@@ -77,8 +98,151 @@ public class ConfigParserLanguageTest {
         // The parser should have translated alternate_alpha to alpha and parsed the value 10
         Object alphaVal = parser.getData(TestKeys.alpha);
         Object betaVal = parser.getData(TestKeys.beta);
-
         assertEquals(10, alphaVal, "Parser failed to map alternate_alpha back to alpha");
         assertEquals(20, betaVal, "Parser failed to map alternate_beta back to beta");
+    }
+
+    // --- missing key lookups ---
+
+    @Test
+    void testMissingKeyReturnsNull() throws IOException {
+        ConfigParser<TestKeys> parser = buildParser("alpha: 42\nversion: 1.0\n");
+        assertNull(parser.getData(TestKeys.beta), "Missing key should return null from getData");
+        assertNull(parser.getData(TestKeys.gamma), "Missing key should return null from getData");
+    }
+
+    @Test
+    void testGetConfigValueWithDefaultForMissingKey() throws IOException {
+        ConfigParser<TestKeys> parser = buildParser("alpha: 42\nversion: 1.0\n");
+        Object result = parser.getConfigValue(TestKeys.beta, "fallback");
+        assertEquals("fallback", result, "getConfigValue should return default when key is absent");
+    }
+
+    @Test
+    void testGetConfigValueWithDefaultForPresentKey() throws IOException {
+        ConfigParser<TestKeys> parser = buildParser("alpha: 99\nversion: 1.0\n");
+        Object result = parser.getConfigValue(TestKeys.alpha, 0);
+        assertEquals(99, result, "getConfigValue should return stored value when key is present");
+    }
+
+    // --- type coercion edge cases ---
+
+    @Test
+    void testIntegerValueParsed() throws IOException {
+        ConfigParser<TestKeys> parser = buildParser("alpha: 7\nversion: 1.0\n");
+        Object val = parser.getData(TestKeys.alpha);
+        assertNotNull(val);
+        assertEquals(7, val);
+    }
+
+    @Test
+    void testBooleanValueParsed() throws IOException {
+        ConfigParser<TestKeys> parser = buildParser("alpha: true\nversion: 1.0\n");
+        Object val = parser.getData(TestKeys.alpha);
+        assertNotNull(val);
+        assertEquals(true, val);
+    }
+
+    @Test
+    void testStringValueParsed() throws IOException {
+        ConfigParser<TestKeys> parser = buildParser("alpha: hello\nversion: 1.0\n");
+        Object val = parser.getData(TestKeys.alpha);
+        assertNotNull(val);
+        assertEquals("hello", val);
+    }
+
+    // --- set and re-read (round-trip) ---
+
+    @Test
+    void testSetAndGetRoundTrip() throws IOException {
+        ConfigParser<TestKeys> parser = buildParser("alpha: 1\nbeta: 2\nversion: 1.0\n");
+        parser.set(TestKeys.alpha, 999);
+        Object val = parser.getData(TestKeys.alpha);
+        assertEquals(999, val, "set() should update the in-memory value immediately");
+    }
+
+    @Test
+    void testSetStringKeyRoundTrip() throws IOException {
+        ConfigParser<TestKeys> parser = buildParser("alpha: 1\nbeta: 2\nversion: 1.0\n");
+        parser.set("beta", 55);
+        assertEquals(55, parser.getData(TestKeys.beta));
+    }
+
+    @Test
+    void testSetInvalidKeyThrows() throws IOException {
+        ConfigParser<TestKeys> parser = buildParser("alpha: 1\nversion: 1.0\n");
+        assertThrows(IllegalArgumentException.class, () -> parser.set("nonexistent_key", 1));
+    }
+
+    // --- save and reload round-trip ---
+
+    @Test
+    void testSaveAndReloadRoundTrip() throws IOException {
+        ConfigParser<TestKeys> parser = buildParser("alpha: 1\nbeta: 2\nversion: 1.0\n");
+        parser.set(TestKeys.alpha, 777);
+        parser.save();
+
+        // Build a second parser reading the same file
+        YamlFileDatabase fileDatabase2 = new YamlFileDatabase(tempDir.toFile());
+        ConfigParser<TestKeys> parser2 = new ConfigParser<>(
+                TestKeys.class, "test", "1.0", tempDir.toFile(), null, fileDatabase2);
+        assertEquals(777, parser2.getData(TestKeys.alpha), "Saved value should persist after reload");
+    }
+
+    // --- getMap() branches ---
+
+    @Test
+    void testGetMapReturnsEmptyForScalarValue() throws IOException {
+        ConfigParser<TestKeys> parser = buildParser("alpha: 42\nversion: 1.0\n");
+        // alpha holds a scalar — getMap should return an empty map
+        java.util.Map<String, Object> map = parser.getMap(TestKeys.alpha);
+        assertNotNull(map);
+        assertTrue(map.isEmpty(), "getMap on a scalar value should return an empty map");
+    }
+
+    @Test
+    void testGetMapReturnsEmptyForMissingKey() throws IOException {
+        ConfigParser<TestKeys> parser = buildParser("alpha: 42\nversion: 1.0\n");
+        java.util.Map<String, Object> map = parser.getMap(TestKeys.beta);
+        assertNotNull(map);
+        assertTrue(map.isEmpty(), "getMap on a missing key should return an empty map");
+    }
+
+    // --- clone() ---
+
+    @Test
+    void testCloneProducesIndependentParser() throws IOException {
+        ConfigParser<TestKeys> parser = buildParser("alpha: 5\nbeta: 10\nversion: 1.0\n");
+        ConfigParser<TestKeys> clone = parser.clone();
+        assertNotSame(parser, clone, "clone() should return a different instance");
+        // Mutating the clone should not affect the original
+        clone.set(TestKeys.alpha, 999);
+        assertEquals(5, parser.getData(TestKeys.alpha), "Original should be unaffected by clone mutation");
+        assertEquals(999, clone.getData(TestKeys.alpha), "Clone should reflect its own mutation");
+    }
+
+    // --- version mismatch triggers update() / renameFiles() ---
+
+    @Test
+    void testVersionMismatchTriggersRename() throws IOException {
+        // Write a config with version 0.9 but request version 1.0 — should trigger update/rename
+        File configFile = tempDir.resolve("test.yml").toFile();
+        Files.writeString(configFile.toPath(), "alpha: 7\nversion: 0.9\n");
+        YamlFileDatabase fileDatabase = new YamlFileDatabase(tempDir.toFile());
+        // Constructor calls check() which detects version mismatch and calls renameFiles()
+        ConfigParser<TestKeys> parser = new ConfigParser<>(
+                TestKeys.class, "test", "1.0", tempDir.toFile(), null, fileDatabase);
+        // After rename, test.yml.old1 should exist
+        File renamed = tempDir.resolve("test.yml.old1").toFile();
+        assertTrue(renamed.exists(), "Version mismatch should cause old config to be renamed to .old1");
+    }
+
+    // --- null value in YAML ---
+
+    @Test
+    void testNullYamlValueNotStored() throws IOException {
+        // YAML null (~) should not be stored in data map
+        ConfigParser<TestKeys> parser = buildParser("alpha: ~\nversion: 1.0\n");
+        assertNull(parser.getData(TestKeys.alpha), "Null YAML value should not be stored (getData returns null)");
     }
 }
