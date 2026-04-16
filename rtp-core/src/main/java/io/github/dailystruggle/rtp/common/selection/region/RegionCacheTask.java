@@ -8,6 +8,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
+import io.github.dailystruggle.rtp.common.tools.PerformanceTracker;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -73,7 +74,14 @@ public class RegionCacheTask extends RTPRunnable {
         if (locationFuture.isDone()) {
             processResult(locationFuture.join());
         } else {
-            locationFuture.thenAccept(this::processResult);
+            locationFuture.thenAccept(res -> {
+                long asyncStart = System.nanoTime();
+                try {
+                    processResult(res);
+                } finally {
+                    PerformanceTracker.totalNanosecondsConsumed.add(System.nanoTime() - asyncStart);
+                }
+            });
         }
     }
 
@@ -109,11 +117,17 @@ public class RegionCacheTask extends RTPRunnable {
                         }, 600L); // 30-second failsafe
                     }
 
+                    // Capture wall-clock start for the chunk-load wait; used below as a rough
+                    // proxy for chunk-loading cost since actual I/O time is server-internal.
+                    final long chunkLoadStart = System.nanoTime();
                     chunkSet.complete().thenAccept(success -> {
+                        // Use elapsed wall-clock time as a rough estimate of chunk loading cost.
+                        long elapsed = System.nanoTime() - chunkLoadStart;
                         try {
                             RTPLocation finalPair = new RTPLocation(coords, res.attempts(), res.reservation());
                             region.queueManager.enqueuePlayerLocation(playerId, finalPair);
                         } finally {
+                            PerformanceTracker.totalNanosecondsConsumed.add(elapsed);
                             region.inFlightCalculations.decrementAndGet();
                             MemoryTracker.untrack(this);
                         }
