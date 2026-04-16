@@ -7,9 +7,25 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
-## [Unreleased]
+## [3.0.0-beta] — Unreleased
+
+> ⚠️ **MAJOR version — breaking `rtp-api` changes.** See [MIGRATION.md](docs/admin/MIGRATION.md#upgrading-to-300-beta) for addon developer and operator upgrade instructions.
 
 ### Added
+- `ChunkReservation` class (`rtp-api`) for explicit, `AutoCloseable` chunk ticket lifecycle management.
+- `rtp-folia` adapter: full regional-thread scheduling (`rtp-folia-v1_20_R1`, `rtp-folia-v1_21_R1`, `rtp-folia-v26_1_R1`).
+- `rtp fill reset [region]` subcommand: clears a region's MemoryShape bad-sector data without starting a new fill. Use when region geometry changes and an immediate cache rebuild is not desired.
+- H2 embedded database for spatial memory persistence, replacing flat-file cache (see ADR-002).
+- Fill task optimization: configurable step distance for spiral traversal, reducing redundant sector checks during region pre-generation.
+- Spatial resolution tuning and `badSum` reduction: finer-grained sector scoring lowers the rate of false-bad-sector classifications.
+- `LocationBuffer` class: pre-computed location pool decoupling chunk selection from teleport dispatch.
+- State-based task system: fill and teleport tasks now progress through explicit states, enabling clean pause/resume and cancellation.
+- Per-region Folia rate limiting: regional threads are throttled independently to prevent scheduler starvation on high-region servers.
+- Platform-specific scheduling pipelines: Spigot, Paper, and Folia each use a dedicated pipeline rather than a shared fallback path.
+- Performance tracker: lightweight per-operation timing instrumentation for fill and teleport hot paths.
+- Coordinate pair represented as a Java record, reducing allocation on the hot path.
+- Integration test suite covering command execution, queue drain, and config reload scenarios.
+- Requirement documentation (`docs/REQUIREMENTS.md`) introduced with full REQ-ID coverage.
 - `SECURITY.md` — private vulnerability disclosure policy and response timeline.
 - `CHANGELOG.md` — this file.
 - `TRACEABILITY.md` — full requirements-to-code traceability matrix (63 REQ-IDs).
@@ -21,7 +37,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Traceability Check stage in `Jenkinsfile` and GitHub Actions workflow.
 - GitHub Actions workflow updated to Java 21, action v4, Spotless check, JUnit result publishing, and Jacoco coverage upload.
 - `MIGRATION.md` — operator upgrade guide covering config compatibility, cache handling, and PaperLib removal for 3.0.0-beta+.
-- `docs/adr/` — Architecture Decision Records directory with template and ADR-001 through ADR-009:
+- `docs/adr/` — Architecture Decision Records directory with template and ADR-001 through ADR-013:
   - ADR-001: Archimedean spiral 1D mapping rationale
   - ADR-002: H2/SQLite over flat-file cache for spatial memory persistence
   - ADR-003: rtp-plugin as a separate bridge module from rtp-core
@@ -37,7 +53,6 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   - ADR-013: Addons as external Gradle projects — extension-by-example model, independent release cadence, lean core jar
 - Module dependency graph (Mermaid diagram) added to `ARCHITECTURE.md`.
 - ADR index link added to `ARCHITECTURE.md` header.
-- `rtp fill reset` subcommand: clears a region's MemoryShape bad-sector data without starting a new fill operation.
 - Improved origin and goal references across user-facing docs: `README.md §Why RTP?` and `docs/CONCEPTS.md §Bounded Selection` now link to the [original mathematical proof](https://www.reddit.com/r/admincraft/comments/owgvzz/too_much_math/) and [ADR-001](docs/adr/ADR-001-archimedean-spiral-1d-mapping.md); `docs/CONCEPTS.md §Where to Go Next` adds the [SpigotMC resource page](https://www.spigotmc.org/resources/rtp.94812/) and the mathematical writeup link.
 - `docs/HAZARDS.md` — hazard register listing 10 known hazards (H-001 through H-010) across player, server stability, and API categories, each with severity, mitigation, and governing REQ-ID or ADR.
 - `docs/FAILURE_MODES.md` — failure mode catalog listing 9 failure modes (FM-001 through FM-009) with component, failure, effect, detection mechanism, defined response, and requirement cross-reference.
@@ -46,23 +61,18 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - `docs/TRACEABILITY.md` — REQ-RTP-S-001 through REQ-RTP-S-006 rows added; Root/System total updated from 15 to 21; overall total updated from 63 to 69.
 - Precondition, postcondition, invariant, and thread-safety Javadoc added to `RTPAPI` (class + all public methods), `ILocationGenerator` (interface + all four method overloads), and `ChunkReservation` (class-level contract block).
 
----
-
-## [3.0.0-beta] — Unreleased
-
-> ⚠️ **MAJOR version — breaking `rtp-api` changes.** See [MIGRATION.md](docs/admin/MIGRATION.md#upgrading-to-300-beta) for addon developer and operator upgrade instructions.
-
-### Added
-- `ChunkReservation` class (`rtp-api`) for explicit, `AutoCloseable` chunk ticket lifecycle management.
-- `rtp-folia` adapter: full regional-thread scheduling (`rtp-folia-v1_20_R1`, `rtp-folia-v1_21_R1`, `rtp-folia-v26_1_R1`).
-- `rtp fill reset [region]` subcommand: clears a region's MemoryShape bad-sector data without starting a new fill. Use when region geometry changes and an immediate cache rebuild is not desired.
-
 ### Changed
 - `CachedLocation` refactored to an immutable Java record (breaking change for addons that mutated fields directly).
 - `rtp-paper` adapter: PaperLib dependency removed in favour of native Paper async chunk loading APIs.
 - Platform version targets upgraded to 26.1 (Spigot, Paper, Folia).
 - `sendMessage` call-site tracking migrated to stack trace source for improved diagnostics.
 - Garbage collection improvements for expired queue entries.
+- Active task tracking refactored with `MemoryTracker` using `WeakReference` deallocation to eliminate long-lived task retention.
+- Caching logic flow updated: write-through path consolidated to remove redundant reads on queue replenishment.
+- Java target upgraded to **Java 21**; build toolchain updated accordingly.
+- Parallelism improved: independent region queues now fill concurrently without a shared lock on the global queue.
+- Java object allocation reduced on hot paths (vectors removed, primitives preferred, records used for value types).
+- `Region` class decomposed: responsibilities split to reduce file size and improve cohesion.
 
 ### Fixed
 - Chunk leak in region queue replenishment.
@@ -71,6 +81,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Duplicate task execution on queue drain.
 - Caching inconsistencies in `MemoryShape`.
 - Locational edge-case bugs in region boundary calculations.
+- Erroneous 2D coordinate check that incorrectly rejected valid surface locations.
+- Initial command execution failure on first plugin load.
+- Chunk ticket leak introduced during early `ChunkReservation` integration.
 
 ---
 
@@ -89,6 +102,5 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
-[Unreleased]: https://github.com/DailyStruggle/RTP/compare/v3.0.0-beta...HEAD
 [3.0.0-beta]: https://github.com/DailyStruggle/RTP/compare/v2.0.18...v3.0.0-beta
 [2.0.18]: https://github.com/DailyStruggle/RTP/releases/tag/v2.0.18
