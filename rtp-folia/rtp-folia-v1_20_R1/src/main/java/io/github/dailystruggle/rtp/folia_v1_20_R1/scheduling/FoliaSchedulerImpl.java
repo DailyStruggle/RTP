@@ -7,4 +7,12 @@ public class FoliaSchedulerImpl
   public FoliaSchedulerImpl(JavaPlugin plugin) {
     super(plugin);
   }
+
+  public FoliaSchedulerImpl(
+      JavaPlugin plugin,
+      io.papermc.paper.threadedregions.scheduler.RegionScheduler rs,
+      io.papermc.paper.threadedregions.scheduler.AsyncScheduler as,
+      io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler gs) {
+    super(plugin, rs, as, gs);
+  }
 }

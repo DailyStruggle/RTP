@@ -5,5 +5,50 @@ plugins {
 dependencies {
     api project(':rtp-paper:rtp-paper-common')
     compileOnly 'dev.folia:folia-api:1.20.1-R0.1-SNAPSHOT'
+    testCompileOnly 'dev.folia:folia-api:1.20.1-R0.1-SNAPSHOT'
+    testRuntimeOnly 'dev.folia:folia-api:1.20.1-R0.1-SNAPSHOT'
     compileOnly 'me.clip:placeholderapi:2.11.6'
+
+    // Checker Framework — full processor JAR needed to compile the custom checker classes
+    // (BaseTypeChecker, BaseTypeVisitor, BaseAnnotatedTypeFactory, TreeUtils, etc.).
+    // checker-qual (already in allprojects) provides only the qualifier annotations.
+    compileOnly 'org.checkerframework:checker:3.42.0'
+
+    // Checker Framework annotation processor — runs FoliaThreadChecker during javac.
+    // The processor reads @RegionThread / @AsyncThread / @GlobalRegionThread on every
+    // method and rejects cross-context direct calls that are not wrapped in a
+    // scheduler-bridge lambda.
+    annotationProcessor 'org.checkerframework:checker:3.42.0'
+
+    // ArchUnit — bytecode-level architecture rule enforcement.
+    // Runs as JUnit 5 tests; catches violations that slip past the annotation processor
+    // (e.g., generated code, reflection wrappers, or builds without the processor active).
+    testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'
+}
+
+// ---------------------------------------------------------------------------
+// Checker Framework compiler integration
+// ---------------------------------------------------------------------------
+tasks.withType(JavaCompile).configureEach {
+    // Activate only our custom checker; suppress the default NullnessChecker so that
+    // existing unannotated code does not produce a flood of unrelated warnings.
+    options.compilerArgs += [
+        // Activate only our custom checker via the Checker Framework's -Achecker flag.
+        // Using -processor directly would require FoliaThreadChecker to already be compiled
+        // and on the processor path, which is impossible when it lives in this same module.
+        // The Checker Framework's own processor (declared in checker.jar's services file)
+        // loads FoliaThreadChecker by name at runtime after javac has compiled it.
+        '-Achecker=io.github.dailystruggle.rtp.folia.thread.checker.FoliaThreadChecker',
+
+        // Tell the Checker Framework where to find the stub file that annotates
+        // Folia's scheduler APIs (RegionScheduler, AsyncScheduler, GlobalRegionScheduler).
+        '-Astubs=src/main/resources/folia-thread-stubs.astub',
+
+        // Emit a warning (not an error) for unannotated third-party library methods so
+        // that Folia API calls not covered by the stub file do not break the build.
+        '-AwarnUnneededSuppressions',
+
+        // Show the full stack trace for checker internal errors during development.
+        '-AshowCheckerFrameworkVersion'
+    ]
 }

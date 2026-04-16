@@ -21,6 +21,14 @@ import org.jetbrains.annotations.Nullable;
 
 public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys> {
   protected static final Map<String, CommandParameter> subParameters = new ConcurrentHashMap<>();
+
+  /** RNG used for the shuffled (state 4) scan order. Replaceable for deterministic testing. */
+  private Random rng = new Random();
+
+  /** Inject a seeded {@link Random} to make the shuffled scan order reproducible in tests. */
+  public void setRng(Random rng) {
+    this.rng = rng;
+  }
   protected static final List<String> keys =
       Arrays.stream(GenericMemoryShapeParams.values()).map(Enum::name).collect(Collectors.toList());
   private static final EnumMap<GenericVerticalAdjustorKeys, Object> defaults =
@@ -246,7 +254,7 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
             }
 
             // randomize order
-            Collections.shuffle(trials);
+            Collections.shuffle(trials, rng);
 
             // try each
             for (int k = 0; k < trials.size(); k++) {

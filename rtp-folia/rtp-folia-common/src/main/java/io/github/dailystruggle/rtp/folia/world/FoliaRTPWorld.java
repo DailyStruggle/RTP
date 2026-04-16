@@ -23,6 +23,8 @@ import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Biome;
 import org.jetbrains.annotations.NotNull;
+import io.github.dailystruggle.rtp.folia.thread.RegionThread;
+import io.github.dailystruggle.rtp.folia.thread.GlobalRegionThread;
 
 public final class FoliaRTPWorld extends RTPWorld<World> {
   private static final AtomicBoolean biomeException = new AtomicBoolean(false);
@@ -51,6 +53,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
 
   private final ConcurrentHashMap<Long, WeakReference<Chunk>> chunkCache = new ConcurrentHashMap<>();
 
+  @RegionThread
   public FoliaRTPWorld(World world) {
     super(world);
     if (world == null) {
@@ -74,6 +77,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
     return getBiomes.apply(world);
   }
 
+  @RegionThread
   public void cacheChunk(int x, int z, org.bukkit.Chunk chunk) {
     long key = ((long) x & 0xffffffffL | ((long) z << 32));
     chunkCache.put(key, new WeakReference<>(chunk));
@@ -90,6 +94,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   }
 
   @Override
+  @RegionThread
   public CompletableFuture<Long> getChunkAt(int cx, int cz) {
     totalChunkLoads.incrementAndGet();
     return world
@@ -103,6 +108,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   }
 
   @Override
+  @RegionThread
   public CompletableFuture<ChunkSet> getChunkAtAsync(int cx, int cz) {
     totalChunkLoads.incrementAndGet();
     return world.getChunkAtAsync(cx, cz).thenApply(chunk -> {
@@ -112,6 +118,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   }
 
   @Override
+  @GlobalRegionThread
   protected void setForceLoadedImpl(int cx, int cz, boolean forceLoad) {
     org.bukkit.plugin.Plugin plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("RTP");
     if (plugin == null || !plugin.isEnabled()) return;
@@ -131,6 +138,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   }
 
   @Override
+  @GlobalRegionThread
   public java.util.concurrent.CompletableFuture<Integer> getServerForceLoadedCount() {
     java.util.concurrent.CompletableFuture<Integer> future = new java.util.concurrent.CompletableFuture<>();
     io.github.dailystruggle.rtp.common.RTP.serverAccessor.getScheduler().runTask(() -> {
@@ -156,6 +164,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   }
 
   @Override
+  @RegionThread
   public RTPChunk<?> getCachedChunk(long key) {
     WeakReference<Chunk> ref = chunkCache.get(key);
     if (ref == null) return null;
@@ -170,6 +179,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
 
 
   @Override
+  @RegionThread
   public void keepChunkAt(int cx, int cz) {
     RTP.scheduler.runTask(this, cx, cz, () -> {
       chunkCache.put(((long) cx & 0xffffffffL | ((long) cz << 32)), new WeakReference<>(world.getChunkAt(cx, cz)));
@@ -178,6 +188,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   }
 
   @Override
+  @RegionThread
   public void forgetChunkAt(int cx, int cz) {
     RTP.scheduler.runTask(this, cx, cz, () -> {
       setForceLoaded(cx, cz, false);
@@ -186,6 +197,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   }
 
   @Override
+  @RegionThread
   public void forgetChunks() {
     // Explicitly un-force-load everything we know about before clearing
     chunkTickets.forEach((key, count) -> {
@@ -199,11 +211,13 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   }
 
   @Override
+  @RegionThread
   public String getBiome(int x, int y, int z) {
     return getBiome.apply(new Location(world, x, y, z));
   }
 
   @Override
+  @RegionThread
   public void platform(RTPLocation location) {
     try {
       ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
@@ -237,31 +251,37 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   }
 
   @Override
+  @GlobalRegionThread
   public boolean isInactive() {
     return Bukkit.getWorld(id) == null;
   }
 
   @Override
+  @GlobalRegionThread
   public void save() {
     world.save();
   }
 
   @Override
+  @RegionThread
   public int getMaxHeight() {
     return world.getMaxHeight();
   }
 
   @Override
+  @RegionThread
   public int getMinHeight() {
     return world.getMinHeight();
   }
 
   @Override
+  @RegionThread
   public int getCacheSize() {
     return chunkCache.size();
   }
 
   @Override
+  @RegionThread
   public long getSeed() {
     return world.getSeed();
   }

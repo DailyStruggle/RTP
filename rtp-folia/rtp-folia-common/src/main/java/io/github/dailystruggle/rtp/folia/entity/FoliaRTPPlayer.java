@@ -18,10 +18,12 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import io.github.dailystruggle.rtp.folia.thread.RegionThread;
 
 public final class FoliaRTPPlayer implements RTPPlayer {
   private final Player player;
 
+  @RegionThread
   public FoliaRTPPlayer(Player player) {
     this.player = player;
   }
@@ -32,21 +34,25 @@ public final class FoliaRTPPlayer implements RTPPlayer {
   }
 
   @Override
+  @RegionThread
   public boolean hasPermission(String permission) {
     return player.hasPermission(permission);
   }
 
   @Override
+  @RegionThread
   public void sendMessage(String message) {
     SendMessage.sendMessage(player, message);
   }
 
   @Override
+  @RegionThread
   public long cooldown() {
     return new FoliaRTPCommandSender(player).cooldown();
   }
 
   @Override
+  @RegionThread
   public long delay() {
     return new FoliaRTPCommandSender(player).delay();
   }
@@ -57,6 +63,7 @@ public final class FoliaRTPPlayer implements RTPPlayer {
   }
 
   @Override
+  @RegionThread
   public Set<String> getEffectivePermissions() {
     return player.getEffectivePermissions().stream()
         .map(
@@ -70,6 +77,7 @@ public final class FoliaRTPPlayer implements RTPPlayer {
   }
 
   @Override
+  @RegionThread
   public void performCommand(RTPPlayer rtpPlayer, String command) {
     OfflinePlayer player;
     if (rtpPlayer == null) player = player();
@@ -85,11 +93,13 @@ public final class FoliaRTPPlayer implements RTPPlayer {
   }
 
   @Override
+  @RegionThread
   public RTPCommandSender clone() {
     return new FoliaRTPPlayer(player);
   }
 
   @Override
+  @RegionThread
   public CompletableFuture<Boolean> setLocation(RTPLocation to) {
     World world = ((FoliaRTPWorld) to.world()).world();
 
@@ -155,6 +165,7 @@ public final class FoliaRTPPlayer implements RTPPlayer {
   }
 
   @Override
+  @RegionThread
   public RTPLocation getLocation() {
     Location location = player.getLocation();
     return new RTPLocation(
@@ -165,10 +176,12 @@ public final class FoliaRTPPlayer implements RTPPlayer {
   }
 
   @Override
+  @RegionThread
   public boolean isOnline() {
     return player.isOnline();
   }
 
+  @RegionThread
   public Player player() {
     return player;
   }

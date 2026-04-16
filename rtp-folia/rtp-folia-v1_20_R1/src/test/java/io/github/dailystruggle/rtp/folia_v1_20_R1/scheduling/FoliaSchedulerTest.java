@@ -40,7 +40,7 @@ class FoliaSchedulerTest {
     globalScheduler = org.mockito.Mockito.mock(GlobalRegionScheduler.class);
     asyncScheduler = org.mockito.Mockito.mock(AsyncScheduler.class);
     regionScheduler = org.mockito.Mockito.mock(RegionScheduler.class);
-    scheduler = new FoliaSchedulerImpl(plugin);
+    scheduler = new FoliaSchedulerImpl(plugin, regionScheduler, asyncScheduler, globalScheduler);
 
     serverAccessor = org.mockito.Mockito.mock(RTPServerAccessor.class);
     RTPTaskPipe taskPipe = org.mockito.Mockito.mock(RTPTaskPipe.class);
