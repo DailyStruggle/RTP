@@ -1,5 +1,7 @@
 ﻿# RTP — Random Teleport
 
+**Current Version:** `3.0.0-beta`
+
 A high-performance random teleportation plugin for Bukkit-derived Minecraft servers (Spigot, Paper, Folia).
 
 [![Build](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml/badge.svg)](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml)
@@ -13,13 +15,13 @@ A high-performance random teleportation plugin for Bukkit-derived Minecraft serv
 
 ## Why RTP?
 
-Most random teleport plugins work by repeatedly rolling random coordinates until they find a valid spot — a naive approach that can stall the server under load. RTP takes a different approach, rooted in a [mathematical proof](https://www.reddit.com/r/admincraft/comments/owgvzz/too_much_math/) that maps the 2D teleport region onto a 1D curve — eliminating rerolling entirely and guaranteeing uniform spatial distribution:
+Most random teleport plugins work by repeatedly rolling random coordinates until they find a valid spot, a naive approach that can stall the server under load. RTP takes a different approach, rooted in a [mathematical proof](https://www.reddit.com/r/admincraft/comments/owgvzz/too_much_math/) that maps the 2D teleport region onto a 1D curve, which eliminates rerolling entirely and guarantees uniform spatial distribution:
 
 - **Bounded algorithms, not rerolling.** Location selection runs in deterministic time (O(log n)) by preemptively subtracting known-invalid sectors from the candidate space. See the [original mathematical writeup](https://www.reddit.com/r/admincraft/comments/owgvzz/too_much_math/) and [ADR-001](docs/adr/ADR-001-archimedean-spiral-1d-mapping.md) for the full rationale.
 - **Pre-generation queue.** Safe locations are validated asynchronously *before* a player asks for one, so teleports resolve in 0–2 game ticks (≤ 100 ms) on average.
-- **Learning memory.** The plugin tracks previously invalid areas and avoids redundant recalculation across teleport selections.
+- **Spatial Memory.** The plugin maps the entire teleport region and remembers invalid areas, such as oceans, solid blocks, and claims. Use `/rtp scan` to proactively map out a region, ensuring deterministic performance and instant skips of unsafe territory.
 - **Multi-region support.** A single world can have any number of independent teleport regions, each with its own shape, distribution, permissions, and queue.
-- **Platform-aware concurrency.** Separate adapters for Spigot, Paper, and Folia ensure correct thread-safety on each server type — including Folia's region-based multithreading.
+- **Platform-aware concurrency.** Separate adapters for Spigot, Paper, and Folia ensure correct thread-safety on each server type, including Folia's region-based multithreading.
 - **Extensible API.** Addon developers can register custom shapes, vertical adjustors, and claim-check hooks without modifying the plugin.
 
 ---
@@ -31,6 +33,7 @@ Most random teleport plugins work by repeatedly rolling random coordinates until
 | Spigot | 1.20 | Baseline adapter |
 | Paper | 1.20 | Uses async chunk loading APIs |
 | Folia | 1.20 | Full regional-thread scheduling support |
+| Fabric | 1.21 | Native mod support (Experimental) |
 
 **Runtime:** Java 21+
 
@@ -38,14 +41,14 @@ Most random teleport plugins work by repeatedly rolling random coordinates until
 
 ## Features
 
-- **Shapes:** Circle, square, rectangle — each supporting flat, normal, and exponential distributions.
-- **Distributions:** Tune where players land — uniform spread, center-weighted, or ring-shaped.
+- **Shapes:** Circle, square, rectangle, each supporting flat, normal, and exponential distributions.
+- **Distributions:** Tune where players land, such as uniform spread, center-weighted, or ring-shaped.
 - **Biome filters:** Exclude specific biomes (e.g., ocean, nether_wastes) per region.
 - **Claim integration:** Works with GriefPrevention, WorldGuard, Towny, and any addon implementing the validation hook.
 - **Economy support:** Optional Vault integration to charge players per teleport.
 - **Per-region permissions:** Fine-grained permission nodes per region and per world.
 - **Runtime config reload:** Adjust region settings by command without restarting the server.
-- **Persistent state:** Region shape memory survives server restarts — no cold-start rebuild penalty.
+- **Persistent state:** Spatial memory and region shape data survive server restarts, avoiding cold-start rebuild penalties.
 
 ---
 
@@ -75,11 +78,14 @@ Custom shapes can be registered at runtime via the `rtp-api`. See the `addons/` 
 | Directory | Purpose |
 |---|---|
 | `rtp-api/` | Public API and shared models. Compile addons against this module only. |
+| `commands-api/` | Unified multi-platform command framework. |
+| `effects-api/` | Unified multi-platform visual/particle effects framework. |
 | `rtp-core/` | Platform-agnostic core logic: regions, shapes, queues, database, memory tracking. |
-| `rtp-plugin/` | Plugin entry point (`RTPBukkitPlugin`). Bridges core with the active platform adapter. |
+| `rtp-plugin/` | Plugin entry point for Bukkit platforms. Bridges core with Spigot/Paper/Folia adapters. |
 | `rtp-spigot/` | Spigot platform adapter. |
 | `rtp-paper/` | Paper platform adapter (async chunk loading). |
 | `rtp-folia/` | Folia platform adapter (regional thread scheduling). |
+| `rtp-fabric/` | Fabric platform adapter and mod entry point. |
 | `addons/` | Example addons: Iris integration, Glide, claim plugin hooks. |
 | `Python Test Scripts/` | Visualisation scripts for distribution math and geometry validation. |
 
@@ -109,6 +115,7 @@ Custom shapes can be registered at runtime via the `rtp-api`. See the `addons/` 
 | [docs/admin/HAZARDS.md](docs/admin/HAZARDS.md) | Hazard register — known failure conditions, severity ratings, and mitigations. |
 | [docs/dev/CONCEPTS.md](docs/dev/CONCEPTS.md) | Plain-language explanation of how RTP works: queue, shapes, pipeline, and platform differences. |
 | [docs/dev/ARCHITECTURE.md](docs/dev/ARCHITECTURE.md) | Module breakdown, key concepts, and navigation to design docs. |
+| [docs/dev/MULTI_PLATFORM_PLAN.md](docs/dev/MULTI_PLATFORM_PLAN.md) | Roadmap for Fabric and future multi-platform support. |
 | [docs/dev/DESIGN.md](docs/dev/DESIGN.md) | High-reliability design: queue system, bounded execution, concurrency model, fault tolerance. |
 | [docs/dev/GLOSSARY.md](docs/dev/GLOSSARY.md) | Definitions for all domain terms (pulse, region, tick, ChunkReservation, etc.). |
 | [docs/dev/REQUIREMENTS.md](docs/dev/REQUIREMENTS.md) | Functional, non-functional, and system requirements with unique IDs. Includes scope and out-of-scope. |
@@ -128,6 +135,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for build instructions, code style rules,
 New to the plugin? Start with [docs/FOR_SERVER_ADMINS.md](docs/FOR_SERVER_ADMINS.md). Want to extend it? See [docs/FOR_ADDON_DEVELOPERS.md](docs/FOR_ADDON_DEVELOPERS.md).
 
 The short version:
-1. `./gradlew build` — compile and run all tests.
-2. `./gradlew spotlessApply` — format code before pushing.
-3. If you add a requirement, add a row to `docs/dev/TRACEABILITY.md` in the same commit — CI will fail otherwise.
+1. `./gradlew build` (compile and run all tests)
+2. `./gradlew spotlessApply` (format code before pushing)
+3. If you add a requirement, add a row to `docs/dev/TRACEABILITY.md` in the same commit, as CI will fail otherwise.

@@ -14,8 +14,8 @@ dependencies {
     api('me.carleslc.Simple-YAML:Simple-Yaml:1.8.4') {
         exclude group: 'org.yaml', module: 'snakeyaml'
     }
-    implementation 'io.github.dailystruggle:CommandsAPI:1.0.0-RELEASE'
-    implementation 'io.github.dailystruggle:EffectsAPI:1.0.1-BETA01'
+    api project(':commands-api')
+    api project(':effects-api')
     // guava is provided by Spigot/Paper/Folia at runtime
     compileOnly 'com.google.guava:guava:33.2.1-jre'
     testRuntimeOnly 'com.google.guava:guava:33.2.1-jre'

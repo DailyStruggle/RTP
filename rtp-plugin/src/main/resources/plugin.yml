@@ -35,7 +35,7 @@ permissions:
   rtp.config:
     description: allow player to use /rtp config
     default: op
-  rtp.fill:
+  rtp.scan:
     description: allow player to start scan tasks
     default: op
   rtp.noDelay:
@@ -151,3 +151,4 @@ permissions:
       rtp.params: true
       rtp.biome: true
       rtp.biome.*: true
+      rtp.scan: true

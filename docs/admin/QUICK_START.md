@@ -1,5 +1,7 @@
 # Quick Start Guide
 
+**Applies to Plugin Version:** `3.0.0-beta`
+
 Get RTP running on your server in under 5 minutes.
 
 ---
@@ -8,7 +10,7 @@ Get RTP running on your server in under 5 minutes.
 
 1. Download the latest `RTP-<version>.jar` from the [SpigotMC resource page](https://www.spigotmc.org/resources/rtp.94812/).
 2. Drop the jar into your server's `plugins/` folder.
-3. Restart the server (not `/reload` — a full restart ensures all hooks register correctly).
+3. Restart the server (rather than using `/reload`), as a full restart ensures all hooks register correctly.
 
 After the first start, RTP creates its config folder at `plugins/RTP/`.
 
@@ -22,7 +24,7 @@ Run this in your server console or as an operator:
 /rtp
 ```
 
-If you land somewhere random, the plugin is working. If you see a permission error, make sure your account has `rtp.use` (operators have all permissions by default).
+If you land somewhere random, the plugin is working. If you see a permission error, make sure your account has `rtp.use`, noting that operators have all permissions by default.
 
 ---
 
@@ -37,10 +39,11 @@ plugins/RTP/regions/default.yml
 Out of the box it:
 - Targets your main world (`[0]`, which Bukkit resolves to `world`).
 - Uses a **circle** shape with a radius of **256 chunks** (~4 096 blocks).
-- Enforces a **64-chunk inner exclusion zone** (donut hole) so players don't land at spawn.
+- Enforces a **64-chunk inner exclusion zone** (or "donut hole") so players don't land at spawn.
 - Excludes ocean, nether, and end biomes.
 - Grants 5 seconds of invulnerability on landing.
 - Pre-generates a queue of safe locations in the background.
+- Spatial Memory: Maps the region to learn which coordinates are unsafe (e.g., oceans) and skips them in future searches.
 
 You can use this region as-is for most servers.
 
@@ -80,7 +83,7 @@ RTP uses a permission-based system. Assign these to your permission plugin (e.g.
 | `rtp.noCooldown` | Bypass cooldown |
 | `rtp.other` | Teleport another player (`/rtp player:<player>`) |
 | `rtp.reload` | Use `/rtp reload` |
-| `rtp.fill` | Use `/rtp fill` to pre-generate locations |
+| `rtp.scan` | Use `/rtp scan` to pre-generate locations |
 
 Example LuckPerms command to grant basic use to all players:
 
@@ -143,9 +146,9 @@ For example, to update the nether region's world after the file already exists:
 /rtp config regions nether shape.centerRadius:16
 ```
 
-Each `/rtp config` write is saved to disk immediately. Follow it with `/rtp reload` (or `/rtp reload nether`) to rebuild the region queue with the new values.
+Each `/rtp config` write is saved to disk immediately. Follow it with `/rtp reload` (or `/rtp reload nether`) to rebuild the region queue using the new values.
 
-> **Tip for automation:** Scripts, RCON clients, and addon plugins can issue `/rtp config` commands programmatically to adjust region settings on the fly — no manual file editing or server restart required. See [COMMANDS.md](COMMANDS.md) for the full syntax.
+> **Tip for automation:** Scripts, RCON clients, and addon plugins can issue `/rtp config` commands programmatically to adjust region settings on the fly, with no manual file editing or server restart required. See [COMMANDS.md](COMMANDS.md) for the full syntax.
 
 ---
 
@@ -156,7 +159,7 @@ Each `/rtp config` write is saved to disk immediately. Follow it with `/rtp relo
 | `/rtp` does nothing | Plugin failed to load | Check console for errors on startup |
 | "No safe location found" | Radius too small or all biomes excluded | Increase `radius` in the region file, or relax biome filters in `safety.yml` |
 | Economy not working | Vault not installed | Install Vault + an economy plugin and restart |
-| Teleport is slow | Cache empty on first run | Wait 30–60 seconds for the background queue to fill, or run `/rtp fill` |
+| Teleport is slow | Cache empty on first run | Wait 30–60 seconds for the background queue to fill, or run `/rtp scan` |
 | Players land in ocean | Biome filter not active | Check `safety.yml` biome blacklist includes ocean biomes |
 | Players land too close to spawn | `centerRadius` too small | Increase `centerRadius` in the region's `shape:` block |
 

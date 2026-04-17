@@ -27,31 +27,22 @@ available.
 
 ---
 
-### FM-002 — All Sectors Marked Bad (Fill Exhaustion)
+### FM-002 — All Sectors Marked Bad (Scan Exhaustion)
 **Component:** `MemoryShape`
-**Failure:** Every location in the region's bad-location map is marked invalid, leaving no
-candidate coordinates for location generation.
-**Effect:** The queue cannot be replenished. All teleport requests to this region will encounter
-FM-001 indefinitely.
-**Detection:** Fill task reports zero valid locations remaining; queue size stays at zero after a
-full replenishment cycle.
-**Response:** The plugin logs an ERROR with the region name. The operator must either reconfigure
-the region geometry to include valid land, clear the bad-location map via `/rtp fill reset`, or
-disable the region.
+**Failure:** Every coordinate in the region's spatial memory is marked invalid, leaving no candidate coordinates for location generation.
+**Effect:** The queue cannot be replenished. All teleport requests to this region will encounter FM-001 indefinitely.
+**Detection:** Scan task reports zero valid locations remaining; spatial memory remains empty after a full mapping cycle.
+**Response:** The plugin logs an ERROR with the region name. The operator must either reconfigure the region geometry to include valid land, clear the spatial memory via `/rtp scan reset`, or disable the region.
 **Requirement:** `REQ-RTP-S-004`
 
 ---
 
 ### FM-003 — Location Fails Safety Check After Dequeue
 **Component:** Safety check layer (runtime re-validation)
-**Failure:** A pre-generated location passes initial validation at fill time but fails a
-re-validation check at teleport time (e.g. a claim was placed over it since generation).
-**Effect:** The candidate location is discarded; the teleport does not proceed with an unsafe
-destination.
+**Failure:** A pre-generated location passes initial validation at scan time but fails a re-validation check at teleport time (e.g. a claim was placed over it since generation).
+**Effect:** The candidate location is discarded; the teleport does not proceed with an unsafe destination.
 **Detection:** Runtime safety check returns false during final dispatch.
-**Response:** The location is marked as a bad location in `MemoryShape` and removed from the queue. The system
-attempts to serve the next queued location if one is available; otherwise FM-001 behaviour
-applies. The player is notified.
+**Response:** The location is marked as invalid in spatial memory and removed from the queue. The system attempts to serve the next queued location if one is available; otherwise FM-001 behaviour applies. The player is notified.
 **Requirement:** `REQ-RTP-S-001`, `REQ-RTP-S-003`
 
 ---
@@ -61,8 +52,8 @@ applies. The player is notified.
 ### FM-004 — Pipeline Task Exceeds Lifespan (Watchdog Trigger)
 **Component:** `MemoryTracker`
 **Failure:** A `TeleportPipelineTask` registered with `MemoryTracker` is not completed within
-its configured maximum lifespan, indicating an abandoned or stalled pipeline.
-**Effect:** Without intervention the stalled task holds any chunk tickets it has acquired,
+its configured maximum lifespan, which indicates an abandoned or stalled pipeline.
+**Effect:** Without intervention, the stalled task holds any chunk tickets it has acquired,
 preventing them from being released (see H-004 in [`HAZARDS.md`](HAZARDS.md)).
 **Detection:** `MemoryTracker.runDiagnostics()` fires on schedule and finds a tracked pipeline
 task alive past its expected lifespan.
@@ -77,13 +68,13 @@ The entry is then removed from the tracker to prevent repeated alerts for the sa
 
 ### FM-005 — Chunk Load Timeout
 **Component:** Platform adapter (`rtp-paper`, `rtp-folia`, `rtp-spigot`)
-**Failure:** An async chunk load request does not complete within the expected window (e.g.
-the server is under extreme I/O load).
-**Effect:** The validation task stalls; the queue slot is not filled.
+**Failure:** An async chunk load request does not complete within the expected window, such as
+when the server is under extreme I/O load.
+**Effect:** The validation task stalls and the queue slot is not filled.
 **Detection:** `CompletableFuture` for the chunk load does not complete before the task's
 scheduled window expires; `MemoryTracker` detects the stalled pipeline task (FM-004 path).
-**Response:** The stalled task is cancelled and rescheduled for cleanup by FM-004 handling. The
-location is not marked as a bad location (it was not evaluated); the fill task retries it in the next cycle.
+**Response:** The stalled task is cancelled and rescheduled for cleanup by FM-004 handling. Since the
+location was not evaluated, it is not marked as invalid, and the scan task will retry it in the next cycle.
 **Requirement:** `REQ-RTP-S-002`, `REQ-RTP-F-008`
 
 ---
@@ -91,15 +82,11 @@ location is not marked as a bad location (it was not evaluated); the fill task r
 ## Persistent State
 
 ### FM-006 — Database Unreadable on Startup
-**Component:** H2 / SQLite bad-location store
-**Failure:** The spatial memory database file is corrupt or incompatible after an unclean
-shutdown or manual file modification.
-**Effect:** The bad-location map cannot be loaded; the plugin cannot resume from prior state.
+**Component:** H2 / SQLite spatial memory store
+**Failure:** The spatial memory database file is corrupt or incompatible after an unclean shutdown or manual file modification.
+**Effect:** The spatial memory cannot be loaded; the plugin cannot resume from prior state.
 **Detection:** Exception thrown during database open or schema migration at `onEnable`.
-**Response:** The plugin logs a WARN-level message identifying the database file and the
-exception. The bad-location map is initialised empty (as if no fill has been run). The plugin
-continues to operate; a new fill operation will rebuild the map. The corrupt file is not
-deleted automatically — the operator may inspect it.
+**Response:** The plugin logs a WARN-level message identifying the database file and the exception. The spatial memory is initialised empty, as if no scan has been run. The plugin continues to operate, and a new scan operation will rebuild the map. The corrupt file is not deleted automatically, allowing the operator to inspect it.
 **Requirement:** `REQ-RTP-NF-001`
 
 ---
@@ -141,9 +128,7 @@ correct platform adapter jar is installed for the running server version and con
 **Effect:** `IllegalStateException` is thrown inside the addon's `onEnable`, disabling the addon.
 **Detection:** Null-check on the static delegate inside `RTPAPI.addShape()` /
 `RTPAPI.addVerticalAdjustor()`.
-**Response:** `RTPAPI` throws `IllegalStateException("[RTP API] Cannot add shape: Core
-implementation is not loaded.")`. The server console identifies the offending addon. The addon
-developer should declare RTP as a hard `depend` (not `softdepend`) in their `plugin.yml`.
+**Response:** `RTPAPI` throws `IllegalStateException("[RTP API] Cannot add shape: Core implementation is not loaded.")`. The server console identifies the offending addon, and the addon developer should declare RTP as a hard `depend` (not `softdepend`) in their `plugin.yml`.
 **Requirement:** `REQ-RTP-S-006`
 
 ---

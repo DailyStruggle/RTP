@@ -1,5 +1,7 @@
 # Start Here — Addon Developers
 
+**Current Plugin Version:** `3.0.0-beta`
+
 This page guides third-party plugin developers who extend RTP using the `rtp-api` module.
 If you are implementing a custom shape, vertical adjustor, biome filter, or claim-check hook, start here.
 

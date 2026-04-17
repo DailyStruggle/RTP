@@ -1,0 +1,5 @@
+dependencies {
+    implementation project(':commands-api')
+    compileOnly 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
+    implementation 'org.jetbrains:annotations:24.1.0'
+}

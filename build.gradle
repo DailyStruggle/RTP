@@ -28,6 +28,7 @@ allprojects {
         maven { url 'https://repo.extendedclip.com/content/repositories/placeholderapi/' }
         maven { url 'https://jitpack.io' }
         maven { url 'https://repo.codemc.io/repository/maven-public/' }
+        maven { url 'https://maven.fabricmc.net/' }
     }
 }
 
@@ -75,5 +76,6 @@ subprojects {
         filesMatching("plugin.yml") {
             expand "version": project.version
         }
+        duplicatesStrategy = DuplicatesStrategy.INCLUDE
     }
 }

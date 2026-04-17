@@ -27,6 +27,9 @@ Six architectural shifts define this release:
 
 6. **`ChunkReservation` lifecycle management** — `AutoCloseable` abstraction centralises chunk ticket tracking and eliminates the 2.x ticket leak (ADR-012).
 
+7. **Renamed `fill` to `scan`** — `rtp.fill` permission and `/rtp fill` command have been renamed to `rtp.scan` and `/rtp scan` for clarity and consistency with the scanning nature of the task.
+8. **Multi-platform expansion** — transition to a true multi-platform project with the introduction of the `rtp-fabric` adapter and the consolidation of `commands-api` and `effects-api` as sub-modules.
+
 For the detailed bullet-level changes see the sections below. For the rationale behind each decision see [`docs/adr/`](docs/adr/README.md).
 
 ---
@@ -51,7 +54,7 @@ For the detailed bullet-level changes see the sections below. For the rationale 
   - `rtp-folia`: `rtp-folia-common`, `rtp-folia-v1_20_R1`, `rtp-folia-v1_21_R1`, `rtp-folia-v26_1_R1` — full regional-thread scheduling
   - `rtp-paper`: `rtp-paper-common`, `rtp-paper-v1_20_R1`, `rtp-paper-v1_21_R1`, `rtp-paper-v26_1_R1` — native Paper async chunk loading (PaperLib removed)
   - `rtp-spigot`: `rtp-spigot-common`, `rtp-spigot-v1_20_R1`, `rtp-spigot-v1_21_R1`, `rtp-spigot-v26_1_R1` — Bukkit scheduler adapter
-- `rtp fill reset [region]` subcommand: clears a region's MemoryShape bad-sector data without starting a new fill. Use when region geometry changes and an immediate cache rebuild is not desired.
+- `rtp scan reset [region]` subcommand: clears a region's MemoryShape bad-sector data without starting a new scan. Use when region geometry changes and an immediate cache rebuild is not desired.
 - Multi-backend database layer for spatial memory persistence, replacing the flat-file cache (see ADR-002). `AbstractSQLDatabaseAccessor` provides a shared SQL foundation; concrete implementations shipped:
   - `H2DatabaseAccessor` — embedded H2 (default, zero-config)
   - `SQLiteDatabaseAccessor` — embedded SQLite (lightweight alternative)
@@ -60,19 +63,22 @@ For the detailed bullet-level changes see the sections below. For the rationale 
   - `RedisManager` — Redis-backed caching layer
   - `YamlFileDatabase` — YAML flat-file fallback for environments where a database is unavailable
   > ⚠️ MySQL, PostgreSQL, Redis, and YAML backends are present in the codebase but not yet fully validated for production use. Operators are advised to use H2 or SQLite until these backends are marked stable.
-- Fill task optimization: configurable step distance for spiral traversal, reducing redundant sector checks during region pre-generation.
+- Scan task optimization: configurable step distance for spiral traversal, reducing redundant sector checks during region pre-generation.
 - Spatial resolution tuning and `badSum` reduction: finer-grained sector scoring lowers the rate of false-bad-sector classifications.
 - `LockFreeLocationBuffer` class: pre-computed, lock-free location pool decoupling chunk selection from teleport dispatch.
-- State-based task system: fill and teleport tasks now progress through explicit states, enabling clean pause/resume and cancellation.
+- State-based task system: scan and teleport tasks now progress through explicit states, enabling clean pause/resume and cancellation.
 - Per-region Folia rate limiting: regional threads are throttled independently to prevent scheduler starvation on high-region servers.
 - Platform-specific scheduling pipelines: Spigot, Paper, and Folia each use a dedicated pipeline rather than a shared fallback path.
-- Performance tracker: lightweight per-operation timing instrumentation for fill and teleport hot paths.
+- Performance tracker: lightweight per-operation timing instrumentation for scan and teleport hot paths.
 - `RegionCacheTask` async callbacks (`processResult` and chunk-loading completion) now report their CPU time to `PerformanceTracker`, so caching task computational cost is included in `pluginMSPT`.
 - Chunk-loading wall-clock time is used as a rough proxy for chunk-load cost in `pluginMSPT`: `chunkLoadStart` is captured immediately before `chunkSet.complete().thenAccept(...)` and the elapsed nanoseconds are added to `PerformanceTracker` when the future resolves, giving a conservative upper-bound estimate for chunk I/O attributed to the plugin.
 - Coordinate pair represented as a Java record, reducing allocation on the hot path.
 - Integration test suite covering command execution, queue drain, and config reload scenarios.
 - Requirement documentation (`docs/dev/REQUIREMENTS.md`) introduced with full REQ-ID coverage.
 - `SECURITY.md` — private vulnerability disclosure policy and response timeline.
+- `docs/dev/MULTI_PLATFORM_PLAN.md` — roadmap for Fabric and future multi-platform support.
+- `commands-api` and `effects-api` integrated as local sub-modules to simplify cross-platform development.
+- `rtp-fabric` module introduced for native Fabric mod support.
 - `CHANGELOG.md` — this file.
 - `docs/dev/TRACEABILITY.md` — full requirements-to-code traceability matrix (63 REQ-IDs).
 - `docs/dev/GLOSSARY.md` — 40+ domain term definitions for contributors and addon developers.

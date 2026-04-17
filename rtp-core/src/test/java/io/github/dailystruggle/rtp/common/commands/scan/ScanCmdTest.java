@@ -153,12 +153,12 @@ public class ScanCmdTest {
     // -------------------------------------------------------------------------
 
     @Test
-    void scanCmd_name_isFill() {
+    void scanCmd_name_isScan() {
         assertEquals("scan", scanCmd.name());
     }
 
     @Test
-    void scanCmd_permission_isRtpFill() {
+    void scanCmd_permission_isRtpScan() {
         assertEquals("rtp.scan", scanCmd.permission());
     }
 
@@ -189,7 +189,7 @@ public class ScanCmdTest {
     }
 
     @Test
-    void scanStartCmd_permission_isRtpFill() {
+    void scanStartCmd_permission_isRtpScan() {
         assertEquals("rtp.scan", scanStartCmd.permission());
     }
 
@@ -288,10 +288,10 @@ public class ScanCmdTest {
     }
 
     @Test
-    void scanPauseCmd_getRegions_withNullParam_nonPlayer_returnsAllRegions() {
+    void scanPauseCmd_getRegions_withNullParam_nonPlayer_returnsDefaultRegion() {
         List<Region> regions = scanPauseCmd.getRegions(senderId, null);
-        assertFalse(regions.isEmpty());
-        assertTrue(regions.stream().anyMatch(r -> r.name.equals("default")));
+        assertEquals(1, regions.size());
+        assertEquals("default", regions.get(0).name);
     }
 
     @Test
@@ -365,20 +365,20 @@ public class ScanCmdTest {
     }
 
     @Test
-    void scanCancelCmd_onCommand_cleansUpFillFile() {
+    void scanCancelCmd_onCommand_cleansUpScanFile() {
         // Create a scan file to verify deletion
         java.io.File dir = new java.io.File(tempDir.toFile(), "database" + java.io.File.separator + "regionData");
         dir.mkdirs();
-        java.io.File fillFile = new java.io.File(dir, "default.scan");
-        try { fillFile.createNewFile(); } catch (java.io.IOException ignored) {}
-        assertTrue(fillFile.exists(), "scan file should exist before cancel");
+        java.io.File scanFile = new java.io.File(dir, "default.scan");
+        try { scanFile.createNewFile(); } catch (java.io.IOException ignored) {}
+        assertTrue(scanFile.exists(), "scan file should exist before cancel");
 
         ScanTask task = makeFakeTask();
         RTP.getInstance().scanTasks.put("default", task);
 
         scanCancelCmd.onCommand(senderId, params(), null);
 
-        assertFalse(fillFile.exists(), "ScanCancelCmd should delete the .scan progress file");
+        assertFalse(scanFile.exists(), "ScanCancelCmd should delete the .scan progress file");
     }
 
     @Test
@@ -402,10 +402,10 @@ public class ScanCmdTest {
     }
 
     @Test
-    void scanCancelCmd_getRegions_withNullParam_nonPlayer_returnsAllRegions() {
+    void scanCancelCmd_getRegions_withNullParam_nonPlayer_returnsDefaultRegion() {
         List<Region> regions = scanCancelCmd.getRegions(senderId, null);
-        assertFalse(regions.isEmpty());
-        assertTrue(regions.stream().anyMatch(r -> r.name.equals("default")));
+        assertEquals(1, regions.size());
+        assertEquals("default", regions.get(0).name);
     }
 
     @Test
@@ -477,10 +477,10 @@ public class ScanCmdTest {
     }
 
     @Test
-    void scanResumeCmd_getRegions_withNullParam_nonPlayer_returnsAllRegions() {
+    void scanResumeCmd_getRegions_withNullParam_nonPlayer_returnsDefaultRegion() {
         List<Region> regions = scanResumeCmd.getRegions(senderId, null);
-        assertFalse(regions.isEmpty());
-        assertTrue(regions.stream().anyMatch(r -> r.name.equals("default")));
+        assertEquals(1, regions.size());
+        assertEquals("default", regions.get(0).name);
     }
 
     @Test
@@ -555,23 +555,23 @@ public class ScanCmdTest {
     }
 
     @Test
-    void scanResetCmd_onCommand_deletesFillProgressFile() {
+    void scanResetCmd_onCommand_deletesScanProgressFile() {
         java.io.File dir = new java.io.File(tempDir.toFile(), "database" + java.io.File.separator + "regionData");
         dir.mkdirs();
-        java.io.File fillFile = new java.io.File(dir, "default.scan");
-        try { fillFile.createNewFile(); } catch (java.io.IOException ignored) {}
-        assertTrue(fillFile.exists());
+        java.io.File scanFile = new java.io.File(dir, "default.scan");
+        try { scanFile.createNewFile(); } catch (java.io.IOException ignored) {}
+        assertTrue(scanFile.exists());
 
         scanResetCmd.onCommand(senderId, params(), null);
 
-        assertFalse(fillFile.exists(), "ScanResetCmd should delete the .scan progress file");
+        assertFalse(scanFile.exists(), "ScanResetCmd should delete the .scan progress file");
     }
 
     @Test
-    void scanResetCmd_getRegions_withNullParam_nonPlayer_returnsAllRegions() {
+    void scanResetCmd_getRegions_withNullParam_nonPlayer_returnsDefaultRegion() {
         List<Region> regions = scanResetCmd.getRegions(senderId, null);
-        assertFalse(regions.isEmpty());
-        assertTrue(regions.stream().anyMatch(r -> r.name.equals("default")));
+        assertEquals(1, regions.size());
+        assertEquals("default", regions.get(0).name);
     }
 
     @Test
@@ -652,7 +652,7 @@ public class ScanCmdTest {
     // -------------------------------------------------------------------------
 
     @Test
-    void scanSubCmd_permission_isRtpFill() {
+    void scanSubCmd_permission_isRtpScan() {
         assertEquals("rtp.scan", scanStartCmd.permission());
         assertEquals("rtp.scan", scanPauseCmd.permission());
         assertEquals("rtp.scan", scanCancelCmd.permission());
@@ -729,7 +729,7 @@ public class ScanCmdTest {
         scanPauseCmd.onCommand(senderId, params(), null);
 
         assertFalse(accessor.announcedMessages.isEmpty(),
-                "scanNotRunning message should be announced to operators with rtp.scan permission");
+                "scanNotRunning message should be announced (defaults to 'default' region)");
     }
 
     @Test
@@ -739,7 +739,7 @@ public class ScanCmdTest {
         scanCancelCmd.onCommand(senderId, params(), null);
 
         assertFalse(accessor.announcedMessages.isEmpty(),
-                "scanNotRunning message should be announced to operators with rtp.scan permission");
+                "scanNotRunning message should be announced (defaults to 'default' region)");
     }
 
     @Test
@@ -756,8 +756,10 @@ public class ScanCmdTest {
         task1.pause.set(true);
         RTP.getInstance().scanTasks.put("default", task1);
 
-        // No region param → console sender resolves all regions
-        scanResumeCmd.onCommand(senderId, params(), null);
+        // Explicit multi-region param to cover both regions
+        Map<String, List<String>> p = new HashMap<>();
+        p.put("region", Arrays.asList("default", "region2"));
+        scanResumeCmd.onCommand(senderId, p, null);
 
         // task1 must have been unpaused (resumed), not skipped or replaced
         assertFalse(task1.pause.get(), "existing task should be resumed (pause flag set to false)");
@@ -767,26 +769,15 @@ public class ScanCmdTest {
     }
 
     @Test
-    void scanResumeCmd_withMixedTasks_doesNotAnnounceResumeForMissingTask() {
-        Square square2 = new Square();
-        LinearAdjustor vert2 = new LinearAdjustor(new ArrayList<>());
-        RegionSettings settings2 = new RegionSettings(
-                "region2", world, square2, vert2, false, false, 10L, 5, 0.0, 1L, "", false);
-        Region region2 = new Region("region2", settings2);
-        RTP.selectionAPI.permRegionLookup.put("region2", region2);
-
-        // "default" paused; "region2" no task
+    void scanResumeCmd_noRegionParam_defaultsToDefaultRegion() {
+        // "default" has a paused task; no region param → should resume "default"
         ScanTask task1 = makeFakeTask();
         task1.pause.set(true);
         RTP.getInstance().scanTasks.put("default", task1);
 
-        accessor.announcedMessages.clear();
         scanResumeCmd.onCommand(senderId, params(), null);
 
-        // task1 must have been unpaused — proof that the existing task was resumed,
-        // not skipped (which would happen if scanStartCmd re-processed all regions
-        // and took the "scan already running" branch without resuming it)
         assertFalse(task1.pause.get(),
-                "original task must have been unpaused, not skipped by all-region re-processing");
+                "no-param resume should default to 'default' region and unpause its task");
     }
 }

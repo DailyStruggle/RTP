@@ -1,0 +1,28 @@
+name: EffectsAPI
+version: ${version}
+main: io.github.dailystruggle.effectsapi.EffectsAPI
+api-version: 1.13
+authors: [ leaf26 ]
+description: common effects code between some plugins, more easily referenced
+website: https://github.com/DailyStruggle
+
+commands:
+  effectsapi:
+    description: "main command"
+    permission: "effectsapi.see"
+    usage: |
+      /effectsapi
+
+permissions:
+  effectsapi.*:
+    description: "do all the stuff"
+    default: op
+    children:
+      effectsapi.see: true
+      effectsapi.test: true
+  effectsapi.see:
+    description: "see commands"
+    default: op
+  effectsapi.test:
+    description: "test effects"
+    default: op

@@ -33,7 +33,7 @@ public abstract class ScanSubCmd extends BaseRTPCmdImpl {
       if (sender instanceof RTPPlayer)
         regions.add(RTP.selectionAPI.getRegion((RTPPlayer) sender));
       else
-        regions.addAll(RTP.selectionAPI.permRegionLookup.values());
+        regions.add(RTP.selectionAPI.getRegion("default"));
     }
     return regions;
   }

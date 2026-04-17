@@ -1,5 +1,7 @@
 # Command Reference
 
+**Applies to Plugin Version:** `3.0.0-beta`
+
 All RTP commands are subcommands of `/rtp`. Parameters are passed in `key:value` format and can be combined freely unless noted otherwise. Tab-completion is available for all parameters and reflects live server state.
 
 ---
@@ -45,7 +47,7 @@ Initiates a random teleportation sequence for the executing player (or a named t
 /rtp worldBorderOverride:true
 ```
 
-> **Threading note:** Permission, cooldown, and duplicate-processing guards run synchronously. The `TeleportPipelineTask` is always dispatched via the async scheduler. Synchronous execution only occurs when all three conditions hold simultaneously: `PerformanceKeys.syncLoading=true`, a cached location already exists for the player, and the teleport delay is ≤ 0.
+> **Threading note:** Permission, cooldown, and duplicate-processing guards run synchronously. The `TeleportPipelineTask` is always dispatched via the async scheduler. Synchronous execution only occurs when a pre-cached (globally queued) location is available for the player **and** the teleport delay is ≤ 0. In that case `syncLoading` is implicitly treated as `true` because no chunk loading is required — the cached location is used directly without any I/O.
 
 ---
 
@@ -109,9 +111,12 @@ Dynamically reads and writes individual keys in any loaded configuration file. O
 
 ---
 
-## `/rtp scan` — Pre-generate Location Cache
+## `/rtp scan` — Map the Teleport Region (Spatial Memory)
 
-Pre-computes and caches every valid teleport destination for a region by iterating its full shape space asynchronously. This warms the location queue so that player teleports consume cached entries instead of performing fresh async searches. A bare `/rtp scan` (no sub-command) behaves identically to `/rtp scan resume`.
+Iterates through every possible coordinate in a region's shape to identify and record safe vs. unsafe areas. This populates the "spatial memory" database so that the plugin knows where it can and cannot teleport players before it even tries. A bare `/rtp scan` (no sub-command) behaves identically to `/rtp scan resume`.
+
+**Actual Purpose:**
+The `scan` command is used to proactively map out the world. While the standard teleport logic finds locations on-the-fly, a `scan` performs a comprehensive sweep of the entire region. It stores known-bad locations (oceans, solid blocks, claimed land) in spatial memory so that all future teleport selections, whether from the cache or a fresh search, can instantly skip these areas.
 
 **Required permission:** `rtp.scan`  
 **Target region resolution:** If `region` is omitted and the caller is a player, the player's current region is used. If the caller is the console, all permanent regions are targeted.
@@ -122,7 +127,7 @@ Pre-computes and caches every valid teleport destination for a region by iterati
 
 ### `/rtp scan start`
 
-Clears any existing cached data for the region and begins a fresh full-space enumeration from position 0.
+Discards any existing spatial memory for the region and begins a full-space enumeration from the first coordinate. Use this when you have radically changed your `safety.yml` or added new protection plugins and want to re-verify the entire world.
 
 **Syntax**
 ```
@@ -146,7 +151,7 @@ Clears any existing cached data for the region and begins a fresh full-space enu
 
 ### `/rtp scan reset`
 
-Clears all cached location data for a region without starting a new scan pass. Use this when you have changed region geometry and want a clean slate before deciding whether to rebuild the cache.
+Clears all spatial memory and cached locations for a region without starting a new scan pass. This effectively "forgets" everything the plugin knows about safe/unsafe spots in that region.
 
 **Syntax**
 ```
@@ -261,7 +266,7 @@ Displays a clickable, permission-filtered list of all available `/rtp` sub-comma
 
 **Required permission:** `rtp.see`
 
-Each displayed line is a clickable chat message — clicking it runs `/rtp <subcommand>`.
+Each displayed line is a clickable chat message; clicking it runs `/rtp <subcommand>`.
 
 ---
 
