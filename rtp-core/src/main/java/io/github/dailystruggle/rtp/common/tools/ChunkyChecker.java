@@ -19,7 +19,7 @@ public class ChunkyChecker {
   /** Default constructor for ChunkyChecker */
   private ChunkyChecker() {}
 
-  /** getPAPI - function to if PAPI exists and fill the above object reference accordingly */
+  /** getPAPI - function to if PAPI exists and scan the above object reference accordingly */
   private static void getChunky() {
     try {
       chunky = ChunkyProvider.get();

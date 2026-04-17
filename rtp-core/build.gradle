@@ -24,12 +24,12 @@ dependencies {
     // bundled JAR.  Servers that need PostgreSQL supply the driver independently.
     compileOnly 'org.postgresql:postgresql:42.7.2'
     testRuntimeOnly 'org.postgresql:postgresql:42.7.2'
-    implementation 'com.h2database:h2:2.2.224'
+    testRuntimeOnly 'com.h2database:h2:2.2.224'
     compileOnly 'org.jetbrains:annotations:24.1.0'
     testFixturesCompileOnly 'org.jetbrains:annotations:24.1.0'
     compileOnly 'org.popcraft:chunky-common:1.3.111'
     testImplementation 'org.popcraft:chunky-common:1.3.111'
-    testRuntimeOnly 'org.xerial:sqlite-jdbc:3.45.1.0'
+    implementation 'org.xerial:sqlite-jdbc:3.45.1.0'
     testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'
 }
 

@@ -89,7 +89,7 @@ public class RTPArchitectureTest {
      *       called only on the shutdown path after the producing threads have been
      *       signalled to stop; the future is guaranteed to complete within the shutdown
      *       timeout window.</li>
-     *   <li><b>FillTask</b> – {@code .join()} at line 572 inside {@code testPos()}, which
+     *   <li><b>ScanTask</b> – {@code .join()} at line 572 inside {@code testPos()}, which
      *       runs on an async worker thread (never the main thread); the future wraps a
      *       synchronous chunk-presence check that completes immediately on the adapter.</li>
      *   <li><b>TeleportPipelineTask</b> – {@code .join()} at line 188 in {@code runSetup()},
@@ -111,7 +111,7 @@ public class RTPArchitectureTest {
                     .and().haveSimpleNameNotContaining("LocationGenerator")
                     .and().haveSimpleNameNotContaining("RegionCacheTask")
                     .and().haveSimpleNameNotContaining("RegionQueueManager")
-                    .and().haveSimpleNameNotContaining("FillTask")
+                    .and().haveSimpleNameNotContaining("ScanTask")
                     .and().haveSimpleNameNotContaining("TeleportPipelineTask")
                     .and().haveSimpleNameNotContaining("MemoryTracker")
                     .and().haveSimpleNameNotContaining("PlaceholderProvider")

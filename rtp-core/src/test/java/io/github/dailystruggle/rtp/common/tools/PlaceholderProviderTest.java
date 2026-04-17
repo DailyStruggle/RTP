@@ -319,8 +319,8 @@ class PlaceholderProviderTest {
     @ParameterizedTest
     @ValueSource(strings = {"delay", "cooldown", "remainingCooldown", "queueLocation",
         "teleports", "mspt", "attempts", "processingTime", "spot",
-        "player", "player_name", "player_status", "fill_chunks", "fill_totalChunks",
-        "fill_cps", "fill_regions", "fill_eta", "world", "name", "region",
+        "player", "player_name", "player_status", "scan_chunks", "scan_totalChunks",
+        "scan_cps", "scan_regions", "scan_eta", "world", "name", "region",
         "requirePermission", "override", "pluginForced", "serverForced",
         "shape", "cacheCap", "cached", "keptCache", "locationQueue",
         "inFlightCalculations", "worldBorderOverride",

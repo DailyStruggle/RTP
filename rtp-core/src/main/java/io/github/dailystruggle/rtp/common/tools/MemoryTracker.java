@@ -231,12 +231,17 @@ public class MemoryTracker {
                     new Object[] { discrepancy, String.format("%.4f", leakRate) });
           }
 
+          // Build a per-world map of keep-alive chunk keys across all regions
+          java.util.Map<RTPWorld<?>, java.util.Set<Long>> keepAliveByWorld = new java.util.HashMap<>();
+
           for (Region sweepRegion : allRegions) {
             // Gate the sweep to prevent race conditions with asynchronous location generation
             if (sweepRegion.inFlightCalculations.get() > 0) continue;
 
-            // Store Long chunk keys instead of RTPCoords objects
-            java.util.Set<Long> keepAliveKeys = new java.util.HashSet<>();
+            RTPWorld<?> sweepWorld = sweepRegion.getWorld();
+            if (sweepWorld == null) continue;
+
+            java.util.Set<Long> keepAliveKeys = keepAliveByWorld.computeIfAbsent(sweepWorld, w -> new java.util.HashSet<>());
 
             // 1. Map public fast queue coordinates
             int keptSize = sweepRegion.queueManager.keptLocations.size();
@@ -258,9 +263,11 @@ public class MemoryTracker {
                 keepAliveKeys.add(data.selectedCoords.getChunkKey());
               }
             }
+          }
 
-            // 4. Audit locAssChunks and forcefully close unmapped reservations
-            // (Tracking removed)
+          // 4. For each world, release any active chunk tickets not in the keep-alive set
+          for (java.util.Map.Entry<RTPWorld<?>, java.util.Set<Long>> entry : keepAliveByWorld.entrySet()) {
+            entry.getKey().releaseOrphanedTickets(entry.getValue());
           }
         }
       });

@@ -1,4 +1,4 @@
-package io.github.dailystruggle.rtp.common.commands.fill;
+package io.github.dailystruggle.rtp.common.commands.scan;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
@@ -8,28 +8,28 @@ import java.util.Map;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
-public class FillCmd extends BaseRTPCmdImpl {
-  FillResumeCmd fillResumeCmd = new FillResumeCmd(this);
+public class ScanCmd extends BaseRTPCmdImpl {
+  ScanResumeCmd scanResumeCmd = new ScanResumeCmd(this);
 
-  public FillCmd(@Nullable CommandsAPICommand parent) {
+  public ScanCmd(@Nullable CommandsAPICommand parent) {
     super(parent);
-    addSubCommand(new FillStartCmd(this));
-    addSubCommand(new FillResetCmd(this));
-    addSubCommand(new FillPauseCmd(this));
-    addSubCommand(fillResumeCmd);
-    addSubCommand(new FillCancelCmd(this));
+    addSubCommand(new ScanStartCmd(this));
+    addSubCommand(new ScanResetCmd(this));
+    addSubCommand(new ScanPauseCmd(this));
+    addSubCommand(scanResumeCmd);
+    addSubCommand(new ScanCancelCmd(this));
     addParameter(
-        "region", new RegionParameter("rtp.fill", "fill a specific region", (uuid, s) -> true));
+        "region", new RegionParameter("rtp.scan", "scan a specific region", (uuid, s) -> true));
   }
 
   @Override
   public String name() {
-    return "fill";
+    return "scan";
   }
 
   @Override
   public String permission() {
-    return "rtp.fill";
+    return "rtp.scan";
   }
 
   @Override
@@ -42,6 +42,6 @@ public class FillCmd extends BaseRTPCmdImpl {
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
 
-    return fillResumeCmd.onCommand(callerId, parameterValues, null);
+    return scanResumeCmd.onCommand(callerId, parameterValues, null);
   }
 }

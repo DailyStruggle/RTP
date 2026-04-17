@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.spigot.server;
 
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.tasks.FillTask;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -24,8 +23,14 @@ public class DatabaseProcessing extends BukkitRunnable {
     asyncTask.set(null);
   }
 
+  public static void start(JavaPlugin plugin) {
+    killed.set(false);
+    clear();
+    new DatabaseProcessing(plugin)
+        .runTaskTimerAsynchronously(plugin, 100L, 100L);
+  }
+
   public static void kill() {
-    FillTask.kill();
     clear();
     killed.set(true);
   }

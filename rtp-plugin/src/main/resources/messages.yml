@@ -15,6 +15,9 @@ placeholders:
 ################################################################################
 # when teleporting, say this
 alreadyTeleporting: "&e[P0] you're already teleporting!"
+
+# if the plugin is currently reloading
+teleportDeniedReloading: "&e[P0] teleports are temporarily disabled while the plugin reloads. Please try again shortly."
 delayMessage: "&e[P0] Teleporting in [delay]. Don't move"
 chunkLoading: "&e[P0] Loading chunks! please wait..."
 teleportMessage: "&e[P0] Teleported in [attempts] attempts, in [processingTime]"
@@ -93,18 +96,18 @@ locationSaved: "&e[P0] Successfully saved [amount] locations for [region]"
 locationLoaded: "&e[P0] Successfully loaded [amount] locations for [region]"
 
 ################################################################################
-# Section 6: Fill Command
+# Section 6: Scan Command
 ################################################################################
-# messages related to the fill command
-# placeholder: [fill_regions] - list of regions
-fillStart: "&a[P0] fill task started for regions: [fill_regions]"
-fillCancel: "&e[P0] fill task cancelled for regions: [fill_regions]"
-fillPause: "#A020F0[P0] fill task paused for regions: [fill_regions]"
-fillResume: "#10A5F5[P0] fill task resumed for regions: [fill_regions]"
-fillRunning: "&c[P0] fill task already running for regions: [fill_regions]"
-fillNotRunning: "&c[rtp] fill task not running for regions: [fill_regions]"
-# placeholder: [fill_chunks], [fill_totalChunks], [fill_cps], [fill_landPercentage], [fill_eta]
-fillStatus: "&a[P0] completed [fill_chunks] / [fill_totalChunks] chunks for regions: [fill_regions]. [fill_cps] cps. Land Percentage: [fill_landPercentage]%. ETA: [fill_eta]"
+# messages related to the scan command
+# placeholder: [scan_regions] - list of regions
+scanStart: "&a[P0] scan task started for regions: [scan_regions]"
+scanCancel: "&e[P0] scan task cancelled for regions: [scan_regions]"
+scanPause: "#A020F0[P0] scan task paused for regions: [scan_regions]"
+scanResume: "#10A5F5[P0] scan task resumed for regions: [scan_regions]"
+scanRunning: "&c[P0] scan task already running for regions: [scan_regions]"
+scanNotRunning: "&c[rtp] scan task not running for regions: [scan_regions]"
+# placeholder: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
+scanStatus: "&a[P0] completed [scan_chunks] / [scan_totalChunks] chunks for regions: [scan_regions]. [scan_cps] cps. Land Percentage: [scan_landPercentage]%. ETA: [scan_eta]"
 
 ################################################################################
 # Section 7: Info Command
@@ -150,7 +153,7 @@ regionInfo:
 rtp: "&b/rtp - teleport to a random location"
 help: "&b/rtp help - see this"
 reload: "&b/rtp reload - reload config files"
-fill: "&b/rtp fill - try all possible region placements to improve load times"
+scan: "&b/rtp scan - try all possible region placements to improve load times"
 
 ################################################################################
 # Section 9: PlaceholderAPI Support

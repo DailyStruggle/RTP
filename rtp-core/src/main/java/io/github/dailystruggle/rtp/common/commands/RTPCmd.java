@@ -54,7 +54,7 @@ public interface RTPCmd extends BaseRTPCmd {
 
   default void init() {}
 
-  // synchronous command component
+  // the server triggers onCommand - perform synchronous guards (cooldown, permissions, etc.) then enqueue work for CommandsAPI
   default boolean onCommand(
       RTPCommandSender sender, CommandsAPICommand command, String label, String[] args) {
     UUID senderId = sender.uuid();
@@ -108,6 +108,11 @@ public interface RTPCmd extends BaseRTPCmd {
       }
     }
 
+    if (RTP.reloading.get()) {
+      RTP.serverAccessor.sendMessage(senderId, MessagesKeys.teleportDeniedReloading);
+      return true;
+    }
+
     if (RTP.getInstance().processingPlayers.contains(senderId)) {
       RTP.serverAccessor.sendMessage(senderId, MessagesKeys.alreadyTeleporting);
       return true;
@@ -130,7 +135,7 @@ public interface RTPCmd extends BaseRTPCmd {
     return true;
   }
 
-  // async command component
+  // CommandsAPI puts the responsibility on the plugin to decide when and how to run compute() - called via CommandsAPI.execute() in SyncTaskProcessing
   default boolean compute(
       UUID senderId, Map<String, List<String>> rtpArgs, CommandsAPICommand nextCommand) {
     if (senderId.equals(new java.util.UUID(0, 0)) && !rtpArgs.containsKey("player")) {

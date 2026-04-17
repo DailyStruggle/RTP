@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.spigot.server;
 
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.tasks.FillTask;
+import io.github.dailystruggle.rtp.common.tasks.ScanTask;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -11,12 +11,12 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
-public class FillTaskProcessing extends BukkitRunnable {
+public class ScanTaskProcessing extends BukkitRunnable {
   private static final AtomicBoolean killed = new AtomicBoolean(false);
   private static final AtomicReference<BukkitTask> asyncTask = new AtomicReference<>(null);
   private final JavaPlugin plugin;
 
-  public FillTaskProcessing(JavaPlugin plugin) {
+  public ScanTaskProcessing(JavaPlugin plugin) {
     this.plugin = plugin;
   }
 
@@ -26,7 +26,7 @@ public class FillTaskProcessing extends BukkitRunnable {
   }
 
   public static void kill() {
-    FillTask.kill();
+    ScanTask.kill();
     clear();
     killed.set(true);
   }
@@ -43,7 +43,7 @@ public class FillTaskProcessing extends BukkitRunnable {
             .runTaskAsynchronously(
                 plugin,
                 () -> {
-                  for (Map.Entry<String, FillTask> e : RTP.getInstance().fillTasks.entrySet()) {
+                  for (Map.Entry<String, ScanTask> e : RTP.getInstance().scanTasks.entrySet()) {
                     if (e.getValue().isRunning()) continue;
                     e.getValue().run();
                   }

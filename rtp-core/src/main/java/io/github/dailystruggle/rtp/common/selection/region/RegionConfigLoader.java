@@ -122,7 +122,8 @@ public class RegionConfigLoader {
 //                System.out.println("[RTP-DEBUG] RegionLoader: [" + name + "] memory shape detected, reading location data from file...");
             }
             String worldName = (world != null) ? world.name() : "null";
-            ((MemoryShape<?>) shape).load(name + ".bin", worldName);
+            long worldSeed = (world != null) ? world.getSeed() : 0L;
+            ((MemoryShape<?>) shape).load(name + "_" + worldSeed + ".bin", worldName);
         }
 
         return new RegionSettings(

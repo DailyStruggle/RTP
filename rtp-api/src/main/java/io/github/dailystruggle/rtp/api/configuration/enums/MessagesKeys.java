@@ -18,6 +18,8 @@ public enum MessagesKeys {
   // --- Teleport lifecycle ---
   /** Sent when a player issues {@code /rtp} while a teleport is already in progress for them. */
   alreadyTeleporting,
+  /** Sent when a player issues {@code /rtp} while the plugin is reloading its configuration. */
+  teleportDeniedReloading,
   /** Sent to the player during the countdown before the teleport fires. */
   delayMessage,
   /** Sent to the player when they are successfully teleported. */
@@ -73,23 +75,23 @@ public enum MessagesKeys {
   noPerms,
   /** Sent when the specified world name does not match any loaded world. */
   invalidWorld,
-  // --- Queue fill operations ---
-  /** Sent when a {@code /rtp fill} operation begins pre-generating locations. */
-  fillStart,
-  /** Sent when the fill queue is reset (cleared). */
-  fillReset,
-  /** Sent when an in-progress fill is cancelled. */
-  fillCancel,
-  /** Sent when a fill operation is paused. */
-  fillPause,
-  /** Sent when a paused fill operation is resumed. */
-  fillResume,
-  /** Sent in response to a fill status query when a fill is currently running. */
-  fillRunning,
-  /** Sent in response to a fill status query when no fill is currently running. */
-  fillNotRunning,
-  /** Template for the fill status report line shown by {@code /rtp fill status}. */
-  fillStatus,
+  // --- Queue scan operations ---
+  /** Sent when a {@code /rtp scan} operation begins pre-generating locations. */
+  scanStart,
+  /** Sent when the scan queue is reset (cleared). */
+  scanReset,
+  /** Sent when an in-progress scan is cancelled. */
+  scanCancel,
+  /** Sent when a scan operation is paused. */
+  scanPause,
+  /** Sent when a paused scan operation is resumed. */
+  scanResume,
+  /** Sent in response to a scan status query when a scan is currently running. */
+  scanRunning,
+  /** Sent in response to a scan status query when no scan is currently running. */
+  scanNotRunning,
+  /** Template for the scan status report line shown by {@code /rtp scan status}. */
+  scanStatus,
   // --- /rtp info display ---
   /** Header title line of the {@code /rtp info} output. */
   infoTitle,
@@ -130,8 +132,8 @@ public enum MessagesKeys {
   help,
   /** Usage string for {@code /rtp reload}. */
   reload,
-  /** Usage string for {@code /rtp fill}. */
-  fill,
+  /** Usage string for {@code /rtp scan}. */
+  scan,
   // --- Player teleport state notifications ---
   /** Sent when the player's teleport slot becomes available (cooldown expired). */
   PLAYER_AVAILABLE,

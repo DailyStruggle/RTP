@@ -59,7 +59,7 @@ public class OnEventTeleports implements Listener {
     TeleportPipelineTask pipelineTask = new TeleportPipelineTask(new GenerationContext(rtpPlayer, rtpPlayer, null), RTP.selectionAPI.getRegion(rtpPlayer));
     pipelineTask.setDelay(10);
     pipelineTask.region().inFlightCalculations.incrementAndGet();
-    pipelineTask.run();
+    RTP.scheduler.runTaskAsynchronously(pipelineTask);
   }
 
   @EventHandler(priority = EventPriority.NORMAL)

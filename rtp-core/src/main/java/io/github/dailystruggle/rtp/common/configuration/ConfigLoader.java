@@ -68,8 +68,7 @@ public interface ConfigLoader {
 
     InputStream in = getResourceFromJar(resourcePath);
     if (in == null) {
-      throw new IllegalArgumentException(
-          "The embedded resource '" + resourcePath + "' cannot be found in RTP");
+      return;
     }
 
     File outFile = new File(getMainDirectory(), resourcePath);

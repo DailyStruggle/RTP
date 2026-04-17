@@ -10,7 +10,7 @@ import io.github.dailystruggle.rtp.spigot.server.AsyncTeleportProcessing;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.tasks.ChunkUnloadProcessor;
 import io.github.dailystruggle.rtp.spigot.server.DatabaseProcessing;
-import io.github.dailystruggle.rtp.spigot.server.FillTaskProcessing;
+import io.github.dailystruggle.rtp.spigot.server.ScanTaskProcessing;
 import io.github.dailystruggle.rtp.spigot.server.SyncTeleportProcessing;
 import io.github.dailystruggle.rtp.spigot.tools.SendMessage;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.ChunkyBorderChecker;
@@ -136,7 +136,6 @@ public final class RTPBukkitPlugin extends JavaPlugin {
   @Override
   public void onEnable() {
     metrics = new Metrics(this, 12277);
-    extractDocs();
 
     if (instance == null) {
       instance = this;
@@ -357,6 +356,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
 
     if (!isFolia()) {
       RTP.scheduler.runTaskTimer(new ChunkUnloadProcessor(), 1, 1);
+      DatabaseProcessing.start(this);
     }
 
     SendMessage.sendMessage(Bukkit.getConsoleSender(), "");
@@ -368,6 +368,8 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
       new PAPI_expansion().register();
     }
+
+    extractDocs();
 
   }
 
@@ -388,7 +390,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
       // catch plugin replaced, no use for old logs
     }
     try {
-      FillTaskProcessing.kill();
+      ScanTaskProcessing.kill();
     } catch (NoClassDefFoundError ignored) {
       // catch plugin replaced, no use for old logs
     }

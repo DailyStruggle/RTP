@@ -40,7 +40,7 @@ public class FoliaLocationGenerator implements ILocationGenerator {
     @AsyncThread
     public CompletableFuture<GenerationResult> generateLocation(Object region, GenerationContext context) {
         if (!(region instanceof Region r)) return CompletableFuture.completedFuture(null);
-        // generateLocation explicitly bypasses the cache (used by RegionCacheTask to fill queues)
+        // generateLocation explicitly bypasses the cache (used by RegionCacheTask to scan queues)
         return executeSearch(r, context.biomeNames());
     }
 

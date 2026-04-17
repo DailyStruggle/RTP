@@ -20,7 +20,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
-import io.github.dailystruggle.rtp.common.tasks.FillTask;
+import io.github.dailystruggle.rtp.common.tasks.ScanTask;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
@@ -35,7 +35,7 @@ import org.jetbrains.annotations.Nullable;
 public class Region extends FactoryValue<RegionKeys> {
   public static final List<BiConsumer<Region, UUID>> onPlayerQueuePush = new ArrayList<>();
   public static final List<BiConsumer<Region, UUID>> onPlayerQueuePop = new ArrayList<>();
-  private final AtomicBoolean isRefillingCache = new AtomicBoolean(false);
+  private final AtomicBoolean isScanningCache = new AtomicBoolean(false);
 
   public RegionQueueManager queueManager = new RegionQueueManager(this);
   public AtomicInteger inFlightCalculations =
@@ -80,13 +80,14 @@ public class Region extends FactoryValue<RegionKeys> {
     if (this.shape != null && this.shape instanceof MemoryShape<?> memoryShape) memoryShape.spatialResolution = settings.spatialResolution();
 
     if (this.shape instanceof MemoryShape<?>) {
-      long[] progress = FillTask.loadProgress(name);
+      long[] progress = ScanTask.loadProgress(name);
       if (progress != null) {
         long iter = progress[0];
         if (iter > 0 && iter < Double.valueOf(((MemoryShape<?>) this.shape).getRange()).longValue()) {
-          FillTask task = new FillTask(this, iter);
-          RTP.getInstance().fillTasks.put(name, task);
-          RTP.scheduler.runTaskAsynchronously(task);
+          MemoryShape<?> ms = (MemoryShape<?>) this.shape;
+          ScanTask task = new ScanTask(this, iter);
+          RTP.getInstance().scanTasks.put(name, task);
+          ms.getLoadFuture().whenComplete((v, t) -> RTP.scheduler.runTaskAsynchronously(task));
         }
       }
     }
@@ -352,8 +353,8 @@ public class Region extends FactoryValue<RegionKeys> {
     long cacheCap = settings.cacheCap();
     long totalCap = Math.max(cacheCap + activeCap, queueManager.playerQueue.size());
 
-    if (!isRefillingCache.compareAndSet(false, true)) {
-//      System.out.println("[RTP-DEBUG] Region '" + name + "' ABORT 2: isRefillingCache lock is currently held by another thread.");
+    if (!isScanningCache.compareAndSet(false, true)) {
+//      System.out.println("[RTP-DEBUG] Region '" + name + "' ABORT 2: isScanningCache lock is currently held by another thread.");
       return;
     }
 
@@ -368,7 +369,7 @@ public class Region extends FactoryValue<RegionKeys> {
 //      System.out.println("[RTP-DEBUG] Region '" + name + "' executing cachePipeline with budget: " + currentAvailable + "ns");
       cachePipeline.execute(availableTime - (System.nanoTime() - start));
     } finally {
-      isRefillingCache.set(false);
+      isScanningCache.set(false);
     }
   }
 
@@ -404,7 +405,8 @@ public class Region extends FactoryValue<RegionKeys> {
     if (world == null) return;
 
     if (shape instanceof MemoryShape<?>) {
-      ((MemoryShape<?>) shape).save(this.name + ".bin", world.name());
+      ((MemoryShape<?>) shape).flushAndRebuild(((MemoryShape<?>) shape).spatialResolution);
+      ((MemoryShape<?>) shape).save(this.name + "_" + world.getSeed() + ".bin", world.name());
       ((MemoryShape<?>) shape).exportDebugJson(this.name, world.name());
     }
 

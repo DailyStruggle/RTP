@@ -8,6 +8,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -45,16 +46,18 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   protected final java.util.concurrent.atomic.AtomicBoolean isRebuilding =
       new java.util.concurrent.atomic.AtomicBoolean(false);
   protected final java.util.concurrent.locks.ReentrantLock writeLock = new ReentrantLock();
-  protected final AtomicLong fillStride = new AtomicLong(-1L);
+  protected final AtomicLong scanStride = new AtomicLong(-1L);
+  private volatile CompletableFuture<Void> loadFuture = CompletableFuture.completedFuture(null);
   private final AtomicLong totalBadCount = new AtomicLong(0L);
   private final AtomicLong totalBiomeCount = new AtomicLong(0L);
 
-  protected volatile Set<Long> rebuildingBadLocations = null;
+  protected volatile ConcurrentHashMap<Long, Long> rebuildingBadLocations = null;
 
-  protected final java.util.concurrent.atomic.AtomicReference<Set<Long>>
+  protected final java.util.concurrent.atomic.AtomicReference<
+          java.util.concurrent.ConcurrentHashMap<Long, Long>>
       pendingBadLocations =
           new java.util.concurrent.atomic.AtomicReference<>(
-              ConcurrentHashMap.newKeySet());
+              new java.util.concurrent.ConcurrentHashMap<>());
   protected final java.util.concurrent.atomic.AtomicReference<
           java.util.concurrent.ConcurrentHashMap<
               String, java.util.concurrent.ConcurrentHashMap<Long, Long>>>
@@ -63,7 +66,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
               new java.util.concurrent.ConcurrentHashMap<>());
 
   protected final java.util.concurrent.atomic.AtomicReference<
-          java.util.concurrent.ConcurrentHashMap<String, Set<Long>>>
+          java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.ConcurrentHashMap<Long, Boolean>>>
       pendingBiomeRemovals =
           new java.util.concurrent.atomic.AtomicReference<>(
               new java.util.concurrent.ConcurrentHashMap<>());
@@ -179,10 +182,10 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @return true if known bad, false otherwise
    */
   public boolean isKnownBad(long location) {
-    if (pendingBadLocations.get().contains(location)) return true;
+    if (pendingBadLocations.get().containsKey(location)) return true;
 
-    Set<Long> rebuilding = rebuildingBadLocations;
-    if (rebuilding != null && rebuilding.contains(location)) return true;
+    ConcurrentHashMap<Long, Long> rebuilding = rebuildingBadLocations;
+    if (rebuilding != null && rebuilding.containsKey(location)) return true;
 
     long[] sums = badPrefixSumsCache;
     long[] keys = badKeysCache;
@@ -241,7 +244,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     byte[] worldBytes = worldName.getBytes(StandardCharsets.UTF_8);
     int size = 0;
     size += 4 + worldBytes.length; // world name length + bytes
-    size += 8; // fillStride
+    size += 8; // scanStride
     size += 4; // bad array length
     size += sBadKeys.length * 16; // key + delta per entry
     size += 4; // biome map size
@@ -255,7 +258,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
     ByteBuffer buf = ByteBuffer.allocate(size).order(ByteOrder.BIG_ENDIAN);
     buf.putInt(worldBytes.length).put(worldBytes);
-    buf.putLong(fillStride.get());
+    buf.putLong(scanStride.get());
 
     buf.putInt(sBadKeys.length);
     long prev = 0L;
@@ -283,9 +286,13 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       }
     }
 
-    // Enqueue background write via the core database accessor's queue
-    if (RTP.getInstance() != null && RTP.getInstance().databaseAccessor != null) {
-      RTP.getInstance().databaseAccessor.saveFile(filePath, buf.array());
+    // Write directly to disk (async-safe: called from async scan/shutdown threads)
+    try {
+      java.nio.file.Path p = java.nio.file.Paths.get(filePath);
+      java.nio.file.Files.createDirectories(p.getParent());
+      java.nio.file.Files.write(p, buf.array());
+    } catch (Exception e) {
+      RTP.log(Level.WARNING, "[MemoryShape] Failed to write binary file: " + filePath + " - " + e.getMessage(), e);
     }
   }
 
@@ -348,7 +355,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     // 4. Construct Root JSON Object
     java.util.Map<String, Object> root = new java.util.LinkedHashMap<>();
     root.put("world", worldName);
-    root.put("fillStride", fillStride.get());
+    root.put("scanStride", scanStride.get());
     root.put("spatialResolution", spatialResolution);
     root.put("badLocations", badList);
     root.put("biomeLocations", biomeMap);
@@ -367,7 +374,11 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     }
   }
 
-  public void load(String fileName, String worldName) {
+  public CompletableFuture<Void> getLoadFuture() {
+    return loadFuture;
+  }
+
+  public CompletableFuture<Void> load(String fileName, String worldName) {
     if (!fileName.endsWith(".bin")) fileName = fileName + ".bin";
 
     File pluginDir = RTP.serverAccessor.getPluginDirectory();
@@ -380,16 +391,17 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
             + File.separator
             + fileName;
 
-    if (RTP.getInstance() == null || RTP.getInstance().databaseAccessor == null) return;
-
-    RTP.getInstance()
-        .databaseAccessor
-        .loadFile(filePath)
-        .thenAccept(
-            optBytes -> {
-              if (!optBytes.isPresent()) return;
-              byte[] data = optBytes.get();
-              try {
+    loadFuture = CompletableFuture.runAsync(() -> {
+      java.nio.file.Path p = java.nio.file.Paths.get(filePath);
+      if (!java.nio.file.Files.exists(p)) return;
+      byte[] data;
+      try {
+        data = java.nio.file.Files.readAllBytes(p);
+      } catch (Exception e) {
+        RTP.log(Level.WARNING, "[MemoryShape] Failed to read binary file: " + filePath + " - " + e.getMessage(), e);
+        return;
+      }
+      try {
                 ByteBuffer buf = ByteBuffer.wrap(data).order(ByteOrder.BIG_ENDIAN);
                 int wLen = buf.getInt();
                 if (wLen < 0 || wLen > buf.remaining()) return;
@@ -399,9 +411,9 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
                 if (!readWorld.equals(worldName)) return;
 
                 if (buf.remaining() >= 8) {
-                  fillStride.set(buf.getLong());
+                  scanStride.set(buf.getLong());
                 } else {
-                  fillStride.set(-1L);
+                  scanStride.set(-1L);
                 }
 
                 int badSize = buf.getInt();
@@ -459,10 +471,11 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
                 RTP.log(Level.WARNING, t.getMessage(), t);
               }
             });
+    return loadFuture;
   }
 
   public void addBadLocation(long location) {
-    pendingBadLocations.get().add(location);
+    pendingBadLocations.get().put(location, 1L);
     badLocationsDirty = true;
   }
 
@@ -475,7 +488,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   public void clear() {
-    fillStride.set(-1L);
+    scanStride.set(-1L);
     badKeysCache = new long[0];
     badPrefixSumsCache = new long[0];
     biomeKeysCache = new ConcurrentHashMap<>();
@@ -503,8 +516,8 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   public void removeBiomeLocation(Long location, String biome) {
     pendingBiomeRemovals
         .get()
-        .computeIfAbsent(biome, b -> ConcurrentHashMap.newKeySet())
-        .add(location);
+        .computeIfAbsent(biome, b -> new ConcurrentHashMap<>())
+        .put(location, true);
     biomeLocationsDirty = true;
   }
 
@@ -533,11 +546,11 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       try {
         long currentBadSum = 0L;
         long currentBiomeSum = 0L;
-        Set<Long> localPendingBad =
-            pendingBadLocations.getAndSet(ConcurrentHashMap.newKeySet());
+        ConcurrentHashMap<Long, Long> localPendingBad =
+            pendingBadLocations.getAndSet(new ConcurrentHashMap<>());
         ConcurrentHashMap<String, ConcurrentHashMap<Long, Long>> localPendingBiome =
             pendingBiomeLocations.getAndSet(new ConcurrentHashMap<>());
-        ConcurrentHashMap<String, Set<Long>> localPendingBiomeRemovals =
+        ConcurrentHashMap<String, ConcurrentHashMap<Long, Boolean>> localPendingBiomeRemovals =
             pendingBiomeRemovals.getAndSet(new ConcurrentHashMap<>());
 
         this.rebuildingBadLocations = localPendingBad;
@@ -556,7 +569,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
             long[] currentBiomePrefixSums = biomePrefixSumsCache.getOrDefault(biome, new long[0]);
 
             ConcurrentHashMap<Long, Long> additions = localPendingBiome.getOrDefault(biome, new ConcurrentHashMap<>());
-            Set<Long> removals = localPendingBiomeRemovals.getOrDefault(biome, Collections.emptySet());
+            ConcurrentHashMap<Long, Boolean> removals = localPendingBiomeRemovals.getOrDefault(biome, new ConcurrentHashMap<>());
 
             java.util.List<java.util.Map.Entry<Long, Long>> tempBiomeEntries = new java.util.ArrayList<>();
             for (java.util.Map.Entry<Long, Long> entry : additions.entrySet()) {
@@ -635,7 +648,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
             // Handle removals
             if (!removals.isEmpty()) {
               java.util.List<Long> tempRemovals = new java.util.ArrayList<>();
-              for (Long rLoc : removals) {
+              for (Long rLoc : removals.keySet()) {
                 tempRemovals.add(rLoc);
               }
               long[] sortedRemovals = new long[tempRemovals.size()];
@@ -795,7 +808,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
         // 5. Merge values from capturedBad into local data with RLE compression
         java.util.List<Long> tempBadKeys = new java.util.ArrayList<>();
-        for (Long loc : localPendingBad) {
+        for (Long loc : localPendingBad.keySet()) {
             tempBadKeys.add(loc);
         }
         long[] pendingKeys = new long[tempBadKeys.size()];
