@@ -706,4 +706,87 @@ public class ScanCmdTest {
         assertTrue(task1.isCancelled());
         assertTrue(task2.isCancelled());
     }
+
+    // -------------------------------------------------------------------------
+    // Region-selection bug fixes: error messages and resume loop integrity
+    // -------------------------------------------------------------------------
+
+    @Test
+    void scanStartCmd_whenTaskAlreadyRunning_announcesToOperators() {
+        ScanTask task = makeFakeTask();
+        RTP.getInstance().scanTasks.put("default", task);
+
+        scanStartCmd.onCommand(senderId, params(), null);
+
+        assertFalse(accessor.announcedMessages.isEmpty(),
+                "scanRunning message should be announced to operators with rtp.scan permission");
+    }
+
+    @Test
+    void scanPauseCmd_whenNoTask_announcesToOperators() {
+        assertNull(RTP.getInstance().scanTasks.get("default"));
+
+        scanPauseCmd.onCommand(senderId, params(), null);
+
+        assertFalse(accessor.announcedMessages.isEmpty(),
+                "scanNotRunning message should be announced to operators with rtp.scan permission");
+    }
+
+    @Test
+    void scanCancelCmd_whenNoTask_announcesToOperators() {
+        assertNull(RTP.getInstance().scanTasks.get("default"));
+
+        scanCancelCmd.onCommand(senderId, params(), null);
+
+        assertFalse(accessor.announcedMessages.isEmpty(),
+                "scanNotRunning message should be announced to operators with rtp.scan permission");
+    }
+
+    @Test
+    void scanResumeCmd_withMixedTasks_resumesExistingAndStartsMissing() {
+        Square square2 = new Square();
+        LinearAdjustor vert2 = new LinearAdjustor(new ArrayList<>());
+        RegionSettings settings2 = new RegionSettings(
+                "region2", world, square2, vert2, false, false, 10L, 5, 0.0, 1L, "", false);
+        Region region2 = new Region("region2", settings2);
+        RTP.selectionAPI.permRegionLookup.put("region2", region2);
+
+        // "default" has a paused task; "region2" has no task
+        ScanTask task1 = makeFakeTask();
+        task1.pause.set(true);
+        RTP.getInstance().scanTasks.put("default", task1);
+
+        // No region param → console sender resolves all regions
+        scanResumeCmd.onCommand(senderId, params(), null);
+
+        // task1 must have been unpaused (resumed), not skipped or replaced
+        assertFalse(task1.pause.get(), "existing task should be resumed (pause flag set to false)");
+        // a new scan must have been started for region2 (announced via scanStart)
+        assertTrue(accessor.announcedMessages.stream().anyMatch(m -> m.contains("region2")),
+                "missing task should have a new scan started for region2");
+    }
+
+    @Test
+    void scanResumeCmd_withMixedTasks_doesNotAnnounceResumeForMissingTask() {
+        Square square2 = new Square();
+        LinearAdjustor vert2 = new LinearAdjustor(new ArrayList<>());
+        RegionSettings settings2 = new RegionSettings(
+                "region2", world, square2, vert2, false, false, 10L, 5, 0.0, 1L, "", false);
+        Region region2 = new Region("region2", settings2);
+        RTP.selectionAPI.permRegionLookup.put("region2", region2);
+
+        // "default" paused; "region2" no task
+        ScanTask task1 = makeFakeTask();
+        task1.pause.set(true);
+        RTP.getInstance().scanTasks.put("default", task1);
+
+        accessor.announcedMessages.clear();
+        scanResumeCmd.onCommand(senderId, params(), null);
+
+        // task1 must have been unpaused — proof that the existing task was resumed,
+        // not skipped (which would happen if scanStartCmd re-processed all regions
+        // and took the "scan already running" branch without resuming it)
+        assertFalse(task1.pause.get(),
+                "original task must have been unpaused, not skipped by all-region re-processing");
+    }
 }

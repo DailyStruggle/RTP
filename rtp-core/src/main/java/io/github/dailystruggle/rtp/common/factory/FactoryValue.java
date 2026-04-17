@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.factory;
 
-import com.google.common.base.Function;
+import java.util.function.Function;
 import io.github.dailystruggle.rtp.common.RTP;
 import java.io.File;
 import java.io.IOException;

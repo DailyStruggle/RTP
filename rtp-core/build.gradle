@@ -8,13 +8,17 @@ dependencies {
     api project(':rtp-api')
 
     // Core logic dependencies (platform agnostic)
-    implementation 'org.yaml:snakeyaml:2.3'
+    // snakeyaml is provided by Spigot/Paper/Folia at runtime
+    compileOnly 'org.yaml:snakeyaml:2.3'
+    testRuntimeOnly 'org.yaml:snakeyaml:2.3'
     api('me.carleslc.Simple-YAML:Simple-Yaml:1.8.4') {
         exclude group: 'org.yaml', module: 'snakeyaml'
     }
     implementation 'io.github.dailystruggle:CommandsAPI:1.0.0-RELEASE'
     implementation 'io.github.dailystruggle:EffectsAPI:1.0.1-BETA01'
-    implementation 'com.google.guava:guava:33.2.1-jre'
+    // guava is provided by Spigot/Paper/Folia at runtime
+    compileOnly 'com.google.guava:guava:33.2.1-jre'
+    testRuntimeOnly 'com.google.guava:guava:33.2.1-jre'
     implementation 'com.zaxxer:HikariCP:5.1.0'
     // Jedis must remain 'implementation': RedisManager (rtp-core) directly instantiates
     // JedisPool/Jedis.  Extraction to rtp-persistence-redis is tracked in the backlog.
@@ -29,7 +33,9 @@ dependencies {
     testFixturesCompileOnly 'org.jetbrains:annotations:24.1.0'
     compileOnly 'org.popcraft:chunky-common:1.3.111'
     testImplementation 'org.popcraft:chunky-common:1.3.111'
-    implementation 'org.xerial:sqlite-jdbc:3.45.1.0'
+    // sqlite-jdbc is provided by Spigot/Paper/Folia at runtime
+    compileOnly 'org.xerial:sqlite-jdbc:3.45.1.0'
+    testRuntimeOnly 'org.xerial:sqlite-jdbc:3.45.1.0'
     testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'
 }
 
