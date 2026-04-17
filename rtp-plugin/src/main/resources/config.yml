@@ -2,7 +2,7 @@
 
 # Teleportation Delay (Seconds)
 # The time a player must wait before the teleport occurs.
-# This gives the server time to pre-load the destination chunks.
+# This sometimes gives the server time to pre-load the destination chunks.
 teleportDelay: 2
 
 # Movement Cancellation (Blocks)
@@ -17,10 +17,12 @@ teleportCooldown: 300
 # Post-Teleport Commands
 # List of commands to execute after a successful teleport.
 # [player] placeholder can be used for the player's name.
-consoleCommands: []
-#  - "say [player] has just randomly teleported!"
-playerCommands: []
-#  - "me is now in a new place!"
+consoleCommands: [
+  - "say [player] has just randomly teleported!"
+]
+playerCommands: [
+  - ""
+]
 
 # --- Database Settings ---
 # Where to store cached locations and player data.

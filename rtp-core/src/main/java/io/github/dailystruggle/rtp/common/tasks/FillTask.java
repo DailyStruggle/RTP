@@ -29,8 +29,8 @@ import java.util.stream.Collectors;
 /** Task for pre-filling a region with valid teleport locations */
 public class FillTask extends RTPRunnable {
   /** Number of locations to process in each step */
-  public static final AtomicLong fillIncrement = new AtomicLong(0L);
-  private static final AtomicLong cps = new AtomicLong(128);
+  public final AtomicLong fillIncrement = new AtomicLong(0L);
+  private final AtomicLong cps = new AtomicLong(128);
   private static final BigInteger increment_big = new BigInteger("1");
 
   // Instance trackers to natively isolate data per FillTask
@@ -95,23 +95,25 @@ public class FillTask extends RTPRunnable {
    * @param start the starting location index
    * @param cps_all total completions per second
    * @param divisor divisor for performance tracking
+   * @param fillIncrementVal current fillIncrement value to carry over
+   * @param cpsVal current cps value to carry over
    */
-  public FillTask(Region region, long start, BigInteger cps_all, BigInteger divisor) {
+  public FillTask(Region region, long start, BigInteger cps_all, BigInteger divisor, long fillIncrementVal, long cpsVal) {
     this.region = region;
     this.fillIter = new AtomicLong(start);
     this.cps_all = cps_all;
     this.cps_divisor = divisor;
+    this.cps.set(cpsVal);
     long[] progress = loadProgress(region.name);
     if (progress != null) {
       if (progress.length > 3) this.currentOffset = progress[3];
     }
 
-    if (fillIncrement.get() <= 0) {
+    if (fillIncrementVal <= 0) {
       long cpu = Runtime.getRuntime().availableProcessors();
       fillIncrement.set(cpu * 10000 / 64);
     } else {
-      // try for 5 seconds between messages
-      fillIncrement.set(cps.get() * 5);
+      fillIncrement.set(fillIncrementVal);
     }
   }
 

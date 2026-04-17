@@ -31,14 +31,43 @@ import java.util.function.Function;
 public class RTPAPI {
   /** The platform-specific server accessor. Volatile for cross-thread visibility. */
   public static volatile RTPServerAccessor serverAccessor;
+  /**
+   * The UUID used to identify this server instance in multi-server or proxy
+   * deployments. Defaults to {@code new UUID(0, 0)} (all-zeros) and may be
+   * overwritten by the core during startup when a server-id is configured.
+   */
   public static volatile UUID serverId = new UUID(0, 0);
 
+  /**
+   * Placeholder token injected by the Polymart/SpigotMC download pipeline with
+   * the purchasing user's ID. Used for licence validation. In development builds
+   * (not downloaded from a marketplace) this string is kept as-is.
+   */
   public static final String DOWNLOADER_ID = "%%__USER__%%";
+  /**
+   * One-time nonce injected by the Polymart/SpigotMC download pipeline for
+   * download verification. Kept as a literal placeholder in development builds.
+   */
   public static final String DOWNLOAD_NONCE = "%%__NONCE__%%";
 
   // Functional delegates mapped by the Core module. Volatile for cross-thread visibility.
+  /**
+   * Delegate that registers a custom {@code Shape} implementation with the core
+   * registry (REQ-API-F-001). Populated by {@code rtp-core} during {@code onEnable};
+   * {@code null} until then.
+   */
   public static volatile Consumer<Object> shapeAdder = null;
+  /**
+   * Delegate that registers a custom vertical adjustor implementation with the
+   * core registry (REQ-API-F-002). Populated by {@code rtp-core} during
+   * {@code onEnable}; {@code null} until then.
+   */
   public static volatile Consumer<Object> vertAdder = null;
+  /**
+   * Delegate that resolves the set of biome names available in a given world.
+   * Populated by {@code rtp-core} during {@code onEnable}; {@code null} until then.
+   * Use {@link #getBiomes(RTPWorld)} rather than calling this field directly.
+   */
   public static volatile Function<RTPWorld, Set<String>> biomeProvider = null;
 
   /**
@@ -70,6 +99,25 @@ public class RTPAPI {
     serverAccessor = accessor;
   }
 
+  /**
+   * Registers a custom {@code Shape} implementation with the core registry.
+   *
+   * <p><b>Preconditions:</b>
+   * <ul>
+   *   <li>{@code shape} must not be {@code null} and must implement the
+   *       platform shape contract expected by {@code rtp-core}.</li>
+   *   <li>{@code rtp-core} must have completed its {@code onEnable}.</li>
+   * </ul>
+   *
+   * <p><b>Postconditions:</b> The shape is available for use in region
+   * configuration by its registered name.
+   *
+   * <p><b>Thread safety:</b> Must be called from the main server thread during
+   * the addon's {@code onEnable} (REQ-API-F-001).
+   *
+   * @param shape the shape implementation to register; must not be {@code null}
+   * @throws IllegalStateException if called before core delegates are registered
+   */
   public static void addShape(Object shape) {
     if (shapeAdder != null) {
       shapeAdder.accept(shape);

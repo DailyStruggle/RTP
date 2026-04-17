@@ -267,18 +267,10 @@ biomes:
   - SWAMP
   - MANGROVE_SWAMP
 
-  # END BIOMES
-  - THE_END
+  # END BIOMES (no solid landing / void-adjacent)
   - SMALL_END_ISLANDS
-  - END_MIDLANDS
-  - END_HIGHLANDS
-  - END_BARRENS
 
-  # NETHER BIOMES
-  - NETHER_WASTES
-  - SOUL_SAND_VALLEY
-  - CRIMSON_FOREST
-  - WARPED_FOREST
+  # NETHER BIOMES (dangerous/irregular terrain)
   - BASALT_DELTAS
 
   # TECHNICAL BIOMES

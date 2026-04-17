@@ -45,6 +45,17 @@ tasks.withType(JavaCompile).configureEach { task ->
     }
 }
 
+java {
+    withJavadocJar()
+    withSourcesJar()
+}
+
+javadoc {
+    options.encoding = 'UTF-8'
+    // Report syntax/HTML errors as errors; missing tags only as warnings while coverage is in progress.
+    options.addStringOption('Xdoclint:syntax,html', '-quiet')
+}
+
 test {
     useJUnitPlatform()
 }

@@ -80,6 +80,10 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
           if (rtpWorld == null) break vertFixBlock;
 
           String name = "JUMP";
+          if (rtpWorld.name().endsWith("_nether") || rtpWorld.name().endsWith("_the_end")) {
+            name = "LINEAR";
+            parameterValues.putIfAbsent("direction", Collections.singletonList(String.valueOf(2)));
+          }
           int maxY = 255;
           int minY = 0;
 
@@ -119,7 +123,7 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
           if (rtpWorld.name().endsWith("_nether")) {
             maxY = Math.min(maxY, 128);
             parameterValues.putIfAbsent(
-                "requireskylight", Collections.singletonList(String.valueOf(false)));
+                    "requireskylight", Collections.singletonList(String.valueOf(false)));
           } else if (rtpWorld.name().endsWith("_the_end")) {
             parameterValues.putIfAbsent(
                 "requireskylight", Collections.singletonList(String.valueOf(false)));
@@ -210,6 +214,7 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
           EnumMap<? extends Enum<?>, Object> vertData = vert.getData();
 
           Map<String, Object> subParams = new HashMap<>();
+
           subParams.put("name", vert.name);
           for (Map.Entry<? extends Enum<?>, Object> entry : vertData.entrySet()) {
             subParams.put(entry.getKey().name(), entry.getValue());
