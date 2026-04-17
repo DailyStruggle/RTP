@@ -358,6 +358,10 @@ public class FillTask extends RTPRunnable {
   }
 
   public void save() {
+    if (isCancelled()) {
+      delete();
+      return;
+    }
     File pluginDir = RTP.serverAccessor.getPluginDirectory();
     File dir = new File(pluginDir, "database" + File.separator + "regionData");
     if (!dir.exists()) dir.mkdirs();

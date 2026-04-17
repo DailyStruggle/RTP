@@ -353,6 +353,26 @@ public class FillCmdTest {
     }
 
     @Test
+    void fillTask_save_whenCancelled_deletesFileInsteadOfWriting() {
+        // Simulate the race condition: a .fill file exists (written by an async batch),
+        // the task is cancelled, then save() is called again from the async thread.
+        java.io.File dir = new java.io.File(tempDir.toFile(), "database" + java.io.File.separator + "regionData");
+        dir.mkdirs();
+        java.io.File fillFile = new java.io.File(dir, "default.fill");
+        try { fillFile.createNewFile(); } catch (java.io.IOException ignored) {}
+        assertTrue(fillFile.exists(), "fill file should exist before save() on cancelled task");
+
+        FillTask task = makeFakeTask();
+        task.setCancelled(true);
+
+        // This simulates the async wrapUpBatch thread calling save() after cancel
+        task.save();
+
+        assertFalse(fillFile.exists(),
+                "save() on a cancelled FillTask must delete the .fill file, not recreate it");
+    }
+
+    @Test
     void fillCancelCmd_getRegions_withNullParam_returnsDefaultRegion() {
         List<Region> regions = fillCancelCmd.getRegions(senderId, null);
         assertFalse(regions.isEmpty());
