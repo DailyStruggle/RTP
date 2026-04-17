@@ -19,11 +19,18 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 /**
  * Automated architectural gatekeeper for the RTP plugin.
  *
- * <p>Enforces three structural constraints across the codebase:
+ * <p>Enforces six structural constraints across the codebase:
  * <ol>
  *   <li>Platform Decoupling – core classes must not import platform-specific APIs.</li>
  *   <li>Non-Blocking Execution – core/api classes must never call blocking Future methods.</li>
- *   <li>Thread Yielding – RTPScheduler implementations must not reside in the core package.</li>
+ *   <li>Driver Isolation – network-backend driver classes must be confined to their designated
+ *       accessor classes ({@code RedisManager}, {@code PostgreSQLDatabaseAccessor}).</li>
+ *   <li>Scheduler Isolation – {@link RTPScheduler} implementations must not reside in
+ *       the core package.</li>
+ *   <li>Chunk Ticket Allocation Boundary – only {@link ChunkReservation} and
+ *       {@link RTPWorld} subclasses may call {@code setForceLoaded}.</li>
+ *   <li>Raw Platform Ticket Call Isolation – only {@link RTPWorld} itself may call
+ *       {@code setForceLoadedImpl}.</li>
  * </ol>
  */
 @AnalyzeClasses(

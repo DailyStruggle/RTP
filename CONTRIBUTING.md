@@ -2,6 +2,40 @@
 
 Thank you for your interest in contributing to the RTP plugin! To ensure a smooth workflow and safe changes, please adhere to the following guidelines.
 
+## Contributor License Agreement
+
+By submitting a pull request or otherwise contributing code, documentation, or other
+material to this repository, you agree to the following terms (derived from the
+[Apache Individual Contributor License Agreement v2.0](https://www.apache.org/licenses/icla.pdf)):
+
+1. **Grant of Copyright License.** You grant the copyright holder a perpetual,
+   worldwide, non-exclusive, no-charge, royalty-free, irrevocable copyright license to
+   reproduce, prepare derivative works of, publicly display, publicly perform,
+   sublicense, and distribute your contributions, including in commercially distributed
+   binary releases.
+
+2. **Grant of Patent License.** You grant the copyright holder a perpetual, worldwide,
+   non-exclusive, no-charge, royalty-free, irrevocable patent license to make, have
+   made, use, offer to sell, sell, import, and otherwise transfer the software, where
+   such license applies only to patent claims licensable by you that are necessarily
+   infringed by your contribution.
+
+3. **Right to submit.** You represent that you are legally entitled to grant the above
+   licenses. If your employer has rights to intellectual property you create, you
+   represent that you have received permission to make this contribution on behalf of
+   that employer.
+
+4. **Original work.** You represent that your contribution is your original creation.
+   If your contribution includes material that is not your original creation, you must
+   identify it and provide its complete details (license, origin) in the pull request
+   description.
+
+5. **No warranty.** You are not expected to provide support for your contributions,
+   and you provide them "as is", without warranty of any kind.
+
+No transfer of copyright ownership is required. You retain all rights to your
+contribution outside of this project.
+
 ## Prerequisites
 
 * **Java 21**: This project targets Java 21. Ensure your JDK is installed and configured correctly.

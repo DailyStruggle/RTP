@@ -24,7 +24,7 @@ import org.bukkit.World;
 import org.bukkit.block.Biome;
 import org.jetbrains.annotations.NotNull;
 
-public final class BukkitRTPWorld extends RTPWorld<World> {
+public class BukkitRTPWorld extends RTPWorld<World> {
   private static final AtomicBoolean biomeException = new AtomicBoolean(false);
   private static Function<Location, String> getBiome =
       location -> {

@@ -129,13 +129,17 @@ public class SelectionAPI {
 
     int req = RTP.minRTPExecutions;
 
-    while (!selectionPipelineUrgent.isEmpty() && (serverAccessor.overTime() < 0 || req > 0)) {
-      if (!selectionPipelineUrgent.isEmpty()) selectionPipelineUrgent.poll().run();
+    while (serverAccessor.overTime() < 0 || req > 0) {
+      Runnable task = selectionPipelineUrgent.poll();
+      if (task == null) break;
+      task.run();
       req--;
     }
 
-    while (!selectionPipeline.isEmpty() && (serverAccessor.overTime() < 0 || req > 0)) {
-      if (!selectionPipeline.isEmpty()) selectionPipeline.poll().run();
+    while (serverAccessor.overTime() < 0 || req > 0) {
+      Runnable task = selectionPipeline.poll();
+      if (task == null) break;
+      task.run();
       req--;
     }
   }

@@ -68,5 +68,6 @@ public enum MessagesKeys {
   stay,
   fadeOut,
   actionbar,
-  version
+  version,
+  showDevTag
 }

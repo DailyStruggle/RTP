@@ -149,7 +149,7 @@ The YAML configuration file for a specific teleport region, defining its shape, 
 The naive pattern of repeatedly generating random coordinates until a valid one is found. RTP explicitly forbids this in favor of bounded algorithms that preemptively subtract invalid sectors.
 
 **RTPLocation**
-A platform-agnostic value object representing a teleport destination (world name, x, y, z, yaw, pitch). Defined in `rtp-api`; must remain immutable.
+A platform-agnostic value object representing a teleport destination (world name, x, y, z, yaw, pitch). The base interface is defined in `rtp-api`; a concrete implementation with queue and reservation support also lives in `rtp-core`. Addon developers should depend only on the `rtp-api` type.
 
 **RTPPlayer**
 A platform-agnostic wrapper around a player reference. Defined in `rtp-api` to decouple core logic from Bukkit's `Player` class.

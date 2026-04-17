@@ -245,7 +245,12 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
           value = subParams;
         }
 
-        configParser.set(key, value);
+        if (key.contains(".")) {
+          YamlFile yamlFile = configParser.fileDatabase.cachedLookup.get().get(configParser.name);
+          if (yamlFile != null) yamlFile.set(key, value);
+        } else {
+          configParser.set(key, value);
+        }
       }
 
       try {
@@ -257,6 +262,10 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
       String updatedMsg = String.valueOf(lang.getConfigValue(MessagesKeys.updated, ""));
       if (updatedMsg != null) updatedMsg = updatedMsg.replace("[filename]", configParser.name);
       RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, updatedMsg);
+
+      CommandsAPICommand reload =
+              RTP.baseCommand.getCommandLookup().getOrDefault("reload", new ReloadCmd(RTP.baseCommand));
+      reload.onCommand(callerId, new HashMap<>(), null);
     } else if (factoryValue instanceof MultiConfigParser) {
       MultiConfigParser<?> parser = (MultiConfigParser<?>) this.factoryValue;
       List<String> remove = parameterValues.getOrDefault("remove", new ArrayList<>());
@@ -279,11 +288,11 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
         subUpdateCmd.addParameters();
         addSubCommand(subUpdateCmd);
       }
-    }
 
       CommandsAPICommand reload =
               RTP.baseCommand.getCommandLookup().getOrDefault("reload", new ReloadCmd(RTP.baseCommand));
       reload.onCommand(callerId, new HashMap<>(), null);
+    }
     });
     return true;
   }
@@ -295,6 +304,31 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
       @NotNull String[] args) {
     addParameters();
     return super.onTabComplete(callerId, permissionCheckMethod, args);
+  }
+
+  private void addSectionParameters(String prefix, ConfigurationSection section) {
+    for (String key : section.getKeys(false)) {
+      String fullKey = prefix + "." + key;
+      Object value = section.get(key);
+      if (value instanceof ConfigurationSection) {
+        addSectionParameters(fullKey, (ConfigurationSection) value);
+      } else if (value instanceof Boolean) {
+        addParameter(fullKey, new BooleanParameter("rtp.update", "", (uuid, s1) -> true));
+      } else if (value instanceof Integer || value instanceof Long) {
+        addParameter(fullKey, new IntegerParameter("rtp.update", "", (uuid, s1) -> true));
+      } else if (value instanceof Double || value instanceof Float) {
+        addParameter(fullKey, new FloatParameter("rtp.update", "", (uuid, s1) -> true));
+      } else {
+        addParameter(
+            fullKey,
+            new CommandParameter("rtp.update", "", (uuid, s1) -> true) {
+              @Override
+              public Set<String> values() {
+                return new HashSet<>();
+              }
+            });
+      }
+    }
   }
 
   public void addParameters() {
@@ -344,6 +378,8 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
           } else if (s.equalsIgnoreCase("vert")) {
             VertParameter vertParameter = new VertParameter("rtp.update", "", (uuid, s1) -> true);
             addParameter(s, vertParameter);
+          } else {
+            addSectionParameters(s, (ConfigurationSection) o);
           }
         } else if (o instanceof List) {
           Supplier<Set<String>> values = HashSet::new;

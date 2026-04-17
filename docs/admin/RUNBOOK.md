@@ -17,8 +17,9 @@ during scheduled fill operations.
 **Diagnosis:**
 1. Check the active chunk count with a monitoring tool (e.g. `/paper chunklist` or a TPS plugin).
    A high number of force-loaded chunks suggests a chunk leak (see H-004 in `HAZARDS.md`).
-2. Check the server console for ERROR-level messages from `MemoryTracker` containing chunk
-   coordinates — these indicate reservations that were forcibly closed by the watchdog.
+2. Check the server console for SEVERE-level messages from `MemoryTracker` in the form
+   `[RTP] Memory leak detected for object: <label>. Alive <ms>ms past its expected lifespan.`
+   — these indicate pipeline tasks that were force-cancelled by the watchdog.
 3. Check `performance.yml`: if `queueSize` or `fillTaskCount` are set very high relative to
    server hardware, the fill task may be loading too many chunks per cycle.
 
@@ -28,7 +29,7 @@ during scheduled fill operations.
   lower `fillTaskCount` in `performance.yml` and run `/rtp fill start` again.
 - If fill task is too aggressive: reduce `fillTaskCount` and/or increase `fillTaskDelay` in
   `performance.yml`, then run `/rtp reload`.
-- If the problem recurs after adjustment, file an issue with the ERROR log lines from
+- If the problem recurs after adjustment, file an issue with the SEVERE log lines from
   `MemoryTracker` attached.
 
 ---
@@ -104,14 +105,16 @@ fix the reported line, and restart.
 
 ## Queue Never Fills / Fill Task Stalls
 
-**Symptom:** `/rtp fill status <region>` reports the fill is running but the queue size does
-not increase over several minutes.
+**Symptom:** `/rtp info <region>` shows the queue size is not increasing over several minutes
+even though a fill is active.
 
 **Diagnosis:**
 1. Check the server console for WARN or ERROR messages from the fill task. A high rate of
    "sector skipped" messages indicates the region geometry has very few valid land areas.
-2. Check if `MemoryTracker` is logging repeated watchdog-triggered closes for the same chunk
-   coordinates — this points to a chunk that consistently times out during loading (FM-005).
+2. Check if `MemoryTracker` is logging repeated SEVERE messages of the form
+   `[RTP] Memory leak detected for object: <label>. Alive <ms>ms past its expected lifespan.`
+   — repeated entries for the same task label point to a chunk that consistently times out
+   during loading (FM-005).
 3. Check `performance.yml` for `fillTaskCount` and `fillTaskDelay`. If `fillTaskDelay` is
    very large, the fill may be making progress but slowly.
 4. Run `/rtp info <region>` and verify that `minRadius` / `maxRadius` define a reachable land
@@ -136,7 +139,7 @@ across restarts, consuming significant disk space.
 **Diagnosis:**
 1. Locate the database file: `plugins/RTP/database/` (check `config.yml` for the configured
    path).
-2. A growing database typically means the bad-sector map is accumulating entries for a region
+2. A growing database typically means the bad-location map is accumulating entries for a region
    whose geometry keeps changing, or that old region entries are never pruned after a region
    is removed.
 3. Query the database with an H2 or SQLite client to count rows per region table and identify
@@ -146,7 +149,7 @@ across restarts, consuming significant disk space.
 - For a removed region: manually delete its table from the database, or delete the database
   file entirely and rebuild via `/rtp fill start` for all active regions.
 - For an active region with excessive entries: run `/rtp fill reset <region>` to clear the
-  bad-sector map, then `/rtp fill start <region>` to rebuild from scratch with the current
+  bad-location map, then `/rtp fill start <region>` to rebuild from scratch with the current
   geometry.
 - After pruning, restart the server so the plugin re-opens the database cleanly.
 

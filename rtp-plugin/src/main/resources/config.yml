@@ -17,9 +17,9 @@ teleportCooldown: 300
 # Post-Teleport Commands
 # List of commands to execute after a successful teleport.
 # [player] placeholder can be used for the player's name.
-consoleCommands:
+consoleCommands: []
 #  - "say [player] has just randomly teleported!"
-playerCommands:
+playerCommands: []
 #  - "me is now in a new place!"
 
 # --- Database Settings ---

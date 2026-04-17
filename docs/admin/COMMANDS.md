@@ -121,7 +121,7 @@ Manually triggers background pre-generation of safe locations for a region's que
 
 **Note:** The cache fills automatically in the background during normal operation. Use `/rtp fill` after a fresh install or after clearing the cache to warm it up immediately.
 
-`/rtp fill reset` only wipes the stored bad-sector memory for a region — it does **not** start a new fill. Use it when you want a clean slate (e.g., after changing region geometry) without immediately triggering background pre-generation. Follow with `/rtp fill start` if you also want to rebuild the cache.
+`/rtp fill reset` only wipes the stored bad-location data for a region — it does **not** start a new fill. Use it when you want a clean slate (e.g., after changing region geometry) without immediately triggering background pre-generation. Follow with `/rtp fill start` if you also want to rebuild the cache.
 
 ---
 

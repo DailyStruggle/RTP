@@ -14,6 +14,8 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import org.simpleyaml.configuration.ConfigurationSection;
+import org.simpleyaml.configuration.MemorySection;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -201,6 +203,63 @@ public class SubConfigCmdTest {
         assertFalse(params.containsKey("version"), "'version' key must be skipped");
     }
 
+    // ── addParameters — MemorySection flattened into dotted-path parameters ──
+
+    @Test
+    void subConfigCmd_addParameters_flattensMemorySectionIntoDottedParameters() {
+        ConfigurationSection section = mock(MemorySection.class);
+        LinkedHashSet<String> keys = new LinkedHashSet<>(Arrays.asList("host", "port", "enabled"));
+        when(section.getKeys(false)).thenReturn(keys);
+        when(section.get("host")).thenReturn("127.0.0.1");
+        when(section.get("port")).thenReturn(3306);
+        when(section.get("enabled")).thenReturn(false);
+
+        EnumMap<PerformanceKeys, Object> data = new EnumMap<>(PerformanceKeys.class);
+        data.put(PerformanceKeys.viewDistanceSelect, section);
+        doReturn(data).when(performanceConfig).getData();
+
+        SubConfigCmd cmd = new SubConfigCmd(null, "performance", performanceConfig);
+        Map<String, CommandParameter> params = cmd.getParameterLookup();
+
+        assertTrue(params.containsKey("viewdistanceselect.host"),
+                "Expected dotted param 'viewdistanceselect.host'");
+        assertTrue(params.containsKey("viewdistanceselect.port"),
+                "Expected dotted param 'viewdistanceselect.port'");
+        assertTrue(params.containsKey("viewdistanceselect.enabled"),
+                "Expected dotted param 'viewdistanceselect.enabled'");
+        assertInstanceOf(IntegerParameter.class, params.get("viewdistanceselect.port"));
+        assertInstanceOf(BooleanParameter.class, params.get("viewdistanceselect.enabled"));
+    }
+
+    // ── addParameters — nested MemorySection flattened recursively ────────────
+
+    @Test
+    void subConfigCmd_addParameters_flattensNestedMemorySectionRecursively() {
+        ConfigurationSection inner = mock(MemorySection.class);
+        LinkedHashSet<String> innerKeys = new LinkedHashSet<>(Arrays.asList("host", "port"));
+        when(inner.getKeys(false)).thenReturn(innerKeys);
+        when(inner.get("host")).thenReturn("127.0.0.1");
+        when(inner.get("port")).thenReturn(6379);
+
+        ConfigurationSection outer = mock(MemorySection.class);
+        LinkedHashSet<String> outerKeys = new LinkedHashSet<>(Collections.singletonList("redis"));
+        when(outer.getKeys(false)).thenReturn(outerKeys);
+        when(outer.get("redis")).thenReturn(inner);
+
+        EnumMap<PerformanceKeys, Object> data = new EnumMap<>(PerformanceKeys.class);
+        data.put(PerformanceKeys.viewDistanceSelect, outer);
+        doReturn(data).when(performanceConfig).getData();
+
+        SubConfigCmd cmd = new SubConfigCmd(null, "performance", performanceConfig);
+        Map<String, CommandParameter> params = cmd.getParameterLookup();
+
+        assertTrue(params.containsKey("viewdistanceselect.redis.host"),
+                "Expected 'viewdistanceselect.redis.host'");
+        assertTrue(params.containsKey("viewdistanceselect.redis.port"),
+                "Expected 'viewdistanceselect.redis.port'");
+        assertInstanceOf(IntegerParameter.class, params.get("viewdistanceselect.redis.port"));
+    }
+
     // ── addParameters — null factoryValue is safe ─────────────────────────────
 
     @Test
@@ -236,6 +295,43 @@ public class SubConfigCmdTest {
         verify(performanceConfig, atLeastOnce()).save();
     }
 
+    // ── onCommand — reload fires exactly once per real update ─────────────────
+
+    @Test
+    void subConfigCmd_onCommand_reloadFiredExactlyOnceOnUpdate() throws InterruptedException {
+        SubConfigCmd cmd = new SubConfigCmd(null, "performance", performanceConfig);
+
+        CommandsAPICommand mockReload = mock(CommandsAPICommand.class);
+        when(mockReload.onCommand(any(), any(), any())).thenReturn(true);
+        RTP.baseCommand.getCommandLookup().put("reload", mockReload);
+
+        Map<String, List<String>> params = new HashMap<>();
+        params.put("viewdistanceselect", Collections.singletonList("10"));
+
+        cmd.onCommand(UUID.randomUUID(), params, null);
+        Thread.sleep(500);
+
+        verify(mockReload, times(1)).onCommand(any(), any(), isNull());
+    }
+
+    // ── onCommand — reload NOT fired when delegating to nextCommand (help) ────
+
+    @Test
+    void subConfigCmd_onCommand_reloadNotFiredWhenDelegatingToNextCommand() throws InterruptedException {
+        SubConfigCmd cmd = new SubConfigCmd(null, "performance", performanceConfig);
+
+        CommandsAPICommand mockReload = mock(CommandsAPICommand.class);
+        RTP.baseCommand.getCommandLookup().put("reload", mockReload);
+
+        CommandsAPICommand mockHelp = mock(CommandsAPICommand.class);
+        when(mockHelp.onCommand(any(), any(), any())).thenReturn(true);
+
+        cmd.onCommand(UUID.randomUUID(), new HashMap<>(), mockHelp);
+        Thread.sleep(200);
+
+        verify(mockReload, never()).onCommand(any(), any(), any());
+    }
+
     // ── ConfigCmd — name / permission / description ───────────────────────────
 
     @Test
@@ -256,18 +352,17 @@ public class SubConfigCmdTest {
         assertNotNull(cmd.description());
     }
 
-    // ── ConfigCmd.onCommand — delegates to nextCommand ────────────────────────
+    // ── ConfigCmd.onCommand — always returns true, library handles sub-command dispatch ──
 
     @Test
-    void configCmd_onCommand_delegatesToNextCommandWhenNonNull() {
+    void configCmd_onCommand_returnsTrueAndDoesNotManuallyDelegateToNextCommand() {
         ConfigCmd cmd = new ConfigCmd(mock(CommandsAPICommand.class));
         CommandsAPICommand next = mock(CommandsAPICommand.class);
-        when(next.onCommand(any(), any(), any())).thenReturn(true);
 
         boolean result = cmd.onCommand(UUID.randomUUID(), new HashMap<>(), next);
 
         assertTrue(result);
-        verify(next).onCommand(any(), any(), isNull());
+        verify(next, never()).onCommand(any(), any(), any());
     }
 
     @Test

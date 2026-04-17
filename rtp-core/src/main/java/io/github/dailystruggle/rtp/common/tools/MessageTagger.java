@@ -1,10 +1,27 @@
 package io.github.dailystruggle.rtp.common.tools; // Moved out of commands/help
 
+import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import org.jetbrains.annotations.Nullable;
 
 public class MessageTagger {
     public static String tagMessage(String message, @Nullable String tag) {
         if (message == null || message.isEmpty()) return message;
+
+        // Check whether the dev tag is enabled in messages.yml
+        ConfigParser<MessagesKeys> lang =
+                (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+        if (lang != null) {
+            Object showDevTag = lang.getConfigValue(MessagesKeys.showDevTag, false);
+            boolean enabled = (showDevTag instanceof Boolean)
+                    ? (Boolean) showDevTag
+                    : Boolean.parseBoolean(showDevTag.toString());
+            if (!enabled) return message;
+        } else {
+            // Config not yet loaded — suppress the tag by default
+            return message;
+        }
 
         String sig = SupportInfo.getSig();
 
