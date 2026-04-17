@@ -29,14 +29,14 @@ available.
 
 ### FM-002 — All Sectors Marked Bad (Fill Exhaustion)
 **Component:** `MemoryShape`
-**Failure:** Every sector in the region's bad-sector map is marked invalid, leaving no
+**Failure:** Every location in the region's bad-location map is marked invalid, leaving no
 candidate coordinates for location generation.
 **Effect:** The queue cannot be replenished. All teleport requests to this region will encounter
 FM-001 indefinitely.
-**Detection:** Fill task reports zero valid sectors remaining; queue size stays at zero after a
+**Detection:** Fill task reports zero valid locations remaining; queue size stays at zero after a
 full replenishment cycle.
 **Response:** The plugin logs an ERROR with the region name. The operator must either reconfigure
-the region geometry to include valid land, clear the bad-sector map via `/rtp fill reset`, or
+the region geometry to include valid land, clear the bad-location map via `/rtp fill reset`, or
 disable the region.
 **Requirement:** `REQ-RTP-S-004`
 
@@ -49,7 +49,7 @@ re-validation check at teleport time (e.g. a claim was placed over it since gene
 **Effect:** The candidate location is discarded; the teleport does not proceed with an unsafe
 destination.
 **Detection:** Runtime safety check returns false during final dispatch.
-**Response:** The location is marked bad in `MemoryShape` and removed from the queue. The system
+**Response:** The location is marked as a bad location in `MemoryShape` and removed from the queue. The system
 attempts to serve the next queued location if one is available; otherwise FM-001 behaviour
 applies. The player is notified.
 **Requirement:** `REQ-RTP-S-001`, `REQ-RTP-S-003`
@@ -58,17 +58,19 @@ applies. The player is notified.
 
 ## Chunk Management
 
-### FM-004 — Chunk Reservation Exceeds Window (Watchdog Trigger)
+### FM-004 — Pipeline Task Exceeds Lifespan (Watchdog Trigger)
 **Component:** `MemoryTracker`
-**Failure:** A `ChunkReservation` is not closed within its configured maximum window, indicating
-an abandoned or stalled validation task.
-**Effect:** Without intervention the chunk remains force-loaded indefinitely (see H-004 in
-[`HAZARDS.md`](HAZARDS.md)).
-**Detection:** `MemoryTracker` watchdog fires on schedule and finds an open reservation older
-than the threshold.
-**Response:** The tracker forcibly calls `reservation.close()`, releasing the chunk ticket. The
-chunk coordinates, world name, and elapsed time are logged at ERROR level so the operator can
-identify the pattern.
+**Failure:** A `TeleportPipelineTask` registered with `MemoryTracker` is not completed within
+its configured maximum lifespan, indicating an abandoned or stalled pipeline.
+**Effect:** Without intervention the stalled task holds any chunk tickets it has acquired,
+preventing them from being released (see H-004 in [`HAZARDS.md`](HAZARDS.md)).
+**Detection:** `MemoryTracker.runDiagnostics()` fires on schedule and finds a tracked pipeline
+task alive past its expected lifespan.
+**Response:** The tracker calls `pipelineTask.setCancelled(true)` and reschedules it via
+`RTP.scheduler.runTask(pipelineTask)`, forcing the task into its cleanup phase where it releases
+any held chunk tickets. The task label and elapsed time are logged at SEVERE level in the format:
+`[RTP] Memory leak detected for object: <label>. Alive <ms>ms past its expected lifespan.`
+The entry is then removed from the tracker to prevent repeated alerts for the same task.
 **Requirement:** `REQ-RTP-S-002`
 
 ---
@@ -79,9 +81,9 @@ identify the pattern.
 the server is under extreme I/O load).
 **Effect:** The validation task stalls; the queue slot is not filled.
 **Detection:** `CompletableFuture` for the chunk load does not complete before the task's
-scheduled window expires; `MemoryTracker` detects the open reservation (FM-004 path).
-**Response:** The reservation is forcibly closed by FM-004 handling. The sector is not marked
-bad (it was not evaluated); the fill task retries it in the next cycle.
+scheduled window expires; `MemoryTracker` detects the stalled pipeline task (FM-004 path).
+**Response:** The stalled task is cancelled and rescheduled for cleanup by FM-004 handling. The
+location is not marked as a bad location (it was not evaluated); the fill task retries it in the next cycle.
 **Requirement:** `REQ-RTP-S-002`, `REQ-RTP-F-008`
 
 ---
@@ -89,13 +91,13 @@ bad (it was not evaluated); the fill task retries it in the next cycle.
 ## Persistent State
 
 ### FM-006 — Database Unreadable on Startup
-**Component:** H2 / SQLite bad-sector store
+**Component:** H2 / SQLite bad-location store
 **Failure:** The spatial memory database file is corrupt or incompatible after an unclean
 shutdown or manual file modification.
-**Effect:** The bad-sector map cannot be loaded; the plugin cannot resume from prior state.
+**Effect:** The bad-location map cannot be loaded; the plugin cannot resume from prior state.
 **Detection:** Exception thrown during database open or schema migration at `onEnable`.
 **Response:** The plugin logs a WARN-level message identifying the database file and the
-exception. The bad-sector map is initialised empty (as if no fill has been run). The plugin
+exception. The bad-location map is initialised empty (as if no fill has been run). The plugin
 continues to operate; a new fill operation will rebuild the map. The corrupt file is not
 deleted automatically — the operator may inspect it.
 **Requirement:** `REQ-RTP-NF-001`
@@ -151,10 +153,10 @@ developer should declare RTP as a hard `depend` (not `softdepend`) in their `plu
 | ID | Component | Failure | Severity | Response |
 |----|-----------|---------|----------|----------|
 | FM-001 | `RegionQueueManager` | Queue empty | Medium | Queue player UUID for deferred teleport; fulfilled on next replenishment cycle |
-| FM-002 | `MemoryShape` | All sectors bad | High | Log ERROR, operator action required |
+| FM-002 | `MemoryShape` | All locations bad | High | Log ERROR, operator action required |
 | FM-003 | Safety check layer | Location unsafe at dispatch | Medium | Discard, retry next, notify player |
-| FM-004 | `MemoryTracker` | Reservation timeout | High | Force-close ticket, log ERROR |
-| FM-005 | Platform adapter | Chunk load timeout | Medium | Force-close via FM-004, retry sector |
+| FM-004 | `MemoryTracker` | Pipeline task timeout | High | Cancel task, reschedule for cleanup, log SEVERE |
+| FM-005 | Platform adapter | Chunk load timeout | Medium | Force-cleanup via FM-004, retry location |
 | FM-006 | H2 / SQLite | Database unreadable | Medium | Log WARN, start empty, continue |
 | FM-007 | Config loader | Region config malformed | Medium | Log ERROR, skip region, continue |
 | FM-008 | Platform adapter | API linkage failure | High | Plugin disabled, operator action required |

@@ -1,13 +1,18 @@
 package io.github.dailystruggle.rtp.paper_v26_1_R1.server;
 
-
-
+import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.paper_v26_1_R1.world.PaperRTPWorld;
 import io.github.dailystruggle.rtp.spigot.server.AbstractServerAccessor;
 import io.papermc.paper.registry.RegistryAccess;
 import io.papermc.paper.registry.RegistryKey;
+import org.bukkit.Bukkit;
 import org.bukkit.Registry;
+import org.bukkit.World;
 import org.bukkit.block.Biome;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.UUID;
 
 public class ServerAccessorImpl extends AbstractServerAccessor {
   @Override
@@ -16,4 +21,37 @@ public class ServerAccessorImpl extends AbstractServerAccessor {
     return biomeRegistry.stream().map(biome -> biome.getKey().getKey().toUpperCase()).collect(java.util.stream.Collectors.toSet());
   }
 
+  @Override
+  public @Nullable RTPWorld<?> getRTPWorld(String name) {
+    if (worldMapStr.containsKey(name)) {
+      RTPWorld<?> rtpWorld = worldMapStr.get(name);
+      if (rtpWorld.isInactive()) {
+        worldMapStr.remove(name);
+        worldMap.remove(rtpWorld.id());
+      } else return rtpWorld;
+    }
+    World world = Bukkit.getWorld(name);
+    if (world == null) return null;
+    RTPWorld<?> rtpWorld = new PaperRTPWorld(world);
+    worldMap.put(world.getUID(), rtpWorld);
+    worldMapStr.put(name, rtpWorld);
+    return rtpWorld;
+  }
+
+  @Override
+  public @Nullable RTPWorld<?> getRTPWorld(UUID id) {
+    if (worldMap.containsKey(id)) {
+      RTPWorld<?> rtpWorld = worldMap.get(id);
+      if (rtpWorld.isInactive()) {
+        worldMap.remove(id);
+        worldMapStr.remove(rtpWorld.name());
+      } else return rtpWorld;
+    }
+    World world = Bukkit.getWorld(id);
+    if (world == null) return null;
+    RTPWorld<?> rtpWorld = new PaperRTPWorld(world);
+    worldMap.put(id, rtpWorld);
+    worldMapStr.put(world.getName(), rtpWorld);
+    return rtpWorld;
+  }
 }

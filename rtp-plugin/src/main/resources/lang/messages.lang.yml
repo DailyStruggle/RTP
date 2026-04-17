@@ -66,3 +66,4 @@ newWorld: newWorld
 fillRunning: fillRunning
 days: days
 infoRegion: infoRegion
+showDevTag: showDevTag
