@@ -8,6 +8,7 @@ import io.papermc.paper.registry.RegistryKey;
 import org.bukkit.Bukkit;
 import org.bukkit.Registry;
 import org.bukkit.World;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.block.Biome;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -15,6 +16,15 @@ import org.jetbrains.annotations.Nullable;
 import java.util.UUID;
 
 public class ServerAccessorImpl extends AbstractServerAccessor {
+  @Override
+  public void releaseAllChunkTickets() {
+    Object plugin = getPlugin();
+    if (!(plugin instanceof Plugin)) return;
+    for (org.bukkit.World world : Bukkit.getWorlds()) {
+      world.removePluginChunkTickets((Plugin) plugin);
+    }
+  }
+
   @Override
   public @NotNull java.util.Set<String> getBiomes() {
     Registry<Biome> biomeRegistry = RegistryAccess.registryAccess().getRegistry(RegistryKey.BIOME);

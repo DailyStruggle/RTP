@@ -8,10 +8,12 @@ import java.util.Set;
 /**
  * Minimal in-memory implementation of {@link RTPChunk} for use in unit tests.
  *
- * <p>All blocks are reported as air and safe, sky-light is always 15, and
- * {@link #getSurfaceHeight} always returns 64.  This is sufficient for
+ * <p>Blocks at Y &le; 31 are solid (non-air, safe) to simulate a ground layer; all
+ * blocks at Y &ge; 32 are air and safe.  Sky-light is always 15 and
+ * {@link #getSurfaceHeight} always returns 64.  This lets
  * {@link io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor}
- * to find a valid Y coordinate without requiring a real platform chunk.
+ * satisfy the solid-floor requirement ({@code !isAir(i-1)}) and find a valid
+ * landing at Y=32 without requiring a real platform chunk.
  */
 public class MockRTPChunk extends RTPChunk<Object> {
 
@@ -41,10 +43,15 @@ public class MockRTPChunk extends RTPChunk<Object> {
         return chunkZ;
     }
 
-    /** All blocks are air — {@link io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor} bottom-up scan will find Y=minY immediately. */
+    /**
+     * Blocks at Y &le; 31 are solid (non-air) to simulate a ground layer beneath the
+     * default {@link io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor}
+     * minY of 32.  All blocks at Y &ge; 32 are air, so the bottom-up scan finds a
+     * valid landing at Y=32 ({@code !isAir(31)} ✓, {@code isAir(32,33)} ✓).
+     */
     @Override
     public boolean isAir(int x, int y, int z) {
-        return true;
+        return y > 31;
     }
 
     /** Full sky-light everywhere — satisfies requireSkyLight checks. */

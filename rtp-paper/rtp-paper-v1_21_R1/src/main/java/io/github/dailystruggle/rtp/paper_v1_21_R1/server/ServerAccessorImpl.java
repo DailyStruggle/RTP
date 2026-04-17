@@ -5,12 +5,22 @@ import io.github.dailystruggle.rtp.paper_v1_21_R1.world.PaperRTPWorld;
 import io.github.dailystruggle.rtp.spigot.server.AbstractServerAccessor;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
+import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
 
 public class ServerAccessorImpl extends AbstractServerAccessor {
+  @Override
+  public void releaseAllChunkTickets() {
+    Object plugin = getPlugin();
+    if (!(plugin instanceof Plugin)) return;
+    for (org.bukkit.World world : Bukkit.getWorlds()) {
+      world.removePluginChunkTickets((Plugin) plugin);
+    }
+  }
+
   @Override
   public @NotNull java.util.Set<String> getBiomes() {
     return org.bukkit.Registry.BIOME.stream().map(biome -> biome.getKey().getKey().toUpperCase()).collect(java.util.stream.Collectors.toSet());

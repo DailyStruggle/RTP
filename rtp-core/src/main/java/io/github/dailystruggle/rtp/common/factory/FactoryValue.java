@@ -191,7 +191,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     } else if (resObj instanceof String) {
       resObj = ((String) resObj).replaceAll(",", ".");
       try {
-        res = Double.parseDouble(((Character) resObj).toString());
+        res = Double.parseDouble((String) resObj);
       } catch (NumberFormatException e) {
         RTP.log(
             Level.SEVERE,

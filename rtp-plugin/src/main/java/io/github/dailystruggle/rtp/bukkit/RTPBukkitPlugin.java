@@ -30,7 +30,12 @@ import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import java.io.File;
+import java.io.InputStream;
+import java.net.URI;
 import java.nio.file.FileSystemException;
+import java.nio.file.Files;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
@@ -85,6 +90,38 @@ public final class RTPBukkitPlugin extends JavaPlugin {
   }
 
   /** on class load by bukkit */
+  private void extractDocs() {
+    File docsDir = new File(getDataFolder(), "docs");
+    try {
+      URI uri = getClass().getProtectionDomain().getCodeSource().getLocation().toURI();
+      try (JarFile jar = new JarFile(new File(uri))) {
+        Enumeration<JarEntry> entries = jar.entries();
+        boolean extracted = false;
+        while (entries.hasMoreElements()) {
+          JarEntry entry = entries.nextElement();
+          String name = entry.getName();
+          if (!name.startsWith("docs/") || name.equals("docs/")) continue;
+          File outFile = new File(getDataFolder(), name);
+          if (entry.isDirectory()) {
+            outFile.mkdirs();
+            continue;
+          }
+          outFile.getParentFile().mkdirs();
+          if (outFile.exists()) continue;
+          try (InputStream in = jar.getInputStream(entry)) {
+            Files.copy(in, outFile.toPath());
+            extracted = true;
+          }
+        }
+        if (extracted) {
+          SendMessage.log(Level.INFO, "#55FF55Documentation extracted to: #AAFFAA" + docsDir.getAbsolutePath());
+        }
+      }
+    } catch (Exception e) {
+      SendMessage.log(Level.WARNING, "#FFAA00Failed to extract documentation", e);
+    }
+  }
+
   @Override
   public void onLoad() {
     // prepare sqlite capability
@@ -99,6 +136,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
   @Override
   public void onEnable() {
     metrics = new Metrics(this, 12277);
+    extractDocs();
 
     if (instance == null) {
       instance = this;
@@ -392,6 +430,8 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     } catch (NoClassDefFoundError ignored) {
       // catch plugin replaced, no use for old logs
     }
+
+    if (RTP.serverAccessor != null) RTP.serverAccessor.releaseAllChunkTickets();
 
     super.onDisable();
   }

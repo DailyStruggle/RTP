@@ -31,6 +31,18 @@ dependencies {
     implementation 'xyz.tozymc.spigot:title-api:1.0'
 }
 
+tasks.register('copyDocs', Copy) {
+    from rootProject.file('docs')
+    from(rootProject.projectDir) {
+        include '*.md'
+        include 'LICENSE'
+    }
+    into layout.buildDirectory.dir('resources/main/docs')
+}
+
+processResources.dependsOn copyDocs
+shadowJar.dependsOn processResources
+
 shadowJar {
     archiveBaseName.set('RTP')
     archiveClassifier.set('')

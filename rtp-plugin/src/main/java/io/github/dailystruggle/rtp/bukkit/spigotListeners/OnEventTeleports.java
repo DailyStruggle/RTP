@@ -26,6 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
+import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
@@ -41,7 +42,7 @@ public class OnEventTeleports implements Listener {
 
   private static boolean checkPerms(Player player, String... permissions) {
     return ParsePermissions.hasPerm(
-        RTP.serverAccessor.getSender(player.getUniqueId()), "rtp.onEvent.", permissions);
+        RTP.serverAccessor.getSender(player.getUniqueId()), "rtp.onevent.", permissions);
   }
 
   private static void teleportAction(Player player) {
@@ -64,6 +65,8 @@ public class OnEventTeleports implements Listener {
   @EventHandler(priority = EventPriority.NORMAL)
   public void onPlayerChangeWorld(PlayerChangedWorldEvent event) {
     Player player = event.getPlayer();
+    // skip world-change events that were triggered by an RTP teleport itself
+    if (RTP.getInstance().invulnerablePlayers.containsKey(player.getUniqueId())) return;
     if (checkPerms(event.getPlayer(), "changeworld")) {
       ConfigParser<LoggingKeys> logging =
           (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
@@ -368,7 +371,7 @@ public class OnEventTeleports implements Listener {
           (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
       boolean verbose = false;
       if (logging != null) {
-        Object o = logging.getConfigValue(LoggingKeys.event_move, false);
+        Object o = logging.getConfigValue(LoggingKeys.event_teleport, false);
         if (o instanceof Boolean) {
           verbose = (Boolean) o;
         } else {
@@ -377,7 +380,7 @@ public class OnEventTeleports implements Listener {
       }
       if (verbose)
         RTP.log(Level.INFO, "#0080FF[RTP] teleporting player:" + player + " on teleport");
-      teleportAction(player);
+      Bukkit.getScheduler().runTaskLater(RTPBukkitPlugin.getPlugin(RTPBukkitPlugin.class), () -> teleportAction(player), 5L);
     }
   }
 }

@@ -132,16 +132,17 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
             for (int i = minY; i < maxY; i++) {
               int skylight = 15;
               if (requireSkyLight) skylight = chunk.getSkyLight(x, i + 1, z);
-              if (skylight > 7
+              if (!chunk.isAir(x, i - 1, z)
+                  && chunk.isAir(x, i, z)
+                  && chunk.isAir(x, i + 1, z)
+                  && skylight > 7
                   && chunk.isSafe(x, i, z, unsafeBlocks)
                   && chunk.isSafe(x, i + 1, z, unsafeBlocks)
                   && chunk.isSafe(x, i - 1, z, unsafeBlocks)) {
-                if (chunk.isAir(x, i, z) && chunk.isAir(x, i + 1, z)) {
-                  output.setWorldName(chunk.getWorld().name());
-                  output.setXZ(globalX, globalZ);
-                  output.setY(i);
-                  return true;
-                }
+                output.setWorldName(chunk.getWorld().name());
+                output.setXZ(globalX, globalZ);
+                output.setY(i);
+                return true;
               }
             }
             break;
@@ -151,16 +152,17 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
             for (int i = maxY; i > minY; i--) {
               int skylight = 15;
               if (requireSkyLight) skylight = chunk.getSkyLight(x, i + 1, z);
-              if (skylight > 7
+              if (!chunk.isAir(x, i - 1, z)
+                  && chunk.isAir(x, i, z)
+                  && chunk.isAir(x, i + 1, z)
+                  && skylight > 7
                   && chunk.isSafe(x, i, z, unsafeBlocks)
                   && chunk.isSafe(x, i + 1, z, unsafeBlocks)
                   && chunk.isSafe(x, i - 1, z, unsafeBlocks)) {
-                if (chunk.isAir(x, i, z) && chunk.isAir(x, i + 1, z)) {
-                  output.setWorldName(chunk.getWorld().name());
-                  output.setXZ(globalX, globalZ);
-                  output.setY(i);
-                  return true;
-                }
+                output.setWorldName(chunk.getWorld().name());
+                output.setXZ(globalX, globalZ);
+                output.setY(i);
+                return true;
               }
             }
             break;
@@ -175,32 +177,34 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
               int y = middle + i;
               int skylight = 15;
               if (requireSkyLight) skylight = chunk.getSkyLight(x, y + 1, z);
-              if (skylight > 7
+              if (!chunk.isAir(x, y - 1, z)
+                  && chunk.isAir(x, y, z)
+                  && chunk.isAir(x, y + 1, z)
+                  && skylight > 7
                   && chunk.isSafe(x, y, z, unsafeBlocks)
                   && chunk.isSafe(x, y + 1, z, unsafeBlocks)
                   && chunk.isSafe(x, y - 1, z, unsafeBlocks)) {
-                if (chunk.isAir(x, y, z) && chunk.isAir(x, y + 1, z)) {
-                  output.setWorldName(chunk.getWorld().name());
-                  output.setXZ(globalX, globalZ);
-                  output.setY(y);
-                  return true;
-                }
+                output.setWorldName(chunk.getWorld().name());
+                output.setXZ(globalX, globalZ);
+                output.setY(y);
+                return true;
               }
 
               // try bottom
               y = middle - i;
               skylight = 15;
               if (requireSkyLight) skylight = chunk.getSkyLight(x, y + 1, z);
-              if (skylight > 7
+              if (!chunk.isAir(x, y - 1, z)
+                  && chunk.isAir(x, y, z)
+                  && chunk.isAir(x, y + 1, z)
+                  && skylight > 7
                   && chunk.isSafe(x, y, z, unsafeBlocks)
                   && chunk.isSafe(x, y + 1, z, unsafeBlocks)
                   && chunk.isSafe(x, y - 1, z, unsafeBlocks)) {
-                if (chunk.isAir(x, y, z) && chunk.isAir(x, y + 1, z)) {
-                  output.setWorldName(chunk.getWorld().name());
-                  output.setXZ(globalX, globalZ);
-                  output.setY(y);
-                  return true;
-                }
+                output.setWorldName(chunk.getWorld().name());
+                output.setXZ(globalX, globalZ);
+                output.setY(y);
+                return true;
               }
             }
             break;
@@ -215,32 +219,34 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
               int y = middle + i;
               int skylight = 15;
               if (requireSkyLight) skylight = chunk.getSkyLight(x, y + 1, z);
-              if (skylight > 7
+              if (!chunk.isAir(x, y - 1, z)
+                  && chunk.isAir(x, y, z)
+                  && chunk.isAir(x, y + 1, z)
+                  && skylight > 7
                   && chunk.isSafe(x, y, z, unsafeBlocks)
                   && chunk.isSafe(x, y + 1, z, unsafeBlocks)
                   && chunk.isSafe(x, y - 1, z, unsafeBlocks)) {
-                if (chunk.isAir(x, y, z) && chunk.isAir(x, y + 1, z)) {
-                  output.setWorldName(chunk.getWorld().name());
-                  output.setXZ(globalX, globalZ);
-                  output.setY(y);
-                  return true;
-                }
+                output.setWorldName(chunk.getWorld().name());
+                output.setXZ(globalX, globalZ);
+                output.setY(y);
+                return true;
               }
 
               // try bottom
               y = middle - i;
               skylight = 15;
               if (requireSkyLight) skylight = chunk.getSkyLight(x, y + 1, z);
-              if (skylight > 7
+              if (!chunk.isAir(x, y - 1, z)
+                  && chunk.isAir(x, y, z)
+                  && chunk.isAir(x, y + 1, z)
+                  && skylight > 7
                   && chunk.isSafe(x, y, z, unsafeBlocks)
                   && chunk.isSafe(x, y + 1, z, unsafeBlocks)
                   && chunk.isSafe(x, y - 1, z, unsafeBlocks)) {
-                if (chunk.isAir(x, y, z) && chunk.isAir(x, y + 1, z)) {
-                  output.setWorldName(chunk.getWorld().name());
-                  output.setXZ(globalX, globalZ);
-                  output.setY(y);
-                  return true;
-                }
+                output.setWorldName(chunk.getWorld().name());
+                output.setXZ(globalX, globalZ);
+                output.setY(y);
+                return true;
               }
             }
             break;
@@ -261,16 +267,17 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
               int i = trials.get(k);
               int skylight = 15;
               if (requireSkyLight) skylight = chunk.getSkyLight(x, i + 1, z);
-              if (skylight > 7
+              if (!chunk.isAir(x, i - 1, z)
+                  && chunk.isAir(x, i, z)
+                  && chunk.isAir(x, i + 1, z)
+                  && skylight > 7
                   && chunk.isSafe(x, i, z, unsafeBlocks)
                   && chunk.isSafe(x, i + 1, z, unsafeBlocks)
                   && chunk.isSafe(x, i - 1, z, unsafeBlocks)) {
-                if (chunk.isAir(x, i, z) && chunk.isAir(x, i + 1, z)) {
-                  output.setWorldName(chunk.getWorld().name());
-                  output.setXZ(globalX, globalZ);
-                  output.setY(i);
-                  return true;
-                }
+                output.setWorldName(chunk.getWorld().name());
+                output.setXZ(globalX, globalZ);
+                output.setY(i);
+                return true;
               }
             }
           }
