@@ -226,8 +226,13 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
         Logger.getLogger("RTP-Mock").log(level, msg, throwable);
     }
 
+    /** Messages passed to {@link #announce} — inspectable in tests. */
+    public final List<String> announcedMessages = new ArrayList<>();
+
     @Override
-    public void announce(String msg, String permission, String tag) { }
+    public void announce(String msg, String permission, String tag) {
+        announcedMessages.add(msg);
+    }
 
     // -------------------------------------------------------------------------
     // RTPServerAccessor — biomes / materials

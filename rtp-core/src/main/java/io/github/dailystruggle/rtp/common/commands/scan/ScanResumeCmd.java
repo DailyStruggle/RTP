@@ -6,6 +6,8 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.ScanTask;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -39,7 +41,10 @@ public class ScanResumeCmd extends ScanSubCmd {
       ConfigParser<MessagesKeys> parser =
           (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
       if (scanTask == null) {
-        return scanStartCmd.onCommand(callerId, parameterValues, null);
+        Map<String, List<String>> singleRegion = new HashMap<>(parameterValues);
+        singleRegion.put("region", Collections.singletonList(region.name));
+        scanStartCmd.onCommand(callerId, singleRegion, null);
+        continue;
       }
 
       scanTask.pause.set(false);

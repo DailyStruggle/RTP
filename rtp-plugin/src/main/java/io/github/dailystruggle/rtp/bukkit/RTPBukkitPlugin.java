@@ -622,6 +622,35 @@ public final class RTPBukkitPlugin extends JavaPlugin {
                       String actionbar = lang.getConfigValue(MessagesKeys.actionbar, "").toString();
                       SendMessage.actionbar(player, actionbar);
                     });
+
+            ConfigParser<ConfigKeys> configParser =
+                (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
+
+            Object consoleCommandsObj =
+                configParser.getConfigValue(ConfigKeys.consoleCommands, new ArrayList<>());
+            if (consoleCommandsObj instanceof List<?> consoleCommands) {
+              for (Object cmd : consoleCommands) {
+                if (cmd == null) continue;
+                String command = cmd.toString().replace("[player]", player.getName());
+                if (command.isBlank()) continue;
+                Bukkit.getScheduler()
+                    .runTask(
+                        this,
+                        () -> Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command));
+              }
+            }
+
+            Object playerCommandsObj =
+                configParser.getConfigValue(ConfigKeys.playerCommands, new ArrayList<>());
+            if (playerCommandsObj instanceof List<?> playerCommands) {
+              for (Object cmd : playerCommands) {
+                if (cmd == null) continue;
+                String command = cmd.toString().replace("[player]", player.getName());
+                if (command.isBlank()) continue;
+                Bukkit.getScheduler()
+                    .runTask(this, () -> player.performCommand(command));
+              }
+            }
           }
 
           if (task.player() != null) {
