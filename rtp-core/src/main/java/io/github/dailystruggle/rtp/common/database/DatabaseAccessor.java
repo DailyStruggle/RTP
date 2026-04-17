@@ -546,7 +546,6 @@ public abstract class DatabaseAccessor<D> {
 
       // Drain file writes within time budget
       while (!fileWriteQueue.isEmpty()) {
-        if (stop.get()) return;
         FileWriteRequest req = fileWriteQueue.poll();
         if (req == null) continue;
         long localStart = System.nanoTime();
@@ -554,8 +553,8 @@ public abstract class DatabaseAccessor<D> {
           java.nio.file.Path p = java.nio.file.Paths.get(req.path);
           java.nio.file.Files.createDirectories(p.getParent());
           java.nio.file.Files.write(p, req.data);
-        } catch (Exception ignored) {
-          // Intentionally ignore to avoid blocking the queue; callers can retry later if needed
+        } catch (Exception e) {
+          RTP.log(Level.WARNING, "[DatabaseAccessor] Failed to write file: " + req.path + " - " + e.getMessage(), e);
         }
         long localStop = System.nanoTime();
         if (localStop < start) start = -(Long.MAX_VALUE - start); // overflow correction
@@ -565,7 +564,6 @@ public abstract class DatabaseAccessor<D> {
 
       // Drain file reads within time budget
       while (!fileReadQueue.isEmpty()) {
-        if (stop.get()) return;
         FileReadRequest req = fileReadQueue.poll();
         if (req == null) continue;
         long localStart = System.nanoTime();

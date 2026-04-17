@@ -124,7 +124,7 @@ public class SendMessage {
       text = PlaceholderProvider.fillNumericPlaceholders(text);
     }
 
-    // check PAPI exists and fill remaining PAPI placeholders
+    // check PAPI exists and scan remaining PAPI placeholders
     // todo: if a null player doesn't work with another PAPI import, blame that import for not
     // verifying its inputs.
     text = PAPIChecker.fillPlaceholders(player, text);
@@ -142,7 +142,7 @@ public class SendMessage {
 
     text = PlaceholderProvider.fillPlaceholders(text, uuid);
 
-    // check PAPI exists and fill remaining PAPI placeholders
+    // check PAPI exists and scan remaining PAPI placeholders
     // todo: if a null player doesn't work with another PAPI import, blame that import for not
     // verifying its inputs.
     text = PAPIChecker.fillPlaceholders(player, text);
@@ -164,7 +164,7 @@ public class SendMessage {
       text = PlaceholderProvider.fillNumericPlaceholders(text);
     }
 
-    // check PAPI exists and fill remaining PAPI placeholders
+    // check PAPI exists and scan remaining PAPI placeholders
     // todo: if a null player doesn't work with another PAPI import, blame that import for not
     // verifying its inputs.
     text = PAPIChecker.fillPlaceholders(player, text);

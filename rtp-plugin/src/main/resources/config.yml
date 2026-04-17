@@ -27,8 +27,8 @@ playerCommands: [
 # --- Database Settings ---
 # Where to store cached locations and player data.
 database:
-  # Available types: yaml, sqlite, h2, mysql, postgresql
-  # - yaml/sqlite/h2: Local files (no additional setup required)
+  # Available types: yaml, sqlite, mysql, postgresql
+  # - yaml/sqlite: Local files (no additional setup required)
   # - mysql/postgresql: Remote database (requires credentials below)
   type: "sqlite"
   

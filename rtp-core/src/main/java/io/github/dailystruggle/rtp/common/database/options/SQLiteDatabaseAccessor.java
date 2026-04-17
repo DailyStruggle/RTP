@@ -271,7 +271,7 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
         for (Map.Entry<TableObj, TableObj> entry : keyValuePairs.entrySet()) {
           create =
               create
-                  .append(entry.getKey().object.toString())
+                  .append("\"").append(entry.getKey().object.toString()).append("\"")
                   .append(" ")
                   .append("TEXT")
                   .append(", ");
@@ -308,7 +308,7 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
         for (Map.Entry<TableObj, TableObj> entry : keyValuePairs.entrySet()) {
           create =
               create
-                  .append(entry.getKey().object.toString())
+                  .append("\"").append(entry.getKey().object.toString()).append("\"")
                   .append(" ")
                   .append("TEXT")
                   .append(", ");
@@ -370,7 +370,7 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
           throw new IllegalStateException("Unexpected value: " + entry.getKey().expectedType);
       }
 
-      sql = "ALTER TABLE " + tableName + " ADD " + key + " " + typeStr + ";";
+      sql = "ALTER TABLE " + tableName + " ADD \"" + key + "\" " + typeStr + ";";
       try {
         statement.execute(sql);
       } catch (SQLException e) {

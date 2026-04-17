@@ -36,7 +36,7 @@ permissions:
     description: allow player to use /rtp config
     default: op
   rtp.fill:
-    description: allow player to start fill tasks
+    description: allow player to start scan tasks
     default: op
   rtp.noDelay:
     description: skip the teleport delay

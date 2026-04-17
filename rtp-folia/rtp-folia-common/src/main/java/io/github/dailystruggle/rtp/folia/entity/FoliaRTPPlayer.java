@@ -107,9 +107,9 @@ public final class FoliaRTPPlayer implements RTPPlayer {
     // Create an org.bukkit.Location directly from the cached RTPLocation.
     // Because the coordinates are already pre-centered by the generation pipeline, do not add any offsets to X, Y, or Z.
     // Just apply the player's current yaw and pitch to the new location.
-    double x = to.x();
+    double x = to.x() + 0.5;
     double y = to.y();
-    double z = to.z();
+    double z = to.z() + 0.5;
     Location destinationLocation = new Location(world, x, y, z, player.getLocation().getYaw(), player.getLocation().getPitch());
 
     // Step 2: Fire the Initial Teleport

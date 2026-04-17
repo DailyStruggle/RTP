@@ -12,7 +12,7 @@ import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.tasks.FillTask;
+import io.github.dailystruggle.rtp.common.tasks.ScanTask;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 
@@ -421,49 +421,49 @@ public class PlaceholderProvider {
                             data.selectedCoords.x(), data.selectedCoords.y(), data.selectedCoords.z());
                 });
         placeholders.put(
-                "fill_chunks",
+                "scan_chunks",
                 uuid -> {
                     if (RTP.getInstance() == null) return "0";
                     long total = 0;
-                    for (FillTask task : RTP.getInstance().fillTasks.values()) {
+                    for (ScanTask task : RTP.getInstance().scanTasks.values()) {
                         total += task.latestAbsolutePos;
                     }
                     return String.valueOf(total);
                 });
         placeholders.put(
-                "fill_totalChunks",
+                "scan_totalChunks",
                 uuid -> {
                     if (RTP.getInstance() == null) return "0";
                     long total = 0;
-                    for (FillTask task : RTP.getInstance().fillTasks.values()) {
+                    for (ScanTask task : RTP.getInstance().scanTasks.values()) {
                         total += task.latestAbsoluteTotal;
                     }
                     return String.valueOf(total);
                 });
         placeholders.put(
-                "fill_cps",
+                "scan_cps",
                 uuid -> {
                     if (RTP.getInstance() == null) return "0";
                     long total = 0;
-                    for (FillTask task : RTP.getInstance().fillTasks.values()) {
+                    for (ScanTask task : RTP.getInstance().scanTasks.values()) {
                         total += task.latestCps;
                     }
                     return String.valueOf(total);
                 });
         placeholders.put(
-                "fill_regions",
+                "scan_regions",
                 uuid -> {
                     if (RTP.getInstance() == null) return "";
-                    return String.join(", ", RTP.getInstance().fillTasks.keySet());
+                    return String.join(", ", RTP.getInstance().scanTasks.keySet());
                 });
         placeholders.put(
-                "fill_eta",
+                "scan_eta",
                 uuid -> {
                     try {
                         if (RTP.getInstance() == null) return "0s";
 
                         long maxEta = 0;
-                        for (FillTask task : RTP.getInstance().fillTasks.values()) {
+                        for (ScanTask task : RTP.getInstance().scanTasks.values()) {
                             if (task.latestEtaSeconds > maxEta) maxEta = task.latestEtaSeconds;
                         }
 
@@ -495,7 +495,7 @@ public class PlaceholderProvider {
 
                         return replacement.toString().trim();
                     } catch (Exception e) {
-                        RTP.log(java.util.logging.Level.WARNING, "Placeholder resolution failed for fill_eta", e);
+                        RTP.log(java.util.logging.Level.WARNING, "Placeholder resolution failed for scan_eta", e);
                         return "0s";
                     }
                 });

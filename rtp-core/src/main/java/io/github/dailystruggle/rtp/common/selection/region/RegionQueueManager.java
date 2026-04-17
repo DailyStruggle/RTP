@@ -235,7 +235,16 @@ public class RegionQueueManager {
      */
     void enqueuePlayerLocation(UUID uuid, RTPLocation location) {
         perPlayerLocationQueue.putIfAbsent(uuid, new ConcurrentLinkedQueue<>());
-        perPlayerLocationQueue.get(uuid).add(location);
+        ConcurrentLinkedQueue<RTPLocation> queue = perPlayerLocationQueue.get(uuid);
+
+        // Enforce max 1 location per player: drain any existing extras before adding the new one
+        RTPLocation excess;
+        while ((excess = queue.poll()) != null) {
+            if (excess.reservation() != null) excess.reservation().close();
+            unkeptLocations.offer(excess);
+        }
+
+        queue.add(location);
         if (RTP.getInstance().databaseAccessor != null) {
             RTP.getInstance().databaseAccessor.saveCachedLocation(region.name, location, uuid);
         }

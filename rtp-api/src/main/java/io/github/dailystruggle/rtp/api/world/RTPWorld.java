@@ -201,6 +201,37 @@ public abstract class RTPWorld<T> {
   public abstract int getMinHeight();
 
   /**
+   * Release any chunk tickets whose keys are not present in the provided keep-alive set.
+   *
+   * <p>This is called by the MemoryTracker GC sweep to reclaim orphaned tickets that were
+   * never released because their owning reservation was abandoned (e.g. a location was
+   * evicted from the kept-locations cache without closing its ChunkReservation).
+   *
+   * @param keepAliveKeys the set of chunk keys that must NOT be released
+   */
+  public final void releaseOrphanedTickets(java.util.Set<Long> keepAliveKeys) {
+    // Snapshot the keys to avoid ConcurrentModificationException during removal
+    java.util.List<Long> orphaned = new java.util.ArrayList<>();
+    for (Long key : chunkTickets.keySet()) {
+      if (!keepAliveKeys.contains(key)) {
+        orphaned.add(key);
+      }
+    }
+    for (Long key : orphaned) {
+      int cx = (int) (key & 0xffffffffL);
+      int cz = (int) (key >>> 32);
+      // Drain all ticket counts for this key by calling setForceLoaded(false) until removed
+      AtomicInteger count = chunkTickets.get(key);
+      if (count != null) {
+        int times = count.get();
+        for (int i = 0; i < times; i++) {
+          setForceLoaded(cx, cz, false);
+        }
+      }
+    }
+  }
+
+  /**
    * Get the number of chunks currently held in the cache
    *
    * @return the cache size

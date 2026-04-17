@@ -25,7 +25,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.jump.JumpAdjustor;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
-import io.github.dailystruggle.rtp.common.tasks.FillTask;
+import io.github.dailystruggle.rtp.common.tasks.ScanTask;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.common.tasks.TimeBoundTaskPipe;
@@ -122,7 +122,7 @@ public class RTP {
   public RTPTaskPipe miscAsyncTasks;
   public RTPTaskPipe startupTasks;
   public RTPTaskPipe cancelTasks;
-  public final Map<String, FillTask> fillTasks = new ConcurrentHashMap<>();
+  public final Map<String, ScanTask> scanTasks = new ConcurrentHashMap<>();
   public final ConcurrentHashMap<UUID, Long> invulnerablePlayers = new ConcurrentHashMap<>();
   public final ConcurrentLinkedQueue<RTPChunk<?>> chunksToUnload = new ConcurrentLinkedQueue<>();
   public DatabaseAccessor<?> databaseAccessor;
@@ -407,7 +407,6 @@ public class RTP {
         sqlDatabaseAccessor.flush();
       }
       instance.databaseAccessor.flushDirtyCache();
-      instance.databaseAccessor.stop.set(true);
     }
 
     instance.miscAsyncTasks.stop();
@@ -428,6 +427,10 @@ public class RTP {
     }
     selectionAPI.tempRegions.clear();
 
+    if (instance.databaseAccessor != null) {
+      instance.databaseAccessor.stop.set(true);
+    }
+
     instance.latestTeleportData.forEach(
         (uuid, data) -> {
           if (!data.completed) new RTPTeleportCancel(uuid).run();
@@ -435,7 +438,7 @@ public class RTP {
 
     instance.processingPlayers.clear();
 
-    FillTask.kill();
+    ScanTask.kill();
 
     if (instance.redisManager != null) {
       instance.redisManager.shutdown();

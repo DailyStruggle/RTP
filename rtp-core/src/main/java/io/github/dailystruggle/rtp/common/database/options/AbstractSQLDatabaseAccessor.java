@@ -105,7 +105,9 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
   public void flush() {
     if (writeQueue.isEmpty()) return;
 
-    try (Connection connection = getConnection()) {
+    Connection connection = null;
+    try {
+      connection = getConnection();
       connection.setAutoCommit(false);
       String sql = getInsertStatement();
       try (PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -134,8 +136,16 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
         statement.executeBatch();
         connection.commit();
       } catch (SQLException e) {
-        connection.rollback();
+        try {
+          connection.rollback();
+        } catch (SQLException rollbackEx) {
+          RTP.log(Level.WARNING, "Failed to rollback after flush error", rollbackEx);
+        }
         RTP.log(Level.WARNING, "Failed to flush teleport data batch", e);
+      } finally {
+        try {
+          connection.setAutoCommit(true);
+        } catch (SQLException ignored) {}
       }
     } catch (SQLException e) {
       RTP.log(Level.WARNING, "Database connection error during flush", e);

@@ -8,7 +8,7 @@ import io.github.dailystruggle.rtp.bukkit.events.TeleportCommandFailEvent;
 import io.github.dailystruggle.rtp.bukkit.events.TeleportCommandSuccessEvent;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.RTPCmd;
-import io.github.dailystruggle.rtp.common.commands.fill.FillCmd;
+import io.github.dailystruggle.rtp.common.commands.scan.ScanCmd;
 import io.github.dailystruggle.rtp.common.commands.help.HelpCmd;
 import io.github.dailystruggle.rtp.common.commands.info.InfoCmd;
 import io.github.dailystruggle.rtp.common.commands.parameters.RegionParameter;
@@ -130,7 +130,7 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
     addSubCommand(new ReloadCmd(this));
     addSubCommand(new HelpCmd(this));
     addSubCommand(new ConfigCmd(this));
-    addSubCommand(new FillCmd(this));
+    addSubCommand(new ScanCmd(this));
     addSubCommand(new InfoCmd(this));
   }
 

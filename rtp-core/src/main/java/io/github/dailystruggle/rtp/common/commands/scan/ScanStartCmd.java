@@ -1,10 +1,8 @@
-package io.github.dailystruggle.rtp.common.commands.fill;
+package io.github.dailystruggle.rtp.common.commands.scan;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
-import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
-import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
@@ -12,15 +10,14 @@ import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
-import io.github.dailystruggle.rtp.common.tasks.FillTask;
-import java.util.ArrayList;
+import io.github.dailystruggle.rtp.common.tasks.ScanTask;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
-public class FillStartCmd extends FillSubCmd {
-  public FillStartCmd(@Nullable CommandsAPICommand parent) {
+public class ScanStartCmd extends ScanSubCmd {
+  public ScanStartCmd(@Nullable CommandsAPICommand parent) {
     super(parent);
   }
 
@@ -41,15 +38,15 @@ public class FillStartCmd extends FillSubCmd {
 
     List<Region> regions = getRegions(callerId, parameterValues.get("region"));
     for (Region region : regions) {
-      FillTask fillTask = RTP.getInstance().fillTasks.get(region.name);
+      ScanTask scanTask = RTP.getInstance().scanTasks.get(region.name);
       ConfigParser<MessagesKeys> parser =
           (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-      if (fillTask != null) {
+      if (scanTask != null) {
         if (parser == null) continue;
-        String msg = String.valueOf(parser.getConfigValue(MessagesKeys.fillRunning, ""));
+        String msg = String.valueOf(parser.getConfigValue(MessagesKeys.scanRunning, ""));
         if (msg == null || msg.isEmpty()) continue;
         msg = msg.replace("[region]", region.name);
-        RTP.serverAccessor.announce(msg, "rtp.fill", "FILL");
+        RTP.serverAccessor.announce(msg, "rtp.scan", "SCAN");
         continue;
       }
 
@@ -67,35 +64,25 @@ public class FillStartCmd extends FillSubCmd {
       }
 
       shape.clear();
-      shape.save(region.name, region.getWorld().name());
-      FillTask.delete(region.name);
+      shape.save(region.name + "_" + region.getWorld().getSeed(), region.getWorld().name());
+      ScanTask.delete(region.name);
       MultiConfigParser<RegionKeys> multiConfigParser = (MultiConfigParser<RegionKeys>) RTP.configs.getParser(RegionKeys.class);
       if (multiConfigParser != null) {
         ConfigParser<RegionKeys> regionConfig = multiConfigParser.getParser(region.name);
         shape.spatialResolution = regionConfig.getNumber(RegionKeys.spatialResolution, 1L).longValue();
       }
 
-      FillTask task = new FillTask(region, 0L);
-      RTP.getInstance().fillTasks.put(region.name, task);
+      ScanTask task = new ScanTask(region, 0L);
+      RTP.getInstance().scanTasks.put(region.name, task);
       RTP.scheduler.runTaskAsynchronously(task);
       if (parser == null) continue;
-      String msg = String.valueOf(parser.getConfigValue(MessagesKeys.fillStart, ""));
+      String msg = String.valueOf(parser.getConfigValue(MessagesKeys.scanStart, ""));
       if (msg == null || msg.isEmpty()) continue;
       msg = msg.replace("[region]", region.name);
-      RTP.serverAccessor.announce(msg, "rtp.fill", "FILL");
+      RTP.serverAccessor.announce(msg, "rtp.scan", "SCAN");
     }
 
     return true;
   }
 
-  public List<Region> getRegions(UUID callerId, List<String> regionParameter) {
-    List<Region> regions = new ArrayList<>();
-    RTPCommandSender sender = RTP.serverAccessor.getSender(callerId);
-    if (regionParameter != null) {
-      for (String name : regionParameter) regions.add(RTP.selectionAPI.getRegion(name));
-    } else if (sender instanceof RTPPlayer)
-      regions.add(RTP.selectionAPI.getRegion((RTPPlayer) sender));
-    else regions.add(RTP.selectionAPI.getRegion("default"));
-    return regions;
-  }
 }
