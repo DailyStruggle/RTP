@@ -1,5 +1,7 @@
 # Migration Guide
 
+**Current Plugin Version:** `3.0.0-beta`
+
 This document provides upgrade instructions for server operators and addon developers when moving between RTP versions.
 
 ---
@@ -12,6 +14,7 @@ This document provides upgrade instructions for server operators and addon devel
 
 | Area | Change | Action Required |
 |------|--------|-----------------|
+| `rtp.fill` -> `rtp.scan` | The `rtp.fill` permission and `/rtp fill` command have been renamed to `rtp.scan` and `/rtp scan`. | Update your permission plugin (e.g., LuckPerms) to use `rtp.scan` instead of `rtp.fill`. |
 | `rtp-api`: `ChunkReservation` added | Chunk ticket lifecycle is now managed via the `ChunkReservation` class (implements `AutoCloseable`) in `rtp-api`. | Addons that previously managed chunk tickets directly must migrate to `ChunkReservation`. |
 | `rtp-api`: `CachedLocation` is now a record | `CachedLocation` has been refactored from a mutable class to an immutable Java record. | Any addon code that mutated `CachedLocation` fields directly must be updated to construct a new instance instead. |
 | PaperLib removed | The `rtp-paper` adapter no longer depends on PaperLib. Native Paper async chunk APIs are used directly. | Remove PaperLib from your server's `plugins/` folder if RTP was its only consumer. |
@@ -28,7 +31,7 @@ The spatial memory format (`MemoryShape` bad-sector index ranges) is unchanged. 
 
 If you want a clean slate (e.g., after significantly changing a region's geometry), delete the relevant database entries or run:
 ```
-/rtp fill reset
+/rtp scan reset
 ```
 
 ### Addon Developers (`rtp-api` consumers)
@@ -36,8 +39,8 @@ If you want a clean slate (e.g., after significantly changing a region's geometr
 This is a **MAJOR** bump. You must recompile your addon against the new `rtp-api` jar. Review the following source-level changes:
 
 1. **`ChunkReservation`** is now part of `rtp-api`. If your addon previously interacted with chunk tickets directly, replace that logic with `ChunkReservation` (use try-with-resources — it implements `AutoCloseable`).
-2. **`CachedLocation`** is now an immutable record. Replace any field-mutation code with construction of a new `CachedLocation` instance.
-3. All other `rtp-api` interfaces (`RTPEconomy`, `RTPCommandSender`, `RTPPlayer`, `RTPScheduler`, `ILocationGenerator`, `RTPServerAccessor`, `RTPWorld`, `RTPChunk`) are unchanged.
+3. **`CachedLocation`** is now an immutable record. Replace any field-mutation code with construction of a new `CachedLocation` instance.
+4. All other `rtp-api` interfaces (`RTPEconomy`, `RTPCommandSender`, `RTPPlayer`, `RTPScheduler`, `ILocationGenerator`, `RTPServerAccessor`, `RTPWorld`, `RTPChunk`) remain unchanged.
 
 ---
 

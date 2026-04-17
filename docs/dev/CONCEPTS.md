@@ -1,5 +1,7 @@
 ﻿# How RTP Works — Core Concepts
 
+**Current Plugin Version:** `3.0.0-beta`
+
 This document explains what happens under the hood when a player runs `/rtp`.
 No Java knowledge required — it's written for server administrators and curious contributors alike.
 

@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.common.commands.scan;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -33,7 +32,8 @@ public class ScanPauseCmd extends ScanSubCmd {
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return nextCommand.onCommand(callerId, parameterValues, null);
 
-    List<Region> regions = getRegions(callerId, parameterValues.get("region"));
+    List<String> regionParam = parameterValues.get("region");
+    List<Region> regions = getRegions(callerId, regionParam);
     for (Region region : regions) {
       ScanTask scanTask = RTP.getInstance().scanTasks.get(region.name);
       ConfigParser<MessagesKeys> parser =

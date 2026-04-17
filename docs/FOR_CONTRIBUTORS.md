@@ -1,5 +1,7 @@
 # Start Here — Core Contributors
 
+**Current Plugin Version:** `3.0.0-beta`
+
 This page guides developers who contribute to `rtp-core`, `rtp-api`, or a platform adapter module.
 If you are fixing a bug, adding a feature, or updating the architecture, start here.
 

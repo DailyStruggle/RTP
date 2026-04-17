@@ -1,5 +1,7 @@
 # Operator Runbook
 
+**Applies to Plugin Version:** `3.0.0-beta`
+
 This document provides step-by-step diagnosis and resolution procedures for common operational
 problems. Each section follows the pattern: **Symptom → Diagnosis → Resolution**.
 
@@ -12,22 +14,22 @@ For the hazard register see [`HAZARDS.md`](HAZARDS.md).
 ## Server TPS Drops After RTP Activity
 
 **Symptom:** Server tick-rate (TPS) noticeably degrades shortly after players use `/rtp`, or
-during scheduled fill operations.
+during scheduled scan operations.
 
 **Diagnosis:**
 1. Check the active chunk count with a monitoring tool (e.g. `/paper chunklist` or a TPS plugin).
    A high number of force-loaded chunks suggests a chunk leak (see H-004 in `HAZARDS.md`).
 2. Check the server console for SEVERE-level messages from `MemoryTracker` in the form
-   `[RTP] Memory leak detected for object: <label>. Alive <ms>ms past its expected lifespan.`
-   — these indicate pipeline tasks that were force-cancelled by the watchdog.
-3. Check `performance.yml`: if `queueSize` or `fillTaskCount` are set very high relative to
-   server hardware, the fill task may be loading too many chunks per cycle.
+   `[RTP] Memory leak detected for object: <label>. Alive <ms>ms past its expected lifespan.`,
+   as these indicate pipeline tasks that were force-cancelled by the watchdog.
+3. Check `performance.yml`: if `queueSize` or `scanTaskCount` are set very high relative to
+   server hardware, the scan task may be loading too many chunks per cycle.
 
 **Resolution:**
-- If chunk leak is confirmed: run `/rtp fill cancel` for all active regions to stop new
+- If chunk leak is confirmed: run `/rtp scan cancel` for all active regions to stop new
   reservations, then restart the server to clear any residual force-loaded chunks. After restart,
-  lower `fillTaskCount` in `performance.yml` and run `/rtp fill start` again.
-- If fill task is too aggressive: reduce `fillTaskCount` and/or increase `fillTaskDelay` in
+  lower `scanTaskCount` in `performance.yml` and run `/rtp scan resume` again.
+- If spatial memory isn't populating: reduce `scanTaskCount` and/or increase `scanTaskDelay` in
   `performance.yml`, then run `/rtp reload`.
 - If the problem recurs after adjustment, file an issue with the SEVERE log lines from
   `MemoryTracker` attached.
@@ -47,17 +49,18 @@ air, or into a claimed region they cannot build in.
    (GriefPrevention, WorldGuard, etc.) is installed, loaded **after** RTP in load order, and
    that the corresponding RTP addon jar (`RTP_ClaimPluginIntegrations` or equivalent) is present
    in the plugins folder.
-4. Check if the region has been recently reconfigured or if `safety.yml` was edited manually —
-   a syntax error can silently disable safety checks.
+4. Check if the region has been recently reconfigured or if `safety.yml` was edited manually,
+   as a syntax error can silently disable safety checks.
 
 **Resolution:**
 - Add the offending block type to `unsafeBlocks` in the region's `safety.yml`.
 - If the protection addon check is not firing: ensure the addon jar is present and that RTP
   declares it as a `softdepend` (or the addon declares RTP as a `depend`) so load order is
   correct.
-- After any `safety.yml` change, run `/rtp fill reset <region>` to discard pre-generated
-  locations that were validated under the old rules, then `/rtp fill start <region>` to
-  rebuild the queue with the corrected safety checks.
+- After any `safety.yml` change, run `/rtp scan reset <region>` to discard spatial memory
+  that was validated under the old rules, then `/rtp scan start <region>` to rebuild the map
+  with the corrected safety checks. Note that this affects spatial memory (the map), not the
+  pre-generation queue directly.
 
 ---
 
@@ -69,11 +72,11 @@ air, or into a claimed region they cannot build in.
 **Diagnosis:**
 1. Find the first exception in the console output after `[RTP] Enabling`. The most common
    causes are:
-   - `ClassNotFoundException` or `NoSuchMethodError` — wrong adapter jar for this server
+   - `ClassNotFoundException` or `NoSuchMethodError`, usually the wrong adapter jar for this server
      version (see FM-008 in `FAILURE_MODES.md`).
-   - `IllegalStateException: [RTP API] Cannot add shape` — an addon loaded before RTP core
+   - `IllegalStateException: [RTP API] Cannot add shape`, which happens when an addon loads before RTP core
      (see FM-009).
-   - YAML parse error — a config file (`config.yml`, `performance.yml`, a region file) has a
+   - YAML parse error, meaning a config file (`config.yml`, `performance.yml`, or a region file) has a
      syntax error.
 
 **Resolution:**
@@ -103,31 +106,31 @@ fix the reported line, and restart.
 
 ---
 
-## Queue Never Fills / Fill Task Stalls
+## Spatial Memory / Mapping Issues
 
-**Symptom:** `/rtp info <region>` shows the queue size is not increasing over several minutes
-even though a fill is active.
+**Symptom:** `/rtp info <region>` shows the scan task is making slow progress or "sector skipped" messages appear in console.
 
 **Diagnosis:**
-1. Check the server console for WARN or ERROR messages from the fill task. A high rate of
-   "sector skipped" messages indicates the region geometry has very few valid land areas.
+1. Check the server console for WARN or ERROR messages from the scan task. A high rate of
+   "sector skipped" messages indicates the region geometry has very few valid land areas. This is
+   expected behavior for spatial memory—it's learning that those sectors are bad.
 2. Check if `MemoryTracker` is logging repeated SEVERE messages of the form
-   `[RTP] Memory leak detected for object: <label>. Alive <ms>ms past its expected lifespan.`
-   — repeated entries for the same task label point to a chunk that consistently times out
+   `[RTP] Memory leak detected for object: <label>. Alive <ms>ms past its expected lifespan.`,
+   where repeated entries for the same task label point to a chunk that consistently times out
    during loading (FM-005).
-3. Check `performance.yml` for `fillTaskCount` and `fillTaskDelay`. If `fillTaskDelay` is
-   very large, the fill may be making progress but slowly.
+3. Check `performance.yml` for `scanTaskCount` and `scanTaskDelay`. If `scanTaskDelay` is
+   very large, the mapping process may be making progress but slowly.
 4. Run `/rtp info <region>` and verify that `minRadius` / `maxRadius` define a reachable land
    area in the target world.
 
 **Resolution:**
 - If most sectors are bad (e.g. ocean-heavy world): widen the region geometry or run
-  `/rtp fill reset <region>` and reconfigure before re-running fill.
-- If chunk load timeouts are the cause: reduce `fillTaskCount` to lower concurrency, allowing
-  the server more time per chunk. Increase `fillTaskDelay` slightly to give the server
-  recovery periods between fill cycles.
-- If the fill task has genuinely stalled (no log activity for > 5 minutes): run
-  `/rtp fill cancel <region>` then `/rtp fill start <region>` to restart it.
+  `/rtp scan reset <region>` and reconfigure before re-mapping.
+- If chunk load timeouts are the cause: reduce `scanTaskCount` to lower concurrency, allowing
+  the server more time per chunk. Increase `scanTaskDelay` slightly to give the server
+  recovery periods between scan cycles.
+- If the mapping process has genuinely stalled (no log activity for > 5 minutes): run
+  `/rtp scan cancel <region>` then `/rtp scan start <region>` to restart it.
 
 ---
 
@@ -139,7 +142,7 @@ across restarts, consuming significant disk space.
 **Diagnosis:**
 1. Locate the database file: `plugins/RTP/database/` (check `config.yml` for the configured
    path).
-2. A growing database typically means the bad-location map is accumulating entries for a region
+2. A growing database typically means the spatial memory is accumulating entries for a region
    whose geometry keeps changing, or that old region entries are never pruned after a region
    is removed.
 3. Query the database with an H2 or SQLite client to count rows per region table and identify
@@ -147,9 +150,9 @@ across restarts, consuming significant disk space.
 
 **Resolution:**
 - For a removed region: manually delete its table from the database, or delete the database
-  file entirely and rebuild via `/rtp fill start` for all active regions.
-- For an active region with excessive entries: run `/rtp fill reset <region>` to clear the
-  bad-location map, then `/rtp fill start <region>` to rebuild from scratch with the current
+  file entirely and rebuild via `/rtp scan start` for all active regions.
+- For an active region with excessive entries: run `/rtp scan reset <region>` to clear its
+  spatial memory, then `/rtp scan start <region>` to rebuild from scratch with the current
   geometry.
 - After pruning, restart the server so the plugin re-opens the database cleanly.
 
@@ -185,7 +188,7 @@ appear to take effect.
 1. Some configuration keys require a full server restart rather than a reload. Check
    [`CONFIGURATION.md`](CONFIGURATION.md) for the reload vs. restart annotation on the
    changed key.
-2. Verify there are no YAML syntax errors in the edited file — a parse failure causes the
+2. Verify there are no YAML syntax errors in the edited file, as a parse failure causes the
    reload to silently retain the last valid config. Check the console for ERROR messages
    immediately after `/rtp reload`.
 

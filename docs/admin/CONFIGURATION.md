@@ -1,6 +1,8 @@
 # Configuration Reference
 
-All configuration files live in `plugins/RTP/` after the first server start. Edit them directly and run `/rtp reload` to apply changes without restarting.
+**Applies to Plugin Version:** `3.0.0-beta`
+
+All configuration files live in `plugins/RTP/` after the first server start. Edit them directly and run `/rtp reload` to apply changes, as this will update settings without a server restart.
 
 ---
 
@@ -33,8 +35,8 @@ Each file in the `regions/` folder defines one teleport region. The filename (wi
 | `cacheCap` | Integer | `50` | Maximum pre-generated safe locations to hold in the queue. Set to `0` to disable background caching. |
 | `activeChunkCap` | Integer | `10` | Maximum chunks kept loaded simultaneously for zero-latency teleportation. |
 | `price` | Double | `0.0` | Economy cost override for this region (overrides the global `economy.yml` price). |
-| `spatialResolution` | Integer | `3` | Precision level for storing bad-location data in the database. Higher = more memory, finer detail. |
-| `version` | String | `"1.0"` | Internal config version — **do not change**. |
+| `spatialResolution` | Integer | `3` | Precision level for storing spatial memory in the database. Higher = more memory, finer detail. |
+| `version` | String | `"1.0"` | Internal config version (do not change). |
 
 ---
 
@@ -164,22 +166,22 @@ Each file in the `worlds/` folder maps a world to its default region and permiss
 
 ## `performance.yml` — Performance Settings
 
-| Key | Type | Default | Description |
-|---|---|---|---|
-| `maxAttempts` | Integer | `10` | Maximum location search attempts before giving up. Higher = more CPU per request. |
+| Key | Type | Default | Description                                                                           |
+|---|---|---|---------------------------------------------------------------------------------------|
+| `maxAttempts` | Integer | `10` | Maximum location search attempts before giving up. Higher = more CPU per request.     |
 | `viewDistanceSelect` | Integer | `0` | Chunk radius to pre-load around a candidate location during selection. `0` = minimum. |
-| `viewDistanceTeleport` | Integer | `0` | Chunk radius to pre-load around the final destination before teleporting. |
-| `period` | Integer | `100` | Ticks between background cache-fill cycles (20 ticks = 1 second). |
-| `syncAllottedTime` | Integer | `50` | Max milliseconds per tick spent on synchronous RTP tasks. Range: 0–50. |
-| `asyncAllottedTime` | Integer | `50` | Max milliseconds per tick spent on asynchronous RTP tasks. |
-| `minTPS` | Double | `19.0` | Minimum server TPS before the plugin pauses background generation. Range: 0.0–20.0. |
-| `postTeleportQueueing` | Boolean | `false` | If `true`, immediately tries to refill the cache after each teleport. |
-| `syncLoading` | Boolean | `false` | Use synchronous chunk loading. **Not recommended** — can cause server hangs. |
-| `onEventParsing` | Boolean | `false` | Parse permissions on each event. Incompatible with wildcard (`*.*`) permissions. |
-| `effectParsing` | Boolean | `true` | Parse effect permissions on startup. |
-| `biomeRecall` | Boolean | `true` | Reuse previously found biome locations from cache. |
-| `biomeRecallForced` | Boolean | `false` | Only teleport to biomes already in cache (never search for new ones). |
-| `checkOnChunkLoads` | Boolean | `false` | Check for safe locations in chunks as they load. **High impact** on busy servers. |
+| `viewDistanceTeleport` | Integer | `0` | Chunk radius to pre-load around the final destination before teleporting.             |
+| `syncAllottedTime` | Integer | `50` | Max milliseconds per tick spent on synchronous RTP tasks. Range: 0–50.                |
+| `period` | Integer | `100` | Ticks between background cache cycles (where 20 ticks equal 1 second).                     |
+| `asyncAllottedTime` | Integer | `50` | Max milliseconds per tick spent on asynchronous RTP tasks.                            |
+| `minTPS` | Double | `19.0` | Minimum server TPS before the plugin pauses background generation. Range: 0.0–20.0.   |
+| `postTeleportQueueing` | Boolean | `false` | If `true`, immediately tries to refill the cache after each teleport.                 |
+| `syncLoading` | Boolean | `false` | Use synchronous chunk loading. This is **not recommended**, as it can cause server hangs.          |
+| `onEventParsing` | Boolean | `false` | Parse permissions on each event. This is incompatible with wildcard (`*.*`) permissions.      |
+| `effectParsing` | Boolean | `true` | Parse effect permissions on startup.                                                  |
+| `biomeRecall` | Boolean | `true` | Reuse previously found biome locations from cache.                                    |
+| `biomeRecallForced` | Boolean | `false` | Only teleport to biomes already in cache (never search for new ones).                 |
+| `checkOnChunkLoads` | Boolean | `false` | Check for safe locations in chunks as they load. This has a **high impact** on busy servers.     |
 
 ---
 
@@ -219,7 +221,7 @@ Requires **Vault** and a compatible economy plugin. If Vault is absent, all econ
 
 ## Custom Shapes and Addons
 
-All five built-in shape engines (`CIRCLE`, `CIRCLE_NORMAL`, `SQUARE`, `SQUARE_NORMAL`, `RECTANGLE`) are configured inline inside each region's `shape:` block — there are no separate per-shape config files.
+All five built-in shape engines (`CIRCLE`, `CIRCLE_NORMAL`, `SQUARE`, `SQUARE_NORMAL`, `RECTANGLE`) are configured inline inside each region's `shape:` block, as there are no separate per-shape config files.
 
 Custom shapes can be registered at runtime via `rtp-api`. See [`addons/`](../addons/) for examples. A registered custom shape appears as a valid `shape.name` value in any region config.
 
@@ -233,8 +235,8 @@ All player-facing strings are defined here. Supports colour codes using `&` (e.g
 
 ## Tips
 
-- **Run `/rtp reload` after every edit** — no restart needed.
-- **Never change `version:` fields** — they are used internally for config migration.
+- **Run `/rtp reload` after every edit**; no restart needed.
+- **Never change `version:` fields**, as they are used internally for config migration.
 - **Use `[0]`, `[1]`, `[2]`** as world placeholders instead of hardcoded names if your world names may change.
 - **Set `cacheCap` to match your player count** — a server with 50 concurrent players benefits from a larger cache than a server with 5.
 - **Lower `minTPS`** (e.g., `18.0`) on busy servers to prevent the plugin from adding load during lag spikes.
