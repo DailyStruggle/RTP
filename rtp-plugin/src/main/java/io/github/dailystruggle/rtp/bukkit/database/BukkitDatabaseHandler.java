@@ -9,7 +9,6 @@ import java.io.File;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.util.Map;
-import java.util.logging.Level;
 
 public class BukkitDatabaseHandler {
     public static void setupDatabase(RTP rtp) throws FileSystemException {

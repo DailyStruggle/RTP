@@ -48,7 +48,7 @@ public class FabricPlayer implements RTPPlayer {
     @Override
     public boolean hasPermission(String permission) {
         // Simple implementation, might need a proper permission API integration
-        return player.hasPermissionLevel(2); 
+        return player.hasPermissionLevel(2);
     }
 
     @Override

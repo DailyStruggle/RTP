@@ -5,13 +5,13 @@
 
 ## Context
 
-The `MemoryShape` system must persist its knowledge of known-invalid spatial sectors (bad-sector index ranges) across server restarts so that the plugin does not redundantly re-validate locations it has already determined to be unsafe. This requires a durable, queryable store for the sorted set of excluded integer intervals per region.
+The `MemoryShape` system shall persist its knowledge of known-invalid spatial sectors (bad-sector index ranges) across server restarts so that the plugin does not redundantly re-validate locations it has already determined to be unsafe. This requires a durable, queryable store for the sorted set of excluded integer intervals per region.
 
-At the time this decision was made, the developer was not yet deeply familiar with the full landscape of embedded database options. The choice was made pragmatically: use a well-supported embedded SQL database rather than designing a custom flat-file format.
+The persistence layer shall be backed by a well-supported embedded SQL database rather than a custom flat-file format, ensuring robust ACID guarantees without requiring complex custom serialization.
 
 ## Decision
 
-Use an embedded relational database (H2 or SQLite, configurable) as the persistence layer for spatial memory data, rather than a hand-rolled flat-file cache.
+The system shall use an embedded relational database (H2 or SQLite, configurable) as the persistence layer for spatial memory data, rather than a hand-rolled flat-file cache.
 
 Both H2 and SQLite are zero-configuration embedded databases that ship as a single JAR/native library, require no external server process, and provide ACID guarantees. The plugin exposes a configurable `database` setting so server operators can choose between them (or connect to an external MySQL instance for multi-server setups).
 
@@ -33,9 +33,9 @@ Both H2 and SQLite are zero-configuration embedded databases that ship as a sing
   - No custom serialisation format to maintain or migrate.
 
 - **Negative / Trade-offs:**
-  - Adds a runtime dependency (H2 or SQLite JDBC driver) that must be bundled or provided.
+  - Adds a runtime dependency (H2 or SQLite JDBC driver) that shall be bundled or provided.
   - SQL schema migrations are required when the data model changes between plugin versions (see `MIGRATION.md`).
-  - H2 and SQLite have different SQL dialects in edge cases; the abstraction layer must handle both.
+  - H2 and SQLite have different SQL dialects in edge cases; the abstraction layer shall handle both.
 
 ## References
 

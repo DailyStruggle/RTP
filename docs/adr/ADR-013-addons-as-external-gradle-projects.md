@@ -18,9 +18,9 @@ Two approaches exist:
 
 ## Decision
 
-Integrations are implemented as **separate external Gradle projects**. The `addons/` directory in the RTP repository contains reference examples (`RTP_ClaimPluginIntegrations`, `RTP_Glide`, `RTP_Iris_integration`), but these are illustrative — not exhaustive, and not shipped as part of the core plugin jar.
+Integrations shall be structured as **separate external Gradle projects**. The `addons/` directory in the RTP repository contains reference examples (`RTP_ClaimPluginIntegrations`, `RTP_Glide`, `RTP_Iris_integration`), but these are illustrative — not exhaustive, and not shipped as part of the core plugin jar.
 
-Third-party developers are expected to own and maintain their own addon jars independently, using the examples as a starting point.
+Third-party developers shall own and maintain their own addon jars independently, using the examples as a starting point.
 
 ---
 
@@ -45,7 +45,7 @@ Every soft-dependency bundled into the core jar increases its size and transitiv
 | Alternative | Reason Rejected |
 |-------------|----------------|
 | Built-in optional modules with soft-dependency guards | Unbounded maintenance scope for a solo project; bloats core jar; ties release cadence to third-party APIs |
-| Monorepo with all addons as Gradle submodules | Same maintenance burden; all addons must be updated on every RTP release |
+| Monorepo with all addons as Gradle submodules | Same maintenance burden; all addons shall be updated on every RTP release |
 | No example addons at all | Leaves addon developers without guidance on how to use `rtp-api`; increases support burden |
 
 ---
@@ -56,4 +56,4 @@ Every soft-dependency bundled into the core jar increases its size and transitiv
 - **Positive:** Addon release cadence is fully independent of RTP core releases.
 - **Positive:** The extension model is clearly demonstrated via reference examples without imposing maintenance obligations.
 - **Negative:** The core maintainer does not control the quality or compatibility of community addons.
-- **Negative:** Operators must source and install addon jars separately; there is no single-jar "batteries included" distribution.
+- **Negative:** Operators shall source and install addon jars separately; there is no single-jar "batteries included" distribution.

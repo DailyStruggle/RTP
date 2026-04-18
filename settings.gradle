@@ -19,7 +19,9 @@ include 'rtp-spigot:rtp-spigot-v26_1_R1'
 include 'rtp-paper:rtp-paper-v26_1_R1'
 include 'rtp-folia:rtp-folia-v26_1_R1'
 include 'rtp-plugin'
-include 'rtp-fabric'
+if (settings.hasProperty('includeFabric') || System.getenv('INCLUDE_FABRIC') == 'true') {
+    include 'rtp-fabric'
+}
 
 include 'addons:RTP_Iris_integration'
 include 'addons:RTP_Glide'

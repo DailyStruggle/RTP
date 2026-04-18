@@ -23,18 +23,18 @@ public abstract class FabricTreeCommand implements TreeCommand, io.github.dailys
             CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
                 dispatcher.register(CommandManager.literal(name())
                     .executes(context -> {
-                        onCommand(getCallerId(context.getSource()), 
-                                  perm -> context.getSource().hasPermissionLevel(2), 
-                                  msg -> context.getSource().sendFeedback(() -> Text.literal(msg), false), 
+                        onCommand(getCallerId(context.getSource()),
+                                  perm -> context.getSource().hasPermissionLevel(2),
+                                  msg -> context.getSource().sendFeedback(() -> Text.literal(msg), false),
                                   new String[0]);
                         return 1;
                     })
                     .then(CommandManager.argument("args", net.minecraft.command.argument.MessageArgumentType.message())
                         .executes(context -> {
                             String[] args = net.minecraft.command.argument.MessageArgumentType.getMessage(context, "args").getString().split(" ");
-                            onCommand(getCallerId(context.getSource()), 
-                                      perm -> context.getSource().hasPermissionLevel(2), 
-                                      msg -> context.getSource().sendFeedback(() -> Text.literal(msg), false), 
+                            onCommand(getCallerId(context.getSource()),
+                                      perm -> context.getSource().hasPermissionLevel(2),
+                                      msg -> context.getSource().sendFeedback(() -> Text.literal(msg), false),
                                       args);
                             return 1;
                         })

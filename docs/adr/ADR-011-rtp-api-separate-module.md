@@ -50,5 +50,5 @@ Because addon developers never compile against `rtp-core`, internal refactors â€
 - **Positive:** Addon developers have a clear, stable, version-controlled interface with no ambiguity about what is supported.
 - **Positive:** `rtp-core` can be refactored freely without affecting addon compatibility, as long as `rtp-api` is unchanged.
 - **Positive:** SemVer major bumps are only required when `rtp-api` changes, not on every internal refactor.
-- **Negative:** Any new capability that addons need must be explicitly added to `rtp-api`; it cannot be accessed ad-hoc from `rtp-core`.
+- **Negative:** Any new capability that addons need shall be explicitly added to `rtp-api`; it cannot be accessed ad-hoc from `rtp-core`.
 - **Negative:** Maintaining two modules requires discipline to keep `rtp-api` minimal and not leak implementation details into it.

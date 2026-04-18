@@ -3,15 +3,11 @@ package io.github.dailystruggle.rtp.fabric.commands;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.RTPCmd;
 import io.github.dailystruggle.rtp.common.commands.reload.ReloadCmd;
-import io.github.dailystruggle.rtp.common.commands.scan.ScanCmd;
 import io.github.dailystruggle.rtp.common.commands.help.HelpCmd;
 import io.github.dailystruggle.rtp.common.commands.config.ConfigCmd;
 import io.github.dailystruggle.rtp.common.commands.info.InfoCmd;
-import io.github.dailystruggle.rtp.fabric.entity.FabricPlayer;
-import net.minecraft.server.network.ServerPlayerEntity;
 
 import java.util.List;
 import java.util.Map;

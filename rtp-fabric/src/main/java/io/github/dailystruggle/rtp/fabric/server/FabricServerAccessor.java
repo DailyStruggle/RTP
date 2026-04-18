@@ -15,11 +15,9 @@ import io.github.dailystruggle.rtp.fabric.entity.FabricPlayer;
 import io.github.dailystruggle.rtp.fabric.world.FabricWorld;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
-import net.minecraft.util.math.BlockPos;
 
 import java.io.File;
 import java.util.*;

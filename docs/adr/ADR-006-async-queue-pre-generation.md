@@ -5,7 +5,7 @@
 
 ## Context
 
-A random teleport plugin must produce a safe, validated world location when a player issues the `/rtp` command. Two broad strategies exist for sourcing that location:
+A safe, validated world location shall be produced when a player issues the `/rtp` command. Two broad strategies exist for sourcing that location:
 
 1. **On-demand async selection**: When a teleport is requested, spawn an async task that generates and validates a candidate location in real time, then fulfil the teleport once the task completes.
 2. **Pre-generation queue**: Continuously maintain a standing queue of pre-validated locations in the background. Teleport requests are fulfilled instantly by consuming the next entry from the queue; a background pipeline replenishes it.
@@ -40,8 +40,8 @@ Pre-filling the queue via `/rtp fill` further guards against runtime chunk-loadi
 
 - **Negative / Trade-offs:**
   - The standing queue consumes memory proportional to its configured depth and the number of active regions.
-  - There is a brief cold-start period after server startup (or after `/rtp fill reset`) during which the queue may be empty and teleports must wait.
-  - Over-provisioning the queue depth wastes chunk ticket allocations; operators must tune depth to their expected concurrent player count.
+  - There is a brief cold-start period after server startup (or after `/rtp fill reset`) during which the queue may be empty and teleports shall wait.
+  - Over-provisioning the queue depth wastes chunk ticket allocations; operators shall tune depth to their expected concurrent player count.
 
 ## References
 

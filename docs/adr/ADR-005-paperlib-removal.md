@@ -34,7 +34,7 @@ Since `rtp-paper` is already a Paper-only module (it is never loaded on a Spigot
 
 - **Negative / Trade-offs:**
   - The `rtp-paper` adapter is now strictly Paper-only at compile time; it cannot be loaded on a plain Spigot server (this was already the intended deployment model).
-  - Any future Paper API changes must be handled directly in `rtp-paper` rather than being absorbed by a compatibility library.
+  - Any future Paper API changes shall be handled directly in `rtp-paper` rather than being absorbed by a compatibility library.
 
 ## References
 
