@@ -43,6 +43,16 @@ final class AnvilTestFixtures {
      * without decoding block indices.
      */
     static LinkedHashMap<String, Object> section(byte yIndex, List<String> palette) throws IOException {
+        return section(yIndex, palette, null);
+    }
+
+    /**
+     * Builds a chunk-section compound whose {@code block_states} carries both the palette
+     * and an explicit packed {@code data} long-array. {@code data} may be {@code null} to
+     * reproduce the single-entry-palette shape vanilla actually writes (no {@code data}
+     * tag emitted at all).
+     */
+    static LinkedHashMap<String, Object> section(byte yIndex, List<String> palette, long[] data) throws IOException {
         LinkedHashMap<String, Object> sec = new LinkedHashMap<>();
         sec.put("Y", yIndex);
 
@@ -50,9 +60,37 @@ final class AnvilTestFixtures {
         List<Object> entries = new ArrayList<>(palette.size());
         for (String id : palette) entries.add(paletteEntry(id));
         blockStates.put("palette", new Nbt.NbtList(Nbt.TAG_COMPOUND, entries));
+        if (data != null) {
+            blockStates.put("data", data);
+        }
         sec.put("block_states", blockStates);
 
         return sec;
+    }
+
+    /**
+     * Packs 4096 palette indices (YZX-major, 16³) into a {@code long[]} using the
+     * Anvil 1.16+ no-cross-long layout. Mirrors the decoder used by {@link PackedPaletteDecoder}
+     * so tests can round-trip known placements.
+     *
+     * @param bitsPerEntry bits per entry; must be {@code >= 1} and divide reasonably into 64
+     * @param indices      flat palette indices, length must be 4096
+     * @return packed data array sized to {@code ceil(4096 / floor(64 / bitsPerEntry))}
+     */
+    static long[] packIndices(int bitsPerEntry, int[] indices) {
+        if (indices.length != 4096) {
+            throw new IllegalArgumentException("indices must have length 4096, got " + indices.length);
+        }
+        int entriesPerLong = 64 / bitsPerEntry;
+        int longs = (4096 + entriesPerLong - 1) / entriesPerLong;
+        long[] out = new long[longs];
+        long mask = (1L << bitsPerEntry) - 1L;
+        for (int i = 0; i < 4096; i++) {
+            int longIdx = i / entriesPerLong;
+            int slot = i - longIdx * entriesPerLong;
+            out[longIdx] |= (indices[i] & mask) << (slot * bitsPerEntry);
+        }
+        return out;
     }
 
     /**

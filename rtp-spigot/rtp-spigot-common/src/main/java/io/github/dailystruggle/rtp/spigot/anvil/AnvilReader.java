@@ -3,7 +3,11 @@ package io.github.dailystruggle.rtp.spigot.anvil;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.InflaterInputStream;
 
@@ -161,5 +165,80 @@ public final class AnvilReader {
     public static Nbt.NbtList getSections(LinkedHashMap<String, Object> root) {
         Object v = root.get("sections");
         return (v instanceof Nbt.NbtList) ? (Nbt.NbtList) v : null;
+    }
+
+    // -------------------------------------------------------------------- typed view (Phase 2)
+
+    /**
+     * Reads the chunk at region-local coordinates {@code (cx, cz)} and lifts the raw
+     * NBT root into an {@link AnvilChunkView} typed view. Returns {@code null} if the
+     * chunk is not present in the region (same semantics as {@link #readChunk}).
+     *
+     * <p>This overload is the preferred entry point for the Phase 3 verdict layer — it
+     * exposes only the fields the pre-filter actually consults, and shields callers from
+     * the {@link Nbt.NbtList} / {@link LinkedHashMap} wire shape.
+     */
+    public static AnvilChunkView readChunkView(byte[] regionBytes, int cx, int cz) throws IOException {
+        ChunkEntry entry = readChunk(regionBytes, cx, cz);
+        if (entry == null) return null;
+        return toView(entry.root);
+    }
+
+    /**
+     * Lifts an already-parsed chunk root compound into an {@link AnvilChunkView}. Exposed
+     * for tests and for callers that want to inspect the raw root before deciding to build
+     * the typed view.
+     *
+     * <p>Robust to malformed sections: entries missing {@code Y} or {@code block_states}
+     * are silently skipped rather than propagated as exceptions, consistent with ADR-016's
+     * "malformed → UNKNOWN, never crash" posture.
+     */
+    public static AnvilChunkView toView(LinkedHashMap<String, Object> root) {
+        int dataVersion = getDataVersion(root);
+        long[] heightmap = getMotionBlockingNoLeaves(root);
+        Nbt.NbtList sections = getSections(root);
+        List<PaletteSection> out;
+        if (sections == null || sections.items.isEmpty()) {
+            out = Collections.emptyList();
+        } else {
+            out = new ArrayList<>(sections.items.size());
+            for (Object raw : sections.items) {
+                PaletteSection ps = sectionFromCompound(raw);
+                if (ps != null) out.add(ps);
+            }
+        }
+        return new AnvilChunkView(dataVersion, Collections.unmodifiableList(out), heightmap);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static PaletteSection sectionFromCompound(Object raw) {
+        if (!(raw instanceof Map)) return null;
+        Map<String, Object> sec = (Map<String, Object>) raw;
+
+        Object yObj = sec.get("Y");
+        if (!(yObj instanceof Number)) return null;
+        int sectionY = ((Number) yObj).intValue();
+
+        Object bsObj = sec.get("block_states");
+        if (!(bsObj instanceof Map)) return null;
+        Map<String, Object> blockStates = (Map<String, Object>) bsObj;
+
+        Object palObj = blockStates.get("palette");
+        if (!(palObj instanceof Nbt.NbtList)) return null;
+        Nbt.NbtList palList = (Nbt.NbtList) palObj;
+        if (palList.items.isEmpty()) return null;
+
+        List<String> paletteNames = new ArrayList<>(palList.items.size());
+        for (Object entry : palList.items) {
+            if (!(entry instanceof Map)) return null;
+            Object name = ((Map<String, Object>) entry).get("Name");
+            if (!(name instanceof String)) return null;
+            paletteNames.add((String) name);
+        }
+
+        Object dataObj = blockStates.get("data");
+        long[] data = (dataObj instanceof long[]) ? (long[]) dataObj : null;
+
+        return new PaletteSection(sectionY, Collections.unmodifiableList(paletteNames), data);
     }
 }
