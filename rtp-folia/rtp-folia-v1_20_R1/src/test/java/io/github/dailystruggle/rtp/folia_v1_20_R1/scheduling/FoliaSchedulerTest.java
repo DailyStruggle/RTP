@@ -37,6 +37,7 @@ class FoliaSchedulerTest {
   @BeforeEach
   void setUp() {
     plugin = org.mockito.Mockito.mock(JavaPlugin.class);
+    org.mockito.Mockito.when(plugin.isEnabled()).thenReturn(true);
     globalScheduler = org.mockito.Mockito.mock(GlobalRegionScheduler.class);
     asyncScheduler = org.mockito.Mockito.mock(AsyncScheduler.class);
     regionScheduler = org.mockito.Mockito.mock(RegionScheduler.class);

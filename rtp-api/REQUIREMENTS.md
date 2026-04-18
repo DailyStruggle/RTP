@@ -13,6 +13,9 @@ For design and implementation details that satisfy these requirements, see [`doc
 ### 1.2 Data Structures and Models
 - **REQ-API-F-004 — Agnostic Representation:** Shared models (e.g., `RTPLocation`, `RTPWorld`, `RTPPlayer`) shall be platform-agnostic to ensure compatibility across Bukkit, Paper, Folia, and potential future server implementations.
 
+### 1.3 Unified Command Framework
+- **REQ-API-F-005 — Unified Command-Tree Contract:** The command framework shall be the single source of truth for the command tree across all supported platforms. Platform adapters shall not duplicate command-tree structure.
+
 ## 2. Non-Functional Requirements
 
 ### 2.1 Backward Compatibility
@@ -32,3 +35,6 @@ For design and implementation details that satisfy these requirements, see [`doc
 
 ### 3.4 Lock-Free Configuration Caching
 - **REQ-API-ARCH-004 — High-Throughput Reads:** API methods reading plugin configuration definitions shall guarantee high-throughput reads without introducing synchronization bottlenecks.
+
+### 3.5 Command Adapter Isolation
+- **REQ-API-ARCH-005 — Platform-Neutral Command Adapter Boundary:** Platform-specific command-framework dependencies shall be scoped such that they do not become runtime dependencies of the public API surface, and shall not be re-exported through the command framework's public types.

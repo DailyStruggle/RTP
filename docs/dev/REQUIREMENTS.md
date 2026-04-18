@@ -38,6 +38,7 @@ For specific code-level and platform-specific requirements, please refer to the 
 - **REQ-RTP-F-002 — Configurable Geometry:** The system shall support various spatial boundaries, including but not limited to circles, squares, and rectangles.
 - **REQ-RTP-F-003 — Statistical Distributions:** The system shall allow server administrators to configure the mathematical distribution of teleport locations (e.g., Flat, Normal, Exponential).
 - **REQ-RTP-F-004 — Region Management:** The system shall allow the server to be divided into multiple teleport regions, each with independent configurations, rules, and permissions.
+- **REQ-RTP-F-012 — Administrative World-Scan Lifecycle:** The system shall expose a world-scan lifecycle (`start`, `pause`, `resume`, `reset`, `cancel`) that allows operators to pre-populate a region's spatial memory without teleporting players.
 
 ### 1.2 Computational Safety and Performance
 - **REQ-RTP-F-005 — Bounded Selection Complexity:** Location selection tasks shall operate within deterministic time complexity bounds (e.g., O(log(n))), ensuring predictable computational overhead during background generation.
@@ -59,6 +60,9 @@ For specific code-level and platform-specific requirements, please refer to the 
 
 ### 2.2 Platform Compatibility
 - **REQ-RTP-NF-002 — Cross-Platform Thread Safety:** The concurrency model shall be adaptable to the underlying server platform (Spigot, Paper, Folia), ensuring strict thread safety and adherence to platform-specific asynchronous APIs or region-based multithreading constraints.
+
+### 2.3 Architectural Isolation
+- **REQ-RTP-NF-003 — Entry-Point Logic Isolation:** The plugin entry point shall not contain business logic. Database wiring, effects wiring, and server-accessor selection shall be delegated to dedicated handler classes, each with a single responsibility.
 
 ## 3. Prohibition Requirements
 

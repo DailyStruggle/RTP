@@ -36,6 +36,25 @@ material to this repository, you agree to the following terms (derived from the
 No transfer of copyright ownership is required. You retain all rights to your
 contribution outside of this project.
 
+## Using Agentic AI Assistants
+
+If you are contributing with the help of an agentic AI coding assistant (e.g., JetBrains Junie, GitHub Copilot Agent, Claude Code, Cursor, Aider, or similar), you may find it helpful to point the agent directly at [`.junie/AGENTS.md`](.junie/AGENTS.md) at the start of a session. This is an optional convenience to improve the agent's output quality. It is **not** a contribution requirement, and PRs are not judged on whether an agent was told to read it.
+
+That file consolidates context an agent would otherwise have to rediscover on its own. It covers:
+
+* The mandatory pre-flight checklist (target platform, Folia thread context, chunk I/O rules, PowerShell syntax).
+* The hard safety rules (`S-001` through `S-006`) derived from `docs/dev/REQUIREMENTS.md §3`.
+* Which documents to read on demand for a given task type, so the agent does not burn tokens reading the entire `docs/` tree.
+* Architecture boundaries that decide which module new code belongs in.
+* Environment and execution setup (Windows PowerShell, Gradle multi-module commands, Java 21 requirement).
+* The self-updating protocol that keeps `AGENTS.md`, `GLOSSARY.md`, and `TRACEABILITY.md` in sync as the codebase evolves.
+
+If you choose to use it, a good first instruction to the agent is simply:
+
+> Read `.junie/AGENTS.md` in full and follow it for the rest of this session.
+
+Human contributors do **not** need to read `AGENTS.md`. It is written for automated agents as a user-experience aid, and the equivalent human-facing guidance lives in this file and under `docs/dev/`.
+
 ## Prerequisites
 
 * **Java 21**: This project targets Java 21. Ensure your JDK is installed and configured correctly.

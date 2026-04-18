@@ -57,6 +57,27 @@ public abstract class RTPWorld<T> {
   public abstract CompletableFuture<ChunkSet> getChunkAtAsync(int cx, int cz);
 
   /**
+   * Non-blocking check for whether the chunk at the specified coordinates is currently loaded
+   * on the native server. Implementations MUST NOT trigger a chunk load or block the calling
+   * thread; this call is used as a stale-chunk guard between an async chunk-load future
+   * resolution and the subsequent block-evaluation task being executed on a Count-Bound
+   * task pipe (see ADR-015 — Stale-Chunk Guard for Count-Bound Pipes).
+   *
+   * <p>The default returns {@code true} to preserve legacy behavior on adapters that have
+   * not yet overridden this contract; callers therefore treat "unknown" as "assume loaded".
+   * Platform adapters (Folia, Paper, Spigot) SHOULD override to query the native
+   * {@code World#isChunkLoaded(int,int)} (or equivalent non-loading lookup).</p>
+   *
+   * @param cx the x coordinate of the chunk
+   * @param cz the z coordinate of the chunk
+   * @return {@code true} if the chunk is currently loaded on the native server,
+   *         {@code false} if it has been unloaded (e.g. by Folia native chunk GC)
+   */
+  public boolean isChunkLoaded(int cx, int cz) {
+    return true;
+  }
+
+  /**
    * Set the force-loaded state of a chunk
    *
    * @param cx the x coordinate of the chunk

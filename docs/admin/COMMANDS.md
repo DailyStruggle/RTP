@@ -255,6 +255,28 @@ Displays the current runtime state of the plugin: loaded worlds, permanent regio
 
 ---
 
+## `/rtp test` — Runtime Test Suite
+
+Operator-facing self-test commands that exercise the teleport pipeline, queue, safety checks, verifiers, and scheduler against the live server. See `docs/dev/RUNTIME_TEST_SUITE_PLAN.md` for the full design and roadmap.
+
+**Required permission:** `rtp.test`
+
+| Sub-command | Status | Description |
+|---|---|---|
+| `/rtp test stress player:<name> [iterations:N] [intervalTicks:T] [region:<name>]` | Available | Repeatedly teleports the listed player(s) through the real `/rtp` pipeline. `iterations` is clamped to `[1, 1000]` (default `10`); `intervalTicks` to `[10, 6000]` (default `40`). |
+| `/rtp test queue`, `safety`, `verifiers`, `memory`, `platform`, `full` | Planned | Documented in `RUNTIME_TEST_SUITE_PLAN.md §4`. |
+
+**Examples**
+```
+/rtp test stress player:leaf26
+/rtp test stress player:leaf26 iterations:50 intervalTicks:60
+/rtp test stress player:Alice player:Bob region:mining
+```
+
+> **Threading note:** The stress loop runs on `runTaskTimerAsynchronously` and delegates each iteration to the standard `/rtp` pipeline, so every safety guard (cooldown, economy, claim verifiers, async chunk I/O) remains active. Per-iteration failures are logged at `Level.WARNING` to satisfy REQ-RTP-S-004.
+
+---
+
 ## `/rtp help` — Help
 
 Displays a clickable, permission-filtered list of all available `/rtp` sub-commands. Only sub-commands for which the sender holds the required permission **and** which have a matching `MessagesKeys` entry are shown.
@@ -325,6 +347,7 @@ When PlaceholderAPI is installed, the following `%rtp_<key>%` placeholders are a
 | `rtp.admin` | op | See DRM info in `/rtp info`; elevated admin access |
 | `rtp.support` | op | See DRM info in `/rtp info` |
 | `rtp.scan` | op | Use all `/rtp scan` sub-commands |
+| `rtp.test` | op | Use all `/rtp test` runtime-test sub-commands |
 | `rtp.params` | op | Override `shape`, `vert`, and `worldBorderOverride` parameters |
 | `rtp.unqueued` | op | Teleport without consuming a pre-generated cached location |
 | `rtp.personalqueue` | op | Use a personal (per-player) location queue |

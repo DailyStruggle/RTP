@@ -9,6 +9,8 @@ build/
 *.ipr
 *.iws
 
+/*.txt
+
 # IntelliJ
 out/
 

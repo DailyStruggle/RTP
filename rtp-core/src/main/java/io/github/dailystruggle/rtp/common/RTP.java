@@ -406,7 +406,15 @@ public class RTP {
       if (instance.databaseAccessor instanceof AbstractSQLDatabaseAccessor sqlDatabaseAccessor) {
         sqlDatabaseAccessor.flush();
       }
+      // Drain dirtyCache -> writeQueue (this enqueues async writes via setValue().thenAccept(),
+      // but getTable returns a completed future synchronously, so the enqueue runs inline).
       instance.databaseAccessor.flushDirtyCache();
+      // CRITICAL: actually drain the writeQueue (and deleteQueue) to disk. Previously this
+      // step was missing on shutdown, so every cached-location save/delete that accumulated
+      // between the 5-minute periodic flushDirtyCache cycle and server stop was lost —
+      // which is why the kept cache appeared empty after restart. Must happen BEFORE
+      // stop.set(true) below, because processQueries bails immediately if stop is set.
+      instance.databaseAccessor.processQueries(Long.MAX_VALUE);
     }
 
     instance.miscAsyncTasks.stop();

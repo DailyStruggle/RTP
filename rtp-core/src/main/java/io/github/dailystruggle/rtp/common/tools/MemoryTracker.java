@@ -80,6 +80,32 @@ public class MemoryTracker {
     });
   }
 
+  /**
+   * Returns the current number of live entries in the tracker. Intended for
+   * diagnostics and the {@code rtp test chunk-ticket} runtime probe
+   * ({@code RUNTIME_TEST_SUITE_PLAN.md} &sect;3.8) &mdash; not for production
+   * decision-making, since the count can change concurrently. Visible in the
+   * public API so that {@code rtp-plugin}'s test commands can assert lifecycle
+   * correctness without reflection (REQ-RTP-S-002 positive-path coverage).
+   */
+  public static int trackedCount() {
+    return trackedObjects.size();
+  }
+
+  /**
+   * Returns the count of tracked entries whose label equals {@code label}.
+   * Used by {@code rtp test chunk-ticket} to isolate its own sentinels from
+   * any unrelated live teleport activity on the server.
+   */
+  public static int trackedCountByLabel(String label) {
+    if (label == null) return 0;
+    int n = 0;
+    for (TrackedObject t : trackedObjects.values()) {
+      if (label.equals(t.getLabel())) n++;
+    }
+    return n;
+  }
+
   public static void runDiagnostics() {
     trackedObjects
             .entrySet()

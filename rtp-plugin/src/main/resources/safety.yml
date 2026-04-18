@@ -11,6 +11,19 @@ invulnerabilityTime: 5
 # Larger values ensure more safety but can make finding a spot harder.
 safetyRadius: 0
 
+# Stale-Chunk Retry Limit (count)
+# Bounded retry budget for the stale-chunk guard (ADR-015 / REQ-RTP-S-005).
+# After an async chunk load resolves, the follow-up block-evaluation task is
+# enqueued on a Count-Bound task pipe (Folia Region Thread scheduler). If the
+# pipe is backlogged, the native chunk GC may unload the chunk before the task
+# runs, which would otherwise trigger a synchronous chunk load on the Region
+# Thread and trip the Folia Watchdog. When this guard detects the race, it
+# re-queues an async chunk load up to this many times per candidate. On
+# exhaustion the candidate is rejected through the normal "unsafe" path
+# (a WARN is logged; nothing is silently discarded).
+# Default: 2. Only raise on forks with hyper-aggressive chunk GC.
+staleChunkRetryLimit: 2
+
 # Landing Platforms
 # Creates a landing platform at the teleport destination.
 # centre block is chosen based on the block type at the location.

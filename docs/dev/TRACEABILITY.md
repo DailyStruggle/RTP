@@ -1,4 +1,4 @@
-# RTP Requirements Traceability Matrix
+﻿# RTP Requirements Traceability Matrix
 
 This document connects each requirement to the design decision that motivated it and the source code that implements it. Where automated tests exist, they are linked as well.
 
@@ -25,15 +25,17 @@ This document connects each requirement to the design decision that motivated it
 | REQ-RTP-F-009 | Redundant calculation elimination | DESIGN.md §3 — Stateful Memory Tracking | `MemoryShape`, `MemoryTracker` | `MemoryShapeTest` |
 | REQ-RTP-F-010 | External API for custom shapes/validators | ARCHITECTURE.md — rtp-api | `SelectionAPI`, `rtp-api` interfaces | — |
 | REQ-RTP-F-011 | Claim/protection plugin integration | ARCHITECTURE.md — Addons | `GlobalRegionVerifiers`, `addons/RTP_ClaimPluginIntegrations` | — |
-| REQ-RTP-NF-001 | State persistence across restarts | DESIGN.md §4 — Persistent State and Fault Tolerance | `DatabaseAccessor`, `H2DatabaseAccessor`, `SQLiteDatabaseAccessor` | — |
+| REQ-RTP-F-012 | Administrative world-scan lifecycle (`start`/`pause`/`resume`/`reset`/`cancel`) | DESIGN.md §1 — Async Queue-Based Pre-Generation | `ScanCmd`, `ScanStartCmd`, `ScanPauseCmd`, `ScanResumeCmd`, `ScanResetCmd`, `ScanCancelCmd`, `ScanSubCmd`, `ScanTask`, `ScanTaskProcessing` (`rtp-core` and `rtp-spigot-common` bindings) | `ScanCmdTest`, `ScanTaskProcessingTest` |
+| REQ-RTP-NF-001 | State persistence across restarts | DESIGN.md §4 — Persistent State and Fault Tolerance | `DatabaseAccessor.saveCachedLocation`/`deleteCachedLocation`/`loadCachedLocations`, `RegionQueueManager` (save/delete callbacks on both `keptLocations` and `unkeptLocations`), `Region.hydrateCacheFromDatabase` (shuffles rows on load — order does not matter since hydrated locations always re-seed as unkept stubs and the `RegionCacheTask` deficit loop re-reserves chunks async per REQ-RTP-S-005), `H2DatabaseAccessor`, `SQLiteDatabaseAccessor`, `MySQLDatabaseAccessor`, `PostgreSQLDatabaseAccessor`, `YamlFileDatabase` | `CachedLocationRoundTripTest` (3 tests: full `saveCachedLocation → flushDirtyCache → processQueries → loadCachedLocations` round-trip; multi-row persistence irrespective of kept/unkept origin; `deleteCachedLocation` removes the row — exercises the public API surface that earlier H2/MySQL/PostgreSQL/SQLite tests bypassed by calling `write()` directly, which is why two silent bugs — column-name/composite-key wrapping in `saveCachedLocation` and deleteQueue being stranded by `processQueries`' early-exit — slipped through until 2026-04-18) |
 | REQ-RTP-NF-002 | Cross-platform thread safety | DESIGN.md §2 — Concurrency and Platform-Specific Thread Safety | `RTPTaskPipe`, `TimeBoundTaskPipe`, platform adapters | `RTPArchitectureTest` (`scheduler_implementations_must_not_reside_in_core`) |
+| REQ-RTP-NF-003 | Entry-point logic isolation (bundle plugin decomposition) | ADR-003 — rtp-plugin as Separate Bridge Module; ARCHITECTURE.md — Module Breakdown | `RTPBukkitPlugin` (slimmed entry point), `BukkitDatabaseHandler`, `BukkitEffectsHandler`, `BukkitServerProvider`, `JarUtils` | `RTPArchitectureTest` (`core_must_not_depend_on_platform_apis`) |
 | REQ-RTP-SYS-001 | Java 21 runtime | `build.gradle` (`sourceCompatibility = 21`) | — | — |
-| REQ-RTP-SYS-002 | Bukkit/Spigot/Paper/Folia compatibility | ARCHITECTURE.md — Platform Adapters | `rtp-spigot`, `rtp-paper`, `rtp-folia` modules | — |
+| REQ-RTP-SYS-002 | Bukkit/Spigot/Paper/Folia compatibility | ARCHITECTURE.md — Platform Adapters | `rtp-spigot`, `rtp-paper`, `rtp-folia` modules, `TestApiCompatCmd` (runtime reflective probe of every Bukkit/Paper/Folia method RTP calls; WARN on missing-method, skipped on platform-conditional missing-class) | `TestApiCompatCmdTest` (ok / missing-class / missing-method / missing-param-type / primitive-param / curated-list well-formed) |
 | REQ-RTP-S-001 | No lethal teleport destination | DESIGN.md §3 — Safety Check Layer | `RegionVerifier`, `SafetyCheck`, `GlobalRegionVerifiers` | — |
-| REQ-RTP-S-002 | No persistent force-loaded chunks | DESIGN.md §6 — Active Task and Resource Tracking | `ChunkReservation`, `MemoryTracker` | — |
+| REQ-RTP-S-002 | No persistent force-loaded chunks | DESIGN.md §6 — Active Task and Resource Tracking | `ChunkReservation`, `MemoryTracker`, `TestChunkTicketCmd` (runtime positive-path probe of every `MemoryTracker` release path: `untrack(UUID)`, `untrack(Object)`, `runDiagnostics()` against a live non-leaking entry), `TestDisconnectMidflightCmd` (synthetic-UUID probe mirroring `OnPlayerQuit` + `RTPTeleportCancel.refund`; asserts `processingPlayers` / `invulnerablePlayers` / `latestTeleportData` cleared and `nextTask.cancelled` true) | `TestChunkTicketCmdTest` (clean-tracker pass, label-isolation from unrelated registry traffic, repeat-invocation idempotence); `TestDisconnectMidflightCmdTest` (clean-state pass, probe self-containment, collision-avoidance against pre-seeded UUIDs, idempotence across repeats) |
 | REQ-RTP-S-003 | No teleport into protected territory | ARCHITECTURE.md — Addons | `GlobalRegionVerifiers`, `addons/RTP_ClaimPluginIntegrations` | — |
-| REQ-RTP-S-004 | No silent failure | DESIGN.md §1 — Fault Tolerance | `TeleportPipelineTask`, `MessagesKeys`, `RegionQueueManager`, `MemoryShape` | `FailureModeTest` (FM-001 deferral/replenishment, FM-002 all-sectors-bad); `RegionPipelineTest` (`full_pipeline_with_impossible_biome_returns_null_coords`) |
-| REQ-RTP-S-005 | No synchronous chunk I/O on main thread | DESIGN.md §2 — Platform-Specific Thread Safety | `RTPTaskPipe`, platform adapters | `RTPArchitectureTest` (`no_blocking_future_calls_in_core_or_api`) |
+| REQ-RTP-S-004 | No silent failure | DESIGN.md §1 — Fault Tolerance | `TeleportPipelineTask`, `MessagesKeys`, `RegionQueueManager`, `MemoryShape`, `TestStressCmd` (hard-cap iteration/interval clamps; WARN on unknown player), `TestCancelCmd` + `ActiveTestJobs` (WARN on denied `all`; every cancel outcome logged), `TestSchedulerCmd` (WARN on tier timeout/failure), `TestReloadSafetyCmd` (WARN on `configs.reload()` returning false or throwing), `TestCommandsCmd` (WARN on every command-tree audit finding: blank name, blank permission, key/name mismatch, null children, traversal errors), `LiveCommandDispatcherTestJob` (WARN on any Throwable escaping `Bukkit.dispatchCommand` during malformed-input dispatch; WARN on any malformed input that produces neither a sender message nor a WARN log record), `TestFullCmd` (umbrella sweep; WARN on any shipped subcommand missing from the parent lookup or throwing during dispatch; S-004 continuity contract per RUNTIME_TEST_SUITE_PLAN.md §3.2) | `FailureModeTest` (FM-001 deferral/replenishment, FM-002 all-sectors-bad); `RegionPipelineTest` (`full_pipeline_with_impossible_biome_returns_null_coords`); `TestStressCmdClampTest` (hard caps on `iterations`/`intervalTicks`; fallback-parse behaviour); `ActiveTestJobsTest` (cancel registry isolation, throwing-canceller isolation, unregister hook, sweep-all); `TestCommandsCmdAuditTest` (clean tree, blank-perm, key/name mismatch, null child, `test`-subtree skip, `findRoot` climb, cycle termination); `TestFullCmdTest` (shipped-list well-formedness, clean coverage, missing-subcommand flagged, unexpected-sibling flagged, null-parent fallback, null-child flagged, parity against real `TestCmd` registration) |
+| REQ-RTP-S-005 | No synchronous chunk I/O on main thread | DESIGN.md §2 — Platform-Specific Thread Safety; ADR-015 — Stale-Chunk Guard for Count-Bound Pipes | `RTPTaskPipe`, platform adapters, `RTPWorld.isChunkLoaded`, `LocationGenerator` (stale-chunk guards at the two `safetyCheck` entry points and pre-`vert.adjust`), `FoliaLocationGenerator.LocationSearchTask` (bounded re-queue via `SafetyKeys.staleChunkRetryLimit`), `BukkitRTPWorld.isChunkLoaded`, `FoliaRTPWorld.isChunkLoaded` | `RTPArchitectureTest` (`no_blocking_future_calls_in_core_or_api`); `ReqRtpS005StaleChunkGuardTest` (`stale_center_chunk_bypasses_block_evaluation` — asserts `MockRTPChunk.isSafe` is never invoked when `isChunkLoadedPredicate` simulates Folia native GC eviction; `loaded_chunk_allows_block_evaluation` — baseline) |
 | REQ-RTP-S-006 | No undefined behaviour on early API access | ARCHITECTURE.md — rtp-api | `RTPAPI.addShape()`, `RTPAPI.addVerticalAdjustor()`, `RTPAPI.setServerAccessor()` | `RTPAPIGuardTest` (pre-init ISE, write-once guard) |
 
 ---
@@ -46,12 +48,14 @@ This document connects each requirement to the design decision that motivated it
 | REQ-API-F-002 | Custom vertical adjustors | ARCHITECTURE.md — Extensibility and API Boundaries | `VerticalAdjustor`, `JumpAdjustor`, `LinearAdjustor` | — |
 | REQ-API-F-003 | Async validation hooks | DESIGN.md §2 — Platform-Specific Thread Safety | `GlobalRegionVerifiers`, `ILocationGenerator` | — |
 | REQ-API-F-004 | Platform-agnostic models | ARCHITECTURE.md — rtp-api | `RTPLocation`, `RTPWorld`, `RTPPlayer` (rtp-api) | — |
+| REQ-API-F-005 | Unified command-tree contract (single source of truth across platforms) | ADR-014 — Brigadier Bridge via commands-api | `commands-api` tree (`CommandsAPICommand`, `TreeCommand`), `BukkitTreeCommand`, `FabricTreeCommand` (registration shim) | — |
 | REQ-API-NF-001 | Semantic versioning | `build.gradle` version declarations | — | — |
 | REQ-API-NF-002 | Implementation decoupling | ARCHITECTURE.md — Core Modules | `RTPServerAccessor` (interface only in api) | `RTPArchitectureTest` (`core_must_not_depend_on_platform_apis`) |
 | REQ-API-ARCH-001 | Thread-safe API interfaces | DESIGN.md §2 — Concurrency | `FactoryValue` (`EnumMap`/`ConcurrentHashMap` backing) | — |
 | REQ-API-ARCH-002 | Non-blocking API contracts | DESIGN.md §1 — Constant-Time Execution | `ILocationGenerator`, `RTPTaskPipe` | `RTPArchitectureTest` (`no_blocking_future_calls_in_core_or_api`) |
 | REQ-API-ARCH-003 | Exception handling at API boundary | DESIGN.md §6 — Active Task and Resource Tracking | `TeleportPipelineTask` (try-finally blocks), `RTPAPI.setServerAccessor()` | `RTPAPIGuardTest` (`addShape` pre-init ISE, null-accessor IAE, double-init ISE) |
 | REQ-API-ARCH-004 | Lock-free config reads | DESIGN.md §1 — Bounded Computation Overhead | `FactoryValue.getData()`, `ConfigParser` | `ConfigParserLanguageTest`, `MultiConfigParserIsolationTest` |
+| REQ-API-ARCH-005 | Platform-neutral command adapter boundary (Brigadier `compileOnly`, no re-export) | ADR-014 — Brigadier Bridge via commands-api | `commands-api/build.gradle` (`compileOnly` Brigadier), `BrigadierCommandAdapter` (future, `commands-api`) | — |
 
 ---
 
@@ -77,6 +81,7 @@ This document connects each requirement to the design decision that motivated it
 | REQ-CORE-ARCH-008 | Max lifespan enforcement | DESIGN.md §6 — Task Pipeline Monitoring | `MemoryTracker` (120 000 ms teleport cap) | — |
 | REQ-CORE-ARCH-009 | Core uses only `RTPServerAccessor` | ARCHITECTURE.md — rtp-core | `RTP.java` (accessor injection point) | `RTPArchitectureTest` (`core_must_not_depend_on_platform_apis`) |
 | REQ-CORE-ARCH-010 | No platform imports in core | ARCHITECTURE.md — rtp-core | Entire `rtp-core` package | `RTPArchitectureTest` (`core_must_not_depend_on_platform_apis`) |
+| REQ-CORE-NF-001 | Deterministic shutdown persistence (spatial-memory flush before stop flag) | DESIGN.md §4 — Persistent State and Fault Tolerance | `MemoryShape` (persist-on-shutdown path), `DatabaseAccessor.processQueries(Long.MAX_VALUE)`, `RTP.stop()` ordering (`flushDirtyCache → processQueries → stop.set(true)`) | `MemoryShapeShutdownTest`, `CachedLocationRoundTripTest` |
 
 ---
 
@@ -137,13 +142,13 @@ This document connects each requirement to the design decision that motivated it
 
 | Module | Total Reqs | Automated Test Coverage |
 |---|---|---|
-| Root / System | 21 | 9 (REQ-RTP-F-001 `SLATest`+`RegionPipelineTest`, REQ-RTP-F-006/007 `RegionPipelineTest`, REQ-RTP-F-008, REQ-RTP-NF-002, REQ-RTP-SYS-001 via build, REQ-RTP-S-004 `FailureModeTest`+`RegionPipelineTest`, REQ-RTP-S-005, REQ-RTP-S-006 `RTPAPIGuardTest`) |
-| rtp-api | 8 | 4 (REQ-API-NF-002, REQ-API-ARCH-002, REQ-API-ARCH-003 `RTPAPIGuardTest`, REQ-API-ARCH-004) |
-| rtp-core | 18 | 11 (REQ-CORE-F-001 `FailureModeTest`+`RegionPipelineTest`, REQ-CORE-F-003–005, REQ-CORE-ARCH-001–002, REQ-CORE-ARCH-009–010; REQ-CORE-F-003/004 also covered end-to-end by `RegionPipelineTest`) |
+| Root / System | 23 | 11 (REQ-RTP-F-001 `SLATest`+`RegionPipelineTest`, REQ-RTP-F-006/007 `RegionPipelineTest`, REQ-RTP-F-008, REQ-RTP-F-012 `ScanCmdTest`+`ScanTaskProcessingTest`, REQ-RTP-NF-002, REQ-RTP-NF-003 via `RTPArchitectureTest`, REQ-RTP-SYS-001 via build, REQ-RTP-S-004 `FailureModeTest`+`RegionPipelineTest`, REQ-RTP-S-005, REQ-RTP-S-006 `RTPAPIGuardTest`) |
+| rtp-api | 10 | 4 (REQ-API-NF-002, REQ-API-ARCH-002, REQ-API-ARCH-003 `RTPAPIGuardTest`, REQ-API-ARCH-004) |
+| rtp-core | 19 | 12 (REQ-CORE-F-001 `FailureModeTest`+`RegionPipelineTest`, REQ-CORE-F-003–005, REQ-CORE-ARCH-001–002, REQ-CORE-ARCH-009–010, REQ-CORE-NF-001 `MemoryShapeShutdownTest`+`CachedLocationRoundTripTest`; REQ-CORE-F-003/004 also covered end-to-end by `RegionPipelineTest`) |
 | rtp-spigot | 9 | 4 (REQ-SPIGOT-F-001, REQ-SPIGOT-ARCH-001/005 via `ChunkTicketLifecycleTest`, REQ-SPIGOT-ARCH-003/004 via `BukkitSchedulerImplTest`) |
 | rtp-paper | 9 | 5 (REQ-PAPER-F-002 via architecture rule, REQ-PAPER-F-003 and REQ-PAPER-ARCH-003 via `ServerAccessorImplTest`, REQ-PAPER-ARCH-001/005 via `ChunkTicketLifecycleTest`) |
 | rtp-folia | 14 | 1 (REQ-FOLIA-F-002 via architecture rule) |
-| **Total** | **69** | **~39** |
+| **Total** | **74** | **~42** |
 
 > **Deterministic RNG seam:** `MemoryShape.setRng(Random)`, `LocationGenerator.setRng(Random)`, and `RTPCmd.setRng(Random)` allow any test to inject a seeded `java.util.Random` and eliminate RNG as a source of flakiness. `DeterministicShapeTest` (12 tests) exercises this seam for `Circle`, `Square`, and `Rectangle`. The biome-recall path in `LocationGenerator` uses the same seam.
 

@@ -54,18 +54,24 @@ public class RegionQueueManager {
             this.keptLocations = new LockFreeLocationBuffer(1024);
         }
 
-        this.keptLocations.setCallbacks(
-            location -> {
-                if (RTP.getInstance().databaseAccessor != null) {
-                    RTP.getInstance().databaseAccessor.saveCachedLocation(region.name, location, null);
-                }
-            },
-            location -> {
-                if (RTP.getInstance().databaseAccessor != null) {
-                    RTP.getInstance().databaseAccessor.deleteCachedLocation(region.name, location);
-                }
+        // Persist both queues. On startup nothing is loaded as "kept" (kept requires a live
+        // chunk reservation, which only the async deficit loop in Region.execute() can produce
+        // safely per REQ-RTP-S-005). The distinction between kept and unkept is therefore
+        // irrelevant to persistence: every cached location is restored as an unkept stub
+        // regardless of which queue it was saved from. Order does not matter — hydration
+        // shuffles the list on load.
+        java.util.function.Consumer<RTPLocation> saveCallback = location -> {
+            if (RTP.getInstance().databaseAccessor != null) {
+                RTP.getInstance().databaseAccessor.saveCachedLocation(region.name, location, null);
             }
-        );
+        };
+        java.util.function.Consumer<RTPLocation> deleteCallback = location -> {
+            if (RTP.getInstance().databaseAccessor != null) {
+                RTP.getInstance().databaseAccessor.deleteCachedLocation(region.name, location);
+            }
+        };
+        this.keptLocations.setCallbacks(saveCallback, deleteCallback);
+        this.unkeptLocations.setCallbacks(saveCallback, deleteCallback);
     }
 
     /**
@@ -181,7 +187,9 @@ public class RegionQueueManager {
     }
 
     public void shutDown() {
-        keptLocations.setCallbacks(null, null); // Disable DB removal during shutdown
+        // Disable DB removal during shutdown so the persisted rows survive for the next boot.
+        keptLocations.setCallbacks(null, null);
+        unkeptLocations.setCallbacks(null, null);
         keptLocations.clear();
         unkeptLocations.clear();
         perPlayerLocationQueue.forEach((uuid, queue) -> {

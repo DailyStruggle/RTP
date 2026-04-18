@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
+import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
+import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
@@ -12,6 +14,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedStatic;
 
+import java.util.Collections;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -36,6 +39,14 @@ public class RegionConfigLoaderTest {
         when(mockConfigs.getParser(LoggingKeys.class)).thenReturn(mockLoggingParser);
         // Default logging value
         doReturn(false).when(mockLoggingParser).getConfigValue(eq(LoggingKeys.detailed_region_init), any());
+
+        // Stub server accessor so RegionConfigLoader's world-lookup path does not NPE.
+        // An empty worlds list causes the RTP-2 fallback to leave world=null, which is
+        // acceptable for these tests (they assert malformed-value fallbacks on other keys).
+        RTPServerAccessor mockAccessor = mock(RTPServerAccessor.class);
+        when(mockAccessor.getRTPWorlds()).thenReturn(Collections.<RTPWorld<?>>emptyList());
+        when(mockAccessor.getRTPWorld(org.mockito.ArgumentMatchers.anyString())).thenReturn(null);
+        RTP.serverAccessor = mockAccessor;
     }
 
     @AfterEach
