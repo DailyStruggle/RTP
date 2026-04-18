@@ -7,7 +7,7 @@
 
 ## Context
 
-RTP must support multiple Minecraft server platforms (Spigot, Paper, Folia) across multiple NMS versions (e.g. `v1_20_R1`, `v1_21_R1`, `v26_1_R1`). Each NMS version exposes a different internal API surface; methods, classes, and behaviours change between versions and between platforms.
+The system shall support multiple Minecraft server platforms (Spigot, Paper, Folia) across multiple NMS versions (e.g. `v1_20_R1`, `v1_21_R1`, `v26_1_R1`). Each NMS version exposes a different internal API surface; methods, classes, and behaviours change between versions and between platforms.
 
 Two broad implementation strategies exist:
 

@@ -30,7 +30,7 @@ Rather than attempting to predict and budget execution time — which is unrelia
 |-------------|--------------|
 | `TimeBoundTaskPipe` (same as Spigot/Paper) | Tracking wall-clock cost of async tasks across Folia's regional threads is extremely unreliable; time measurements are skewed by thread scheduling jitter and cross-region contention, making the budget meaningless in practice. |
 | Unbounded task execution per cycle | Risks monopolising a regional thread during a replenishment burst, causing tick lag in that region. |
-| Single global replenishment thread (bypass regional scheduling) | Violates Folia's thread-safety contract: chunk and entity state must only be accessed from the owning regional thread. Accessing world data from a non-owning thread causes data corruption or crashes. |
+| Single global replenishment thread (bypass regional scheduling) | Violates Folia's thread-safety contract: chunk and entity state shall only be accessed from the owning regional thread. Accessing world data from a non-owning thread causes data corruption or crashes. |
 
 ## Consequences
 
@@ -41,7 +41,7 @@ Rather than attempting to predict and budget execution time — which is unrelia
 
 - **Negative / Trade-offs:**
   - The count bound is a coarser control than a time budget: if individual tasks vary significantly in cost, a fixed count may over- or under-utilise the available time window.
-  - The optimal task count per cycle must be tuned empirically for typical Folia deployments; it is exposed as a configurable parameter.
+  - The optimal task count per cycle shall be tuned empirically for typical Folia deployments; it is exposed as a configurable parameter.
 
 ## References
 

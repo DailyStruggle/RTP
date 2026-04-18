@@ -45,3 +45,35 @@ To guarantee system stability and prevent server exhaustion, RTP employs a rigor
 ## Extensibility and API Boundaries
 The `rtp-api` module provides a strict, defined interface for external integrations:
 - **Safe Extensibility**: Developers can inject custom `Shape` algorithms or claim-plugin validations (e.g., GriefPrevention) via the API without modifying or compromising the reliability guarantees of the `rtp-core` module.
+
+## Platform Adapter Design Details
+
+### rtp-core Implementation Notes
+- **Lock-Free Configuration Storage**: Configuration data is stored in `EnumMap`/`ConcurrentHashMap` structures that guarantee O(1) read access. Public methods return immutable views or primitive values accessed via `FactoryValue.getData()`.
+- **Pipeline Phases**: The teleportation pipeline is divided into four phases — Setup, Load, Teleport, and Cleanup — each managed by `TeleportPipelineTask`. Every phase wraps exceptions to prevent corruption of subsequent phases.
+- **Resource Release on Exit**: On every exit path (normal, exception, cancellation), `TeleportPipelineTask.runCleanup()` releases chunk reservations, untracks teleport data, and decrements in-flight calculation counters.
+- **Pulse-Driven Maintenance**: Background maintenance is driven by `MemoryTracker.runDiagnostics()` and task-pipe processing via `RTPTaskPipe`. All pulsed tasks accept an available-time budget (in milliseconds) and cease execution once that budget is exhausted.
+- **Lifespan Enforcement**: `MemoryTracker` assigns a maximum lifespan to every `TeleportPipelineTask`. The diagnostic pulse forcefully invalidates and cleans up any task exceeding its lifespan.
+- **Concurrency Abstractions**: All blocking and async operations are dispatched via `SyncTaskProcessing` and `AsyncTaskProcessing` abstractions implementing `RTPRunnable`, keeping `rtp-core` free of direct platform imports.
+
+### rtp-api Implementation Notes
+- **Registration Guards**: `RTPAPI.addShape()` and `RTPAPI.addVerticalAdjustor()` throw `IllegalStateException` if called before core is loaded, enforcing a write-once contract.
+- **Location Generator Interface**: `ILocationGenerator` is the core abstraction through which `GenerationContext` flows; platform accessors implement this to wire into the teleport pipeline.
+- **Lock-Free Config Caching**: API-level configuration caches use `EnumMap` and `ConcurrentHashMap` to ensure high-throughput reads without synchronization bottlenecks.
+- **Exception Isolation**: Addon-supplied `Shape` or validation `Predicate`/`Function` implementations are called inside `try-finally` blocks so that unhandled addon exceptions do not escape into the core pipeline.
+
+### rtp-spigot Implementation Notes
+- **Plugin Chunk Tickets**: Chunk retention is implemented via `world.addPluginChunkTicket(cx, cz, plugin)` and released via `world.removePluginChunkTicket(cx, cz, plugin)`. This is preferred over `Chunk.setForceLoaded(true)`, which permanently marks chunks in the world's force-loaded map and is not reclaimed on plugin disable.
+- **Time-Bounded Slicing**: Main-thread operations use `TimeBoundTaskPipe` to yield after a wall-clock time budget (e.g., 2 ms per tick) is exhausted, preventing TPS degradation.
+- **Forced Reclamation**: Player disconnect listeners call `reservation.close()` on all in-flight `TeleportPipelineTask` instances associated with that player.
+
+### rtp-paper Implementation Notes
+- **Async Chunk Loading**: `BukkitRTPWorld.getChunkAtAsync(cx, cz)` calls Paper's `world.getChunkAtAsync(cx, cz)`, returning a `CompletableFuture<Chunk>` that resolves on a Paper worker thread without touching the main thread.
+- **Callback-Only Pattern**: No `.join()` or synchronous waits are used on futures; all continuation logic is attached via `.thenApply` / `.whenComplete` callbacks, eliminating deadlock risk.
+- **Ticket Lifecycle**: Same plugin-owned chunk ticket approach as `rtp-spigot`; Paper's async API handles ticket acquisition internally, and explicit release is still performed via `reservation.close()` in all exit paths.
+
+### rtp-folia Implementation Notes
+- **Thread Ownership Checks**: Before scheduling a regional task, the adapter calls `Bukkit.isOwnedByCurrentRegion(entity/location)`. If ownership is confirmed, the task runs immediately; otherwise it is submitted via `RegionScheduler.run(plugin, location, task)`.
+- **Count-Bound Execution**: Within regional threads, iterative background operations use `CountBoundTaskPipe` with a fixed instruction count (not wall-clock time), because Folia's per-region ticks make time-based slicing non-deterministic.
+- **Economy Delegation**: Vault economy calls (`withdraw`, `deposit`, `getBalance`) are never invoked on a Folia region thread. They are dispatched to `GlobalRegionScheduler` or `AsyncScheduler`, and results are piped back to the originating region via a follow-up scheduled task.
+- **Chunk Ticket Lifecycle**: `getChunkAtAsync` allocates a Folia chunk ticket for validation, and `reservation.close()` explicitly removes the ticket when the chunk is no longer needed, preventing permanent force-loading.

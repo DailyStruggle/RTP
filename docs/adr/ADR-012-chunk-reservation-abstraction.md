@@ -7,22 +7,20 @@
 
 ## Context
 
-RTP must force-load chunks during location pre-generation and active teleportation, then release them promptly to avoid memory bloat. Early implementations managed chunk tickets directly at each call site — requesting a ticket, storing a reference, and releasing it inline.
+Chunks shall be force-loaded during location pre-generation and active teleportation, and released promptly to avoid memory bloat. Managing chunk tickets directly at each call site — requesting a ticket, storing a reference, and releasing it inline — creates two recurring failure modes:
 
-This ad-hoc approach had two recurring failure modes:
+1. **Chunk leaks** — small errors in tracking (missed release on an exception path, a race between queue drain and task cancellation) cause chunks to remain force-loaded indefinitely, producing the memory-bloat problem documented in ADR-008.
+2. **Platform variance** — different server software versions have different performance characteristics and requirements for chunk data access. A lookup table mapping chunk coordinates to reservation state is needed for efficient access, but ad-hoc call sites have no consistent place to maintain it.
 
-1. **Chunk leaks** — small errors in tracking (missed release on an exception path, a race between queue drain and task cancellation) caused chunks to remain force-loaded indefinitely, producing the memory-bloat problem documented in ADR-008.
-2. **Platform variance** — different server software versions have different performance characteristics and requirements for chunk data access. A lookup table mapping chunk coordinates to reservation state was needed for efficient access, but ad-hoc call sites had no consistent place to maintain it.
-
-Additionally, different server software versions may change how chunk tickets are issued or queried, meaning the implementation details of "hold a chunk loaded" must be isolated behind a single boundary that can be updated per platform without touching call sites throughout the codebase.
+Additionally, different server software versions change how chunk tickets are issued or queried. The concept of "holding a chunk loaded" shall be isolated behind a single boundary that can be adapted per platform without modifying call sites throughout the codebase.
 
 ---
 
 ## Decision
 
-A dedicated `ChunkReservation` class is introduced in `rtp-api` (3.0.0-beta). It is `AutoCloseable`, encapsulating the full lifecycle of a chunk ticket: acquisition, lookup-table registration, and guaranteed release on `close()`.
+A dedicated `ChunkReservation` abstraction in `rtp-api` shall be utilized. `AutoCloseable` shall be implemented to encapsulate the full lifecycle of a chunk ticket: acquisition, lookup-table registration, and guaranteed release on `close()`.
 
-`ChunkReservation` is **internal API**: it is referenced by addons (e.g. to inspect whether a chunk is currently reserved) but is **not intended to be constructed or implemented by addon developers**. Construction is the responsibility of the platform adapter layer.
+`ChunkReservation` shall serve as an **internal API**: it is exposed for addons to inspect whether a chunk is reserved, but is **not intended to be constructed or implemented by addon developers**. Construction shall remain the exclusive responsibility of the platform adapter layer.
 
 ---
 
@@ -54,5 +52,5 @@ Server software differences in chunk ticket APIs or data-access performance are 
 - **Positive:** Try-with-resources usage guarantees chunk release on all code paths, eliminating the class of leak described in ADR-008.
 - **Positive:** Centralised lookup table enables efficient reservation queries and supports `MemoryTracker` leak detection.
 - **Positive:** Platform-specific ticket behaviour is encapsulated; call sites in `rtp-core` are platform-agnostic.
-- **Negative:** Addon developers can read reservation state but cannot construct reservations — any new use-case requiring reservation creation must go through `rtp-core` or a future `rtp-api` factory method.
+- **Negative:** Addon developers can read reservation state but cannot construct reservations — any new use-case requiring reservation creation shall be routed through `rtp-core` or a future `rtp-api` factory method.
 - **Negative:** `ChunkReservation` is in `rtp-api` (for visibility) but is not a fully open API class; this requires clear documentation to avoid misuse.

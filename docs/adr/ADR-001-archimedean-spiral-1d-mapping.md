@@ -47,7 +47,7 @@ https://www.reddit.com/r/admincraft/comments/owgvzz/too_much_math/
 
 - **Negative / Trade-offs:**
   - The inverse spiral formula (converting a 1D index back to polar coordinates) is non-trivial to implement and verify. Errors in this formula produce subtle distribution bugs that are hard to detect visually.
-  - The segment granularity (number of discrete steps N) must be chosen carefully: too coarse and the distribution has visible gaps; too fine and the index range overflows or the bad-sector set becomes large.
+  - The segment granularity (number of discrete steps N) shall be chosen carefully: too coarse and the distribution has visible gaps; too fine and the index range overflows or the bad-sector set becomes large.
   - The algorithm is novel enough that new contributors are unlikely to be familiar with it, increasing onboarding cost. This ADR and the `DESIGN.md` §3 entry exist specifically to address that.
 
 ## References

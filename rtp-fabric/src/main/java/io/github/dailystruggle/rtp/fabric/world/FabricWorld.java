@@ -1,12 +1,9 @@
 package io.github.dailystruggle.rtp.fabric.world;
 
-import io.github.dailystruggle.rtp.api.world.RTPChunk;
-import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
-import net.minecraft.world.Heightmap;
 
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;

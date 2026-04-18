@@ -4,6 +4,23 @@ This glossary defines domain-specific terms used throughout the RTP codebase and
 
 ---
 
+## ⚠ Multipurpose / Overloaded Terms
+
+The words below have common meanings in Java, Minecraft, or software engineering that differ from their **RTP-specific** meanings. Always use the RTP definition when reading or writing code and documentation in this repository.
+
+| Term | Common / Generic Meaning | **RTP-Specific Meaning** |
+|------|--------------------------|---------------------------|
+| **Region** | Any bounded area of space | A *named, independently configured teleport zone* with its own shape, queue, and permissions. Not a Minecraft world region or a Folia region thread. See *Region* entry below. |
+| **Queue** | A generic FIFO data structure | The *per-region buffer of pre-validated teleport locations* ready for instant dequeue. Not a generic task queue. See *Queue* entry below. |
+| **Pipeline** | Any multi-stage data flow | The *fixed five-step candidate-location validation sequence* (sample → load → adjust → validate → enqueue). Do not use loosely to mean "process". See *Pipeline* entry below. |
+| **Shape** | A visual or geometric figure | A *pluggable spatial boundary and random-sampling algorithm* registered with `rtp-api`. Not just a geometry class. See *Shape* entry below. |
+| **World** | A Minecraft `World` object | Always wrapped as `RTPWorld` inside `rtp-core`/`rtp-api`. Never pass a raw Bukkit `World` across module boundaries. See *RTPWorld* entry below. |
+| **Ticket** | Generic token or pass | A *Plugin Chunk Ticket* (`world.addPluginChunkTicket`) tracked by `ChunkReservation`. Must be released after validation. See *Plugin Chunk Ticket* entry below. |
+| **Adapter** | Generic design-pattern adapter | A *Platform Adapter module* (`rtp-spigot`, `rtp-paper`, `rtp-folia`, `rtp-fabric`). Refers specifically to module boundary, not the GoF adapter pattern. See *Platform Adapter* entry below. |
+| **Task** | Any `Runnable` or scheduled work | A `TeleportPipelineTask` — a stateful object that owns a `ChunkReservation` and must be registered with `MemoryTracker`. See *TeleportPipelineTask* entry (DESIGN.md). |
+
+---
+
 ## A
 
 **Addon**
@@ -185,6 +202,9 @@ The fundamental unit of Minecraft server time. One tick = 50 ms at 20 TPS. RTP t
 
 **TeleportData**
 An internal record bundling the player, destination, and metadata for a single pending or completed teleport operation.
+
+**TeleportPipelineTask**
+The stateful object that drives a single player's teleport request through the pipeline. Owns a `ChunkReservation`, must be registered with `MemoryTracker` on creation, and must call `reservation.close()` on every exit path. Lives in `rtp-core`; platform adapters must not subclass it.
 
 **Traceability Matrix**
 The document (`TRACEABILITY.md`) linking each requirement ID to its design reference, implementing class(es), and automated test(s).
