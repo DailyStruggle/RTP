@@ -18,6 +18,7 @@ The words below have common meanings in Java, Minecraft, or software engineering
 | **Ticket** | Generic token or pass | A *Plugin Chunk Ticket* (`world.addPluginChunkTicket`) tracked by `ChunkReservation`. Must be released after validation. See *Plugin Chunk Ticket* entry below. |
 | **Adapter** | Generic design-pattern adapter | A *Platform Adapter module* (`rtp-spigot`, `rtp-paper`, `rtp-folia`, `rtp-fabric`). Refers specifically to module boundary, not the GoF adapter pattern. See *Platform Adapter* entry below. |
 | **Task** | Any `Runnable` or scheduled work | A `TeleportPipelineTask` — a stateful object that owns a `ChunkReservation` and must be registered with `MemoryTracker`. See *TeleportPipelineTask* entry (DESIGN.md). |
+| **Scan** | A generic word meaning "to examine sequentially" | The *administrative world-scan lifecycle* (`/rtp scan start`/`pause`/`resume`/`reset`/`cancel`) that pre-populates a region's spatial memory without teleporting any player. Supersedes the legacy term *Fill*. See *Scan Task* and *Scan Lifecycle* entries below. |
 
 ---
 
@@ -38,6 +39,12 @@ A validation check that rejects candidate teleport locations based on their Mine
 
 **Bounded Execution**
 A design constraint requiring that all algorithms complete within a deterministic, pre-calculated time or step budget. RTP explicitly forbids unbounded retry loops ("rerolling") in favor of preemptive sector subtraction.
+
+**Brigadier Bridge**
+The `BrigadierCommandAdapter` inside `commands-api` that converts the shared `commands-api` command tree into Brigadier nodes for Minecraft platforms (notably Fabric) that dispatch through Brigadier natively. Platform adapters (e.g., `rtp-fabric`) are thin registration shims that delegate to this adapter. Brigadier is a `compileOnly` dependency and is not loaded on Bukkit platforms. See ADR-014.
+
+**Bundle Plugin**
+The `rtp-plugin` module — a dedicated bridge module that combines `rtp-core` logic, a `JavaPlugin` entry point, and the active platform adapter into the final shaded distribution JAR. It is the only module permitted to depend simultaneously on `rtp-core` and Bukkit-family server classes. See ADR-003.
 
 ---
 
@@ -72,6 +79,9 @@ The mathematical probability function governing how random coordinates are sampl
 **Economy Delegation**
 The mechanism by which Folia's region-threaded scheduler dispatches economy (Vault) calls to the correct regional thread. Required because Folia prohibits cross-region API calls from arbitrary threads.
 
+**Entry Point**
+The single class per platform that the server's plugin loader instantiates (on Bukkit-family platforms, `RTPBukkitPlugin` extending `JavaPlugin`; on Fabric, `RTPFabric` implementing `ModInitializer`). Entry points are restricted to lifecycle wiring — they shall not contain business logic (REQ-RTP-NF-003). Database wiring, effects wiring, and server-accessor selection are delegated to dedicated handler classes (`BukkitDatabaseHandler`, `BukkitEffectsHandler`, `BukkitServerProvider`).
+
 ---
 
 ## F
@@ -79,8 +89,8 @@ The mechanism by which Folia's region-threaded scheduler dispatches economy (Vau
 **Folia**
 A fork of Paper that implements region-based multithreading, where different areas of the world run on separate threads. RTP's `rtp-folia` adapter handles the additional scheduling constraints this imposes.
 
-**Fill Task**
-A background task that pre-generates and validates candidate locations, filling the queue for a given region. Runs asynchronously and respects the region's configured queue depth.
+**Fill Task** *(legacy alias for Scan Task)*
+Historical term for the admin-triggered pre-population task. Renamed to *Scan Task* (see *Scan Task* below); surviving references in external configurations, old documentation, or issue history shall be read as *Scan Task*.
 
 ---
 
@@ -180,6 +190,12 @@ A platform-agnostic wrapper around a world reference. Defined in `rtp-api`.
 ---
 
 ## S
+
+**Scan Lifecycle**
+The operator-visible state machine for a world scan: `start` → (`pause` ⇌ `resume`) → `cancel` or `reset`. Exposed via `/rtp scan <subcommand>` (`ScanCmd` tree) and governed by `REQ-RTP-F-012`. Replaces the legacy `/rtp fill` command family.
+
+**Scan Task**
+The background task that pre-generates and validates candidate locations for a region, populating its spatial memory without issuing teleports. Runs asynchronously and respects the region's configured queue depth and scan bounds. Implemented by `ScanTask` and driven by `ScanTaskProcessing`. Formerly called *Fill Task*.
 
 **Semantic Versioning (SemVer)**
 A versioning scheme (`MAJOR.MINOR.PATCH`) where breaking API changes increment MAJOR, backward-compatible additions increment MINOR, and bug fixes increment PATCH. Required for `rtp-api` releases.

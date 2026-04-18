@@ -121,6 +121,13 @@ public class Region extends FactoryValue<RegionKeys> {
 
   public void hydrateCacheFromDatabase(List<DatabaseAccessor.StoredLocation> storedLocations) {
     long currentSeed = getWorld().getSeed();
+    // The database may return rows in insertion order. That order is meaningless for our
+    // caching strategy — we want players landing in different areas on reboot, not a
+    // deterministic rush to whichever location happened to be saved first. Shuffle in-place.
+    // (A defensive copy-then-shuffle is avoided because the caller does not reuse the list.)
+    if (storedLocations.size() > 1) {
+      java.util.Collections.shuffle(storedLocations);
+    }
     for (DatabaseAccessor.StoredLocation stored : storedLocations) {
       if (stored.getSeed() != 0L && stored.getSeed() != currentSeed) {
         // The world was wiped and repopulated with a different seed.
@@ -130,7 +137,11 @@ public class Region extends FactoryValue<RegionKeys> {
       }
 
       RTPCoords coords = new RTPCoords(stored.getWorldName(), stored.getX(), stored.getY(), stored.getZ());
-      // Reconstruct as an unkept location stub (null reservation)
+      // Reconstruct as an unkept location stub (null reservation).
+      // Every row in the DB was validated before it was saved, and the seed check above
+      // confirms the world terrain is unchanged, so the deficit loop just needs to re-reserve
+      // the chunk — the consumer path in LocationGenerator already treats any queue-polled
+      // candidate as validated (only freshly generated candidates run the full safety grid).
       RTPLocation recoveredLoc = new RTPLocation(coords, stored.getAttempts(), null);
 
       // Feed into the queues for the region execution loop to handle

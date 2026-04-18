@@ -384,8 +384,15 @@ public abstract class DatabaseAccessor<D> {
    * composite key of the form {@code tableName + ":" + primaryKey}.
    *
    * The primary key is inferred from common identifiers, in order of preference:
-   * "id", "uuid", "key", "primaryKey", "senderId", "name". If none are present,
+   * "id", "UUID", "key", "primaryKey", "senderId", "name". If none are present,
    * a deterministic fallback based on {@code data.hashCode()} is used.
+   *
+   * <p>Note: "UUID" here is the in-project column-name convention (uppercase). It does
+   * not necessarily hold a {@link java.util.UUID} — depending on the table it may be a
+   * player UUID string ({@code teleportData}), a sentinel zero-UUID ({@code referenceData}),
+   * or a synthetic composite row key such as {@code region:world:x:y:z}
+   * ({@code rtp_cached_locations}). All SQL schemas and lookups in this project spell the
+   * column {@code UUID}; no caller uses lowercase {@code "uuid"}.
    *
    * @param tableName the table name
    * @param data the row data to cache
@@ -395,8 +402,10 @@ public abstract class DatabaseAccessor<D> {
     if (data == null || data.isEmpty()) return;
 
     String primaryKey = null;
-    // Preferred keys in order
-    String[] preferredKeys = new String[] {"id", "uuid", "key", "primaryKey", "senderId", "name"};
+    // Preferred keys in order (case-sensitive match against the column map).
+    // "UUID" is uppercase to match the SQL column convention used across all tables;
+    // no caller in this codebase uses lowercase "uuid".
+    String[] preferredKeys = new String[] {"id", "UUID", "key", "primaryKey", "senderId", "name"};
     for (String k : preferredKeys) {
       if (data.containsKey(k) && data.get(k) != null) {
         primaryKey = String.valueOf(data.get(k));
@@ -418,7 +427,7 @@ public abstract class DatabaseAccessor<D> {
    * composite key of the form {@code tableName + ":" + primaryKey}.
    *
    * The primary key is inferred from common identifiers, in order of preference:
-   * "id", "uuid", "key", "primaryKey", "senderId", "name". If none are present,
+   * "id", "UUID", "key", "primaryKey", "senderId", "name". If none are present,
    * a deterministic fallback based on {@code data.hashCode()} is used.
    *
    * @param data the row data to cache
@@ -442,9 +451,14 @@ public abstract class DatabaseAccessor<D> {
     String key = regionName + ":" + location.coords().worldName() + ":" + location.coords().x() + ":" + location.coords().y() + ":" + location.coords().z();
     columns.put("UUID", key);
 
-    Map<String, Object> data = new HashMap<>();
-    data.put(key, columns);
-    cacheValue("rtp_cached_locations", data);
+    // Pass the flat columns map directly; cacheValue infers the primary key from the "UUID" column.
+    // NOTE: Prior revisions wrapped this in an outer { key -> columns } map, which caused
+    // cacheValue's key inference to fall through to data.hashCode() and the downstream SQL write
+    // to emit an INSERT whose column name was the composite key string and whose value was the
+    // whole columns map. The resulting SQLException was swallowed by the per-backend write()
+    // catch blocks, so nothing was ever actually persisted. See round-trip regression test
+    // CachedLocationRoundTripTest.
+    cacheValue("rtp_cached_locations", columns);
   }
 
   /**
@@ -584,7 +598,11 @@ public abstract class DatabaseAccessor<D> {
       }
     }
 
-    if (readQueue.isEmpty() && writeQueue.isEmpty()) return;
+    // Include deleteQueue in the early-exit check — otherwise pending deletes are stranded
+    // whenever no reads/writes are queued. Symptom: deleteCachedLocation enqueues a row
+    // for removal, processQueries returns before the delete loop runs, and the row
+    // remains in the DB until the next write happens to land in the same tick.
+    if (readQueue.isEmpty() && writeQueue.isEmpty() && deleteQueue.isEmpty()) return;
     D database = connect();
     if (database == null) return;
     if (stop.get()) return;

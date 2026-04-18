@@ -143,8 +143,8 @@ regionInfo:
   - "#58CCED  - requirePermission: [requirePermission]"
   - "#58CCED  - worldBorderOverride: [worldBorderOverride]"
   - "#58CCED  - cacheCap: [cacheCap]"
-  - "#58CCED  - cached: [cached]"
   - "#58CCED  - keptCache: [keptCache]"
+  - "#58CCED  - cached: [cached]"
 
 ################################################################################
 # Section 8: Command Descriptions

@@ -46,6 +46,11 @@ public class FoliaSchedulerImpl implements RTPScheduler {
     if (RTPAPI.serverAccessor != null) {
       RTPAPI.serverAccessor.registerAction(trackedTask);
     }
+    if (!plugin.isEnabled()) {
+      // Plugin is disabling/disabled; Folia's AsyncScheduler would throw IllegalPluginAccessException.
+      // Drop the task silently — shutdown is an expected, non-teleport code path.
+      return trackedTask;
+    }
     asyncScheduler.runNow(plugin, scheduledTask -> trackedTask.run());
     return trackedTask;
   }
@@ -55,6 +60,7 @@ public class FoliaSchedulerImpl implements RTPScheduler {
     if (org.bukkit.Bukkit.isGlobalTickThread()) {
       task.run();
     } else {
+      if (!plugin.isEnabled()) return;
       globalScheduler.run(plugin, scheduledTask -> task.run());
     }
   }
@@ -68,6 +74,7 @@ public class FoliaSchedulerImpl implements RTPScheduler {
         task.run();
       } else {
         // We are on the wrong thread; bounce it to the correct Region Scheduler
+        if (!plugin.isEnabled()) return;
         regionScheduler.run(plugin, foliaRTPWorld.world(), location.x() >> 4, location.z() >> 4, st -> task.run());
       }
     } else if (rtpWorld == null || rtpWorld.world() == null) {
@@ -86,6 +93,7 @@ public class FoliaSchedulerImpl implements RTPScheduler {
         task.run();
       } else {
         // We are on the wrong thread; bounce it to the correct Region Scheduler
+        if (!plugin.isEnabled()) return;
         regionScheduler.run(plugin, foliaRTPWorld.world(), cx, cz, st -> task.run());
       }
     } else if (world == null || world.world() == null) {
@@ -100,6 +108,7 @@ public class FoliaSchedulerImpl implements RTPScheduler {
   public Object runTaskTimer(io.github.dailystruggle.rtp.api.world.RTPWorld<?> world, int cx, int cz, Runnable task, long delay, long period) {
     if (world instanceof FoliaRTPWorld && world.world() != null) {
       World bukkitWorld = ((FoliaRTPWorld) world).world();
+      if (!plugin.isEnabled()) return null;
       return regionScheduler.runAtFixedRate(plugin, bukkitWorld, cx, cz, scheduledTask -> task.run(), Math.max(1, delay), Math.max(1, period));
     } else if (world == null || world.world() == null) {
       // TODO: THREAD-VIOLATION - Requires async bridge; null-world fallback crosses to @AsyncThread
@@ -113,6 +122,7 @@ public class FoliaSchedulerImpl implements RTPScheduler {
   public void runTaskLater(io.github.dailystruggle.rtp.api.world.RTPWorld<?> world, int cx, int cz, Runnable task, long delay) {
     if (world instanceof FoliaRTPWorld && world.world() != null) {
       World bukkitWorld = ((FoliaRTPWorld) world).world();
+      if (!plugin.isEnabled()) return;
       regionScheduler.runDelayed(plugin, bukkitWorld, cx, cz, scheduledTask -> task.run(), Math.max(1, delay));
     } else if (world == null || world.world() == null) {
       // TODO: THREAD-VIOLATION - Requires async bridge; null-world fallback crosses to @GlobalRegionThread
@@ -124,6 +134,7 @@ public class FoliaSchedulerImpl implements RTPScheduler {
 
   @Override
   public void runTaskLater(Runnable task, long delay) {
+    if (!plugin.isEnabled()) return;
     globalScheduler.runDelayed(plugin, scheduledTask -> task.run(), Math.max(1, delay));
   }
 
@@ -133,6 +144,7 @@ public class FoliaSchedulerImpl implements RTPScheduler {
     long safeDelay = Math.max(1, delay);
     long safePeriod = Math.max(1, period);
 
+    if (!plugin.isEnabled()) return null;
     return globalScheduler.runAtFixedRate(
             plugin,
             scheduledTask -> runnable.run(),
@@ -147,6 +159,7 @@ public class FoliaSchedulerImpl implements RTPScheduler {
     long delayMs = Math.max(1, delay * 50);
     long periodMs = Math.max(1, period * 50);
 
+    if (!plugin.isEnabled()) return null;
     return asyncScheduler.runAtFixedRate(
             plugin,
             scheduledTask -> runnable.run(),
@@ -178,6 +191,7 @@ public class FoliaSchedulerImpl implements RTPScheduler {
     }
 
     if (delayTicks <= 0) delayTicks = 1;
+    if (!plugin.isEnabled()) return;
     bukkitPlayer
         .getScheduler()
         .runDelayed(plugin, (scheduledTask) -> trackedTask.run(), null, delayTicks);

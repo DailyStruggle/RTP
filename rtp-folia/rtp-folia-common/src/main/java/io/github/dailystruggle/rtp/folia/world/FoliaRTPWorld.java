@@ -117,6 +117,27 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
     });
   }
 
+  /**
+   * Folia-specific stale-chunk guard (ADR-015 / REQ-RTP-S-005). Uses Bukkit's
+   * {@code World#isChunkLoaded(int,int)}, which is a non-loading status query and
+   * does NOT dispatch to the Region Thread. This guards the race between
+   * {@link #getChunkAtAsync(int,int)} future resolution and the subsequent
+   * block-evaluation task executing on a backlogged Count-Bound pipe, during
+   * which Folia's native chunk GC may have unloaded the chunk.
+   *
+   * <p>Never call this from a hot inner loop that expects pin semantics — this
+   * is a best-effort status read, not a guarantee the chunk will remain loaded
+   * on the following line.</p>
+   */
+  @Override
+  public boolean isChunkLoaded(int cx, int cz) {
+    try {
+      return world.isChunkLoaded(cx, cz);
+    } catch (Throwable t) {
+      return false;
+    }
+  }
+
   @Override
   @GlobalRegionThread
   protected void setForceLoadedImpl(int cx, int cz, boolean forceLoad) {

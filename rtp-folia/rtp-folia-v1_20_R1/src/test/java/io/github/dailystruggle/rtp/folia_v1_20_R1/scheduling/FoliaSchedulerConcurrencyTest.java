@@ -32,6 +32,7 @@ public class FoliaSchedulerConcurrencyTest {
   @BeforeEach
   void setUp() {
     plugin = mock(JavaPlugin.class);
+    Mockito.when(plugin.isEnabled()).thenReturn(true);
     globalScheduler = mock(GlobalRegionScheduler.class);
     asyncScheduler = mock(AsyncScheduler.class);
     regionScheduler = mock(RegionScheduler.class);

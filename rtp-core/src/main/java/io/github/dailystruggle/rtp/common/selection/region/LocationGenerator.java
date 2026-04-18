@@ -192,8 +192,23 @@ public class LocationGenerator implements ILocationGenerator {
                                 int centerChunkX = chunk.x();
                                 int centerChunkZ = chunk.z();
                                 localChunks[safe * L + safe] = chunk;
+                                // REQ-RTP-S-005 Stale-Chunk Guard (ADR-015): the center chunk was loaded
+                                // async above, but the getLocation(...) call may have sat on the
+                                // AsyncTaskProcessing pipe long enough for Folia's native chunk GC to
+                                // unload it before we reach the safetyCheck. A subsequent chunk1.isSafe
+                                // call on an unloaded chunk can force a synchronous load. Detect and
+                                // reject the candidate (the poll loop will pick the next one).
+                                boolean centerStillLoaded = world.isChunkLoaded(cx, cz);
+                                if (!centerStillLoaded) {
+                                    RTP.log(Level.FINE,
+                                            "[RTP] Stale center chunk on safetyCheck entry ("
+                                                    + world.name() + " " + cx + "," + cz
+                                                    + "); rejecting candidate.");
+                                    pass = false;
+                                }
                                 safetyCheck:
                                 for (int x = left.x() - safe; x <= left.x() + safe; x++) {
+                                    if (!centerStillLoaded) break safetyCheck;
                                     int chunkX = x >> 4;
                                     int xx = x & 15;
                                     int dcX = chunkX - centerChunkX;
@@ -577,6 +592,18 @@ public class LocationGenerator implements ILocationGenerator {
                 continue;
             }
 
+            // REQ-RTP-S-005 Stale-Chunk Guard (ADR-015): vert.adjust(chunk) below invokes
+            // chunk.isSafe(...) repeatedly for vertical scanning. If the chunk was evicted
+            // by native GC between getChunkAtAsync() above and this line, those isSafe
+            // reads can force a synchronous chunk load on a tick thread. Skip the candidate.
+            if (!world.isChunkLoaded(cx, cz)) {
+                RTP.log(Level.FINE,
+                        "[RTP] Stale chunk before vert.adjust ("
+                                + world.name() + " " + cx + "," + cz
+                                + "); rejecting candidate.");
+                continue;
+            }
+
             try {
                 RTPCoords res = vert.adjust(chunk);
                 if (res == null) {
@@ -619,8 +646,21 @@ public class LocationGenerator implements ILocationGenerator {
                 int centerChunkZ = chunk.z();
                 int L = safetyRadius * 2 + 1;
                 localChunks[safetyRadius * L + safetyRadius] = chunk;
+                // REQ-RTP-S-005 Stale-Chunk Guard (ADR-015): native chunk GC may have unloaded
+                // the center chunk between the async load above and this safetyCheck. On a
+                // stale detection, reject the candidate rather than letting chunk1.isSafe
+                // force a synchronous load on a tick thread.
+                boolean centerStillLoaded = world.isChunkLoaded(cx, cz);
+                if (!centerStillLoaded) {
+                    RTP.log(Level.FINE,
+                            "[RTP] Stale center chunk on safetyCheck entry ("
+                                    + world.name() + " " + cx + "," + cz
+                                    + "); rejecting candidate.");
+                    pass = false;
+                }
                 safetyCheck:
                 for (int x = finalX - safetyRadius; x <= finalX + safetyRadius; x++) {
+                    if (!centerStillLoaded) break safetyCheck;
                     int chunkX = x >> 4;
                     int xx = x & 15;
                     int dcX = chunkX - centerChunkX;

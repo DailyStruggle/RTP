@@ -42,3 +42,8 @@ For design and implementation details that satisfy these requirements, see [`doc
 ### 2.5 Decoupled Platform-Agnostic Core Logic
 - **REQ-CORE-ARCH-009 — Interface-Only Platform Access:** The `rtp-core` module shall interact with the server environment exclusively through platform-agnostic interfaces.
 - **REQ-CORE-ARCH-010 — No Platform Imports:** Direct references to platform-specific classes shall be absent from `rtp-core`. All concurrency shall be handled via abstractions provided by the server adapter, ensuring that core logic remains platform-neutral and testable in isolation.
+
+## 3. Non-Functional Requirements
+
+### 3.1 Shutdown Persistence
+- **REQ-CORE-NF-001 — Deterministic Shutdown Persistence:** Volatile spatial-memory state shall be flushed to the configured persistence backend on plugin shutdown before the shutdown flag is set, ensuring no state accumulated between the last periodic drain and shutdown is lost.

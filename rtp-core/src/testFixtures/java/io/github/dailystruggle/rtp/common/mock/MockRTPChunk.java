@@ -69,6 +69,9 @@ public class MockRTPChunk extends RTPChunk<Object> {
     /** All positions are safe — no unsafe-block filtering needed in tests. */
     @Override
     public boolean isSafe(int x, int y, int z, Set<String> unsafeBlocks) {
+        if (world instanceof MockRTPWorld m) {
+            m.isSafeCallCount.incrementAndGet();
+        }
         return true;
     }
 

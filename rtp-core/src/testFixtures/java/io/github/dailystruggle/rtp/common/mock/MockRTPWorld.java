@@ -8,6 +8,8 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.LongPredicate;
 
 /**
  * Minimal in-memory implementation of {@link RTPWorld} for use in unit tests.
@@ -29,6 +31,25 @@ public class MockRTPWorld extends RTPWorld<String> {
     public MockRTPWorld() {
         this("mock_world");
     }
+
+    /**
+     * Test hook: predicate controlling the return value of {@link #isChunkLoaded(int,int)}.
+     * Input is the encoded chunk key (see {@link #encodeKey(int,int)}). Default returns {@code true}.
+     * Set a custom predicate to simulate Folia native chunk GC (e.g. {@code k -> false} after
+     * the first block-evaluation attempt) for REQ-RTP-S-005 stale-chunk guard tests.
+     */
+    public volatile LongPredicate isChunkLoadedPredicate = key -> true;
+
+    /** Test hook: number of times {@link #getChunkAtAsync(int,int)} has been invoked. */
+    public final AtomicInteger chunkAsyncLoadCount = new AtomicInteger();
+
+    /**
+     * Test hook: number of times any {@link MockRTPChunk#isSafe(int,int,int,java.util.Set)}
+     * on a chunk belonging to this world has been invoked. Used by the stale-chunk guard
+     * test (ADR-015 / REQ-RTP-S-005) to assert that block evaluation is entirely bypassed
+     * when the guard trips.
+     */
+    public final AtomicInteger isSafeCallCount = new AtomicInteger();
 
     @Override
     public String name() {
@@ -67,11 +88,26 @@ public class MockRTPWorld extends RTPWorld<String> {
      */
     @Override
     public CompletableFuture<ChunkSet> getChunkAtAsync(int cx, int cz) {
+        chunkAsyncLoadCount.incrementAndGet();
         ChunkSet chunkSet = new ChunkSet(
                 this, cx, cz,
                 List.of(CompletableFuture.completedFuture(encodeKey(cx, cz))),
                 new CompletableFuture<>());
         return CompletableFuture.completedFuture(chunkSet);
+    }
+
+    /**
+     * Test-controllable implementation of the stale-chunk guard contract
+     * (ADR-015 / REQ-RTP-S-005). Delegates to {@link #isChunkLoadedPredicate};
+     * defaults to {@code true}.
+     */
+    /** Test hook: number of times {@link #isChunkLoaded(int,int)} has been invoked. */
+    public final AtomicInteger isChunkLoadedCallCount = new AtomicInteger();
+
+    @Override
+    public boolean isChunkLoaded(int cx, int cz) {
+        isChunkLoadedCallCount.incrementAndGet();
+        return isChunkLoadedPredicate.test(encodeKey(cx, cz));
     }
 
     @Override

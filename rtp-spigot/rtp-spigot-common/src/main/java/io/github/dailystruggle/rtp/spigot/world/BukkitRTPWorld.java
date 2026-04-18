@@ -51,6 +51,31 @@ public class BukkitRTPWorld extends RTPWorld<World> {
 
   private final ConcurrentHashMap<Long, WeakReference<Chunk>> chunkCache = new ConcurrentHashMap<>();
 
+  /**
+   * Reflective handle to {@code World#getChunkAtAsync(int, int)} — an overload that returns
+   * {@link CompletableFuture}&lt;{@link Chunk}&gt;. The Bukkit API shipped with
+   * {@code spigot-api:1.20.1-R0.1-SNAPSHOT} only declares the {@code Consumer}-based async
+   * overloads, so we cannot bind to this method at compile time, but Paper, Folia, and modern
+   * Spigot forks all expose it at runtime. Cached as a static field (nullable) to keep the
+   * per-call hot path to a single {@code Method.invoke} call.
+   */
+  private static final java.lang.reflect.Method CHUNK_AT_ASYNC_FUTURE;
+
+  static {
+    java.lang.reflect.Method m = null;
+    try {
+      m = World.class.getMethod("getChunkAtAsync", int.class, int.class);
+      if (!CompletableFuture.class.isAssignableFrom(m.getReturnType())) {
+        // Some very old API stubs declared the same name with a Consumer-based signature but
+        // never with this exact (int,int) pair; defensive check in case that ever changes.
+        m = null;
+      }
+    } catch (Throwable ignored) {
+      // No such method on the running server — fall back to synchronous loading.
+    }
+    CHUNK_AT_ASYNC_FUTURE = m;
+  }
+
   public BukkitRTPWorld(World world) {
     super(world);
     if (world == null) {
@@ -92,20 +117,46 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   @Override
   public CompletableFuture<Long> getChunkAt(int cx, int cz) {
     totalChunkLoads.incrementAndGet();
-    CompletableFuture<Long> future = new CompletableFuture<>();
+    final long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
 
+    // Prefer Bukkit's async chunk API (present in Spigot since 1.13). This avoids
+    // hopping work back onto the primary thread for a synchronous world.getChunkAt()
+    // call and keeps the location pipeline off the tick thread wherever the server
+    // fork implements true async generation (Paper/Folia). On vanilla Spigot the
+    // scheduling still resolves on the main thread internally, but the caller is
+    // not blocked — a strict improvement over the previous runTask+getChunkAt path.
+    if (CHUNK_AT_ASYNC_FUTURE != null) {
+      try {
+        @SuppressWarnings("unchecked")
+        CompletableFuture<org.bukkit.Chunk> asyncFuture =
+            (CompletableFuture<org.bukkit.Chunk>) CHUNK_AT_ASYNC_FUTURE.invoke(world, cx, cz);
+        if (asyncFuture != null) {
+          return asyncFuture
+              .thenApply(chunk -> {
+                if (chunk == null) return null;
+                cacheChunk(cx, cz, chunk);
+                return key;
+              })
+              .exceptionally(t -> null);
+        }
+      } catch (Throwable ignored) {
+        // Fall through to the synchronous fallback below. Some test doubles
+        // (e.g. MockBukkit builds) or very old forks may not honor the async API.
+      }
+    }
+
+    // Fallback: synchronous load, bounced to the primary thread when needed.
+    CompletableFuture<Long> future = new CompletableFuture<>();
     Runnable loadChunkTask = () -> {
       try {
-        // world.getChunkAt() is strictly synchronous and guarantees ChunkStatus.FULL
         org.bukkit.Chunk chunk = world.getChunkAt(cx, cz);
         cacheChunk(cx, cz, chunk);
-        future.complete(((long) cx & 0xffffffffL | ((long) cz << 32)));
+        future.complete(key);
       } catch (Throwable t) {
         future.complete(null); // Safely fail the future if generation crashes
       }
     };
 
-    // Spigot mandates that synchronous chunk generation must occur on the primary thread
     if (org.bukkit.Bukkit.isPrimaryThread()) {
       loadChunkTask.run();
     } else {
@@ -125,6 +176,23 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     return getChunkAt(cx, cz).thenApply(key -> {
       return new ChunkSet(this, cx, cz, Collections.singletonList(CompletableFuture.completedFuture(key)), new CompletableFuture<>());
     });
+  }
+
+  /**
+   * Non-blocking lookup — delegates to Bukkit's {@code World#isChunkLoaded(int,int)}, which is
+   * documented as a pure state query and does NOT trigger a chunk load. Used by the stale-chunk
+   * guard (ADR-015 / REQ-RTP-S-005) to abort block evaluation when the chunk was GC'd while the
+   * Count-Bound pipe was backlogged.
+   */
+  @Override
+  public boolean isChunkLoaded(int cx, int cz) {
+    try {
+      return world.isChunkLoaded(cx, cz);
+    } catch (Throwable t) {
+      // Defensive: if the underlying world view is gone, treat as unloaded so callers abort
+      // safely rather than proceeding into a synchronous load path.
+      return false;
+    }
   }
 
   @Override

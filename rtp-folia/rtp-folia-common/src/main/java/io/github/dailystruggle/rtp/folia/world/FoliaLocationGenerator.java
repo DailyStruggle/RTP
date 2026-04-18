@@ -140,6 +140,7 @@ public class FoliaLocationGenerator implements ILocationGenerator {
                 : new HashSet<>();
 
         int safetyRadius = safety.getNumber(SafetyKeys.safetyRadius, 0).intValue();
+        int staleChunkRetryLimit = Math.max(0, safety.getNumber(SafetyKeys.staleChunkRetryLimit, 2).intValue());
         long maxAttemptsBase = performance.getNumber(PerformanceKeys.maxAttempts, 20).longValue();
         maxAttemptsBase = Math.max(maxAttemptsBase, 1);
         long maxAttempts = maxAttemptsBase;
@@ -160,6 +161,7 @@ public class FoliaLocationGenerator implements ILocationGenerator {
         state.vert = vert;
         state.unsafeBlocks = unsafeBlocks;
         state.safetyRadius = safetyRadius;
+        state.staleChunkRetryLimit = staleChunkRetryLimit;
         state.maxAttempts = maxAttempts;
         state.maxBiomeChecks = maxBiomeChecks;
         state.biomeRecall = biomeRecall;
@@ -183,6 +185,7 @@ public class FoliaLocationGenerator implements ILocationGenerator {
         VerticalAdjustor<?> vert;
         Set<String> unsafeBlocks;
         int safetyRadius;
+        int staleChunkRetryLimit;
         long maxAttempts;
         long maxBiomeChecks;
         boolean biomeRecall;
@@ -289,9 +292,18 @@ public class FoliaLocationGenerator implements ILocationGenerator {
                     final int cx = select[0];
                     final int cz = select[1];
 
-                    // Request the chunk. We break the while loop by returning,
-                    // which cleanly suspends this worker thread until the future fires.
-                    world.getChunkAtAsync(cx, cz).thenAccept(chunkSet -> {
+                    // --- REQ-RTP-S-005 Stale-Chunk Guard (ADR-015) ---
+                    // We hold a bounded retry counter across the getChunkAtAsync -> Region-Thread-runTask
+                    // chain. Between the async load future resolving and the runTask body actually
+                    // executing on the Count-Bound pipe, Folia's native chunk GC may unload the chunk
+                    // (especially during /rtp scan bursts or caching pulses). If we then call
+                    // getCachedChunk/vert.adjust without checking, Folia forcibly triggers a synchronous
+                    // chunk load on the Region Thread, which stalls the Watchdog and crashes the server.
+                    // On a stale detection, we re-queue a fresh async load up to staleChunkRetryLimit
+                    // times. On exhaustion we reject this candidate via the normal unsafe path (i++).
+                    final int[] staleRetries = {0};
+                    final Runnable[] requestAndEvaluate = new Runnable[1];
+                    requestAndEvaluate[0] = () -> world.getChunkAtAsync(cx, cz).thenAccept(chunkSet -> {
                         try {
                             if (chunkSet == null) {
                                 this.i++;
@@ -305,6 +317,33 @@ public class FoliaLocationGenerator implements ILocationGenerator {
 
                             RTP.serverAccessor.getScheduler().runTask(targetLoc, () -> {
                                 try {
+                                    // Stale-chunk guard: Folia native GC may have unloaded the chunk
+                                    // while this task sat in the Count-Bound pipe. If so, abort
+                                    // block reads and re-queue an async load (bounded).
+                                    if (!world.isChunkLoaded(cx, cz)) {
+                                        if (staleRetries[0] < state.staleChunkRetryLimit) {
+                                            staleRetries[0]++;
+                                            RTP.log(Level.FINE,
+                                                    "[RTP] Stale chunk detected on Region-Thread dispatch ("
+                                                            + world.name() + " " + cx + "," + cz
+                                                            + "); re-queuing async load (attempt "
+                                                            + staleRetries[0] + "/" + state.staleChunkRetryLimit + ")");
+                                            // Bounce to async pool to obey the rule: no chunk I/O
+                                            // dispatch from a TickThread's callback. The recursive
+                                            // requestAndEvaluate re-enters on the async worker.
+                                            RTP.serverAccessor.getScheduler().runTaskAsynchronously(requestAndEvaluate[0]);
+                                        } else {
+                                            RTP.log(Level.WARNING,
+                                                    "[RTP] Stale-chunk retry budget exhausted for "
+                                                            + world.name() + " " + cx + "," + cz
+                                                            + " (limit=" + state.staleChunkRetryLimit
+                                                            + "); rejecting candidate and advancing spiral.");
+                                            this.i++;
+                                            reschedule(false);
+                                        }
+                                        return;
+                                    }
+
                                     long chunkKey = ((long) cx & 0xffffffffL | ((long) cz << 32));
                                     RTPChunk<?> chunk = world.getCachedChunk(chunkKey);
                                     if (chunk == null) {
@@ -460,6 +499,10 @@ public class FoliaLocationGenerator implements ILocationGenerator {
                             reschedule(false);
                         }
                     });
+
+                    // Kick off the first async chunk load. On stale-chunk detection inside the
+                    // Region-Thread callback, the same runnable re-enters (bounced to async pool).
+                    requestAndEvaluate[0].run();
 
                     // SUSPEND the while loop cleanly! It will resume asynchronously when the chunk loads.
                     return;
