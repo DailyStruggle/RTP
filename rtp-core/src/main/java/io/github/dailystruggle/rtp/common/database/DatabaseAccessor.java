@@ -685,6 +685,10 @@ public abstract class DatabaseAccessor<D> {
   /** Start the database accessor */
   public abstract void startup();
 
+  /** Close the database accessor */
+  public void close() {
+  }
+
   /**
    * Connect to the database
    *

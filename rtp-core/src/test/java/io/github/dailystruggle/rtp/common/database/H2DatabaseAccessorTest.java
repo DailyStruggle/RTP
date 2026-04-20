@@ -142,9 +142,14 @@ class H2DatabaseAccessorTest extends AbstractDatabaseAccessorTest {
             }
         }
 
-        void close() throws SQLException {
-            if (sharedConnection != null && !sharedConnection.isClosed()) {
-                sharedConnection.close();
+        @Override
+        public void close() {
+            try {
+                if (sharedConnection != null && !sharedConnection.isClosed()) {
+                    sharedConnection.close();
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
             }
         }
     }

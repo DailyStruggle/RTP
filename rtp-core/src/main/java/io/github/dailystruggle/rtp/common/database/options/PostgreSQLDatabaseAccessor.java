@@ -79,6 +79,13 @@ public class PostgreSQLDatabaseAccessor extends AbstractSQLDatabaseAccessor {
   }
 
   @Override
+  public void close() {
+    if (dataSource != null) {
+      dataSource.close();
+    }
+  }
+
+  @Override
   public void startup() {
     try (Connection connection = getConnection()) {
       // get full table

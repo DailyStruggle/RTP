@@ -75,6 +75,22 @@ class H2DatabaseAccessorTest {
         }
 
         @Override
+        public void disconnect(Connection connection) {
+            // Shared connection, do nothing.
+        }
+
+        @Override
+        public void close() {
+            try {
+                if (connection != null && !connection.isClosed()) {
+                    connection.close();
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Override
         public void startup() {
             // no-op for tests
         }
@@ -175,10 +191,19 @@ class H2DatabaseAccessorTest {
     }
 
     @Test
-    void disconnect_closesConnection() throws SQLException {
+    void disconnect_doesNotCloseConnection() throws SQLException {
         // Use a separate connection so the shared field is unaffected
         Connection conn = DriverManager.getConnection(dbUrl);
         accessor.disconnect(conn);
+        assertFalse(conn.isClosed(), "disconnect should not close a shared connection");
+        conn.close();
+    }
+
+    @Test
+    void close_closesInternalConnection() throws SQLException {
+        Connection conn = accessor.getConnection();
+        assertFalse(conn.isClosed());
+        accessor.close();
         assertTrue(conn.isClosed());
     }
 

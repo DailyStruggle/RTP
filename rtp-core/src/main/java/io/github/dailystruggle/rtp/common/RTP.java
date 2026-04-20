@@ -437,6 +437,7 @@ public class RTP {
 
     if (instance.databaseAccessor != null) {
       instance.databaseAccessor.stop.set(true);
+      instance.databaseAccessor.close();
     }
 
     instance.latestTeleportData.forEach(
