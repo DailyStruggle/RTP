@@ -52,6 +52,18 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   private final ConcurrentHashMap<Long, WeakReference<Chunk>> chunkCache = new ConcurrentHashMap<>();
 
   /**
+   * ADR-016 — per-world cache of Anvil-backed chunk views keyed by the same
+   * {@code (cx, cz) -> long} packing used by {@link #chunkCache}. The cache +
+   * FIFO-eviction lifecycle is owned by {@link io.github.dailystruggle.rtp.anvil.AnvilProbeSupport},
+   * which is shared by every adapter that wires the ADR-016 pipeline (currently
+   * Bukkit/Spigot and Folia). The live {@link #chunkCache} takes precedence:
+   * once a candidate is promoted to a real load (e.g. at teleport-commit time),
+   * the live entry is the source of truth and the Anvil entry is evicted.
+   */
+  private final io.github.dailystruggle.rtp.anvil.AnvilProbeSupport anvilProbeSupport =
+      new io.github.dailystruggle.rtp.anvil.AnvilProbeSupport();
+
+  /**
    * Reflective handle to {@code World#getChunkAtAsync(int, int)} — an overload that returns
    * {@link CompletableFuture}&lt;{@link Chunk}&gt;. The Bukkit API shipped with
    * {@code spigot-api:1.20.1-R0.1-SNAPSHOT} only declares the {@code Consumer}-based async
@@ -119,6 +131,155 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     totalChunkLoads.incrementAndGet();
     final long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
 
+    // ADR-016 — Anvil read-only data source (no longer a gate).
+    //
+    // For candidate chunks that are not currently loaded and the world uses the
+    // vanilla chunk generator, we probe the persisted r.X.Z.mca region file
+    // off-thread. The prefilter is a *data source*, not a
+    // short-circuit: whenever the probe yields a decoded AnvilChunkView
+    // (regardless of the advisory ACCEPT/REJECT verdict) we publish that view
+    // into the Anvil cache and return the same chunk key the live path would
+    // use, so the immediately-following getCachedChunk(key) call in
+    // LocationGenerator receives an Anvil-backed BukkitRTPChunk and lets the
+    // vert adjustor scan across the whole decoded Y range. An advisory REJECT
+    // (surface unsafe) no longer drops the candidate — the vert adjustor may
+    // still find a safe air pocket below the surface (e.g. sub-lava caverns
+    // in the nether).
+    //
+    // Only when the probe returns no view at all (UNKNOWN: no region file /
+    // unsupported DataVersion / decode error / no emitted sections) do we
+    // fall through to the live-load path. The live chunk.isSafe(...) re-check
+    // at teleport commit (ADR-016 §4) remains the authoritative arbiter.
+    // Paper and Folia @Override this method and never enter the prefilter.
+    if (shouldPrefilter(cx, cz)) {
+      java.util.Set<String> rawUnsafe = currentUnsafeBlocks();
+      // AnvilPrefilter is platform-neutral and takes a Path + dimension subpath
+      // plus a UnaryOperator<String> reconciler. The Material-aware reconciler lives in
+      // the spigot-side PaletteNormalizer.
+      java.nio.file.Path worldFolder = world.getWorldFolder().toPath();
+      String dim = dimensionRegionSubpath(world);
+      return anvilProbeSupport
+          .probeAndPublish(worldFolder, dim, cx, cz, key, rawUnsafe,
+              io.github.dailystruggle.rtp.spigot.anvil.PaletteNormalizer::reconcile)
+          .thenCompose(result -> {
+            io.github.dailystruggle.rtp.anvil.AnvilChunkView view = result.view();
+            if (view != null) {
+              // FINE breadcrumb so operators can still see how often the surface
+              // heightmap would have been rejected under the old gate semantics;
+              // the verdict remains meaningful as telemetry.
+              if (result.verdict() == io.github.dailystruggle.rtp.anvil.Verdict.REJECT) {
+                RTP.log(java.util.logging.Level.FINE,
+                    "[RTP] Anvil surface-unsafe (advisory) world=" + name
+                        + " chunk=(" + cx + "," + cz + ") — handing view to vert adjustor");
+              }
+              return CompletableFuture.completedFuture(key);
+            }
+            // No view available (UNKNOWN) → live load is authoritative.
+            return loadChunkFuture(cx, cz, key);
+          });
+    }
+
+    return loadChunkFuture(cx, cz, key);
+  }
+
+  /**
+   * Returns {@code true} when the applicability gates for the ADR-016 Anvil pre-filter
+   * are all satisfied for the chunk at absolute coords {@code (cx, cz)}:
+   * <ul>
+   *   <li>{@code SafetyKeys.anvilPrefilterEnabled} is truthy (default {@code true}),</li>
+   *   <li>the chunk is not currently loaded (avoids corrupted/desync reads against live writes).</li>
+   * </ul>
+   *
+   * <p>The custom-{@link org.bukkit.generator.ChunkGenerator} short-circuit that previously
+   * appeared here has been intentionally removed (ADR-016 §1 trust-model revision): for
+   * chunks that are already populated on disk, the {@code .mca} palette is a strictly
+   * more accurate data source than the Bukkit {@link org.bukkit.Material} / {@link
+   * org.bukkit.block.Biome} enum views (which silently collapse modded and Iris-native
+   * identifiers to their nearest vanilla cousin). For chunks that are not yet populated,
+   * {@code AnvilPrefilter.probeDetailed} returns {@code UNKNOWN} and the caller falls
+   * through to the authoritative live load, which is exactly the safety net required when
+   * a custom generator still has work to do. Downstream {@code chunk.isSafe(...)} corroborates
+   * every {@code REJECT}, so any disk-vs-live divergence under a custom generator is
+   * bounded to "extra retries", never "unsafe teleport".
+   */
+  private boolean shouldPrefilter(int cx, int cz) {
+    if (world == null) return false;
+    try {
+      if (world.isChunkLoaded(cx, cz)) return false;
+    } catch (Throwable ignored) {
+      return false;
+    }
+    try {
+      ConfigParser<SafetyKeys> safety =
+          (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+      if (safety == null) return true; // Config not available yet — default-on.
+      Object raw = safety.getConfigValue(SafetyKeys.anvilPrefilterEnabled, Boolean.TRUE);
+      if (raw instanceof Boolean b) return b;
+      if (raw != null) return Boolean.parseBoolean(raw.toString());
+      return true;
+    } catch (Throwable ignored) {
+      return true;
+    }
+  }
+
+  /**
+   * Map a Bukkit {@link World#getEnvironment()} to the on-disk region subdirectory used
+   * by vanilla. Inlined here (rather than in the platform-neutral {@code AnvilPrefilter})
+   * because it is the single place where {@code rtp-anvil} would otherwise need to know
+   * about Bukkit's {@link org.bukkit.World.Environment} enum.
+   */
+  private static String dimensionRegionSubpath(World world) {
+    if (world == null) return "";
+    try {
+      switch (world.getEnvironment()) {
+        case NETHER:
+          return "DIM-1";
+        case THE_END:
+          return "DIM1";
+        case NORMAL:
+        default:
+          return "";
+      }
+    } catch (Throwable ignored) {
+      return "";
+    }
+  }
+
+  /**
+   * Snapshot the current {@code SafetyKeys.unsafeBlocks} list as a plain {@code Set<String>}.
+   * Returns an empty set on any lookup failure — the pre-filter treats an empty set as
+   * "never reject", which is the safe default.
+   */
+  @SuppressWarnings("unchecked")
+  private static java.util.Set<String> currentUnsafeBlocks() {
+    try {
+      ConfigParser<SafetyKeys> safety =
+          (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+      if (safety == null) return java.util.Collections.emptySet();
+      Object raw = safety.getConfigValue(SafetyKeys.unsafeBlocks, new java.util.ArrayList<>());
+      if (raw instanceof java.util.Collection<?> c) {
+        java.util.Set<String> out = new java.util.HashSet<>(c.size());
+        for (Object o : c) if (o != null) out.add(o.toString());
+        return out;
+      }
+    } catch (Throwable ignored) {
+      // Fall through to empty.
+    }
+    return java.util.Collections.emptySet();
+  }
+
+  /**
+   * Perform the actual chunk load (reflective async → sync-on-primary-thread fallback).
+   *
+   * <p>When the reflective async path is unavailable, returns {@code null} (async I/O
+   * failed), or resolves to a {@code null} {@link Chunk} (some Paper/Folia builds
+   * return null when a chunk cannot be provided off-tick without generation), this
+   * method falls back to {@link World#getChunkAt(int, int)} on the primary thread
+   * — the only Bukkit API guaranteed to generate a missing chunk. Each failure edge
+   * is logged at {@code WARNING} so operators can isolate problems in the pregen
+   * summary's {@code nullChunk} bucket (REQ-RTP-S-004).
+   */
+  private CompletableFuture<Long> loadChunkFuture(int cx, int cz, long key) {
     // Prefer Bukkit's async chunk API (present in Spigot since 1.13). This avoids
     // hopping work back onto the primary thread for a synchronous world.getChunkAt()
     // call and keeps the location pipeline off the tick thread wherever the server
@@ -131,44 +292,86 @@ public class BukkitRTPWorld extends RTPWorld<World> {
         CompletableFuture<org.bukkit.Chunk> asyncFuture =
             (CompletableFuture<org.bukkit.Chunk>) CHUNK_AT_ASYNC_FUTURE.invoke(world, cx, cz);
         if (asyncFuture != null) {
-          return asyncFuture
-              .thenApply(chunk -> {
-                if (chunk == null) return null;
-                cacheChunk(cx, cz, chunk);
-                return key;
-              })
-              .exceptionally(t -> null);
+          CompletableFuture<Long> out = new CompletableFuture<>();
+          asyncFuture.whenComplete((chunk, ex) -> {
+            if (ex != null) {
+              RTP.log(java.util.logging.Level.WARNING,
+                  "[RTP] Async chunk load threw for world=" + name + " chunk=(" + cx + "," + cz
+                      + "): " + ex.getClass().getSimpleName() + ": " + ex.getMessage()
+                      + " — falling back to Bukkit synchronous getChunkAt");
+              completeViaSyncGenerate(cx, cz, key, out);
+              return;
+            }
+            if (chunk == null) {
+              RTP.log(java.util.logging.Level.WARNING,
+                  "[RTP] Async chunk load returned null for world=" + name + " chunk=(" + cx
+                      + "," + cz + ") — falling back to Bukkit synchronous getChunkAt to"
+                      + " trigger generation");
+              completeViaSyncGenerate(cx, cz, key, out);
+              return;
+            }
+            cacheChunk(cx, cz, chunk);
+            out.complete(key);
+          });
+          return out;
         }
-      } catch (Throwable ignored) {
-        // Fall through to the synchronous fallback below. Some test doubles
-        // (e.g. MockBukkit builds) or very old forks may not honor the async API.
+      } catch (Throwable t) {
+        // Some test doubles (e.g. MockBukkit builds) or very old forks may not
+        // honor the async API — fall through to the synchronous generation path.
+        RTP.log(java.util.logging.Level.WARNING,
+            "[RTP] Reflective async chunk API failed for world=" + name + " chunk=(" + cx
+                + "," + cz + "): " + t.getClass().getSimpleName() + ": " + t.getMessage()
+                + " — falling back to Bukkit synchronous getChunkAt");
       }
     }
 
-    // Fallback: synchronous load, bounced to the primary thread when needed.
     CompletableFuture<Long> future = new CompletableFuture<>();
+    completeViaSyncGenerate(cx, cz, key, future);
+    return future;
+  }
+
+  /**
+   * Synchronous generation fallback. Runs {@link World#getChunkAt(int, int)} on the
+   * primary thread (generating the chunk if needed) and completes {@code out} with
+   * {@code key} on success or {@code null} on failure. Each failure edge is logged
+   * at {@code WARNING} so operators can isolate which candidates are being dropped
+   * and why.
+   */
+  private void completeViaSyncGenerate(int cx, int cz, long key, CompletableFuture<Long> out) {
     Runnable loadChunkTask = () -> {
       try {
         org.bukkit.Chunk chunk = world.getChunkAt(cx, cz);
+        if (chunk == null) {
+          RTP.log(java.util.logging.Level.WARNING,
+              "[RTP] Synchronous world.getChunkAt returned null for world=" + name
+                  + " chunk=(" + cx + "," + cz + ")");
+          out.complete(null);
+          return;
+        }
         cacheChunk(cx, cz, chunk);
-        future.complete(key);
+        out.complete(key);
       } catch (Throwable t) {
-        future.complete(null); // Safely fail the future if generation crashes
+        RTP.log(java.util.logging.Level.WARNING,
+            "[RTP] Synchronous chunk load threw for world=" + name + " chunk=(" + cx + ","
+                + cz + "): " + t.getClass().getSimpleName() + ": " + t.getMessage());
+        out.complete(null);
       }
     };
 
     if (org.bukkit.Bukkit.isPrimaryThread()) {
       loadChunkTask.run();
-    } else {
-      org.bukkit.plugin.Plugin plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("RTP");
-      if (plugin != null) {
-        org.bukkit.Bukkit.getScheduler().runTask(plugin, loadChunkTask);
-      } else {
-        future.complete(null);
-      }
+      return;
     }
-
-    return future;
+    org.bukkit.plugin.Plugin plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("RTP");
+    if (plugin != null) {
+      org.bukkit.Bukkit.getScheduler().runTask(plugin, loadChunkTask);
+    } else {
+      RTP.log(java.util.logging.Level.WARNING,
+          "[RTP] Cannot schedule synchronous chunk load — RTP plugin is not registered"
+              + " with Bukkit plugin manager (world=" + name + " chunk=(" + cx + "," + cz
+              + ")) — dropping candidate");
+      out.complete(null);
+    }
   }
 
   @Override
@@ -243,16 +446,33 @@ public class BukkitRTPWorld extends RTPWorld<World> {
 
   @Override
   public RTPChunk<?> getCachedChunk(long key) {
+    // Live chunk takes precedence over any Anvil snapshot — the live path is
+    // authoritative once a real chunk has been loaded.
     WeakReference<org.bukkit.Chunk> ref = chunkCache.get(key);
-    if (ref == null) return null;
-
-    org.bukkit.Chunk chunk = ref.get();
-    if (chunk == null || !chunk.isLoaded()) {
+    if (ref != null) {
+      org.bukkit.Chunk chunk = ref.get();
+      if (chunk != null && chunk.isLoaded()) {
+        // Drop any stale Anvil entry now that the live chunk exists.
+        anvilProbeSupport.evict(key);
+        return new BukkitRTPChunk(chunk);
+      }
       chunkCache.remove(key); // Cleanup stale reference
-      return null;
     }
-    return new BukkitRTPChunk(chunk);
+
+    // ADR-016 fallback: no live chunk cached, but the Phase 3a probe may
+    // have produced an Anvil-backed view earlier in this candidate's evaluation.
+    io.github.dailystruggle.rtp.anvil.AnvilChunkView view = anvilProbeSupport.takeCached(key);
+    if (view != null) {
+      int cx = (int) (key & 0xffffffffL);
+      int cz = (int) (key >> 32);
+      java.util.Set<String> reconciled =
+          io.github.dailystruggle.rtp.spigot.anvil.PaletteNormalizer.reconcileAll(
+              currentUnsafeBlocks());
+      return new BukkitRTPChunk(view, cx, cz, id, reconciled);
+    }
+    return null;
   }
+
 
 
   @Override
@@ -282,6 +502,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
       }
     });
     chunkCache.clear();
+    anvilProbeSupport.clear();
   }
 
   @Override

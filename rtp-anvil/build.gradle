@@ -1,0 +1,14 @@
+// rtp-anvil — platform-neutral vanilla Anvil region-file decode.
+// Per ADR-016 / docs/dev/ANVIL_SHARED_MODULE_PLAN.md, this module shall NOT depend on:
+//   - any RTP module (rtp-api, rtp-core, commands-api, effects-api, platform adapters);
+//   - any platform package (org.bukkit.*, io.papermc.*, net.minecraft.*, net.fabricmc.*).
+// Java 21 toolchain, JUnit 5, and Mockito are inherited from the root build.gradle subprojects block.
+
+dependencies {
+    implementation 'org.jetbrains:annotations:24.1.0'
+    // LZ4 chunk-payload decompression (compression mode 4 in r.X.Z.mca).
+    implementation 'org.lz4:lz4-java:1.8.0'
+    // ArchUnit — bytecode-level enforcement of the "no platform / no RTP imports"
+    // invariant inside this module. See AnvilPackageBoundaryArchTest.
+    testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'
+}

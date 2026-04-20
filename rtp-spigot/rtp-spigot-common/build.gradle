@@ -4,6 +4,7 @@ plugins {
 dependencies {
     api project(':rtp-api')
     api project(':rtp-core')
+    api project(':rtp-anvil')
     compileOnly 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
     compileOnly 'me.clip:placeholderapi:2.11.6'
     implementation 'xyz.tozymc.spigot:title-api:1.0'
