@@ -1,6 +1,6 @@
-﻿# Project Architecture
+# Project Architecture
 
-**Current Plugin Version:** `3.0.0-beta`
+**Current Plugin Version:** `3.0.0-beta.1`
 
 For a high-level overview of the plugin's reliability guarantees and bounded execution architecture, see [System Architecture and High-Reliability Design](DESIGN.md).
 For the full requirements-to-code traceability matrix (Req ID → design decision → implementing class → test), see [TRACEABILITY.md](TRACEABILITY.md).

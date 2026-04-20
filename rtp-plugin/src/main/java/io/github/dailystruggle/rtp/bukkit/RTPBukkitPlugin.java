@@ -108,6 +108,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         return;
       }
 
+      RTP.serverAccessor.start(this);
       RTP rtp = new RTP(); // constructor updates API instance
 
       try {
@@ -145,15 +146,14 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         },
         1);
 
-    RTP.scheduler.runTaskLater(() -> RTP.serverAccessor.start(this), 1);
     RTP.scheduler.runTaskLater(this::setupBukkitEvents, 1);
     RTP.scheduler.runTaskLater(this::setupIntegrations, 1);
     RTP.scheduler.runTaskLater(() -> BukkitEffectsHandler.setupEffects(this), 1);
 
     if (!isFolia()) {
       RTP.scheduler.runTaskTimer(new ChunkUnloadProcessor(), 1, 1);
-      DatabaseProcessing.start(this);
     }
+    DatabaseProcessing.start(this);
 
     SendMessage.sendMessage(Bukkit.getConsoleSender(), "");
 

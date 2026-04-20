@@ -21,6 +21,16 @@ public enum SafetyKeys {
   platformMaterial,
   airBlocks,
   unsafeBlocks,
+  /**
+   * Toggle for the vanilla-Spigot Anvil read-only pre-filter (ADR-016 / REQ-RTP-S-005).
+   * When enabled, {@code BukkitRTPWorld.getChunkAt} will probe the persisted
+   * {@code r.X.Z.mca} region file on a background thread and reject clearly-unsafe
+   * candidates (lava/magma/fire at the heightmap surface) before requesting the
+   * authoritative live chunk load. Default: {@code true}. The flag has no effect on
+   * Paper or Folia — those platforms {@code @Override} {@code getChunkAt} with their
+   * native async APIs and never enter the pre-filter path.
+   */
+  anvilPrefilterEnabled,
   biomeWhitelist,
   biomes,
   version

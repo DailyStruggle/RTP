@@ -24,11 +24,27 @@ safetyRadius: 0
 # Default: 2. Only raise on forks with hyper-aggressive chunk GC.
 staleChunkRetryLimit: 2
 
+# Anvil Read-Only Pre-filter (vanilla Spigot only)
+# Off-thread safety probe that parses the persisted `r.X.Z.mca` region file and
+# rejects clearly-unsafe candidates (lava/magma/fire at the heightmap surface)
+# before requesting the authoritative live chunk load. Reduces tick-thread
+# pressure on vanilla Spigot where the live chunk-load API is not truly async.
+# Has no effect on Paper or Folia (they override the chunk-load path with
+# native async APIs and never enter the pre-filter).
+# The live chunk.isSafe(...) re-check remains the authoritative source of truth
+# on ACCEPT; REJECT is the only short-circuit. See ADR-016 / REQ-RTP-S-005.
+# Default: true. Set to false to disable the probe (useful on modded forks with
+# exotic region formats).
+anvilPrefilterEnabled: true
+
 # Landing Platforms
 # Creates a landing platform at the teleport destination.
 # centre block is chosen based on the block type at the location.
 # Set platformRadius to -1 to disable platforms.
-platformRadius: 0
+# Default is -1 (disabled) — modern safety checks (chunk.isSafe + vert-adjustor) reliably
+# produce solid-ground landings, so the emergency glass-block platform is off by default.
+# Increase to 0+ only if you still see unsafe landings and want the legacy fallback.
+platformRadius: -1
 platformDepth: 1
 
 # Height of air to ensure above the platform.
@@ -50,12 +66,16 @@ airBlocks:
   - LIGHT
 
   # Flowers & Plants
-  - GRASS
+  # NOTE: the flat-id `GRASS` intentionally omitted -- in modern Bukkit (1.20.3+)
+  # `GRASS` refers to the solid grass *block*; the plant was renamed to `SHORT_GRASS`.
   - SHORT_GRASS
   - TALL_GRASS
+  - SHORT_DRY_GRASS
+  - TALL_DRY_GRASS
   - FERN
   - LARGE_FERN
   - DEAD_BUSH
+  - BUSH
   - DANDELION
   - POPPY
   - BLUE_ORCHID
@@ -74,6 +94,11 @@ airBlocks:
   - PEONY
   - PITCHER_PLANT
   - TORCHFLOWER
+  - WILDFLOWERS
+  - FIREFLY_BUSH
+  - CACTUS_FLOWER
+  - OPEN_EYEBLOSSOM
+  - CLOSED_EYEBLOSSOM
   - LEGACY_LONG_GRASS
   - LEGACY_DEAD_BUSH
 
@@ -86,6 +111,7 @@ airBlocks:
   - DARK_OAK_SAPLING
   - MANGROVE_PROPAGULE
   - CHERRY_SAPLING
+  - PALE_OAK_SAPLING
   - BROWN_MUSHROOM
   - RED_MUSHROOM
   - CRIMSON_FUNGUS
@@ -107,6 +133,8 @@ airBlocks:
   - WEEPING_VINES
   - TWISTING_VINES
   - HANGING_ROOTS
+  - PALE_HANGING_MOSS
+  - RESIN_CLUMP
 
   # Rails
   - RAIL
@@ -141,6 +169,7 @@ airBlocks:
   - DARK_OAK_BUTTON
   - MANGROVE_BUTTON
   - CHERRY_BUTTON
+  - PALE_OAK_BUTTON
   - BAMBOO_BUTTON
   - CRIMSON_BUTTON
   - WARPED_BUTTON
@@ -156,6 +185,7 @@ airBlocks:
   - DARK_OAK_PRESSURE_PLATE
   - MANGROVE_PRESSURE_PLATE
   - CHERRY_PRESSURE_PLATE
+  - PALE_OAK_PRESSURE_PLATE
   - BAMBOO_PRESSURE_PLATE
   - CRIMSON_PRESSURE_PLATE
   - WARPED_PRESSURE_PLATE
@@ -196,6 +226,10 @@ airBlocks:
   - CHERRY_WALL_SIGN
   - CHERRY_HANGING_SIGN
   - CHERRY_WALL_HANGING_SIGN
+  - PALE_OAK_SIGN
+  - PALE_OAK_WALL_SIGN
+  - PALE_OAK_HANGING_SIGN
+  - PALE_OAK_WALL_HANGING_SIGN
   - BAMBOO_SIGN
   - BAMBOO_WALL_SIGN
   - BAMBOO_HANGING_SIGN
@@ -214,8 +248,13 @@ airBlocks:
   # Ground Cover
   - SNOW
   - MOSS_CARPET
+  - PALE_MOSS_CARPET
+  - LEAF_LITTER
 
-#what materials, according to the bukkit api, to avoid
+# Unsafe Blocks
+# Materials the plugin will reject as a landing target or any block within
+# `safetyRadius` of the target. Populated from the Bukkit Material enum.
+# Anything that can damage, trap, or drown a player belongs here.
 unsafeBlocks:
   # Fluids and Elemental Hazards
   - WATER
@@ -233,6 +272,7 @@ unsafeBlocks:
   - POINTED_DRIPSTONE
   - CAMPFIRE
   - SOUL_CAMPFIRE
+  - CREAKING_HEART
 
   # Trapping and Obstructions
   - COBWEB
@@ -255,7 +295,11 @@ unsafeBlocks:
   # State Flags
   - WATERLOGGED
 
-#switch between blacklist/whitelist
+# Biome Filter
+# biomeWhitelist: false -> `biomes` list is a blacklist (skip these biomes)
+#                  true  -> `biomes` list is a whitelist (only allow these biomes)
+# The default blacklist excludes oceans, rivers, void, and other biomes where
+# a safe solid-ground landing is unlikely or impossible.
 biomeWhitelist: false
 biomes:
   # OCEAN BIOMES
@@ -289,5 +333,5 @@ biomes:
   # TECHNICAL BIOMES
   - THE_VOID
 
-
+# DO NOT TOUCH VERSION NUMBER
 version: "1.0"

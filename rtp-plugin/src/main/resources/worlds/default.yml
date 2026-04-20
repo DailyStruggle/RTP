@@ -1,5 +1,8 @@
-# --- World Configuration ---
-# Configures default RTP behavior for a specific world.
+# --- World Configuration (default template) ---
+# Per-world RTP behavior. One file per Bukkit world; the filename (minus `.yml`)
+# must match the world name. This `default.yml` is copied as the template for
+# any world that has no explicit file, and is also used as the fallback when a
+# world lookup fails.
 
 # Default Region
 # The region to use by default when a player is in this world.

@@ -19,6 +19,7 @@ dependencies {
     testImplementation 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
     testImplementation 'com.github.seeseemelk:MockBukkit-v1.21:3.111.0'
     testImplementation 'dev.folia:folia-api:1.20.1-R0.1-SNAPSHOT'
+    testImplementation testFixtures(project(':rtp-core'))
     testImplementation project(':rtp-folia:rtp-folia-common')
 
     // Optional/Soft dependencies

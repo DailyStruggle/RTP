@@ -2,13 +2,23 @@ package io.github.dailystruggle.rtp.api.world;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-/** Class representing a world in the server */
+/**
+ * Platform-agnostic representation of a world.
+ *
+ * <p>This abstract class provides a common interface for interacting with worlds
+ * across different server implementations. It encapsulates a platform-specific
+ * world object and delegates method calls to it. It also manages chunk tickets
+ * to keep chunks loaded during asynchronous operations.
+ *
+ * @param <T> the type of the underlying platform-specific world object
+ */
 public abstract class RTPWorld<T> {
   protected final T world;
 
@@ -20,39 +30,44 @@ public abstract class RTPWorld<T> {
     this.world = world;
   }
 
+  /**
+   * Returns the underlying platform-specific world object.
+   *
+   * @return the platform world object
+   */
   public T world() {
     return world;
   }
 
   /**
-   * Get the name of the world
+   * Returns the name of this world.
    *
-   * @return the name
+   * @return the world's name
    */
   public abstract String name();
 
   /**
-   * Get the UUID of the world
+   * Returns the unique identifier of this world.
    *
-   * @return the UUID
+   * @return the world's UUID
    */
   public abstract UUID id();
 
   /**
-   * Get the chunk at the specified coordinates asynchronously
+   * Asynchronously retrieves the chunk at the specified coordinates.
    *
-   * @param chunkX the x coordinate of the chunk
-   * @param chunkZ the z coordinate of the chunk
-   * @return a future that completes with the chunk key
+   * @param chunkX the chunk's X coordinate
+   * @param chunkZ the chunk's Z coordinate
+   * @return a {@link CompletableFuture} that completes with a long representing the chunk key
    */
   public abstract CompletableFuture<Long> getChunkAt(int chunkX, int chunkZ);
 
   /**
-   * Get the chunk at the specified coordinates asynchronously
+   * Asynchronously retrieves a set of chunks centered at the specified coordinates.
    *
-   * @param cx the x coordinate of the chunk
-   * @param cz the z coordinate of the chunk
-   * @return a future that completes with the chunk set
+   * @param cx the center chunk's X coordinate
+   * @param cz the center chunk's Z coordinate
+   * @return a {@link CompletableFuture} that completes with a {@link ChunkSet}
    */
   public abstract CompletableFuture<ChunkSet> getChunkAtAsync(int cx, int cz);
 
@@ -78,11 +93,11 @@ public abstract class RTPWorld<T> {
   }
 
   /**
-   * Set the force-loaded state of a chunk
+   * Sets the force-loaded state of a chunk using a reference-counting system.
    *
-   * @param cx the x coordinate of the chunk
-   * @param cz the z coordinate of the chunk
-   * @param forceLoad true to force-load, false otherwise
+   * @param cx        the chunk's X coordinate
+   * @param cz        the chunk's Z coordinate
+   * @param forceLoad {@code true} to increment the force-load count, {@code false} to decrement
    */
   public final void setForceLoaded(int cx, int cz, boolean forceLoad) {
     long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
@@ -110,41 +125,41 @@ public abstract class RTPWorld<T> {
   }
 
   /**
-   * Internal implementation for setting force-loaded state
+   * The platform-specific implementation for setting the force-loaded state of a chunk.
    *
-   * @param cx the x coordinate of the chunk
-   * @param cz the z coordinate of the chunk
-   * @param forceLoad true to force-load, false otherwise
+   * @param cx        the chunk's X coordinate
+   * @param cz        the chunk's Z coordinate
+   * @param forceLoad {@code true} to force-load, {@code false} to un-force-load
    */
   protected abstract void setForceLoadedImpl(int cx, int cz, boolean forceLoad);
 
   /**
-   * Re-apply the force-loaded state without affecting the ticket counter
+   * Re-applies the force-loaded state to a chunk without changing its ticket count.
    *
-   * @param cx the x coordinate of the chunk
-   * @param cz the z coordinate of the chunk
+   * @param cx the chunk's X coordinate
+   * @param cz the chunk's Z coordinate
    */
   public final void refreshForceLoaded(int cx, int cz) {
     setForceLoadedImpl(cx, cz, true);
   }
 
   /**
-   * Get the number of chunks currently force-loaded by the server
+   * Asynchronously retrieves the number of chunks currently force-loaded by the server.
    *
-   * @return the number of force-loaded chunks
+   * @return a {@link CompletableFuture} that completes with the number of force-loaded chunks
    */
-  public abstract java.util.concurrent.CompletableFuture<Integer> getServerForceLoadedCount();
+  public abstract CompletableFuture<Integer> getServerForceLoadedCount();
 
   /**
-   * Get a cached chunk by its key
+   * Retrieves a cached {@link RTPChunk} by its key.
    *
    * @param key the chunk key
-   * @return the chunk, or null if not cached
+   * @return the cached chunk, or {@code null} if not found
    */
   public abstract RTPChunk<?> getCachedChunk(long key);
 
   /**
-   * Get the number of chunks currently force-loaded by the plugin
+   * Returns the number of chunks currently force-loaded by the plugin in this world.
    *
    * @return the number of force-loaded chunks
    */
@@ -153,69 +168,73 @@ public abstract class RTPWorld<T> {
   }
 
   /**
-   * Keep a chunk loaded
+   * Keeps the chunk at the specified coordinates loaded.
    *
-   * @param chunkX the x coordinate of the chunk
-   * @param chunkZ the z coordinate of the chunk
+   * @param chunkX the chunk's X coordinate
+   * @param chunkZ the chunk's Z coordinate
    */
   public abstract void keepChunkAt(int chunkX, int chunkZ);
 
   /**
-   * Forget a chunk and allow it to be unloaded
+   * Allows the chunk at the specified coordinates to be unloaded.
    *
-   * @param chunkX the x coordinate of the chunk
-   * @param chunkZ the z coordinate of the chunk
+   * @param chunkX the chunk's X coordinate
+   * @param chunkZ the chunk's Z coordinate
    */
   public abstract void forgetChunkAt(int chunkX, int chunkZ);
 
-  /** Forget all chunks and allow them to be unloaded */
+  /**
+   * Allows all chunks in this world that were kept loaded by the plugin to be unloaded.
+   */
   public abstract void forgetChunks();
 
   /**
-   * Get the name of the biome at the specified coordinates
+   * Returns the name of the biome at the specified block coordinates.
    *
-   * @param x the x coordinate
-   * @param y the y coordinate
-   * @param z the z coordinate
+   * @param x the block's X coordinate
+   * @param y the block's Y coordinate
+   * @param z the block's Z coordinate
    * @return the biome name
    */
   public abstract String getBiome(int x, int y, int z);
 
   /**
-   * Create a platform at the specified location if necessary
+   * Creates a platform at the specified location if necessary to ensure it is safe.
    *
-   * @param location the location
+   * @param location the location to create a platform at
    */
   public abstract void platform(RTPLocation location);
 
   /**
-   * Check if the world is inactive
+   * Checks if this world is considered inactive (e.g., has no players).
    *
-   * @return true if inactive, false otherwise
+   * @return {@code true} if the world is inactive, {@code false} otherwise
    */
   public abstract boolean isInactive();
 
   /**
-   * Check if the world is active
+   * Checks if this world is considered active.
    *
-   * @return true if active, false otherwise
+   * @return {@code true} if the world is active, {@code false} otherwise
    */
   public boolean isActive() {
     return !isInactive();
   }
 
-    /** Save world data */
+  /**
+   * Saves this world's data.
+   */
   public abstract void save();
 
   /**
-   * Get the maximum height of the world
+   * Returns the maximum build height of this world.
    *
    * @return the maximum height
    */
   public abstract int getMaxHeight();
 
   /**
-   * Get the minimum height of the world
+   * Returns the minimum build height of this world.
    *
    * @return the minimum height
    */
@@ -230,7 +249,7 @@ public abstract class RTPWorld<T> {
    *
    * @param keepAliveKeys the set of chunk keys that must NOT be released
    */
-  public final void releaseOrphanedTickets(java.util.Set<Long> keepAliveKeys) {
+  public final void releaseOrphanedTickets(Set<Long> keepAliveKeys) {
     // Snapshot the keys to avoid ConcurrentModificationException during removal
     java.util.List<Long> orphaned = new java.util.ArrayList<>();
     for (Long key : chunkTickets.keySet()) {
@@ -253,16 +272,16 @@ public abstract class RTPWorld<T> {
   }
 
   /**
-   * Get the number of chunks currently held in the cache
+   * Returns the number of chunks currently held in the cache.
    *
    * @return the cache size
    */
   public abstract int getCacheSize();
 
   /**
-   * Get the world seed
+   * Returns the seed of this world.
    *
-   * @return the seed
+   * @return the world's seed
    */
   public abstract long getSeed();
 

@@ -6,19 +6,40 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+/**
+ * Represents a world's border, providing a way to get its shape and check if a
+ * location is inside it. This class is a simple container for the functions that
+ * define the border's behavior, allowing for different border implementations.
+ */
 public final class WorldBorder {
   private final Supplier<Shape<?>> getShape;
   private final Function<RTPLocation, Boolean> isInside;
 
+  /**
+   * Constructs a new WorldBorder.
+   *
+   * @param getShape A supplier that provides the {@link Shape} of the world border.
+   * @param isInside A function that checks if a given {@link RTPLocation} is inside the border.
+   */
   public WorldBorder(Supplier<Shape<?>> getShape, Function<RTPLocation, Boolean> isInside) {
     this.getShape = getShape;
     this.isInside = isInside;
   }
 
+  /**
+   * Gets the supplier for the world border's shape.
+   *
+   * @return The shape supplier.
+   */
   public Supplier<Shape<?>> getShape() {
     return getShape;
   }
 
+  /**
+   * Gets the function used to check if a location is inside the world border.
+   *
+   * @return The checking function.
+   */
   public Function<RTPLocation, Boolean> isInside() {
     return isInside;
   }

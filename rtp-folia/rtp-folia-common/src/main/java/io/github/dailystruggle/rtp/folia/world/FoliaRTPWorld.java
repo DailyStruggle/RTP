@@ -53,6 +53,23 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
 
   private final ConcurrentHashMap<Long, WeakReference<Chunk>> chunkCache = new ConcurrentHashMap<>();
 
+  /**
+   * ADR-016 §11 — per-world cache of Anvil-backed chunk views. Populated by
+   * {@link #getChunkAt(int, int)} whenever the shared
+   * {@link io.github.dailystruggle.rtp.anvil.AnvilProbeSupport#probeAndPublish} yields a
+   * decoded view, and consumed by {@link #getCachedChunk(long)} when no live
+   * chunk is cached. The live {@link #chunkCache} takes precedence: once a
+   * candidate is promoted to a real load at teleport-commit time, the live
+   * entry is authoritative and the Anvil entry is evicted.
+   *
+   * <p>Folia benefits from this mechanism for the same reason Spigot does: the
+   * pre-filter lets the candidate-selection loop evaluate surface safety from a
+   * persisted region file on {@code ForkJoinPool.commonPool()} without hopping
+   * to the Region Thread for every unloaded chunk.</p>
+   */
+  private final io.github.dailystruggle.rtp.anvil.AnvilProbeSupport anvilProbeSupport =
+      new io.github.dailystruggle.rtp.anvil.AnvilProbeSupport();
+
   @RegionThread
   public FoliaRTPWorld(World world) {
     super(world);
@@ -97,14 +114,135 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   @RegionThread
   public CompletableFuture<Long> getChunkAt(int cx, int cz) {
     totalChunkLoads.incrementAndGet();
+    final long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
+
+    // ADR-016 §11 — Anvil read-only data source, same probe-then-fall-through
+    // semantics as BukkitRTPWorld. When the applicability gate passes and the
+    // pre-filter returns a decoded view, publish it into the per-world cache
+    // and resolve the future with the key directly — no region-thread hop,
+    // no chunk ticket acquired. The live chunk.isSafe(...) re-check at
+    // teleport-commit time (ADR-016 §4) remains the authoritative arbiter.
+    // On UNKNOWN (no view) we fall through to Folia's native async load.
+    if (shouldPrefilter(cx, cz)) {
+      java.util.Set<String> rawUnsafe = currentUnsafeBlocks();
+      java.nio.file.Path worldFolder = world.getWorldFolder().toPath();
+      String dim = dimensionRegionSubpath(world);
+      return anvilProbeSupport
+          .probeAndPublish(worldFolder, dim, cx, cz, key, rawUnsafe,
+              io.github.dailystruggle.rtp.spigot.anvil.PaletteNormalizer::reconcile)
+          .thenCompose(result -> {
+            io.github.dailystruggle.rtp.anvil.AnvilChunkView view = result.view();
+            if (view != null) {
+              if (result.verdict() == io.github.dailystruggle.rtp.anvil.Verdict.REJECT) {
+                RTP.log(java.util.logging.Level.FINE,
+                    "[RTP] Anvil surface-unsafe (advisory) world=" + name
+                        + " chunk=(" + cx + "," + cz + ") — handing view to vert adjustor");
+              }
+              return CompletableFuture.completedFuture(key);
+            }
+            // No view available (UNKNOWN) → Folia native async load is authoritative.
+            return loadLiveChunk(cx, cz, key);
+          });
+    }
+
+    return loadLiveChunk(cx, cz, key);
+  }
+
+  /**
+   * Folia native async chunk load. Resolves to the packed chunk key on success,
+   * or {@code null} when the native async path returns a null chunk.
+   */
+  @RegionThread
+  private CompletableFuture<Long> loadLiveChunk(int cx, int cz, long key) {
     return world
         .getChunkAtAsync(cx, cz, true)
         .thenApply(
             chunk -> {
               if (chunk == null) return null;
               cacheChunk(cx, cz, chunk);
-              return ((long) cx & 0xffffffffL | ((long) cz << 32));
+              return key;
             });
+  }
+
+  /**
+   * ADR-016 §11 applicability gate — mirrors
+   * {@code BukkitRTPWorld#shouldPrefilter}. Returns {@code true} when:
+   * <ul>
+   *   <li>{@code SafetyKeys.anvilPrefilterEnabled} is truthy (default true),</li>
+   *   <li>the chunk is not currently loaded.</li>
+   * </ul>
+   *
+   * <p>The custom-{@link org.bukkit.generator.ChunkGenerator} short-circuit that previously
+   * appeared here has been intentionally removed (ADR-016 §1 trust-model revision). For
+   * populated chunks the {@code .mca} palette is a strictly more accurate source than the
+   * Bukkit enum view (modded/Iris-native IDs collapse to vanilla on {@code Material}/{@code
+   * Biome} lookups but survive verbatim in the on-disk palette). For chunks the custom
+   * generator has not yet populated, {@code AnvilPrefilter.probeDetailed} returns {@code
+   * UNKNOWN} and we fall through to Folia's native async load — which is exactly when we
+   * want the generator to run. {@code REJECT} remains advisory: downstream
+   * {@code chunk.isSafe(...)} corroborates every rejection, so disk-vs-live divergence
+   * under a custom generator is bounded to "extra retries", never "unsafe teleport".
+   */
+  private boolean shouldPrefilter(int cx, int cz) {
+    if (world == null) return false;
+    try {
+      if (world.isChunkLoaded(cx, cz)) return false;
+    } catch (Throwable ignored) {
+      return false;
+    }
+    try {
+      @SuppressWarnings("unchecked")
+      ConfigParser<SafetyKeys> safety =
+          (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+      if (safety == null) return true;
+      Object raw = safety.getConfigValue(SafetyKeys.anvilPrefilterEnabled, Boolean.TRUE);
+      if (raw instanceof Boolean b) return b;
+      if (raw != null) return Boolean.parseBoolean(raw.toString());
+      return true;
+    } catch (Throwable ignored) {
+      return true;
+    }
+  }
+
+  /**
+   * Vanilla region-folder subpath for the Folia environment. Folia preserves
+   * the vanilla layout: overworld in {@code region/}, nether in
+   * {@code DIM-1/region/}, end in {@code DIM1/region/}.
+   */
+  private static String dimensionRegionSubpath(World world) {
+    if (world == null) return "";
+    try {
+      switch (world.getEnvironment()) {
+        case NETHER:
+          return "DIM-1";
+        case THE_END:
+          return "DIM1";
+        case NORMAL:
+        default:
+          return "";
+      }
+    } catch (Throwable ignored) {
+      return "";
+    }
+  }
+
+  /** Snapshot the current {@code SafetyKeys.unsafeBlocks} list. */
+  @SuppressWarnings("unchecked")
+  private static java.util.Set<String> currentUnsafeBlocks() {
+    try {
+      ConfigParser<SafetyKeys> safety =
+          (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+      if (safety == null) return java.util.Collections.emptySet();
+      Object raw = safety.getConfigValue(SafetyKeys.unsafeBlocks, new java.util.ArrayList<>());
+      if (raw instanceof java.util.Collection<?> c) {
+        java.util.Set<String> out = new java.util.HashSet<>(c.size());
+        for (Object o : c) if (o != null) out.add(o.toString());
+        return out;
+      }
+    } catch (Throwable ignored) {
+      // Fall through to empty.
+    }
+    return java.util.Collections.emptySet();
   }
 
   @Override
@@ -187,15 +325,30 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   @Override
   @RegionThread
   public RTPChunk<?> getCachedChunk(long key) {
+    // Live chunk takes precedence over any Anvil snapshot — the live path is
+    // authoritative once a real chunk has been loaded.
     WeakReference<Chunk> ref = chunkCache.get(key);
-    if (ref == null) return null;
-
-    org.bukkit.Chunk chunk = ref.get();
-    if (chunk == null || !chunk.isLoaded()) {
+    if (ref != null) {
+      org.bukkit.Chunk chunk = ref.get();
+      if (chunk != null && chunk.isLoaded()) {
+        anvilProbeSupport.evict(key); // Drop any stale Anvil entry.
+        return new FoliaRTPChunk(chunk);
+      }
       chunkCache.remove(key); // Cleanup stale reference
-      return null;
     }
-    return new FoliaRTPChunk(chunk);
+
+    // ADR-016 §11 fallback: no live chunk cached, but the pre-filter may have
+    // produced an Anvil-backed view earlier in this candidate's evaluation.
+    io.github.dailystruggle.rtp.anvil.AnvilChunkView view = anvilProbeSupport.takeCached(key);
+    if (view != null) {
+      int cx = (int) (key & 0xffffffffL);
+      int cz = (int) (key >> 32);
+      java.util.Set<String> reconciled =
+          io.github.dailystruggle.rtp.spigot.anvil.PaletteNormalizer.reconcileAll(
+              currentUnsafeBlocks());
+      return new FoliaRTPChunk(view, cx, cz, id, reconciled);
+    }
+    return null;
   }
 
 
@@ -229,6 +382,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
       }
     });
     chunkCache.clear();
+    anvilProbeSupport.clear();
   }
 
   @Override

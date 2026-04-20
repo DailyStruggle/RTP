@@ -1,4 +1,4 @@
-﻿# Hazard Register
+# Hazard Register
 
 This document lists known hazards for the RTP plugin: conditions that could cause harm to players,
 degrade server stability, or corrupt persistent state. Each hazard records its severity, the

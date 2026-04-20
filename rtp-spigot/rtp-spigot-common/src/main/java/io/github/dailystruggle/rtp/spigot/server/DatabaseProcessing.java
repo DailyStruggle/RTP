@@ -1,62 +1,47 @@
 package io.github.dailystruggle.rtp.spigot.server;
 
 import io.github.dailystruggle.rtp.common.RTP;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.scheduler.BukkitTask;
 
-public class DatabaseProcessing extends BukkitRunnable {
+public class DatabaseProcessing {
   private static final AtomicBoolean killed = new AtomicBoolean(false);
-  private static final AtomicReference<BukkitTask> asyncTask = new AtomicReference<>(null);
-  private final JavaPlugin plugin;
-
-  public DatabaseProcessing(JavaPlugin plugin) {
-    this.plugin = plugin;
-  }
+  private static final AtomicBoolean processing = new AtomicBoolean(false);
+  private static final AtomicReference<Object> task = new AtomicReference<>(null);
 
   public static void clear() {
-    if (asyncTask.get() != null) asyncTask.get().cancel();
-    asyncTask.set(null);
+    // getAndSet makes the cancel-and-null sequence atomic against concurrent
+    // clear() callers: only the caller that wins the swap will see the prior
+    // task reference, so the scheduled task is cancelled exactly once.
+    // (start() vs. start() and start() vs. kill() races are unchanged — those
+    // still need an external lifecycle guard if invoked from multiple threads.)
+    Object scheduledTask = task.getAndSet(null);
+    if (scheduledTask != null) {
+        RTP.scheduler.cancelTask(scheduledTask);
+    }
   }
 
   public static void start(JavaPlugin plugin) {
     killed.set(false);
     clear();
-    new DatabaseProcessing(plugin)
-        .runTaskTimerAsynchronously(plugin, 100L, 100L);
+    Object scheduledTask = RTP.scheduler.runTaskTimerAsynchronously(
+        () -> {
+            if (killed.get()) return;
+            if (processing.getAndSet(true)) return;
+            try {
+                if (RTP.getInstance().databaseAccessor != null) {
+                    RTP.getInstance().databaseAccessor.processQueries(Long.MAX_VALUE);
+                }
+            } finally {
+                processing.set(false);
+            }
+        }, 100L, 100L);
+    task.set(scheduledTask);
   }
 
   public static void kill() {
     clear();
     killed.set(true);
-  }
-
-  @Override
-  public void run() {
-    if (killed.get()) return;
-    if (asyncTask.get() != null) return;
-
-    CompletableFuture<Boolean> future = new CompletableFuture<>();
-    BukkitTask task =
-        Bukkit.getScheduler()
-            .runTaskAsynchronously(
-                plugin,
-                () -> {
-                  if (RTP.getInstance().databaseAccessor != null)
-                    RTP.getInstance().databaseAccessor.processQueries(Long.MAX_VALUE);
-                  future.complete(true);
-                });
-    asyncTask.set(task);
-    future.thenAccept(aBoolean -> asyncTask.set(null));
-  }
-
-  @Override
-  public void cancel() {
-    kill();
-    super.cancel();
   }
 }

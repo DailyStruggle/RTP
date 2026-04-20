@@ -1,6 +1,18 @@
-#general message configuration for user experience
-# supports bukkit color codes and hex color codes
-# supports PlaceholderAPI references
+# --- RTP User-Facing Messages ---
+# All player- and console-visible strings.
+#
+# Formatting:
+#   - Bukkit legacy color codes (e.g. &a, &e, &c)
+#   - Hex color codes (e.g. #2636ef)
+#   - PlaceholderAPI placeholders (when PAPI is installed)
+#
+# Placeholders:
+#   - Shared "[Pn]" placeholders are defined in the `placeholders` list below.
+#     [P0] is the RTP prefix by default.
+#   - Per-message placeholders (e.g. [attempts], [world]) are documented inline
+#     above each message that uses them.
+#
+# REQ-RTP-F-013: every user-facing message is configurable here.
 
 ################################################################################
 # Section 1: General Configuration
@@ -83,6 +95,13 @@ badArg: "&c[P0] invalid command argument [arg]"
 # when the console tries to run a command meant only for players
 consoleCmdNotAllowed: "&c[P0] You must be an in-game player to execute this command."
 
+# plugin is busy reloading
+busy: "&c[P0] busy"
+
+# plugin doesn't have the subcommand or parameter the user requested
+# placeholder: [arg] - the argument attempted
+invalidCommand: "&c[P0] invalid command - [arg]"
+
 # user doesn't have permission for the command requested
 noPerms: "&eI'm sorry, but you do not have permission to perform this command. Please contact the server administrators if you believe that this is in error."
 
@@ -105,7 +124,7 @@ scanCancel: "&e[P0] scan task cancelled for regions: [scan_regions]"
 scanPause: "#A020F0[P0] scan task paused for regions: [scan_regions]"
 scanResume: "#10A5F5[P0] scan task resumed for regions: [scan_regions]"
 scanRunning: "&c[P0] scan task already running for regions: [scan_regions]"
-scanNotRunning: "&c[rtp] scan task not running for regions: [scan_regions]"
+scanNotRunning: "&c[P0] scan task not running for regions: [scan_regions]"
 # placeholder: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
 scanStatus: "&a[P0] completed [scan_chunks] / [scan_totalChunks] chunks for regions: [scan_regions]. [scan_cps] cps. Land Percentage: [scan_landPercentage]%. ETA: [scan_eta]"
 
@@ -183,6 +202,7 @@ actionbar: ""
 ################################################################################
 # Section 11: Metadata
 ################################################################################
+# DO NOT TOUCH VERSION NUMBER
 version: "1.0"
 
 ################################################################################

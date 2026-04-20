@@ -1,3 +1,11 @@
+# --- Language Mapping: messages.yml ---
+# Maps internal message keys (left) to the user-visible key names used in
+# messages.yml (right). Edit only the right-hand side to rename or translate
+# a message key; the left-hand side is a code constant and must not change.
+# Note: this file maps KEY NAMES only. The actual translated message text
+# lives in messages.yml. If this file is missing, the plugin regenerates it
+# with identical left/right pairs (the English defaults).
+
 oldFile: oldFile
 infoTitle: infoTitle
 worldInfo: worldInfo

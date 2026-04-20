@@ -1,12 +1,27 @@
+# --- Bukkit/Spigot/Paper/Folia Plugin Descriptor ---
+# This file is parsed by the server at startup and is NOT user-editable.
+# Schema reference: https://docs.papermc.io/paper/dev/plugin-yml/
+#
+#   name:        plugin identifier (must match the plugin data folder name)
+#   version:     substituted from Gradle (${version}) at build time
+#   main:        fully qualified JavaPlugin class
+#   api-version: minimum Bukkit API level
+#   softdepend:  plugins we integrate with if present (never required)
+#   folia-supported: honored by Folia servers; opts this plugin into regionized scheduling
+
 name: RTP
 version: '${version}'
 main: io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin
 api-version: 1.13
+prefix: 'RTP'
 authors: [ leaf26 ]
 description: 'a fast and flexible random teleportation plugin'
 softdepend: [ WorldGuard, WorldEdit, PlaceholderAPI, Vault, Chunky, ChunkyBorder ]
 folia-supported: true
 
+# --- Commands ---
+# Registered command aliases. Argument parsing itself is dispatched through
+# the TreeCommand framework (see ADR-014 / commands-api).
 commands:
   rtp:
     description: Teleport randomly
@@ -19,6 +34,16 @@ commands:
     usage: |
       /wild
 
+# --- Permissions ---
+# Grouped by feature area:
+#   rtp.see / rtp.use       - baseline player permissions (default: true)
+#   rtp.free / rtp.no*      - bypasses for delays, cooldowns, cancellation (op)
+#   rtp.other / rtp.notme   - teleport-someone-else controls (op)
+#   rtp.world(s) / rtp.region(s) - cross-world / cross-region targeting (op)
+#   rtp.onevent.*           - automatic RTP on player events (default: false)
+#   rtp.biome.*             - biome-targeted teleports (op)
+#   rtp.scan / rtp.info / rtp.reload / rtp.config - admin tooling (op)
+#   rtp.*                   - aggregate; grants all of the above
 permissions:
   rtp.see:
     description: allow player to tab for rtp commands
@@ -112,6 +137,7 @@ permissions:
     default: false
     children:
       rtp.onevent.join: true
+      rtp.onevent.firstJoin: true
       rtp.onevent.respawn: true
       rtp.onevent.changeWorld: true
       rtp.onevent.move: true
@@ -149,6 +175,7 @@ permissions:
       rtp.region: true
       rtp.regions.*: true
       rtp.params: true
+      rtp.unqueued: true
       rtp.biome: true
       rtp.biome.*: true
       rtp.scan: true

@@ -1,6 +1,6 @@
-﻿# RTP System Architecture and High-Reliability Design
+# RTP System Architecture and High-Reliability Design
 
-**Current Plugin Version:** `3.0.0-beta`
+**Current Plugin Version:** `3.0.0-beta.1`
 
 > **Note:** In the context of this architecture, **RTP** holds a dual meaning: **R**andom **T**ele**P**ort and **R**eal-**T**ime **P**rocess. This reflects the core design philosophy that the plugin's codebase should be structured and analyzed with the rigor of highly reliable server software.
 
@@ -17,7 +17,7 @@ The core reliability mechanism of RTP is its `RegionQueueManager`. The system ma
 
 ### 2. Concurrency and Platform-Specific Thread Safety
 RTP employs platform-specific adapters to ensure strict thread safety and optimal concurrent execution across disparate server environments:
-- **`rtp-spigot`**: Standard synchronous fallback with bounded chunk loading.
+- **`rtp-spigot`**: The Bukkit API exposes only `Consumer`-based async chunk overloads (the `CompletableFuture`-returning `World#getChunkAtAsync(int,int)` is a Paper addition). On pure Spigot the adapter reflectively probes for the Paper overload and, when absent, falls back to a synchronous `world.getChunkAt(...)` scheduled onto the primary thread via `Bukkit.getScheduler().runTask(...)`. The caller's `CompletableFuture` is unblocked, but the chunk I/O itself is not off-tick. Off-tick *safety evaluation* on pure Spigot is achieved only for candidates covered by the Anvil read-only pre-filter (ADR-016).
 - **`rtp-paper`**: Leverages asynchronous chunk loading APIs to prevent main-thread deadlocks.
 - **`rtp-folia`**: Implements strictly isolated region-based multithreading, guaranteeing thread safety and data integrity during concurrent state mutations.
 
@@ -66,6 +66,8 @@ The `rtp-api` module provides a strict, defined interface for external integrati
 - **Plugin Chunk Tickets**: Chunk retention is implemented via `world.addPluginChunkTicket(cx, cz, plugin)` and released via `world.removePluginChunkTicket(cx, cz, plugin)`. This is preferred over `Chunk.setForceLoaded(true)`, which permanently marks chunks in the world's force-loaded map and is not reclaimed on plugin disable.
 - **Time-Bounded Slicing**: Main-thread operations use `TimeBoundTaskPipe` to yield after a wall-clock time budget (e.g., 2 ms per tick) is exhausted, preventing TPS degradation.
 - **Forced Reclamation**: Player disconnect listeners call `reservation.close()` on all in-flight `TeleportPipelineTask` instances associated with that player.
+- **Chunk Load Path (pure Spigot)**: `BukkitRTPWorld.loadChunkFuture` reflectively probes for Paper's `World#getChunkAtAsync(int,int) → CompletableFuture<Chunk>`. On pure Spigot that overload is absent (Bukkit ships only the `Consumer`-based variants), so the fallback schedules a synchronous `world.getChunkAt(...)` onto the primary thread via `Bukkit.getScheduler().runTask(plugin, ...)`. This does **not** make chunk I/O itself off-tick on pure Spigot — the caller's future is simply unblocked while the load runs on tick. No blanket "fully async chunk loading on all platforms" claim is made for the `rtp-spigot` adapter.
+- **Anvil Read-Only Pre-Filter (pure Spigot)**: To recover off-tick safety evaluation for the common case, `BukkitRTPWorld.getChunkAt` routes unloaded, vanilla-generator candidates through `AnvilPrefilter.probeDetailed(...)` (ADR-016). `REJECT` short-circuits without any chunk load; `ACCEPT` publishes an `AnvilChunkView` into a bounded `anvilCache` and the `BukkitRTPChunk` hybrid dispatches `isAir` / `isSafe` / `getSkyLight` / `getSurfaceHeight` from the off-tick view. `UNKNOWN` verdicts, already-loaded chunks, worlds with a custom `ChunkGenerator`, and I/O errors fall through to the main-thread-bounced `loadChunkFuture` path; prefilter coverage therefore defines effective off-tick coverage on pure Spigot.
 
 ### rtp-paper Implementation Notes
 - **Async Chunk Loading**: `BukkitRTPWorld.getChunkAtAsync(cx, cz)` calls Paper's `world.getChunkAtAsync(cx, cz)`, returning a `CompletableFuture<Chunk>` that resolves on a Paper worker thread without touching the main thread.

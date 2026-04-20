@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.api.scheduling;
 
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
+
 import java.util.UUID;
 
 /**

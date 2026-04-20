@@ -264,22 +264,29 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
 
   @Override
   public String format(@Nullable UUID player, String text) { // @AnyThread — pure text formatting
-    return text;
+    org.bukkit.OfflinePlayer bukkitPlayer = (player != null) ? Bukkit.getOfflinePlayer(player) : null;
+    return io.github.dailystruggle.rtp.spigot.tools.SendMessage.format(bukkitPlayer, text);
   }
 
   @Override
   public String formatNoColor(@Nullable UUID player, String text) { // @AnyThread — pure text formatting
-    return text;
+    org.bukkit.OfflinePlayer bukkitPlayer = (player != null) ? Bukkit.getOfflinePlayer(player) : null;
+    return io.github.dailystruggle.rtp.spigot.tools.SendMessage.formatNoColor(bukkitPlayer, text);
   }
 
   @Override
   public void log(Level level, String msg) { // @AnyThread — thread-safe logger
-    Bukkit.getLogger().log(level, msg);
+    // Route through SendMessage.log so that '&' color codes in messages.yml
+    // (e.g. the locationLoaded hydration banner) are translated before being
+    // printed to the console. Previously this delegated directly to
+    // Bukkit.getLogger().log, causing raw "&e[P0] Successfully loaded ..." to
+    // appear on Folia consoles.
+    io.github.dailystruggle.rtp.spigot.tools.SendMessage.log(level, msg);
   }
 
   @Override
   public void log(Level level, String msg, Throwable throwable) { // @AnyThread — thread-safe logger
-    Bukkit.getLogger().log(level, msg, throwable);
+    io.github.dailystruggle.rtp.spigot.tools.SendMessage.log(level, msg, throwable);
   }
 
   @Override

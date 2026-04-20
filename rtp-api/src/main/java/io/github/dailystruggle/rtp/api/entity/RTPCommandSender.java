@@ -4,70 +4,80 @@ import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
-/** Interface representing a command sender (player or console) */
+/**
+ * Platform-agnostic representation of an entity that can send commands, such as
+ * a player or the server console.
+ *
+ * <p>This interface abstracts over the platform's native command sender object
+ * (e.g. {@code org.bukkit.command.CommandSender}) to decouple command handling
+ * from server-specific APIs. Implementations are provided by the platform adapter.
+ *
+ * <p><b>Thread safety:</b> All methods on this interface must be called from the
+ * main server thread.
+ */
 public interface RTPCommandSender extends Cloneable {
   /**
-   * Get the UUID of the command sender
+   * Returns the unique identifier for this command sender.
    *
-   * @return the UUID
+   * @return the sender's {@link UUID}
    */
   UUID uuid();
 
   /**
-   * Check if the command sender has the specified permission
+   * Checks if the sender has the specified permission.
    *
-   * @param permission the permission to check
-   * @return true if has permission, false otherwise
+   * @param permission the permission string to check; must not be {@code null}
+   * @return {@code true} if the sender has the permission, {@code false} otherwise
    */
   boolean hasPermission(String permission);
 
   /**
-   * Send a message to the command sender
+   * Sends a message to this command sender.
    *
-   * @param message the message to send
+   * @param message the message to send; must not be {@code null}
    */
   void sendMessage(String message);
 
   /**
-   * Get the cooldown for the command sender in seconds
+   * Returns the sender-specific teleport cooldown in seconds.
    *
-   * @return the cooldown
+   * @return the cooldown duration
    */
   long cooldown();
 
   /**
-   * Get the delay for the command sender in seconds
+   * Returns the sender-specific teleport delay in seconds.
    *
-   * @return the delay
+   * @return the delay duration
    */
   long delay();
 
   /**
-   * Get the name of the command sender
+   * Returns the name of this command sender.
    *
-   * @return the name
+   * @return the sender's name
    */
   String name();
 
   /**
-   * Get all effective permissions for the command sender
+   * Returns all effective permissions for this command sender.
    *
-   * @return the set of permissions
+   * @return a non-null, potentially empty {@link Set} of permission strings
    */
   Set<String> getEffectivePermissions();
 
   /**
-   * Perform a command as the command sender
+   * Executes a command as this sender.
    *
-   * @param player the player involved, or null if not applicable
-   * @param command the command to perform
+   * @param player the player context for the command, or {@code null} if none
+   * @param command the command string to execute; must not be {@code null}
    */
   void performCommand(@Nullable RTPPlayer player, String command);
 
   /**
-   * Clone the command sender
+   * Creates a clone of this command sender.
    *
-   * @return the cloned command sender
+   * @return a new {@link RTPCommandSender} instance
    */
   RTPCommandSender clone();
 }

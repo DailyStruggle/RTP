@@ -1,6 +1,6 @@
 # Command Reference
 
-**Applies to Plugin Version:** `3.0.0-beta`
+**Applies to Plugin Version:** `3.0.0-beta.1`
 
 All RTP commands are subcommands of `/rtp`. Parameters are passed in `key:value` format and can be combined freely unless noted otherwise. Tab-completion is available for all parameters and reflects live server state.
 
@@ -332,7 +332,7 @@ When PlaceholderAPI is installed, the following `%rtp_<key>%` placeholders are a
 | Permission | Default | Description |
 |---|---|---|
 | `rtp.use` | op | Use `/rtp` to teleport yourself |
-| `rtp.see` | op | See RTP-related messages and `/rtp help` |
+| `rtp.see` | op | See RTP related messages and `/rtp help` |
 | `rtp.free` | op | Bypass all economy charges |
 | `rtp.noCooldown` | op | Bypass teleport cooldown |
 | `rtp.noDelay` | op | Bypass teleport delay |

@@ -1,12 +1,12 @@
 # Migration Guide
 
-**Current Plugin Version:** `3.0.0-beta`
+**Current Plugin Version:** `3.0.0-beta.1`
 
 This document provides upgrade instructions for server operators and addon developers when moving between RTP versions.
 
 ---
 
-## Upgrading to 3.0.0-beta
+## Upgrading to 3.0.0-beta.1
 
 > ⚠️ **This is a MAJOR version release.** The `rtp-api` public interface has breaking changes. Addon developers must recompile against the new `rtp-api` jar and review the source changes listed below.
 
@@ -23,7 +23,7 @@ This document provides upgrade instructions for server operators and addon devel
 
 ### Configuration Files
 
-No configuration keys were renamed, removed, or restructured in 3.0.0-beta. Existing `config.yml`, `performance.yml`, `safety.yml`, `economy.yml`, `worlds/`, and `regions/` files are fully forward-compatible — no edits required.
+No configuration keys were renamed, removed, or restructured in 3.0.0-beta.1. Existing `config.yml`, `performance.yml`, `safety.yml`, `economy.yml`, `worlds/`, and `regions/` files are fully forward-compatible — no edits required.
 
 ### Database / Spatial Memory Cache
 
@@ -44,9 +44,9 @@ This is a **MAJOR** bump. You must recompile your addon against the new `rtp-api
 
 ---
 
-## Upgrading from 2.0.18 to 3.0.0-beta
+## Upgrading from 2.0.18 to 3.0.0-beta.1
 
-> The changes that shipped in the `2.0.18` tag are now fully documented under [Upgrading to 3.0.0-beta](#upgrading-to-300-beta) above. `2.0.18` was the last 2.x release; its changes (PaperLib removal, Folia adapter, platform target upgrade) were subsequently re-tagged as `3.0.0-beta` due to the breaking `rtp-api` changes introduced at the same time. Follow the 3.0.0-beta instructions above.
+> The changes that shipped in the `2.0.18` tag are now fully documented under [Upgrading to 3.0.0-beta.1](#upgrading-to-300-beta) above. `2.0.18` was the last 2.x release; its changes (PaperLib removal, Folia adapter, platform target upgrade) were subsequently re-tagged as `3.0.0-beta.1` due to the breaking `rtp-api` changes introduced at the same time. Follow the 3.0.0-beta.1 instructions above.
 
 ---
 
@@ -61,7 +61,7 @@ Detailed per-commit history is available via `git log`. For versions prior to 2.
 1. **Back up** your `plugins/RTP/` folder (configs, database files).
 2. **Stop** the server.
 3. **Replace** the RTP jar with the new version.
-4. **Remove PaperLib** from `plugins/` if upgrading to 3.0.0-beta+ on a Paper server and PaperLib was only used by RTP.
+4. **Remove PaperLib** from `plugins/` if upgrading to 3.0.0-beta.1+ on a Paper server and PaperLib was only used by RTP.
 5. **Start** the server. RTP will load existing config and cache files automatically.
 6. Run `/rtp info` to confirm the new version is active.
 7. Run `/rtp reload` if you want to force a full config re-read.

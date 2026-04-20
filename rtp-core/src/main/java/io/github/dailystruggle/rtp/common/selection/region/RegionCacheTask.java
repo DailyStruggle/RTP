@@ -14,13 +14,33 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.logging.Level;
 
+/**
+ * A task that asynchronously generates and caches a safe teleportation location
+ * for a specific region. This task is used to proactively fill the region's
+ * location queue, ensuring that teleports can be processed quickly.
+ *
+ * <p>On the private-queue path (a specific {@code playerId} is set), the task
+ * also pre-warms the landing neighborhood's chunks before enqueueing the
+ * {@link RTPLocation}, so the consumer (which can run on any scheduler lane —
+ * including Folia region threads under the ADR-015 stale-chunk guard) does not
+ * drive chunk I/O itself. See ADR-016 §6 for why this wait is intentionally
+ * kept on the cache path even though the Anvil pre-filter means the safety
+ * evaluation itself is already off-tick.
+ */
 public class RegionCacheTask extends RTPRunnable {
     private final Region region;
     private final UUID playerId;
     private final long selectRadius;
     private final long maxNanos;
 
+    /**
+     * Creates a new cache task for the general region queue.
+     *
+     * @param region   The region to cache a location for.
+     * @param maxNanos The maximum time in nanoseconds this task is allowed to run.
+     */
     public RegionCacheTask(Region region, long maxNanos) {
         super(600000L);
         this.region = region;
@@ -29,6 +49,13 @@ public class RegionCacheTask extends RTPRunnable {
         this.maxNanos = maxNanos;
     }
 
+    /**
+     * Creates a new cache task for a specific player's private queue.
+     *
+     * @param region   The region to cache a location for.
+     * @param playerId The UUID of the player.
+     * @param maxNanos The maximum time in nanoseconds this task is allowed to run.
+     */
     public RegionCacheTask(Region region, UUID playerId, long maxNanos) {
         super(600000L);
         this.region = region;
@@ -37,6 +64,9 @@ public class RegionCacheTask extends RTPRunnable {
         this.maxNanos = maxNanos;
     }
 
+    /**
+     * Executes the location generation and caching logic.
+     */
     @Override
     public void run() {
         if (isCancelled()) return;
@@ -48,7 +78,7 @@ public class RegionCacheTask extends RTPRunnable {
                 return;
             }
 
-            // 2. THROTTLE: Cap the number of concurrent asynchronous generations allowed per region.
+            // THROTTLE: Cap the number of concurrent asynchronous generations allowed per region.
             // When the TaskPipe rapidly loops 60 times in a tick, 58 of them will cleanly abort here,
             // naturally pacing the generation to 2 chunks at a time.
             if (region.inFlightCalculations.get() > 2) {
@@ -62,9 +92,9 @@ public class RegionCacheTask extends RTPRunnable {
 
         locationFuture = locationFuture.exceptionally(e -> {
             if (playerId != null) {
-                RTP.log(java.util.logging.Level.SEVERE, "Failed to generate location for player " + playerId, e);
+                RTP.log(Level.SEVERE, "Failed to generate location for player " + playerId, e);
             } else {
-                RTP.log(java.util.logging.Level.SEVERE, "Failed to generate location", e);
+                RTP.log(Level.SEVERE, "Failed to generate location", e);
             }
             region.inFlightCalculations.decrementAndGet();
             MemoryTracker.untrack(this);
@@ -146,7 +176,7 @@ public class RegionCacheTask extends RTPRunnable {
                 MemoryTracker.untrack(this);
             }
         } catch (Exception e) {
-            RTP.log(java.util.logging.Level.SEVERE, "Error in processResult", e);
+            RTP.log(Level.SEVERE, "Error in processResult", e);
         }
     }
 }
