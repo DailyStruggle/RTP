@@ -9,6 +9,7 @@ import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.common.tasks.TimeBoundTaskPipe;
 import org.jetbrains.annotations.Nullable;
@@ -53,11 +54,24 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     private static final WorldBorder ALWAYS_INSIDE_BORDER =
             new WorldBorder(() -> null, loc -> true);
 
+    private String platform = "mock";
+
     public MockRTPServerAccessor(File pluginDirectory) {
         this.pluginDirectory = pluginDirectory;
         MockRTPWorld defaultWorld = new MockRTPWorld("world");
         addWorld(defaultWorld);
         this.locationGenerator = new MockLocationGenerator(defaultWorld);
+    }
+
+    public void addSender(RTPCommandSender sender) {
+        if (sender instanceof MockRTPPlayer) {
+            addPlayer((MockRTPPlayer) sender);
+        } else {
+            playersById.put(sender.uuid(), new MockRTPPlayer(sender.uuid(), sender.name(), null) {
+                @Override public void sendMessage(String message) { sender.sendMessage(message); }
+                @Override public boolean hasPermission(String permission) { return sender.hasPermission(permission); }
+            });
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -107,7 +121,11 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
 
     @Override
     public String getPlatform() {
-        return "mock";
+        return platform;
+    }
+
+    public void setPlatform(String platform) {
+        this.platform = platform;
     }
 
     @Override
@@ -156,10 +174,15 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
 
     @Override
     public RTPCommandSender getSender(UUID uuid) {
-        MockRTPPlayer player = playersById.get(uuid);
-        if (player != null) return player;
         if (uuid.equals(consolePlayer.uuid())) return consolePlayer;
-        return new MockRTPCommandSender();
+        RTPPlayer player = playersById.get(uuid);
+        if (player != null) return player;
+
+        // Return existing mock player if available (registered via addSender/addPlayer)
+        // or create and register a new one so its messages can be tracked
+        MockRTPPlayer mockSender = new MockRTPPlayer(uuid, "MockSender", new RTPLocation(new MockRTPWorld("default"), 0, 0, 0));
+        addPlayer(mockSender);
+        return mockSender;
     }
 
     // -------------------------------------------------------------------------
@@ -181,19 +204,36 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     // -------------------------------------------------------------------------
 
     @Override
-    public void sendMessage(UUID target, MessagesKeys msgType, String tag) { }
+    public void sendMessage(UUID target, MessagesKeys msgType, String tag) {
+        RTPCommandSender sender = getSender(target);
+        if (sender != null) {
+            ConfigParser<MessagesKeys> lang = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+            Object configValue = lang.getConfigValue(msgType, null);
+            String msg = (configValue != null) ? String.valueOf(configValue) : msgType.name();
+            sender.sendMessage(msg);
+        }
+    }
 
     @Override
-    public void sendMessage(UUID target1, UUID target2, MessagesKeys msgType, String tag) { }
+    public void sendMessage(UUID target1, UUID target2, MessagesKeys msgType, String tag) {
+        sendMessage(target1, msgType, tag);
+    }
 
     @Override
-    public void sendMessage(UUID target, String message, String tag) { }
+    public void sendMessage(UUID target, String message, String tag) {
+        RTPCommandSender sender = getSender(target);
+        if (sender != null) {
+            sender.sendMessage(message);
+        }
+    }
 
     @Override
     public void sendMessageAndSuggest(UUID target, String message, String suggestion) { }
 
     @Override
-    public void sendMessage(UUID sender, UUID target, String message, String tag) { }
+    public void sendMessage(UUID sender, UUID target, String message, String tag) {
+        sendMessage(target, message, tag);
+    }
 
     @Override
     public void sendMessage(RTPCommandSender target, String message, String hover, String click, String tag) { }
@@ -216,13 +256,23 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     // RTPServerAccessor — logging
     // -------------------------------------------------------------------------
 
+    /**
+     * Test hook: every message passed to {@link #log(Level, String)} or
+     * {@link #log(Level, String, Throwable)} is appended here so tests can assert on
+     * diagnostic output (e.g. the REQ-RTP-S-004 nullChunk attribution summary line).
+     * Format: {@code "<LEVEL>: <msg>"}.
+     */
+    public final List<String> logMessages = Collections.synchronizedList(new ArrayList<>());
+
     @Override
     public void log(Level level, String msg) {
+        logMessages.add(level + ": " + msg);
         Logger.getLogger("RTP-Mock").log(level, msg);
     }
 
     @Override
     public void log(Level level, String msg, Throwable throwable) {
+        logMessages.add(level + ": " + msg);
         Logger.getLogger("RTP-Mock").log(level, msg, throwable);
     }
 

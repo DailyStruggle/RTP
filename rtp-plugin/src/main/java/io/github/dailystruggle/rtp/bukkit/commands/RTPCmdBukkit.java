@@ -96,7 +96,11 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
             "select a biome to teleport to",
             (uuid, s) -> {
               RTPCommandSender sender = RTP.serverAccessor.getSender(uuid);
-              return sender.hasPermission("rtp.biome.*") || sender.hasPermission("rtp.biome." + s);
+              // Biome keys are upper-cased with the root locale to avoid locale-dependent
+              // case folding (e.g. Turkish 'i' -> 'İ'), which would otherwise miss biomes
+              // such as ICE_SPIKES on operators running a tr_TR JVM.
+              return (sender.hasPermission("rtp.biome.*") || sender.hasPermission("rtp.biome." + s))
+                      && RTP.serverAccessor.getBiomes().contains(s.toUpperCase(java.util.Locale.ROOT));
             }));
 
     // target player parameter
@@ -109,7 +113,7 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
             (sender, s) -> {
               if (!sender.hasPermission("rtp.other")) return false;
               Player player = Bukkit.getPlayer(s);
-              return player != null && !player.hasPermission("rtp.notme");
+              return player != null && player.getName().equalsIgnoreCase(s) && !player.hasPermission("rtp.notme");
             }));
 
     // world name parameter
@@ -119,14 +123,17 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
         new WorldParameter(
             "rtp.world",
             "select a world to teleport to",
-            (sender, s) -> Bukkit.getWorld(s) != null && sender.hasPermission("rtp.worlds." + s)));
+            (sender, s) -> {
+                org.bukkit.World world = Bukkit.getWorld(s);
+                return world != null && world.getName().equalsIgnoreCase(s) && sender.hasPermission("rtp.worlds." + s);
+            }));
 
     addParameter(
         "toggletargetperms",
         new BooleanParameter(
             "rtp.params",
             "check player's perms when running this command",
-            (sender, s) -> sender.hasPermission("rtp.params")));
+            (sender, s) -> sender.hasPermission("rtp.params") && (s.equalsIgnoreCase("true") || s.equalsIgnoreCase("false"))));
 
     addSubCommand(new ReloadCmd(this));
     addSubCommand(new HelpCmd(this));
@@ -159,11 +166,13 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
 
       return false;
     }
+
+    UUID senderUuid = sender instanceof Player
+        ? ((Player) sender).getUniqueId()
+        : io.github.dailystruggle.rtp.api.RTPAPI.serverId;
+
     return onCommand(
-        RTP.serverAccessor.getSender(
-            sender instanceof Player
-                ? ((Player) sender).getUniqueId()
-                : io.github.dailystruggle.rtp.api.RTPAPI.serverId),
+        RTP.serverAccessor.getSender(senderUuid),
         this,
         label,
         args);
@@ -174,6 +183,15 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
       UUID senderId,
       Map<String, List<String>> parameterValues,
       CommandsAPICommand nextCommand) {
+    return onCommand(senderId, parameterValues, nextCommand, null);
+  }
+
+  @Override
+  public boolean onCommand(
+      UUID senderId,
+      Map<String, List<String>> parameterValues,
+      CommandsAPICommand nextCommand,
+      java.util.function.Consumer<String> messageMethod) {
 
     if (nextCommand != null) return true;
 
@@ -195,7 +213,7 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
       return false;
     }
 
-    return compute(senderId, parameterValues, nextCommand);
+    return compute(senderId, parameterValues, nextCommand, messageMethod);
   }
 
   @Override

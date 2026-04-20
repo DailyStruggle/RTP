@@ -11,6 +11,7 @@ public final class CommandExecutor implements Runnable {
     private final UUID callerId;
     private final Map<String, List<String>> parameterValues;
     private final CommandsAPICommand nextCommand;
+    private final java.util.function.Consumer<String> messageMethod;
     private final CompletableFuture<Boolean> result;
 
     public CommandExecutor(CommandsAPICommand command,
@@ -18,10 +19,20 @@ public final class CommandExecutor implements Runnable {
                            Map<String, List<String>> parameterValues,
                            CommandsAPICommand nextCommand,
                            CompletableFuture<Boolean> result){
+        this(command,callerId,parameterValues,nextCommand,null,result);
+    }
+
+    public CommandExecutor(CommandsAPICommand command,
+                           UUID callerId,
+                           Map<String, List<String>> parameterValues,
+                           CommandsAPICommand nextCommand,
+                           java.util.function.Consumer<String> messageMethod,
+                           CompletableFuture<Boolean> result){
         this.command = command;
         this.callerId = callerId;
         this.parameterValues = parameterValues;
         this.nextCommand = nextCommand;
+        this.messageMethod = messageMethod;
         this.result = result;
     }
 
@@ -56,6 +67,7 @@ public final class CommandExecutor implements Runnable {
 
     @Override
     public void run() {
-        result.complete(command.onCommand(callerId,parameterValues,nextCommand));
+        if(messageMethod != null) result.complete(command.onCommand(callerId,parameterValues,nextCommand,messageMethod));
+        else result.complete(command.onCommand(callerId,parameterValues,nextCommand));
     }
 }

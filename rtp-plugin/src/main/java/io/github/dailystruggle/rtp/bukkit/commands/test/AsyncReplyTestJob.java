@@ -276,7 +276,16 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
               : "folia: thread name '" + threadName + "' is not a recognised scheduler tier";
     } else {
       // Paper/Spigot: either main or a recognised async pool is fine.
-      permitted = isPrimary || threadName.toLowerCase(Locale.ROOT).contains("async");
+      // "craft scheduler" matches CraftBukkit's async scheduler thread names
+      // (e.g. "Craft Scheduler Thread - 3 - RTP"), which is the canonical
+      // worker pool for BukkitScheduler#runTaskAsynchronously and is safe
+      // for CommandSender#sendMessage. Intentionally permissive — see
+      // REQ-RTP-S-004 auditor notes in AGENTS.md.
+      String lower = threadName.toLowerCase(Locale.ROOT);
+      permitted =
+          isPrimary
+              || lower.contains("async")
+              || lower.contains("craft scheduler");
       reason =
           permitted
               ? (isPrimary ? "paper/spigot: main thread" : "paper/spigot: async (catcher-safe)")

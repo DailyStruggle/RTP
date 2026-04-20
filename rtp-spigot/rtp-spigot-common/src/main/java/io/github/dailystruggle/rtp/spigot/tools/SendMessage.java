@@ -8,6 +8,8 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.tools.PlaceholderProvider;
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -31,14 +33,28 @@ public class SendMessage {
   private static final Pattern hexColorPattern1 = Pattern.compile("(&?#[0-9a-fA-F]{6})");
   private static final Pattern hexColorPattern2 =
       Pattern.compile("(&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F])");
+  private static final List<Consumer<String>> interceptors = new CopyOnWriteArrayList<>();
   private static ConfigParser<MessagesKeys> lang = null;
 
-  static {
-    RTP.scheduler.runTaskLater(
-        () -> {
-          lang = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-        },
-        2);
+  public static void addInterceptor(Consumer<String> interceptor) {
+    interceptors.add(interceptor);
+  }
+
+  public static void removeInterceptor(Consumer<String> interceptor) {
+    interceptors.remove(interceptor);
+  }
+
+  private static void intercept(String message) {
+    for (Consumer<String> interceptor : interceptors) {
+      interceptor.accept(message);
+    }
+  }
+
+  private static ConfigParser<MessagesKeys> getLang() {
+    if (lang == null && RTP.configs != null) {
+      lang = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+    }
+    return lang;
   }
 
   public static void sendMessage(CommandSender target1, CommandSender target2, String message) {
@@ -51,6 +67,7 @@ public class SendMessage {
 
   public static void sendMessage(CommandSender sender, String message) {
     if (message == null || message.isEmpty()) return;
+    intercept(message);
     if (sender instanceof Player) sendMessage((Player) sender, message);
     else {
       message = format(Bukkit.getOfflinePlayer(RTPAPI.serverId), message);
@@ -63,6 +80,7 @@ public class SendMessage {
 
   public static void sendMessage(Player player, String message) {
     if (message == null || message.isEmpty()) return;
+    intercept(message);
     message = format(player, message);
     if (RTP.serverAccessor.getServerIntVersion() > 12) {
       BaseComponent[] components = TextComponent.fromLegacyText(message);
@@ -73,6 +91,7 @@ public class SendMessage {
   public static void sendMessage(
       RTPCommandSender sender, String message, String hover, String click) {
     if (message.isEmpty()) return;
+    intercept(message);
 
     OfflinePlayer player;
     if (sender instanceof Player) player = (OfflinePlayer) sender;
@@ -120,7 +139,7 @@ public class SendMessage {
 
     text = PlaceholderProvider.fillPlaceholders(text, uuid);
 
-    if (lang != null) {
+    if (getLang() != null) {
       text = PlaceholderProvider.fillNumericPlaceholders(text);
     }
 
@@ -160,7 +179,7 @@ public class SendMessage {
 
     text = PlaceholderProvider.fillPlaceholders(text, uuid);
 
-    if (lang != null) {
+    if (getLang() != null) {
       text = PlaceholderProvider.fillNumericPlaceholders(text);
     }
 
@@ -202,6 +221,7 @@ public class SendMessage {
     if (Objects.isNull(message) || message.isEmpty()) return;
 
     message = format(null, message);
+    intercept(message);
 
     if (RTP.serverAccessor.getServerIntVersion() <= 12) message = ChatColor.stripColor(message);
 
@@ -241,16 +261,19 @@ public class SendMessage {
   public static void log(Level level, String message, Throwable throwable) {
     if (Objects.isNull(message) || message.isEmpty()) return;
 
+    String formatted = format(null, message);
+    intercept(formatted);
+
     CommandSender.Spigot spigot = Bukkit.getConsoleSender().spigot();
 
     if (level.equals(Level.INFO))
-      spigot.sendMessage(TextComponent.fromLegacyText(format(null, message)));
+      spigot.sendMessage(TextComponent.fromLegacyText(formatted));
     else if (level.equals(Level.CONFIG))
-      spigot.sendMessage(TextComponent.fromLegacyText(ChatColor.GREEN + format(null, message)));
+      spigot.sendMessage(TextComponent.fromLegacyText(ChatColor.GREEN + formatted));
     else if (level.equals(Level.WARNING))
-      spigot.sendMessage(TextComponent.fromLegacyText(ChatColor.YELLOW + format(null, message)));
+      spigot.sendMessage(TextComponent.fromLegacyText(ChatColor.YELLOW + formatted));
     else if (level.equals(Level.SEVERE))
-      spigot.sendMessage(TextComponent.fromLegacyText(ChatColor.RED + format(null, message)));
+      spigot.sendMessage(TextComponent.fromLegacyText(ChatColor.RED + formatted));
     else {
       Logger logger = Bukkit.getLogger();
       logger.log(level, message);

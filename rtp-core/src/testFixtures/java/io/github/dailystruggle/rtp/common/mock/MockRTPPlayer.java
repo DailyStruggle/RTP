@@ -19,7 +19,7 @@ public class MockRTPPlayer extends MockRTPCommandSender implements RTPPlayer {
     }
 
     public MockRTPPlayer() {
-        this(UUID.randomUUID(), "MockPlayer", null);
+        this(UUID.randomUUID(), "MockPlayer", new RTPLocation(new MockRTPWorld("default"), 0, 0, 0));
     }
 
     @Override

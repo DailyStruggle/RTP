@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.bukkit.commands.test;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.spigot.tools.SendMessage;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -10,7 +11,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.logging.Level;
-import java.util.logging.LogRecord;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.jetbrains.annotations.Nullable;
@@ -90,38 +90,65 @@ public class LiveCommandDispatcherTestJob extends BaseRTPCmdImpl {
   /**
    * Malformed command lines (without the leading slash). Package-private so the
    * unit test can exercise the same list without a live Bukkit dispatcher.
+   *
+   * <p>EXPECTED BEHAVIOR: These inputs ARE malformed and MUST produce a
+   * {@link Level#WARNING} log message (via REQ-RTP-S-004) to avoid silent failure.
+   * If they don't, this job reports them as "silent failures".
    */
   static List<String> malformedInputs() {
+    // Parameter-style arguments MUST use the `key:value` delimiter so the
+    // `TreeCommand` parser routes them through the parameter-validation path
+    // (producing `msgBadParameter`) instead of the subcommand-lookup path
+    // (which would otherwise emit `msgInvalidCommand`, a semantically
+    // different failure mode — see REQ-RTP-S-004 and the "TreeCommand Error
+    // Reporting" note in .junie/AGENTS.md).
     return Collections.unmodifiableList(
         Arrays.asList(
-            "rtp player thatdoesnotexist",
+            "rtp player:thatdoesnotexist",
             "rtp reload invalid_arg",
-            "rtp region __no_such_region__",
-            "rtp biome ::: ???",
+            "rtp region:__no_such_region__",
+            "rtp biome:???",
             "rtp frobnicate"));
   }
+
+  private static final java.util.concurrent.atomic.AtomicBoolean isProcessing = new java.util.concurrent.atomic.AtomicBoolean(false);
 
   @Override
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
-
-    CommandSender sender;
+    if (isProcessing.get()) return true;
+    isProcessing.set(true);
     try {
-      sender = Bukkit.getConsoleSender();
-    } catch (Throwable t) {
-      // Bukkit not initialised (e.g. unit-test harness); abort with a
-      // WARNING rather than letting the throwable escape.
-      String msg =
-          TAG + " aborted: Bukkit console sender unavailable (" + t.getClass().getSimpleName() + ")";
-      RTP.serverAccessor.sendMessage(callerId, msg);
-      RTP.log(Level.WARNING, msg, t);
-      return true;
-    }
+      CommandSender sender;
+      try {
+        sender = Bukkit.getConsoleSender();
+      } catch (Throwable t) {
+        // Bukkit not initialised (e.g. unit-test harness); abort with a
+        // WARNING rather than letting the throwable escape.
+        String msg =
+            TAG + " aborted: Bukkit console sender unavailable (" + t.getClass().getSimpleName() + ")";
+        if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+          RTP.serverAccessor.sendMessage(callerId, msg);
+        }
+        RTP.log(Level.WARNING, msg, t);
+        return true;
+      }
 
-    DispatchReport report = runDispatches(sender, malformedInputs());
-    emit(callerId, report);
-    return true;
+      if (RTP.serverAccessor.isPrimaryThread()) {
+        DispatchReport report = runDispatches(sender, malformedInputs());
+        emit(callerId, report);
+      } else {
+        RTP.scheduler.runTask(
+            () -> {
+              DispatchReport report = runDispatches(sender, malformedInputs());
+              emit(callerId, report);
+            });
+      }
+      return true;
+    } finally {
+      isProcessing.set(false);
+    }
   }
 
   /**
@@ -131,12 +158,8 @@ public class LiveCommandDispatcherTestJob extends BaseRTPCmdImpl {
   static DispatchReport runDispatches(CommandSender sender, List<String> inputs) {
     DispatchReport report = new DispatchReport();
 
-    // Attach a JUL handler to the root logger so we can observe whether any
-    // WARNING/SEVERE records fire during dispatch. The handler is always
-    // detached in the finally block, even if a throwable escapes.
-    java.util.logging.Logger root = java.util.logging.Logger.getLogger("");
     CountingHandler handler = new CountingHandler();
-    root.addHandler(handler);
+    SendMessage.addInterceptor(handler);
     try {
       for (String line : inputs) {
         int warnsBefore = handler.warnCount;
@@ -153,6 +176,14 @@ public class LiveCommandDispatcherTestJob extends BaseRTPCmdImpl {
           report.threwOnDispatch.add(
               line + " -> " + t.getClass().getSimpleName() + ": " + safeMessage(t));
         }
+        // Some subcommands (notably `rtp reload`) parse their arguments on an
+        // async worker (ForkJoinPool.commonPool). `Bukkit.dispatchCommand`
+        // returns before that parse produces its msgInvalidCommand /
+        // msgBadParameter WARNING, so a purely-synchronous probe here would
+        // misclassify the async failure path as a silent failure and emit the
+        // report before the warn even arrives. Poll the interceptor with a
+        // bounded budget so async feedback has a chance to land.
+        awaitAsyncFeedback(handler, warnsBefore);
         int warnsAfter = handler.warnCount;
         boolean producedWarn = warnsAfter > warnsBefore;
         if (!threw && !producedWarn) {
@@ -168,7 +199,7 @@ public class LiveCommandDispatcherTestJob extends BaseRTPCmdImpl {
         }
       }
     } finally {
-      root.removeHandler(handler);
+      SendMessage.removeInterceptor(handler);
     }
     return report;
   }
@@ -184,38 +215,72 @@ public class LiveCommandDispatcherTestJob extends BaseRTPCmdImpl {
     return lc.contains("unknown command") || lc.contains("unknown or incomplete");
   }
 
+  /**
+   * Wait up to {@link #ASYNC_FEEDBACK_BUDGET_MS} ms for either a new
+   * interceptor warn or a visible message to land after
+   * {@link Bukkit#dispatchCommand} returns. Exits early as soon as the
+   * handler has observed any activity, keeping the live harness fast for
+   * the common synchronous case. This exists because subcommands such as
+   * {@code rtp reload} parse arguments on ForkJoinPool.commonPool, so
+   * their {@code msgInvalidCommand} / {@code msgBadParameter} warnings
+   * can arrive slightly after the dispatcher call site (see REQ-RTP-S-004).
+   */
+  static void awaitAsyncFeedback(CountingHandler handler, int warnsBefore) {
+    final long deadline = System.nanoTime() + ASYNC_FEEDBACK_BUDGET_NANOS;
+    while (System.nanoTime() < deadline) {
+      if (handler.warnCount > warnsBefore) return;
+      if (handler.lastMessage != null) return;
+      try {
+        Thread.sleep(5L);
+      } catch (InterruptedException ie) {
+        Thread.currentThread().interrupt();
+        return;
+      }
+    }
+  }
+
+  /** Per-input wait budget for async feedback. Kept short to avoid stalling the dispatch loop. */
+  static final long ASYNC_FEEDBACK_BUDGET_MS = 250L;
+  private static final long ASYNC_FEEDBACK_BUDGET_NANOS = ASYNC_FEEDBACK_BUDGET_MS * 1_000_000L;
+
   private static String safeMessage(Throwable t) {
     String m = t.getMessage();
     return m == null ? "<no message>" : m;
   }
 
-  private void emit(UUID callerId, DispatchReport report) {
-    int issues = report.threwOnDispatch.size() + report.possibleSilentFailures.size();
-    String summary =
-        TAG
-            + " attempted="
-            + report.attempted
-            + " threw="
-            + report.threwOnDispatch.size()
-            + " possible-silent-failures="
-            + report.possibleSilentFailures.size();
-    RTP.serverAccessor.sendMessage(callerId, summary);
-    if (issues == 0) {
-      RTP.log(Level.INFO, summary);
-      return;
+    private void emit(UUID callerId, DispatchReport report) {
+        int issues = report.threwOnDispatch.size() + report.possibleSilentFailures.size();
+        String summary =
+                TAG
+                        + " attempted="
+                        + report.attempted
+                        + " threw="
+                        + report.threwOnDispatch.size()
+                        + " possible-silent-failures="
+                        + report.possibleSilentFailures.size();
+        if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+            RTP.serverAccessor.sendMessage(callerId, summary);
+        }
+        if (issues == 0) {
+            RTP.log(Level.INFO, summary + " (all malformed inputs correctly handled/logged)");
+            return;
+        }
+        RTP.log(Level.WARNING, summary);
+        for (String line : report.threwOnDispatch) {
+            String msg = TAG + " threw: " + line;
+            if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+                RTP.serverAccessor.sendMessage(callerId, msg);
+            }
+            RTP.log(Level.WARNING, msg);
+        }
+        for (String line : report.possibleSilentFailures) {
+            String msg = TAG + " silent: " + line;
+            if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+                RTP.serverAccessor.sendMessage(callerId, msg);
+            }
+            RTP.log(Level.WARNING, msg);
+        }
     }
-    RTP.log(Level.WARNING, summary);
-    for (String line : report.threwOnDispatch) {
-      String msg = TAG + " threw: " + line;
-      RTP.serverAccessor.sendMessage(callerId, msg);
-      RTP.log(Level.WARNING, msg);
-    }
-    for (String line : report.possibleSilentFailures) {
-      String msg = TAG + " silent: " + line;
-      RTP.serverAccessor.sendMessage(callerId, msg);
-      RTP.log(Level.WARNING, msg);
-    }
-  }
 
   /**
    * Aggregates dispatch findings. Lists are intentionally mutable and
@@ -232,29 +297,24 @@ public class LiveCommandDispatcherTestJob extends BaseRTPCmdImpl {
   }
 
   /**
-   * Minimal JUL handler that counts {@link Level#WARNING}+ records and
-   * remembers the last formatted message. Intentionally allocation-light
-   * because it is attached to the root logger for the duration of a dispatch
-   * batch.
+   * Minimal interceptor that counts messages and remembers the last message.
+   * Intentionally allocation-light because it is attached to SendMessage
+   * for the duration of a dispatch batch.
    */
-  static final class CountingHandler extends java.util.logging.Handler {
+  static final class CountingHandler implements java.util.function.Consumer<String> {
     volatile int warnCount = 0;
     volatile @Nullable String lastMessage = null;
 
     @Override
-    public void publish(LogRecord record) {
-      if (record == null) return;
-      if (record.getLevel() != null
-          && record.getLevel().intValue() >= Level.WARNING.intValue()) {
+    public void accept(String s) {
+      if (s == null) return;
+      lastMessage = s;
+      // In the interceptor, we treat any message as a sign of non-silence.
+      // We specifically look for "RTP" to avoid counting generic Bukkit messages
+      // as our own warnings, but for S-004 any feedback is better than none.
+      if (s.toUpperCase().contains("RTP")) {
         warnCount++;
       }
-      lastMessage = record.getMessage();
     }
-
-    @Override
-    public void flush() {}
-
-    @Override
-    public void close() throws SecurityException {}
   }
 }

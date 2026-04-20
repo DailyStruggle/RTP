@@ -54,34 +54,26 @@ public interface RTPCmd extends BaseRTPCmd {
 
   default void init() {}
 
-  // the server triggers onCommand - perform synchronous guards (cooldown, permissions, etc.) then enqueue work for CommandsAPI
-  default boolean onCommand(
-      RTPCommandSender sender, CommandsAPICommand command, String label, String[] args) {
-    UUID senderId = sender.uuid();
+    default boolean onCommand(
+        RTPCommandSender sender, CommandsAPICommand command, String label, String[] args) {
+        UUID senderId = sender.uuid();
+        java.util.function.Consumer<String> messageMethod = sender::sendMessage;
 
-    if (RTP.reloading.get()) {
-      RTP.serverAccessor.sendMessage(senderId, "&4busy");
-      return true;
-    }
-
-    for (String arg : args) {
-      if (!arg.contains(String.valueOf(CommandsAPI.parameterDelimiter))) {
-        java.util.concurrent.CompletableFuture<Boolean> future = onCommand(senderId, sender::hasPermission, sender::sendMessage, args);
-
-        future.whenComplete((result, throwable) -> {
-          if (throwable != null) {
-            RTP.log(Level.WARNING, "[DEBUG_LOG] RTPCmd.onCommand - library onCommand threw an exception:", throwable);
-          }
-        });
-
-        return true;
-      }
-    }
+        if (RTP.reloading.get()) {
+            ConfigParser<MessagesKeys> langParser =
+                    (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+            String msg = (String) langParser.getConfigValue(MessagesKeys.busy, "");
+            messageMethod.accept(msg);
+            return true;
+        }
 
     // ------------------------D--------------------------------------------------------------------------------------
     // guard command perms with custom message
     if (!sender.hasPermission("rtp.use")) {
-      RTP.serverAccessor.sendMessage(senderId, MessagesKeys.noPerms);
+      ConfigParser<MessagesKeys> langParser =
+              (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+      String msg = (String) langParser.getConfigValue(MessagesKeys.noPerms, "");
+      messageMethod.accept(msg);
       return true;
     }
 
@@ -101,7 +93,10 @@ public interface RTPCmd extends BaseRTPCmd {
       if (dt < 0) dt = Long.MAX_VALUE + dt;
 
       if (dt < sender.cooldown()) {
-        RTP.serverAccessor.sendMessage(senderId, MessagesKeys.cooldownMessage);
+        ConfigParser<MessagesKeys> langParser =
+                (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+        String msg = (String) langParser.getConfigValue(MessagesKeys.cooldownMessage, "");
+        messageMethod.accept(msg);
         return true;
       } else if (senderData.completed) { // resolve command bugs preemptively
         RTP.getInstance().processingPlayers.remove(senderId);
@@ -109,19 +104,25 @@ public interface RTPCmd extends BaseRTPCmd {
     }
 
     if (RTP.reloading.get()) {
-      RTP.serverAccessor.sendMessage(senderId, MessagesKeys.teleportDeniedReloading);
+      ConfigParser<MessagesKeys> langParser =
+              (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+      String msg = (String) langParser.getConfigValue(MessagesKeys.teleportDeniedReloading, "");
+      messageMethod.accept(msg);
       return true;
     }
 
     if (RTP.getInstance().processingPlayers.contains(senderId)) {
-      RTP.serverAccessor.sendMessage(senderId, MessagesKeys.alreadyTeleporting);
+      ConfigParser<MessagesKeys> langParser =
+              (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+      String msg = (String) langParser.getConfigValue(MessagesKeys.alreadyTeleporting, "");
+      messageMethod.accept(msg);
       return true;
     }
 
     if (!senderId.equals(CommandsAPI.serverId)) RTP.getInstance().processingPlayers.add(senderId);
 
     try {
-      onCommand(senderId, sender::hasPermission, sender::sendMessage, args)
+      onCommand(senderId, sender::hasPermission, messageMethod, args)
           .whenComplete((aBoolean, throwable) -> {
             if (throwable != null) {
               RTP.log(Level.WARNING, throwable.getMessage(), throwable);
@@ -135,20 +136,38 @@ public interface RTPCmd extends BaseRTPCmd {
     return true;
   }
 
+  @Override
+  default boolean onCommand(UUID senderId, Map<String, List<String>> rtpArgs, CommandsAPICommand nextCommand, java.util.function.Consumer<String> messageMethod) {
+    if (nextCommand != null) return true;
+
+    return compute(senderId, rtpArgs, nextCommand, messageMethod);
+  }
+
   // CommandsAPI puts the responsibility on the plugin to decide when and how to run compute() - called via CommandsAPI.execute() in SyncTaskProcessing
   default boolean compute(
-      UUID senderId, Map<String, List<String>> rtpArgs, CommandsAPICommand nextCommand) {
-    if (senderId.equals(new java.util.UUID(0, 0)) && !rtpArgs.containsKey("player")) {
-      RTP.serverAccessor.sendMessage(senderId, MessagesKeys.consoleCmdNotAllowed);
+          UUID senderId, Map<String, List<String>> rtpArgs, CommandsAPICommand nextCommand) {
+    return compute(senderId, rtpArgs, nextCommand, null);
+  }
+
+  default boolean compute(
+      UUID senderId, Map<String, List<String>> rtpArgs, CommandsAPICommand nextCommand, java.util.function.Consumer<String> messageMethod) {
+    if (nextCommand != null) {
       return true;
     }
-    if (nextCommand != null) {
+    if (senderId.equals(new java.util.UUID(0, 0)) && !rtpArgs.containsKey("player")) {
+      if(messageMethod != null) {
+        ConfigParser<MessagesKeys> langParser =
+                (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+        String msg = (String) langParser.getConfigValue(MessagesKeys.consoleCmdNotAllowed, "");
+        messageMethod.accept(msg);
+      }
+      else RTP.serverAccessor.sendMessage(senderId, MessagesKeys.consoleCmdNotAllowed);
       return true;
     }
 
     RTPCommandSender sender = RTP.serverAccessor.getSender(senderId);
 
-    RTP.getInstance().processingPlayers.add(senderId);
+    if (!senderId.equals(CommandsAPI.serverId)) RTP.getInstance().processingPlayers.add(senderId);
 
     List<String> toggletargetpermsList = rtpArgs.get("toggletargetperms");
     boolean toggleTargetPerms =
@@ -195,8 +214,10 @@ public interface RTPCmd extends BaseRTPCmd {
         if (p == null) {
           String msg =
               (String)
-                  langParser.getConfigValue(MessagesKeys.badArg, "player:" + rtpArgs.get("player"));
-          RTP.serverAccessor.sendMessage(senderId, msg);
+                  langParser.getConfigValue(MessagesKeys.badArg, "player:" + playerName);
+          if(messageMethod != null) messageMethod.accept(msg);
+          else RTP.serverAccessor.sendMessage(senderId, msg);
+          RTP.log(Level.WARNING, msg);
           continue;
         }
 
@@ -208,6 +229,7 @@ public interface RTPCmd extends BaseRTPCmd {
       players.add((RTPPlayer) sender);
     } else { // if no players and sender isn't a player, idk who to send
       String msg = (String) langParser.getConfigValue(MessagesKeys.consoleCmdNotAllowed, "");
+      if(messageMethod != null) messageMethod.accept(msg);
       failEvent(sender, msg);
       RTP.getInstance().processingPlayers.remove(senderId);
       return true;
@@ -236,7 +258,8 @@ public interface RTPCmd extends BaseRTPCmd {
       if ((bal - price) < floor) {
         String s = langParser.getConfigValue(MessagesKeys.notEnoughMoney, "").toString();
         s = s.replace("[money]", String.valueOf(price));
-        RTP.serverAccessor.sendMessage(senderId, s);
+        if(messageMethod != null) messageMethod.accept(s);
+        else RTP.serverAccessor.sendMessage(senderId, s);
         RTP.getInstance().processingPlayers.remove(senderId);
         return true;
       }
@@ -297,7 +320,9 @@ public interface RTPCmd extends BaseRTPCmd {
 
         if (worldParser == null) {
           String msg = (String) langParser.getConfigValue(MessagesKeys.badArg, "world:" + worldName);
-          RTP.serverAccessor.sendMessage(senderId, msg);
+          if(messageMethod != null) messageMethod.accept(msg);
+          else RTP.serverAccessor.sendMessage(senderId, msg);
+          RTP.log(Level.WARNING, msg);
           RTP.getInstance().processingPlayers.remove(senderId);
           return true;
         }
@@ -313,6 +338,7 @@ public interface RTPCmd extends BaseRTPCmd {
       } catch (IllegalArgumentException | IllegalStateException exception) {
         String msg = (String) langParser.getConfigValue(MessagesKeys.badArg, "region:" + regionName);
         RTP.serverAccessor.sendMessage(senderId, msg);
+        RTP.log(Level.WARNING, msg);
         RTP.getInstance().processingPlayers.remove(senderId);
         RTP.getInstance().latestTeleportData.remove(senderId);
         return true;
@@ -322,6 +348,7 @@ public interface RTPCmd extends BaseRTPCmd {
       if (rtpWorld == null) {
         String msg = (String) langParser.getConfigValue(MessagesKeys.badArg, "region:" + regionName);
         RTP.serverAccessor.sendMessage(senderId, msg);
+        RTP.log(Level.WARNING, msg);
         RTP.getInstance().processingPlayers.remove(senderId);
         RTP.getInstance().latestTeleportData.remove(senderId);
         return true;

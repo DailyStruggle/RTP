@@ -30,6 +30,14 @@ public interface TreeCommand extends CommandsAPICommand {
     Map<String, CommandParameter> getParameterLookup();
     Map<String, CommandsAPICommand> getCommandLookup();
 
+    default void msgInvalidCommand(UUID callerId, String argument) {
+        //no-op
+    }
+
+    default void msgInvalidCommand(UUID callerId, String argument, Consumer<String> messageMethod) {
+        msgInvalidCommand(callerId, argument);
+    }
+
     @NotNull
     default List<String> onTabComplete(@NotNull UUID callerId,
                                        @NotNull Predicate<String> permissionCheckMethod,
@@ -211,7 +219,7 @@ public interface TreeCommand extends CommandsAPICommand {
 
             //catch delimiter with no value
             if (arg.endsWith(String.valueOf(CommandsAPI.parameterDelimiter))) {
-                msgBadParameter(callerId,arg,"");
+                msgBadParameter(callerId,arg.substring(0,arg.length()-1),"",messageMethod);
                 return CompletableFuture.completedFuture(false);
             }
 
@@ -226,43 +234,14 @@ public interface TreeCommand extends CommandsAPICommand {
 
                 //catch bad command
                 if (subCommand == null) {
-                    List<Map.Entry<String,CommandParameter>> parameters = new ArrayList<>(parameterLookup.size());
-                    String lowerCase = arg.toLowerCase();
-                    for(Map.Entry<String,CommandParameter> parameterEntry : parameterLookup.entrySet()) {
-                        if(!permissionCheckMethod.test(parameterEntry.getValue().permission())) continue;
-                        if(!parameterEntry.getValue().isRelevant.apply(callerId, lowerCase)) continue;
-                        parameters.add(parameterEntry);
-                    }
-
-                    for(Map.Entry<String,CommandParameter> parameterEntry : tempParameters.entrySet()) {
-                        if(!permissionCheckMethod.test(parameterEntry.getValue().permission())) continue;
-                        if(!parameterEntry.getValue().isRelevant.apply(callerId, lowerCase)) continue;
-                        parameters.add(parameterEntry);
-                    }
-
-                    if(parameters.isEmpty()) {
-                        messageMethod.accept("invalid command - " + arg);
-                        return CompletableFuture.completedFuture(false);
-                    }
-
-                    parameters.sort(Comparator.comparingInt(o -> o.getValue().priority));
-                    Map.Entry<String, CommandParameter> parameterEntry = parameters.get(0);
-                    List<String> list = parameterValues.get(parameterEntry.getKey());
-                    if(list == null) list = new ArrayList<>();
-                    list.add(lowerCase);
-                    parameterValues.put(parameterEntry.getKey().toLowerCase(),list);
-
-                    CommandParameter currentParameter = parameterEntry.getValue();
-                    Map<String, CommandParameter> subParameterMap = currentParameter.subParams(lowerCase);
-                    if(subParameterMap == null || subParameterMap.isEmpty()) continue;
-                    tempParameters.putAll(subParameterMap);
-                    continue;
+                    msgInvalidCommand(callerId, arg, messageMethod);
+                    return CompletableFuture.completedFuture(false);
                 }
 
                 //on top of trying subcommand, run current command in case of independent functionality
 
                 CompletableFuture<Boolean> cont = new CompletableFuture<>();
-                CommandExecutor commandExecutor = new CommandExecutor(this, callerId, parameterValues, subCommand, cont);
+                CommandExecutor commandExecutor = new CommandExecutor(this, callerId, parameterValues, subCommand, messageMethod, cont);
                 CommandsAPI.commandPipeline.add(commandExecutor);
 
                 //catch no perms for subcommand
@@ -289,7 +268,7 @@ public interface TreeCommand extends CommandsAPICommand {
                     ? parameterLookup.get(paramName)
                     : tempParameters.get(paramName);
             if (currentParameter == null || !permissionCheckMethod.test(currentParameter.permission())) {
-                msgBadParameter(callerId,paramName,"");
+                msgBadParameter(callerId,argSplit[0],argSplit[1],messageMethod);
                 return CompletableFuture.completedFuture(false);
             }
 
@@ -302,7 +281,7 @@ public interface TreeCommand extends CommandsAPICommand {
                     Arrays.stream(val.split(String.valueOf(CommandsAPI.multiParameterDelimiter)))
                             .filter(s -> {
                                 Boolean pass = currentParameter.isRelevant.apply(callerId,s);
-                                if(!pass) msgBadParameter(callerId,paramName,s);
+                                if(!pass) msgBadParameter(callerId,paramName,s,messageMethod);
                                 return pass;
                             })
                             .collect(Collectors.toList());
@@ -330,7 +309,7 @@ public interface TreeCommand extends CommandsAPICommand {
                             Arrays.stream(val2.split(String.valueOf(CommandsAPI.multiParameterDelimiter)))
                                     .filter(s2 -> {
                                         boolean pass = currentParameter2.isRelevant.apply(callerId,s2);
-                                        if(!pass) msgBadParameter(callerId,paramName,s2);
+                                        if(!pass) msgBadParameter(callerId,paramName2,s2,messageMethod);
                                         return pass;
                                     })
                                     .collect(Collectors.toList());
@@ -342,7 +321,7 @@ public interface TreeCommand extends CommandsAPICommand {
             }
         }
 
-        return CompletableFuture.completedFuture(onCommand(callerId, parameterValues, null));
+        return CompletableFuture.completedFuture(onCommand(callerId, parameterValues, null, messageMethod));
     }
 
     default List<String> help(UUID callerId, Predicate<String> permissionCheckMethod) {

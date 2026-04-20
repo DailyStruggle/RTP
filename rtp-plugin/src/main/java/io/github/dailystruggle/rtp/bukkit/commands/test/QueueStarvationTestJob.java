@@ -356,14 +356,8 @@ public class QueueStarvationTestJob extends BaseRTPCmdImpl {
     String regionName = (regionNames == null || regionNames.isEmpty()) ? null : regionNames.getFirst();
     Region region;
     if (regionName != null) {
-      region = RTP.selectionAPI.getRegion(regionName);
-      if (region == null) {
-        String msg = "&c[RTP test/queue-starvation] unknown region: " + regionName;
-        RTP.serverAccessor.sendMessage(callerId, msg);
-        RTP.log(Level.WARNING, msg);
-        return null;
-      }
-      return region;
+      region = RTP.selectionAPI.getRegionOrDefault(regionName);
+        return region;
     }
     // Fall back to caller's current region.
     try {

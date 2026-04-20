@@ -44,6 +44,18 @@ public class MockRTPWorld extends RTPWorld<String> {
     public final AtomicInteger chunkAsyncLoadCount = new AtomicInteger();
 
     /**
+     * Test hook: when this predicate returns {@code true} for a given encoded chunk key,
+     * both {@link #getChunkAt(int,int)} and {@link #getChunkAtAsync(int,int)} complete
+     * their long-key future with {@code null}. This simulates the ADR-016
+     * Anvil pre-filter {@code REJECT} path on vanilla Spigot (where
+     * {@code BukkitRTPWorld.getChunkAt} completes with {@code null} by design) and lets
+     * the REQ-RTP-S-004 nullChunk attribution tests exercise
+     * {@link io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes#nullChunk}.
+     * Default: never returns null.
+     */
+    public volatile LongPredicate nullChunkKeyPredicate = key -> false;
+
+    /**
      * Test hook: number of times any {@link MockRTPChunk#isSafe(int,int,int,java.util.Set)}
      * on a chunk belonging to this world has been invoked. Used by the stale-chunk guard
      * test (ADR-015 / REQ-RTP-S-005) to assert that block evaluation is entirely bypassed
@@ -69,10 +81,14 @@ public class MockRTPWorld extends RTPWorld<String> {
         return ((long) cx << 32) | (cz & 0xFFFFFFFFL);
     }
 
-    /** Returns a future that completes immediately with the encoded chunk key. */
+    /** Returns a future that completes immediately with the encoded chunk key, or {@code null} if {@link #nullChunkKeyPredicate} signals rejection. */
     @Override
     public CompletableFuture<Long> getChunkAt(int chunkX, int chunkZ) {
-        return CompletableFuture.completedFuture(encodeKey(chunkX, chunkZ));
+        long key = encodeKey(chunkX, chunkZ);
+        if (nullChunkKeyPredicate.test(key)) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return CompletableFuture.completedFuture(key);
     }
 
     /**
@@ -89,9 +105,14 @@ public class MockRTPWorld extends RTPWorld<String> {
     @Override
     public CompletableFuture<ChunkSet> getChunkAtAsync(int cx, int cz) {
         chunkAsyncLoadCount.incrementAndGet();
+        long key = encodeKey(cx, cz);
+        CompletableFuture<Long> chunkFuture =
+                nullChunkKeyPredicate.test(key)
+                        ? CompletableFuture.completedFuture(null)
+                        : CompletableFuture.completedFuture(key);
         ChunkSet chunkSet = new ChunkSet(
                 this, cx, cz,
-                List.of(CompletableFuture.completedFuture(encodeKey(cx, cz))),
+                List.of(chunkFuture),
                 new CompletableFuture<>());
         return CompletableFuture.completedFuture(chunkSet);
     }

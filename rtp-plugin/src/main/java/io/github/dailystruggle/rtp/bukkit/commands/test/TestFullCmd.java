@@ -5,8 +5,10 @@ import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.spigot.tools.SendMessage;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -63,6 +65,8 @@ public class TestFullCmd extends BaseRTPCmdImpl {
               "api-compat",
               "chunk-ticket",
               "disconnect-midflight",
+              "anvil-prefilter",
+              "async-chunk-load",
               "scheduler",
               "folia-ownership",
               "commands-live",
@@ -98,11 +102,53 @@ public class TestFullCmd extends BaseRTPCmdImpl {
     return "runs every currently-shipped rtp test subcommand in sequence (alias: all)";
   }
 
+  private static final java.util.concurrent.atomic.AtomicBoolean isProcessing = new java.util.concurrent.atomic.AtomicBoolean(false);
+
+  /**
+   * Per-step ceiling on how long the sweep will wait for async jobs
+   * (stress/queue-starvation/disconnect-midflight/reload-safety) registered
+   * in {@link ActiveTestJobs} for the caller to drain before dispatching the
+   * next subcommand. Bounded so a stuck job cannot park the umbrella run
+   * indefinitely; a breached timeout is logged at {@code WARNING} per
+   * REQ-RTP-S-004 and the sweep continues.
+   */
+  static final long DRAIN_TIMEOUT_MILLIS =
+      Long.getLong("rtp.test.full.drainTimeoutMillis", 60_000L);
+
+  /** Polling cadence for the drain wait; kept small to keep shutdown responsive. */
+  static final long DRAIN_POLL_MILLIS = 100L;
+
   @Override
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
-    runShippedSubcommands(callerId);
+    if (!isProcessing.compareAndSet(false, true)) return true;
+    // The sweep polls ActiveTestJobs between subcommands; doing that on the
+    // command thread (which on Bukkit is the main server thread) would block
+    // ticks and violate REQ-RTP-S-005. Hop onto the async scheduler so the
+    // caller returns immediately and the sweep runs sequentially off-tick.
+    try {
+      RTP.scheduler.runTaskAsynchronously(() -> {
+        try {
+          runShippedSubcommands(callerId);
+        } catch (Throwable t) {
+          RTP.log(
+              Level.WARNING,
+              "[RTP test/full] sweep aborted: " + t.getMessage(),
+              t);
+        } finally {
+          isProcessing.set(false);
+        }
+      });
+    } catch (Throwable t) {
+      // If the async scheduler is unavailable (e.g. in headless tests),
+      // fall back to running inline so we don't silently no-op (S-004).
+      try {
+        runShippedSubcommands(callerId);
+      } finally {
+        isProcessing.set(false);
+      }
+    }
     return true;
   }
 
@@ -113,36 +159,62 @@ public class TestFullCmd extends BaseRTPCmdImpl {
    */
   private void runShippedSubcommands(UUID callerId) {
     String header = "[RTP test/full] begin (shipped subcommands only)";
-    RTP.serverAccessor.sendMessage(callerId, header);
+    if (!callerId.equals(RTPAPI.serverId)) {
+        RTP.serverAccessor.sendMessage(callerId, header);
+    }
     RTP.log(Level.INFO, header);
 
+    FullAudit audit = new FullAudit();
+    SendMessage.addInterceptor(audit);
+    try {
+
     // --- commands audit (read-only, cheapest, runs first) ------------
-    dispatchNoArg(callerId, "commands");
+    dispatchNoArgAndWait(callerId, "commands");
 
     // --- api-compat (read-only reflective probe; safe everywhere) ----
-    dispatchNoArg(callerId, "api-compat");
+    dispatchNoArgAndWait(callerId, "api-compat");
 
     // --- chunk-ticket (MemoryTracker positive-path; read-only, safe) --
-    dispatchNoArg(callerId, "chunk-ticket");
+    dispatchNoArgAndWait(callerId, "chunk-ticket");
 
     // --- disconnect-midflight (synthetic UUID; never touches live players) --
-    dispatchNoArg(callerId, "disconnect-midflight");
+    dispatchNoArgAndWait(callerId, "disconnect-midflight");
+
+    // --- anvil-prefilter (read-only telemetry readout; ADR-016/017) ---
+    // Just reads AnvilPrefilterMetrics atomics; safe on every platform.
+    // On Paper/Folia the counters stay at zero because those platforms
+    // structurally bypass the pre-filter in BukkitRTPWorld.getChunkAt.
+    dispatchNoArgAndWait(callerId, "anvil-prefilter");
+
+    // --- async-chunk-load (verifies one generated chunk loads off the
+    // main thread; REQ-RTP-S-005). Skips gracefully when the server has
+    // no RTPWorlds registered (headless harness). Safe on every platform.
+    dispatchNoArgAndWait(callerId, "async-chunk-load");
 
     // --- scheduler (passive, cheap, runs before stress) ---------------
-    dispatchNoArg(callerId, "scheduler");
+    dispatchNoArgAndWait(callerId, "scheduler");
 
     // --- folia-ownership (Entity-Scheduler region handoff probe) -----
-    // Safe on all platforms: reports UNSUPPORTED on Spigot/Paper when
-    // Bukkit.isOwnedByCurrentRegion is absent, rather than failing.
-    dispatchNoArg(callerId, "folia-ownership");
+    // Safe on all platforms, but only meaningful on Folia. We skip it
+    // on Spigot/Paper per user request to keep the sweep focused.
+    if (RTP.serverAccessor.getPlatform().equalsIgnoreCase("Folia")) {
+      dispatchNoArgAndWait(callerId, "folia-ownership");
+    }
 
     // --- commands-live (malformed-input dispatch audit; aborts with a
     // loud WARNING when Bukkit is unavailable in a headless harness).
-    dispatchNoArg(callerId, "commands-live");
+    String liveWarning = "[RTP test/full] notice: the 'commands-live' phase intentionally "
+        + "dispatches malformed inputs and will produce several WARNING logs "
+        + "to verify compliance with REQ-RTP-S-004.";
+    if (!callerId.equals(RTPAPI.serverId)) {
+        RTP.serverAccessor.sendMessage(callerId, liveWarning);
+    }
+    RTP.log(Level.INFO, liveWarning);
+    dispatchNoArgAndWait(callerId, "commands-live");
 
     // --- economy-isolation (synthetic Vault debit; S-006-guarded and
     // runs entirely on the async tier, so no player context required).
-    dispatchNoArg(callerId, "economy-isolation");
+    dispatchNoArgAndWait(callerId, "economy-isolation");
 
     // --- queue-starvation (ADR-006 refill pulse; async sampling only) -
     // Uses a small sample count so the sweep stays conservative. The job
@@ -152,7 +224,9 @@ public class TestFullCmd extends BaseRTPCmdImpl {
     CommandsAPICommand queueStarvation = findChild("queue-starvation");
     if (queueStarvation == null) {
       String msg = "[RTP test/full] queue-starvation subcommand not registered; skipping";
-      RTP.serverAccessor.sendMessage(callerId, msg);
+      if (!callerId.equals(RTPAPI.serverId)) {
+        RTP.serverAccessor.sendMessage(callerId, msg);
+      }
       RTP.log(Level.WARNING, msg);
     } else if (callerId.equals(RTPAPI.serverId)) {
       String msg =
@@ -172,6 +246,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
             "[RTP test/full] queue-starvation dispatch failed: " + t.getMessage(),
             t);
       }
+      waitForCallerJobsToDrain(callerId, "queue-starvation");
     }
 
     // --- async-reply (end-to-end pipeline probe; requires a live player
@@ -181,7 +256,9 @@ public class TestFullCmd extends BaseRTPCmdImpl {
     CommandsAPICommand asyncReply = findChild("async-reply");
     if (asyncReply == null) {
       String msg = "[RTP test/full] async-reply subcommand not registered; skipping";
-      RTP.serverAccessor.sendMessage(callerId, msg);
+      if (!callerId.equals(RTPAPI.serverId)) {
+        RTP.serverAccessor.sendMessage(callerId, msg);
+      }
       RTP.log(Level.WARNING, msg);
     } else if (callerId.equals(RTPAPI.serverId)) {
       String msg =
@@ -200,6 +277,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
             "[RTP test/full] async-reply dispatch failed: " + t.getMessage(),
             t);
       }
+      waitForCallerJobsToDrain(callerId, "async-reply");
     }
 
     // --- stress -------------------------------------------------------
@@ -209,7 +287,9 @@ public class TestFullCmd extends BaseRTPCmdImpl {
     CommandsAPICommand stress = findChild("stress");
     if (stress == null) {
       String msg = "[RTP test/full] stress subcommand not registered; skipping";
-      RTP.serverAccessor.sendMessage(callerId, msg);
+      if (!callerId.equals(RTPAPI.serverId)) {
+        RTP.serverAccessor.sendMessage(callerId, msg);
+      }
       RTP.log(Level.WARNING, msg);
     } else {
       Map<String, List<String>> stressArgs = new HashMap<>();
@@ -226,6 +306,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
       } catch (Throwable t) {
         RTP.log(Level.WARNING, "[RTP test/full] stress dispatch failed: " + t.getMessage(), t);
       }
+      waitForCallerJobsToDrain(callerId, "stress");
     }
 
     // --- future shipped subcommands go here, in the order documented in
@@ -237,10 +318,23 @@ public class TestFullCmd extends BaseRTPCmdImpl {
     //   * `reload-safety` — admin-only, intentionally courts failures.
     //   Operators who want those must invoke them directly.
 
-    String footer = "[RTP test/full] end";
-    RTP.serverAccessor.sendMessage(callerId, footer);
+    // Final drain: catch any subcommand whose async tail is still in flight
+    // (e.g. a synchronous dispatcher that fans out to ActiveTestJobs jobs
+    // we did not explicitly wait on above). The end-state of the sweep --
+    // including the audited-warnings count reported in the footer -- must
+    // be evaluated AFTER every registered job has completed so operators
+    // see a stable final tally rather than a snapshot taken mid-flight.
+    waitForCallerJobsToDrain(callerId, "final");
+
+    String footer = "[RTP test/full] end (total-audited-warnings=" + audit.warnCount + ")";
+    if (!callerId.equals(RTPAPI.serverId)) {
+        RTP.serverAccessor.sendMessage(callerId, footer);
+    }
     RTP.log(Level.INFO, footer);
+  } finally {
+    SendMessage.removeInterceptor(audit);
   }
+}
 
   /**
    * Dispatches a shipped subcommand by name with no arguments, logging at
@@ -261,6 +355,56 @@ public class TestFullCmd extends BaseRTPCmdImpl {
           Level.WARNING,
           "[RTP test/full] " + subName + " dispatch failed: " + t.getMessage(),
           t);
+    }
+  }
+
+  /**
+   * Dispatches {@code subName} then blocks (off-main-thread, see {@link
+   * #onCommand}) until every {@link ActiveTestJobs} entry owned by
+   * {@code callerId} has completed or {@link #DRAIN_TIMEOUT_MILLIS}
+   * elapses. This gives the umbrella sweep true sequential semantics:
+   * each subcommand finishes (including any async tail it registered in
+   * {@link ActiveTestJobs}) before the next one starts, and the final
+   * footer reflects the real end-state of the whole run rather than a
+   * mid-flight snapshot.
+   */
+  private void dispatchNoArgAndWait(UUID callerId, String subName) {
+    dispatchNoArg(callerId, subName);
+    waitForCallerJobsToDrain(callerId, subName);
+  }
+
+  /**
+   * Polls {@link ActiveTestJobs#snapshot()} until the caller has no
+   * outstanding jobs or the drain budget is exhausted. A budget breach is
+   * reported at {@code WARNING} (REQ-RTP-S-004) and the sweep is allowed
+   * to continue; the stuck job remains registered so {@code rtp test
+   * cancel} can still reach it.
+   *
+   * <p>Must only be called from an async context (the sweep runs on
+   * {@code RTP.scheduler.runTaskAsynchronously}); see {@link #onCommand}.
+   */
+  static void waitForCallerJobsToDrain(UUID callerId, String stageLabel) {
+    long deadline = System.nanoTime() + DRAIN_TIMEOUT_MILLIS * 1_000_000L;
+    while (true) {
+      Collection<ActiveTestJobs.Job> jobs = ActiveTestJobs.snapshot().get(callerId);
+      if (jobs == null || jobs.isEmpty()) return;
+      if (System.nanoTime() >= deadline) {
+        RTP.log(
+            Level.WARNING,
+            "[RTP test/full] drain timeout after stage=" + stageLabel
+                + " (remaining=" + jobs.size() + "); continuing sweep. "
+                + "Use `rtp test cancel` to abort the stuck job(s).");
+        return;
+      }
+      try {
+        Thread.sleep(DRAIN_POLL_MILLIS);
+      } catch (InterruptedException ie) {
+        Thread.currentThread().interrupt();
+        RTP.log(
+            Level.WARNING,
+            "[RTP test/full] drain interrupted at stage=" + stageLabel);
+        return;
+      }
     }
   }
 
@@ -342,6 +486,26 @@ public class TestFullCmd extends BaseRTPCmdImpl {
       }
     }
     return r;
+  }
+
+  /**
+   * Simple interceptor for the duration of the full sweep.
+   */
+  private static final class FullAudit implements java.util.function.Consumer<String> {
+    volatile int warnCount = 0;
+
+    @Override
+    public void accept(String s) {
+      // We rely on the convention that warnings/errors produced by our plugin
+      // include the "[RTP" tag or similar markers from SendMessage.
+      if (s != null && s.toUpperCase().contains("RTP")) {
+        // We only count it as a "warning" if it's not the start/end/notice logs
+        // from the test suite itself.
+        if (!s.contains("[RTP test/full]") && !s.contains("notice:")) {
+          warnCount++;
+        }
+      }
+    }
   }
 
   /** Result of {@link #auditShippedCoverage(TreeCommand)}. */
