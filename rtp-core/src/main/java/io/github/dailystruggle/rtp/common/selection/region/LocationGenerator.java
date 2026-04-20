@@ -61,6 +61,7 @@ public class LocationGenerator implements ILocationGenerator {
         vert,
         safety,
         safetyExternal,
+        nullChunk,
         misc
     }
 
@@ -366,13 +367,13 @@ public class LocationGenerator implements ILocationGenerator {
 
         Shape<?> shape = region.getShape();
         if (shape == null) {
-            new IllegalStateException("[RTP] invalid state, null shape").printStackTrace();
+            RTP.log(Level.WARNING, "[RTP] invalid state, null shape", new IllegalStateException());
             return null;
         }
 
         VerticalAdjustor<?> vert = region.getVert();
         if (vert == null) {
-            new IllegalStateException("[RTP] invalid state, null vert").printStackTrace();
+            RTP.log(Level.WARNING, "[RTP] invalid state, null vert", new IllegalStateException());
             return null;
         }
 
@@ -589,6 +590,9 @@ public class LocationGenerator implements ILocationGenerator {
             }
 
             if (chunk == null) {
+                if (verbose) {
+                    failMap.get(FailTypes.nullChunk).compute("reason=asyncLoadNull", (s, aLong) -> (aLong == null) ? 1L : ++aLong);
+                }
                 continue;
             }
 
@@ -685,6 +689,9 @@ public class LocationGenerator implements ILocationGenerator {
                         }
 
                         if (chunk1 == null) {
+                            if (verbose) {
+                                failMap.get(FailTypes.nullChunk).compute("reason=neighborNull", (s, aLong) -> (aLong == null) ? 1L : ++aLong);
+                            }
                             pass = false;
                             break safetyCheck;
                         }
