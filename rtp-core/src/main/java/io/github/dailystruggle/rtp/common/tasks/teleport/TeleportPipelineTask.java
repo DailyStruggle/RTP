@@ -413,7 +413,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
       if (world == null) world = region.getWorld();
       RTPLocation location = new RTPLocation(world, coords.x(), coords.y(), coords.z());
       location.setReservation(reservation);
-      if (location.getReservation() == null) {
+      if (shouldBuildPlatform(world, coords)) {
         location.world().platform(location);
       }
       RTP.getInstance().invulnerablePlayers.put(playerId, System.currentTimeMillis());
@@ -480,6 +480,78 @@ public final class TeleportPipelineTask extends RTPRunnable {
       SupportLogger.logException(Level.SEVERE, "Error in runTeleport", e);
       currentPhase = Phase.CLEANUP;
       runCleanup();
+    }
+  }
+
+  /**
+   * Decide whether the emergency {@link RTPWorld#platform(RTPLocation)} call is warranted for
+   * this teleport.
+   *
+   * <p>Historically this method was invoked unconditionally, and subsequently gated on
+   * {@code reservation == null} — a heuristic that silently misfires for the kept-queue and
+   * DB-rehydrated paths (which legitimately carry a null reservation) and ends up stamping a
+   * glass block under every teleport. Gate instead on an actual look at the landing column:
+   * build a platform only when the block below the landing Y is non-solid (air / liquid / unsafe)
+   * OR the landing block itself is in {@link SafetyKeys#unsafeBlocks}.
+   *
+   * <p>The check is read-only against {@link RTPWorld#getCachedChunk(long)}, so no chunk load
+   * is triggered (REQ-RTP-S-005). If the landing chunk is not cached — which can happen during
+   * tests or if the reservation was dropped — we fall back to the safe-by-construction value
+   * {@code false}: the authoritative {@code chunk.isSafe(...)} re-check in the selection loop
+   * already ran, and the configurable {@code platformRadius: -1} escape hatch remains for
+   * operators who want the mechanism fully disabled.
+   */
+  private static boolean shouldBuildPlatform(RTPWorld<?> world, RTPCoords coords) {
+    if (world == null || coords == null) return false;
+    try {
+      @SuppressWarnings("unchecked")
+      ConfigParser<SafetyKeys> safety =
+          (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+      int radius = (safety == null) ? 0 : safety.getNumber(SafetyKeys.platformRadius, 0).intValue();
+      // Honour the documented "disable platforms" contract in safety.yml up front, so we never
+      // charge the cost of a safety check when the operator has opted out entirely.
+      if (radius < 0) return false;
+
+      int x = coords.x();
+      int y = coords.y();
+      int z = coords.z();
+      int cx = x >> 4;
+      int cz = z >> 4;
+      long key = ((long) cx & 0xffffffffL) | (((long) cz & 0xffffffffL) << 32);
+      io.github.dailystruggle.rtp.api.world.RTPChunk<?> chunk = world.getCachedChunk(key);
+      if (chunk == null) return false;
+
+      java.util.Set<String> unsafe = new java.util.HashSet<>();
+      if (safety != null) {
+        Object raw = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
+        if (raw instanceof java.util.Collection<?> col) {
+          for (Object o : col) if (o != null) unsafe.add(o.toString().toUpperCase());
+        }
+      }
+
+      int lx = x & 15;
+      int lz = z & 15;
+      int minY = world.getMinHeight();
+
+      // Landing block itself unsafe (unsafe-material list covers lava/fire/magma/void_air/etc.)
+      // — build platform to preserve S-001 semantics when the vert-adjustor placed us on top of
+      // or inside an unsafe block.
+      if (!chunk.isSafe(lx, y, lz, unsafe)) return true;
+
+      // Block directly below is air or liquid — vert-adjustor gave us an airborne or swimming
+      // landing; platform provides footing. Uses isAir for air/void_air and the unsafe set for
+      // lava (which is the common water/lava case; pure water will fall through to `false`,
+      // which is the prior behaviour for swim-spawn configs).
+      int belowY = y - 1;
+      if (belowY < minY) return true;
+      if (chunk.isAir(lx, belowY, lz)) return true;
+      if (!chunk.isSafe(lx, belowY, lz, unsafe)) return true;
+
+      return false;
+    } catch (Exception e) {
+      // Never let the platform heuristic itself abort a teleport.
+      SupportLogger.logException(Level.FINE, "shouldBuildPlatform evaluation failed", e);
+      return false;
     }
   }
 
