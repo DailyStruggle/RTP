@@ -3,6 +3,7 @@ rootProject.name = 'RTP'
 include 'rtp-api'
 include 'commands-api'
 include 'effects-api'
+include 'rtp-anvil'
 include 'rtp-core'
 
 include 'rtp-spigot:rtp-spigot-common'
@@ -26,4 +27,3 @@ if (settings.hasProperty('includeFabric') || System.getenv('INCLUDE_FABRIC') == 
 include 'addons:RTP_Iris_integration'
 include 'addons:RTP_Glide'
 include 'addons:RTP_ClaimPluginIntegrations'
-// include 'addons:RTP_Domain'

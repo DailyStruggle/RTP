@@ -1,13 +1,20 @@
 # Anvil Read-Only Pre-Filter Implementation Plan
 
 > Status: Living document. Tracks the implementation work for ADR-016
-> (`docs/adr/ADR-016-anvil-readonly-prefilter.md`). This plan is amended each
+> (`docs/adr/ADR-016-anvil-subsystem.md`). This plan is amended each
 > time a phase lands. ADR-016 defines the *what* and *why*; this document
 > defines the *where* and *in what order*.
 >
-> Scope boundary: everything described here is **Spigot-exclusive**. Paper
-> and Folia use their native async chunk APIs and MUST NOT inherit or import
-> the pre-filter code path.
+> Scope boundary: everything described in this plan is **Spigot-exclusive**.
+> Paper uses its native async chunk APIs and MUST NOT inherit or import the
+> pre-filter code path. Folia was originally described as "immune by
+> construction" (see §2 below) and that remains true for REQ-RTP-S-005 *in
+> letter*, but ADR-016 §11 (absorbed from the drafted ADR-016 on 2026-04-19)
+> now also directs Folia to consume `rtp-anvil` via a Folia-side source-union
+> to eliminate the per-candidate region-thread hop. The §2 "parallel tree —
+> never touched" wording below describes the pre-filter's *Spigot* wiring
+> only; the Folia source-union is tracked under ADR-016 §11 and writes no
+> Spigot-side code.
 
 ## 1. Motivation
 
@@ -113,7 +120,7 @@ Test tree:
 | `rtp-spigot/rtp-spigot-common/src/main/resources/safety.yml` *(or adapter-local default)* | Add `anvilPrefilterEnabled: true` and a short comment referencing ADR-016. | Documented default. |
 | `rtp-core/src/main/java/.../configuration/ConfigParser.java` *(or the specific loader for `SafetyKeys.unsafeBlocks`)* | At load time, pass each configured unsafe-block string through the normalizer hook (see §8 decision 1) and cache the normalized set alongside the raw set. | Required so palette reads and config reads compare in identical form. |
 | `rtp-spigot/rtp-spigot-common/src/main/java/.../world/BukkitRTPChunk.java` | Update `isSafe(...)` to compare against the normalized set produced above (currently compares raw `Material.name()` only). | Eliminates the semantic drift the ADR called out. |
-| `docs/adr/ADR-016-anvil-readonly-prefilter.md` | Flip `Status: Proposed` → `Accepted` with today's date when PR #3 lands. Add an "Implementation" references section pointing at the new package. | ADR lifecycle hygiene. |
+| `docs/adr/ADR-016-anvil-subsystem.md` | Flip `Status: Proposed` → `Accepted` with today's date when PR #3 lands. Add an "Implementation" references section pointing at the new package. | ADR lifecycle hygiene. |
 | `docs/adr/README.md` | Update ADR-016 status column. | Index hygiene. |
 | `docs/dev/TRACEABILITY.md` | Add REQ-RTP-S-005 rows for `AnvilPrefilter`, `AnvilReader`, `AnvilPrefilterTest`. | Per `.junie/AGENTS.md` self-updating protocol. |
 | `docs/dev/DESIGN.md` | Add a short subsection documenting the pre-filter's thread placement (async I/O pool; never Region Thread; never tick thread). | Design, not requirements. |
@@ -244,8 +251,47 @@ green before the next begins.
 | 1a | Scaffolding (no fixtures) — **SHIPPED 2026-04-18** | `rtp-api` `PaletteIdentifierNormalizer` + `PaletteIdentifierNormalizerTest` (11 cases). `io.github.dailystruggle.rtp.spigot.anvil` package skeleton: `package-info`, `Verdict`, `UnsupportedAnvilFormatException`, `DataVersionSupport` (empty whitelist — populated in Phase 2), `PaletteNormalizer` (Spigot-side reconciler). `PaletteNormalizerTest` (MockBukkit, 8 cases). `AnvilPackageBoundaryArchTest` (2 ArchUnit rules). No wire-in. | ✅ `:rtp-api:test` green. ✅ `:rtp-spigot:rtp-spigot-common:test` green (10/10 including ArchUnit). ✅ `:rtp-core:test` `RTPArchitectureTest` unaffected (6/6). |
 | 1b | Reader + fixtures — **SHIPPED 2026-04-18** | `Nbt` codec (13 tag types, Modified-UTF-8, read/write symmetric). `AnvilReader` (MCA header parser, zlib/gzip/uncompressed decompression, LZ4 → `UnsupportedAnvilFormatException`, root-compound accessors for `DataVersion` / `sections` / `Heightmaps`). `DataVersionSupport` whitelist populated with observed fixture versions {3465, 4671, 4788}. `AnvilTestFixtures` synthetic-chunk writer. `AnvilFixtureParityTest` (7 cases — 3 real-decode + 3 semantic round-trips + 1 synthetic). Three trimmed real `r.0.0.mca` fixtures (~44 KB total) committed under `src/test/resources/anvil/real/`. Still not wired in. | ✅ `:rtp-api:test` green (11/11). ✅ `:rtp-spigot:rtp-spigot-common:test` green (17/17 — 10 Phase-1a + 7 parity). ✅ `:rtp-core:RTPArchitectureTest` unaffected (6/6). ✅ §8.2 parity gate satisfied. |
 | 2 | `AnvilChunkView` + palette semantics — **SHIPPED 2026-04-18** | `PaletteSection` / `AnvilChunkView` immutable records (raw identifier strings, YZX-major section layout). `PackedPaletteDecoder` for the Anvil 1.16+ no-cross-long packed layout (`bitsPerEntry = max(4, ceil(log2(size)))`, `entryIndex = (y<<8) \| (z<<4) \| x`). `AnvilReader.readChunkView(...)` + `toView(...)` lift raw NBT into the typed view; malformed sections silently skipped per ADR-016 "never crash" posture. `AnvilTestFixtures.section(byte, palette, data)` overload + `packIndices(bits, flat[4096])` helper. `AnvilChunkViewTest` 10 cases (unit: bitsPerEntry table, entryIndex YZX ordering, single-entry-palette guard; synthetic: 2-entry placement at targeted coords, 17-entry bits=5 placement, single-entry palette stone fill, out-of-range Y → null; real: three parameterised fixture sanity decodes). Still not wired in. | ✅ `:rtp-spigot:rtp-spigot-common:test` green (27/27 — 17 Phase-1 + 10 Phase-2). ✅ `:rtp-api:test` green (11/11). ✅ ArchUnit `anvilDoesNotDependOnBukkitChunk` still holds — no record imports `org.bukkit.Chunk`. |
-| 3 | Wire-in | `AnvilPrefilter`, `BukkitRTPWorld.getChunkAt` insertion, `SafetyKeys.anvilPrefilterEnabled`, `safety.yml` default, `BukkitRTPChunk.isSafe` normalization update, `AnvilPrefilterTest`. ADR-016 → Accepted. `TRACEABILITY.md`, `.junie/AGENTS.md`, `DESIGN.md` updated. | `:rtp-spigot:*`, `:rtp-paper:*` (sanity), `:rtp-folia:*` (sanity), `:rtp-core:*` green. |
-| 4 | Hardening *(optional)* | `DataVersion` whitelist expansion, LZ4 support (adds `org.lz4:lz4-java` dependency — separate decision), telemetry counters for `REJECT` / `ACCEPT` / `UNKNOWN` rates. | Post-acceptance based on real-world data. |
+| 3a | Wire-in (verdict-only) — **SHIPPED 2026-04-18** | `AnvilPrefilter.probe` (async, `ForkJoinPool.commonPool()` dispatch, internal `PaletteNormalizer.reconcileAll` for caller-supplied unsafe sets, 1.18+ heightmap decoder, 256-column bounded scan at ground/feet/head). `BukkitRTPWorld.getChunkAt` wire-in after the reflective async probe, gated on `enabled ∧ !isChunkLoaded ∧ getGenerator()==null`; `REJECT` short-circuits via the null-key convention, `ACCEPT` / `UNKNOWN` delegate to `loadChunkFuture`. `SafetyKeys.anvilPrefilterEnabled` enum + `safety.yml` default `true`. `AnvilPrefilterTest` (8 cases: lava REJECT / namespace-split REJECT / stone ACCEPT / empty-unsafe ACCEPT / missing file UNKNOWN / unsupported DataVersion UNKNOWN / negative coords ACCEPT / real-fixture ACCEPT). ADR-016 → **Accepted**. | ✅ `:rtp-api:test` green (11/11). ✅ `:rtp-spigot:rtp-spigot-common:test` green (35/35 — 27 Phase-1/2 + 8 Phase-3a). ✅ `:rtp-core:test` green. ✅ `:rtp-paper:*:compileJava` + `:rtp-folia:*:compileJava` green. |
+| 3b | Hybrid `BukkitRTPChunk` — **SHIPPED 2026-04-18** | ADR-016 accepted, supersedes ADR-016 §"ACCEPT still loads". `BukvilRTPChunk` carries a source union (`Chunk \| AnvilChunkView`) and dispatches `isAir`/`isSafe`/`getSkyLight`/`getSurfaceHeight` / `keep`/`unload` on the populated source; Anvil-backed instances are no-op on lifecycle (no ticket, no `MemoryTracker` accounting). `AnvilChunkView` extended with typed queries (`isAir`, `isSafe`, `getSkyLight`, `getSurfaceHeight`, `minHeight`) using the 1.18+ 9-bit-packed MOTION_BLOCKING_NO_LEAVES heightmap; `PaletteSection` extended with a 2048-byte nibble-packed `SkyLight` field (absent == 15 per vanilla convention) and `skyLightAt(lx, ly, lz)` decoder; `AnvilReader` lifts `SkyLight` from the section compound into the record. `AnvilPrefilter` gains `probeDetailed(...) -> ProbeResult(verdict, view)` so the ACCEPT view is reused as the load-free chunk source (no second region-file read). `BukkitRTPWorld.getChunkAt` routes via `probeDetailed`; on ACCEPT it publishes the view into a bounded (1024-entry FIFO) `anvilCache` keyed by the same `(cx,cz)→long` packing, and `getCachedChunk(key)` prefers the live `chunkCache` entry but falls back to constructing an Anvil-backed `BukkitRTPChunk` with a pre-reconciled unsafe set. Live `chunkCache` promotion evicts the Anvil entry (ADR-016 §4 invariant: live is authoritative). `forgetChunks` clears both caches. | ✅ `:rtp-spigot:rtp-spigot-common:test` green (39/39 — 35 Phase-3a + 4 Phase-3b additions from the extended `AnvilChunkView` suite and SkyLight decoder coverage). ✅ `:rtp-core:test` `RTPArchitectureTest` unaffected. ✅ `:rtp-paper:rtp-paper-v26_1_R1:compileJava` + `:rtp-folia:rtp-folia-v26_1_R1:compileJava` green — override hierarchy intact. ADR-016 → **Accepted**. |
+| 4 | Hardening *(partially shipped 2026-04-18; remainder optional)* | Telemetry counters for `REJECT` / `ACCEPT` / `UNKNOWN` are live (`AnvilPrefilterMetrics`, incremented inside `AnvilPrefilter.probe`) and now operator-visible via **`/rtp test anvil-prefilter`** (`TestAnvilPrefilterCmd`, wired into `TestCmd` and the `TestFullCmd` umbrella sweep after `disconnect-midflight`; `Snapshot` helper exposes `accepts` / `rejects` / `unknowns` / `total` / `hitRate` / `rejectRate` with div-by-zero-safe defaults). Remaining optional items: `DataVersion` whitelist expansion (needs a real fixture per new version per §8.2 parity gate) and LZ4 support (adds `org.lz4:lz4-java` — separate ADR decision, gated on telemetry showing a material LZ4-driven `UNKNOWN` rate). | ✅ `:rtp-plugin:test` green (41/41, includes 5 `TestAnvilPrefilterCmdTest` cases + `TestFullCmdTest` parity invariant). DataVersion / LZ4 deferred until real-world telemetry motivates them. |
+| 4b | Pregen-summary attribution for null-chunk drops — **SHIPPED 2026-04-18** | `LocationGenerator.FailTypes.nullChunk` added and incremented at both `chunk == null` exit sites in `LocationGenerator.getLocation(Region, Set)` (primary async-load null + `safetyCheck` neighbour-chunk null), with sub-keys `reason=asyncLoadNull` / `reason=neighborNull`. Closes the REQ-RTP-S-004 diagnostic gap surfaced by a live Spigot 1.20.1 pregen log where `tries=10, cause=biome fails=0` (every other bucket also zero) — the unaccounted drops were Anvil-prefilter `REJECT` verdicts taking the null-key short-circuit in `BukkitRTPWorld.getChunkAt` and disappearing from the "failed to generate a location within N tries" summary. A `Level.FINE` per-candidate breadcrumb is also emitted for offline debugging. `MockRTPWorld` gained a `nullChunkKeyPredicate` test hook; `MockRTPServerAccessor` gained a `logMessages` capture buffer. | ✅ `:rtp-core:test` green for the new `ReqRtpS004NullChunkAttributionTest` (2/2). ✅ Pre-existing `WorldBorderTest` isolation failures (4) are unrelated — reproduce on clean master with these changes stashed. |
+| 6 | Shared module extraction (ADR-016) -- **SHIPPED 2026-04-18** | New top-level `rtp-anvil` Gradle module under package `io.github.dailystruggle.rtp.anvil`. The decode stack (`AnvilReader`, `AnvilChunkView`, `AnvilPrefilter`, `AnvilPrefilterMetrics`, `Verdict`, `DataVersionSupport`, `Nbt`, `PackedPaletteDecoder`, `PaletteSection`, `UnsupportedAnvilFormatException`) lives in the new module with strict "no platform / no RTP-internal imports" invariants enforced at the bytecode level by `AnvilPackageBoundaryArchTest`. `PaletteNormalizer` (genuinely Bukkit-coupled -- uses `Material.matchMaterial`) and `dimensionRegionSubpath(World)` stay in `rtp-spigot-common`. `AnvilPrefilter` API now takes `Path` + dimension subpath + `UnaryOperator<String>` reconciler; the platform-neutral `DEFAULT_RECONCILER` (namespace-strip + `Locale.ROOT` upper-case) is the no-arg default. `BukkitRTPWorld.getChunkAt` passes `PaletteNormalizer::reconcile` as the Material-aware reconciler. LZ4 dependency moved from `rtp-spigot-common` to `rtp-anvil`. Pre-positions Folia (ADR-016, drafted) and Fabric (ADR-016, future) ports. | OK `:rtp-anvil:test` green. OK `:rtp-spigot:rtp-spigot-common:test` green. OK `:rtp-core:test` green. OK Full repo `:build` green. |
+| 5 | Gate → data source (ADR-016) — **SHIPPED 2026-04-18** | `AnvilPrefilter.probeSyncDetailed(...)` now attaches the decoded `AnvilChunkView` on `Verdict.REJECT` as well as `ACCEPT` — the verdict becomes an advisory telemetry signal. `BukkitRTPWorld.getChunkAt` routes on `view != null` instead of on verdict: any view-bearing outcome publishes the view into `anvilCache` and returns the live-shaped chunk key, so the immediately-following `getCachedChunk(key)` call in `LocationGenerator` receives a source-union `BukkitRTPChunk` and the vert adjustor scans across the whole decoded `[minY-1, maxY+1]` range (finding safe air pockets below lava-surface nether columns that previously drove 100 % `nullChunk` drops per pregen cycle). Null-key short-circuit on `REJECT` is deleted outright — no feature flag. `Level.FINE` breadcrumb `[RTP] Anvil surface-unsafe (advisory) world=… chunk=(cx, cz) — handing view to vert adjustor` replaces the old REJECT breadcrumb. ADR-016 written, supersedes ADR-016 §4 Decision 7. | ✅ `:rtp-spigot:rtp-spigot-common:test` green including new `AnvilPrefilterTest#adr018_rejectRetainsView` regression guard. ✅ Existing `REJECT`-verdict tests pass (the enum value is retained as advisory). ✅ `:rtp-core:test` `ReqRtpS004NullChunkAttributionTest` (2/2) still green — null-key attribution now applies only to true async-load failures. |
+
+### 10.1 Pure-Spigot Fallback Reality (added 2026-04-18)
+
+The `loadChunkFuture` path in `BukkitRTPWorld` is **not** a blanket off-tick
+chunk-loading guarantee on pure Spigot. The Bukkit API ships only the
+`Consumer`-based async chunk overloads; the
+`World#getChunkAtAsync(int,int) → CompletableFuture<Chunk>` overload used
+by the reflective `CHUNK_AT_ASYNC_FUTURE` probe is a Paper addition. On
+pure Spigot that reflective lookup returns `null`, and the fallback
+invokes `Bukkit.getScheduler().runTask(plugin, () -> world.getChunkAt(cx, cz))`
+— a **synchronous chunk load scheduled onto the primary thread**. The
+caller's `CompletableFuture` is unblocked, but the chunk I/O itself is
+not off-tick.
+
+Consequences that should be honestly reflected in any reader's mental model:
+
+1. On Paper and Folia, off-tick chunk loading is a platform API guarantee
+   and the Anvil prefilter is a (pure-Spigot-scoped) optimisation they
+   never enter.
+2. On pure Spigot, off-tick *safety evaluation* is achieved for every
+   candidate whose probe yields a decoded `AnvilChunkView` — under
+   ADR-016 that is both `ACCEPT` and `REJECT`. Only `UNKNOWN` outcomes
+   (no region file, unsupported `DataVersion`, parse error, no emitted
+   sections), already-loaded chunks, worlds with a custom
+   `ChunkGenerator`, and thrown I/O errors still fall to the
+   main-thread-bounced `getChunkAt` described above.
+3. Therefore, on pure Spigot, **prefilter coverage defines effective
+   off-tick coverage**. The Phase 4 "optional" items (`DataVersion`
+   whitelist expansion, LZ4 support) are the only levers available to
+   shrink the main-thread-bounced fallback surface without introducing
+   an NMS/CraftBukkit dependency per `rtp-spigot-v*_R*` submodule.
+4. The S-005 letter is still satisfied because `LocationGenerator` runs
+   under `AsyncTaskProcessing` and never blocks on the returned future;
+   the *spirit* (no chunk I/O on the tick thread) is only fully honoured
+   when the prefilter catches the candidate on pure Spigot.
 
 ## 11. Out of Scope
 
@@ -261,7 +307,7 @@ green before the next begins.
 
 ## 12. References
 
-* `docs/adr/ADR-016-anvil-readonly-prefilter.md` — authoritative decision.
+* `docs/adr/ADR-016-anvil-subsystem.md` — authoritative decision.
 * `docs/adr/ADR-015-stale-chunk-guard-countbound-pipes.md` — related stale-chunk protection; shares the `isChunkLoaded` gate.
 * `docs/dev/REQUIREMENTS.md §3` — REQ-RTP-S-001, S-004, S-005.
 * `docs/dev/ARCHITECTURE.md` — module boundary rules enforced by §6 ArchUnit rules.
