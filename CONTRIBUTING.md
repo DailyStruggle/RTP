@@ -1,4 +1,4 @@
-﻿# Contributing to RTP
+# Contributing to RTP
 
 Thank you for your interest in contributing to the RTP plugin! To ensure a smooth workflow and safe changes, please adhere to the following guidelines.
 

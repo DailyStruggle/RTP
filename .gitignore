@@ -4,6 +4,7 @@ tmp/
 build/
 *.bin
 *.uniqueid*
+*.bak
 
 *.iml
 *.ipr
