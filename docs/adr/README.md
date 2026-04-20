@@ -23,7 +23,7 @@ An ADR captures a significant architectural decision: the context that forced it
 | [ADR-013](ADR-013-addons-as-external-gradle-projects.md) | Addons as External Gradle Projects Rather Than Built-In Optional Modules | Accepted |
 | [ADR-014](ADR-014-brigadier-bridge-via-commands-api.md) | Brigadier Bridge via `commands-api` Adapter Layer | Proposed |
 | [ADR-015](ADR-015-stale-chunk-guard-countbound-pipes.md) | Stale-Chunk Guard for Count-Bound Pipes | Accepted |
-| [ADR-016](ADR-016-anvil-readonly-prefilter.md) | Anvil Read-Only Pre-Filter for Vanilla Spigot Safety Checks | Proposed |
+| [ADR-016](ADR-016-anvil-subsystem.md) | Anvil Read-Only Subsystem (Prefilter, Backed Chunk View, Shared Module) | Accepted |
 
 ## Template
 

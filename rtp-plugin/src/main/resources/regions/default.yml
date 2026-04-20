@@ -1,5 +1,8 @@
-# --- Region Configuration ---
-# Regions define the area and behavior for random teleportation.
+# --- Region Configuration (default template) ---
+# Regions define the area and behavior for random teleportation. Each file in
+# `regions/` is a named region; the filename (minus `.yml`) is the region ID
+# referenced by `worlds/<world>.yml -> region:` and by `/rtp region:<name>`.
+# This `default.yml` is the fallback region used when no other is configured.
 
 # Target World
 # case-sensitive name of target world this region is in.

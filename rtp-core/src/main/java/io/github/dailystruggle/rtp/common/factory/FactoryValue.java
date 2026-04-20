@@ -195,16 +195,14 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
       } catch (NumberFormatException e) {
         RTP.log(
             Level.SEVERE,
-            "expected floating point value for " + key.name() + ", received - " + resObj);
-        e.printStackTrace();
+            "expected floating point value for " + key.name() + ", received - " + resObj, e);
         res = def;
       }
     } else if (resObj instanceof Character) {
       try {
         res = Integer.parseInt(((Character) resObj).toString());
       } catch (NumberFormatException e) {
-        RTP.log(Level.SEVERE, "expected integer for " + key.name() + ", received - " + resObj);
-        e.printStackTrace();
+        RTP.log(Level.SEVERE, "expected integer for " + key.name() + ", received - " + resObj, e);
         res = def;
       }
     } else throw new IllegalArgumentException("[RTP] " + key.name() + ":NaN");
@@ -277,6 +275,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     String name = this.name;
     if (!name.endsWith(".yml")) name = name + ".yml";
     File langFile;
+    if (RTP.serverAccessor == null) return;
     String langDirStr =
         RTP.serverAccessor.getPluginDirectory().getAbsolutePath()
             + File.separator

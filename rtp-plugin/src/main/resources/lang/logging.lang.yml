@@ -1,3 +1,10 @@
+# --- Language Mapping: logging.yml ---
+# Maps internal config keys (left) to the user-visible key names used in
+# logging.yml (right). Edit only the right-hand side to rename or translate
+# a config option; the left-hand side is a code constant and must not change.
+# If this file is missing, the plugin regenerates it with identical left/right
+# pairs (the English defaults).
+
 event_changeworld: event_changeworld
 event_respawn: event_respawn
 detailed_reload: detailed_reload

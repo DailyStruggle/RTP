@@ -1,9 +1,11 @@
 package io.github.dailystruggle.rtp.common.factory;
 
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import java.util.Enumeration;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -86,7 +88,7 @@ public class Factory<T extends FactoryValue<?>> {
         Optional<T> any = map.values().stream().findAny();
         if (any.isPresent()) return any.get().clone();
         else {
-          new IllegalStateException("no values in map").printStackTrace();
+          RTP.log(Level.WARNING, "no values in map", new IllegalStateException());
         }
       }
     }

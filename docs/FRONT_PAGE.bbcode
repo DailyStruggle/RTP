@@ -1,0 +1,127 @@
+[CENTER]
+[SIZE=7][B][COLOR=#2C3E50]RTP[/COLOR][COLOR=#2980B9]-Pro[/COLOR][/B][/SIZE]
+[SIZE=4][B][COLOR=#555555]Enterprise-Grade Deterministic Teleportation[/COLOR][/B][/SIZE]
+[I]A Specialized Zero-Latency Random Teleport Solution for Technical and Community Networks.[/I]
+
+[URL='https://github.com/dailystruggle/RTP'][IMG]https://img.shields.io/github/v/release/dailystruggle/RTP?label=Version&style=for-the-badge&color=2980B9[/IMG][/URL] [URL='https://github.com/dailystruggle/RTP'][IMG]https://img.shields.io/github/license/dailystruggle/RTP?label=License&style=for-the-badge&color=2C3E50[/IMG][/URL]
+
+[COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR]
+[/CENTER]
+
+[SIZE=5][B][COLOR=#2980B9]Core Architectural Pillars[/COLOR][/B][/SIZE]
+RTP is engineered from the ground up to solve the fundamental performance and reliability problems that plague other teleportation plugins. Our design is built on four key pillars:
+
+[LIST]
+[*][B]Deterministic Selection Engine:[/B] We use a specialized [B]spiral mapping algorithm[/B] to explore your world. This eliminates lag-inducing "re-roll" guessing and guarantees fast, uniform player distribution even in massive worlds.
+[*][B]Platform-Native Performance:[/B] RTP isn't just "compatible with" modern servers—it's [B]optimized for them[/B]. With dedicated support for Spigot, Paper, and Folia, we use the best background processing and threading models each platform has to offer.
+[*][B]Active Resource Watchdog:[/B] A persistent background watchdog actively monitors all tasks and chunk requests, instantly reclaiming resources from abandoned teleports and preventing memory leaks before they can start.
+[*][B]Direct Region I/O Pre-Filter:[/B] On Spigot [I]and Folia[/I], we bypass slow, region-bound chunk loads by reading world data directly from disk (`.mca` region files) on a background thread pool. This gives you Paper-grade off-tick safety evaluation on Spigot and eliminates per-candidate Region-Thread hops on Folia.
+[/LIST]
+
+[CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
+
+[SIZE=5][B][COLOR=#16A085]Chunk Loading — How It Actually Works On Your Platform[/COLOR][/B][/SIZE]
+Chunk I/O is the single biggest source of teleport lag. Most RTP plugins treat every platform the same and pay the cost of the [I]worst[/I] one. RTP does not. Here is exactly what happens when a candidate chunk is evaluated on your server:
+
+[LIST]
+[*][B][COLOR=#27AE60]Paper — Fully Async, Zero Tradeoffs.[/COLOR][/B] Paper exposes a native `World#getChunkAtAsync` that returns a `CompletableFuture<Chunk>`. RTP uses it directly. Safety evaluation runs off-tick. No pre-filter needed, no main-thread fallback, no surprises. [B]This is the reference platform.[/B]
+[*][B][COLOR=#2980B9]Folia — Off-Tick Pre-Filter + Native Region Scheduler.[/COLOR][/B] Folia's chunk API is Region-Thread-bound, which normally means every candidate costs a scheduler hop. RTP defeats this by running the [B]Anvil read-only pre-filter[/B] on `ForkJoinPool.commonPool()` [I]before[/I] touching the Region Scheduler — rejected candidates never hop a thread. Confirmed candidates are then loaded via Folia's native async region-aware API. Teleports themselves are dispatched through the Entity Scheduler per Folia's contract.
+[*][B][COLOR=#E67E22]Spigot — Anvil Pre-Filter Does The Heavy Lifting.[/COLOR][/B] Vanilla Spigot has [I]no[/I] `CompletableFuture`-returning async chunk API — the `World#getChunkAtAsync(int,int) -> CompletableFuture<Chunk>` overload is a Paper addition. Without mitigation, every candidate would drive a synchronous main-thread `getChunkAt`. RTP mitigates this by parsing `.mca` region files directly off-tick: `isAir`, `isSafe`, surface-height and sky-light checks all run on `ForkJoinPool.commonPool()` against an `AnvilChunkView`. [B]This is how Spigot gets Paper-class selection throughput without a Paper fork.[/B]
+[*][B][COLOR=#C0392B]Honest Caveats (Spigot + Folia fallback path).[/COLOR][/B] The Anvil pre-filter is a [I]data source[/I], not a universal gate. It falls through to the platform's native chunk API when: (1) the chunk is already loaded (live data wins), (2) the world uses a custom `ChunkGenerator` (Iris, Terra, etc.), or (3) the Anvil format is unrecognized. On Spigot, the fallback is a main-thread `getChunkAt` scheduled via the primary scheduler — unblocking the caller's future but not moving the I/O off-tick. On Folia, the fallback is a Region-Scheduler hop. [B]If you run a custom-generator world on Spigot, you will not get the off-tick win for those chunks — use Paper or Folia for that workload.[/B]
+[*][B][COLOR=#8E44AD]Fabric — Not Supported.[/COLOR][/B] Fabric is on the roadmap but is explicitly out of scope for the current release. Do not run RTP on a Fabric server and expect production behavior.
+[/LIST]
+
+[B]Operator takeaway:[/B] on Paper and Folia, chunk I/O is fully off-tick by design. On vanilla Spigot, the Anvil pre-filter covers the common case (unloaded chunks, vanilla generator) — which is the vast majority of candidates in a typical selection sweep — and the rare fallback to main-thread `getChunkAt` is bounded by your configured tick-budget. No platform silently blocks the tick loop without reporting it.
+
+[CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
+
+[SIZE=5][B][COLOR=#C0392B]Performance Proofs & Demos[/COLOR][/B][/SIZE]
+
+[B]Learning & Performance Test (Older Version, Principles Remain)[/B]
+[media=youtube]PY6W7DikhAI[/media]
+[I]Demonstrates the plugin "learning" bad sectors to achieve deterministic selection time.[/I]
+
+[B]Command Response & Throughput Test[/B]
+[media=youtube]l6KSvKxsKAQ[/media]
+[I]Showcases the immediate command response and high-throughput capabilities of the queueing system.[/I]
+
+[CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
+
+[SIZE=5][B][COLOR=#E67E22]The Engineering: A Deeper Dive[/COLOR][/B][/SIZE]
+
+[B]1. Algorithmic Spatial Memory - No More "Brute-Force Guessing"[/B]
+Without spatial indexing, teleportation is a guessing game. Profiling vanilla generation reveals the challenge: the Overworld is ~45% ocean, and the End is ~33% void. Standard RTPs waste immense resources loading and discarding these chunks.
+[B]Our Solution:[/B] RTP uses advanced mapping to plot out your world's geometry. When it encounters a massive ocean or unsafe biome, it remembers that area. As the server runs, RTP dynamically shrinks its searchable area, skipping known "bad sectors" entirely without ever needing to load those chunks again. [B]The longer it runs, the faster it gets.[/B]
+
+[B]2. Zero-Latency Execution Engine - Taming the Tick[/B]
+Traditional RTPs cause unpredictable MSPT spikes by flooding the server with random, un-paced chunk requests. [B]RTP subverts this by enforcing strict structural caps.[/B]
+[LIST]
+[*][B]Pre-Warmed Background Caching:[/B] Our background pipeline continuously paces chunk evaluations, ensuring safe locations are ready before a player ever requests one.
+[*][B]Native Folia Support:[/B] Built to respect Folia's regionized multi-threading using non-blocking execution to eliminate unnecessary scheduling delays.
+[*][B]Zero-Leak Resource Management:[/B] We utilize transient in-memory tickets and an active watchdog to aggressively recover abandoned chunks and prevent the RAM bloat and world corruption caused by older force-loading methods.
+[/LIST]
+
+[CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
+
+[SIZE=5][B][COLOR=#27AE60]Feature Set & Integrations[/COLOR][/B][/SIZE]
+
+[B]Full Feature Suite:[/B]
+[LIST]
+[*]Any number of teleportation regions per world
+[*]Per-region shapes (Square, Circle, Rectangle) with configurable radius, center, and weighting
+[*]Per-region vertical adjustors (Linear, Jump) to navigate complex terrain
+[*]Optional sky light checks, world permission requirements, and unique placement guarantees
+[*]Configurable safety radius, platform creation, and invulnerability timers
+[*]Fully async chunk loading on Paper and Folia; off-tick Anvil pre-filter on Spigot (see platform breakdown above)
+[*]Per-player and global location queues
+[/LIST]
+[B]Supported Claim Plugins:[/B]
+Native, thread-safe integrations for the following are provided via our addons system:
+[LIST]
+[*]Factions (and derivatives)
+[*]GriefDefender
+[*]GriefPrevention
+[*]HuskTowns
+[*]Lands
+[*]TownyAdvanced
+[*]WorldGuard
+[/LIST]
+[B]Granular Configuration:[/B]
+RTP exposes its core pipelines through modular configuration, allowing you to tailor the engine to your hardware.
+[LIST]
+[*]Configurable time budgets and chunk limits per tick.
+[*]Customize unsafe materials and safety radii.
+[*]Apply dimension locks and unique safety configs (e.g., Nether vs. Overworld).
+[*]Establish variable pricing for different teleport types.
+[*]Complete localization and player-facing text isolation.
+[/LIST]
+
+[CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
+
+[SIZE=5][B][COLOR=#9B59B6]FAQ[/COLOR][/B][/SIZE]
+[B]Q: This plugin responds much faster than I'm used to. Why am I not waiting for chunk loading?[/B]
+A: When we say optimized, we mean it. In most cases, our pre-warmed caching system has a safe location ready to go before you even type the command.
+
+[B]Q: How do I set up teleportation for different worlds?[/B]
+A: Check the wiki for details on configuring regions and worlds. The logic follows a clear hierarchy: player's current world -> world's target region -> region's target world.
+
+[B]Q: What's the best setup for performance?[/B]
+A: The plugin is optimized for Paper and Folia servers. Because it relies on pre-loading, it works best when you have memory to spare for the location cache.
+
+[CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
+
+[SIZE=5][B][COLOR=#7F8C8D]Important Links[/COLOR][/B][/SIZE]
+[LIST]
+[*][URL='https://github.com/dailystruggle/RTP/blob/main/docs/admin/FOR_SERVER_ADMINS.md'][B]For Server Admins:[/B] Installation, Configuration, and Commands[/URL]
+[*][URL='https://github.com/dailystruggle/RTP/blob/main/docs/dev/FOR_ADDON_DEVELOPERS.md'][B]For Addon Developers:[/B] API Usage and Customization Guide[/URL]
+[*][URL='https://github.com/dailystruggle/RTP'][B]Source Code (GitHub):[/B] Star, watch, or contribute to the project![/URL]
+[/LIST]
+
+[CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
+
+[SIZE=5][B][COLOR=#C0392B]Support Philosophy[/COLOR][/B][/SIZE]
+[QUOTE]
+I am a solo engineer dedicated to maintaining a deterministic, high-performance teleport engine. Instead of padding this resource with cosmetic bloat, my development time is strictly focused on Folia concurrency and zero-latency execution.
+
+Choose RTP if you value [B]engineering quality, RAM efficiency, and compounding TPS stability[/B] over feature-padding and GUI gimmicks.
+[/QUOTE]

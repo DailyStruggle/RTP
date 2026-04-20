@@ -1,6 +1,6 @@
-﻿# RTP Requirements Overview
+# RTP Requirements Overview
 
-**Current Plugin Version:** `3.0.0-beta`
+**Current Plugin Version:** `3.0.0-beta.1`
 
 This document outlines the high-level functional and non-functional requirements for the RTP (Random Teleport) plugin. These requirements guide the system's architecture, ensuring it meets strict performance, safety, and reliability standards.
 
@@ -53,6 +53,9 @@ For specific code-level and platform-specific requirements, please refer to the 
 - **REQ-RTP-F-010 — API Access:** The system shall expose a robust, decoupled API (`rtp-api`) allowing external plugins to register custom shapes, vertical adjustors, and validation checks.
 - **REQ-RTP-F-011 — Claim and Protection Checks:** The system shall support integrations with third-party land protection plugins (e.g., GriefPrevention, WorldGuard) to prevent players from teleporting into claimed or restricted areas.
 
+### 1.5 Configuration
+- **REQ-RTP-F-013 — Configurable User Messages:** The system shall allow all user-facing messages to be configurable via the `messages.yml` configuration file.
+
 ## 2. Non-Functional Requirements
 
 ### 2.1 Fault Tolerance
@@ -84,6 +87,8 @@ These requirements describe prohibited behaviours. Each maps to one or more haza
 - **REQ-RTP-S-004 — No Silent Failure:** The system shall not silently discard a teleport
   request. Every failure (empty queue, invalid region, permission denied, safety rejection) shall
   produce a player-visible message and a log entry at WARN level or higher.
+  - *Compliance Note:* Malformed command inputs are intentionally tested by `rtp test commands-live`
+    to ensure they produce these required warnings. Expect `Level.WARNING` logs during test execution.
 
 - **REQ-RTP-S-005 — No Synchronous Chunk I/O on the Main Thread:** The system shall not perform
   chunk loading or validation on the main server thread. All such operations shall be dispatched

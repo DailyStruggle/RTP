@@ -23,6 +23,9 @@ import io.github.dailystruggle.rtp.spigot.entity.BukkitRTPPlayer;
 import io.github.dailystruggle.rtp.spigot.world.BukkitRTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.common.tasks.TimeBoundTaskPipe;
+import org.bukkit.plugin.Plugin;
+import org.bukkit.plugin.PluginDescriptionFile;
+
 import java.io.File;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -50,6 +53,8 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   protected Function<RTPWorld<?>, Set<String>> biomes = BukkitRTPWorld::getBiomes;
   protected Function<String, ?> worldBorderFunction = this::createNativeWorldBorder;
   private final Map<String, WorldBorder> nativeWorldBorderCache = new ConcurrentHashMap<>();
+
+  private File dataFolder;
 
   protected WorldBorder createNativeWorldBorder(String worldName) {
     return nativeWorldBorderCache.computeIfAbsent(worldName, s -> {
@@ -104,7 +109,15 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   @Override
   public @NotNull String getPluginVersion() {
-    return Objects.requireNonNull(Bukkit.getPluginManager().getPlugin("RTP")).getDescription().getVersion();
+    // plugin is typed Object to match the platform-agnostic RTPServerAccessor
+    // contract; at runtime every Bukkit-family platform passes a Plugin instance
+    // into start(Object). Cast directly instead of going through reflection.
+    if (!(plugin instanceof Plugin bukkitPlugin)) {
+      throw new IllegalStateException(
+          "[RTP] AbstractServerAccessor has no Bukkit Plugin bound; start(Object) must be called with a Plugin instance first.");
+    }
+    PluginDescriptionFile description = bukkitPlugin.getDescription();
+    return description.getVersion();
   }
 
   @Override
@@ -243,7 +256,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   @Override
   public @NotNull File getPluginDirectory() {
-    return Objects.requireNonNull(Bukkit.getPluginManager().getPlugin("RTP")).getDataFolder();
+    return dataFolder;
   }
 
   @Override
@@ -380,6 +393,15 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   @Override
   public void start(Object plugin) {
     this.plugin = Objects.requireNonNull(plugin);
+    // See getPluginVersion(): plugin is Object in the API but is always a Bukkit
+    // Plugin at runtime on this adapter. Avoid reflection and fail fast with a
+    // descriptive IllegalStateException if someone wires in the wrong type.
+    if (!(plugin instanceof Plugin bukkitPlugin)) {
+      throw new IllegalStateException(
+          "[RTP] AbstractServerAccessor.start(Object) requires an org.bukkit.plugin.Plugin instance, got: "
+              + plugin.getClass().getName());
+    }
+    this.dataFolder = bukkitPlugin.getDataFolder();
   }
 
   @Override

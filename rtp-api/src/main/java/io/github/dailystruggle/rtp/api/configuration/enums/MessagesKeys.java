@@ -71,6 +71,10 @@ public enum MessagesKeys {
   locationLoaded,
   /** Sent when the console attempts to run a command that requires a player sender. */
   consoleCmdNotAllowed,
+  /** Sent when a command is issued while the plugin is reloading or busy. */
+  busy,
+  /** Sent when an unrecognized subcommand or parameter is provided. */
+  invalidCommand,
   /** Sent when the sender lacks the required permission for the requested command. */
   noPerms,
   /** Sent when the specified world name does not match any loaded world. */

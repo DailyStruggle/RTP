@@ -1,6 +1,6 @@
 # Configuration Reference
 
-**Applies to Plugin Version:** `3.0.0-beta`
+**Applies to Plugin Version:** `3.0.0-beta.1`
 
 All configuration files live in `plugins/RTP/` after the first server start. Edit them directly and run `/rtp reload` to apply changes, as this will update settings without a server restart.
 

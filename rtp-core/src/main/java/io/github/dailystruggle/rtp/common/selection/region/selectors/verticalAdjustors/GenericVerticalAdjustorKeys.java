@@ -1,13 +1,26 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors;
 
-/** Common keys for vertical adjustors */
+/**
+ * Represents the generic configurable parameters common to most vertical adjustors.
+ */
 public enum GenericVerticalAdjustorKeys {
-  /** The minimum Y coordinate */
+  /**
+   * The minimum Y-level to consider for a valid teleport location.
+   */
   minY,
-  /** The maximum Y coordinate */
+
+  /**
+   * The maximum Y-level to consider for a valid teleport location.
+   */
   maxY,
-  /** The direction to adjust (e.g. UP, DOWN) */
+
+  /**
+   * The direction to search for a safe spot (e.g., UP, DOWN, or a specific strategy).
+   */
   direction,
-  /** Whether sky light is required */
+
+  /**
+   * Whether a valid location must have direct access to the sky.
+   */
   requireSkyLight
 }

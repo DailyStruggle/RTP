@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-**Applies to Plugin Version:** `3.0.0-beta`
+**Applies to Plugin Version:** `3.0.0-beta.1`
 
 Get RTP running on your server in under 5 minutes.
 

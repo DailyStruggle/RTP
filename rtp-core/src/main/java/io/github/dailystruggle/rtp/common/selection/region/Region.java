@@ -12,6 +12,7 @@ import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask.ConfigCache;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
@@ -313,13 +314,51 @@ public class Region extends FactoryValue<RegionKeys> {
       // 3. Both are ready. Poll them to finalize the pairing.
       if (isPrivate) privateQueue.poll();
       else queueManager.keptLocations.poll();
+      // DatabaseAccessor.deleteCachedLocation keys on (regionName, worldName, x, y, z) only —
+      // there is no per-player UUID column — so the same call serves both branches and a
+      // single hoisted invocation cannot over-delete a private row from the public branch.
+      // Cache the accessor in a local to avoid a second RTP.getInstance() and the TOCTOU
+      // null-window between the null check and the deleteCachedLocation call.
+      DatabaseAccessor databaseAccessor = RTP.getInstance().databaseAccessor;
+      if (databaseAccessor != null) {
+        databaseAccessor.deleteCachedLocation(name, pair);
+      }
       queueManager.playerQueue.poll();
 
       teleportData.attempts = pair.attempts();
       teleportData.selectedCoords = pair.coords();
 
       RTPCommandSender sender = RTP.serverAccessor.getSender(CommandsAPI.serverId);
-      TeleportPipelineTask pipelineTask = new TeleportPipelineTask(new GenerationContext(sender, player, null), this, pair.coords(), pair.reservation());
+
+      // Kept-queue entries generated asynchronously (e.g. FoliaLocationGenerator) are always
+      // constructed with a null ChunkReservation, and the DB-rehydrated path never carries one.
+      // Synthesize a reservation here so `TeleportPipelineTask.runTeleport` has live chunks to
+      // consult for its unsafe-landing check, and so the chunks stay loaded long enough to
+      // perform the teleport. Mirrors the synthesis in
+      // TeleportPipelineTask.processGenerationResult() — REQ-RTP-S-002 is preserved because
+      // runCleanup still closes whichever reservation ends up attached to the task.
+      ChunkReservation reservationForTask = pair.reservation();
+      if (reservationForTask == null) {
+        RTPCoords pairCoords = pair.coords();
+        RTPWorld<?> rtpWorld =
+            (pairCoords != null) ? RTP.serverAccessor.getRTPWorld(pairCoords.worldName()) : null;
+        if (rtpWorld == null) rtpWorld = getWorld();
+        if (rtpWorld != null && pairCoords != null) {
+          int radius = (int) ConfigCache.viewDistanceTeleport;
+          int cx = pairCoords.x() >> 4;
+          int cz = pairCoords.z() >> 4;
+          java.util.List<CompletableFuture<Long>> chunks = new java.util.ArrayList<>();
+          for (int dx = -radius; dx <= radius; dx++) {
+            for (int dz = -radius; dz <= radius; dz++) {
+              chunks.add(rtpWorld.getChunkAt(cx + dx, cz + dz));
+            }
+          }
+          ChunkSet synthesized = new ChunkSet(rtpWorld, cx, cz, chunks, new CompletableFuture<>());
+          reservationForTask = new ChunkReservation(synthesized, rtpWorld);
+        }
+      }
+
+      TeleportPipelineTask pipelineTask = new TeleportPipelineTask(new GenerationContext(sender, player, null), this, pair.coords(), reservationForTask);
       teleportData.nextTask = pipelineTask;
       pipelineTask.setPhase(TeleportPipelineTask.Phase.LOAD);
       RTP.scheduler.runTaskAsynchronously(pipelineTask);

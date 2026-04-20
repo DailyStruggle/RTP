@@ -19,25 +19,36 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+/**
+ * The main API for managing and selecting teleportation regions. This class handles
+ * region lookups, creation of temporary regions, and processing of the location
+ * selection pipeline.
+ */
 public class SelectionAPI {
-  /**
-   * pipe of selection tasks to be done. will be done in the order given, trying urgent tasks first
-   * A failed selection will go to the back of the line.
-   */
+  /** A queue for standard-priority location selection tasks. */
   public final ConcurrentLinkedQueue<Runnable> selectionPipeline = new ConcurrentLinkedQueue<>();
 
+  /** A queue for high-priority (urgent) location selection tasks. */
   public final ConcurrentLinkedQueue<Runnable> selectionPipelineUrgent =
       new ConcurrentLinkedQueue<>();
+
+  /** A cache for temporary, on-the-fly regions, keyed by UUID. */
   public final ConcurrentHashMap<UUID, Region> tempRegions = new ConcurrentHashMap<>();
+
+  /** A lookup map for all permanently configured regions, keyed by name. */
   public final ConcurrentHashMap<String, Region> permRegionLookup = new ConcurrentHashMap<>();
+
+  /** A factory for creating {@link Region} instances. */
   private final Factory<Region> regionFactory = new Factory<>();
+
+  /** A factory for creating {@link Shape} instances. */
   public Factory<Shape<?>> shapeFactory;
 
   /**
-   * getFromString a region by name
+   * Retrieves a region by its name.
    *
-   * @param regionName - name of region, case-insensitive
-   * @return region object by that name, or null on bad lookup
+   * @param regionName The name of the region (case-insensitive).
+   * @return The {@link Region} object, or null if not found.
    */
   @Nullable
   public Region getRegion(String regionName) {
@@ -45,10 +56,11 @@ public class SelectionAPI {
   }
 
   /**
-   * getFromString a region by name
+   * Retrieves a region by its name, throwing an exception if not found.
    *
-   * @param regionName - name of region, case-insensitive
-   * @return region object by that name, or null on bad lookup
+   * @param regionName The name of the region (case-insensitive).
+   * @return The {@link Region} object.
+   * @throws IllegalStateException if the region does not exist.
    */
   @NotNull
   public Region getRegionExceptionally(String regionName) {
@@ -58,10 +70,10 @@ public class SelectionAPI {
   }
 
   /**
-   * getFromString a region by name
+   * Retrieves a region by name, falling back to the "default" region if not found.
    *
-   * @param regionName - name of region
-   * @return region by that name, or null if none
+   * @param regionName The name of the region.
+   * @return The requested {@link Region} or the default region.
    */
   @NotNull
   public Region getRegionOrDefault(String regionName) {
@@ -69,11 +81,12 @@ public class SelectionAPI {
   }
 
   /**
-   * getFromString a region by name
+   * Retrieves a region by name, falling back to a specified default region if not found.
    *
-   * @param regionName - name of region
-   * @param defaultName - name of default region to fall back on
-   * @return region by that name, or null if none
+   * @param regionName  The name of the region.
+   * @param defaultName The name of the fallback region.
+   * @return The requested {@link Region} or the specified default region.
+   * @throws IllegalStateException if neither the requested nor the default region exist.
    */
   @NotNull
   public Region getRegionOrDefault(String regionName, String defaultName) {
@@ -93,37 +106,30 @@ public class SelectionAPI {
   }
 
   /**
-   * add or update a region by name
+   * Creates or updates a region with the given parameters.
+   * (Note: This method is not yet fully implemented).
    *
-   * @param regionName - name of region
-   * @param params - mapped parameters, based on parameters in default.yml
+   * @param regionName The name of the region.
+   * @param params     A map of parameters to configure the region.
    */
   public void setRegion(String regionName, Map<String, String> params) {
-    // todo: implement
-    //        params.put( "region",regionName );
-    //
-    //        String worldName = ( String ) Configs.regions.getRegionSetting( regionName,"world",""
-    // );
-    //        if ( worldName == null || worldName.equals( "" ) || !Configs.worlds.checkWorldExists(
-    // worldName) ) {
-    //            return null;
-    //        }
-    //
-    //        RegionParams randomSelectParams = new RegionParams( RTP.getInstance().getRTPWorld(
-    // worldName ),params );
-    //        if( permRegions.containsKey( randomSelectParams) ) {
-    //            permRegions.getFromString( randomSelectParams ).shutdown();
-    //        }
-    //
-    //        Configs.regions.setRegion( regionName,randomSelectParams );
-    //        return permRegions.put( randomSelectParams,
-    //                new Region( regionName,randomSelectParams.params) );
+    // TODO: Implement region creation/updating logic.
   }
 
+  /**
+   * Returns a set of all configured region names.
+   *
+   * @return A {@link Set} of region names.
+   */
   public Set<String> regionNames() {
     return permRegionLookup.keySet();
   }
 
+  /**
+   * Processes tasks from the selection pipelines, prioritizing urgent tasks.
+   * This method is called on each server tick to drive the asynchronous location
+   * generation process.
+   */
   public void compute() {
     RTPServerAccessor serverAccessor = RTP.serverAccessor;
 
@@ -144,22 +150,19 @@ public class SelectionAPI {
     }
   }
 
+  /**
+   * Creates a temporary, one-time-use region with custom parameters, based on an
+   * existing region's settings.
+   *
+   * @param regionParams   A map of parameters to override the base region's settings.
+   * @param baseRegionName The name of the region to use as a base.
+   * @return A new temporary {@link Region} instance.
+   */
   public Region tempRegion(Map<String, Object> regionParams, @Nullable String baseRegionName) {
     if (baseRegionName == null
         || baseRegionName.isEmpty()
         || !permRegionLookup.containsKey(baseRegionName)) baseRegionName = "default";
     Region baseRegion = Objects.requireNonNull(permRegionLookup.get(baseRegionName));
-
-    // Create a dummy ConfigParser to use RegionConfigLoader
-    // This is a bit of a hack but it's consistent with moving logic to RegionConfigLoader
-    MultiConfigParser<RegionKeys> regionParsers =
-        (MultiConfigParser<RegionKeys>) RTP.configs.multiConfigParserMap.get(RegionKeys.class);
-    ConfigParser<RegionKeys> baseParser = regionParsers.getParser(baseRegionName);
-
-    // We want to override values from regionParams
-    // Since ConfigParser.getData() returns a copy or we shouldn't modify the base one,
-    // we'll need a way to create a modified one.
-    // For now, let's just manually update RegionSettings from the base region.
 
     RegionSettings baseSettings = baseRegion.getSettings();
 
@@ -192,8 +195,15 @@ public class SelectionAPI {
     return new Region("temp", newSettings);
   }
 
+  /**
+   * Determines the appropriate region for a player based on their current world,
+   * permissions, and any configured overrides.
+   *
+   * @param player The player to get the region for.
+   * @return The determined {@link Region}.
+   * @throws IllegalStateException if an infinite override loop is detected.
+   */
   public Region getRegion(RTPPlayer player) {
-    // get region from world name, check for overrides
     Set<String> worldsAttempted = new HashSet<>();
     String worldName = player.getLocation().world().name();
     MultiConfigParser<WorldKeys> worldParsers =
@@ -239,8 +249,13 @@ public class SelectionAPI {
     return getRegion(regionName);
   }
 
+  /**
+   * Determines the appropriate region for a given world.
+   *
+   * @param world The world to get the region for.
+   * @return The determined {@link Region}.
+   */
   public Region getRegion(RTPWorld world) {
-    // get region from world name, check for overrides
     String worldName = world.name();
     MultiConfigParser<WorldKeys> worldParsers =
         (MultiConfigParser<WorldKeys>) RTP.configs.multiConfigParserMap.get(WorldKeys.class);
