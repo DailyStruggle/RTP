@@ -78,8 +78,27 @@ public class H2DatabaseAccessor extends AbstractSQLDatabaseAccessor {
   }
 
   @Override
+  public void disconnect(Connection connection) {
+    // Shared connection, do nothing.
+    // Hard disconnect happens in close()
+  }
+
+  @Override
+  public void close() {
+    try {
+      if (connection != null && !connection.isClosed()) {
+        connection.close();
+      }
+    } catch (SQLException e) {
+      RTP.log(Level.WARNING, e.getMessage(), e);
+    }
+  }
+
+  @Override
   public void startup() {
-    try (Connection connection = getConnection()) {
+    Connection connection = connect();
+    if (connection == null) return;
+    try {
       String tableName = "rtp_teleport_data";
       String sql = "SELECT * FROM " + tableName;
       try (Statement statement = connection.createStatement();
@@ -114,6 +133,8 @@ public class H2DatabaseAccessor extends AbstractSQLDatabaseAccessor {
     } catch (SQLException e) {
       RTP.log(Level.WARNING, e.getMessage(), e);
     } catch (IllegalArgumentException ignored) {
+    } finally {
+      disconnect(connection);
     }
 
     purgeStaleLocations();

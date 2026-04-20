@@ -85,6 +85,23 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
 
 
   @Override
+  public void disconnect(Connection connection) {
+    // Shared connection, do nothing.
+    // Hard disconnect happens in close()
+  }
+
+  @Override
+  public void close() {
+    try {
+      if (connection != null && !connection.isClosed()) {
+        connection.close();
+      }
+    } catch (SQLException e) {
+      RTP.log(Level.WARNING, e.getMessage(), e);
+    }
+  }
+
+  @Override
   public void startup() {
     DriverManager.setLoginTimeout(30);
     Connection connection;

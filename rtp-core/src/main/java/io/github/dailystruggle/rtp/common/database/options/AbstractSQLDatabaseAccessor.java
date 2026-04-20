@@ -173,7 +173,9 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
   @Override
   public List<StoredLocation> loadCachedLocations(String regionName) {
     List<StoredLocation> res = new ArrayList<>();
-    try (Connection connection = getConnection()) {
+    Connection connection = connect();
+    if (connection == null) return res;
+    try {
       String sql = "SELECT * FROM rtp_cached_locations WHERE region = ?";
       try (PreparedStatement statement = connection.prepareStatement(sql)) {
         statement.setString(1, regionName);
@@ -211,6 +213,8 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
       }
     } catch (SQLException e) {
       // If table doesn't exist, it's fine, just return empty list
+    } finally {
+      disconnect(connection);
     }
     return res;
   }
@@ -220,7 +224,9 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
    * Stale locations are those bound to a specific player and older than 7 days.
    */
   public void purgeStaleLocations() {
-    try (Connection connection = getConnection()) {
+    Connection connection = connect();
+    if (connection == null) return;
+    try {
       // 7 days in milliseconds
       long threshold = System.currentTimeMillis() - (7 * 24 * 60 * 60 * 1000L);
       String sql = "DELETE FROM rtp_cached_locations WHERE player_uuid <> 'shared' AND (timestamp < ? OR timestamp IS NULL)";
@@ -233,6 +239,8 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
       }
     } catch (SQLException e) {
       // Table might not exist yet, or timestamp column might be missing
+    } finally {
+      disconnect(connection);
     }
   }
 

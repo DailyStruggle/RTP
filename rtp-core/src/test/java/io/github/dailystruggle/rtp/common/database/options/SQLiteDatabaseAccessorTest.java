@@ -55,6 +55,22 @@ class SQLiteDatabaseAccessorTest {
         public Connection getConnection() throws SQLException { return mockConnection; }
 
         @Override
+        public void disconnect(Connection connection) {
+            // Shared connection, do nothing.
+        }
+
+        @Override
+        public void close() {
+            try {
+                if (mockConnection != null && !mockConnection.isClosed()) {
+                    mockConnection.close();
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Override
         public void startup() { /* no-op */ }
 
         @Override
@@ -646,11 +662,22 @@ class SQLiteDatabaseAccessorTest {
     }
 
     @Test
-    void disconnect_closesOpenConnection() throws SQLException {
+    void disconnect_doesNotCloseOpenConnection() throws SQLException {
         Connection conn = mock(Connection.class);
         when(conn.isClosed()).thenReturn(false);
 
         accessor.disconnect(conn);
+
+        verify(conn, never()).close();
+    }
+
+    @Test
+    void close_closesOpenConnection() throws SQLException {
+        Connection conn = mock(Connection.class);
+        when(conn.isClosed()).thenReturn(false);
+        accessor.setMockConnection(conn);
+
+        accessor.close();
 
         verify(conn).close();
     }
