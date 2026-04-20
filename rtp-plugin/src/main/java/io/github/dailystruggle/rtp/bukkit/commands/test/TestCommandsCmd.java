@@ -81,26 +81,35 @@ public class TestCommandsCmd extends BaseRTPCmdImpl {
     return "audits the rtp command tree: names, permissions, and lookup-key consistency";
   }
 
+  private static final java.util.concurrent.atomic.AtomicBoolean isProcessing = new java.util.concurrent.atomic.AtomicBoolean(false);
+
   @Override
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
+    if (isProcessing.get()) return true;
+    isProcessing.set(true);
+    try {
+      CommandsAPICommand root = findRoot(this);
+      if (root == null) {
+        String msg = "[RTP test/commands] root command not resolvable; audit aborted";
+        if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+          RTP.serverAccessor.sendMessage(callerId, msg);
+        }
+        RTP.log(Level.WARNING, msg);
+        return true;
+      }
 
-    CommandsAPICommand root = findRoot(this);
-    if (root == null) {
-      String msg = "[RTP test/commands] root command not resolvable; audit aborted";
-      RTP.serverAccessor.sendMessage(callerId, msg);
-      RTP.log(Level.WARNING, msg);
+      AuditReport report = new AuditReport();
+      Set<CommandsAPICommand> visited =
+          java.util.Collections.newSetFromMap(new IdentityHashMap<>());
+      walk(root, 0, "", report, visited);
+
+      emit(callerId, report);
       return true;
+    } finally {
+      isProcessing.set(false);
     }
-
-    AuditReport report = new AuditReport();
-    Set<CommandsAPICommand> visited =
-        java.util.Collections.newSetFromMap(new IdentityHashMap<>());
-    walk(root, 0, "", report, visited);
-
-    emit(callerId, report);
-    return true;
   }
 
   /**
@@ -214,7 +223,9 @@ public class TestCommandsCmd extends BaseRTPCmdImpl {
             + " traversal-errors="
             + report.traversalErrors.size()
             + ")";
-    RTP.serverAccessor.sendMessage(callerId, summary);
+    if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+        RTP.serverAccessor.sendMessage(callerId, summary);
+    }
     if (issues == 0) {
       RTP.log(Level.INFO, summary);
       return;
@@ -230,7 +241,9 @@ public class TestCommandsCmd extends BaseRTPCmdImpl {
   private static void emitDetails(UUID callerId, String tag, List<String> items) {
     for (String item : items) {
       String line = "[RTP test/commands] " + tag + ": " + item;
-      RTP.serverAccessor.sendMessage(callerId, line);
+      if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+          RTP.serverAccessor.sendMessage(callerId, line);
+      }
       RTP.log(Level.WARNING, line);
     }
   }

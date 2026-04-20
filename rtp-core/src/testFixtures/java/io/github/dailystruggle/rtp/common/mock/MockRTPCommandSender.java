@@ -4,6 +4,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -14,7 +15,7 @@ public class MockRTPCommandSender implements RTPCommandSender {
 
     private final UUID uuid;
     private final String name;
-    public final List<String> sentMessages = new ArrayList<>();
+    public final List<String> sentMessages = Collections.synchronizedList(new ArrayList<>());
     public final List<String> performedCommands = new ArrayList<>();
 
     public MockRTPCommandSender(UUID uuid, String name) {

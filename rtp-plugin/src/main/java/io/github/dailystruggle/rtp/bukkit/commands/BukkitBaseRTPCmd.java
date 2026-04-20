@@ -28,17 +28,49 @@ public abstract class BukkitBaseRTPCmd extends BukkitTreeCommand
 
   @Override
   public void msgBadParameter(UUID callerId, String parameterName, String parameterValue) {
-    CommandSender sender =
-        callerId.equals(CommandsAPI.serverId)
-            ? Bukkit.getConsoleSender()
-            : Bukkit.getPlayer(callerId);
-    if (sender == null) return;
+    msgBadParameter(callerId, parameterName, parameterValue, (java.util.function.Consumer<String>) null);
+  }
 
+  @Override
+  public void msgBadParameter(UUID callerId, String parameterName, String parameterValue, java.util.function.Consumer<String> messageMethod) {
     ConfigParser<MessagesKeys> lang =
-        (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+            (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
 
-    String msg = String.valueOf(lang.getConfigValue(MessagesKeys.badArg, ""));
+    String msg = String.valueOf(lang.getConfigValue(MessagesKeys.badArg, "[P0] bad parameter - [arg]"));
     msg = msg.replace("[arg]", parameterName + ":" + parameterValue);
-    SendMessage.sendMessage(sender, msg);
+    if(messageMethod != null) {
+      messageMethod.accept(msg);
+    } else if (!callerId.equals(CommandsAPI.serverId)) {
+      // Player caller: deliver the player-visible message. Console callers are served
+      // by the RTP.log(WARNING, ...) call below (which writes to the console sender
+      // via SendMessage.log) -- routing through both paths here would cause the
+      // duplicate-line pattern observed under `rtp test full` (REQ-RTP-S-004 auditor).
+      CommandSender sender = Bukkit.getPlayer(callerId);
+      if (sender != null) SendMessage.sendMessage(sender, msg);
+    }
+    RTP.log(java.util.logging.Level.WARNING, msg);
+  }
+
+  @Override
+  public void msgInvalidCommand(UUID callerId, String argument) {
+    msgInvalidCommand(callerId, argument, null);
+  }
+
+  @Override
+  public void msgInvalidCommand(UUID callerId, String argument, java.util.function.Consumer<String> messageMethod) {
+    ConfigParser<MessagesKeys> lang =
+            (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+
+    String msg = String.valueOf(lang.getConfigValue(MessagesKeys.invalidCommand, "[P0] invalid command - [arg]"));
+    msg = msg.replace("[arg]", argument);
+    if(messageMethod != null) {
+      messageMethod.accept(msg);
+    } else if (!callerId.equals(CommandsAPI.serverId)) {
+      // See msgBadParameter: console callers are served by RTP.log(WARNING, ...)
+      // alone to avoid the duplicate-line pattern observed under `rtp test full`.
+      CommandSender sender = Bukkit.getPlayer(callerId);
+      if (sender != null) SendMessage.sendMessage(sender, msg);
+    }
+    RTP.log(java.util.logging.Level.WARNING, msg);
   }
 }

@@ -5,10 +5,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.rtp.bukkit.commands.test.TestApiCompatCmd.ApiProbe;
 import io.github.dailystruggle.rtp.bukkit.commands.test.TestApiCompatCmd.ProbeReport;
+import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Unit tests for {@link TestApiCompatCmd#runProbes(List)}.
@@ -22,6 +28,12 @@ import org.junit.jupiter.api.Test;
  * (REQ-RTP-SYS-001; {@code docs/dev/RUNTIME_TEST_SUITE_PLAN.md &sect;3.7}).
  */
 class TestApiCompatCmdTest {
+  @TempDir Path tempDir;
+
+  @BeforeEach
+  void setUp() {
+    RTPTestSetup.install(tempDir.toFile());
+  }
 
   @Test
   @DisplayName("probe resolves a real JDK method (java.lang.String#length) → ok")
@@ -99,8 +111,9 @@ class TestApiCompatCmdTest {
   @Test
   @DisplayName("defaultProbes() list is non-empty and every entry has a hint")
   void defaultProbesWellFormed() {
+    ((MockRTPServerAccessor) RTP.serverAccessor).setPlatform("Folia");
     List<ApiProbe> probes = TestApiCompatCmd.defaultProbes();
-    assertTrue(probes.size() >= 5, "curated list suspiciously small: " + probes.size());
+    assertTrue(probes.size() >= 10, "Folia list suspiciously small: " + probes.size());
     for (ApiProbe p : probes) {
       assertTrue(p.className != null && !p.className.isBlank(), "blank className in " + p);
       assertTrue(p.methodName != null && !p.methodName.isBlank(), "blank methodName in " + p);

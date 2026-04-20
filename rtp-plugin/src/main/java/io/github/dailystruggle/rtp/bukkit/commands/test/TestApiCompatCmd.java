@@ -265,44 +265,49 @@ public class TestApiCompatCmd extends BaseRTPCmdImpl {
             "fallback teleport path on platforms without teleportAsync"));
 
     // --- Paper (optional on Spigot) ----------------------------------
-    p.add(
-        new ApiProbe(
-            "org.bukkit.entity.Player",
-            "teleportAsync",
-            List.of("org.bukkit.Location"),
-            "PaperRTPWorld/PaperPlayer async teleport"));
+    if (RTP.serverAccessor.getPlatform().equalsIgnoreCase("Paper")
+        || RTP.serverAccessor.getPlatform().equalsIgnoreCase("Folia")) {
+      p.add(
+          new ApiProbe(
+              "org.bukkit.entity.Player",
+              "teleportAsync",
+              List.of("org.bukkit.Location"),
+              "PaperRTPWorld/PaperPlayer async teleport"));
+    }
 
     // --- Folia (optional on Paper/Spigot) ----------------------------
-    p.add(
-        new ApiProbe(
-            "org.bukkit.Bukkit",
-            "isOwnedByCurrentRegion",
-            List.of("org.bukkit.Location"),
-            "FoliaSchedulerImpl region-ownership shortcut"));
-    p.add(
-        new ApiProbe(
-            "org.bukkit.Bukkit",
-            "getRegionScheduler",
-            Collections.emptyList(),
-            "FoliaSchedulerImpl region-scheduler dispatch"));
-    p.add(
-        new ApiProbe(
-            "org.bukkit.Bukkit",
-            "getAsyncScheduler",
-            Collections.emptyList(),
-            "FoliaSchedulerImpl async-scheduler dispatch"));
-    p.add(
-        new ApiProbe(
-            "org.bukkit.Bukkit",
-            "getGlobalRegionScheduler",
-            Collections.emptyList(),
-            "FoliaSchedulerImpl global-region-scheduler dispatch"));
-    p.add(
-        new ApiProbe(
-            "org.bukkit.entity.Entity",
-            "getScheduler",
-            Collections.emptyList(),
-            "FoliaSchedulerImpl entity-scheduler dispatch"));
+    if (RTP.serverAccessor.getPlatform().equalsIgnoreCase("Folia")) {
+      p.add(
+          new ApiProbe(
+              "org.bukkit.Bukkit",
+              "isOwnedByCurrentRegion",
+              List.of("org.bukkit.Location"),
+              "FoliaSchedulerImpl region-ownership shortcut"));
+      p.add(
+          new ApiProbe(
+              "org.bukkit.Bukkit",
+              "getRegionScheduler",
+              Collections.emptyList(),
+              "FoliaSchedulerImpl region-scheduler dispatch"));
+      p.add(
+          new ApiProbe(
+              "org.bukkit.Bukkit",
+              "getAsyncScheduler",
+              Collections.emptyList(),
+              "FoliaSchedulerImpl async-scheduler dispatch"));
+      p.add(
+          new ApiProbe(
+              "org.bukkit.Bukkit",
+              "getGlobalRegionScheduler",
+              Collections.emptyList(),
+              "FoliaSchedulerImpl global-region-scheduler dispatch"));
+      p.add(
+          new ApiProbe(
+              "org.bukkit.entity.Entity",
+              "getScheduler",
+              Collections.emptyList(),
+              "FoliaSchedulerImpl entity-scheduler dispatch"));
+    }
 
     return p;
   }

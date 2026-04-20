@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.mock.MockRTPCommandSender;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
@@ -103,8 +104,17 @@ public class ScanCmdTest {
         MultiConfigParser<RegionKeys> multiConfigParser = mock(MultiConfigParser.class);
         ConfigParser<RegionKeys> regionConfig = mock(ConfigParser.class);
         when(regionConfig.getNumber(any(RegionKeys.class), any())).thenReturn(1L);
+        when(regionConfig.getConfigValue(any(), any())).thenReturn("false");
+        when(regionConfig.getConfigValue(eq(RegionKeys.world), any())).thenReturn("default");
         when(multiConfigParser.getParser(any(String.class))).thenReturn(regionConfig);
         RTP.configs.multiConfigParserMap.put(RegionKeys.class, multiConfigParser);
+
+        MultiConfigParser<WorldKeys> worldMultiConfigParser = mock(MultiConfigParser.class);
+        ConfigParser<WorldKeys> worldConfig = mock(ConfigParser.class);
+        when(worldConfig.getConfigValue(any(), any())).thenReturn("false");
+        when(worldConfig.getConfigValue(eq(WorldKeys.region), any())).thenReturn("default");
+        when(worldMultiConfigParser.getParser(any(String.class))).thenReturn(worldConfig);
+        RTP.configs.multiConfigParserMap.put(WorldKeys.class, worldMultiConfigParser);
 
         // Set up sender
         senderId = UUID.randomUUID();

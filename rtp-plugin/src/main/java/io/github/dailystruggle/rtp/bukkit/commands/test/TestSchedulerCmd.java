@@ -62,48 +62,57 @@ public class TestSchedulerCmd extends BaseRTPCmdImpl {
     return "probe each RTPScheduler tier and report dispatch latency";
   }
 
+  private static final java.util.concurrent.atomic.AtomicBoolean isProcessing = new java.util.concurrent.atomic.AtomicBoolean(false);
+
   @Override
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
-
-    RTPScheduler scheduler = RTP.scheduler;
-    if (scheduler == null) {
-      String msg = "&c[RTP test/scheduler] RTP.scheduler is null; core not yet loaded";
-      RTP.serverAccessor.sendMessage(callerId, msg);
-      RTP.log(Level.WARNING, msg);
-      return true;
-    }
-
-    // Snapshot the caller's location on the calling thread (the command
-    // dispatch thread may be the main thread; we deliberately do *not*
-    // call getLocation from an async context later). From the console
-    // this is null and the region tier is skipped.
-    RTPLocation callerLoc = null;
+    if (isProcessing.get()) return true;
+    isProcessing.set(true);
     try {
-      RTPPlayer caller = RTP.serverAccessor.getPlayer(callerId);
-      if (caller != null) callerLoc = caller.getLocation();
-    } catch (Throwable ignored) {
-      // region probe skipped below
-    }
-    final RTPLocation loc = callerLoc;
+      RTPScheduler scheduler = RTP.scheduler;
+      if (scheduler == null) {
+        String msg = "&c[RTP test/scheduler] RTP.scheduler is null; core not yet loaded";
+        if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+          RTP.serverAccessor.sendMessage(callerId, msg);
+        }
+        RTP.log(Level.WARNING, msg);
+        return true;
+      }
 
-    // Run the probes on the async tier so the calling thread (which may
-    // be the main server thread on Paper/Spigot) is never blocked
-    // waiting for `fut.get(...)`. S-005 is thereby preserved.
-    scheduler.runTaskAsynchronously(
-        () -> {
-          report(callerId, "[RTP test/scheduler] begin");
-          probeAsync(callerId, scheduler);
-          probePrimary(callerId, scheduler);
-          if (loc != null) {
-            probeRegion(callerId, scheduler, loc);
-          } else {
-            report(callerId, "[RTP test/scheduler] region: skipped (no caller location)");
-          }
-          report(callerId, "[RTP test/scheduler] end");
-        });
-    return true;
+      // Snapshot the caller's location on the calling thread (the command
+      // dispatch thread may be the main thread; we deliberately do *not*
+      // call getLocation from an async context later). From the console
+      // this is null and the region tier is skipped.
+      RTPLocation callerLoc = null;
+      try {
+        RTPPlayer caller = RTP.serverAccessor.getPlayer(callerId);
+        if (caller != null) callerLoc = caller.getLocation();
+      } catch (Throwable ignored) {
+        // region probe skipped below
+      }
+      final RTPLocation loc = callerLoc;
+
+      // Run the probes on the async tier so the calling thread (which may
+      // be the main server thread on Paper/Spigot) is never blocked
+      // waiting for `fut.get(...)`. S-005 is thereby preserved.
+      scheduler.runTaskAsynchronously(
+          () -> {
+            report(callerId, "[RTP test/scheduler] begin");
+            probeAsync(callerId, scheduler);
+            probePrimary(callerId, scheduler);
+            if (loc != null) {
+              probeRegion(callerId, scheduler, loc);
+            } else {
+              report(callerId, "[RTP test/scheduler] region: skipped (no caller location)");
+            }
+            report(callerId, "[RTP test/scheduler] end");
+          });
+      return true;
+    } finally {
+      isProcessing.set(false);
+    }
   }
 
   private void probeAsync(UUID callerId, RTPScheduler scheduler) {
@@ -169,7 +178,9 @@ public class TestSchedulerCmd extends BaseRTPCmdImpl {
   }
 
   private void report(UUID callerId, String msg) {
-    RTP.serverAccessor.sendMessage(callerId, msg);
+    if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+      RTP.serverAccessor.sendMessage(callerId, msg);
+    }
     RTP.log(Level.INFO, msg);
   }
 }
