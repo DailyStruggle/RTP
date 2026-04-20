@@ -1,6 +1,6 @@
-﻿# RTP — Random Teleport
+# RTP — Random Teleport
 
-**Current Version:** `3.0.0-beta`
+**Current Version:** `3.0.0-beta.1`
 
 A high-performance random teleportation plugin for Bukkit-derived Minecraft servers (Spigot, Paper, Folia).
 
