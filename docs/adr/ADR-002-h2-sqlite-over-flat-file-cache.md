@@ -15,15 +15,6 @@ The system shall use an embedded relational database (H2 or SQLite, configurable
 
 Both H2 and SQLite are zero-configuration embedded databases that ship as a single JAR/native library, require no external server process, and provide ACID guarantees. The plugin exposes a configurable `database` setting so server operators can choose between them (or connect to an external MySQL instance for multi-server setups).
 
-## Alternatives Considered
-
-| Alternative | Why Rejected |
-|-------------|--------------|
-| Custom flat-file (e.g., serialised Java objects or CSV of index ranges) | Requires designing, implementing, and maintaining a custom serialisation format, including versioning and migration logic. No query capability; full file parse required for any lookup. High risk of corruption on unclean shutdown. |
-| Java `Properties` / YAML file per region | Human-readable but not suited to storing large sets of integer intervals efficiently; no atomic write guarantees; no indexing. |
-| In-memory only (no persistence) | Loses all spatial memory on restart, forcing full re-validation of the region on every server start — directly contradicts the fault-tolerance and restart-resilience requirements (`REQ-CORE-NF-003`). |
-| External database only (MySQL/MariaDB) | Requires operators to provision and maintain a separate database server; unacceptable as a default for single-server deployments. |
-
 ## Consequences
 
 - **Positive:**

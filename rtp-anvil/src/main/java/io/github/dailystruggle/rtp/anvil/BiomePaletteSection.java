@@ -6,7 +6,7 @@ import java.util.Objects;
 /**
  * Immutable view of a single chunk section's biome palette and packed-index array.
  *
- * <p>Phase 2 of ADR-016 ({@code docs/dev/ANVIL_BIOME_PLAN.md}). Mirrors the on-disk
+ * <p>Phase 2 of ADR-016 ({@code ADR-016}). Mirrors the on-disk
  * shape of {@code sections[i].biomes}, which is structurally identical to
  * {@code sections[i].block_states} but differs in two observable ways:
  *
@@ -32,7 +32,7 @@ import java.util.Objects;
  * <p>As with {@link PaletteSection}, identifiers are the raw on-disk strings
  * (e.g. {@code "minecraft:plains"}, {@code "iris:volcanic_ash_plains"}) — the
  * caller applies the normaliser when an RTP-configuration-comparable form is
- * needed. See ANVIL_BIOME_PLAN.md §4.
+ * needed. See ADR-016 (biome) §4.
  */
 public record BiomePaletteSection(int sectionY, List<String> palette, long[] data) {
 

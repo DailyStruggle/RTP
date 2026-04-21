@@ -27,16 +27,6 @@ Invalid segments (known bad sectors — ocean, claimed land, out-of-bounds biome
 This approach was derived from and validated by the mathematical proof authored and published by the plugin's sole developer at:
 https://www.reddit.com/r/admincraft/comments/owgvzz/too_much_math/
 
-## Alternatives Considered
-
-| Alternative | Why Rejected |
-|-------------|--------------|
-| Naive 2D rejection sampling (reroll on invalid) | Non-deterministic execution time; degrades to infinite loop as invalid space grows |
-| `sqrt(random())` polar sampling | Fixes distribution skew but retains unbounded rerolling; does not support memory of invalid sectors |
-| Poisson disk sampling | Produces well-distributed points but is stateful, expensive to initialise, and does not map cleanly to the annulus shape or support efficient bad-sector subtraction |
-| Grid / chunk-aligned sampling | Deterministic but produces visually regular patterns; does not provide uniform random distribution |
-| Space-filling curves (Hilbert, Z-order) | Good cache locality but do not map naturally to a circular/annular region; require clipping that reintroduces rejection |
-
 ## Consequences
 
 - **Positive:**

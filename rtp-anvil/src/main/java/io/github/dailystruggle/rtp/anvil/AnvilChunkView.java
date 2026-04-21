@@ -31,7 +31,7 @@ public record AnvilChunkView(int dataVersion,
 
     /**
      * Back-compat constructor used by pre-Phase-2 call sites that predate the biome
-     * palette (ANVIL_BIOME_PLAN.md §4). Defaults {@code biomeSections} to an empty
+     * palette (ADR-016 (biome) §4). Defaults {@code biomeSections} to an empty
      * list, which makes {@link #getBiomeAt(int, int, int)} return {@code null}
      * everywhere and {@link #getBiomesPresent()} return an empty set — i.e. the view
      * reports "no biome data available" and the platform adapter falls through to
@@ -162,7 +162,7 @@ public record AnvilChunkView(int dataVersion,
         return floor + raw - 1;
     }
 
-    // ---------------------------------------------------------- Phase 2 (ANVIL_BIOME_PLAN) biome queries
+    // ---------------------------------------------------------- Phase 2 (ADR-016) biome queries
 
     /**
      * Returns the raw namespaced biome identifier at world coordinate {@code (x, worldY, z)},
@@ -175,7 +175,7 @@ public record AnvilChunkView(int dataVersion,
      * the RTP-configuration-comparable form must run it through the platform-side
      * {@code PaletteNormalizer::reconcile}.
      *
-     * <p>See ANVIL_BIOME_PLAN.md §4 for the contract and §5 for the trust model (the
+     * <p>See ADR-016 (biome) §4 for the contract and §5 for the trust model (the
      * disk palette is authoritative for populated chunks; for an {@code UNKNOWN} /
      * absent section the platform adapter is expected to fall through to the live
      * {@code world.getBiome(loc).name()} getter).
@@ -201,7 +201,7 @@ public record AnvilChunkView(int dataVersion,
     /**
      * Returns the union of every distinct namespaced biome identifier that appears
      * in any decoded section of this chunk. Intended for pregen biome-enumeration
-     * scans (see ANVIL_BIOME_PLAN.md §6.1). Does not include biomes from sections
+     * scans (see ADR-016 (biome) §6.1). Does not include biomes from sections
      * whose biome container failed to decode (those sections are simply absent from
      * {@link #biomeSections()}).
      *

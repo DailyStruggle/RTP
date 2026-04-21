@@ -1,7 +1,7 @@
 # Biome & Bad-Location Visitor Plan
 
 **Status:** Draft — design-only. No code in the amendment below.
-**Supersedes:** `docs/dev/ANVIL_BIOME_PLAN.md` (Steps 1–3 landed 2026-04-19
+**Supersedes:** `ADR-016` (Steps 1–3 landed 2026-04-19
 as building blocks; Steps 4–6 migrate here).
 **Extends:** ADR-016 "Anvil subsystem" (block + biome palette pre-filter).
 **Minimum supported format:** Minecraft 1.20.1 region files
@@ -209,7 +209,7 @@ Each sub-step is independently shippable and testable.
 
 ## 4a. Platform coverage & upgrade-drift invariant (2026-04-20d)
 
-The Anvil-first biome resolution landed in `ANVIL_BIOME_PLAN.md` §10.3
+The Anvil-first biome resolution landed in `ADR-016` §10.3
 shall apply to **every Bukkit-family server**, not only vanilla
 Spigot. Concretely:
 
@@ -247,7 +247,7 @@ Spigot. Concretely:
   platform, not just Spigot. Step §4.5 (route biome-filter
   validation through `MemoryShape`) therefore does not need a
   per-platform override.
-- **No new `setBiomeGetter` registration.** Per `ANVIL_BIOME_PLAN.md`
+- **No new `setBiomeGetter` registration.** Per `ADR-016`
   §6, the Anvil-first step is woven into the adapter's default
   getter body. Addon precedence (`RTP_Iris_integration`) is
   preserved by construction on every platform.
@@ -263,7 +263,7 @@ platforms shall be rejected and shall require a superseding ADR.
   `FoliaRTPWorld.getBiome` amendments (Phase 2 Step 3, landed
   2026-04-19). No new test class is required for the invariant
   itself, but the platform-adapter coverage tests already in
-  `ANVIL_BIOME_PLAN.md` §9 exercise it on both Bukkit and Folia
+  `ADR-016` §9 exercise it on both Bukkit and Folia
   paths.
 
 ---

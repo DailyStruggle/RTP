@@ -63,7 +63,7 @@ The front page honestly says "Not Supported". The requirements explicitly scope 
 The Spatial Memory paragraph now cites a concrete ~45% Overworld-safe figure from a local profiling pass on a vanilla 1.21 seed set; Nether and End ratios remain qualitative ("dominated by lava seas", "almost entirely void"). The caveat has narrowed from "no numbers anywhere" to "one number, not yet reproducible by readers".
 
 - [ ] **Publish the reference profiling run** in `docs/admin/BENCHMARKS.md` — seed list, sample size, methodology, and per-dimension safe-fraction columns for Overworld / Nether / End. Until this exists, the ~45% figure is an author claim, not a reproducible one.
-- [ ] **Extend the existing bStats integration with custom charts.** Default metrics are already wired (`RTPBukkitPlugin` → bStats ID `30865`, relocated `org.bstats` → `io.github.dailystruggle.rtp.bstats`); what is missing is `addCustomChart(...)` for RTP-specific aggregates — platform split, region count, queue depth, and observed safe-fraction histograms per dimension. Full chart catalog, privacy rules, and rollout are in [`BSTATS_CUSTOM_CHARTS_PLAN.md`](BSTATS_CUSTOM_CHARTS_PLAN.md).
+- [ ] **Extend the existing bStats integration with custom charts.** Default metrics are already wired (`RTPBukkitPlugin` → bStats ID `30865`, relocated `org.bstats` → `io.github.dailystruggle.rtp.bstats`); what is missing is `addCustomChart(...)` for RTP-specific aggregates — platform split, region count, queue depth, and observed safe-fraction histograms per dimension.
 - [ ] **Replace the qualitative Nether/End phrasing** on the front page with measured figures once either path above lands.
 
 ---

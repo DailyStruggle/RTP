@@ -25,12 +25,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Contract test for {@link AnvilRegionScanner} — the pregen biome-enumeration
  * utility that feeds the platform adapter's {@code setBiomesGetter} hook
- * (ANVIL_BIOME_PLAN.md §6.1, Step 2 of §10).
+ * (ADR-016 (biome) §6.1, Step 2 of §10).
  *
  * <p>Covers: happy-path union across multiple region files, mtime-keyed cache
  * hit/invalidation, empty-directory and missing-directory fallthrough, silent
  * skip of malformed {@code .mca} files, async dispatch off the caller thread.
- * Tracked in TRACEABILITY.md as the verification for ANVIL_BIOME_PLAN §6.1.
+ * Tracked in TRACEABILITY.md as the verification for ADR-016 (biome) §6.1.
  */
 class AnvilRegionScannerTest {
 

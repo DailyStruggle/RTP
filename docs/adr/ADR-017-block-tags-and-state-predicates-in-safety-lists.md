@@ -5,64 +5,31 @@
 
 ## Context
 
-The `unsafeBlocks` and `airBlocks` lists in `safety.yml` are presently
-flat `Set<String>` of `org.bukkit.Material.name()` identifiers.
-`SafetyKeys.unsafeBlocks` and `SafetyKeys.airBlocks` are declared as
-`List`; `ConfigParser` coerces the YAML scalars to `Set<String>` via
-`.toString()`; `RTPChunk.isSafe(int, int, int, Set<String>)` compares
-those reconciled names against the live block's `Material.name()`. Every
-caller in the pipeline — `LocationGenerator`, `TeleportPipelineTask.isStillUnsafe`,
-`LinearAdjustor`, `JumpAdjustor`, `ScanTask`, `AnvilChunkView.isSafe` —
-passes `unsafeBlocks` forward as `Set<String>`.
+The `unsafeBlocks` and `airBlocks` lists in `safety.yml` wire as flat `Set<String>` of `org.bukkit.Material.name()` identifiers. `SafetyKeys.unsafeBlocks`/`airBlocks` are declared as `List`; `ConfigParser` coerces the YAML scalars to `Set<String>`; every pipeline caller (`LocationGenerator`, `TeleportPipelineTask.isStillUnsafe`, `LinearAdjustor`, `JumpAdjustor`, `ScanTask`, `AnvilChunkView.isSafe`) compares against the live block's `Material.name()`.
 
-This representation cannot express two admin intents that are frequently
-requested:
+Flat material names alone cannot express two admin intents:
 
-1. **Block tags** — Minecraft data-pack tag references such as
-   `#minecraft:leaves`, `#minecraft:logs`, `#minecraft:wool`,
-   `#rtp:hazardous`. Without tag support, an admin who wants "all leaves
-   are unsafe" must enumerate every wood variant and re-edit on every
-   Mojang release that adds a new wood type.
-2. **Block states** — properties encoded on the `BlockData`, not on the
-   `Material`. The canonical example is `WATERLOGGED=true` on fences,
-   slabs, stairs, trapdoors, and signs; today `OAK_SLAB` is uniformly
-   safe or uniformly unsafe with no way to distinguish "slab, but only
-   when waterlogged". Other routinely-useful state predicates are
-   `LEVEL` (liquids), `LIT` (campfires), `POWERED`/`ATTACHED` (tripwire),
-   `AGE` (crops, fire), `OPEN` (doors/trapdoors), and `FACE=CEILING`
-   (buttons).
+1. **Block tags** — Minecraft data-pack tag references such as `#minecraft:leaves`, `#minecraft:logs`, `#minecraft:wool`, `#rtp:hazardous`. Without tag support, "all leaves are unsafe" requires enumerating every wood variant and re-editing on every Mojang release that adds a new wood type.
+2. **Block states** — properties encoded on the `BlockData`, not on the `Material`. The canonical example is `WATERLOGGED=true` on fences, slabs, stairs, trapdoors, and signs; `OAK_SLAB` is otherwise uniformly safe or uniformly unsafe with no way to distinguish "slab, but only when waterlogged". Other useful state predicates include `LEVEL` (liquids), `LIT` (campfires), `POWERED`/`ATTACHED` (tripwire), `AGE` (crops, fire), `OPEN` (doors/trapdoors), and `FACE=CEILING` (buttons).
 
-The originating user report cites `WATERLOGGED` specifically; see also
-`docs/dev/SAFETY_TAGS_AND_STATES_PLAN.md`, which enumerates the affected
-layers and weighs the two design options below.
+Two architectural constraints shape the solution:
 
-A key architectural constraint is that `rtp-api` must not take a
-compile-time dependency on `org.bukkit.*` (see ADR-011). Any solution
-that compiles a Bukkit `BlockData` at config-load time is therefore
-ineligible to live in `rtp-api`.
-
-A second constraint is that `/rtp config set/add/remove` must continue
-to round-trip every configured value as a leaf string (see
-`docs/dev/EMPTY_LIST_CONFIG_PLAN.md`). Nested YAML maps cannot be
-addressed by the command surface today.
+- `rtp-api` shall not take a compile-time dependency on `org.bukkit.*` (ADR-011). Any solution that compiles a Bukkit `BlockData` at config-load time is ineligible to live in `rtp-api`.
+- `/rtp config set/add/remove` shall round-trip every configured value as a leaf string; nested YAML maps are not addressable by the command surface.
 
 ## Decision
 
-RTP shall extend the safety-list grammar to accept three token shapes
-within the existing flat `Set<String>` wire format:
+The safety-list grammar accepts three token shapes within the flat `Set<String>` wire format:
 
 ```
-LAVA                                 # bare material (unchanged)
+LAVA                                 # bare material
 #minecraft:leaves                    # tag reference (namespace required)
 OAK_SLAB[waterlogged=true]           # material + state predicate(s)
 #minecraft:slabs[waterlogged=true]   # tag + state predicate(s)
 *[waterlogged=true]                  # wildcard material + state predicate(s)
 ```
 
-This corresponds to **Option A** of the plan document. The `Set<String>`
-wire type on `RTPChunk.isSafe` is preserved; an additional
-`isSafe(int, int, int, CompiledUnsafeSet)` overload is introduced and
-the legacy overload delegates through a compiler.
+The `Set<String>` wire type on `RTPChunk.isSafe` is preserved; an `isSafe(int, int, int, CompiledUnsafeSet)` overload carries the compiled form, and the legacy overload delegates through the compiler.
 
 ### 1. Token grammar (normative)
 
@@ -94,8 +61,7 @@ path       := [a-z0-9_/.-]+
   candidate block matches the predicated token iff every listed property
   equals (case-insensitively) the live block's property of the same
   name.
-- Negation, disjunction, and numeric ranges are **out of scope** (see
-  §"Alternatives Considered" and the plan's "Out of Scope" section).
+- Negation, disjunction, and numeric ranges are **out of scope** for this grammar. A future ADR may add them via a separate safety-list key rather than complicating the token grammar.
 - **Wildcard material.** The identifier `*` is reserved as a wildcard
   material that matches any block regardless of `Material.name()`. A
   bare `*` (no predicate) is **rejected at parse time with a WARNING**
@@ -162,9 +128,7 @@ separate concern and lives in the platform adapter:
 - **Malformed token** (unbalanced `[...]`, empty predicate, reserved
   character in value): single startup `WARNING` with the offending
   substring and offset; token is dropped.
-- **Never silent**: no parse failure returns without a log line. This is
-  a REQ-RTP-S-004 surface; see the `ReqRtpS004UnknownTagWarnTest` row in
-  `TRACEABILITY.md` added alongside the implementation PR.
+- **Never silent**: no parse failure returns without a log line. This is a REQ-RTP-S-004 surface; regression guard is `ReqRtpS004UnknownTagWarnTest` (see `TRACEABILITY.md`).
 
 ### 4. Evaluation (hot path)
 
@@ -207,76 +171,30 @@ gains a §"Block tags and states" subsection with three worked examples
 (bare material, tag, predicated material). Existing configs keep
 working verbatim; `legacyConfigSupport.yml` emits no SUPERSEDED notice.
 
-The `/rtp config set/add/remove` surface must round-trip the new tokens
-verbatim. Because every token is a single string containing no YAML
-structural characters other than `[`, `]`, `,`, and `=`, the existing
-string-list serializer handles them; the implementation PR shall add a
-test that verifies
-`rtp config set safety unsafeBlocks add "OAK_SLAB[waterlogged=true]"`
-round-trips through `SubConfigCmd` without quoting damage.
-
-## Alternatives Considered
-
-| Alternative | Why Rejected |
-|-------------|--------------|
-| **Option B — structured YAML** (`unsafeBlocks: { materials: [...], tags: [...], states: [...] }`) | Breaks every `SafetyKeys.unsafeBlocks` consumer in `rtp-api` addons; nested maps are not addressable by `/rtp config` (worsens the gap documented in `EMPTY_LIST_CONFIG_PLAN.md`); `legacyConfigSupport.yml` must perform a first-boot schema rewrite. Option A provides the same expressive power with zero API break. |
-| **Typed property resolution via `BlockData.createBlockData().getMatchedProperties()`** | Requires `org.bukkit.*` on the compiler's classpath, forcing the compiler into `rtp-spigot-common` and duplicating the grammar parser into Folia/Paper/Fabric adapters. Lowercase-string comparison gives equivalent admin-facing behaviour with no loss of accuracy that we care about (property values are already stable lowercase identifiers in the Bukkit string form). |
-| **Disjunction / negation in the grammar** (e.g. `OAK_SLAB[waterlogged=true|waterlogged=false]`, `!OAK_SLAB`) | Requires a full expression parser and conflict resolution against the `airBlocks`/`unsafeBlocks` split. Deferred; if requested, a follow-up ADR can add a third safety-list key rather than complicating the token grammar. |
-| **Regex-style material matching** (e.g. `.*_LEAVES`) | Collides with the `[A-Za-z0-9_]+` identifier rule and would interact badly with legacy palette aliases. Tags cover the same admin need canonically. |
-| **Compile at `ConfigParser.check()` time** | Bukkit tag registries are not populated until `onEnable`; compiling eagerly would force a partial compile with tag resolution deferred to first use. The implementation compiles the pure grammar at `check()` and defers tag expansion to first matcher use (lazy, cached, invalidated on config reload). |
+The `/rtp config set/add/remove` surface round-trips new tokens verbatim. Every token is a single string containing no YAML structural characters other than `[`, `]`, `,`, and `=`, so the string-list serializer handles them; `rtp config set safety unsafeBlocks add "OAK_SLAB[waterlogged=true]"` round-trips through `SubConfigCmd` without quoting damage (covered by `SubConfigCmd` round-trip test).
 
 ## Consequences
 
 - **Positive:**
-  - Zero API break. `RTPChunk.isSafe(int, int, int, Set<String>)` still
-    compiles and still works; addons using `SafetyKeys.unsafeBlocks`
-    directly are unaffected.
-  - Admin edits stay in one flat YAML list; `/rtp config` keeps
-    functioning on every token.
-  - The grammar is additive: future tokens (e.g. biome predicates, if
-    ever wanted) would fit the same `name[key=value]` shape without
-    another schema break.
-  - Compiler is pure logic in `rtp-api` — unit-testable without a
-    server, which keeps CI coverage honest.
-  - Fast path in the hot evaluation loop means the feature has no
-    measurable cost for admins who only use plain material names.
+  - Zero API break: `RTPChunk.isSafe(int, int, int, Set<String>)` still compiles; addons using `SafetyKeys.unsafeBlocks` directly are unaffected.
+  - Admin edits stay in one flat YAML list; `/rtp config` keeps functioning on every token.
+  - Grammar is additive: future tokens (e.g. biome predicates) fit the same `name[key=value]` shape without a schema break.
+  - Compiler is pure logic in `rtp-api` — unit-testable without a server.
+  - Fast path in the hot evaluation loop means zero measurable cost for admins who only use plain material names.
 
 - **Negative / Trade-offs:**
-  - A mini-grammar to document and teach. The `safety.yml` header and
-    the RTP GLOSSARY must both gain entries; otherwise the token
-    `OAK_SLAB[waterlogged=true]` is opaque to new admins.
-  - `AnvilChunkView.isSafe` grows a second data source (the NBT
-    `Properties` compound). This is local complexity in one class but
-    expands the Anvil test matrix.
-  - Tag-expansion snapshot adds a one-shot cross-module hand-off
-    (`rtp-spigot-common` → `rtp-anvil`) at enable time. Lifecycle
-    wiring must be explicit; a null snapshot must degrade gracefully to
-    "no tag match" (fail-open, logged once).
-  - The `airBlocks` key is unchanged for this ADR. The compiler is
-    symmetric so a follow-up can enable the same grammar on `airBlocks`
-    with a one-call wiring change; this is deliberately out of scope
-    here to keep the PR tight.
-  - Lowercase-string property comparison means a config line that
-    capitalises the value (`FACE=CEILING`) will not match at runtime
-    unless normalised; the compiler lowercases both sides to remove
-    that footgun, and the documentation calls it out.
+  - A mini-grammar to document and teach: `safety.yml` header and `GLOSSARY.md` both carry entries so `OAK_SLAB[waterlogged=true]` is not opaque to new admins.
+  - `AnvilChunkView.isSafe` consumes a second data source (NBT `Properties` compound), expanding the Anvil test matrix.
+  - Tag-expansion snapshot introduces a one-shot cross-module hand-off (`rtp-spigot-common` → `rtp-anvil`) at enable time. A null snapshot degrades to "no tag match" (fail-open, logged once).
+  - The `airBlocks` key uses the same compiler; enabling the grammar there is a one-call wiring change.
+  - Lowercase-string property comparison: the compiler lowercases both sides so `FACE=CEILING` matches the live `face=ceiling` property; documentation calls out the normalization.
 
 ## References
 
-- `docs/dev/SAFETY_TAGS_AND_STATES_PLAN.md` — full design plan,
-  current-data-flow inventory, work breakdown, and risk table.
-- `docs/dev/EMPTY_LIST_CONFIG_PLAN.md` — `/rtp config` round-trip
-  constraints that ruled out Option B.
-- `docs/dev/REQUIREMENTS.md §3` — REQ-RTP-S-001 (unsafe-block
-  prohibition) and REQ-RTP-S-004 (never-silent failure).
-- [ADR-011](ADR-011-rtp-api-separate-module.md) — no Bukkit on the
-  `rtp-api` classpath.
-- [ADR-016](ADR-016-anvil-subsystem.md) — Anvil pre-filter advisory
-  semantics; this ADR extends the pre-filter to consult palette
-  `Properties`.
-- `rtp-api/src/main/java/io/github/dailystruggle/rtp/api/substitutions/RTPChunk.java`
-  — `isSafe` contract to be overloaded.
-- `PaletteNormalizer` / `PaletteIdentifierNormalizer` in `rtp-api` —
-  home of the new grammar compiler.
-- `BukkitRTPChunk`, `FoliaRTPChunk`, `AnvilChunkView` — live and
-  off-tick `isSafe` implementations to be updated.
+- `docs/dev/SAFETY_TAGS_AND_STATES_PLAN.md` — active plan tracking remaining implementation work.
+- `docs/dev/REQUIREMENTS.md §3` — REQ-RTP-S-001 (unsafe-block prohibition) and REQ-RTP-S-004 (never-silent failure).
+- [ADR-011](ADR-011-rtp-api-separate-module.md) — no Bukkit on the `rtp-api` classpath.
+- [ADR-016](ADR-016-anvil-subsystem.md) — Anvil pre-filter advisory semantics; this ADR extends the pre-filter to consult palette `Properties`.
+- `rtp-api/.../RTPChunk.java` — `isSafe` contract.
+- `PaletteNormalizer` / `PaletteIdentifierNormalizer` in `rtp-api` — grammar compiler.
+- `BukkitRTPChunk`, `FoliaRTPChunk`, `AnvilChunkView` — live and off-tick `isSafe` implementations.

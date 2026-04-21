@@ -29,21 +29,12 @@ The system shall expose three named probability distributions for radial distanc
 
 The `Normal` distribution achieves parity with legacy plugins (e.g., JakesRTP) and satisfies operators who want a "natural-feeling" distribution that avoids hard edges.
 
-## Alternatives Considered
-
-| Alternative | Why Rejected |
-|---|---|
-| Single fixed uniform distribution | Cannot satisfy operators who need centre-weighted or mid-weighted placement without workarounds. |
-| Arbitrary user-supplied distribution function | Maximum flexibility but no reasonable configuration surface for non-technical operators; excessive implementation complexity. |
-| Poisson disk / blue-noise sampling | Good for even coverage but not a probability distribution over a 1D radial axis; incompatible with the Archimedean spiral 1D mapping (see ADR-001). |
-| Additional named distributions (e.g. power-law, triangular) | The three chosen distributions cover all three qualitatively distinct placement goals — inner-edge bias, outer-edge bias, and mid-annulus bias — making additional distributions redundant for practical server configurations. |
-
 ## Consequences
 
 - **Positive:** Operators can match teleport scatter to their server's social design (exploration spread, hub proximity, or natural-feeling clustering) with a single config key, without needing multiple regions.
 - **Positive:** The three distributions cover the full qualitative space of placement relative to the annulus: inner edge, middle, and outer edge.
 - **Positive:** Parity with JakesRTP lowers the migration barrier for operators switching to RTP.
-- **Negative / Trade-offs:** Three distributions shall be maintained and tested. The `Normal` distribution in particular has an unclear primary use-case and was added largely for feature parity; if it is found to be unused it could be deprecated in a future major version.
+- **Negative / Trade-offs:** Three distributions shall be maintained and tested. The `Normal` distribution primarily serves feature parity with JakesRTP; its independent use-case is narrower than `Flat` or `Exponential`.
 - **Negative / Trade-offs:** Operators shall understand the concept of a probability distribution to choose correctly; documentation in `CONCEPTS.md` and `CONFIGURATION.md` is required to make this accessible.
 
 ## References

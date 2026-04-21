@@ -212,7 +212,7 @@ public final class AnvilReader {
                 if (ps != null) out.add(ps);
                 // Biome container is decoded independently: a section may carry a
                 // valid biome palette even if its block_states is missing, and vice
-                // versa (malformed-section tolerance, ANVIL_BIOME_PLAN §5.1 trust model).
+                // versa (malformed-section tolerance, ADR-016 (biome) §5.1 trust model).
                 BiomePaletteSection bs = biomeSectionFromCompound(raw);
                 if (bs != null) biomeOut.add(bs);
             }
@@ -269,14 +269,14 @@ public final class AnvilReader {
      * Lifts a raw section compound's {@code biomes} container into a
      * {@link BiomePaletteSection}, or returns {@code null} if the container is
      * absent / structurally malformed. Decode failures are silent (per
-     * ANVIL_BIOME_PLAN §8): biome naming is advisory, not a safety signal, so a
+     * ADR-016 (biome) §8): biome naming is advisory, not a safety signal, so a
      * missing/bad biome palette causes the caller to fall through to the live
      * {@code world.getBiome(loc)} getter rather than raise a warning.
      *
      * <p>The biome container has the same wire shape as {@code block_states} except:
      * (1) {@code palette[i]} is a bare {@code TAG_String} (namespaced identifier)
      * rather than a compound with a {@code Name} field, and (2) the packed {@code data}
-     * array is 64 cells (4×4×4) rather than 4096 blocks — see ANVIL_BIOME_PLAN §3.
+     * array is 64 cells (4×4×4) rather than 4096 blocks — see ADR-016 (biome) §3.
      */
     @SuppressWarnings("unchecked")
     private static BiomePaletteSection biomeSectionFromCompound(Object raw) {

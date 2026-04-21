@@ -5,25 +5,13 @@
 
 ## Context
 
-The `rtp-paper` adapter originally used [PaperLib](https://github.com/PaperMC/PaperLib) — a compatibility shim library published by the PaperMC team — to access Paper-specific features (primarily asynchronous chunk loading) while maintaining a fallback path for Spigot servers that did not have those APIs.
-
-PaperLib was designed for a period when Paper and Spigot shared a largely common API surface, and plugin authors needed a safe way to call Paper-only methods without crashing on Spigot. Its `getChunkAtAsync` wrapper, for example, would call the native Paper async API if available, or fall back to a synchronous Bukkit call otherwise.
-
-Since then, Paper has substantially differentiated its implementation from Spigot's and has deprecated many of the older compatibility APIs that PaperLib was bridging. The gap between Paper and Spigot has grown to the point where PaperLib's original purpose — providing a single codebase that runs on both — is less relevant. RTP already maintains separate adapter modules (`rtp-spigot`, `rtp-paper`) for each platform, so the cross-platform shim layer PaperLib provides is redundant.
+[PaperLib](https://github.com/PaperMC/PaperLib) is a cross-platform compatibility shim (async chunk loading, etc.) intended for plugins that run on both Paper and plain Spigot. RTP maintains separate adapter modules (`rtp-spigot`, `rtp-paper`) for each platform, so the Paper adapter has no Spigot code path to shim and a cross-platform compatibility library adds no value there.
 
 ## Decision
 
-Remove the PaperLib dependency from `rtp-paper` and call Paper's native async chunk loading APIs directly.
+`rtp-paper` shall not depend on PaperLib. It calls Paper's native async chunk loading APIs directly.
 
-Since `rtp-paper` is already a Paper-only module (it is never loaded on a Spigot server), there is no need for a compatibility shim. Calling Paper's native APIs directly removes an unnecessary dependency, eliminates the indirection layer, and ensures the adapter uses the current, non-deprecated API surface.
-
-## Alternatives Considered
-
-| Alternative | Why Rejected |
-|-------------|--------------|
-| Keep PaperLib | PaperLib's bridging purpose is obsolete given RTP's per-platform adapter architecture. Retaining it adds a dependency with no benefit and ties the adapter to an API layer that Paper itself is moving away from. |
-| Merge `rtp-paper` and `rtp-spigot` into a single adapter using PaperLib for compatibility | Reintroduces the coupling that the separate adapter modules were designed to avoid; prevents using Paper-only APIs that have no Spigot equivalent. |
-| Use reflection to call Paper APIs without a compile-time dependency | Fragile, hard to maintain, and unnecessary given that `rtp-paper` already has a hard compile-time dependency on Paper. |
+Because `rtp-paper` is loaded only on Paper servers, a compatibility shim is unnecessary. Direct native calls remove a runtime dependency, eliminate an indirection layer, and keep the adapter on the current, non-deprecated Paper API surface.
 
 ## Consequences
 

@@ -2,8 +2,7 @@
 
 *Status:* **Accepted — implementation in progress.** Option A ratified by
 [ADR-017](../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists.md)
-on 2026-04-19. Sibling of `YAML_SIMPLIFICATION_PLAN.md` and
-`EMPTY_LIST_CONFIG_PLAN.md`.
+on 2026-04-19.
 
 **Clarifications ratified by ADR-017** (supersede any conflicting text
 below):
@@ -92,8 +91,7 @@ through `reconcileAll` and delegates. No caller is forced to migrate.
 - Zero API break — addon authors who stored `Set<String>` keep working.
 - Admins edit a single YAML list; no schema restructure in `safety.yml`.
 - Tokens round-trip through `/rtp config set …` via the existing string
-  list serializer (critical for REQ-RTP-F-013 surface parity; see
-  `EMPTY_LIST_CONFIG_PLAN.md`).
+  list serializer (critical for REQ-RTP-F-013 surface parity).
 
 **Cons:**
 - Non-trivial parser: must tolerate quoted values (`name="oak stairs"`
@@ -137,8 +135,8 @@ through a migration adapter for one major version.
   `unsafeBlocks: [ … ]` into the new structure on first boot, logging
   a SUPERSEDED note per REQ-RTP-F-013.
 - `/rtp config` cannot currently render nested maps as a leaf command
-  (see `EMPTY_LIST_CONFIG_PLAN.md` — empty collections already drop out
-  of the command surface; a nested bean list would worsen the gap).
+  (empty collections already drop out of the command surface; a nested
+  bean list would worsen the gap).
 - Every addon consuming `SafetyKeys.unsafeBlocks` via
   `RTP.getInstance().configs.getParser(SafetyKeys.class)` breaks.
 

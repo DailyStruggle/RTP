@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Bytecode-level boundary rules for the Spigot-exclusive Anvil read-only pre-filter package.
  *
- * <p>Per ADR-016 and {@code docs/dev/ANVIL_PREFILTER_PLAN.md} §2, the pre-filter is confined
+ * <p>Per ADR-016 and {@code ADR-016} §2, the pre-filter is confined
  * to {@code io.github.dailystruggle.rtp.spigot.anvil}. Paper overrides {@code getChunkAt}
  * with its native async API, and Folia extends {@link io.github.dailystruggle.rtp.api.world.RTPWorld}
  * directly — so structural exclusivity is guaranteed by the class hierarchy. These rules

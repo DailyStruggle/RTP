@@ -44,16 +44,6 @@ Paper-specific and Folia-specific methodologies (e.g. async chunk loading on Pap
 
 ---
 
-## Alternatives Considered
-
-| Alternative | Reason Rejected |
-|-------------|----------------|
-| Single adapter with reflection | Reflection overhead on hot paths; brittle at runtime; no compile-time safety |
-| Single adapter with version guards (`if/else`) | Fragile fallback chains; silent failures when a guard is wrong; poor readability |
-| Runtime class-loading with a plugin classloader | Complex build and deployment; harder to debug; no improvement over submodules |
-
----
-
 ## Consequences
 
 - **Positive:** Zero runtime version-detection overhead; compile-time safety for all NMS API usage; clear per-version dependency surface.

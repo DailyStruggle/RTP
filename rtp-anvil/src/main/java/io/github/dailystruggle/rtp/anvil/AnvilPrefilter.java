@@ -39,7 +39,7 @@ import java.util.logging.Logger;
  * <h3>Applicability gating</h3>
  *
  * <p>Callers are expected to gate the probe behind the four checks from
- * {@code ANVIL_PREFILTER_PLAN.md §3} (config flag, chunk not loaded, no custom
+ * {@code ADR-016 §3} (config flag, chunk not loaded, no custom
  * generator, structural cache miss). The probe itself enforces only the
  * {@link DataVersionSupport#isSupported(int)} format-support gate internally — any
  * out-of-whitelist {@code DataVersion} yields {@link Verdict#UNKNOWN}.

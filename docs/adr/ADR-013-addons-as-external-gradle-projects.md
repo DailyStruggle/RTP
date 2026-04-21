@@ -40,16 +40,6 @@ Every soft-dependency bundled into the core jar increases its size and transitiv
 
 ---
 
-## Alternatives Considered
-
-| Alternative | Reason Rejected |
-|-------------|----------------|
-| Built-in optional modules with soft-dependency guards | Unbounded maintenance scope for a solo project; bloats core jar; ties release cadence to third-party APIs |
-| Monorepo with all addons as Gradle submodules | Same maintenance burden; all addons shall be updated on every RTP release |
-| No example addons at all | Leaves addon developers without guidance on how to use `rtp-api`; increases support burden |
-
----
-
 ## Consequences
 
 - **Positive:** Core plugin remains lean; no third-party plugin stubs shipped to servers that don't need them.

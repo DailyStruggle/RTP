@@ -22,14 +22,6 @@ The replenishment task is scheduled on a fixed cadence rather than triggered rea
 
 Pre-filling the queue via `/rtp fill` further guards against runtime chunk-loading costs: when a region has been pre-filled into the spatial memory database (`MemoryShape`), background replenishment can skip the most expensive step (loading and ticking unknown chunks) entirely, because safe sectors are already known.
 
-## Alternatives Considered
-
-| Alternative | Why Rejected |
-|-------------|--------------|
-| On-demand async selection (original design) | Produced sporadic, nondeterministic CPU load spikes with no recovery periods between concurrent requests; worst-case latency was unbounded in poorly-seeded regions. |
-| On-demand selection with a thread pool | Bounds concurrency but does not smooth the load distribution over time; bursts still occur at peak request rates and recovery periods are unpredictable. |
-| Lazy per-request caching (generate once, reuse) | Does not scale to multiple concurrent users or high-frequency servers; the first requester still bears the full cold-start validation cost. |
-
 ## Consequences
 
 - **Positive:**
