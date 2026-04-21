@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test;
  * stay deterministic.
  *
  * <p>Traces ADR-016 Phase&nbsp;4 telemetry exposure (see
- * {@code docs/dev/ANVIL_PREFILTER_PLAN.md &sect;10}).
+ * {@code ADR-016 §10}).
  */
 class TestAnvilPrefilterCmdTest {
 

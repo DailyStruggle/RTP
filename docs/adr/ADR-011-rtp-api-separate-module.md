@@ -35,16 +35,6 @@ Because addon developers never compile against `rtp-core`, internal refactors â€
 
 ---
 
-## Alternatives Considered
-
-| Alternative | Reason Rejected |
-|-------------|----------------|
-| Expose `rtp-core` as the addon API | No distinction between supported and unsupported surfaces; every refactor is a potential breaking change for addons |
-| Document "supported" classes within `rtp-core` | Documentation-only contracts are not enforced; developers still depend on undocumented internals |
-| Annotations to mark public API within `rtp-core` | Adds complexity without the module-level isolation that prevents accidental dependency on internals |
-
----
-
 ## Consequences
 
 - **Positive:** Addon developers have a clear, stable, version-controlled interface with no ambiguity about what is supported.

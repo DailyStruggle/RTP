@@ -13,7 +13,7 @@ package io.github.dailystruggle.rtp.spigot.anvil;
  * <p>The whitelist is deliberately conservative: a {@code DataVersion} not covered here
  * yields {@link Verdict#UNKNOWN} and falls through to the existing live-load path. New
  * Minecraft releases opt in by extending the whitelist and adding fixture-backed parity
- * evidence per {@code ANVIL_PREFILTER_PLAN.md} §8.2.</p>
+ * evidence per {@code ADR-016} §8.2.</p>
  *
  * <p>This class is immutable and thread-safe; it exposes only static helpers.</p>
  *

@@ -23,14 +23,6 @@ The `rtp-plugin` module shall be a dedicated bridge module that sits between `rt
 
 This keeps `rtp-core` a pure logic layer, easing the addition of new server platform adapters without touching core logic.
 
-## Alternatives Considered
-
-| Alternative | Why Rejected |
-|-------------|--------------|
-| Merge `rtp-plugin` into `rtp-core` | Forces `rtp-core` to import Bukkit/server classes, breaking platform agnosticism and making it impossible to test core logic without a running server. |
-| Merge `rtp-plugin` into each platform adapter | Duplicates the `JavaPlugin` entry point, command registration, and common event listeners across every adapter — high maintenance cost and divergence risk. |
-| Single monolithic module | Eliminates all module boundaries; makes it impossible to enforce the dependency rule that core logic shall not reference platform APIs. |
-
 ## Consequences
 
 - **Positive:**

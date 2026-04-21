@@ -25,7 +25,7 @@ import org.jetbrains.annotations.Nullable;
  * ({@code SafetyKeys.anvilPrefilterEnabled}) or no teleport has triggered a
  * candidate chunk load since startup. Fabric is out of scope (§13.2).
  *
- * <p>See {@code docs/dev/ANVIL_PREFILTER_PLAN.md &sect;10} (Phase&nbsp;4)
+ * <p>See {@code ADR-016 §10} (Phase&nbsp;4)
  * and {@code docs/dev/RUNTIME_TEST_SUITE_PLAN.md} for the runtime-test
  * suite contract.
  *

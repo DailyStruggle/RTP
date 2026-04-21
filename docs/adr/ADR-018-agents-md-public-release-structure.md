@@ -5,13 +5,11 @@
 
 ## Context
 
-`.junie/AGENTS.md` grew to 184 lines / ~32 KB as successive sessions accreted engineering lore, per‑feature narratives, and dated "gotcha" notes. Prior to public release as an open, community‑editable guide, this created three problems:
+`.junie/AGENTS.md` is a top-level, community-editable guide read at the start of every agent session. Three constraints shape its shape:
 
-1. **Token cost.** Every agent session reads the full file; ~50% of its content is narrative rationale or dated lore that most tasks do not need.
-2. **Source-of-truth duplication.** Key topics (stale-chunk guard, Anvil prefilter, shutdown-flush pipeline, per-requirement "already satisfied by" class lists) were restated in `AGENTS.md` in addition to their canonical home in an ADR, `DESIGN.md`, `REQUIREMENTS.md`, or `TRACEABILITY.md`. Stale copies actively mislead agents when code is refactored.
-3. **Self‑contradiction with project rules.** `AGENTS.md` itself mandates "Separation of Concerns — requirements define *what*, not *how*" and "no temporal narrative phrasing" in requirement docs, yet the `Already satisfied by:` blocks and dated `(2026-04-18)` pitfalls embed exactly that kind of implementation/temporal content in a top-level rules file.
-
-A gap analysis concluded that a structural split would reduce the file to a thin routing layer while preserving every piece of information in a canonical source.
+1. **Token cost.** Every agent session reads the full file; narrative rationale and dated lore inflate the read without helping most tasks.
+2. **Single source of truth.** Topics with canonical homes (stale-chunk guard, Anvil prefilter, shutdown-flush pipeline, per-requirement "already satisfied by" class lists) shall not be restated — duplicated copies mislead agents when code is refactored.
+3. **Separation of concerns.** `AGENTS.md` itself mandates that requirements state *what*, not *how*, and forbids temporal narrative phrasing; the file shall therefore not embed implementation-satisfaction tables or dated pitfall notes.
 
 ## Decision
 
@@ -24,24 +22,15 @@ A gap analysis concluded that a structural split would reduce the file to a thin
 - **Architecture Boundaries**, **Logging & Feedback**, **Environment & Execution** (compressed), **Code & Testing Conventions**, **Self-Updating Protocol**.
 - One-line pointers into the canonical sources listed below.
 
-Content extracted out of `AGENTS.md`:
+Content lives in its canonical home, not in `AGENTS.md`:
 
-| Moved from `AGENTS.md` | Canonical destination |
-|------------------------|-----------------------|
-| `Already satisfied by:` paragraphs for S-001…S-007, F-013 | `docs/dev/TRACEABILITY.md` (per-REQ rows) |
-| S-005 narrative: Spigot fallback, prefilter semantics, stale-chunk guard | `ADR-015`, `ADR-016`, `docs/dev/DESIGN.md` |
-| Dated DB persistence / shutdown-flush / shared-connection notes | `docs/dev/LESSONS_LEARNED.md` (new) |
-| `AI Formatting Rules & Communication Style` (Junie-specific) | `.junie/JUNIE.md` (Junie-only; not in public guide) |
-| Full document index | `docs/dev/INDEX.md` (new) |
-
-## Alternatives Considered
-
-| Alternative | Why Rejected |
-|-------------|--------------|
-| Leave `AGENTS.md` as a single large file | Continued token bloat; public contributors inherit the duplication problem. |
-| Rewrite inline, no extraction | Loses irrecoverable engineering lore (dated pitfalls that aren't in any ADR). |
-| Move everything into ADRs | ADRs are decision records, not lesson logs or task-oriented cheat sheets. |
-| Keep Junie formatting rules in public `AGENTS.md` | Other agents (Claude Code, Aider, Cursor, Copilot) impose their own formatting; Junie-specific guidance biases non-Junie contributors. |
+| Topic | Canonical home |
+|-------|----------------|
+| Per-REQ "already satisfied by" class lists (S-001…S-007, F-013) | `docs/dev/TRACEABILITY.md` |
+| S-005 narrative (Spigot fallback, prefilter semantics, stale-chunk guard) | `ADR-015`, `ADR-016`, `docs/dev/DESIGN.md` |
+| Dated DB persistence / shutdown-flush / shared-connection notes | `docs/dev/LESSONS_LEARNED.md` |
+| Junie-specific AI formatting and communication rules | `.junie/JUNIE.md` |
+| Full document index | `docs/dev/INDEX.md` |
 
 ## Consequences
 
@@ -53,12 +42,11 @@ Content extracted out of `AGENTS.md`:
   - `INDEX.md` becomes the onboarding entry point for new contributors and agents alike.
 
 - **Negative / Trade-offs:**
-  - Agents now occasionally need a second file read (e.g., TRACEABILITY.md) to see the "already satisfied" pointer that used to be inline. Mitigated by the Required Reading table explicitly listing it for safety-critical tasks.
-  - The Self-Updating Protocol must now route new notes to the correct destination file rather than always appending to `AGENTS.md`. The protocol has been updated to reflect this.
+  - Agents occasionally need a second file read (e.g., `TRACEABILITY.md`) to resolve "already satisfied" pointers. Mitigated by the Required Reading table, which lists the relevant destination for safety-critical tasks.
+  - The Self-Updating Protocol routes new notes to the correct destination file rather than appending to `AGENTS.md`.
 
 ## References
 
-- `.junie/AGENTS.md` (post-refactor)
-- `.junie/AGENTS.md.bak` (pre-refactor snapshot, retained for the migration commit only)
+- `.junie/AGENTS.md`
 - `docs/dev/TRACEABILITY.md`, `docs/dev/LESSONS_LEARNED.md`, `docs/dev/INDEX.md`
 - ADR-015 (stale-chunk guard), ADR-016 (Anvil prefilter) — canonical homes for S-005 narrative

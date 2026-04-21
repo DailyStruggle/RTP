@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * ANVIL_BIOME_PLAN.md Phase 2, landing-order step 1: biome-palette decode in
+ * ADR-016 Phase 2, landing-order step 1: biome-palette decode in
  * {@link BiomePaletteSection} and the public {@link AnvilChunkView#getBiomeAt(int, int, int)} /
  * {@link AnvilChunkView#getBiomesPresent()} surface.
  *
@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * (namespaced strings like {@code iris:volcanic_ash_plains} round-trip without
  * being collapsed).
  */
-@DisplayName("ANVIL_BIOME_PLAN §3–§4: biome palette decoder + AnvilChunkView biome API")
+@DisplayName("ADR-016 (biome) §3–§4: biome palette decoder + AnvilChunkView biome API")
 class AnvilBiomeDecoderTest {
 
     // ----------------------------------------------------------- BiomePaletteSection unit-level

@@ -37,16 +37,6 @@ Server software differences in chunk ticket APIs or data-access performance are 
 
 ---
 
-## Alternatives Considered
-
-| Alternative | Reason Rejected |
-|-------------|----------------|
-| Ad-hoc ticket management at each call site | Proven to produce leaks; no central lookup; brittle across platforms |
-| WeakReference-only management | Handles clean disconnects but not force-loaded chunk leaks (see ADR-008); insufficient alone |
-| Full addon-constructable API class | Addons have no need to create reservations; exposing construction would widen the supported API surface unnecessarily |
-
----
-
 ## Consequences
 
 - **Positive:** Try-with-resources usage guarantees chunk release on all code paths, eliminating the class of leak described in ADR-008.

@@ -2,7 +2,7 @@
  * Read-only Anvil region-file pre-filter for vanilla Spigot.
  *
  * <p>See {@code docs/adr/ADR-016-anvil-readonly-prefilter.md} for the authoritative
- * decision and {@code docs/dev/ANVIL_PREFILTER_PLAN.md} for the implementation map.</p>
+ * decision and {@code ADR-016} for the implementation map.</p>
  *
  * <h2>Scope boundary (Spigot-exclusive)</h2>
  * This package is deliberately confined to {@code rtp-spigot-common}. It is never imported

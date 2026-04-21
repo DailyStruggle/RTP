@@ -103,28 +103,7 @@ Custom shapes can be registered at runtime via the `rtp-api`. See the `addons/` 
 
 ### Full Reference Index
 
-| Document | Purpose |
-|---|---|
-| [docs/admin/QUICK_START.md](docs/admin/QUICK_START.md) | Step-by-step installation, first region setup, and common troubleshooting. |
-| [docs/admin/COMMANDS.md](docs/admin/COMMANDS.md) | Every `/rtp` subcommand, argument, and permission node explained. |
-| [docs/admin/CONFIGURATION.md](docs/admin/CONFIGURATION.md) | Every config key across all files with type, default, and description. |
-| [docs/admin/FAQ.md](docs/admin/FAQ.md) | Answers to common questions from server admins, including performance tuning and troubleshooting. |
-| [docs/admin/MIGRATION.md](docs/admin/MIGRATION.md) | Upgrade instructions, config compatibility notes, and breaking change guidance per version. |
-| [docs/admin/RUNBOOK.md](docs/admin/RUNBOOK.md) | Operator incident response — symptom, diagnosis, and resolution for common problems. |
-| [docs/admin/FAILURE_MODES.md](docs/admin/FAILURE_MODES.md) | Failure mode catalog — per-component failure, detection, and defined system response. |
-| [docs/admin/HAZARDS.md](docs/admin/HAZARDS.md) | Hazard register — known failure conditions, severity ratings, and mitigations. |
-| [docs/dev/CONCEPTS.md](docs/dev/CONCEPTS.md) | Plain-language explanation of how RTP works: queue, shapes, pipeline, and platform differences. |
-| [docs/dev/ARCHITECTURE.md](docs/dev/ARCHITECTURE.md) | Module breakdown, key concepts, and navigation to design docs. |
-| [docs/dev/MULTI_PLATFORM_PLAN.md](docs/dev/MULTI_PLATFORM_PLAN.md) | Roadmap for Fabric and future multi-platform support. |
-| [docs/dev/DESIGN.md](docs/dev/DESIGN.md) | High-reliability design: queue system, bounded execution, concurrency model, fault tolerance. |
-| [docs/dev/GLOSSARY.md](docs/dev/GLOSSARY.md) | Definitions for all domain terms (pulse, region, tick, ChunkReservation, etc.). |
-| [docs/dev/REQUIREMENTS.md](docs/dev/REQUIREMENTS.md) | Functional, non-functional, and system requirements with unique IDs. Includes scope and out-of-scope. |
-| [docs/dev/STAKEHOLDERS.md](docs/dev/STAKEHOLDERS.md) | Actors (admin, player, addon dev, contributor, platform) and their goals. |
-| [docs/dev/TRACEABILITY.md](docs/dev/TRACEABILITY.md) | Requirements → design → implementing class → test matrix. |
-| [docs/adr/](docs/adr/README.md) | Architecture Decision Records — why key design choices were made and what alternatives were rejected. |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Build instructions, code style, testing guidelines, and the requirement workflow. |
-| [CHANGELOG.md](CHANGELOG.md) | Release history and notable changes per version. |
-| [SECURITY.md](SECURITY.md) | Vulnerability disclosure policy and response timeline. |
+See [docs/MAP.md](docs/MAP.md) for a one-line catalog of every document, or [docs/dev/INDEX.md](docs/dev/INDEX.md) for a task-to-file router. Root-level: [CONTRIBUTING.md](CONTRIBUTING.md), [CHANGELOG.md](CHANGELOG.md), [SECURITY.md](SECURITY.md).
 
 ---
 

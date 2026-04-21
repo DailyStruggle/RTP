@@ -1,48 +1,68 @@
 # RTP Documentation Index
 
-One-line purpose for every document under `docs/`. New contributors and AI agents should start here. If you add a new doc, add its row below.
+Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) router so agents can fetch slices instead of whole documents.
+
+## Task router (fetch this file + anchor, not the whole tree)
+
+| Task | Open |
+|---|---|
+| What absolute rules apply? | [`REQUIREMENTS.md §3`](REQUIREMENTS.md#3-prohibition-requirements) (S-001 … S-007) |
+| Where does my code go? | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
+| Threading / Folia / chunk I/O | [`DESIGN.md#threading`](DESIGN.md) |
+| Memory lifecycle | [`DESIGN.md#memorytracker`](DESIGN.md) |
+| Domain term meaning | [`GLOSSARY.md`](GLOSSARY.md) |
+| REQ-* → class → test | [`TRACEABILITY.md`](TRACEABILITY.md) |
+| Prior pitfalls / reproduction notes | [`LESSONS_LEARNED.md`](LESSONS_LEARNED.md) |
+| Requirement-authoring style (`shall`, no temporal framing) | [`RULES.md`](RULES.md) |
+| A decision (why something is the way it is) | [`../adr/README.md`](../adr/README.md) |
+| Fabric status / blockers | [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) |
+| Spiral 1D math | [`../adr/ADR-001-archimedean-spiral-1d-mapping.md`](../adr/ADR-001-archimedean-spiral-1d-mapping.md) |
+| Anvil prefilter / biome / shared module | [`../adr/ADR-016-anvil-subsystem.md`](../adr/ADR-016-anvil-subsystem.md) + [`../architecture/06-anvil-prefilter.md`](../architecture/06-anvil-prefilter.md) |
+| Block tags / state predicates in safety lists | [`../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists.md`](../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists.md) |
+| Coverage targets | [`COVERAGE_PLAN.md`](COVERAGE_PLAN.md) |
+| Runtime test suite (`rtp test full`) | [`RUNTIME_TEST_SUITE_PLAN.md`](RUNTIME_TEST_SUITE_PLAN.md) |
+| Server-admin docs | [`../FOR_SERVER_ADMINS.md`](../FOR_SERVER_ADMINS.md) → [`../admin/`](../admin/) |
+| Addon author docs | [`../FOR_ADDON_DEVELOPERS.md`](../FOR_ADDON_DEVELOPERS.md) |
+| Flat map of every doc | [`../MAP.md`](../MAP.md) |
 
 ## Normative (read before writing code)
 
 | Doc | Purpose |
 |-----|---------|
-| [`REQUIREMENTS.md`](REQUIREMENTS.md) | Absolute laws: threading, memory, command contexts, safety prohibitions (REQ-* IDs). |
+| [`REQUIREMENTS.md`](REQUIREMENTS.md) | Absolute laws: threading, memory, command contexts, safety prohibitions (REQ-* IDs, S-00x prohibitions). |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | Module separation and ArchUnit-enforced import boundaries. |
 | [`DESIGN.md`](DESIGN.md) | Threading model, `MemoryTracker` lifecycle, region caching, chunk-reservation flow. |
-| [`GLOSSARY.md`](GLOSSARY.md) | Canonical domain terms; overloaded-word disambiguation. Do not invent synonyms. |
-| [`../adr/README.md`](../adr/README.md) | Architecture Decision Records index (ADR-001…). |
-| `../../rtp-<platform>/REQUIREMENTS.md` | Module-level requirement files (`rtp-api`, `rtp-core`, `rtp-spigot`, `rtp-paper`, `rtp-folia`). |
+| [`GLOSSARY.md`](GLOSSARY.md) | Canonical domain terms; overloaded-word disambiguation. |
+| [`RULES.md`](RULES.md) | Requirement/ADR authoring rules (`shall` phrasing, absolute state, no temporal framing) and the document type catalog. |
+| [`../adr/README.md`](../adr/README.md) | ADR index. |
+| `../../rtp-<module>/REQUIREMENTS.md` | Module-level requirement files. |
 
 ## Reference (consult on demand)
 
 | Doc | Purpose |
 |-----|---------|
-| [`CONCEPTS.md`](CONCEPTS.md) | O(log n) Archimedean spiral math underpinning location selection. |
-| [`TRACEABILITY.md`](TRACEABILITY.md) | REQ-* → class/method → test mapping; the canonical "already satisfied by" table. |
-| [`COVERAGE_PLAN.md`](COVERAGE_PLAN.md) | JaCoCo baseline (49% → 80% target); critical-gap packages. |
-| [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) | Current Fabric roadmap phase status; known blockers. |
-| [`STAKEHOLDERS.md`](STAKEHOLDERS.md) | Stakeholder roles and review expectations. |
-| [`RULES.md`](RULES.md) | Requirement-document authoring rules (linguistic style, `shall`/`shall not`). |
-| [`DOCUMENTATION_GUIDE.md`](DOCUMENTATION_GUIDE.md) | How to author, structure, and cross-link docs in this repo. |
-| [`LESSONS_LEARNED.md`](LESSONS_LEARNED.md) | Dated engineering notes, reproduction pitfalls, non-obvious behaviors. |
+| [`CONCEPTS.md`](CONCEPTS.md) | Archimedean spiral math; see ADR-001 for the decision. |
+| [`TRACEABILITY.md`](TRACEABILITY.md) | REQ-* → class/method → test mapping. |
+| [`COVERAGE_PLAN.md`](COVERAGE_PLAN.md) | JaCoCo baseline and targets. |
+| [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) | Active Fabric frontier status. |
+| [`ROADMAP.md`](ROADMAP.md) | Forward-looking work. |
+| [`STAKEHOLDERS.md`](STAKEHOLDERS.md) | Roles and review expectations. |
+| [`LESSONS_LEARNED.md`](LESSONS_LEARNED.md) | Dated engineering notes. |
 
-## Feature / Subsystem Plans
-
-| Doc | Purpose |
-|-----|---------|
-| [`ANVIL_PREFILTER_PLAN.md`](ANVIL_PREFILTER_PLAN.md) | Implementation plan for the Anvil read-only prefilter (ADR-016). |
-| [`ANVIL_SHARED_MODULE_PLAN.md`](ANVIL_SHARED_MODULE_PLAN.md) | Shared `rtp-anvil` module design. |
-| [`ANVIL_BIOME_PLAN.md`](ANVIL_BIOME_PLAN.md) | Anvil-backed biome lookups. |
-| [`BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md`](BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md) | Biome + bad-location visitor design. |
-| [`SAFETY_TAGS_AND_STATES_PLAN.md`](SAFETY_TAGS_AND_STATES_PLAN.md) | Block-tag and block-state predicates in safety lists (ADR-017). |
-| [`EMPTY_LIST_CONFIG_PLAN.md`](EMPTY_LIST_CONFIG_PLAN.md) | Empty-list config semantics. |
-| [`YAML_SIMPLIFICATION_PLAN.md`](YAML_SIMPLIFICATION_PLAN.md) | YAML config surface reduction. |
-| [`RUNTIME_TEST_SUITE_PLAN.md`](RUNTIME_TEST_SUITE_PLAN.md) | `rtp test full` runtime test suite design. |
-
-## Agent / Contributor Guides
+## Active subsystem plans
 
 | Doc | Purpose |
 |-----|---------|
-| [`../../.junie/AGENTS.md`](../../.junie/AGENTS.md) | Top-level operational guide for AI agents and contributors. Start here. |
-| [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md) | Human contributor workflow, PR expectations. |
-| [`../../CHANGELOG.md`](../../CHANGELOG.md) | User-facing release notes. |
+| [`BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md`](BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md) | Biome + bad-location visitor design (active pivot). |
+| [`SAFETY_TAGS_AND_STATES_PLAN.md`](SAFETY_TAGS_AND_STATES_PLAN.md) | Block-tag / block-state predicate rollout (ADR-017). |
+| [`RUNTIME_TEST_SUITE_PLAN.md`](RUNTIME_TEST_SUITE_PLAN.md) | `rtp test full` runtime suite. |
+
+> Plans that shipped or were superseded are removed; the ADR is the durable record. Pre-deletion state is recoverable from git.
+
+## Agent / contributor entry points
+
+| Doc | Purpose |
+|-----|---------|
+| [`../../.junie/AGENTS.md`](../../.junie/AGENTS.md) | Top-level operational guide. Start here. |
+| [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md) | Human contributor workflow. |
+| [`../../CHANGELOG.md`](../../CHANGELOG.md) | Release notes. |

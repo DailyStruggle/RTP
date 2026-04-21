@@ -16,14 +16,14 @@ import java.util.regex.Pattern;
 /**
  * Pregen-scan utility that walks every {@code r.X.Z.mca} file under a dimension's
  * {@code region/} folder and returns the union of every namespaced biome identifier
- * it can decode (ANVIL_BIOME_PLAN.md §6.1, Step 2 of §10).
+ * it can decode (ADR-016 (biome) §6.1, Step 2 of §10).
  *
  * <p>Intended consumer: the platform adapter's {@code setBiomesGetter} hook (Step 3),
  * which uses the returned set as the "populated" half of a tab-completion enumerator.
  * Worlds whose pregen is complete get a complete roster; partial pregen yields the
  * subset that has actually been written to disk (addons that can enumerate from a
  * generator engine — e.g. {@code RTP_Iris_integration} — remain the authoritative
- * source in that case, see ANVIL_BIOME_PLAN.md §7).
+ * source in that case, see ADR-016 (biome) §7).
  *
  * <h2>Threading</h2>
  * <ul>
@@ -43,7 +43,7 @@ import java.util.regex.Pattern;
  * startup-scan-plus-tab-completion usage.
  *
  * <h2>Failure mode</h2>
- * <p>Per ANVIL_BIOME_PLAN §8 and ADR-016's "malformed → UNKNOWN, never crash" posture,
+ * <p>Per ADR-016 (biome) §8 and ADR-016's "malformed → UNKNOWN, never crash" posture,
  * any individual chunk or file decode failure is silently skipped. The scanner returns
  * only the biome identifiers it could successfully decode; it never throws on bad data.
  * A missing region folder yields an empty set, not an exception (an unpopulated world

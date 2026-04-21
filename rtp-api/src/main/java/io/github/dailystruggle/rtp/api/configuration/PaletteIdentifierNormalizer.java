@@ -11,7 +11,7 @@ import java.util.Set;
  * Pure-string, platform-neutral identifier normalizer shared by RTP's safety configuration
  * and by the Spigot-only Anvil read-only pre-filter (see
  * {@code docs/adr/ADR-016-anvil-subsystem.md} and
- * {@code docs/dev/ANVIL_PREFILTER_PLAN.md} §8.1).
+ * {@code ADR-016} §8.1).
  *
  * <p>The normalizer intentionally has <strong>zero Bukkit dependencies</strong> so it can
  * live in {@code rtp-api} and be called from both {@code rtp-core} (during

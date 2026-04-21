@@ -445,7 +445,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   @Override
   @RegionThread
   public String getBiome(int x, int y, int z) {
-    // ADR-016 / ANVIL_BIOME_PLAN §6 — Anvil-first in-place amendment (parity
+    // ADR-016 / ADR-016 (biome) §6 — Anvil-first in-place amendment (parity
     // with BukkitRTPWorld). Zero-I/O cache read; on miss or outside-window the
     // call falls through to the pre-existing static getter (vanilla enum or
     // Iris-addon override, depending on last-registered setter). Biome reads

@@ -2,7 +2,7 @@
 
 This document outlines critical development rules that MUST be followed to ensure the stability, safety, and performance of the RTP plugin. The **S-series** rules are derived from the [Prohibition Requirements](REQUIREMENTS.md#3-prohibition-requirements); other rule families (F-, D-) have their own sources, cited per rule.
 
-For operational guidelines and AI-specific instructions, see [`AGENTS.md`](../../.junie/AGENTS.md). For the catalog of document types in this project, see [`DOCUMENTATION_GUIDE.md`](./DOCUMENTATION_GUIDE.md).
+For operational guidelines and AI-specific instructions, see [`AGENTS.md`](../../.junie/AGENTS.md). The catalog of document types is appended at the end of this file.
 
 ## Quick Reference
 
@@ -86,3 +86,24 @@ These rules govern how project documentation, requirements, and design specifica
 
 - Any new ADR that introduces a prohibition or a new safety/architectural invariant MUST add a corresponding rule to this file (and its quick-reference row) in the same change set.
 - When a rule's underlying requirement is renamed or renumbered, update both the detailed bullet and the quick-reference table row; stale requirement IDs silently break `Rule D-001`.
+
+---
+
+## Appendix: Document Type Catalog
+
+Project documents follow one of two structures:
+
+- **Centralized ("Living")** — a single project-wide document in `docs/dev/` covering a concern that spans modules.
+- **Recurring** — a high-level summary in `docs/dev/` plus a module-specific copy in each submodule. Recurring docs MUST use the identical filename and top-level heading in every module so that a filename search yields the complete set.
+
+| # | Type | Structure | Location | Primary audience |
+|---|------|-----------|----------|------------------|
+| 1 | Requirements (`what`) | Recurring | `docs/dev/REQUIREMENTS.md`, module `REQUIREMENTS.md` | PMs, devs, QA |
+| 2 | Design (`how`) | Recurring | `docs/dev/DESIGN.md`, module `DESIGN.md` | Devs, architects |
+| 3 | ADRs (`why`, immutable) | Centralized | `docs/adr/ADR-NNN-*.md` | Devs, architects |
+| 4 | Plans | Centralized | `docs/dev/*_PLAN.md` | Devs, PMs |
+| 5 | Traceability / Coverage | Centralized | `docs/dev/TRACEABILITY.md`, `COVERAGE_PLAN.md` | Devs, PMs, QA |
+| 6 | Rules (this file) | Centralized | `docs/dev/RULES.md` | Devs, AI agents |
+| 7 | Glossary | Centralized | `docs/dev/GLOSSARY.md` | All contributors |
+
+IDs use `REQ-<module>-<family>-NNN` (requirements) and ADR-NNN (decisions). Requirements use `shall` / `shall not`; see Rule D-002.

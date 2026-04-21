@@ -13,7 +13,7 @@ package io.github.dailystruggle.rtp.anvil;
  * <p>The whitelist is deliberately conservative: a {@code DataVersion} not covered here
  * yields {@link Verdict#UNKNOWN} and falls through to the existing live-load path. New
  * Minecraft releases opt in by extending the whitelist and adding fixture-backed parity
- * evidence per {@code ANVIL_PREFILTER_PLAN.md} §8.2.</p>
+ * evidence per {@code ADR-016} §8.2.</p>
  *
  * <p>This class is immutable and thread-safe; it exposes only static helpers.</p>
  *
@@ -70,7 +70,7 @@ public final class DataVersionSupport {
    * constant ({@link #MC_26_1_DATA_VERSION} = 4788). Future Minecraft releases that
    * break the chunk NBT layout (section Y-range shift, heightmap bit-width change,
    * new compression mode, etc.) shall tighten this ceiling and add a new fixture
-   * per {@code ANVIL_PREFILTER_PLAN.md} §8.2.
+   * per {@code ADR-016} §8.2.
    *
    * <p>Ratcheting the ceiling up without fixture evidence is only safe when no
    * breaking format change has shipped; errant parsing failures in the probe path

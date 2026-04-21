@@ -739,6 +739,18 @@ public class LocationGenerator implements ILocationGenerator {
                 try {
                     ticket = world.getChunkAtAsync(cx, cz).get();
                 } catch (InterruptedException | ExecutionException e) {
+                    // REQ-RTP-S-004: do not silently discard this attempt.
+                    // Paper's native async-load path can resolve exceptionally under
+                    // chunk-system-v2 back-pressure; previously this `continue` hid
+                    // the failure from both the `failMap` summary and the RTP log.
+                    RTP.log(Level.WARNING,
+                            "[RTP] Async chunk ticket failed for world=" + world.name()
+                                    + " chunk=(" + cx + "," + cz + "): "
+                                    + e.getClass().getSimpleName() + ": " + e.getMessage());
+                    if (verbose) {
+                        failMap.get(FailTypes.nullChunk)
+                                .compute("reason=ticketFailed", (s, aLong) -> (aLong == null) ? 1L : ++aLong);
+                    }
                     continue;
                 }
                 try {
@@ -748,6 +760,12 @@ public class LocationGenerator implements ILocationGenerator {
                     chunk = (key != null) ? world.getCachedChunk(key) : null;
                 } catch (java.util.concurrent.TimeoutException | InterruptedException | ExecutionException e) {
                     RTP.log(Level.WARNING, "Chunk load timed out or failed at " + cx + ", " + cz);
+                    // REQ-RTP-S-004: attribute the timeout/exception to the
+                    // existing `timeout` bucket so the pregen summary reflects it.
+                    if (verbose) {
+                        failMap.get(FailTypes.timeout)
+                                .compute("reason=chunkLoadTimeout", (s, aLong) -> (aLong == null) ? 1L : ++aLong);
+                    }
                     continue;
                 }
             }
@@ -768,6 +786,12 @@ public class LocationGenerator implements ILocationGenerator {
                         "[RTP] Stale chunk before vert.adjust ("
                                 + world.name() + " " + cx + "," + cz
                                 + "); rejecting candidate.");
+                // REQ-RTP-S-004: attribute the stale-chunk rejection so the pregen
+                // summary does not report `fails=0` everywhere while attempts drop.
+                if (verbose) {
+                    failMap.get(FailTypes.nullChunk)
+                            .compute("reason=staleChunkBeforeVert", (s, aLong) -> (aLong == null) ? 1L : ++aLong);
+                }
                 continue;
             }
 

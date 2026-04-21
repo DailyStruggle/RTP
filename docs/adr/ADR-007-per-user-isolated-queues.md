@@ -21,15 +21,6 @@ This provides a tiered priority model:
 - **Standard players** consume from the global queue and are subject to its current depth.
 - **Permissioned players** (e.g., operators, VIPs, trusted staff) consume from their own pre-warmed queue, guaranteeing availability regardless of global queue state.
 
-## Alternatives Considered
-
-| Alternative | Why Rejected |
-|-------------|--------------|
-| Single global queue only | Permissioned users are not protected from queue flooding by less trusted players; a DDoS-style burst of requests from public players degrades the experience for everyone equally. |
-| Rate-limiting the global queue per player | Limits burst consumption but does not guarantee availability for high-priority users; a sustained flood still depletes the shared pool. |
-| Priority queue with weighted consumption | More complex to implement and reason about; still shares a single pool so a large enough flood can starve lower-priority entries before they are consumed. |
-| Separate queues per player for all players | Excessive memory usage and replenishment overhead when player counts are high; the benefit (isolation) is only meaningful for a small set of trusted users. |
-
 ## Consequences
 
 - **Positive:**

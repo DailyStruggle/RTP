@@ -15,15 +15,6 @@ A `BrigadierCommandAdapter` inside `commands-api` shall be provided to convert t
 
 For implementation and code-level details, see [DESIGN.md — Brigadier Bridge](../dev/DESIGN.md#brigadier-bridge-commands-api).
 
-## Alternatives Considered
-
-| Alternative | Why Rejected |
-|---|---|
-| Keep manually duplicating the command tree in `rtp-fabric` | Any command tree change required two edits; divergence was inevitable. |
-| Move all command logic into `rtp-fabric` and drop `commands-api` for Fabric | Defeated the purpose of `commands-api` as a shared framework; broke the architecture boundary (ARCHITECTURE.md). |
-| Use Brigadier directly in `rtp-core` | `rtp-core` does not import platform-specific classes (ArchUnit-enforced). Brigadier is bundled with Minecraft, not a standalone library available to `rtp-core`. |
-| Adopt Architectury as a cross-platform command abstraction | Architectury is a large transitive dependency and introduces its own abstraction layer on top of Fabric/Forge. Premature until Forge support is actively planned; re-evaluate when `rtp-forge` work begins (see MULTI_PLATFORM_PLAN.md §Future). |
-
 ## Consequences
 
 - **Positive:**

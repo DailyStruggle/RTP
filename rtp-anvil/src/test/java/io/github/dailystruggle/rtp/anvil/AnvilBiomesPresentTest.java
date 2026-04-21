@@ -19,12 +19,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Focused contract test for {@link AnvilChunkView#getBiomesPresent()} — the enumeration
- * surface feeding {@link AnvilRegionScanner} (ANVIL_BIOME_PLAN.md §4, §10.2).
+ * surface feeding {@link AnvilRegionScanner} (ADR-016 (biome) §4, §10.2).
  *
  * <p>Extends the Step-1 sanity in {@code AnvilBiomeDecoderTest} with the properties
  * the scanner relies on: insertion-order stability, per-section skip of unparseable
  * containers, and immutability of the returned view. Tracked in TRACEABILITY.md as
- * the verification for ANVIL_BIOME_PLAN §4 ({@code getBiomesPresent} union).
+ * the verification for ADR-016 (biome) §4 ({@code getBiomesPresent} union).
  */
 class AnvilBiomesPresentTest {
 

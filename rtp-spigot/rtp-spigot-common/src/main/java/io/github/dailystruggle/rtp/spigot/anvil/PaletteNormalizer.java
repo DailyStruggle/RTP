@@ -10,7 +10,7 @@ import org.bukkit.Material;
 /**
  * Spigot-side reconciler layered on top of {@link PaletteIdentifierNormalizer}.
  *
- * <p>Per {@code ANVIL_PREFILTER_PLAN.md} §8.1, identifier normalization is deliberately
+ * <p>Per {@code ADR-016} §8.1, identifier normalization is deliberately
  * split in two:</p>
  *
  * <ul>

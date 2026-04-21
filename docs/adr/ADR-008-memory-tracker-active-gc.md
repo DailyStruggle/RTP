@@ -29,21 +29,12 @@ Together, the active tracker catches leaks that persist despite live references 
 
 For implementation and code-level details (e.g., `MemoryTracker`, `TeleportPipelineTask`), see [DESIGN.md §6 — Active Task and Resource Tracking](../dev/DESIGN.md#6-active-task-and-resource-tracking-memory-and-chunk-management).
 
-## Alternatives Considered
-
-| Alternative | Why Rejected |
-|-------------|--------------|
-| `try-finally` only | Only covers synchronous, single-frame cleanup. Cannot detect a task stalled across tick boundaries or abandoned due to a player disconnect during async execution. |
-| `WeakReference` only | JVM reclaims the Java object but does not release the server-side chunk ticket held by the Minecraft engine. Force-loaded chunks remain loaded even after the Java wrapper is GC'd. |
-| No explicit tracking (rely on plugin disable cleanup) | Chunk tickets accumulate during uptime and are only released on server restart. Does not solve the re-load-on-startup reproduction of the leak. |
-| OS/JVM heap monitoring | Monitors JVM memory, not Minecraft chunk ticket state. Chunk tickets are server-engine resources invisible to standard JVM profilers. |
-
 ## Consequences
 
 - **Positive:**
   - Force-loaded chunks are guaranteed to be released within a bounded time window even if the owning task stalls or its player disconnects.
   - The active tracker provides observable diagnostics: leaked tasks can be logged and counted, enabling developers to identify and fix new leak patterns as they are discovered.
-  - Servers that previously required periodic restarts due to chunk bloat can run indefinitely without intervention.
+  - Long-running servers remain stable without restart intervention caused by chunk bloat.
 
 - **Negative / Trade-offs:**
   - The `MemoryTracker` registry adds a small per-task overhead (registration, deregistration, periodic scan).

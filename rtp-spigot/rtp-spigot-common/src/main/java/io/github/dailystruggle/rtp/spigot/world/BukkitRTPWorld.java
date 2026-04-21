@@ -555,7 +555,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
 
   @Override
   public String getBiome(int x, int y, int z) {
-    // ADR-016 / ANVIL_BIOME_PLAN §6 — in-place amendment. Anvil-first:
+    // ADR-016 / ADR-016 (biome) §6 — in-place amendment. Anvil-first:
     // if the Phase-3a pre-filter already decoded this chunk and its view
     // is still cached (no I/O on this path — O(1) ConcurrentHashMap read),
     // return the raw namespaced biome identifier from the on-disk palette.

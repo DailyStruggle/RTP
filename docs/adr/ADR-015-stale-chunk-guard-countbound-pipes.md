@@ -65,16 +65,6 @@ Count-Bound-scheduled callback:
    candidate without a retry — the outer spiral/poll loop will naturally
    pick a fresh candidate (and load its chunk async) on the next iteration.
 
-## Alternatives Considered
-
-| Alternative | Why Rejected |
-|-------------|--------------|
-| Hold a force-load ticket for the duration of the Count-Bound callback | Violates REQ-RTP-S-002 on Folia; on Paper it inflates the active-chunk ticket count and fights the MemoryTracker watchdog. |
-| Dispatch the block-evaluation under a Global Region Scheduler task instead of a Region-Thread task | Serializes all teleport pipelines through the global region; destroys the throughput that motivates ADR-004 Count-Bound pipes in the first place. |
-| Wrap `chunk.isSafe(...)` in a try/catch that swallows the sync-load and retries | Silent discard — violates REQ-RTP-S-004. Also: the sync load already ran by the time the catch block executes, so the Watchdog has already been woken. |
-| Keep a `WeakReference` to the `ChunkSnapshot` and re-read from that | Java's GC is not deterministic and is not correlated with Folia's native chunk-lifetime tracking; a live `WeakReference` does not imply the native chunk is still loaded. |
-| Add the guard only in `FoliaLocationGenerator` | The same Count-Bound-vs-native-GC race can occur in `rtp-core`'s own pipeline when an async caching pulse delays the block-evaluation side of `LocationGenerator.getLocation(...)`. Protecting one site leaves the other exposed. |
-
 ## Consequences
 
 - **Positive:**
