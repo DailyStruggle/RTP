@@ -352,6 +352,49 @@ public interface RTPServerAccessor {
   Set<String> materials();
 
   /**
+   * Returns an immutable snapshot of the platform's live block-tag registry,
+   * keyed by the lowercase {@code namespace:path} tag identifier (no leading
+   * {@code #}), matching the parsed form of a {@code SafetyToken} with
+   * {@code Kind.TAG}. Values are immutable {@link Set}s of upper-case material
+   * names in the platform's canonical format (e.g. {@code "OAK_LEAVES"}).
+   *
+   * <p>The snapshot is consumed by the ADR-017 safety-token compiler
+   * ({@code SafetyCompilationCache}) to expand tag tokens into their constituent
+   * material names at compile time. Implementations shall return a <b>stable
+   * reference</b> between reloads — i.e. the map is rebuilt only when
+   * {@link #rebuildBlockTagSnapshot()} is invoked — so that downstream caches
+   * may key on {@link System#identityHashCode(Object)} to detect invalidation.
+   *
+   * <p>The default implementation returns {@link java.util.Collections#emptyMap()},
+   * which is the correct behaviour for platforms without a tag registry and for
+   * test accessors that do not need to exercise the tag path. Bukkit-family
+   * platforms override this to expose {@code Bukkit.getTags(Tag.REGISTRY_BLOCKS, …)}.
+   * Fabric and other non-Bukkit platforms may delegate to the standalone
+   * {@code rtp-tags} disk resolver.
+   *
+   * <p><b>Thread safety:</b> the returned map and all value sets shall be
+   * immutable. Callers shall treat them as read-only and shall not rely on
+   * reference equality across rebuilds.
+   *
+   * @return immutable {@code tagToken -> materialNames} map; never {@code null}.
+   */
+  default Map<String, Set<String>> blockTagSnapshot() {
+    return java.util.Collections.emptyMap();
+  }
+
+  /**
+   * Instructs the accessor to rebuild its block-tag snapshot on the next call
+   * to {@link #blockTagSnapshot()}. Invoked by the {@code /rtp reload} handler
+   * and by test fixtures that swap the underlying tag registry.
+   *
+   * <p>The default implementation is a no-op for platforms that do not maintain
+   * a tag snapshot.
+   */
+  default void rebuildBlockTagSnapshot() {
+    // no-op by default.
+  }
+
+  /**
    * Shuts down all RTP subsystems cleanly (called on plugin disable).
    * Releases chunk tickets, cancels pending tasks, and flushes any pending state.
    */

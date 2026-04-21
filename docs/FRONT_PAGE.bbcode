@@ -3,63 +3,67 @@
 [SIZE=4][B][COLOR=#555555]Enterprise-Grade Deterministic Teleportation[/COLOR][/B][/SIZE]
 [I]A Specialized Zero-Latency Random Teleport Solution for Technical and Community Networks.[/I]
 
+[SIZE=4][COLOR=#E67E22][B]3.0.0, Early Access (beta.1)[/B][/COLOR][/SIZE]
+[SIZE=3][I]A deterministic, bounded, audited RTP engine, built for operators and open to contributors.[/I][/SIZE]
+
+[SIZE=3][B][COLOR=#27AE60]Beta launch pricing: $7.50 during the Early Access window. Regular price $15 at 3.0.0 GA. Early buyers keep the resource at no extra cost.[/COLOR][/B][/SIZE]
+
 [URL='https://github.com/dailystruggle/RTP'][IMG]https://img.shields.io/github/v/release/dailystruggle/RTP?label=Version&style=for-the-badge&color=2980B9[/IMG][/URL] [URL='https://github.com/dailystruggle/RTP'][IMG]https://img.shields.io/github/license/dailystruggle/RTP?label=License&style=for-the-badge&color=2C3E50[/IMG][/URL]
 
 [COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR]
 [/CENTER]
 
+[SIZE=5][B][COLOR=#C0392B]Before You Buy[/B][/COLOR][/SIZE]
+RTP-Pro is a specialist tool. A few things to confirm before you purchase. If any of these are a hard [B]no[/B] for you, this probably isn't the right plugin for your server, and I'd rather you know that now than after a refund ticket.
+
+[LIST]
+[*][B]Java 21 or newer[/B] on your host. This one is non-negotiable (REQ-RTP-SYS-001).
+[*][B]Paper, Folia, or Spigot.[/B] Fabric isn't supported. Other Bukkit-family forks outside those three are untested.
+[*][B]Comfortable editing YAML[/B] and reading a wiki. There's no GUI by design, configuration is plain text files you can version and diff.
+[*][B]Willing to read the admin guide before asking for help.[/B] See the Support Policy below, this one is enforced.
+[*][B]Running a real server,[/B] not a 2-player LAN world. The engineering here targets networks where teleport latency and TPS stability add up to real cost. For a friends-only SMP it is overkill.
+[*][B]OK with AI-assisted development[/B] in the authoring loop. See the note at the bottom of this page. Every shipped line is human-reviewed, but the tooling is disclosed.
+[/LIST]
+
+If all six are a yes, read on. If any are a no, EssentialsX `/rtp` and HuskHomes RTP are solid free alternatives that will probably serve you better.
+
+[CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
+
 [SIZE=5][B][COLOR=#2980B9]Core Architectural Pillars[/COLOR][/B][/SIZE]
-RTP is engineered from the ground up to solve the fundamental performance and reliability problems that plague other teleportation plugins. Our design is built on four key pillars:
+RTP was rebuilt from scratch to fix the performance and reliability problems that show up in most teleport plugins once you scale past a handful of players. The design rests on five things:
 
 [LIST]
-[*][B]Deterministic Selection Engine:[/B] We use a specialized [B]spiral mapping algorithm[/B] to explore your world. This eliminates lag-inducing "re-roll" guessing and guarantees fast, uniform player distribution even in massive worlds.
-[*][B]Platform-Native Performance:[/B] RTP isn't just "compatible with" modern servers—it's [B]optimized for them[/B]. With dedicated support for Spigot, Paper, and Folia, we use the best background processing and threading models each platform has to offer.
-[*][B]Active Resource Watchdog:[/B] A persistent background watchdog actively monitors all tasks and chunk requests, instantly reclaiming resources from abandoned teleports and preventing memory leaks before they can start.
-[*][B]Direct Region I/O Pre-Filter:[/B] On Spigot [I]and Folia[/I], we bypass slow, region-bound chunk loads by reading world data directly from disk (`.mca` region files) on a background thread pool. This gives you Paper-grade off-tick safety evaluation on Spigot and eliminates per-candidate Region-Thread hops on Folia.
+[*][B]Deterministic selection.[/B] A spiral mapping algorithm replaces lag-inducing "re-roll" guessing, and gives you fast, uniform player distribution even in massive worlds.
+[*][B]Platform-native performance.[/B] Not just compatible with modern servers, optimized for them. Spigot, Paper, and Folia each get the threading model that actually fits them.
+[*][B]Active resource watchdog.[/B] A background sweep reclaims chunk tickets from abandoned teleports via WeakReferences, so stalled tasks can't pin resources and no chunk stays force-loaded past its reservation window.
+[*][B]Direct region I/O pre-filter.[/B] On Spigot and Folia, `.mca` region files are parsed off-tick on a background pool. That gives Paper-grade safety evaluation on Spigot, and skips per-candidate Region-Thread hops on Folia. The same reader resolves biomes off-tick, including custom namespaced biomes like Iris.
+[*][B]Self-warming background sampler.[/B] Once the cache is full, selection switches to observational mode. It keeps walking the spiral with the same off-tick safety evaluation, but discards the results instead of enqueuing them. The side effects (bad-sector learning, observed biomes) still stick. The longer your server runs, the more of your world gets mapped — whether or not anyone is teleporting.
 [/LIST]
 
 [CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
 
-[SIZE=5][B][COLOR=#16A085]Chunk Loading — How It Actually Works On Your Platform[/COLOR][/B][/SIZE]
-Chunk I/O is the single biggest source of teleport lag. Most RTP plugins treat every platform the same and pay the cost of the [I]worst[/I] one. RTP does not. Here is exactly what happens when a candidate chunk is evaluated on your server:
+[SIZE=5][B][COLOR=#16A085]Chunk Loading, By Platform[/COLOR][/B][/SIZE]
+Chunk I/O is the single biggest source of teleport lag. Most RTP plugins treat every platform the same and end up paying the cost of the [I]worst[/I] one. I wasn't willing to do that. Here is what actually happens when a candidate chunk is evaluated on your server:
 
 [LIST]
-[*][B][COLOR=#27AE60]Paper — Fully Async, Zero Tradeoffs.[/COLOR][/B] Paper exposes a native `World#getChunkAtAsync` that returns a `CompletableFuture<Chunk>`. RTP uses it directly. Safety evaluation runs off-tick. No pre-filter needed, no main-thread fallback, no surprises. [B]This is the reference platform.[/B]
-[*][B][COLOR=#2980B9]Folia — Off-Tick Pre-Filter + Native Region Scheduler.[/COLOR][/B] Folia's chunk API is Region-Thread-bound, which normally means every candidate costs a scheduler hop. RTP defeats this by running the [B]Anvil read-only pre-filter[/B] on `ForkJoinPool.commonPool()` [I]before[/I] touching the Region Scheduler — rejected candidates never hop a thread. Confirmed candidates are then loaded via Folia's native async region-aware API. Teleports themselves are dispatched through the Entity Scheduler per Folia's contract.
-[*][B][COLOR=#E67E22]Spigot — Anvil Pre-Filter Does The Heavy Lifting.[/COLOR][/B] Vanilla Spigot has [I]no[/I] `CompletableFuture`-returning async chunk API — the `World#getChunkAtAsync(int,int) -> CompletableFuture<Chunk>` overload is a Paper addition. Without mitigation, every candidate would drive a synchronous main-thread `getChunkAt`. RTP mitigates this by parsing `.mca` region files directly off-tick: `isAir`, `isSafe`, surface-height and sky-light checks all run on `ForkJoinPool.commonPool()` against an `AnvilChunkView`. [B]This is how Spigot gets Paper-class selection throughput without a Paper fork.[/B]
-[*][B][COLOR=#C0392B]Honest Caveats (Spigot + Folia fallback path).[/COLOR][/B] The Anvil pre-filter is a [I]data source[/I], not a universal gate. It falls through to the platform's native chunk API when: (1) the chunk is already loaded (live data wins), (2) the world uses a custom `ChunkGenerator` (Iris, Terra, etc.), or (3) the Anvil format is unrecognized. On Spigot, the fallback is a main-thread `getChunkAt` scheduled via the primary scheduler — unblocking the caller's future but not moving the I/O off-tick. On Folia, the fallback is a Region-Scheduler hop. [B]If you run a custom-generator world on Spigot, you will not get the off-tick win for those chunks — use Paper or Folia for that workload.[/B]
-[*][B][COLOR=#8E44AD]Fabric — Not Supported.[/COLOR][/B] Fabric is on the roadmap but is explicitly out of scope for the current release. Do not run RTP on a Fabric server and expect production behavior.
+[*][B][COLOR=#27AE60]Paper, fully async.[/COLOR][/B] Paper's native `World#getChunkAtAsync` returns a `CompletableFuture<Chunk>`, and RTP uses it directly. Safety evaluation runs off-tick, with no pre-filter and no main-thread fallback. This is the reference platform.
+[*][B][COLOR=#2980B9]Folia, off-tick pre-filter plus the native Region Scheduler.[/COLOR][/B] Folia's chunk API is Region-Thread-bound, which normally costs a scheduler hop per candidate. RTP runs its Anvil read-only pre-filter on `ForkJoinPool.commonPool()` before the Region Scheduler, so rejected candidates never hop a thread. Confirmed candidates load through Folia's native async API, and teleports dispatch through the Entity Scheduler.
+[*][B][COLOR=#E67E22]Spigot, where the Anvil pre-filter does most of the heavy lifting.[/COLOR][/B] Vanilla Spigot has no `CompletableFuture`-returning async chunk API (that overload is a Paper addition), so without mitigation every candidate would drive a synchronous main-thread `getChunkAt`. RTP parses `.mca` region files off-tick instead. `isAir`, `isSafe`, surface-height, and sky-light checks all run on `ForkJoinPool.commonPool()` against an `AnvilChunkView`. The practical result is Paper-class throughput on Spigot, without having to run a Paper fork.
+[*][B][COLOR=#C0392B]Honest caveats on the Spigot and Folia fallback path.[/COLOR][/B] The Anvil pre-filter is a data source, not a universal gate. It falls through to the platform's native chunk API in two cases: when the chunk is already loaded (live data wins), and when the probe returns [I]unknown[/I] (no region file, unsupported data version, decode error, or un-populated). On Spigot the fallback is one on-tick `getChunkAt`. On Folia it's one Region-Scheduler hop. Custom generators like Iris, Terra, and datapacks are [I]not[/I] a fallback trigger, since populated `.mca` palettes are read directly, preserving modded and namespaced IDs that the Bukkit enum would otherwise collapse.
+[*][B][COLOR=#8E44AD]Upgrade-drift proof biome filtering.[/COLOR][/B] When you bump your Paper or Folia server across a Minecraft version, Mojang's seed-based biome assignment can change for coordinates already written to disk. The Anvil-first biome read — applied on every Bukkit-family platform — keeps the `.mca` palette authoritative for populated chunks, so the biome the player actually lands in is the biome your `biomes:` allow-list was written against. No re-pregen, no re-tuning after an upgrade.
+[*][B][COLOR=#8E44AD]Fabric is not supported.[/COLOR][/B] It's on the roadmap but explicitly out of scope for this release. Don't run RTP on Fabric and expect production behavior.
 [/LIST]
 
-[B]Operator takeaway:[/B] on Paper and Folia, chunk I/O is fully off-tick by design. On vanilla Spigot, the Anvil pre-filter covers the common case (unloaded chunks, vanilla generator) — which is the vast majority of candidates in a typical selection sweep — and the rare fallback to main-thread `getChunkAt` is bounded by your configured tick-budget. No platform silently blocks the tick loop without reporting it.
-
-[CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
-
-[SIZE=5][B][COLOR=#C0392B]Performance Proofs & Demos[/COLOR][/B][/SIZE]
-
-[B]Learning & Performance Test (Older Version, Principles Remain)[/B]
-[media=youtube]PY6W7DikhAI[/media]
-[I]Demonstrates the plugin "learning" bad sectors to achieve deterministic selection time.[/I]
-
-[B]Command Response & Throughput Test[/B]
-[media=youtube]l6KSvKxsKAQ[/media]
-[I]Showcases the immediate command response and high-throughput capabilities of the queueing system.[/I]
+[B]Operator takeaway:[/B] Paper and Folia run chunk I/O fully off-tick by design. On vanilla Spigot the Anvil pre-filter covers the common case (any unloaded chunk already populated on disk, vanilla or custom-generated), which is the vast majority of candidates. The rare main-thread fallback is bounded by your configured tick-budget, and no platform silently blocks the tick loop without reporting it.
 
 [CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
 
 [SIZE=5][B][COLOR=#E67E22]The Engineering: A Deeper Dive[/COLOR][/B][/SIZE]
 
-[B]1. Algorithmic Spatial Memory - No More "Brute-Force Guessing"[/B]
-Without spatial indexing, teleportation is a guessing game. Profiling vanilla generation reveals the challenge: the Overworld is ~45% ocean, and the End is ~33% void. Standard RTPs waste immense resources loading and discarding these chunks.
-[B]Our Solution:[/B] RTP uses advanced mapping to plot out your world's geometry. When it encounters a massive ocean or unsafe biome, it remembers that area. As the server runs, RTP dynamically shrinks its searchable area, skipping known "bad sectors" entirely without ever needing to load those chunks again. [B]The longer it runs, the faster it gets.[/B]
-
-[B]2. Zero-Latency Execution Engine - Taming the Tick[/B]
-Traditional RTPs cause unpredictable MSPT spikes by flooding the server with random, un-paced chunk requests. [B]RTP subverts this by enforcing strict structural caps.[/B]
-[LIST]
-[*][B]Pre-Warmed Background Caching:[/B] Our background pipeline continuously paces chunk evaluations, ensuring safe locations are ready before a player ever requests one.
-[*][B]Native Folia Support:[/B] Built to respect Folia's regionized multi-threading using non-blocking execution to eliminate unnecessary scheduling delays.
-[*][B]Zero-Leak Resource Management:[/B] We utilize transient in-memory tickets and an active watchdog to aggressively recover abandoned chunks and prevent the RAM bloat and world corruption caused by older force-loading methods.
-[/LIST]
+[B]Algorithmic spatial memory, instead of brute-force guessing[/B]
+Without spatial indexing, teleportation is a guessing game, and the numbers are ugly. A typical Overworld is only around 45% safely teleportable (oceans, rivers, ravines, and steep terrain eat the rest), the Nether is dominated by lava seas and wall-to-wall stone, and the End is [I]almost entirely[/I] void. Standard RTPs pay full chunk-load cost to discover this one candidate at a time, forever.
+RTP plots your world's geometry as it evaluates candidates. When it hits a massive ocean or an unsafe biome, it remembers that sector and shrinks its searchable area, so known bad sectors never get loaded again. The longer it runs, the faster it gets — and the observational sampler keeps that learning going during idle periods without forcing chunk generation.
+[B]Persistence across restarts:[/B] learned bad-sector state is written to H2 or SQLite and reloaded on startup, so a seasoned server doesn't pay the cold-cache cost when the JVM bounces.
 
 [CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
 
@@ -73,7 +77,9 @@ Traditional RTPs cause unpredictable MSPT spikes by flooding the server with ran
 [*]Optional sky light checks, world permission requirements, and unique placement guarantees
 [*]Configurable safety radius, platform creation, and invulnerability timers
 [*]Fully async chunk loading on Paper and Folia; off-tick Anvil pre-filter on Spigot (see platform breakdown above)
-[*]Per-player and global location queues
+[*][B]Per-player isolated queues[/B] alongside a global queue, so one player's bad luck never starves another's teleport
+[*][B]Administrative world-scan lifecycle[/B] (`start` / `pause` / `resume` / `reset` / `cancel`) to pre-populate spatial memory without teleporting players
+[*][B]Persistent learned state[/B] across restarts via H2 / SQLite
 [/LIST]
 [B]Supported Claim Plugins:[/B]
 Native, thread-safe integrations for the following are provided via our addons system:
@@ -90,7 +96,7 @@ Native, thread-safe integrations for the following are provided via our addons s
 RTP exposes its core pipelines through modular configuration, allowing you to tailor the engine to your hardware.
 [LIST]
 [*]Configurable time budgets and chunk limits per tick.
-[*]Customize unsafe materials and safety radii.
+[*]Customize unsafe materials and safety radii, using a full [B]token grammar[/B] (see below), not just flat material names.
 [*]Apply dimension locks and unique safety configs (e.g., Nether vs. Overworld).
 [*]Establish variable pricing for different teleport types.
 [*]Complete localization and player-facing text isolation.
@@ -98,15 +104,79 @@ RTP exposes its core pipelines through modular configuration, allowing you to ta
 
 [CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
 
+[SIZE=5][B][COLOR=#16A085]Safety List Grammar: Block Tags, Block States, and Wildcards[/COLOR][/B][/SIZE]
+`safety.yml` has a first-class token grammar. You aren't limited to enumerating every `Material` name anymore, you can target entire vanilla block tags and match on block-state properties. All five shapes can be mixed freely in `unsafeBlocks` (and `airBlocks`).
+
+[LIST]
+[*][B]Plain material:[/B] `LAVA`, `MAGMA_BLOCK`. Exactly what you'd expect.
+[*][B]Material with a state predicate:[/B] `OAK_SLAB[waterlogged=true]` matches oak slabs [I]only when waterlogged[/I]. Multiple predicates are AND-ed, like `OAK_SLAB[waterlogged=true,type=top]`.
+[*][B]Vanilla block tag:[/B] `#minecraft:leaves`, `#minecraft:fire`, `#minecraft:campfires`. These are expanded at config-load time from the server's live tag registry, so they update automatically when Mojang adds new blocks to a tag. You don't have to edit your config on every MC update.
+[*][B]Tag with a state predicate:[/B] `#minecraft:slabs[waterlogged=true]`, i.e. "any slab, but only when waterlogged". No more manually listing every slab variant.
+[*][B]Wildcard with a state predicate:[/B] `*[waterlogged=true]`, i.e. "any block at all, matched when `waterlogged=true`". One line replaces the entire waterloggable-block enumeration (iron bars, lanterns, chains, fences, all of them).
+[/LIST]
+
+[B]Key properties:[/B]
+[LIST]
+[*][B]Fail-open on unknown tags and properties.[/B] Missing tags on older MC versions silently reduce coverage rather than breaking startup, which keeps your config portable across Minecraft versions.
+[*][B]Never silent on malformed tokens.[/B] Typos like `OAK_SLAB[waterlogged` surface as a single `[WARNING] [safety.yml] rejected token '…': <reason>` in console, so you always know what was dropped.
+[*][B]Zero hot-path cost when unused.[/B] The evaluator only extracts block-state properties when a token in your config actually needs them, and plain-material configs pay nothing.
+[*][B]Platform-portable tag resolution.[/B] Bukkit platforms read tags from the live registry (`Bukkit.getTag`), and the standalone `rtp-tags` module can parse tag JSON directly from data packs and jars for future non-Bukkit platforms.
+[/LIST]
+
+[B]Example: the new default `safety.yml` is roughly 25% shorter.[/B]
+[LIST]
+[*]`FIRE` + `SOUL_FIRE` → `#minecraft:fire`
+[*]`CAMPFIRE` + `SOUL_CAMPFIRE` → `#minecraft:campfires`
+[*]Every waterloggable block → `*[waterlogged=true]`
+[*]Dozens of decorative air-safe plants → `#minecraft:flowers`, `#minecraft:saplings`, `#minecraft:crops`, `#minecraft:rails`, `#minecraft:buttons`, `#minecraft:pressure_plates`, sign tags, …
+[/LIST]
+
+[CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
+
+[SIZE=5][B][COLOR=#D35400]Roadmap: Known Limitations and Planned Work[/COLOR][/B][/SIZE]
+I don't hide the rough edges. Here is what I already know is incomplete in `3.0.0-beta.1`, along with the direction each one is heading. The full tiered roadmap lives in the repository, this is the short version.
+
+[LIST]
+[*][B]Vanilla Spigot still pays a rare main-thread fallback.[/B] When the Anvil pre-filter can't resolve a chunk, one on-tick load fills the gap. Planned: expose per-minute fallback counters so operators can see the real cost, and ship an optional strict mode that skips the fallback entirely for zero main-thread time.
+[*][B]Folia candidates can still pay one scheduler hop.[/B] Only for candidates the pre-filter couldn't resolve, but the cost is currently unmeasured. Planned: publish actual p50/p95 numbers, and look at amortising the hop across adjacent candidates.
+[*][B]Un-populated chunks always fall through to a live load.[/B] This is correct by design, since the live load is the authoritative safety net, but telemetry doesn't distinguish this path from other fallbacks today. Planned: a dedicated attribution bucket so operators can tell these apart at a glance, and documented guidance on warming populations ahead of time via the admin scan lifecycle.
+[*][B]Fabric is not supported.[/B] Out of scope for this release, with known blockers (async chunk I/O, location-generator wiring, build tooling). Planned: resolve the three blockers, then decide whether Fabric ships alongside the Bukkit family or on its own preview track.
+[*][B]Only one marketing number is sourced so far.[/B] The ~45% Overworld-safe figure above comes from local profiling of a vanilla 1.21 seed set; Nether and End ratios are still qualitative. Planned: anonymous opt-in usage telemetry and a published reference benchmark, so every figure on this page can cite a real number.
+[*][B]Demonstration videos predate this release.[/B] The clips below still illustrate the learning and queue principles accurately, but the numbers shown aren't current-release benchmarks. Planned: fresh footage recorded against `3.0.0` before the `-beta` tag comes off.
+[/LIST]
+
+[I]Everything above is a known issue with a plan — not a surprise. If you hit something that isn't on this list, I want to know about it, so please open an issue on the GitHub repo linked below.[/I]
+
+[CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
+
 [SIZE=5][B][COLOR=#9B59B6]FAQ[/COLOR][/B][/SIZE]
 [B]Q: This plugin responds much faster than I'm used to. Why am I not waiting for chunk loading?[/B]
-A: When we say optimized, we mean it. In most cases, our pre-warmed caching system has a safe location ready to go before you even type the command.
+A: When I say optimized, I mean it. In most cases, the pre-warmed caching system has a safe location ready to go before you even type the command.
 
 [B]Q: How do I set up teleportation for different worlds?[/B]
 A: Check the wiki for details on configuring regions and worlds. The logic follows a clear hierarchy: player's current world -> world's target region -> region's target world.
 
 [B]Q: What's the best setup for performance?[/B]
 A: The plugin is optimized for Paper and Folia servers. Because it relies on pre-loading, it works best when you have memory to spare for the location cache.
+
+[B]Q: Does RTP work with Iris, Terra, or other custom-generator worlds?[/B]
+A: Yes, this was a deliberate 3.0 design goal. The Anvil pre-filter reads `.mca` palette data directly, so populated custom-generator chunks evaluate off-tick like vanilla. That's actually [I]strictly more accurate[/I] than the live Bukkit view, which collapses modded and Iris-native IDs to vanilla cousins. Un-populated chunks fall through to the live load as the authoritative safety net.
+
+[B]Q: What happens to my existing `safety.yml` when I upgrade?[/B]
+A: Existing plain-material entries keep working unchanged, since the new grammar is strictly additive. No manual conversion is required on upgrade.
+
+[CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
+
+[SIZE=5][B][COLOR=#C0392B]Historical Demonstrations[/COLOR][/B][/SIZE]
+[I]The clips below were recorded on earlier versions. The underlying principles (spatial learning, queue-paced throughput) are unchanged in 3.0.0, but the numbers shown are not current-release benchmarks.[/I]
+
+[B]Learning & Performance Test[/B]
+[media=youtube]PY6W7DikhAI[/media]
+[I]Demonstrates the plugin "learning" bad sectors to achieve deterministic selection time.[/I]
+
+[B]Command Response & Throughput Test[/B]
+[media=youtube]l6KSvKxsKAQ[/media]
+[I]Showcases the immediate command response and high-throughput capabilities of the queueing system.[/I]
 
 [CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
 
@@ -119,9 +189,28 @@ A: The plugin is optimized for Paper and Folia servers. Because it relies on pre
 
 [CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
 
+[SIZE=5][B][COLOR=#C0392B]Support Policy[/COLOR][/B][/SIZE]
+[LIST]
+[*][B]Support is for bugs and configuration questions,[/B] after you've read the admin guide linked above and the in-repo wiki.
+[*][B]Bug reports need a reproduction:[/B] server version, plugin version, platform (Spigot, Paper, or Folia), attached `config.yml`, `regions/`, and `safety.yml`, plus the relevant `server.log` section. Reports without these will be asked for them once, then closed.
+[*][B]"It doesn't work" is not a bug report.[/B] Neither is "it's broken on my server." Tell me what you did, what you expected, and what actually happened instead.
+[*][B]Unsupported scenarios include[/B] Fabric, modded servers outside the Bukkit family, plugin conflicts I can't reproduce, and general Minecraft-server administration questions. For that last one, the SpigotMC help forum is the right venue.
+[*][B]Response time:[/B] I'm a solo maintainer. Expect 24 to 72 hours on weekdays for properly-filed reports. Critical safety issues (S-001 through S-007 violations) jump the queue.
+[*][B]Feature requests[/B] are welcome via GitHub issues, not the resource discussion thread. Priority is driven by the published roadmap, not ticket volume.
+[/LIST]
+
+This policy exists because focused engineering time is what keeps the plugin fast and current. Respecting it is how you get the most out of your purchase.
+
+[CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
+
 [SIZE=5][B][COLOR=#C0392B]Support Philosophy[/COLOR][/B][/SIZE]
 [QUOTE]
-I am a solo engineer dedicated to maintaining a deterministic, high-performance teleport engine. Instead of padding this resource with cosmetic bloat, my development time is strictly focused on Folia concurrency and zero-latency execution.
+I'm a solo engineer maintaining a deterministic, high-performance teleport engine. Instead of padding this resource with cosmetic bloat, my development time stays focused on Folia concurrency and zero-latency execution.
 
-Choose RTP if you value [B]engineering quality, RAM efficiency, and compounding TPS stability[/B] over feature-padding and GUI gimmicks.
+Choose RTP if you care about engineering quality, RAM efficiency, and compounding TPS stability more than you care about feature-padding and GUI gimmicks.
 [/QUOTE]
+
+[CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
+
+[SIZE=4][B][COLOR=#7F8C8D]A Note On AI Assistance[/COLOR][/B][/SIZE]
+[INDENT]I use AI coding assistants (LLM-based pair-programming tools) for scaffolding, refactoring, test generation, and documentation drafting. Every line that ships is reviewed, tested, and signed off by me. Architecture, safety invariants (thread model, chunk-ticket lifecycle, claim checks), and release decisions are mine alone. No AI output is published without human verification against the requirements and test suite. If you prefer plugins written without AI tooling in the loop at all, this isn't that plugin, and I'd rather you know up front.[/INDENT]

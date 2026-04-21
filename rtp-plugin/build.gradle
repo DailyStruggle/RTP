@@ -1,7 +1,16 @@
 plugins {
     id 'com.gradleup.shadow'
 }
-
+repositories {
+    // Soft-dep repos for bundled claim-plugin integrations (see ADR-019).
+    maven { url 'https://maven.enginehub.org/repo/' }
+    maven { url 'https://jitpack.io' }
+    maven { url 'https://repo.glaremasters.me/repository/bloodshot/' }
+    maven { url 'https://raw.githubusercontent.com/FabioZumbi12/RedProtect/mvn-repo/' }
+    maven { url 'https://repo.spongepowered.org/maven/' }
+    maven { url 'https://ci.ender.zone/plugin/repository/everything/' }
+    maven { url 'https://repo.dmulloy2.net/repository/public/' }
+}
 dependencies {
     implementation project(':rtp-core')
     implementation project(':rtp-spigot:rtp-spigot-v1_20_R1')
@@ -27,6 +36,24 @@ dependencies {
     compileOnly 'me.clip:placeholderapi:2.11.6'
     compileOnly 'org.popcraft:chunkyborder-common:1.0.70'
     compileOnly 'org.popcraft:chunky-common:1.2.217'
+
+    // Bundled claim-plugin integrations (compile-only; runtime via Bukkit soft-depends).
+    compileOnly 'com.sk89q.worldguard:worldguard-bukkit:7.0.9'
+    compileOnly 'com.sk89q.worldedit:worldedit-bukkit:7.2.15'
+    compileOnly 'com.github.TechFortress:GriefPrevention:16.18.1'
+    compileOnly 'com.github.WiIIiam278:HuskTowns:1.6.2'
+    compileOnly 'com.github.LlmDl:Towny:0.97.5.0'
+    compileOnly 'com.massivecraft:Factions:1.6.9.5-U0.6.9'
+    compileOnly 'com.griefdefender:api:2.1.0-SNAPSHOT'
+    compileOnly 'com.github.angeschossen:LandsAPI:6.22.0'
+    compileOnly 'br.net.fabiozumbi12.RedProtect:RedProtect-Core:7.7.3'
+    compileOnly('br.net.fabiozumbi12.RedProtect:RedProtect-Spigot:7.7.3') {
+        exclude group: 'com.destroystokyo.paper', module: 'paper-api'
+        exclude group: 'com.sk89q.worldedit'
+        exclude group: 'com.sk89q.worldguard'
+        exclude group: 'de.keyle', module: 'mypet'
+        exclude group: 'net.ess3', module: 'EssentialsX'
+    }
 
     implementation 'org.bstats:bstats-bukkit:3.0.3'
     implementation 'xyz.tozymc.spigot:title-api:1.0'

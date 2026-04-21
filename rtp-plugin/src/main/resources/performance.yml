@@ -60,5 +60,21 @@ biomeRecallForced: false
 # Impact: HIGH - Can significantly increase server load on chunk load events.
 checkOnChunkLoads: false
 
+# Observational Cache-Fill Mode (Region Data Visitor)
+# When the pregen cache is full, a single observational RegionCacheTask is
+# scheduled per region on the existing cache-fill `period`. It reuses the
+# same LocationGenerator pipeline as the default cache fill, but drops the
+# resulting safe candidate instead of enqueuing it — so pregen side effects
+# (bad-location recording, observed-biome harvesting) accumulate in the
+# background without growing the queue past its cap. It NEVER triggers
+# worldgen: chunks that are not already on disk are skipped via the
+# ADR-016 Anvil pre-filter UNKNOWN verdict.
+# visitorEnabled: master switch (true enables observational mode).
+# Cadence is inherited from the `period` setting above; there is no
+# separate rate knob.
+# Impact: LOW - Bounded by the existing `period`; work only happens when
+# the cache has no headroom for default-mode fills.
+visitorEnabled: true
+
 # DO NOT TOUCH VERSION NUMBER
 version: "1.0"

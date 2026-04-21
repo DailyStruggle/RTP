@@ -6,6 +6,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.function.UnaryOperator;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Platform-neutral orchestration helper shared by every adapter that wires the
@@ -37,6 +39,8 @@ import java.util.function.UnaryOperator;
  * chunk key before eviction).</p>
  */
 public final class AnvilProbeSupport {
+
+  private static final Logger LOG = Logger.getLogger(AnvilProbeSupport.class.getName());
 
   /**
    * Default soft cap mirroring the legacy {@code BukkitRTPWorld.ANVIL_CACHE_MAX_ENTRIES}.
@@ -98,8 +102,35 @@ public final class AnvilProbeSupport {
         .thenApply(result -> {
           if (result != null && result.view() != null) {
             publish(key, result.view());
+            logProbeOutcome("PUBLISH", worldFolder, dimSubpath, cx, cz,
+                result.verdict());
+          } else {
+            // ADR-016 §13.1 follow-up (2026-04-20): emit a rate-limited line on
+            // every UNKNOWN so operators can see the probe ran (applicability
+            // gate passed, probe executed) and still produced no view — i.e.
+            // the `rtp-anvil` decoder fell through at one of the attribution
+            // points in `AnvilPrefilter.probeSyncDetailed` (no-region-file,
+            // empty-location-entry, unsupported-dataversion,
+            // missing-heightmap, no-sections). The attribution line at
+            // INFO/FINE inside `AnvilPrefilter` says which one; this line
+            // proves the probe path was reached at all.
+            logProbeOutcome("UNKNOWN", worldFolder, dimSubpath, cx, cz,
+                result == null ? null : result.verdict());
           }
           return result;
+        })
+        .exceptionally(ex -> {
+          // Defensive: probeDetailed itself already catches IOException/RuntimeException
+          // in probeSyncDetailed, but the reconciler or any future composition could
+          // still surface a throwable here. Log at WARNING and fall through to the
+          // live-load path (UNKNOWN, no view) so the caller's chunk-load pipeline
+          // stays on the happy path.
+          LOG.log(Level.WARNING,
+              "[RTP] Anvil probeAndPublish failed for world=" + worldFolder
+                  + " dim=\"" + dimSubpath + "\" chunk=(" + cx + "," + cz
+                  + ") — falling through to live chunk load",
+              ex);
+          return new AnvilPrefilter.ProbeResult(Verdict.UNKNOWN, null);
         });
   }
 
@@ -152,5 +183,59 @@ public final class AnvilProbeSupport {
   /** Current number of published views. Intended for tests and diagnostics. */
   public int size() {
     return cache.size();
+  }
+
+  /**
+   * Rate-limit counters for {@link #logProbeOutcome}. Per-JVM and per-outcome
+   * (currently {@code "PUBLISH"} or {@code "UNKNOWN"}). The first
+   * {@link #PROBE_OUTCOME_BUDGET_PER_REASON} lines land at {@link Level#INFO};
+   * subsequent ones fall to {@link Level#FINE}. Parity with the rate-limit
+   * pattern used by {@code AnvilPrefilter.diagLog} and
+   * {@code FoliaRTPWorld#logBiomeFallthrough}.
+   */
+  private static final java.util.concurrent.ConcurrentHashMap<
+          String, java.util.concurrent.atomic.AtomicInteger>
+      PROBE_OUTCOME_COUNTERS = new java.util.concurrent.ConcurrentHashMap<>();
+
+  private static final int PROBE_OUTCOME_BUDGET_PER_REASON = 200;
+
+  /**
+   * ADR-016 §13.1 follow-up (2026-04-20): emit a rate-limited one-liner for
+   * every probe outcome (view published or no view available). Makes the
+   * "gate accepted → probe ran → outcome" chain observable end-to-end from
+   * the server console so an operator triaging a sustained {@code
+   * anvil-hits=0} biome-source metric can tell apart "gate skipped probing"
+   * (no line here, per-adapter gate-skip log instead) from "probe ran and
+   * produced no view" (UNKNOWN line here + a single attribution line from
+   * {@link AnvilPrefilter#probeSyncDetailed}).
+   */
+  private static void logProbeOutcome(
+      String outcome, Path worldFolder, String dimSubpath, int cx, int cz,
+      Verdict verdict) {
+    // 2026-04-20 housekeeping (post-Folia-1.21.11 debug arc): PUBLISH is the
+    // happy path and confirmed working end-to-end — log at FINE only. UNKNOWN
+    // keeps its first-N-at-INFO budget because it still signals a real
+    // diagnostic (probe ran, but no view produced) that an operator triaging
+    // a stuck `anvil-hits=0` metric needs to see. The per-reason attribution
+    // line from `AnvilPrefilter.diagLog` ("UNKNOWN:<cause>") is the
+    // complementary detail for an UNKNOWN; this line proves the probe path
+    // was reached.
+    final Level level;
+    if ("PUBLISH".equals(outcome)) {
+      level = Level.FINE;
+    } else {
+      java.util.concurrent.atomic.AtomicInteger counter =
+          PROBE_OUTCOME_COUNTERS.computeIfAbsent(
+              outcome, k -> new java.util.concurrent.atomic.AtomicInteger());
+      int n = counter.incrementAndGet();
+      level = (n <= PROBE_OUTCOME_BUDGET_PER_REASON) ? Level.INFO : Level.FINE;
+    }
+    if (!LOG.isLoggable(level)) return;
+    LOG.log(level,
+        "[RTP] Anvil probe outcome=" + outcome
+            + " verdict=" + (verdict == null ? "null" : verdict.name())
+            + " world=" + worldFolder
+            + " dim=\"" + dimSubpath + "\""
+            + " chunk=(" + cx + "," + cz + ")");
   }
 }

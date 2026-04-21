@@ -126,10 +126,18 @@ public class ReqRtpS005StaleChunkGuardTest {
                         + "stale-chunk guard detects an unloaded center chunk. Any non-zero "
                         + "call count would indicate the guard failed to prevent the race.");
 
-        // Sanity: at least one async chunk load was attempted (we exercised the pipeline).
-        assertTrue(world.chunkAsyncLoadCount.get() > 0,
-                "Test harness sanity: the pipeline should have attempted at least one async "
-                        + "chunk load. If zero, the test is not exercising the guarded path.");
+        // Sanity: the stale-chunk guard was consulted at least once (we exercised the
+        // pipeline). ADR-016 §11 probe-first ordering (2026-04-20) means
+        // `LocationGenerator` can satisfy a candidate via `getChunkAt` (anvil-backed
+        // or mock-cached) without ever reaching `getChunkAtAsync`, so
+        // `chunkAsyncLoadCount` is no longer a reliable "pipeline ran" proxy. The
+        // guard at `LocationGenerator` line ~710 always calls `isChunkLoaded(cx, cz)`
+        // before `vert.adjust(chunk)`, so `isChunkLoadedCallCount` is the
+        // order-independent sanity counter.
+        assertTrue(world.isChunkLoadedCallCount.get() > 0,
+                "Test harness sanity: the pipeline should have consulted the "
+                        + "stale-chunk guard (isChunkLoaded) at least once. If zero, the "
+                        + "test is not exercising the guarded path.");
     }
 
     @Test

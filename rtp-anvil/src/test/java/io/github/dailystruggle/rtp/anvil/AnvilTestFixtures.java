@@ -69,6 +69,73 @@ final class AnvilTestFixtures {
     }
 
     /**
+     * Builds a section compound carrying <em>both</em> a {@code block_states} and a
+     * {@code biomes} container. Phase-2 (ANVIL_BIOME_PLAN.md §3) fixture helper: the
+     * biome palette is a bare-string {@code TAG_List} (element type {@code TAG_STRING}),
+     * not the compound list the block palette uses, and the packed {@code data}
+     * array is 64 cells (4×4×4) rather than 4096 blocks. {@code biomeData} may be
+     * {@code null} to reproduce the single-entry-palette shape vanilla actually writes.
+     */
+    static LinkedHashMap<String, Object> sectionWithBiomes(
+            byte yIndex,
+            List<String> blockPalette,
+            long[] blockData,
+            List<String> biomePalette,
+            long[] biomeData) throws IOException {
+        LinkedHashMap<String, Object> sec = section(yIndex, blockPalette, blockData);
+        attachBiomes(sec, biomePalette, biomeData);
+        return sec;
+    }
+
+    /**
+     * Attaches a {@code biomes} container to an already-built section compound.
+     * Used by {@link #sectionWithBiomes(byte, List, long[], List, long[])} and by
+     * tests that want to build a biome-only section (no block palette).
+     */
+    static void attachBiomes(
+            LinkedHashMap<String, Object> sec,
+            List<String> biomePalette,
+            long[] biomeData) {
+        LinkedHashMap<String, Object> biomes = new LinkedHashMap<>();
+        List<Object> biomePalItems = new ArrayList<>(biomePalette.size());
+        biomePalItems.addAll(biomePalette);
+        biomes.put("palette", new Nbt.NbtList(Nbt.TAG_STRING, biomePalItems));
+        if (biomeData != null) {
+            biomes.put("data", biomeData);
+        }
+        sec.put("biomes", biomes);
+    }
+
+    /**
+     * Packs 64 biome-cell palette indices (YZX-major, 4³) into a {@code long[]} using
+     * the Anvil 1.18+ no-cross-long layout. Mirrors the inline decoder in
+     * {@link BiomePaletteSection#biomeIdAt(int, int, int)} so tests can round-trip
+     * known placements.
+     *
+     * @param bitsPerEntry bits per cell; must be {@code >= 1}
+     * @param indices      flat palette indices, length must be 64
+     * @return packed data array sized to {@code ceil(64 / floor(64 / bitsPerEntry))}
+     */
+    static long[] packBiomeIndices(int bitsPerEntry, int[] indices) {
+        if (indices.length != 64) {
+            throw new IllegalArgumentException("biome indices must have length 64, got " + indices.length);
+        }
+        if (bitsPerEntry < 1) {
+            throw new IllegalArgumentException("bitsPerEntry must be >= 1, got " + bitsPerEntry);
+        }
+        int entriesPerLong = 64 / bitsPerEntry;
+        int longs = (64 + entriesPerLong - 1) / entriesPerLong;
+        long[] out = new long[longs];
+        long mask = (1L << bitsPerEntry) - 1L;
+        for (int i = 0; i < 64; i++) {
+            int longIdx = i / entriesPerLong;
+            int slot = i - longIdx * entriesPerLong;
+            out[longIdx] |= (indices[i] & mask) << (slot * bitsPerEntry);
+        }
+        return out;
+    }
+
+    /**
      * Packs 4096 palette indices (YZX-major, 16³) into a {@code long[]} using the
      * Anvil 1.16+ no-cross-long layout. Mirrors the decoder used by {@link PackedPaletteDecoder}
      * so tests can round-trip known placements.

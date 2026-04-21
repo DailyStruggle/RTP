@@ -24,7 +24,7 @@ public class JarUtils {
             }
         }
 
-        boolean forceOverwrite = !currentVersion.equals(lastVersion);
+        boolean forceOverwrite = ( !lastVersion.isBlank() && !currentVersion.equals(lastVersion));
 
         try {
             URI uri = JarUtils.class.getProtectionDomain().getCodeSource().getLocation().toURI();

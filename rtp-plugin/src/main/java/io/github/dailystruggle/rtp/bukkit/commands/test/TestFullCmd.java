@@ -66,6 +66,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
               "chunk-ticket",
               "disconnect-midflight",
               "anvil-prefilter",
+              "biome-source",
               "async-chunk-load",
               "scheduler",
               "folia-ownership",
@@ -185,6 +186,11 @@ public class TestFullCmd extends BaseRTPCmdImpl {
     // On Paper/Folia the counters stay at zero because those platforms
     // structurally bypass the pre-filter in BukkitRTPWorld.getChunkAt.
     dispatchNoArgAndWait(callerId, "anvil-prefilter");
+
+    // --- biome-source (read-only biome-tier attribution telemetry; ADR-016 §13.1)
+    // Reads BiomeSourceMetrics atomics to verify post-load biome reads came from
+    // the Anvil cache vs. the live World#getBiome fallthrough. Safe on all platforms.
+    dispatchNoArgAndWait(callerId, "biome-source");
 
     // --- async-chunk-load (verifies one generated chunk loads off the
     // main thread; REQ-RTP-S-005). Skips gracefully when the server has

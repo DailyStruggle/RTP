@@ -1,0 +1,22 @@
+plugins {
+    id 'java'
+}
+group = 'io.github.dailystruggle'
+version = '1.0-SNAPSHOT'
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+repositories {
+    mavenCentral()
+    maven { url 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
+}
+dependencies {
+    compileOnly 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
+    compileOnly project(':rtp-api')
+    compileOnly project(':rtp-core')
+    compileOnly project(':rtp-plugin')
+}
+test {
+    useJUnitPlatform()
+}

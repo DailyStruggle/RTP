@@ -417,6 +417,24 @@ public class PlaceholderProvider {
                     RTPWorld<?> world =
                             RTP.serverAccessor.getRTPWorld(data.selectedCoords.worldName());
                     if (world == null) return "";
+                    // ADR-016 §13.1 follow-up (2026-04-20): route the biome read
+                    // through the resolved chunk so anvil-cached data is used
+                    // transparently and an ungenerated chunk is probed/loaded on
+                    // demand rather than falling to the seed-synth getter.
+                    int cx = data.selectedCoords.x() >> 4;
+                    int cz = data.selectedCoords.z() >> 4;
+                    try {
+                        io.github.dailystruggle.rtp.api.world.RTPChunk<?> chunk =
+                                world.getOrLoadChunk(cx, cz).get(5, TimeUnit.SECONDS);
+                        if (chunk != null) {
+                            return chunk.getBiome(
+                                    data.selectedCoords.x(),
+                                    data.selectedCoords.y(),
+                                    data.selectedCoords.z());
+                        }
+                    } catch (Exception ignored) {
+                        // Fall through to world-level getter on timeout/error.
+                    }
                     return world.getBiome(
                             data.selectedCoords.x(), data.selectedCoords.y(), data.selectedCoords.z());
                 });

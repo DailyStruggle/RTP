@@ -16,7 +16,7 @@ api-version: 1.13
 prefix: 'RTP'
 authors: [ leaf26 ]
 description: 'a fast and flexible random teleportation plugin'
-softdepend: [ WorldGuard, WorldEdit, PlaceholderAPI, Vault, Chunky, ChunkyBorder ]
+softdepend: [ WorldGuard, WorldEdit, PlaceholderAPI, Vault, Chunky, ChunkyBorder, GriefDefender, GriefPrevention, Towny, HuskTowns, Factions, Lands, RedProtect ]
 folia-supported: true
 
 # --- Commands ---

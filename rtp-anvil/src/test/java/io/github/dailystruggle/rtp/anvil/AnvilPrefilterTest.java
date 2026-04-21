@@ -104,15 +104,18 @@ class AnvilPrefilterTest {
   }
 
   @Test
-  @DisplayName("Unsupported DataVersion ⇒ UNKNOWN (reader may parse, but verdict layer opts out)")
-  void unsupportedDataVersionIsUnknown(@TempDir Path worldFolder) throws IOException {
-    // DataVersion 1 is well below any whitelisted value — structurally parseable by our
-    // minimal reader but explicitly not on the DataVersionSupport list, so the probe
-    // must return UNKNOWN and defer to the live load.
+  @DisplayName("Arbitrary DataVersion ⇒ decoder is authoritative (gate retired 2026-04-20)")
+  void arbitraryDataVersionDeferredToDecoder(@TempDir Path worldFolder) throws IOException {
+    // ADR-016 §13.1 follow-up: the DataVersion range gate has been retired.
+    // Every DataVersion is admitted; the decoder (`AnvilReader`) is the only
+    // gate, and decode failures surface as WARNING + UNKNOWN. Here we feed
+    // DataVersion=1 (well outside any real MC range) but with a valid
+    // synthetic chunk payload containing lava at the surface — the probe
+    // must now parse it and return REJECT rather than the old UNKNOWN.
     writeSyntheticRegion(worldFolder, 0, 0, rootAtDataVersion(1));
     Verdict v = AnvilPrefilter.probeSync(
         worldFolder, "", 0, 0, Set.of("LAVA"));
-    assertEquals(Verdict.UNKNOWN, v);
+    assertEquals(Verdict.REJECT, v);
   }
 
   @Test

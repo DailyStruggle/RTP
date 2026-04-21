@@ -1,19 +1,11 @@
 package io.github.dailystruggle.rtp_iris_integration;
 
 import com.volmit.iris.core.tools.IrisToolbelt;
-import com.volmit.iris.engine.object.IrisBiome;
 import com.volmit.iris.engine.platform.PlatformChunkGenerator;
-import com.volmit.iris.util.collection.KList;
-import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.block.Biome;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /** Main class for RTP_Iris_integration addon */
@@ -23,23 +15,15 @@ public final class RTP_Iris_integration extends JavaPlugin {
   /** Default constructor for RTP_Iris_integration */
   public RTP_Iris_integration() {}
 
-  static Set<String> getBiomes(RTPWorld rtpWorld) {
-    org.bukkit.World bukkitWorld = Bukkit.getWorld(rtpWorld.id());
-    if (bukkitWorld == null) {
-      return new HashSet<>();
-    }
-    PlatformChunkGenerator access = IrisToolbelt.access(bukkitWorld);
-    if (access == null)
-      return Arrays.stream(Biome.values()).map(Enum::name).collect(Collectors.toSet());
-    KList<IrisBiome> allBiomes = access.getEngine().getAllBiomes();
-    Set<String> collect = new HashSet<>();
-    for (IrisBiome irisBiome : allBiomes) {
-      String s = irisBiome.getName().toUpperCase();
-      s = invalidCharacters.matcher(s).replaceAll("_");
-      collect.add(s);
-    }
-    return collect;
-  }
+  // BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md §4 step 7: the world-level biome
+  // enumeration override (formerly `setBiomesGetter(RTP_Iris_integration::getBiomes)`)
+  // has been retired. `LocationGenerator` now evaluates the whitelist/blacklist
+  // directly without needing a materialised world-level biome set, so the Iris
+  // addon no longer needs to publish one. The per-coordinate resolver below
+  // (`setBiomeGetter`) is retained — it is still load-bearing for surfacing
+  // namespaced Iris biome names (`iris:volcanic_ash_plains`) on candidate
+  // evaluation; the adapter-default Anvil-first pre-step covers populated
+  // chunks when the addon is absent.
 
   private static String getBiome(Location location) {
     PlatformChunkGenerator access = IrisToolbelt.access(location.getWorld());
@@ -52,7 +36,6 @@ public final class RTP_Iris_integration extends JavaPlugin {
   @Override
   public void onEnable() {
     // Plugin startup logic
-    RTP.serverAccessor.setBiomesGetter(RTP_Iris_integration::getBiomes);
     RTP.serverAccessor.setBiomeGetter(
         rtpLocation -> {
           org.bukkit.World bukkitWorld = Bukkit.getWorld(rtpLocation.world().id());

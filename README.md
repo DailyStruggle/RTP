@@ -128,6 +128,12 @@ Custom shapes can be registered at runtime via the `rtp-api`. See the `addons/` 
 
 ---
 
+## A Note On AI Assistance
+
+I am a solo engineer, and I use AI coding assistants (LLM-based pair-programming tools) for scaffolding, refactoring, test generation, and documentation drafting. Every line that ships is reviewed, tested, and signed off by me — architecture, safety invariants (thread model, chunk-ticket lifecycle, claim checks), and release decisions are mine alone. No AI output is published without human verification against the requirements in [docs/dev/REQUIREMENTS.md](docs/dev/REQUIREMENTS.md) and the test suite. If you prefer plugins written without AI tooling in the loop at all, RTP is not that plugin, and I would rather you know up front.
+
+---
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for build instructions, code style rules, and the workflow for adding requirements.

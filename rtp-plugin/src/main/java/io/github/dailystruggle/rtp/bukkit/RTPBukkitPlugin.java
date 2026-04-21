@@ -10,6 +10,7 @@ import io.github.dailystruggle.rtp.bukkit.spigotListeners.*;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.ChunkyBorderChecker;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.PAPI_expansion;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.VaultChecker;
+import io.github.dailystruggle.rtp.bukkit.tools.softdepends.claims.ClaimIntegrations;
 import io.github.dailystruggle.rtp.bukkit.utils.JarUtils;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -86,7 +87,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
   /** whenever bukkit feels like enabling this plugin */
   @Override
   public void onEnable() {
-    metrics = new Metrics(this, 12277);
+    metrics = new Metrics(this, 30865);
 
     if (instance == null) {
       instance = this;
@@ -254,6 +255,17 @@ public final class RTPBukkitPlugin extends JavaPlugin {
       VaultChecker.setupPermissions();
       if (VaultChecker.getEconomy() != null) RTP.economy = new VaultChecker();
       else RTP.economy = null;
+    }
+
+    // Bundled claim-plugin integrations (formerly the RTP_ClaimPluginIntegrations addon).
+    // Registers a GlobalRegionVerifier per enabled claim plugin; see ADR-019.
+    try {
+      ClaimIntegrations.setup(this);
+    } catch (Throwable t) {
+      RTP.log(
+          java.util.logging.Level.WARNING,
+          "[RTP] Failed to initialize claim-plugin integrations; continuing without them.",
+          t);
     }
   }
 }

@@ -229,6 +229,36 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, YamlFile>> {
     }
   }
 
+  /**
+   * Synchronously wipe every entry in {@code rtp_cached_locations.yml}.
+   *
+   * <p>Called by {@link #rebuildCachedLocationsFromMemory()} immediately before
+   * the in-memory state is re-enqueued. Keeping the file (rather than deleting
+   * it) preserves any top-level comments/headers that simpleyaml would lose on
+   * recreate.
+   */
+  @Override
+  public void clearAllCachedLocations() {
+    File file = new File(directory, "rtp_cached_locations.yml");
+    if (!file.exists()) return;
+    try {
+      YamlFile yamlFile = new YamlFile(file);
+      yamlFile.loadWithComments();
+      for (String key : new ArrayList<>(yamlFile.getMapValues(false).keySet())) {
+        yamlFile.set(key, null);
+      }
+      yamlFile.save();
+      // Invalidate caches so a subsequent connect() re-reads the empty file
+      // instead of serving the pre-wipe snapshot.
+      cachedLookup.get().remove("rtp_cached_locations.yml");
+      cachedLookupLastModified.get().remove("rtp_cached_locations.yml");
+      Map<TableObj, TableObj> tableMap = localTables.get("rtp_cached_locations.yml");
+      if (tableMap != null) tableMap.clear();
+    } catch (IOException e) {
+      RTP.log(Level.WARNING, e.getMessage(), e);
+    }
+  }
+
   @Override
   public List<StoredLocation> loadCachedLocations(String regionName) {
     List<StoredLocation> res = new ArrayList<>();

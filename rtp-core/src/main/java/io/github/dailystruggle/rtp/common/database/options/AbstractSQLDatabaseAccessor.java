@@ -102,13 +102,22 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
   }
 
   /** Drain the write queue and execute a batched insert. */
-  public void flush() {
+  public synchronized void flush() {
     if (writeQueue.isEmpty()) return;
 
     Connection connection = null;
+    boolean autoCommitToggled = false;
+    boolean batchAdded = false;
     try {
       connection = getConnection();
-      connection.setAutoCommit(false);
+      // Guard against a shared connection whose auto-commit state
+      // may have been flipped by another operation on the same
+      // SQLite/H2 connection. Only toggle if we actually own the
+      // transition so we can restore it in the finally block.
+      if (connection.getAutoCommit()) {
+        connection.setAutoCommit(false);
+        autoCommitToggled = true;
+      }
       String sql = getInsertStatement();
       try (PreparedStatement statement = connection.prepareStatement(sql)) {
         TeleportData data;
@@ -132,20 +141,33 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
           statement.setDouble(16, ((Number) columns.getOrDefault("cost", 0.0)).doubleValue());
           statement.setLong(17, ((Number) columns.getOrDefault("attempts", 0L)).longValue());
           statement.addBatch();
+          batchAdded = true;
         }
-        statement.executeBatch();
-        connection.commit();
+        if (batchAdded) {
+          statement.executeBatch();
+          if (!connection.getAutoCommit()) {
+            connection.commit();
+          }
+        }
       } catch (SQLException e) {
+        // Only attempt rollback if we are actually in a transaction.
+        // On a shared SQLite/H2 connection another caller may have
+        // restored auto-commit, in which case rollback would throw
+        // "database in auto-commit mode" and mask the real error.
         try {
-          connection.rollback();
+          if (!connection.getAutoCommit()) {
+            connection.rollback();
+          }
         } catch (SQLException rollbackEx) {
           RTP.log(Level.WARNING, "Failed to rollback after flush error", rollbackEx);
         }
         RTP.log(Level.WARNING, "Failed to flush teleport data batch", e);
       } finally {
-        try {
-          connection.setAutoCommit(true);
-        } catch (SQLException ignored) {}
+        if (autoCommitToggled) {
+          try {
+            connection.setAutoCommit(true);
+          } catch (SQLException ignored) {}
+        }
       }
     } catch (SQLException e) {
       RTP.log(Level.WARNING, "Database connection error during flush", e);
@@ -217,6 +239,29 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
       disconnect(connection);
     }
     return res;
+  }
+
+  /**
+   * Synchronously delete every row from {@code rtp_cached_locations}.
+   *
+   * <p>Called by {@link #rebuildCachedLocationsFromMemory()} immediately before
+   * the in-memory state is re-enqueued for writing, guaranteeing that stale rows
+   * from consumed-but-not-deleted locations cannot survive a restart.
+   */
+  @Override
+  public void clearAllCachedLocations() {
+    Connection connection = connect();
+    if (connection == null) return;
+    try {
+      try (PreparedStatement statement =
+          connection.prepareStatement("DELETE FROM rtp_cached_locations")) {
+        statement.executeUpdate();
+      }
+    } catch (SQLException e) {
+      // Table may not exist yet on first save — that's a successful no-op.
+    } finally {
+      disconnect(connection);
+    }
   }
 
   /**

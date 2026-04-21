@@ -1,6 +1,14 @@
 # Anvil Biome Resolution Plan (Phase 2)
 
-**Status:** Draft — design-only. No code in this phase.
+**Status:** Superseded 2026-04-19 by
+`docs/dev/BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md`. Steps 1–3 (Anvil
+biome-palette decode, `AnvilRegionScanner`, in-place getter amendment)
+landed 2026-04-19 and are consumed as building blocks by the successor
+plan. Steps 4–6 (Iris addon shrink, ADR-016 amendment, `FRONT_PAGE`
+bullet) did **not** land under this plan and have migrated to the
+successor's §8 landing order. The sections below are retained for
+historical reference; do not extend them.
+
 **Supersedes:** none. **Extends:** ADR-016 "Anvil subsystem" (block-palette
 pre-filter). **Minimum supported format:** Minecraft 1.20.1 region files
 (REQ-RTP-SYS-002).
@@ -59,8 +67,15 @@ naming for free.
 - A new `AnvilChunkView#getBiomesPresent() -> Set<String>` returning the
   union of biome identifiers across the chunk's sections — needed to
   implement pregen-scan-based enumeration (§4).
-- Platform-side wiring through `RTPServerAccessor#setBiomeGetter` with a
-  `.mca`-first, live-fallback precedence order.
+- An **in-place amendment** of the biome getter that the Bukkit-family
+  platform adapters already register via `RTPServerAccessor#setBiomeGetter`:
+  the existing getter body gains an `.mca`-first pre-step and then falls
+  through to the **pre-existing resolution chain** (today:
+  `world.getBiome(loc).name()`; with the Iris addon installed: the
+  addon's engine-backed override, because the addon registers *last*
+  and its getter is what `setBiomeGetter` stores). No new
+  `setBiomeGetter` / `setBiomesGetter` registration is introduced by
+  this phase, and the addon load order is unchanged.
 - `PaletteIdentifierNormalizer` reuse — the same reconciler that
   normalises block identifiers (`minecraft:lava` → `LAVA`) applies to
   biome identifiers unchanged.
@@ -192,56 +207,85 @@ change gated on a future defect report; no plumbing is needed now.
 
 ## 6. Platform-adapter wiring
 
-On each Bukkit-family platform (`rtp-spigot`, `rtp-paper`, `rtp-folia`)
-the adapter registers a composite biome getter at plugin-enable time:
+**Design correction (2026-04-19):** earlier drafts of this plan
+proposed a new composite `setBiomeGetter` registration in the
+platform adapter. That was wrong. `setBiomeGetter` is a *single-slot*
+registration point; introducing a second caller would either (a)
+race against the Iris addon for last-writer-wins ordering, or (b)
+force the adapter to re-implement the addon's override chain. Neither
+is acceptable.
+
+Instead, Phase 2 **amends the existing biome getter in place**. The
+adapter's `BukkitRTPWorld.getBiome` / `FoliaRTPWorld.getBiome` default
+(the one installed by `AbstractServerAccessor.setBiomeGetter` at
+plugin-enable if no addon overrides it) gains an Anvil pre-step:
 
 ```
-Function<Location, String> getter = loc -> {
-    Chunk liveChunk = loc.getWorld().getChunkAt(loc);  // already loaded path
-    if (liveChunk != null) {
-        AnvilChunkView view = anvilProbeSupport.takeCached(key(liveChunk));
-        if (view != null) {
-            String id = view.getBiomeAt(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
-            if (id != null) return id;
-        }
-        // Opportunistic probe: chunk is on disk even though live handle
-        // is cached; read off-tick. This is the common Phase-2 case.
-        String fromDisk = tryAnvilBiomeAt(loc);
-        if (fromDisk != null) return fromDisk;
-    }
-    // Fallback: unpopulated chunk or Anvil decode failure.
-    return loc.getWorld().getBiome(loc).name();
+// Inside the existing default biome getter body (adapter-side).
+Function<Location, String> existingGetter = /* today's impl: world.getBiome(loc).name() */;
+
+Function<Location, String> amended = loc -> {
+    // 1. Anvil-first: consult the already-decoded view cache, then
+    //    an opportunistic off-tick disk probe. Zero I/O on the hot
+    //    path when the view is cached (Phase-1 AnvilProbeSupport).
+    String fromAnvil = tryAnvilBiomeAt(loc);   // null if no view / outside Y window / decode miss
+    if (fromAnvil != null) return fromAnvil;
+
+    // 2. Fallback: the pre-existing resolution logic, unchanged.
+    //    On vanilla this is world.getBiome(loc).name(). When the
+    //    Iris addon is installed, the addon's enable handler has
+    //    already replaced this function via setBiomeGetter with its
+    //    engine-backed override, so "existing" means "whatever the
+    //    last registered setter installed" — Anvil-first is layered
+    //    onto that same function.
+    return existingGetter.apply(loc);
 };
-RTP.serverAccessor.setBiomeGetter(getter);
 ```
 
 Key points:
 
-- The adapter owns the composite getter. `rtp-anvil` exposes only
-  `getBiomeAt` on the view; the fallback decision is platform-aware.
-- Registration must happen **before** the Iris addon's enable handler
-  (addon load order) so that an operator running Iris + the addon still
-  sees the addon override (the addon's getter is authoritative for
-  Iris-engine truth when the engine is live — see §7).
-- Folia uses the same `AnvilProbeSupport` cache introduced in Phase 1;
-  the Folia-side biome getter is bit-for-bit identical to Spigot's
-  because `AnvilProbeSupport` is platform-neutral.
+- **No new `setBiomeGetter` call is introduced by this phase.** The
+  Anvil-first step is woven into the getter's body that the adapter
+  already installs. The public API surface of `RTPServerAccessor`
+  does not grow.
+- **Addon precedence is preserved by construction.** Because the
+  Iris addon still calls `setBiomeGetter(engineOverride)` during its
+  own enable handler, and because that call runs *after* the adapter's
+  default install, the addon's override remains authoritative when
+  installed. Operators who want "Iris engine beats disk" keep that
+  behaviour for free.
+- **When the addon is absent**, the amended default getter runs:
+  Anvil-first, then `world.getBiome(loc).name()`. This is the pure
+  Phase-2 win case — Iris/Terra/modded biomes on disk are surfaced
+  verbatim without any addon installed.
+- Folia inherits the same amendment on `FoliaRTPWorld.getBiome` via
+  `AbstractFoliaServerAccessor`; `AnvilProbeSupport` is platform-neutral.
+- `rtp-anvil` exposes only `getBiomeAt` on the view. The fallback
+  decision — "what to do when Anvil returns `null`" — stays on the
+  platform side because the fallback may be addon-supplied.
 
-### 6.1 Enumeration (`setBiomesGetter`)
+### 6.1 Enumeration (biomes-present)
 
 Enumeration is inherently a pregen-dependent operation: the disk can
-only report biomes that have actually been written to disk. The plan
-is:
+only report biomes that have actually been written to disk. Following
+the same "amend in place" correction as §6:
 
-- `rtp-anvil` gains a `AnvilRegionScanner.scanBiomes(worldFolder,
-  dimSubpath)` utility that walks every `.mca` file in the dimension,
-  decodes each chunk's biome palette lazily, and returns the union.
-  Runs on `ForkJoinPool.commonPool()` and is cached per (world,
-  world-folder-mtime) pair.
-- The platform adapter registers a `setBiomesGetter` that returns the
-  cached union. For worlds where pregen covers the full RTP region,
-  this is complete. For worlds with sparse pregen it is a subset — the
-  addon's engine-backed enumeration remains the complete source.
+- `rtp-anvil` ships `AnvilRegionScanner.scanBiomes(worldFolder,
+  dimSubpath)` — already landed in Step 2 — which walks every `.mca`
+  file in the dimension, decodes each chunk's biome palette lazily,
+  and returns the union on `ForkJoinPool.commonPool()` with a
+  `(regionFolder, max-mtime)` cache.
+- The adapter's **existing** biomes-getter (the one installed via
+  `setBiomesGetter` — default today: the vanilla-biome-enum union on
+  the world) is amended to union the Anvil scanner's result with the
+  pre-existing result. Anvil-union-first, pre-existing-second; both
+  are merged so the caller sees a superset.
+- As with §6, when the Iris addon is installed its `setBiomesGetter`
+  call runs later and replaces the function wholesale with the
+  engine-backed roster (`IrisToolbelt.access(world).getEngine()
+  .getAllBiomes()`). The addon's roster is a strict superset of the
+  Anvil scan, so the replacement is an upgrade, not a regression. No
+  new `setBiomesGetter` registration is introduced by this phase.
 
 Scan cost budget: ~5 ms per region file on commodity disk, dominated
 by sequential read. A 10-region pregen zone scans in under a second
@@ -253,34 +297,35 @@ re-scans.
 
 ## 7. Impact on `RTP_Iris_integration` addon
 
-The addon shrinks but does not disappear.
+**The addon does not shrink in this phase.** Under the corrected
+design (§6), the adapter's default getter gains an Anvil-first
+pre-step; it does **not** try to absorb the addon's responsibilities.
+The addon continues to register both `setBiomeGetter` and
+`setBiomesGetter` exactly as today, and its enable handler still
+runs after the adapter's default install, so its engine-backed
+overrides win whenever Iris is present.
 
-**Removed from the addon (absorbed by `rtp-anvil` + platform adapter):**
+What operators observe after Phase 2 lands:
 
-- `setBiomeGetter` — the core composite getter (§6) reads Iris biome
-  names directly from disk for populated chunks. The addon's
-  `engine.getBiome(location).getName()` override is no longer needed
-  for the populated case.
+- **Iris installed + addon installed:** unchanged. The addon's
+  engine-backed getter is authoritative; the Anvil pre-step inside
+  the adapter default is never consulted because the adapter default
+  is no longer the registered getter.
+- **Iris installed, addon *not* installed:** this is the new win.
+  The adapter default is the registered getter, so its Anvil-first
+  pre-step reads `iris:volcanic_ash_plains` directly from disk for
+  every populated chunk. Unpopulated chunks still collapse to
+  `world.getBiome(loc).name()` — no worse than today.
+- **Vanilla / datapack biomes, no Iris:** Anvil-first surfaces
+  namespaced datapack biome identifiers for populated chunks; the
+  fallback to `world.getBiome(loc).name()` is unchanged for
+  unpopulated chunks.
 
-**Retained in the addon:**
-
-- `setBiomesGetter` as an **override** — when Iris is installed and
-  loaded, `IrisToolbelt.access(world).getEngine().getAllBiomes()`
-  returns the full Iris-pack biome roster regardless of pregen state.
-  This is strictly a superset of what the Anvil region scan can see,
-  and it is the correct source for tab-completion on worlds where
-  pregen is partial. Registered with a higher-precedence setter call
-  than the platform adapter so it wins when Iris is present.
-- `setBiomeGetter` as an **override for unpopulated chunks** — when
-  the Anvil probe returns `UNKNOWN` and Iris is installed, the addon's
-  `engine.getBiome(location).getName()` can still answer because Iris
-  computes biomes deterministically from pack configuration. This
-  replaces the current "fall through to `world.getBiome(loc).name()`
-  lossy vanilla collapse" for the pre-population case.
-
-Net addon size estimate: ~60 LOC (down from ~140). The residual
-responsibility is the gap that `rtp-anvil` by construction cannot fill:
-"what biome *will* exist here before the generator has run."
+A follow-up pass may revisit whether the addon's `setBiomeGetter`
+override can be simplified (since the adapter default now covers the
+populated-chunk case on disk), but that is deferred out of this plan.
+Any such simplification must be driven by its own proposal; this
+phase is strictly additive to the adapter default.
 
 ---
 
@@ -325,14 +370,23 @@ authored at implementation time.
 
 ## 10. Landing order
 
-1. Biome-palette decoder in `rtp-anvil` (behind `AnvilChunkView#getBiomeAt`),
+1. **[Landed 2026-04-19]** Biome-palette decoder in `rtp-anvil` (behind `AnvilChunkView#getBiomeAt`),
    plus `AnvilBiomeDecoderTest`. No platform wiring yet.
-2. `AnvilChunkView#getBiomesPresent` + `AnvilRegionScanner` + cache.
-3. Platform composite getter on Spigot (`BukkitRTPWorld` enable path)
-   and Folia (`FoliaRTPWorld` enable path). Paper inherits through
-   Spigot class hierarchy.
-4. Iris addon shrink (`setBiomeGetter` removal, `setBiomesGetter`
-   kept as override).
+2. **[Landed 2026-04-19]** `AnvilChunkView#getBiomesPresent` + `AnvilRegionScanner` + cache.
+3. **[Landed 2026-04-19]** Amend the adapter-default biome getter in place on Spigot
+   (`BukkitRTPWorld.getBiome` / `BukkitRTPWorld.getBiomes`) and Folia
+   (`FoliaRTPWorld.getBiome` / `FoliaRTPWorld.getBiomes`) to run an
+   Anvil-first pre-step before delegating to the pre-existing
+   resolution logic. Paper inherits through the Spigot class
+   hierarchy. **No new `setBiomeGetter` registration is introduced.**
+   The instance `getBiome(x,y,z)` consults `AnvilProbeSupport.takeCached(key)`
+   (zero-I/O hot path) and calls `AnvilChunkView#getBiomeAt`; the static
+   `getBiomes(RTPWorld)` unions `AnvilRegionScanner.scanBiomes` with the
+   pre-existing registered `getBiomes` function.
+4. (Deferred, out of this plan) Any further simplification of the
+   `RTP_Iris_integration` addon. The addon's current
+   `setBiomeGetter` / `setBiomesGetter` registrations remain
+   authoritative when Iris is installed; see §7.
 5. ADR-016 amendment: §11 / §Consequences updated to reflect Phase 2
    semantics; Alternatives `A` / `B` revised if needed. No new ADR
    unless the trust model in §5 is later challenged.

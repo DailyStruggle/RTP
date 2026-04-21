@@ -508,6 +508,25 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   /**
+   * Returns the union of biome identifiers that have been observed producing at least one
+   * candidate within this shape. The returned set is a live, unmodifiable view of
+   * {@link #biomePrefixSumsCache}'s key set and reflects subsequent updates.
+   *
+   * <p>This is the authoritative enumeration consulted by the biome-allow-list inversion
+   * path in {@code LocationGenerator} — it is strictly tighter than
+   * {@code RTPServerAccessor#getBiomes(world)} and, by virtue of being populated only
+   * through the `LocationGenerator` pipeline (which is Anvil-first on every platform),
+   * is upgrade-drift proof: observations reflect what `.mca` palettes actually contain
+   * rather than what the current server seed / algorithm would synthesise live.</p>
+   *
+   * @return unmodifiable view of observed biome identifiers; empty before the first
+   *         successful candidate selection.
+   */
+  public Set<String> getObservedBiomes() {
+    return Collections.unmodifiableSet(biomePrefixSumsCache.keySet());
+  }
+
+  /**
    * Remove a location from biome-specific valid locations
    *
    * @param location the location value

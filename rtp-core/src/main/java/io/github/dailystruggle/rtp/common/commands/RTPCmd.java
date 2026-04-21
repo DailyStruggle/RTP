@@ -166,6 +166,10 @@ public interface RTPCmd extends BaseRTPCmd {
     }
 
     RTPCommandSender sender = RTP.serverAccessor.getSender(senderId);
+    RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.compute ENTER senderId=" + senderId
+            + " senderName=" + (sender != null ? sender.name() : "null")
+            + " args=" + rtpArgs
+            + " thread=" + Thread.currentThread().getName());
 
     if (!senderId.equals(CommandsAPI.serverId)) RTP.getInstance().processingPlayers.add(senderId);
 
@@ -274,9 +278,12 @@ public interface RTPCmd extends BaseRTPCmd {
 
       // get their data
       TeleportData data = RTP.getInstance().latestTeleportData.get(player.uuid());
+      RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.compute per-player loop playerId=" + player.uuid()
+              + " priorData=" + (data == null ? "null" : ("completed=" + data.completed + " age=" + (System.currentTimeMillis() - data.time) + "ms")));
       // if player has an incomplete teleport
       if (data != null) {
         if (!data.completed) {
+          RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.compute short-circuit ALREADY_TELEPORTING playerId=" + player.uuid() + " -> skipping pipeline");
           String msg = (String) langParser.getConfigValue(MessagesKeys.alreadyTeleporting, "");
           RTP.serverAccessor.sendMessage(senderId, player.uuid(), msg);
           failEvent(sender, msg);
@@ -510,6 +517,10 @@ public interface RTPCmd extends BaseRTPCmd {
 
       TeleportPipelineTask pipelineTask = new TeleportPipelineTask(new GenerationContext(sender, player, biomes), region);
       data.nextTask = pipelineTask;
+      RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.compute TeleportPipelineTask constructed playerId=" + player.uuid()
+              + " region=" + region.name
+              + " biomes=" + biomes
+              + " syncLoading=" + syncLoading);
 
       long delay = (toggleTargetPerms) ? player.delay() : sender.delay();
       data.delay = delay;
@@ -523,9 +534,11 @@ public interface RTPCmd extends BaseRTPCmd {
       }
 
       if (syncLoading) {
+        RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.compute SUBMIT pipelineTask SYNC playerId=" + player.uuid());
         region.inFlightCalculations.incrementAndGet();
         pipelineTask.run();
       } else {
+        RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.compute SUBMIT pipelineTask ASYNC playerId=" + player.uuid());
         region.inFlightCalculations.incrementAndGet();
         RTP.scheduler.runTaskAsynchronously(pipelineTask);
       }

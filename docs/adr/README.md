@@ -20,10 +20,13 @@ An ADR captures a significant architectural decision: the context that forced it
 | [ADR-010](ADR-010-versioned-platform-adapter-submodules.md) | Versioned Platform Adapter Submodules | Accepted |
 | [ADR-011](ADR-011-rtp-api-separate-module.md) | `rtp-api` as a Separately Published Addon Interface | Accepted |
 | [ADR-012](ADR-012-chunk-reservation-abstraction.md) | `ChunkReservation` as an Internal Chunk Ticket Abstraction | Accepted |
-| [ADR-013](ADR-013-addons-as-external-gradle-projects.md) | Addons as External Gradle Projects Rather Than Built-In Optional Modules | Accepted |
+| [ADR-013](ADR-013-addons-as-external-gradle-projects.md) | Addons as External Gradle Projects Rather Than Built-In Optional Modules | Accepted (partially superseded by ADR-019) |
 | [ADR-014](ADR-014-brigadier-bridge-via-commands-api.md) | Brigadier Bridge via `commands-api` Adapter Layer | Proposed |
 | [ADR-015](ADR-015-stale-chunk-guard-countbound-pipes.md) | Stale-Chunk Guard for Count-Bound Pipes | Accepted |
 | [ADR-016](ADR-016-anvil-subsystem.md) | Anvil Read-Only Subsystem (Prefilter, Backed Chunk View, Shared Module) | Accepted |
+| [ADR-017](ADR-017-block-tags-and-state-predicates-in-safety-lists.md) | Block Tags and Block-State Predicates in Safety Lists | Accepted |
+| [ADR-018](ADR-018-agents-md-public-release-structure.md) | `AGENTS.md` Public Release Structure: Thin Router + Canonical Sources | Accepted |
+| [ADR-019](ADR-019-claim-plugin-integrations-folded-into-plugin.md) | Claim-Plugin Integrations Folded Into `rtp-plugin`; Example Addon Retained | Accepted |
 
 ## Template
 

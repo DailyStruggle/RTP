@@ -15,11 +15,15 @@ import org.jetbrains.annotations.Nullable;
  * the current {@link AnvilPrefilterMetrics} counters (ACCEPT / REJECT /
  * UNKNOWN) plus the derived hit rate.
  *
- * <p>Surfaces the Phase&nbsp;4 telemetry introduced in ADR-016 /
- * ADR-016 so operators can verify the pre-filter is doing useful work on
- * their vanilla Spigot deployments. On Paper and Folia the counters stay
- * at zero because those platforms never enter the pre-filter
- * ({@code BukkitRTPWorld.getChunkAt} is structurally overridden).
+ * <p>Surfaces the Phase&nbsp;4 telemetry introduced in ADR-016 so operators
+ * can verify the pre-filter is doing useful work across every in-scope
+ * Bukkit-family adapter: Spigot runs the probe in {@code
+ * BukkitRTPWorld#getChunkAt}; Paper inherits the same path verbatim per
+ * §13.2 (landed 2026-04-20); Folia re-implements the same orchestration in
+ * {@code FoliaRTPWorld#getChunkAt} per §11. Counters staying at zero now
+ * means either the pre-filter is disabled
+ * ({@code SafetyKeys.anvilPrefilterEnabled}) or no teleport has triggered a
+ * candidate chunk load since startup. Fabric is out of scope (§13.2).
  *
  * <p>See {@code docs/dev/ANVIL_PREFILTER_PLAN.md &sect;10} (Phase&nbsp;4)
  * and {@code docs/dev/RUNTIME_TEST_SUITE_PLAN.md} for the runtime-test
@@ -115,9 +119,9 @@ public class TestAnvilPrefilterCmd extends BaseRTPCmdImpl {
     if (s.total() == 0L) {
       String note =
           "[RTP test/anvil-prefilter] no probes observed yet — either the pre-filter is "
-              + "disabled (SafetyKeys.anvilPrefilterEnabled), the platform is Paper/Folia "
-              + "(structurally bypassed), or no teleport has triggered a candidate chunk "
-              + "load since startup.";
+              + "disabled (SafetyKeys.anvilPrefilterEnabled) or no teleport has triggered "
+              + "a candidate chunk load since startup. Spigot, Paper (§13.2), and Folia "
+              + "all enter the prefilter; Fabric is out of scope (§13.2).";
       RTP.serverAccessor.sendMessage(callerId, note);
       RTP.log(Level.INFO, note);
     }

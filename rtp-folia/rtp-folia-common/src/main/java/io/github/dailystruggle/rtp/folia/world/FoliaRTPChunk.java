@@ -1,16 +1,23 @@
 package io.github.dailystruggle.rtp.folia.world;
 
 import io.github.dailystruggle.rtp.anvil.AnvilChunkView;
+import io.github.dailystruggle.rtp.api.safety.CompiledUnsafeSet;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.folia.thread.GlobalRegionThread;
 import io.github.dailystruggle.rtp.folia.thread.RegionThread;
 import io.github.dailystruggle.rtp.spigot.anvil.PaletteNormalizer;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.bukkit.Chunk;
 import org.bukkit.HeightMap;
+import org.bukkit.block.Block;
+import org.bukkit.block.data.BlockData;
 
 /**
  * Folia-side {@link RTPChunk} implementation. Carries an internal source union
@@ -158,6 +165,43 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
     return chunk.getBlock(x & 0xF, y, z & 0xF).getType().isAir();
   }
 
+  /**
+   * ADR-016 §13.1 post-load biome read, chunk-local. Anvil-backed: consult the
+   * decoded {@link AnvilChunkView#getBiomeAt(int,int,int)} (chunk-local x/z,
+   * absolute Y). Live-backed: delegate to the loaded block's biome. Neither
+   * path consults {@code anvilProbeSupport}, so an evicted cache entry cannot
+   * cause a fall-through to the seed-synth getter when the caller already
+   * holds a valid chunk handle (the 2026-04-20 `no-view-cached` regression).
+   */
+  @Override
+  @RegionThread
+  public String getBiome(int x, int y, int z) {
+    if (anvilView != null) {
+      String id = anvilView.getBiomeAt(x & 0xF, y, z & 0xF);
+      if (id != null) {
+        // Normalize the on-disk biome identifier (e.g. "minecraft:plains") to
+        // the RTP-config-comparable form ("PLAINS"). `PaletteNormalizer` is
+        // for blocks (Material registry); biomes use the pure-string
+        // namespace-strip + upper-case helper from `rtp-api`.
+        String normalized = io.github.dailystruggle.rtp.api.configuration
+            .PaletteIdentifierNormalizer.normalize(id);
+        return (normalized != null && !normalized.isEmpty()) ? normalized : id;
+      }
+      // Anvil view had no biome container at this Y; fall back to the world
+      // getter as a last resort (matches the §13.1 precedence chain tail).
+      return super.getBiome(x, y, z);
+    }
+    if (chunk != null) {
+      try {
+        return chunk.getBlock(x & 0xF, y, z & 0xF).getBiome().name();
+      } catch (Throwable ignored) {
+        // Fall through to the world getter if the live path throws (e.g.
+        // post-unload race).
+      }
+    }
+    return super.getBiome(x, y, z);
+  }
+
   @Override
   @RegionThread
   public int getSkyLight(int x, int y, int z) {
@@ -194,6 +238,81 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
     }
     String materialName = chunk.getBlock(x & 0xF, y, z & 0xF).getType().name();
     return !unsafeBlocks.contains(materialName);
+  }
+
+  /**
+   * Compiled-form safety check (ADR-017). Mirror of {@code BukkitRTPChunk} override —
+   * see that class's Javadoc for the evaluation contract, hot-path fast exits, and
+   * Slice 2 boundary caveats (tag membership stubbed to empty collection; Anvil-backed
+   * snapshots evaluate only the plain-material bucket, deferring state / tag predicates
+   * to Slice 3).
+   *
+   * <p>Runs under {@link RegionThread} because the live-backed path reads from the
+   * chunk and the caller already holds region-thread context in {@code LocationGenerator};
+   * the Anvil-backed branch is thread-agnostic (self-contained snapshot, ADR-015 §interop).</p>
+   */
+  @Override
+  @RegionThread
+  public boolean isSafe(int x, int y, int z, CompiledUnsafeSet unsafeBlocks) {
+    if (unsafeBlocks == null || unsafeBlocks.isEmpty()) return true;
+
+    if (anvilView != null) {
+      Set<String> plain = (reconciledUnsafe != null) ? reconciledUnsafe : unsafeBlocks.plainMaterials();
+      return anvilView.isSafe(x & 0xF, y, z & 0xF, plain);
+    }
+
+    Block block = chunk.getBlock(x & 0xF, y, z & 0xF);
+    String materialName = block.getType().name();
+
+    boolean needsProperties =
+        unsafeBlocks.hasWildcardStatePredicate()
+            || unsafeBlocks.materialStatePredicates().containsKey(materialName);
+    Map<String, String> props = needsProperties
+        ? extractProperties(block.getBlockData())
+        : Collections.emptyMap();
+
+    return !unsafeBlocks.isUnsafe(materialName, Collections.emptyList(), props);
+  }
+
+  /**
+   * Parse a {@link BlockData#getAsString()} into a lowercase property map. See the
+   * equivalent helper in {@code BukkitRTPChunk} for the format contract; the
+   * implementation is duplicated deliberately so the Folia adapter retains zero
+   * compile-time coupling to {@code rtp-spigot-common}'s internal helpers (keeps the
+   * platform boundary clean per Architecture Boundaries rule §4).
+   */
+  private static Map<String, String> extractProperties(BlockData data) {
+    if (data == null) return Collections.emptyMap();
+    String s;
+    try {
+      s = data.getAsString();
+    } catch (Throwable t) {
+      return Collections.emptyMap();
+    }
+    if (s == null) return Collections.emptyMap();
+    int open = s.indexOf('[');
+    if (open < 0) return Collections.emptyMap();
+    int close = s.lastIndexOf(']');
+    if (close <= open + 1) return Collections.emptyMap();
+    String body = s.substring(open + 1, close);
+    if (body.isEmpty()) return Collections.emptyMap();
+
+    Map<String, String> out = new LinkedHashMap<>(4);
+    int start = 0;
+    int len = body.length();
+    for (int i = 0; i <= len; i++) {
+      if (i == len || body.charAt(i) == ',') {
+        String pair = body.substring(start, i).trim();
+        start = i + 1;
+        if (pair.isEmpty()) continue;
+        int eq = pair.indexOf('=');
+        if (eq <= 0 || eq == pair.length() - 1) continue;
+        String k = pair.substring(0, eq).trim().toLowerCase(Locale.ROOT);
+        String v = pair.substring(eq + 1).trim().toLowerCase(Locale.ROOT);
+        if (!k.isEmpty()) out.put(k, v);
+      }
+    }
+    return out;
   }
 
   @Override
