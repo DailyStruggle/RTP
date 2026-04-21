@@ -34,6 +34,17 @@ public class RegionCacheTask extends RTPRunnable {
     private final UUID playerId;
     private final long selectRadius;
     private final long maxNanos;
+    /**
+     * Observational mode flag (Phase 8.2 pivot, 2026-04-20c). When
+     * {@code true}, this task runs only when the pregen cache is at or above
+     * {@code cacheCap} (the strict inversion of the default gate) and drops
+     * any safe candidate instead of enqueuing it. All side effects that
+     * matter — {@code MemoryShape#addBadLocation} for rejected cells and
+     * {@code biomePrefixSumsCache} updates for every evaluated candidate —
+     * already occur inside {@code LocationGenerator} and are inherited for
+     * free. See {@code docs/dev/BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md §§2, 4.2}.
+     */
+    private final boolean observationalOnly;
 
     /**
      * Creates a new cache task for the general region queue.
@@ -47,6 +58,7 @@ public class RegionCacheTask extends RTPRunnable {
         this.playerId = null;
         this.selectRadius = RTP.configs.getParser(PerformanceKeys.class).getNumber(PerformanceKeys.viewDistanceSelect, 0L).longValue();
         this.maxNanos = maxNanos;
+        this.observationalOnly = false;
     }
 
     /**
@@ -62,6 +74,31 @@ public class RegionCacheTask extends RTPRunnable {
         this.playerId = playerId;
         this.selectRadius = RTP.configs.getParser(PerformanceKeys.class).getNumber(PerformanceKeys.viewDistanceSelect, 0L).longValue();
         this.maxNanos = maxNanos;
+        this.observationalOnly = false;
+    }
+
+    private RegionCacheTask(Region region, long maxNanos, boolean observationalOnly) {
+        super(600000L);
+        this.region = region;
+        this.playerId = null;
+        this.selectRadius = RTP.configs.getParser(PerformanceKeys.class).getNumber(PerformanceKeys.viewDistanceSelect, 0L).longValue();
+        this.maxNanos = maxNanos;
+        this.observationalOnly = observationalOnly;
+    }
+
+    /**
+     * Observational-mode factory (Phase 8.2 pivot, 2026-04-20c). Constructs a
+     * task that runs only when the cache is at/above {@code cacheCap} and
+     * discards the resulting safe candidate (if any). Side effects on
+     * {@code pendingBadLocations} / {@code biomePrefixSumsCache} are inherited
+     * from the existing {@code LocationGenerator} walk.
+     *
+     * @param region   the region to sample against
+     * @param maxNanos the time budget for the backing task
+     * @return a cache task configured for observational mode
+     */
+    public static RegionCacheTask observe(Region region, long maxNanos) {
+        return new RegionCacheTask(region, maxNanos, true);
     }
 
     /**
@@ -73,7 +110,16 @@ public class RegionCacheTask extends RTPRunnable {
 
         if (playerId == null) {
             long cacheCap = region.getSettings().cacheCap();
-            if (region.queueManager.unkeptLocations.size() >= cacheCap) {
+            boolean cacheFull = region.queueManager.unkeptLocations.size() >= cacheCap;
+            if (observationalOnly) {
+                // Observational mode runs only when the cache has NO headroom;
+                // the default-mode task retains priority while it still has
+                // work to do. See plan §2.
+                if (!cacheFull) {
+                    MemoryTracker.untrack(this);
+                    return;
+                }
+            } else if (cacheFull) {
                 MemoryTracker.untrack(this);
                 return;
             }
@@ -170,8 +216,15 @@ public class RegionCacheTask extends RTPRunnable {
                 region.inFlightCalculations.decrementAndGet();
                 if (res.coords() != null) {
                     if (res.reservation() != null) res.reservation().close();
-                    RTPLocation coldLoc = new RTPLocation(res.coords(), res.attempts(), null);
-                    region.queueManager.unkeptLocations.offer(coldLoc);
+                    // Observational mode (Phase 8.2 pivot): drop the safe
+                    // candidate instead of enqueuing it. All biome /
+                    // bad-location side effects already fired inside
+                    // LocationGenerator; the winning candidate itself is
+                    // eligible for immediate GC. See plan §2.
+                    if (!observationalOnly) {
+                        RTPLocation coldLoc = new RTPLocation(res.coords(), res.attempts(), null);
+                        region.queueManager.unkeptLocations.offer(coldLoc);
+                    }
                 }
                 MemoryTracker.untrack(this);
             }

@@ -183,6 +183,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
       teleportData.nextTask = this;
       teleportData.targetRegion = region;
 
+      RTP.log(java.util.logging.Level.FINE, "[ENQUEUE_TRACE] TeleportPipelineTask.runSetup invoking getLocation playerId=" + player.uuid() + " region=" + (region != null ? region.name : "null") + " thread=" + Thread.currentThread().getName());
       CompletableFuture<GenerationResult> locationFuture = RTP.serverAccessor.getLocationGenerator().getLocation(region, context);
       if (locationFuture.isDone()) {
         processGenerationResult(locationFuture.join());
@@ -211,6 +212,11 @@ public final class TeleportPipelineTask extends RTPRunnable {
         return;
       }
       UUID playerId = player.uuid();
+      RTP.log(java.util.logging.Level.FINE, "[ENQUEUE_TRACE] TeleportPipelineTask.processGenerationResult ENTER playerId=" + playerId
+              + " resNull=" + (res == null)
+              + " inProcessing=" + RTP.getInstance().processingPlayers.contains(playerId)
+              + " inQueuedPlayers=" + RTP.getInstance().queuedPlayers.contains(playerId)
+              + " thread=" + Thread.currentThread().getName());
 
       boolean success = false;
       try {
@@ -218,6 +224,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
           // If the player was successfully queued, gracefully halt this thread.
           // Region.execute() will spawn a new pipeline task when a location is ready.
           if (RTP.getInstance().processingPlayers.contains(playerId)) {
+            RTP.log(java.util.logging.Level.FINE, "[ENQUEUE_TRACE] TeleportPipelineTask silent-halt (processingPlayers.contains==true) playerId=" + playerId);
             if (region != null && handledInFlight.compareAndSet(false, true)) {
               region.inFlightCalculations.getAndDecrement();
             }
@@ -225,6 +232,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
           }
 
           // Otherwise, generation failed entirely (e.g., custom biome search failed).
+          RTP.log(java.util.logging.Level.FINE, "[ENQUEUE_TRACE] TeleportPipelineTask null-result CLEANUP playerId=" + playerId);
           currentPhase = Phase.CLEANUP;
           runCleanup();
           return;

@@ -1,0 +1,8 @@
+name: RTP_ExampleAddon
+version: '${version}'
+main: io.github.dailystruggle.rtp.example.RTPExampleAddon
+api-version: 1.17
+prefix: RTP
+authors: [ leaf26 ]
+description: example addon demonstrating the common RTP API surfaces
+depend: [ RTP ]

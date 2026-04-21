@@ -401,6 +401,18 @@ public class Region extends FactoryValue<RegionKeys> {
 
 //    long totalCap = Math.max(settings.cacheCap(), queueManager.playerQueue.size());
     long cacheCap = settings.cacheCap();
+
+    // Phase 8.2 pivot (2026-04-20c): schedule at most one observational
+    // RegionCacheTask alongside the default-mode deficit loop. The task
+    // itself self-gates on the inverted cache condition
+    // (unkeptLocations.size() >= cacheCap), reuses LocationGenerator, and
+    // drops any safe result instead of enqueuing it. Config surface is a
+    // single master switch (PerformanceKeys.visitorEnabled); cadence is
+    // inherited from the existing cache-fill `period`. See
+    // docs/dev/BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md §§2, 4.2–4.3.
+    if (isObservationalModeEnabled()) {
+      cachePipeline.add(RegionCacheTask.observe(this, availableTime - (System.nanoTime() - start)));
+    }
     long totalCap = Math.max(cacheCap + activeCap, queueManager.playerQueue.size());
 
     if (!isScanningCache.compareAndSet(false, true)) {
@@ -421,6 +433,29 @@ public class Region extends FactoryValue<RegionKeys> {
     } finally {
       isScanningCache.set(false);
     }
+  }
+
+  /**
+   * isObservationalModeEnabled - consults {@code PerformanceKeys.visitorEnabled}
+   * as the single master switch for the observational cache-fill mode
+   * (plan §§2, 3). Defaults to {@code true} (beta telemetry direction,
+   * 2026-04-19). Returns {@code false} if the config parser is unavailable
+   * so a cold-boot race cannot produce spurious observational tasks.
+   */
+  private boolean isObservationalModeEnabled() {
+    io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> perf;
+    try {
+      @SuppressWarnings("unchecked")
+      io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> p =
+          (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys>)
+              RTP.configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
+      perf = p;
+    } catch (Throwable t) {
+      return false;
+    }
+    if (perf == null) return false;
+    return Boolean.parseBoolean(
+        perf.getConfigValue(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.visitorEnabled, true).toString());
   }
 
   /**

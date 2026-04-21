@@ -64,8 +64,10 @@ public final class DataVersionSupport {
    * @return {@code true} if the format is whitelisted; {@code false} otherwise.
    */
   public static boolean isSupported(int dataVersion) {
-    return dataVersion == MC_1_20_DATA_VERSION
-        || dataVersion == MC_1_21_DATA_VERSION
-        || dataVersion == MC_26_1_DATA_VERSION;
+    // 2026-04-20 follow-up (ADR-016 §13.1 debug on Folia 1.21.11): the exact-value
+    // whitelist has been retired in parity with the `rtp-anvil` copy. See the
+    // canonical class for rationale. Every DataVersion is now admitted; decoder
+    // failures surface as WARNING + `Verdict.UNKNOWN` rather than silent rejection.
+    return true;
   }
 }

@@ -496,6 +496,106 @@ public abstract class DatabaseAccessor<D> {
   public abstract List<StoredLocation> loadCachedLocations(String regionName);
 
   /**
+   * Synchronously wipe every row from the {@code rtp_cached_locations} table (or
+   * equivalent storage unit for non-SQL backends).
+   *
+   * <p>Default implementation is a no-op. Backends override this to erase
+   * every persisted location row before a full state rewrite so consumed
+   * entries cannot leak across restarts.
+   */
+  public void clearAllCachedLocations() {}
+
+  /**
+   * Rebuild the cached-locations store from the authoritative in-memory state
+   * held by every live {@link io.github.dailystruggle.rtp.common.selection.region.Region}.
+   *
+   * <p>Steps, in order:
+   * <ol>
+   *   <li>Dump every location currently held in {@code keptLocations},
+   *       {@code unkeptLocations}, and {@code perPlayerLocationQueue} of every
+   *       region into {@link #dirtyCache} via {@link #saveCachedLocation}.</li>
+   *   <li>Purge any pending {@code rtp_cached_locations} entries from
+   *       {@link #writeQueue} and {@link #deleteQueue}; they are mooted by the
+   *       upcoming wipe + rewrite.</li>
+   *   <li>Call {@link #clearAllCachedLocations()} to erase the table
+   *       synchronously.</li>
+   * </ol>
+   *
+   * <p>After this call, a subsequent {@link #flushDirtyCache()} +
+   * {@link #processQueries(long)} cycle repopulates the table from scratch —
+   * "fresh table on every save". This prevents stale rows for already-consumed
+   * locations from surviving a restart (the per-poll delete callback alone is
+   * subject to a save-vs-delete race in {@link #processQueries(long)} and to
+   * missed drains when the server crashes between flush cycles).
+   *
+   * <p>No-ops when {@link RTP#selectionAPI} is null or exposes no regions,
+   * so direct unit-test calls to {@link #flushDirtyCache()} retain their
+   * original semantics.
+   */
+  public void rebuildCachedLocationsFromMemory() {
+    if (RTP.selectionAPI == null) return;
+    if (RTP.selectionAPI.permRegionLookup.isEmpty()
+        && RTP.selectionAPI.tempRegions.isEmpty()) return;
+
+    boolean anyDumped = false;
+    anyDumped |= dumpRegions(RTP.selectionAPI.permRegionLookup.values());
+    anyDumped |= dumpRegions(RTP.selectionAPI.tempRegions.values());
+
+    if (!anyDumped) return;
+
+    // Any prior-cycle ops targeting rtp_cached_locations are now stale — the
+    // in-memory dump above is the authoritative state.
+    writeQueue.removeIf(e ->
+        e != null && e.getKey() != null
+            && "rtp_cached_locations".equalsIgnoreCase(e.getKey()));
+    deleteQueue.removeIf(r ->
+        r != null && "rtp_cached_locations".equalsIgnoreCase(r.tableName));
+
+    // Synchronously erase the table; subsequent flush writes will repopulate.
+    clearAllCachedLocations();
+  }
+
+  private boolean dumpRegions(
+      Iterable<io.github.dailystruggle.rtp.common.selection.region.Region> regions) {
+    boolean dumped = false;
+    for (io.github.dailystruggle.rtp.common.selection.region.Region region : regions) {
+      if (region == null || region.queueManager == null) continue;
+      io.github.dailystruggle.rtp.common.selection.region.RegionQueueManager qm = region.queueManager;
+
+      int keptSize = qm.keptLocations.size();
+      for (int i = 0; i < keptSize; i++) {
+        io.github.dailystruggle.rtp.common.selection.region.RTPLocation loc =
+            qm.keptLocations.get(i);
+        if (loc == null) continue;
+        saveCachedLocation(region.name, loc, null);
+        dumped = true;
+      }
+
+      int unkeptSize = qm.unkeptLocations.size();
+      for (int i = 0; i < unkeptSize; i++) {
+        io.github.dailystruggle.rtp.common.selection.region.RTPLocation loc =
+            qm.unkeptLocations.get(i);
+        if (loc == null) continue;
+        saveCachedLocation(region.name, loc, null);
+        dumped = true;
+      }
+
+      for (Map.Entry<UUID, java.util.concurrent.ConcurrentLinkedQueue<
+              io.github.dailystruggle.rtp.common.selection.region.RTPLocation>> entry
+          : qm.perPlayerLocationQueue.entrySet()) {
+        UUID pid = entry.getKey();
+        for (io.github.dailystruggle.rtp.common.selection.region.RTPLocation loc
+            : entry.getValue()) {
+          if (loc == null) continue;
+          saveCachedLocation(region.name, loc, pid);
+          dumped = true;
+        }
+      }
+    }
+    return dumped;
+  }
+
+  /**
    * Write all cached/dirty rows to the database and clear the cache.
    *
    * Each entry in {@code dirtyCache} is identified by a composite key

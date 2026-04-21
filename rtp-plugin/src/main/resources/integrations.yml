@@ -1,0 +1,11 @@
+#reroll if selection was in a reserved location
+rerollFactions: false
+rerollGriefDefender: false
+rerollGriefPrevention: false
+rerollHuskTowns: false
+rerollLands: false
+rerollRedProtect: false
+rerollTownyAdvanced: false
+rerollWorldGuard: false
+
+version: "1.0"

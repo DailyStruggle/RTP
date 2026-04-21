@@ -1,11 +1,14 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
+import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
+import io.github.dailystruggle.rtp.api.safety.SafetyCompilationCache;
 import io.github.dailystruggle.rtp.api.selection.GenerationContext;
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.api.selection.ILocationGenerator;
+import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.*;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -52,6 +55,22 @@ public class LocationGenerator implements ILocationGenerator {
     private static final Set<String> unsafeBlocks = new ConcurrentSkipListSet<>();
     private static final AtomicLong lastUpdate = new AtomicLong(0);
     private static final AtomicInteger safetyRadius = new AtomicInteger(0);
+
+    /**
+     * ADR-016 §13.3 (2026-04-20 revision): the pre-chunk-load biome pre-check is
+     * disabled by default because it forces a live `world.getBiome(...)` call
+     * BEFORE any chunk load for the candidate (no Anvil view has been published
+     * yet for that key), producing a continuous stream of
+     * `reason=no-view-cached` fallthroughs on pregenerated vanilla worlds without
+     * any correctness benefit — the post-load read later in the candidate loop
+     * is authoritative and runs through the §13.1 three-tier precedence chain.
+     *
+     * <p>The pre-check code path is preserved intact under this constant so it
+     * can be flipped back on without code archaeology if a future workload
+     * (e.g. bounded biome-targeted search on giant regions) needs the
+     * short-circuit optimisation.
+     */
+    private static final boolean PRE_CHUNK_BIOME_PRECHECK_ENABLED = false;
 
     // localized generic task for
     public enum FailTypes {
@@ -117,6 +136,12 @@ public class LocationGenerator implements ILocationGenerator {
         UUID playerId = player.uuid();
 
         boolean custom = biomeNames != null && !biomeNames.isEmpty();
+        RTP.log(java.util.logging.Level.FINE, "[ENQUEUE_TRACE] LocationGenerator.getLocation ENTER playerId=" + playerId
+                + " region=" + (region != null ? region.name : "null")
+                + " custom=" + custom
+                + " biomeNames=" + biomeNames
+                + " hasUnqueuedPerm=" + (sender != null && sender.hasPermission("rtp.unqueued"))
+                + " thread=" + Thread.currentThread().getName());
 
         while (!custom) {
             CompletableFuture<RTPLocation> poll = region.queueManager.poll(playerId);
@@ -140,27 +165,67 @@ public class LocationGenerator implements ILocationGenerator {
                     ChunkSet ticket;
                     ChunkReservation reservation = pair.reservation();
                     boolean temporaryReservation = false;
+                    RTPChunk<?> chunk = null;
+                    Long chunkKey = null;
+
+                    // ADR-016 §11 probe-first ordering (2026-04-20 follow-up):
+                    // When the poll has no pre-acquired reservation, run the
+                    // adapter's probe-first `getChunkAt` path BEFORE allocating
+                    // a live ticket. On an anvil hit the subsequent
+                    // `getBiome(finalX,finalY,finalZ)` routes through
+                    // `anvilProbeSupport.takeCached` (tier 2 of ADR-016 §13.1)
+                    // instead of falling through to the live getter. Only on a
+                    // no-view outcome do we create a temporary reservation via
+                    // `getChunkAtAsync`. See the parallel edit in
+                    // `getLocation(Region, biomeNames)` below.
                     if (reservation != null) {
                         ticket = reservation.getChunkSet();
                     } else {
                         try {
-                            ticket = world.getChunkAtAsync(cx, cz).get();
+                            chunkKey = world.getChunkAt(cx, cz)
+                                    .get(5, java.util.concurrent.TimeUnit.SECONDS);
+                            if (chunkKey != null) {
+                                chunk = world.getCachedChunk(chunkKey);
+                            }
+                        } catch (java.util.concurrent.TimeoutException | InterruptedException | ExecutionException ignored) {
+                            // Fall through to the live-load path.
+                        }
+
+                        if (chunk == null) {
+                            try {
+                                ticket = world.getChunkAtAsync(cx, cz).get();
+                                reservation = new ChunkReservation(ticket, world);
+                                temporaryReservation = true;
+                            } catch (InterruptedException | ExecutionException e) {
+                                return new GenerationResult(null, 1, null);
+                            }
+                        } else {
+                            // Anvil hit: no live ticket acquired. Synthesise an
+                            // empty `ChunkSet` and a temporary reservation so
+                            // the downstream `finally { reservation.close(); }`
+                            // invariant holds. Closing a reservation over an
+                            // empty chunk list is a no-op in MemoryTracker.
+                            ticket = new ChunkSet(
+                                    world, cx, cz,
+                                    java.util.Collections.singletonList(
+                                            CompletableFuture.completedFuture(chunkKey)),
+                                    new CompletableFuture<>());
                             reservation = new ChunkReservation(ticket, world);
                             temporaryReservation = true;
-                        } catch (InterruptedException | ExecutionException e) {
-                            return new GenerationResult(null, 1, null);
                         }
                     }
 
                     try {
-                        CompletableFuture<Long> chunkAt = ticket.chunks().getFirst();
-                        Long chunkKey = chunkAt.get();
-                        RTPChunk<?> chunk = (chunkKey != null) ? world.getCachedChunk(chunkKey) : null;
-
                         if (chunk == null) {
-                            chunkKey = world.getChunkAt(cx, cz).get(5, java.util.concurrent.TimeUnit.SECONDS);
-                            if (chunkKey != null) {
-                                chunk = world.getCachedChunk(chunkKey);
+                            CompletableFuture<Long> chunkAt = ticket.chunks().getFirst();
+                            chunkKey = chunkAt.get();
+                            chunk = (chunkKey != null) ? world.getCachedChunk(chunkKey) : null;
+
+                            if (chunk == null) {
+                                chunkKey = world.getChunkAt(cx, cz).get(5, java.util.concurrent.TimeUnit.SECONDS);
+                                if (chunkKey != null) {
+                                    chunk = world.getCachedChunk(chunkKey);
+                                }
                             }
                         }
 
@@ -182,6 +247,28 @@ public class LocationGenerator implements ILocationGenerator {
                                                         .filter(Objects::nonNull)
                                                         .map(Object::toString)
                                                         .collect(Collectors.toSet()));
+                                        // ADR-017 / REQ-RTP-S-004: surface malformed safety
+                                        // tokens to the log at WARNING. The cache's
+                                        // one-time-sink semantics ensure we warn exactly
+                                        // once per distinct raw-token set — repeated refresh
+                                        // cycles against the same config will not spam.
+                                        // We also preload the compiled set so that Slice 3a
+                                        // tag expansion is memoized off the hot path.
+                                        RTPServerAccessor accessor = RTPAPI.serverAccessor;
+                                        Map<String, Set<String>> tagSnapshot =
+                                                (accessor != null)
+                                                        ? accessor.blockTagSnapshot()
+                                                        : Collections.emptyMap();
+                                        SafetyCompilationCache.getOrCompile(
+                                                unsafeBlocks,
+                                                tagSnapshot,
+                                                rejection ->
+                                                        RTP.log(
+                                                                Level.WARNING,
+                                                                "[safety.yml] rejected unsafe-blocks token '"
+                                                                        + rejection.rawToken()
+                                                                        + "': "
+                                                                        + rejection.reason()));
                                     }
                                     lastUpdate.set(t);
                                     safetyRadius.set(safety.getNumber(SafetyKeys.safetyRadius, 0).intValue());
@@ -267,7 +354,9 @@ public class LocationGenerator implements ILocationGenerator {
         }
 
         if (custom || sender.hasPermission("rtp.unqueued")) {
+            RTP.log(java.util.logging.Level.FINE, "[ENQUEUE_TRACE] LocationGenerator taking UNQUEUED fast-path playerId=" + playerId);
             GenerationResult res = getLocation(region, biomeNames);
+            RTP.log(java.util.logging.Level.FINE, "[ENQUEUE_TRACE] LocationGenerator UNQUEUED fast-path result playerId=" + playerId + " resNull=" + (res == null));
             if (res != null) {
                 chunkSet = res.verifiedChunks();
                 long attempts = res.attempts();
@@ -279,6 +368,7 @@ public class LocationGenerator implements ILocationGenerator {
                 return new GenerationResult(coords, attempts, chunkSet);
             }
         } else {
+            RTP.log(java.util.logging.Level.FINE, "[ENQUEUE_TRACE] LocationGenerator taking ENQUEUE branch playerId=" + playerId + " region=" + (region != null ? region.name : "null"));
             RTP.getInstance().processingPlayers.add(playerId);
             TeleportData data = RTP.getInstance().latestTeleportData.get(playerId);
             if (data == null) {
@@ -303,7 +393,11 @@ public class LocationGenerator implements ILocationGenerator {
             region.queueManager.playerQueue.add(playerId);
             RTP.getInstance().queuedPlayers.add(playerId);
             data.queueLocation = region.queueManager.playerQueue.size();
+            RTP.log(java.util.logging.Level.FINE, "[ENQUEUE_TRACE] LocationGenerator ENQUEUED playerId=" + playerId
+                    + " queueSize=" + data.queueLocation
+                    + " -> calling sendMessage(queueUpdate)");
             RTP.serverAccessor.sendMessage(playerId, MessagesKeys.queueUpdate);
+            RTP.log(java.util.logging.Level.FINE, "[ENQUEUE_TRACE] LocationGenerator sendMessage(queueUpdate) RETURNED playerId=" + playerId);
         }
         return null;
     }
@@ -327,32 +421,35 @@ public class LocationGenerator implements ILocationGenerator {
         ConfigParser<LoggingKeys> logging =
                 (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
         Object o;
+
+        // BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md §4 step 5 (revised 2026-04-20):
+        // The biome filter is evaluated against the user/config-supplied set directly,
+        // with `biomeWhitelist` deciding the match polarity. Earlier revisions inverted
+        // the blacklist against a world-level enumeration (`RTPServerAccessor#getBiomes`
+        // or `AnvilRegionScanner.scanBiomes`) to materialise a "good-biomes" set; that
+        // approach broke on cold start when the enumeration was empty or lossy (closed
+        // vanilla `Biome` enum collapses Iris/Terra/datapack biomes). The direct
+        // whitelist/blacklist evaluation is enumeration-free and therefore drift-proof.
+        boolean biomeWhitelist;
         if (biomeNames == null || biomeNames.isEmpty()) {
             defaultBiomes = true;
             o = safety.getConfigValue(SafetyKeys.biomeWhitelist, false);
-            boolean whitelist = (o instanceof Boolean b) ? b : Boolean.parseBoolean(o.toString());
+            biomeWhitelist = (o instanceof Boolean b) ? b : Boolean.parseBoolean(o.toString());
 
             o = safety.getConfigValue(SafetyKeys.biomes, null);
             List<String> biomeList =
                     (o instanceof List<?> list)
                             ? list.stream().map(Object::toString).toList()
                             : null;
-            Set<String> biomeSet =
+            biomeNames =
                     (biomeList == null)
                             ? new HashSet<>()
                             : biomeList.stream().map(String::toUpperCase).collect(Collectors.toSet());
-            if (whitelist) {
-                biomeNames = biomeSet;
-            } else {
-                Set<String> biomes = RTP.serverAccessor.getBiomes(region.getWorld());
-                Set<String> set = new HashSet<>();
-                for (String s : biomes) {
-                    if (!biomeSet.contains(s.toUpperCase())) {
-                        set.add(s);
-                    }
-                }
-                biomeNames = set;
-            }
+        } else {
+            // Caller-supplied biome set (e.g. `/rtp biome:plains`) is a whitelist by
+            // definition: the caller asked for these biomes explicitly.
+            biomeWhitelist = true;
+            biomeNames = biomeNames.stream().map(String::toUpperCase).collect(Collectors.toSet());
         }
 
         boolean verbose = false;
@@ -383,6 +480,27 @@ public class LocationGenerator implements ILocationGenerator {
                         ? collection
                         .stream().map(o1 -> o1.toString().toUpperCase()).collect(Collectors.toSet())
                         : new HashSet<>();
+        // ADR-017 / REQ-RTP-S-004: pregen path — surface malformed safety tokens at
+        // WARNING via the SafetyCompilationCache's one-time-sink semantics.
+        // Preloading the compiled set here also memoises the tag expansion for
+        // subsequent candidate checks (Slice 3a).
+        {
+            RTPServerAccessor pregenAccessor = RTPAPI.serverAccessor;
+            Map<String, Set<String>> pregenTagSnapshot =
+                    (pregenAccessor != null)
+                            ? pregenAccessor.blockTagSnapshot()
+                            : Collections.emptyMap();
+            SafetyCompilationCache.getOrCompile(
+                    unsafeBlocks,
+                    pregenTagSnapshot,
+                    rejection ->
+                            RTP.log(
+                                    Level.WARNING,
+                                    "[safety.yml] rejected unsafe-blocks token '"
+                                            + rejection.rawToken()
+                                            + "': "
+                                            + rejection.reason()));
+        }
 
         int safetyRadius = safety.getNumber(SafetyKeys.safetyRadius, 0).intValue();
 
@@ -462,76 +580,105 @@ public class LocationGenerator implements ILocationGenerator {
                 selections.add(new AbstractMap.SimpleEntry<>((long) select[0], (long) select[1]));
             }
 
-            String currBiome =
-                    world.getBiome(blockX, (vert.minY() + vert.maxY()) / 2, blockZ).toUpperCase();
+            // ADR-016 §13.3 (2026-04-20 revision) — pre-chunk-load biome check retired.
+            //
+            // Rationale: the prior pre-check called `world.getBiome(...)` BEFORE any
+            // chunk was loaded for this candidate, which forced `BukkitRTPWorld#getBiome`
+            // / `FoliaRTPWorld#getBiome` to fall through to the live seed-synthesised
+            // `world.getBiome(x,y,z)` (the Anvil cache has no entry before the probe
+            // runs for this key). On pregenerated vanilla worlds where the selected
+            // chunk falls outside the pregen radius, this produced a continuous stream
+            // of `reason=no-view-cached` fallthroughs and zero `anvil-hits` in
+            // `rtp test biome-source` without any correctness benefit.
+            //
+            // The authoritative biome check happens after the async chunk load at the
+            // post-load read further down this loop (`world.getBiome(finalX, finalY,
+            // finalZ)`), which is routed through the ADR-016 §13.1 three-tier
+            // precedence chain (loaded chunk → AnvilChunkView → live getter) and is
+            // therefore upgrade-drift-proof on every in-scope Bukkit-family adapter.
+            //
+            // The former pre-check block (seed-biome pre-filter + whitelist-driven
+            // re-selection loop that could short-circuit a candidate before any chunk
+            // load) is preserved below under `if (PRE_CHUNK_BIOME_PRECHECK_ENABLED)` so
+            // it can be revived without code archaeology if a future workload needs it.
+            String currBiome = "";
 
-            for (;
-                 biomeChecks < maxBiomeChecks && !biomeNames.contains(currBiome);
-                 biomeChecks++, maxAttempts++, i++) {
-                if (shape instanceof MemoryShape<?> memoryShape) {
-                    if (defaultBiomes && biomeRecall) {
-                        memoryShape.addBadLocation(l);
-                    }
-                    if (biomeRecall && !defaultBiomes) {
-                        List<Map.Entry<Long, Long>> biomes = new ArrayList<>();
-                        for (String biomeName : biomeNames) {
-                            long[] keys = memoryShape.getBiomeKeys(biomeName);
-                            long[] sums = memoryShape.getBiomePrefixSums(biomeName);
-                            if (keys != null && sums != null) {
-                                for (int k = 0; k < keys.length; k++) {
-                                    long prevSum = (k > 0) ? sums[k - 1] : 0L;
-                                    biomes.add(new AbstractMap.SimpleEntry<>(keys[k], sums[k] - prevSum));
+            //noinspection ConstantValue
+            if (PRE_CHUNK_BIOME_PRECHECK_ENABLED) {
+                final boolean vanillaPreCheck = world.isVanilla();
+                boolean canPreCheck = vanillaPreCheck && !world.isChunkGenerated(select[0], select[1]);
+                currBiome = canPreCheck
+                        ? world.getBiome(blockX, (vert.minY() + vert.maxY()) / 2, blockZ).toUpperCase()
+                        : "";
+
+                for (;
+                     canPreCheck
+                             && biomeChecks < maxBiomeChecks
+                             && (biomeNames.contains(currBiome) != biomeWhitelist);
+                     biomeChecks++, maxAttempts++, i++) {
+                    if (shape instanceof MemoryShape<?> memoryShape) {
+                        if (defaultBiomes && biomeRecall) {
+                            memoryShape.addBadLocation(l);
+                        }
+                        if (biomeRecall && !defaultBiomes) {
+                            List<Map.Entry<Long, Long>> biomes = new ArrayList<>();
+                            for (String biomeName : biomeNames) {
+                                long[] keys = memoryShape.getBiomeKeys(biomeName);
+                                long[] sums = memoryShape.getBiomePrefixSums(biomeName);
+                                if (keys != null && sums != null) {
+                                    for (int k = 0; k < keys.length; k++) {
+                                        long prevSum = (k > 0) ? sums[k - 1] : 0L;
+                                        biomes.add(new AbstractMap.SimpleEntry<>(keys[k], sums[k] - prevSum));
+                                    }
                                 }
                             }
+                            Map.Entry<Long, Long> entry;
+                            if (biomes.size() > 0) {
+                                int nextInt = rng().nextInt(biomes.size());
+                                entry = biomes.get(nextInt);
+                                l = entry.getKey() + (long) (rng().nextDouble() * entry.getValue());
+                            } else if (biomeRecallForced) {
+                                new IllegalStateException(
+                                        "[RTP] invalid state, biome recall enabled but biomes are not in memory - "
+                                                + Arrays.toString(biomeNames.toArray()))
+                                        .printStackTrace();
+                                return new GenerationResult(null, i, null);
+                            } else l = memoryShape.rand();
+                        } else {
+                            l = memoryShape.rand();
                         }
-                        Map.Entry<Long, Long> entry;
-                        if (biomes.size() > 0) {
-                            int nextInt = rng().nextInt(biomes.size());
-                            entry = biomes.get(nextInt);
-                            l = entry.getKey() + (long) (rng().nextDouble() * entry.getValue());
-                        } else if (biomeRecallForced) {
-                            new IllegalStateException(
-                                    "[RTP] invalid state, biome recall enabled but biomes are not in memory - "
-                                            + Arrays.toString(biomeNames.toArray()))
-                                    .printStackTrace();
-                            return new GenerationResult(null, i, null);
-                        } else l = memoryShape.rand();
+
+                        select = memoryShape.locationToXZ(l);
                     } else {
-                        l = memoryShape.rand();
+                        select = shape.select();
                     }
 
-                    select = memoryShape.locationToXZ(l);
-                } else {
-                    select = shape.select();
-                }
+                    blockX = (select[0] << 4) + 8;
+                    blockZ = (select[1] << 4) + 8;
+                    cursor.setXZ(blockX, blockZ);
 
-                blockX = (select[0] << 4) + 8;
-                blockZ = (select[1] << 4) + 8;
-                cursor.setXZ(blockX, blockZ);
+                    if (verbose) {
+                        selections.add(new AbstractMap.SimpleEntry<>((long) select[0], (long) select[1]));
+                    }
 
-                if (verbose) {
-                    //                if( shape instanceof MemoryShape ) selections.add( new
-                    // AbstractMap.SimpleEntry<>( (long ) selections.size(), l) );
-                    //                else selections.add( new AbstractMap.SimpleEntry<>( (long ) select[0], (
-                    // long ) select[1]) );
-                    selections.add(new AbstractMap.SimpleEntry<>((long) select[0], (long) select[1]));
+                    if (verbose) {
+                        String key = "biome=" + currBiome;
+                        failMap
+                                .get(FailTypes.biome)
+                                .compute(
+                                        key,
+                                        (s, aLong) -> {
+                                            if (aLong == null) return 1L;
+                                            return ++aLong;
+                                        });
+                    }
+                    canPreCheck = vanillaPreCheck && !world.isChunkGenerated(select[0], select[1]);
+                    currBiome = canPreCheck
+                            ? world.getBiome(blockX, (vert.minY() + vert.maxY()) / 2, blockZ)
+                            : "";
                 }
-
-                if (verbose) {
-                    String key = "biome=" + currBiome;
-                    failMap
-                            .get(FailTypes.biome)
-                            .compute(
-                                    key,
-                                    (s, aLong) -> {
-                                        if (aLong == null) return 1L;
-                                        return ++aLong;
-                                    });
-                }
-                currBiome =
-                        world.getBiome(blockX, (vert.minY() + vert.maxY()) / 2, blockZ);
+                if (biomeChecks >= maxBiomeChecks) break;
             }
-            if (biomeChecks >= maxBiomeChecks) break;
 
             WorldBorder border = (WorldBorder) RTP.serverAccessor.getWorldBorder(world.name());
             if (!border
@@ -560,33 +707,49 @@ public class LocationGenerator implements ILocationGenerator {
 
             int cx = select[0];
             int cz = select[1];
-            ChunkSet ticket;
-            try {
-                ticket = world.getChunkAtAsync(cx, cz).get();
-            } catch (InterruptedException | ExecutionException e) {
-                continue;
-            }
-            RTPChunk<?> chunk;
-            try {
-                CompletableFuture<Long> cfChunk = ticket.chunks().get(0);
-                // Bounded fetch
-                Long key = cfChunk.get(5, java.util.concurrent.TimeUnit.SECONDS);
-                chunk = (key != null) ? world.getCachedChunk(key) : null;
 
-                if (chunk == null) {
-                    try {
-                        key = (Long) world.getChunkAt(cx, cz)
-                                .get(5, java.util.concurrent.TimeUnit.SECONDS);
-                    } catch (InterruptedException | ExecutionException | TimeoutException e) {
-                        key = null;
-                    }
-                    if (key != null) {
-                        chunk = world.getCachedChunk(key);
-                    }
+            // ADR-016 §11 probe-first ordering (2026-04-20 follow-up):
+            // Call `world.getChunkAt(cx, cz)` BEFORE any live async load so the
+            // adapter's internal `shouldPrefilter → probeAndPublish` chain runs
+            // and publishes an `AnvilChunkView` into `anvilProbeSupport` for
+            // this chunk key. Only on a no-view outcome (UNKNOWN / gate-skip
+            // with an evicted live chunk) do we fall through to
+            // `getChunkAtAsync`, which acquires a live ticket + MemoryTracker
+            // registration. Without this ordering, eager `getChunkAtAsync`
+            // loaded every candidate live, `shouldPrefilter` correctly saw
+            // `isChunkLoaded=true` and skipped the probe, and the subsequent
+            // `world.getBiome(finalX,finalY,finalZ)` below at the post-load
+            // read always fell through to the live seed-synthesised getter
+            // with `reason=no-view-cached`, producing zero `anvil-hits` in
+            // `rtp test biome-source` regardless of what was on disk.
+            RTPChunk<?> chunk = null;
+            Long probeKey = null;
+            try {
+                probeKey = world.getChunkAt(cx, cz)
+                        .get(5, java.util.concurrent.TimeUnit.SECONDS);
+                if (probeKey != null) {
+                    chunk = world.getCachedChunk(probeKey);
                 }
-            } catch (java.util.concurrent.TimeoutException | InterruptedException | ExecutionException e) {
-                RTP.log(Level.WARNING, "Chunk load timed out or failed at " + cx + ", " + cz);
-                continue;
+            } catch (java.util.concurrent.TimeoutException | InterruptedException | ExecutionException ignored) {
+                // Fall through to the live-load path below.
+            }
+
+            ChunkSet ticket = null;
+            if (chunk == null) {
+                try {
+                    ticket = world.getChunkAtAsync(cx, cz).get();
+                } catch (InterruptedException | ExecutionException e) {
+                    continue;
+                }
+                try {
+                    CompletableFuture<Long> cfChunk = ticket.chunks().get(0);
+                    // Bounded fetch
+                    Long key = cfChunk.get(5, java.util.concurrent.TimeUnit.SECONDS);
+                    chunk = (key != null) ? world.getCachedChunk(key) : null;
+                } catch (java.util.concurrent.TimeoutException | InterruptedException | ExecutionException e) {
+                    RTP.log(Level.WARNING, "Chunk load timed out or failed at " + cx + ", " + cz);
+                    continue;
+                }
             }
 
             if (chunk == null) {
@@ -625,11 +788,29 @@ public class LocationGenerator implements ILocationGenerator {
                 finalX = res.x();
                 finalY = res.y();
                 finalZ = res.z();
-                currBiome = world.getBiome(finalX, finalY, finalZ).toUpperCase();
+                // ADR-016 §13.1 follow-up (2026-04-20): ask the resolved chunk
+                // for its own biome, not the world. On an anvil-backed chunk
+                // this goes straight to the decoded `AnvilChunkView` we already
+                // hold (bypassing `anvilProbeSupport.takeCached`, which can be
+                // evicted between probe-publish and this read). On a live-
+                // backed chunk this goes to the loaded block's biome (no
+                // seed-synth fallthrough). Either way, `no-view-cached` can no
+                // longer be logged at this point.
+                currBiome = chunk.getBiome(finalX, finalY, finalZ).toUpperCase();
 
-                if (!biomeNames.contains(currBiome)) {
+                if (biomeNames.contains(currBiome) != biomeWhitelist) {
                     biomeChecks++;
-                    maxAttempts++;
+                    // Bounded-rerolling invariant (REQ-RTP-F-006): grow `maxAttempts` on a
+                    // biome mismatch so a run of unlucky candidates does not prematurely
+                    // exhaust the outer loop, but only while biome-check budget remains.
+                    // Once `biomeChecks` saturates `maxBiomeChecks`, stop extending
+                    // `maxAttempts` so an impossible-biome filter terminates instead of
+                    // looping forever. The legacy pre-check enforced this bound inline;
+                    // it must also be enforced here now that the pre-check is retired
+                    // (ADR-016 §13.3, 2026-04-20).
+                    if (biomeChecks < maxBiomeChecks) {
+                        maxAttempts++;
+                    }
                     if (defaultBiomes && shape instanceof MemoryShape && biomeRecall) {
                         ((MemoryShape<?>) shape).addBadLocation(l);
                     }
@@ -638,6 +819,9 @@ public class LocationGenerator implements ILocationGenerator {
                         failMap
                                 .get(FailTypes.biome)
                                 .compute("biome=" + currBiome, (s, aLong) -> (aLong == null) ? 1L : ++aLong);
+                    }
+                    if (biomeChecks >= maxBiomeChecks) {
+                        break;
                     }
                     continue;
                 }

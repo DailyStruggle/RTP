@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.anvil;
 
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -17,10 +19,27 @@ import java.util.Set;
  * but the view does not sort). A world Y below or above the emitted section range
  * returns {@code null} from {@link #blockIdAt(int, int, int)}.
  */
-public record AnvilChunkView(int dataVersion, List<PaletteSection> sections, long[] motionBlockingNoLeaves) {
+public record AnvilChunkView(int dataVersion,
+                             List<PaletteSection> sections,
+                             long[] motionBlockingNoLeaves,
+                             List<BiomePaletteSection> biomeSections) {
 
     public AnvilChunkView {
         Objects.requireNonNull(sections, "sections");
+        Objects.requireNonNull(biomeSections, "biomeSections");
+    }
+
+    /**
+     * Back-compat constructor used by pre-Phase-2 call sites that predate the biome
+     * palette (ANVIL_BIOME_PLAN.md §4). Defaults {@code biomeSections} to an empty
+     * list, which makes {@link #getBiomeAt(int, int, int)} return {@code null}
+     * everywhere and {@link #getBiomesPresent()} return an empty set — i.e. the view
+     * reports "no biome data available" and the platform adapter falls through to
+     * the live {@code world.getBiome(loc)} path. This is the correct pre-Phase-2
+     * baseline.
+     */
+    public AnvilChunkView(int dataVersion, List<PaletteSection> sections, long[] motionBlockingNoLeaves) {
+        this(dataVersion, sections, motionBlockingNoLeaves, Collections.emptyList());
     }
 
     /**
@@ -141,5 +160,60 @@ public record AnvilChunkView(int dataVersion, List<PaletteSection> sections, lon
         // floor + raw - 1 (the topmost motion-blocking block, same convention the
         // Phase 3a prefilter already uses).
         return floor + raw - 1;
+    }
+
+    // ---------------------------------------------------------- Phase 2 (ANVIL_BIOME_PLAN) biome queries
+
+    /**
+     * Returns the raw namespaced biome identifier at world coordinate {@code (x, worldY, z)},
+     * or {@code null} if {@code worldY} falls outside the decoded Y window or the covering
+     * section has no biome container on disk.
+     *
+     * <p>Coordinates are chunk-local for {@code x} / {@code z} (0..15) and absolute for
+     * {@code worldY}. The returned identifier is the on-disk form (e.g.
+     * {@code "minecraft:plains"}, {@code "iris:volcanic_ash_plains"}); callers that need
+     * the RTP-configuration-comparable form must run it through the platform-side
+     * {@code PaletteNormalizer::reconcile}.
+     *
+     * <p>See ANVIL_BIOME_PLAN.md §4 for the contract and §5 for the trust model (the
+     * disk palette is authoritative for populated chunks; for an {@code UNKNOWN} /
+     * absent section the platform adapter is expected to fall through to the live
+     * {@code world.getBiome(loc).name()} getter).
+     *
+     * @param x       chunk-local x, 0..15
+     * @param worldY  absolute world Y
+     * @param z       chunk-local z, 0..15
+     * @return the on-disk biome identifier, or {@code null} when no biome container
+     *         covers that Y range in this view
+     * @throws IndexOutOfBoundsException if {@code x} or {@code z} is outside {@code 0..15}
+     */
+    public String getBiomeAt(int x, int worldY, int z) {
+        int sy = Math.floorDiv(worldY, 16);
+        int ly = Math.floorMod(worldY, 16);
+        for (BiomePaletteSection bs : biomeSections) {
+            if (bs.sectionY() == sy) {
+                return bs.biomeIdAt(x, ly, z);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Returns the union of every distinct namespaced biome identifier that appears
+     * in any decoded section of this chunk. Intended for pregen biome-enumeration
+     * scans (see ANVIL_BIOME_PLAN.md §6.1). Does not include biomes from sections
+     * whose biome container failed to decode (those sections are simply absent from
+     * {@link #biomeSections()}).
+     *
+     * <p>The returned set preserves insertion order (first-seen per section / per
+     * palette index) to make tab-completion output stable.
+     */
+    public Set<String> getBiomesPresent() {
+        if (biomeSections.isEmpty()) return Collections.emptySet();
+        Set<String> out = new LinkedHashSet<>();
+        for (BiomePaletteSection bs : biomeSections) {
+            out.addAll(bs.palette());
+        }
+        return Collections.unmodifiableSet(out);
     }
 }

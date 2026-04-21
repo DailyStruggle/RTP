@@ -217,66 +217,86 @@ public class SendMessage {
     return text;
   }
 
+  /**
+   * Returns the ChatColor prefix for a given log level, or null if the level should be
+   * routed through the plain {@link Logger} path instead of the colored console-sender path.
+   */
+  private static @Nullable ChatColor colorFor(Level level) {
+    switch (level.intValue()) {
+      case 1000: // Level.SEVERE
+        return ChatColor.RED;
+      case 900: // Level.WARNING
+        return ChatColor.YELLOW;
+      case 800: // Level.INFO
+        return ChatColor.WHITE;
+      case 700: // Level.CONFIG
+        return ChatColor.GREEN;
+      case 500: // Level.FINE
+        return ChatColor.AQUA;
+      case 400: // Level.FINER
+        return ChatColor.DARK_AQUA;
+      case 300: // Level.FINEST
+        return ChatColor.GRAY;
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * Returns true if {@link Bukkit#getLogger()} would publish a record at the given level.
+   * Callers that are about to perform expensive formatting should short-circuit on false so
+   * FINE/FINER/FINEST debug paths don't pay the placeholder/PAPI cost when disabled.
+   */
+  private static boolean isLoggable(Level level) {
+    Logger logger = Bukkit.getLogger();
+    return logger == null || logger.isLoggable(level);
+  }
+
   public static void log(Level level, String message) {
     if (Objects.isNull(message) || message.isEmpty()) return;
+    if (!isLoggable(level)) return;
 
     message = format(null, message);
     intercept(message);
 
     if (RTP.serverAccessor.getServerIntVersion() <= 12) message = ChatColor.stripColor(message);
 
-    if (level.equals(Level.INFO)) {
-      String[] split = message.split("\n");
-      for (String s : split) {
-        s = ChatColor.WHITE + s;
-        if (RTP.serverAccessor.getServerIntVersion() > 12) {
-          BaseComponent[] baseComponents = TextComponent.fromLegacyText(s);
-          Bukkit.getConsoleSender().spigot().sendMessage(baseComponents);
-        } else Bukkit.getLogger().log(Level.INFO, s);
+    ChatColor color = colorFor(level);
+    if (color == null) {
+      Bukkit.getLogger().log(level, message);
+      return;
+    }
+
+    // Map CONFIG → INFO for the legacy (<=1.12) Bukkit logger path; newer servers use the
+    // console-sender route which carries its own color and level via the component payload.
+    Level legacyLevel = (level.equals(Level.CONFIG)) ? Level.INFO : level;
+    boolean modern = RTP.serverAccessor.getServerIntVersion() > 12;
+
+    for (String s : message.split("\n")) {
+      String colored = color + s;
+      if (modern) {
+        Bukkit.getConsoleSender().spigot().sendMessage(TextComponent.fromLegacyText(colored));
+      } else {
+        Bukkit.getLogger().log(legacyLevel, colored);
       }
-    } else if (level.equals(Level.CONFIG)) {
-      String[] split = message.split("\n");
-      for (String s : split) {
-        s = ChatColor.GREEN + s;
-        if (RTP.serverAccessor.getServerIntVersion() > 12) {
-          BaseComponent[] baseComponents = TextComponent.fromLegacyText(s);
-          Bukkit.getConsoleSender().spigot().sendMessage(baseComponents);
-        } else Bukkit.getLogger().log(Level.INFO, s);
-      }
-    } else if (level.equals(Level.WARNING)) {
-      String[] split = message.split("\n");
-      for (String s : split) {
-        s = ChatColor.YELLOW + s;
-        if (RTP.serverAccessor.getServerIntVersion() > 12) {
-          BaseComponent[] baseComponents = TextComponent.fromLegacyText(s);
-          Bukkit.getConsoleSender().spigot().sendMessage(baseComponents);
-        } else Bukkit.getLogger().log(Level.WARNING, s);
-      }
-    } else {
-      Logger logger = Bukkit.getLogger();
-      logger.log(level, message);
     }
   }
 
   public static void log(Level level, String message, Throwable throwable) {
     if (Objects.isNull(message) || message.isEmpty()) return;
+    if (!isLoggable(level)) return;
 
     String formatted = format(null, message);
     intercept(formatted);
 
-    CommandSender.Spigot spigot = Bukkit.getConsoleSender().spigot();
-
-    if (level.equals(Level.INFO))
-      spigot.sendMessage(TextComponent.fromLegacyText(formatted));
-    else if (level.equals(Level.CONFIG))
-      spigot.sendMessage(TextComponent.fromLegacyText(ChatColor.GREEN + formatted));
-    else if (level.equals(Level.WARNING))
-      spigot.sendMessage(TextComponent.fromLegacyText(ChatColor.YELLOW + formatted));
-    else if (level.equals(Level.SEVERE))
-      spigot.sendMessage(TextComponent.fromLegacyText(ChatColor.RED + formatted));
-    else {
-      Logger logger = Bukkit.getLogger();
-      logger.log(level, message);
+    ChatColor color = colorFor(level);
+    if (color == null) {
+      Bukkit.getLogger().log(level, message);
+    } else {
+      CommandSender.Spigot spigot = Bukkit.getConsoleSender().spigot();
+      // INFO keeps its historical "no color prefix" rendering in the throwable overload.
+      String prefixed = level.equals(Level.INFO) ? formatted : color + formatted;
+      spigot.sendMessage(TextComponent.fromLegacyText(prefixed));
     }
 
     if (throwable != null) {

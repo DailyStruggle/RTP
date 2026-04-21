@@ -1,5 +1,17 @@
 # --- RTP Safety Configuration ---
 # Configures how the plugin determines if a teleport location is "safe".
+#
+# Token grammar (ADR-017):
+#   MATERIAL                          -- plain material, e.g. LAVA
+#   MATERIAL[prop=val,prop2=val2]     -- material only when ALL block-state properties match
+#   #namespace:tag                    -- expands to every material in that block tag
+#   #namespace:tag[prop=val]          -- tag members only when properties match
+#   *[prop=val]                       -- ANY material when properties match (wildcard)
+#
+# Property values are compared case-insensitively against the string form of
+# Bukkit's BlockData. Unknown tags expand to the empty set (no-op, fail-open);
+# malformed tokens are logged once at WARN level on reload (REQ-RTP-S-004).
+# Order within a list does not matter.
 
 # Invulnerability (Seconds)
 # Duration of invulnerability granted to the player after teleporting.
@@ -55,9 +67,12 @@ platformAirHeight: 2
 platformMaterial: GLASS
 
 # Air Blocks
-# Material types considered as "air" or walkable space.
+# Material types treated as walkable / non-blocking space above the landing.
+# Uses vanilla block tags where possible to stay forward-compatible with new
+# Mojang additions (e.g. a new flower variant added in a future MC release
+# is automatically picked up by #minecraft:small_flowers without a config edit).
 airBlocks:
-  # Base Air & Technical
+  # True air variants (no tag covers all of these together)
   - AIR
   - CAVE_AIR
   - VOID_AIR
@@ -65,9 +80,12 @@ airBlocks:
   - STRUCTURE_VOID
   - LIGHT
 
-  # Flowers & Plants
-  # NOTE: the flat-id `GRASS` intentionally omitted -- in modern Bukkit (1.20.3+)
-  # `GRASS` refers to the solid grass *block*; the plant was renamed to `SHORT_GRASS`.
+  # Flowers (covers dandelion, poppies, tulips, eyeblossoms, torchflower, ...)
+  - "#minecraft:flowers"
+  - "#minecraft:small_flowers"
+  - "#minecraft:tall_flowers"
+
+  # Grass-like plants and bushes not in the flowers tags
   - SHORT_GRASS
   - TALL_GRASS
   - SHORT_DRY_GRASS
@@ -76,58 +94,26 @@ airBlocks:
   - LARGE_FERN
   - DEAD_BUSH
   - BUSH
-  - DANDELION
-  - POPPY
-  - BLUE_ORCHID
-  - ALLIUM
-  - AZURE_BLUET
-  - RED_TULIP
-  - ORANGE_TULIP
-  - WHITE_TULIP
-  - PINK_TULIP
-  - OXEYE_DAISY
-  - CORNFLOWER
-  - LILY_OF_THE_VALLEY
-  - SUNFLOWER
-  - LILAC
-  - ROSE_BUSH
-  - PEONY
-  - PITCHER_PLANT
-  - TORCHFLOWER
   - WILDFLOWERS
   - FIREFLY_BUSH
-  - CACTUS_FLOWER
-  - OPEN_EYEBLOSSOM
-  - CLOSED_EYEBLOSSOM
   - LEGACY_LONG_GRASS
   - LEGACY_DEAD_BUSH
 
-  # Saplings & Fungi
-  - OAK_SAPLING
-  - SPRUCE_SAPLING
-  - BIRCH_SAPLING
-  - JUNGLE_SAPLING
-  - ACACIA_SAPLING
-  - DARK_OAK_SAPLING
-  - MANGROVE_PROPAGULE
-  - CHERRY_SAPLING
-  - PALE_OAK_SAPLING
+  # Saplings, propagules, and fungi
+  - "#minecraft:saplings"
   - BROWN_MUSHROOM
   - RED_MUSHROOM
   - CRIMSON_FUNGUS
   - WARPED_FUNGUS
 
-  # Crops & Surface Flora
-  - WHEAT
-  - CARROTS
-  - POTATOES
-  - BEETROOTS
+  # Crops and surface flora not in a convenient tag
+  - "#minecraft:crops"
   - MELON_STEM
   - PUMPKIN_STEM
   - SUGAR_CANE
   - BAMBOO_SAPLING
 
-  # Vines & Wall-Mounted Flora
+  # Vines and wall-mounted flora
   - VINE
   - GLOW_LICHEN
   - WEEPING_VINES
@@ -137,12 +123,9 @@ airBlocks:
   - RESIN_CLUMP
 
   # Rails
-  - RAIL
-  - POWERED_RAIL
-  - DETECTOR_RAIL
-  - ACTIVATOR_RAIL
+  - "#minecraft:rails"
 
-  # Redstone & Mechanisms
+  # Redstone and mechanisms (no grouping tag exists)
   - REDSTONE_WIRE
   - COMPARATOR
   - REPEATER
@@ -150,7 +133,7 @@ airBlocks:
   - STRING
   - TRIPWIRE
 
-  # Torches & Lighting
+  # Torches and lighting (no grouping tag)
   - TORCH
   - WALL_TORCH
   - SOUL_TORCH
@@ -159,123 +142,57 @@ airBlocks:
   - REDSTONE_WALL_TORCH
   - END_ROD
 
-  # Buttons
-  - STONE_BUTTON
-  - OAK_BUTTON
-  - SPRUCE_BUTTON
-  - BIRCH_BUTTON
-  - JUNGLE_BUTTON
-  - ACACIA_BUTTON
-  - DARK_OAK_BUTTON
-  - MANGROVE_BUTTON
-  - CHERRY_BUTTON
-  - PALE_OAK_BUTTON
-  - BAMBOO_BUTTON
-  - CRIMSON_BUTTON
-  - WARPED_BUTTON
-  - POLISHED_BLACKSTONE_BUTTON
+  # Buttons (stone + wooden variants)
+  - "#minecraft:buttons"
 
-  # Pressure Plates
-  - STONE_PRESSURE_PLATE
-  - OAK_PRESSURE_PLATE
-  - SPRUCE_PRESSURE_PLATE
-  - BIRCH_PRESSURE_PLATE
-  - JUNGLE_PRESSURE_PLATE
-  - ACACIA_PRESSURE_PLATE
-  - DARK_OAK_PRESSURE_PLATE
-  - MANGROVE_PRESSURE_PLATE
-  - CHERRY_PRESSURE_PLATE
-  - PALE_OAK_PRESSURE_PLATE
-  - BAMBOO_PRESSURE_PLATE
-  - CRIMSON_PRESSURE_PLATE
-  - WARPED_PRESSURE_PLATE
-  - POLISHED_BLACKSTONE_PRESSURE_PLATE
-  - LIGHT_WEIGHTED_PRESSURE_PLATE
-  - HEAVY_WEIGHTED_PRESSURE_PLATE
+  # Pressure plates
+  - "#minecraft:pressure_plates"
 
-  # Signs (Standing, Wall, and Hanging)
-  - OAK_SIGN
-  - OAK_WALL_SIGN
-  - OAK_HANGING_SIGN
-  - OAK_WALL_HANGING_SIGN
-  - SPRUCE_SIGN
-  - SPRUCE_WALL_SIGN
-  - SPRUCE_HANGING_SIGN
-  - SPRUCE_WALL_HANGING_SIGN
-  - BIRCH_SIGN
-  - BIRCH_WALL_SIGN
-  - BIRCH_HANGING_SIGN
-  - BIRCH_WALL_HANGING_SIGN
-  - JUNGLE_SIGN
-  - JUNGLE_WALL_SIGN
-  - JUNGLE_HANGING_SIGN
-  - JUNGLE_WALL_HANGING_SIGN
-  - ACACIA_SIGN
-  - ACACIA_WALL_SIGN
-  - ACACIA_HANGING_SIGN
-  - ACACIA_WALL_HANGING_SIGN
-  - DARK_OAK_SIGN
-  - DARK_OAK_WALL_SIGN
-  - DARK_OAK_HANGING_SIGN
-  - DARK_OAK_WALL_HANGING_SIGN
-  - MANGROVE_SIGN
-  - MANGROVE_WALL_SIGN
-  - MANGROVE_HANGING_SIGN
-  - MANGROVE_WALL_HANGING_SIGN
-  - CHERRY_SIGN
-  - CHERRY_WALL_SIGN
-  - CHERRY_HANGING_SIGN
-  - CHERRY_WALL_HANGING_SIGN
-  - PALE_OAK_SIGN
-  - PALE_OAK_WALL_SIGN
-  - PALE_OAK_HANGING_SIGN
-  - PALE_OAK_WALL_HANGING_SIGN
-  - BAMBOO_SIGN
-  - BAMBOO_WALL_SIGN
-  - BAMBOO_HANGING_SIGN
-  - BAMBOO_WALL_HANGING_SIGN
-  - CRIMSON_SIGN
-  - CRIMSON_WALL_SIGN
-  - CRIMSON_HANGING_SIGN
-  - CRIMSON_WALL_HANGING_SIGN
-  - WARPED_SIGN
-  - WARPED_WALL_SIGN
-  - WARPED_HANGING_SIGN
-  - WARPED_WALL_HANGING_SIGN
+  # Signs -- all standing/wall/hanging variants in four tags
+  - "#minecraft:standing_signs"
+  - "#minecraft:wall_signs"
+  - "#minecraft:ceiling_hanging_signs"
+  - "#minecraft:wall_hanging_signs"
   - LEGACY_SIGN
   - LEGACY_WALL_SIGN
 
-  # Ground Cover
+  # Ground cover
   - SNOW
   - MOSS_CARPET
   - PALE_MOSS_CARPET
   - LEAF_LITTER
 
 # Unsafe Blocks
-# Materials the plugin will reject as a landing target or any block within
-# `safetyRadius` of the target. Populated from the Bukkit Material enum.
-# Anything that can damage, trap, or drown a player belongs here.
+# Materials or block-states the plugin will reject as a landing target or any
+# block within `safetyRadius` of the target. Supports state predicates and
+# wildcards (see grammar at top of file).
 unsafeBlocks:
-  # Fluids and Elemental Hazards
+  # Fluids
   - WATER
   - LAVA
   - BUBBLE_COLUMN
-  - FIRE
-  - SOUL_FIRE
-  - POWDER_SNOW
 
-  # Environmental Damage
+  # Any waterlogged block (slabs/stairs/fences/walls/signs/chains/...) --
+  # replaces the legacy 'WATERLOGGED' pseudo-token. Uses ADR-017 wildcard.
+  - "*[waterlogged=true]"
+
+  # Fire and heat hazards
+  - "#minecraft:fire"
+  - POWDER_SNOW
   - MAGMA_BLOCK
+
+  # Campfires (both lit and unlit are unsafe -- players sink into them)
+  - "#minecraft:campfires"
+
+  # Contact damage / entrapment
   - CACTUS
   - SWEET_BERRY_BUSH
   - WITHER_ROSE
   - POINTED_DRIPSTONE
-  - CAMPFIRE
-  - SOUL_CAMPFIRE
+  - COBWEB
   - CREAKING_HEART
 
-  # Trapping and Obstructions
-  - COBWEB
+  # Void / portal / immovable
   - BEDROCK
   - NETHER_PORTAL
   - END_PORTAL
@@ -286,14 +203,11 @@ unsafeBlocks:
   - END_CRYSTAL
   - RESPAWN_ANCHOR
 
-  # Aquatic Flora
+  # Aquatic flora (drown risk)
   - SEAGRASS
   - TALL_SEAGRASS
   - KELP
   - KELP_PLANT
-
-  # State Flags
-  - WATERLOGGED
 
 # Biome Filter
 # biomeWhitelist: false -> `biomes` list is a blacklist (skip these biomes)

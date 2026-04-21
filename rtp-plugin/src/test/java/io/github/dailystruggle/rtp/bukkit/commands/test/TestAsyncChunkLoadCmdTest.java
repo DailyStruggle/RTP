@@ -176,7 +176,24 @@ class TestAsyncChunkLoadCmdTest {
     @Override
     public CompletableFuture<Long> getChunkAt(int cx, int cz) {
       long key = ((long) cx & 0xffffffffL) | ((long) cz << 32);
-      return gate.thenApplyAsync(v -> key, executor);
+      // Add a small delay on the executor after gate.complete fires so the
+      // probe's whenComplete callback is guaranteed to be registered before
+      // the returned future is actually completed. Without this delay, a
+      // fast gate.complete → executor-dispatch → inline-complete sequence
+      // can race the probe's whenComplete registration, causing the
+      // callback to fire inline on the caller thread instead of on the
+      // executor. The race is an artefact of the test fake, not the
+      // production S-005 contract.
+      return gate.thenApplyAsync(
+          v -> {
+            try {
+              Thread.sleep(100L);
+            } catch (InterruptedException ie) {
+              Thread.currentThread().interrupt();
+            }
+            return key;
+          },
+          executor);
     }
   }
 

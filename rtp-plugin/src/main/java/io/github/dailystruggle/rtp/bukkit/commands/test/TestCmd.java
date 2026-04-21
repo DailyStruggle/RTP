@@ -36,6 +36,7 @@ public class TestCmd extends BaseRTPCmdImpl {
     addSubCommand(new TestChunkTicketCmd(this));
     addSubCommand(new TestDisconnectMidflightCmd(this));
     addSubCommand(new TestAnvilPrefilterCmd(this));
+    addSubCommand(new TestBiomeSourceCmd(this));
     addSubCommand(new TestAsyncChunkLoadCmd(this));
     addSubCommand(new AsyncReplyTestJob(this));
     addSubCommand(new QueueStarvationTestJob(this));

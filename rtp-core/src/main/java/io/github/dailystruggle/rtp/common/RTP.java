@@ -194,6 +194,11 @@ public class RTP {
     trackedTasks.add(scheduler.runTaskTimerAsynchronously(
         () -> {
           if (databaseAccessor != null) {
+            // Rewrite the cached-locations table from authoritative in-memory
+            // state so already-consumed locations cannot leak across restarts.
+            // Must run BEFORE flushDirtyCache so the wipe-then-write ordering
+            // survives into the shared writeQueue drain.
+            databaseAccessor.rebuildCachedLocationsFromMemory();
             databaseAccessor.flushDirtyCache();
           }
         },
@@ -406,6 +411,12 @@ public class RTP {
       if (instance.databaseAccessor instanceof AbstractSQLDatabaseAccessor sqlDatabaseAccessor) {
         sqlDatabaseAccessor.flush();
       }
+      // Rewrite the cached-locations table from authoritative in-memory state
+      // BEFORE flushing the dirtyCache. Without this, rows for locations that
+      // were consumed in prior flush cycles (or whose delete enqueue lost the
+      // write-vs-delete ordering race in processQueries) survive into the next
+      // startup and get re-hydrated as ghosts.
+      instance.databaseAccessor.rebuildCachedLocationsFromMemory();
       // Drain dirtyCache -> writeQueue (this enqueues async writes via setValue().thenAccept(),
       // but getTable returns a completed future synchronously, so the enqueue runs inline).
       instance.databaseAccessor.flushDirtyCache();

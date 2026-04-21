@@ -1,0 +1,5 @@
+# Example addon configuration. Edit values here; RTP's ConfigParser will
+# pick up changes on /rtp reload through the Configs.onReload hook.
+rejectInClaim: true
+announceTeleport: true
+version: "1.0"

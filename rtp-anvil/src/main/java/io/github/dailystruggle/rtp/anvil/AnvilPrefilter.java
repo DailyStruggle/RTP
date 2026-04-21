@@ -6,8 +6,12 @@ import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.UnaryOperator;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Read-only Anvil pre-filter entry point (ADR-016 Phase 3a).
@@ -55,6 +59,15 @@ import java.util.function.UnaryOperator;
 public final class AnvilPrefilter {
 
   /**
+   * Logger used for diagnostic output from the Anvil pre-filter. Local to the
+   * {@code rtp-anvil} module to preserve its zero-dependency contract (no
+   * Bukkit, no rtp-core imports — see {@code AnvilPackageBoundaryArchTest}).
+   * Routed to the JDK root logger, which the Bukkit/Paper/Folia server forwards
+   * to its own log; the platform adapter's log formatter handles the rest.
+   */
+  private static final Logger LOG = Logger.getLogger(AnvilPrefilter.class.getName());
+
+  /**
    * Number of bits per entry in the 1.18+ {@code MOTION_BLOCKING_NO_LEAVES} packed long
    * array. Derived from {@code ceil(log2(worldHeight + 1))}; for a 384-block overworld
    * (min {@code -64}, max {@code 319}) this is {@code 9} bits per entry, yielding
@@ -81,6 +94,46 @@ public final class AnvilPrefilter {
 
   private AnvilPrefilter() {
     // Utility class.
+  }
+
+  /**
+   * Rate-limit budget for each distinct UNKNOWN/verdict-diagnostic log reason
+   * (per JVM). The probe is called once per candidate chunk, so unbounded
+   * INFO-level logging would drown the console on a cold server. A small cap
+   * is enough to surface "0 Anvil hits" root causes to operators without
+   * sustained spam; once the cap is reached further emissions drop to FINE.
+   */
+  private static final int DIAG_LOG_BUDGET_PER_REASON = 200;
+
+  private static final ConcurrentHashMap<String, AtomicInteger> DIAG_LOG_COUNTERS =
+      new ConcurrentHashMap<>();
+
+  /**
+   * Emit a rate-limited diagnostic line explaining why a probe returned
+   * {@link Verdict#UNKNOWN} (or, for positive breadcrumbs, why it decoded a
+   * view). Operators triaging a stuck {@code anvil-hits=0} metric from
+   * {@code rtp test biome-source} / {@code rtp test anvil-prefilter} can use
+   * these lines to tell apart the five possible UNKNOWN causes:
+   * {@code no-region-file}, {@code empty-location-entry},
+   * {@code unsupported-dataversion}, {@code missing-heightmap},
+   * {@code no-sections}. The {@code first-N} lines per reason are emitted at
+   * {@link Level#INFO} so they appear in standard server logs; once the budget
+   * is exhausted the logger falls back to {@link Level#FINE}.
+   */
+  private static void diagLog(String reason, Path worldFolder, String dim,
+                              int cx, int cz) {
+    AtomicInteger counter =
+        DIAG_LOG_COUNTERS.computeIfAbsent(reason, k -> new AtomicInteger());
+    int n = counter.incrementAndGet();
+    Level level = (n <= DIAG_LOG_BUDGET_PER_REASON) ? Level.INFO : Level.FINE;
+    if (LOG.isLoggable(level)) {
+      LOG.log(level,
+          "[RTP] Anvil probe " + reason + " world=" + worldFolder
+              + " dim=\"" + dim + "\" chunk=(" + cx + "," + cz + ")"
+              + (n > DIAG_LOG_BUDGET_PER_REASON
+                  ? " (further occurrences suppressed to FINE)"
+                  : ""));
+    }
   }
 
   /**
@@ -170,6 +223,8 @@ public final class AnvilPrefilter {
       if (!Files.isRegularFile(regionFile)) {
         // Chunk has never been generated and persisted; the live load path will generate
         // it if needed. The pre-filter cannot reject what does not exist on disk.
+        diagLog("UNKNOWN:no-region-file(" + regionFile + ")",
+            worldFolder, dimensionSubpath, cx, cz);
         return new ProbeResult(Verdict.UNKNOWN, null);
       }
       byte[] regionBytes = Files.readAllBytes(regionFile);
@@ -179,22 +234,44 @@ public final class AnvilPrefilter {
       AnvilReader.ChunkEntry entry = AnvilReader.readChunk(regionBytes, rx, rz);
       if (entry == null) {
         // Location entry is zeroed — chunk slot unused in this region file.
+        diagLog("UNKNOWN:empty-location-entry",
+            worldFolder, dimensionSubpath, cx, cz);
         return new ProbeResult(Verdict.UNKNOWN, null);
       }
 
       int dataVersion = AnvilReader.getDataVersion(entry.root);
       if (!DataVersionSupport.isSupported(dataVersion)) {
+        diagLog("UNKNOWN:unsupported-dataversion=" + dataVersion,
+            worldFolder, dimensionSubpath, cx, cz);
         return new ProbeResult(Verdict.UNKNOWN, null);
       }
 
       long[] packedHeightmap = AnvilReader.getMotionBlockingNoLeaves(entry.root);
       if (packedHeightmap == null) {
+        diagLog("UNKNOWN:missing-heightmap(MOTION_BLOCKING_NO_LEAVES)",
+            worldFolder, dimensionSubpath, cx, cz);
         return new ProbeResult(Verdict.UNKNOWN, null);
       }
 
       AnvilChunkView view = AnvilReader.toView(entry.root);
       if (view.sections().isEmpty()) {
+        diagLog("UNKNOWN:no-sections",
+            worldFolder, dimensionSubpath, cx, cz);
         return new ProbeResult(Verdict.UNKNOWN, null);
+      }
+      // 2026-04-20 housekeeping: VIEW-DECODED is the happy-path confirmation
+      // that a chunk decoded cleanly. Log at FINE only — the probe outcome
+      // (PUBLISH) already logs at FINE in AnvilProbeSupport, and the
+      // `rtp test biome-source` counters (`anvil-hit`) are the authoritative
+      // steady-state signal. The UNKNOWN:* diag lines above remain at INFO
+      // (rate-limited) because those flag real decode problems.
+      if (LOG.isLoggable(Level.FINE)) {
+        LOG.log(Level.FINE,
+            "[RTP] Anvil probe VIEW-DECODED:dataVersion=" + dataVersion
+                + ",sections=" + view.sections().size()
+                + " world=" + worldFolder
+                + " dim=\"" + dimensionSubpath + "\""
+                + " chunk=(" + cx + "," + cz + ")");
       }
 
       // The heightmap is stored relative to the world's minimum build height. We don't
@@ -226,9 +303,16 @@ public final class AnvilPrefilter {
         }
       }
       return new ProbeResult(Verdict.ACCEPT, view);
-    } catch (IOException | RuntimeException ignored) {
+    } catch (IOException | RuntimeException e) {
       // Any decode failure falls through to the live load path. Intentional: we never
-      // want the pre-filter to be load-bearing for correctness.
+      // want the pre-filter to be load-bearing for correctness. Logged at WARNING so
+      // operators can tell a real mca read failure apart from a legitimate
+      // "chunk not yet persisted" UNKNOWN (see rtp-anvil/AGENTS notes on S-004 spirit).
+      LOG.log(Level.WARNING,
+          "[RTP] Anvil probe failed for world=" + worldFolder
+              + " dim=\"" + dimensionSubpath + "\" chunk=(" + cx + "," + cz
+              + ") — falling through to live chunk load",
+          e);
       return new ProbeResult(Verdict.UNKNOWN, null);
     }
   }

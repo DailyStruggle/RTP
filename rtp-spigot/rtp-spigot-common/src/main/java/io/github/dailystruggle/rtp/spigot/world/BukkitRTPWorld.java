@@ -108,7 +108,14 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   }
 
   public static Set<String> getBiomes(RTPWorld<?> world) {
-    return getBiomes.apply(world);
+    // BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md §4 step 6 — the `AnvilRegionScanner.scanBiomes`
+    // union has been retired from the runtime getter. The authoritative runtime enumeration
+    // for the biome-allow-list inversion is now `MemoryShape#getObservedBiomes()`
+    // (consulted inside `LocationGenerator`); the platform enumeration returned here is
+    // a fallback used only before the region has observed its first candidate. The
+    // scanner remains available in `rtp-anvil` as a diagnostic tool for admin commands.
+    Set<String> pre = getBiomes.apply(world);
+    return (pre == null) ? new java.util.HashSet<>() : new java.util.HashSet<>(pre);
   }
 
   public void cacheChunk(int x, int z, org.bukkit.Chunk chunk) {
@@ -150,7 +157,13 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     // unsupported DataVersion / decode error / no emitted sections) do we
     // fall through to the live-load path. The live chunk.isSafe(...) re-check
     // at teleport commit (ADR-016 §4) remains the authoritative arbiter.
-    // Paper and Folia @Override this method and never enter the prefilter.
+    //
+    // ADR-016 §13.2 — every Bukkit-family adapter in scope (Spigot, Paper,
+    // Folia) goes through this pre-filter. Paper inherits it verbatim via
+    // this class (its `PaperRTPWorld` subclass deliberately adds no
+    // `getChunkAt` override). Folia re-implements the same probe-and-publish
+    // orchestration in `FoliaRTPWorld#getChunkAt` because it extends
+    // `RTPWorld<World>` directly, not `BukkitRTPWorld`.
     if (shouldPrefilter(cx, cz)) {
       java.util.Set<String> rawUnsafe = currentUnsafeBlocks();
       // AnvilPrefilter is platform-neutral and takes a Path + dimension subpath
@@ -205,8 +218,12 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   private boolean shouldPrefilter(int cx, int cz) {
     if (world == null) return false;
     try {
-      if (world.isChunkLoaded(cx, cz)) return false;
+      if (world.isChunkLoaded(cx, cz)) {
+        logGateSkip("chunk-already-loaded", cx, cz);
+        return false;
+      }
     } catch (Throwable ignored) {
+      logGateSkip("isChunkLoaded-threw", cx, cz);
       return false;
     }
     try {
@@ -214,12 +231,43 @@ public class BukkitRTPWorld extends RTPWorld<World> {
           (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
       if (safety == null) return true; // Config not available yet — default-on.
       Object raw = safety.getConfigValue(SafetyKeys.anvilPrefilterEnabled, Boolean.TRUE);
-      if (raw instanceof Boolean b) return b;
-      if (raw != null) return Boolean.parseBoolean(raw.toString());
-      return true;
+      boolean enabled;
+      if (raw instanceof Boolean b) enabled = b;
+      else if (raw != null) enabled = Boolean.parseBoolean(raw.toString());
+      else enabled = true;
+      if (!enabled) {
+        logGateSkip("config-disabled(anvilPrefilterEnabled=false)", cx, cz);
+      }
+      return enabled;
     } catch (Throwable ignored) {
       return true;
     }
+  }
+
+  /**
+   * Rate-limited diagnostic (first 20 per reason at INFO, then FINE) for the
+   * two adapter-level early-exits from {@link #shouldPrefilter}. Complements the
+   * {@code rtp-anvil/AnvilPrefilter} probe-level diagLog which cannot see the
+   * adapter's pre-probe gate. Together they give operators a complete "why
+   * anvil-hits=0" chain: gate skip → probe UNKNOWN reason → view published.
+   */
+  private static final java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.atomic.AtomicInteger>
+      GATE_SKIP_COUNTERS = new java.util.concurrent.ConcurrentHashMap<>();
+  private static final int GATE_SKIP_BUDGET_PER_REASON = 200;
+
+  private void logGateSkip(String reason, int cx, int cz) {
+    java.util.concurrent.atomic.AtomicInteger counter =
+        GATE_SKIP_COUNTERS.computeIfAbsent(reason,
+            k -> new java.util.concurrent.atomic.AtomicInteger());
+    int n = counter.incrementAndGet();
+    java.util.logging.Level level = (n <= GATE_SKIP_BUDGET_PER_REASON)
+        ? java.util.logging.Level.INFO
+        : java.util.logging.Level.FINE;
+    RTP.log(level,
+        "[RTP] Anvil gate skipped reason=" + reason + " world=" + name
+            + " chunk=(" + cx + "," + cz + ")"
+            + (n > GATE_SKIP_BUDGET_PER_REASON
+                ? " (further occurrences suppressed to FINE)" : ""));
   }
 
   /**
@@ -507,7 +555,110 @@ public class BukkitRTPWorld extends RTPWorld<World> {
 
   @Override
   public String getBiome(int x, int y, int z) {
+    // ADR-016 / ANVIL_BIOME_PLAN §6 — in-place amendment. Anvil-first:
+    // if the Phase-3a pre-filter already decoded this chunk and its view
+    // is still cached (no I/O on this path — O(1) ConcurrentHashMap read),
+    // return the raw namespaced biome identifier from the on-disk palette.
+    // Only fall through to the pre-existing getter when:
+    //   - no Anvil view is cached for this chunk key (unpopulated / live-loaded), OR
+    //   - the view has no biome container for this Y / (x,z) cell (pre-1.18 chunk,
+    //     malformed section, or outside the vertical window).
+    // The fallback chain is unchanged: in vanilla it is `world.getBiome().name()`;
+    // when the Iris addon is installed, the addon's setBiomeGetter has already
+    // replaced the static function with its engine-backed override, so Anvil-first
+    // layers on top of whatever the last-registered setter installed. Biome reads
+    // never gate safety (plan §5), so a null from the Anvil branch is always a
+    // quiet fall-through.
+    // Reason-keyed metric + rate-limited log so operators can tell *why* a
+    // live-tier read happened (ADR-016 §13.1 observability, audit option A+C).
+    String reason;
+    int cx = x >> 4;
+    int cz = z >> 4;
+    try {
+      long key = ((long) cx & 0xffffffffL) | ((long) cz << 32);
+      io.github.dailystruggle.rtp.anvil.AnvilChunkView view = anvilProbeSupport.takeCached(key);
+      if (view != null) {
+        String fromAnvil = view.getBiomeAt(x, y, z);
+        if (fromAnvil != null) {
+          io.github.dailystruggle.rtp.anvil.BiomeSourceMetrics.record(
+              io.github.dailystruggle.rtp.anvil.BiomeSourceMetrics.Reasons.ANVIL_HIT);
+          return fromAnvil;
+        }
+        reason = io.github.dailystruggle.rtp.anvil.BiomeSourceMetrics.Reasons.VIEW_MISSING_BIOME;
+      } else {
+        reason = io.github.dailystruggle.rtp.anvil.BiomeSourceMetrics.Reasons.NO_VIEW_CACHED;
+      }
+    } catch (Throwable ignored) {
+      reason = io.github.dailystruggle.rtp.anvil.BiomeSourceMetrics.Reasons.ANVIL_THROW;
+    }
+    io.github.dailystruggle.rtp.anvil.BiomeSourceMetrics.record(reason);
+    logBiomeFallthrough(reason, cx, cz);
     return getBiome.apply(new Location(world, x, y, z));
+  }
+
+  /**
+   * Rate-limited diagnostic (first {@link #BIOME_LOG_BUDGET_PER_REASON} per
+   * reason at INFO, then FINE) for each live-tier fallthrough path in
+   * {@link #getBiome(int,int,int)}. Closes the ADR-016 §13.1 observability
+   * gap alongside the {@code BiomeSourceMetrics} reason breakdown.
+   */
+  private static final java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.atomic.AtomicInteger>
+      BIOME_FALLTHROUGH_COUNTERS = new java.util.concurrent.ConcurrentHashMap<>();
+  private static final int BIOME_LOG_BUDGET_PER_REASON = 200;
+
+  private void logBiomeFallthrough(String reason, int cx, int cz) {
+    java.util.concurrent.atomic.AtomicInteger counter =
+        BIOME_FALLTHROUGH_COUNTERS.computeIfAbsent(reason,
+            k -> new java.util.concurrent.atomic.AtomicInteger());
+    int n = counter.incrementAndGet();
+    java.util.logging.Level level = (n <= BIOME_LOG_BUDGET_PER_REASON)
+        ? java.util.logging.Level.INFO
+        : java.util.logging.Level.FINE;
+    RTP.log(level,
+        "[RTP] Anvil biome fallthrough reason=" + reason + " world=" + name
+            + " chunk=(" + cx + "," + cz + ")"
+            + (n > BIOME_LOG_BUDGET_PER_REASON
+                ? " (further occurrences suppressed to FINE)" : ""));
+  }
+
+  /**
+   * ADR-016 §13.3 vanilla-generator detection.
+   *
+   * <p>Treats a world as vanilla iff the running server reports no custom
+   * {@link org.bukkit.generator.ChunkGenerator} and no custom
+   * {@link org.bukkit.generator.BiomeProvider} for it. This catches the two
+   * public Bukkit hooks that Iris, Terra, Chunky, and the datapack world-preset
+   * bootstrapper use to install a non-vanilla generator. It cannot positively
+   * detect mods that replace generation via NMS mixins, so any {@link Throwable}
+   * collapses to {@code false} — "assume non-vanilla" is the safe default that
+   * keeps the §13.3 exemption from over-firing.</p>
+   */
+  @Override
+  public boolean isVanilla() {
+    if (world == null) return false;
+    try {
+      return world.getGenerator() == null && world.getBiomeProvider() == null;
+    } catch (Throwable ignored) {
+      return false;
+    }
+  }
+
+  /**
+   * ADR-016 §13.3 upgrade-drift gate — non-blocking delegation to
+   * {@link org.bukkit.World#isChunkGenerated(int, int)}. A {@code true} answer
+   * means the chunk is already on disk, so the seed-synthesised biome fallback
+   * must NOT be used even on vanilla worlds (the persisted palette wins). Any
+   * {@link Throwable} collapses to {@code true} — "assume generated, skip the
+   * pre-check" is the conservative default that preserves correctness.
+   */
+  @Override
+  public boolean isChunkGenerated(int cx, int cz) {
+    if (world == null) return true;
+    try {
+      return world.isChunkGenerated(cx, cz);
+    } catch (Throwable ignored) {
+      return true;
+    }
   }
 
   @Override

@@ -480,13 +480,6 @@ public class ScanTask extends RTPRunnable {
 
       RTPWorld<?> world = region.getWorld();
 
-      String midBiome = world.getBiome(blockX, (vert.maxY() + vert.minY()) / 2, blockZ).toUpperCase();
-      if (!defaultBiomes.contains(midBiome)) {
-        shape.addBadLocation(pos);
-        if (biomeRecall) shape.addBiomeLocation(pos, 1, midBiome);
-        return CompletableFuture.completedFuture(false);
-      }
-
       // Fast mathematical rejection ONLY for World Border.
       // Mathematical biome check is completely removed to force chunk generation.
       if (!border.isInside().apply(new RTPLocation(world, blockX, (vert.maxY() + vert.minY()) / 2, blockZ))) {
@@ -500,17 +493,22 @@ public class ScanTask extends RTPRunnable {
 
       CompletableFuture<Boolean> res = new CompletableFuture<>();
       int finalSafetyRadius = safetyRadius;
+      final int midY = (vert.maxY() + vert.minY()) / 2;
 
-      // Unconditional chunk generation request
-      world.getChunkAt(cx, cz)
+      // Probe-first resolution: anvil cache if available, else live load.
+      // The mid-Y biome pre-filter is now performed on the resolved chunk so
+      // ungenerated-chunk cases transparently load on demand and cached
+      // anvil/live data is used when available (ADR-016 §13.1 follow-up,
+      // 2026-04-20).
+      world.getOrLoadChunk(cx, cz)
               .orTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-              .whenComplete((chunkKey, throwable) -> {
+              .whenComplete((resolvedChunk, throwable) -> {
                 try {
-                  if (throwable != null || chunkKey == null || isCancelled() || pause.get()) {
+                  if (throwable != null || resolvedChunk == null || isCancelled() || pause.get()) {
                     if (throwable != null) {
                       RTP.log(Level.WARNING, "[ScanTask] Chunk generation exception at " + pos, throwable);
-                    } else if (chunkKey == null) {
-                      RTP.log(Level.WARNING, "[ScanTask] INSTANT BYPASS: Chunk manager returned a null chunkKey for " + pos);
+                    } else if (resolvedChunk == null) {
+                      RTP.log(Level.WARNING, "[ScanTask] INSTANT BYPASS: Chunk manager returned a null chunk for " + pos);
                     } else {
                         if (!isCancelled() && !pause.get()) {
                           RTP.log(Level.WARNING, "[ScanTask] undetermined failure at " + pos);
@@ -520,15 +518,28 @@ public class ScanTask extends RTPRunnable {
                     return;
                   }
 
+                  // Mid-Y biome pre-filter on the resolved chunk — safe to run
+                  // inline only for self-contained (anvil-backed) chunks. For
+                  // live-backed chunks the biome read routes through
+                  // CraftBlock#getBiome which enforces TickThread and would
+                  // throw on the async scheduler thread we're currently on;
+                  // in that case we defer the biome check to the region-thread
+                  // runTask body below (the post-load biome guard already
+                  // rejects out-of-biome candidates there).
+                  if (resolvedChunk.isSelfContained()) {
+                    String midBiome = resolvedChunk.getBiome(blockX, midY, blockZ).toUpperCase();
+                    if (!defaultBiomes.contains(midBiome)) {
+                      shape.addBadLocation(pos);
+                      if (biomeRecall) shape.addBiomeLocation(pos, 1, midBiome);
+                      res.complete(false);
+                      return;
+                    }
+                  }
+
                   RTPLocation targetLoc = new RTPLocation(world, blockX, 0, blockZ);
                   RTP.serverAccessor.getScheduler().runTask(targetLoc, () -> {
                     try {
-                      RTPChunk<?> chunk = world.getCachedChunk(chunkKey);
-                      if (chunk == null) {
-                        shape.addBadLocation(pos);
-                        res.complete(false);
-                        return;
-                      }
+                      RTPChunk<?> chunk = resolvedChunk;
 
                       MutableRTPCoords localCursor = new MutableRTPCoords(blockX, blockZ);
                       localCursor.setWorldName(world.name());
@@ -539,8 +550,11 @@ public class ScanTask extends RTPRunnable {
                         return;
                       }
 
-                      // PHYSICAL BIOME CHECK: Evaluated directly from the generated 3D block array
-                      String actualBiome = world.getBiome(localCursor.x, localCursor.y, localCursor.z);
+                      // PHYSICAL BIOME CHECK: ask the resolved chunk for its own biome
+                      // (ADR-016 §13.1 follow-up, 2026-04-20). This bypasses
+                      // `anvilProbeSupport.takeCached` so an evicted cache entry cannot
+                      // cause a fallthrough to the seed-synth getter on a loaded chunk.
+                      String actualBiome = chunk.getBiome(localCursor.x, localCursor.y, localCursor.z);
 
                       if (!defaultBiomes.contains(actualBiome.toUpperCase())) {
                         shape.addBadLocation(pos);

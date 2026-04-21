@@ -1,0 +1,13 @@
+// rtp-tags — platform-neutral Minecraft block-tag JSON resolver.
+// Per docs/adr/ADR-017 and docs/dev/SAFETY_TAGS_AND_STATES_PLAN.md (Slice 3a),
+// this module shall NOT depend on:
+//   - any RTP module (rtp-api, rtp-core, commands-api, effects-api, platform adapters);
+//   - any platform package (org.bukkit.*, io.papermc.*, net.minecraft.*, net.fabricmc.*);
+//   - any third-party JSON library. Tag file JSON is trivially simple and is parsed
+//     by a hand-rolled reader to avoid a runtime dependency on Gson / Jackson and to
+//     prevent external schema drift from creeping in via dependency updates.
+// Java 21 toolchain and JUnit 5 are inherited from the root build.gradle subprojects block.
+
+dependencies {
+    implementation 'org.jetbrains:annotations:24.1.0'
+}

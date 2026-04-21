@@ -50,6 +50,7 @@ Rationale for each decision lives in [`docs/adr/`](docs/adr/README.md).
 
 ### Changed
 
+- **Claim-plugin integrations folded into `rtp-plugin`** (ADR-019). The `RTP_ClaimPluginIntegrations` addon is removed; the eight checkers (Factions, GriefDefender, GriefPrevention, HuskTowns, Lands, RedProtect, TownyAdvanced, WorldGuard) now register at plugin startup in `ClaimIntegrations`. `integrations.yml` ships with the plugin jar; behaviour for REQ-RTP-S-003 is unchanged (verifiers still live behind `GlobalRegionVerifiers`). A new `addons/RTP_ExampleAddon` replaces the claim addon as the canonical "how to write an addon" template.
 - `/rtp fill` → `/rtp scan` (permission `rtp.fill` → `rtp.scan`) for clarity.
 - `CachedLocation` is now an immutable Java record (breaking for addons that mutated fields directly).
 - `rtp-paper`: PaperLib dropped in favour of native Paper async chunk loading.

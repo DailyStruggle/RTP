@@ -3,32 +3,21 @@ package io.github.dailystruggle.rtp.paper_v26_1_R1.world;
 import io.github.dailystruggle.rtp.spigot.world.BukkitRTPWorld;
 import org.bukkit.World;
 
-import java.util.concurrent.CompletableFuture;
-
 /**
- * Paper-specific RTPWorld that uses Paper's async chunk loading API
- * to avoid blocking the main server thread during chunk generation.
+ * Paper v26_1_R1 {@code RTPWorld}.
+ *
+ * <p>ADR-016 §13.2 compliance: this class intentionally does <b>not</b> override
+ * {@link BukkitRTPWorld#getChunkAt(int, int)}. The parent Spigot implementation
+ * already reflectively invokes {@code World#getChunkAtAsync(int, int)} as its
+ * live-load path — which is exactly Paper's native async chunk API — and it
+ * additionally threads every candidate through the ADR-016 Anvil pre-filter
+ * before the live load. Overriding here would silently bypass the pre-filter
+ * and therefore the §13.1 chunk-data precedence rule, producing upgrade-drift
+ * regressions after a Minecraft version bump.
  */
 public final class PaperRTPWorld extends BukkitRTPWorld {
 
   public PaperRTPWorld(World world) {
     super(world);
-  }
-
-  /**
-   * Uses Paper's {@code World.getChunkAtAsync()} instead of the synchronous
-   * {@code World.getChunkAt()} to prevent deadlocking the main server thread
-   * on PaperMC's chunk scheduler.
-   */
-  @Override
-  public CompletableFuture<Long> getChunkAt(int cx, int cz) {
-    totalChunkLoads.incrementAndGet();
-    return world.getChunkAtAsync(cx, cz)
-        .thenApply(chunk -> {
-          if (chunk == null) return null;
-          cacheChunk(cx, cz, chunk);
-          return ((long) cx & 0xffffffffL | ((long) cz << 32));
-        })
-        .exceptionally(t -> null);
   }
 }

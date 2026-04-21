@@ -200,16 +200,28 @@ public final class AnvilReader {
         long[] heightmap = getMotionBlockingNoLeaves(root);
         Nbt.NbtList sections = getSections(root);
         List<PaletteSection> out;
+        List<BiomePaletteSection> biomeOut;
         if (sections == null || sections.items.isEmpty()) {
             out = Collections.emptyList();
+            biomeOut = Collections.emptyList();
         } else {
             out = new ArrayList<>(sections.items.size());
+            biomeOut = new ArrayList<>(sections.items.size());
             for (Object raw : sections.items) {
                 PaletteSection ps = sectionFromCompound(raw);
                 if (ps != null) out.add(ps);
+                // Biome container is decoded independently: a section may carry a
+                // valid biome palette even if its block_states is missing, and vice
+                // versa (malformed-section tolerance, ANVIL_BIOME_PLAN §5.1 trust model).
+                BiomePaletteSection bs = biomeSectionFromCompound(raw);
+                if (bs != null) biomeOut.add(bs);
             }
         }
-        return new AnvilChunkView(dataVersion, Collections.unmodifiableList(out), heightmap);
+        return new AnvilChunkView(
+                dataVersion,
+                Collections.unmodifiableList(out),
+                heightmap,
+                Collections.unmodifiableList(biomeOut));
     }
 
     @SuppressWarnings("unchecked")
@@ -251,5 +263,51 @@ public final class AnvilReader {
         }
 
         return new PaletteSection(sectionY, Collections.unmodifiableList(paletteNames), data, skyLight);
+    }
+
+    /**
+     * Lifts a raw section compound's {@code biomes} container into a
+     * {@link BiomePaletteSection}, or returns {@code null} if the container is
+     * absent / structurally malformed. Decode failures are silent (per
+     * ANVIL_BIOME_PLAN §8): biome naming is advisory, not a safety signal, so a
+     * missing/bad biome palette causes the caller to fall through to the live
+     * {@code world.getBiome(loc)} getter rather than raise a warning.
+     *
+     * <p>The biome container has the same wire shape as {@code block_states} except:
+     * (1) {@code palette[i]} is a bare {@code TAG_String} (namespaced identifier)
+     * rather than a compound with a {@code Name} field, and (2) the packed {@code data}
+     * array is 64 cells (4×4×4) rather than 4096 blocks — see ANVIL_BIOME_PLAN §3.
+     */
+    @SuppressWarnings("unchecked")
+    private static BiomePaletteSection biomeSectionFromCompound(Object raw) {
+        if (!(raw instanceof Map)) return null;
+        Map<String, Object> sec = (Map<String, Object>) raw;
+
+        Object yObj = sec.get("Y");
+        if (!(yObj instanceof Number)) return null;
+        int sectionY = ((Number) yObj).intValue();
+
+        Object biomesObj = sec.get("biomes");
+        if (!(biomesObj instanceof Map)) return null;
+        Map<String, Object> biomes = (Map<String, Object>) biomesObj;
+
+        Object palObj = biomes.get("palette");
+        if (!(palObj instanceof Nbt.NbtList)) return null;
+        Nbt.NbtList palList = (Nbt.NbtList) palObj;
+        if (palList.items.isEmpty()) return null;
+
+        List<String> paletteNames = new ArrayList<>(palList.items.size());
+        for (Object entry : palList.items) {
+            // Unlike the block palette, the biome palette stores bare strings, not
+            // compounds with a Name field. Reject the section if an entry is not a
+            // string — that indicates a format drift we have not characterised.
+            if (!(entry instanceof String)) return null;
+            paletteNames.add((String) entry);
+        }
+
+        Object dataObj = biomes.get("data");
+        long[] data = (dataObj instanceof long[]) ? (long[]) dataObj : null;
+
+        return new BiomePaletteSection(sectionY, Collections.unmodifiableList(paletteNames), data);
     }
 }

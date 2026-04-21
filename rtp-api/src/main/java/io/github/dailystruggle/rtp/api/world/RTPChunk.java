@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.api.world;
 
+import io.github.dailystruggle.rtp.api.safety.CompiledUnsafeSet;
 import java.util.Objects;
 import java.util.Set;
 
@@ -85,6 +86,34 @@ public abstract class RTPChunk<T> {
   public abstract boolean isSafe(int x, int y, int z, Set<String> unsafeBlocks);
 
   /**
+   * Compiled-form overload of {@link #isSafe(int, int, int, Set)} introduced by ADR-017.
+   *
+   * <p>Platform adapters that can extract live tag membership and block-property data
+   * from their native {@code BlockData} / {@code Tag} APIs override this to evaluate
+   * the candidate directly against the supplied {@link CompiledUnsafeSet}, skipping the
+   * per-call parse-and-compile step that the legacy {@code Set<String>} overload
+   * performs via {@code SafetyCompilationCache}. Adapters that do not override fall back
+   * to a best-effort evaluation against the compiled set's plain-material bucket only;
+   * state and tag predicates are silently inert on such adapters.</p>
+   *
+   * <p>The default implementation delegates to the legacy {@link #isSafe(int, int, int, Set)}
+   * overload using {@link CompiledUnsafeSet#plainMaterials()} as the string set, which
+   * preserves backward-compatible behaviour for adapters that have not yet migrated.
+   * New platform implementations should override this method.</p>
+   *
+   * @param x the block's X coordinate relative to the chunk (0-15).
+   * @param y the block's Y coordinate.
+   * @param z the block's Z coordinate relative to the chunk (0-15).
+   * @param unsafeBlocks pre-compiled safety rules. Must not be {@code null}; pass
+   *     {@link CompiledUnsafeSet#EMPTY} for "nothing is unsafe".
+   * @return {@code true} iff the block at the given coordinates is considered safe.
+   */
+  public boolean isSafe(int x, int y, int z, CompiledUnsafeSet unsafeBlocks) {
+    Objects.requireNonNull(unsafeBlocks, "unsafeBlocks");
+    return isSafe(x, y, z, unsafeBlocks.plainMaterials());
+  }
+
+  /**
    * Returns the world this chunk belongs to.
    *
    * @return the {@link RTPWorld} containing this chunk
@@ -116,6 +145,40 @@ public abstract class RTPChunk<T> {
    * Unloads this chunk from memory.
    */
   public abstract void unload();
+
+  /**
+   * Returns the biome identifier at the specified world coordinates, sourced from
+   * this chunk instance's own backing (ADR-016 §13.1 precedence chain, chunk-local
+   * view). Anvil-backed adapters consult the decoded {@code AnvilChunkView}; live
+   * chunk adapters consult the loaded {@code Chunk}. Either way, the answer is
+   * derived from the same chunk instance the caller already holds — no separate
+   * cache lookup, no fallthrough to the seed-synthesised
+   * {@code world.getBiome(x,y,z)} getter.
+   *
+   * <p>This is the right entry point for post-load biome checks that already have
+   * a resolved {@link RTPChunk} in hand (e.g. inside
+   * {@code LocationGenerator}'s candidate loop). Callers that do not yet have a
+   * chunk handle should continue to use {@link RTPWorld#getBiome(int, int, int)},
+   * which runs the adapter's three-tier precedence chain starting from
+   * {@code anvilProbeSupport.takeCached}.
+   *
+   * <p>The default implementation delegates to
+   * {@link RTPWorld#getBiome(int, int, int)} on {@link #getWorld()} for
+   * back-compat with adapters / mocks that have not yet migrated. New platform
+   * implementations should override this method.
+   *
+   * @param x absolute world X
+   * @param y absolute world Y
+   * @param z absolute world Z
+   * @return the biome identifier at the requested coordinates, sourced from this
+   *     chunk's backing; never {@code null} on production adapters — a backing
+   *     that has no answer for the requested Y is expected to fall back to its
+   *     platform getter at override time.
+   */
+  public String getBiome(int x, int y, int z) {
+    RTPWorld<?> w = getWorld();
+    return (w != null) ? w.getBiome(x, y, z) : null;
+  }
 
   /**
    * Whether this chunk instance can answer block-data queries

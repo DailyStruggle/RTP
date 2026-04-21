@@ -267,18 +267,17 @@ public class FoliaLocationGenerator implements ILocationGenerator {
                     int blockX = (select[0] << 4) + 8;
                     int blockZ = (select[1] << 4) + 8;
                     RTPWorld<?> world = state.region.getWorld();
-                    // TODO: THREAD-VIOLATION - Requires async bridge: getBiome() is @RegionThread but called here on @AsyncThread
-                    String currBiome = world.getBiome(blockX, (state.vert.minY() + state.vert.maxY()) / 2, blockZ).toUpperCase();
 
-                    // Instantly retry on the current thread! No recursion, no queueing.
-                    if (!state.biomeNames.contains(currBiome)) {
-                        if (state.shape instanceof MemoryShape && state.defaultBiomes && state.biomeRecall) {
-                            ((MemoryShape<?>) state.shape).addBadLocation(l);
-                        }
-                        i++;
-                        biomeChecks++;
-                        continue;
-                    }
+                    // ADR-016 §13.1 follow-up (2026-04-20): seed-synth biome pre-filter
+                    // retired. The prior `world.getBiome(blockX, midY, blockZ)` pre-check
+                    // ran before any chunk was loaded/probed for this candidate, forcing
+                    // `FoliaRTPWorld#getBiome` to fall through to the live seed-synth
+                    // getter and contaminating `/rtp test biome-source` with
+                    // `reason=no-view-cached` noise. The authoritative biome read now
+                    // happens below on the resolved chunk via `chunk.getBiome(...)` —
+                    // which reads the anvil view when cached and the live chunk
+                    // otherwise. `biomeChecks` is still incremented on the post-load
+                    // mismatch path.
 
                     WorldBorder border = (WorldBorder) RTP.serverAccessor.getWorldBorder(world.name());
                     if (!border.isInside().apply(new io.github.dailystruggle.rtp.api.world.RTPLocation(
@@ -303,24 +302,36 @@ public class FoliaLocationGenerator implements ILocationGenerator {
                     // times. On exhaustion we reject this candidate via the normal unsafe path (i++).
                     final int[] staleRetries = {0};
                     final Runnable[] requestAndEvaluate = new Runnable[1];
-                    requestAndEvaluate[0] = () -> world.getChunkAtAsync(cx, cz).thenAccept(chunkSet -> {
+                    // ADR-016 §13.1 follow-up (2026-04-20): probe-first via
+                    // getOrLoadChunk so `anvilProbeSupport` is populated before the
+                    // post-load biome read. The prior direct `getChunkAtAsync` call
+                    // live-loaded every candidate and caused `shouldPrefilter` to
+                    // short-circuit the probe (isChunkLoaded=true), producing the
+                    // persistent `reason=no-view-cached` stream.
+                    requestAndEvaluate[0] = () -> world.getOrLoadChunk(cx, cz).thenAccept(resolvedChunk -> {
                         try {
-                            if (chunkSet == null) {
+                            if (resolvedChunk == null) {
                                 this.i++;
                                 reschedule(false);
                                 return;
                             }
 
                             // THE TRAFFIC COP: Route the internal block checks to the Region Thread
+                            // unless the resolved chunk is self-contained (Anvil-backed), in
+                            // which case no live chunk is touched and we can run inline on the
+                            // current async worker — saving the region-thread hop entirely.
                             io.github.dailystruggle.rtp.api.world.RTPLocation targetLoc =
                                     new io.github.dailystruggle.rtp.api.world.RTPLocation(world, blockX, 0, blockZ);
 
-                            RTP.serverAccessor.getScheduler().runTask(targetLoc, () -> {
+                            Runnable blockEvaluation = () -> {
                                 try {
                                     // Stale-chunk guard: Folia native GC may have unloaded the chunk
                                     // while this task sat in the Count-Bound pipe. If so, abort
                                     // block reads and re-queue an async load (bounded).
-                                    if (!world.isChunkLoaded(cx, cz)) {
+                                    // ADR-016 §11: Anvil-backed chunks are self-contained
+                                    // snapshots — the guard is moot for them (no live chunk to
+                                    // race against).
+                                    if (!resolvedChunk.isSelfContained() && !world.isChunkLoaded(cx, cz)) {
                                         if (staleRetries[0] < state.staleChunkRetryLimit) {
                                             staleRetries[0]++;
                                             RTP.log(Level.FINE,
@@ -344,13 +355,11 @@ public class FoliaLocationGenerator implements ILocationGenerator {
                                         return;
                                     }
 
-                                    long chunkKey = ((long) cx & 0xffffffffL | ((long) cz << 32));
-                                    RTPChunk<?> chunk = world.getCachedChunk(chunkKey);
-                                    if (chunk == null) {
-                                        this.i++;
-                                        reschedule(false);
-                                        return;
-                                    }
+                                    // Use the already-resolved chunk from getOrLoadChunk
+                                    // rather than re-looking up via getCachedChunk (which can
+                                    // miss if the anvil cache entry was evicted between the
+                                    // async resolve and the region-thread dispatch).
+                                    RTPChunk<?> chunk = resolvedChunk;
 
                                     MutableRTPCoords res = new MutableRTPCoords(world.name(), 0, 0, 0);
                                     if (!state.vert.adjust(chunk, res)) {
@@ -365,7 +374,11 @@ public class FoliaLocationGenerator implements ILocationGenerator {
                                     int finalX = res.x;
                                     int finalY = res.y;
                                     int finalZ = res.z;
-                                    String resBiome = world.getBiome(finalX, finalY, finalZ).toUpperCase();
+                                    // ADR-016 §13.1 follow-up (2026-04-20): ask the resolved
+                                    // chunk for its biome, not the world — avoids
+                                    // `anvilProbeSupport` cache-miss fallthrough to the seed-
+                                    // synth getter.
+                                    String resBiome = chunk.getBiome(finalX, finalY, finalZ).toUpperCase();
 
                                     if (!state.biomeNames.contains(resBiome)) {
                                         if (state.defaultBiomes && state.shape instanceof MemoryShape && state.biomeRecall) {
@@ -492,7 +505,15 @@ public class FoliaLocationGenerator implements ILocationGenerator {
                                     this.i++;
                                     reschedule(false);
                                 }
-                            });
+                            };
+
+                            if (resolvedChunk.isSelfContained()) {
+                                // Anvil-backed: no live chunk state touched, so no region-
+                                // thread hop required. Run inline on the current async worker.
+                                blockEvaluation.run();
+                            } else {
+                                RTP.serverAccessor.getScheduler().runTask(targetLoc, blockEvaluation);
+                            }
                         } catch (Exception e) {
                             SendMessage.log(Level.SEVERE, "Failed to generate location in getChunkAtAsync callback!", e);
                             this.i++;

@@ -36,6 +36,8 @@ import java.util.stream.Collectors;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.Tag;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
@@ -264,6 +266,11 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
     ConfigParser<MessagesKeys> lang =
             (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
     String message = lang.getConfigValue(msgType, "").toString();
+    RTP.log(Level.FINE, "[ENQUEUE_TRACE] AbstractServerAccessor.sendMessage(UUID, MessagesKeys) target=" + target
+            + " msgType=" + msgType
+            + " resolvedLen=" + (message == null ? -1 : message.length())
+            + " resolvedEmpty=" + (message == null || message.isEmpty())
+            + " preview=\"" + (message == null ? "null" : (message.length() > 80 ? message.substring(0, 80) + "..." : message)) + "\"");
     sendMessage(target, message, tag);
   }
 
@@ -279,11 +286,20 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   public void sendMessage(UUID target, String message, String tag) {
     message = tagMessage(message, tag);
     if (target.equals(RTPAPI.serverId)) {
+      RTP.log(Level.FINE, "[ENQUEUE_TRACE] AbstractServerAccessor.sendMessage routing target=SERVER -> console");
       io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(Bukkit.getConsoleSender(), message);
       return;
     }
     Player player = Bukkit.getPlayer(target);
-    if (player != null) io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(player, message);
+    RTP.log(Level.FINE, "[ENQUEUE_TRACE] AbstractServerAccessor.sendMessage(UUID, String) target=" + target
+            + " bukkitPlayerNonNull=" + (player != null)
+            + " msgEmpty=" + (message == null || message.isEmpty())
+            + " thread=" + Thread.currentThread().getName());
+    if (player != null) {
+      io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(player, message);
+    } else {
+      RTP.log(Level.WARNING, "[ENQUEUE_TRACE] AbstractServerAccessor.sendMessage DROPPED (Bukkit.getPlayer returned null) target=" + target);
+    }
   }
 
   @Override
@@ -375,6 +391,64 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
     return Arrays.stream(Material.values())
         .map(material -> material.name().toUpperCase())
         .collect(Collectors.toSet());
+  }
+
+  /**
+   * Lazy-initialised snapshot of the Bukkit block-tag registry, published under
+   * the ADR-017 {@code namespace:path} key form. {@code volatile} because the
+   * reference is swapped atomically on {@link #rebuildBlockTagSnapshot()}; the
+   * map itself is deeply immutable so readers can safely iterate without
+   * locking.
+   */
+  private volatile Map<String, Set<String>> blockTagSnapshot;
+
+  @Override
+  public @NotNull Map<String, Set<String>> blockTagSnapshot() {
+    Map<String, Set<String>> snap = this.blockTagSnapshot;
+    if (snap != null) return snap;
+    synchronized (this) {
+      snap = this.blockTagSnapshot;
+      if (snap != null) return snap;
+      snap = buildBlockTagSnapshot();
+      this.blockTagSnapshot = snap;
+      return snap;
+    }
+  }
+
+  @Override
+  public void rebuildBlockTagSnapshot() {
+    synchronized (this) {
+      this.blockTagSnapshot = buildBlockTagSnapshot();
+    }
+  }
+
+  /**
+   * Iterate {@code Bukkit.getTags(Tag.REGISTRY_BLOCKS, Material.class)} and
+   * produce an immutable {@code namespace:path → upper-case material name}
+   * snapshot. Any failure (e.g. a server that hasn't loaded the tag registry
+   * yet, or a pre-1.13 fork that doesn't implement the Tag API) is logged at
+   * WARNING and falls through to an empty snapshot — never a null reference.
+   */
+  private Map<String, Set<String>> buildBlockTagSnapshot() {
+    Map<String, Set<String>> out = new HashMap<>();
+    try {
+      Iterable<Tag<Material>> tags = Bukkit.getTags(Tag.REGISTRY_BLOCKS, Material.class);
+      if (tags == null) return Collections.emptyMap();
+      for (Tag<Material> tag : tags) {
+        NamespacedKey key = tag.getKey();
+        Set<Material> values = tag.getValues();
+        if (values == null || values.isEmpty()) continue;
+        Set<String> members = new HashSet<>(values.size());
+        for (Material m : values) members.add(m.name());
+        out.put(
+            key.getNamespace() + ":" + key.getKey(),
+            Collections.unmodifiableSet(members));
+      }
+    } catch (RuntimeException e) {
+      log(Level.WARNING, "[RTP] Failed to snapshot block tag registry", e);
+      return Collections.emptyMap();
+    }
+    return Collections.unmodifiableMap(out);
   }
 
   private Object plugin;

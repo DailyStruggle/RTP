@@ -91,7 +91,13 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   }
 
   public static Set<String> getBiomes(RTPWorld<?> world) {
-    return getBiomes.apply(world);
+    // BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md §4 step 6 — the `AnvilRegionScanner.scanBiomes`
+    // union has been retired from the runtime getter (parity with BukkitRTPWorld). The
+    // biome filter in `LocationGenerator` now evaluates the whitelist/blacklist directly
+    // without materialising a world-level biome enumeration, so this path is only used
+    // by tab completion and diagnostics. The scanner remains available in `rtp-anvil`.
+    Set<String> pre = getBiomes.apply(world);
+    return (pre == null) ? new java.util.HashSet<>() : new java.util.HashSet<>(pre);
   }
 
   @RegionThread
@@ -158,10 +164,26 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
         .getChunkAtAsync(cx, cz, true)
         .thenApply(
             chunk -> {
-              if (chunk == null) return null;
+              if (chunk == null) {
+                // Symmetrical with BukkitRTPWorld.loadChunkSync's null-guard log.
+                // A null live chunk after a prefilter UNKNOWN is an attributable
+                // load failure — surface it so operators can tell "Folia caching
+                // feels slow" apart from genuine async-load failures.
+                RTP.log(java.util.logging.Level.WARNING,
+                    "[RTP] Folia world.getChunkAtAsync returned null for world=" + name
+                        + " chunk=(" + cx + "," + cz + ")");
+                return null;
+              }
               cacheChunk(cx, cz, chunk);
               return key;
-            });
+            })
+        .exceptionally(ex -> {
+          RTP.log(java.util.logging.Level.WARNING,
+              "[RTP] Folia world.getChunkAtAsync failed for world=" + name
+                  + " chunk=(" + cx + "," + cz + ")",
+              ex);
+          return null;
+        });
   }
 
   /**
@@ -186,8 +208,12 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   private boolean shouldPrefilter(int cx, int cz) {
     if (world == null) return false;
     try {
-      if (world.isChunkLoaded(cx, cz)) return false;
+      if (world.isChunkLoaded(cx, cz)) {
+        logGateSkip("chunk-already-loaded", cx, cz);
+        return false;
+      }
     } catch (Throwable ignored) {
+      logGateSkip("isChunkLoaded-threw", cx, cz);
       return false;
     }
     try {
@@ -196,12 +222,43 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
           (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
       if (safety == null) return true;
       Object raw = safety.getConfigValue(SafetyKeys.anvilPrefilterEnabled, Boolean.TRUE);
-      if (raw instanceof Boolean b) return b;
-      if (raw != null) return Boolean.parseBoolean(raw.toString());
-      return true;
+      boolean enabled;
+      if (raw instanceof Boolean b) enabled = b;
+      else if (raw != null) enabled = Boolean.parseBoolean(raw.toString());
+      else enabled = true;
+      if (!enabled) {
+        logGateSkip("config-disabled(anvilPrefilterEnabled=false)", cx, cz);
+      }
+      return enabled;
     } catch (Throwable ignored) {
       return true;
     }
+  }
+
+  /**
+   * Rate-limited diagnostic (first 20 per reason at INFO, then FINE) for the
+   * adapter-level short-circuits in {@link #shouldPrefilter}. Mirrors the
+   * equivalent in {@code BukkitRTPWorld} so operators triaging a stuck
+   * {@code anvil-hits=0} metric see the same gate-skip story regardless of
+   * platform (Spigot / Paper inherit the Bukkit variant; Folia uses this one).
+   */
+  private static final java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.atomic.AtomicInteger>
+      GATE_SKIP_COUNTERS = new java.util.concurrent.ConcurrentHashMap<>();
+  private static final int GATE_SKIP_BUDGET_PER_REASON = 200;
+
+  private void logGateSkip(String reason, int cx, int cz) {
+    java.util.concurrent.atomic.AtomicInteger counter =
+        GATE_SKIP_COUNTERS.computeIfAbsent(reason,
+            k -> new java.util.concurrent.atomic.AtomicInteger());
+    int n = counter.incrementAndGet();
+    java.util.logging.Level level = (n <= GATE_SKIP_BUDGET_PER_REASON)
+        ? java.util.logging.Level.INFO
+        : java.util.logging.Level.FINE;
+    RTP.log(level,
+        "[RTP] Anvil gate skipped reason=" + reason + " world=" + name
+            + " chunk=(" + cx + "," + cz + ")"
+            + (n > GATE_SKIP_BUDGET_PER_REASON
+                ? " (further occurrences suppressed to FINE)" : ""));
   }
 
   /**
@@ -388,7 +445,99 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   @Override
   @RegionThread
   public String getBiome(int x, int y, int z) {
+    // ADR-016 / ANVIL_BIOME_PLAN §6 — Anvil-first in-place amendment (parity
+    // with BukkitRTPWorld). Zero-I/O cache read; on miss or outside-window the
+    // call falls through to the pre-existing static getter (vanilla enum or
+    // Iris-addon override, depending on last-registered setter). Biome reads
+    // never gate safety (plan §5), so a null from the Anvil branch is a quiet
+    // fall-through. Catch-all guards the advisory path per ADR-016's
+    // "malformed → UNKNOWN, never crash" posture.
+    // Reason-keyed metric + rate-limited log (ADR-016 §13.1 observability,
+    // audit options A+C). Mirrors BukkitRTPWorld#getBiome.
+    String reason;
+    int cx = x >> 4;
+    int cz = z >> 4;
+    try {
+      long key = ((long) cx & 0xffffffffL) | ((long) cz << 32);
+      io.github.dailystruggle.rtp.anvil.AnvilChunkView view = anvilProbeSupport.takeCached(key);
+      if (view != null) {
+        String fromAnvil = view.getBiomeAt(x, y, z);
+        if (fromAnvil != null) {
+          io.github.dailystruggle.rtp.anvil.BiomeSourceMetrics.record(
+              io.github.dailystruggle.rtp.anvil.BiomeSourceMetrics.Reasons.ANVIL_HIT);
+          return fromAnvil;
+        }
+        reason = io.github.dailystruggle.rtp.anvil.BiomeSourceMetrics.Reasons.VIEW_MISSING_BIOME;
+      } else {
+        reason = io.github.dailystruggle.rtp.anvil.BiomeSourceMetrics.Reasons.NO_VIEW_CACHED;
+      }
+    } catch (Throwable ignored) {
+      reason = io.github.dailystruggle.rtp.anvil.BiomeSourceMetrics.Reasons.ANVIL_THROW;
+    }
+    io.github.dailystruggle.rtp.anvil.BiomeSourceMetrics.record(reason);
+    logBiomeFallthrough(reason, cx, cz);
     return getBiome.apply(new Location(world, x, y, z));
+  }
+
+  /**
+   * Rate-limited diagnostic (first {@link #BIOME_LOG_BUDGET_PER_REASON} per
+   * reason at INFO, then FINE) for each live-tier fallthrough path in
+   * {@link #getBiome(int,int,int)} — parity with {@code BukkitRTPWorld}.
+   */
+  private static final java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.atomic.AtomicInteger>
+      BIOME_FALLTHROUGH_COUNTERS = new java.util.concurrent.ConcurrentHashMap<>();
+  private static final int BIOME_LOG_BUDGET_PER_REASON = 200;
+
+  private void logBiomeFallthrough(String reason, int cx, int cz) {
+    java.util.concurrent.atomic.AtomicInteger counter =
+        BIOME_FALLTHROUGH_COUNTERS.computeIfAbsent(reason,
+            k -> new java.util.concurrent.atomic.AtomicInteger());
+    int n = counter.incrementAndGet();
+    java.util.logging.Level level = (n <= BIOME_LOG_BUDGET_PER_REASON)
+        ? java.util.logging.Level.INFO
+        : java.util.logging.Level.FINE;
+    RTP.log(level,
+        "[RTP] Anvil biome fallthrough reason=" + reason + " world=" + name
+            + " chunk=(" + cx + "," + cz + ")"
+            + (n > BIOME_LOG_BUDGET_PER_REASON
+                ? " (further occurrences suppressed to FINE)" : ""));
+  }
+
+  /**
+   * ADR-016 §13.3 vanilla-generator detection (parity with BukkitRTPWorld).
+   *
+   * <p>Folia inherits Bukkit's {@code World#getGenerator()} /
+   * {@code World#getBiomeProvider()} API, so the same reflective-safe detection
+   * applies. Any {@link Throwable} falls back to {@code false} ("assume
+   * non-vanilla"), which keeps {@code LocationGenerator} on the safe
+   * post-load-authoritative biome path.</p>
+   */
+  @Override
+  public boolean isVanilla() {
+    if (world == null) return false;
+    try {
+      return world.getGenerator() == null && world.getBiomeProvider() == null;
+    } catch (Throwable ignored) {
+      return false;
+    }
+  }
+
+  /**
+   * ADR-016 §13.3 upgrade-drift gate (parity with {@code BukkitRTPWorld}) —
+   * non-blocking delegation to {@link org.bukkit.World#isChunkGenerated(int, int)}.
+   * A {@code true} answer means the chunk is already on disk, so the seed-synthesised
+   * biome fallback must NOT be used even on vanilla worlds (the persisted palette
+   * wins). Any {@link Throwable} collapses to {@code true} ("assume generated, skip
+   * the pre-check").
+   */
+  @Override
+  public boolean isChunkGenerated(int cx, int cz) {
+    if (world == null) return true;
+    try {
+      return world.isChunkGenerated(cx, cz);
+    } catch (Throwable ignored) {
+      return true;
+    }
   }
 
   @Override
