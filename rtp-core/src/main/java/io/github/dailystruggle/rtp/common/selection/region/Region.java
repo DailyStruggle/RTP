@@ -222,32 +222,50 @@ public class Region extends FactoryValue<RegionKeys> {
     if (storedLocations.size() > 1) {
       java.util.Collections.shuffle(storedLocations);
     }
-    for (DatabaseAccessor.StoredLocation stored : storedLocations) {
-      if (stored.getSeed() != 0L && stored.getSeed() != currentSeed) {
-        // The world was wiped and repopulated with a different seed.
-        // This location is no longer safe. Delete it and skip.
-        RTP.getInstance().databaseAccessor.removeCachedLocation(stored.getId());
-        continue;
-      }
 
-      RTPCoords coords = new RTPCoords(stored.getWorldName(), stored.getX(), stored.getY(), stored.getZ());
-      // Reconstruct as an unkept location stub (null reservation).
-      // Every row in the DB was validated before it was saved, and the seed check above
-      // confirms the world terrain is unchanged, so the deficit loop just needs to re-reserve
-      // the chunk — the consumer path in LocationGenerator already treats any queue-polled
-      // candidate as validated (only freshly generated candidates run the full safety grid).
-      RTPLocation recoveredLoc = new RTPLocation(coords, stored.getAttempts(), null);
-
-      // Feed into the queues for the region execution loop to handle
-      if (stored.getPlayerId() == null) {
-        if (this.queueManager.unkeptLocations.size() < settings.cacheCap()) {
-          this.queueManager.unkeptLocations.offer(recoveredLoc);
-        } else {
-          RTP.getInstance().databaseAccessor.removeCachedLocation(stored.getId());
+    // Flush-after-consumption: while hydrating, suppress the save callback on both location
+    // buffers so that offer(...) does NOT immediately re-queue a write for a row that is
+    // already persisted. Every successfully consumed row is deleted from the DB explicitly
+    // below. The periodic rebuildCachedLocationsFromMemory() cycle (and shutdown) repopulate
+    // the table from the authoritative in-memory state, so runtime persistence is unchanged;
+    // this change only prevents stale / duplicated rows from repeating locations across
+    // unclean shutdowns — previously observed on slow async world generators (e.g. Iris).
+    this.queueManager.keptLocations.setCallbacks(null, null);
+    this.queueManager.unkeptLocations.setCallbacks(null, null);
+    try {
+      DatabaseAccessor db = RTP.getInstance().databaseAccessor;
+      for (DatabaseAccessor.StoredLocation stored : storedLocations) {
+        if (stored.getSeed() != 0L && stored.getSeed() != currentSeed) {
+          // The world was wiped and repopulated with a different seed.
+          // This location is no longer safe. Delete it and skip.
+          if (db != null) db.removeCachedLocation(stored.getId());
+          continue;
         }
-      } else {
-        this.queueManager.perPlayerLocationQueue.computeIfAbsent(stored.getPlayerId(), k -> new java.util.concurrent.ConcurrentLinkedQueue<>()).add(recoveredLoc);
+
+        RTPCoords coords = new RTPCoords(stored.getWorldName(), stored.getX(), stored.getY(), stored.getZ());
+        // Reconstruct as an unkept location stub (null reservation).
+        // Every row in the DB was validated before it was saved, and the seed check above
+        // confirms the world terrain is unchanged, so the deficit loop just needs to re-reserve
+        // the chunk — the consumer path in LocationGenerator already treats any queue-polled
+        // candidate as validated (only freshly generated candidates run the full safety grid).
+        RTPLocation recoveredLoc = new RTPLocation(coords, stored.getAttempts(), null);
+
+        // Feed into the queues for the region execution loop to handle
+        if (stored.getPlayerId() == null) {
+          if (this.queueManager.unkeptLocations.size() < settings.cacheCap()) {
+            this.queueManager.unkeptLocations.offer(recoveredLoc);
+          }
+          // Whether the row was consumed into the queue or dropped because the queue is
+          // already at cacheCap, the DB row must go — the in-memory state is authoritative.
+          if (db != null) db.removeCachedLocation(stored.getId());
+        } else {
+          this.queueManager.perPlayerLocationQueue.computeIfAbsent(stored.getPlayerId(), k -> new java.util.concurrent.ConcurrentLinkedQueue<>()).add(recoveredLoc);
+          if (db != null) db.removeCachedLocation(stored.getId());
+        }
       }
+    } finally {
+      // Restore the normal persistence callbacks for steady-state operation.
+      this.queueManager.installDatabaseCallbacks();
     }
   }
 

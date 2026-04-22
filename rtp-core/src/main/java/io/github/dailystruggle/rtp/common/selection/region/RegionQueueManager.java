@@ -54,12 +54,24 @@ public class RegionQueueManager {
             this.keptLocations = new LockFreeLocationBuffer(1024);
         }
 
-        // Persist both queues. On startup nothing is loaded as "kept" (kept requires a live
-        // chunk reservation, which only the async deficit loop in Region.execute() can produce
-        // safely per REQ-RTP-S-005). The distinction between kept and unkept is therefore
-        // irrelevant to persistence: every cached location is restored as an unkept stub
-        // regardless of which queue it was saved from. Order does not matter — hydration
-        // shuffles the list on load.
+        installDatabaseCallbacks();
+    }
+
+    /**
+     * (Re)install the database save/delete callbacks on both location buffers.
+     *
+     * <p>Persist both queues. On startup nothing is loaded as "kept" (kept requires a live
+     * chunk reservation, which only the async deficit loop in Region.execute() can produce
+     * safely per REQ-RTP-S-005). The distinction between kept and unkept is therefore
+     * irrelevant to persistence: every cached location is restored as an unkept stub
+     * regardless of which queue it was saved from. Order does not matter — hydration
+     * shuffles the list on load.
+     *
+     * <p>Exposed publicly so that {@link Region#hydrateCacheFromDatabase} can temporarily
+     * disable the save callback during hydration (the rows are already in the DB and are
+     * deleted-after-consumption) and restore the normal persistence behaviour afterwards.
+     */
+    public void installDatabaseCallbacks() {
         java.util.function.Consumer<RTPLocation> saveCallback = location -> {
             if (RTP.getInstance().databaseAccessor != null) {
                 RTP.getInstance().databaseAccessor.saveCachedLocation(region.name, location, null);

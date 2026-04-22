@@ -200,6 +200,53 @@ public class ReqRtpWorldFallbackRebindTest {
     }
 
     // ------------------------------------------------------------------
+    // hydrateCacheFromDatabase — flush-after-consumption
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("hydrateCacheFromDatabase removes every consumed row from the DB and never re-saves during hydration")
+    void hydrate_flushesAfterConsumption() {
+        @SuppressWarnings("unchecked")
+        DatabaseAccessor<Object> db = mock(DatabaseAccessor.class);
+        doReturn(Collections.emptyList()).when(db).loadCachedLocations(anyString());
+        RTP.getInstance().databaseAccessor = db;
+
+        // Construct a live region bound to a real world so hydrate's getWorld().getSeed() works.
+        RegionSettings s = settings("flush_region", fallbackWorld);
+        Region region = new Region("flush_region", s);
+
+        long seed = fallbackWorld.getSeed();
+        java.util.List<DatabaseAccessor.StoredLocation> rows = new ArrayList<>();
+        rows.add(new DatabaseAccessor.StoredLocation(
+                "id-1", "flush_region", "world",  100,  64,  200,  3, seed, null));
+        rows.add(new DatabaseAccessor.StoredLocation(
+                "id-2", "flush_region", "world", -300,  64, -400,  7, seed, null));
+        rows.add(new DatabaseAccessor.StoredLocation(
+                "id-3", "flush_region", "world",  500,  64,  600, 11, seed,
+                java.util.UUID.fromString("00000000-0000-0000-0000-000000000001")));
+        // Stale-seed row: must be removed without being queued.
+        rows.add(new DatabaseAccessor.StoredLocation(
+                "id-stale", "flush_region", "world", 0, 64, 0, 1, seed + 1, null));
+
+        region.hydrateCacheFromDatabase(rows);
+
+        // Every row — consumed, per-player, or seed-rejected — must be removed from the DB.
+        verify(db).removeCachedLocation("id-1");
+        verify(db).removeCachedLocation("id-2");
+        verify(db).removeCachedLocation("id-3");
+        verify(db).removeCachedLocation("id-stale");
+
+        // During hydration the save callback must be suppressed: no rows are re-saved.
+        verify(db, never()).saveCachedLocation(anyString(), any(), any());
+
+        // After hydration, the save callback must be re-installed: a subsequent offer persists.
+        RTPLocation steadyStateLoc = new RTPLocation(
+                new io.github.dailystruggle.rtp.api.world.RTPCoords("world", 1, 64, 1), 0, null);
+        region.queueManager.unkeptLocations.offer(steadyStateLoc);
+        verify(db, atLeastOnce()).saveCachedLocation(eq("flush_region"), eq(steadyStateLoc), any());
+    }
+
+    // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
 
