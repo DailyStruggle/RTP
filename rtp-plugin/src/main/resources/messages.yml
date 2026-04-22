@@ -120,6 +120,7 @@ locationLoaded: "&e[P0] Successfully loaded [amount] locations for [region]"
 # messages related to the scan command
 # placeholder: [scan_regions] - list of regions
 scanStart: "&a[P0] scan task started for regions: [scan_regions]"
+scanReset: "&e[P0] scan queue reset for regions: [scan_regions]"
 scanCancel: "&e[P0] scan task cancelled for regions: [scan_regions]"
 scanPause: "#A020F0[P0] scan task paused for regions: [scan_regions]"
 scanResume: "#10A5F5[P0] scan task resumed for regions: [scan_regions]"

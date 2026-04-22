@@ -1,0 +1,80 @@
+# --- Mapeo de Idioma: messages.yml ---
+# Asigna las claves de mensaje internas (izquierda) a los nombres visibles
+# para el usuario en messages.yml (derecha). Modifica únicamente el lado
+# derecho para renombrar o traducir una clave de mensaje; el lado izquierdo
+# es una constante de código y no debe cambiarse.
+# Nota: este archivo solo asigna NOMBRES DE CLAVE. El texto traducido del
+# mensaje en sí vive en messages.yml. Si este archivo falta, el plugin lo
+# regenera con pares idénticos izquierda/derecha (los valores por defecto
+# en inglés).
+
+oldFile: archivoAntiguo
+infoTitle: tituloInfo
+worldInfo: datosMundo
+placeholders: marcadores
+teleportMessage: mensajeTeletransporte
+noLocationsQueued: sinUbicacionesEnCola
+scanNotRunning: escaneoNoActivo
+scanCancel: cancelarEscaneo
+PLAYER_COOLDOWN: JUGADOR_ENFRIAMIENTO
+seconds: segundos
+scanPause: pausarEscaneo
+updating: actualizando
+regionInfo: datosRegion
+PLAYER_AVAILABLE: JUGADOR_DISPONIBLE
+consoleCmdNotAllowed: comandoConsolaNoPermitido
+queueUpdate: actualizarCola
+delayMessage: mensajeRetraso
+PLAYER_TELEPORTING: JUGADOR_TELETRANSPORTANDO
+alreadyTeleporting: yaTeletransportando
+teleportDeniedReloading: teletransporteDenegadoRecargando
+invalidWorld: mundoInvalido
+infoTickets: infoTickets
+infoTeleports: infoTeletransportes
+infoMSPT: infoMSPT
+infoTotalLoads: infoCargasTotales
+infoLeakRate: infoTasaFuga
+infoDisclaimerHeader: cabeceraAvisoInfo
+infoDisclaimer: avisoInfo
+infoConsoleWorldHeader: cabeceraMundoConsolaInfo
+infoConsoleRegionHeader: cabeceraRegionConsolaInfo
+minutes: minutos
+teleportCancel: cancelarTeletransporte
+infoWorldHeader: cabeceraMundoInfo
+noPerms: sinPermisos
+scan: escaneo
+version: version
+notEnoughMoney: dineroInsuficiente
+cooldownMessage: mensajeEnfriamiento
+scanResume: reanudarEscaneo
+subtitle: subtitulo
+millis: milisegundos
+updated: actualizado
+fadeOut: desvanecer
+reloading: recargando
+reloaded: recargado
+PLAYER_LOADING: JUGADOR_CARGANDO
+unsafe: inseguro
+scanStart: iniciarEscaneo
+scanReset: reiniciarEscaneo
+title: titulo
+actionbar: barraAccion
+badArg: argumentoInvalido
+locationSaved: ubicacionGuardada
+locationLoaded: ubicacionCargada
+reload: recargar
+fadeIn: aparecer
+infoRegionHeader: cabeceraRegionInfo
+hours: horas
+PLAYER_SETUP: JUGADOR_CONFIGURAR
+rtp: rtp
+stay: permanecer
+help: ayuda
+scanStatus: estadoEscaneo
+infoWorld: infoMundo
+chunkLoading: cargaDeChunk
+newWorld: mundoNuevo
+scanRunning: escaneoActivo
+days: dias
+infoRegion: infoRegion
+showDevTag: mostrarEtiquetaDev

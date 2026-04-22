@@ -83,6 +83,18 @@ The `commands-live` portion of the full test suite intentionally dispatches malf
 
 ---
 
+## Performance & Throughput
+
+### Paper 26.1 scan throughput parity with Spigot/Folia (2026-04-21)
+
+Paper 26.1 with the non-blocking `LocationGenerator` state machine (ADR-015 post-refactor) achieves roughly **300 cps effective scan throughput**, on parity with the Spigot/Folia Anvil-based scan path. This confirms that ADR-016 §1.1 (the adapter-internal `[RTP] Anvil gate skipped reason=chunk-already-loaded` gate firing on essentially every candidate on Paper chunk-system-v2) is **not** a performance regression relative to the pure-Anvil path — Paper's live-chunk `getBiome` on an already-loaded chunk is cheap enough to close the gap.
+
+Important caveat: the ~300 cps figure is a **batched / parallel effective throughput** (candidates-per-wall-second aggregated across the `scan` command's parallel `allOf` chunk-load batches). It is **not** a per-chunk read latency and must not be divided out as `1/N` to reason about per-stage cost — dividing underestimates true per-chunk latency by roughly the scan batch's parallelism factor.
+
+For a genuine per-chunk latency number, use the serial `--samples N` harness in the `rtp test/async-chunk-load` sub-command (reports p50/p95/p99 over N serial `getChunkAt` probes along a non-spawn spiral). That harness deliberately walks one candidate at a time and is the correct signal to compare between Paper chunk-system versions and/or before/after ADR-015 / ADR-016 changes.
+
+---
+
 ## Build & Environment
 
 ### Gradle daemon / Java version mismatch

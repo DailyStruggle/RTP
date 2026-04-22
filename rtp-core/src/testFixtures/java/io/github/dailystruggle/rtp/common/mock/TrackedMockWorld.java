@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.mock;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -41,12 +42,18 @@ public class TrackedMockWorld extends MockRTPWorld {
      *                  {@code false} when it is being released
      */
     @Override
-    protected void setForceLoadedImpl(int cx, int cz, boolean forceLoad) {
+    protected CompletableFuture<Void> setForceLoadedImpl(int cx, int cz, boolean forceLoad) {
         if (forceLoad) {
             activeTicketCount.incrementAndGet();
         } else {
             activeTicketCount.decrementAndGet();
         }
+        // Synchronous apply in this mock: the counter is updated inline, so the
+        // ticket is "applied" by the time this method returns. Subclasses that
+        // want to simulate Paper's deferred-apply behaviour should override this
+        // to return an incomplete future that is only completed after a test-
+        // controlled drain (see ReqRtpS005PaperTicketApplicationRaceTest).
+        return CompletableFuture.completedFuture(null);
     }
 
     /**
@@ -57,6 +64,28 @@ public class TrackedMockWorld extends MockRTPWorld {
      */
     public int getActiveTicketCount() {
         return activeTicketCount.get();
+    }
+
+    /**
+     * Bumps the ticket counter on behalf of a subclass that simulates a deferred
+     * (main-thread-scheduled) apply — e.g. the {@code DeferredApplyWorld} used by
+     * {@code ReqRtpS005PaperTicketApplicationRaceTest} to reproduce Paper's
+     * {@code Bukkit.getScheduler().runTask(...)} ticket-application pattern.
+     *
+     * <p>Plain subclasses that want the default synchronous counter behaviour
+     * should not call this — {@code super.setForceLoadedImpl(cx, cz, forceLoad)}
+     * handles it. This hook exists only so a subclass that overrides
+     * {@code setForceLoadedImpl} (and therefore skips the superclass counter
+     * update) can still drive the counter from its own deferred callback.
+     *
+     * @param forceLoad {@code true} to increment, {@code false} to decrement
+     */
+    protected final void setForceLoadedImpl_syncCounterForTesting(boolean forceLoad) {
+        if (forceLoad) {
+            activeTicketCount.incrementAndGet();
+        } else {
+            activeTicketCount.decrementAndGet();
+        }
     }
 
     /**

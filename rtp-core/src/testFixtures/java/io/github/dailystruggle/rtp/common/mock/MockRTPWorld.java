@@ -132,8 +132,9 @@ public class MockRTPWorld extends RTPWorld<String> {
     }
 
     @Override
-    protected void setForceLoadedImpl(int cx, int cz, boolean forceLoad) {
-        // no-op in tests
+    protected CompletableFuture<Void> setForceLoadedImpl(int cx, int cz, boolean forceLoad) {
+        // no-op in tests — synchronous apply, completed future.
+        return CompletableFuture.completedFuture(null);
     }
 
     @Override

@@ -77,6 +77,18 @@ public interface RTPCmd extends BaseRTPCmd {
       return true;
     }
 
+    // --------------------------------------------------------------------------------------------------------------
+    // Subcommand dispatch (e.g. `rtp info`, `rtp reload`) must bypass teleport-related guards.
+    // These guards (cooldown, alreadyTeleporting, processingPlayers registration) apply only to
+    // the root teleport invocation, not to administrative / query subcommands.
+    boolean hasSubCommand = false;
+    if (args != null && args.length > 0) {
+      Map<String, CommandsAPICommand> lookup = getCommandLookup();
+      if (lookup != null && !lookup.isEmpty()) {
+        hasSubCommand = lookup.containsKey(args[0].toUpperCase(java.util.Locale.ROOT));
+      }
+    }
+
     long dt = -1;
 
     // --------------------------------------------------------------------------------------------------------------
@@ -92,7 +104,7 @@ public interface RTPCmd extends BaseRTPCmd {
 
       if (dt < 0) dt = Long.MAX_VALUE + dt;
 
-      if (dt < sender.cooldown()) {
+      if (!hasSubCommand && dt < sender.cooldown()) {
         ConfigParser<MessagesKeys> langParser =
                 (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
         String msg = (String) langParser.getConfigValue(MessagesKeys.cooldownMessage, "");
@@ -111,7 +123,7 @@ public interface RTPCmd extends BaseRTPCmd {
       return true;
     }
 
-    if (RTP.getInstance().processingPlayers.contains(senderId)) {
+    if (!hasSubCommand && RTP.getInstance().processingPlayers.contains(senderId)) {
       ConfigParser<MessagesKeys> langParser =
               (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
       String msg = (String) langParser.getConfigValue(MessagesKeys.alreadyTeleporting, "");
@@ -119,7 +131,7 @@ public interface RTPCmd extends BaseRTPCmd {
       return true;
     }
 
-    if (!senderId.equals(CommandsAPI.serverId)) RTP.getInstance().processingPlayers.add(senderId);
+    if (!hasSubCommand && !senderId.equals(CommandsAPI.serverId)) RTP.getInstance().processingPlayers.add(senderId);
 
     try {
       onCommand(senderId, sender::hasPermission, messageMethod, args)

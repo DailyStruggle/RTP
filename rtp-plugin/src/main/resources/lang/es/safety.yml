@@ -1,0 +1,258 @@
+# --- Configuración de seguridad de RTP ---
+# Configura cómo el plugin determina si una ubicación de teletransporte es "segura".
+#
+# Gramática de tokens (ADR-017):
+#   MATERIAL                          -- material simple, p. ej. LAVA
+#   MATERIAL[prop=val,prop2=val2]     -- material sólo si TODAS las propiedades de
+#                                        estado de bloque coinciden
+#   #namespace:tag                    -- se expande a todos los materiales de esa etiqueta
+#   #namespace:tag[prop=val]          -- miembros de la etiqueta sólo si las propiedades coinciden
+#   *[prop=val]                       -- CUALQUIER material cuando las propiedades coinciden (comodín)
+#
+# Los valores de las propiedades se comparan sin distinguir mayúsculas/minúsculas
+# con la forma de cadena del BlockData de Bukkit. Las etiquetas desconocidas se
+# expanden al conjunto vacío (no-op, fail-open); los tokens malformados se
+# registran una vez en nivel WARN al recargar (REQ-RTP-S-004).
+# El orden dentro de una lista no importa.
+
+# Invulnerabilidad (segundos)
+# Duración de la invulnerabilidad concedida al jugador tras teletransportarse.
+# Evita daño por fuego, ahogamiento o caídas al llegar.
+tiempoInvulnerabilidad: 5
+
+# Radio de comprobación de seguridad (bloques)
+# Radio alrededor del bloque objetivo a comprobar en busca de condiciones peligrosas.
+# Valores mayores dan más seguridad pero dificultan encontrar un sitio.
+radioSeguridad: 0
+
+# Límite de reintentos por chunk obsoleto (conteo)
+# Presupuesto acotado de reintentos para el guardián de chunks obsoletos
+# (ADR-015 / REQ-RTP-S-005). Tras resolverse una carga asíncrona de chunk, la
+# tarea posterior de evaluación de bloque se encola en una tubería de tareas
+# Count-Bound (planificador de Region Thread de Folia). Si la tubería está
+# saturada, el GC nativo de chunks puede descargar el chunk antes de que la
+# tarea se ejecute, lo que de otro modo dispararía una carga síncrona en el
+# Region Thread y activaría el Watchdog de Folia. Cuando el guardián detecta
+# esta carrera, vuelve a encolar una carga asíncrona hasta este número de veces
+# por candidato. Al agotarse, el candidato se rechaza por la ruta "unsafe"
+# habitual (se registra un WARN; nada se descarta silenciosamente).
+# Predeterminado: 2. Súbelo sólo en forks con un GC de chunks muy agresivo.
+staleChunkRetryLimit: 2
+
+# Pre-filtro Anvil de sólo lectura (sólo Spigot vanilla)
+# Sonda de seguridad fuera de hilo que analiza el archivo de región persistido
+# `r.X.Z.mca` y rechaza candidatos claramente inseguros (lava/magma/fuego en la
+# superficie del heightmap) antes de solicitar la carga autoritativa del chunk
+# en vivo. Reduce la presión sobre el hilo de tick en Spigot vanilla, donde la
+# API de carga de chunks en vivo no es realmente asíncrona.
+# No tiene efecto en Paper ni en Folia (sustituyen la ruta de carga de chunks
+# por APIs asíncronas nativas y nunca entran al pre-filtro).
+# El re-chequeo en vivo chunk.isSafe(...) sigue siendo la fuente autoritativa
+# en caso de ACCEPT; REJECT es el único atajo. Véase ADR-016 / REQ-RTP-S-005.
+# Predeterminado: true. Ponlo a false para desactivar la sonda (útil en forks
+# modificados con formatos de región exóticos).
+anvilPrefilterEnabled: true
+
+# Plataformas de aterrizaje
+# Crea una plataforma de aterrizaje en el destino del teletransporte.
+# El bloque central se elige según el tipo de bloque en la ubicación.
+# Establece platformRadius en -1 para desactivar las plataformas.
+# Predeterminado: -1 (desactivado) — las comprobaciones modernas de seguridad
+# (chunk.isSafe + ajustador vertical) producen aterrizajes firmes de forma
+# fiable, por lo que la plataforma de emergencia (bloque de cristal) está
+# desactivada por defecto.
+# Auméntalo a 0 o más sólo si aún ves aterrizajes inseguros y deseas la opción
+# de respaldo antigua.
+radioPlataforma: -1
+profundidadPlataforma: 1
+
+# Altura de aire a asegurar sobre la plataforma.
+# Puede causar problemas de iluminación si es demasiado alta.
+alturaAirePlataforma: 2
+
+# Tipo de bloque predeterminado para la plataforma si no hay un bloque sólido.
+materialPlataforma: GLASS
+
+# Bloques de aire
+# Tipos de materiales considerados como espacio transitable/no bloqueante sobre el aterrizaje.
+# Usa etiquetas de bloques vanilla siempre que sea posible para mantener compatibilidad futura
+# con nuevas adiciones de Mojang (p. ej., una nueva variante de flor añadida en un futuro
+# MC se recoge automáticamente mediante #minecraft:small_flowers sin editar la configuración).
+bloquesAire:
+  # Variantes reales de aire (ninguna etiqueta las cubre todas a la vez)
+  - AIR
+  - CAVE_AIR
+  - VOID_AIR
+  - LEGACY_AIR
+  - STRUCTURE_VOID
+  - LIGHT
+
+  # Flores (cubre dientes de león, amapolas, tulipanes, eyeblossoms, torchflower, ...)
+  - "#minecraft:flowers"
+  - "#minecraft:small_flowers"
+  - "#minecraft:tall_flowers"
+
+  # Plantas similares a la hierba y arbustos no incluidos en las etiquetas de flores
+  - SHORT_GRASS
+  - TALL_GRASS
+  - SHORT_DRY_GRASS
+  - TALL_DRY_GRASS
+  - FERN
+  - LARGE_FERN
+  - DEAD_BUSH
+  - BUSH
+  - WILDFLOWERS
+  - FIREFLY_BUSH
+  - LEGACY_LONG_GRASS
+  - LEGACY_DEAD_BUSH
+
+  # Saplings, propágulos y hongos
+  - "#minecraft:saplings"
+  - BROWN_MUSHROOM
+  - RED_MUSHROOM
+  - CRIMSON_FUNGUS
+  - WARPED_FUNGUS
+
+  # Cultivos y flora de superficie sin una etiqueta conveniente
+  - "#minecraft:crops"
+  - MELON_STEM
+  - PUMPKIN_STEM
+  - SUGAR_CANE
+  - BAMBOO_SAPLING
+
+  # Enredaderas y flora montada en paredes
+  - VINE
+  - GLOW_LICHEN
+  - WEEPING_VINES
+  - TWISTING_VINES
+  - HANGING_ROOTS
+  - PALE_HANGING_MOSS
+  - RESIN_CLUMP
+
+  # Raíles
+  - "#minecraft:rails"
+
+  # Redstone y mecanismos (no existe una etiqueta que los agrupe)
+  - REDSTONE_WIRE
+  - COMPARATOR
+  - REPEATER
+  - LEVER
+  - STRING
+  - TRIPWIRE
+
+  # Antorchas e iluminación (no hay etiqueta de grupo)
+  - TORCH
+  - WALL_TORCH
+  - SOUL_TORCH
+  - SOUL_WALL_TORCH
+  - REDSTONE_TORCH
+  - REDSTONE_WALL_TORCH
+  - END_ROD
+
+  # Botones (variantes de piedra y madera)
+  - "#minecraft:buttons"
+
+  # Placas de presión
+  - "#minecraft:pressure_plates"
+
+  # Letreros -- todas las variantes de pie/pared/colgantes en cuatro etiquetas
+  - "#minecraft:standing_signs"
+  - "#minecraft:wall_signs"
+  - "#minecraft:ceiling_hanging_signs"
+  - "#minecraft:wall_hanging_signs"
+  - LEGACY_SIGN
+  - LEGACY_WALL_SIGN
+
+  # Cubierta del suelo
+  - SNOW
+  - MOSS_CARPET
+  - PALE_MOSS_CARPET
+  - LEAF_LITTER
+
+# Bloques inseguros
+# Materiales o estados de bloque que el plugin rechazará como destino de aterrizaje,
+# o cualquier bloque dentro de `safetyRadius` del objetivo. Admite predicados de
+# estado y comodines (véase la gramática al principio del archivo).
+bloquesInseguros:
+  # Fluidos
+  - WATER
+  - LAVA
+  - BUBBLE_COLUMN
+
+  # Cualquier bloque waterlogged (losas/escaleras/vallas/muros/letreros/cadenas/...) --
+  # reemplaza al antiguo pseudo-token 'WATERLOGGED'. Usa el comodín de ADR-017.
+  - "*[waterlogged=true]"
+
+  # Fuego y peligros de calor
+  - "#minecraft:fire"
+  - POWDER_SNOW
+  - MAGMA_BLOCK
+
+  # Hogueras (tanto encendidas como apagadas son inseguras -- los jugadores se hunden en ellas)
+  - "#minecraft:campfires"
+
+  # Daño por contacto / atrapamiento
+  - CACTUS
+  - SWEET_BERRY_BUSH
+  - WITHER_ROSE
+  - POINTED_DRIPSTONE
+  - COBWEB
+  - CREAKING_HEART
+
+  # Void / portal / inamovible
+  - BEDROCK
+  - NETHER_PORTAL
+  - END_PORTAL
+  - END_GATEWAY
+
+  # Explosivos
+  - TNT
+  - END_CRYSTAL
+  - RESPAWN_ANCHOR
+
+  # Flora acuática (riesgo de ahogamiento)
+  - SEAGRASS
+  - TALL_SEAGRASS
+  - KELP
+  - KELP_PLANT
+
+# Filtro de biomas
+# biomeWhitelist: false -> la lista `biomes` es una lista negra (omite estos biomas)
+#                  true  -> la lista `biomes` es una lista blanca (sólo permite estos biomas)
+# La lista negra predeterminada excluye océanos, ríos, void y otros biomas donde
+# un aterrizaje firme y seguro es improbable o imposible.
+listaPermitidaBiomas: false
+biomas:
+  # BIOMAS OCEÁNICOS
+  - OCEAN
+  - DEEP_OCEAN
+  - WARM_OCEAN
+  - LUKEWARM_OCEAN
+  - DEEP_LUKEWARM_OCEAN
+  - COLD_OCEAN
+  - DEEP_COLD_OCEAN
+  - FROZEN_OCEAN
+  - DEEP_FROZEN_OCEAN
+
+  # BIOMAS FLUVIALES
+  - RIVER
+  - FROZEN_RIVER
+
+  # BIOMAS ADYACENTES Y COSTEROS
+  - BEACH
+  - SNOWY_BEACH
+  - STONY_SHORE
+  - SWAMP
+  - MANGROVE_SWAMP
+
+  # BIOMAS DEL END (sin aterrizaje sólido / adyacentes al void)
+  - SMALL_END_ISLANDS
+
+  # BIOMAS DEL NETHER (terreno peligroso/irregular)
+  - BASALT_DELTAS
+
+  # BIOMAS TÉCNICOS
+  - THE_VOID
+
+# NO MODIFIQUES EL NÚMERO DE VERSIÓN
+version: "1.0"

@@ -146,6 +146,29 @@ class TestAsyncChunkLoadCmdTest {
         () -> "notes must describe future failure; actual='" + r.notes + "'");
   }
 
+  @Test
+  @DisplayName("runSeries aggregates per-sample elapsed times into min/p50/p95/p99/max/mean")
+  void runSeriesAggregatesPercentiles() {
+    // FakeSyncWorld returns an already-complete future, so each probe
+    // resolves in ~0 ms and every sample passes its off-caller-thread
+    // check (caller is the test-harness thread, not primary).
+    FakeSyncWorld world = new FakeSyncWorld();
+    TestAsyncChunkLoadCmd.SeriesResult s =
+        TestAsyncChunkLoadCmd.runSeries(world, 8, 1_000L);
+
+    assertEquals(8, s.samples, "sample count must round-trip");
+    assertEquals(8, s.ok, "every sample must pass against a sync-complete fake");
+    assertEquals(0, s.fail, "no failures expected");
+    assertTrue(s.minMs >= 0, "minMs must be non-negative");
+    assertTrue(s.p50Ms >= s.minMs, "p50 must be >= min");
+    assertTrue(s.p95Ms >= s.p50Ms, "p95 must be >= p50");
+    assertTrue(s.p99Ms >= s.p95Ms, "p99 must be >= p95");
+    assertTrue(s.maxMs >= s.p99Ms, "max must be >= p99");
+    assertTrue(s.meanMs >= 0, "mean must be non-negative");
+    assertEquals("sync-world", s.worldName, "world name must round-trip");
+    assertEquals("", s.firstNote, "no skipped/errored probes expected");
+  }
+
   // --------------------------------------------------------------------------
   // Test fakes
   // --------------------------------------------------------------------------
@@ -249,7 +272,9 @@ class TestAsyncChunkLoadCmdTest {
       throw new UnsupportedOperationException("not exercised by runProbe");
     }
 
-    @Override protected void setForceLoadedImpl(int cx, int cz, boolean forceLoad) { /* no-op */ }
+    @Override protected CompletableFuture<Void> setForceLoadedImpl(int cx, int cz, boolean forceLoad) {
+      return CompletableFuture.completedFuture(null);
+    }
 
     @Override
     public CompletableFuture<Integer> getServerForceLoadedCount() {

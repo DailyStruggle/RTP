@@ -34,6 +34,11 @@ public abstract class RTPTaskPipe {
 
   public void clear() {
     runnables.clear();
+    // Semantically "clear" is a full reset: also unset the stop flag so the pipe
+    // is reusable after a prior stop()/clear() sequence (e.g. in tests that
+    // exercise the shutdown path and then re-use the shared RTP.getInstance()
+    // singleton pipes).
+    stop = false;
   }
 
   public void start() {

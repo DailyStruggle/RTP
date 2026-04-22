@@ -93,45 +93,95 @@ public abstract class RTPWorld<T> {
   }
 
   /**
+   * Tracks the latest {@code setForceLoadedImpl(true)} application future per chunk key so
+   * ref-counted no-op callers can still await the actual ticket application rather than
+   * seeing a stale "ready" signal.
+   *
+   * <p>Motivation (ADR-015 Paper chunk-system-v2 follow-up): on the Bukkit/Paper adapter the
+   * raw {@code addPluginChunkTicket} call is scheduled onto the primary thread via
+   * {@code runTask} when invoked off-thread. Callers running on
+   * {@code Craft Scheduler Thread - 1 - RTP} (the pregen / location-generator path) would
+   * otherwise return from {@code setForceLoaded(true)} before the ticket was actually applied,
+   * re-opening the exact race the stale-chunk guard (REQ-RTP-S-005) exists to detect and
+   * causing every candidate to be falsely rejected on Paper chunk-system-v2.</p>
+   */
+  protected final Map<Long, CompletableFuture<Void>> ticketApplyFutures = new ConcurrentHashMap<>();
+
+  /**
    * Sets the force-loaded state of a chunk using a reference-counting system.
+   *
+   * <p>Returns a {@link CompletableFuture} that completes when the underlying platform call
+   * ({@code addPluginChunkTicket} / {@code removePluginChunkTicket}) has actually been applied.
+   * Callers on off-thread contexts (e.g. the location generator running on an async scheduler
+   * thread) must await this future before relying on {@code isChunkLoaded} or treating the
+   * chunk as pinned.</p>
+   *
+   * <p>Ref-counted no-op invocations (i.e. {@code setForceLoaded(true)} on a chunk whose
+   * count is already &gt;0) return the in-flight apply future for the original call, so a
+   * second caller cannot bypass the ticket-application wait by incrementing past a still-
+   * pending first application.</p>
    *
    * @param cx        the chunk's X coordinate
    * @param cz        the chunk's Z coordinate
    * @param forceLoad {@code true} to increment the force-load count, {@code false} to decrement
+   * @return a future that completes when the platform call has actually been applied
    */
-  public final void setForceLoaded(int cx, int cz, boolean forceLoad) {
+  public final CompletableFuture<Void> setForceLoaded(int cx, int cz, boolean forceLoad) {
     long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
+    final CompletableFuture<Void>[] captured = new CompletableFuture[]{null};
     if (forceLoad) {
       activeChunkTickets.incrementAndGet();
       chunkTickets.compute(key, (k, v) -> {
         if (v == null) {
-          setForceLoadedImpl(cx, cz, true);
+          CompletableFuture<Void> f = setForceLoadedImpl(cx, cz, true);
+          if (f == null) f = CompletableFuture.completedFuture(null);
+          ticketApplyFutures.put(key, f);
+          captured[0] = f;
           return new AtomicInteger(1);
         }
         v.incrementAndGet();
+        // Return the in-flight apply future so subsequent callers wait for the
+        // original addPluginChunkTicket to actually land before proceeding.
+        CompletableFuture<Void> f = ticketApplyFutures.get(key);
+        captured[0] = (f != null) ? f : CompletableFuture.completedFuture(null);
         return v;
       });
     } else {
       chunkTickets.compute(key, (k, v) -> {
-        if (v == null) return null;
-        activeChunkTickets.decrementAndGet();
-        if (v.decrementAndGet() <= 0) {
-          setForceLoadedImpl(cx, cz, false);
+        if (v == null) {
+          captured[0] = CompletableFuture.completedFuture(null);
           return null;
         }
+        activeChunkTickets.decrementAndGet();
+        if (v.decrementAndGet() <= 0) {
+          CompletableFuture<Void> f = setForceLoadedImpl(cx, cz, false);
+          ticketApplyFutures.remove(key);
+          captured[0] = (f != null) ? f : CompletableFuture.completedFuture(null);
+          return null;
+        }
+        captured[0] = CompletableFuture.completedFuture(null);
         return v;
       });
     }
+    return captured[0];
   }
 
   /**
    * The platform-specific implementation for setting the force-loaded state of a chunk.
    *
+   * <p>Implementations MUST return a {@link CompletableFuture} that completes only after the
+   * native {@code addPluginChunkTicket} / {@code removePluginChunkTicket} call has executed
+   * on the appropriate scheduler. On platforms where the call is synchronous on the current
+   * thread, return a completed future; on platforms where the call is scheduled onto the
+   * primary/region thread, complete the future inside the scheduled lambda (ADR-015 Paper
+   * follow-up: ticket-application race).</p>
+   *
    * @param cx        the chunk's X coordinate
    * @param cz        the chunk's Z coordinate
    * @param forceLoad {@code true} to force-load, {@code false} to un-force-load
+   * @return a future that completes when the platform call has been applied
    */
-  protected abstract void setForceLoadedImpl(int cx, int cz, boolean forceLoad);
+  protected abstract CompletableFuture<Void> setForceLoadedImpl(int cx, int cz, boolean forceLoad);
 
   /**
    * Re-applies the force-loaded state to a chunk without changing its ticket count.

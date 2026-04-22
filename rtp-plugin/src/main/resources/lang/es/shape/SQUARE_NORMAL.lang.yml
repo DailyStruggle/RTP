@@ -1,0 +1,9 @@
+mode: modo
+radius: radio
+centerRadius: radioCentro
+centerX: centroX
+centerZ: centroZ
+uniquePlacements: colocacionesUnicas
+mean: media
+deviation: desviacion
+expand: expandir

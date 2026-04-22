@@ -55,6 +55,24 @@ public final class RTPTestSetup {
         // Ensure RTP.getInstance() returns a valid instance
         ensureRTPInstance();
 
+        // Guarantee the task pipes on the shared RTP.getInstance() are real
+        // TimeBoundTaskPipe instances, not whatever a previous test class may
+        // have installed (e.g. Mockito mocks in ReqRtpF013LocaleOverlayTest,
+        // which return `false` from execute(...) and silently no-op add(...),
+        // causing any later test that queues and drains the pipe to fail).
+        // Rebuilding per-install also resets any `stop=true`/`avgTime` drift
+        // left by shutdown-path tests.
+        io.github.dailystruggle.rtp.common.RTP rtpInstance = RTP.getInstance();
+        if (rtpInstance != null) {
+            rtpInstance.cancelTasks = (io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe) accessor.createTaskPipe();
+            rtpInstance.miscSyncTasks = (io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe) accessor.createTaskPipe();
+            rtpInstance.miscAsyncTasks = (io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe) accessor.createTaskPipe();
+            rtpInstance.startupTasks = (io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe) accessor.createTaskPipe();
+            if (rtpInstance.cancelTasks instanceof io.github.dailystruggle.rtp.common.tasks.TimeBoundTaskPipe timeBoundCancel) {
+                timeBoundCancel.setAvailableTime(Long.MAX_VALUE);
+            }
+        }
+
         // Guarantee RTPAPI.serverAccessor is always set to the current test's accessor.
         // ensureRTPInstance() reuses an existing RTP instance when one is present, so the
         // RTP constructor (which calls RTPAPI.setServerAccessor) may not run on subsequent

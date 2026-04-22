@@ -102,6 +102,16 @@ public class RTPArchitectureTest {
      *       static initialiser that runs once during class loading on a background thread;
      *       the futures wrap synchronous lookups that complete before the initialiser
      *       returns.</li>
+     *   <li><b>ChunkReservation</b> – {@code .get(timeout, unit)} inside
+     *       {@link io.github.dailystruggle.rtp.api.world.ChunkReservation#awaitReady(long, java.util.concurrent.TimeUnit)}.
+     *       ADR-015 (Paper chunk-system-v2 follow-up — ticket-application race): the future
+     *       is completed by the platform adapter once {@code addPluginChunkTicket} has been
+     *       applied on the primary/region thread. The bounded wait (2s) is REQ-RTP-S-005-
+     *       compliant because it is only ever called off-tick (the location generator runs
+     *       on an async scheduler thread); a timeout attributes to
+     *       {@code FailTypes.timeout / reason=ticketApplyTimeout}. The method lives in
+     *       {@code rtp-api} so it cannot be covered by the {@code LocationGenerator} name-
+     *       match; it is exempted here explicitly.</li>
      * </ul>
      */
     @ArchTest
@@ -115,6 +125,7 @@ public class RTPArchitectureTest {
                     .and().haveSimpleNameNotContaining("TeleportPipelineTask")
                     .and().haveSimpleNameNotContaining("MemoryTracker")
                     .and().haveSimpleNameNotContaining("PlaceholderProvider")
+                    .and().haveSimpleNameNotContaining("ChunkReservation")
                     .should().callMethodWhere(
                             target(owner(assignableTo(CompletableFuture.class)))
                                     .and(target(nameMatching("get|join")))

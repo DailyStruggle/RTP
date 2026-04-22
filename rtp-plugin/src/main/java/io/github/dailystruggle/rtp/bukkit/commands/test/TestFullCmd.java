@@ -74,6 +74,8 @@ public class TestFullCmd extends BaseRTPCmdImpl {
               "economy-isolation",
               "queue-starvation",
               "async-reply",
+              "disconnect-job",
+              "safety-verifier",
               "stress"));
 
   /**
@@ -285,6 +287,16 @@ public class TestFullCmd extends BaseRTPCmdImpl {
       }
       waitForCallerJobsToDrain(callerId, "async-reply");
     }
+
+    // --- disconnect-job (REQ-RTP-S-002 async mid-flight leak canary) --
+    // Synthetic UUID caller; no live-player dependency. Complements the
+    // `disconnect-midflight` sync-path variant dispatched earlier.
+    dispatchNoArgAndWait(callerId, "disconnect-job");
+
+    // --- safety-verifier (REQ-RTP-S-001 block safety + REQ-RTP-S-003 --
+    // claim verifiers, bounded by a strict timeout). Read-only; safe on
+    // every platform.
+    dispatchNoArgAndWait(callerId, "safety-verifier");
 
     // --- stress -------------------------------------------------------
     // Defaults: caller is the sole target (operators on console with no

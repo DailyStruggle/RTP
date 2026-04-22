@@ -42,6 +42,8 @@ public class TestCmd extends BaseRTPCmdImpl {
     addSubCommand(new QueueStarvationTestJob(this));
     addSubCommand(new EconomyIsolationTestJob(this));
     addSubCommand(new FoliaOwnershipTestJob(this));
+    addSubCommand(new DisconnectTestJob(this));
+    addSubCommand(new SafetyVerifierTestJob(this));
 
     // `full` is the umbrella entry point (see RUNTIME_TEST_SUITE_PLAN.md §3.2).
     // It is wired in last so `findChild` in TestFullCmd can resolve every

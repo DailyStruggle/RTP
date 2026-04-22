@@ -1,5 +1,13 @@
 # --- RTP Core Configuration ---
 
+# Language for user-facing messages.
+# Default: "en" (baseline English shipped in messages.yml).
+# Other shipped locales live under lang/<locale>/messages.yml and are loaded
+# as an overlay on top of the English baseline. Missing keys in a locale file
+# silently fall back to English. Unknown locales log a warning and fall back.
+# See ADR-020 and REQ-RTP-F-013.
+language: "en"
+
 # Teleportation Delay (Seconds)
 # The time a player must wait before the teleport occurs.
 # This sometimes gives the server time to pre-load the destination chunks.

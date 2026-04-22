@@ -256,17 +256,29 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   private static final int GATE_SKIP_BUDGET_PER_REASON = 200;
 
   private void logGateSkip(String reason, int cx, int cz) {
+    // "chunk-already-loaded" is the steady-state outcome on Paper chunk-system-v2
+    // and Folia (ADR-016 §1.1): the call-site probe in LocationGenerator runs after
+    // candidate selection, by which time ambient server load or prior-attempt residue
+    // has typically already ticket-pinned the candidate chunk. The message carries no
+    // diagnostic signal in that regime and would otherwise spam the log. Suppressed
+    // entirely; the counter is retained below so `rtp test/anvil-prefilter` (and any
+    // future metric surface) can still observe the rate.
     java.util.concurrent.atomic.AtomicInteger counter =
         GATE_SKIP_COUNTERS.computeIfAbsent(reason,
             k -> new java.util.concurrent.atomic.AtomicInteger());
     int n = counter.incrementAndGet();
+    if ("chunk-already-loaded".equals(reason)) {
+      return;
+    }
+    // Other reasons (dimension-unsupported, world-save-disabled, config-disabled(...))
+    // remain operator-actionable: INFO within budget, FINE afterward.
     java.util.logging.Level level = (n <= GATE_SKIP_BUDGET_PER_REASON)
         ? java.util.logging.Level.INFO
         : java.util.logging.Level.FINE;
     RTP.log(level,
         "[RTP] Anvil gate skipped reason=" + reason + " world=" + name
             + " chunk=(" + cx + "," + cz + ")"
-            + (n > GATE_SKIP_BUDGET_PER_REASON
+            + (level == java.util.logging.Level.FINE
                 ? " (further occurrences suppressed to FINE)" : ""));
   }
 
@@ -447,9 +459,11 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   }
 
   @Override
-  protected void setForceLoadedImpl(int cx, int cz, boolean forceLoad) {
+  protected java.util.concurrent.CompletableFuture<Void> setForceLoadedImpl(int cx, int cz, boolean forceLoad) {
     org.bukkit.plugin.Plugin plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("RTP");
-    if (plugin == null || !plugin.isEnabled()) return;
+    if (plugin == null || !plugin.isEnabled()) {
+      return java.util.concurrent.CompletableFuture.completedFuture(null);
+    }
     if (org.bukkit.Bukkit.isPrimaryThread()) {
       if (forceLoad) {
         if (!world.getPluginChunkTickets(cx, cz).contains(plugin)) {
@@ -458,8 +472,17 @@ public class BukkitRTPWorld extends RTPWorld<World> {
       } else {
         world.removePluginChunkTicket(cx, cz, plugin);
       }
-    } else {
-      org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+      return java.util.concurrent.CompletableFuture.completedFuture(null);
+    }
+    // ADR-015 Paper chunk-system-v2 follow-up (ticket-application race):
+    // the raw addPluginChunkTicket call is main-thread-only on Bukkit/Paper.
+    // Off-thread callers schedule the application via runTask and MUST await
+    // the returned future before relying on the chunk being pinned; the
+    // previous void return allowed the location generator to hit the stale-
+    // chunk guard before the scheduled task had actually run.
+    java.util.concurrent.CompletableFuture<Void> future = new java.util.concurrent.CompletableFuture<>();
+    org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+      try {
         if (forceLoad) {
           if (!world.getPluginChunkTickets(cx, cz).contains(plugin)) {
             world.addPluginChunkTicket(cx, cz, plugin);
@@ -467,8 +490,12 @@ public class BukkitRTPWorld extends RTPWorld<World> {
         } else {
           world.removePluginChunkTicket(cx, cz, plugin);
         }
-      });
-    }
+        future.complete(null);
+      } catch (Throwable t) {
+        future.completeExceptionally(t);
+      }
+    });
+    return future;
   }
 
   @Override

@@ -88,9 +88,137 @@ public class TestAsyncChunkLoadCmd extends BaseRTPCmdImpl {
       return true;
     }
 
-    Result r = runProbe(worlds.get(0), 0, 0, DEFAULT_TIMEOUT_MS);
-    emit(callerId, r);
+    // Optional --samples N for a serial per-chunk latency harness
+    // (REQ-RTP-S-005 regression-spotting — isolates per-stage cost from
+    // the `scan` command's parallel/batched effective-throughput number).
+    // N=1 preserves the original single-probe behaviour and log shape.
+    int samples = clampSamples(parseFirstInt(parameterValues.get("samples"), 1));
+    if (samples <= 1) {
+      Result r = runProbe(worlds.get(0), 0, 0, DEFAULT_TIMEOUT_MS);
+      emit(callerId, r);
+      return true;
+    }
+
+    emitSamples(callerId, runSeries(worlds.get(0), samples, DEFAULT_TIMEOUT_MS));
     return true;
+  }
+
+  /**
+   * Serially runs {@code samples} single-candidate probes along an
+   * Archimedean-ish spiral around {@code (0,0)} and aggregates per-probe
+   * elapsed times.
+   *
+   * <p>Serial — not batched — on purpose. The {@code scan} command's ~cps
+   * figure is an aggregate of batched parallel loads; this harness
+   * deliberately walks one candidate at a time so each sample's
+   * {@code elapsedMs} is a genuine per-chunk wall-clock latency through the
+   * full {@link RTPWorld#getChunkAt(int, int)} path (probe → view cache
+   * publish → completed future). Each probe targets a distinct
+   * {@code (cx,cz)} so repeated runs do not just re-hit a single warm
+   * cache entry.
+   */
+  static SeriesResult runSeries(RTPWorld<?> world, int samples, long timeoutMs) {
+    SeriesResult s = new SeriesResult();
+    s.worldName = safeName(world);
+    s.samples = samples;
+    s.callerThread = Thread.currentThread().getName();
+    s.callerIsPrimary = isBukkitPrimaryThread();
+
+    long[] elapsed = new long[samples];
+    int ok = 0;
+    int fail = 0;
+    int offPrimary = 0;
+    // Simple radial walk — stride 2 chunks so we don't alias the spawn
+    // chunk on every sample; kept bounded to ±(samples+4) to avoid
+    // straying outside a typical generated region.
+    for (int i = 0; i < samples; i++) {
+      int cx = ((i & 1) == 0) ? (i / 2) : -((i / 2) + 1);
+      int cz = ((i & 2) == 0) ? (i / 2) : -((i / 2) + 1);
+      Result r = runProbe(world, cx, cz, timeoutMs);
+      elapsed[i] = r.elapsedMs;
+      if (r.pass) ok++;
+      else fail++;
+      if (r.completingThread != null && !r.completingThread.equals(r.callerThread)) offPrimary++;
+      if (!r.notes.isEmpty() && s.firstNote.isEmpty()) s.firstNote = r.notes;
+    }
+    s.ok = ok;
+    s.fail = fail;
+    s.offCallerThread = offPrimary;
+    s.p50Ms = percentile(elapsed, 50);
+    s.p95Ms = percentile(elapsed, 95);
+    s.p99Ms = percentile(elapsed, 99);
+    s.minMs = min(elapsed);
+    s.maxMs = max(elapsed);
+    s.meanMs = mean(elapsed);
+    return s;
+  }
+
+  private static int clampSamples(int n) {
+    if (n < 1) return 1;
+    // Hard cap — per-chunk latency harness is a diagnostic, not a benchmark
+    // rig; anything above this belongs in a dedicated performance test.
+    if (n > 256) return 256;
+    return n;
+  }
+
+  private static int parseFirstInt(@Nullable List<String> values, int fallback) {
+    if (values == null || values.isEmpty()) return fallback;
+    try {
+      return Integer.parseInt(values.get(0).trim());
+    } catch (NumberFormatException ignored) {
+      return fallback;
+    }
+  }
+
+  private static long percentile(long[] arr, int pct) {
+    if (arr.length == 0) return 0L;
+    long[] copy = arr.clone();
+    java.util.Arrays.sort(copy);
+    int idx = (int) Math.ceil((pct / 100.0) * copy.length) - 1;
+    if (idx < 0) idx = 0;
+    if (idx >= copy.length) idx = copy.length - 1;
+    return copy[idx];
+  }
+
+  private static long min(long[] arr) {
+    long v = Long.MAX_VALUE;
+    for (long x : arr) if (x < v) v = x;
+    return v == Long.MAX_VALUE ? 0L : v;
+  }
+
+  private static long max(long[] arr) {
+    long v = Long.MIN_VALUE;
+    for (long x : arr) if (x > v) v = x;
+    return v == Long.MIN_VALUE ? 0L : v;
+  }
+
+  private static long mean(long[] arr) {
+    if (arr.length == 0) return 0L;
+    long sum = 0L;
+    for (long x : arr) sum += x;
+    return sum / arr.length;
+  }
+
+  private void emitSamples(UUID callerId, SeriesResult s) {
+    String summary =
+        "[RTP test/async-chunk-load] "
+            + (s.fail == 0 ? "ok" : "FAIL")
+            + " world=" + s.worldName
+            + " samples=" + s.samples
+            + " ok=" + s.ok
+            + " fail=" + s.fail
+            + " offCallerThread=" + s.offCallerThread
+            + " callerThread=" + s.callerThread
+            + " callerIsPrimary=" + s.callerIsPrimary
+            + " minMs=" + s.minMs
+            + " p50Ms=" + s.p50Ms
+            + " p95Ms=" + s.p95Ms
+            + " p99Ms=" + s.p99Ms
+            + " maxMs=" + s.maxMs
+            + " meanMs=" + s.meanMs
+            + (s.firstNote.isEmpty() ? "" : " firstNote=" + s.firstNote);
+    RTP.serverAccessor.sendMessage(callerId, summary);
+    RTP.log(s.fail == 0 ? Level.INFO : Level.WARNING, summary);
   }
 
   /**
@@ -260,5 +388,26 @@ public class TestAsyncChunkLoadCmd extends BaseRTPCmdImpl {
       r.notes = reason;
       return r;
     }
+  }
+
+  /**
+   * Aggregated result of a serial {@code --samples N} latency harness run.
+   * Package-private so the unit test can assert on the percentile values.
+   */
+  static final class SeriesResult {
+    String worldName = "<none>";
+    int samples;
+    int ok;
+    int fail;
+    int offCallerThread;
+    String callerThread = "<none>";
+    boolean callerIsPrimary;
+    long minMs;
+    long p50Ms;
+    long p95Ms;
+    long p99Ms;
+    long maxMs;
+    long meanMs;
+    String firstNote = "";
   }
 }

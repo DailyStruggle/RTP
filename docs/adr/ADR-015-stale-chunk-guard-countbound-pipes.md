@@ -30,6 +30,42 @@ ticket or `setForceLoaded(true)` is not an option on Folia — it would either
 violate REQ-RTP-S-002 or require a Global Region Scheduler detour that
 destroys the throughput benefit of Count-Bound pipes.
 
+The same race exists, with different mechanics, on Paper chunk-system-v2 (MC
+26.1+): `World#getChunkAtAsync(cx, cz)` returns a `Chunk` reference **without**
+a plugin ticket, and the chunk is eligible for immediate native GC on the
+scheduler thread that resolved the future. A guard that queries
+`world.isChunkLoaded(cx, cz)` on the server's default TTL therefore reports
+`false` on every candidate, rejecting loads that RTP itself just performed.
+The guard must test RTP-owned liveness — a bounded `ChunkReservation` held
+across the block-evaluation section — not server-default TTL.
+
+A bounded `ChunkReservation` alone is still insufficient on Paper chunk-system-v2.
+The raw `addPluginChunkTicket` call is main-thread-only on Bukkit/Paper, and
+`BukkitRTPWorld.setForceLoadedImpl` therefore schedules the call via
+`Bukkit.getScheduler().runTask(...)` when invoked off-thread. The location
+generator runs on an async scheduler thread (`Craft Scheduler Thread - * - RTP`);
+`new ChunkReservation(...)` returns immediately, before the scheduled
+`addPluginChunkTicket` has actually executed on the primary thread. The
+stale-chunk guard running on the same async thread therefore still sees
+`isChunkLoaded=false` and rejects the candidate. The reservation must expose
+a confirmation future that the caller awaits on its async thread before the
+guard reads `isChunkLoaded`; the platform adapter completes that future only
+from inside the scheduled `runTask` (or `GlobalRegionScheduler.run`) lambda
+that applies the ticket.
+
+The async confirmation must be composed through `CompletableFuture`, not a
+bounded `.get()` on an async worker. A bounded block (`awaitReady(2s)` on a
+worker thread) serialises the generator's attempt loop through the async pool
+and, under cache replenishment pressure, starves unrelated
+`RTP.serverAccessor.getScheduler().runTaskAsynchronously` work. The generator
+releases the worker between each I/O-bearing stage
+(`getChunkAtAsync` → `readyFuture` → `ticket.chunks().get(0)` → neighbour
+`allOf` → `checkGlobalRegionVerifiers`) via a state machine driven by
+`thenCompose` / `whenComplete`, and the synchronous rejection paths (biome,
+worldborder, stale-guard trip) loop in a local trampoline without a new
+scheduler dispatch so the exhaust path (e.g. 20 000 biome mismatches for an
+impossible-biome request) completes in milliseconds without stack growth.
+
 ## Decision
 
 We introduce a **Stale-Chunk Guard** contract on `RTPWorld` and call it
@@ -61,9 +97,59 @@ Count-Bound-scheduled callback:
 
 4. On the `LocationGenerator` internal block-sampling paths (the two
    `safetyCheck` loops, and the pre-`vert.adjust` site in the
-   `getLocation(Region, Set<String>)` overload), the guard simply rejects the
-   candidate without a retry — the outer spiral/poll loop will naturally
-   pick a fresh candidate (and load its chunk async) on the next iteration.
+   `getLocation(Region, Set<String>)` overload), the guard is bracketed by a
+   `ChunkReservation` allocated immediately after the async/probe path
+   resolves a chunk and released in a `finally` on all exit paths
+   (`continue`, `break`, exception). The guard therefore rejects only when
+   the server reports the chunk unloaded **despite** a live RTP ticket — a
+   genuine GC race — and never falsely classifies an async-load-returned
+   chunk as stale on Paper chunk-system-v2. On rejection the outer
+   spiral/poll loop picks a fresh candidate on the next iteration.
+
+5. `RTPWorld.setForceLoadedImpl` returns a `CompletableFuture<Void>` that
+   completes only after the raw `addPluginChunkTicket` /
+   `removePluginChunkTicket` call has executed on the appropriate scheduler
+   (primary thread on Bukkit/Paper; Global Region Scheduler on Folia). The
+   public `RTPWorld.setForceLoaded` propagates this future, and
+   ref-counted no-op invocations (count > 0) return the in-flight apply
+   future so a second caller cannot bypass the ticket-application wait by
+   incrementing past a still-pending first application. `ChunkReservation`
+   captures this future on construction and exposes
+   `readyFuture()` / `awaitReady(timeout, unit)`; the `LocationGenerator`
+   state machine composes the guard via
+   `reservation.readyFuture().orTimeout(2, SECONDS).whenComplete(...)`
+   rather than a bounded `.get()` on the async worker. A timeout attributes
+   to `FailTypes.timeout / reason=ticketApplyTimeout` and the candidate is
+   rejected (REQ-RTP-S-004). The non-blocking composition preserves
+   REQ-RTP-S-005 compliance by never occupying an async worker for the
+   duration of the platform-scheduled apply, and eliminates the head-of-line
+   blocking of unrelated scheduler work that a bounded wait incurs. The
+   legacy `awaitReady` accessor is retained on `ChunkReservation` as a
+   convenience for test fixtures and the deprecated sync shims on
+   `LocationGenerator`.
+
+6. The `LocationGenerator` pregen path (`getLocation(Region, Set<String>)`)
+   and the queue path (`getLocation(Region, sender, player, biomeNames)`)
+   are non-blocking state machines (`PregenTask` and `QueueTask` in
+   `rtp-core.../selection/region`). Each I/O-bearing stage is composed via
+   `CompletableFuture`; the worker is released between stages. Synchronous
+   rejection paths (biome, worldborder, stale guard, vert.adjust returning
+   `null`) re-enter `runAttempt` through a per-task trampoline — a
+   `volatile boolean inRunAttempt` flag toggled around the top of the
+   state-machine loop — so that a CF callback which resolves on the current
+   thread (the common case when the platform adapter returns a completed
+   future) does not grow the stack or schedule a redundant scheduler hop.
+   When a CF resolves on a different thread after the loop has returned,
+   the callback invokes `PregenTask.run()` on that thread, starting a fresh
+   iteration. The deprecated static `LocationGenerator.getLocation(...)`
+   methods are sync shims that `.get(60s)` on the async future for
+   backward compatibility with the test suite and the
+   `ENQUEUE_TRACE LocationGenerator taking UNQUEUED fast-path` internal
+   caller; `FoliaLocationGenerator` collapses to an inheritance-only
+   subclass of the unified core generator, which routes its scheduler
+   calls through `RTP.serverAccessor.getScheduler()` (Folia's adapter
+   implementation picks up `runTaskAsynchronously` without a separate
+   state machine).
 
 ## Consequences
 
@@ -96,15 +182,41 @@ Count-Bound-scheduled callback:
 - ADR-004 "Count-Bound Task Pipe on Folia".
 - ADR-012 "Chunk Reservation Abstraction".
 - Implementation:
-  - `rtp-api`: `RTPWorld.isChunkLoaded(int, int)`.
-  - `rtp-core`: `LocationGenerator.getLocation(...)` — stale-chunk guards at the
-    two `safetyCheck` entry points and pre-`vert.adjust`.
-  - `rtp-folia`: `FoliaLocationGenerator.LocationSearchTask` Region-Thread
-    callback — bounded re-queue via `SafetyKeys.staleChunkRetryLimit`.
+  - `rtp-api`: `RTPWorld.isChunkLoaded(int, int)`; `RTPWorld.setForceLoaded`
+    and the abstract `RTPWorld.setForceLoadedImpl` return
+    `CompletableFuture<Void>`; `RTPWorld.ticketApplyFutures` tracks the
+    in-flight apply future per chunk key so ref-counted no-op callers
+    receive the same future that resolves the initial apply.
+  - `rtp-api`: `ChunkReservation` captures the apply future on construction
+    and exposes `readyFuture()` / `awaitReady(long, TimeUnit)`.
+  - `rtp-core`: `LocationGenerator` / `PregenState` / `PregenTask` /
+    `QueueTask` — unified non-blocking state machine. Stale-chunk guards at
+    the two `safetyCheck` entry points and pre-`vert.adjust`, with
+    `reservation.readyFuture().orTimeout(2, SECONDS).whenComplete(...)`
+    bracketing the pre-`vert.adjust` guard on the pregen path; timeout
+    attributes to `FailTypes.timeout / reason=ticketApplyTimeout`. The
+    per-task trampoline (`volatile boolean inRunAttempt`) prevents
+    stack growth on synchronous rejection chains.
+  - `rtp-folia`: `FoliaLocationGenerator` — inheritance-only subclass of
+    `LocationGenerator`; scheduler routing is provided by the Folia
+    platform adapter's `RTPScheduler` implementation.
   - `rtp-spigot` / `rtp-folia`: `BukkitRTPWorld.isChunkLoaded` and
     `FoliaRTPWorld.isChunkLoaded` delegate to native
-    `World#isChunkLoaded(int, int)`.
-- Test: `rtp-core` `ReqRtpS005StaleChunkGuardTest` — simulates Folia native
-  GC via `MockRTPWorld.isChunkLoadedPredicate` and asserts that
-  `MockRTPChunk.isSafe` is never invoked when the guard trips.
+    `World#isChunkLoaded(int, int)`; `BukkitRTPWorld.setForceLoadedImpl`
+    completes the apply future from inside the `Bukkit.getScheduler().runTask`
+    lambda (primary-thread path completes immediately);
+    `FoliaRTPWorld.setForceLoadedImpl` completes inside the Global Region
+    Scheduler lambda.
+- Tests:
+  - `rtp-core` `ReqRtpS005StaleChunkGuardTest` — simulates Folia native
+    GC via `MockRTPWorld.isChunkLoadedPredicate` and asserts that
+    `MockRTPChunk.isSafe` is never invoked when the guard trips.
+  - `rtp-core` `ReqRtpS005PaperStaleGuardFalsePositiveTest` — verifies that
+    a `ChunkReservation` with a synchronous apply pins the chunk across the
+    guard check (pinning-semantics baseline).
+  - `rtp-core` `ReqRtpS005PaperTicketApplicationRaceTest` — installs a
+    deferred-apply mock world whose `setForceLoadedImpl` returns an
+    incomplete future drained by a background "primary-thread simulator";
+    asserts that `reservation.awaitReady(...)` bridges the race and that
+    `MockRTPChunk.isSafe` runs only after the deferred apply has fired.
 - Configuration: `safety.yml` `staleChunkRetryLimit` (default `2`).
