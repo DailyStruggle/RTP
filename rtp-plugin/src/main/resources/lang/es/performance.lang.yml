@@ -1,0 +1,23 @@
+# --- Mapeo de Idioma: performance.yml ---
+# Asigna las claves internas (izquierda) a los nombres visibles para el
+# usuario en performance.yml (derecha). Modifica únicamente el lado derecho
+# para renombrar o traducir una opción; el lado izquierdo es una constante de
+# código y no debe cambiarse.
+# Si este archivo falta, el plugin lo regenera con pares idénticos
+# izquierda/derecha (los valores por defecto en inglés).
+
+period: periodo
+viewDistanceSelect: distanciaVistaSeleccion
+biomeRecall: recuerdoBioma
+version: version
+maxAttempts: intentosMaximos
+biomeRecallForced: recuerdoBiomaForzado
+onEventParsing: analisisAlEvento
+checkOnChunkLoads: verificarEnCargaChunk
+postTeleportQueueing: encolarPostTeletransporte
+syncLoading: cargaSincrona
+effectParsing: analisisEfectos
+viewDistanceTeleport: distanciaVistaTeletransporte
+minTPS: tpsMinimo
+syncAllottedTime: tiempoAsignadoSincrono
+asyncAllottedTime: tiempoAsignadoAsincrono

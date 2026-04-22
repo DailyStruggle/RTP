@@ -3,6 +3,10 @@ package io.github.dailystruggle.rtp.api.world;
 import org.checkerframework.checker.mustcall.qual.InheritableMustCall;
 import org.checkerframework.checker.mustcall.qual.Owning;
 
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
 /**
  * A deterministic {@link AutoCloseable} lifecycle wrapper that ties a {@link ChunkSet}'s
  * force-loaded ticket to a bounded scope.
@@ -34,6 +38,13 @@ public class ChunkReservation implements AutoCloseable {
   private final @Owning ChunkSet chunkSet;
   private final RTPWorld<?> world;
   private boolean transferred = false;
+  /**
+   * The future returned by the initial {@code keep(true)} invocation. Completes when the
+   * underlying platform call ({@code addPluginChunkTicket}) has actually been applied.
+   * Callers on off-thread contexts must {@link #awaitReady(long, TimeUnit)} before relying
+   * on the chunk being pinned (ADR-015 Paper chunk-system-v2 follow-up).
+   */
+  private final CompletableFuture<Void> applyFuture;
 
   /**
    * Secure chunk tickets upon reservation.
@@ -46,7 +57,8 @@ public class ChunkReservation implements AutoCloseable {
   public ChunkReservation(@Owning ChunkSet chunkSet, RTPWorld<?> world) {
     this.chunkSet = chunkSet;
     this.world = world;
-    this.keep(true);
+    CompletableFuture<Void> f = world.setForceLoaded(chunkSet.getX(), chunkSet.getZ(), true);
+    this.applyFuture = (f != null) ? f : CompletableFuture.completedFuture(null);
   }
 
   /**
@@ -56,6 +68,47 @@ public class ChunkReservation implements AutoCloseable {
    */
   public void keep(boolean keep) {
     world.setForceLoaded(chunkSet.getX(), chunkSet.getZ(), keep);
+  }
+
+  /**
+   * Returns the future that completes when the initial {@code addPluginChunkTicket} call has
+   * actually been applied on the underlying platform. Callers on off-thread contexts must
+   * await this before relying on the chunk being pinned.
+   *
+   * <p>ADR-015 Paper chunk-system-v2 follow-up: on the Bukkit/Paper adapter the raw
+   * {@code addPluginChunkTicket} call is scheduled onto the primary thread when invoked
+   * off-thread. Before this follow-up, the location generator would return from
+   * {@code new ChunkReservation(...)} before the ticket was actually applied and the stale-
+   * chunk guard (REQ-RTP-S-005) would then reject the still-not-pinned chunk.</p>
+   *
+   * @return the apply future; never {@code null}
+   */
+  public CompletableFuture<Void> readyFuture() {
+    return applyFuture;
+  }
+
+  /**
+   * Blocks the current thread (up to {@code timeout}) until the initial ticket application
+   * has been confirmed. This is a bounded wait and MUST NOT be called on any tick thread
+   * (REQ-RTP-S-005 prohibits blocking on tick threads, but scheduler / async threads are
+   * permitted).
+   *
+   * @param timeout the maximum time to wait
+   * @param unit    the time unit of the {@code timeout} argument
+   * @return {@code true} if the ticket application completed within the timeout;
+   *         {@code false} if the wait timed out (the caller SHOULD treat this as a
+   *         ticket-apply failure and reject the candidate)
+   * @throws InterruptedException if the current thread was interrupted while waiting
+   */
+  public boolean awaitReady(long timeout, TimeUnit unit) throws InterruptedException {
+    try {
+      applyFuture.get(timeout, unit);
+      return true;
+    } catch (TimeoutException te) {
+      return false;
+    } catch (java.util.concurrent.ExecutionException ee) {
+      return false;
+    }
   }
 
   /**

@@ -1,0 +1,61 @@
+# --- Configuración principal de RTP ---
+
+# Idioma para los mensajes visibles al jugador.
+# Predeterminado: "en" (inglés base incluido en messages.yml).
+# Otras traducciones disponibles residen en lang/<locale>/messages.yml y se
+# cargan como una capa sobre el inglés base. Las claves ausentes en el archivo
+# de idioma vuelven silenciosamente al inglés. Un idioma desconocido genera
+# una advertencia y también vuelve al inglés.
+# Véase ADR-020 y REQ-RTP-F-013.
+language: "en"
+
+# Retraso del teletransporte (segundos)
+# Tiempo que el jugador debe esperar antes de que se realice el teletransporte.
+# A veces le da tiempo al servidor para precargar los chunks de destino.
+retrasoTeletransporte: 2
+
+# Cancelación por movimiento (bloques)
+# Si el jugador se mueve más de esta distancia durante el retraso, el
+# teletransporte se cancela. Establece -1 para desactivarlo.
+distanciaCancelar: 2
+
+# Tiempo de espera entre teletransportes (segundos)
+# Tiempo que el jugador debe esperar entre usos exitosos de RTP.
+enfriamientoTeletransporte: 300
+
+# Comandos posteriores al teletransporte
+# Lista de comandos a ejecutar tras un teletransporte exitoso.
+# El marcador [player] representa el nombre del jugador.
+comandosConsola: [
+  - "say ¡[player] acaba de teletransportarse aleatoriamente!"
+]
+comandosJugador: [
+  - ""
+]
+
+# --- Configuración de la base de datos ---
+# Dónde almacenar ubicaciones en caché y datos de los jugadores.
+baseDeDatos:
+  # Tipos disponibles: yaml, sqlite, mysql, postgresql
+  # - yaml/sqlite: archivos locales (sin configuración adicional)
+  # - mysql/postgresql: base de datos remota (requiere credenciales abajo)
+  type: "sqlite"
+
+  # Credenciales de base de datos en red (ignoradas para tipos locales)
+  host: "127.0.0.1"
+  port: 3306
+  name: "rtp"
+  username: "root"
+  password: "password"
+
+# --- Red y sincronización ---
+# Redis se utiliza para sincronizar ubicaciones en caché entre varios servidores.
+red:
+  redis:
+    enabled: false
+    host: "127.0.0.1"
+    port: 6379
+    password: ""
+
+# NO MODIFIQUES EL NÚMERO DE VERSIÓN
+version: "3.0"

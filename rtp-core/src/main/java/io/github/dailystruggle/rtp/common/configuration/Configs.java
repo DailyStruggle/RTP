@@ -207,13 +207,18 @@ public class Configs {
             new ConfigParser<>(LoggingKeys.class, "logging.yml", "1.0", pluginDirectory, fileDatabase);
     newConfigParserMap.put(LoggingKeys.class, logging);
 
+    ConfigParser<ConfigKeys> config =
+            new ConfigParser<>(ConfigKeys.class, "config.yml", "3.0", pluginDirectory, fileDatabase);
+    newConfigParserMap.put(ConfigKeys.class, config);
+
     ConfigParser<MessagesKeys> lang =
             new ConfigParser<>(MessagesKeys.class, "messages.yml", "1.0", pluginDirectory, fileDatabase);
     newConfigParserMap.put(MessagesKeys.class, lang);
 
-    ConfigParser<ConfigKeys> config =
-            new ConfigParser<>(ConfigKeys.class, "config.yml", "3.0", pluginDirectory, fileDatabase);
-    newConfigParserMap.put(ConfigKeys.class, config);
+    // REQ-RTP-F-013 / ADR-020: lazy locale overlay. No-op for "en" or missing key.
+    Object localeRaw = config.getConfigValue(ConfigKeys.language, "en");
+    String locale = (localeRaw == null) ? "en" : localeRaw.toString().trim();
+    LocaleOverlay.apply(lang, pluginDirectory, locale);
 
     ConfigParser<EconomyKeys> economy =
             new ConfigParser<>(EconomyKeys.class, "economy.yml", "1.0", pluginDirectory, fileDatabase);

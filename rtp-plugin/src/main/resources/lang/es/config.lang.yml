@@ -1,0 +1,16 @@
+# --- Mapeo de Idioma: config.yml ---
+# Asigna las claves internas (izquierda) a los nombres visibles para el
+# usuario en config.yml (derecha). Modifica únicamente el lado derecho para
+# renombrar o traducir una opción; el lado izquierdo es una constante de
+# código y no debe cambiarse.
+# Si este archivo falta, el plugin lo regenera con pares idénticos
+# izquierda/derecha (los valores por defecto en inglés).
+
+database: baseDeDatos
+playerCommands: comandosJugador
+teleportCooldown: enfriamientoTeletransporte
+cancelDistance: distanciaCancelar
+teleportDelay: retrasoTeletransporte
+consoleCommands: comandosConsola
+version: version
+network: red

@@ -103,7 +103,7 @@ public final class AnvilPrefilter {
    * is enough to surface "0 Anvil hits" root causes to operators without
    * sustained spam; once the cap is reached further emissions drop to FINE.
    */
-  private static final int DIAG_LOG_BUDGET_PER_REASON = 200;
+  private static final int DIAG_LOG_BUDGET_PER_REASON = 5;
 
   private static final ConcurrentHashMap<String, AtomicInteger> DIAG_LOG_COUNTERS =
       new ConcurrentHashMap<>();
@@ -303,11 +303,21 @@ public final class AnvilPrefilter {
         }
       }
       return new ProbeResult(Verdict.ACCEPT, view);
+    } catch (CorruptRegionEntryException e) {
+      // Known failure type: a single chunk entry in the region file is corrupt or
+      // truncated (e.g. location-table pointer spans past EOF, implausible declared
+      // length, region buffer shorter than header). The live load path handles this
+      // transparently, so log it at INFO via the same rate-limited diag channel used
+      // for other UNKNOWN:* outcomes — no stacktrace needed.
+      diagLog("UNKNOWN:corrupt-region-entry(" + e.getMessage() + ")",
+          worldFolder, dimensionSubpath, cx, cz);
+      return new ProbeResult(Verdict.UNKNOWN, null);
     } catch (IOException | RuntimeException e) {
-      // Any decode failure falls through to the live load path. Intentional: we never
-      // want the pre-filter to be load-bearing for correctness. Logged at WARNING so
-      // operators can tell a real mca read failure apart from a legitimate
-      // "chunk not yet persisted" UNKNOWN (see rtp-anvil/AGENTS notes on S-004 spirit).
+      // Any other decode failure falls through to the live load path. Intentional: we
+      // never want the pre-filter to be load-bearing for correctness. Logged at WARNING
+      // with stacktrace so operators can tell a real mca read failure apart from a
+      // legitimate "chunk not yet persisted" UNKNOWN (see rtp-anvil/AGENTS notes on
+      // S-004 spirit).
       LOG.log(Level.WARNING,
           "[RTP] Anvil probe failed for world=" + worldFolder
               + " dim=\"" + dimensionSubpath + "\" chunk=(" + cx + "," + cz

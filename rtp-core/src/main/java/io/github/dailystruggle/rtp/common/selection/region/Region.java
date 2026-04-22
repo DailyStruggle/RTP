@@ -368,7 +368,19 @@ public class Region extends FactoryValue<RegionKeys> {
       for (int i = 0; i < onPlayerQueuePop.size(); i++) {
         onPlayerQueuePop.get(i).accept(this, playerId);
       }
+    }
 
+    // Broadcast queue-update to every remaining queued player exactly once
+    // per pulse, regardless of whether a pop happened this tick. Previously
+    // this broadcast was nested inside the pop loop above, which meant queued
+    // players received no position update whenever the pop loop broke early
+    // (empty kept queue, or front player's chunks not yet loaded — lines
+    // guarded by the two `break` statements above). Regular players (Type A:
+    // no rtp.unqueued) were left in the queue silently with stale
+    // TeleportData.queueLocation and no visible feedback until a successful
+    // pop eventually occurred — contradicting the "placed on queue / queue
+    // position changed" messaging contract.
+    {
       Iterator<UUID> iterator = queueManager.playerQueue.iterator();
       int i = 0;
       while (iterator.hasNext()) {
@@ -382,18 +394,22 @@ public class Region extends FactoryValue<RegionKeys> {
           data.completed = false;
           data.sender = RTP.serverAccessor.getSender(CommandsAPI.serverId);
           data.time = System.currentTimeMillis();
-          data.delay = sender.delay();
+          data.delay = 0;
           data.targetRegion = this;
-          data.originalCoords =
-                  new RTPCoords(
-                          player.getLocation().world().name(),
-                          player.getLocation().x(),
-                          player.getLocation().y(),
-                          player.getLocation().z());
           RTP.getInstance().latestTeleportData.put(id, data);
         }
+        long previousSpot = data.queueLocation;
         data.queueLocation = i;
-        RTP.serverAccessor.sendMessage(id, MessagesKeys.queueUpdate);
+        // Only emit a message if the spot actually changed (player was just
+        // enqueued with queueLocation==size, or the line shifted). The
+        // enqueue-time emission in QueueTask.enqueueAndComplete() already
+        // covers the initial placement; this pulse emission covers
+        // subsequent position changes. Always emitting every pulse would
+        // spam the player with identical spot numbers while the queue is
+        // stalled.
+        if (previousSpot != i) {
+          RTP.serverAccessor.sendMessage(id, MessagesKeys.queueUpdate);
+        }
       }
     }
 

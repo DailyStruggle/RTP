@@ -1,0 +1,19 @@
+# --- Mapeo de Idioma: regions/*.yml ---
+# Asigna las claves internas de región (izquierda) a los nombres visibles
+# para el usuario utilizados en todos los archivos bajo `regions/` (derecha).
+# Modifica únicamente el lado derecho para renombrar o traducir una opción;
+# el lado izquierdo es una constante de código y no debe cambiarse.
+# Si este archivo falta, el plugin lo regenera con pares idénticos
+# izquierda/derecha (los valores por defecto en inglés).
+
+world: mundo
+worldBorderOverride: sobrescribirBordeMundo
+shape: forma
+vert: vertical
+requirePermission: requerirPermiso
+cacheCap: limiteCache
+activeChunkCap: limiteChunkActivo
+price: precio
+spatialResolution: resolucionEspacial
+override: sobrescribir
+version: version

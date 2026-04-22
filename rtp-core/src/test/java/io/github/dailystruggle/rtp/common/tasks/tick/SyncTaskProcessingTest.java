@@ -27,9 +27,17 @@ class SyncTaskProcessingTest {
     @BeforeEach
     void setUp() {
         RTPTestSetup.install(tempDir);
-        // Ensure task pipes are clean before each test
+        // Ensure task pipes are clean before each test. Must call start() as
+        // well as clear() because prior tests that exercise the shutdown path
+        // (RTP.stop() -> miscSyncTasks.stop()) leave stop=true on the shared
+        // RTP.getInstance() pipes; TimeBoundTaskPipe.execute short-circuits
+        // on stop=true and would cause every runnable we add here to be
+        // silently skipped, producing spurious assertion failures under the
+        // full :rtp-core:test run (while passing in isolation).
         RTP.getInstance().cancelTasks.clear();
+        RTP.getInstance().cancelTasks.start();
         RTP.getInstance().miscSyncTasks.clear();
+        RTP.getInstance().miscSyncTasks.start();
     }
 
     // -----------------------------------------------------------------------

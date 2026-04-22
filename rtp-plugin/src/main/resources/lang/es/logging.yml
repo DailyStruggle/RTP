@@ -1,0 +1,35 @@
+# --- Registros del plugin ---
+# Activa o desactiva los registros de las distintas actividades del plugin.
+
+# Registros detallados del sistema
+# detailed_reload: registrar todos los archivos/secciones recargados
+# detailed_region_init: registrar la inicialización de cada región
+recarga_detallada: false
+inicio_region_detallado: false
+
+# Registros de actividad básica
+# command: registrar los comandos de RTP ejecutados por los jugadores
+# teleport: registrar los eventos de teletransporte reales
+comando: false
+teletransporte: true
+
+# Registros de RTP automáticos o por evento
+# Registros para RTP activados por eventos:
+evento_cambioMundo: true # Cuando el jugador cambia de mundo
+evento_union: true       # Cuando el jugador se une al servidor
+evento_reaparicion: true # Cuando el jugador reaparece
+evento_movimiento: true  # Cuando el jugador se mueve (si el RTP por movimiento está activo)
+evento_teletransporte: true # Cuando el jugador se teletransporta (si el RTP por teletransporte está activo)
+
+# Depuración de fallos de selección
+# Registra información detallada cuando la selección de una ubicación segura falla,
+# incluyendo las tasas de fallo y los parámetros de búsqueda.
+fallo_seleccion: true
+
+# Registros del sistema
+# Relacionados con tareas en segundo plano y operaciones de base de datos.
+sistema_rastreoMemoria: false
+sistema_baseDeDatos: false
+
+# NO MODIFIQUES EL NÚMERO DE VERSIÓN
+version: "1.0"

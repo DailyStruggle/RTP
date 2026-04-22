@@ -69,7 +69,7 @@ public final class AnvilReader {
      */
     public static ChunkEntry readChunk(byte[] regionBytes, int cx, int cz) throws IOException {
         if (regionBytes == null || regionBytes.length < SECTOR_SIZE * 2) {
-            throw new IOException("Region buffer too short: " + (regionBytes == null ? 0 : regionBytes.length));
+            throw new CorruptRegionEntryException("Region buffer too short: " + (regionBytes == null ? 0 : regionBytes.length));
         }
         if (cx < 0 || cx > 31 || cz < 0 || cz > 31) {
             throw new IllegalArgumentException("Region-local (cx,cz) out of range: (" + cx + "," + cz + ")");
@@ -89,7 +89,7 @@ public final class AnvilReader {
         int payloadStart = sectorOffset * SECTOR_SIZE;
         int payloadBudget = sectorCount * SECTOR_SIZE;
         if (payloadStart + payloadBudget > regionBytes.length) {
-            throw new IOException("Chunk entry (" + cx + "," + cz + ") spans past end of file: start="
+            throw new CorruptRegionEntryException("Chunk entry (" + cx + "," + cz + ") spans past end of file: start="
                     + payloadStart + " budget=" + payloadBudget + " fileLen=" + regionBytes.length);
         }
 
@@ -101,7 +101,7 @@ public final class AnvilReader {
                     "External-file compression flag (0x80) not supported for chunk (" + cx + "," + cz + ")");
         }
         if (declaredLength <= 0 || declaredLength - 1 > payloadBudget - 5) {
-            throw new IOException("Implausible declared chunk length " + declaredLength
+            throw new CorruptRegionEntryException("Implausible declared chunk length " + declaredLength
                     + " for (" + cx + "," + cz + "); sector budget=" + (payloadBudget - 5));
         }
         int compressedLen = declaredLength - 1;

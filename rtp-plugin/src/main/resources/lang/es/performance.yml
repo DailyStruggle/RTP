@@ -1,0 +1,80 @@
+# --- Configuración de rendimiento de RTP ---
+# Ajusta con precisión el plugin para el rendimiento del servidor.
+
+# Intentos máximos de búsqueda
+# Cuántas veces buscará el plugin una ubicación segura antes de detenerse.
+# Impacto: ALTO — valores elevados pueden aumentar mucho el uso de CPU por petición.
+intentosMaximos: 10
+
+# Precarga de destino (chunks)
+# Radio de chunks a precargar alrededor del destino.
+# Número de chunks cargados = ( 1 + 2 * radio )^2.
+# Impacto: ALTO — un valor demasiado alto puede causar caídas de TPS al teletransportar.
+distanciaVistaSeleccion: 0
+distanciaVistaTeletransporte: 0
+
+# Frecuencia de selección (ticks de juego)
+# Tiempo entre búsquedas de nuevas ubicaciones para rellenar las cachés de región.
+# ( 20 ticks = 1 segundo ).
+# Impacto: MEDIO — valores menores rellenan la caché más rápido pero usan más CPU.
+periodo: 100
+
+# Tiempo asignado por tarea (milisegundos)
+# Tiempo máximo (ms) que se dedica a tareas RTP por tick.
+# Rango: 0 - 50.
+# Impacto: MEDIO — valores altos permiten procesar más rápido a riesgo del tiempo de tick.
+tiempoAsignadoSincrono: 50
+tiempoAsignadoAsincrono: 50
+
+# Requisito mínimo de TPS
+# TPS mínimo del servidor antes de encolar una nueva ubicación para la caché.
+# Rango: 0.0 - 20.0.
+# Impacto: BAJO — evita que el plugin añada lag cuando el servidor va mal.
+tpsMinimo: 19.0
+
+# Encolado posterior al teletransporte
+# Si es true, el plugin intentará rellenar la caché de ubicaciones inmediatamente después de un RTP.
+# Impacto: MEDIO
+encolarPostTeletransporte: false
+
+# Carga síncrona
+# Usar carga síncrona de chunks para la selección de ubicaciones.
+# Impacto: ALTO — ¡NO RECOMENDADO! Puede provocar bloqueos importantes del servidor.
+cargaSincrona: false
+
+# Análisis de permisos (arranque)
+# onEventParsing: Incompatible con permisos amplios tipo *.*.
+# Impacto: MEDIO (onEvent) / BAJO (effect)
+analisisAlEvento: false
+analisisEfectos: true
+
+# Caché de selección de biomas
+# biomeRecall: Reutilizar ubicaciones previamente encontradas por bioma.
+# biomeRecallForced: Usar únicamente biomas ya descubiertos y almacenados en caché.
+# Impacto: BAJO a MEDIO
+recuerdoBioma: true
+recuerdoBiomaForzado: false
+
+# Comprobación pasiva de chunks
+# Busca ubicaciones seguras dentro de todos los chunks cargados dentro del rango de una región.
+# Impacto: ALTO — puede aumentar significativamente la carga del servidor en los eventos de carga de chunks.
+verificarEnCargaChunk: false
+
+# Modo de relleno de caché por observación (Region Data Visitor)
+# Cuando la caché de pregeneración está llena, se programa una única RegionCacheTask
+# de observación por región según el mismo `period` de relleno de caché. Reutiliza
+# el mismo pipeline de LocationGenerator que el relleno de caché predeterminado,
+# pero descarta el candidato seguro resultante en vez de encolarlo, de modo que
+# los efectos colaterales (registro de malas ubicaciones, cosecha de biomas
+# observados) se acumulan en segundo plano sin que la cola crezca más allá de su
+# tope. NUNCA activa la generación de mundo: los chunks que no estén ya en disco
+# se omiten mediante el pre-filtro Anvil de ADR-016 con veredicto UNKNOWN.
+# visitorEnabled: interruptor maestro (true activa el modo observación).
+# La cadencia se hereda del ajuste `period` de arriba; no hay un parámetro
+# de tasa separado.
+# Impacto: BAJO — limitado por el `period` existente; sólo hay trabajo cuando
+# la caché no tiene margen para rellenos en modo predeterminado.
+visitorEnabled: true
+
+# NO MODIFIQUES EL NÚMERO DE VERSIÓN
+version: "1.0"

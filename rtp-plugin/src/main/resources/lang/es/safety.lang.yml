@@ -1,0 +1,19 @@
+# --- Mapeo de Idioma: safety.yml ---
+# Asigna las claves internas (izquierda) a los nombres visibles para el
+# usuario en safety.yml (derecha). Modifica únicamente el lado derecho para
+# renombrar o traducir una opción; el lado izquierdo es una constante de
+# código y no debe cambiarse.
+# Si este archivo falta, el plugin lo regenera con pares idénticos
+# izquierda/derecha (los valores por defecto en inglés).
+
+safetyRadius: radioSeguridad
+biomeWhitelist: listaPermitidaBiomas
+airBlocks: bloquesAire
+biomes: biomas
+unsafeBlocks: bloquesInseguros
+platformRadius: radioPlataforma
+platformAirHeight: alturaAirePlataforma
+platformMaterial: materialPlataforma
+invulnerabilityTime: tiempoInvulnerabilidad
+version: version
+platformDepth: profundidadPlataforma
