@@ -139,75 +139,91 @@ final class QueueTask {
 
         ChunkReservation preReservation = pair.reservation();
         if (preReservation != null) {
-            // Pre-acquired reservation from the queue: skip probe-first + ticket allocation.
-            ChunkSet ticket = preReservation.getChunkSet();
-            evaluateLoadedChunk(pair, left, world, cx, cz, ticket, preReservation, /*temporary*/ false, /*resolvedKey*/ null);
+            // Pre-acquired reservation from the queue: chunk is already loaded + pinned.
+            Long resolvedKey = null;
+            try {
+                resolvedKey = preReservation.getChunkSet().chunks().get(0).getNow(null);
+            } catch (Throwable ignored) { /* fall through to resolve via getCachedChunk */ }
+            RTPChunk<?> cachedChunk = (resolvedKey != null) ? world.getCachedChunk(resolvedKey) : null;
+            if (cachedChunk != null) {
+                afterChunkResolved(pair, left, world, cx, cz, cachedChunk, preReservation);
+            } else {
+                // Unusual: reservation held but chunk not in cache. Use probe + livefallback.
+                world.getOrLoadChunk(cx, cz)
+                        .orTimeout(5, TimeUnit.SECONDS)
+                        .whenComplete((chunk, ex) -> afterChunkResolved(pair, left, world, cx, cz,
+                                (ex == null) ? chunk : null, preReservation));
+            }
             return;
         }
 
-        // ADR-016 §11 probe-first ordering.
-        world.getChunkAt(cx, cz)
+        // ADR-016 §13.1 probe-first via getOrLoadChunk traffic-cop.
+        // Anvil-backed candidates run inline with no reservation; live-backed
+        // candidates allocate a reservation and dispatch to the region thread.
+        world.getOrLoadChunk(cx, cz)
                 .orTimeout(5, TimeUnit.SECONDS)
-                .whenComplete((probeKey, probeEx) -> {
-                    Long pk = (probeEx == null) ? probeKey : null;
-                    RTPChunk<?> probed = (pk != null) ? world.getCachedChunk(pk) : null;
-                    if (probed != null) {
-                        // Anvil / view hit: synthesise an empty ChunkSet and a temporary reservation.
-                        ChunkSet ticket = new ChunkSet(
-                                world, cx, cz,
-                                Collections.singletonList(CompletableFuture.completedFuture(pk)),
-                                new CompletableFuture<>());
-                        ChunkReservation reservation = new ChunkReservation(ticket, world);
-                        evaluateLoadedChunk(pair, left, world, cx, cz, ticket, reservation, /*temporary*/ true, pk);
+                .whenComplete((chunk, ex) -> {
+                    if (ex != null || chunk == null) {
+                        if (ex != null) {
+                            RTP.log(Level.WARNING,
+                                    "[RTP] QueueTask getOrLoadChunk failed for world=" + world.name()
+                                            + " chunk=(" + cx + "," + cz + "): "
+                                            + ex.getClass().getSimpleName() + ": " + ex.getMessage());
+                        }
+                        result.complete(new GenerationResult(null, 1, null));
                         return;
                     }
-                    // No probe hit: fall through to live-load.
-                    world.getChunkAtAsync(cx, cz).whenComplete((ticket, liveEx) -> {
-                        if (liveEx != null || ticket == null) {
-                            RTP.log(Level.WARNING, (liveEx != null ? liveEx.getMessage() : "null live ticket"), liveEx);
+                    if (chunk.isSelfContained()) {
+                        // Anvil branch: no reservation, no region-thread hop.
+                        afterChunkResolved(pair, left, world, cx, cz, chunk, /*reservation*/ null);
+                        return;
+                    }
+                    // Live branch: allocate reservation, await ticket apply, dispatch to region thread.
+                    long chunkKey = ((long) cx & 0xffffffffL) | ((long) cz << 32);
+                    ChunkSet ticket = new ChunkSet(
+                            world, cx, cz,
+                            Collections.singletonList(CompletableFuture.completedFuture(chunkKey)),
+                            new CompletableFuture<>());
+                    ChunkReservation reservation = new ChunkReservation(ticket, world);
+                    reservation.readyFuture().orTimeout(2, TimeUnit.SECONDS).whenComplete((v, tex) -> {
+                        if (tex != null) {
+                            RTP.log(Level.WARNING,
+                                    "[RTP] QueueTask ticket apply did not complete within 2s ("
+                                            + world.name() + " " + cx + "," + cz + ")");
+                            reservation.close();
                             result.complete(new GenerationResult(null, 1, null));
                             return;
                         }
-                        ChunkReservation reservation = new ChunkReservation(ticket, world);
-                        evaluateLoadedChunk(pair, left, world, cx, cz, ticket, reservation, /*temporary*/ true, null);
+                        io.github.dailystruggle.rtp.api.world.RTPLocation targetLoc =
+                                new io.github.dailystruggle.rtp.api.world.RTPLocation(
+                                        world, (cx << 4) + 8, 0, (cz << 4) + 8);
+                        try {
+                            RTP.serverAccessor.getScheduler().runTask(targetLoc, () -> {
+                                try {
+                                    if (!world.isChunkLoaded(cx, cz)) {
+                                        RTP.log(Level.FINE,
+                                                "[RTP] Stale chunk on QueueTask region-thread dispatch ("
+                                                        + world.name() + " " + cx + "," + cz + "); rejecting.");
+                                        reservation.close();
+                                        finishRejected(null);
+                                        return;
+                                    }
+                                    afterChunkResolved(pair, left, world, cx, cz, chunk, reservation);
+                                } catch (Throwable t) {
+                                    RTP.log(Level.WARNING,
+                                            "[RTP] QueueTask region-thread evaluation threw: " + t, t);
+                                    reservation.close();
+                                    finishRejected(null);
+                                }
+                            });
+                        } catch (Throwable t) {
+                            RTP.log(Level.WARNING,
+                                    "[RTP] QueueTask failed to dispatch region-thread evaluation: " + t, t);
+                            reservation.close();
+                            finishRejected(null);
+                        }
                     });
                 });
-    }
-
-    @SuppressWarnings("unchecked")
-    private void evaluateLoadedChunk(
-            RTPLocation pair,
-            RTPCoords left,
-            RTPWorld<?> world,
-            int cx,
-            int cz,
-            ChunkSet ticket,
-            ChunkReservation reservation,
-            boolean temporaryReservation,
-            @Nullable Long resolvedKey) {
-        // Resolve the center chunk from the ticket (or reuse a probe-hit key).
-        CompletableFuture<Long> keyFuture;
-        if (resolvedKey != null) {
-            keyFuture = CompletableFuture.completedFuture(resolvedKey);
-        } else {
-            keyFuture = ticket.chunks().get(0);
-        }
-        keyFuture.orTimeout(5, TimeUnit.SECONDS).whenComplete((key, ex) -> {
-            RTPChunk<?> chunk = (ex == null && key != null) ? world.getCachedChunk(key) : null;
-            if (chunk == null) {
-                // Secondary probe: matches the prior fallback on null cached chunk.
-                world.getChunkAt(cx, cz)
-                        .orTimeout(5, TimeUnit.SECONDS)
-                        .whenComplete((fallbackKey, fex) -> {
-                            RTPChunk<?> fb = (fex == null && fallbackKey != null)
-                                    ? world.getCachedChunk(fallbackKey)
-                                    : null;
-                            afterChunkResolved(pair, left, world, cx, cz, fb, reservation);
-                        });
-                return;
-            }
-            afterChunkResolved(pair, left, world, cx, cz, chunk, reservation);
-        });
     }
 
     @SuppressWarnings("unchecked")
@@ -218,7 +234,7 @@ final class QueueTask {
             int cx,
             int cz,
             @Nullable RTPChunk<?> chunk,
-            ChunkReservation reservation) {
+            @Nullable ChunkReservation reservation) {
 
         boolean pass = chunk != null;
 
@@ -269,14 +285,10 @@ final class QueueTask {
         final RTPChunk<?>[] localChunks = new RTPChunk<?>[L * L];
         localChunks[safe * L + safe] = chunk;
 
-        boolean centerStillLoaded = world.isChunkLoaded(cx, cz);
-        if (!centerStillLoaded) {
-            RTP.log(Level.FINE,
-                    "[RTP] Stale center chunk on safetyCheck entry ("
-                            + world.name() + " " + cx + "," + cz + "); rejecting candidate.");
-            finishRejected(reservation);
-            return;
-        }
+        // ADR-015 Folia-follow-up: no redundant stale-guard here. Live-backed
+        // branch already guarded on the region thread in handlePair; anvil-
+        // backed branch has no live chunk to race. A post-dispatch race
+        // surfaces organically when neighbour getCachedChunk returns null.
 
         // Pre-load all needed neighbour chunks async.
         Set<Long> neighbourKeys = new LinkedHashSet<>();
@@ -387,13 +399,30 @@ final class QueueTask {
                         finishRejected(reservation);
                         return;
                     }
-                    // SUCCESS: transfer ownership of the reservation's chunkSet via GenerationResult.
-                    ChunkSet transferred = reservation.transferOwnership();
+                    // SUCCESS: for the live-backed branch, transfer ownership
+                    // of the reservation's chunkSet via GenerationResult. For
+                    // the anvil-backed branch (reservation==null), synthesise
+                    // a fresh view-distance ChunkSet from anvil probes.
+                    ChunkSet transferred;
+                    if (reservation != null) {
+                        transferred = reservation.transferOwnership();
+                    } else {
+                        int ccx = left.x() >> 4;
+                        int ccz = left.z() >> 4;
+                        int radius = 1; // minimal view-distance analog for anvil branch
+                        List<CompletableFuture<Long>> vd = new ArrayList<>();
+                        for (int dx = -radius; dx <= radius; dx++) {
+                            for (int dz = -radius; dz <= radius; dz++) {
+                                vd.add(world.getChunkAt(ccx + dx, ccz + dz));
+                            }
+                        }
+                        transferred = new ChunkSet(world, ccx, ccz, vd, new CompletableFuture<>());
+                    }
                     result.complete(new GenerationResult(left, fpair.attempts(), transferred, reservation));
                 });
     }
 
-    private void finishRejected(ChunkReservation reservation) {
+    private void finishRejected(@Nullable ChunkReservation reservation) {
         if (reservation != null) {
             try {
                 reservation.close();

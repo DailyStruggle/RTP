@@ -124,7 +124,18 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
       RTP.selectionAPI.permRegionLookup.clear();
       for (ConfigParser<RegionKeys> regionConfig : regions.configParserFactory.map.values()) {
         RegionSettings settings = RegionConfigLoader.load(regionConfig);
-        Region region = new Region(settings.name(), settings);
+        String configuredWorldName =
+            RegionConfigLoader.detectFallbackConfiguredWorld(regionConfig, settings);
+        boolean worldFallback = configuredWorldName != null;
+        if (worldFallback) {
+          RTP.log(
+              java.util.logging.Level.INFO,
+              "[RTP] Region '" + settings.name() + "' configured for world '"
+                  + configuredWorldName
+                  + "' which isn't loaded yet; region is dormant and will activate when the "
+                  + "world loads.");
+        }
+        Region region = new Region(settings.name(), settings, worldFallback, configuredWorldName);
         RTP.selectionAPI.permRegionLookup.put(region.name, region);
       }
     } else if (parser.myClass.equals(WorldKeys.class)) {

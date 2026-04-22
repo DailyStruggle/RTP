@@ -64,6 +64,28 @@ final class PregenTask implements Runnable {
         }
     }
 
+    /**
+     * Record a per-attempt outcome breadcrumb in {@link PregenState#attemptOutcomes}.
+     * Always runs regardless of {@code verbose}, so a failing log always reveals the
+     * code path even if the {@code failMap} bucketing is ambiguous.
+     */
+    private void recordOutcome(String name) {
+        try {
+            state.attemptOutcomes.add("attempt=" + i + " outcome=" + name);
+        } catch (Throwable ignored) {
+            // best-effort breadcrumb; never let diagnostics break the pipeline
+        }
+    }
+
+    /**
+     * Null-safe reservation close. Anvil-backed candidates evaluate with
+     * {@code reservation == null}; live-backed candidates hold a non-null
+     * reservation that must be released on every exit path.
+     */
+    private static void closeIfPresent(@org.jetbrains.annotations.Nullable ChunkReservation reservation) {
+        if (reservation != null) reservation.close();
+    }
+
     /** Continue the current attempt inline (no scheduler hop). */
     private void continueInline(Runnable r) {
         try {
@@ -167,6 +189,7 @@ final class PregenTask implements Runnable {
                 state.failMap.get(LocationGenerator.FailTypes.worldBorder)
                         .put("OUTSIDE_BORDER", state.worldBorderFails);
             }
+            recordOutcome("worldBorder/OUTSIDE_BORDER");
             rescheduleNextAttempt();
             return;
         }
@@ -175,74 +198,85 @@ final class PregenTask implements Runnable {
         int cz = select[1];
         final long finalL = l;
 
-        // --- probe-first (ADR-016 §11) ---
-        CompletableFuture<Long> probeFuture = state.world.getChunkAt(cx, cz);
-        probeFuture.orTimeout(5, TimeUnit.SECONDS).whenComplete((probeKey, probeEx) -> {
-            Long pk = probeEx == null ? probeKey : null;
-            RTPChunk<?> probedChunk = (pk != null) ? state.world.getCachedChunk(pk) : null;
-            continueInline(() -> onProbeResolved(cx, cz, finalL, pk, probedChunk));
-        });
+        // --- probe-first via ADR-016 §13.1 precedence chain (cached → anvil → live) ---
+        requestChunk(cx, cz, finalL, /*staleRetries*/ 0);
     }
 
-    private void onProbeResolved(int cx, int cz, long finalL, Long probeKey, RTPChunk<?> probedChunk) {
-        if (probedChunk != null) {
-            // Anvil / view hit: synthesise a ticket for the downstream reservation and continue.
-            onChunkLoaded(cx, cz, finalL, probeKey, /*ticket*/ null, probedChunk);
+    /**
+     * Request the candidate chunk via {@link RTPWorld#getOrLoadChunk(int, int)}.
+     * The returned chunk's {@link RTPChunk#isSelfContained()} flag is the traffic-cop
+     * signal: Anvil-backed chunks stay on the current async thread (thread-safe reads),
+     * live-backed chunks allocate a {@link ChunkReservation} and dispatch block
+     * evaluation to the region-owning thread via
+     * {@link io.github.dailystruggle.rtp.api.scheduling.RTPScheduler#runTask(io.github.dailystruggle.rtp.api.world.RTPLocation, Runnable)}.
+     * On a stale-chunk detection inside the region-thread dispatch, re-request up to
+     * {@link PregenState#staleChunkRetryLimit} times before advancing the spiral index.
+     */
+    private void requestChunk(int cx, int cz, long finalL, int staleRetries) {
+        state.world.getOrLoadChunk(cx, cz)
+                .orTimeout(5, TimeUnit.SECONDS)
+                .whenComplete((chunk, ex) -> {
+                    if (ex != null) {
+                        RTP.log(Level.WARNING,
+                                "[RTP] getOrLoadChunk failed for world=" + state.world.name()
+                                        + " chunk=(" + cx + "," + cz + "): "
+                                        + ex.getClass().getSimpleName() + ": " + ex.getMessage());
+                        if (state.verbose) {
+                            state.failMap.get(LocationGenerator.FailTypes.nullChunk)
+                                    .compute("reason=ticketFailed", (s, a) -> (a == null) ? 1L : ++a);
+                        }
+                        recordOutcome("nullChunk/ticketFailed");
+                        continueInline(this::rescheduleNextAttempt);
+                        return;
+                    }
+                    if (chunk == null) {
+                        if (state.verbose) {
+                            state.failMap.get(LocationGenerator.FailTypes.nullChunk)
+                                    .compute("reason=asyncLoadNull", (s, a) -> (a == null) ? 1L : ++a);
+                        }
+                        recordOutcome("nullChunk/asyncLoadNull chunk=(" + cx + "," + cz + ")");
+                        continueInline(this::rescheduleNextAttempt);
+                        return;
+                    }
+                    continueInline(() -> onChunkResolved(cx, cz, finalL, chunk, staleRetries));
+                });
+    }
+
+    /**
+     * Traffic-cop entry point: branch on {@link RTPChunk#isSelfContained()}.
+     * <ul>
+     *   <li><b>Anvil-backed</b> ({@code isSelfContained==true}): no live chunk
+     *       state is touched; evaluate inline on the current async worker with
+     *       {@code reservation=null}. No ticket application needed, no stale
+     *       guard needed (Anvil snapshots do not race against server GC).</li>
+     *   <li><b>Live-backed</b>: allocate a {@link ChunkReservation}, await
+     *       {@link ChunkReservation#readyFuture} (ADR-015 Paper chunk-system-v2
+     *       ticket-apply race), then dispatch block evaluation to the
+     *       region-owning thread via
+     *       {@link io.github.dailystruggle.rtp.api.scheduling.RTPScheduler#runTask(io.github.dailystruggle.rtp.api.world.RTPLocation, Runnable)}.
+     *       Inside the region-thread runnable, the stale-chunk guard is
+     *       authoritative; on a stale detection we re-request via
+     *       {@link #requestChunk(int, int, long, int)} up to
+     *       {@link PregenState#staleChunkRetryLimit} times.</li>
+     * </ul>
+     */
+    @SuppressWarnings("resource")
+    private void onChunkResolved(int cx, int cz, long finalL, RTPChunk<?> chunk, int staleRetries) {
+        if (chunk.isSelfContained()) {
+            // Anvil / view hit: no reservation, no stale guard, no region-thread hop.
+            continueInline(() -> proceedWithEvaluation(cx, cz, finalL, chunk, /*reservation*/ null));
             return;
         }
-        // Fall through to the live-load path.
-        CompletableFuture<ChunkSet> ticketFuture = state.world.getChunkAtAsync(cx, cz);
-        ticketFuture.whenComplete((ticket, ex) -> {
-            if (ex != null || ticket == null) {
-                RTP.log(Level.WARNING,
-                        "[RTP] Async chunk ticket failed for world=" + state.world.name()
-                                + " chunk=(" + cx + "," + cz + "): "
-                                + (ex != null ? (ex.getClass().getSimpleName() + ": " + ex.getMessage()) : "null ticket"));
-                if (state.verbose) {
-                    state.failMap.get(LocationGenerator.FailTypes.nullChunk)
-                            .compute("reason=ticketFailed", (s, a) -> (a == null) ? 1L : ++a);
-                }
-                continueInline(this::rescheduleNextAttempt);
-                return;
-            }
-            CompletableFuture<Long> keyFuture = ticket.chunks().get(0);
-            keyFuture.orTimeout(5, TimeUnit.SECONDS).whenComplete((key, ex2) -> {
-                if (ex2 != null) {
-                    RTP.log(Level.WARNING, "Chunk load timed out or failed at " + cx + ", " + cz);
-                    if (state.verbose) {
-                        state.failMap.get(LocationGenerator.FailTypes.timeout)
-                                .compute("reason=chunkLoadTimeout", (s, a) -> (a == null) ? 1L : ++a);
-                    }
-                    continueInline(this::rescheduleNextAttempt);
-                    return;
-                }
-                RTPChunk<?> chunk = (key != null) ? state.world.getCachedChunk(key) : null;
-                if (chunk == null) {
-                    if (state.verbose) {
-                        state.failMap.get(LocationGenerator.FailTypes.nullChunk)
-                                .compute("reason=asyncLoadNull", (s, a) -> (a == null) ? 1L : ++a);
-                    }
-                    continueInline(this::rescheduleNextAttempt);
-                    return;
-                }
-                continueInline(() -> onChunkLoaded(cx, cz, finalL, key, ticket, chunk));
-            });
-        });
-    }
 
-    @SuppressWarnings("resource")
-    private void onChunkLoaded(int cx, int cz, long finalL, Long chunkKey, ChunkSet ticketIn, RTPChunk<?> chunk) {
-        // Synthesise a ticket for the probe-hit branch so ChunkReservation has a ChunkSet.
-        ChunkSet ticket = ticketIn;
-        if (ticket == null) {
-            ticket = new ChunkSet(
-                    state.world, cx, cz,
-                    Collections.singletonList(CompletableFuture.completedFuture(chunkKey)),
-                    new CompletableFuture<>());
-        }
+        // Live-backed: allocate reservation + await ticket apply, then dispatch
+        // to the region-owning thread for the stale guard and block reads.
+        final long chunkKey = ((long) cx & 0xffffffffL) | ((long) cz << 32);
+        ChunkSet ticket = new ChunkSet(
+                state.world, cx, cz,
+                Collections.singletonList(CompletableFuture.completedFuture(chunkKey)),
+                new CompletableFuture<>());
         final ChunkReservation reservation = new ChunkReservation(ticket, state.world);
 
-        // --- await ticket apply (ADR-015 Paper chunk-system-v2) ---
         reservation.readyFuture().orTimeout(2, TimeUnit.SECONDS).whenComplete((v, ex) -> {
             if (ex != null) {
                 RTP.log(Level.WARNING,
@@ -253,28 +287,79 @@ final class PregenTask implements Runnable {
                     state.failMap.get(LocationGenerator.FailTypes.timeout)
                             .compute("reason=ticketApplyTimeout", (s, a) -> (a == null) ? 1L : ++a);
                 }
-                reservation.close();
+                recordOutcome("timeout/ticketApplyTimeout");
+                closeIfPresent(reservation);
                 continueInline(this::rescheduleNextAttempt);
                 return;
             }
-            continueInline(() -> onReservationReady(cx, cz, finalL, chunk, reservation));
+            dispatchLiveEvaluation(cx, cz, finalL, chunk, reservation, staleRetries);
         });
     }
 
-    private void onReservationReady(int cx, int cz, long finalL, RTPChunk<?> chunk, ChunkReservation reservation) {
-        // --- stale-chunk guard (ADR-015) ---
-        if (!state.world.isChunkLoaded(cx, cz)) {
-            RTP.log(Level.FINE,
-                    "[RTP] Stale chunk before vert.adjust ("
-                            + state.world.name() + " " + cx + "," + cz + "); rejecting candidate.");
-            if (state.verbose) {
-                state.failMap.get(LocationGenerator.FailTypes.nullChunk)
-                        .compute("reason=staleChunkBeforeVert", (s, a) -> (a == null) ? 1L : ++a);
-            }
-            reservation.close();
-            rescheduleNextAttempt();
-            return;
+    /**
+     * Dispatch the live-backed candidate's block evaluation to the region-owning
+     * thread. On Folia this is the region scheduler; on Spigot/Paper this is the
+     * main thread. Runs the stale-chunk guard authoritatively (ADR-015), then
+     * proceeds inline within the region-thread runnable.
+     */
+    private void dispatchLiveEvaluation(
+            int cx, int cz, long finalL,
+            RTPChunk<?> chunk, ChunkReservation reservation, int staleRetries) {
+        io.github.dailystruggle.rtp.api.world.RTPLocation targetLoc =
+                new io.github.dailystruggle.rtp.api.world.RTPLocation(
+                        state.world, (cx << 4) + 8, 0, (cz << 4) + 8);
+        try {
+            RTP.serverAccessor.getScheduler().runTask(targetLoc, () -> {
+                try {
+                    // Stale-chunk guard on the region-owning thread, where
+                    // isChunkLoaded is authoritative and legal to call.
+                    if (!state.world.isChunkLoaded(cx, cz)) {
+                        closeIfPresent(reservation);
+                        if (staleRetries < state.staleChunkRetryLimit) {
+                            RTP.log(Level.FINE,
+                                    "[RTP] Stale chunk detected on region-thread dispatch ("
+                                            + state.world.name() + " " + cx + "," + cz
+                                            + "); re-requesting (attempt " + (staleRetries + 1)
+                                            + "/" + state.staleChunkRetryLimit + ")");
+                            // Bounce back to async pool — the async scheduler is
+                            // where the CF chain is safe.
+                            RTP.serverAccessor.getScheduler().runTaskAsynchronously(
+                                    () -> requestChunk(cx, cz, finalL, staleRetries + 1));
+                        } else {
+                            if (state.verbose) {
+                                state.failMap.get(LocationGenerator.FailTypes.nullChunk)
+                                        .compute("reason=staleChunkBeforeVert", (s, a) -> (a == null) ? 1L : ++a);
+                            }
+                            recordOutcome("nullChunk/staleChunkBeforeVert chunk=(" + cx + "," + cz + ")");
+                            RTP.serverAccessor.getScheduler().runTaskAsynchronously(this::rescheduleNextAttempt);
+                        }
+                        return;
+                    }
+                    proceedWithEvaluation(cx, cz, finalL, chunk, reservation);
+                } catch (Throwable t) {
+                    RTP.log(Level.WARNING,
+                            "[RTP] Region-thread evaluation threw: " + t, t);
+                    closeIfPresent(reservation);
+                    RTP.serverAccessor.getScheduler().runTaskAsynchronously(this::rescheduleNextAttempt);
+                }
+            });
+        } catch (Throwable t) {
+            RTP.log(Level.WARNING,
+                    "[RTP] Failed to dispatch region-thread evaluation: " + t, t);
+            closeIfPresent(reservation);
+            continueInline(this::rescheduleNextAttempt);
         }
+    }
+
+    /**
+     * Evaluate the resolved chunk: vert adjust → biome filter → neighbour
+     * grid load → safety y-scan → global verifiers → completeSuccess.
+     * {@code reservation} may be {@code null} when the chunk is Anvil-backed
+     * ({@link RTPChunk#isSelfContained()}). Every rejection path calls
+     * {@link ChunkReservation#close()} only when the reservation is non-null.
+     */
+    private void proceedWithEvaluation(int cx, int cz, long finalL, RTPChunk<?> chunk,
+                                       @org.jetbrains.annotations.Nullable ChunkReservation reservation) {
 
         // --- vert.adjust ---
         RTPCoords res = state.vert.adjust(chunk);
@@ -286,7 +371,8 @@ final class PregenTask implements Runnable {
                 state.failMap.get(LocationGenerator.FailTypes.vert)
                         .compute("biome=", (s, a) -> (a == null) ? 1L : ++a);
             }
-            reservation.close();
+            recordOutcome("vert/null-result");
+            closeIfPresent(reservation);
             rescheduleNextAttempt();
             return;
         }
@@ -310,7 +396,8 @@ final class PregenTask implements Runnable {
                 state.failMap.get(LocationGenerator.FailTypes.biome)
                         .compute("biome=" + cb, (s, a) -> (a == null) ? 1L : ++a);
             }
-            reservation.close();
+            recordOutcome("biome/" + currBiome);
+            closeIfPresent(reservation);
             if (state.biomeChecks >= state.maxBiomeChecks) {
                 completeExhausted();
                 return;
@@ -359,7 +446,8 @@ final class PregenTask implements Runnable {
                             state.failMap.get(LocationGenerator.FailTypes.nullChunk)
                                     .compute("reason=neighborNull", (s, a) -> (a == null) ? 1L : ++a);
                         }
-                        reservation.close();
+                        recordOutcome("nullChunk/neighborNull-allOf");
+                        closeIfPresent(reservation);
                         continueInline(this::rescheduleNextAttempt);
                         return;
                     }
@@ -384,7 +472,8 @@ final class PregenTask implements Runnable {
                             state.failMap.get(LocationGenerator.FailTypes.nullChunk)
                                     .compute("reason=neighborNull", (s, a) -> (a == null) ? 1L : ++a);
                         }
-                        reservation.close();
+                        recordOutcome("nullChunk/neighborNull-cacheMiss");
+                        closeIfPresent(reservation);
                         continueInline(this::rescheduleNextAttempt);
                         return;
                     }
@@ -398,16 +487,15 @@ final class PregenTask implements Runnable {
                                 String resBiome,
                                 RTPChunk<?>[] localChunks, int L,
                                 int centerChunkX, int centerChunkZ,
-                                ChunkReservation reservation) {
+                                @org.jetbrains.annotations.Nullable ChunkReservation reservation) {
         int safe = state.safetyRadius;
-        // Stale guard immediately before the y-scan.
-        boolean centerStillLoaded = state.world.isChunkLoaded(cx, cz);
-        boolean pass = centerStillLoaded;
-        if (!centerStillLoaded) {
-            RTP.log(Level.FINE,
-                    "[RTP] Stale center chunk on safetyCheck entry ("
-                            + state.world.name() + " " + cx + "," + cz + "); rejecting candidate.");
-        }
+        // ADR-015 Folia-follow-up: no redundant stale-guard here. For the
+        // live-backed branch the guard already fired on the region-owning
+        // thread inside dispatchLiveEvaluation; for the Anvil-backed branch
+        // there is no live chunk state to be stale against. A post-dispatch
+        // race manifests organically via neighbour getCachedChunk returning
+        // null (reason=neighborNull) so we still cannot false-accept.
+        boolean pass = true;
 
         safetyCheck:
         for (int x = finalX - safe; pass && x <= finalX + safe; x++) {
@@ -442,14 +530,15 @@ final class PregenTask implements Runnable {
         if (!pass) {
             if (state.verbose) {
                 final int fx = finalX, fy = finalY, fz = finalZ;
-                state.failMap.get(LocationGenerator.FailTypes.misc)
-                        .compute("location=(" + fx + "," + fy + "," + fz,
+                state.failMap.get(LocationGenerator.FailTypes.safety)
+                        .compute("location=(" + fx + "," + fy + "," + fz + ")",
                                 (s, a) -> (a == null) ? 1L : ++a);
             }
+            recordOutcome("safety/blockReject (" + finalX + "," + finalY + "," + finalZ + ")");
             if (state.shape instanceof MemoryShape) {
                 ((MemoryShape<?>) state.shape).addBadLocation(finalL);
             }
-            reservation.close();
+            closeIfPresent(reservation);
             rescheduleNextAttempt();
             return;
         }
@@ -461,14 +550,15 @@ final class PregenTask implements Runnable {
                     if (verEx != null || !Boolean.TRUE.equals(verPass)) {
                         if (state.verbose) {
                             final int fx = finalX, fy = finalY, fz = finalZ;
-                            state.failMap.get(LocationGenerator.FailTypes.misc)
-                                    .compute("location=(" + fx + "," + fy + "," + fz,
+                            state.failMap.get(LocationGenerator.FailTypes.safetyExternal)
+                                    .compute("location=(" + fx + "," + fy + "," + fz + ")",
                                             (s, a) -> (a == null) ? 1L : ++a);
                         }
+                        recordOutcome("safetyExternal/verifier ex=" + (verEx == null ? "null" : verEx.getClass().getSimpleName()));
                         if (state.shape instanceof MemoryShape) {
                             ((MemoryShape<?>) state.shape).addBadLocation(finalL);
                         }
-                        reservation.close();
+                        closeIfPresent(reservation);
                         continueInline(this::rescheduleNextAttempt);
                         return;
                     }
@@ -480,6 +570,7 @@ final class PregenTask implements Runnable {
     private void completeSuccess(long finalL, int finalX, int finalY, int finalZ,
                                  String resBiome, RTPCoords resCoords,
                                  ChunkReservation reservation) {
+        recordOutcome("success (" + finalX + "," + finalY + "," + finalZ + ")");
         if (state.shape instanceof MemoryShape && finalL > 0) {
             ((MemoryShape<?>) state.shape).addBiomeLocation(finalL, state.resolution, resBiome);
         }
@@ -496,7 +587,7 @@ final class PregenTask implements Runnable {
         ChunkSet verifiedChunks = new ChunkSet(state.world, ccx, ccz, chunks, new CompletableFuture<>());
         // Close the per-iteration reservation; ownership of the verifiedChunks set
         // transfers via the returned GenerationResult (matches the prior contract).
-        reservation.close();
+        closeIfPresent(reservation);
         result.complete(new GenerationResult(resCoords, i, verifiedChunks));
     }
 
@@ -538,6 +629,23 @@ final class PregenTask implements Runnable {
             }
             selectionsStr.append("}");
             RTP.log(Level.INFO, "#0f0080[RTP] [" + state.region.name + "] selections: " + selectionsStr);
+
+            // Per-attempt outcome breadcrumb — always printed (diagnostic: reveals
+            // which code path actually fired when the failMap bucketing is
+            // ambiguous or appears silent).
+            if (state.attemptOutcomes.isEmpty()) {
+                RTP.log(Level.INFO,
+                        "#ff8040[RTP] [" + state.region.name
+                                + "] attemptOutcomes: <empty — no rescheduleNextAttempt site fired;"
+                                + " investigate CF callback suppression or task re-entry>");
+            } else {
+                RTP.log(Level.INFO,
+                        "#ff8040[RTP] [" + state.region.name + "] attemptOutcomes ("
+                                + state.attemptOutcomes.size() + "):");
+                for (String outcome : state.attemptOutcomes) {
+                    RTP.log(Level.INFO, "#ff8040[RTP] [" + state.region.name + "]   " + outcome);
+                }
+            }
         }
         result.complete(new GenerationResult(null, reported, null));
     }

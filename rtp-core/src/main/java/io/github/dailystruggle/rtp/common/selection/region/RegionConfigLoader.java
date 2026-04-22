@@ -53,15 +53,10 @@ public class RegionConfigLoader {
                 world = RTP.serverAccessor.getRTPWorld(worldName);
             }
 
-            // RTP-2 Master Fallback: If world is still null (invalid name or bad index),
-            // force it to the server's primary world to prevent NPEs during Generation.
-            if (world == null) {
-                List<RTPWorld<?>> worlds = RTP.serverAccessor.getRTPWorlds();
-                if (worlds != null && !worlds.isEmpty()) {
-                    world = worlds.get(0);
-//                    System.out.println("[RTP-DEBUG] RegionLoader: World '" + worldName + "' not found. Falling back to primary world '" + world.name() + "'");
-                }
-            }
+            // No fallback: if the configured world cannot be resolved (e.g. an automatic world
+            // generator such as Multiverse has not yet loaded it), leave the region's world as
+            // null. The region will be constructed in a dormant state and activated via
+            // Region.rebindWorld once WorldLoadEvent delivers the configured world.
         }
 
         // 2. Deserializing the Shape
@@ -116,15 +111,15 @@ public class RegionConfigLoader {
         if (shape != null && shape instanceof MemoryShape<?> memoryShape) memoryShape.spatialResolution = spatialResolution;
         String override = String.valueOf(regionParser.getConfigValue(RegionKeys.override, "default"));
 
-        if (shape instanceof MemoryShape<?>) {
+        if (shape instanceof MemoryShape<?> && world != null) {
             if (detailedRegionInit) {
                 // Here we CAN use RTP.log if we want, but since we are debugging early init, sysout is safer
 //                System.out.println("[RTP-DEBUG] RegionLoader: [" + name + "] memory shape detected, reading location data from file...");
             }
-            String worldName = (world != null) ? world.name() : "null";
-            long worldSeed = (world != null) ? world.getSeed() : 0L;
-            ((MemoryShape<?>) shape).load(name + "_" + worldSeed + ".bin", worldName);
+            ((MemoryShape<?>) shape).load(name + "_" + world.getSeed() + ".bin", world.name());
         }
+        // If world is null here, the region is dormant; the MemoryShape (if any) is loaded
+        // later via OnWorldLoadUnload -> RegionConfigLoader.load(...) at rebind time.
 
         return new RegionSettings(
                 name,
@@ -176,6 +171,29 @@ public class RegionConfigLoader {
 //            System.out.println("[RTP-DEBUG] RegionLoader: FAILURE - No vert prototype found in factory for '" + vertName + "'. Available: " + factory.list());
         }
         return null;
+    }
+
+    /**
+     * Detects whether the configured world in {@code regionParser} was unavailable at the time
+     * {@link #load} ran, causing the "RTP-2 master fallback" to substitute the server's primary
+     * world. Returns the raw configured world name when a fallback occurred; returns {@code null}
+     * when the resolved world matches the configured name (or the configured value uses the
+     * {@code [index]} syntax, where no meaningful rebind target exists).
+     *
+     * <p>Callers use the returned name to re-resolve and rebind the region via
+     * {@code Region.rebindWorld} once the real world becomes available (e.g. after
+     * {@code WorldLoadEvent}).
+     */
+    public static String detectFallbackConfiguredWorld(ConfigParser<RegionKeys> regionParser, RegionSettings settings) {
+        if (settings == null) return null;
+        Object raw = regionParser.getConfigValue(RegionKeys.world, null);
+        if (raw == null) return null;
+        String rawName = String.valueOf(raw);
+        if (rawName.startsWith("[") && rawName.endsWith("]")) return null;
+        // World unavailable at load time -> dormant region; rebind target is the configured name.
+        if (settings.world() == null) return rawName;
+        if (rawName.equalsIgnoreCase(settings.world().name())) return null;
+        return rawName;
     }
 
     private static boolean getBoolean(Object o) {

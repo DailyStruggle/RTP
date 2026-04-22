@@ -148,6 +148,13 @@ public class MockRTPWorld extends RTPWorld<String> {
      */
     @Override
     public RTPChunk<?> getCachedChunk(long key) {
+        // Honour the nullChunkKeyPredicate on the cache path too so that
+        // ADR-016 §13.1 getOrLoadChunk() (which queries getCachedChunk before
+        // falling through to getChunkAtAsync) correctly simulates the
+        // "all null" scenarios used by the REQ-RTP-S-004 attribution tests.
+        if (nullChunkKeyPredicate.test(key)) {
+            return null;
+        }
         int cx = (int) (key >> 32);
         int cz = (int) (key & 0xFFFFFFFFL);
         return new MockRTPChunk(cx, cz, this);

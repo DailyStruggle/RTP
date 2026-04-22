@@ -147,7 +147,17 @@ public final class RTPBukkitPlugin extends JavaPlugin {
         },
         1);
 
-    RTP.scheduler.runTaskLater(this::setupBukkitEvents, 1);
+    // Register event listeners synchronously so that WorldLoadEvents fired by
+    // automatic world generators (e.g. Multiverse) during the first tick are not
+    // missed. Previously this ran via runTaskLater(..., 1), which caused dormant
+    // regions configured for a late-loaded world to never rebind.
+    setupBukkitEvents();
+    // Catch worlds that were already loaded by the time the listener registered
+    // (either before RTP enabled, or between region config load and listener
+    // registration), so dormant regions for those worlds are activated without
+    // needing another WorldLoadEvent.
+    io.github.dailystruggle.rtp.bukkit.spigotListeners.OnWorldLoadUnload
+        .rebindFallbackRegionsForAllLoadedWorlds();
     RTP.scheduler.runTaskLater(this::setupIntegrations, 1);
     RTP.scheduler.runTaskLater(() -> BukkitEffectsHandler.setupEffects(this), 1);
 
