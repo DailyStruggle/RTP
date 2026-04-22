@@ -50,10 +50,31 @@ public class Region extends FactoryValue<RegionKeys> {
   private RegionSettings settings;
   public Shape<?> shape;
 
+  /**
+   * True when this region was instantiated before its configured world was loaded, so the
+   * resolved {@link RTPWorld} is a server-primary fallback rather than the configured world.
+   * Regions in this state skip destructive startup actions (e.g. DB-cache hydrate) until
+   * {@link #rebindWorld(RegionSettings)} swaps them onto the real world.
+   */
+  public volatile boolean worldFallbackBound = false;
+
+  /**
+   * The raw world name read from the region config, preserved so a later {@code WorldLoadEvent}
+   * can match and rebind this region when its true world becomes available. Null when no
+   * fallback occurred.
+   */
+  public volatile String configuredWorldName = null;
+
   public Region(String name, RegionSettings settings) {
+    this(name, settings, false, null);
+  }
+
+  public Region(String name, RegionSettings settings, boolean worldFallbackBound, String configuredWorldName) {
     super(RegionKeys.class, name);
     this.name = name;
     this.settings = settings;
+    this.worldFallbackBound = worldFallbackBound;
+    this.configuredWorldName = configuredWorldName;
     this.set(RegionKeys.spatialResolution, settings.spatialResolution());
     this.cachePipeline = (RTPTaskPipe) RTP.serverAccessor.createCachePipe();
     this.miscPipeline = (RTPTaskPipe) RTP.serverAccessor.createTaskPipe();
@@ -80,6 +101,91 @@ public class Region extends FactoryValue<RegionKeys> {
 
     if (this.shape != null && this.shape instanceof MemoryShape<?> memoryShape) memoryShape.spatialResolution = settings.spatialResolution();
 
+    // Skip the MemoryShape scan-task bootstrap for dormant regions: the shape's data file
+    // was not loaded (world not available yet) so getLoadFuture() has no backing load. The
+    // scan-task wiring happens implicitly when rebindWorld(...) swaps in freshly-loaded
+    // settings produced by RegionConfigLoader.load against the now-loaded world.
+    if (!this.worldFallbackBound && this.shape instanceof MemoryShape<?>) {
+      long[] progress = ScanTask.loadProgress(name);
+      if (progress != null) {
+        long iter = progress[0];
+        if (iter > 0 && iter < Double.valueOf(((MemoryShape<?>) this.shape).getRange()).longValue()) {
+          MemoryShape<?> ms = (MemoryShape<?>) this.shape;
+          ScanTask task = new ScanTask(this, iter);
+          RTP.getInstance().scanTasks.put(name, task);
+          ms.getLoadFuture().whenComplete((v, t) -> RTP.scheduler.runTaskAsynchronously(task));
+        }
+      }
+    }
+
+    // Hydrate locations from database. Skip when this region is fallback-bound to a
+    // stand-in world: the DB rows reference the configured world's seed, and the seed
+    // mismatch check in hydrateCacheFromDatabase would permanently delete every row.
+    // Hydration is performed later by rebindWorld(...) once the real world loads.
+    if (!this.worldFallbackBound) {
+      hydrateFromDatabaseIfAvailable();
+    }
+  }
+
+  /**
+   * Reads cached locations for this region from the database (if any) and feeds them into the
+   * local queues. Safe to call multiple times; the region simply won't re-queue rows already
+   * consumed. Intended to be invoked at construction for normally-bound regions, and again by
+   * {@link #rebindWorld(RegionSettings)} when a fallback-bound region is switched onto its
+   * configured world.
+   */
+  private void hydrateFromDatabaseIfAvailable() {
+    if (RTP.getInstance().databaseAccessor == null) return;
+    List<DatabaseAccessor.StoredLocation> storedLocations =
+        RTP.getInstance().databaseAccessor.loadCachedLocations(name);
+    if (storedLocations.isEmpty()) return;
+    hydrateCacheFromDatabase(storedLocations);
+    ConfigParser<MessagesKeys> messages =
+        (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+    String msg = messages.getConfigValue(MessagesKeys.locationLoaded, "").toString();
+    if (!msg.isEmpty()) {
+      msg = msg.replace("[amount]", String.valueOf(storedLocations.size()));
+      msg = msg.replace("[region]", name);
+      RTP.log(Level.INFO, msg);
+    }
+  }
+
+  /**
+   * Replaces this region's {@link RegionSettings} with settings resolved against a now-loaded
+   * configured world, then hydrates cached locations from the database.
+   *
+   * <p>Used when automatic world generation (e.g. Multiverse) loads the configured world after
+   * the plugin has already instantiated the region against a fallback world. Drops any stale
+   * queue entries that were reserved against the fallback world before swapping, so no location
+   * resolved for the wrong world leaks to a player.
+   *
+   * @param newSettings settings produced by {@link RegionConfigLoader#load} after the
+   *                    configured world was loaded.
+   */
+  public void rebindWorld(RegionSettings newSettings) {
+    // Purge any queued locations bound to the fallback world. None should have actually been
+    // generated yet (hydrate was skipped), but the generator and scan tasks may have produced
+    // some during the short window between construction and world load.
+    io.github.dailystruggle.rtp.common.selection.region.RTPLocation stale;
+    while ((stale = queueManager.keptLocations.poll()) != null) {
+      if (stale.reservation() != null) stale.reservation().close();
+    }
+    queueManager.perPlayerLocationQueue.forEach((uuid, queue) -> {
+      io.github.dailystruggle.rtp.common.selection.region.RTPLocation pStale;
+      while ((pStale = queue.poll()) != null) {
+        if (pStale.reservation() != null) pStale.reservation().close();
+      }
+    });
+    queueManager.perPlayerLocationQueue.clear();
+    queueManager.unkeptLocations.clear();
+
+    setSettings(newSettings);
+    this.worldFallbackBound = false;
+    this.configuredWorldName = null;
+
+    // Re-run the MemoryShape scan-task bootstrap that was skipped at construction because
+    // the region was dormant. The new shape (from newSettings) has been loaded against the
+    // now-available world, so getLoadFuture() has a real backing load.
     if (this.shape instanceof MemoryShape<?>) {
       long[] progress = ScanTask.loadProgress(name);
       if (progress != null) {
@@ -93,20 +199,7 @@ public class Region extends FactoryValue<RegionKeys> {
       }
     }
 
-    // Hydrate locations from database
-    if (RTP.getInstance().databaseAccessor != null) {
-      List<DatabaseAccessor.StoredLocation> storedLocations = RTP.getInstance().databaseAccessor.loadCachedLocations(name);
-      if (storedLocations.size() > 0) {
-        hydrateCacheFromDatabase(storedLocations);
-        ConfigParser<MessagesKeys> messages = (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-        String msg = messages.getConfigValue(MessagesKeys.locationLoaded, "").toString();
-        if (!msg.isEmpty()) {
-          msg = msg.replace("[amount]", String.valueOf(storedLocations.size()));
-          msg = msg.replace("[region]", name);
-          RTP.log(Level.INFO, msg);
-        }
-      }
-    }
+    hydrateFromDatabaseIfAvailable();
   }
 
   public RegionSettings getSettings() {
@@ -165,6 +258,11 @@ public class Region extends FactoryValue<RegionKeys> {
    * @param availableTime available time in nanoseconds
    */
   public void execute(long availableTime) {
+    // Dormant regions (configured world not yet loaded) must not attempt chunk I/O,
+    // ticket validation, or cache generation — they activate via rebindWorld once
+    // WorldLoadEvent delivers the configured world.
+    if (getWorld() == null) return;
+
     long now = System.currentTimeMillis();
     if (now - lastValidationTime > 60000) {
       this.queueManager.validateTickets(getWorld());
@@ -531,7 +629,8 @@ public class Region extends FactoryValue<RegionKeys> {
    */
   public Map<String, String> params() {
     Map<String, String> res = new ConcurrentHashMap<>();
-    res.put("world", settings.world().name());
+    res.put("world", settings.world() != null ? settings.world().name() : String.valueOf(configuredWorldName));
+    if (settings.shape() == null) return res;
     res.put("shape", settings.shape().name);
     for (Map.Entry<? extends Enum<?>, ?> entry : settings.shape().getData().entrySet()) {
       res.put(entry.getKey().name(), entry.getValue().toString());
@@ -604,7 +703,7 @@ public class Region extends FactoryValue<RegionKeys> {
     RTPWorld<?> world = getWorld();
     Shape<?> shape = this.shape;
 
-    if (wbo) {
+    if (wbo && world != null) {
       Shape<?> worldShape = ((WorldBorder) RTP.serverAccessor.getWorldBorder(world.name())).getShape().get();
       if (!worldShape.equals(shape)) {
         this.shape = worldShape;
@@ -657,9 +756,9 @@ public class Region extends FactoryValue<RegionKeys> {
     if (!(other instanceof Region)) return false;
     Region region = (Region) other;
 
-    if (!getShape().equals(region.getShape())) return false;
-    if (!getVert().equals(region.getVert())) return false;
-    if (!getWorld().equals(region.getWorld())) return false;
+    if (!java.util.Objects.equals(getShape(), region.getShape())) return false;
+    if (!java.util.Objects.equals(getVert(), region.getVert())) return false;
+    if (!java.util.Objects.equals(getWorld(), region.getWorld())) return false;
     return region.settings.worldBorderOverride() == settings.worldBorderOverride();
   }
 

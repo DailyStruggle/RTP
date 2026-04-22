@@ -283,7 +283,22 @@ public class Configs {
       RegionSettings settings = RegionConfigLoader.load(regionConfig);
       String name = settings.name();
 
-      Region region = new Region(name, settings);
+      // Detect "dormant region" — the configured world wasn't loaded yet (common when
+      // automatic world generators like Multiverse load their worlds after plugin enable).
+      // The region is constructed with a null world; OnWorldLoadUnload rebinds the real
+      // world via Region.rebindWorld once WorldLoadEvent fires.
+      String configuredWorldName =
+          RegionConfigLoader.detectFallbackConfiguredWorld(regionConfig, settings);
+      boolean worldFallback = configuredWorldName != null;
+      if (worldFallback) {
+        RTP.log(
+            Level.INFO,
+            "[RTP] Region '" + name + "' configured for world '" + configuredWorldName
+                + "' which isn't loaded yet; region is dormant and will activate when the "
+                + "world loads.");
+      }
+
+      Region region = new Region(name, settings, worldFallback, configuredWorldName);
 
       RTP.selectionAPI.permRegionLookup.put(region.name, region);
       if (detailed_region_init) {
@@ -296,6 +311,9 @@ public class Configs {
               .add(
                       new RTPRunnable(
                               () -> {
+                                // Dormant regions (world not yet loaded) must not select a
+                                // shape region — the shape's data file hasn't been loaded.
+                                if (region.getWorld() == null) return;
                                 if (region.getShape() == null) return;
                                 region.getShape().select();
                               },

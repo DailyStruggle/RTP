@@ -207,14 +207,22 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
    */
   private boolean shouldPrefilter(int cx, int cz) {
     if (world == null) return false;
+    // Folia note: world.isChunkLoaded(cx,cz) is region-thread-restricted. The
+    // ADR-016 call-site probe runs on the async scheduler thread (no owning
+    // region), so a ThreadAccessException here is expected and non-diagnostic.
+    // We must not fall through to loadLiveChunk on that exception — the whole
+    // point of ADR-016 is that when the chunk is *not* loaded we read .mca
+    // instead of forcing a live load. Treat "can't determine" as "not loaded"
+    // and continue into the anvil probe; the worst case is one extra probe
+    // against an already-loaded chunk, which AnvilPrefilter handles cleanly.
     try {
       if (world.isChunkLoaded(cx, cz)) {
         logGateSkip("chunk-already-loaded", cx, cz);
         return false;
       }
     } catch (Throwable ignored) {
-      logGateSkip("isChunkLoaded-threw", cx, cz);
-      return false;
+      // Fall through to the anvil path — do NOT short-circuit, do NOT log
+      // at INFO (would spam every candidate on Folia).
     }
     try {
       @SuppressWarnings("unchecked")
@@ -318,9 +326,25 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   @RegionThread
   public CompletableFuture<ChunkSet> getChunkAtAsync(int cx, int cz) {
     totalChunkLoads.incrementAndGet();
-    return world.getChunkAtAsync(cx, cz).thenApply(chunk -> {
+    // Must pass gen=true to force generation of unexplored chunks — RTP's primary
+    // use case. Without the generate flag Folia returns a null Chunk for coordinates
+    // with no prior .mca data, causing PregenTask to attribute every candidate to
+    // nullChunk/asyncLoadNull (parity with BukkitRTPWorld.loadChunkSync / loadLiveChunk).
+    return world.getChunkAtAsync(cx, cz, true).thenApply(chunk -> {
+      if (chunk == null) {
+        RTP.log(java.util.logging.Level.WARNING,
+            "[RTP] Folia world.getChunkAtAsync returned null for world=" + name
+                + " chunk=(" + cx + "," + cz + ")");
+        return null;
+      }
       cacheChunk(cx, cz, chunk);
       return new ChunkSet(this, cx, cz, Collections.singletonList(CompletableFuture.completedFuture(((long) cx & 0xffffffffL | ((long) cz << 32)))), new CompletableFuture<>());
+    }).exceptionally(ex -> {
+      RTP.log(java.util.logging.Level.WARNING,
+          "[RTP] Folia world.getChunkAtAsync failed for world=" + name
+              + " chunk=(" + cx + "," + cz + ")",
+          ex);
+      return null;
     });
   }
 
@@ -338,6 +362,29 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
    */
   @Override
   public boolean isChunkLoaded(int cx, int cz) {
+    // Folia ADR-015 follow-up: World#isChunkLoaded(int,int) is region-thread-
+    // restricted on Folia — calling it from an async scheduler thread (which
+    // owns no region) throws ThreadAccessException, which previously caused
+    // the stale-chunk guard in PregenTask to reject every candidate with
+    // reason=staleChunkBeforeVert fails=10. Trust our own liveness signal
+    // first: getChunkAtAsync caches the live Chunk reference in chunkCache,
+    // and Chunk#isLoaded() is a field read on the chunk object, safe off
+    // the owning region thread. Fall back to the Bukkit query only when
+    // we have no cached reference (and suppress its thread-access throw).
+    long key = ((long) cx & 0xffffffffL) | ((long) cz << 32);
+    WeakReference<Chunk> ref = chunkCache.get(key);
+    if (ref != null) {
+      Chunk chunk = ref.get();
+      if (chunk != null) {
+        try {
+          if (chunk.isLoaded()) {
+            return true;
+          }
+        } catch (Throwable ignored) {
+          // fall through
+        }
+      }
+    }
     try {
       return world.isChunkLoaded(cx, cz);
     } catch (Throwable t) {
