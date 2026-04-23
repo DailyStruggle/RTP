@@ -158,6 +158,248 @@ public final class Nbt {
         }
     }
 
+    // ------------------------------------------------------------------------------------- skip
+
+    /**
+     * Consumes the payload for a tag of {@code type} without materialising it.
+     *
+     * <p>Bytes are read from {@code in} exactly as {@link #readPayload} would have read
+     * them, but no Java objects are allocated for the payload contents. This lets a
+     * selective parser skip uninteresting root/section subtrees (e.g. {@code block_entities},
+     * {@code Heightmaps} when only biomes are needed) while keeping the byte stream aligned
+     * for subsequent tags.
+     *
+     * <p>Recursive payloads ({@code TAG_COMPOUND}, {@code TAG_LIST} of compounds/lists)
+     * are skipped recursively. Non-recursive payloads advance the stream by their fixed
+     * or length-prefixed width.
+     *
+     * @throws IOException on malformed input or an unknown tag id (mirrors {@link #readPayload})
+     */
+    public static void skipPayload(DataInput in, byte type) throws IOException {
+        switch (type) {
+            case TAG_END:
+                throw new IOException("Unexpected TAG_End in payload position");
+            case TAG_BYTE:       in.readByte();                                 return;
+            case TAG_SHORT:      in.readShort();                                return;
+            case TAG_INT:        in.readInt();                                  return;
+            case TAG_LONG:       in.readLong();                                 return;
+            case TAG_FLOAT:      in.readFloat();                                return;
+            case TAG_DOUBLE:     in.readDouble();                               return;
+            case TAG_BYTE_ARRAY: {
+                int n = in.readInt();
+                if (n < 0) throw new IOException("Negative TAG_Byte_Array length " + n);
+                skipBytes(in, n);
+                return;
+            }
+            case TAG_STRING:     in.readUTF();                                  return;
+            case TAG_LIST: {
+                byte elemType = in.readByte();
+                int n = in.readInt();
+                if (elemType == TAG_END) {
+                    if (n > 0) throw new IOException("TAG_List declared TAG_End element type with nonzero length " + n);
+                    return;
+                }
+                int fixed = fixedPayloadSize(elemType);
+                if (fixed > 0) {
+                    // All fixed-width numeric elements — bulk skip.
+                    long total = (long) fixed * (long) n;
+                    skipBytes(in, total);
+                    return;
+                }
+                for (int i = 0; i < n; i++) {
+                    skipPayload(in, elemType);
+                }
+                return;
+            }
+            case TAG_COMPOUND: {
+                while (true) {
+                    byte childType = in.readByte();
+                    if (childType == TAG_END) return;
+                    in.readUTF(); // child name, discarded
+                    skipPayload(in, childType);
+                }
+            }
+            case TAG_INT_ARRAY: {
+                int n = in.readInt();
+                if (n < 0) throw new IOException("Negative TAG_Int_Array length " + n);
+                skipBytes(in, (long) n * 4L);
+                return;
+            }
+            case TAG_LONG_ARRAY: {
+                int n = in.readInt();
+                if (n < 0) throw new IOException("Negative TAG_Long_Array length " + n);
+                skipBytes(in, (long) n * 8L);
+                return;
+            }
+            default:
+                throw new IOException("Unknown NBT tag type: " + (type & 0xFF));
+        }
+    }
+
+    /** Returns the fixed byte width of {@code type}, or {@code -1} if the width is variable. */
+    private static int fixedPayloadSize(byte type) {
+        switch (type) {
+            case TAG_BYTE:   return 1;
+            case TAG_SHORT:  return 2;
+            case TAG_INT:    return 4;
+            case TAG_LONG:   return 8;
+            case TAG_FLOAT:  return 4;
+            case TAG_DOUBLE: return 8;
+            default:         return -1;
+        }
+    }
+
+    private static void skipBytes(DataInput in, long n) throws IOException {
+        // DataInput#skipBytes is not guaranteed to skip the full count; loop.
+        long remaining = n;
+        while (remaining > 0) {
+            int want = (int) Math.min(remaining, (long) Integer.MAX_VALUE);
+            int skipped = in.skipBytes(want);
+            if (skipped <= 0) {
+                // Fall back to a byte read to force progress / surface EOF.
+                in.readByte();
+                skipped = 1;
+            }
+            remaining -= skipped;
+        }
+    }
+
+    // ---------------------------------------------------------------------------- selective read
+
+    /**
+     * Predicate for selective compound parsing.
+     *
+     * <p>Called for every named child of a compound being parsed selectively. Receives
+     * the parent-path (list of ancestor child names, root-first) and the current child's
+     * name + tag type, and returns whether the child should be fully materialised
+     * ({@code KEEP}), descended into as another selective compound ({@code RECURSE}),
+     * or skipped without allocation ({@code SKIP}).
+     *
+     * <p>{@code RECURSE} is only meaningful for {@code TAG_COMPOUND} children. For
+     * {@code TAG_LIST} elements, the filter is consulted once per element using the
+     * synthetic child name {@code "[]"} — returning {@code RECURSE} there descends into
+     * each element compound individually (useful e.g. for {@code sections[*]}).
+     */
+    @FunctionalInterface
+    public interface SelectiveFilter {
+        enum Decision { KEEP, RECURSE, SKIP }
+        Decision decide(List<String> path, String childName, byte childType);
+    }
+
+    /**
+     * Reads the named-root compound from {@code rawUncompressedNbt} into a
+     * {@link LinkedHashMap}, but invokes {@code filter} for every child to decide whether
+     * to fully read, selectively recurse, or skip the payload. Uninteresting subtrees are
+     * never materialised, producing a significantly smaller decoded map when the caller
+     * only needs a subset of the tree.
+     *
+     * <p>Returns the (possibly sparse) root compound. Children that were skipped are
+     * absent from the map; children that were kept/recursed are present with their decoded
+     * values (recursed compounds are themselves selectively-filtered).
+     *
+     * <p>{@code TAG_LIST} elements are always materialised in order, but each element is
+     * subject to {@code filter} under the synthetic name {@code "[]"}: {@code SKIP} drops
+     * the element entirely (the list is shortened), {@code RECURSE} descends into
+     * compound elements selectively, {@code KEEP} materialises the element fully. Mixed
+     * decisions within a single list are allowed.
+     */
+    public static LinkedHashMap<String, Object> readRootCompoundSelective(
+            byte[] rawUncompressedNbt, SelectiveFilter filter) throws IOException {
+        try (DataInputStream in = new DataInputStream(new java.io.ByteArrayInputStream(rawUncompressedNbt))) {
+            byte type = in.readByte();
+            if (type == TAG_END) return new LinkedHashMap<>();
+            if (type != TAG_COMPOUND) {
+                throw new IOException("NBT root is not a TAG_Compound (got type " + (type & 0xFF) + ")");
+            }
+            in.readUTF(); // root name, discarded
+            ArrayList<String> path = new ArrayList<>();
+            return readCompoundSelective(in, path, filter);
+        }
+    }
+
+    private static LinkedHashMap<String, Object> readCompoundSelective(
+            DataInput in, ArrayList<String> path, SelectiveFilter filter) throws IOException {
+        LinkedHashMap<String, Object> map = new LinkedHashMap<>();
+        while (true) {
+            byte childType = in.readByte();
+            if (childType == TAG_END) return map;
+            String childName = in.readUTF();
+            SelectiveFilter.Decision d = filter.decide(path, childName, childType);
+            switch (d) {
+                case SKIP:
+                    skipPayload(in, childType);
+                    break;
+                case RECURSE:
+                    if (childType == TAG_COMPOUND) {
+                        path.add(childName);
+                        try {
+                            map.put(childName, readCompoundSelective(in, path, filter));
+                        } finally {
+                            path.remove(path.size() - 1);
+                        }
+                    } else if (childType == TAG_LIST) {
+                        path.add(childName);
+                        try {
+                            map.put(childName, readListSelective(in, path, filter));
+                        } finally {
+                            path.remove(path.size() - 1);
+                        }
+                    } else {
+                        // RECURSE only meaningful for compound/list; fall back to KEEP.
+                        map.put(childName, readPayload(in, childType));
+                    }
+                    break;
+                case KEEP:
+                default:
+                    map.put(childName, readPayload(in, childType));
+                    break;
+            }
+        }
+    }
+
+    private static NbtList readListSelective(
+            DataInput in, ArrayList<String> path, SelectiveFilter filter) throws IOException {
+        byte elemType = in.readByte();
+        int n = in.readInt();
+        List<Object> items = new ArrayList<>(Math.max(0, n));
+        if (elemType == TAG_END) {
+            if (n > 0) throw new IOException("TAG_List declared TAG_End element type with nonzero length " + n);
+            return new NbtList(elemType, items);
+        }
+        for (int i = 0; i < n; i++) {
+            SelectiveFilter.Decision d = filter.decide(path, "[]", elemType);
+            switch (d) {
+                case SKIP:
+                    skipPayload(in, elemType);
+                    break;
+                case RECURSE:
+                    if (elemType == TAG_COMPOUND) {
+                        path.add("[]");
+                        try {
+                            items.add(readCompoundSelective(in, path, filter));
+                        } finally {
+                            path.remove(path.size() - 1);
+                        }
+                    } else if (elemType == TAG_LIST) {
+                        path.add("[]");
+                        try {
+                            items.add(readListSelective(in, path, filter));
+                        } finally {
+                            path.remove(path.size() - 1);
+                        }
+                    } else {
+                        items.add(readPayload(in, elemType));
+                    }
+                    break;
+                case KEEP:
+                default:
+                    items.add(readPayload(in, elemType));
+                    break;
+            }
+        }
+        return new NbtList(elemType, items);
+    }
+
     // ----------------------------------------------------------------------------------------- write
 
     public static byte[] writeNamedRoot(String name, Object value) throws IOException {
