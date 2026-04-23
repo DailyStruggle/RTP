@@ -7,6 +7,82 @@
 
 ---
 
+## Direction locked (current approach)
+
+**One candidate per chunk, center column, probed at every Y the `VerticalAdjustor` would consider.** Confirmed with user. The plan below is reorganized around this: phases 1 + 3 + 4 collapse into the landing work, phase 2 (streaming inflate) is deferred, phase 0 (benchmark) is deferred but still wanted.
+
+Key decisions (locked):
+
+- **Shape granularity**: `spatialResolution` already measures in chunks; no shape remapping needed. Each shape index = one chunk. `(x, z)` = `(cx*16+8, cz*16+8)`.
+- **Y iteration**: the `VerticalAdjustor` owns Y selection. New hook `VerticalAdjustor.adjustFromProbe(ColumnProbe) → OptionalInt`. **Option (a) chosen** over an iterator-returning API — perf delta is <0.2% wall-clock, (a) keeps adjustors as the single source of truth for Y selection logic.
+- **Budget**: `Region.maxBiomeChecksPerGen` is retired in PR-3. Budget becomes `maxAttempts` = chunks probed per generation. `PregenState.maxBiomeChecks` and `PregenState.defaultBiomes` go away with it.
+- **Prefilter semantics**: the probe is a *superset-reject* filter. `REJECT_*` ⇒ the full pipeline would also reject. Accepted chunks still go through the existing safety + adjustor + verifier path unchanged. A parity test guards the superset property.
+- **Heightmap**: probe uses `Heightmaps.MOTION_BLOCKING_NO_LEAVES` as a fast hint; falls back to section scan if absent/malformed. Not authoritative — the real decision is `probe.blockAt(y)` / `probe.biomeAt(y)` per Y.
+
+---
+
+## PR sequencing & status
+
+Landing in three sequenced PRs so each slice is testable independently. Update the status marker in-place as work lands; **do not branch this into per-session copies**.
+
+### PR-1 — `rtp-anvil` lean parser + column probe  `[x]`
+
+Pure addition, no callers yet. Zero behavior change.
+
+- [x] `Nbt.skipPayload(DataInput, byte type)` — non-allocating skip for every tag type.
+- [x] `Nbt.readRootCompoundSelective(byte[], SelectiveFilter)` — general selective NBT walker used by `AnvilReader.readColumnProbe`; filter decides `KEEP`/`RECURSE`/`SKIP` per named child (and per list element via synthetic name `"[]"`).
+- [x] `ColumnProbe` record: `minY`/`maxY`/`heightmapTopY`, center-column `blockAt(int worldY)` / `biomeAt(int worldY)`, `hasHeightmap()`. Reuses existing `PaletteSection` / `BiomePaletteSection` at `(lx=8, lz=8)` for guaranteed parity with `AnvilChunkView`; single-entry-palette fast path is inherited from those carriers.
+- [x] `AnvilReader.readColumnProbe(byte[] regionBytes, int cx, int cz, int minY, int maxY)`.
+- [x] Tests in `rtp-anvil/src/test`:
+  - `NbtSkipPayloadTest`: KEEP/RECURSE/SKIP fidelity on a synthetic every-tag-type fixture; full-skip empties the root without byte drift; KEEP-all matches full-parse byte-for-byte; selective parse of the real `r.0.0.mca` preserves kept subtrees (`MOTION_BLOCKING_NO_LEAVES`, `sections`).
+  - `ColumnProbeParityTest`: per-Y center-column block + biome + heightmap-top parity vs `AnvilChunkView` across every supported fixture (`1_20_R1`, `1_21_R1`, `26_1_R1`); window-bounds enforcement; null on absent chunk; inverted window throws.
+- [ ] Bit-packing edge-case test (1/2/3-bit palettes, `entriesPerLong` threshold). Existing `AnvilBiomeDecoderTest` already covers 1-bit/2-bit biome packing; deferred to PR-2 if PR-2's adjustor-probe path surfaces a new packing case the existing coverage doesn't hit.
+
+**Status**: landed. All 62 `rtp-anvil` tests green.
+
+### PR-2 — `rtp-core` hook + `VerticalAdjustor.adjustFromProbe`  `[ ]`
+
+Still no behavior change (nothing calls the hook yet).
+
+- [ ] Define `ColumnProbe` interface in `rtp-api` (so adjustors in `rtp-core` can reference it without pulling `rtp-anvil`); Anvil side implements it.
+- [ ] `BiomeSource.probeChunkColumn(RTPWorld, int cx, int cz, int minY, int maxY) → CompletableFuture<Optional<ColumnProbe>>`. Anvil impl delegates to `AnvilReader.readColumnProbe`. Default no-op for non-Anvil platforms returns `Optional.empty()` → caller falls back to current path.
+- [ ] `VerticalAdjustor.adjustFromProbe(ColumnProbe) → OptionalInt`. Default impl bridges to existing `adjust(RTPChunk)` via a probe-backed `RTPChunk` adapter (so every subclass works out of the box; overrides are optional optimization).
+- [ ] Concrete overrides for the hot adjustor subclasses. Grep for `extends VerticalAdjustor` before coding to scope this.
+- [ ] Unit tests per subclass: `adjustFromProbe` produces the same Y as `adjust(RTPChunk)` on a fixture-backed probe.
+
+**Status**: not started. Depends on PR-1 `ColumnProbe` surface.
+
+### PR-3 — `PregenTask` rewire + retire `maxBiomeChecksPerGen`  `[ ]`
+
+Behavior change lands atomically here.
+
+- [ ] New `LocationGenerator.FailTypes.prefilterBiome / prefilterBlock / prefilterRange`.
+- [ ] `PregenTask`: per attempt, resolve `(cx, cz)` from shape, call `BiomeSource.probeChunkColumn`, then `vert.adjustFromProbe(probe)`, then biome check, then unsafe-block check on the center column (and same-chunk safety-radius cells — free, same probe). Full pipeline (existing safety eval + verifiers + teleport) runs only on accept.
+- [ ] Delete `Region.maxBiomeChecksPerGen` + all readers:
+  - `PregenState.build` (drop `maxBiomeChecks` construction).
+  - `PregenState.maxBiomeChecks` field + constructor param.
+  - `PregenState.defaultBiomes` field + constructor param (confirmed dead after PR-1+2 land).
+  - `PregenTask.completeExhausted` verbose log threshold using the old constant.
+  - Any test asserting the old value.
+- [ ] Docs:
+  - `docs/architecture/09-location-selection-per-attempt.md` — update per-attempt flow.
+  - `docs/dev/BIOME_LOOKUP_PERF_PLAN.md` — tick phases 1 + 3 + 4; keep 0, 2, 5 open.
+  - `CHANGELOG.md` — user-visible: `maxBiomeChecksPerGen` removed, budget is now `maxAttempts` (chunks probed).
+- [ ] Tests:
+  - `PregenTask` test asserting chunk-granular iteration and `FailTypes.prefilter*` accounting.
+  - Superset-reject parity: on fixture-backed probes, every `REJECT_*` outcome implies the old pipeline also rejected (prevents the prefilter from ever over-rejecting).
+- [ ] Run the full rtp-core + rtp-anvil test suites; do not ship PR-3 with failures.
+
+**Status**: not started. Depends on PR-1 and PR-2.
+
+### Deferred (not in this sequence)
+
+- **Phase 0 — benchmark harness**: still wanted for before/after numbers once PR-3 lands.
+- **Phase 2 — streaming inflate with early termination**: stacks on PR-1; revisit if PR-3 numbers show inflate still dominates.
+- **Phase 5 — region-level batching**: only if benchmarks justify it.
+
+---
+
 ## Context
 
 Biome sampling during location selection used to be an in-memory call on already-loaded chunks; it is now backed by `rtp-anvil` reads from `.mca` files on disk. The per-sample cost grew by ~1–2 orders of magnitude, which exposed `Region.maxBiomeChecksPerGen` (previously effectively `100 * maxAttempts` ≈ 10k) as a budget that produces intolerable worst-case latency.

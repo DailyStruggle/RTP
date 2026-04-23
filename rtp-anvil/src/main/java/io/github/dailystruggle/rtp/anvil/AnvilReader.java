@@ -68,6 +68,19 @@ public final class AnvilReader {
      * @throws IOException                     on malformed headers or NBT
      */
     public static ChunkEntry readChunk(byte[] regionBytes, int cx, int cz) throws IOException {
+        RawChunk raw = readRawChunk(regionBytes, cx, cz);
+        if (raw == null) return null;
+        LinkedHashMap<String, Object> root = Nbt.readRootCompound(raw.nbtBytes);
+        return new ChunkEntry(raw.compressionByte, raw.declaredLength, root);
+    }
+
+    /**
+     * Locates the chunk at {@code (cx, cz)} and inflates its NBT payload without parsing
+     * the tag tree. Returns {@code null} if the chunk is absent from the region. Shared
+     * by {@link #readChunk} and {@link #readColumnProbe} to avoid duplicating the
+     * header-walk and decompression logic.
+     */
+    private static RawChunk readRawChunk(byte[] regionBytes, int cx, int cz) throws IOException {
         if (regionBytes == null || regionBytes.length < SECTOR_SIZE * 2) {
             throw new CorruptRegionEntryException("Region buffer too short: " + (regionBytes == null ? 0 : regionBytes.length));
         }
@@ -107,8 +120,18 @@ public final class AnvilReader {
         int compressedLen = declaredLength - 1;
 
         byte[] nbtBytes = decompress(regionBytes, payloadStart + 5, compressedLen, compressionByte);
-        LinkedHashMap<String, Object> root = Nbt.readRootCompound(nbtBytes);
-        return new ChunkEntry(compressionByte, declaredLength, root);
+        return new RawChunk(compressionByte, declaredLength, nbtBytes);
+    }
+
+    private static final class RawChunk {
+        final int compressionByte;
+        final int declaredLength;
+        final byte[] nbtBytes;
+        RawChunk(int compressionByte, int declaredLength, byte[] nbtBytes) {
+            this.compressionByte = compressionByte;
+            this.declaredLength = declaredLength;
+            this.nbtBytes = nbtBytes;
+        }
     }
 
     /** Decompresses a chunk payload according to Minecraft Anvil compression modes. */
@@ -184,6 +207,134 @@ public final class AnvilReader {
         ChunkEntry entry = readChunk(regionBytes, cx, cz);
         if (entry == null) return null;
         return toView(entry.root);
+    }
+
+    // ----------------------------------------------------------- PR-1 (ADR-016) column probe
+
+    /**
+     * Reads the chunk at region-local {@code (cx, cz)} and returns a lean
+     * {@link ColumnProbe} covering the caller-supplied world-Y window {@code [minY, maxY]}.
+     *
+     * <p>Semantically equivalent to {@code readChunkView(...).blockIdAt(8, y, 8)} /
+     * {@code .getBiomeAt(8, y, 8)} / {@code .getSurfaceHeight(8, 8)} for every Y in the
+     * window — the probe exists to make those queries cheaper, not to change what they
+     * answer (see {@code docs/dev/BIOME_LOOKUP_PERF_PLAN.md}). Internally the NBT parse
+     * skips every root child we do not need ({@code block_entities}, {@code structures},
+     * {@code Entities}, tick queues, {@code Heightmaps} entries other than
+     * {@code MOTION_BLOCKING_NO_LEAVES}, etc.) and every section child other than
+     * {@code Y}, {@code block_states}, and {@code biomes}.
+     *
+     * @return the probe, or {@code null} if the chunk is not present in the region
+     * @throws UnsupportedAnvilFormatException if the compression mode is not supported
+     * @throws IOException                     on malformed headers or NBT
+     */
+    public static ColumnProbe readColumnProbe(byte[] regionBytes, int cx, int cz, int minY, int maxY)
+            throws IOException {
+        if (minY > maxY) {
+            throw new IllegalArgumentException("minY=" + minY + " must be <= maxY=" + maxY);
+        }
+        RawChunk raw = readRawChunk(regionBytes, cx, cz);
+        if (raw == null) return null;
+
+        LinkedHashMap<String, Object> root = Nbt.readRootCompoundSelective(
+                raw.nbtBytes, AnvilReader::columnProbeDecision);
+
+        long[] heightmap = getMotionBlockingNoLeaves(root);
+        Nbt.NbtList sections = getSections(root);
+        List<PaletteSection> sectionsOut;
+        List<BiomePaletteSection> biomeSectionsOut;
+        if (sections == null || sections.items.isEmpty()) {
+            sectionsOut = Collections.emptyList();
+            biomeSectionsOut = Collections.emptyList();
+        } else {
+            sectionsOut = new ArrayList<>(sections.items.size());
+            biomeSectionsOut = new ArrayList<>(sections.items.size());
+            for (Object rawSection : sections.items) {
+                PaletteSection ps = sectionFromCompound(rawSection);
+                if (ps != null) sectionsOut.add(ps);
+                BiomePaletteSection bs = biomeSectionFromCompound(rawSection);
+                if (bs != null) biomeSectionsOut.add(bs);
+            }
+        }
+
+        int heightmapTop = computeHeightmapTop(heightmap, sectionsOut);
+        return new ColumnProbe(minY, maxY, heightmapTop,
+                Collections.unmodifiableList(sectionsOut),
+                Collections.unmodifiableList(biomeSectionsOut));
+    }
+
+    /**
+     * Selective-parser decision for {@link #readColumnProbe}. Keeps only the subset of
+     * the chunk root that center-column queries need: {@code DataVersion} (for future
+     * version-gating), {@code Heightmaps.MOTION_BLOCKING_NO_LEAVES}, and each section's
+     * {@code Y}/{@code block_states}/{@code biomes}. Everything else is skipped without
+     * allocation. Sections outside the probe's Y window are dropped entirely.
+     */
+    private static Nbt.SelectiveFilter.Decision columnProbeDecision(
+            List<String> path, String name, byte type) {
+        int depth = path.size();
+        if (depth == 0) {
+            // Root compound
+            if ("sections".equals(name) && type == Nbt.TAG_LIST) return Nbt.SelectiveFilter.Decision.RECURSE;
+            if ("Heightmaps".equals(name) && type == Nbt.TAG_COMPOUND) return Nbt.SelectiveFilter.Decision.RECURSE;
+            if ("DataVersion".equals(name)) return Nbt.SelectiveFilter.Decision.KEEP;
+            return Nbt.SelectiveFilter.Decision.SKIP;
+        }
+        String top = path.get(0);
+        if ("Heightmaps".equals(top)) {
+            // Only the surface heightmap matters; every other heightmap variant is skipped.
+            return "MOTION_BLOCKING_NO_LEAVES".equals(name)
+                    ? Nbt.SelectiveFilter.Decision.KEEP
+                    : Nbt.SelectiveFilter.Decision.SKIP;
+        }
+        if ("sections".equals(top)) {
+            if (depth == 1) {
+                // Each list element is a compound — recurse to filter its children.
+                return Nbt.SelectiveFilter.Decision.RECURSE;
+            }
+            if (depth == 2) {
+                // Inside sections[*]: keep Y, recurse block_states/biomes, skip lights/etc.
+                if ("Y".equals(name)) return Nbt.SelectiveFilter.Decision.KEEP;
+                if ("block_states".equals(name) || "biomes".equals(name)) {
+                    return Nbt.SelectiveFilter.Decision.RECURSE;
+                }
+                return Nbt.SelectiveFilter.Decision.SKIP;
+            }
+            if (depth == 3) {
+                // Inside sections[*].block_states or sections[*].biomes: keep palette + data.
+                if ("palette".equals(name) || "data".equals(name)) {
+                    return Nbt.SelectiveFilter.Decision.KEEP;
+                }
+                return Nbt.SelectiveFilter.Decision.SKIP;
+            }
+        }
+        return Nbt.SelectiveFilter.Decision.SKIP;
+    }
+
+    /**
+     * Extracts the surface Y at {@code (8, 8)} from a decoded {@code MOTION_BLOCKING_NO_LEAVES}
+     * heightmap, using the same bit-packing + floor convention as
+     * {@link AnvilChunkView#getSurfaceHeight(int, int)}. Returns {@link Integer#MIN_VALUE}
+     * when the heightmap or sections list is absent/empty.
+     */
+    private static int computeHeightmapTop(long[] heightmap, List<PaletteSection> sectionsOut) {
+        if (heightmap == null || heightmap.length == 0) return Integer.MIN_VALUE;
+        int floor = Integer.MAX_VALUE;
+        for (PaletteSection s : sectionsOut) {
+            if (s.sectionY() < floor) floor = s.sectionY();
+        }
+        if (floor == Integer.MAX_VALUE) return Integer.MIN_VALUE;
+        int minHeight = floor * 16;
+        int bits = 9;
+        int entriesPerLong = 64 / bits;
+        int columnIndex = (ColumnProbe.CENTER_LOCAL_Z & 15) * 16 + (ColumnProbe.CENTER_LOCAL_X & 15);
+        int longIdx = columnIndex / entriesPerLong;
+        if (longIdx >= heightmap.length) return Integer.MIN_VALUE;
+        int slot = columnIndex - longIdx * entriesPerLong;
+        long mask = (1L << bits) - 1L;
+        int rawVal = (int) ((heightmap[longIdx] >>> (slot * bits)) & mask);
+        if (rawVal <= 0) return minHeight;
+        return minHeight + rawVal - 1;
     }
 
     /**
