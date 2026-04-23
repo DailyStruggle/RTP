@@ -199,8 +199,10 @@ final class PregenState {
 
         long maxAttemptsBase = Math.max(1L, performance.getNumber(PerformanceKeys.maxAttempts, 20).longValue());
         long maxAttempts = maxAttemptsBase;
-        long maxBiomeChecks = Region.maxBiomeChecksPerGen * maxAttempts;
-        if (!defaultBiomes) maxBiomeChecks *= 10;
+        // Flat cap on total biome checks. Since biome sampling now reads chunk files
+        // from disk, the old 10x multiplier for explicit biome requests was too expensive
+        // to justify; use a single bound for both default and explicit biome paths.
+        long maxBiomeChecks = Math.max(maxAttempts, (long) Region.maxBiomeChecksPerGen);
 
         boolean biomeRecall = Boolean.parseBoolean(
                 performance.getConfigValue(PerformanceKeys.biomeRecall, false).toString());

@@ -1,3 +1,13 @@
+# `/rtp scan` task crawler
+
+**Scope of this diagram.** This chart covers the admin-triggered bulk pre-warm loop — `/rtp scan <region> <count>` — that crawls a region's spiral index in bounded ticks, pushes accepted locations into the same per-region cache that diagram 02 fills, and reports progress. Related-but-separate behavior paths are intentionally **out of scope** here:
+- **What makes a single candidate acceptable** — see diagram 09 (per-attempt pipeline); scan just invokes it in a loop.
+- **How `/rtp` consumes those pre-warmed locations** — see diagram 01 (cache-hot branch).
+- **Background refill without admin intervention** — see diagram 02; the two crawlers both write to the same cache but scan is one-shot, budget-bounded by count rather than `queueLen`.
+- **Command parsing / permissions for `/rtp scan`** — see `commands-api` and `BukkitBaseRTPCmd`; this chart starts after the command has been dispatched.
+
+> Companion walkthrough: [`CODE_TOUR.md` §6 — Scan task crawler](../dev/CODE_TOUR.md).
+
 ```mermaid
 stateDiagram-v2
     CmdTrigger : Admin executes /rtp scan
@@ -69,4 +79,14 @@ stateDiagram-v2
     CalcStats --> SaveState : Log Output
     SaveState --> YieldTask : Range Not Met
     SaveState --> [*] : Scan Complete / Cancelled
+
+%% Color legend: green = safe location found, red = rejected candidate, blue = async/scheduler work, yellow = bookkeeping/checkpoint
+    classDef success fill:#b7e4b7,stroke:#1f6b1f,stroke-width:2px,color:#0b2a0b;
+    classDef fail    fill:#f4b7b7,stroke:#8a1f1f,color:#3a0b0b;
+    classDef async   fill:#cfe2ff,stroke:#1f4e8a,color:#0b1f3a;
+    classDef data    fill:#fff2b3,stroke:#8a6d1f,color:#3a2f0b;
+    class SafeCheck success
+    class MarkBad fail
+    class CmdTrigger,AcquireGate,ReqChunk,DrainGate,YieldTask async
+    class CheckLimit,BorderCheck,CheckContained,AnvilBiome,VertAdjust,PhysBiome,ReleaseGate,CalcStats,SaveState data
 ```

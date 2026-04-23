@@ -14,7 +14,7 @@ Operational guide for AI agents and human contributors working in the RTP reposi
 4. Use **PowerShell** syntax (`.\gradlew`, `;` not `&&`).
 5. Use the `search_project` tool — not `grep`/`find` — to search the codebase.
 6. Java 21+ is required (REQ-RTP-SYS-001).
-7. Before modifying any file, create a `.bak` copy in the same directory.
+7. Before modifying an uncommitted **code** file, create a `.bak` copy beside it. Skip for git-clean files and for docs/markdown.
 
 ---
 
@@ -27,13 +27,21 @@ Before generating code or terminal commands, explicitly state and verify:
 3. **Chunk I/O** — zero synchronous chunk loads or blocking `.get()` on the main thread.
 4. **Terminal** — PowerShell (`.\gradlew`, `;`, correctly-escaped quotes).
 5. **Safety rule** — name the S-00x rule(s) that apply (see table below).
-6. **Backups** — `.bak` copy of every file you will modify.
+6. **Backups** — `.bak` copy required only for uncommitted **code** files. Skip for git-clean files and for docs/markdown.
 
 ## Backup Policy
 
-- Use the suffix `.bak` (e.g., `LocationGenerator.java.bak`) in the same directory as the original.
-- Delete the backup only after the change is verified and committed.
-- Never modify a file without a corresponding backup.
+`.bak` copies protect uncommitted code only; git covers committed revisions and docs diffs are cheap.
+
+| File type | Dirty | Clean |
+|-----------|-------|-------|
+| Code | `.bak` required | No `.bak` (use git) |
+| Docs / markdown / config | No `.bak` | No `.bak` |
+
+- Check status with `git status --porcelain <path>` or `git diff --quiet -- <path>`.
+- Name: `<original>.bak` in the same directory (e.g., `LocationGenerator.java.bak`).
+- Delete after the change is verified and committed.
+- When in doubt on code, create the `.bak`.
 
 ---
 

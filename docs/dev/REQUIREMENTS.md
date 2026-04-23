@@ -30,6 +30,7 @@ For specific code-level and platform-specific requirements, please refer to the 
 - **GUI / inventory menus:** RTP does not provide a graphical interface. All interaction is command- and config-based.
 - **Cross-server teleportation:** RTP operates within a single server instance. BungeeCord/Velocity network teleportation is out of scope.
 - **Non-Bukkit platforms:** RTP targets Bukkit-derived software only (Spigot, Paper, Folia). Forge, Fabric, and other mod loaders are not supported.
+- **Legacy Minecraft and Java versions:** RTP targets Java 21+ (REQ-RTP-SYS-001) and the Minecraft versions enumerated by the shipped versioned platform adapter submodules (ADR-010). Older Minecraft versions and older Java runtimes are out of scope; users on legacy servers shall be directed to the last RTP release that supported their server. Revisit conditions and rationale are recorded in [ADR-021](../adr/ADR-021-legacy-mc-and-java-support-scope.md).
 
 ## 1. Functional Requirements
 

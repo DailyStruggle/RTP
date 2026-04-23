@@ -114,18 +114,6 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
       int z = xz.get(1);
       int globalX = (chunk.x() << 4) + x;
       int globalZ = (chunk.z() << 4) + z;
-      if (requireSkyLight) {
-        int y = chunk.getSurfaceHeight(x, z);
-        if (y >= minY && y < maxY) {
-          if (chunk.isSafe(x, y, z, unsafeBlocks)) {
-            output.setWorldName(chunk.getWorld().name());
-            output.setXZ(globalX, globalZ);
-            output.setY(y + 1);
-            return true;
-          }
-        }
-        continue; // Sky light is required, so do not check lower blocks.
-      }
       switch (dir) {
         case 0:
           { // bottom up

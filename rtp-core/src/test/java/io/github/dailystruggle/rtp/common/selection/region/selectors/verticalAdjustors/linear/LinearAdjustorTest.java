@@ -275,17 +275,18 @@ public class LinearAdjustorTest {
     }
 
     // -----------------------------------------------------------------------
-    // requireSkyLight = true — surface-height path
+    // requireSkyLight = true — per-Y sky-light gate (V2 behavior, not a fast-path)
     // -----------------------------------------------------------------------
 
     /**
-     * When {@code requireSkyLight=true} the adjustor uses {@link io.github.dailystruggle.rtp.api.world.RTPChunk#getSurfaceHeight}
-     * and returns Y = surfaceHeight + 1 when the surface block is safe.
+     * When {@code requireSkyLight=true} the adjustor performs the same per-Y scan as the
+     * non-requireSkyLight path; it merely gates the candidate Y on
+     * {@link io.github.dailystruggle.rtp.api.world.RTPChunk#getSkyLight} {@code > 7}.
+     * No {@code getSurfaceHeight} fast-path is used.
      */
     @Test
-    void requireSkyLight_safeAtSurface_returnsSurfacePlusOne() {
+    void requireSkyLight_findsLandingViaPerYScan() {
         ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
-        // Place a solid-safe block at Y=70 so getSurfaceHeight returns 70
         chunk.setSolidSafe(70);
 
         LinearAdjustor adj = new LinearAdjustor(new ArrayList<>());
@@ -295,8 +296,7 @@ public class LinearAdjustorTest {
         adj.set(GenericVerticalAdjustorKeys.requireSkyLight, true);
 
         RTPCoords result = adj.adjust(chunk);
-        // The requireSkyLight path uses getSurfaceHeight; just verify a non-null result is returned
-        assertNotNull(result, "requireSkyLight adjustor should find a landing");
+        assertNotNull(result, "requireSkyLight adjustor should find a landing via per-Y scan");
     }
 
     // -----------------------------------------------------------------------
