@@ -6,7 +6,13 @@ labels: enhancement
 assignees: ''
 ---
 
-> **Solo Developer Disclaimer:** I maintain this project alone with limited time. Requests that duplicate existing functionality, lack a clear use-case, or conflict with the plugin's design goals will be closed without a response. Please read the [docs](../../docs/FOR_SERVER_ADMINS.md) before submitting.
+> **Solo Developer Disclaimer:** I maintain this project alone with limited time. Requests that duplicate existing functionality, lack a clear use-case, or conflict with the plugin's design goals will be closed without a response. Before filing, read the [docs](../../docs/FOR_SERVER_ADMINS.md) and [`SUPPORT.md`](../../SUPPORT.md). By participating you agree to the [Code of Conduct](../../CODE_OF_CONDUCT.md).
+
+**0. Pre-flight (required — unchecked boxes = auto-close)**
+- [ ] I read [`SUPPORT.md`](../../SUPPORT.md); this belongs as a feature request and not as a [Discussion](https://github.com/DailyStruggle/RTP/discussions).
+- [ ] I searched **open *and* closed** issues and Discussions for duplicates.
+- [ ] I confirmed the capability is not already provided by existing config keys, permissions, or commands.
+- [ ] I agree to the [Code of Conduct](../../CODE_OF_CONDUCT.md).
 
 **1. Problem / Motivation**
 What problem does this feature solve? Who is affected and how often?

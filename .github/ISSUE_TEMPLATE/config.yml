@@ -1,5 +1,14 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Question / "how do I…" — GitHub Discussions
+    url: https://github.com/DailyStruggle/RTP/discussions
+    about: The issue tracker is for bugs. Ask usage questions and propose ideas in Discussions first.
+  - name: How to get support (read before opening an issue)
+    url: https://github.com/DailyStruggle/RTP/blob/main/SUPPORT.md
+    about: Where to ask, how to ask well, and what will be closed without a reply.
+  - name: Security vulnerability (private)
+    url: https://github.com/DailyStruggle/RTP/security/advisories/new
+    about: Do NOT open a public issue. Report privately via GitHub Security Advisories. See SECURITY.md.
   - name: SpigotMC Resource Page (reviews, releases, wiki)
     url: https://www.spigotmc.org/resources/rtp.94812/
     about: Check for existing wiki answers, download the latest release, or leave a review.

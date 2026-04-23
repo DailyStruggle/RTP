@@ -115,6 +115,31 @@ public class LockFreeLocationBuffer {
      * @return The removed location, or {@code null} if the buffer is empty.
      */
     public RTPLocation poll() {
+        return poll0(true);
+    }
+
+    /**
+     * Removes and returns the head location without firing the {@code onRemove}
+     * callback.
+     *
+     * <p>Intended for internal-promotion paths where a location is being moved
+     * from one buffer to another (e.g. {@code unkeptLocations} → {@code keptLocations}
+     * in {@code Region.execute}) and persists under an identical DB composite key
+     * at the destination. Firing the delete callback on the source poll and the
+     * save callback on the destination offer on the same key races inside
+     * {@code DatabaseAccessor}'s {@code writeQueue} / {@code deleteQueue} and can
+     * produce a net delete (silently losing the row across restarts). Using this
+     * silent variant for the source removal keeps the DB row intact — the
+     * destination offer's save callback is a deterministic upsert that refreshes
+     * the existing row.
+     *
+     * @return The removed location, or {@code null} if the buffer is empty.
+     */
+    public RTPLocation pollSilently() {
+        return poll0(false);
+    }
+
+    private RTPLocation poll0(boolean fireCallback) {
         long currentHead;
         RTPLocation location;
         do {
@@ -130,7 +155,7 @@ public class LockFreeLocationBuffer {
         } while (location == null || !head.compareAndSet(currentHead, currentHead + 1));
 
         buffer.set((int) (currentHead & mask), null);
-        if (onRemove != null) onRemove.accept(location);
+        if (fireCallback && onRemove != null) onRemove.accept(location);
         return location;
     }
 

@@ -1,3 +1,13 @@
+# Budgeted cache generator (queue refill)
+
+**Scope of this diagram.** This chart covers the *background* loop that keeps each region's location cache warm: the periodic `SelectionAPI.compute()` pulse, the region-by-region budget enforcement (`queueLen` / maxBiasedAttempts), the hand-off to `LocationGenerator`, and the insertion of successful results into the cache that diagram 01 pops from. Related-but-separate behavior paths are intentionally **out of scope** here:
+- **What happens inside one candidate attempt** — see diagram 09 (location selection per attempt); `GenerateLocation` in this chart expands into that flowchart.
+- **How a waiting `/rtp` consumes the cache** — see diagram 01 (`QueryCache` / `QueueWait`).
+- **Chunk ticket book-keeping** — see diagram 03; every generated candidate reserves a ticket via `ChunkReservation`.
+- **`/rtp scan` pre-warm** — see diagram 05; scan is an admin tool that *pushes* into the same cache but uses a different crawler.
+
+> Companion walkthrough: [`CODE_TOUR.md` §3 — Budgeted cache generator](../dev/CODE_TOUR.md).
+
 ```mermaid
 stateDiagram-v2
     PulseTrigger : selectionAPI.compute() [Async]
@@ -40,4 +50,14 @@ stateDiagram-v2
 %% Terminations
     WakePlayer --> [*]
     YieldTask --> [*]
+
+%% Color legend: green = cache successfully grew / consumer woken, blue = async worker / scheduler pulse, yellow = cache touchpoint, grey = yield
+    classDef success fill:#b7e4b7,stroke:#1f6b1f,stroke-width:2px,color:#0b2a0b;
+    classDef async   fill:#cfe2ff,stroke:#1f4e8a,color:#0b1f3a;
+    classDef data    fill:#fff2b3,stroke:#8a6d1f,color:#3a2f0b;
+    classDef cleanup fill:#e2e2e2,stroke:#555555,color:#111111;
+    class PushQueue,WakePlayer success
+    class PulseTrigger,SpawnWorker,ExecuteRegion async
+    class InitBudget,CheckBudget,CheckPeriod data
+    class YieldTask cleanup
 ```

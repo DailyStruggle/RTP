@@ -2,6 +2,10 @@
 
 This document outlines the comprehensive plan for transitioning RTP to a multi-platform project, starting with Fabric and potentially expanding to Forge in the future.
 
+## Out of Scope
+
+Legacy Minecraft versions (older than the shipped `v*_R*` adapter submodules) and legacy Java runtimes (older than Java 21) are explicitly out of scope for this roadmap. See [ADR-021](../adr/ADR-021-legacy-mc-and-java-support-scope.md) for the decision, revisit conditions, and the minimum plan to follow if the question is reopened. Do not add legacy-MC phases or backport Fabric-stage work to older servers without first superseding ADR-021.
+
 ## Phase 1: Infrastructure & Core Consolidation (COMPLETED/IN-PROGRESS)
 
 - [x] **Consolidate APIs**: Pull `CommandsAPI` and `EffectsAPI` back into the main repository as sub-modules.

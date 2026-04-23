@@ -150,6 +150,39 @@ class LockFreeLocationBufferTest {
         assertSame(l, removed.get(0));
     }
 
+    /**
+     * Regression: {@code Region.execute}'s unkept→kept promotion race caused the
+     * {@code rtp_cached_locations} DB row to disappear across restarts because the
+     * source poll fired a delete callback and the destination offer fired a save
+     * callback against the same composite key. {@link LockFreeLocationBuffer#pollSilently}
+     * suppresses the {@code onRemove} callback so the destination offer's save callback
+     * acts as an idempotent upsert rather than racing with a competing delete.
+     */
+    @Test
+    void pollSilently_doesNotFireOnRemoveButReturnsHead() {
+        List<RTPLocation> removed = new ArrayList<>();
+        buffer.setCallbacks(null, removed::add);
+        RTPLocation a = loc(1);
+        RTPLocation b = loc(2);
+        buffer.offer(a);
+        buffer.offer(b);
+        assertSame(a, buffer.pollSilently());
+        assertTrue(removed.isEmpty(), "pollSilently must not fire onRemove");
+        assertEquals(1, buffer.size());
+        // Subsequent regular poll still fires the callback.
+        assertSame(b, buffer.poll());
+        assertEquals(1, removed.size());
+        assertSame(b, removed.get(0));
+    }
+
+    @Test
+    void pollSilently_emptyBuffer_returnsNull() {
+        List<RTPLocation> removed = new ArrayList<>();
+        buffer.setCallbacks(null, removed::add);
+        assertNull(buffer.pollSilently());
+        assertTrue(removed.isEmpty());
+    }
+
     @Test
     void concurrentOfferAndPoll_noDataLoss() throws InterruptedException {
         int count = 100;

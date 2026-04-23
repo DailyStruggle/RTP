@@ -298,7 +298,14 @@ public class Region extends FactoryValue<RegionKeys> {
     long deficit = activeCap - (currentHot + inFlightCalculations.get());
 
     for (int i = 0; i < deficit; i++) {
-      RTPLocation coldLoc = queueManager.unkeptLocations.poll();
+      // Silent poll: this location is about to be re-offered to keptLocations under an
+      // identical DB composite key (region:world:x:y:z). Firing the delete callback here
+      // and the save callback on the kept offer races inside DatabaseAccessor's
+      // writeQueue/deleteQueue and can net out to a row loss across restarts (symptom:
+      // `/rtp info` showing cacheCap+activeCap-1 instead of the expected total). Keeping
+      // the source poll silent preserves the DB row through the promotion; the kept
+      // offer's save callback then acts as an idempotent upsert on the same key.
+      RTPLocation coldLoc = queueManager.unkeptLocations.pollSilently();
       if (coldLoc == null) break;
 
       inFlightCalculations.incrementAndGet();
@@ -780,5 +787,11 @@ public class Region extends FactoryValue<RegionKeys> {
     return region.settings.worldBorderOverride() == settings.worldBorderOverride();
   }
 
-  public static int maxBiomeChecksPerGen = 100;
+  /**
+   * Absolute ceiling on biome checks per generation. Lowered from the historical
+   * {@code 100 * maxAttempts} formula (~10k) because biome sampling now reads
+   * chunk files from disk; a smaller bounded budget keeps worst-case time
+   * tolerable. Treated as a hard total cap (not a per-attempt multiplier).
+   */
+  public static int maxBiomeChecksPerGen = 1000;
 }

@@ -6,6 +6,12 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 
 | Task | Open |
 |---|---|
+| New-dev walkthrough by behavior / symptom | [`CODE_TOUR.md`](CODE_TOUR.md) |
+| Plugin startup / `onEnable` ordering | [`../architecture/07-plugin-setup-lifecycle.md`](../architecture/07-plugin-setup-lifecycle.md) |
+| `/rtp` command → world / region / permission decision tree | [`../architecture/08-rtp-command-region-selection.md`](../architecture/08-rtp-command-region-selection.md) |
+| Location selection — per-attempt pipeline (shape → chunk → vert → biome → safety) | [`../architecture/09-location-selection-per-attempt.md`](../architecture/09-location-selection-per-attempt.md) |
+| Configuration load / `/rtp reload` data flow | [`../architecture/10-configuration-load-and-reload.md`](../architecture/10-configuration-load-and-reload.md) |
+| Shutdown / `onDisable` flush + chunk-ticket release ordering | [`../architecture/11-shutdown-and-flush-lifecycle.md`](../architecture/11-shutdown-and-flush-lifecycle.md) |
 | What absolute rules apply? | [`REQUIREMENTS.md §3`](REQUIREMENTS.md#3-prohibition-requirements) (S-001 … S-007) |
 | Where does my code go? | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
 | Threading / Folia / chunk I/O | [`DESIGN.md#threading`](DESIGN.md) |
