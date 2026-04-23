@@ -230,14 +230,35 @@ public final class AnvilReader {
      */
     public static ColumnProbe readColumnProbe(byte[] regionBytes, int cx, int cz, int minY, int maxY)
             throws IOException {
+        return readColumnProbe(regionBytes, cx, cz, minY, maxY, false);
+    }
+
+    /**
+     * {@link #readColumnProbe(byte[], int, int, int, int)} variant that optionally retains
+     * sky-light data.
+     *
+     * <p>When {@code includeSkyLight} is {@code true}, the selective parse additionally
+     * keeps the chunk-root {@code isLightOn} flag and each section's {@code SkyLight}
+     * nibble array (2 KiB per section). This lets callers (e.g. {@code LinearAdjustor}
+     * with {@code requireSkyLight=true}) answer sky-light queries directly from the probe
+     * without falling back to the authoritative chunk-load path. When {@code false} —
+     * the default — {@code SkyLight}/{@code isLightOn} are skipped without allocation and
+     * {@link ColumnProbe#skyLightAt(int)} returns the "open" default (15).</p>
+     */
+    public static ColumnProbe readColumnProbe(byte[] regionBytes, int cx, int cz,
+                                              int minY, int maxY, boolean includeSkyLight)
+            throws IOException {
         if (minY > maxY) {
             throw new IllegalArgumentException("minY=" + minY + " must be <= maxY=" + maxY);
         }
         RawChunk raw = readRawChunk(regionBytes, cx, cz);
         if (raw == null) return null;
 
+        Nbt.SelectiveFilter filter = includeSkyLight
+                ? AnvilReader::columnProbeDecisionWithSkyLight
+                : AnvilReader::columnProbeDecision;
         LinkedHashMap<String, Object> root = Nbt.readRootCompoundSelective(
-                raw.nbtBytes, AnvilReader::columnProbeDecision);
+                raw.nbtBytes, filter);
 
         long[] heightmap = getMotionBlockingNoLeaves(root);
         Nbt.NbtList sections = getSections(root);
@@ -258,9 +279,16 @@ public final class AnvilReader {
         }
 
         int heightmapTop = computeHeightmapTop(heightmap, sectionsOut);
+        boolean lightOn = true;
+        if (includeSkyLight) {
+            Object v = root.get("isLightOn");
+            if (v instanceof Number n) lightOn = n.intValue() != 0;
+            else if (v instanceof Boolean b) lightOn = b;
+        }
         return new ColumnProbe(minY, maxY, heightmapTop,
                 Collections.unmodifiableList(sectionsOut),
-                Collections.unmodifiableList(biomeSectionsOut));
+                Collections.unmodifiableList(biomeSectionsOut),
+                lightOn);
     }
 
     /**
@@ -302,6 +330,49 @@ public final class AnvilReader {
             }
             if (depth == 3) {
                 // Inside sections[*].block_states or sections[*].biomes: keep palette + data.
+                if ("palette".equals(name) || "data".equals(name)) {
+                    return Nbt.SelectiveFilter.Decision.KEEP;
+                }
+                return Nbt.SelectiveFilter.Decision.SKIP;
+            }
+        }
+        return Nbt.SelectiveFilter.Decision.SKIP;
+    }
+
+    /**
+     * Selective-parser decision for {@link #readColumnProbe(byte[], int, int, int, int, boolean)}
+     * with {@code includeSkyLight=true}: same as {@link #columnProbeDecision} but additionally
+     * keeps the root {@code isLightOn} flag and each section's {@code SkyLight} nibble array
+     * (2 KiB per section). {@code BlockLight} is still skipped — callers that need block-light
+     * aren't currently served by the probe path.
+     */
+    private static Nbt.SelectiveFilter.Decision columnProbeDecisionWithSkyLight(
+            List<String> path, String name, byte type) {
+        int depth = path.size();
+        if (depth == 0) {
+            if ("sections".equals(name) && type == Nbt.TAG_LIST) return Nbt.SelectiveFilter.Decision.RECURSE;
+            if ("Heightmaps".equals(name) && type == Nbt.TAG_COMPOUND) return Nbt.SelectiveFilter.Decision.RECURSE;
+            if ("DataVersion".equals(name)) return Nbt.SelectiveFilter.Decision.KEEP;
+            if ("isLightOn".equals(name)) return Nbt.SelectiveFilter.Decision.KEEP;
+            return Nbt.SelectiveFilter.Decision.SKIP;
+        }
+        String top = path.get(0);
+        if ("Heightmaps".equals(top)) {
+            return "MOTION_BLOCKING_NO_LEAVES".equals(name)
+                    ? Nbt.SelectiveFilter.Decision.KEEP
+                    : Nbt.SelectiveFilter.Decision.SKIP;
+        }
+        if ("sections".equals(top)) {
+            if (depth == 1) return Nbt.SelectiveFilter.Decision.RECURSE;
+            if (depth == 2) {
+                if ("Y".equals(name)) return Nbt.SelectiveFilter.Decision.KEEP;
+                if ("SkyLight".equals(name)) return Nbt.SelectiveFilter.Decision.KEEP;
+                if ("block_states".equals(name) || "biomes".equals(name)) {
+                    return Nbt.SelectiveFilter.Decision.RECURSE;
+                }
+                return Nbt.SelectiveFilter.Decision.SKIP;
+            }
+            if (depth == 3) {
                 if ("palette".equals(name) || "data".equals(name)) {
                     return Nbt.SelectiveFilter.Decision.KEEP;
                 }

@@ -157,6 +157,124 @@ final class QueueTask {
             return;
         }
 
+        // BIOME_LOOKUP_PERF_PLAN.md Stage 1 — probe-first gate (QUEUETASK_PROBE_FIRST_PLAN.md
+        // Slice 1). Mirrors PregenTask.tryProbeFirst / ScanTask.tryProbeFirstScan: try to
+        // reject the candidate from a lean column probe before paying for the full
+        // getOrLoadChunk decode. On probe-accept / probe-UNKNOWN / probe-exception we
+        // fall through to the original load path unchanged; the post-load evaluateSafety
+        // and Region.execute unkept→kept recheck remain authoritative.
+        if (tryProbeFirstQueue(pair, left, world, cx, cz)) {
+            return;
+        }
+        runFullLoadAndResolve(pair, left, world, cx, cz);
+    }
+
+    /**
+     * Stage-1 probe-first gate for the location caching loop
+     * (both {@code RegionCacheTask}-driven fills of {@code unkeptLocations}
+     * and player-triggered {@code LocationGenerator.getLocation} attempts).
+     *
+     * <p>Returns {@code true} iff the probe committed a verdict that the caller
+     * must honour without running the full load path:
+     * <ul>
+     *   <li><b>Reject</b> — {@link #pollNext()} has been (or will be) invoked
+     *       via {@link #reenterAsync(Runnable)}. No chunk load, no reservation,
+     *       no DB write.</li>
+     *   <li><b>Accept-via-async</b> — the probe completed asynchronously and
+     *       {@link #runFullLoadAndResolve} was dispatched from the callback.</li>
+     * </ul>
+     * Returns {@code false} on synchronous probe-UNKNOWN (default no-op adapter,
+     * probe future null, adapter threw) so the caller runs the load path inline —
+     * preserving zero behaviour change on platforms without an Anvil-backed probe.</p>
+     *
+     * <p>S-005: all probe work stays on the async pool; the
+     * {@link java.util.concurrent.CompletableFuture} chain matches the shape used by
+     * {@code ScanTask.tryProbeFirstScan} / {@code PregenTask.tryProbeFirst}.</p>
+     */
+    private boolean tryProbeFirstQueue(
+            RTPLocation pair, RTPCoords left, RTPWorld<?> world, int cx, int cz) {
+        io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor<?> vert;
+        try {
+            vert = region.getVert();
+        } catch (Throwable t) {
+            return false;
+        }
+        if (vert == null) return false;
+        int minY = vert.minY();
+        int maxY = vert.maxY();
+        if (minY >= maxY) return false;
+
+        CompletableFuture<io.github.dailystruggle.rtp.api.world.ChunkColumnProbe> fut;
+        try {
+            // PR-18 window: widen by one block below minY so adjustFromProbe's
+            // standing-surface y-1 read doesn't trivially reject.
+            fut = world.probeChunkColumn(cx, cz, minY - 1, maxY, vert.requiresSkyLight());
+        } catch (Throwable t) {
+            RTP.log(Level.FINE,
+                    "[RTP] QueueTask probeChunkColumn threw for world=" + world.name()
+                            + " chunk=(" + cx + "," + cz + "): " + t);
+            return false;
+        }
+        if (fut == null) return false;
+
+        // Synchronous fast path: default no-op adapter returns completedFuture(null);
+        // real adapters with a warm cache frequently complete inline as well.
+        if (fut.isDone() && !fut.isCompletedExceptionally()) {
+            io.github.dailystruggle.rtp.api.world.ChunkColumnProbe probe;
+            try {
+                probe = fut.getNow(null);
+            } catch (Throwable ignored) {
+                return false;
+            }
+            if (probe == null) return false;
+            RTPCoords picked;
+            try {
+                picked = vert.adjustFromProbe(probe, world.name());
+            } catch (Throwable t) {
+                // Adjustor misbehaved — treat as UNKNOWN, fall through.
+                return false;
+            }
+            if (picked == null) {
+                // Stage-1 reject: no valid Y in the probe window. Skip load + DB write.
+                reenterAsync(this::pollNext);
+                return true;
+            }
+            return false; // probe-accept — caller runs full load.
+        }
+
+        // Async completion: we've committed to this candidate; continuation happens
+        // from the whenComplete callback.
+        fut.whenComplete((probe, ex) -> {
+            if (ex != null) {
+                RTP.log(Level.FINE,
+                        "[RTP] QueueTask probeChunkColumn failed for world=" + world.name()
+                                + " chunk=(" + cx + "," + cz + "): "
+                                + ex.getClass().getSimpleName() + ": " + ex.getMessage());
+                reenterAsync(() -> runFullLoadAndResolve(pair, left, world, cx, cz));
+                return;
+            }
+            if (probe == null) {
+                reenterAsync(() -> runFullLoadAndResolve(pair, left, world, cx, cz));
+                return;
+            }
+            RTPCoords picked;
+            try {
+                picked = vert.adjustFromProbe(probe, world.name());
+            } catch (Throwable t) {
+                reenterAsync(() -> runFullLoadAndResolve(pair, left, world, cx, cz));
+                return;
+            }
+            if (picked == null) {
+                reenterAsync(this::pollNext);
+                return;
+            }
+            reenterAsync(() -> runFullLoadAndResolve(pair, left, world, cx, cz));
+        });
+        return true;
+    }
+
+    private void runFullLoadAndResolve(
+            RTPLocation pair, RTPCoords left, RTPWorld<?> world, int cx, int cz) {
         // ADR-016 §13.1 probe-first via getOrLoadChunk traffic-cop.
         // Anvil-backed candidates run inline with no reservation; live-backed
         // candidates allocate a reservation and dispatch to the region thread.
@@ -355,6 +473,42 @@ final class QueueTask {
             Set<String> unsafeBlocks,
             ChunkReservation reservation) {
 
+        // Safety scan must run on the centre chunk's owning region thread on
+        // Folia — live-backed RTPChunk.isSafe reads Level.getBlockState, which
+        // is thread-local. On Spigot/Paper, RTP.scheduler.runTask(world,cx,cz,..)
+        // hops to the MAIN server thread, which would dump a region-hop onto
+        // the tick loop per candidate (unacceptable). Only Folia needs the
+        // region-thread hop — dispatch inline on other platforms where the
+        // current async-worker context is fine for the read.
+        Runnable scan = () -> runSafetyScan(pair, left, world, localChunks, L,
+            centerChunkX, centerChunkZ, safe, unsafeBlocks, reservation);
+        if (isFoliaPlatform()) {
+            RTP.scheduler.runTask(world, centerChunkX, centerChunkZ, scan);
+        } else {
+            scan.run();
+        }
+    }
+
+    private static boolean isFoliaPlatform() {
+        try {
+            return "Folia".equals(RTP.serverAccessor.getPlatform());
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private void runSafetyScan(
+            RTPLocation pair,
+            RTPCoords left,
+            RTPWorld<?> world,
+            RTPChunk<?>[] localChunks,
+            int L,
+            int centerChunkX,
+            int centerChunkZ,
+            int safe,
+            Set<String> unsafeBlocks,
+            ChunkReservation reservation) {
+
         boolean pass = true;
         try {
             safetyCheck:
@@ -430,7 +584,14 @@ final class QueueTask {
                 // best-effort close
             }
         }
-        pollNext();
+        // Trampoline through the async pool rather than a direct call. When many
+        // queued polls are already completed (e.g. a storm of rejected candidates
+        // from an async pre-check) a direct pollNext() recurses pollNext ->
+        // handlePair -> afterChunkResolved -> evaluateSafety -> finishRejected ->
+        // pollNext on the same stack, which has been observed to exceed 50 frames
+        // deep and blow past the tolerable call-stack budget. Re-enter via the
+        // async pool to break the stack between rejections.
+        reenterAsync(this::pollNext);
     }
 
     /**

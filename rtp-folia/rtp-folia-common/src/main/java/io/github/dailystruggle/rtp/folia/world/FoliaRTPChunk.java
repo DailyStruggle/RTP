@@ -236,6 +236,11 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
           : PaletteNormalizer.reconcileAll(unsafeBlocks);
       return anvilView.isSafe(x & 0xF, y, z & 0xF, effective);
     }
+    // Callers are required to invoke this on the chunk's owning region thread
+    // (enforced upstream in QueueTask.evaluateSafety / Region.execute, which
+    // dispatch via RTP.scheduler.runTask(world, cx, cz, ...)). No defensive
+    // region-ownership guard here — it would fail-closed on legitimate
+    // candidates and pollute the "bad chunk" signal.
     String materialName = chunk.getBlock(x & 0xF, y, z & 0xF).getType().name();
     return !unsafeBlocks.contains(materialName);
   }
@@ -260,7 +265,8 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
       Set<String> plain = (reconciledUnsafe != null) ? reconciledUnsafe : unsafeBlocks.plainMaterials();
       return anvilView.isSafe(x & 0xF, y, z & 0xF, plain);
     }
-
+    // Callers are required to invoke this on the chunk's owning region thread
+    // (see Set<String> overload above).
     Block block = chunk.getBlock(x & 0xF, y, z & 0xF);
     String materialName = block.getType().name();
 

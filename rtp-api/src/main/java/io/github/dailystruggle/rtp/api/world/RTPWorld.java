@@ -345,6 +345,39 @@ public abstract class RTPWorld<T> {
   }
 
   /**
+   * Asynchronously produces a lean {@link ChunkColumnProbe} for the center column of
+   * chunk {@code (cx, cz)} over the world-Y window {@code [minY, maxY]}, used by
+   * {@code PregenTask} as a probe-first fast path before falling back to the
+   * authoritative full-chunk load.
+   *
+   * <p>The default returns {@code completedFuture(null)} — "no probe available",
+   * which instructs callers to skip the fast path and resolve the chunk the normal
+   * way (ADR-016 §13.1 precedence chain). Platform adapters that can cheaply
+   * answer a center-column probe (currently: Bukkit-family worlds with an
+   * {@code .mca}-backed chunk store) SHOULD override to return a real probe.</p>
+   *
+   * <p>When {@code includeSkyLight} is {@code true} the adapter SHOULD retain the
+   * per-section {@code SkyLight} nibble arrays and the root {@code isLightOn} flag
+   * so that {@link io.github.dailystruggle.rtp.api.world.ChunkColumnProbe#skyLightAt(int)}
+   * and {@link io.github.dailystruggle.rtp.api.world.ChunkColumnProbe#isLightOn()}
+   * return authoritative values. When {@code false} the adapter MAY skip that data;
+   * callers receive the vanilla defaults (15 / true) via
+   * {@link io.github.dailystruggle.rtp.api.world.ChunkColumnProbe}.</p>
+   *
+   * @param cx the chunk's X coordinate
+   * @param cz the chunk's Z coordinate
+   * @param minY inclusive minimum world-Y the caller cares about
+   * @param maxY inclusive maximum world-Y the caller cares about
+   * @param includeSkyLight whether the caller needs sky-light data retained
+   * @return a future completing with a probe, or {@code null} if no fast path is
+   *     available (caller falls back to the authoritative path).
+   */
+  public CompletableFuture<ChunkColumnProbe> probeChunkColumn(
+      int cx, int cz, int minY, int maxY, boolean includeSkyLight) {
+    return CompletableFuture.completedFuture(null);
+  }
+
+  /**
    * Creates a platform at the specified location if necessary to ensure it is safe.
    *
    * @param location the location to create a platform at

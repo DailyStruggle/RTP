@@ -84,7 +84,16 @@ public class TestFullCmd extends BaseRTPCmdImpl {
    * comment in {@link #runShippedSubcommands(UUID)} for the rationale.
    */
   static final List<String> DELIBERATELY_EXCLUDED_SUBCOMMANDS =
-      Collections.unmodifiableList(Arrays.asList("cancel", "reload-safety", "full", "all"));
+      Collections.unmodifiableList(
+          Arrays.asList(
+              "cancel",
+              "reload-safety",
+              "full",
+              "all",
+              // Player-context diagnostic: needs the caller's live world + origin
+              // chunk to seed the A/B timing; the umbrella sweep fires under
+              // RTPAPI.serverId which has no location. Runs on-demand only.
+              "chunk-probe-perf"));
 
   public TestFullCmd(@Nullable CommandsAPICommand parent) {
     super(parent);

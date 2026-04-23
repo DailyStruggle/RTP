@@ -17,7 +17,7 @@ distanciaVistaTeletransporte: 0
 # Tiempo entre búsquedas de nuevas ubicaciones para rellenar las cachés de región.
 # ( 20 ticks = 1 segundo ).
 # Impacto: MEDIO — valores menores rellenan la caché más rápido pero usan más CPU.
-periodo: 100
+periodo: 20
 
 # Tiempo asignado por tarea (milisegundos)
 # Tiempo máximo (ms) que se dedica a tareas RTP por tick.
