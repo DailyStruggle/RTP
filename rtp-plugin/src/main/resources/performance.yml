@@ -17,7 +17,7 @@ viewDistanceTeleport: 0
 # Time between searching for new locations to refill the region caches.
 # ( 20 gameticks = 1 second ).
 # Impact: MEDIUM - Lower values refill caches faster but use more CPU.
-period: 100
+period: 20
 
 # Task Time Allotment (Milliseconds)
 # Maximum time (ms) to spend on RTP tasks per game tick. 

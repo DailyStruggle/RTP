@@ -155,6 +155,62 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   }
 
   /**
+   * BIOME_LOOKUP_PERF_PLAN.md PR-3b — fast-path center-column probe for Folia.
+   * See {@code BukkitRTPWorld#probeChunkColumn} for the shared contract.
+   *
+   * <p>S-005 / Folia threading: all file I/O is dispatched to
+   * {@link java.util.concurrent.ForkJoinPool#commonPool()}, never to a region
+   * thread. The applicability gate ({@link #shouldPrefilter}) already tolerates
+   * the region-thread-restricted {@code world.isChunkLoaded} call by treating
+   * a thrown {@code ThreadAccessException} as "continue into the probe", so
+   * this override is safe to invoke from either the async scheduler or a
+   * region thread.</p>
+   */
+  @Override
+  public CompletableFuture<io.github.dailystruggle.rtp.api.world.ChunkColumnProbe>
+      probeChunkColumn(int cx, int cz, int minY, int maxY, boolean includeSkyLight) {
+    if (minY > maxY) return CompletableFuture.completedFuture(null);
+    if (!shouldPrefilter(cx, cz)) return CompletableFuture.completedFuture(null);
+    if (world == null) return CompletableFuture.completedFuture(null);
+    final java.nio.file.Path worldFolder = world.getWorldFolder().toPath();
+    final String dim = dimensionRegionSubpath(world);
+    final int finalMinY = minY;
+    final int finalMaxY = maxY;
+    final boolean finalSky = includeSkyLight;
+    // BIOME_LOOKUP_PERF_PLAN.md PR-9: revert PR-8's inline dispatch. The ScanTask
+    // concurrency gauge showed peak in-flight 11–12 vs cap 50 — the driver loop
+    // was serializing ~7ms of probe I/O onto its single thread, capping throughput
+    // at 1/7ms ≈ 140 cps instead of saturating the semaphore. Dispatch back onto
+    // AnvilIoPool (dedicated blocking-I/O executor) so the driver hands off in
+    // µs and AnvilIoPool runs probes in parallel. S-005 preserved: AnvilIoPool
+    // threads are daemons with no region-thread affinity.
+    return CompletableFuture.supplyAsync(() -> {
+      try {
+        java.nio.file.Path regionFile =
+            io.github.dailystruggle.rtp.anvil.AnvilPrefilter.regionFileFor(worldFolder, dim, cx, cz);
+        // BIOME_LOOKUP_PERF_PLAN.md PR-10: share raw region bytes across sibling-chunk
+        // probes in the same r.X.Z.mca via a 4-entry LRU, with mtime invalidation.
+        byte[] regionBytes = io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache.get(regionFile);
+        if (regionBytes == null) return null;
+        int rx = Math.floorMod(cx, 32);
+        int rz = Math.floorMod(cz, 32);
+        io.github.dailystruggle.rtp.anvil.ColumnProbe probe =
+            io.github.dailystruggle.rtp.anvil.AnvilReader.readColumnProbe(
+                regionBytes, rx, rz, finalMinY, finalMaxY, finalSky);
+        if (probe == null) return null;
+        return (io.github.dailystruggle.rtp.api.world.ChunkColumnProbe)
+            new io.github.dailystruggle.rtp.spigot.anvil.probe.AnvilColumnProbeAdapter(probe, cx, cz);
+      } catch (Throwable t) {
+        RTP.log(java.util.logging.Level.FINE,
+            "[RTP] probeChunkColumn failed for world=" + name
+                + " chunk=(" + cx + "," + cz + "): "
+                + t.getClass().getSimpleName() + ": " + t.getMessage());
+        return null;
+      }
+    }, io.github.dailystruggle.rtp.anvil.AnvilIoPool.get());
+  }
+
+  /**
    * Folia native async chunk load. Resolves to the packed chunk key on success,
    * or {@code null} when the native async path returns a null chunk.
    */

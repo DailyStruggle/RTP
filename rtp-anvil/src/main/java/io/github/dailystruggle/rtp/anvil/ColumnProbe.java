@@ -12,10 +12,11 @@ import java.util.Objects;
  * <p>Built from a <i>selectively</i>-parsed chunk NBT root (see
  * {@link Nbt#readRootCompoundSelective}): non-relevant root children (e.g.
  * {@code block_entities}, {@code structures}, {@code Entities}, tick queues) and
- * non-relevant section children ({@code BlockLight}, {@code SkyLight}) are never
- * materialised. For center-column queries — the only queries this probe answers — this
- * yields the same answers {@link AnvilChunkView#blockIdAt}/{@link AnvilChunkView#getBiomeAt}
- * would at {@code (8, y, 8)}, while doing substantially less allocation and NBT-parse work.
+ * non-relevant section children ({@code BlockLight} and — when the caller did not
+ * request sky-light — {@code SkyLight}) are never materialised. For center-column
+ * queries — the only queries this probe answers — this yields the same answers
+ * {@link AnvilChunkView#blockIdAt}/{@link AnvilChunkView#getBiomeAt} would at
+ * {@code (8, y, 8)}, while doing substantially less allocation and NBT-parse work.
  *
  * <p>The probe is intentionally minimal. It does <b>not</b> answer queries at arbitrary
  * {@code (x, z)} coordinates — {@link AnvilChunkView} is the right target for those. The
@@ -34,12 +35,20 @@ import java.util.Objects;
  *                           overshoot when sections straddle {@code minY}/{@code maxY};
  *                           callers use {@link #blockAt(int)} which bounds-checks)
  * @param biomeSections      biome sections paralleling {@code sections}
+ * @param isLightOn          mirrors the vanilla chunk NBT {@code isLightOn} flag; when
+ *                           {@code false} the {@code SkyLight} nibble arrays on
+ *                           {@code sections} are stale and {@link #skyLightAt(int)}
+ *                           values should not be trusted. When the probe was built
+ *                           with {@code includeSkyLight=false} this field is
+ *                           {@code true} by convention (callers must not rely on
+ *                           sky-light in that case).
  */
 public record ColumnProbe(int minY,
                           int maxY,
                           int heightmapTopY,
                           List<PaletteSection> sections,
-                          List<BiomePaletteSection> biomeSections) {
+                          List<BiomePaletteSection> biomeSections,
+                          boolean isLightOn) {
 
     /** Chunk-local X used for all center-column queries. */
     public static final int CENTER_LOCAL_X = 8;
@@ -51,6 +60,20 @@ public record ColumnProbe(int minY,
         Objects.requireNonNull(biomeSections, "biomeSections");
         sections = Collections.unmodifiableList(sections);
         biomeSections = Collections.unmodifiableList(biomeSections);
+    }
+
+    /**
+     * Back-compat constructor for probes built without a sky-light pass. Defaults
+     * {@code isLightOn} to {@code true} — a producer that did not request sky-light
+     * must leave {@link PaletteSection#skyLight()} null in every section, so
+     * {@link #skyLightAt(int)} returns the "open" default (15) regardless.
+     */
+    public ColumnProbe(int minY,
+                       int maxY,
+                       int heightmapTopY,
+                       List<PaletteSection> sections,
+                       List<BiomePaletteSection> biomeSections) {
+        this(minY, maxY, heightmapTopY, sections, biomeSections, true);
     }
 
     /**
@@ -85,6 +108,29 @@ public record ColumnProbe(int minY,
             }
         }
         return null;
+    }
+
+    /**
+     * Returns the sky-light level at center-column world-Y {@code worldY} in {@code 0..15}.
+     *
+     * <p>If the probe was built without {@code includeSkyLight}, the underlying
+     * {@link PaletteSection#skyLight()} arrays are null and this method returns
+     * {@code 15} (vanilla "absent tag means fully lit" convention). Callers that need
+     * a trusted sky-light answer must first check {@link #isLightOn()}.</p>
+     *
+     * <p>Out-of-window Ys return {@code 15} rather than throwing, matching the
+     * {@code ChunkColumnProbe.skyLightAt(int)} contract in {@code rtp-api}.</p>
+     */
+    public int skyLightAt(int worldY) {
+        if (worldY < minY || worldY > maxY) return 15;
+        int sy = Math.floorDiv(worldY, 16);
+        int ly = Math.floorMod(worldY, 16);
+        for (PaletteSection s : sections) {
+            if (s.sectionY() == sy) {
+                return s.skyLightAt(CENTER_LOCAL_X, ly, CENTER_LOCAL_Z);
+            }
+        }
+        return 15;
     }
 
     /**

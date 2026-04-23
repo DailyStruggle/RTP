@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
+import io.github.dailystruggle.rtp.api.world.ChunkColumnProbe;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
@@ -65,6 +66,13 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
     return Arrays.stream(GenericVerticalAdjustorKeys.values())
         .map(Enum::name)
         .collect(Collectors.toList());
+  }
+
+  @Override
+  public boolean requiresSkyLight() {
+    Object o = getData().getOrDefault(GenericVerticalAdjustorKeys.requireSkyLight, false);
+    if (o instanceof Boolean b) return b;
+    return Boolean.parseBoolean(o.toString());
   }
 
   @Override
@@ -272,6 +280,146 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
       }
     }
     return false;
+  }
+
+  /**
+   * Probe-backed fast path mirroring {@link #adjust(RTPChunk, MutableRTPCoords)}'s scan modes
+   * on the center column of the supplied probe (local {@code x=8, z=8}).
+   *
+   * <p>Returns {@code null} (fall back to full parse) when:
+   * <ul>
+   *   <li>the probe's window does not cover the adjustor's {@code [minY, maxY]},</li>
+   *   <li>{@code requireSkyLight} is true <em>and</em> the probe reports
+   *       {@link ChunkColumnProbe#isLightOn()} is false — lighting hasn't been
+   *       finalized for this chunk, so the on-disk sky-light nibble array is stale,</li>
+   *   <li>no acceptable Y was found on the center column.</li>
+   * </ul>
+   *
+   * <p>When {@code requireSkyLight} is true and {@code isLightOn} is true, the scan
+   * enforces the same {@code skyLight > 7} threshold as {@link #adjust} using
+   * {@link ChunkColumnProbe#skyLightAt(int)}; when false, sky-light is not checked.
+   */
+  @Override
+  public @Nullable RTPCoords adjustFromProbe(
+      @NotNull ChunkColumnProbe probe, @NotNull String worldName) {
+    int maxY = getNumber(GenericVerticalAdjustorKeys.maxY, 320L).intValue();
+    int minY = getNumber(GenericVerticalAdjustorKeys.minY, 0L).intValue();
+    int dir = getNumber(GenericVerticalAdjustorKeys.direction, 0).intValue();
+
+    boolean requireSkyLight;
+    Object o = getData().getOrDefault(GenericVerticalAdjustorKeys.requireSkyLight, false);
+    if (o instanceof Boolean) {
+      requireSkyLight = (Boolean) o;
+    } else requireSkyLight = Boolean.parseBoolean(o.toString());
+
+    // When the caller needs sky-light and the chunk's lighting isn't finalized,
+    // on-disk SkyLight is stale — defer to the authoritative path which forces a
+    // lighting pass. When !requireSkyLight, isLightOn is irrelevant.
+    if (requireSkyLight && !probe.isLightOn()) return null;
+
+    // Probe window must cover the adjustor's [minY, maxY] with one-cell headroom
+    // for the y-1 / y+1 safety probes.
+    if (probe.minY() > minY - 1 || probe.maxY() < maxY) return null;
+
+    refreshUnsafeBlocks();
+
+    int globalX = (probe.chunkX() << 4) + 8;
+    int globalZ = (probe.chunkZ() << 4) + 8;
+
+    int y = scanProbe(probe, minY, maxY, dir, requireSkyLight);
+    if (y == Integer.MIN_VALUE) return null;
+
+    MutableRTPCoords out = new MutableRTPCoords(worldName, globalX, y, globalZ);
+    return out.toImmutable();
+  }
+
+  /**
+   * Refresh the cached unsafe-block set on the same 5-second cadence as
+   * {@link #adjust(RTPChunk, MutableRTPCoords)}, so probe-first callers that never invoke
+   * the authoritative path still see operator-edited safety config.
+   */
+  private static void refreshUnsafeBlocks() {
+    long t = System.currentTimeMillis();
+    long dt = t - lastUpdate.get();
+    if (dt > 5000 || dt < 0) {
+      ConfigParser<SafetyKeys> safety =
+          (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+      Object value = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
+      unsafeBlocks.clear();
+      if (value instanceof Collection) {
+        unsafeBlocks.addAll(
+            ((Collection<?>) value)
+                .stream()
+                    .filter(Objects::nonNull)
+                    .map(Object::toString)
+                    .collect(Collectors.toSet()));
+      }
+      lastUpdate.set(t);
+    }
+  }
+
+  /**
+   * Scan the center column for an acceptable Y under the given direction mode.
+   *
+   * @return the accepted Y, or {@link Integer#MIN_VALUE} if none found.
+   */
+  private int scanProbe(ChunkColumnProbe probe, int minY, int maxY, int dir, boolean requireSkyLight) {
+    switch (dir) {
+      case 0: // bottom up
+        for (int i = minY; i < maxY; i++) if (acceptY(probe, i, requireSkyLight)) return i;
+        return Integer.MIN_VALUE;
+      case 1: // top down
+        for (int i = maxY; i > minY; i--) if (acceptY(probe, i, requireSkyLight)) return i;
+        return Integer.MIN_VALUE;
+      case 2: { // middle out
+        int maxDistance = (maxY - minY) / 2;
+        int middle = minY + maxDistance;
+        for (int i = 0; i <= maxDistance; i++) {
+          if (acceptY(probe, middle + i, requireSkyLight)) return middle + i;
+          if (acceptY(probe, middle - i, requireSkyLight)) return middle - i;
+        }
+        return Integer.MIN_VALUE;
+      }
+      case 3: { // edges in
+        int maxDistance = (maxY - minY) / 2;
+        int middle = minY + maxDistance;
+        for (int i = maxDistance; i >= 0; i--) {
+          if (acceptY(probe, middle + i, requireSkyLight)) return middle + i;
+          if (acceptY(probe, middle - i, requireSkyLight)) return middle - i;
+        }
+        return Integer.MIN_VALUE;
+      }
+      default: { // random order
+        List<Integer> trials = new ArrayList<>(maxY - minY + 1);
+        for (int i = minY; i < maxY; i++) trials.add(i);
+        Collections.shuffle(trials, rng);
+        for (int k = 0; k < trials.size(); k++) {
+          int i = trials.get(k);
+          if (acceptY(probe, i, requireSkyLight)) return i;
+        }
+        return Integer.MIN_VALUE;
+      }
+    }
+  }
+
+  private boolean acceptY(ChunkColumnProbe probe, int y, boolean requireSkyLight) {
+    // Feet stand on a non-air block; head region (y, y+1) is air.
+    if (probe.isAirAt(y - 1)) return false;
+    if (!probe.isAirAt(y)) return false;
+    if (!probe.isAirAt(y + 1)) return false;
+    // Safety: none of y-1, y, y+1 may be in unsafeBlocks.
+    String below = probe.blockAt(y - 1);
+    String at = probe.blockAt(y);
+    String above = probe.blockAt(y + 1);
+    if (below == null || at == null || above == null) return false;
+    if (unsafeBlocks.contains(below)) return false;
+    if (unsafeBlocks.contains(at)) return false;
+    if (unsafeBlocks.contains(above)) return false;
+    // Sky-light gate: matches adjust()'s `skylight > 7` check at y+1. The probe returns
+    // 15 when sky-light wasn't requested at parse time, which is semantically identical
+    // to a vanilla section without a SkyLight tag — i.e. treat as fully lit.
+    if (requireSkyLight && probe.skyLightAt(y + 1) <= 7) return false;
+    return true;
   }
 
   @Override

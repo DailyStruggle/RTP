@@ -119,7 +119,7 @@ final class PregenTask implements Runnable {
     }
 
     private void runAttempt() {
-        if (i > state.maxAttempts || state.biomeChecks >= state.maxBiomeChecks) {
+        if (i > state.maxAttempts) {
             completeExhausted();
             return;
         }
@@ -177,7 +177,7 @@ final class PregenTask implements Runnable {
                         (state.vert.maxY() + state.vert.minY()) / 2,
                         blockZ);
         if (!border.isInside().apply(borderProbe)) {
-            state.maxAttempts++;
+            if (state.maxAttempts < state.maxAttemptsCeiling) state.maxAttempts++;
             state.worldBorderFails++;
             if (state.worldBorderFails > 1000L) {
                 RTP.log(Level.WARNING,
@@ -198,8 +198,162 @@ final class PregenTask implements Runnable {
         int cz = select[1];
         final long finalL = l;
 
-        // --- probe-first via ADR-016 §13.1 precedence chain (cached → anvil → live) ---
+        // --- probe-first fast path (BIOME_LOOKUP_PERF_PLAN.md PR-3) ---
+        //
+        // Ask the world for a lean center-column probe covering the adjustor's Y window.
+        // Platform adapters that can cheaply satisfy the probe (Bukkit-family worlds
+        // with an .mca-backed chunk store) return a non-null probe; all others return
+        // a null future and we fall through to the authoritative full-chunk path below.
+        //
+        // On a probe hit we run the adjustor's probe-backed scan + a center-column
+        // biome check. Any rejection here is bucketed as FailTypes.prefilter* and
+        // skips the expensive full-chunk decode entirely. Accepted candidates still
+        // fall through to the full pipeline, which remains authoritative for safety
+        // radius scanning and block-level evaluation.
+        if (tryProbeFirst(cx, cz, finalL)) {
+            // Probe rejected — a rescheduleNextAttempt has already been queued.
+            return;
+        }
+
+        // --- full path via ADR-016 §13.1 precedence chain (cached → anvil → live) ---
         requestChunk(cx, cz, finalL, /*staleRetries*/ 0);
+    }
+
+    /**
+     * Probe-first gate (ADR-016 §13 follow-up, BIOME_LOOKUP_PERF_PLAN.md PR-3).
+     *
+     * <p>Attempts to reject the candidate chunk before paying for the full
+     * {@link RTPWorld#getOrLoadChunk(int, int)} decode, by asking the world for a
+     * lean {@link io.github.dailystruggle.rtp.api.world.ChunkColumnProbe} covering
+     * the adjustor's {@code [minY, maxY]} window. Returns {@code true} iff a
+     * reject verdict has been recorded and {@link #rescheduleNextAttempt()} has
+     * been queued; returns {@code false} on UNKNOWN (no probe available, default
+     * adapter) or probe-accept (authoritative path still runs).</p>
+     *
+     * <p>S-005: the probe future is resolved asynchronously; the reject-and-reschedule
+     * path is continued via {@link #continueInline(Runnable)} so we never block the
+     * caller. The default {@link RTPWorld#probeChunkColumn} returns
+     * {@code completedFuture(null)}, keeping this method a no-op on adapters that
+     * have not yet wired a real backend.</p>
+     */
+    private boolean tryProbeFirst(int cx, int cz, long finalL) {
+        io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor<?> vert =
+                state.vert;
+        int minY = vert.minY();
+        int maxY = vert.maxY();
+        if (minY >= maxY) return false;
+        boolean needSkyLight = vert.requiresSkyLight();
+
+        CompletableFuture<io.github.dailystruggle.rtp.api.world.ChunkColumnProbe> fut;
+        try {
+            // PR-18: widen probe window by one block below minY so that
+            // LinearAdjustor/JumpAdjustor.adjustFromProbe (which consults the
+            // block at y-1 for standing-surface safety) doesn't trivially
+            // reject with probe.minY() > minY - 1. Without this, the fast path
+            // was inert on every candidate and every probe-accept degraded to
+            // a full chunk load.
+            fut = state.world.probeChunkColumn(cx, cz, minY - 1, maxY, needSkyLight);
+        } catch (Throwable t) {
+            // Adapter threw — treat as UNKNOWN, fall through to full path.
+            RTP.log(Level.FINE,
+                    "[RTP] probeChunkColumn threw for world=" + state.world.name()
+                            + " chunk=(" + cx + "," + cz + "): " + t);
+            return false;
+        }
+        if (fut == null) return false;
+
+        // If the future is already complete (default no-op adapter), handle synchronously
+        // to avoid scheduling overhead and preserve the pre-PR-3 runAttempt call shape.
+        if (fut.isDone() && !fut.isCompletedExceptionally()) {
+            io.github.dailystruggle.rtp.api.world.ChunkColumnProbe probe;
+            try {
+                probe = fut.getNow(null);
+            } catch (Throwable ignored) {
+                return false;
+            }
+            if (probe == null) return false;
+            return evaluateProbe(probe, cx, cz, finalL);
+        }
+
+        // Async completion — dispatch the evaluation and return true to prevent the
+        // caller from also invoking requestChunk. On UNKNOWN / accept, we re-enter
+        // the full path from the callback via requestChunk; on reject we reschedule.
+        fut.whenComplete((probe, ex) -> {
+            if (ex != null) {
+                RTP.log(Level.FINE,
+                        "[RTP] probeChunkColumn failed for world=" + state.world.name()
+                                + " chunk=(" + cx + "," + cz + "): "
+                                + ex.getClass().getSimpleName() + ": " + ex.getMessage());
+                continueInline(() -> requestChunk(cx, cz, finalL, /*staleRetries*/ 0));
+                return;
+            }
+            if (probe == null) {
+                continueInline(() -> requestChunk(cx, cz, finalL, /*staleRetries*/ 0));
+                return;
+            }
+            if (evaluateProbe(probe, cx, cz, finalL)) {
+                // reject already queued rescheduleNextAttempt via evaluateProbe.
+                return;
+            }
+            continueInline(() -> requestChunk(cx, cz, finalL, /*staleRetries*/ 0));
+        });
+        return true;
+    }
+
+    /**
+     * Evaluate a {@link io.github.dailystruggle.rtp.api.world.ChunkColumnProbe}:
+     * run the adjustor's probe-backed Y scan, then biome + unsafe-block check on
+     * the accepted Y. Returns {@code true} iff the probe produced a reject
+     * verdict (caller must not fall through to the full path) and queues
+     * {@link #rescheduleNextAttempt()}. Returns {@code false} on
+     * adjustor-UNKNOWN (probe cannot answer — fall back) or probe-accept.
+     */
+    private boolean evaluateProbe(
+            io.github.dailystruggle.rtp.api.world.ChunkColumnProbe probe,
+            int cx, int cz, long finalL) {
+        RTPCoords picked = state.vert.adjustFromProbe(probe, state.world.name());
+        if (picked == null) {
+            // UNKNOWN — adjustor could not commit from probe data. Fall through.
+            return false;
+        }
+        int py = picked.y();
+
+        // Center-column biome check (ADR-016 §13.1 — probe is equivalent to
+        // post-chunk-load biomeAt at center column).
+        String probeBiome = probe.biomeAt(py);
+        if (probeBiome != null) {
+            String ub = probeBiome.toUpperCase();
+            if (state.biomeNames.contains(ub) != state.biomeWhitelist) {
+                state.maxAttempts++;
+                if (state.verbose) {
+                    state.failMap.get(LocationGenerator.FailTypes.prefilterBiome)
+                            .compute("biome=" + ub, (s, a) -> (a == null) ? 1L : ++a);
+                }
+                recordOutcome("prefilterBiome/" + ub);
+                continueInline(this::rescheduleNextAttempt);
+                return true;
+            }
+        }
+
+        // Center-column unsafe-block check. The authoritative safety pipeline still
+        // runs on accepted candidates; this just rejects obvious losers early.
+        String probeBlock = probe.blockAt(py);
+        if (probeBlock != null && state.unsafeBlocks != null) {
+            String ub = probeBlock.toUpperCase();
+            if (state.unsafeBlocks.contains(ub)) {
+                state.maxAttempts++;
+                if (state.verbose) {
+                    state.failMap.get(LocationGenerator.FailTypes.prefilterBlock)
+                            .compute("block=" + ub, (s, a) -> (a == null) ? 1L : ++a);
+                }
+                recordOutcome("prefilterBlock/" + ub);
+                continueInline(this::rescheduleNextAttempt);
+                return true;
+            }
+        }
+
+        // Probe accepted. Full authoritative pipeline still runs via requestChunk.
+        return false;
     }
 
     /**
@@ -384,10 +538,7 @@ final class PregenTask implements Runnable {
         // --- biome filter (ADR-016 §13.1 — read from the resolved chunk) ---
         String currBiome = chunk.getBiome(finalX, finalY, finalZ).toUpperCase();
         if (state.biomeNames.contains(currBiome) != state.biomeWhitelist) {
-            state.biomeChecks++;
-            if (state.biomeChecks < state.maxBiomeChecks) {
-                state.maxAttempts++;
-            }
+            if (state.maxAttempts < state.maxAttemptsCeiling) state.maxAttempts++;
             if (state.defaultBiomes && state.shape instanceof MemoryShape && state.biomeRecall) {
                 ((MemoryShape<?>) state.shape).addBadLocation(finalL);
             }
@@ -398,10 +549,6 @@ final class PregenTask implements Runnable {
             }
             recordOutcome("biome/" + currBiome);
             closeIfPresent(reservation);
-            if (state.biomeChecks >= state.maxBiomeChecks) {
-                completeExhausted();
-                return;
-            }
             rescheduleNextAttempt();
             return;
         }
@@ -594,8 +741,7 @@ final class PregenTask implements Runnable {
     private void completeExhausted() {
         long reported = Math.min(i, state.maxAttempts);
         // Verbose failure summary — preserves the historical log shape.
-        if (state.verbose
-                && (i >= state.maxAttempts || i > state.maxAttemptsBase * Region.maxBiomeChecksPerGen)) {
+        if (state.verbose && i >= state.maxAttempts) {
             RTP.log(Level.INFO,
                     "#00ff80[RTP] ["
                             + state.region.name

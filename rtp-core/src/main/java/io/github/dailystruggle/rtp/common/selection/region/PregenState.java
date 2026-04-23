@@ -50,9 +50,19 @@ final class PregenState {
 
     // Mutable across the attempt loop
     long maxAttempts;
-    long maxBiomeChecks;
-    long biomeChecks = 0L;
     long worldBorderFails = 0L;
+    /**
+     * Absolute ceiling on how large {@link #maxAttempts} may grow via
+     * "free-retry" bumps (biome reject, worldborder miss, prefilter reject,
+     * stale-chunk retry, etc.). Without this ceiling, a configuration that can
+     * never satisfy the biome filter (e.g. MockRTPWorld + an impossible biome)
+     * would bump {@code maxAttempts} on every attempt and never exhaust.
+     * <p>Set to {@code maxAttemptsBase * 100} — the historical multiplier that
+     * was previously expressed as {@code Region.maxBiomeChecksPerGen}; that
+     * knob was retired in PR-3a of the biome-lookup performance plan but the
+     * bound it enforced is still structurally required.</p>
+     */
+    final long maxAttemptsCeiling;
 
     final Map<LocationGenerator.FailTypes, Map<String, Long>> failMap;
     final List<Map.Entry<Long, Long>> selections = new ArrayList<>();
@@ -85,7 +95,6 @@ final class PregenState {
             int staleChunkRetryLimit,
             long maxAttemptsBase,
             long maxAttempts,
-            long maxBiomeChecks,
             boolean biomeRecall,
             boolean biomeRecallForced,
             long resolution,
@@ -103,7 +112,7 @@ final class PregenState {
         this.staleChunkRetryLimit = staleChunkRetryLimit;
         this.maxAttemptsBase = maxAttemptsBase;
         this.maxAttempts = maxAttempts;
-        this.maxBiomeChecks = maxBiomeChecks;
+        this.maxAttemptsCeiling = Math.max(maxAttempts, maxAttemptsBase * 100L);
         this.biomeRecall = biomeRecall;
         this.biomeRecallForced = biomeRecallForced;
         this.resolution = resolution;
@@ -199,10 +208,6 @@ final class PregenState {
 
         long maxAttemptsBase = Math.max(1L, performance.getNumber(PerformanceKeys.maxAttempts, 20).longValue());
         long maxAttempts = maxAttemptsBase;
-        // Flat cap on total biome checks. Since biome sampling now reads chunk files
-        // from disk, the old 10x multiplier for explicit biome requests was too expensive
-        // to justify; use a single bound for both default and explicit biome paths.
-        long maxBiomeChecks = Math.max(maxAttempts, (long) Region.maxBiomeChecksPerGen);
 
         boolean biomeRecall = Boolean.parseBoolean(
                 performance.getConfigValue(PerformanceKeys.biomeRecall, false).toString());
@@ -223,7 +228,6 @@ final class PregenState {
                 staleChunkRetryLimit,
                 maxAttemptsBase,
                 maxAttempts,
-                maxBiomeChecks,
                 biomeRecall,
                 biomeRecallForced,
                 resolution,

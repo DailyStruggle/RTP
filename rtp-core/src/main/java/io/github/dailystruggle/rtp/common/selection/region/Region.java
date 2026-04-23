@@ -314,23 +314,71 @@ public class Region extends FactoryValue<RegionKeys> {
 
       getWorld().getChunkAtAsync(cx, cz).thenAccept(chunkSet -> {
         chunkSet.complete().whenComplete((success, throwable) -> {
-          try {
-            if (success != null && success) {
-              ChunkReservation reservation = new ChunkReservation(chunkSet, getWorld());
+          if (success == null || !success) {
+            try {
+              queueManager.unkeptLocations.offer(coldLoc);
+            } finally {
+              inFlightCalculations.decrementAndGet();
+            }
+            return;
+          }
+          // Second-pass safety verification at the unkept→kept transition must
+          // run on the chunk's owning region thread on Folia (live-backed
+          // RTPChunk.isSafe reads Level.getBlockState, which is thread-local).
+          // On Spigot/Paper, RTP.scheduler.runTask(world,cx,cz,..) hops to the
+          // MAIN thread — which would unreasonably impact tick time per
+          // promotion. Dispatch inline on non-Folia; region-hop on Folia only.
+          Runnable verify = () -> {
+            try {
+              boolean safe = false;
+              try {
+                long key = ((long) cx & 0xffffffffL) | ((long) cz << 32);
+                io.github.dailystruggle.rtp.api.world.RTPChunk<?> rtpChunk =
+                    getWorld().getCachedChunk(key);
+                if (rtpChunk != null) {
+                  int localX = coldLoc.coords().x() - (cx << 4);
+                  int localZ = coldLoc.coords().z() - (cz << 4);
+                  localX = ((localX % 16) + 16) % 16;
+                  localZ = ((localZ % 16) + 16) % 16;
+                  int y = coldLoc.coords().y();
+                  safe = rtpChunk.isSafe(
+                      localX, y, localZ, LocationGenerator.unsafeBlocksCache);
+                }
+              } catch (Throwable verifyEx) {
+                // Fail CLOSED on verification error — never promote an
+                // unverified location (prior fail-open default caused
+                // lava-placement reports).
+                safe = false;
+                RTP.log(
+                    Level.FINE,
+                    "[Region] unkept→kept safety re-verification failed: "
+                        + verifyEx.getClass().getSimpleName() + ": " + verifyEx.getMessage());
+              }
 
+              if (!safe) {
+                // Drop the now-unsafe location. pollSilently above skipped
+                // the delete callback; fire offer+poll so the DB row is purged.
+                queueManager.unkeptLocations.offer(coldLoc);
+                queueManager.unkeptLocations.poll();
+                return;
+              }
+
+              ChunkReservation reservation = new ChunkReservation(chunkSet, getWorld());
               boolean added = queueManager.keptLocations.offer(
                       new RTPLocation(coldLoc.coords(), coldLoc.attempts(), reservation)
               );
-
               if (!added) {
                 reservation.close();
                 queueManager.unkeptLocations.offer(coldLoc);
               }
-            } else {
-              queueManager.unkeptLocations.offer(coldLoc);
+            } finally {
+              inFlightCalculations.decrementAndGet();
             }
-          } finally {
-            inFlightCalculations.decrementAndGet();
+          };
+          if (isFoliaPlatform()) {
+            RTP.scheduler.runTask(getWorld(), cx, cz, verify);
+          } else {
+            verify.run();
           }
         });
       }).exceptionally(throwable -> {
@@ -776,6 +824,14 @@ public class Region extends FactoryValue<RegionKeys> {
     return settings.world();
   }
 
+  private static boolean isFoliaPlatform() {
+    try {
+      return "Folia".equals(RTP.serverAccessor.getPlatform());
+    } catch (Throwable ignored) {
+      return false;
+    }
+  }
+
   @Override
   public boolean equals(Object other) {
     if (!(other instanceof Region)) return false;
@@ -787,11 +843,4 @@ public class Region extends FactoryValue<RegionKeys> {
     return region.settings.worldBorderOverride() == settings.worldBorderOverride();
   }
 
-  /**
-   * Absolute ceiling on biome checks per generation. Lowered from the historical
-   * {@code 100 * maxAttempts} formula (~10k) because biome sampling now reads
-   * chunk files from disk; a smaller bounded budget keeps worst-case time
-   * tolerable. Treated as a hard total cap (not a per-attempt multiplier).
-   */
-  public static int maxBiomeChecksPerGen = 1000;
 }
