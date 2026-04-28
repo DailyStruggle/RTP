@@ -33,7 +33,7 @@ Most random teleport plugins work by repeatedly rolling random coordinates until
 | Spigot | 1.20 | Baseline adapter |
 | Paper | 1.20 | Uses async chunk loading APIs |
 | Folia | 1.20 | Full regional-thread scheduling support |
-| Fabric | 1.21 | Native mod support (Experimental) |
+| Fabric | 1.21 | Native mod support (Planned) |
 
 **Runtime:** Java 21+
 
@@ -85,8 +85,8 @@ Custom shapes can be registered at runtime via the `rtp-api`. See the `addons/` 
 | `rtp-spigot/` | Spigot platform adapter. |
 | `rtp-paper/` | Paper platform adapter (async chunk loading). |
 | `rtp-folia/` | Folia platform adapter (regional thread scheduling). |
-| `rtp-fabric/` | Fabric platform adapter and mod entry point. |
-| `addons/` | Example addons: Iris integration, Glide, claim plugin hooks. |
+| `rtp-fabric/` | Fabric platform adapter and mod entry point (Planned). |
+| `addons/` | Example addons: Iris integration, Glide. (Claim plugin integrations are folded into the core). |
 | `Python Test Scripts/` | Visualisation scripts for distribution math and geometry validation. |
 
 ---

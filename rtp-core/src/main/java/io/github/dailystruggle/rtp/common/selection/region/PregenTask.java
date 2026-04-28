@@ -525,7 +525,7 @@ final class PregenTask implements Runnable {
                 state.failMap.get(LocationGenerator.FailTypes.vert)
                         .compute("biome=", (s, a) -> (a == null) ? 1L : ++a);
             }
-            recordOutcome("vert/null-result");
+            recordOutcome("vert/no-stand-y");
             closeIfPresent(reservation);
             rescheduleNextAttempt();
             return;

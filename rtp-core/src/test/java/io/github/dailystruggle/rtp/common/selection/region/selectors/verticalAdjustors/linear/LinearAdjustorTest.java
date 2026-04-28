@@ -378,4 +378,72 @@ public class LinearAdjustorTest {
         LinearAdjustor adj = buildAdjustor(0, 60, 80);
         assertNotNull(adj.getParameters());
     }
+
+    // -----------------------------------------------------------------------
+    // platformDepth — live full-load path sweeps [1..platformDepth] below feet
+    // -----------------------------------------------------------------------
+
+    /**
+     * Regression guard for the live full-load path: with {@code platformDepth=2}, a
+     * safe crust at {@code y-1} over an unsafe block at {@code y-2} (classic
+     * sand-over-water / magma-under-cobblestone) must reject the candidate. Before
+     * aligning the live path with the probe-path sweep, only {@code y-1} was checked
+     * and the crust alone would pass — players would drop through into the fluid.
+     */
+    @Test
+    void platformDepth_liveFullLoad_rejectsUnsafeUnderSafeCrust() throws Exception {
+        // Configure platformDepth = 2 on the shared SafetyKeys parser the adjustor reads.
+        io.github.dailystruggle.rtp.common.configuration.ConfigParser<
+                io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys>
+                safety = (io.github.dailystruggle.rtp.common.configuration.ConfigParser<
+                        io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys>)
+                io.github.dailystruggle.rtp.common.RTP.configs.getParser(
+                        io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.class);
+        java.lang.reflect.Field dataField =
+                io.github.dailystruggle.rtp.common.factory.FactoryValue.class.getDeclaredField("data");
+        dataField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        java.util.EnumMap<io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys, Object>
+                safetyData =
+                        (java.util.EnumMap<
+                                        io.github.dailystruggle.rtp.common.configuration.enums
+                                                .SafetyKeys,
+                                        Object>)
+                                dataField.get(safety);
+        safetyData.put(
+                io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.platformDepth, 2);
+
+        // Force refreshSafetySets to re-read on next adjust call.
+        java.lang.reflect.Field lastUpdateField =
+                LinearAdjustor.class.getDeclaredField("lastUpdate");
+        lastUpdateField.setAccessible(true);
+        ((java.util.concurrent.atomic.AtomicLong) lastUpdateField.get(null)).set(0L);
+
+        try {
+        // Column layout: air above 64, safe crust at 63, UNSAFE at 62. Without the
+        // [1..platformDepth] sweep the live path accepts y=64 (only y-1=63 is
+        // checked, and 63 is safe). With the sweep it rejects because y-2=62 is
+        // unsafe. A higher valid landing at y=72 proves the adjustor is otherwise
+        // willing to find a candidate.
+        ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
+        chunk.setSolidSafe(63); // thin safe crust
+        chunk.setSolid(62);     // unsafe block (lava/water analogue) under the crust
+        chunk.setSolidSafe(71); // higher safe floor — acceptable landing at y=72
+
+        LinearAdjustor adj = buildAdjustor(0, 60, 80);
+        RTPCoords result = adj.adjust(chunk);
+
+        assertNotNull(result, "adjustor should find the higher safe floor at y=72");
+        assertEquals(
+                72,
+                result.y(),
+                "platformDepth=2 must reject y=64 (unsafe at y-2) and pick the higher safe floor");
+        } finally {
+            // Static fields leak across tests; restore the default so later tests are unaffected.
+            safetyData.put(
+                    io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.platformDepth,
+                    1);
+            ((java.util.concurrent.atomic.AtomicLong) lastUpdateField.get(null)).set(0L);
+        }
+    }
 }

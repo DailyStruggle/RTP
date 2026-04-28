@@ -43,18 +43,25 @@ parameter map (`getParameterLookup()`), and a subcommand map
 
 ### 2.2 Argument syntax — the cardinal rule
 
-| Form           | Meaning                     | Example         |
-|----------------|-----------------------------|-----------------|
-| `name`         | subcommand (positional)     | `reload`        |
-| `name:value`   | parameter                   | `player:steve`  |
-| `name:v1,v2`   | parameter, multi-value      | `player:a,b`    |
+| Form           | Meaning                     | Example          |
+|----------------|-----------------------------|------------------|
+| `name`         | subcommand (positional)     | `reload`         |
+| `name=value`   | parameter (canonical)       | `player=steve`   |
+| `name:value`   | parameter (legacy, accepted)| `player:steve`   |
+| `name=v1,v2`   | parameter, multi-value      | `player=a,b`     |
 
-Delimiters: `CommandsAPI.parameterDelimiter` (`:`) and
+Delimiters: `CommandsAPI.parameterDelimiter` (`=`, canonical — used in
+tab-complete) and `CommandsAPI.parameterDelimiterAlt` (`:`, accepted on
+input for backward compatibility). Multi-value delimiter:
 `multiParameterDelimiter` (`,`).
 
-> **A bare token (no `:`) is _always_ a subcommand name.** It is never
-> treated as a "default" parameter value. Unknown bare token →
+> **A bare token (no `=` or `:`) is _always_ a subcommand name.** It is
+> never treated as a "default" parameter value. Unknown bare token →
 > `msgInvalidCommand`.
+
+> **Tip:** if a parameter *value* contains `:` (e.g. a namespaced Minecraft
+> ID like `iris:volcanic_ash_plains`), use `=` as the separator to avoid
+> ambiguity: `biome=iris:volcanic_ash_plains`.
 
 ### 2.3 Parameters
 
@@ -139,8 +146,9 @@ Failures go through callbacks, never a magic boolean return.
 - **`msgInvalidCommand(callerId, arg[, msg])`** — bare token matching no
   visible subcommand (`/rtp frobnicate`). Platform adapters requiring
   auditing (RTP REQ-RTP-S-004) log at `WARNING`.
-- **`msgBadParameter(callerId, name, value[, msg])`** — `key:value` where
-  key is unknown, value is empty, or `isRelevant(callerId, value)` is false.
+- **`msgBadParameter(callerId, name, value[, msg])`** — `key=value` (or
+  `key:value`) where key is unknown, value is empty, or
+  `isRelevant(callerId, value)` is false.
 
 Consequences:
 - Do **not** hand-parse positional args in business-logic `onCommand` — the
@@ -155,7 +163,7 @@ Consequences:
 
 `onTabComplete` mirrors `onCommand`: same recursion, same permission filter.
 Subcommand names and parameter keys suggest as bare words; parameter values
-suggest as `key:value`, filtered by `relevantValues(callerId)`. `priority`
+suggest as `key=value`, filtered by `relevantValues(callerId)`. `priority`
 orders parameters that match the same prefix.
 
 ---

@@ -1,83 +1,33 @@
-# --- Region Configuration (default template) ---
-# Regions define the area and behavior for random teleportation. Each file in
-# `regions/` is a named region; the filename (minus `.yml`) is the region ID
-# referenced by `worlds/<world>.yml -> region:` and by `/rtp region:<name>`.
-# This `default.yml` is the fallback region used when no other is configured.
+# --- RTP Region Configuration ---
+# Documentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/REGIONS.md
 
-# Target World
-# case-sensitive name of target world this region is in.
-# Special placeholder: [num] - world index according to bukkit, 0 is usually the main world.
-world: "[0]"
+world: "[0]" # Target world. [0] = main world.
+worldBorderOverride: false # Use vanilla /worldborder radius if true
 
-# World Border Synchronization
-# If true, use the vanilla /worldborder radius for this region.
-worldBorderOverride: false
-
-# Selection Area (Shape)
 shape:
-  # Available shapes: CIRCLE, SQUARE, RECTANGLE, etc.
   name: "CIRCLE"
-
-  # Selection Logic Mode
-  # ACCUMULATE - even distribution; accumulates all sectors up to the current point to compute a shift, with distances precomputed at region load. Recommended default.
-  # NEAREST    - tries closest non-blocked spot, possible clustering, fast.
-  # REROLL     - re-selects early on known bad spots, even distribution, fast.
-  # NONE       - no pre-check, best for massive radii (>50,000 blocks).
   mode: "ACCUMULATE"
-
-  # Selection Radius (Chunks)
   radius: 256
-  # Inner Radius (Donut Hole) - players won't land within this radius from the center.
   centerRadius: 64
-  # Center Coordinates (Chunk X and Z)
   centerX: 0
   centerZ: 0
-
-  # Distribution Weight
-  # Formula: rand()^(weight). 
-  # >1.0 shifts towards center, <1.0 shifts towards edge.
   weight: 1.0
-
-  # Unique Placements
-  # If true, once a location is used, it's marked as "bad" to prevent repeated landings.
   uniquePlacements: false
-
-  # Auto-Expansion
-  # If true, the region radius expands as locations are used up.
   expand: false
 
-# Vertical Selection (Height)
 vert:
-  # Available: JUMP, LINEAR, etc.
   name: "JUMP"
-  # Height range for placement.
   minY: 32
   maxY: 255
-  # Vertical search step size.
   step: 16
-  # Require daylight at the destination (above ground).
   requireSkyLight: false
 
-# Permissions & Requirements
-# Require 'rtp.regions.<regionName>' permission to use.
-requirePermission: false
-# If a player lacks permission, they are redirected to this region.
-override: "default"
-
-# Location Caching
-# Maximum number of safe locations to pre-calculate and store in the database.
-# Set to 0 to disable background caching for this region.
-cacheCap: 50
-# Maximum chunks to keep loaded for zero-latency teleportation.
-activeChunkCap: 10
-
-# Vault Economy Cost
-# Price to use this specific region.
-price: 0.0
-
-# Database Precision
-# Precision level for storing bad-location data.
-spatialResolution: 3
+requirePermission: false # If true, rtp.regions.<name> is required
+override: "default" # Region to redirect to if no permission
+cacheCap: 50 # Max pre-calculated safe locations
+activeChunkCap: 10 # Max chunks kept loaded for zero-latency
+price: 0.0 # Economy cost override for this region
+spatialResolution: 3 # Precision for bad-location tracking (1-5)
 
 # DO NOT TOUCH VERSION NUMBER
 version: "1.0"

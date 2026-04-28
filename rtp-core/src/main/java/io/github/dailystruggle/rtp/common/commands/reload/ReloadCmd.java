@@ -60,26 +60,18 @@ public class ReloadCmd extends BaseRTPCmdImpl {
   }
 
   @Override
-  public String description() {
-    return "reload config files";
-  }
-
-  @Override
   public boolean onCommand(
       UUID senderId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return nextCommand.onCommand(senderId, parameterValues, null);
 
     RTP.reloading.set(true);
 
-    ConfigParser<MessagesKeys> lang =
-            (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
-    if (lang != null) {
-      String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloading, ""));
-      if (msg != null)
-        msg =
-                filenamePattern
-                        .matcher(msg)
-                        .replaceAll("configs"); // msg = msg.replaceAll( "\\[filename]", "configs" );
+    String msg = msg(MessagesKeys.reloading, "");
+    if (!msg.isEmpty()) {
+      msg =
+          filenamePattern
+              .matcher(msg)
+              .replaceAll("configs"); // msg = msg.replaceAll( "\\[filename]", "configs" );
       RTP.serverAccessor.sendMessage(RTPAPI.serverId, senderId, msg);
     }
 
@@ -87,14 +79,13 @@ public class ReloadCmd extends BaseRTPCmdImpl {
       boolean b = RTP.configs.reload();
       if (!b) throw new IllegalStateException("reload failed");
 
-      if (lang != null) {
-        String msg = String.valueOf(lang.getConfigValue(MessagesKeys.reloaded, ""));
-        if (msg != null)
-          msg =
-                  filenamePattern
-                          .matcher(msg)
-                          .replaceAll("configs"); // msg.replaceAll( "\\[filename]", "configs" );
-        RTP.serverAccessor.sendMessage(RTPAPI.serverId, senderId, msg);
+      String msgReloaded = msg(MessagesKeys.reloaded, "");
+      if (!msgReloaded.isEmpty()) {
+        msgReloaded =
+            filenamePattern
+                .matcher(msgReloaded)
+                .replaceAll("configs"); // msg.replaceAll( "\\[filename]", "configs" );
+        RTP.serverAccessor.sendMessage(RTPAPI.serverId, senderId, msgReloaded);
       }
 
       RTP.getInstance()

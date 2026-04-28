@@ -187,7 +187,17 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
   @Override
   public long rand() {
     flushAndRebuild(spatialResolution);
+    // Snapshot both arrays together to avoid races with concurrent rebuilds where
+    // badKeysCache and badPrefixSumsCache may be observed at different lengths.
     long[] sums = badPrefixSumsCache;
+    long[] keysSnap = badKeysCache;
+    if (keysSnap.length != sums.length) {
+      // Length mismatch indicates a concurrent rebuild was observed mid-update.
+      // Clamp to the shorter common length to keep indexing safe.
+      int common = Math.min(keysSnap.length, sums.length);
+      if (keysSnap.length != common) keysSnap = Arrays.copyOf(keysSnap, common);
+      if (sums.length != common) sums = Arrays.copyOf(sums, common);
+    }
     long badSum = (sums.length > 0) ? sums[sums.length - 1] : 0L;
 
     double range = getRange();
@@ -209,7 +219,7 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
       // We iterate until the number of bad spots preceding our physical guess stabilizes.
       while (true) {
         // Search Physical Keys using a Physical Guess (Target + Current Shift)
-        int index = java.util.Arrays.binarySearch(badKeysCache, target + currentBadSum);
+        int index = java.util.Arrays.binarySearch(keysSnap, target + currentBadSum);
 
         if (index < 0) {
           // Point is between keys (or after all keys). Invert insertion point.
@@ -219,6 +229,10 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
           // Force the index forward to include this interval's bad sum.
           index = index + 1;
         }
+
+        // Clamp index defensively against the prefix-sums length to avoid AIOOBE
+        // if a concurrent rebuild slipped a longer keys snapshot past us.
+        if (index > sums.length) index = sums.length;
 
         // Find the total bad area before this physical point
         long newBadSum = (index > 0) ? sums[index - 1] : 0;
@@ -240,9 +254,12 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
       case "NEAREST":
         {
           if (isKnownBad(location)) {
-            long[] keys = badKeysCache;
+            long[] keys = keysSnap;
             int idx = Arrays.binarySearch(keys, location);
             int floorIdx = (idx >= 0) ? idx : -(idx + 1) - 1;
+            if (floorIdx < 0 || floorIdx >= sums.length) {
+              return location;
+            }
 
             long key = keys[floorIdx];
             long sum = sums[floorIdx];

@@ -1,0 +1,8 @@
+# --- Taalkaart: worlds/*.yml ---
+# Koppelt interne wereldsleutels (links) aan de zichtbare namen in worlds/-bestanden (rechts).
+# Wijzig alleen de rechterkant; de linkerkant is een codeconstante.
+# Als dit bestand ontbreekt, genereert de plugin het opnieuw met identieke paren.
+region: regio
+requirePermission: toestemmingVereist
+override: overschrijven
+version: version

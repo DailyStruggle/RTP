@@ -114,7 +114,9 @@ public class TestStressCmd extends BaseRTPCmdImpl {
       RTPPlayer p = RTP.serverAccessor.getPlayer(name);
       if (p == null) {
         String msg = "&c[RTP test/stress] unknown player: " + name;
-        RTP.serverAccessor.sendMessage(callerId, msg);
+        if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+          RTP.serverAccessor.sendMessage(callerId, msg);
+        }
         RTP.log(Level.WARNING, msg);
         continue;
       }
@@ -140,7 +142,9 @@ public class TestStressCmd extends BaseRTPCmdImpl {
     final RTPCmd rootCmd = findRtpCmd();
     if (rootCmd == null) {
       String msg = "&c[RTP test/stress] root rtp command not found; aborting";
-      RTP.serverAccessor.sendMessage(callerId, msg);
+      if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+        RTP.serverAccessor.sendMessage(callerId, msg);
+      }
       RTP.log(Level.WARNING, msg);
       return true;
     }
@@ -159,7 +163,9 @@ public class TestStressCmd extends BaseRTPCmdImpl {
             + " player(s), every "
             + intervalTicks
             + " ticks";
-    RTP.serverAccessor.sendMessage(callerId, startMsg);
+    if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+      RTP.serverAccessor.sendMessage(callerId, startMsg);
+    }
     RTP.log(Level.INFO, startMsg);
 
     Runnable tick =
@@ -197,7 +203,9 @@ public class TestStressCmd extends BaseRTPCmdImpl {
                     + targets.size()
                     + " failures="
                     + failures.get();
-            RTP.serverAccessor.sendMessage(callerId, summary);
+            if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+              RTP.serverAccessor.sendMessage(callerId, summary);
+            }
             RTP.log(Level.INFO, summary);
             Object h = handleHolder[0];
             if (h != null) {

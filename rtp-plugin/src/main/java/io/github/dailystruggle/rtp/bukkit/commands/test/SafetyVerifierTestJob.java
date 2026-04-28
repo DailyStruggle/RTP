@@ -295,7 +295,9 @@ public class SafetyVerifierTestJob extends BaseRTPCmdImpl {
             + r.timeoutCaught
             + (r.notes.isEmpty() ? "" : " notes=" + r.notes);
 
-    RTP.serverAccessor.sendMessage(callerId, summary);
+    if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+        RTP.serverAccessor.sendMessage(callerId, summary);
+    }
     // S-004: failing run logs at WARNING; clean run at INFO.
     RTP.log(r.pass ? Level.INFO : Level.WARNING, summary);
   }

@@ -1,54 +1,24 @@
 # --- RTP Core Configuration ---
+# Documentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/CORE_CONFIG.md
 
-# Language for user-facing messages.
-# Default: "en" (baseline English shipped in messages.yml).
-# Other shipped locales live under lang/<locale>/messages.yml and are loaded
-# as an overlay on top of the English baseline. Missing keys in a locale file
-# silently fall back to English. Unknown locales log a warning and fall back.
-# See ADR-020 and REQ-RTP-F-013.
-language: "en"
+# Locale selection now lives in language.yml (loaded before config.yml).
+teleportDelay: 2 # Wait time (seconds) before teleport
+cancelDistance: 2 # Max move distance during delay before cancellation
+teleportCooldown: 300 # Wait time (seconds) between successful uses
 
-# Teleportation Delay (Seconds)
-# The time a player must wait before the teleport occurs.
-# This sometimes gives the server time to pre-load the destination chunks.
-teleportDelay: 2
-
-# Movement Cancellation (Blocks)
-# If a player moves more than this distance during the teleport delay, 
-# the teleportation will be cancelled. Set to -1 to disable.
-cancelDistance: 2
-
-# Teleportation Cooldown (Seconds)
-# The time a player must wait between successful RTP uses.
-teleportCooldown: 300
-
-# Post-Teleport Commands
-# List of commands to execute after a successful teleport.
-# [player] placeholder can be used for the player's name.
-consoleCommands: [
+consoleCommands:
   - "say [player] has just randomly teleported!"
-]
-playerCommands: [
+playerCommands:
   - ""
-]
 
-# --- Database Settings ---
-# Where to store cached locations and player data.
 database:
-  # Available types: yaml, sqlite, mysql, postgresql
-  # - yaml/sqlite: Local files (no additional setup required)
-  # - mysql/postgresql: Remote database (requires credentials below)
-  type: "sqlite"
-  
-  # Network database credentials (ignored for local database types)
+  type: "sqlite" # yaml, sqlite, mysql, or postgresql
   host: "127.0.0.1"
   port: 3306
   name: "rtp"
   username: "root"
   password: "password"
 
-# --- Network & Synchronization ---
-# Redis is used for multi-server synchronization of cached locations.
 network:
   redis:
     enabled: false

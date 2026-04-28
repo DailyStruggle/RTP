@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.bukkit.tools.softdepends.claims;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
+import io.github.dailystruggle.rtp.common.configuration.LanguageBootstrap;
 import io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -29,19 +30,24 @@ public final class ClaimIntegrations {
    */
   public static void setup(JavaPlugin plugin) {
     Configs configs = RTP.configs;
-    configs.putParser(buildParser(plugin));
+    ConfigParser<IntegrationsKeys> parser = buildParser(plugin);
+    configs.putParser(parser);
 
     // Initialize Lands once the plugin is loaded (no-op if Lands isn't installed).
     if (Bukkit.getPluginManager().isPluginEnabled("Lands")) {
       LandsChecker.landsSetup(plugin);
     }
 
-    Configs.onReload(() -> RTP.configs.putParser(buildParser(plugin)));
+    Configs.onReload(() -> {
+      ConfigParser<IntegrationsKeys> p = buildParser(plugin);
+      RTP.configs.putParser(p);
+    });
 
     registerVerifiers();
   }
 
   private static ConfigParser<IntegrationsKeys> buildParser(JavaPlugin plugin) {
+    String locale = LanguageBootstrap.resolve(RTP.serverAccessor.getPluginDirectory());
     return new ConfigParser<>(
         IntegrationsKeys.class,
         "integrations",
@@ -49,7 +55,8 @@ public final class ClaimIntegrations {
         RTP.serverAccessor.getPluginDirectory(),
         null,
         RTP.configs.fileDatabase,
-        plugin.getClass().getClassLoader());
+        plugin.getClass().getClassLoader(),
+        locale);
   }
 
   @SuppressWarnings("unchecked")

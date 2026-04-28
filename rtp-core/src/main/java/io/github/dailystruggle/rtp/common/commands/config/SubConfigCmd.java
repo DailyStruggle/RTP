@@ -343,6 +343,7 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
 
     if (factoryValue instanceof ConfigParser) {
       ConfigParser<?> configParser = (ConfigParser<?>) this.factoryValue;
+      addSubCommand(new ViewSubConfigCmd(this, configParser));
       EnumMap<?, ?> data = configParser.getData();
       for (Map.Entry<? extends Enum<?>, ?> e : data.entrySet()) {
         String name = e.getKey().name();

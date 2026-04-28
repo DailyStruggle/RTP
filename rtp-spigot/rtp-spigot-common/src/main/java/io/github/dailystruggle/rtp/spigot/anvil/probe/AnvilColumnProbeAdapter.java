@@ -55,6 +55,19 @@ public final class AnvilColumnProbeAdapter implements ChunkColumnProbe {
     return reconcile(probe.blockAt(y));
   }
 
+  /**
+   * Off-center column read. The backing {@link ColumnProbe} already retains
+   * the entire decoded section palette, so this is an O(1) palette-index
+   * lookup with the same {@link PaletteNormalizer#reconcile reconciliation}
+   * applied as the center-column entry point — keeping safety / air-set
+   * comparisons consistent across all five {@code testCoords} columns the
+   * adjustor probe path now scans.
+   */
+  @Override
+  public String blockAt(int localX, int localZ, int y) {
+    return reconcile(probe.blockAt(localX, localZ, y));
+  }
+
   @Override
   public String biomeAt(int y) {
     return reconcile(probe.biomeAt(y));
@@ -95,6 +108,24 @@ public final class AnvilColumnProbeAdapter implements ChunkColumnProbe {
         || path.equals("AIR") || path.equals("CAVE_AIR") || path.equals("VOID_AIR");
   }
 
+  /**
+   * Off-center air check. Mirrors the center-column override: tolerate both
+   * the reconciled upper-case form ({@code "AIR"} / {@code "CAVE_AIR"} /
+   * {@code "VOID_AIR"}) and the raw namespaced form, so the multi-column
+   * probe sweep matches the live-path tolerance regardless of which producer
+   * pipeline reconciled the identifier.
+   */
+  @Override
+  public boolean isAirAt(int localX, int localZ, int y) {
+    String b = blockAt(localX, localZ, y);
+    if (b == null) return false;
+    if (b.equals("AIR") || b.equals("CAVE_AIR") || b.equals("VOID_AIR")) return true;
+    int colon = b.indexOf(':');
+    String path = (colon >= 0) ? b.substring(colon + 1) : b;
+    return path.equals("air") || path.equals("cave_air") || path.equals("void_air")
+        || path.equals("AIR") || path.equals("CAVE_AIR") || path.equals("VOID_AIR");
+  }
+
   @Override
   public boolean isLightOn() {
     return probe.isLightOn();
@@ -103,6 +134,11 @@ public final class AnvilColumnProbeAdapter implements ChunkColumnProbe {
   @Override
   public int skyLightAt(int y) {
     return probe.skyLightAt(y);
+  }
+
+  @Override
+  public int skyLightAt(int localX, int localZ, int y) {
+    return probe.skyLightAt(localX, localZ, y);
   }
 
   private static String reconcile(String raw) {

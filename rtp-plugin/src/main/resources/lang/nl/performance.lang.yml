@@ -1,0 +1,20 @@
+# --- Taalkaart: performance.yml ---
+# Koppelt interne sleutels (links) aan de zichtbare namen in performance.yml (rechts).
+# Wijzig alleen de rechterkant; de linkerkant is een codeconstante.
+# Als dit bestand ontbreekt, genereert de plugin het opnieuw met identieke paren.
+period: periode
+viewDistanceSelect: zichtafstandSelectie
+biomeRecall: bioomHerinnering
+version: version
+maxAttempts: maximaalPogingen
+biomeRecallForced: bioomHerinnering_geforceerd
+onEventParsing: verwerking_bijGebeurtenis
+checkOnChunkLoads: controleer_bijChunkLaden
+postTeleportQueueing: wachtrij_naTeletransport
+syncLoading: synchroonLaden
+effectParsing: effectVerwerking
+viewDistanceTeleport: zichtafstandTeletransport
+minTPS: minimaalTPS
+syncAllottedTime: synchroonToegewezenTijd
+asyncAllottedTime: asynchroonToegewezenTijd
+visitorEnabled: bezoeker_ingeschakeld

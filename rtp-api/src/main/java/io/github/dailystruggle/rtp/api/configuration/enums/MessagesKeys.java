@@ -138,6 +138,20 @@ public enum MessagesKeys {
   reload,
   /** Usage string for {@code /rtp scan}. */
   scan,
+  /** Description for base {@code /rtp} command. */
+  rtp_description,
+  /** Description for {@code /rtp help} command. */
+  help_description,
+  /** Description for {@code /rtp reload} command. */
+  reload_description,
+  /** Description for {@code /rtp config} command. */
+  config_description,
+  /** Description for {@code /rtp scan} command. */
+  scan_description,
+  /** Description for {@code /rtp info} command. */
+  info_description,
+  /** Description for {@code /rtp test} command. */
+  test_description,
   // --- Player teleport state notifications ---
   /** Sent when the player's teleport slot becomes available (cooldown expired). */
   PLAYER_AVAILABLE,

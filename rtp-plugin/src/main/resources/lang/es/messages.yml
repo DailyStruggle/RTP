@@ -2,102 +2,106 @@
 # Traducción de los mensajes visibles para el jugador y la consola.
 #
 # IMPORTANTE:
+#   - Los nombres de clave de este archivo se corresponden con la columna
+#     derecha de lang/es/messages.lang.yml (la traducción de los nombres de
+#     clave internos del plugin). Si una clave no aparece en messages.lang.yml,
+#     se utiliza la clave en inglés del archivo base (lang/messages.lang.yml).
 #   - Conservar los marcadores entre corchetes tal cual: [P0], [delay], [attempts],
 #     [world], [region], [remainingCooldown], [scan_chunks], etc.
 #   - Conservar los códigos de color &a &e &c y hexadecimales (#2636ef).
-#   - Las claves que faltan aquí se rellenan automáticamente con el inglés.
 #
 # REQ-RTP-F-013 / ADR-020.
 
 ################################################################################
 # Sección 1: Configuración general
 ################################################################################
-placeholders:
+marcadores:
   - "[RTP]" #P0
 
 ################################################################################
 # Sección 2: Teletransporte
 ################################################################################
-alreadyTeleporting: "&e[P0] ¡ya te estás teletransportando!"
-teleportDeniedReloading: "&e[P0] los teletransportes están desactivados temporalmente mientras el plugin se recarga. Inténtalo de nuevo en unos instantes."
-delayMessage: "&e[P0] Teletransportando en [delay]. No te muevas."
-chunkLoading: "&e[P0] Cargando chunks, por favor espera..."
-teleportMessage: "&e[P0] Teletransportado en [attempts] intentos, en [processingTime]"
-teleportCancel: "&e[P0] ¡Teletransporte cancelado!"
-unsafe: "&e[P0] no se encontró una ubicación segura en [attempts] intentos"
-cooldownMessage: "&e[P0] No puedes teletransportarte otra vez hasta dentro de [remainingCooldown]"
-noLocationsQueued: "#f5eb73[P0] no hay ubicaciones listas en este momento"
-queueUpdate: "#2636ef[P0] tu puesto en la cola: [spot]"
-notEnoughMoney: "&e[P0] necesitas al menos $[money] para eso."
+yaTeletransportando: "&e[P0] ¡ya te estás teletransportando!"
+teletransporteDenegadoRecargando: "&e[P0] los teletransportes están desactivados temporalmente mientras el plugin se recarga. Inténtalo de nuevo en unos instantes."
+mensajeRetraso: "&e[P0] Teletransportando en [delay]. No te muevas."
+cargaDeChunk: "&e[P0] Cargando chunks, por favor espera..."
+mensajeTeletransporte: "&e[P0] Teletransportado en [attempts] intentos, en [processingTime]"
+cancelarTeletransporte: "&e[P0] ¡Teletransporte cancelado!"
+inseguro: "&e[P0] no se encontró una ubicación segura en [attempts] intentos"
+mensajeEnfriamiento: "&e[P0] No puedes teletransportarte otra vez hasta dentro de [remainingCooldown]"
+sinUbicacionesEnCola: "#f5eb73[P0] no hay ubicaciones listas en este momento"
+actualizarCola: "#2636ef[P0] tu puesto en la cola: [spot]"
+dineroInsuficiente: "&e[P0] necesitas al menos $[money] para eso."
 
 ################################################################################
 # Sección 3: Formato de tiempo
 ################################################################################
-days: "d"
-hours: "h"
-minutes: "m"
-seconds: "s"
-millis: "ms"
+dias: "d"
+horas: "h"
+minutos: "m"
+segundos: "s"
+milisegundos: "ms"
 
 ################################################################################
 # Sección 4: Sistema y administración
 ################################################################################
-oldFile: "&b[P0] se detectó un [filename] antiguo. Actualizando"
-newWorld: "&b[P0] se detectó un nuevo mundo '[world]'"
-invalidWorld: "&e[P0] no se pudo encontrar el mundo '[world]'"
-reloading: "&b[P0] cargando [filename]..."
-reloaded: "&b[P0] [filename] cargado correctamente."
-updating: "&a[P0] actualizando [filename]..."
-updated: "&a[P0] [filename] actualizado correctamente."
-badArg: "&c[P0] argumento de comando no válido [arg]"
-consoleCmdNotAllowed: "&c[P0] Debes ser un jugador en el juego para ejecutar este comando."
+archivoAntiguo: "&b[P0] se detectó un [filename] antiguo. Actualizando"
+mundoNuevo: "&b[P0] se detectó un nuevo mundo '[world]'"
+mundoInvalido: "&e[P0] no se pudo encontrar el mundo '[world]'"
+recargando: "&b[P0] cargando [filename]..."
+recargado: "&b[P0] [filename] cargado correctamente."
+actualizando: "&a[P0] actualizando [filename]..."
+actualizado: "&a[P0] [filename] actualizado correctamente."
+argumentoInvalido: "&c[P0] argumento de comando no válido [arg]"
+comandoConsolaNoPermitido: "&c[P0] Debes ser un jugador en el juego para ejecutar este comando."
+# busy y invalidCommand no se traducen en messages.lang.yml -> se usan las claves en inglés (fallback al baseline).
 busy: "&c[P0] ocupado"
 invalidCommand: "&c[P0] comando no válido - [arg]"
-noPerms: "&eLo sentimos, pero no tienes permiso para ejecutar este comando. Contacta con los administradores del servidor si crees que esto es un error."
+sinPermisos: "&eLo sentimos, pero no tienes permiso para ejecutar este comando. Contacta con los administradores del servidor si crees que esto es un error."
 
 ################################################################################
 # Sección 5: Registros administrativos
 ################################################################################
-locationSaved: "&e[P0] Se guardaron correctamente [amount] ubicaciones para [region]"
-locationLoaded: "&e[P0] Se cargaron correctamente [amount] ubicaciones para [region]"
+ubicacionGuardada: "&e[P0] Se guardaron correctamente [amount] ubicaciones para [region]"
+ubicacionCargada: "&e[P0] Se cargaron correctamente [amount] ubicaciones para [region]"
 
 ################################################################################
 # Sección 6: Comando Scan
 ################################################################################
-scanStart: "&a[P0] tarea de escaneo iniciada para las regiones: [scan_regions]"
-scanReset: "&e[P0] cola de escaneo reiniciada para las regiones: [scan_regions]"
-scanCancel: "&e[P0] tarea de escaneo cancelada para las regiones: [scan_regions]"
-scanPause: "#A020F0[P0] tarea de escaneo pausada para las regiones: [scan_regions]"
-scanResume: "#10A5F5[P0] tarea de escaneo reanudada para las regiones: [scan_regions]"
-scanRunning: "&c[P0] ya hay una tarea de escaneo en curso para las regiones: [scan_regions]"
-scanNotRunning: "&c[P0] no hay ninguna tarea de escaneo en curso para las regiones: [scan_regions]"
-scanStatus: "&a[P0] completados [scan_chunks] / [scan_totalChunks] chunks para las regiones: [scan_regions]. [scan_cps] cps. Porcentaje de tierra: [scan_landPercentage]%. Tiempo restante: [scan_eta]"
+iniciarEscaneo: "&a[P0] tarea de escaneo iniciada para las regiones: [scan_regions]"
+reiniciarEscaneo: "&e[P0] cola de escaneo reiniciada para las regiones: [scan_regions]"
+cancelarEscaneo: "&e[P0] tarea de escaneo cancelada para las regiones: [scan_regions]"
+pausarEscaneo: "#A020F0[P0] tarea de escaneo pausada para las regiones: [scan_regions]"
+reanudarEscaneo: "#10A5F5[P0] tarea de escaneo reanudada para las regiones: [scan_regions]"
+escaneoActivo: "&c[P0] ya hay una tarea de escaneo en curso para las regiones: [scan_regions]"
+escaneoNoActivo: "&c[P0] no hay ninguna tarea de escaneo en curso para las regiones: [scan_regions]"
+estadoEscaneo: "&a[P0] completados [scan_chunks] / [scan_totalChunks] chunks para las regiones: [scan_regions]. [scan_cps] cps. Porcentaje de tierra: [scan_landPercentage]%. Tiempo restante: [scan_eta]"
 
 ################################################################################
 # Sección 7: Comando Info
 ################################################################################
-infoTitle: "&a======Información de RTP======"
+tituloInfo: "&a======Información de RTP======"
 infoTickets: "&7Tickets de chunks activos globales: &f[tickets]"
-infoTeleports: "&7Máquinas de estado de teletransporte activas: &f[teleports]"
+infoTeletransportes: "&7Máquinas de estado de teletransporte activas: &f[teleports]"
 infoMSPT: "&7MSPT actual del plugin: &f[mspt]"
-infoTotalLoads: "&7Chunks cargados de por vida: &f[loads]"
-infoLeakRate: "&7Tasa actual de fuga de chunks: &f[leakRate]"
-infoDisclaimerHeader: "&7--- Aviso de diagnóstico ---"
-infoDisclaimer: "&7Nota de diagnóstico: Si el número total de chunks huérfanos del servidor supera el total histórico de cargas de este plugin ([loads]), este plugin no es la única causa de la fuga de memoria."
-infoWorldHeader: "#008080Mundos:"
-infoConsoleWorldHeader: "&7--- Mundos ---"
-infoWorld: "  #21ADA8[world]"
-infoRegionHeader: "#63C5DARegiones:"
-infoConsoleRegionHeader: "&7--- Regiones ---"
+infoCargasTotales: "&7Chunks cargados de por vida: &f[loads]"
+infoTasaFuga: "&7Tasa actual de fuga de chunks: &f[leakRate]"
+cabeceraAvisoInfo: "&7--- Aviso de diagnóstico ---"
+avisoInfo: "&7Nota de diagnóstico: Si el número total de chunks huérfanos del servidor supera el total histórico de cargas de este plugin ([loads]), este plugin no es la única causa de la fuga de memoria."
+cabeceraMundoInfo: "#008080Mundos:"
+cabeceraMundoConsolaInfo: "&7--- Mundos ---"
+infoMundo: "  #21ADA8[world]"
+cabeceraRegionInfo: "#63C5DARegiones:"
+cabeceraRegionConsolaInfo: "&7--- Regiones ---"
 infoRegion: "  #52B2BF[region]"
 
-worldInfo:
+datosMundo:
   - "#21ADA8[world]:"
   - "#99EEBB  - región: [region]"
   - "#99EEBB  - requierePermiso: [requirePermission]"
   - "#99EEBB  - sobrescribir: [override]"
 
-regionInfo:
+datosRegion:
   - "#52B2BF[region]:"
   - "#58CCED  - mundo: [world]"
   - "#58CCED  - forma: [shape]"
@@ -111,29 +115,36 @@ regionInfo:
 # Sección 8: Descripciones de comandos
 ################################################################################
 rtp: "&b/rtp - teletranspórtate a una ubicación aleatoria"
-help: "&b/rtp help - mostrar esta ayuda"
-reload: "&b/rtp reload - recargar los archivos de configuración"
-scan: "&b/rtp scan - probar todas las ubicaciones posibles de la región para mejorar los tiempos de carga"
+rtp_descripcion: "teletranspórtate a una ubicación aleatoria"
+ayuda: "&b/rtp help - mostrar esta ayuda"
+ayuda_descripcion: "describir comandos"
+recargar: "&b/rtp reload - recargar los archivos de configuración"
+recargar_descripcion: "recargar archivos de configuración"
+escaneo: "&b/rtp scan - probar todas las ubicaciones posibles de la región para mejorar los tiempos de carga"
+escaneo_descripcion: "borrar datos guardados y probar todas las ubicaciones posibles de la región"
+config_descripcion: "actualizar archivos de configuración en tiempo de ejecución"
+info_descripcion: "verificar el estado actual del plugin"
+prueba_descripcion: "probar funciones de RTP"
 
 ################################################################################
 # Sección 9: Soporte de PlaceholderAPI
 ################################################################################
-PLAYER_AVAILABLE: "&aDISPONIBLE"
-PLAYER_COOLDOWN: "&eEN ESPERA"
-PLAYER_SETUP: "&bELIGIENDO UBICACIÓN"
-PLAYER_LOADING: "&bCARGANDO CHUNKS"
-PLAYER_TELEPORTING: "&bTELETRANSPORTANDO"
+JUGADOR_DISPONIBLE: "&aDISPONIBLE"
+JUGADOR_ENFRIAMIENTO: "&eEN ESPERA"
+JUGADOR_CONFIGURAR: "&bELIGIENDO UBICACIÓN"
+JUGADOR_CARGANDO: "&bCARGANDO CHUNKS"
+JUGADOR_TELETRANSPORTANDO: "&bTELETRANSPORTANDO"
 
 ################################################################################
 # Sección 10: Elementos visuales
 ################################################################################
-title: "&a¡Teletransportado!"
-subtitle: "&b¡diviértete!"
-fadeIn: 20
-stay: 20
-fadeOut: 20
+titulo: "#FF6B6B¡#FF7E63T#FF9155e#FFA447l#FFB739e#FFCA2Bt#FFDD1Dr#F0F00Fa#C8F010n#A0F011s#78F012p#50F013o#38EF6Br#3BECC8t#38ECF0a#35E9FFd#32E6FFo#2FE3FF!"
+subtitulo: "#A78BFA¡#AF84F9d#B77DF7i#BF76F5v#C76FF3i#CF68F1é#D761EFr#DF5AEDt#E753EBe#EF4CE9t#E855D0e#E860B8!"
+aparecer: 20
+permanecer: 20
+desvanecer: 20
 
-actionbar: ""
+barraAccion: ""
 
 ################################################################################
 # Sección 11: Metadatos
@@ -143,4 +154,4 @@ version: "1.0"
 ################################################################################
 # Sección 12: Opciones para desarrolladores
 ################################################################################
-showDevTag: false
+mostrarEtiquetaDev: false

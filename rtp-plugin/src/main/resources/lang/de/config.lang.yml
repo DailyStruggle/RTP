@@ -1,0 +1,10 @@
+# --- Sprachzuordnung: config.yml ---
+language: language
+teleportDelay: teleportVerzoegerung
+cancelDistance: distanzAbbruch
+teleportCooldown: teleportAbkuehlung
+consoleCommands: konsolenBefehle
+playerCommands: spielerBefehle
+database: datenbank
+network: netzwerk
+version: version

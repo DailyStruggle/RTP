@@ -147,7 +147,9 @@ public class EconomyIsolationTestJob extends BaseRTPCmdImpl {
                 + "ThreadAccessException on thread '"
                 + Thread.currentThread().getName()
                 + "' &mdash; Vault call leaked onto a Region Tick Thread";
-        RTP.serverAccessor.sendMessage(callerId, msg);
+        if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+          RTP.serverAccessor.sendMessage(callerId, msg);
+        }
         RTP.log(Level.WARNING, msg, t);
       } else {
         reportFailure(callerId, "debit", t);
@@ -170,7 +172,9 @@ public class EconomyIsolationTestJob extends BaseRTPCmdImpl {
           "[RTP test/economy-isolation] TIMEOUT after "
               + PROBE_TIMEOUT_MS
               + "ms &mdash; debit never reached a scheduler tier";
-      RTP.serverAccessor.sendMessage(callerId, msg);
+      if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+        RTP.serverAccessor.sendMessage(callerId, msg);
+      }
       RTP.log(Level.WARNING, msg);
       return;
     } catch (Throwable t) {
@@ -196,7 +200,9 @@ public class EconomyIsolationTestJob extends BaseRTPCmdImpl {
               + "' &mdash; Vault isolation breached (latency="
               + micros
               + "us)";
-      RTP.serverAccessor.sendMessage(callerId, msg);
+      if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+        RTP.serverAccessor.sendMessage(callerId, msg);
+      }
       RTP.log(Level.WARNING, msg);
       return;
     }
@@ -212,7 +218,9 @@ public class EconomyIsolationTestJob extends BaseRTPCmdImpl {
           "[RTP test/economy-isolation] FAILED: debit ran on a Region Tick Thread '"
               + runnerName
               + "' &mdash; expected Global Region Scheduler or Async Scheduler";
-      RTP.serverAccessor.sendMessage(callerId, msg);
+      if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+        RTP.serverAccessor.sendMessage(callerId, msg);
+      }
       RTP.log(Level.WARNING, msg);
       return;
     }
@@ -223,7 +231,9 @@ public class EconomyIsolationTestJob extends BaseRTPCmdImpl {
             + "' (not caller's region thread) latency="
             + micros
             + "us";
-    RTP.serverAccessor.sendMessage(callerId, ok);
+    if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+      RTP.serverAccessor.sendMessage(callerId, ok);
+    }
     RTP.log(Level.INFO, ok);
   }
 
@@ -236,7 +246,9 @@ public class EconomyIsolationTestJob extends BaseRTPCmdImpl {
             + ": "
             + t.getMessage()
             + ")";
-    RTP.serverAccessor.sendMessage(callerId, msg);
+    if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+      RTP.serverAccessor.sendMessage(callerId, msg);
+    }
     RTP.log(Level.WARNING, msg, t);
   }
 }

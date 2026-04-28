@@ -27,6 +27,15 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
       new EnumMap<>(JumpAdjustorKeys.class);
   private static final Set<String> unsafeBlocks = new ConcurrentSkipListSet<>();
   /**
+   * Cached {@link SafetyKeys#platformDepth} value, refreshed alongside
+   * {@link #unsafeBlocks}. Controls how many blocks below the candidate
+   * feet-Y the probe-side {@link #acceptProbeY} sweep checks against
+   * {@link #unsafeBlocks} — catches fluids hidden under a thin crust of
+   * solid blocks (e.g. sand-over-water) that would otherwise pass the
+   * single-cell {@code y-1} ground check and place the player on water.
+   */
+  private static volatile int platformDepth = 1;
+  /**
    * Reconciled, materialised set of {@link SafetyKeys#airBlocks} — materials the
    * operator considers passable / non-blocking (tall grass, flowers, torches, snow
    * layer, etc.) in addition to vanilla {@code AIR}/{@code CAVE_AIR}/{@code VOID_AIR}.
@@ -86,6 +95,20 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
     MutableRTPCoords output = new MutableRTPCoords(chunk.getWorld().name(), 0, 0, 0);
     if (adjust(chunk, output)) return output.toImmutable();
     return null;
+  }
+
+  /**
+   * Sweeps {@code chunk.isSafe} across {@code [1..platformDepth]} cells below the
+   * candidate feet-Y. Mirrors the probe-path ground-column check in
+   * {@link #acceptProbeY} so the live full-load fallback rejects fluids hidden
+   * under a thin solid crust (sand-over-water, magma-under-cobblestone).
+   */
+  private static boolean isGroundSafe(RTPChunk chunk, int x, int y, int z) {
+    int depth = Math.max(1, platformDepth);
+    for (int d = 1; d <= depth; d++) {
+      if (!chunk.isSafe(x, y - d, z, unsafeBlocks)) return false;
+    }
+    return true;
   }
 
   @Override
@@ -153,7 +176,7 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
             && skylight > 7
             && chunk.isSafe(x, i + 1, z, unsafeBlocks)
             && chunk.isSafe(x, i, z, unsafeBlocks)
-            && chunk.isSafe(x, i - 1, z, unsafeBlocks)) {
+            && isGroundSafe(chunk, x, i, z)) {
           output.setWorldName(chunk.getWorld().name());
           output.setXZ(globalX, globalZ);
           output.setY(i);
@@ -168,18 +191,34 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
    * Probe-backed fast path mirroring {@link #adjust(RTPChunk, MutableRTPCoords)} on the
    * center column of the supplied probe (local {@code x=8, z=8}).
    *
-   * <p>Returns {@code null} (fall back to full parse) when:
+   * <p>Returns {@code null} (fall back to the live {@link #adjust} vert method) when:
    * <ul>
    *   <li>the probe's window does not cover the adjustor's {@code [minY, maxY]},</li>
-   *   <li>{@code requireSkyLight} is true <em>and</em> the probe reports
-   *       {@link ChunkColumnProbe#isLightOn()} is false — the on-disk sky-light
-   *       nibble array is stale, defer to the authoritative path,</li>
+   *   <li>{@code requireSkyLight} is true and the probe's on-disk sky-light is
+   *       stale ({@link ChunkColumnProbe#isLightOn()} false) <em>and</em> the
+   *       heightmap-derived sky-access proxy can't be trusted either (no
+   *       heightmap, or the column has a non-air block above the reported top —
+   *       cave roof, ravine overhang, structure ceiling, player edit, or an
+   *       older-version chunk whose noise maps no longer correlate with the
+   *       heightmap),</li>
    *   <li>no acceptable Y was found on the center column.</li>
    * </ul>
    *
-   * <p>When {@code requireSkyLight} is true and {@code isLightOn} is true, the
-   * scan enforces the same {@code skyLight > 7} threshold as {@link #adjust}
-   * using {@link ChunkColumnProbe#skyLightAt(int)}.
+   * <p>Sky-light decision tree when {@code requireSkyLight} is true:
+   * <ol>
+   *   <li>{@code isLightOn} true → trust {@link ChunkColumnProbe#skyLightAt(int)}
+   *       and apply the same {@code &gt; 7} threshold as {@link #adjust}.</li>
+   *   <li>{@code isLightOn} false + heightmap present + verified open from
+   *       {@code heightmapTopY+1} through {@code maxY} → accept any
+   *       {@code y+1 &gt; heightmapTopY} as sky-access. The verification step
+   *       exists because the heightmap alone is not authoritative —
+   *       caves/ravines/structures and player edits routinely contradict it;
+   *       we re-check the column blocks the probe already carries before
+   *       trusting the proxy. Light data is validated separately at the
+   *       unkept→kept chunk-load handoff (live vert fallback path).</li>
+   *   <li>{@code isLightOn} false + heightmap absent or contradicted →
+   *       return {@code null} and let the live vert method handle it.</li>
+   * </ol>
    *
    * <p>The step-halving binary-descent of the legacy path is collapsed to a linear
    * bottom-up scan on the probe path: the legacy optimization exists to reduce
@@ -190,6 +229,17 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
   @Override
   public @Nullable RTPCoords adjustFromProbe(
       @NotNull ChunkColumnProbe probe, @NotNull String worldName) {
+    return adjustFromProbeWithReason(probe, worldName).picked();
+  }
+
+  /**
+   * Typed probe-path entry point mirroring {@code LinearAdjustor}'s —
+   * {@link #adjustFromProbe} delegates here so the two paths share a single
+   * source of truth.
+   */
+  @Override
+  public @NotNull AdjustResult adjustFromProbeWithReason(
+      @NotNull ChunkColumnProbe probe, @NotNull String worldName) {
     int maxY = getNumber(JumpAdjustorKeys.maxY, 256L).intValue();
     int minY = getNumber(JumpAdjustorKeys.minY, 0L).intValue();
 
@@ -199,25 +249,74 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
       requireSkyLight = (Boolean) o;
     } else requireSkyLight = Boolean.parseBoolean(o.toString());
 
-    // When sky-light is required but the chunk's lighting isn't finalized, on-disk
-    // SkyLight is stale — defer to the authoritative path which forces a lighting pass.
-    if (requireSkyLight && !probe.isLightOn()) return null;
-
     // Probe window must cover the adjustor's [minY, maxY] with one-cell headroom
     // for the y-1 / y+1 safety probes.
-    if (probe.minY() > minY - 1 || probe.maxY() < maxY) return null;
+    if (probe.minY() > minY - 1 || probe.maxY() < maxY) return AdjustResult.WINDOW_REJECT;
+
+    // Decide sky-light source: trusted nibble array (skyLightAt), or a verified
+    // heightmap proxy, or defer to the live vert method.
+    int heightmapSkyFloor = computeHeightmapSkyFloor(probe, requireSkyLight);
+    if (heightmapSkyFloor == Integer.MAX_VALUE) return AdjustResult.LIGHT_GATE_REJECT;
 
     refreshSafetySets();
 
-    // Linear bottom-up center-column scan; same acceptance predicate as the legacy
-    // final pass in adjust(...).
-    for (int y = minY; y < maxY; y++) {
-      if (!acceptProbeY(probe, y, requireSkyLight)) continue;
-      int globalX = (probe.chunkX() << 4) + 8;
-      int globalZ = (probe.chunkZ() << 4) + 8;
-      return new MutableRTPCoords(worldName, globalX, y, globalZ).toImmutable();
+    // Multi-column probe sweep. Mirrors the live adjust(RTPChunk,...) path,
+    // which iterates testCoords (5 sub-columns within the chunk). Aligning
+    // the probe and live column sets makes a probe SCAN_MISS authoritative
+    // (no acceptable Y exists at any of the five live-path columns either),
+    // which lets ScanTask short-circuit instead of paying a full chunk load.
+    for (int j = 0; j < testCoords.size(); j++) {
+      List<Integer> xz = testCoords.get(j);
+      int lx = xz.get(0);
+      int lz = xz.get(1);
+      for (int y = minY; y < maxY; y++) {
+        if (!acceptProbeY(probe, lx, lz, y, requireSkyLight, heightmapSkyFloor)) continue;
+        int globalX = (probe.chunkX() << 4) + lx;
+        int globalZ = (probe.chunkZ() << 4) + lz;
+        return AdjustResult.ok(new MutableRTPCoords(worldName, globalX, y, globalZ).toImmutable());
+      }
     }
-    return null;
+    return AdjustResult.SCAN_MISS_REJECT;
+  }
+
+  /**
+   * Pick a sky-light source for {@link #acceptProbeY}. See
+   * {@code LinearAdjustor.computeHeightmapSkyFloor} for the full contract — this
+   * method is a literal mirror to keep the two adjustors' probe paths aligned.
+   *
+   * <p>Return contract:
+   * <ul>
+   *   <li>{@link Integer#MIN_VALUE} — sky-light not required, or {@code
+   *       isLightOn} is true; use {@link ChunkColumnProbe#skyLightAt(int)}.</li>
+   *   <li>the heightmap top Y — sky-light required, {@code isLightOn} false,
+   *       heightmap present, and verified open from {@code top+1} through
+   *       {@code maxY}. Callers may then treat any {@code y+1 &gt; floor} as
+   *       fully sky-lit.</li>
+   *   <li>{@link Integer#MAX_VALUE} — sky-light required, {@code isLightOn}
+   *       false, heightmap absent or contradicted; the caller must return
+   *       {@code null} and defer to the live vert method.</li>
+   * </ul>
+   */
+  private static int computeHeightmapSkyFloor(
+      ChunkColumnProbe probe, boolean requireSkyLight) {
+    if (!requireSkyLight) return Integer.MIN_VALUE;
+    if (probe.isLightOn()) return Integer.MIN_VALUE;
+    java.util.OptionalInt h = probe.heightmapTopY();
+    if (h.isEmpty()) return Integer.MAX_VALUE;
+    int top = h.getAsInt();
+    // Verify heightmap honesty across the probe's full Y window: anything
+    // between top+1 and probe.maxY() must be air. A non-air block anywhere
+    // above the reported top means the heightmap is lying about openness
+    // (cave roof, structure ceiling, overhang, player edit, or older-version
+    // chunk where noise maps no longer correlate). Walk to probe.maxY()
+    // rather than the adjustor's narrower maxY because skylight propagates
+    // from above the adjustor scan range. Defer to the live vert path on
+    // failure, which will relight the chunk on load.
+    int verifyTo = probe.maxY();
+    for (int y = top + 1; y <= verifyTo; y++) {
+      if (!probe.isAirAt(y)) return Integer.MAX_VALUE;
+    }
+    return top;
   }
 
   /**
@@ -225,7 +324,7 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
    * 5-second cadence. Both sets are sourced from {@code safety.yml} via
    * {@link SafetyKeys#unsafeBlocks} / {@link SafetyKeys#airBlocks} and are consumed by
    * both {@link #adjust(RTPChunk, MutableRTPCoords)} (legacy full-load path) and
-   * {@link #acceptProbeY(ChunkColumnProbe, int, boolean)} (anvil probe fast path).
+   * {@link #acceptProbeY(ChunkColumnProbe, int, int, int, boolean, int)} (anvil probe fast path).
    *
    * <p>ADR-017 token grammar is expanded in-place at refresh time:
    * <ul>
@@ -272,6 +371,9 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
 
       Object airValue = safety.getConfigValue(SafetyKeys.airBlocks, new ArrayList<>());
       List<String> reappliedAir = expandSafetyTokens(airValue, tagSnapshot, airBlocks);
+
+      platformDepth = Math.max(1,
+          safety.getNumber(SafetyKeys.platformDepth, 1).intValue());
 
       // Reapply the expanded lists to the in-memory config value so downstream
       // consumers (QueueTask, LocationGenerator, SafetyCompilationCache) read the
@@ -375,18 +477,30 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
   }
 
   /**
-   * Decide whether {@code y} is an acceptable standing coordinate on the probe's center column.
+   * Decide whether {@code y} is an acceptable standing coordinate on the probe at
+   * chunk-local column {@code (lx, lz)}.
    *
    * <p>A Y is accepted iff:
    * <ul>
    *   <li>{@code y-1} is solid (not vanilla air AND not a member of {@link #airBlocks}) —
    *       i.e. there is something to stand on;</li>
    *   <li>{@code y} and {@code y+1} are passable — vanilla air OR a member of
-   *       {@link #airBlocks} (tall grass, flowers, snow layer, torches, ...);</li>
+   *       {@link #airBlocks} (tall grass, flowers, snow layer, torches, leaves, ...);</li>
    *   <li>none of the three cells are in {@link #unsafeBlocks} — {@code unsafeBlocks}
    *       wins over {@code airBlocks} on conflicts;</li>
-   *   <li>when {@code requireSkyLight} is true, the sky-light at {@code y+1} exceeds 7.</li>
+   *   <li>when {@code requireSkyLight} is true, sky-access is satisfied either via
+   *       {@code skyLightAt(lx, lz, y+1) > 7} (when the probe's lighting is trusted)
+   *       or via {@code y+1 > heightmapSkyFloor} when the caller supplied a
+   *       verified heightmap proxy (see {@link #computeHeightmapSkyFloor}).</li>
    * </ul>
+   *
+   * <p>Multi-column variant: parameterised on chunk-local {@code (lx, lz)} so the
+   * probe path mirrors the live {@code adjust(RTPChunk, MutableRTPCoords)} sweep
+   * over {@code testCoords}. Off-center reads are O(1) palette-index lookups via
+   * {@link ChunkColumnProbe#blockAt(int, int, int)}; the heightmap-derived
+   * sky-light floor still applies chunk-wide because the probe retains a single
+   * (center-column) heightmap and that is the only sky-light proxy used when
+   * {@code isLightOn} is false.</p>
    *
    * <p>Using {@link #airBlocks} here mirrors the live-path {@code chunk.isSafe(...)}
    * tolerance, so the anvil probe fast path no longer rejects Y candidates whose body
@@ -395,23 +509,46 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
    * every such chunk and routing it to the full-load path, showing up as the residual
    * {@code adjustNull} tail on the ScanTask concurrency gauge.</p>
    */
-  private static boolean acceptProbeY(ChunkColumnProbe probe, int y, boolean requireSkyLight) {
-    String below = probe.blockAt(y - 1);
-    String at = probe.blockAt(y);
-    String above = probe.blockAt(y + 1);
+  private static boolean acceptProbeY(ChunkColumnProbe probe, int lx, int lz, int y,
+                                      boolean requireSkyLight, int heightmapSkyFloor) {
+    String below = probe.blockAt(lx, lz, y - 1);
+    String at = probe.blockAt(lx, lz, y);
+    String above = probe.blockAt(lx, lz, y + 1);
     if (below == null || at == null || above == null) return false;
     // Ground cell must be non-passable.
-    if (probe.isAirAt(y - 1) || airBlocks.contains(below)) return false;
+    if (probe.isAirAt(lx, lz, y - 1)
+        || airBlocks.contains(canonicaliseMaterialToken(below))) return false;
     // Body and head cells must be passable (vanilla air OR configured air-block).
-    if (!probe.isAirAt(y) && !airBlocks.contains(at)) return false;
-    if (!probe.isAirAt(y + 1) && !airBlocks.contains(above)) return false;
+    if (!probe.isAirAt(lx, lz, y)
+        && !airBlocks.contains(canonicaliseMaterialToken(at))) return false;
+    if (!probe.isAirAt(lx, lz, y + 1)
+        && !airBlocks.contains(canonicaliseMaterialToken(above))) return false;
     // Unsafe set wins over air set on conflicts.
-    if (unsafeBlocks.contains(below)) return false;
-    if (unsafeBlocks.contains(at)) return false;
-    if (unsafeBlocks.contains(above)) return false;
-    // Sky-light gate matches adjust()'s `skylight > 7` at y+1. The probe returns 15
-    // when sky-light wasn't requested at parse time (vanilla "absent tag == fully lit").
-    if (requireSkyLight && probe.skyLightAt(y + 1) <= 7) return false;
+    String atCanon = canonicaliseMaterialToken(at);
+    String aboveCanon = canonicaliseMaterialToken(above);
+    if (unsafeBlocks.contains(atCanon)) return false;
+    if (unsafeBlocks.contains(aboveCanon)) return false;
+    // Sweep down [1..platformDepth] for hidden fluids/unsafe materials under
+    // a thin solid crust (sand-over-water, magma-under-cobblestone, ...).
+    int depth = Math.max(1, platformDepth);
+    for (int d = 1; d <= depth; d++) {
+      String b = probe.blockAt(lx, lz, y - d);
+      if (b == null) return false;
+      if (unsafeBlocks.contains(canonicaliseMaterialToken(b))) return false;
+    }
+    // Sky-light gate: when heightmapSkyFloor != MIN_VALUE the probe's nibble
+    // array is stale (isLightOn=false) but the heightmap was verified honest in
+    // computeHeightmapSkyFloor, so any y+1 strictly above the reported top has
+    // sky-light = 15 by definition. Otherwise fall back to skyLightAt(lx,lz,y+1)
+    // — trusted when isLightOn=true, otherwise the benign "absent tag means
+    // fully lit" default of 15.
+    if (requireSkyLight) {
+      if (heightmapSkyFloor != Integer.MIN_VALUE) {
+        if (y + 1 <= heightmapSkyFloor) return false;
+      } else if (probe.skyLightAt(lx, lz, y + 1) <= 7) {
+        return false;
+      }
+    }
     return true;
   }
 

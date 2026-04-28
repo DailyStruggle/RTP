@@ -4,6 +4,7 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
+import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import java.lang.reflect.Method;
@@ -205,13 +206,22 @@ public class FoliaOwnershipTestJob extends BaseRTPCmdImpl {
       Method m = bukkit.getMethod("isOwnedByCurrentRegion", bukkitLoc);
 
       // The RTP-side RTPLocation must be converted to an org.bukkit.Location
-      // to call the Folia API. If the concrete RTPLocation doesn't expose
-      // a Bukkit handle we treat that as "unsupported" rather than a fail.
-      Object bukkitLocation = unwrapBukkitLocation(loc, bukkitLoc);
+      // to call the Folia API. RTPLocation is a value type with a world()
+      // accessor that returns an RTPWorld<T>; on the Bukkit family T is
+      // org.bukkit.World, so we can construct a Bukkit Location directly.
+      // We only fall through to UNSUPPORTED when the running platform is
+      // demonstrably not Folia (the reflective method-lookup branch below
+      // catches Spigot / pre-Folia Paper).
+      Object bukkitLocation = buildBukkitLocation(loc, bukkitLoc);
       if (bukkitLocation == null) {
-        return "UNSUPPORTED (no org.bukkit.Location handle on this platform) latency="
-            + micros
-            + "us";
+        // Not Folia (or RTPWorld handle isn't a Bukkit World) — record
+        // unsupported only when we are also certain the Folia entry-point
+        // isn't on the classpath; otherwise this would be a regression on
+        // the very platform the probe exists for.
+        if (!isFoliaRuntime()) {
+          return "UNSUPPORTED (not running on Folia) latency=" + micros + "us";
+        }
+        return "FAIL could-not-build-bukkit-location-on-folia latency=" + micros + "us";
       }
 
       Object owned = m.invoke(null, bukkitLocation);
@@ -245,37 +255,65 @@ public class FoliaOwnershipTestJob extends BaseRTPCmdImpl {
   }
 
   /**
-   * Extracts an {@code org.bukkit.Location} from an {@link RTPLocation}
-   * if the concrete implementation provides one. Returns {@code null}
-   * on non-Bukkit platforms or when the handle is not exposed.
+   * Builds an {@code org.bukkit.Location} from an {@link RTPLocation}.
+   *
+   * <p>{@link RTPLocation} is a platform-agnostic value type carrying an
+   * {@link RTPWorld} reference plus integer block coordinates. On the
+   * Bukkit family of adapters {@link RTPWorld#world()} returns the
+   * underlying {@code org.bukkit.World}; we therefore reflectively
+   * construct {@code new Location(world, x, y, z)}. Reflection is used
+   * only to keep the test job free of a hard {@code org.bukkit} import
+   * at compile time &mdash; the Bukkit jar is always on the classpath
+   * here, so this is a runtime concern only insofar as it lets the same
+   * code path produce a clean {@code UNSUPPORTED} on hypothetical
+   * non-Bukkit hosts.
+   *
+   * @return a {@code org.bukkit.Location} instance, or {@code null} if
+   *     the {@link RTPWorld} handle is not a Bukkit {@code World}.
    */
-  private Object unwrapBukkitLocation(RTPLocation loc, Class<?> bukkitLocationClass) {
+  private Object buildBukkitLocation(RTPLocation loc, Class<?> bukkitLocationClass) {
     try {
-      // Convention used across the Bukkit-family adapters: a public
-      // getLocation()/getHandle() returning the platform Location.
-      for (String name : new String[] {"getLocation", "getHandle", "location"}) {
-        try {
-          Method m = loc.getClass().getMethod(name);
-          Object v = m.invoke(loc);
-          if (bukkitLocationClass.isInstance(v)) return v;
-        } catch (NoSuchMethodException ignored) {
-          // try next
-        }
-      }
+      RTPWorld<?> rtpWorld = loc.world();
+      if (rtpWorld == null) return null;
+      Object handle = rtpWorld.world();
+      Class<?> bukkitWorld = Class.forName("org.bukkit.World");
+      if (!bukkitWorld.isInstance(handle)) return null;
+      // new Location(World, double, double, double)
+      return bukkitLocationClass
+          .getConstructor(bukkitWorld, double.class, double.class, double.class)
+          .newInstance(handle, (double) loc.getBlockX(), (double) loc.getBlockY(), (double) loc.getBlockZ());
     } catch (Throwable ignored) {
-      // fall through to null
+      // Spigot/Paper without a usable World handle, or a non-Bukkit host.
+      return null;
     }
-    return null;
+  }
+
+  /**
+   * Detects whether the running server is Folia by class presence, the
+   * same probe used in {@code RTPBukkitPlugin.isFolia()} and
+   * {@code AbstractServerAccessor.isFolia()}.
+   */
+  private static boolean isFoliaRuntime() {
+    try {
+      Class.forName("io.papermc.paper.threadedregions.RegionizedServer");
+      return true;
+    } catch (ClassNotFoundException e) {
+      return false;
+    }
   }
 
   private void report(UUID callerId, String msg) {
-    RTP.serverAccessor.sendMessage(callerId, msg);
+    if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+      RTP.serverAccessor.sendMessage(callerId, msg);
+    }
     RTP.log(Level.INFO, msg);
   }
 
   private void fail(UUID callerId, String msg) {
     String line = "[RTP test/folia-ownership] " + msg;
-    RTP.serverAccessor.sendMessage(callerId, line);
+    if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+      RTP.serverAccessor.sendMessage(callerId, line);
+    }
     RTP.log(Level.WARNING, line);
   }
 

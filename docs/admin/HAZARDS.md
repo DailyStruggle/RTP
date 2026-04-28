@@ -14,6 +14,9 @@ is rated on four levels:
 | **Medium** | Causes a degraded experience recoverable without restart |
 | **Low** | Cosmetic or minor inconvenience with no lasting effect |
 
+For the failure-mode view (detection + response details) see [Failure Modes](#failure-modes) below.
+For operator diagnosis and recovery steps see [`RUNBOOK.md`](RUNBOOK.md).
+
 ---
 
 ## Player Hazards
@@ -209,3 +212,21 @@ tickets directly.
 | H-008 | Database corruption on unclean shutdown | Medium | Mitigated |
 | H-009 | Addon calls API before Core is loaded | Medium | Mitigated |
 | H-010 | `ChunkReservation` constructed by addon | Medium | Mitigated |
+
+---
+
+## Failure Modes
+
+Failure modes describe specific component-level failures, how they are detected, and the system's defined response.
+
+| ID | Component | Failure | Response | Req |
+|----|-----------|---------|----------|-----|
+| FM-001 | `RegionQueueManager` | Queue empty | Queue player UUID for deferred teleport; fulfilled on next replenishment. | `REQ-RTP-S-004` |
+| FM-002 | `MemoryShape` | All sectors bad | Log ERROR; operator must reconfigure or reset scan. | `REQ-RTP-S-004` |
+| FM-003 | Safety check | Location unsafe at dispatch | Discard location, mark bad in memory, serve next in queue. | `REQ-RTP-S-001/003` |
+| FM-004 | `MemoryTracker` | Pipeline timeout | Force cancel and cleanup; release chunk tickets; log SEVERE. | `REQ-RTP-S-002` |
+| FM-005 | Platform adapter | Chunk load timeout | Handled by FM-004; retry location in next scan cycle. | `REQ-RTP-S-002`, `REQ-RTP-F-008` |
+| FM-006 | DB Accessor | Database unreadable | Log WARN; initialize empty memory; rebuild via new scan. | `REQ-RTP-NF-001` |
+| FM-007 | Config loader | Malformed config | Log ERROR; skip affected region; others continue. | `REQ-RTP-S-004` |
+| FM-008 | Platform adapter | API linkage failure | Plugin disabled by Bukkit; operator must fix JAR version. | `REQ-RTP-SYS-002` |
+| FM-010 | `RTPAPI` | Early API call | Throw `IllegalStateException` with clear explanation. | `REQ-RTP-S-006` |

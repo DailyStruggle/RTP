@@ -188,8 +188,8 @@ public final class AnvilProbeSupport {
   /**
    * Rate-limit counters for {@link #logProbeOutcome}. Per-JVM and per-outcome
    * (currently {@code "PUBLISH"} or {@code "UNKNOWN"}). The first
-   * {@link #PROBE_OUTCOME_BUDGET_PER_REASON} lines land at {@link Level#INFO};
-   * subsequent ones fall to {@link Level#FINE}. Parity with the rate-limit
+   * {@link #PROBE_OUTCOME_BUDGET_PER_REASON} lines land at {@link Level#FINE};
+   * subsequent ones fall to {@link Level#FINER}. Parity with the rate-limit
    * pattern used by {@code AnvilPrefilter.diagLog} and
    * {@code FoliaRTPWorld#logBiomeFallthrough}.
    */
@@ -213,8 +213,8 @@ public final class AnvilProbeSupport {
       String outcome, Path worldFolder, String dimSubpath, int cx, int cz,
       Verdict verdict) {
     // 2026-04-20 housekeeping (post-Folia-1.21.11 debug arc): PUBLISH is the
-    // happy path and confirmed working end-to-end — log at FINE only. UNKNOWN
-    // keeps its first-N-at-INFO budget because it still signals a real
+    // happy path and confirmed working end-to-end — log at FINER only. UNKNOWN
+    // keeps its first-N-at-FINE budget because it still signals a real
     // diagnostic (probe ran, but no view produced) that an operator triaging
     // a stuck `anvil-hits=0` metric needs to see. The per-reason attribution
     // line from `AnvilPrefilter.diagLog` ("UNKNOWN:<cause>") is the
@@ -222,13 +222,13 @@ public final class AnvilProbeSupport {
     // was reached.
     final Level level;
     if ("PUBLISH".equals(outcome)) {
-      level = Level.FINE;
+      level = Level.FINER;
     } else {
       java.util.concurrent.atomic.AtomicInteger counter =
           PROBE_OUTCOME_COUNTERS.computeIfAbsent(
               outcome, k -> new java.util.concurrent.atomic.AtomicInteger());
       int n = counter.incrementAndGet();
-      level = (n <= PROBE_OUTCOME_BUDGET_PER_REASON) ? Level.INFO : Level.FINE;
+      level = (n <= PROBE_OUTCOME_BUDGET_PER_REASON) ? Level.FINE : Level.FINER;
     }
     if (!LOG.isLoggable(level)) return;
     LOG.log(level,

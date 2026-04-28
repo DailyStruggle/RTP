@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 
 /**
@@ -45,6 +46,18 @@ public class RegionCacheTask extends RTPRunnable {
      * free. See {@code docs/dev/BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md §§2, 4.2}.
      */
     private final boolean observationalOnly;
+
+    /**
+     * Idempotency latch for {@link #releaseInFlight()}. The lifecycle of this
+     * task has multiple terminal branches (normal-null result, exception,
+     * playerId-success after chunk-load, playerId-coords-null, public-cache
+     * offer); each must release the {@code inFlightCalculations} counter and
+     * the {@link MemoryTracker} registration exactly once. A single CAS gate
+     * collapses "who decrements?" into a single answer regardless of which
+     * branch fires first or whether {@code exceptionally} chains into
+     * {@code thenAccept(null)}.
+     */
+    private final AtomicBoolean released = new AtomicBoolean(false);
 
     /**
      * Creates a new cache task for the general region queue.
@@ -142,8 +155,11 @@ public class RegionCacheTask extends RTPRunnable {
             } else {
                 RTP.log(Level.SEVERE, "Failed to generate location", e);
             }
-            region.inFlightCalculations.decrementAndGet();
-            MemoryTracker.untrack(this);
+            // Cleanup is owned by processResult(null) below — keeping the
+            // decrement here as well would race with processResult on a future
+            // that completes after recovery, leaking or double-counting the
+            // counter depending on dispatch order. The releaseInFlight() CAS
+            // makes "who decrements?" unambiguous.
             return null;
         });
 
@@ -162,7 +178,16 @@ public class RegionCacheTask extends RTPRunnable {
     }
 
     private void processResult(GenerationResult res) {
-        if (res == null) return;
+        if (res == null) {
+            // Normal-null completion paths: malformed region, pregen dispatch
+            // failure (LocationGenerator.getLocationFuture lines 105/181/188),
+            // PregenTask attempts exhausted, or recovery from exceptionally
+            // returning null. All of them previously leaked
+            // inFlightCalculations (visible as `[cached]` freezing one short
+            // of cacheCap+activeCap forever).
+            releaseInFlight();
+            return;
+        }
         try {
             if (playerId != null) {
                 if (res.coords() != null) {
@@ -204,16 +229,13 @@ public class RegionCacheTask extends RTPRunnable {
                             region.queueManager.enqueuePlayerLocation(playerId, finalPair);
                         } finally {
                             PerformanceTracker.totalNanosecondsConsumed.add(elapsed);
-                            region.inFlightCalculations.decrementAndGet();
-                            MemoryTracker.untrack(this);
+                            releaseInFlight();
                         }
                     });
                 } else {
-                    region.inFlightCalculations.decrementAndGet();
-                    MemoryTracker.untrack(this);
+                    releaseInFlight();
                 }
             } else {
-                region.inFlightCalculations.decrementAndGet();
                 if (res.coords() != null) {
                     if (res.reservation() != null) res.reservation().close();
                     // Observational mode (Phase 8.2 pivot): drop the safe
@@ -226,10 +248,30 @@ public class RegionCacheTask extends RTPRunnable {
                         region.queueManager.unkeptLocations.offer(coldLoc);
                     }
                 }
-                MemoryTracker.untrack(this);
+                releaseInFlight();
             }
         } catch (Exception e) {
             RTP.log(Level.SEVERE, "Error in processResult", e);
+            // Fail-safe: a thrown exception inside processResult must still
+            // release the in-flight slot, otherwise a single buggy reservation
+            // close or buffer offer can permanently freeze the cache deficit.
+            releaseInFlight();
+        }
+    }
+
+    /**
+     * Decrements {@code region.inFlightCalculations} and untracks this task in
+     * {@link MemoryTracker} exactly once across the task's lifetime, regardless
+     * of how many terminal branches fire. The CAS on {@link #released}
+     * guarantees idempotency, which is required because the chain
+     * {@code exceptionally -> thenAccept(null)} can deliver the null result to
+     * {@code processResult} after recovery, and the playerId-success branch
+     * finalises asynchronously inside the {@code chunkSet.complete()} callback.
+     */
+    private void releaseInFlight() {
+        if (released.compareAndSet(false, true)) {
+            region.inFlightCalculations.decrementAndGet();
+            MemoryTracker.untrack(this);
         }
     }
 }

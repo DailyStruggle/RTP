@@ -589,17 +589,6 @@ public class Region extends FactoryValue<RegionKeys> {
 //    long totalCap = Math.max(settings.cacheCap(), queueManager.playerQueue.size());
     long cacheCap = settings.cacheCap();
 
-    // Phase 8.2 pivot (2026-04-20c): schedule at most one observational
-    // RegionCacheTask alongside the default-mode deficit loop. The task
-    // itself self-gates on the inverted cache condition
-    // (unkeptLocations.size() >= cacheCap), reuses LocationGenerator, and
-    // drops any safe result instead of enqueuing it. Config surface is a
-    // single master switch (PerformanceKeys.visitorEnabled); cadence is
-    // inherited from the existing cache-fill `period`. See
-    // docs/dev/BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md §§2, 4.2–4.3.
-    if (isObservationalModeEnabled()) {
-      cachePipeline.add(RegionCacheTask.observe(this, availableTime - (System.nanoTime() - start)));
-    }
     long totalCap = Math.max(cacheCap + activeCap, queueManager.playerQueue.size());
 
     if (!isScanningCache.compareAndSet(false, true)) {
@@ -608,11 +597,35 @@ public class Region extends FactoryValue<RegionKeys> {
     }
 
     try {
+      // Compute the cache-fill deficit BEFORE scheduling any observational
+      // task. The observational task is queued onto the same `cachePipeline`
+      // and would otherwise inflate `cachePipeline.size()` here by 1 every
+      // pulse, swallowing exactly one default-mode cache slot. Because the
+      // observational task self-gates closed when the cache has headroom
+      // (RegionCacheTask.run() line 131: `if (!cacheFull) return;`), it
+      // would early-return without filling — leaving the cache pinned one
+      // slot below `cacheCap + activeChunkCap` indefinitely (visible as
+      // `[cached] = totalCap - 1`, e.g. perpetual 59 against a 60-slot
+      // total). Scheduling observational AFTER this loop preserves the
+      // Phase 8.2 contract (one observational task per pulse, no enqueues
+      // when cache full) without contaminating the deficit math.
       deficit = totalCap - (cachePipeline.size() + queueManager.keptLocations.size() + queueManager.unkeptLocations.size() + inFlightCalculations.get());
 //      System.out.println("[RTP-DEBUG] Region '" + name + "' caching phase. Deficit: " + deficit + " | inFlight: " + inFlightCalculations.get() + " | cachePipeSize: " + cachePipeline.size());
 
       for (long i = 0; i < deficit; i++) {
         cachePipeline.add(new RegionCacheTask(this, availableTime - (System.nanoTime() - start)));
+      }
+
+      // Phase 8.2 pivot (2026-04-20c): schedule at most one observational
+      // RegionCacheTask alongside the default-mode deficit loop. The task
+      // itself self-gates on the inverted cache condition
+      // (unkeptLocations.size() >= cacheCap), reuses LocationGenerator, and
+      // drops any safe result instead of enqueuing it. Config surface is a
+      // single master switch (PerformanceKeys.visitorEnabled); cadence is
+      // inherited from the existing cache-fill `period`. See
+      // docs/dev/BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md §§2, 4.2–4.3.
+      if (isObservationalModeEnabled()) {
+        cachePipeline.add(RegionCacheTask.observe(this, availableTime - (System.nanoTime() - start)));
       }
 
 //      System.out.println("[RTP-DEBUG] Region '" + name + "' executing cachePipeline with budget: " + currentAvailable + "ns");

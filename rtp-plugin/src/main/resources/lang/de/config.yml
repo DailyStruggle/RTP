@@ -1,0 +1,40 @@
+# --- RTP Kernkonfiguration ---
+# Dokumentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/CORE_CONFIG.md
+
+# Sprache für spielerorientierte Nachrichten
+language: "en"
+
+# Wartezeit (Sekunden) vor der Teleportation
+teleportVerzoegerung: 2
+
+# Maximale Bewegungsdistanz während der Verzögerung vor Abbruch
+distanzAbbruch: 2
+
+# Wartezeit (Sekunden) zwischen erfolgreichen Nutzungen
+teleportAbkuehlung: 300
+
+# Befehle, die nach der Teleportation ausgeführt werden
+konsolenBefehle:
+  - "say [player] hat sich gerade zufällig teleportiert!"
+spielerBefehle:
+  - ""
+
+# Datenbankkonfiguration
+datenbank:
+  type: "sqlite"
+  host: "127.0.0.1"
+  port: 3306
+  name: "rtp"
+  username: "root"
+  password: "password"
+
+# Netzwerk- und Synchronisationskonfiguration
+netzwerk:
+  redis:
+    enabled: false
+    host: "127.0.0.1"
+    port: 6379
+    password: ""
+
+# ÄNDERE NICHT DIE VERSIONSNUMMER
+version: "3.0"

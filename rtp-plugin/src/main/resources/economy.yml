@@ -1,26 +1,12 @@
 # --- RTP Economy Settings ---
-# Configures costs for random teleportation using the server's economy.
+# Documentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/ECONOMY.md
 
-# Refund Policy
-# Whether to refund the price and reset the cooldown if the teleport is cancelled.
-refundOnCancel: true
-
-# Teleportation Costs
-# Base cost for a standard /rtp command.
-price: 50.0
-
-# Cost to teleport another player (/rtp <player>).
-priceOther: 200.0
-
-# Cost for using custom parameters (/rtp region:<region>, etc.).
-paramsPrice: 1000000000.0
-
-# Additional cost for specifying a biome (/rtp biome:<biome>).
-biomePrice: 5000.0
-
-# Minimum balance requirement.
-# Players cannot drop below this amount when using RTP.
-balanceFloor: 0.0
+refundOnCancel: true # Refund cost if teleport is cancelled
+price: 50.0 # Base cost for /rtp
+priceOther: 200.0 # Cost to teleport another player
+paramsPrice: 1000000000.0 # Extra cost for using parameters
+biomePrice: 5000.0 # Extra cost for specifying a biome
+balanceFloor: 0.0 # Minimum balance to keep after payment
 
 # DO NOT TOUCH VERSION NUMBER
 version: "1.0"

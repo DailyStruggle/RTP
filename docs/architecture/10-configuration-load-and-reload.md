@@ -4,7 +4,7 @@
 
 - **Plugin enable ordering** (when `reloadAction` is first called) — see diagram 07.
 - **How a runtime task reads a value** (`getWorldParserValue` vs. direct `ConfigParser.getConfigValue`) — see diagrams 01 / 08 / 09 and `CODE_TOUR.md` §11.
-- **Message routing** (`messages.yml` keys → player feedback) — see `CODE_TOUR.md` §7 and `LocaleOverlay` / ADR-020.
+- **Message routing** (`messages.yml` keys → player feedback) — see `CODE_TOUR.md` §7 and ADR-020 (locale resolution lives in `LanguageBootstrap` + locale-aware `ConfigParser`).
 - **Persistent storage of player/teleport state** (`YamlFileDatabase`) — see `LESSONS_LEARNED.md` and diagram 02.
 
 > Companion walkthrough: [`CODE_TOUR.md` §13 — Configuration load and reload](../dev/CODE_TOUR.md).
@@ -14,6 +14,7 @@ flowchart TD
     %% Color legend: green = live-parser swap (new readers see new values), red = in-flight cancel / region shutdown, blue = disk I/O + async shape selection, yellow = config data / snapshot
 
     Trigger{{First enable<br/>or /rtp reload}}:::data
+    Bootstrap[LanguageBootstrap reads<br/>language.yml<br/>ADR-020]:::async
     FlushDB[fileDatabase.processQueries MAX<br/>then connect]:::async
     CancelTasks[ScanTask.kill<br/>processingPlayers.clear<br/>cancel in-flight RTPTeleportCancel]:::fail
 
@@ -21,7 +22,7 @@ flowchart TD
         direction TB
         P1[logging.yml]:::async
         P2[config.yml]:::async
-        P3[messages.yml + LocaleOverlay<br/>ADR-020 / REQ-RTP-F-013]:::async
+        P3[messages.yml<br/>locale-aware ConfigParser<br/>ADR-020 / REQ-RTP-F-013]:::async
         P4[economy.yml]:::async
         P5[performance.yml]:::async
         P6[safety/*.yml]:::async
@@ -42,7 +43,8 @@ flowchart TD
     OnReload[onReload callbacks<br/>e.g. integrations reattach]:::success
     Done([Ready — every new read<br/>sees new values]):::success
 
-    Trigger ==> FlushDB
+    Trigger ==> Bootstrap
+    Bootstrap --> FlushDB
     FlushDB --> CancelTasks
     CancelTasks --> NewParsers
     NewParsers --> Swap
@@ -74,7 +76,7 @@ flowchart TD
 
 1. **"Changed a value, didn't take effect."** Either (a) an in-flight task is still holding the old snapshot — wait one teleport cycle, or (b) the value lives in a per-region/per-world file and the caller is reading the global `ConfigKeys` parser — check `getWorldParserValue` vs. `getParser(ConfigKeys.class)`.
 2. **"Reload duplicates regions / leaks regions."** `reloadRegions` calls `Region.shutDown` on every entry before clearing the lookup maps — if a region lingers, its `shutDown` threw or a third party added to `permRegionLookup` after the swap.
-3. **"Messages are in English despite `language:` set."** `LocaleOverlay.apply` is a no-op for `"en"` or when the locale file is missing. Check the overlay file path and the `language` key in `config.yml` (ADR-020).
+3. **"Messages are in English despite the configured locale."** The active locale is read from `plugins/RTP/language.yml` *before* any parser is built (ADR-020); editing `language` in `config.yml` has no effect (the key was removed). Verify `language.yml` is present and contains a known locale, then confirm the corresponding `lang/<locale>/messages.yml` ships in the jar or exists on disk.
 4. **"Teleport mid-reload crashed."** `reloadConfigs` cancels in-flight teleports via `RTPTeleportCancel` and clears `processingPlayers` *before* the parser swap, so tasks don't straddle two parser generations. If a crash reaches the pipeline, the cancel path was skipped (custom entry point bypassing `Configs.reload`).
 5. **"Dormant region never activates."** `OnWorldLoadUnload` must fire `WorldLoadEvent` — check that the world is actually being loaded (not just referenced), and that `RegionConfigLoader.detectFallbackConfiguredWorld` returned the correct name.
 6. **"First-enable differs from reload."** There is no distinction in this code path: plugin enable calls `reloadAction` the same way `/rtp reload` does. Diagram 07 shows *when* that call happens during enable.
@@ -84,6 +86,6 @@ flowchart TD
 - `rtp-core/.../configuration/Configs.java` — `reload`, `reloadConfigs`, `reloadRegions`, `reloadAction`, `getWorldParser`, `getWorldParserValue`.
 - `rtp-core/.../configuration/ConfigParser.java` — single-file parser.
 - `rtp-core/.../configuration/MultiConfigParser.java` — directory-of-files parser (regions, worlds).
-- `rtp-core/.../configuration/LocaleOverlay.java` — messages overlay (ADR-020).
+- `rtp-core/.../configuration/LanguageBootstrap.java` — reads `language.yml` before any parser is constructed (ADR-020).
 - `rtp-core/.../configuration/enums/*.java` — one enum per config category; adding a key = adding an enum constant plus a default in the YAML template.
 - `rtp-core/.../selection/region/RegionConfigLoader.java` — `load` + `detectFallbackConfiguredWorld` (dormant detection).

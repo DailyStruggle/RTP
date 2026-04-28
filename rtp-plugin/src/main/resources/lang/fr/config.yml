@@ -1,0 +1,40 @@
+# --- Configuration principale de RTP ---
+# Documentation : https://github.com/DailyStruggle/RTP/blob/master/docs/admin/CORE_CONFIG.md
+
+# Langue pour les messages destinés aux joueurs
+language: "en"
+
+# Temps d'attente (secondes) avant la téléportation
+delaiTeleportation: 2
+
+# Distance de mouvement maximale pendant le délai avant annulation
+distanceAnnulation: 2
+
+# Temps d'attente (secondes) entre les utilisations réussies
+refroidissementTeleportation: 300
+
+# Commandes exécutées après la téléportation
+commandesConsole:
+  - "say [player] vient de se téléporter aléatoirement !"
+commandesJoueur:
+  - ""
+
+# Configuration de la base de données
+baseDeDonnees:
+  type: "sqlite"
+  host: "127.0.0.1"
+  port: 3306
+  name: "rtp"
+  username: "root"
+  password: "password"
+
+# Configuration du réseau et de la synchronisation
+reseau:
+  redis:
+    enabled: false
+    host: "127.0.0.1"
+    port: 6379
+    password: ""
+
+# NE PAS MODIFIER LE NUMÉRO DE VERSION
+version: "3.0"

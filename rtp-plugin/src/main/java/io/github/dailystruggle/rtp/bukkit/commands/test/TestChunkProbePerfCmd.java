@@ -109,7 +109,9 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
       if (resolvedWorld == null) {
         String msg =
             "&c[RTP test/chunk-probe-perf] no RTP worlds configured — cannot pick a default";
-        RTP.serverAccessor.sendMessage(callerId, msg);
+        if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+          RTP.serverAccessor.sendMessage(callerId, msg);
+        }
         RTP.log(Level.WARNING, msg);
         return true;
       }
@@ -134,7 +136,9 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
             + ","
             + maxY
             + "] (random sample of pregenerated chunks)";
-    RTP.serverAccessor.sendMessage(callerId, startMsg);
+    if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+      RTP.serverAccessor.sendMessage(callerId, startMsg);
+    }
     RTP.log(Level.INFO, startMsg);
 
     RTP.scheduler.runTaskAsynchronously(
@@ -150,7 +154,9 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
           "[RTP test/chunk-probe-perf] could not resolve region folder for world="
               + world.name()
               + " — aborting";
-      RTP.serverAccessor.sendMessage(callerId, msg);
+      if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+        RTP.serverAccessor.sendMessage(callerId, msg);
+      }
       RTP.log(Level.WARNING, msg);
       return;
     }
@@ -166,7 +172,9 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
               + t.getClass().getSimpleName()
               + ": "
               + t.getMessage();
-      RTP.serverAccessor.sendMessage(callerId, msg);
+      if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+        RTP.serverAccessor.sendMessage(callerId, msg);
+      }
       RTP.log(Level.WARNING, msg, t);
       return;
     }
@@ -176,7 +184,9 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
           "[RTP test/chunk-probe-perf] no pregenerated chunks found in "
               + regionDir
               + " — nothing to sample";
-      RTP.serverAccessor.sendMessage(callerId, msg);
+      if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+        RTP.serverAccessor.sendMessage(callerId, msg);
+      }
       RTP.log(Level.INFO, msg);
       return;
     }
@@ -223,10 +233,14 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
       // that the probe path replaces.
       File regionFile = regionFileForSample(regionDir, cx, cz);
       if (regionFile != null && regionFile.isFile()) {
+        // AnvilReader.readChunk expects region-local (0..31) chunk coords, not
+        // world-space — mirrors AnvilPrefilter.probeSyncDetailed's convention.
+        int rxLocal = Math.floorMod(cx, 32);
+        int rzLocal = Math.floorMod(cz, 32);
         long t2 = System.nanoTime();
         try {
           byte[] bytes = Files.readAllBytes(regionFile.toPath());
-          AnvilReader.readChunk(bytes, cx, cz);
+          AnvilReader.readChunk(bytes, rxLocal, rzLocal);
           anvilTotalNs += System.nanoTime() - t2;
           anvilSamples++;
         } catch (Throwable t) {
@@ -268,7 +282,9 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
             ratio,
             anvilRatio,
             fullOverAnvil);
-    RTP.serverAccessor.sendMessage(callerId, summary);
+    if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+      RTP.serverAccessor.sendMessage(callerId, summary);
+    }
     RTP.log(Level.INFO, summary);
 
     if (probeNulls == effective) {
@@ -276,7 +292,9 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
           "[RTP test/chunk-probe-perf] every probe returned null — fast path is inert for this"
               + " world/adapter. Check SafetyKeys.anvilPrefilterEnabled and that the world is"
               + " an .mca-backed Bukkit/Paper/Folia world.";
-      RTP.serverAccessor.sendMessage(callerId, note);
+      if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+        RTP.serverAccessor.sendMessage(callerId, note);
+      }
       RTP.log(Level.INFO, note);
     }
   }

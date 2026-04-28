@@ -208,18 +208,27 @@ public class PlaceholderProvider {
         placeholders.put(
                 "leakRate",
                 uuid -> {
-                    long activeTickets = 0;
-                    long totalLoads = 0;
+                    // Defensive leak-rate accounting: rather than trusting that everything in
+                    // each region's kept cache / per-player queues is genuinely kept (which
+                    // would silently hide bugs where a "kept" entry has no live ticket, or a
+                    // ticket exists for a chunk no longer in any cache), we rely on the
+                    // makeshift GC sweep in MemoryTracker — it scans world.chunkTickets,
+                    // compares against the keep-alive set, and increments
+                    // RTPWorld.lifetimeOrphanedTicketsScanned for every unexpected ticket it
+                    // finds. The leak rate is therefore the cumulative count of unexpected
+                    // tickets ever observed, divided by the cumulative number of chunk
+                    // tickets we have ever issued (lifetimeTicketsIssued). Note: we
+                    // deliberately do NOT use totalChunkLoads as the divisor — that counter
+                    // is incremented on every chunk-load attempt (including probe-only
+                    // paths that never tie a ticket), which would understate the leak rate
+                    // by inflating the denominator with non-ticketed loads.
+                    long lifetimeOrphaned = 0;
+                    long ticketsIssued = 0;
                     for (RTPWorld<?> world : RTP.serverAccessor.getRTPWorlds()) {
-                        activeTickets += world.activeChunkTickets.get();
-                        totalLoads += world.totalChunkLoads.get();
+                        lifetimeOrphaned += world.lifetimeOrphanedTicketsScanned.get();
+                        ticketsIssued += world.lifetimeTicketsIssued.get();
                     }
-
-                    long totalExpectedTickets = 0;
-                    // (Detailed tracking removed)
-
-                    long discrepancy = activeTickets - totalExpectedTickets;
-                    double leakRate = (totalLoads > 0) ? ((double) Math.max(0, discrepancy) / totalLoads) * 100.0 : 0.0;
+                    double leakRate = (ticketsIssued > 0) ? ((double) lifetimeOrphaned / ticketsIssued) * 100.0 : 0.0;
                     return String.format("%.4f%%", leakRate);
                 });
         placeholders.put(

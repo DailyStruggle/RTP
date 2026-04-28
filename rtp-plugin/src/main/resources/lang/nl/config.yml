@@ -1,0 +1,49 @@
+# --- Hoofdconfiguratie van RTP ---
+# Taal voor spelerberichten.
+# Standaard: "en" (Engelse basis in messages.yml).
+# Andere vertalingen staan in lang/<locale>/messages.yml en worden als laag
+# over de Engelse basis geladen. Ontbrekende sleutels vallen terug op Engels.
+# Een onbekende taal geeft een waarschuwing en valt ook terug op Engels.
+# Zie ADR-020 en REQ-RTP-F-013.
+language: "en"
+# Teletransportvertraging (seconden)
+# Tijd die de speler moet wachten voordat het teletransport plaatsvindt.
+# Geeft de server soms tijd om bestemmingschunks voor te laden.
+teletransportVertraging: 2
+# Annuleerdrempel (blokken)
+# Als de speler meer dan deze afstand beweegt tijdens de vertraging,
+# wordt het teletransport geannuleerd. Stel in op -1 om uit te schakelen.
+annuleerAfstand: 2
+# Wachttijd tussen teletransports (seconden)
+# Tijd die de speler moet wachten tussen succesvolle RTP-gebruiken.
+teletransportWachttijd: 300
+# Opdrachten na teletransport
+# Lijst van opdrachten die worden uitgevoerd na een succesvol teletransport.
+# De plaatshouder [player] staat voor de spelernaam.
+consoleOpdrachten:
+  - "say [player] is zojuist willekeurig geteletransporteerd!"
+spelerOpdrachten:
+  - ""
+# --- Databaseconfiguratie ---
+# Waar gecachte locaties en spelergegevens worden opgeslagen.
+database:
+  # Beschikbare typen: yaml, sqlite, mysql, postgresql
+  # - yaml/sqlite: lokale bestanden (geen extra configuratie nodig)
+  # - mysql/postgresql: externe database (vereist onderstaande gegevens)
+  type: "sqlite"
+  # Netwerkdatabasegegevens (genegeerd voor lokale typen)
+  host: "127.0.0.1"
+  port: 3306
+  name: "rtp"
+  username: "root"
+  password: "password"
+# --- Netwerk en synchronisatie ---
+# Redis wordt gebruikt om gecachte locaties tussen meerdere servers te synchroniseren.
+netwerk:
+  redis:
+    enabled: false
+    host: "127.0.0.1"
+    port: 6379
+    password: ""
+# WIJZIG HET VERSIENUMMER NIET
+version: "3.0"

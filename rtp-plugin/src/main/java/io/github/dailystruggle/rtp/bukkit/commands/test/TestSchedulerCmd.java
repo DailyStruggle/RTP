@@ -163,7 +163,9 @@ public class TestSchedulerCmd extends BaseRTPCmdImpl {
     } catch (TimeoutException te) {
       String msg =
           "[RTP test/scheduler] " + tier + ": TIMEOUT after " + PROBE_TIMEOUT_MS + "ms";
-      RTP.serverAccessor.sendMessage(callerId, msg);
+      if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+        RTP.serverAccessor.sendMessage(callerId, msg);
+      }
       RTP.log(Level.WARNING, msg);
     } catch (Throwable t) {
       reportTierFailure(callerId, tier, t);
@@ -173,7 +175,9 @@ public class TestSchedulerCmd extends BaseRTPCmdImpl {
   private void reportTierFailure(UUID callerId, String tier, Throwable t) {
     String msg =
         "[RTP test/scheduler] " + tier + ": FAILED (" + t.getClass().getSimpleName() + ": " + t.getMessage() + ")";
-    RTP.serverAccessor.sendMessage(callerId, msg);
+    if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+      RTP.serverAccessor.sendMessage(callerId, msg);
+    }
     RTP.log(Level.WARNING, msg, t);
   }
 

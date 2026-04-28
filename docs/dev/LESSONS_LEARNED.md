@@ -95,6 +95,20 @@ For a genuine per-chunk latency number, use the serial `--samples N` harness in 
 
 ---
 
+## Localization
+
+### Locale-switch migration in `ConfigParser` (2026-04-26)
+
+When `language.yml` is edited from `en` → another locale and the server reloads, `ConfigParser.detectAndPreserveLocaleMismatch` re-extracts `lang/<locale>/<file>.yml` from the JAR over the on-disk file (after backing it up to `<name>.old<n>`) and re-applies user-customized scalar values keyed by enum so they survive under the new locale's key names. Three pitfalls the regression suite (`ConfigParserLocaleSwitchTest`) guards against:
+
+- **Stale `fileDatabase` cache.** After re-extraction, evict `cachedLookup` / `cachedLookupLastModified` for the file or the next read returns the previously-loaded English `YamlFile` and every lookup via the new locale's key names returns `null` (silent blank lines, e.g. the original `rtp info` Spanish report).
+- **Identity mappings carry no locale signal.** A `<file>.lang.yml` line where left == right (`infoTickets: infoTickets`) must not count as evidence the on-disk file is already in the active locale. The detector explicitly excludes identity entries from `activeLocaleHits`; otherwise files like `messages.yml` that happen to retain English-named identity keys short-circuit migration falsely.
+- **No-rename locale ⇒ no migration.** Files like `integrations.yml` that have no localized JAR resource get a seeded identity-only `language_mapping` from `loadLangFile`. Treating them as "foreign" causes an infinite re-backup loop on every reload. The detector short-circuits when **every** mapping entry is identity (i.e. the active locale renames zero keys for this file).
+
+When adding a new translatable file or locale, see `TRANSLATION_GUIDE.md`. The `LocaleResourceParityTest` enforces the on-disk shape contract that this migration depends on.
+
+---
+
 ## Build & Environment
 
 ### Gradle daemon / Java version mismatch

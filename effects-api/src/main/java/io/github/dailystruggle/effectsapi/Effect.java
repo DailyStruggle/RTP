@@ -64,8 +64,10 @@ public abstract class Effect<T extends Enum<T>> extends BukkitRunnable implement
                 }
                 else if (res instanceof Color) {
                     String str = val.toString();
-                    if (str.contains(String.valueOf(CommandsAPI.parameterDelimiter)))
-                        str = str.substring(str.indexOf(CommandsAPI.parameterDelimiter));
+                    if (str.contains(String.valueOf(CommandsAPI.parameterDelimiterAlt)))
+                        str = str.substring(str.indexOf(CommandsAPI.parameterDelimiterAlt) + 1);
+                    else if (str.contains(String.valueOf(CommandsAPI.parameterDelimiter)))
+                        str = str.substring(str.indexOf(CommandsAPI.parameterDelimiter) + 1);
                     res = Color.fromRGB(Integer.parseInt(str, 16));
                 } else {
                     try {

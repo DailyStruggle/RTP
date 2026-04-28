@@ -1,0 +1,26 @@
+# --- RTP Wirtschaftseinstellungen ---
+# Konfiguriere die Kosten für zufällige Teleports unter Verwendung der Serverwirtschaft.
+
+# Erstattungsrichtlinie
+# Gibt an, ob der Preis erstattet wird und der Cooldown zurückgesetzt wird, wenn der Teleport abgebrochen wird.
+erstattungBeiAbbruch: true
+
+# Teleportationskosten
+# Basiskosten für einen Standard /rtp Befehl.
+preis: 50.0
+
+# Kosten für die Teleportation eines anderen Spielers (/rtp <Spieler>).
+preisAnderer: 200.0
+
+# Kosten für die Verwendung benutzerdefinierter Parameter (/rtp region:<Region>, etc.).
+preisParameter: 1000000000.0
+
+# Zusätzliche Kosten für die Angabe eines Bioms (/rtp biome:<Biom>).
+preisBiom: 5000.0
+
+# Obligatorischer Mindestkontostand.
+# Spieler können diesen Kontostand beim Verwenden von RTP nicht unterschreiten.
+mindestKontostand: 0.0
+
+# ÄNDERE NICHT DIE VERSIONSNUMMER
+version: "1.0"

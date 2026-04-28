@@ -10,6 +10,7 @@ import io.github.dailystruggle.rtp.common.commands.parameters.RegionParameter;
 import io.github.dailystruggle.rtp.common.commands.parameters.WorldParameter;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.api.DownloadInfo;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -35,11 +36,6 @@ public class InfoCmd extends BaseRTPCmdImpl {
   @Override
   public String permission() {
     return "rtp.info";
-  }
-
-  @Override
-  public String description() {
-    return "check the current state of the plugin";
   }
 
   private void sendWorldInfo(UUID callerId, RTPWorld world, ConfigParser<MessagesKeys> lang) {
@@ -160,8 +156,13 @@ public class InfoCmd extends BaseRTPCmdImpl {
     RTPCommandSender sender = RTP.serverAccessor.getSender(callerId);
     if (sender.hasPermission("rtp.admin") || sender.hasPermission("rtp.support")) {
       RTP.serverAccessor.sendMessage(callerId, "&7--- DRM Information ---");
-      RTP.serverAccessor.sendMessage(callerId, "&7Downloader ID: &f" + RTPAPI.DOWNLOADER_ID);
-      RTP.serverAccessor.sendMessage(callerId, "&7Download Nonce: &f" + RTPAPI.DOWNLOAD_NONCE);
+      RTP.serverAccessor.sendMessage(callerId, "&7Source: &f" + DownloadInfo.source());
+      RTP.serverAccessor.sendMessage(callerId, "&7Downloader ID: &f" + DownloadInfo.userId());
+      RTP.serverAccessor.sendMessage(callerId, "&7Download Nonce: &f" + DownloadInfo.nonce());
+      if (DownloadInfo.source() == DownloadInfo.Source.BUILTBYBIT) {
+        RTP.serverAccessor.sendMessage(callerId, "&7BBB Resource: &f" + DownloadInfo.resourceId());
+        RTP.serverAccessor.sendMessage(callerId, "&7BBB Timestamp: &f" + DownloadInfo.timestamp());
+      }
     }
 
     return true;

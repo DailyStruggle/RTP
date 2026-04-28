@@ -1,0 +1,26 @@
+# --- Paramètres de l'économie RTP ---
+# Configurez les coûts de la téléportation aléatoire en utilisant l'économie du serveur.
+
+# Politique de remboursement
+# Indique si le prix est remboursé et le temps d'attente réinitialisé si la téléportation est annulée.
+remboursementAnnulation: true
+
+# Coûts de la téléportation
+# Coût de base pour une commande /rtp standard.
+prix: 50.0
+
+# Coût pour téléporter un autre joueur (/rtp <joueur>).
+prixAutre: 200.0
+
+# Coût pour l'utilisation de paramètres personnalisés (/rtp region:<région>, etc.).
+prixParametres: 1000000000.0
+
+# Coût supplémentaire pour la spécification d'un biome (/rtp biome:<biome>).
+prixBiome: 5000.0
+
+# Solde minimum obligatoire.
+# Les joueurs ne peuvent pas descendre en dessous de ce solde lors de l'utilisation du RTP.
+soldeMinimum: 0.0
+
+# NE PAS MODIFIER LE NUMÉRO DE VERSION
+version: "1.0"

@@ -113,7 +113,9 @@ public class TestAnvilPrefilterCmd extends BaseRTPCmdImpl {
 
     Snapshot s = snapshot();
     String summary = "[RTP test/anvil-prefilter] " + s;
-    RTP.serverAccessor.sendMessage(callerId, summary);
+    if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+      RTP.serverAccessor.sendMessage(callerId, summary);
+    }
     RTP.log(Level.INFO, summary);
 
     if (s.total() == 0L) {
@@ -122,7 +124,9 @@ public class TestAnvilPrefilterCmd extends BaseRTPCmdImpl {
               + "disabled (SafetyKeys.anvilPrefilterEnabled) or no teleport has triggered "
               + "a candidate chunk load since startup. Spigot, Paper (§13.2), and Folia "
               + "all enter the prefilter; Fabric is out of scope (§13.2).";
-      RTP.serverAccessor.sendMessage(callerId, note);
+      if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+        RTP.serverAccessor.sendMessage(callerId, note);
+      }
       RTP.log(Level.INFO, note);
     }
     return true;

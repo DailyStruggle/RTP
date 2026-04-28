@@ -168,26 +168,39 @@ public class BukkitEffectsHandler {
                         Player player = Bukkit.getPlayer(task.player().uuid());
                         if (player == null) return;
 
-                        RTP.getInstance()
-                                .miscAsyncTasks
-                                .add(
-                                        () -> {
-                                            String title = lang.getConfigValue(MessagesKeys.title, "").toString();
-                                            String subtitle = lang.getConfigValue(MessagesKeys.subtitle, "").toString();
+                        /*
+                         * Title/subtitle/actionbar must be dispatched on the player's region/main
+                         * thread. Player.sendTitle from an async thread is silently dropped on modern
+                         * Spigot/Paper and throws on Folia, which is why titles weren't appearing
+                         * in-game. Resolve config values up-front (cheap, thread-safe) and hand the
+                         * Bukkit API calls to the scheduler.
+                         */
+                        String title = lang.getConfigValue(MessagesKeys.title, "").toString();
+                        String subtitle = lang.getConfigValue(MessagesKeys.subtitle, "").toString();
 
-                                            int fadeIn = lang.getNumber(MessagesKeys.fadeIn, 0).intValue();
-                                            int stay = lang.getNumber(MessagesKeys.stay, 0).intValue();
-                                            int fadeOut = lang.getNumber(MessagesKeys.fadeOut, 0).intValue();
+                        int fadeIn = lang.getNumber(MessagesKeys.fadeIn, 0).intValue();
+                        int stay = lang.getNumber(MessagesKeys.stay, 0).intValue();
+                        int fadeOut = lang.getNumber(MessagesKeys.fadeOut, 0).intValue();
 
-                                            SendMessage.title(player, title, subtitle, fadeIn, stay, fadeOut);
+                        String actionbar = lang.getConfigValue(MessagesKeys.actionbar, "").toString();
 
-                                            String actionbar = lang.getConfigValue(MessagesKeys.actionbar, "").toString();
-                                            SendMessage.actionbar(player, actionbar);
-                                        });
+                        RTP.scheduler.runTask(() -> {
+                            SendMessage.title(player, title, subtitle, fadeIn, stay, fadeOut);
+                            SendMessage.actionbar(player, actionbar);
+                        });
 
                         ConfigParser<ConfigKeys> configParser =
                                 (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
 
+                        /*
+                         * Folia note: command dispatch (Bukkit.dispatchCommand and player.performCommand)
+                         * is handled by the global region. Region/entity threads throw
+                         * IllegalStateException("Dispatching command async"). Always route to the
+                         * global region scheduler via RTP.scheduler.runTask(Runnable).
+                         * Collect all commands and dispatch them in a single scheduled task to
+                         * reduce per-command scheduling overhead.
+                         */
+                        List<String> consoleCommandsToRun = new ArrayList<>();
                         Object consoleCommandsObj =
                                 configParser.getConfigValue(ConfigKeys.consoleCommands, new ArrayList<>());
                         if (consoleCommandsObj instanceof List<?> consoleCommands) {
@@ -195,13 +208,11 @@ public class BukkitEffectsHandler {
                                 if (cmd == null) continue;
                                 String command = cmd.toString().replace("[player]", player.getName());
                                 if (command.isBlank()) continue;
-                                Bukkit.getScheduler()
-                                        .runTask(
-                                                plugin,
-                                                () -> Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command));
+                                consoleCommandsToRun.add(command);
                             }
                         }
 
+                        List<String> playerCommandsToRun = new ArrayList<>();
                         Object playerCommandsObj =
                                 configParser.getConfigValue(ConfigKeys.playerCommands, new ArrayList<>());
                         if (playerCommandsObj instanceof List<?> playerCommands) {
@@ -209,9 +220,19 @@ public class BukkitEffectsHandler {
                                 if (cmd == null) continue;
                                 String command = cmd.toString().replace("[player]", player.getName());
                                 if (command.isBlank()) continue;
-                                Bukkit.getScheduler()
-                                        .runTask(plugin, () -> player.performCommand(command));
+                                playerCommandsToRun.add(command);
                             }
+                        }
+
+                        if (!consoleCommandsToRun.isEmpty() || !playerCommandsToRun.isEmpty()) {
+                            RTP.scheduler.runTask(() -> {
+                                for (String c : consoleCommandsToRun) {
+                                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), c);
+                                }
+                                for (String c : playerCommandsToRun) {
+                                    player.performCommand(c);
+                                }
+                            });
                         }
                     }
 
@@ -219,7 +240,9 @@ public class BukkitEffectsHandler {
                         boolean effectParsing;
                         Object data = parser.getData(PerformanceKeys.effectParsing);
                         if (data instanceof Boolean) effectParsing = (Boolean) data;
-                        else {
+                        else if (data == null) {
+                            effectParsing = false;
+                        } else {
                             effectParsing = Boolean.parseBoolean(data.toString());
                             parser.set(PerformanceKeys.effectParsing, effectParsing);
                         }

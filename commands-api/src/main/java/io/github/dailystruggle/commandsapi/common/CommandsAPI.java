@@ -13,7 +13,9 @@ import java.util.concurrent.TimeUnit;
  *          events?
  */
 public class CommandsAPI {
-    public static char parameterDelimiter = ':';
+    public static char parameterDelimiter = '=';
+    /** Legacy delimiter accepted on input for backward compatibility. */
+    public static final char parameterDelimiterAlt = ':';
     public static char multiParameterDelimiter = ',';
     public static final UUID serverId = new UUID(0,0);
 

@@ -30,6 +30,7 @@ public class TestCmd extends BaseRTPCmdImpl {
     addSubCommand(new TestCancelCmd(this));
     addSubCommand(new TestSchedulerCmd(this));
     addSubCommand(new TestReloadSafetyCmd(this));
+    addSubCommand(new TestConfigSetCmd(this));
     addSubCommand(new TestCommandsCmd(this));
     addSubCommand(new LiveCommandDispatcherTestJob(this));
     addSubCommand(new TestApiCompatCmd(this));

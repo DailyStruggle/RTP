@@ -1,0 +1,67 @@
+# --- Prestatieconfiguratie van RTP ---
+# Stem de plugin af op de serverprestaties.
+# Maximaal aantal zoekpogingen
+# Hoe vaak de plugin een veilige locatie zoekt voordat hij stopt.
+# Impact: HOOG — hoge waarden kunnen het CPU-gebruik per verzoek sterk verhogen.
+maximaalPogingen: 10
+# Voorlaadafstand bestemming (chunks)
+# Straal van chunks die rondom de bestemming worden voorgeladen.
+# Aantal geladen chunks = ( 1 + 2 * straal )^2.
+# Impact: HOOG — een te hoge waarde kan TPS-dalingen veroorzaken bij teletransport.
+zichtafstandSelectie: 0
+zichtafstandTeletransport: 0
+# Selectiefrequentie (spelticks)
+# Tijd tussen zoekopdrachten naar nieuwe locaties om regiocaches te vullen.
+# ( 20 ticks = 1 seconde ).
+# Impact: GEMIDDELD — lagere waarden vullen de cache sneller maar gebruiken meer CPU.
+periode: 20
+# Toegewezen tijd per taak (milliseconden)
+# Maximale tijd (ms) besteed aan RTP-taken per tick.
+# Bereik: 0 - 50.
+# Impact: GEMIDDELD — hoge waarden verwerken sneller maar riskeren ticktijd.
+synchroonToegewezenTijd: 50
+asynchroonToegewezenTijd: 50
+# Minimale TPS-vereiste
+# Minimale server-TPS voordat een nieuwe locatie in de cache wordt geplaatst.
+# Bereik: 0.0 - 20.0.
+# Impact: LAAG — voorkomt dat de plugin lag toevoegt wanneer de server het moeilijk heeft.
+minimaalTPS: 19.0
+# Wachtrij na teletransport
+# Als true probeert de plugin de locatiecache direct na een RTP te vullen.
+# Impact: GEMIDDELD
+wachtrij_naTeletransport: false
+# Synchroon laden
+# Gebruik synchroon chunkladen voor locatieselectie.
+# Impact: HOOG — NIET AANBEVOLEN! Kan ernstige serverblokkades veroorzaken.
+synchroonLaden: false
+# Rechtenparsering (opstarten)
+# verwerking_bijGebeurtenis: Incompatibel met brede rechten zoals *.*.
+# Impact: GEMIDDELD (bijGebeurtenis) / LAAG (effect)
+verwerking_bijGebeurtenis: false
+effectVerwerking: true
+# Bioomselektiecache
+# bioomHerinnering: Eerder gevonden locaties per bioom hergebruiken.
+# bioomHerinnering_geforceerd: Alleen al ontdekte en gecachte biomen gebruiken.
+# Impact: LAAG tot GEMIDDELD
+bioomHerinnering: true
+bioomHerinnering_geforceerd: false
+# Passieve chunkcontrole
+# Zoekt naar veilige locaties in alle geladen chunks binnen het bereik van een regio.
+# Impact: HOOG — kan de serverbelasting bij chunklaadgebeurtenissen aanzienlijk verhogen.
+controleer_bijChunkLaden: false
+# Achtergrondgegevensverzameling (Region Data Visitor)
+# Wanneer de voorgenereercache vol is, wordt per regio één observerende
+# RegionCacheTask gepland met dezelfde `periode`. Hergebruikt dezelfde
+# LocationGenerator-pipeline maar verwerpt de veilige kandidaat in plaats van
+# hem in de wachtrij te plaatsen, zodat bijeffecten (registratie van slechte
+# locaties, bioomoogst) op de achtergrond worden opgebouwd zonder dat de
+# wachtrij boven zijn limiet groeit. Genereert NOOIT wereldgeneratie: chunks
+# die nog niet op schijf staan worden overgeslagen via het Anvil-voorfilter
+# van ADR-016 met uitkomst UNKNOWN.
+# bezoeker_ingeschakeld: hoofdschakelaar (true schakelt observatiemodus in).
+# De cadans wordt overgenomen van de bovenstaande `periode`-instelling.
+# Impact: LAAG — begrensd door de bestaande `periode`; werk alleen wanneer
+# de cache geen ruimte heeft voor standaard vullingen.
+bezoeker_ingeschakeld: true
+# WIJZIG HET VERSIENUMMER NIET
+version: "1.0"

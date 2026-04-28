@@ -171,9 +171,16 @@ regionInfo:
 ################################################################################
 # shown in help command
 rtp: "&b/rtp - teleport to a random location"
+rtp_description: "teleport to a random location"
 help: "&b/rtp help - see this"
+help_description: "describe commands"
 reload: "&b/rtp reload - reload config files"
+reload_description: "reload config files"
 scan: "&b/rtp scan - try all possible region placements to improve load times"
+scan_description: "clear stored data and try all possible region placements"
+config_description: "update configuration files at runtime"
+info_description: "check the current state of the plugin"
+test_description: "test RTP functions"
 
 ################################################################################
 # Section 9: PlaceholderAPI Support
@@ -191,8 +198,8 @@ PLAYER_TELEPORTING: "&bTELEPORTING"
 # title settings
 # remove or set title to "" to disable
 # PlaceholderAPI is recommended for coordinates
-title: "&aTeleported!"
-subtitle: "&bhave fun!"
+title: "#FF6B6BT#FF8560e#FF9F55l#FFBA4Ae#FFD53Fp#E8E040o#BFED41r#96F542t#6DF543e#44F2A0d#3BEFC8!#38ECF0"
+subtitle: "#A78BFAh#B47EF8a#C171F6v#CE64F4e#DB57F2 #E84AF0f#E855D8u#E860C0n#E86BA8!#E876A0"
 fadeIn: 20
 stay: 20
 fadeOut: 20

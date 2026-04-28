@@ -1,0 +1,34 @@
+# --- Plugin-logboeken ---
+# Schakelt logboekregistratie van verschillende pluginactiviteiten in of uit.
+# Gedetailleerde systeemlogboeken
+# gedetailleerd_herladen: alle herladen bestanden/secties registreren
+# gedetailleerd_regioInit: initialisatie van elke regio registreren
+gedetailleerd_herladen: false
+gedetailleerd_regioInit: false
+# Basisactiviteitslogboeken
+# opdracht: RTP-opdrachten uitgevoerd door spelers registreren
+# teletransport: werkelijke teletransportgebeurtenissen registreren
+opdracht: false
+teletransport: true
+# Automatische of gebeurtenisgestuurde RTP-logboeken
+# Logboeken voor door gebeurtenissen geactiveerde RTP:
+gebeurtenis_wereldWisseling: true # Wanneer de speler van wereld wisselt
+gebeurtenis_deelnemen: true       # Wanneer de speler de server betreedt
+gebeurtenis_herSpawn: true        # Wanneer de speler herSpawnt
+gebeurtenis_bewegen: true         # Wanneer de speler beweegt (als bewegings-RTP actief is)
+gebeurtenis_teletransport: true   # Wanneer de speler teletransporteert (als teletransport-RTP actief is)
+# Foutopsporing bij selectiemislukkingen
+# Registreert gedetailleerde informatie wanneer het selecteren van een veilige locatie mislukt,
+# inclusief mislukkingspercentages en zoekparameters.
+selectie_mislukking: true
+# Systeemlogboeken
+# Gerelateerd aan achtergrondtaken en databasebewerkingen.
+systeem_geheugenTracker: false
+systeem_database: false
+# Minimaal logniveau van de plugin. Het effectieve filter is het fijnste van
+# dit niveau en dat van de Bukkit-logger. Accepteert: SEVERE, WARNING, INFO,
+# CONFIG, FINE, FINER, FINEST, ALL, OFF. De standaardwaarde ALL behoudt
+# hetzelfde gedrag als de Bukkit-logger.
+min_niveau: INFO
+# WIJZIG HET VERSIENUMMER NIET
+version: "1.0"

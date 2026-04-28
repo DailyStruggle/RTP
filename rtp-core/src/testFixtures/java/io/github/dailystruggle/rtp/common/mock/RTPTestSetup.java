@@ -57,9 +57,9 @@ public final class RTPTestSetup {
 
         // Guarantee the task pipes on the shared RTP.getInstance() are real
         // TimeBoundTaskPipe instances, not whatever a previous test class may
-        // have installed (e.g. Mockito mocks in ReqRtpF013LocaleOverlayTest,
-        // which return `false` from execute(...) and silently no-op add(...),
-        // causing any later test that queues and drains the pipe to fail).
+        // have installed (e.g. Mockito mocks that return `false` from
+        // execute(...) and silently no-op add(...), causing any later test
+        // that queues and drains the pipe to fail).
         // Rebuilding per-install also resets any `stop=true`/`avgTime` drift
         // left by shutdown-path tests.
         io.github.dailystruggle.rtp.common.RTP rtpInstance = RTP.getInstance();
