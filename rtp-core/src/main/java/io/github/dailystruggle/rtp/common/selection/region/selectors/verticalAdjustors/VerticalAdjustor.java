@@ -89,6 +89,65 @@ public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E
   }
 
   /**
+   * Why a probe-path attempt returned no coords. Used by {@code ScanTask} to
+   * attribute the single {@code adjustNull} outcome into {@code light /
+   * window / scan / threw} sub-buckets for platform-asymmetry diagnosis. See
+   * {@link #adjustFromProbeWithReason(ChunkColumnProbe, String)}. Diagnostic
+   * only — does not change behavior.
+   */
+  public enum ProbeRejectReason {
+    /** The probe succeeded; {@code AdjustResult.picked()} is non-null. */
+    NONE,
+    /** Probe Y window did not cover the adjustor's {@code [minY, maxY]}. */
+    WINDOW,
+    /**
+     * Sky-light gate closed: {@code requireSkyLight} is true, probe
+     * {@code isLightOn=false}, and the heightmap proxy could not be verified
+     * (no heightmap, or a non-air block contradicts the reported top).
+     */
+    LIGHT_GATE,
+    /** Center-column scan found no acceptable Y. */
+    SCAN_MISS,
+    /** {@code adjustFromProbeWithReason} threw (attributed by the caller). */
+    THREW
+  }
+
+  /**
+   * Typed result of {@link #adjustFromProbeWithReason(ChunkColumnProbe, String)}.
+   * Either {@code picked} is non-null and {@code reason == NONE}, or
+   * {@code picked} is null and {@code reason} names which gate fired.
+   */
+  public record AdjustResult(@Nullable RTPCoords picked, @NotNull ProbeRejectReason reason) {
+    public static final AdjustResult WINDOW_REJECT =
+        new AdjustResult(null, ProbeRejectReason.WINDOW);
+    public static final AdjustResult LIGHT_GATE_REJECT =
+        new AdjustResult(null, ProbeRejectReason.LIGHT_GATE);
+    public static final AdjustResult SCAN_MISS_REJECT =
+        new AdjustResult(null, ProbeRejectReason.SCAN_MISS);
+
+    public static AdjustResult ok(@NotNull RTPCoords picked) {
+      return new AdjustResult(picked, ProbeRejectReason.NONE);
+    }
+  }
+
+  /**
+   * Probe-backed fast path with typed rejection reason. The default delegates
+   * to {@link #adjustFromProbe(ChunkColumnProbe, String)} and maps a null
+   * result to {@link ProbeRejectReason#SCAN_MISS} (preserves back-compat for
+   * third-party adjustors that only override the nullable-return entry point).
+   *
+   * <p>Concrete adjustors with distinct rejection branches (e.g.
+   * {@code LinearAdjustor}, {@code JumpAdjustor}) override this to return the
+   * specific reason; their {@link #adjustFromProbe} then delegates here and
+   * unwraps {@code picked()} to keep a single source of truth.
+   */
+  public @NotNull AdjustResult adjustFromProbeWithReason(
+      @NotNull ChunkColumnProbe probe, @NotNull String worldName) {
+    RTPCoords c = adjustFromProbe(probe, worldName);
+    return c == null ? AdjustResult.SCAN_MISS_REJECT : AdjustResult.ok(c);
+  }
+
+  /**
    * Reports whether this adjustor's Y-acceptance policy consults sky-light at the
    * column (i.e. whether it needs authoritative {@code SkyLight} + {@code isLightOn}
    * data retained by a {@link ChunkColumnProbe}). Callers use this flag to set

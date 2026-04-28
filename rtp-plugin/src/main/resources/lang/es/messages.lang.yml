@@ -70,6 +70,13 @@ PLAYER_SETUP: JUGADOR_CONFIGURAR
 rtp: rtp
 stay: permanecer
 help: ayuda
+rtp_description: rtp_descripcion
+help_description: ayuda_descripcion
+reload_description: recargar_descripcion
+scan_description: escaneo_descripcion
+config_description: config_descripcion
+info_description: info_descripcion
+test_description: prueba_descripcion
 scanStatus: estadoEscaneo
 infoWorld: infoMundo
 chunkLoading: cargaDeChunk

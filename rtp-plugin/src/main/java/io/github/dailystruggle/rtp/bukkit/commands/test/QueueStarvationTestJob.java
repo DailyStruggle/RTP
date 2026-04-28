@@ -324,10 +324,11 @@ public class QueueStarvationTestJob extends BaseRTPCmdImpl {
     String refillLine =
         "[RTP test/queue-starvation] refill: SelectionAPI.compute() tookMs=" + refillMs;
     String detail = "[RTP test/queue-starvation] per-sample ms=" + timings;
-
-    RTP.serverAccessor.sendMessage(callerId, header);
-    RTP.serverAccessor.sendMessage(callerId, drainLine);
-    RTP.serverAccessor.sendMessage(callerId, refillLine);
+    if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+      RTP.serverAccessor.sendMessage(callerId, header);
+      RTP.serverAccessor.sendMessage(callerId, drainLine);
+      RTP.serverAccessor.sendMessage(callerId, refillLine);
+    }
     RTP.log(Level.INFO, header);
     RTP.log(Level.INFO, drainLine);
     RTP.log(Level.INFO, refillLine);
@@ -369,7 +370,9 @@ public class QueueStarvationTestJob extends BaseRTPCmdImpl {
     if (region == null) {
       String msg =
           "&c[RTP test/queue-starvation] no region specified and caller has no resolvable region";
-      RTP.serverAccessor.sendMessage(callerId, msg);
+      if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+        RTP.serverAccessor.sendMessage(callerId, msg);
+      }
       RTP.log(Level.WARNING, msg);
       return null;
     }

@@ -1,0 +1,138 @@
+# --- Messages RTP (Français) ---
+# Traduction des messages visibles par les joueurs et la console.
+#
+# IMPORTANT :
+#   - Conserver les balises entre crochets telles quelles : [P0], [delay], [attempts],
+#     [world], [region], [remainingCooldown], [scan_chunks], etc.
+#   - Conserver les codes couleur &a &e &c et les codes hexadécimaux (#2636ef).
+#   - Les clés absentes seront automatiquement remplacées par leur équivalent anglais.
+#
+# REQ-RTP-F-013 / ADR-020.
+################################################################################
+# Section 1 : Configuration générale
+################################################################################
+balises:
+  - "[RTP]" #P0
+################################################################################
+# Section 2 : Téléportation
+################################################################################
+dejaEnTeleportation: "&e[P0] tu es déjà en cours de téléportation !"
+teleportRefuseRechargement: "&e[P0] les téléportations sont temporairement désactivées pendant le rechargement du plugin. Réessaie dans un instant."
+messageDélai: "&e[P0] Téléportation dans [delay]. Ne bouge pas."
+chargementChunks: "&e[P0] Chargement des chunks en cours, patiente..."
+messageTeleport: "&e[P0] Téléporté en [attempts] tentatives, en [processingTime]"
+annulerTeleport: "&e[P0] Téléportation annulée !"
+dangereux: "&e[P0] impossible de trouver un emplacement sûr en [attempts] tentatives"
+messageRecharge: "&e[P0] Tu ne peux pas te téléporter avant [remainingCooldown]"
+aucunEmplacementEnAttente: "#f5eb73[P0] aucun emplacement disponible pour le moment"
+miseAJourFile: "#2636ef[P0] ta position dans la file : [spot]"
+argentInsuffisant: "&e[P0] il te faut au moins $[money] pour cela."
+################################################################################
+# Section 3 : Format du temps
+################################################################################
+jours: "j"
+heures: "h"
+minutes: "min"
+secondes: "s"
+millisecondes: "ms"
+################################################################################
+# Section 4 : Système & Administration
+################################################################################
+ancienFichier: "&b[P0] ancien fichier [filename] détecté. Mise à jour en cours"
+nouveauMonde: "&b[P0] nouveau monde '[world]' détecté"
+mondeInvalide: "&e[P0] impossible de trouver le monde '[world]'"
+rechargement: "&b[P0] chargement de [filename]..."
+recharge: "&b[P0] [filename] chargé avec succès."
+miseAJour: "&a[P0] mise à jour de [filename]..."
+misAJour: "&a[P0] [filename] mis à jour avec succès."
+argumentInvalide: "&c[P0] argument de commande invalide [arg]"
+commandeConsoleNonAutorisee: "&c[P0] Tu dois être un joueur en jeu pour exécuter cette commande."
+busy: "&c[P0] occupé"
+invalidCommand: "&c[P0] commande invalide - [arg]"
+sansPermission: "&eNous sommes désolés, mais tu n'as pas la permission d'exécuter cette commande. Contacte les administrateurs du serveur si tu penses qu'il s'agit d'une erreur."
+################################################################################
+# Section 5 : Journaux d'administration
+################################################################################
+emplacementSauvegarde: "&e[P0] [amount] emplacements sauvegardés avec succès pour [region]"
+emplacementCharge: "&e[P0] [amount] emplacements chargés avec succès pour [region]"
+################################################################################
+# Section 6 : Commande Scan
+################################################################################
+demarrerScan: "&a[P0] tâche de scan démarrée pour les régions : [scan_regions]"
+reinitialiserScan: "&e[P0] file de scan réinitialisée pour les régions : [scan_regions]"
+annulerScan: "&e[P0] tâche de scan annulée pour les régions : [scan_regions]"
+mettreEnPauseScan: "#A020F0[P0] tâche de scan mise en pause pour les régions : [scan_regions]"
+reprendreScan: "#10A5F5[P0] tâche de scan reprise pour les régions : [scan_regions]"
+scanEnCours: "&c[P0] une tâche de scan est déjà en cours pour les régions : [scan_regions]"
+scanNonActif: "&c[P0] aucune tâche de scan en cours pour les régions : [scan_regions]"
+etatScan: "&a[P0] [scan_chunks] / [scan_totalChunks] chunks traités pour les régions : [scan_regions]. [scan_cps] cps. Pourcentage de terre : [scan_landPercentage]%. ETA : [scan_eta]"
+################################################################################
+# Section 7 : Commande Info
+################################################################################
+titreInfo: "&a======Infos RTP======"
+infoTickets: "&7Tickets de chunks actifs globaux : &f[tickets]"
+infoTeleportations: "&7Machines d'état de téléportation actives : &f[teleports]"
+infoMSPT: "&7MSPT actuel du plugin : &f[mspt]"
+infoChargementTotal: "&7Chunks chargés (total) : &f[loads]"
+infoTauxFuite: "&7Taux de fuite de chunks actuel : &f[leakRate]"
+enteteAvertissementInfo: "&7--- Avertissement de diagnostic ---"
+avertissementInfo: "&7Note de diagnostic : si le nombre total de chunks orphelins sur le serveur dépasse le nombre de chargements à vie de ce plugin ([loads]), ce plugin n'est pas la seule source de la fuite mémoire."
+enteteMondeInfo: "#008080Mondes :"
+enteteMondeConsoleInfo: "&7--- Mondes ---"
+infoMonde: "  #21ADA8[world]"
+enteteRegionInfo: "#63C5DARégions :"
+enteteRegionConsoleInfo: "&7--- Régions ---"
+infoRegion: "  #52B2BF[region]"
+mondInfo:
+  - "#21ADA8[world] :"
+  - "#99EEBB  - région : [region]"
+  - "#99EEBB  - permissionRequise : [requirePermission]"
+  - "#99EEBB  - substitution : [override]"
+regionInfo:
+  - "#52B2BF[region] :"
+  - "#58CCED  - monde : [world]"
+  - "#58CCED  - forme : [shape]"
+  - "#58CCED  - permissionRequise : [requirePermission]"
+  - "#58CCED  - substitutionBordureMonde : [worldBorderOverride]"
+  - "#58CCED  - capaciteCache : [cacheCap]"
+  - "#58CCED  - cacheConserve : [keptCache]"
+  - "#58CCED  - enCache : [cached]"
+################################################################################
+# Section 8 : Descriptions des commandes
+################################################################################
+rtp: "&b/rtp - se téléporter à un endroit aléatoire"
+rtp_description: "se téléporter à un endroit aléatoire"
+aide: "&b/rtp help - afficher cette aide"
+aide_description: "décrire les commandes"
+recharger: "&b/rtp reload - recharger les fichiers de configuration"
+recharger_description: "recharger les fichiers de configuration"
+scan: "&b/rtp scan - tester tous les placements possibles de région pour améliorer les temps de chargement"
+scan_description: "effacer les données sauvegardées et tester tous les placements possibles de région"
+config_description: "mettre à jour les fichiers de configuration au moment de l'exécution"
+info_description: "vérifier l'état actuel du plugin"
+test_description: "tester les fonctions RTP"
+################################################################################
+# Section 9 : Support PlaceholderAPI
+################################################################################
+JOUEUR_DISPONIBLE: "&aDISPONIBLE"
+JOUEUR_RECHARGE: "&eEN RECHARGE"
+JOUEUR_PREPARATION: "&bCHOIX DE L'EMPLACEMENT"
+JOUEUR_CHARGEMENT: "&bCHARGEMENT DES CHUNKS"
+JOUEUR_TELEPORTATION: "&bTÉLÉPORTATION"
+################################################################################
+# Section 10 : Éléments visuels
+################################################################################
+titre: "#FF6B6BT#FF8560é#FF9F55l#FFBA4Aé#FFD53Fp#E8E040o#BFED41r#96F542t#6DF543é#44F2A0 #3BEFC8!#38ECF0"
+sousTitre: "#A78BFAA#AF84F9m#B77DF7u#BF76F5s#C76FF3e#CF68F1-#D761EFt#DF5AEDo#E753EBi#EF4CE9 #E84AF0b#E052D8i#D85AC0e#D062A8n#C86A90 #E876A0!"
+apparition: 20
+affichage: 20
+disparition: 20
+barreAction: ""
+################################################################################
+# Section 11 : Métadonnées
+################################################################################
+version: "1.0"
+################################################################################
+# Section 12 : Options développeur
+################################################################################
+afficherBalisesDev: false

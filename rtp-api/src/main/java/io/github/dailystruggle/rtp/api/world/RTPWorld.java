@@ -24,6 +24,25 @@ public abstract class RTPWorld<T> {
 
   public final AtomicLong activeChunkTickets = new AtomicLong(0);
   public final AtomicLong totalChunkLoads = new AtomicLong(0);
+  /**
+   * Lifetime count of chunk tickets observed by the {@link #releaseOrphanedTickets(Set)} GC
+   * sweep that were not present in the supplied keep-alive set. Each such observation
+   * indicates a ticket the plugin was holding without a matching kept-cache / per-player-
+   * queue / in-flight-teleport entry — i.e. a defensively-detected leak. Used by the
+   * {@code leakRate} placeholder to report the cumulative leak ratio against
+   * {@link #lifetimeTicketsIssued} (the number of chunk tickets we have ever issued).
+   */
+  public final AtomicLong lifetimeOrphanedTicketsScanned = new AtomicLong(0);
+  /**
+   * Lifetime count of chunk tickets ever issued by this world via
+   * {@link #setForceLoaded(int, int, boolean)} with {@code forceLoad=true}. Counts every
+   * acquire (including ref-counted increments on an already-ticketed chunk), so this
+   * represents the cumulative number of chunks-with-tickets the plugin has produced —
+   * the correct divisor for the {@code leakRate} placeholder, distinct from
+   * {@link #totalChunkLoads} which counts chunk-load attempts (including probe-only
+   * paths that never tie a ticket).
+   */
+  public final AtomicLong lifetimeTicketsIssued = new AtomicLong(0);
   protected final Map<Long, AtomicInteger> chunkTickets = new ConcurrentHashMap<>();
 
   protected RTPWorld(T world) {
@@ -131,6 +150,7 @@ public abstract class RTPWorld<T> {
     final CompletableFuture<Void>[] captured = new CompletableFuture[]{null};
     if (forceLoad) {
       activeChunkTickets.incrementAndGet();
+      lifetimeTicketsIssued.incrementAndGet();
       chunkTickets.compute(key, (k, v) -> {
         if (v == null) {
           CompletableFuture<Void> f = setForceLoadedImpl(cx, cz, true);
@@ -435,6 +455,9 @@ public abstract class RTPWorld<T> {
       if (!keepAliveKeys.contains(key)) {
         orphaned.add(key);
       }
+    }
+    if (!orphaned.isEmpty()) {
+      lifetimeOrphanedTicketsScanned.addAndGet(orphaned.size());
     }
     for (Long key : orphaned) {
       int cx = (int) (key & 0xffffffffL);

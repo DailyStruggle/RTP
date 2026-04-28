@@ -5,7 +5,7 @@ Paper, Folia). All extend `BukkitParameter`, which bridges the core's
 `UUID callerId` back to a `CommandSender` so `isRelevant` can read the real
 sender.
 
-See `../../README.md` (module root) for tree model, `key:value` syntax, and
+See `../../README.md` (module root) for tree model, `key=value` syntax, and
 the two-call `onCommand` lifecycle. Usage:
 
 ```java
@@ -19,10 +19,10 @@ tree.addParameter("player", new OnlinePlayerParameter(
 
 | Class                    | `values()` source                          | Use                         |
 |--------------------------|--------------------------------------------|-----------------------------|
-| `BooleanParameter`       | `{"true","false"}`                         | Flags (`persist:true`).     |
-| `IntegerParameter`       | Bounded range from constructor             | Counts (`count:10`).        |
-| `FloatParameter`         | Bounded range from constructor             | Ratios (`weight:0.5`).      |
-| `CoordinateParameter`    | Numeric tokens                             | `x:100`, `y:64`, `z:-200`.  |
+| `BooleanParameter`       | `{"true","false"}`                         | Flags (`persist=true`).     |
+| `IntegerParameter`       | Bounded range from constructor             | Counts (`count=10`).        |
+| `FloatParameter`         | Bounded range from constructor             | Ratios (`weight=0.5`).      |
+| `CoordinateParameter`    | Numeric tokens                             | `x=100`, `y=64`, `z=-200`.  |
 | `ColorParameter`         | Color names / hex                          | Cosmetic / effects.         |
 | `EnumParameter`          | Names of an enum class                     | Fixed enumerations.         |
 | `PotionParameter`        | `PotionEffectType` names                   | Potion identifiers.         |

@@ -7,7 +7,9 @@ import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -23,6 +25,15 @@ public class MockRTPScheduler implements RTPScheduler {
 
     private final List<MockTask> scheduledTasks = new ArrayList<>();
     private final AtomicLong currentTick = new AtomicLong(0);
+
+    /**
+     * Trampoline queue for re-entrant {@link #runTaskAsynchronously(Runnable)} calls.
+     * Preserves the "everything runs before the initial call returns" synchronous
+     * semantics that existing tests rely on, while replacing recursion with iteration
+     * so batch chains (e.g. {@code ScanTask}'s per-batch self-dispatch) don't blow
+     * the stack.
+     */
+    private static final ThreadLocal<Deque<Runnable>> asyncTrampoline = new ThreadLocal<>();
 
     private static class MockTask {
         final Runnable runnable;
@@ -50,7 +61,29 @@ public class MockRTPScheduler implements RTPScheduler {
         if (io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor != null) {
             io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor.registerAction(trackedTask);
         }
-        trackedTask.run();
+
+        // Trampoline: nested runTaskAsynchronously calls (e.g. a task that
+        // re-dispatches itself at the end of run()) enqueue onto the calling
+        // thread's deque and return immediately. The outermost call drains the
+        // deque iteratively. This preserves the synchronous "runs before the
+        // call returns" semantics tests depend on, without growing the stack
+        // frame-for-frame with each self-re-dispatch.
+        Deque<Runnable> queue = asyncTrampoline.get();
+        if (queue != null) {
+            queue.addLast(trackedTask);
+            return trackedTask;
+        }
+        queue = new ArrayDeque<>();
+        asyncTrampoline.set(queue);
+        try {
+            trackedTask.run();
+            Runnable next;
+            while ((next = queue.pollFirst()) != null) {
+                next.run();
+            }
+        } finally {
+            asyncTrampoline.remove();
+        }
         return trackedTask;
     }
 

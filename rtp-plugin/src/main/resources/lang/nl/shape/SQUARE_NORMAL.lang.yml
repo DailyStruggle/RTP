@@ -1,0 +1,9 @@
+mode: modus
+radius: straal
+centerRadius: middenStraal
+centerX: middenX
+centerZ: middenZ
+uniquePlacements: uniekePlaatsingen
+mean: gemiddelde
+deviation: afwijking
+expand: uitbreiden

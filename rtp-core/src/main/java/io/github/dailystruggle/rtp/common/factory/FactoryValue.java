@@ -43,7 +43,13 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
 
   public Map<String, Object> language_mapping = new ConcurrentHashMap<>();
   public Map<String, String> reverse_language_mapping = new ConcurrentHashMap<>();
-  protected EnumMap<E, Object> data;
+  // Volatile so {@link #setData(EnumMap)} can publish a fresh map by reference
+  // assignment and concurrent readers always observe either the old map intact
+  // or the new map intact — never a clear()+putAll() torn state. Reads that
+  // need a coherent snapshot (getData, toString, toYAML, getNumber cache-back)
+  // synchronize on the current map instance, which is correct as long as no
+  // mutator ever modifies the map after publishing it via setData.
+  protected volatile EnumMap<E, Object> data;
   private Set<String> keys = null;
 
   protected FactoryValue(Class<E> myClass, String name) {
@@ -62,10 +68,17 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
    * generic getter
    *
    * @return copy of data, to prevent editing
+   *
+   * <p>The clone is taken under {@code synchronized (data)} so concurrent
+   * {@code put}s from {@link #getNumber} (cache-back on first parse) cannot
+   * interleave with the snapshot. The returned {@code EnumMap} is owned by
+   * the caller and may be iterated freely without CME risk.</p>
    */
   @NotNull
   public EnumMap<E, Object> getData() {
-    return data.clone();
+    synchronized (data) {
+      return data.clone();
+    }
   }
 
   /**
@@ -75,7 +88,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
    * @throws IllegalArgumentException - if the data is invalid
    */
   public void setData(final EnumMap<? extends Enum<?>, ?> data) throws IllegalArgumentException {
-    this.data = new EnumMap<>(myClass);
+    EnumMap<E, Object> rebuilt = new EnumMap<>(myClass);
     data.forEach(
         (key, value) -> {
           if (key == null) throw new IllegalArgumentException("null key");
@@ -88,8 +101,19 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
                     + "\nreceived:"
                     + key.getClass().getSimpleName());
           }
-          this.data.put((E) key, value);
+          rebuilt.put((E) key, value);
         });
+    // Atomic swap: publish the fully-built map by reference assignment so a
+    // concurrent reader either sees the old map (intact) or the new map
+    // (intact), never a clear()+putAll() in-between state. The {@code data}
+    // field is volatile (in-VM via the synchronized read sites that wrap
+    // every cache-back / iterate snapshot); subclasses populating
+    // {@code data.put(...)} in constructors run before publication, so the
+    // swap pattern is safe across the existing surface.
+    EnumMap<E, Object> oldData = this.data;
+    synchronized (oldData) {
+      this.data = rebuilt;
+    }
   }
 
   /**
@@ -99,6 +123,14 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
    * @throws IllegalArgumentException - if the data is invalid
    */
   public void setData(final Map<String, Object> data) throws IllegalArgumentException {
+    // Build a fresh map off-side, then atomically swap. Mirrors the
+    // {@link #setData(EnumMap)} pattern: concurrent readers always see
+    // either the old map intact or the new map intact, never an
+    // intermediate state. Pre-existing entries in {@code this.data} are
+    // preserved by seeding {@code rebuilt} with the current snapshot
+    // (this overload is "merge", not "replace" — matches the prior
+    // {@code this.data.put(...)} semantics).
+    EnumMap<E, Object> rebuilt = new EnumMap<>(getData());
     data.forEach(
         (keyStr, value) -> {
           if (keyStr == null) return;
@@ -106,11 +138,15 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
 
           try {
             E key = Enum.valueOf(myClass, keyStr);
-            this.data.put(key, value);
+            rebuilt.put(key, value);
           } catch (IllegalArgumentException ignored) {
 
           }
         });
+    EnumMap<E, Object> oldData = this.data;
+    synchronized (oldData) {
+      this.data = rebuilt;
+    }
   }
 
   /**
@@ -146,14 +182,20 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
   public void set(@NotNull E key, @NotNull Object value) throws IllegalArgumentException {
     if (key == null) throw new IllegalArgumentException("null key");
     if (value == null) throw new IllegalArgumentException("null value");
-    this.data.put(key, value);
+    synchronized (this.data) {
+      this.data.put(key, value);
+    }
   }
 
   @Override
   public FactoryValue<E> clone() {
     try {
       FactoryValue<E> clone = (FactoryValue<E>) super.clone();
-      clone.data = data.clone();
+      // Snapshot under the same lock as getNumber's cache-back put, so the
+      // clone observes a coherent EnumMap rather than a partially-mutated one.
+      synchronized (data) {
+        clone.data = data.clone();
+      }
       for (Map.Entry<E, Object> entry : clone.data.entrySet()) {
         Object value = entry.getValue();
         if (value instanceof FactoryValue<?>) {
@@ -178,35 +220,55 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
    * @throws NumberFormatException if the value is not a number
    */
   public Number getNumber(E key, Number def) throws NumberFormatException {
-    Number res;
+    // Snapshot {@code data} once: a concurrent {@link #setData(EnumMap)} may
+    // publish a new map between the read and the cache-back put, in which
+    // case we want both to target the same instance. {@code data} is volatile,
+    // so this load is the read-side of the publication.
+    EnumMap<E, Object> snapshot = data;
+    Object resObj;
+    synchronized (snapshot) {
+      resObj = snapshot.getOrDefault(key, def);
+    }
+    // Hot path: already a Number — return without writing back. Pre-fix this
+    // method called {@code data.put(key, res)} unconditionally on every read,
+    // which (a) wasted a write per call after the first parse and (b) raced
+    // with concurrent EnumMap iterators (toString / toYAML / setData.forEach)
+    // under the probe-first pipeline, producing CME during pregen. The
+    // cache-back is now restricted to genuine String/Character → Number
+    // transitions, which fire at most once per (instance, key) for the
+    // lifetime of the process. See FactoryValueGetNumberConcurrencyTest.
+    if (resObj instanceof Number n) return n;
 
-    Object resObj = data.getOrDefault(key, def);
-    if (resObj instanceof Number) {
-      res = (Number) resObj;
-    } else if (resObj instanceof Integer
-        || resObj instanceof Long
-        || resObj instanceof Float
-        || resObj instanceof Double) {
-      res = (Number) resObj;
-    } else if (resObj instanceof String) {
-      resObj = ((String) resObj).replaceAll(",", ".");
+    Number res;
+    if (resObj instanceof String s) {
+      String coerced = s.replaceAll(",", ".");
       try {
-        res = Double.parseDouble((String) resObj);
+        res = Double.parseDouble(coerced);
       } catch (NumberFormatException e) {
         RTP.log(
             Level.SEVERE,
-            "expected floating point value for " + key.name() + ", received - " + resObj, e);
+            "expected floating point value for " + key.name() + ", received - " + coerced, e);
         res = def;
       }
-    } else if (resObj instanceof Character) {
+    } else if (resObj instanceof Character c) {
       try {
-        res = Integer.parseInt(((Character) resObj).toString());
+        res = Integer.parseInt(c.toString());
       } catch (NumberFormatException e) {
         RTP.log(Level.SEVERE, "expected integer for " + key.name() + ", received - " + resObj, e);
         res = def;
       }
-    } else throw new IllegalArgumentException("[RTP] " + key.name() + ":NaN");
-    data.put(key, res);
+    } else {
+      throw new IllegalArgumentException("[RTP] " + key.name() + ":NaN");
+    }
+    // Idempotent transition cache: any racing thread parses the same String
+    // to the same Number, so last-writer-wins is harmless. Cache back into
+    // the same map instance we read from (the snapshot) — if a concurrent
+    // {@link #setData(EnumMap)} has since swapped {@code data}, the put
+    // lands harmlessly in the now-orphaned old map; the next reader will
+    // load the new map via the volatile {@code data} field and parse again.
+    synchronized (snapshot) {
+      snapshot.put(key, res);
+    }
     return res;
   }
 
@@ -224,7 +286,9 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
   @Override
   public String toString() {
     StringBuilder builder = new StringBuilder();
-    data.forEach((e, o) -> builder.append("\n").append(e).append(": ").append(o.toString()));
+    // Iterate a snapshot so a concurrent {@link #getNumber} cache-back
+    // cannot fire CME on the underlying EnumMap iterator.
+    getData().forEach((e, o) -> builder.append("\n").append(e).append(": ").append(o.toString()));
     return builder.toString();
   }
 
@@ -235,7 +299,9 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
    */
   public String toYAML() {
     StringBuilder res = new StringBuilder();
-    for (Map.Entry<? extends Enum<?>, Object> e : data.entrySet()) {
+    // Iterate a snapshot so a concurrent {@link #getNumber} cache-back
+    // cannot fire CME on the underlying EnumMap iterator.
+    for (Map.Entry<E, Object> e : getData().entrySet()) {
       String[] desc = this.desc.get(e.getKey());
       if (desc != null) {
         for (String d : desc) {

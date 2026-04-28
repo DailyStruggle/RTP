@@ -1,15 +1,15 @@
 package io.github.dailystruggle.rtp.common.tools;
 
-import io.github.dailystruggle.rtp.api.RTPAPI;
+import io.github.dailystruggle.rtp.api.DownloadInfo;
 import io.github.dailystruggle.rtp.common.RTP;
 
 public class SupportInfo {
     public static String getSig() {
-        String buildSignature = RTPAPI.DOWNLOADER_ID;
-        if (buildSignature.startsWith("%%")) {
-            buildSignature = "Dev";
+        DownloadInfo.Source source = DownloadInfo.source();
+        if (source == DownloadInfo.Source.DEV) {
+            return "Dev";
         }
-        return buildSignature;
+        return source.name() + ":" + DownloadInfo.userId();
     }
 
     public static String getSupportSignature() {

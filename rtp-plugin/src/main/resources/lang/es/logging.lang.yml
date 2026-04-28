@@ -19,3 +19,4 @@ version: version
 detailed_region_init: inicio_region_detallado
 command: comando
 event_move: evento_movimiento
+min_level: nivel_minimo

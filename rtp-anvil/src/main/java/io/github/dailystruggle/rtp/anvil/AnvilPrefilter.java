@@ -117,21 +117,21 @@ public final class AnvilPrefilter {
    * {@code no-region-file}, {@code empty-location-entry},
    * {@code unsupported-dataversion}, {@code missing-heightmap},
    * {@code no-sections}. The {@code first-N} lines per reason are emitted at
-   * {@link Level#INFO} so they appear in standard server logs; once the budget
-   * is exhausted the logger falls back to {@link Level#FINE}.
+   * {@link Level#FINE} so they appear in standard server logs; once the budget
+   * is exhausted the logger falls back to {@link Level#FINER}.
    */
   private static void diagLog(String reason, Path worldFolder, String dim,
                               int cx, int cz) {
     AtomicInteger counter =
         DIAG_LOG_COUNTERS.computeIfAbsent(reason, k -> new AtomicInteger());
     int n = counter.incrementAndGet();
-    Level level = (n <= DIAG_LOG_BUDGET_PER_REASON) ? Level.INFO : Level.FINE;
+    Level level = (n <= DIAG_LOG_BUDGET_PER_REASON) ? Level.FINE : Level.FINER;
     if (LOG.isLoggable(level)) {
       LOG.log(level,
           "[RTP] Anvil probe " + reason + " world=" + worldFolder
               + " dim=\"" + dim + "\" chunk=(" + cx + "," + cz + ")"
               + (n > DIAG_LOG_BUDGET_PER_REASON
-                  ? " (further occurrences suppressed to FINE)"
+                  ? " (further occurrences suppressed to FINER)"
                   : ""));
     }
   }
@@ -227,7 +227,20 @@ public final class AnvilPrefilter {
             worldFolder, dimensionSubpath, cx, cz);
         return new ProbeResult(Verdict.UNKNOWN, null);
       }
-      byte[] regionBytes = Files.readAllBytes(regionFile);
+      // PR-10/PR-15 alignment: route region-file reads through AnvilRegionByteCache so
+      // that ScanTask's up-to-50-in-flight probes per region collapse onto a single
+      // shared byte[] (LRU reuse + miss coalescing). Calling Files.readAllBytes directly
+      // here caused 50x transient 2–8 MB allocations on the ForkJoin common pool and
+      // OOM'd the heap (see 2026-04-23 incident on world=.\test chunk=(132,147)).
+      byte[] regionBytes = AnvilRegionByteCache.get(regionFile);
+      if (regionBytes == null) {
+        // Either the file vanished between the isRegularFile check and the cache read,
+        // or the cache's readAllBytes failed. Treat as UNKNOWN and fall through to the
+        // live load path, same as the original IOException branch below.
+        diagLog("UNKNOWN:region-read-failed",
+            worldFolder, dimensionSubpath, cx, cz);
+        return new ProbeResult(Verdict.UNKNOWN, null);
+      }
       int rx = Math.floorMod(cx, 32);
       int rz = Math.floorMod(cz, 32);
 

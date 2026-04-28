@@ -206,7 +206,7 @@ final class PregenState {
         int staleChunkRetryLimit = Math.max(0,
                 safety.getNumber(SafetyKeys.staleChunkRetryLimit, 2).intValue());
 
-        long maxAttemptsBase = Math.max(1L, performance.getNumber(PerformanceKeys.maxAttempts, 20).longValue());
+        long maxAttemptsBase = Math.max(1L, performance.getNumber(PerformanceKeys.maxAttempts, 32).longValue());
         long maxAttempts = maxAttemptsBase;
 
         boolean biomeRecall = Boolean.parseBoolean(

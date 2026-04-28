@@ -55,24 +55,17 @@ public class HelpCmd extends BaseRTPCmdImpl {
   }
 
   @Override
-  public String description() {
-    return "describe commands";
-  }
-
-  @Override
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return nextCommand.onCommand(callerId, parameterValues, null);
 
     RTPCommandSender sender = RTP.serverAccessor.getSender(callerId);
-    ConfigParser<MessagesKeys> lang =
-        (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
     if (!sender.hasPermission("rtp.see")) {
       RTP.serverAccessor.sendMessage(callerId, MessagesKeys.noPerms);
       return true;
     }
 
-    String msg = lang.getConfigValue(MessagesKeys.rtp, "").toString();
+    String msg = msg(MessagesKeys.rtp, "");
     String hover = "/rtp";
     String click = "/rtp";
 
@@ -89,7 +82,7 @@ public class HelpCmd extends BaseRTPCmdImpl {
           continue;
         }
 
-        msg = lang.getConfigValue(key, "").toString();
+        msg = msg(key, "");
         hover = "/rtp " + arg;
         click = "/rtp " + arg;
 

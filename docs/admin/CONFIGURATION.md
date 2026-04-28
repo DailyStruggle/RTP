@@ -8,21 +8,24 @@ All configuration files live in `plugins/RTP/` after the first server start. Edi
 
 ## File Overview
 
-| File | Purpose |
-|---|---|
-| `regions/<name>.yml` | Per-region teleport area, shape, queue settings. Contains nested `shape:` and `vert:` sub-sections (see below). |
-| `worlds/<name>.yml` | Per-world default region and permission settings |
-| `performance.yml` | Background task timing, cache behaviour, TPS thresholds |
-| `economy.yml` | Teleport costs and refund policy (requires Vault) |
-| `safety.yml` | Landing safety checks, invulnerability, biome filters |
-| `messages.yml` | All player-facing message strings |
-| `logging.yml` | Console logging verbosity |
+| File | Purpose | Detailed Reference |
+|---|---|---|
+| `config.yml` | Core plugin settings (language, delays, database) | [CORE_CONFIG.md](CORE_CONFIG.md) |
+| `regions/*.yml` | Per-region teleport area, shape, queue settings | [REGIONS.md](REGIONS.md) |
+| `worlds/*.yml` | Per-world default region and permission settings | [WORLDS.md](WORLDS.md) |
+| `performance.yml` | Background task timing, cache behaviour, TPS thresholds | [PERFORMANCE.md](PERFORMANCE.md) |
+| `economy.yml` | Teleport costs and refund policy (requires Vault) | [ECONOMY.md](ECONOMY.md) |
+| `safety.yml` | Landing safety checks, invulnerability, biome filters | [SAFETY.md](SAFETY.md) |
+| `messages.yml` | All player-facing message strings | *(See below)* |
+| `logging.yml` | Console logging verbosity | *(See below)* |
 
 ---
 
 ## `regions/<name>.yml` — Region Configuration
 
 Each file in the `regions/` folder defines one teleport region. The filename (without `.yml`) is the region's name.
+
+> 📎 **Detailed Reference:** See [REGIONS.md](REGIONS.md) for a full breakdown of every key and engine parameter in the region configuration.
 
 ### Top-level keys
 
@@ -168,7 +171,7 @@ Each file in the `worlds/` folder maps a world to its default region and permiss
 
 | Key | Type | Default | Description                                                                           |
 |---|---|---|---------------------------------------------------------------------------------------|
-| `maxAttempts` | Integer | `10` | Maximum location search attempts before giving up. Higher = more CPU per request.     |
+| `maxAttempts` | Integer | `32` | Maximum location search attempts before giving up. Higher = more CPU per request.     |
 | `viewDistanceSelect` | Integer | `0` | Chunk radius to pre-load around a candidate location during selection. `0` = minimum. |
 | `viewDistanceTeleport` | Integer | `0` | Chunk radius to pre-load around the final destination before teleporting.             |
 | `syncAllottedTime` | Integer | `50` | Max milliseconds per tick spent on synchronous RTP tasks. Range: 0–50.                |
@@ -224,6 +227,29 @@ Requires **Vault** and a compatible economy plugin. If Vault is absent, all econ
 All five built-in shape engines (`CIRCLE`, `CIRCLE_NORMAL`, `SQUARE`, `SQUARE_NORMAL`, `RECTANGLE`) are configured inline inside each region's `shape:` block, as there are no separate per-shape config files.
 
 Custom shapes can be registered at runtime via `rtp-api`. See [`addons/`](../addons/) for examples. A registered custom shape appears as a valid `shape.name` value in any region config.
+
+---
+
+## `worlds/<name>.yml` — World Configuration
+
+See [WORLDS.md](WORLDS.md) for a full breakdown of the world configuration.
+
+---
+
+## `logging.yml` — Console Logging Verbosity
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `detailed_reload` | Boolean | `false` | Log all files and sections reloaded during `/rtp reload`. |
+| `detailed_region_init` | Boolean | `false` | Log the initialization details for each region. |
+| `command` | Boolean | `false` | Log every player-executed RTP command. |
+| `teleport` | Boolean | `true` | Log successful teleportation events. |
+| `event_join` | Boolean | `true` | Log RTP triggered on join. |
+| `event_respawn` | Boolean | `true` | Log RTP triggered on respawn. |
+| `event_changeworld` | Boolean | `true` | Log RTP triggered by world changes. |
+| `selection_failure` | Boolean | `true` | Log detailed info when location selection fails (rates, parameters). |
+| `system_memory_tracker` | Boolean | `false` | Debug logs for memory allocator/tracker activity. |
+| `system_database` | Boolean | `false` | Debug logs for database queries and connection state. |
 
 ---
 

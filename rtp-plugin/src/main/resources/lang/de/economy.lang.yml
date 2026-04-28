@@ -1,0 +1,8 @@
+# --- Sprachzuordnung: economy.yml ---
+refundOnCancel: erstattungBeiAbbruch
+price: preis
+priceOther: preisAnderer
+paramsPrice: preisParameter
+biomePrice: preisBiom
+balanceFloor: mindestKontostand
+version: version

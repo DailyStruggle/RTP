@@ -67,13 +67,17 @@ public class TestCancelCmd extends BaseRTPCmdImpl {
       // stay platform-agnostic.
       if (!callerHasAdmin(callerId)) {
         String denied = "&c[RTP test/cancel] 'all' requires rtp.test.admin";
-        RTP.serverAccessor.sendMessage(callerId, denied);
+        if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+          RTP.serverAccessor.sendMessage(callerId, denied);
+        }
         RTP.log(Level.WARNING, "[RTP test/cancel] denied 'all' to " + callerId);
         return true;
       }
       int n = ActiveTestJobs.cancelAll();
       String msg = "[RTP test/cancel] cancelled " + n + " job(s) across all owners";
-      RTP.serverAccessor.sendMessage(callerId, msg);
+      if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+        RTP.serverAccessor.sendMessage(callerId, msg);
+      }
       RTP.log(Level.INFO, msg);
       return true;
     }
@@ -83,7 +87,9 @@ public class TestCancelCmd extends BaseRTPCmdImpl {
         n == 0
             ? "[RTP test/cancel] no active jobs owned by you"
             : "[RTP test/cancel] cancelled " + n + " job(s)";
-    RTP.serverAccessor.sendMessage(callerId, msg);
+    if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+      RTP.serverAccessor.sendMessage(callerId, msg);
+    }
     RTP.log(Level.INFO, msg);
     return true;
   }

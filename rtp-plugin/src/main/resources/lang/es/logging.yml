@@ -31,5 +31,11 @@ fallo_seleccion: true
 sistema_rastreoMemoria: false
 sistema_baseDeDatos: false
 
+# Nivel mínimo de registro del plugin. El filtro efectivo es el más fino entre
+# este y el del logger de Bukkit. Acepta: SEVERE, WARNING, INFO, CONFIG, FINE,
+# FINER, FINEST, ALL, OFF. El valor predeterminado ALL mantiene el comportamiento
+# idéntico al del logger de Bukkit.
+nivel_minimo: INFO
+
 # NO MODIFIQUES EL NÚMERO DE VERSIÓN
 version: "1.0"

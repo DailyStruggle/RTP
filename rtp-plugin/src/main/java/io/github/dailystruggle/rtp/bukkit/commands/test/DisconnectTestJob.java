@@ -311,7 +311,9 @@ public class DisconnectTestJob extends BaseRTPCmdImpl {
             + (r.operatorCancelled ? " operatorCancelled=true" : "")
             + (r.threw == null ? "" : " threw=" + r.threw);
 
-    RTP.serverAccessor.sendMessage(callerId, summary);
+    if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+      RTP.serverAccessor.sendMessage(callerId, summary);
+    }
     // S-004: a failing run logs at WARNING; a clean run at INFO.
     RTP.log(r.pass ? Level.INFO : Level.WARNING, summary);
   }

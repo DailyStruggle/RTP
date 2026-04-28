@@ -39,6 +39,11 @@ public class SubcommandBypassesTeleportGuardsTest {
         public TestRTPCmd() { super(null); }
 
         @Override
+        public boolean onCommand(UUID senderId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
+            return onCommand(senderId, parameterValues, nextCommand, null);
+        }
+
+        @Override
         public boolean onCommand(UUID senderId, Map<String, List<String>> parameterValues,
                                  CommandsAPICommand nextCommand, java.util.function.Consumer<String> messageMethod) {
             if (nextCommand != null) return true;

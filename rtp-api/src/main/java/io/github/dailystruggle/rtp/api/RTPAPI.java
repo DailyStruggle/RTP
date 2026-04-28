@@ -38,17 +38,6 @@ public class RTPAPI {
    */
   public static volatile UUID serverId = new UUID(0, 0);
 
-  /**
-   * Placeholder token injected by the Polymart/SpigotMC download pipeline with
-   * the purchasing user's ID. Used for licence validation. In development builds
-   * (not downloaded from a marketplace) this string is kept as-is.
-   */
-  public static final String DOWNLOADER_ID = "%%__USER__%%";
-  /**
-   * One-time nonce injected by the Polymart/SpigotMC download pipeline for
-   * download verification. Kept as a literal placeholder in development builds.
-   */
-  public static final String DOWNLOAD_NONCE = "%%__NONCE__%%";
 
   // Functional delegates mapped by the Core module. Volatile for cross-thread visibility.
   /**
@@ -69,6 +58,7 @@ public class RTPAPI {
    * Use {@link #getBiomes(RTPWorld)} rather than calling this field directly.
    */
   public static volatile Function<RTPWorld, Set<String>> biomeProvider = null;
+
 
   /**
    * Sets the platform-specific server accessor.

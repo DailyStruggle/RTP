@@ -82,12 +82,30 @@ public record ColumnProbe(int minY,
      * section was not emitted on disk.
      */
     public String blockAt(int worldY) {
+        return blockAt(CENTER_LOCAL_X, CENTER_LOCAL_Z, worldY);
+    }
+
+    /**
+     * Returns the raw namespaced block identifier at chunk-local column
+     * {@code (localX, localZ)} and world-Y {@code worldY}, or {@code null} if
+     * {@code worldY} is outside {@code [minY, maxY]} or the covering section
+     * was not emitted on disk.
+     *
+     * <p>The probe's backing {@link PaletteSection}s already hold the entire
+     * 16×16×16 section data, so off-center reads are O(1) palette-index lookups
+     * with no additional NBT-parse or allocation cost. This entry point exists
+     * to let probe-side adjustors mirror the multi-column {@code testCoords}
+     * sweep performed by the live {@code adjust(RTPChunk, MutableRTPCoords)}
+     * path, so a probe-side {@code SCAN_MISS} can be authoritative across the
+     * same five columns rather than only the center.</p>
+     */
+    public String blockAt(int localX, int localZ, int worldY) {
         if (worldY < minY || worldY > maxY) return null;
         int sy = Math.floorDiv(worldY, 16);
         int ly = Math.floorMod(worldY, 16);
         for (PaletteSection s : sections) {
             if (s.sectionY() == sy) {
-                return s.blockIdAt(CENTER_LOCAL_X, ly, CENTER_LOCAL_Z);
+                return s.blockIdAt(localX, ly, localZ);
             }
         }
         return null;
@@ -122,12 +140,23 @@ public record ColumnProbe(int minY,
      * {@code ChunkColumnProbe.skyLightAt(int)} contract in {@code rtp-api}.</p>
      */
     public int skyLightAt(int worldY) {
+        return skyLightAt(CENTER_LOCAL_X, CENTER_LOCAL_Z, worldY);
+    }
+
+    /**
+     * Sky-light level at chunk-local column {@code (localX, localZ)} at world-Y
+     * {@code worldY}, in the vanilla {@code 0..15} range. Same semantics as
+     * {@link #skyLightAt(int)}; off-center cells are read directly from the
+     * underlying {@link PaletteSection#skyLight()} nibble array (when present),
+     * with no extra allocation or parse cost.
+     */
+    public int skyLightAt(int localX, int localZ, int worldY) {
         if (worldY < minY || worldY > maxY) return 15;
         int sy = Math.floorDiv(worldY, 16);
         int ly = Math.floorMod(worldY, 16);
         for (PaletteSection s : sections) {
             if (s.sectionY() == sy) {
-                return s.skyLightAt(CENTER_LOCAL_X, ly, CENTER_LOCAL_Z);
+                return s.skyLightAt(localX, ly, localZ);
             }
         }
         return 15;

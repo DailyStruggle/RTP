@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.anvil;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -145,6 +146,34 @@ class AnvilPrefilterTest {
     Verdict v = AnvilPrefilter.probeSync(
         worldFolder, "", 0, 0, Set.of("LAVA"));
     assertEquals(Verdict.ACCEPT, v);
+  }
+
+  @Test
+  @DisplayName("Prefilter reads region bytes via AnvilRegionByteCache (OOM regression, 2026-04-23)")
+  void prefilterRoutesThroughRegionByteCache(@TempDir Path worldFolder) throws IOException {
+    // Regression guard for the 2026-04-23 OOM: AnvilPrefilter.probeSyncDetailed used
+    // to call Files.readAllBytes directly, bypassing the 16-entry LRU cache and the
+    // PR-15 miss-coalescing path. Under ScanTask's 50-in-flight workload this let 50
+    // concurrent probes each allocate the same 2–8 MB .mca byte[], triggering
+    // "Retried waiting for GCLocker too often" and OOM on the ForkJoin common pool.
+    // This test asserts the prefilter now shares the same cache as
+    // BukkitRTPWorld / FoliaRTPWorld: a second probe of the same chunk must register
+    // as a cache hit.
+    writeSyntheticRegion(worldFolder, 0, 0, stoneAtOriginRoot());
+    AnvilRegionByteCache.invalidateAll();
+    AnvilRegionByteCache.resetStats();
+    Verdict first = AnvilPrefilter.probeSync(
+        worldFolder, "", 0, 0, Set.of("LAVA"));
+    Verdict second = AnvilPrefilter.probeSync(
+        worldFolder, "", 0, 0, Set.of("LAVA"));
+    assertEquals(Verdict.ACCEPT, first);
+    assertEquals(Verdict.ACCEPT, second);
+    AnvilRegionByteCache.Stats stats = AnvilRegionByteCache.stats();
+    assertTrue(stats.misses() >= 1,
+        "first probe should register as a cache miss; stats=" + stats);
+    assertTrue(stats.hits() >= 1,
+        "second probe of same region should register as a cache hit (proves "
+            + "prefilter is not bypassing AnvilRegionByteCache); stats=" + stats);
   }
 
   // ---------------------------------------------------------------------------- helpers

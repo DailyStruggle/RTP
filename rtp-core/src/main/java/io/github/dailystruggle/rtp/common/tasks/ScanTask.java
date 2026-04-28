@@ -47,42 +47,105 @@ public class ScanTask extends RTPRunnable {
   private final CompletableFuture<Boolean> done = new CompletableFuture<>();
   private long currentOffset = 0L;
 
+  /**
+   * Two-pass scan phase: 0 = PRESCAN (anvil probe sweep; cheap rejects only,
+   * probe-accept trusted without full-load verification), 1 = FULLSCAN
+   * (classic full chunk-load sweep over positions not already marked bad by
+   * Pass 1, authoritative (2r+1)^3 safety scan). Persisted in the .scan
+   * progress file so a killed/resumed scan continues in the correct phase.
+   */
+  public static final int PHASE_PRESCAN = 0;
+  public static final int PHASE_FULLSCAN = 1;
+  private final AtomicInteger scanPhase = new AtomicInteger(PHASE_PRESCAN);
+
   /** Whether the task is currently paused */
   public AtomicBoolean pause = new AtomicBoolean(false);
 
   private static final int MAX_PENDING_CHUNKS = 50;
   private final Semaphore inFlightGate = new Semaphore(MAX_PENDING_CHUNKS);
 
-  // [DEBUG_LOG] PR-8 diagnostics: concurrency gauge for the scan driver. Incremented at dispatch,
-  // decremented on future completion. `peakInFlight` tracks the max observed in a batch; both are
-  // logged + reset in wrapUpBatch. If peak stays ≪ MAX_PENDING_CHUNKS, the driver is the bottleneck,
-  // not the I/O pool.
+  /*
+   * [TRACE] PR-8 diagnostics: concurrency gauge for the scan driver. Incremented at dispatch,
+   * decremented on future completion. `peakInFlight` tracks the max observed in a batch; both are
+   * logged + reset in wrapUpBatch. If peak stays ≪ MAX_PENDING_CHUNKS, the driver is the bottleneck,
+   * not the I/O pool.
+   */
   private final AtomicInteger inFlight = new AtomicInteger(0);
   private final AtomicInteger peakInFlight = new AtomicInteger(0);
 
-  // PR-16 diagnostic: cumulative GC time (ms) observed at the start of the previous gauge
-  // log. Delta = current - last, reported as gcDeltaMs in the log line. If this climbs with
-  // scan progress it confirms the 4MB-per-region byte[] churn is pressuring the collector.
+  /*
+   * PR-16 diagnostic: cumulative GC time (ms) observed at the start of the previous gauge
+   * log. Delta = current - last, reported as gcDeltaMs in the log line. If this climbs with
+   * scan progress it confirms the 4MB-per-region byte[] churn is pressuring the collector.
+   */
   private long lastGcTotalMs = -1L;
 
-  // PR-17 diagnostic: stage-2 (full chunk load + safety scan) cost. Count and total wall-clock
-  // nanos accumulated per gauge window. Reported as fullLoads / fullLoadAvgMs. If fullLoadAvgMs
-  // grows with scan progress while probe I/O (avgColdMissMs) stays flat, the degradation is in
-  // stage-2 (loaded-chunk path), not the probe prefilter.
+  /*
+   * PR-17 diagnostic: stage-2 (full chunk load + safety scan) cost. Count and total wall-clock
+   * nanos accumulated per gauge window. Reported as fullLoads / fullLoadAvgMs. If fullLoadAvgMs
+   * grows with scan progress while probe I/O (avgColdMissMs) stays flat, the degradation is in
+   * stage-2 (loaded-chunk path), not the probe prefilter.
+   */
   private final java.util.concurrent.atomic.AtomicLong fullLoadCount = new java.util.concurrent.atomic.AtomicLong(0L);
   private final java.util.concurrent.atomic.AtomicLong fullLoadNanos = new java.util.concurrent.atomic.AtomicLong(0L);
 
-  // PR-19: per-outcome counters for the probe-first fast path. Diagnostic only; emitted on the
-  // concurrency gauge log. Tells us which branch of evaluateScanProbe / tryProbeFirstScan is
-  // consuming each candidate. After PR-18 fullLoads stayed ~= activeChecks despite the minY-1
-  // fix, meaning something else is routing every candidate to runFullLoadPath. These counters
-  // split that bucket so we can target the real cause.
+  /*
+   * PR-19: per-outcome counters for the probe-first fast path. Diagnostic only; emitted on the
+   * concurrency gauge log. Tells us which branch of evaluateScanProbe / tryProbeFirstScan is
+   * consuming each candidate. After PR-18 fullLoads stayed ~= activeChecks despite the minY-1
+   * fix, meaning something else is routing every candidate to runFullLoadPath. These counters
+   * split that bucket so we can target the real cause.
+   */
   private final AtomicLong probeOutcomeProbeNull = new AtomicLong(0L);
   private final AtomicLong probeOutcomeAdjustNull = new AtomicLong(0L);
+  /*
+   * PR-20: sub-attribution of probeOutcomeAdjustNull. The single adjustNull
+   * counter was ambiguous across platforms (Paper-vs-Folia asymmetry couldn't
+   * be diagnosed without a debugger). These four buckets are mutually
+   * exclusive and sum to adjustNull. Reasons map to VerticalAdjustor.
+   * ProbeRejectReason: LIGHT_GATE / WINDOW / SCAN_MISS / THREW.
+   */
+  private final AtomicLong probeOutcomeAdjustNullLight = new AtomicLong(0L);
+  private final AtomicLong probeOutcomeAdjustNullWindow = new AtomicLong(0L);
+  private final AtomicLong probeOutcomeAdjustNullScan = new AtomicLong(0L);
+  private final AtomicLong probeOutcomeAdjustNullThrew = new AtomicLong(0L);
+  /*
+   * Counts SCAN_MISS verdicts that were short-circuited to addBadLocation
+   * without dispatching runFullLoadPath. After the multi-column probe sweep
+   * (JumpAdjustor / LinearAdjustor), probe SCAN_MISS is authoritative across
+   * the same testCoords columns the live path would scan, so the chunk has
+   * no acceptable Y and a full chunk load would only confirm the verdict.
+   * Subset of probeOutcomeAdjustNullScan: every increment here also
+   * increments probeOutcomeAdjustNullScan. Reported as
+   * {@code adjustNull=...(scan=S scanShortCircuit=K)} so K/S = fraction of
+   * SCAN_MISS cases that bypassed the full-load path.
+   */
+  private final AtomicLong probeOutcomeAdjustNullScanShortCircuit = new AtomicLong(0L);
   private final AtomicLong probeOutcomeBiomeReject = new AtomicLong(0L);
   private final AtomicLong probeOutcomeBlockReject = new AtomicLong(0L);
   private final AtomicLong probeOutcomeCacheMissAccept = new AtomicLong(0L);
   private final AtomicLong probeOutcomeCacheHitLoad = new AtomicLong(0L);
+
+  // Land-percentage accounting (2026-04-26). Pre-fix the reported land% was
+  // computed from MemoryShape.getEffectiveGoodCount()/getEffectiveBadCount(),
+  // but `goodCount` there returns `totalBiomeCount` which is only populated
+  // when `biomeRecall` records a *rejected* biome via addBiomeLocation. True
+  // accepts (res.complete(true)) never bumped any "good" counter, so the
+  // reported land% was structurally tiny (only the biomeRecall-tagged subset
+  // of rejects contributed to the numerator while every reject contributed
+  // to the denominator). These local counters are bumped from the verdict
+  // callback in run() and yield an honest accept/(accept+reject) ratio.
+  private final AtomicLong scanGoodCount = new AtomicLong(0L);
+  private final AtomicLong scanBadCount = new AtomicLong(0L);
+
+  // Tracks whether the "prescan starting" announcement has been emitted for
+  // this task instance. Symmetric with the existing "prescan complete; starting
+  // full-load verification pass" log emitted at the PRESCAN -> FULLSCAN flip:
+  // without it, users who run /rtp scan see no indication that the cheap probe
+  // sweep (PRESCAN) is the active phase, and mistake long initial runtimes for
+  // a stalled fullscan. Logged once per run() entry when phase==PRESCAN.
+  private final AtomicBoolean prescanAnnounced = new AtomicBoolean(false);
+  private final AtomicBoolean fullscanAnnounced = new AtomicBoolean(false);
 
   private long lastSaveTime = 0;
 
@@ -105,6 +168,7 @@ public class ScanTask extends RTPRunnable {
     long[] progress = loadProgress(region.name);
     if (progress != null) {
       if (progress.length > 3) this.currentOffset = progress[3];
+      if (progress.length > 4) this.scanPhase.set((int) progress[4]);
     }
 
     if (scanIncrement.get() <= 0) {
@@ -115,7 +179,11 @@ public class ScanTask extends RTPRunnable {
       scanIncrement.set(cps.get() * 5);
     }
 
-    if(start == 0) {
+    // Clear the shape only when starting from scratch (start==0 AND PRESCAN).
+    // When resuming mid-FULLSCAN with scanIter persisted as 0 (fresh Pass 2),
+    // the Pass 1 bad-location bitmap must be preserved so Pass 2 can skip
+    // positions already marked bad.
+    if(start == 0 && scanPhase.get() == PHASE_PRESCAN) {
       if (region.shape instanceof MemoryShape<?> memoryShape) {
         memoryShape.clear();
       }
@@ -140,6 +208,7 @@ public class ScanTask extends RTPRunnable {
     this.cps.set(cpsVal);
     long[] progress = loadProgress(region.name);
     if (progress != null) {
+      if (progress.length > 4) this.scanPhase.set((int) progress[4]);
       if (progress.length > 3) this.currentOffset = progress[3];
     }
 
@@ -164,6 +233,22 @@ public class ScanTask extends RTPRunnable {
     }
 
     if (!isRunning.compareAndSet(false, true)) return;
+
+    // Announce the active scan phase at the beginning so users are not
+    // confused by the two-pass design (PRESCAN -> FULLSCAN). The PRESCAN
+    // -> FULLSCAN transition already logs in wrapUpBatch; this covers the
+    // initial entry into either phase (fresh start, resume after pause,
+    // or resume after restart with persisted phase==FULLSCAN).
+    if (scanPhase.get() == PHASE_PRESCAN) {
+      if (prescanAnnounced.compareAndSet(false, true)) {
+        RTP.log(Level.INFO, "[RTP] starting prescan (anvil probe sweep) for region=" + region.name);
+      }
+    } else if (scanPhase.get() == PHASE_FULLSCAN) {
+      if (fullscanAnnounced.compareAndSet(false, true)) {
+        RTP.log(Level.INFO, "[RTP] starting fullscan (full-load verification pass) for region=" + region.name);
+      }
+    }
+
     if (pause.get() || isCancelled() || scanIncrement.get() <= 0) {
       if (pause.get() || isCancelled()) {
         if (region.getShape() instanceof MemoryShape<?> ms) {
@@ -360,6 +445,10 @@ public class ScanTask extends RTPRunnable {
           posFuture.whenComplete((res, err) -> {
             inFlight.decrementAndGet();
             inFlightGate.release();
+            if (err == null && res != null) {
+              if (res) scanGoodCount.incrementAndGet();
+              else scanBadCount.incrementAndGet();
+            }
           });
         } catch (Exception e) {
           // Failsafe: Release the permit instantly if a synchronous error occurs
@@ -402,12 +491,19 @@ public class ScanTask extends RTPRunnable {
 
       long etaSeconds = getEtaSeconds(range, finalPos1, shape);
 
-      // --- NEW LAND PERCENTAGE CALCULATION ---
-      long good = shape.getEffectiveGoodCount();
-      long bad = shape.getEffectiveBadCount();
+      // --- LAND PERCENTAGE CALCULATION ---
+      // Uses ScanTask-local accept/reject counters rather than
+      // MemoryShape.getEffectiveGoodCount()/getEffectiveBadCount(): the
+      // latter's "good" channel is `totalBiomeCount`, populated only by
+      // biomeRecall on *rejected* candidates, so the resulting ratio was
+      // structurally <<1 (denominator counted every reject; numerator only
+      // the biomeRecall-tagged subset). See the scanGoodCount/scanBadCount
+      // declaration above.
+      long good = scanGoodCount.get();
+      long bad = scanBadCount.get();
       double totalEvaluated = (double) good + bad;
       double landPercentage = (totalEvaluated > 0) ? (good * 100.0 / totalEvaluated) : 0.0;
-      // ---------------------------------------
+      // ------------------------------------
 
       this.latestAbsolutePos = ((currentOffset * range) + finalPos1) / Math.max(1L, shape.spatialResolution);
       this.latestAbsoluteTotal = range;
@@ -418,7 +514,7 @@ public class ScanTask extends RTPRunnable {
       if (now - lastSaveTime > 5000 || finalPos1 >= range || pause.get() || isCancelled()) {
         lastSaveTime = now;
 
-        // [DEBUG_LOG] PR-8 concurrency gauge: observed peak in-flight probes this window vs the
+        // [TRACE] PR-8 concurrency gauge: observed peak in-flight probes this window vs the
         // MAX_PENDING_CHUNKS cap. peak ≪ cap => driver-loop serialization (root-cause fix is driver
         // prefetch or region-file batching, not adapter-side tuning).
         int peak = peakInFlight.getAndSet(inFlight.get());
@@ -426,7 +522,9 @@ public class ScanTask extends RTPRunnable {
         String gcSuffix = readGcDeltaMs();
         String fullLoadSuffix = readFullLoadStatsAndReset();
         String probeOutcomeSuffix = readProbeOutcomeStatsAndReset();
-        RTP.log(Level.INFO, "[DEBUG_LOG] ScanTask concurrency region=" + region.name
+        String phaseLabel = scanPhase.get() == PHASE_FULLSCAN ? "fullscan" : "prescan";
+        RTP.log(Level.FINER, "[TRACE] ScanTask concurrency region=" + region.name
+            + " phase=" + phaseLabel
             + " cps=" + cps_local + " activeChecks=" + activeChecks + " peakInFlight=" + peak
             + " currentInFlight=" + inFlight.get() + " cap=" + MAX_PENDING_CHUNKS
             + cacheSuffix + gcSuffix + fullLoadSuffix + probeOutcomeSuffix);
@@ -458,6 +556,27 @@ public class ScanTask extends RTPRunnable {
         save();
         shape.save(region.name + "_" + region.getWorld().getSeed(), region.getWorld().name());
         shape.exportDebugJson(region.name, region.getWorld().name());
+        isRunning.set(false);
+        if (!isCancelled() && !pause.get()) {
+          RTP.scheduler.runTaskAsynchronously(this);
+        }
+        return;
+      }
+
+      // Pass 1 / PRESCAN complete -> flip to Pass 2 / FULLSCAN instead of
+      // terminating. Pass 2 re-sweeps every position that Pass 1 did not
+      // mark bad, running runFullLoadPath for authoritative (2r+1)^3
+      // safety verification.
+      if (scanPhase.get() == PHASE_PRESCAN) {
+        scanPhase.set(PHASE_FULLSCAN);
+        currentOffset = 0L;
+        scanIter.set(0);
+        shape.flushAndRebuild(shape.spatialResolution);
+        save();
+        shape.save(region.name + "_" + region.getWorld().getSeed(), region.getWorld().name());
+        shape.exportDebugJson(region.name, region.getWorld().name());
+        RTP.log(Level.INFO, "[RTP] prescan complete for region=" + region.name
+                + "; starting full-load verification pass");
         isRunning.set(false);
         if (!isCancelled() && !pause.get()) {
           RTP.scheduler.runTaskAsynchronously(this);
@@ -600,11 +719,20 @@ public class ScanTask extends RTPRunnable {
   private String readProbeOutcomeStatsAndReset() {
     long pn = probeOutcomeProbeNull.getAndSet(0L);
     long an = probeOutcomeAdjustNull.getAndSet(0L);
+    // PR-20 sub-attribution. Buckets are mutually exclusive and sum to {@code an}.
+    long anL = probeOutcomeAdjustNullLight.getAndSet(0L);
+    long anW = probeOutcomeAdjustNullWindow.getAndSet(0L);
+    long anS = probeOutcomeAdjustNullScan.getAndSet(0L);
+    long anT = probeOutcomeAdjustNullThrew.getAndSet(0L);
+    long anSC = probeOutcomeAdjustNullScanShortCircuit.getAndSet(0L);
     long br = probeOutcomeBiomeReject.getAndSet(0L);
     long kr = probeOutcomeBlockReject.getAndSet(0L);
     long cma = probeOutcomeCacheMissAccept.getAndSet(0L);
     long chl = probeOutcomeCacheHitLoad.getAndSet(0L);
-    return " probeNull=" + pn + " adjustNull=" + an
+    return " probeNull=" + pn
+            + " adjustNull=" + an
+            + "(light=" + anL + " window=" + anW + " scan=" + anS
+            + " scanShortCircuit=" + anSC + " threw=" + anT + ")"
             + " biomeReject=" + br + " blockReject=" + kr
             + " cacheMissAccept=" + cma + " cacheHitLoad=" + chl;
   }
@@ -633,12 +761,14 @@ public class ScanTask extends RTPRunnable {
     File file = new File(dir, region.name + ".scan");
 
     try (java.io.FileOutputStream out = new java.io.FileOutputStream(file)) {
-      ByteBuffer buf = ByteBuffer.allocate(25).order(ByteOrder.BIG_ENDIAN);
+      // Layout: scanIter(8) | spatialResolution(8) | currentOffset(8) | isFine(1) | scanPhase(1) = 26 bytes.
+      ByteBuffer buf = ByteBuffer.allocate(26).order(ByteOrder.BIG_ENDIAN);
       buf.putLong(scanIter.get());
       Shape<?> shape = region.getShape();
       if (shape instanceof MemoryShape<?> memoryShape) {buf.putLong(memoryShape.spatialResolution);}
       buf.putLong(currentOffset);
       buf.put((byte) 0);
+      buf.put((byte) (scanPhase.get() & 0xFF));
       out.write(buf.array());
     } catch (java.io.IOException e) {
       RTP.log(Level.WARNING, e.getMessage(), e);
@@ -654,7 +784,7 @@ public class ScanTask extends RTPRunnable {
     if (!file.exists()) return null;
 
     try (java.io.FileInputStream in = new java.io.FileInputStream(file)) {
-      byte[] bytes = new byte[25];
+      byte[] bytes = new byte[26];
       int read = in.read(bytes);
       if (read >= 16) {
         ByteBuffer buf = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN);
@@ -662,17 +792,21 @@ public class ScanTask extends RTPRunnable {
         long stride = buf.getLong();
         long offset = 0;
         long isFine = 0;
+        long phase = 0;
         if (read >= 24) {
           offset = buf.getLong();
           if (read >= 25) {
             isFine = bytes[24] & 0xFF;
+          }
+          if (read >= 26) {
+            phase = bytes[25] & 0xFF;
           }
         } else if (read == 17) {
           isFine = bytes[16] & 0xFF;
         } else if (stride == 1) {
           isFine = 1;
         }
-        return new long[] {iter, stride, isFine, offset, 0L, 0L};
+        return new long[] {iter, stride, isFine, offset, phase, 0L};
       }
     } catch (java.io.IOException e) {
       // ignore
@@ -752,6 +886,26 @@ public class ScanTask extends RTPRunnable {
       CompletableFuture<Boolean> res = new CompletableFuture<>();
       int finalSafetyRadius = safetyRadius;
       final int midY = (vert.maxY() + vert.minY()) / 2;
+
+      // Two-pass scan model (2026-04-23):
+      //   Pass 1 / PRESCAN  - run the anvil probe sweep; on probe-accept we
+      //                       trust the probe and complete true WITHOUT a
+      //                       full chunk-load safety scan. Only cheap rejects
+      //                       (biome / adjust-null / center-column unsafe)
+      //                       mark bad locations.
+      //   Pass 2 / FULLSCAN - skip the probe entirely and route every
+      //                       non-isKnownBad position through the classic
+      //                       full chunk-load (2r+1)^3 safety scan for
+      //                       authoritative verification. This catches the
+      //                       probe's false-accepts (waterlogged blocks,
+      //                       stale-chunk body cells, etc.) and upgrades all
+      //                       remaining candidates to the full safety
+      //                       contract.
+      if (scanPhase.get() == PHASE_FULLSCAN) {
+        runFullLoadPath(region, world, vert, shape, pos, blockX, blockZ, midY,
+                finalSafetyRadius, unsafeBlocks, defaultBiomes, biomeRecall, res);
+        return res;
+      }
 
       // BIOME_LOOKUP_PERF_PLAN.md PR-5: probe-first with cache-aware gating.
       //
@@ -895,13 +1049,50 @@ public class ScanTask extends RTPRunnable {
           CompletableFuture<Boolean> res) {
     RTPCoords picked;
     try {
-      picked = vert.adjustFromProbe(probe, world.name());
+      VerticalAdjustor.AdjustResult ar = vert.adjustFromProbeWithReason(probe, world.name());
+      picked = ar.picked();
+      if (picked == null) {
+        probeOutcomeAdjustNull.incrementAndGet();
+        switch (ar.reason()) {
+          case LIGHT_GATE -> {
+            probeOutcomeAdjustNullLight.incrementAndGet();
+            return false; // UNKNOWN: probe couldn't decide light, defer to full load.
+          }
+          case WINDOW -> {
+            probeOutcomeAdjustNullWindow.incrementAndGet();
+            return false; // UNKNOWN: probe window incomplete, defer to full load.
+          }
+          case THREW -> {
+            probeOutcomeAdjustNullThrew.incrementAndGet();
+            return false; // UNKNOWN: adjustor threw, defer to full load.
+          }
+          case SCAN_MISS, NONE -> {
+            // Authoritative bad: the multi-column probe sweep (JumpAdjustor /
+            // LinearAdjustor) iterated the same testCoords columns the live
+            // adjust(RTPChunk,...) path would and found no acceptable Y on any
+            // column. The probe-side predicate is at least as permissive as
+            // the live predicate (state-predicated unsafe tokens are dropped
+            // from the probe fast set; sky-light cold path returns
+            // LIGHT_GATE_REJECT not SCAN_MISS), so a SCAN_MISS verdict
+            // implies the full chunk load would also reject. Short-circuit
+            // here instead of paying for a chunk load that confirms the
+            // verdict — turns the historical air-column / void / no-foothold
+            // adjustNull tail into a zero-cost reject.
+            probeOutcomeAdjustNullScan.incrementAndGet();
+            probeOutcomeAdjustNullScanShortCircuit.incrementAndGet();
+            shape.addBadLocation(pos);
+            res.complete(false);
+            return true;
+          }
+        }
+        return false;
+      }
     } catch (Throwable t) {
-      // Adjustor failed — UNKNOWN, fall through.
+      // Adjustor threw — UNKNOWN, fall through. Attribute to THREW sub-bucket.
       probeOutcomeAdjustNull.incrementAndGet();
+      probeOutcomeAdjustNullThrew.incrementAndGet();
       return false;
     }
-    if (picked == null) { probeOutcomeAdjustNull.incrementAndGet(); return false; }
     int py = picked.y();
 
     // Center-column biome check. On reject record biomeRecall for later lookup.
@@ -932,95 +1123,17 @@ public class ScanTask extends RTPRunnable {
     final long chunkKey = ((long) cx & 0xffffffffL) | ((long) cz << 32);
     RTPChunk<?> cached = world.getCachedChunk(chunkKey);
 
+    // Pass 1 / PRESCAN: trust probe-accept for BOTH cache-miss and cache-hit.
+    // Authoritative (2r+1)^3 verification is deferred to Pass 2 / FULLSCAN,
+    // which re-sweeps every position that Pass 1 did not mark bad. This keeps
+    // Pass 1 a pure anvil-probe sweep (no chunk loads on accept, no region-
+    // thread dispatch), while Pass 2 runs the classic authoritative scan.
     if (cached == null) {
-      // CACHE MISS — trust the probe, skip the full load. Still run
-      // GlobalRegionVerifiers (location-only checks).
       probeOutcomeCacheMissAccept.incrementAndGet();
-      MutableRTPCoords acceptedCursor = new MutableRTPCoords(blockX, blockZ);
-      acceptedCursor.setWorldName(world.name());
-      acceptedCursor.y = py;
-      GlobalRegionVerifiers.checkGlobalRegionVerifiers(acceptedCursor)
-              .whenComplete((pass, ex) -> {
-                if (ex != null || pass == null || !pass) {
-                  shape.addBadLocation(pos);
-                  res.complete(false);
-                } else {
-                  res.complete(true);
-                }
-              });
-      return true;
+    } else {
+      probeOutcomeCacheHitLoad.incrementAndGet();
     }
-
-    // CACHE HIT — full chunk is free, upgrade to full (2r+1)^3 safety scan
-    // with radius max(configured, 2).
-    probeOutcomeCacheHitLoad.incrementAndGet();
-    final int effectiveRadius = Math.max(configuredSafetyRadius, 2);
-    RTPLocation targetLoc = new RTPLocation(world, blockX, py, blockZ);
-    RTP.serverAccessor.getScheduler().runTask(targetLoc, () -> {
-      try {
-        // Re-check cache residency on the region thread — chunk could have
-        // unloaded between getCachedChunk and scheduler dispatch.
-        RTPChunk<?> chunk = world.getCachedChunk(chunkKey);
-        if (chunk == null) {
-          // Racy eviction — same outcome as cache-miss branch: trust probe.
-          MutableRTPCoords acceptedCursor = new MutableRTPCoords(blockX, blockZ);
-          acceptedCursor.setWorldName(world.name());
-          acceptedCursor.y = py;
-          GlobalRegionVerifiers.checkGlobalRegionVerifiers(acceptedCursor)
-                  .whenComplete((pass, ex) -> {
-                    if (ex != null || pass == null || !pass) {
-                      shape.addBadLocation(pos);
-                      res.complete(false);
-                    } else {
-                      res.complete(true);
-                    }
-                  });
-          return;
-        }
-
-        int localX = blockX & 15;
-        int localZ = blockZ & 15;
-        int minX = Math.max(0, localX - effectiveRadius);
-        int maxX = Math.min(15, localX + effectiveRadius);
-        int minZ = Math.max(0, localZ - effectiveRadius);
-        int maxZ = Math.min(15, localZ + effectiveRadius);
-
-        boolean pass = true;
-        for (int xx = minX; xx <= maxX && pass; xx++) {
-          for (int zz = minZ; zz <= maxZ && pass; zz++) {
-            for (int y = py - effectiveRadius; y <= py + effectiveRadius && pass; y++) {
-              if (!chunk.isSafe(xx, y, zz, unsafeBlocks)) {
-                pass = false;
-              }
-            }
-          }
-        }
-
-        if (isCancelled() || pause.get()) {
-          res.complete(false);
-          return;
-        }
-
-        if (pass) {
-          MutableRTPCoords acceptedCursor = new MutableRTPCoords(blockX, blockZ);
-          acceptedCursor.setWorldName(world.name());
-          acceptedCursor.y = py;
-          pass = GlobalRegionVerifiers.checkGlobalRegionVerifiers(acceptedCursor).join();
-        }
-
-        if (pass) {
-          res.complete(true);
-        } else {
-          shape.addBadLocation(pos);
-          res.complete(false);
-        }
-      } catch (Throwable t) {
-        RTP.log(Level.SEVERE,
-                "[ScanTask] Cache-hit probe scan crashed at " + pos, t);
-        shape.addBadLocation(pos);
-        res.complete(false);
-      }
-    });
+    res.complete(true);
     return true;
   }
 

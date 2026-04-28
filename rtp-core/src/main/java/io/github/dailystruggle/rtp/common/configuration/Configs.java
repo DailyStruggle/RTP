@@ -203,33 +203,32 @@ public class Configs {
     Map<Class<?>, ConfigParser<?>> newConfigParserMap = new ConcurrentHashMap<>();
     Map<Class<?>, MultiConfigParser<?>> newMultiConfigParserMap = new ConcurrentHashMap<>();
 
+    // REQ-RTP-F-013 / ADR-020: resolve the active locale BEFORE any other config is
+    // loaded so that every parser can extract its locale-specific YAML directly.
+    String locale = LanguageBootstrap.resolve(pluginDirectory);
+
     ConfigParser<LoggingKeys> logging =
-            new ConfigParser<>(LoggingKeys.class, "logging.yml", "1.0", pluginDirectory, fileDatabase);
+            new ConfigParser<>(LoggingKeys.class, "logging.yml", "1.0", pluginDirectory, fileDatabase, locale);
     newConfigParserMap.put(LoggingKeys.class, logging);
 
     ConfigParser<ConfigKeys> config =
-            new ConfigParser<>(ConfigKeys.class, "config.yml", "3.0", pluginDirectory, fileDatabase);
+            new ConfigParser<>(ConfigKeys.class, "config.yml", "3.0", pluginDirectory, fileDatabase, locale);
     newConfigParserMap.put(ConfigKeys.class, config);
 
     ConfigParser<MessagesKeys> lang =
-            new ConfigParser<>(MessagesKeys.class, "messages.yml", "1.0", pluginDirectory, fileDatabase);
+            new ConfigParser<>(MessagesKeys.class, "messages.yml", "1.0", pluginDirectory, fileDatabase, locale);
     newConfigParserMap.put(MessagesKeys.class, lang);
 
-    // REQ-RTP-F-013 / ADR-020: lazy locale overlay. No-op for "en" or missing key.
-    Object localeRaw = config.getConfigValue(ConfigKeys.language, "en");
-    String locale = (localeRaw == null) ? "en" : localeRaw.toString().trim();
-    LocaleOverlay.apply(lang, pluginDirectory, locale);
-
     ConfigParser<EconomyKeys> economy =
-            new ConfigParser<>(EconomyKeys.class, "economy.yml", "1.0", pluginDirectory, fileDatabase);
+            new ConfigParser<>(EconomyKeys.class, "economy.yml", "1.0", pluginDirectory, fileDatabase, locale);
     newConfigParserMap.put(EconomyKeys.class, economy);
 
     ConfigParser<PerformanceKeys> performance =
-            new ConfigParser<>(PerformanceKeys.class, "performance.yml", "1.0", pluginDirectory, fileDatabase);
+            new ConfigParser<>(PerformanceKeys.class, "performance.yml", "1.0", pluginDirectory, fileDatabase, locale);
     newConfigParserMap.put(PerformanceKeys.class, performance);
 
     ConfigParser<SafetyKeys> safety =
-            new ConfigParser<>(SafetyKeys.class, "safety", "1.0", pluginDirectory, fileDatabase);
+            new ConfigParser<>(SafetyKeys.class, "safety", "1.0", pluginDirectory, fileDatabase, locale);
     newConfigParserMap.put(SafetyKeys.class, safety);
 
     MultiConfigParser<RegionKeys> regions =

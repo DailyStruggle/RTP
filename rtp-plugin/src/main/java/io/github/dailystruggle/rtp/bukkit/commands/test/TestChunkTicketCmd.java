@@ -171,7 +171,9 @@ public class TestChunkTicketCmd extends BaseRTPCmdImpl {
             + r.finalResidual
             + (r.staleBaseline == 0 ? "" : " staleBaseline=" + r.staleBaseline);
 
-    RTP.serverAccessor.sendMessage(callerId, summary);
+    if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+      RTP.serverAccessor.sendMessage(callerId, summary);
+    }
     // S-004: failing run logs at WARNING; clean run at INFO.
     RTP.log(r.pass ? Level.INFO : Level.WARNING, summary);
 

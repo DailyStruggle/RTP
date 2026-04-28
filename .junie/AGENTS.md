@@ -28,6 +28,7 @@ Before generating code or terminal commands, explicitly state and verify:
 4. **Terminal** — PowerShell (`.\gradlew`, `;`, correctly-escaped quotes).
 5. **Safety rule** — name the S-00x rule(s) that apply (see table below).
 6. **Backups** — `.bak` copy required only for uncommitted **code** files. Skip for git-clean files and for docs/markdown.
+7. **Architecture** — if multi-class/module, has the proposal been approved? (Rule D-005)
 
 ## Backup Policy
 
@@ -110,6 +111,19 @@ Place new code following this decision order:
 
 ---
 
+## Propose Before Implementation (Rule D-005)
+
+For any change that touches more than one class, crosses a module boundary, or introduces a new command architecture, present a proposal **before** writing code. Include:
+
+1. Affected classes / modules.
+2. Intended before/after structure.
+3. Relevant REQ-* requirements or ADRs.
+4. Risks and trade-offs.
+
+Wait for explicit approval before implementing. If the change contradicts an existing ADR, say so and propose a superseding ADR.
+
+---
+
 ## Logging & Feedback
 
 - Use `RTP.log()` / `RTPServerAccessor.log()` in `rtp-core` and `rtp-api`. Never `Bukkit.getLogger()` or `System.out.println`.
@@ -181,15 +195,3 @@ When you discover something durable, record it in the **correct** file:
 
 Do **not** add code-level optimizations, algorithm explanations, or per-feature narratives to this file — those belong in code comments, ADRs, or `CHANGELOG.md`.
 
----
-
-## Propose Before Refactoring
-
-For any refactor that touches more than one class or crosses a module boundary, present a proposal **before** writing code. Include:
-
-1. Affected classes / modules.
-2. Intended before/after structure.
-3. Relevant REQ-* requirements or ADRs.
-4. Risks and trade-offs.
-
-Wait for explicit approval before implementing. If the change contradicts an existing ADR, say so and propose a superseding ADR.

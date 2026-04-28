@@ -1,0 +1,47 @@
+# --- Paramètres de journalisation du plugin ---
+# Documentation : https://github.com/DailyStruggle/RTP/blob/master/docs/admin/CONFIGURATION.md#loggingyml--console-logging-verbosity
+
+# Journaliser tous les fichiers rechargés lors de /rtp reload
+rechargementDetaille: false
+
+# Journaliser les détails de l'initialisation des régions
+initialisationRegionDetaillee: false
+
+# Journaliser les commandes RTP exécutées par les joueurs
+commande: false
+
+# Journaliser les événements de téléportation réussis
+teleport: true
+
+# Journaliser le RTP déclenché par des changements de monde
+evenementChangementMonde: true
+
+# Journaliser le RTP déclenché lors de la connexion
+evenementConnexion: true
+
+# Journaliser le RTP déclenché lors de la réapparition
+evenementReapparition: true
+
+# Journaliser le traitement des événements de mouvement
+evenementMouvement: true
+
+# Journaliser le traitement des événements de téléportation
+evenementTeleport: true
+
+# Journaliser les informations lorsque la sélection de l'emplacement échoue
+echecSelection: true
+
+# Journaux de débogage pour l'activité mémoire
+systemeTraceurMemoire: false
+
+# Journaux de débogage pour l'activité de la base de données
+systemeBaseDonnees: false
+
+# Niveau minimum de journalisation du plugin. Le filtre effectif est le plus
+# fin entre celui-ci et le logger de Bukkit. Valeurs : SEVERE, WARNING, INFO,
+# CONFIG, FINE, FINER, FINEST, ALL, OFF. Par défaut ALL : comportement identique
+# à celui du logger de Bukkit.
+niveauMinimum: INFO
+
+# NE PAS MODIFIER LE NUMÉRO DE VERSION
+version: "1.0"

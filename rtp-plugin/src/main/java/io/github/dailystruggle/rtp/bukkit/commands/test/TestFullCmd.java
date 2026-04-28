@@ -88,6 +88,9 @@ public class TestFullCmd extends BaseRTPCmdImpl {
           Arrays.asList(
               "cancel",
               "reload-safety",
+              // admin-only; mutates a live ConfigParser value and restores
+              // it. Runs on-demand only so the default sweep stays read-only.
+              "config-set",
               "full",
               "all",
               // Player-context diagnostic: needs the caller's live world + origin
@@ -248,7 +251,9 @@ public class TestFullCmd extends BaseRTPCmdImpl {
     } else if (callerId.equals(RTPAPI.serverId)) {
       String msg =
           "[RTP test/full] queue-starvation skipped: console caller has no resolvable region";
-      RTP.serverAccessor.sendMessage(callerId, msg);
+      if (!callerId.equals(RTPAPI.serverId)) {
+        RTP.serverAccessor.sendMessage(callerId, msg);
+      }
       RTP.log(Level.INFO, msg);
     } else {
       Map<String, List<String>> qsArgs = new HashMap<>();
@@ -280,7 +285,9 @@ public class TestFullCmd extends BaseRTPCmdImpl {
     } else if (callerId.equals(RTPAPI.serverId)) {
       String msg =
           "[RTP test/full] async-reply skipped: console caller has no resolvable player";
-      RTP.serverAccessor.sendMessage(callerId, msg);
+      if (!callerId.equals(RTPAPI.serverId)) {
+        RTP.serverAccessor.sendMessage(callerId, msg);
+      }
       RTP.log(Level.INFO, msg);
     } else {
       Map<String, List<String>> arArgs = new HashMap<>();

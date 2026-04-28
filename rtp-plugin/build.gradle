@@ -68,6 +68,10 @@ tasks.register('copyDocs', Copy) {
     into layout.buildDirectory.dir('resources/main/docs')
 }
 
+processResources {
+    // Defensive exclude: never ship editor/agent backup files even if one slips into resources.
+    exclude '**/*.bak'
+}
 processResources.dependsOn copyDocs
 shadowJar.dependsOn processResources
 

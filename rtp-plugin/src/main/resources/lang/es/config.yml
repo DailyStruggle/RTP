@@ -26,12 +26,10 @@ enfriamientoTeletransporte: 300
 # Comandos posteriores al teletransporte
 # Lista de comandos a ejecutar tras un teletransporte exitoso.
 # El marcador [player] representa el nombre del jugador.
-comandosConsola: [
+comandosConsola:
   - "say ¡[player] acaba de teletransportarse aleatoriamente!"
-]
-comandosJugador: [
+comandosJugador:
   - ""
-]
 
 # --- Configuración de la base de datos ---
 # Dónde almacenar ubicaciones en caché y datos de los jugadores.

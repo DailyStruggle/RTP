@@ -1,21 +1,9 @@
-# --- World Configuration (default template) ---
-# Per-world RTP behavior. One file per Bukkit world; the filename (minus `.yml`)
-# must match the world name. This `default.yml` is copied as the template for
-# any world that has no explicit file, and is also used as the fallback when a
-# world lookup fails.
+# --- RTP World Configuration ---
+# Documentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/WORLDS.md
 
-# Default Region
-# The region to use by default when a player is in this world.
-region: "default"
-
-# Permissions & Requirements
-# If true, requires 'rtp.worlds.<worldName>' permission to RTP in this world.
-requirePermission: false
-
-# Redirection Override
-# If a player lacks permission, attempt RTP in this world instead.
-# Special placeholder: [num] - world index according to bukkit, 0 is usually the main world.
-override: "[0]"
+region: "default" # Default region for this world
+requirePermission: false # If true, rtp.worlds.<worldname> is required
+override: "[0]" # World to redirect to if no permission
 
 # DO NOT TOUCH VERSION NUMBER
 version: "1.0"

@@ -1,0 +1,84 @@
+# --- Taalkaart: messages.yml ---
+# Koppelt interne berichtsleutels (links) aan de zichtbare namen
+# in messages.yml (rechts). Wijzig alleen de rechterkant om een
+# berichtsleutel te hernoemen of te vertalen; de linkerkant is een
+# codeconstante en mag niet worden gewijzigd.
+# Als dit bestand ontbreekt, genereert de plugin het opnieuw met
+# identieke links/rechts-paren (de Engelse standaardwaarden).
+oldFile: oudBestand
+infoTitle: titelInfo
+worldInfo: wereldGegevens
+placeholders: plaatshouders
+teleportMessage: teletransportBericht
+noLocationsQueued: geenLocatiesInWachtrij
+scanNotRunning: scanNietActief
+scanCancel: scanAnnuleren
+PLAYER_COOLDOWN: SPELER_WACHTTIJD
+seconds: seconden
+scanPause: scanPauze
+updating: bijwerken
+regionInfo: regioGegevens
+PLAYER_AVAILABLE: SPELER_BESCHIKBAAR
+consoleCmdNotAllowed: consoleOpdrachNietToegestaan
+queueUpdate: wachtrijUpdate
+delayMessage: vertragingsBericht
+PLAYER_TELEPORTING: SPELER_TELETRANSPORTEERT
+alreadyTeleporting: alTeletransporteert
+teleportDeniedReloading: teletransportGeweigerdHerladen
+invalidWorld: ongeldigeWereld
+infoTickets: infoTickets
+infoTeleports: infoTeletransports
+infoMSPT: infoMSPT
+infoTotalLoads: infoTotaalLadingen
+infoLeakRate: infoLekSnelheid
+infoDisclaimerHeader: infoDisclaimerKoptekst
+infoDisclaimer: infoDisclaimer
+infoConsoleWorldHeader: infoConsoleWereldKoptekst
+infoConsoleRegionHeader: infoConsoleRegioKoptekst
+minutes: minuten
+teleportCancel: teletransportAnnuleren
+infoWorldHeader: infoWereldKoptekst
+noPerms: geenRechten
+scan: scan
+version: version
+notEnoughMoney: onvoldoendeSaldo
+cooldownMessage: wachttijdBericht
+scanResume: scanHervatten
+subtitle: ondertitel
+millis: milliseconden
+updated: bijgewerkt
+fadeOut: uitfaden
+reloading: herladen
+reloaded: herladen_klaar
+PLAYER_LOADING: SPELER_LAADT
+unsafe: onveilig
+scanStart: scanStarten
+scanReset: scanResetten
+title: titel
+actionbar: actiebalk
+badArg: ongeldigArgument
+locationSaved: locatieOpgeslagen
+locationLoaded: locatieGeladen
+reload: herladen_opdracht
+fadeIn: infaden
+infoRegionHeader: infoRegioKoptekst
+hours: uren
+PLAYER_SETUP: SPELER_INSTELLEN
+rtp: rtp
+stay: blijven
+help: hulp
+rtp_description: rtp_beschrijving
+help_description: hulp_beschrijving
+reload_description: herladen_beschrijving
+scan_description: scan_beschrijving
+config_description: config_beschrijving
+info_description: info_beschrijving
+test_description: test_beschrijving
+scanStatus: scanStatus
+infoWorld: infoWereld
+chunkLoading: chunkLaden
+newWorld: nieuweWereld
+scanRunning: scanActief
+days: dagen
+infoRegion: infoRegio
+showDevTag: devTagTonen

@@ -32,17 +32,16 @@ public class ConfigCmd extends BaseRTPCmdImpl {
   }
 
   @Override
-  public String description() {
-    return "update configuration files at runtime";
-  }
-
-  @Override
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     return true;
   }
 
   public void addCommands() {
+    if (!getCommandLookup().containsKey("language")) {
+      addSubCommand(new LanguageCmd(this));
+    }
+
     final Configs configs = RTP.configs;
     for (ConfigParser<?> value : configs.configParserMap.values()) {
       String name = value.name.replace(".yml", "");

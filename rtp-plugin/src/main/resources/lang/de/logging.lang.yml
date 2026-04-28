@@ -1,0 +1,15 @@
+# --- Sprachzuordnung: logging.yml ---
+detailed_reload: detailliertesNeuladen
+detailed_region_init: detaillierteRegionsInitialisierung
+command: befehl
+teleport: teleport
+event_changeworld: ereignisWeltwechsel
+event_join: ereignisBeitritt
+event_respawn: ereignisRespawn
+event_move: ereignisBewegung
+event_teleport: ereignisTeleport
+selection_failure: auswahlFehlschlag
+system_memory_tracker: systemSpeicherTracker
+system_database: systemDatenbank
+min_level: minLevel
+version: version

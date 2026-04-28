@@ -98,7 +98,9 @@ public class TestBiomeSourceCmd extends BaseRTPCmdImpl {
 
     Snapshot s = snapshot();
     String summary = "[RTP test/biome-source] " + s;
-    RTP.serverAccessor.sendMessage(callerId, summary);
+    if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+      RTP.serverAccessor.sendMessage(callerId, summary);
+    }
     RTP.log(Level.INFO, summary);
 
     // Reason-keyed breakdown (ADR-016 §13.1 audit option C). Tells operators
@@ -112,7 +114,9 @@ public class TestBiomeSourceCmd extends BaseRTPCmdImpl {
         sb.append(' ').append(e.getKey()).append('=').append(e.getValue());
       }
       String reasonLine = sb.toString();
-      RTP.serverAccessor.sendMessage(callerId, reasonLine);
+      if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+        RTP.serverAccessor.sendMessage(callerId, reasonLine);
+      }
       RTP.log(Level.INFO, reasonLine);
     } catch (Throwable ignored) {
       // Reason map is best-effort diagnostics; never block the summary on it.
@@ -124,7 +128,9 @@ public class TestBiomeSourceCmd extends BaseRTPCmdImpl {
               + "has triggered candidate evaluation since startup, or the platform "
               + "adapter does not route getBiome through the ADR-016 §13.1 chain "
               + "(Fabric is out of scope).";
-      RTP.serverAccessor.sendMessage(callerId, note);
+      if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+        RTP.serverAccessor.sendMessage(callerId, note);
+      }
       RTP.log(Level.INFO, note);
     }
     return true;

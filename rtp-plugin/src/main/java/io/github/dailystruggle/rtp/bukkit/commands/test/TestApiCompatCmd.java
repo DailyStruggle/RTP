@@ -125,7 +125,9 @@ public class TestApiCompatCmd extends BaseRTPCmdImpl {
             + report.missingMethod.size()
             + " errors="
             + report.errors.size();
-    RTP.serverAccessor.sendMessage(callerId, summary);
+    if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+      RTP.serverAccessor.sendMessage(callerId, summary);
+    }
     if (report.failures() == 0) {
       RTP.log(Level.INFO, summary);
     } else {
@@ -142,7 +144,9 @@ public class TestApiCompatCmd extends BaseRTPCmdImpl {
     if (items.isEmpty()) return;
     for (String line : items) {
       String msg = "[RTP test/api-compat] " + tag + ": " + line;
-      RTP.serverAccessor.sendMessage(callerId, msg);
+      if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+        RTP.serverAccessor.sendMessage(callerId, msg);
+      }
       RTP.log(level, msg);
     }
   }

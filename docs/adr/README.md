@@ -27,7 +27,7 @@ An ADR captures a significant architectural decision: the context that forced it
 | [ADR-017](ADR-017-block-tags-and-state-predicates-in-safety-lists.md) | Block Tags and Block-State Predicates in Safety Lists | Accepted |
 | [ADR-018](ADR-018-agents-md-public-release-structure.md) | `AGENTS.md` Public Release Structure: Thin Router + Canonical Sources | Accepted |
 | [ADR-019](ADR-019-claim-plugin-integrations-folded-into-plugin.md) | Claim-Plugin Integrations Folded Into `rtp-plugin`; Example Addon Retained | Accepted |
-| [ADR-020](ADR-020-message-localization-lazy-overlay.md) | Message Localization via Lazy Folder-Per-Locale Overlay | Proposed |
+| [ADR-020](ADR-020-language-bootstrap-and-locale-aware-configparser.md) | Language Bootstrap and Locale-Aware ConfigParser | Accepted |
 | [ADR-021](ADR-021-legacy-mc-and-java-support-scope.md) | Legacy Minecraft and Java Support Are Out of Scope | Accepted |
 
 ## Template

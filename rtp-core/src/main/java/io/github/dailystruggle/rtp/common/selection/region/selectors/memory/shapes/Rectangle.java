@@ -157,6 +157,15 @@ public class Rectangle extends MemoryShape<RectangleParams> {
   @Override
   public long rand() {
     flushAndRebuild(spatialResolution);
+    // Snapshot both arrays together to avoid races with concurrent rebuilds where
+    // badKeysCache and badPrefixSumsCache may be observed at different lengths.
+    long[] keysSnap = badKeysCache;
+    long[] sums = badPrefixSumsCache;
+    if (keysSnap.length != sums.length) {
+      int common = Math.min(keysSnap.length, sums.length);
+      if (keysSnap.length != common) keysSnap = Arrays.copyOf(keysSnap, common);
+      if (sums.length != common) sums = Arrays.copyOf(sums, common);
+    }
     String mode = data.getOrDefault(RectangleParams.mode, "ACCUMULATE").toString();
 
     double range = getRange();
@@ -171,7 +180,7 @@ public class Rectangle extends MemoryShape<RectangleParams> {
       // We iterate until the number of bad spots preceding our physical guess stabilizes.
       while (true) {
         // Search Physical Keys using a Physical Guess (Target + Current Shift)
-        int index = java.util.Arrays.binarySearch(badKeysCache, target + currentBadSum);
+        int index = java.util.Arrays.binarySearch(keysSnap, target + currentBadSum);
 
         if (index < 0) {
           // Point is between keys (or after all keys). Invert insertion point.
@@ -182,8 +191,12 @@ public class Rectangle extends MemoryShape<RectangleParams> {
           index = index + 1;
         }
 
+        // Clamp index defensively against the prefix-sums length to avoid AIOOBE
+        // if a concurrent rebuild slipped a longer keys snapshot past us.
+        if (index > sums.length) index = sums.length;
+
         // Find the total bad area before this physical point
-        long newBadSum = (index > 0) ? badPrefixSumsCache[index - 1] : 0;
+        long newBadSum = (index > 0) ? sums[index - 1] : 0;
 
         // If the bad count is stable, we have found the correct Physical Coordinate
         if (newBadSum == currentBadSum) break;
@@ -202,10 +215,12 @@ public class Rectangle extends MemoryShape<RectangleParams> {
       case "NEAREST":
         {
           if (isKnownBad(location)) {
-            long[] keys = badKeysCache;
-            long[] sums = badPrefixSumsCache;
+            long[] keys = keysSnap;
             int idx = Arrays.binarySearch(keys, location);
             int floorIdx = (idx >= 0) ? idx : -(idx + 1) - 1;
+            if (floorIdx < 0 || floorIdx >= sums.length) {
+              break;
+            }
 
             long key = keys[floorIdx];
             long sum = sums[floorIdx];

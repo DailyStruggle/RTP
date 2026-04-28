@@ -1,4 +1,6 @@
-#reroll if selection was in a reserved location
+# --- RTP Integration Settings ---
+# If true, RTP will reroll the location if it lands within a claim/region from the respective plugin.
+
 rerollFactions: false
 rerollGriefDefender: false
 rerollGriefPrevention: false
@@ -8,4 +10,5 @@ rerollRedProtect: false
 rerollTownyAdvanced: false
 rerollWorldGuard: false
 
+# DO NOT TOUCH VERSION NUMBER
 version: "1.0"

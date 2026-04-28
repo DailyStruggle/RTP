@@ -242,7 +242,9 @@ public class TestDisconnectMidflightCmd extends BaseRTPCmdImpl {
             + r.teleportDataCleared
             + (r.threw == null ? "" : " threw=" + r.threw);
 
-    RTP.serverAccessor.sendMessage(callerId, summary);
+    if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+      RTP.serverAccessor.sendMessage(callerId, summary);
+    }
     // S-004: a failing run logs at WARNING; a clean run logs at INFO.
     RTP.log(r.pass ? Level.INFO : Level.WARNING, summary);
   }

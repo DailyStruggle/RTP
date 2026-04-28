@@ -571,7 +571,7 @@ public interface RTPCmd extends BaseRTPCmd {
 
   @Override
   default String description() {
-    return "teleport randomly";
+    return BaseRTPCmd.super.description();
   }
 
   void successEvent(RTPCommandSender sender, RTPPlayer player);

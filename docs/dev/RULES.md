@@ -23,6 +23,7 @@ Scan this table first. Read the detailed rule below only if you are touching cod
 | D-002 | Doc    | Be specific and unambiguous; define terms          | self-contained                              |
 | D-003 | Doc    | Single Source of Truth — reference, don't duplicate| self-contained                              |
 | D-004 | Doc    | Write for the audience                             | self-contained                              |
+| D-005 | Doc    | Propose architecture before implementation         | self-contained                              |
 
 ## Core Development Rules
 
@@ -81,6 +82,9 @@ These rules govern how project documentation, requirements, and design specifica
 
 - **Rule D-004: Write for the Audience**
   - **Description**: Tailor the language, detail, and format to the intended audience. `README.md` is for users (high-level), `docs/dev/` is for developers (technical), and `.junie/` is for AI agents (operational).
+
+- **Rule D-005: Propose Architecture Before Implementation**
+  - **Description**: For any refactor or new feature that touches more than one class, crosses a module boundary, or introduces a new command architecture, a written proposal must be presented and approved before any code is written.
 
 ## Maintenance Protocol
 

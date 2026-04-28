@@ -16,8 +16,6 @@ public enum ConfigKeys {
   database,
   /** Network configuration */
   network,
-  /** Active language for user-facing messages (see REQ-RTP-F-013, ADR-020). */
-  language,
   /** Configuration version */
   version
 }

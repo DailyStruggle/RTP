@@ -71,6 +71,29 @@ public interface ChunkColumnProbe {
   String blockAt(int y);
 
   /**
+   * Returns the block identifier at chunk-local column {@code (localX, localZ)}
+   * at the given world Y.
+   *
+   * <p>The default implementation delegates to {@link #blockAt(int)} regardless
+   * of {@code localX}/{@code localZ}, preserving back-compat for legacy
+   * single-column producers (the adjustor probe path then evaluates the same
+   * data five times instead of five distinct columns — semantically a no-op
+   * vs. the pre-multi-column behaviour). Producers whose backing data covers
+   * the full chunk (e.g. {@code AnvilColumnProbeAdapter}) override to return
+   * the actual off-center palette identifier so the probe-side
+   * {@code adjustFromProbeWithReason} sweep can scan all live-path
+   * {@code testCoords} columns and so {@code SCAN_MISS} becomes authoritative.</p>
+   *
+   * @param localX chunk-local X in {@code [0..15]}.
+   * @param localZ chunk-local Z in {@code [0..15]}.
+   * @param y      world Y to query; must satisfy {@code minY <= y <= maxY}.
+   * @return namespaced block identifier or {@code null} as in {@link #blockAt(int)}.
+   */
+  default String blockAt(int localX, int localZ, int y) {
+    return blockAt(y);
+  }
+
+  /**
    * Returns the biome identifier at the center column at the given world Y.
    *
    * @param y world Y to query; must satisfy {@code minY <= y <= maxY}.
@@ -81,7 +104,8 @@ public interface ChunkColumnProbe {
   String biomeAt(int y);
 
   /**
-   * Convenience: whether the block at the given Y is considered air.
+   * Convenience: whether the block at the given Y on the center column is
+   * considered air.
    *
    * <p>The default implementation tests for any namespaced {@code *:air}
    * identifier ({@code minecraft:air}, {@code minecraft:cave_air},
@@ -94,6 +118,25 @@ public interface ChunkColumnProbe {
    */
   default boolean isAirAt(int y) {
     String b = blockAt(y);
+    if (b == null) return false;
+    int colon = b.indexOf(':');
+    String path = (colon >= 0) ? b.substring(colon + 1) : b;
+    return path.equals("air") || path.equals("cave_air") || path.equals("void_air");
+  }
+
+  /**
+   * Convenience: whether the block at chunk-local column {@code (localX, localZ)}
+   * at the given Y is considered air. Default delegates to
+   * {@link #blockAt(int, int, int)} and applies the same path-segment test as
+   * {@link #isAirAt(int)}. Producers that override {@link #isAirAt(int)} for a
+   * cheaper representation should also override this overload.
+   *
+   * @param localX chunk-local X in {@code [0..15]}.
+   * @param localZ chunk-local Z in {@code [0..15]}.
+   * @param y      world Y to query.
+   */
+  default boolean isAirAt(int localX, int localZ, int y) {
+    String b = blockAt(localX, localZ, y);
     if (b == null) return false;
     int colon = b.indexOf(':');
     String path = (colon >= 0) ? b.substring(colon + 1) : b;
@@ -144,5 +187,15 @@ public interface ChunkColumnProbe {
    */
   default int skyLightAt(int y) {
     return 15;
+  }
+
+  /**
+   * Sky-light level at chunk-local column {@code (localX, localZ)} at the given Y.
+   * Default delegates to {@link #skyLightAt(int)} (center column) for back-compat
+   * with single-column producers; producers that retain per-column sky-light
+   * data should override.
+   */
+  default int skyLightAt(int localX, int localZ, int y) {
+    return skyLightAt(y);
   }
 }

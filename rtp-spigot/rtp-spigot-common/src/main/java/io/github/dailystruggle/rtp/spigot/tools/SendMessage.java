@@ -243,13 +243,119 @@ public class SendMessage {
   }
 
   /**
-   * Returns true if {@link Bukkit#getLogger()} would publish a record at the given level.
-   * Callers that are about to perform expensive formatting should short-circuit on false so
-   * FINE/FINER/FINEST debug paths don't pay the placeholder/PAPI cost when disabled.
+   * Cached parsed {@code logging.yml#min_level} so the hot-path log gate doesn't re-parse
+   * on every call. The cache is keyed by the raw string read from config; if an admin
+   * edits the value (or {@code /rtp reload} swaps the parser instance), the next call
+   * sees a different string and re-parses. Defaults to {@link Level#ALL}.
+   */
+  private static volatile String cachedMinLevelRaw = "ALL";
+  private static volatile Level cachedMinLevel = Level.ALL;
+
+  /**
+   * Resolves the plugin-scoped minimum log level from {@code logging.yml#min_level}.
+   *
+   * <p>This value is the sole gate in {@link #isLoggable(Level)}. After parsing, the
+   * threshold is also pushed onto {@link Bukkit#getLogger()} (and its parent / handler
+   * chain) via {@link #applyToBukkitLogger(Level)} so that JUL-routed log calls — in
+   * particular the throwable-carrying {@code log} overload — aren't silently filtered
+   * by the server's default {@code INFO} threshold when an admin configures FINE-and-
+   * below verbosity in {@code logging.yml}.
+   *
+   * <p>Returns {@link Level#ALL} when the config parser hasn't been initialized yet
+   * (e.g. very early in startup) or when the configured value can't be parsed —
+   * keeping the gate purely additive in those cases.
+   */
+  private static Level resolveMinLevel() {
+    try {
+      if (RTP.configs == null) return Level.ALL;
+      io.github.dailystruggle.rtp.common.configuration.ConfigParser<
+              io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys>
+          logging =
+              (io.github.dailystruggle.rtp.common.configuration.ConfigParser<
+                      io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys>)
+                  RTP.configs.getParser(
+                      io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys.class);
+      if (logging == null) return Level.ALL;
+      Object raw =
+          logging.getConfigValue(
+              io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys.min_level, "ALL");
+      String name = (raw == null) ? "ALL" : raw.toString().trim().toUpperCase(java.util.Locale.ROOT);
+      if (name.isEmpty()) name = "ALL";
+      // Fast path: identical raw value → reuse parsed Level without re-parsing.
+      if (name.equals(cachedMinLevelRaw)) return cachedMinLevel;
+      Level parsed;
+      try {
+        parsed = Level.parse(name);
+      } catch (IllegalArgumentException ex) {
+        parsed = Level.ALL;
+      }
+      cachedMinLevelRaw = name;
+      cachedMinLevel = parsed;
+      applyToBukkitLogger(parsed);
+      return parsed;
+    } catch (Throwable t) {
+      return Level.ALL;
+    }
+  }
+
+  /**
+   * Lowers {@link Bukkit#getLogger()} (and its parent / root handlers) to at least the
+   * given level so records published via the throwable-carrying {@code log} overload —
+   * which always routes through the JUL logger so the stack trace is preserved — are
+   * not silently dropped by the server's default {@code INFO} threshold when an admin
+   * configures {@code logging.yml#min_level: FINE/FINER/FINEST}. Never raises the
+   * server's logger level (i.e. only relaxes filtering for our records).
+   */
+  private static void applyToBukkitLogger(Level desired) {
+    try {
+      Logger logger = Bukkit.getLogger();
+      if (logger == null) return;
+      // Walk up the parent chain (Minecraft / root) so JUL's effective level check passes.
+      Logger cursor = logger;
+      while (cursor != null) {
+        Level current = cursor.getLevel();
+        if (current == null || current.intValue() > desired.intValue()) {
+          cursor.setLevel(desired);
+        }
+        // Relax handlers attached to this logger so they actually emit the record.
+        for (java.util.logging.Handler h : cursor.getHandlers()) {
+          Level hl = h.getLevel();
+          if (hl == null || hl.intValue() > desired.intValue()) {
+            h.setLevel(desired);
+          }
+        }
+        cursor = cursor.getParent();
+      }
+    } catch (Throwable ignored) {
+      // Never let log-config plumbing break the caller.
+    }
+  }
+
+  /** Returns the currently effective plugin-scoped minimum log level. */
+  public static Level getMinLevel() {
+    return resolveMinLevel();
+  }
+
+  /**
+   * Returns true if the level meets the plugin-scoped {@code logging.yml#min_level}
+   * threshold.
+   *
+   * <p>Historically this gate also consulted {@link Bukkit#getLogger()}'s level, but
+   * Bukkit's root logger defaults to {@code INFO} on most servers. That made the
+   * {@code min_level} setting effectively useless for {@code FINE}/{@code FINER}/
+   * {@code FINEST} verbosity (e.g. {@code ScanTask} debug logs at {@code FINE}/
+   * {@code FINER} were silently dropped even with {@code min_level: FINEST}). On
+   * modern servers ({@code >1.12}) RTP routes log output through
+   * {@link Bukkit#getConsoleSender()} rather than the JUL logger, so the JUL level
+   * filter doesn't naturally bound it anyway.
+   *
+   * <p>Callers that are about to perform expensive formatting should short-circuit on
+   * false so FINE/FINER/FINEST debug paths don't pay the placeholder/PAPI cost when
+   * disabled.
    */
   private static boolean isLoggable(Level level) {
-    Logger logger = Bukkit.getLogger();
-    return logger == null || logger.isLoggable(level);
+    if (level == null) return false;
+    return level.intValue() >= resolveMinLevel().intValue();
   }
 
   public static void log(Level level, String message) {
@@ -257,6 +363,12 @@ public class SendMessage {
     if (!isLoggable(level)) return;
 
     message = format(null, message);
+    // Defensive second pass: any '&' legacy codes that survived `format`
+    // (for example, codes re-introduced by a placeholder substitution after
+    // `translateAlternateColorCodes` already ran in format) are converted
+    // here so the literal '&c' never reaches the console sender on Folia.
+    // This addresses the F4 finding in RTP_TEST_FULL_RELEASE_PLAN.md.
+    message = ChatColor.translateAlternateColorCodes('&', message);
     intercept(message);
 
     if (RTP.serverAccessor.getServerIntVersion() <= 12) message = ChatColor.stripColor(message);
@@ -287,6 +399,9 @@ public class SendMessage {
     if (!isLoggable(level)) return;
 
     String formatted = format(null, message);
+    // See log(Level, String): defensive second pass against '&' codes
+    // re-introduced by placeholder substitution. Idempotent.
+    formatted = ChatColor.translateAlternateColorCodes('&', formatted);
     intercept(formatted);
 
     ChatColor color = colorFor(level);

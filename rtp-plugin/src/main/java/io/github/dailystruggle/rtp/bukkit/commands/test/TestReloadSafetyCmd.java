@@ -78,7 +78,9 @@ public class TestReloadSafetyCmd extends BaseRTPCmdImpl {
 
     if (RTP.scheduler == null) {
       String msg = "&c[RTP test/reload-safety] RTP.scheduler is null; core not yet loaded";
-      RTP.serverAccessor.sendMessage(callerId, msg);
+      if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+        RTP.serverAccessor.sendMessage(callerId, msg);
+      }
       RTP.log(Level.WARNING, msg);
       return true;
     }
@@ -102,7 +104,9 @@ public class TestReloadSafetyCmd extends BaseRTPCmdImpl {
             + " reload iteration(s), every "
             + RELOAD_PERIOD_TICKS
             + " ticks";
-    RTP.serverAccessor.sendMessage(callerId, startMsg);
+    if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+      RTP.serverAccessor.sendMessage(callerId, startMsg);
+    }
     RTP.log(Level.INFO, startMsg);
 
     Runnable tick =
@@ -139,7 +143,9 @@ public class TestReloadSafetyCmd extends BaseRTPCmdImpl {
                     + reloadsOk.get()
                     + " failed="
                     + reloadsFailed.get();
-            RTP.serverAccessor.sendMessage(callerId, summary);
+            if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+              RTP.serverAccessor.sendMessage(callerId, summary);
+            }
             RTP.log(Level.INFO, summary);
             Object h = handleHolder[0];
             if (h != null) {
@@ -185,7 +191,9 @@ public class TestReloadSafetyCmd extends BaseRTPCmdImpl {
                   + " failed="
                   + reloadsFailed.get()
                   + ")";
-          RTP.serverAccessor.sendMessage(callerId, msg);
+          if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+            RTP.serverAccessor.sendMessage(callerId, msg);
+          }
           RTP.log(Level.INFO, msg);
         };
     unregisterHolder[0] =

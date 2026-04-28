@@ -33,11 +33,6 @@ public class ScanCmd extends BaseRTPCmdImpl {
   }
 
   @Override
-  public String description() {
-    return "clear stored data and try all possible region placements";
-  }
-
-  @Override
   public boolean onCommand(
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;

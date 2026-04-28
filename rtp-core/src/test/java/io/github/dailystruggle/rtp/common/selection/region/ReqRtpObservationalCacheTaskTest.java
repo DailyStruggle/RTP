@@ -139,4 +139,51 @@ public class ReqRtpObservationalCacheTaskTest {
         RegionCacheTask defaultTask = new RegionCacheTask(region, 1_000_000L);
         assertNotSame(task, defaultTask);
     }
+
+    /**
+     * Regression guard for the perpetual {@code [cached] = totalCap - 1}
+     * symptom (e.g. "cached: 59" against a 60-slot total). Root cause:
+     * {@code Region.execute()} added the observational task to
+     * {@code cachePipeline} BEFORE computing the cache-fill deficit, so
+     * {@code cachePipeline.size()} was already inflated by 1 at deficit
+     * time. The deficit equation
+     * {@code totalCap - (cachePipeline.size() + kept + unkept + inFlight)}
+     * therefore swallowed exactly one default-mode cache slot per pulse.
+     * The observational task self-gates closed when the cache has headroom
+     * (RegionCacheTask.run() — {@code if (!cacheFull) return;}), so the
+     * stolen slot was never filled by the observational task either. Net:
+     * cache pinned one slot below {@code cacheCap + activeChunkCap}
+     * indefinitely.
+     *
+     * <p>Setup mirrors the user-visible scenario: cacheCap=3, activeCap=5
+     * (totalCap=8), observational mode enabled by default. We pump
+     * execute() until the public queue length stops growing and assert it
+     * reaches the full totalCap.
+     */
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void execute_withObservationalEnabled_reachesFullCacheCapPlusActiveCap() {
+        long totalCap = region.getSettings().cacheCap() + region.getSettings().activeChunkCap();
+        long previous = -1L;
+        long current = region.getPublicQueueLength();
+        // Bounded retry: each pulse should add at least one location until
+        // saturation. 64 pulses comfortably covers the 8-slot total even
+        // with cache-pipeline yielding.
+        for (int i = 0; i < 64 && current < totalCap; i++) {
+            region.execute(Long.MAX_VALUE);
+            previous = current;
+            current = region.getPublicQueueLength();
+            if (current == previous && current >= totalCap - 1) {
+                // Saturation candidate: one more pulse to confirm we're not
+                // mid-promotion (kept polled, awaiting async chunk-load).
+                region.execute(Long.MAX_VALUE);
+                current = region.getPublicQueueLength();
+                break;
+            }
+        }
+        assertEquals(totalCap, current,
+                "with observational mode enabled, [cached] must reach "
+                        + "cacheCap + activeChunkCap (regression guard for the "
+                        + "off-by-one cache-deficit bug — \"cached: 59\" symptom).");
+    }
 }

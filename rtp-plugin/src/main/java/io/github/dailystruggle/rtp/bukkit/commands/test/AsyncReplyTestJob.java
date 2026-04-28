@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.bukkit.commands.test;
 
 import io.github.dailystruggle.commandsapi.bukkit.LocalParameters.OnlinePlayerParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
+import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -12,10 +13,12 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -80,8 +83,36 @@ import org.jetbrains.annotations.Nullable;
  */
 public class AsyncReplyTestJob extends BaseRTPCmdImpl {
 
-  /** Case-insensitive substrings that identify the teleport pipeline's final reply. */
-  static final String[] REPLY_NEEDLES = {"teleporting", "searching"};
+  /**
+   * Case-insensitive substrings that identify the teleport pipeline's first
+   * player-facing reply.
+   *
+   * <p>The needles cover both English defaults
+   * ({@code "Teleporting in [delay]"}, {@code "Teleported in [attempts]"})
+   * and the loading / searching states used in localized {@code messages.yml}
+   * variants. {@code "teleport"} matches both "teleporting" and "teleported";
+   * {@code "loading"} covers {@link MessagesKeys#chunkLoading}.
+   */
+  static final String[] REPLY_NEEDLES = {
+      "teleport", "searching", "loading", "setup"
+  };
+
+  /**
+   * {@link MessagesKeys} values whose dispatch counts as the pipeline's
+   * tracked reply, regardless of the rendered text. This makes the probe
+   * resilient to {@code messages.yml} translations and rewordings: if the
+   * pipeline calls
+   * {@code sendMessage(uuid, MessagesKeys.delayMessage, ...)} we treat that
+   * as the reply we're waiting for, even if the configured string was
+   * fully translated and contains none of the English needles above.
+   */
+  static final Set<MessagesKeys> REPLY_KEYS = EnumSet.of(
+      MessagesKeys.delayMessage,
+      MessagesKeys.teleportMessage,
+      MessagesKeys.chunkLoading,
+      MessagesKeys.PLAYER_SETUP,
+      MessagesKeys.PLAYER_LOADING,
+      MessagesKeys.PLAYER_TELEPORTING);
 
   /** Max wall time to wait for the first tracked reply before timing out. */
   static final long REPLY_TIMEOUT_MS = 5_000L;
@@ -304,7 +335,9 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
             + " ("
             + reason
             + ")";
-    realAccessor.sendMessage(callerId, line);
+    if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+        realAccessor.sendMessage(callerId, line);
+    }
     RTP.log(permitted ? Level.INFO : Level.WARNING, line);
   }
 
@@ -341,7 +374,9 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
   }
 
   private void report(UUID callerId, RTPServerAccessor accessor, String msg) {
-    accessor.sendMessage(callerId, msg);
+    if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+        accessor.sendMessage(callerId, msg);
+    }
     RTP.log(Level.INFO, msg);
   }
 
@@ -391,24 +426,42 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
       if (!"sendMessage".equals(method.getName())) return result;
       if (args == null || args.length == 0) return result;
 
-      // Find the target UUID slot and a stringified payload among the
-      // heterogeneous sendMessage overloads.
+      // Inspect the heterogeneous sendMessage overloads:
+      //   sendMessage(UUID, String[, tag])
+      //   sendMessage(UUID, UUID, String[, tag])
+      //   sendMessage(UUID, MessagesKeys[, tag])
+      //   sendMessage(UUID, UUID, MessagesKeys[, tag])
+      //   sendMessage(RTPCommandSender, String, hover, click[, tag])
+      // We accept either a recognised MessagesKeys constant (locale-proof)
+      // or, failing that, a String payload that contains one of
+      // REPLY_NEEDLES. Targeting is matched by *any* UUID arg equal to the
+      // tracked target (covers both the receiver-only and sender+receiver
+      // overloads).
       boolean targetsUs = false;
       String payload = null;
+      MessagesKeys keyArg = null;
       for (Object a : args) {
         if (a instanceof UUID && targetId.equals(a)) targetsUs = true;
         if (a instanceof String && payload == null) payload = (String) a;
-        // MessagesKeys / RTPCommandSender: we can't know the rendered text
-        // cheaply, so those overloads are best-effort and only match when
-        // a String payload is also present.
+        if (a instanceof MessagesKeys && keyArg == null) keyArg = (MessagesKeys) a;
       }
-      if (!targetsUs || payload == null) return result;
+      if (!targetsUs) return result;
 
-      String lower = payload.toLowerCase(Locale.ROOT);
-      for (String needle : REPLY_NEEDLES) {
-        if (lower.contains(needle)) {
-          delivery.complete(Thread.currentThread());
-          break;
+      // Path 1: matched a MessagesKeys constant we care about. Locale
+      // independent — preferred.
+      if (keyArg != null && REPLY_KEYS.contains(keyArg)) {
+        delivery.complete(Thread.currentThread());
+        return result;
+      }
+
+      // Path 2: needle match on rendered string payload.
+      if (payload != null) {
+        String lower = payload.toLowerCase(Locale.ROOT);
+        for (String needle : REPLY_NEEDLES) {
+          if (lower.contains(needle)) {
+            delivery.complete(Thread.currentThread());
+            break;
+          }
         }
       }
       return result;
