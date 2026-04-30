@@ -2,7 +2,7 @@
 
 **Scope of this diagram.** This chart covers the behavior *inside* a single attempt of `LocationGenerator` — i.e., how one candidate `(x, y, z)` is proposed, chunk-loaded, and accepted or rejected. This is the **decision core** that drives everything downstream: every cached location (diagram 02), every `/rtp` teleport that reaches `Start LOAD` (diagram 01), and every `/rtp scan` hit (diagram 05) comes out of this loop. Related-but-separate behavior paths are intentionally **out of scope** here:
 
-- **Who invoked us** — `/rtp` command selection (diagram 08), cache replenishment (diagram 02), `/rtp scan` (diagram 05), onEvent auto-teleport — all funnel into `ILocationGenerator.getLocation` but differ only in who owns the returned `GenerationResult`.
+- **Who invoked us** — `/rtp` command selection (diagram 07), cache replenishment (diagram 02), `/rtp scan` (diagram 05), onEvent auto-teleport — all funnel into `ILocationGenerator.getLocation` but differ only in who owns the returned `GenerationResult`.
 - **Outer attempt-loop re-entry plumbing** — `PregenTask.run()` / `rescheduleNextAttempt()` / `continueInline(...)` is the state-machine harness (ADR-015 Option B) that re-invokes `runAttempt` without blocking. See `PregenTask.java` header.
 - **Chunk ticket lifecycle** (`ChunkReservation`, `MemoryTracker`) — see diagram 03.
 - **Stale-chunk guard** on live-backed chunks — see [ADR-015](../adr/ADR-015-stale-chunk-guard-countbound-pipes.md).

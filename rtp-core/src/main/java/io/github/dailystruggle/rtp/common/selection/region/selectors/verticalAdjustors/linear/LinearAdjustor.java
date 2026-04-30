@@ -13,8 +13,6 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdj
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import org.jetbrains.annotations.NotNull;
@@ -34,22 +32,56 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
       Arrays.stream(GenericMemoryShapeParams.values()).map(Enum::name).collect(Collectors.toList());
   private static final EnumMap<GenericVerticalAdjustorKeys, Object> defaults =
       new EnumMap<>(GenericVerticalAdjustorKeys.class);
-  private static final Set<String> unsafeBlocks = new ConcurrentSkipListSet<>();
-  private static final AtomicLong lastUpdate = new AtomicLong();
   /**
-   * Cached {@link SafetyKeys#platformDepth} value, refreshed on the same 5s
-   * cadence as {@link #unsafeBlocks}. Controls how many blocks below the
-   * candidate feet-Y the probe-side {@link #acceptY} sweep checks against
-   * {@link #unsafeBlocks} — so a fluid (water/lava) sitting under a thin
-   * dirt/sand crust within {@code platformDepth} cells is rejected upstream
-   * of the live full-load path.
+   * Snapshot of the configured safety state read at adjustor entry: the
+   * canonicalised {@link SafetyKeys#unsafeBlocks} set and {@link
+   * SafetyKeys#platformDepth}. Plumbed by reference through every helper
+   * predicate ({@link #acceptY}, {@link #isGroundSafe}, {@link #scanProbe})
+   * so a single {@code adjust(...)} / {@code adjustFromProbeWithReason(...)}
+   * invocation evaluates the entire scan against one consistent snapshot.
+   * No static cache — config is read once per top-level entry, and {@code
+   * SafetyTokenExpander} (config load + {@code /rtp reload}) ensures the
+   * parser already holds the tag-expanded list.
    */
-  private static volatile int platformDepth = 1;
+  private record SafetySnapshot(Set<String> unsafeBlocks, int platformDepth) {}
+
+  /**
+   * Read the current safety configuration directly from {@link RTP#configs}
+   * and canonicalise the unsafe-block tokens for fast set-membership lookup
+   * on the probe path. Tag expansion is already performed upstream by
+   * {@code SafetyTokenExpander} at config load and on {@code /rtp reload},
+   * so the parser values are flat material names by the time this runs.
+   */
+  @SuppressWarnings("unchecked")
+  private static SafetySnapshot readSafetySnapshot() {
+    ConfigParser<SafetyKeys> safety =
+        (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+    Set<String> unsafe = new HashSet<>();
+    if (safety != null) {
+      Object value = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
+      if (value instanceof Collection) {
+        for (Object item : (Collection<?>) value) {
+          if (item == null) continue;
+          String c = canon(item.toString());
+          if (c != null) unsafe.add(c);
+        }
+      }
+    }
+    int depth = 1;
+    if (safety != null) {
+      // Ground-sweep depth — reuses SafetyKeys.safetyRadius so it stays
+      // distinct from SafetyKeys.platformDepth (which exclusively sizes the
+      // platform-creation tool in BukkitRTPWorld.platform / FoliaRTPWorld.platform).
+      // Floor of 1 so the [1..depth] sweep below feet always includes y-1.
+      depth = Math.max(1, safety.getNumber(SafetyKeys.safetyRadius, 1).intValue());
+    }
+    return new SafetySnapshot(unsafe, depth);
+  }
 
   /**
    * Canonicalise an identifier returned by {@link ChunkColumnProbe#blockAt(int)}
    * (lowercase namespaced, e.g. {@code minecraft:water}) into the upper-case,
-   * namespace-stripped form used by yml-loaded {@link #unsafeBlocks} entries
+   * namespace-stripped form used by yml-loaded {@code unsafeBlocks} entries
    * (e.g. {@code WATER}). Mirrors {@code JumpAdjustor.canonicaliseMaterialToken}.
    */
   private static String canon(String id) {
@@ -124,7 +156,8 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
    * single {@code y-1} check and the player would drop through on landing.
    * Returns {@code true} when every checked cell is safe.
    */
-  private static boolean isGroundSafe(RTPChunk chunk, int x, int y, int z) {
+  private static boolean isGroundSafe(
+      RTPChunk chunk, int x, int y, int z, Set<String> unsafeBlocks, int platformDepth) {
     int depth = Math.max(1, platformDepth);
     for (int d = 1; d <= depth; d++) {
       if (!chunk.isSafe(x, y - d, z, unsafeBlocks)) return false;
@@ -148,25 +181,9 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
       requireSkyLight = (Boolean) o;
     } else requireSkyLight = Boolean.parseBoolean(o.toString());
 
-    long t = System.currentTimeMillis();
-    long dt = t - lastUpdate.get();
-    if (dt > 5000 || dt < 0) {
-      ConfigParser<SafetyKeys> safety =
-          (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
-      Object value = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
-      unsafeBlocks.clear();
-      if (value instanceof Collection) {
-        unsafeBlocks.addAll(
-            ((Collection<?>) value)
-                .stream()
-                    .filter(Objects::nonNull)
-                    .map(Object::toString)
-                    .collect(Collectors.toSet()));
-      }
-      platformDepth = Math.max(1,
-          safety.getNumber(SafetyKeys.platformDepth, 1).intValue());
-      lastUpdate.set(t);
-    }
+    SafetySnapshot snap = readSafetySnapshot();
+    Set<String> unsafeBlocks = snap.unsafeBlocks();
+    int platformDepth = snap.platformDepth();
 
     for (int j = 0; j < testCoords.size(); j++) {
       List<Integer> xz = testCoords.get(j);
@@ -186,7 +203,7 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
                   && skylight > 7
                   && chunk.isSafe(x, i, z, unsafeBlocks)
                   && chunk.isSafe(x, i + 1, z, unsafeBlocks)
-                  && isGroundSafe(chunk, x, i, z)) {
+                  && isGroundSafe(chunk, x, i, z, unsafeBlocks, platformDepth)) {
                 output.setWorldName(chunk.getWorld().name());
                 output.setXZ(globalX, globalZ);
                 output.setY(i);
@@ -206,7 +223,7 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
                   && skylight > 7
                   && chunk.isSafe(x, i, z, unsafeBlocks)
                   && chunk.isSafe(x, i + 1, z, unsafeBlocks)
-                  && isGroundSafe(chunk, x, i, z)) {
+                  && isGroundSafe(chunk, x, i, z, unsafeBlocks, platformDepth)) {
                 output.setWorldName(chunk.getWorld().name());
                 output.setXZ(globalX, globalZ);
                 output.setY(i);
@@ -231,7 +248,7 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
                   && skylight > 7
                   && chunk.isSafe(x, y, z, unsafeBlocks)
                   && chunk.isSafe(x, y + 1, z, unsafeBlocks)
-                  && isGroundSafe(chunk, x, y, z)) {
+                  && isGroundSafe(chunk, x, y, z, unsafeBlocks, platformDepth)) {
                 output.setWorldName(chunk.getWorld().name());
                 output.setXZ(globalX, globalZ);
                 output.setY(y);
@@ -248,7 +265,7 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
                   && skylight > 7
                   && chunk.isSafe(x, y, z, unsafeBlocks)
                   && chunk.isSafe(x, y + 1, z, unsafeBlocks)
-                  && isGroundSafe(chunk, x, y, z)) {
+                  && isGroundSafe(chunk, x, y, z, unsafeBlocks, platformDepth)) {
                 output.setWorldName(chunk.getWorld().name());
                 output.setXZ(globalX, globalZ);
                 output.setY(y);
@@ -273,7 +290,7 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
                   && skylight > 7
                   && chunk.isSafe(x, y, z, unsafeBlocks)
                   && chunk.isSafe(x, y + 1, z, unsafeBlocks)
-                  && isGroundSafe(chunk, x, y, z)) {
+                  && isGroundSafe(chunk, x, y, z, unsafeBlocks, platformDepth)) {
                 output.setWorldName(chunk.getWorld().name());
                 output.setXZ(globalX, globalZ);
                 output.setY(y);
@@ -290,7 +307,7 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
                   && skylight > 7
                   && chunk.isSafe(x, y, z, unsafeBlocks)
                   && chunk.isSafe(x, y + 1, z, unsafeBlocks)
-                  && isGroundSafe(chunk, x, y, z)) {
+                  && isGroundSafe(chunk, x, y, z, unsafeBlocks, platformDepth)) {
                 output.setWorldName(chunk.getWorld().name());
                 output.setXZ(globalX, globalZ);
                 output.setY(y);
@@ -321,7 +338,7 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
                   && skylight > 7
                   && chunk.isSafe(x, i, z, unsafeBlocks)
                   && chunk.isSafe(x, i + 1, z, unsafeBlocks)
-                  && isGroundSafe(chunk, x, i, z)) {
+                  && isGroundSafe(chunk, x, i, z, unsafeBlocks, platformDepth)) {
                 output.setWorldName(chunk.getWorld().name());
                 output.setXZ(globalX, globalZ);
                 output.setY(i);
@@ -403,7 +420,7 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
     int heightmapSkyFloor = computeHeightmapSkyFloor(probe, requireSkyLight);
     if (heightmapSkyFloor == Integer.MAX_VALUE) return AdjustResult.LIGHT_GATE_REJECT;
 
-    refreshUnsafeBlocks();
+    SafetySnapshot snap = readSafetySnapshot();
 
     // Multi-column probe sweep over the same testCoords set used by the live
     // adjust(RTPChunk,...) path. Aligning the column sets makes a probe
@@ -414,7 +431,8 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
       List<Integer> xz = testCoords.get(j);
       int lx = xz.get(0);
       int lz = xz.get(1);
-      int y = scanProbe(probe, lx, lz, minY, maxY, dir, requireSkyLight, heightmapSkyFloor);
+      int y = scanProbe(probe, lx, lz, minY, maxY, dir, requireSkyLight, heightmapSkyFloor,
+          snap.unsafeBlocks(), snap.platformDepth());
       if (y == Integer.MIN_VALUE) continue;
       int globalX = (probe.chunkX() << 4) + lx;
       int globalZ = (probe.chunkZ() << 4) + lz;
@@ -469,33 +487,6 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
     return top;
   }
 
-  /**
-   * Refresh the cached unsafe-block set on the same 5-second cadence as
-   * {@link #adjust(RTPChunk, MutableRTPCoords)}, so probe-first callers that never invoke
-   * the authoritative path still see operator-edited safety config.
-   */
-  private static void refreshUnsafeBlocks() {
-    long t = System.currentTimeMillis();
-    long dt = t - lastUpdate.get();
-    if (dt > 5000 || dt < 0) {
-      ConfigParser<SafetyKeys> safety =
-          (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
-      Object value = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
-      unsafeBlocks.clear();
-      if (value instanceof Collection) {
-        unsafeBlocks.addAll(
-            ((Collection<?>) value)
-                .stream()
-                    .filter(Objects::nonNull)
-                    .map(Object::toString)
-                    .map(LinearAdjustor::canon)
-                    .collect(Collectors.toSet()));
-      }
-      platformDepth = Math.max(1,
-          safety.getNumber(SafetyKeys.platformDepth, 1).intValue());
-      lastUpdate.set(t);
-    }
-  }
 
   /**
    * Scan chunk-local column {@code (lx, lz)} for an acceptable Y under the given
@@ -510,22 +501,23 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
    * @return the accepted Y, or {@link Integer#MIN_VALUE} if none found.
    */
   private int scanProbe(ChunkColumnProbe probe, int lx, int lz, int minY, int maxY, int dir,
-                        boolean requireSkyLight, int heightmapSkyFloor) {
+                        boolean requireSkyLight, int heightmapSkyFloor,
+                        Set<String> unsafeBlocks, int platformDepth) {
     switch (dir) {
       case 0: // bottom up
         for (int i = minY; i < maxY; i++)
-          if (acceptY(probe, lx, lz, i, requireSkyLight, heightmapSkyFloor)) return i;
+          if (acceptY(probe, lx, lz, i, requireSkyLight, heightmapSkyFloor, unsafeBlocks, platformDepth)) return i;
         return Integer.MIN_VALUE;
       case 1: // top down
         for (int i = maxY; i > minY; i--)
-          if (acceptY(probe, lx, lz, i, requireSkyLight, heightmapSkyFloor)) return i;
+          if (acceptY(probe, lx, lz, i, requireSkyLight, heightmapSkyFloor, unsafeBlocks, platformDepth)) return i;
         return Integer.MIN_VALUE;
       case 2: { // middle out
         int maxDistance = (maxY - minY) / 2;
         int middle = minY + maxDistance;
         for (int i = 0; i <= maxDistance; i++) {
-          if (acceptY(probe, lx, lz, middle + i, requireSkyLight, heightmapSkyFloor)) return middle + i;
-          if (acceptY(probe, lx, lz, middle - i, requireSkyLight, heightmapSkyFloor)) return middle - i;
+          if (acceptY(probe, lx, lz, middle + i, requireSkyLight, heightmapSkyFloor, unsafeBlocks, platformDepth)) return middle + i;
+          if (acceptY(probe, lx, lz, middle - i, requireSkyLight, heightmapSkyFloor, unsafeBlocks, platformDepth)) return middle - i;
         }
         return Integer.MIN_VALUE;
       }
@@ -533,8 +525,8 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
         int maxDistance = (maxY - minY) / 2;
         int middle = minY + maxDistance;
         for (int i = maxDistance; i >= 0; i--) {
-          if (acceptY(probe, lx, lz, middle + i, requireSkyLight, heightmapSkyFloor)) return middle + i;
-          if (acceptY(probe, lx, lz, middle - i, requireSkyLight, heightmapSkyFloor)) return middle - i;
+          if (acceptY(probe, lx, lz, middle + i, requireSkyLight, heightmapSkyFloor, unsafeBlocks, platformDepth)) return middle + i;
+          if (acceptY(probe, lx, lz, middle - i, requireSkyLight, heightmapSkyFloor, unsafeBlocks, platformDepth)) return middle - i;
         }
         return Integer.MIN_VALUE;
       }
@@ -544,7 +536,7 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
         Collections.shuffle(trials, rng);
         for (int k = 0; k < trials.size(); k++) {
           int i = trials.get(k);
-          if (acceptY(probe, lx, lz, i, requireSkyLight, heightmapSkyFloor)) return i;
+          if (acceptY(probe, lx, lz, i, requireSkyLight, heightmapSkyFloor, unsafeBlocks, platformDepth)) return i;
         }
         return Integer.MIN_VALUE;
       }
@@ -558,7 +550,8 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
    * the probe retains a single (center-column) heightmap.
    */
   private boolean acceptY(ChunkColumnProbe probe, int lx, int lz, int y,
-                          boolean requireSkyLight, int heightmapSkyFloor) {
+                          boolean requireSkyLight, int heightmapSkyFloor,
+                          Set<String> unsafeBlocks, int platformDepth) {
     // Feet stand on a non-air block; head region (y, y+1) is air.
     if (probe.isAirAt(lx, lz, y - 1)) return false;
     if (!probe.isAirAt(lx, lz, y)) return false;

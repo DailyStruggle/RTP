@@ -2,7 +2,7 @@
 
 **Scope of this diagram.** This chart covers the **configuration data flow** — how the YAML files under `plugins/RTP/` become the in-memory `ConfigParser` / `MultiConfigParser` objects that every runtime path reads from, and what happens during `/rtp reload`. This is the single most error-prone surface (most "bug reports" are misread config), so this diagram is the one to open first when a key appears to have no effect. Related-but-separate behavior paths are intentionally **out of scope**:
 
-- **Plugin enable ordering** (when `reloadAction` is first called) — see diagram 07.
+- **Plugin enable ordering** (when `reloadAction` is first called) — see diagram 06.
 - **How a runtime task reads a value** (`getWorldParserValue` vs. direct `ConfigParser.getConfigValue`) — see diagrams 01 / 08 / 09 and `CODE_TOUR.md` §11.
 - **Message routing** (`messages.yml` keys → player feedback) — see `CODE_TOUR.md` §7 and ADR-020 (locale resolution lives in `LanguageBootstrap` + locale-aware `ConfigParser`).
 - **Persistent storage of player/teleport state** (`YamlFileDatabase`) — see `LESSONS_LEARNED.md` and diagram 02.
@@ -70,7 +70,7 @@ flowchart TD
 - **Single accepting state:** `Done`. Every other node is either preparatory I/O (blue), destructive bookkeeping (red), a data/decision point (yellow), or the atomic swap (green).
 - **The reload is not in-place.** New `ConfigParser` / `MultiConfigParser` objects are built in fresh maps, then the `configParserMap` / `multiConfigParserMap` fields are replaced atomically. Any task already holding a reference to the *old* parser continues to see the old values — this is why mid-teleport reloads are safe but a key change "doesn't apply" until the player's current teleport finishes.
 - **Dormant regions are normal.** If a region's configured world isn't loaded yet (common with Multiverse-style lazy world loaders), the `Region` is built with a `null` world and rebinds on `WorldLoadEvent` via `OnWorldLoadUnload.rebindWorld`. Shape selection is deferred until the rebind completes.
-- **Override resolution is not shown here.** The per-world / per-region override chain (`requirePermission`, `override`, cycle-guard `worldsAttempted` / `regionsAttempted`) lives in diagram 08; this chart only covers how the backing data gets into memory.
+- **Override resolution is not shown here.** The per-world / per-region override chain (`requirePermission`, `override`, cycle-guard `worldsAttempted` / `regionsAttempted`) lives in diagram 07; this chart only covers how the backing data gets into memory.
 
 ## Common repair lenses
 
@@ -79,7 +79,7 @@ flowchart TD
 3. **"Messages are in English despite the configured locale."** The active locale is read from `plugins/RTP/language.yml` *before* any parser is built (ADR-020); editing `language` in `config.yml` has no effect (the key was removed). Verify `language.yml` is present and contains a known locale, then confirm the corresponding `lang/<locale>/messages.yml` ships in the jar or exists on disk.
 4. **"Teleport mid-reload crashed."** `reloadConfigs` cancels in-flight teleports via `RTPTeleportCancel` and clears `processingPlayers` *before* the parser swap, so tasks don't straddle two parser generations. If a crash reaches the pipeline, the cancel path was skipped (custom entry point bypassing `Configs.reload`).
 5. **"Dormant region never activates."** `OnWorldLoadUnload` must fire `WorldLoadEvent` — check that the world is actually being loaded (not just referenced), and that `RegionConfigLoader.detectFallbackConfiguredWorld` returned the correct name.
-6. **"First-enable differs from reload."** There is no distinction in this code path: plugin enable calls `reloadAction` the same way `/rtp reload` does. Diagram 07 shows *when* that call happens during enable.
+6. **"First-enable differs from reload."** There is no distinction in this code path: plugin enable calls `reloadAction` the same way `/rtp reload` does. diagram 06 shows *when* that call happens during enable.
 
 ## Source anchors
 

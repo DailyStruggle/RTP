@@ -77,12 +77,17 @@ public final class AsyncTaskProcessing extends RTPRunnable {
     RTP.getInstance().miscAsyncTasks.execute(currentAvailableTime - (System.nanoTime() - start));
     if (isCancelled()) return;
 
+    // Diagram 02 (PulseTrigger): drain SelectionAPI urgent + standard pipelines.
+    RTP.log(Level.FINER, "[Pulse] selectionAPI.compute() invoked");
     RTP.selectionAPI.compute();
 
     List<Region> regions = new ArrayList<>(RTP.selectionAPI.permRegionLookup.values());
     int size = regions.size();
 
-    if (size == 0) return;
+    if (size == 0) {
+      RTP.log(Level.FINER, "[Pulse] no regions configured; skipping budget loop");
+      return;
+    }
     if (period < size) period = size;
 
     long betweenTime = Math.max((period / size) - 1, 0);
@@ -114,6 +119,10 @@ public final class AsyncTaskProcessing extends RTPRunnable {
       if (step >= regions.size()) return;
 
       Region region = regions.get((int) step);
+      // Diagram 02 (CheckPeriod -> ExecuteRegion): this region's turn has come.
+      RTP.log(Level.FINE,
+          "[Pulse] executing region '" + region.name + "' (step=" + step
+              + "/" + size + ", betweenStep=" + betweenStep + ")");
       try {
         region.execute(currentAvailableTime - (System.nanoTime() - start));
       } catch (Exception e) {

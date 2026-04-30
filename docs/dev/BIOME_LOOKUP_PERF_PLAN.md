@@ -94,7 +94,7 @@ Wires the real backend so the PR-3a plumbing actually fires in production.
 - [ ] Integration test: `PregenTask` test asserting that with a probe-backed `MockRTPWorld`, rejects are accounted under `FailTypes.prefilter*` and never reach `requestChunk`. **Deferred** — same rationale; the probe-first path is already exercised through the `isDone() && !completedExceptionally` branch of `tryProbeFirst` during PR-3a testing (483/483 pass).
 - [x] Docs:
   - `CHANGELOG.md` — probe-first is now active on Bukkit + Paper + Folia adapters with `.mca`-backed worlds.
-  - `docs/architecture/09-location-selection-per-attempt.md` — deferred (no structural change to the chunk-data precedence chain; the probe runs *before* the chain, as documented in PR-3a).
+  - `docs/architecture/08-location-selection-per-attempt.md` — deferred (no structural change to the chunk-data precedence chain; the probe runs *before* the chain, as documented in PR-3a).
 
 **Status**: landed (scaffolding + adapter override on Bukkit and Folia). All existing tests pass: `rtp-spigot-common` 31/31, `rtp-folia-common` 7/7, `rtp-core selection` 483/483, `rtp-anvil` 62/62. Two parity/integration tests intentionally deferred as value-add rather than correctness gates.
 
@@ -472,7 +472,7 @@ Exit criterion: no measurable regression and fewer allocations per point query i
 - [ ] Introduce a per-`PregenTask` chunk cache keyed by `(cx, cz)` holding the lean `BiomesOnlyChunk`. Sampling inside an already-decoded chunk does not count against the budget.
 - [ ] Deprecate `Region.maxBiomeChecksPerGen` (keep the field, log a one-shot warning on read, forward to the new knob) and update `PregenState.build` + `PregenTask.completeExhausted` to use the new metric.
 - [ ] Remove `PregenState.defaultBiomes` from `PregenState.build` consumption if no remaining caller needs the distinction (it currently has no cap-sizing effect; verify no other reads exist before deleting).
-- [ ] Update `docs/architecture/09-location-selection-per-attempt.md` and `CODE_TOUR.md` to describe the chunk-budget model instead of the check-budget model.
+- [ ] Update `docs/architecture/08-location-selection-per-attempt.md` and `CODE_TOUR.md` to describe the chunk-budget model instead of the check-budget model.
 - [ ] Add REQ-* traceability: if this becomes an observable contract (e.g. REQ-RTP-PERF-???), update `docs/dev/TRACEABILITY.md` and cite the regression test.
 
 Exit criterion: `maxBiomeChecksPerGen` is no longer load-bearing; new metric is what operators tune; docs + traceability aligned.
@@ -517,7 +517,7 @@ This file is the **single source of truth** for the biome-lookup-performance lin
 
 ## Cross-references
 
-- `docs/architecture/09-location-selection-per-attempt.md` — per-attempt selection flow that consumes the biome budget.
+- `docs/architecture/08-location-selection-per-attempt.md` — per-attempt selection flow that consumes the biome budget.
 - `docs/architecture/02-budgeted-cache-generator.md` — outer loop that drives `PregenTask`.
 - `docs/dev/LESSONS_LEARNED.md` — add a dated entry when each phase lands if any non-obvious pitfall surfaces.
 - `docs/dev/TRACEABILITY.md` — update when a REQ-* is introduced to pin the new chunk budget.

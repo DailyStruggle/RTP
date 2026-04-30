@@ -49,16 +49,21 @@ public final class LanguageBootstrap {
 
     File file = new File(pluginDirectory, FILE_NAME);
     if (!file.exists()) {
+      RTP.log(Level.FINE, "[RTP] LanguageBootstrap: " + FILE_NAME
+          + " missing; writing default and using '" + DEFAULT_LOCALE + "'");
       writeDefault(file);
       return DEFAULT_LOCALE;
     }
 
     try {
+      RTP.log(Level.FINER, "[RTP] LanguageBootstrap: reading " + file.getPath());
       YamlFile yaml = new YamlFile(file.getPath());
       yaml.loadWithComments();
       Object raw = yaml.get(KEY);
       String locale = (raw == null) ? DEFAULT_LOCALE : raw.toString().trim();
-      return sanitize(locale);
+      String sanitized = sanitize(locale);
+      RTP.log(Level.FINE, "[RTP] LanguageBootstrap: resolved locale '" + sanitized + "'");
+      return sanitized;
     } catch (IOException e) {
       RTP.log(Level.WARNING,
           "[RTP] Failed to read " + FILE_NAME + "; falling back to '" + DEFAULT_LOCALE + "'.", e);

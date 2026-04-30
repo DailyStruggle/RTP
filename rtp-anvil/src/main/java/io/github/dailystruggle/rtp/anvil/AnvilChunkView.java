@@ -97,14 +97,55 @@ public record AnvilChunkView(int dataVersion,
      * Coordinates in a section not present on disk are treated as air (Y above the
      * highest emitted section) — this matches the live-chunk behaviour where a
      * never-written column reads as air all the way up to the build ceiling.
+     *
+     * <p>Vanilla-air-only overload: returns {@code true} only for the three vanilla
+     * air identifiers. Use {@link #isAir(int, int, int, Set)} when the caller wants
+     * the configured {@code airBlocks} list (tall grass, snow layer, leaf litter,
+     * tag-expanded leaves, ...) to count as passable.
      */
     public boolean isAir(int x, int worldY, int z) {
+        return isAir(x, worldY, z, Collections.emptySet());
+    }
+
+    /**
+     * True iff the block at {@code (x, worldY, z)} is air OR a member of the
+     * supplied reconciled {@code airBlocks} set. This is the same
+     * "passable / not solid feet support" predicate the probe-fast-path
+     * {@code JumpAdjustor.acceptProbeY} applies. Use this overload from any
+     * code path that needs to mirror the {@code airBlocks} semantics — i.e.
+     * "tall grass / leaf litter / snow layer / leaves canopy is passable" —
+     * so that off-thread Anvil-backed reads agree with the live-path
+     * {@code chunk.isAir(...) || airBlocks.contains(...)} predicate.
+     *
+     * <p>The set must already be reconciled to the canonical form (upper-case,
+     * namespace-stripped, with {@code #namespace:tag} tokens already expanded
+     * to their material members) — produced by {@code PaletteNormalizer.reconcileAll}
+     * on Spigot/Paper/Folia or by the equivalent core-side normalizer. The vanilla
+     * air identifiers ({@code AIR}, {@code CAVE_AIR}, {@code VOID_AIR}) are
+     * always treated as air regardless of whether they appear in
+     * {@code reconciledAir}. Out-of-range Y values (no covering section) are
+     * treated as air (matches the live-chunk behaviour for never-written
+     * columns).
+     *
+     * @param x chunk-local x, 0..15
+     * @param worldY absolute world Y
+     * @param z chunk-local z, 0..15
+     * @param reconciledAir already-reconciled {@code airBlocks} set; may be
+     *     {@code null} or empty to fall through to vanilla-only semantics
+     * @return {@code true} iff the block is vanilla air or a member of
+     *     {@code reconciledAir}
+     */
+    public boolean isAir(int x, int worldY, int z, Set<String> reconciledAir) {
         String id = blockIdAt(x, worldY, z);
         if (id == null) return true;
         String reconciled = AnvilPrefilter.DEFAULT_RECONCILER.apply(id);
-        return "AIR".equals(reconciled)
+        if ("AIR".equals(reconciled)
                 || "CAVE_AIR".equals(reconciled)
-                || "VOID_AIR".equals(reconciled);
+                || "VOID_AIR".equals(reconciled)) {
+            return true;
+        }
+        if (reconciledAir == null || reconciledAir.isEmpty()) return false;
+        return reconciled != null && reconciledAir.contains(reconciled);
     }
 
     /**

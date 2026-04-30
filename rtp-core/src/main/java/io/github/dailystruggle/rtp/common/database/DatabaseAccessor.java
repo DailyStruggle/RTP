@@ -478,6 +478,15 @@ public abstract class DatabaseAccessor<D> {
    * @param id the unique identifier of the cached location
    */
   public void removeCachedLocation(String id) {
+    // First drop any matching row that is still parked in dirtyCache. Without
+    // this, a save → delete sequence inside a single flushDirtyCache window
+    // leaves the save in dirtyCache (deleteQueue drain is a DB no-op because
+    // the row has not been written yet); the next flushDirtyCache then merges
+    // the now-orphan row into the table, where nothing will ever remove it.
+    // This is the root cause of the "Successfully loaded N locations" banner
+    // reporting impossible counts on boot. See ProcessQueriesSaveDeleteRaceTest.
+    dirtyCache.remove("rtp_cached_locations:" + id);
+
     Map.Entry<String, Object> lookup = new AbstractMap.SimpleEntry<>("UUID", id);
     deleteQueue.add(new DeleteRequest("rtp_cached_locations", lookup));
   }

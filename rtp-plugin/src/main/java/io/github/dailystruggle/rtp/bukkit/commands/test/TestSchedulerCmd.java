@@ -97,17 +97,28 @@ public class TestSchedulerCmd extends BaseRTPCmdImpl {
       // Run the probes on the async tier so the calling thread (which may
       // be the main server thread on Paper/Spigot) is never blocked
       // waiting for `fut.get(...)`. S-005 is thereby preserved.
+      //
+      // Register with ActiveTestJobs so `rtp test full`'s
+      // dispatchNoArgAndWait blocks on us; otherwise the next stage's
+      // output interleaves with the per-tier probe lines.
+      final Runnable[] hookHolder = new Runnable[1];
+      hookHolder[0] = ActiveTestJobs.register(
+          callerId, new ActiveTestJobs.Job("scheduler", () -> { /* no cancel handle */ }));
       scheduler.runTaskAsynchronously(
           () -> {
-            report(callerId, "[RTP test/scheduler] begin");
-            probeAsync(callerId, scheduler);
-            probePrimary(callerId, scheduler);
-            if (loc != null) {
-              probeRegion(callerId, scheduler, loc);
-            } else {
-              report(callerId, "[RTP test/scheduler] region: skipped (no caller location)");
+            try {
+              report(callerId, "[RTP test/scheduler] begin");
+              probeAsync(callerId, scheduler);
+              probePrimary(callerId, scheduler);
+              if (loc != null) {
+                probeRegion(callerId, scheduler, loc);
+              } else {
+                report(callerId, "[RTP test/scheduler] region: skipped (no caller location)");
+              }
+              report(callerId, "[RTP test/scheduler] end");
+            } finally {
+              if (hookHolder[0] != null) hookHolder[0].run();
             }
-            report(callerId, "[RTP test/scheduler] end");
           });
       return true;
     } finally {

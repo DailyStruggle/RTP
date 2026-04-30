@@ -120,6 +120,9 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
   @Override
   public void run() {
+    RTP.log(Level.FINER, "[PIPELINE_TRACE] dispatch phase=" + currentPhase
+            + " cancelled=" + isCancelled()
+            + " thread=" + Thread.currentThread().getName());
     if (isCancelled()) {
       currentPhase = Phase.CLEANUP;
       runCleanup();
@@ -303,6 +306,11 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
   private void runLoad() {
     try {
+      RTP.log(Level.FINE, "[PIPELINE_TRACE] runLoad ENTER playerId="
+              + (context != null && context.player() != null ? context.player().uuid() : "null")
+              + " coordsNull=" + (coords == null)
+              + " reservationNull=" + (reservation == null)
+              + " thread=" + Thread.currentThread().getName());
       loadPreActions.forEach(consumer -> consumer.accept(this));
       if (isCancelled()) {
         currentPhase = Phase.CLEANUP;
@@ -364,6 +372,9 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
       if(!chunkSet.complete().isDone()) RTP.serverAccessor.sendMessage(player().uuid(), MessagesKeys.chunkLoading);
 
+      RTP.log(Level.FINER, "[PIPELINE_TRACE] runLoad awaiting chunkSet alreadyDone="
+              + chunkSet.complete().isDone() + " cx=" + (coords.x() >> 4) + " cz=" + (coords.z() >> 4));
+
       chunkSet.complete().thenAccept(aBoolean -> {
                 if (isCancelled()) {
                   currentPhase = Phase.CLEANUP;
@@ -376,6 +387,8 @@ public final class TeleportPipelineTask extends RTPRunnable {
                   this.run();
                   return;
                 }
+
+                RTP.log(Level.FINER, "[PIPELINE_TRACE] runLoad chunkSet completed result=" + aBoolean);
 
                 long start = System.currentTimeMillis();
                 long lastTime = teleportData.time;
@@ -401,6 +414,10 @@ public final class TeleportPipelineTask extends RTPRunnable {
   }
 
   private void runTeleport() {
+    RTP.log(Level.FINE, "[PIPELINE_TRACE] runTeleport ENTER playerId="
+            + (context != null && context.player() != null ? context.player().uuid() : "null")
+            + " coords=" + (coords != null ? (coords.worldName() + "@" + coords.x() + "," + coords.y() + "," + coords.z()) : "null")
+            + " thread=" + Thread.currentThread().getName());
     teleportPreActions.forEach(consumer -> consumer.accept(this));
     if (isCancelled()) {
       currentPhase = Phase.CLEANUP;
@@ -421,7 +438,10 @@ public final class TeleportPipelineTask extends RTPRunnable {
       if (world == null) world = region.getWorld();
       RTPLocation location = new RTPLocation(world, coords.x(), coords.y(), coords.z());
       location.setReservation(reservation);
-      if (shouldBuildPlatform(world, coords)) {
+      boolean buildPlatform = shouldBuildPlatform(world, coords);
+      RTP.log(Level.FINER, "[PIPELINE_TRACE] runTeleport platformDecision=" + buildPlatform
+              + " worldNull=" + (world == null));
+      if (buildPlatform) {
         location.world().platform(location);
       }
       RTP.getInstance().invulnerablePlayers.put(playerId, System.currentTimeMillis());
@@ -431,11 +451,17 @@ public final class TeleportPipelineTask extends RTPRunnable {
       RTP.getInstance().processingPlayers.remove(playerId);
 
       CompletableFuture<Boolean> setLocation = player.setLocation(location);
+      RTP.log(Level.FINE, "[PIPELINE_TRACE] runTeleport setLocation dispatched playerId=" + playerId
+              + " attempts=" + teleportData.attempts
+              + " processingTime=" + teleportData.processingTime + "ms");
       RTP.getInstance().databaseAccessor.cacheValue(teleportData);
 
       setLocation.whenComplete(
           (aBoolean, throwable) -> {
             try {
+              RTP.log(Level.FINER, "[PIPELINE_TRACE] runTeleport setLocation completed playerId=" + playerId
+                      + " success=" + aBoolean
+                      + " throwable=" + (throwable != null ? throwable.getClass().getSimpleName() : "none"));
               if (reservation != null) {
                 reservation.close();
                 this.reservation = null;
@@ -564,6 +590,11 @@ public final class TeleportPipelineTask extends RTPRunnable {
   }
 
   private void runCleanup() {
+    RTP.log(Level.FINE, "[PIPELINE_TRACE] runCleanup ENTER playerId="
+            + (context != null && context.player() != null ? context.player().uuid() : "null")
+            + " reservationNull=" + (reservation == null)
+            + " handledInFlight=" + handledInFlight.get()
+            + " thread=" + Thread.currentThread().getName());
     cleanupPreActions.forEach(consumer -> consumer.accept(this));
     try {
       // Explicitly untrack the data to prevent false positive leak alerts
@@ -592,6 +623,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
       if (rtpWorld == null) rtpWorld = region.getWorld();
 
       if (reservation != null) {
+        RTP.log(Level.FINER, "[PIPELINE_TRACE] runCleanup releasing reservation world=" + rtpWorld);
         reservation.close();
         reservation = null;
       }

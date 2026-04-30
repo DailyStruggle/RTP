@@ -109,6 +109,8 @@ public interface RTPCmd extends BaseRTPCmd {
                 (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
         String msg = (String) langParser.getConfigValue(MessagesKeys.cooldownMessage, "");
         messageMethod.accept(msg);
+        RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.onCommand REJECT cooldown senderId=" + senderId
+                + " dtMs=" + dt + " cooldownMs=" + sender.cooldown());
         return true;
       } else if (senderData.completed) { // resolve command bugs preemptively
         RTP.getInstance().processingPlayers.remove(senderId);
@@ -120,6 +122,7 @@ public interface RTPCmd extends BaseRTPCmd {
               (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
       String msg = (String) langParser.getConfigValue(MessagesKeys.teleportDeniedReloading, "");
       messageMethod.accept(msg);
+      RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.onCommand REJECT reloading senderId=" + senderId);
       return true;
     }
 
@@ -128,6 +131,7 @@ public interface RTPCmd extends BaseRTPCmd {
               (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
       String msg = (String) langParser.getConfigValue(MessagesKeys.alreadyTeleporting, "");
       messageMethod.accept(msg);
+      RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.onCommand REJECT alreadyTeleporting senderId=" + senderId);
       return true;
     }
 
@@ -341,6 +345,8 @@ public interface RTPCmd extends BaseRTPCmd {
           String msg = (String) langParser.getConfigValue(MessagesKeys.badArg, "world:" + worldName);
           if(messageMethod != null) messageMethod.accept(msg);
           else RTP.serverAccessor.sendMessage(senderId, msg);
+          RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.compute REJECT badArg world senderId=" + senderId
+                  + " worldName=" + worldName);
           RTP.log(Level.WARNING, msg);
           RTP.getInstance().processingPlayers.remove(senderId);
           return true;
@@ -354,9 +360,13 @@ public interface RTPCmd extends BaseRTPCmd {
       Region region;
       try {
         region = selectionAPI.getRegionOrDefault(regionName);
+        RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.compute region resolved senderId=" + senderId
+                + " requestedRegion=" + regionName + " resolvedRegion=" + region.name);
       } catch (IllegalArgumentException | IllegalStateException exception) {
         String msg = (String) langParser.getConfigValue(MessagesKeys.badArg, "region:" + regionName);
         RTP.serverAccessor.sendMessage(senderId, msg);
+        RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.compute REJECT badArg region senderId=" + senderId
+                + " regionName=" + regionName + " cause=" + exception.getClass().getSimpleName());
         RTP.log(Level.WARNING, msg);
         RTP.getInstance().processingPlayers.remove(senderId);
         RTP.getInstance().latestTeleportData.remove(senderId);

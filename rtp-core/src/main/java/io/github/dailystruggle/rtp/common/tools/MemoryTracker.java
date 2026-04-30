@@ -11,14 +11,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.text.MessageFormat;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /** Utility class for tracking memory leaks in objects. */
 public class MemoryTracker {
-  private static final Logger LOGGER = Logger.getLogger(MemoryTracker.class.getName());
   private static final ConcurrentHashMap<UUID, TrackedObject> trackedObjects =
           new ConcurrentHashMap<>();
+
+  private static void log(Level level, String pattern, Object... args) {
+    RTP.log(level, MessageFormat.format(pattern, args));
+  }
 
   static {
     // Inject the core untrack logic into the API
@@ -54,6 +57,9 @@ public class MemoryTracker {
     TrackedObject obj = trackedObjects.get(trackingId);
     if (obj != null) {
       obj.reset();
+      // Diagram 03: TrackRes timer reset (e.g., pipeline stage transition).
+      log(Level.FINER, "[RTP][Track] Lifespan reset: id={0}, label={1}",
+              trackingId, obj.getLabel());
     }
   }
 
@@ -68,6 +74,11 @@ public class MemoryTracker {
     UUID uuid = UUID.randomUUID();
     TrackedObject trackedObject = new TrackedObject(target, label, maxLifespan);
     trackedObjects.put(uuid, trackedObject);
+    // Diagram 03: TrackRes node — MemoryTracker.track() registers a freshly opened
+    // ChunkReservation (or pipeline task) for the active GC safety net.
+    log(Level.FINE,
+            "[RTP][Track] Registered: id={0}, label={1}, maxLifespanMs={2}, totalTracked={3}",
+            uuid, label, maxLifespan, trackedObjects.size());
     return uuid; // Now returns the reference ID
   }
 
@@ -76,7 +87,14 @@ public class MemoryTracker {
     if (target == null) return;
     trackedObjects.entrySet().removeIf(entry -> {
       TrackedObject tracked = entry.getValue();
-      return tracked.isCollected() || tracked.matches(target);
+      boolean remove = tracked.isCollected() || tracked.matches(target);
+      // Diagram 03: UntrackRes node — normal teardown path after CloseRes/DropTicket.
+      if (remove) {
+        log(Level.FINER,
+                "[RTP][Track] Untracked: id={0}, label={1}, collected={2}",
+                entry.getKey(), tracked.getLabel(), tracked.isCollected());
+      }
+      return remove;
     });
   }
 
@@ -107,14 +125,28 @@ public class MemoryTracker {
   }
 
   public static void runDiagnostics() {
+    // Diagram 04: TimerTrigger -> FetchMap. Per-pulse heartbeat at FINE so operators
+    // can confirm the active GC sweep is actually firing without enabling INFO spam.
+    log(Level.FINE,
+            "[RTP][GC] Sweep pulse start: tracked={0}",
+            trackedObjects.size());
     trackedObjects
             .entrySet()
             .removeIf(
                     entry -> {
                       TrackedObject tracked = entry.getValue();
                       if (tracked.isCollected()) {
+                        // Diagram 04: collected entry == healthy GC by JVM; trace at FINER.
+                        log(Level.FINER,
+                                "[RTP][GC] Untrack collected entry label={0}",
+                                tracked.getLabel());
                         return true;
                       }
+                      // Diagram 04: CheckTimeout per-entry trace (FINER). Healthy entries take the
+                      // "No (Healthy, Loop Next)" branch silently; only log when verbose.
+                      log(Level.FINER,
+                              "[RTP][GC] CheckTimeout label={0} leaking={1}",
+                              tracked.getLabel(), tracked.isLeaking());
                       if (tracked.isLeaking()) {
                         long leakDuration = tracked.getLeakDuration();
                         String label = tracked.getLabel();
@@ -139,14 +171,18 @@ public class MemoryTracker {
                         }
 
                         if (isSystemLoggingEnabled()) {
-                          LOGGER.log(
-                                  Level.SEVERE,
+                          log(Level.SEVERE,
                                   "[RTP] Memory leak detected for object: {0}. Alive {1}ms past its expected lifespan.",
-                                  new Object[] {label, leakDuration});
+                                  label, leakDuration);
                         }
 
                         // Active Cleanup Injection
                         if (actualTask instanceof io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask pipelineTask) {
+                          // Diagram 04: ForceClose -> DecCounter -> Untrack. FINE because each occurrence
+                          // represents a real cleanup action (cancellation + chunk release scheduling).
+                          log(Level.FINE,
+                                  "[RTP][GC] ForceClose stalled pipeline label={0} ageOverBudgetMs={1}",
+                                  label, leakDuration);
                           // Force the abandoned pipeline into its CLEANUP phase
                           pipelineTask.setCancelled(true);
 
@@ -227,6 +263,11 @@ public class MemoryTracker {
       long finalTotalCacheCap = totalCacheCap;
       long finalTotalPerPlayerLocationQueueSize = totalPerPlayerLocationQueueSize;
 
+      // Diagram 04: FetchMap -> FetchServer transition (Internal Sweep Complete).
+      log(Level.FINE,
+              "[RTP][GC] Internal sweep complete; querying native ticket counts (worlds={0})",
+              serverForcedFutures.size());
+
       java.util.concurrent.CompletableFuture.allOf(serverForcedFutures.toArray(new java.util.concurrent.CompletableFuture[0])).thenAccept(v -> {
         long serverForced = 0;
         for (java.util.concurrent.CompletableFuture<Integer> future : serverForcedFutures) {
@@ -238,23 +279,19 @@ public class MemoryTracker {
         long discrepancy = finalActiveTickets - expectedTickets;
 
         if (isSystemLoggingEnabled()) {
-          LOGGER.log(
-                  Level.INFO,
+          log(Level.INFO,
                   "[RTP] Diagnostic: Locations=[Queue:{0}/{1}, PerPlayer:{2}], Chunks=[Tickets:{3}, Expected:{4}, PluginForced:{5}, ServerForced:{6}, Discrepancy:{7}]",
-                  new Object[] {
-                          finalTotalLocationQueueSize, finalTotalCacheCap, finalTotalPerPlayerLocationQueueSize,
-                          finalActiveTickets, expectedTickets, finalPluginForced, serverForced, discrepancy
-                  });
+                  finalTotalLocationQueueSize, finalTotalCacheCap, finalTotalPerPlayerLocationQueueSize,
+                  finalActiveTickets, expectedTickets, finalPluginForced, serverForced, discrepancy);
         }
 
         // Focus leak detection on the positive discrepancy (orphaned tickets + cap overflows)
         if (discrepancy > 0 && rtp.processingPlayers.isEmpty()) {
           double leakRate = (finalTotalLoads > 0) ? ((double) discrepancy / finalTotalLoads) * 100.0 : 0.0;
           if (isSystemLoggingEnabled()) {
-            LOGGER.log(
-                    Level.SEVERE,
+            log(Level.SEVERE,
                     "[RTP] Leak Alert: {0} orphaned chunk tickets detected. Leak Rate: {1}%. Executing GC...",
-                    new Object[] { discrepancy, String.format("%.4f", leakRate) });
+                    discrepancy, String.format("%.4f", leakRate));
           }
 
           // Build a per-world map of keep-alive chunk keys across all regions
@@ -293,16 +330,30 @@ public class MemoryTracker {
 
           // 4. For each world, release any active chunk tickets not in the keep-alive set
           for (java.util.Map.Entry<RTPWorld<?>, java.util.Set<Long>> entry : keepAliveByWorld.entrySet()) {
+            // Diagram 04: CheckTracked -> DropOrphan. FINER because the per-world action is
+            // a fine-grained step inside the native sweep loop; the high-level SEVERE alert
+            // above already covers the operator-visible summary.
+            log(Level.FINER,
+                    "[RTP][GC] DropOrphan sweep world={0} keepAlive={1}",
+                    entry.getKey(), entry.getValue().size());
             entry.getKey().releaseOrphanedTickets(entry.getValue());
           }
         }
+        // Diagram 04: GC Pulse Complete terminator.
+        log(Level.FINE, "[RTP][GC] Sweep pulse complete");
       });
     }
   }
 
   public static void untrack(UUID trackingId) {
     if (trackingId != null) {
-      trackedObjects.remove(trackingId);
+      TrackedObject removed = trackedObjects.remove(trackingId);
+      // Diagram 03: UntrackRes node — RAM Freed transition (id-keyed fast path).
+      if (removed != null) {
+        log(Level.FINER,
+                "[RTP][Track] Untracked by id: id={0}, label={1}, remaining={2}",
+                trackingId, removed.getLabel(), trackedObjects.size());
+      }
     }
   }
 }

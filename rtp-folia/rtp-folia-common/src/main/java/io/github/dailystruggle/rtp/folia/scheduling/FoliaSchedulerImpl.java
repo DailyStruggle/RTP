@@ -181,9 +181,6 @@ public class FoliaSchedulerImpl implements RTPScheduler {
       io.github.dailystruggle.rtp.api.entity.RTPPlayer player,
       io.github.dailystruggle.rtp.common.tasks.RTPRunnable task,
       long delayTicks) {
-    org.bukkit.entity.Player bukkitPlayer = Bukkit.getPlayer(player.uuid());
-    if (bukkitPlayer == null) return;
-
     String taskId = UUID.randomUUID().toString();
     TrackedRTPTask trackedTask = new TrackedRTPTask(task, taskId);
     if (RTPAPI.serverAccessor != null) {
@@ -192,8 +189,18 @@ public class FoliaSchedulerImpl implements RTPScheduler {
 
     if (delayTicks <= 0) delayTicks = 1;
     if (!plugin.isEnabled()) return;
-    bukkitPlayer
-        .getScheduler()
-        .runDelayed(plugin, (scheduledTask) -> trackedTask.run(), null, delayTicks);
+
+    // Delegate the entity-scheduler hop to FoliaRTPPlayer so the underlying
+    // Bukkit Player reference stays encapsulated. Non-Folia implementations
+    // (synthetic / mock players from test harnesses) and entities that the
+    // scheduler refused fall through to the global region scheduler so the
+    // runnable still fires (REQ-RTP-S-004: don't silently drop tasks).
+    boolean scheduled = false;
+    if (player instanceof io.github.dailystruggle.rtp.folia.entity.FoliaRTPPlayer foliaPlayer) {
+      scheduled = foliaPlayer.scheduleOnSelf(trackedTask::run, null, delayTicks);
+    }
+    if (!scheduled) {
+      globalScheduler.runDelayed(plugin, (scheduledTask) -> trackedTask.run(), delayTicks);
+    }
   }
 }

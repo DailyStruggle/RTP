@@ -15,6 +15,7 @@ Operational guide for AI agents and human contributors working in the RTP reposi
 5. Use the `search_project` tool — not `grep`/`find` — to search the codebase.
 6. Java 21+ is required (REQ-RTP-SYS-001).
 7. Before modifying an uncommitted **code** file, create a `.bak` copy beside it. Skip for git-clean files and for docs/markdown.
+8. **Stay on task.** If you spot an unrelated potential bug, record it in [`docs/dev/POTENTIAL_BUGS.md`](../docs/dev/POTENTIAL_BUGS.md) and keep going — do not fix it in the current change.
 
 ---
 
@@ -124,6 +125,25 @@ Wait for explicit approval before implementing. If the change contradicts an exi
 
 ---
 
+## Stay-On-Task Policy (record, don't chase)
+
+To minimise time spent on unrelated fixes, record incidental discoveries instead of acting on them.
+
+- While working on the current `Effective Issue`, if you notice a **potential bug, suspicious code path, missing validation, stale comment, or latent race** that is **not** required to satisfy the current task, **do not fix it**.
+- Append a one-entry record to [`docs/dev/POTENTIAL_BUGS.md`](../docs/dev/POTENTIAL_BUGS.md) before returning to the task. Required fields:
+  1. **Date** (YYYY-MM-DD) and **discovered-during** (link/short ref to the issue or task you were on).
+  2. **Location** — file path + line range or symbol.
+  3. **Symptom / hypothesis** — one or two sentences. What looks wrong, why you suspect it.
+  4. **Impact** — best guess at user-visible effect (e.g. "may place player on water in rare race", "log spam only").
+  5. **Suggested next step** — minimal investigation or fix sketch (no implementation).
+- Exceptions where you may fix in-line:
+  - The discovery is a **direct cause** of the current `Effective Issue` symptom.
+  - The discovery violates an **S-00x prohibition** (S-001…S-007) that the current change would otherwise leave broken.
+  - The user has explicitly broadened scope in an `<issue_update>`.
+- Otherwise: record, mention the entry in your `<UPDATE>` / submit summary, and continue.
+
+---
+
 ## Logging & Feedback
 
 - Use `RTP.log()` / `RTPServerAccessor.log()` in `rtp-core` and `rtp-api`. Never `Bukkit.getLogger()` or `System.out.println`.
@@ -192,6 +212,7 @@ When you discover something durable, record it in the **correct** file:
 | Renamed / moved class referenced by a REQ-* | [`docs/dev/TRACEABILITY.md`](../docs/dev/TRACEABILITY.md) row |
 | New REQ-traceable test | [`docs/dev/TRACEABILITY.md`](../docs/dev/TRACEABILITY.md) row |
 | Architecturally significant decision | New ADR under [`docs/adr/`](../docs/adr/) (use `ADR-TEMPLATE.md`) |
+| Incidental potential bug found while doing unrelated work | [`docs/dev/POTENTIAL_BUGS.md`](../docs/dev/POTENTIAL_BUGS.md) (see *Stay-On-Task Policy*) |
 
 Do **not** add code-level optimizations, algorithm explanations, or per-feature narratives to this file — those belong in code comments, ADRs, or `CHANGELOG.md`.
 

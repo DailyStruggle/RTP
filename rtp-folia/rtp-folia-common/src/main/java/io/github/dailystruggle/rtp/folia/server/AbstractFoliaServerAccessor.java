@@ -32,6 +32,8 @@ import java.util.stream.Collectors;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.Tag;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -321,6 +323,88 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
     return Arrays.stream(Material.values())
         .map(material -> material.name().toUpperCase())
         .collect(Collectors.toSet());
+  }
+
+  /**
+   * Lazy-initialised snapshot of the Bukkit block-tag registry, mirroring the
+   * Spigot-side {@code AbstractServerAccessor.blockTagSnapshot} contract
+   * (ADR-017). Populated on first read or on explicit
+   * {@link #rebuildBlockTagSnapshot()}, consumed by
+   * {@code SafetyTokenExpander} / {@code SafetyCompilationCache} to flatten
+   * {@code #namespace:tag} tokens in {@code safety.airBlocks} /
+   * {@code unsafeBlocks} into their member material names.
+   */
+  private volatile Map<String, Set<String>> blockTagSnapshot;
+
+  @Override
+  public @NotNull Map<String, Set<String>> blockTagSnapshot() {
+    Map<String, Set<String>> snap = this.blockTagSnapshot;
+    if (snap != null) return snap;
+    synchronized (this) {
+      snap = this.blockTagSnapshot;
+      if (snap != null) return snap;
+      snap = buildBlockTagSnapshot();
+      this.blockTagSnapshot = snap;
+      return snap;
+    }
+  }
+
+  @Override
+  public void rebuildBlockTagSnapshot() {
+    synchronized (this) {
+      this.blockTagSnapshot = buildBlockTagSnapshot();
+    }
+  }
+
+  private Map<String, Set<String>> buildBlockTagSnapshot() {
+    Map<String, Set<String>> out = new HashMap<>();
+    int totalTags = 0;
+    int totalEmpty = 0;
+    try {
+      Iterable<Tag<Material>> tags = Bukkit.getTags(Tag.REGISTRY_BLOCKS, Material.class);
+      if (tags == null) {
+        log(Level.WARNING,
+            "[RTP] (Folia) Bukkit.getTags(REGISTRY_BLOCKS, Material.class) returned null — "
+                + "tag-flattening of safety.airBlocks/unsafeBlocks #tag tokens will be skipped");
+        return Collections.emptyMap();
+      }
+      for (Tag<Material> tag : tags) {
+        totalTags++;
+        NamespacedKey key = tag.getKey();
+        Set<Material> values;
+        try {
+          values = tag.getValues();
+        } catch (Throwable t) {
+          log(Level.WARNING,
+              "[RTP] (Folia) tag.getValues() threw for key="
+                  + key.getNamespace() + ":" + key.getKey()
+                  + " (" + t.getClass().getName() + ": " + t.getMessage() + ")");
+          totalEmpty++;
+          continue;
+        }
+        if (values == null || values.isEmpty()) {
+          totalEmpty++;
+          continue;
+        }
+        Set<String> members = new HashSet<>(values.size());
+        for (Material m : values) members.add(m.name());
+        out.put(
+            key.getNamespace() + ":" + key.getKey(),
+            Collections.unmodifiableSet(members));
+      }
+    } catch (Throwable e) {
+      log(Level.WARNING,
+          "[RTP] (Folia) Failed to snapshot block tag registry: "
+              + e.getClass().getName() + ": " + e.getMessage(), e);
+      return Collections.emptyMap();
+    }
+    if (out.isEmpty()) {
+      log(Level.WARNING,
+          "[RTP] (Folia) Bukkit block-tag registry yielded no usable tags (iterated="
+              + totalTags + ", empty=" + totalEmpty
+              + "); #tag tokens in safety.airBlocks/unsafeBlocks will not be flattened.");
+    }
+    return Collections.unmodifiableMap(out);
   }
 
   private Object plugin;

@@ -342,12 +342,107 @@ public class RTP {
     return serverAccessor.getPlugin();
   }
 
+  /**
+   * Bounded buffer for sub-INFO log entries emitted before the {@code logging.yml}
+   * parser is built. Without this, FINE/FINER/FINEST/CONFIG records emitted during
+   * the bootstrap window (plugin enable, very early {@code reloadConfigs}) bypass
+   * the configured {@code min_level} gate because the platform sink (e.g.
+   * {@code SendMessage#getMinLevel()} on Bukkit) falls back to {@link Level#ALL}
+   * when the parser is unavailable, causing them to render as INFO on the
+   * console. After the parser is wired, {@link #flushPendingLogs()}
+   * drains the buffer through the normal sink so the configured threshold gates
+   * them retroactively.
+   */
+  private static final java.util.concurrent.ConcurrentLinkedQueue<Object[]> pendingLogs =
+      new java.util.concurrent.ConcurrentLinkedQueue<>();
+
+  /** Hard cap so a misconfigured/late bootstrap can't grow the buffer unbounded. */
+  private static final int PENDING_LOGS_CAP = 4096;
+
+  /**
+   * True once {@link #flushPendingLogs()} has run; subsequent calls bypass the
+   * buffer and emit directly. Kept volatile so the gate is visible across threads
+   * without locking the hot log path.
+   */
+  private static volatile boolean logsBuffered = true;
+
+  /**
+   * Returns true when the {@code logging.yml} parser hasn't been built yet, so
+   * sub-INFO records would otherwise leak past the (yet-unfiltered) sink.
+   */
+  private static boolean loggingParserUnavailable() {
+    Configs c = configs;
+    if (c == null) return true;
+    try {
+      return c.getParser(
+              io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys.class)
+          == null;
+    } catch (Throwable t) {
+      return true;
+    }
+  }
+
+  /**
+   * Drains any sub-INFO records buffered during bootstrap through the live sink.
+   * Idempotent: callers (notably {@link Configs#reloadConfigs()} after the atomic
+   * parser swap) may invoke this freely. Once drained, future {@link #log} calls
+   * bypass the buffer.
+   */
+  public static void flushPendingLogs() {
+    logsBuffered = false;
+    RTPServerAccessor accessor = serverAccessor;
+    Object[] entry;
+    while ((entry = pendingLogs.poll()) != null) {
+      Level lvl = (Level) entry[0];
+      String msg = (String) entry[1];
+      Throwable t = (Throwable) entry[2];
+      try {
+        if (accessor == null) {
+          if (t == null) java.util.logging.Logger.getLogger("RTP").log(lvl, msg);
+          else java.util.logging.Logger.getLogger("RTP").log(lvl, msg, t);
+        } else {
+          if (t == null) accessor.log(lvl, msg);
+          else accessor.log(lvl, msg, t);
+        }
+      } catch (Throwable ignored) {
+        // Never let replay failures break the caller.
+      }
+    }
+  }
+
   public static void log(Level level, String str) {
-    serverAccessor.log(level, str);
+    RTPServerAccessor accessor = serverAccessor;
+    if (logsBuffered && level != null && level.intValue() < Level.INFO.intValue()
+        && loggingParserUnavailable()) {
+      if (pendingLogs.size() < PENDING_LOGS_CAP) {
+        pendingLogs.offer(new Object[] {level, str, null});
+      }
+      return;
+    }
+    if (accessor == null) {
+      // Bootstrap fallback: serverAccessor is wired during onEnable, but lifecycle
+      // tracing fires before/after that window (e.g. early onEnable, onDisable after a
+      // failed onEnable). Route through JUL so we never NPE during plugin enable/disable.
+      java.util.logging.Logger.getLogger("RTP").log(level, str);
+      return;
+    }
+    accessor.log(level, str);
   }
 
   public static void log(Level level, String str, Throwable throwable) {
-    serverAccessor.log(level, str, throwable);
+    RTPServerAccessor accessor = serverAccessor;
+    if (logsBuffered && level != null && level.intValue() < Level.INFO.intValue()
+        && loggingParserUnavailable()) {
+      if (pendingLogs.size() < PENDING_LOGS_CAP) {
+        pendingLogs.offer(new Object[] {level, str, throwable});
+      }
+      return;
+    }
+    if (accessor == null) {
+      java.util.logging.Logger.getLogger("RTP").log(level, str, throwable);
+      return;
+    }
+    accessor.log(level, str, throwable);
   }
 
   public static RTPWorld getWorld(RTPPlayer player) {
@@ -380,7 +475,9 @@ public class RTP {
   }
 
   public static void stop() {
+    log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop ENTER");
     if (diagnosticTimer != null) {
+      log(Level.FINER, "[SHUTDOWN_TRACE] RTP.stop diagnosticTimer.shutdown()");
       diagnosticTimer.shutdown();
     }
 
@@ -389,6 +486,8 @@ public class RTP {
       if (!future.isDone()) validFutures.add(future);
     }
     if (!validFutures.isEmpty()) {
+      log(Level.FINE,
+          "[SHUTDOWN_TRACE] RTP.stop completing outstanding futures count=" + validFutures.size());
       for (CompletableFuture<?> future : validFutures) {
         try {
           if (future.isDone()) continue;
@@ -399,16 +498,25 @@ public class RTP {
       }
     }
 
-    if (instance == null) return;
+    if (instance == null) {
+      log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop instance==null EARLY-RETURN");
+      return;
+    }
 
+    int inflight = 0;
     for (Map.Entry<UUID, TeleportData> e : instance.latestTeleportData.entrySet()) {
       TeleportData data = e.getValue();
       if (data == null || data.completed) continue;
+      log(Level.FINER,
+          "[SHUTDOWN_TRACE] RTP.stop cancelInflight playerId=" + e.getKey());
       new RTPTeleportCancel(e.getKey()).run();
+      inflight++;
     }
+    log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop CancelInflight cancelled=" + inflight);
 
     if (instance.databaseAccessor != null) {
       if (instance.databaseAccessor instanceof AbstractSQLDatabaseAccessor sqlDatabaseAccessor) {
+        log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop SQL accessor flush (WAL checkpoint)");
         sqlDatabaseAccessor.flush();
       }
       // Rewrite the cached-locations table from authoritative in-memory state
@@ -416,55 +524,78 @@ public class RTP {
       // were consumed in prior flush cycles (or whose delete enqueue lost the
       // write-vs-delete ordering race in processQueries) survive into the next
       // startup and get re-hydrated as ghosts.
+      log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop rebuildCachedLocationsFromMemory");
       instance.databaseAccessor.rebuildCachedLocationsFromMemory();
       // Drain dirtyCache -> writeQueue (this enqueues async writes via setValue().thenAccept(),
       // but getTable returns a completed future synchronously, so the enqueue runs inline).
+      log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop flushDirtyCache");
       instance.databaseAccessor.flushDirtyCache();
       // CRITICAL: actually drain the writeQueue (and deleteQueue) to disk. Previously this
       // step was missing on shutdown, so every cached-location save/delete that accumulated
       // between the 5-minute periodic flushDirtyCache cycle and server stop was lost —
       // which is why the kept cache appeared empty after restart. Must happen BEFORE
       // stop.set(true) below, because processQueries bails immediately if stop is set.
+      log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop processQueries(MAX) drain BEFORE stop.set(true)");
       instance.databaseAccessor.processQueries(Long.MAX_VALUE);
     }
 
+    log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop StopPipes miscAsyncTasks/miscSyncTasks");
     instance.miscAsyncTasks.stop();
     instance.miscSyncTasks.stop();
 
+    log(Level.FINE,
+        "[SHUTDOWN_TRACE] RTP.stop CancelTracked count=" + trackedTasks.size());
     for (Object task : trackedTasks) {
+      log(Level.FINER, "[SHUTDOWN_TRACE] RTP.stop cancelTrackedTask task=" + task);
       scheduler.cancelTask(task);
     }
     trackedTasks.clear();
 
+    log(Level.FINE,
+        "[SHUTDOWN_TRACE] RTP.stop permRegionLookup shutDown count="
+            + selectionAPI.permRegionLookup.size());
     for (Region r : selectionAPI.permRegionLookup.values()) {
+      log(Level.FINER, "[SHUTDOWN_TRACE] RTP.stop permRegion.shutDown name=" + r.name);
       r.shutDown();
     }
     selectionAPI.permRegionLookup.clear();
 
+    log(Level.FINE,
+        "[SHUTDOWN_TRACE] RTP.stop tempRegions shutDown count=" + selectionAPI.tempRegions.size());
     for (Region r : selectionAPI.tempRegions.values()) {
+      log(Level.FINER, "[SHUTDOWN_TRACE] RTP.stop tempRegion.shutDown name=" + r.name);
       r.shutDown();
     }
     selectionAPI.tempRegions.clear();
 
     if (instance.databaseAccessor != null) {
+      log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop databaseAccessor.stop.set(true) + close()");
       instance.databaseAccessor.stop.set(true);
       instance.databaseAccessor.close();
     }
 
     instance.latestTeleportData.forEach(
         (uuid, data) -> {
-          if (!data.completed) new RTPTeleportCancel(uuid).run();
+          if (!data.completed) {
+            log(Level.FINER,
+                "[SHUTDOWN_TRACE] RTP.stop CancelAgain late-cancel playerId=" + uuid);
+            new RTPTeleportCancel(uuid).run();
+          }
         });
 
     instance.processingPlayers.clear();
 
+    log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop ScanTask.kill");
     ScanTask.kill();
 
     if (instance.redisManager != null) {
+      log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop redisManager.shutdown");
       instance.redisManager.shutdown();
     }
 
+    log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop serverAccessor.stop");
     serverAccessor.stop();
+    log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop EXIT");
   }
 
   /** dynamic factories for certain types */

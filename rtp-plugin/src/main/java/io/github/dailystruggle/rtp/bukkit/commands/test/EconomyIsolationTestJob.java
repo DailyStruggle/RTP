@@ -106,18 +106,36 @@ public class EconomyIsolationTestJob extends BaseRTPCmdImpl {
     // adapter but is functionally equivalent for isolation purposes.
     CompletableFuture<Thread> executor = new CompletableFuture<>();
     long t0 = System.nanoTime();
+
+    // Register with ActiveTestJobs so the umbrella `rtp test full`
+    // sweep blocks on us; the unregister hook fires inside
+    // awaitAndAssert (or the dispatch-failure branch below).
+    final Runnable[] hookHolder = new Runnable[1];
+    hookHolder[0] = ActiveTestJobs.register(
+        callerId, new ActiveTestJobs.Job("economy-isolation", () -> { /* no cancel handle */ }));
+
     try {
       scheduler.runTaskAsynchronously(
           () -> syntheticDebit(executor, callerId));
     } catch (Throwable dispatchFailure) {
-      reportFailure(callerId, "dispatch", dispatchFailure);
+      try {
+        reportFailure(callerId, "dispatch", dispatchFailure);
+      } finally {
+        if (hookHolder[0] != null) hookHolder[0].run();
+      }
       return true;
     }
 
     // Await the result on a fresh async task so the command thread
     // (which may be the main thread) is never blocked. S-005 preserved.
     scheduler.runTaskAsynchronously(
-        () -> awaitAndAssert(callerId, executor, t0, forbiddenThread, forbiddenName));
+        () -> {
+          try {
+            awaitAndAssert(callerId, executor, t0, forbiddenThread, forbiddenName);
+          } finally {
+            if (hookHolder[0] != null) hookHolder[0].run();
+          }
+        });
     return true;
   }
 

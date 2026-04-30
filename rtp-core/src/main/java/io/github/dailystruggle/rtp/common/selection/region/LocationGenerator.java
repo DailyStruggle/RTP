@@ -56,6 +56,16 @@ public class LocationGenerator implements ILocationGenerator {
     static final Set<String> unsafeBlocksCache = new ConcurrentSkipListSet<>();
     static final AtomicLong lastUpdate = new AtomicLong(0);
     static final AtomicInteger safetyRadiusCache = new AtomicInteger(0);
+    /**
+     * Mirrors {@code SafetyKeys.platformDepth} so {@code QueueTask.runSafetyScan} can
+     * always re-validate the ground column on the live (commit-time) chunk regardless
+     * of {@code safetyRadius}. Closes the probe-vs-live drift window where a candidate
+     * Y was approved by the off-thread probe (e.g. ice over water) but the live block
+     * has changed by commit time (ice melted, water source flowed). Refreshed in the
+     * same throttled block as {@link #safetyRadiusCache} inside
+     * {@code QueueTask.afterChunkResolved}.
+     */
+    static final AtomicInteger platformDepthCache = new AtomicInteger(1);
 
     /**
      * ADR-016 §13.3 (2026-04-20 revision): pre-chunk-load biome pre-check disabled by

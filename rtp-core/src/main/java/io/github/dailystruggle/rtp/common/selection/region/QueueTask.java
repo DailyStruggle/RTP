@@ -389,6 +389,16 @@ final class QueueTask {
             LocationGenerator.lastUpdate.set(t);
             safetyRadiusVal = safety.getNumber(SafetyKeys.safetyRadius, 0).intValue();
             LocationGenerator.safetyRadiusCache.set(safetyRadiusVal);
+            // Ground-sweep depth — reuses SafetyKeys.safetyRadius so it stays
+            // distinct from SafetyKeys.platformDepth (which exclusively sizes the
+            // platform-creation tool in BukkitRTPWorld.platform / FoliaRTPWorld.platform).
+            // Floor of 1 so the live-chunk re-check in runSafetyScan always validates
+            // the ground column even when safetyRadius:0 collapsed the cube scan to a
+            // no-op (probe-vs-live drift such as ice→water or water flow-in cases).
+            int platformDepthVal = Math.max(
+                    1,
+                    safety.getNumber(SafetyKeys.safetyRadius, 1).intValue());
+            LocationGenerator.platformDepthCache.set(platformDepthVal);
         }
 
         if (!pass) {
@@ -531,6 +541,50 @@ final class QueueTask {
                         if (!chunk1.isSafe(xx, y, zz, unsafeBlocks)) {
                             pass = false;
                             break safetyCheck;
+                        }
+                    }
+                }
+            }
+
+            // Always-on commit-time re-validation of the candidate's own column on
+            // the live center chunk, independent of safetyRadius. This mirrors the
+            // gate that LinearAdjustor / JumpAdjustor used at probe time:
+            //   - head cell (y+1) must not be in unsafeBlocks,
+            //   - ground sweep (y-1 .. y-platformDepth) must not be in unsafeBlocks.
+            // Rationale: with safetyRadius:0 the cube loop above only inspected the
+            // feet air cell (trivially safe), so any probe-vs-live drift on the
+            // ground (e.g. ice that melted to water, source water that flowed in,
+            // a waterlogged-state block whose Set<String> isSafe path missed it)
+            // went unchallenged. Re-running the predicate on the live center chunk
+            // closes that window without changing the meaning of safetyRadius for
+            // operators who configured a wider neighbourhood scan.
+            if (pass) {
+                RTPChunk<?> centerLive = (L > 0)
+                        ? localChunks[safe * L + safe]
+                        : null;
+                if (centerLive == null) {
+                    pass = false;
+                } else {
+                    int xx = left.x() & 15;
+                    int zz = left.z() & 15;
+                    int feetY = left.y();
+                    int headY = feetY + 1;
+                    int minH = world.getMinHeight();
+                    int maxH = world.getMaxHeight();
+                    if (headY <= maxH && headY >= minH
+                            && !centerLive.isSafe(xx, headY, zz, unsafeBlocks)) {
+                        pass = false;
+                    }
+                    if (pass) {
+                        int depth = Math.max(
+                                1, LocationGenerator.platformDepthCache.get());
+                        for (int d = 1; d <= depth; d++) {
+                            int gy = feetY - d;
+                            if (gy < minH || gy > maxH) continue;
+                            if (!centerLive.isSafe(xx, gy, zz, unsafeBlocks)) {
+                                pass = false;
+                                break;
+                            }
                         }
                     }
                 }

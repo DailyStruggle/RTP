@@ -297,6 +297,13 @@ public class Region extends FactoryValue<RegionKeys> {
     long currentHot = queueManager.keptLocations.size();
     long deficit = activeCap - (currentHot + inFlightCalculations.get());
 
+    // Diagram 02 (ExecuteRegion -> SpawnWorker): per-region budget enforcement.
+    if (deficit > 0) {
+      RTP.log(Level.FINE,
+          "[Region:" + name + "] hot deficit=" + deficit + " (activeCap=" + activeCap
+              + ", kept=" + currentHot + ", inFlight=" + inFlightCalculations.get() + ")");
+    }
+
     for (int i = 0; i < deficit; i++) {
       // Silent poll: this location is about to be re-offered to keptLocations under an
       // identical DB composite key (region:world:x:y:z). Firing the delete callback here
@@ -309,6 +316,9 @@ public class Region extends FactoryValue<RegionKeys> {
       if (coldLoc == null) break;
 
       inFlightCalculations.incrementAndGet();
+      RTP.log(Level.FINER,
+          "[Region:" + name + "] SpawnWorker for cold (" + coldLoc.coords().x()
+              + "," + coldLoc.coords().y() + "," + coldLoc.coords().z() + ")");
       int cx = coldLoc.coords().x() >> 4;
       int cz = coldLoc.coords().z() >> 4;
 
@@ -370,6 +380,13 @@ public class Region extends FactoryValue<RegionKeys> {
               if (!added) {
                 reservation.close();
                 queueManager.unkeptLocations.offer(coldLoc);
+                RTP.log(Level.FINE,
+                    "[Region:" + name + "] PushQueue rejected (cache full); returned to unkept");
+              } else {
+                // Diagram 02 (PushQueue): cache successfully grew.
+                RTP.log(Level.FINE,
+                    "[Region:" + name + "] PushQueue: kept-cache size="
+                        + queueManager.keptLocations.size());
               }
             } finally {
               inFlightCalculations.decrementAndGet();
@@ -532,6 +549,13 @@ public class Region extends FactoryValue<RegionKeys> {
       TeleportPipelineTask pipelineTask = new TeleportPipelineTask(new GenerationContext(sender, player, null), this, pair.coords(), reservationForTask);
       teleportData.nextTask = pipelineTask;
       pipelineTask.setPhase(TeleportPipelineTask.Phase.LOAD);
+      // Diagram 02 (WakePlayer): public/private queue produced a location and
+      // the waiting player's pipeline is dispatched.
+      RTP.log(Level.FINE,
+          "[Region:" + name + "] WakePlayer uuid=" + playerId
+              + " private=" + isPrivate
+              + " coords=(" + pair.coords().x() + "," + pair.coords().y()
+              + "," + pair.coords().z() + ")");
       RTP.scheduler.runTaskAsynchronously(pipelineTask);
 
       RTP.getInstance().latestTeleportData.put(playerId, teleportData);

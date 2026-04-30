@@ -18,11 +18,24 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 public abstract class BukkitTreeCommand extends BukkitCommand implements TreeCommand {
     protected long avgTime = 0;
 
     protected final Map<String, CommandParameter> parameterLookup = new ConcurrentHashMap<>();
+
+    /**
+     * Optional override for the {@link Consumer} that delivers reply messages to a
+     * {@link CommandSender} when {@link #onCommand(CommandSender, Command, String, String[])}
+     * dispatches the args-based pipeline. Defaults to {@code sender::sendMessage}.
+     * Subclasses (e.g. {@code RTPCmdBukkit}) may set a custom factory in their
+     * constructor to route raw templates through a formatter such as
+     * {@code SendMessage.sendMessage(sender, msg)} so colour codes / placeholders
+     * are substituted before reaching the player or console.
+     */
+    protected Function<CommandSender, Consumer<String>> messageMethodFactory = sender -> sender::sendMessage;
 
     private final CommandsAPICommand parent;
 
@@ -63,7 +76,10 @@ public abstract class BukkitTreeCommand extends BukkitCommand implements TreeCom
             return false;
         }
 
-        CompletableFuture<Boolean> future = onCommand(senderId, sender::hasPermission, sender::sendMessage, args);
+        Consumer<String> messageMethod = messageMethodFactory != null
+                ? messageMethodFactory.apply(sender)
+                : sender::sendMessage;
+        CompletableFuture<Boolean> future = onCommand(senderId, sender::hasPermission, messageMethod, args);
 
         return true;
     }

@@ -3,9 +3,14 @@ package io.github.dailystruggle.rtp.api.world;
 import org.checkerframework.checker.mustcall.qual.InheritableMustCall;
 import org.checkerframework.checker.mustcall.qual.Owning;
 
+import io.github.dailystruggle.rtp.api.RTPAPI;
+import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
+
+import java.text.MessageFormat;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.logging.Level;
 
 /**
  * A deterministic {@link AutoCloseable} lifecycle wrapper that ties a {@link ChunkSet}'s
@@ -33,6 +38,26 @@ import java.util.concurrent.TimeoutException;
 // the lifecycle contract on subclasses as well.
 @InheritableMustCall("close")
 public class ChunkReservation implements AutoCloseable {
+  /**
+   * Diagnostic logging helper for chunk-ticket lifecycle events (architecture diagram 03).
+   * <p>All messages are emitted at {@link Level#FINE} or {@link Level#FINER} so production
+   * deployments stay silent unless an operator opts in. These logs are intended for tracing
+   * the {@code ReqTicket -> TrackRes -> CloseRes -> DropTicket -> UntrackRes} state machine
+   * when investigating S-002 / S-005 regressions. Routed through {@link RTPServerAccessor}
+   * (per project rule: no {@code java.util.logging.Logger.getLogger} in rtp-api/rtp-core).
+   */
+  private static void log(Level level, String pattern, Object... args) {
+    RTPServerAccessor accessor = RTPAPI.serverAccessor;
+    if (accessor == null) return;
+    accessor.log(level, MessageFormat.format(pattern, args));
+  }
+
+  private static void log(Level level, String msg, Throwable t) {
+    RTPServerAccessor accessor = RTPAPI.serverAccessor;
+    if (accessor == null) return;
+    accessor.log(level, msg, t);
+  }
+
   // @Owning declares that this field holds the resource whose lifecycle this class manages.
   // The Checker Framework will verify that close() releases it on all paths.
   private final @Owning ChunkSet chunkSet;
@@ -59,6 +84,18 @@ public class ChunkReservation implements AutoCloseable {
     this.world = world;
     CompletableFuture<Void> f = world.setForceLoaded(chunkSet.getX(), chunkSet.getZ(), true);
     this.applyFuture = (f != null) ? f : CompletableFuture.completedFuture(null);
+    // Architecture diagram 03 — ReqTicket: addPluginChunkTicket() invoked, apply future captured.
+    log(Level.FINE, "ChunkReservation opened: world={0}, chunk=({1},{2}), size={3}",
+            worldName(), chunkSet.getX(), chunkSet.getZ(),
+            chunkSet.chunks() != null ? chunkSet.chunks().size() : -1);
+  }
+
+  private String worldName() {
+    try {
+      return world != null ? String.valueOf(world.name()) : "<null>";
+    } catch (Throwable t) {
+      return "<unknown>";
+    }
   }
 
   /**
@@ -67,6 +104,8 @@ public class ChunkReservation implements AutoCloseable {
    * @param keep true to keep, false to release
    */
   public void keep(boolean keep) {
+    log(Level.FINER, "ChunkReservation keep({0}): world={1}, chunk=({2},{3})",
+            keep, worldName(), chunkSet.getX(), chunkSet.getZ());
     world.setForceLoaded(chunkSet.getX(), chunkSet.getZ(), keep);
   }
 
@@ -103,10 +142,19 @@ public class ChunkReservation implements AutoCloseable {
   public boolean awaitReady(long timeout, TimeUnit unit) throws InterruptedException {
     try {
       applyFuture.get(timeout, unit);
+      log(Level.FINER, "ChunkReservation awaitReady applied: world={0}, chunk=({1},{2})",
+              worldName(), chunkSet.getX(), chunkSet.getZ());
       return true;
     } catch (TimeoutException te) {
+      // ADR-015 follow-up: timed out waiting for addPluginChunkTicket to apply.
+      log(Level.FINE,
+              "ChunkReservation awaitReady timeout after {0} {1}: world={2}, chunk=({3},{4})",
+              timeout, unit, worldName(), chunkSet.getX(), chunkSet.getZ());
       return false;
     } catch (java.util.concurrent.ExecutionException ee) {
+      log(Level.FINE,
+              "ChunkReservation awaitReady failed: world=" + worldName()
+                      + ", chunk=(" + chunkSet.getX() + "," + chunkSet.getZ() + ")", ee);
       return false;
     }
   }
@@ -129,6 +177,8 @@ public class ChunkReservation implements AutoCloseable {
    * @return the reserved ChunkSet
    */
   public @Owning ChunkSet transferOwnership() {
+    log(Level.FINER, "ChunkReservation ownership transferred: world={0}, chunk=({1},{2})",
+            worldName(), chunkSet.getX(), chunkSet.getZ());
     this.transferred = true;
     return this.chunkSet;
   }
@@ -143,8 +193,16 @@ public class ChunkReservation implements AutoCloseable {
   @Override
   public void close() {
     if (!transferred) {
+      // Architecture diagram 03 — CloseRes: try-finally release path; keep(false) drops the
+      // plugin chunk ticket and feeds DropTicket -> UntrackRes downstream.
+      log(Level.FINE, "ChunkReservation closed: world={0}, chunk=({1},{2})",
+              worldName(), chunkSet.getX(), chunkSet.getZ());
       this.keep(false);
       this.transferred = true;
+    } else {
+      log(Level.FINER,
+              "ChunkReservation close() no-op (already transferred/closed): world={0}, chunk=({1},{2})",
+              worldName(), chunkSet.getX(), chunkSet.getZ());
     }
   }
 
