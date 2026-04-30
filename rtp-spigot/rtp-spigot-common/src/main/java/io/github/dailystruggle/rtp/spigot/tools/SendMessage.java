@@ -67,14 +67,22 @@ public class SendMessage {
 
   public static void sendMessage(CommandSender sender, String message) {
     if (message == null || message.isEmpty()) return;
+    // Bukkit.getLogger().info("[diag/sendMessage(CS)] entry sender=" + (sender == null ? "null" : sender.getClass().getSimpleName()) + " raw=\"" + message + "\"");
     intercept(message);
+    // Bukkit.getLogger().info("[diag/sendMessage(CS)] after intercept(): \"" + message + "\"");
     if (sender instanceof Player) sendMessage((Player) sender, message);
     else {
+      String beforeFormat = message;
       message = format(Bukkit.getOfflinePlayer(RTPAPI.serverId), message);
+      // Bukkit.getLogger().info("[diag/sendMessage(CS)] after format(): before=\"" + beforeFormat + "\" after=\"" + message + "\"");
       if (RTP.serverAccessor.getServerIntVersion() > 12) {
         BaseComponent[] components = TextComponent.fromLegacyText(message);
+        // Bukkit.getLogger().info("[diag/sendMessage(CS)] dispatching via spigot().sendMessage(BaseComponent[]) for legacy text=\"" + message + "\"");
         sender.spigot().sendMessage(components);
-      } else sender.sendMessage(message);
+      } else {
+        // Bukkit.getLogger().info("[diag/sendMessage(CS)] dispatching via sender.sendMessage(String) text=\"" + message + "\"");
+        sender.sendMessage(message);
+      }
     }
   }
 
@@ -133,23 +141,31 @@ public class SendMessage {
 
   public static String format(@Nullable OfflinePlayer player, @Nullable String text) {
     if (text == null) return "";
+    // Bukkit.getLogger().info("[diag/format] entry player=" + (player == null ? "null" : player.getUniqueId()) + " raw=\"" + text + "\"");
 
     // get uuid to be referenced by placeholder getters
     UUID uuid = (player != null) ? player.getUniqueId() : RTPAPI.serverId;
 
     text = PlaceholderProvider.fillPlaceholders(text, uuid);
+    // Bukkit.getLogger().info("[diag/format] after fillPlaceholders: \"" + text + "\"");
 
     if (getLang() != null) {
       text = PlaceholderProvider.fillNumericPlaceholders(text);
+      // Bukkit.getLogger().info("[diag/format] after fillNumericPlaceholders: \"" + text + "\"");
+    } else {
+      // Bukkit.getLogger().info("[diag/format] skipped fillNumericPlaceholders (getLang()==null)");
     }
 
     // check PAPI exists and scan remaining PAPI placeholders
     // todo: if a null player doesn't work with another PAPI import, blame that import for not
     // verifying its inputs.
     text = PAPIChecker.fillPlaceholders(player, text);
+    // Bukkit.getLogger().info("[diag/format] after PAPIChecker.fillPlaceholders: \"" + text + "\"");
 
     text = ChatColor.translateAlternateColorCodes('&', text);
+    // Bukkit.getLogger().info("[diag/format] after translateAlternateColorCodes('&'): \"" + text + "\"");
     text = Hex2Color(text);
+    // Bukkit.getLogger().info("[diag/format] after Hex2Color: \"" + text + "\"");
     return text;
   }
 

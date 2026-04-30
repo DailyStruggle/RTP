@@ -1,14 +1,14 @@
-# 11 — Shutdown and flush lifecycle
+# 10 — Shutdown and flush lifecycle
 
 ## Scope of this diagram
 
-One-shot `onDisable` path for the Bukkit-family entry point `RTPBukkitPlugin` — the symmetric partner of diagram 07. Covers the precise ordering required to (a) stop accepting new work, (b) cancel in-flight teleports, (c) persist cached-location + player data to the SQLite-backed `DatabaseAccessor`, (d) shut down per-region selectors, and (e) release all outstanding chunk tickets without leaking any (S-002).
+One-shot `onDisable` path for the Bukkit-family entry point `RTPBukkitPlugin` — the symmetric partner of diagram 06. Covers the precise ordering required to (a) stop accepting new work, (b) cancel in-flight teleports, (c) persist cached-location + player data to the SQLite-backed `DatabaseAccessor`, (d) shut down per-region selectors, and (e) release all outstanding chunk tickets without leaking any (S-002).
 
 Out of scope (covered elsewhere):
 
 - Normal per-ticket close during runtime → diagram 03.
 - `MemoryTracker` active-GC sweep (runtime leak safety net) → diagram 04.
-- Config reload (a *partial* teardown that reuses some of the same primitives) → diagram 10.
+- Config reload (a *partial* teardown that reuses some of the same primitives) → diagram 09.
 - Fabric / other-platform shutdown — this diagram is Bukkit-family only; Folia uses the same path with the global-region-scheduler variant of `RTPScheduler.cancelTask`.
 - The synchronous `/reload` pitfall — see `LESSONS_LEARNED.md`.
 

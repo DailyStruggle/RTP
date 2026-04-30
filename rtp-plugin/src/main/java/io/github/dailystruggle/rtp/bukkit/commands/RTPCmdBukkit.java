@@ -38,6 +38,14 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
   public RTPCmdBukkit(Plugin plugin) {
     super(plugin, null);
 
+    // Route reply messages through SendMessage so raw templates (placeholders,
+    // '&' colour codes, hex tokens, PAPI) are formatted at the platform
+    // boundary instead of leaking to console as e.g. "&c[P0] ...".
+    // The default in BukkitTreeCommand is sender::sendMessage which bypasses
+    // formatting entirely.
+    this.messageMethodFactory =
+        sender -> msg -> io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(sender, msg);
+
     // region name parameter
     // filter by region exists and sender permission
     RegionParameter regionParameter =
@@ -213,7 +221,16 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
       return false;
     }
 
-    return compute(senderId, parameterValues, nextCommand, messageMethod);
+    // Route the messageMethod Consumer through SendMessage so any raw template
+    // it receives from RTPCmd.compute is formatted (placeholders, '&' colour
+    // codes, hex tokens, PAPI) before reaching the player/console. This keeps
+    // formatting at the platform boundary and out of rtp-core. See REQ-RTP-F-013
+    // and the AGENTS.md "Color handling" guidance.
+    final CommandSender finalSender = sender;
+    java.util.function.Consumer<String> wrapped =
+        msg -> io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(finalSender, msg);
+
+    return compute(senderId, parameterValues, nextCommand, wrapped);
   }
 
   @Override

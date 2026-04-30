@@ -105,4 +105,106 @@ class ActiveTestJobsTest {
     assertTrue(cancelled >= 4, "cancelAll should cancel at least the jobs we just registered");
     assertTrue(total.get() >= 4);
   }
+
+  // -----------------------------------------------------------------
+  // addOnEmptyListener / removeOnEmptyListener — these are the hooks
+  // TestFullCmd uses to chain shipped subcommands without parking an
+  // async-pool worker between dispatches. Without these tests, a
+  // regression in fire-once semantics would silently strand the umbrella
+  // sweep (S-004 would NOT fire because the sweep would simply never
+  // advance), which is why each contract is asserted explicitly below.
+  // -----------------------------------------------------------------
+
+  @Test
+  @DisplayName("addOnEmptyListener fires inline when the owner is already drained")
+  void addOnEmptyListenerFiresInlineWhenAlreadyDrained() {
+    UUID owner = UUID.randomUUID();
+    AtomicInteger fires = new AtomicInteger();
+
+    // No jobs ever registered for this owner → already drained.
+    ActiveTestJobs.addOnEmptyListener(owner, fires::incrementAndGet);
+
+    assertEquals(1, fires.get(), "listener must fire synchronously when owner is already empty");
+  }
+
+  @Test
+  @DisplayName("addOnEmptyListener fires exactly once when the last job unregisters")
+  void addOnEmptyListenerFiresOnTransitionToEmpty() {
+    UUID owner = UUID.randomUUID();
+    AtomicInteger fires = new AtomicInteger();
+
+    Runnable unreg1 =
+        ActiveTestJobs.register(owner, new ActiveTestJobs.Job("a", () -> {}));
+    Runnable unreg2 =
+        ActiveTestJobs.register(owner, new ActiveTestJobs.Job("b", () -> {}));
+
+    ActiveTestJobs.addOnEmptyListener(owner, fires::incrementAndGet);
+
+    assertEquals(0, fires.get(), "listener must not fire while jobs remain");
+    unreg1.run();
+    assertEquals(0, fires.get(), "listener must not fire while one job remains");
+    unreg2.run();
+    assertEquals(1, fires.get(), "listener must fire on transition to empty");
+
+    // Re-arming jobs and draining again must NOT re-fire the original
+    // listener — it was a one-shot and was removed at fire time.
+    Runnable unreg3 =
+        ActiveTestJobs.register(owner, new ActiveTestJobs.Job("c", () -> {}));
+    unreg3.run();
+    assertEquals(1, fires.get(), "drain listener must be one-shot");
+  }
+
+  @Test
+  @DisplayName("removeOnEmptyListener prevents a parked listener from firing")
+  void removeOnEmptyListenerCancelsBeforeFire() {
+    UUID owner = UUID.randomUUID();
+    AtomicInteger fires = new AtomicInteger();
+    Runnable listener = fires::incrementAndGet;
+
+    Runnable unreg =
+        ActiveTestJobs.register(owner, new ActiveTestJobs.Job("a", () -> {}));
+    ActiveTestJobs.addOnEmptyListener(owner, listener);
+    assertEquals(0, fires.get());
+
+    // Caller (e.g. TestFullCmd's watchdog) un-arms the listener before
+    // the owner drains. The subsequent drain must not fire it.
+    ActiveTestJobs.removeOnEmptyListener(owner, listener);
+    unreg.run();
+
+    assertEquals(0, fires.get(), "removed listener must not fire on drain");
+  }
+
+  @Test
+  @DisplayName("cancelOwned fires drain listeners so a chained sweep can advance")
+  void cancelOwnedFiresOnEmptyListeners() {
+    UUID owner = UUID.randomUUID();
+    AtomicInteger fires = new AtomicInteger();
+
+    ActiveTestJobs.register(owner, new ActiveTestJobs.Job("a", () -> {}));
+    ActiveTestJobs.addOnEmptyListener(owner, fires::incrementAndGet);
+    assertEquals(0, fires.get());
+
+    int cancelled = ActiveTestJobs.cancelOwned(owner);
+
+    assertEquals(1, cancelled);
+    assertEquals(
+        1,
+        fires.get(),
+        "cancelOwned must fire drain listeners — otherwise `rtp test cancel` "
+            + "mid-sweep would strand the umbrella chain in TestFullCmd.");
+  }
+
+  @Test
+  @DisplayName("a throwing drain listener does not block sibling listeners")
+  void onEmptyListenerThrowableIsSwallowed() {
+    UUID owner = UUID.randomUUID();
+    AtomicInteger goodFires = new AtomicInteger();
+
+    // Owner is already empty → both listeners fire inline at registration.
+    // The bad listener throws; the good one must still observe its fire.
+    ActiveTestJobs.addOnEmptyListener(owner, () -> { throw new RuntimeException("boom"); });
+    ActiveTestJobs.addOnEmptyListener(owner, goodFires::incrementAndGet);
+
+    assertEquals(1, goodFires.get(), "throwing listener must not block siblings");
+  }
 }

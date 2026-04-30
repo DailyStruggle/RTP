@@ -232,7 +232,16 @@ public class ScanTask extends RTPRunnable {
       io.github.dailystruggle.rtp.common.tools.MemoryTracker.updateTracking(trackingId);
     }
 
-    if (!isRunning.compareAndSet(false, true)) return;
+    if (!isRunning.compareAndSet(false, true)) {
+      RTP.log(Level.FINER, "[ScanTask] run() reentry skipped (already running) region=" + region.name);
+      return;
+    }
+
+    RTP.log(Level.FINE, "[ScanTask] batch entry region=" + region.name
+            + " phase=" + (scanPhase.get() == PHASE_FULLSCAN ? "fullscan" : "prescan")
+            + " scanIter=" + scanIter.get()
+            + " scanIncrement=" + scanIncrement.get()
+            + " currentOffset=" + currentOffset);
 
     // Announce the active scan phase at the beginning so users are not
     // confused by the two-pass design (PRESCAN -> FULLSCAN). The PRESCAN
@@ -250,6 +259,9 @@ public class ScanTask extends RTPRunnable {
     }
 
     if (pause.get() || isCancelled() || scanIncrement.get() <= 0) {
+      RTP.log(Level.FINE, "[ScanTask] batch short-circuit region=" + region.name
+              + " pause=" + pause.get() + " cancelled=" + isCancelled()
+              + " scanIncrement=" + scanIncrement.get());
       if (pause.get() || isCancelled()) {
         if (region.getShape() instanceof MemoryShape<?> ms) {
           ms.flushAndRebuild(ms.spatialResolution);
@@ -408,13 +420,19 @@ public class ScanTask extends RTPRunnable {
 
     // Dispatch bin-by-bin: one full region file's worth of candidates completes before the next
     // bin starts. Within-bin in-flight probes all share the same .mca -> cache hit rate ~1.0.
+    RTP.log(Level.FINER, "[ScanTask] dispatching bins region=" + region.name
+            + " bins=" + binHeaders.size() + " cap=" + MAX_PENDING_CHUNKS);
     outer:
     for (java.util.Map.Entry<Long, long[]> binEntry : binHeaders.entrySet()) {
       if (pause.get() || isCancelled()) {
+        RTP.log(Level.FINE, "[ScanTask] dispatch loop interrupted region=" + region.name
+                + " pause=" + pause.get() + " cancelled=" + isCancelled());
         break;
       }
       long key = binEntry.getKey();
       int binCount = (int) binEntry.getValue()[0];
+      RTP.log(Level.FINER, "[ScanTask] bin start region=" + region.name
+              + " binKey=" + key + " binCount=" + binCount);
       long[] positions = binPositions.get(key);
       int[] cxArr = binCx.get(key);
       int[] czArr = binCz.get(key);
@@ -471,10 +489,15 @@ public class ScanTask extends RTPRunnable {
     final long finalActiveChecks = activeChecks;
 
     // 4. Drain the gate to wait for the final trailing chunks of the iteration to complete
+    RTP.log(Level.FINER, "[ScanTask] drain begin region=" + region.name
+            + " activeChecks=" + activeChecks + " inFlight=" + inFlight.get());
+    long drainStart = System.nanoTime();
     try {
       inFlightGate.acquire(MAX_PENDING_CHUNKS);
       inFlightGate.release(MAX_PENDING_CHUNKS);
     } catch (InterruptedException ignored) {}
+    RTP.log(Level.FINER, "[ScanTask] drain end region=" + region.name
+            + " drainMs=" + ((System.nanoTime() - drainStart) / 1_000_000L));
 
     // 5. Execute synchronously on the async thread, avoiding detached callback contexts
     wrapUpBatch(finalPos1, finalActiveChecks, timingStart, range, shape, limitEnd);
@@ -512,6 +535,10 @@ public class ScanTask extends RTPRunnable {
 
       long now = System.currentTimeMillis();
       if (now - lastSaveTime > 5000 || finalPos1 >= range || pause.get() || isCancelled()) {
+        RTP.log(Level.FINE, "[ScanTask] checkpoint region=" + region.name
+                + " pos=" + finalPos1 + "/" + range
+                + " cps=" + cps_local + " etaSec=" + etaSeconds
+                + " land%=" + String.format("%.2f", landPercentage));
         lastSaveTime = now;
 
         // [TRACE] PR-8 concurrency gauge: observed peak in-flight probes this window vs the
@@ -584,6 +611,8 @@ public class ScanTask extends RTPRunnable {
         return;
       }
 
+      RTP.log(Level.FINE, "[ScanTask] scan complete region=" + region.name
+              + " finalPos=" + finalPos1 + " range=" + range);
       shape.flushAndRebuild(shape.spatialResolution);
       shape.save(region.name + "_" + region.getWorld().getSeed(), region.getWorld().name());
       save(); // Ensure final pass is securely flushed before deletion
@@ -594,17 +623,23 @@ public class ScanTask extends RTPRunnable {
       isRunning.set(false);
     } else if (!isCancelled() && !pause.get()) {
       if (RTP.getInstance().scanTasks.get(region.name) == this) {
+        RTP.log(Level.FINER, "[ScanTask] yielding to scheduler for next batch region=" + region.name
+                + " nextScanIter=" + finalPos1);
         shape.flushAndRebuild(shape.spatialResolution);
         isRunning.set(false);
         RTP.scheduler.runTaskAsynchronously(this);
       } else {
+        RTP.log(Level.FINE, "[ScanTask] task supplanted; halting reschedule region=" + region.name);
         isRunning.set(false);
       }
     } else {
       isRunning.set(false);
       if (isCancelled()) {
+        RTP.log(Level.FINE, "[ScanTask] batch end (cancelled) region=" + region.name);
         RTP.getInstance().scanTasks.remove(region.name, this);
         done.complete(true);
+      } else {
+        RTP.log(Level.FINE, "[ScanTask] batch end (paused) region=" + region.name);
       }
     }
   }
@@ -752,9 +787,14 @@ public class ScanTask extends RTPRunnable {
 
   public void save() {
     if (isCancelled()) {
+      RTP.log(Level.FINER, "[ScanTask] save() skipped (cancelled); deleting progress file region=" + region.name);
       delete();
       return;
     }
+    RTP.log(Level.FINER, "[ScanTask] save() region=" + region.name
+            + " scanIter=" + scanIter.get()
+            + " currentOffset=" + currentOffset
+            + " phase=" + scanPhase.get());
     File pluginDir = RTP.serverAccessor.getPluginDirectory();
     File dir = new File(pluginDir, "database" + File.separator + "regionData");
     if (!dir.exists()) dir.mkdirs();
@@ -875,6 +915,8 @@ public class ScanTask extends RTPRunnable {
       // Fast mathematical rejection ONLY for World Border.
       // Mathematical biome check is completely removed to force chunk generation.
       if (!border.isInside().apply(new RTPLocation(world, blockX, (vert.maxY() + vert.minY()) / 2, blockZ))) {
+        RTP.log(Level.FINER, "[ScanTask] border-reject region=" + region.name
+                + " pos=" + pos + " block=(" + blockX + "," + blockZ + ")");
         shape.addBadLocation(pos);
         return CompletableFuture.completedFuture(false);
       }
@@ -1287,12 +1329,17 @@ public class ScanTask extends RTPRunnable {
   }
 
   public void pause() {
+    RTP.log(Level.FINE, "[ScanTask] pause requested region=" + region.name
+            + " inFlight=" + inFlight.get());
     pause.set(true);
     // Drain in-flight chunk futures before saving to prevent ghost callbacks
+    long drainStart = System.nanoTime();
     try {
       inFlightGate.acquire(MAX_PENDING_CHUNKS);
       inFlightGate.release(MAX_PENDING_CHUNKS);
     } catch (InterruptedException ignored) { }
+    RTP.log(Level.FINER, "[ScanTask] pause drain complete region=" + region.name
+            + " drainMs=" + ((System.nanoTime() - drainStart) / 1_000_000L));
     MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
     shape.flushAndRebuild(shape.spatialResolution);
     save();
@@ -1302,15 +1349,20 @@ public class ScanTask extends RTPRunnable {
   @Override
   public void setCancelled(boolean cancelled) {
     if (cancelled) {
+      RTP.log(Level.FINE, "[ScanTask] cancellation requested region=" + region.name
+              + " inFlight=" + inFlight.get());
       try {
         done.cancel(true);
       } catch (CancellationException | CompletionException ignored) { }
       // Drain all in-flight chunk futures before saving, so no ghost callbacks
       // can call addBadLocation() after flushAndRebuild/save.
+      long drainStart = System.nanoTime();
       try {
         inFlightGate.acquire(MAX_PENDING_CHUNKS);
         inFlightGate.release(MAX_PENDING_CHUNKS);
       } catch (InterruptedException ignored) { }
+      RTP.log(Level.FINER, "[ScanTask] cancel drain complete region=" + region.name
+              + " drainMs=" + ((System.nanoTime() - drainStart) / 1_000_000L));
       MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
       if (shape != null) {
         shape.flushAndRebuild(shape.spatialResolution);

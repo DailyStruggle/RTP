@@ -76,25 +76,30 @@ public final class RTPBukkitPlugin extends JavaPlugin {
 
   @Override
   public void onLoad() {
+    RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onLoad ENTER -- probing org.sqlite.JDBC");
     // prepare sqlite capability
     try {
       Class.forName("org.sqlite.JDBC");
+      RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] onLoad SQLite JDBC driver loaded successfully");
     } catch (ClassNotFoundException e) {
+      RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onLoad FAIL_FAST -- org.sqlite.JDBC not found");
       throw new IllegalStateException();
     }
+    RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onLoad EXIT");
   }
 
   /** whenever bukkit feels like enabling this plugin */
   @Override
   public void onEnable() {
-    metrics = new Metrics(this, 30865);
-
+    // Wire RTP.serverAccessor and RTP.scheduler FIRST (silently) so every subsequent
+    // RTP.log(...) routes through the canonical accessor instead of the JUL bootstrap
+    // fallback. Reflection itself cannot log via RTP.log because the accessor isn't ready.
     if (instance == null) {
       instance = this;
 
-      BukkitServerProvider.ServerModel serverModel = BukkitServerProvider.resolveServerModel(this);
-
+      BukkitServerProvider.ServerModel serverModel;
       try {
+        serverModel = BukkitServerProvider.resolveServerModel(this);
         RTP.serverAccessor =
             (io.github.dailystruggle.rtp.api.server.RTPServerAccessor)
                 Class.forName(serverModel.accessorClassName).getDeclaredConstructor().newInstance();
@@ -104,26 +109,42 @@ public final class RTPBukkitPlugin extends JavaPlugin {
                     .getDeclaredConstructor(JavaPlugin.class)
                     .newInstance(this);
       } catch (Exception e) {
-        e.printStackTrace();
-        onDisable();
-        return;
-      }
-
-      RTP.serverAccessor.start(this);
-      RTP rtp = new RTP(); // constructor updates API instance
-
-      try {
-        BukkitDatabaseHandler.setupDatabase(rtp);
-      } catch (Exception e) {
-        e.printStackTrace();
+        RTP.log(java.util.logging.Level.WARNING,
+            "[LIFECYCLE] onEnable reflection failure -- bailing out via onDisable", e);
         onDisable();
         return;
       }
     }
 
+    RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable ENTER -- initializing bStats Metrics(id=30865)");
+    metrics = new Metrics(this, 30865);
+
+    if (RTP.getInstance() == null) {
+      RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] onEnable accessor/scheduler wired; starting accessor");
+      RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable RTP.serverAccessor.start(plugin)");
+      RTP.serverAccessor.start(this);
+      RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable constructing new RTP() -- wires API instance");
+      RTP rtp = new RTP(); // constructor updates API instance
+
+      try {
+        RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable BukkitDatabaseHandler.setupDatabase");
+        BukkitDatabaseHandler.setupDatabase(rtp);
+        RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] onEnable database setup complete");
+      } catch (Exception e) {
+        RTP.log(java.util.logging.Level.WARNING,
+            "[LIFECYCLE] onEnable database setup failure -- bailing out via onDisable", e);
+        onDisable();
+        return;
+      }
+    }
+
+    RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable ChunkyBorderChecker.loadChunky");
     ChunkyBorderChecker.loadChunky();
+    RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable startupTasks drain #1 size="
+        + RTP.getInstance().startupTasks.size());
     RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
 
+    RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable binding /rtp and /wild executors and tab-completers");
     RTPCmdBukkit mainCommand = new RTPCmdBukkit(this);
     RTP.baseCommand = mainCommand;
 
@@ -131,16 +152,25 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     if (rtpCommand != null) {
       rtpCommand.setExecutor(mainCommand);
       rtpCommand.setTabCompleter(mainCommand);
+      RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] onEnable bound /rtp executor + tab completer");
+    } else {
+      RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] onEnable /rtp PluginCommand not registered");
     }
 
     org.bukkit.command.PluginCommand wildCommand = getCommand("wild");
     if (wildCommand != null) {
       wildCommand.setExecutor(mainCommand);
       wildCommand.setTabCompleter(mainCommand);
+      RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] onEnable bound /wild executor + tab completer");
+    } else {
+      RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] onEnable /wild PluginCommand not registered");
     }
 
+    RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable scheduling deferred startupTasks drain (tick+1)");
     RTP.scheduler.runTaskLater(
         () -> {
+          RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] deferred startupTasks drain firing size="
+              + RTP.getInstance().startupTasks.size());
           while (RTP.getInstance().startupTasks.size() > 0) {
             RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
           }
@@ -151,53 +181,86 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     // automatic world generators (e.g. Multiverse) during the first tick are not
     // missed. Previously this ran via runTaskLater(..., 1), which caused dormant
     // regions configured for a late-loaded world to never rebind.
+    RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable setupBukkitEvents (synchronous)");
     setupBukkitEvents();
     // Catch worlds that were already loaded by the time the listener registered
     // (either before RTP enabled, or between region config load and listener
     // registration), so dormant regions for those worlds are activated without
     // needing another WorldLoadEvent.
+    RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable rebindFallbackRegionsForAllLoadedWorlds");
     io.github.dailystruggle.rtp.bukkit.spigotListeners.OnWorldLoadUnload
         .rebindFallbackRegionsForAllLoadedWorlds();
-    RTP.scheduler.runTaskLater(this::setupIntegrations, 1);
-    RTP.scheduler.runTaskLater(() -> BukkitEffectsHandler.setupEffects(this), 1);
+    RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable scheduling deferred setupIntegrations (tick+1)");
+    RTP.scheduler.runTaskLater(() -> {
+      RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] deferred setupIntegrations firing");
+      setupIntegrations();
+    }, 1);
+    RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable scheduling deferred BukkitEffectsHandler.setupEffects (tick+1)");
+    RTP.scheduler.runTaskLater(() -> {
+      RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] deferred BukkitEffectsHandler.setupEffects firing");
+      BukkitEffectsHandler.setupEffects(this);
+    }, 1);
 
     if (!isFolia()) {
+      RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable starting non-Folia ChunkUnloadProcessor timer");
       RTP.scheduler.runTaskTimer(new ChunkUnloadProcessor(), 1, 1);
+    } else {
+      RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] onEnable Folia detected -- skipping ChunkUnloadProcessor");
     }
+    RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable DatabaseProcessing.start");
     DatabaseProcessing.start(this);
 
     SendMessage.sendMessage(Bukkit.getConsoleSender(), "");
 
+    RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable startupTasks drain #2 size="
+        + RTP.getInstance().startupTasks.size());
     while (RTP.getInstance().startupTasks.size() > 0) {
       RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
     }
 
     if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
+      RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable registering PAPI_expansion");
       new PAPI_expansion().register();
+    } else {
+      RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] onEnable PlaceholderAPI not present -- skipping PAPI_expansion");
     }
 
+    RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable JarUtils.extractDocs version=" + getDescription().getVersion());
     JarUtils.extractDocs(getDataFolder(), getDescription().getVersion());
+    RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable EXIT -- plugin enabled");
   }
 
   /** whenever bukkit feels like disabling this plugin */
   @Override
   public void onDisable() {
-    if (commandTimer != null) commandTimer.cancel();
-    if (commandProcessing != null) commandProcessing.cancel();
+    RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onDisable ENTER -- cancelling command timers");
+    if (commandTimer != null) {
+      RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] onDisable commandTimer.cancel()");
+      commandTimer.cancel();
+    }
+    if (commandProcessing != null) {
+      RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] onDisable commandProcessing.cancel()");
+      commandProcessing.cancel();
+    }
 
     try {
+      RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] onDisable AsyncTeleportProcessing.kill");
       AsyncTeleportProcessing.kill();
     } catch (NoClassDefFoundError ignored) {
     }
     try {
+      RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] onDisable SyncTeleportProcessing.kill");
       SyncTeleportProcessing.kill();
     } catch (NoClassDefFoundError ignored) {
     }
     try {
+      RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] onDisable ScanTaskProcessing.kill");
       ScanTaskProcessing.kill();
     } catch (NoClassDefFoundError ignored) {
     }
     try {
+      RTP.log(java.util.logging.Level.FINER,
+          "[LIFECYCLE] onDisable DatabaseProcessing.kill (stops periodic flush task)");
       DatabaseProcessing.kill();
     } catch (NoClassDefFoundError ignored) {
     }
@@ -205,6 +268,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     metrics = null;
 
     try {
+      RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onDisable RTP.stop() invoking core shutdown");
       RTP.stop();
     } catch (NoClassDefFoundError ignored) {
     }
@@ -217,27 +281,48 @@ public final class RTPBukkitPlugin extends JavaPlugin {
                         && !b.isSync()
                         && !b.isCancelled())
             .collect(Collectors.toList());
+    RTP.log(java.util.logging.Level.FINE,
+        "[LIFECYCLE] onDisable cancelling pending RTP-owned async Bukkit tasks count="
+            + pendingTasks.size());
     for (BukkitTask pendingTask : pendingTasks) {
+      RTP.log(java.util.logging.Level.FINER,
+          "[LIFECYCLE] onDisable cancelling pending Bukkit task id=" + pendingTask.getTaskId());
       pendingTask.cancel();
     }
 
     try {
       if (RTP.getInstance() != null && RTP.getInstance().databaseAccessor != null) {
+        RTP.log(java.util.logging.Level.FINE,
+            "[LIFECYCLE] onDisable writing referenceData sentinel + processQueries(MAX) final drain");
         Map<String, Object> referenceData = new HashMap<>();
         referenceData.put("time", System.currentTimeMillis());
         referenceData.put("UUID", new UUID(0, 0).toString());
         RTP.getInstance().databaseAccessor.setValue("referenceData", referenceData);
         RTP.getInstance().databaseAccessor.processQueries(Long.MAX_VALUE);
+        RTP.log(java.util.logging.Level.FINER,
+            "[LIFECYCLE] onDisable referenceData sentinel persisted");
+      } else {
+        RTP.log(java.util.logging.Level.FINER,
+            "[LIFECYCLE] onDisable referenceData sentinel skipped (instance or accessor null)");
       }
     } catch (NoClassDefFoundError ignored) {
     }
 
-    if (RTP.serverAccessor != null) RTP.serverAccessor.releaseAllChunkTickets();
+    if (RTP.serverAccessor != null) {
+      RTP.log(java.util.logging.Level.FINE,
+          "[LIFECYCLE] onDisable releaseAllChunkTickets (S-002 guarantee)");
+      RTP.serverAccessor.releaseAllChunkTickets();
+    } else {
+      RTP.log(java.util.logging.Level.FINER,
+          "[LIFECYCLE] onDisable releaseAllChunkTickets skipped (serverAccessor null)");
+    }
 
+    RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onDisable EXIT -- plugin disabled");
     super.onDisable();
   }
 
   private void setupBukkitEvents() {
+    RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] setupBukkitEvents ENTER");
     ConfigParser<PerformanceKeys> performance =
         (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
 
@@ -245,6 +330,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     Object o = performance.getConfigValue(PerformanceKeys.onEventParsing, false);
     if (o instanceof Boolean) onEventParsing = (Boolean) o;
     else onEventParsing = Boolean.parseBoolean(o.toString());
+    RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] setupBukkitEvents onEventParsing=" + onEventParsing);
 
     if (onEventParsing) Bukkit.getPluginManager().registerEvents(new OnEventTeleports(), this);
     Bukkit.getPluginManager().registerEvents(new OnPlayerChangeWorld(), this);
@@ -257,9 +343,11 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     Bukkit.getPluginManager().registerEvents(new OnWorldLoadUnload(), this);
 
     if (RTP.serverAccessor.getServerIntVersion() > 12) EffectsAPI.init(this);
+    RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] setupBukkitEvents EXIT -- listeners registered");
   }
 
   public void setupIntegrations() {
+    RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] setupIntegrations ENTER");
     if (RTP.economy == null && Bukkit.getServer().getPluginManager().getPlugin("Vault") != null) {
       VaultChecker.setupEconomy();
       VaultChecker.setupPermissions();
@@ -270,6 +358,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     // Bundled claim-plugin integrations (formerly the RTP_ClaimPluginIntegrations addon).
     // Registers a GlobalRegionVerifier per enabled claim plugin; see ADR-019.
     try {
+      RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] setupIntegrations invoking ClaimIntegrations.setup");
       ClaimIntegrations.setup(this);
     } catch (Throwable t) {
       RTP.log(
@@ -277,5 +366,6 @@ public final class RTPBukkitPlugin extends JavaPlugin {
           "[RTP] Failed to initialize claim-plugin integrations; continuing without them.",
           t);
     }
+    RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] setupIntegrations EXIT");
   }
 }

@@ -431,25 +431,59 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
    */
   private Map<String, Set<String>> buildBlockTagSnapshot() {
     Map<String, Set<String>> out = new HashMap<>();
+    int totalTags = 0;
+    int totalEmpty = 0;
     try {
       Iterable<Tag<Material>> tags = Bukkit.getTags(Tag.REGISTRY_BLOCKS, Material.class);
-      if (tags == null) return Collections.emptyMap();
+      if (tags == null) {
+        log(Level.WARNING,
+            "[RTP] Bukkit.getTags(REGISTRY_BLOCKS, Material.class) returned null — "
+                + "tag-flattening of safety.airBlocks/unsafeBlocks #tag tokens will be skipped");
+        return Collections.emptyMap();
+      }
       for (Tag<Material> tag : tags) {
+        totalTags++;
         NamespacedKey key = tag.getKey();
-        Set<Material> values = tag.getValues();
-        if (values == null || values.isEmpty()) continue;
+        Set<Material> values;
+        try {
+          values = tag.getValues();
+        } catch (Throwable t) {
+          log(Level.WARNING,
+              "[RTP] tag.getValues() threw for key="
+                  + key.getNamespace() + ":" + key.getKey()
+                  + " (" + t.getClass().getName() + ": " + t.getMessage() + ")");
+          totalEmpty++;
+          continue;
+        }
+        if (values == null || values.isEmpty()) {
+          totalEmpty++;
+          continue;
+        }
         Set<String> members = new HashSet<>(values.size());
         for (Material m : values) members.add(m.name());
         out.put(
             key.getNamespace() + ":" + key.getKey(),
             Collections.unmodifiableSet(members));
       }
-    } catch (RuntimeException e) {
-      log(Level.WARNING, "[RTP] Failed to snapshot block tag registry", e);
+    } catch (Throwable e) {
+      // Catch Throwable (not just RuntimeException) — Bukkit.getTags can throw
+      // NoSuchMethodError / NoClassDefFoundError on forks where the Tag API
+      // signature differs, and those would otherwise silently escape our handler
+      // with no operator-visible log line.
+      log(Level.WARNING,
+          "[RTP] Failed to snapshot block tag registry: "
+              + e.getClass().getName() + ": " + e.getMessage(), e);
       return Collections.emptyMap();
+    }
+    if (out.isEmpty()) {
+      log(Level.WARNING,
+          "[RTP] Bukkit block-tag registry yielded no usable tags (iterated="
+              + totalTags + ", empty=" + totalEmpty
+              + "); #tag tokens in safety.airBlocks/unsafeBlocks will not be flattened.");
     }
     return Collections.unmodifiableMap(out);
   }
+
 
   private Object plugin;
 

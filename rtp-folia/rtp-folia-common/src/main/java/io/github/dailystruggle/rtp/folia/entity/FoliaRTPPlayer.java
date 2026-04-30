@@ -182,8 +182,29 @@ public final class FoliaRTPPlayer implements RTPPlayer {
   }
 
   @RegionThread
-  public Player player() {
+  Player player() {
     return player;
+  }
+
+  /**
+   * Schedule {@code task} on this player's entity scheduler after {@code delayTicks}.
+   * The optional {@code retired} runnable fires if the entity is removed before the
+   * task runs (Folia's "retired" callback). Keeps the underlying {@link Player}
+   * reference encapsulated within this class so callers don't need to fetch it via
+   * {@link #player()} or {@code Bukkit.getPlayer(uuid)}.
+   *
+   * @return {@code true} if the scheduler accepted the task, {@code false} if the
+   *         player is no longer schedulable (caller should use a fallback path so
+   *         the runnable is not silently dropped — see REQ-RTP-S-004).
+   */
+  public boolean scheduleOnSelf(Runnable task, Runnable retired, long delayTicks) {
+    if (player == null) return false;
+    Plugin plugin = (Plugin) RTP.getInstance().getPlugin();
+    if (plugin == null || !plugin.isEnabled()) return false;
+    Object scheduled = player
+        .getScheduler()
+        .runDelayed(plugin, st -> task.run(), retired, Math.max(1, delayTicks));
+    return scheduled != null;
   }
 
   @Override

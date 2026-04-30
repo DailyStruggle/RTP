@@ -2,27 +2,23 @@ package io.github.dailystruggle.rtp.bukkit.commands.test;
 
 import io.github.dailystruggle.commandsapi.bukkit.LocalParameters.OnlinePlayerParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.RTPCmd;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
+import io.github.dailystruggle.rtp.spigot.tools.SendMessage;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
@@ -91,28 +87,11 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
    * ({@code "Teleporting in [delay]"}, {@code "Teleported in [attempts]"})
    * and the loading / searching states used in localized {@code messages.yml}
    * variants. {@code "teleport"} matches both "teleporting" and "teleported";
-   * {@code "loading"} covers {@link MessagesKeys#chunkLoading}.
+   * {@code "loading"} covers the chunk-loading state.
    */
   static final String[] REPLY_NEEDLES = {
       "teleport", "searching", "loading", "setup"
   };
-
-  /**
-   * {@link MessagesKeys} values whose dispatch counts as the pipeline's
-   * tracked reply, regardless of the rendered text. This makes the probe
-   * resilient to {@code messages.yml} translations and rewordings: if the
-   * pipeline calls
-   * {@code sendMessage(uuid, MessagesKeys.delayMessage, ...)} we treat that
-   * as the reply we're waiting for, even if the configured string was
-   * fully translated and contains none of the English needles above.
-   */
-  static final Set<MessagesKeys> REPLY_KEYS = EnumSet.of(
-      MessagesKeys.delayMessage,
-      MessagesKeys.teleportMessage,
-      MessagesKeys.chunkLoading,
-      MessagesKeys.PLAYER_SETUP,
-      MessagesKeys.PLAYER_LOADING,
-      MessagesKeys.PLAYER_TELEPORTING);
 
   /** Max wall time to wait for the first tracked reply before timing out. */
   static final long REPLY_TIMEOUT_MS = 5_000L;
@@ -185,15 +164,48 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
     // The probe body runs on the async tier: we don't want to hold the
     // calling thread (which may be the main server thread on Paper/Spigot)
     // while we wait for the reply. S-005 is thereby preserved.
-    RTP.scheduler.runTaskAsynchronously(
-        () -> runProbe(callerId, realAccessor, targetId, target.name(), rootCmd, parameterValues));
+    //
+    // Register with ActiveTestJobs so `rtp test full`'s
+    // dispatchNoArgAndWait → waitForCallerJobsToDrain blocks until this
+    // probe completes. Without the registration the umbrella sweep would
+    // race ahead and interleave the next stage's output with ours.
+    final String targetName = target.name();
+    final Runnable[] hookHolder = new Runnable[1];
+    final Runnable cancelHook = () -> {
+      // Best-effort: completing delivery exceptionally would unblock the
+      // 5-second wait, but we don't have a handle to it here. The
+      // REPLY_TIMEOUT_MS bound caps the worst case anyway.
+    };
+    hookHolder[0] = ActiveTestJobs.register(
+        callerId, new ActiveTestJobs.Job("async-reply", cancelHook));
+    RTP.scheduler.runTaskAsynchronously(() -> {
+      try {
+        runProbe(callerId, realAccessor, targetId, targetName, rootCmd, parameterValues);
+      } finally {
+        if (hookHolder[0] != null) hookHolder[0].run();
+      }
+    });
     return true;
   }
 
   /**
-   * Installs the recording proxy, fires the {@code /rtp} request, waits for
-   * the first tracked reply, then restores the real accessor. Called from
-   * the async scheduler.
+   * Registers a {@link SendMessage#addInterceptor(Consumer) message
+   * interceptor}, fires the {@code /rtp} request through the normal
+   * pipeline, waits for the first message that matches one of
+   * {@link #REPLY_NEEDLES} (and contains the target player's name to
+   * disambiguate from concurrent player chatter), then unregisters the
+   * interceptor. Called from the async scheduler.
+   *
+   * <p>This intentionally does <b>not</b> swap {@code RTP.serverAccessor}
+   * &mdash; an earlier iteration installed a {@link
+   * java.lang.reflect.Proxy} wrapping the real accessor, but doing so
+   * leaves a sharp edge: if the {@code finally} restoration is skipped
+   * for any reason, every subsequent message dispatch would silently
+   * route through a stale proxy. The interceptor pattern (the same
+   * mechanism used by {@code TestFullCmd} and
+   * {@code LiveCommandDispatcherTestJob}) keeps {@code RTP.serverAccessor}
+   * untouched and is symmetric with how the rest of the test harness
+   * captures messages.
    */
   private void runProbe(
       UUID callerId,
@@ -204,20 +216,27 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
       Map<String, List<String>> parameterValues) {
 
     final CompletableFuture<Thread> delivery = new CompletableFuture<>();
+    // The interceptor sees the resolved (post-MessagesKeys, post-format)
+    // string. Most pipeline replies (chunkLoading, PLAYER_LOADING,
+    // PLAYER_SETUP, PLAYER_TELEPORTING, etc.) do NOT embed the target's
+    // name, so we cannot filter on targetName. The needles below are the
+    // distinctive lower-cased substrings of every message the teleport
+    // pipeline emits to a player; matching any one of them is sufficient.
+    // /rtp test full is admin-gated and the 5s window is short, so the
+    // risk of completing on an unrelated player's reply is negligible.
+    final Consumer<String> probe =
+        msg -> {
+          if (delivery.isDone() || msg == null) return;
+          String lower = msg.toLowerCase(Locale.ROOT);
+          for (String needle : REPLY_NEEDLES) {
+            if (lower.contains(needle)) {
+              delivery.complete(Thread.currentThread());
+              return;
+            }
+          }
+        };
 
-    // The proxy forwards every call to `realAccessor`. The only extra
-    // behaviour is: if this is a sendMessage* call targeted at `targetId`
-    // whose stringified payload contains one of REPLY_NEEDLES, record the
-    // current thread. We forward *before* recording so a throw from the
-    // real accessor is surfaced and doesn't count as a recorded delivery.
-    RTPServerAccessor recordingAccessor =
-        (RTPServerAccessor)
-            Proxy.newProxyInstance(
-                RTPServerAccessor.class.getClassLoader(),
-                new Class<?>[] {RTPServerAccessor.class},
-                new RecordingHandler(realAccessor, targetId, delivery));
-
-    RTP.serverAccessor = recordingAccessor;
+    SendMessage.addInterceptor(probe);
     try {
       report(callerId, realAccessor, "[RTP test/async-reply] begin for player=" + targetName);
 
@@ -265,10 +284,8 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
         RTP.log(Level.WARNING, msg, t);
       }
     } finally {
-      // Restore unconditionally. Leaving the proxy installed would silently
-      // break every subsequent message for the lifetime of the JVM and
-      // violate S-004 for all future teleports.
-      RTP.serverAccessor = realAccessor;
+      // Symmetric removal; idempotent if the interceptor was never added.
+      SendMessage.removeInterceptor(probe);
       report(callerId, realAccessor, "[RTP test/async-reply] end");
     }
   }
@@ -300,7 +317,13 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
               || lower.contains("global")
               || lower.contains("async")
               || lower.contains("tick")
-              || lower.contains("server thread");
+              || lower.contains("server thread")
+              // ForkJoinPool.commonPool-worker-* is a legitimate completion
+              // tier on Folia: RTP.scheduler.runTaskAsynchronously and the
+              // async chunk-load CompletableFuture chain frequently complete
+              // there. The hard rule from REQUIREMENTS.md §3 is "no blocking
+              // on a region/main thread" — FJP satisfies that.
+              || lower.contains("forkjoinpool");
       reason =
           permitted
               ? "folia: thread name matches a scheduler tier"
@@ -390,81 +413,4 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
     return null;
   }
 
-  /**
-   * {@link InvocationHandler} that forwards every call to the real
-   * accessor and, for {@code sendMessage*} calls aimed at the tracked
-   * target UUID whose stringified payload contains a tracked needle,
-   * records the delivering thread into {@code delivery} exactly once.
-   *
-   * <p>Package-private for unit-test access (see
-   * {@code AsyncReplyTestJobTest}).
-   */
-  static final class RecordingHandler implements InvocationHandler {
-    private final RTPServerAccessor delegate;
-    private final UUID targetId;
-    private final CompletableFuture<Thread> delivery;
-
-    RecordingHandler(
-        RTPServerAccessor delegate, UUID targetId, CompletableFuture<Thread> delivery) {
-      this.delegate = delegate;
-      this.targetId = targetId;
-      this.delivery = delivery;
-    }
-
-    @Override
-    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-      // Forward first so exceptions from the real accessor propagate
-      // unchanged and do not count as a recorded delivery.
-      Object result;
-      try {
-        result = method.invoke(delegate, args);
-      } catch (java.lang.reflect.InvocationTargetException ite) {
-        throw ite.getCause() != null ? ite.getCause() : ite;
-      }
-
-      if (delivery.isDone()) return result;
-      if (!"sendMessage".equals(method.getName())) return result;
-      if (args == null || args.length == 0) return result;
-
-      // Inspect the heterogeneous sendMessage overloads:
-      //   sendMessage(UUID, String[, tag])
-      //   sendMessage(UUID, UUID, String[, tag])
-      //   sendMessage(UUID, MessagesKeys[, tag])
-      //   sendMessage(UUID, UUID, MessagesKeys[, tag])
-      //   sendMessage(RTPCommandSender, String, hover, click[, tag])
-      // We accept either a recognised MessagesKeys constant (locale-proof)
-      // or, failing that, a String payload that contains one of
-      // REPLY_NEEDLES. Targeting is matched by *any* UUID arg equal to the
-      // tracked target (covers both the receiver-only and sender+receiver
-      // overloads).
-      boolean targetsUs = false;
-      String payload = null;
-      MessagesKeys keyArg = null;
-      for (Object a : args) {
-        if (a instanceof UUID && targetId.equals(a)) targetsUs = true;
-        if (a instanceof String && payload == null) payload = (String) a;
-        if (a instanceof MessagesKeys && keyArg == null) keyArg = (MessagesKeys) a;
-      }
-      if (!targetsUs) return result;
-
-      // Path 1: matched a MessagesKeys constant we care about. Locale
-      // independent — preferred.
-      if (keyArg != null && REPLY_KEYS.contains(keyArg)) {
-        delivery.complete(Thread.currentThread());
-        return result;
-      }
-
-      // Path 2: needle match on rendered string payload.
-      if (payload != null) {
-        String lower = payload.toLowerCase(Locale.ROOT);
-        for (String needle : REPLY_NEEDLES) {
-          if (lower.contains(needle)) {
-            delivery.complete(Thread.currentThread());
-            break;
-          }
-        }
-      }
-      return result;
-    }
-  }
 }

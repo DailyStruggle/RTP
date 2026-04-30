@@ -325,18 +325,18 @@ public class JumpAdjustorTest {
     }
 
     // -----------------------------------------------------------------------
-    // platformDepth — live full-load path sweeps [1..platformDepth] below feet
+    // safetyRadius — live full-load path sweeps [1..safetyRadius] below feet
     // -----------------------------------------------------------------------
 
     /**
-     * Mirrors {@code LinearAdjustorTest.platformDepth_liveFullLoad_rejectsUnsafeUnderSafeCrust}:
-     * with {@code platformDepth=2}, a safe crust at {@code y-1} over an unsafe block
+     * Mirrors {@code LinearAdjustorTest.safetyRadius_liveFullLoad_rejectsUnsafeUnderSafeCrust}:
+     * with {@code safetyRadius=2}, a safe crust at {@code y-1} over an unsafe block
      * at {@code y-2} must reject the candidate. Before aligning the live path with
      * the probe-path sweep, only {@code y-1} was checked and the crust alone would
      * pass — players would drop through into the fluid.
      */
     @Test
-    void platformDepth_liveFullLoad_rejectsUnsafeUnderSafeCrust() throws Exception {
+    void safetyRadius_liveFullLoad_rejectsUnsafeUnderSafeCrust() throws Exception {
         io.github.dailystruggle.rtp.common.configuration.ConfigParser<
                 io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys>
                 safety = (io.github.dailystruggle.rtp.common.configuration.ConfigParser<
@@ -355,17 +355,15 @@ public class JumpAdjustorTest {
                                         Object>)
                                 dataField.get(safety);
         safetyData.put(
-                io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.platformDepth, 2);
+                io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.safetyRadius, 2);
 
-        java.lang.reflect.Field lastUpdateField =
-                JumpAdjustor.class.getDeclaredField("lastUpdate");
-        lastUpdateField.setAccessible(true);
-        ((java.util.concurrent.atomic.AtomicLong) lastUpdateField.get(null)).set(0L);
+        // No static cache to reset — JumpAdjustor reads safety config directly
+        // from RTP.configs at the top of each adjust(...) call now.
 
         try {
         // y=63 safe crust, y=62 unsafe (fluid analogue), y=71 higher safe floor.
         // step=1 → linear scan from minY upward; bottom-up path accepts at the
-        // first column satisfying the full triplet. Without the [1..platformDepth]
+        // first column satisfying the full triplet. Without the [1..safetyRadius]
         // sweep, y=64 passes (only y-1=63 checked, safe); with the sweep, y=64 is
         // rejected (y-2=62 unsafe) and the scan proceeds until it finds y=72.
         ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
@@ -380,13 +378,12 @@ public class JumpAdjustorTest {
         assertEquals(
                 72,
                 result.y(),
-                "platformDepth=2 must reject y=64 (unsafe at y-2) and pick the higher safe floor");
+                "safetyRadius=2 must reject y=64 (unsafe at y-2) and pick the higher safe floor");
         } finally {
-            // Static fields leak across tests; restore the default so later tests are unaffected.
+            // Restore the default safetyRadius so later tests see a clean parser state.
             safetyData.put(
-                    io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.platformDepth,
-                    1);
-            ((java.util.concurrent.atomic.AtomicLong) lastUpdateField.get(null)).set(0L);
+                    io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.safetyRadius,
+                    0);
         }
     }
 }

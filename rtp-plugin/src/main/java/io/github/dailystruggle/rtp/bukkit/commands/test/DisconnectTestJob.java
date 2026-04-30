@@ -106,18 +106,26 @@ public class DisconnectTestJob extends BaseRTPCmdImpl {
             RTP.getInstance().priorTeleportData);
 
     AtomicBoolean cancelFlag = new AtomicBoolean(false);
-    ActiveTestJobs.register(
-        callerId, new ActiveTestJobs.Job("disconnect-job", () -> cancelFlag.set(true)));
+    Runnable unregister =
+        ActiveTestJobs.register(
+            callerId, new ActiveTestJobs.Job("disconnect-job", () -> cancelFlag.set(true)));
 
     runProbeAsync(live, ForkJoinPool.commonPool(), DEFAULT_TIMEOUT_MS, cancelFlag::get)
         .whenComplete(
             (r, err) -> {
-              if (err != null) {
-                Result failed = new Result();
-                failed.threw = err.getClass().getSimpleName() + ": " + err.getMessage();
-                emit(callerId, failed);
-              } else {
-                emit(callerId, r);
+              try {
+                if (err != null) {
+                  Result failed = new Result();
+                  failed.threw = err.getClass().getSimpleName() + ": " + err.getMessage();
+                  emit(callerId, failed);
+                } else {
+                  emit(callerId, r);
+                }
+              } finally {
+                // Release the ActiveTestJobs slot so TestFullCmd's
+                // waitForCallerJobsToDrain can see the stage as done and
+                // advance to the next sweep step (true sequential semantics).
+                unregister.run();
               }
             });
     return true;

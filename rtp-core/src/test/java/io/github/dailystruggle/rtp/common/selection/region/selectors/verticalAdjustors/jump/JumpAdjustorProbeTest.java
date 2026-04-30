@@ -218,11 +218,7 @@ public class JumpAdjustorProbeTest {
     EnumMap<SafetyKeys, Object> safetyData = (EnumMap<SafetyKeys, Object>) dataField.get(safety);
     safetyData.put(SafetyKeys.airBlocks, new ArrayList<>(Arrays.asList("TALL_GRASS")));
 
-    // Force the 5-second cache refresh window to elapse; the static lastUpdate may
-    // already have been advanced by a prior test in this class.
-    java.lang.reflect.Field lastUpdateField = JumpAdjustor.class.getDeclaredField("lastUpdate");
-    lastUpdateField.setAccessible(true);
-    ((java.util.concurrent.atomic.AtomicLong) lastUpdateField.get(null)).set(0L);
+    // No static cache to reset — readSafetySnapshot() reads the parser per call.
 
     FakeChunkColumnProbe probe = new FakeChunkColumnProbe(0, 0, 0, 128);
     probe.setSolidRange(0, 63);
@@ -259,10 +255,7 @@ public class JumpAdjustorProbeTest {
     EnumMap<SafetyKeys, Object> safetyData = (EnumMap<SafetyKeys, Object>) dataField.get(safety);
     safetyData.put(SafetyKeys.airBlocks, new ArrayList<>(Arrays.asList("#minecraft:flowers")));
 
-    // Force the 5-second refresh window.
-    java.lang.reflect.Field lastUpdateField = JumpAdjustor.class.getDeclaredField("lastUpdate");
-    lastUpdateField.setAccessible(true);
-    ((java.util.concurrent.atomic.AtomicLong) lastUpdateField.get(null)).set(0L);
+    // No static cache to reset — readSafetySnapshot() reads the parser per call.
 
     // Install a tag-snapshot-aware accessor that publishes minecraft:flowers → {POPPY}.
     io.github.dailystruggle.rtp.api.server.RTPServerAccessor prev = RTP.serverAccessor;
@@ -289,27 +282,20 @@ public class JumpAdjustorProbeTest {
               + " #minecraft:flowers tag token");
       assertEquals(64, r.y());
 
-      // Cross-check the materialised fast-lookup set directly (the private static
-      // airBlocks field consumed by acceptProbeY). The reapply to the YAML-backed
-      // config value is also attempted (try/catch in refreshSafetySets) but the
-      // in-test YamlFile branch of ConfigParser.set can reject ArrayList values
-      // when the resource is backed by a ConfigurationSection — the live set is
-      // the authoritative source of truth for the probe path regardless.
-      java.lang.reflect.Field airBlocksField = JumpAdjustor.class.getDeclaredField("airBlocks");
-      airBlocksField.setAccessible(true);
-      @SuppressWarnings("unchecked")
-      java.util.Set<String> airBlocksLive = (java.util.Set<String>) airBlocksField.get(null);
-      org.junit.jupiter.api.Assertions.assertTrue(
-          airBlocksLive.contains("POPPY"),
-          "materialised airBlocks set should contain the expanded POPPY member, was "
-              + airBlocksLive);
-      org.junit.jupiter.api.Assertions.assertTrue(
-          airBlocksLive.contains("DANDELION"),
-          "materialised airBlocks set should contain the expanded DANDELION member, was "
-              + airBlocksLive);
-      org.junit.jupiter.api.Assertions.assertFalse(
-          airBlocksLive.contains("#minecraft:flowers"),
-          "materialised airBlocks set must not contain the literal tag token");
+      // Behavioural cross-check: the snapshot drops bare DANDELION too (other tag
+      // member). A separate column with DANDELION in body/head must also be
+      // accepted, proving the tag was expanded and the literal "#minecraft:flowers"
+      // token is no longer a fast-lookup entry.
+      FakeChunkColumnProbe probe2 = new FakeChunkColumnProbe(0, 0, 0, 128);
+      probe2.setSolidRange(0, 63);
+      probe2.withBlock(64, "DANDELION");
+      probe2.withBlock(65, "DANDELION");
+      RTPCoords r2 = adj(60, 80).adjustFromProbe(probe2, "w");
+      assertNotNull(
+          r2,
+          "expected the probe path to also accept DANDELION (sibling tag member) when"
+              + " airBlocks contains the #minecraft:flowers tag token");
+      assertEquals(64, r2.y());
     } finally {
       RTP.serverAccessor = prev;
     }
@@ -334,35 +320,32 @@ public class JumpAdjustorProbeTest {
         SafetyKeys.unsafeBlocks,
         new ArrayList<>(Arrays.asList("LAVA", "CAMPFIRE[lit=true]")));
 
-    java.lang.reflect.Field lastUpdateField = JumpAdjustor.class.getDeclaredField("lastUpdate");
-    lastUpdateField.setAccessible(true);
-    ((java.util.concurrent.atomic.AtomicLong) lastUpdateField.get(null)).set(0L);
+    // Behavioural assertion: the probe path drops state-predicated tokens (it has
+    // no property map), so a bare CAMPFIRE at the feet must still be accepted by
+    // the probe path — only the compiled-form full-load consumer evaluates the
+    // state predicate. Conversely a bare LAVA at the feet must be rejected.
+    FakeChunkColumnProbe campfireProbe = new FakeChunkColumnProbe(0, 0, 0, 128);
+    campfireProbe.setSolidRange(0, 62);
+    campfireProbe.withBlock(63, "CAMPFIRE"); // bare; not a state-predicated match
+    campfireProbe.setAirRange(64, 128);
+    RTPCoords accepted = adj(60, 80).adjustFromProbe(campfireProbe, "w");
+    assertNotNull(
+        accepted,
+        "probe path must accept CAMPFIRE feet when only CAMPFIRE[lit=true] is unsafe"
+            + " — state-predicated tokens are dropped from the probe fast-path set");
+    assertEquals(64, accepted.y());
 
-    // Trigger refreshSafetySets via a probe call.
-    FakeChunkColumnProbe probe = new FakeChunkColumnProbe(0, 0, 0, 128);
-    probe.setSolidRange(0, 63);
-    probe.setAirRange(64, 128);
-    adj(60, 80).adjustFromProbe(probe, "w");
-
-    // Fast-lookup unsafe set: LAVA materialised, state-predicated CAMPFIRE dropped
-    // (probe has no property map). These assertions are the authoritative contract
-    // for the probe-fast-path; the config-value reapply is attempted best-effort
-    // inside refreshSafetySets and tested above.
-    java.lang.reflect.Field unsafeField = JumpAdjustor.class.getDeclaredField("unsafeBlocks");
-    unsafeField.setAccessible(true);
-    @SuppressWarnings("unchecked")
-    java.util.Set<String> unsafeLive = (java.util.Set<String>) unsafeField.get(null);
-    org.junit.jupiter.api.Assertions.assertTrue(
-        unsafeLive.contains("LAVA"), "bare material LAVA must land in the fast-lookup set");
-    org.junit.jupiter.api.Assertions.assertFalse(
-        unsafeLive.contains("CAMPFIRE[lit=true]"),
-        "state-predicated tokens must be excluded from the probe-fast-path set (probe has"
-            + " no property map) — the compiled-form path on the full-load branch still"
-            + " honours them");
-    org.junit.jupiter.api.Assertions.assertFalse(
-        unsafeLive.contains("CAMPFIRE"),
-        "a state-predicated CAMPFIRE[lit=true] token must not be silently collapsed to the"
-            + " bare CAMPFIRE material in the fast-lookup set");
+    FakeChunkColumnProbe lavaProbe = new FakeChunkColumnProbe(0, 0, 0, 128);
+    lavaProbe.setSolidRange(0, 62);
+    lavaProbe.withBlock(63, "LAVA"); // bare unsafe — must be rejected
+    lavaProbe.withBlock(64, "STONE");
+    lavaProbe.setAirRange(65, 128);
+    RTPCoords lavaResult = adj(60, 80).adjustFromProbe(lavaProbe, "w");
+    assertNotNull(lavaResult, "scan should land at the higher stone-floored y=65");
+    assertEquals(
+        65,
+        lavaResult.y(),
+        "bare LAVA token must reject the y=64 candidate; scan continues to y=65");
   }
 
   /**

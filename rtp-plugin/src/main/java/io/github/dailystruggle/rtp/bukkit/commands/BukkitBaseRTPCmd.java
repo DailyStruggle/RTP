@@ -38,17 +38,32 @@ public abstract class BukkitBaseRTPCmd extends BukkitTreeCommand
 
     String msg = String.valueOf(lang.getConfigValue(MessagesKeys.badArg, "[P0] bad parameter - [arg]"));
     msg = msg.replace("[arg]", parameterName + ":" + parameterValue);
+    // Format ([P0], &-codes, hex) before invoking the Consumer. The
+    // messageMethod handed in by BukkitTreeCommand is sender::sendMessage,
+    // which writes the *raw* template directly to the player and (because
+    // the dispatch came from a player) is mirrored to the console at INFO
+    // by Bukkit -- producing the literal '&c[P0] ...' line observed in the
+    // F4 live log. The RTP.log(WARNING, ...) call below routes through
+    // SendMessage.log which formats independently.
+    String formatted = RTP.serverAccessor.format(callerId, msg);
     if(messageMethod != null) {
-      messageMethod.accept(msg);
+      // The Consumer (configured by RTPCmdBukkit's messageMethodFactory) routes
+      // through SendMessage.sendMessage, which fires SendMessage.intercept(...) --
+      // the REQ-RTP-S-004 auditor's CountingHandler is registered there, so this
+      // single dispatch suffices for both player delivery and audit coverage.
+      // Calling RTP.log(WARNING, ...) in addition would re-emit the same text to
+      // the console via SendMessage.log, producing the duplicate `[RTP] invalid
+      // command - <arg>` lines observed under `rtp test full`.
+      messageMethod.accept(formatted);
     } else if (!callerId.equals(CommandsAPI.serverId)) {
-      // Player caller: deliver the player-visible message. Console callers are served
-      // by the RTP.log(WARNING, ...) call below (which writes to the console sender
-      // via SendMessage.log) -- routing through both paths here would cause the
-      // duplicate-line pattern observed under `rtp test full` (REQ-RTP-S-004 auditor).
       CommandSender sender = Bukkit.getPlayer(callerId);
       if (sender != null) SendMessage.sendMessage(sender, msg);
+      RTP.log(java.util.logging.Level.WARNING, msg);
+    } else {
+      // Console caller, no Consumer supplied: route through SendMessage.log so
+      // the S-004 interceptor fires.
+      RTP.log(java.util.logging.Level.WARNING, msg);
     }
-    RTP.log(java.util.logging.Level.WARNING, msg);
   }
 
   @Override
@@ -63,14 +78,20 @@ public abstract class BukkitBaseRTPCmd extends BukkitTreeCommand
 
     String msg = String.valueOf(lang.getConfigValue(MessagesKeys.invalidCommand, "[P0] invalid command - [arg]"));
     msg = msg.replace("[arg]", argument);
+    // See msgBadParameter: format before the Consumer sink so the player and
+    // the console-mirror both see substituted [P0] / colors instead of '&c[P0]'.
+    String formatted = RTP.serverAccessor.format(callerId, msg);
     if(messageMethod != null) {
-      messageMethod.accept(msg);
+      // See msgBadParameter: the Consumer routes through SendMessage.sendMessage
+      // which already triggers the S-004 auditor via SendMessage.intercept(...).
+      // RTP.log here would duplicate the `[RTP] invalid command - <arg>` line.
+      messageMethod.accept(formatted);
     } else if (!callerId.equals(CommandsAPI.serverId)) {
-      // See msgBadParameter: console callers are served by RTP.log(WARNING, ...)
-      // alone to avoid the duplicate-line pattern observed under `rtp test full`.
       CommandSender sender = Bukkit.getPlayer(callerId);
       if (sender != null) SendMessage.sendMessage(sender, msg);
+      RTP.log(java.util.logging.Level.WARNING, msg);
+    } else {
+      RTP.log(java.util.logging.Level.WARNING, msg);
     }
-    RTP.log(java.util.logging.Level.WARNING, msg);
   }
 }

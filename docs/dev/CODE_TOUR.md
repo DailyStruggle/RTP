@@ -207,7 +207,7 @@ When a bug reproduces only on Folia, the answer is almost always one of the abov
 
 ## 10. Plugin setup lifecycle
 
-Canonical diagram: [`docs/architecture/07-plugin-setup-lifecycle.md`](../architecture/07-plugin-setup-lifecycle.md). Entry class: `RTPBukkitPlugin` (`rtp-plugin/.../bukkit/RTPBukkitPlugin.java`).
+Canonical diagram: [`docs/architecture/06-plugin-setup-lifecycle.md`](../architecture/06-plugin-setup-lifecycle.md). Entry class: `RTPBukkitPlugin` (`rtp-plugin/.../bukkit/RTPBukkitPlugin.java`).
 
 Startup is the one path that is not repeated at runtime, so bugs here look like "plugin silently half-enabled" rather than a pipeline failure. Read the diagram, then use the following repair lenses:
 
@@ -225,7 +225,7 @@ Startup is the one path that is not repeated at runtime, so bugs here look like 
 
 ## 11. How behaviors are decided
 
-Canonical diagram: [`docs/architecture/08-rtp-command-region-selection.md`](../architecture/08-rtp-command-region-selection.md). Scope: the `/rtp` + `/wild` command path through `SelectionAPI.getRegion(player)` — other behavior paths (onEvent auto-teleport, `tempRegion`, `/rtp scan`) have their own entry points and are not covered by this diagram. Entry class: `SelectionAPI.getRegion(RTPPlayer)` in `rtp-core/.../common/selection/SelectionAPI.java`.
+Canonical diagram: [`docs/architecture/07-rtp-command-region-selection.md`](../architecture/07-rtp-command-region-selection.md). Scope: the `/rtp` + `/wild` command path through `SelectionAPI.getRegion(player)` — other behavior paths (onEvent auto-teleport, `tempRegion`, `/rtp scan`) have their own entry points and are not covered by this diagram. Entry class: `SelectionAPI.getRegion(RTPPlayer)` in `rtp-core/.../common/selection/SelectionAPI.java`.
 
 The key mental model: **RTP's behavior is data, not code.** From the moment the player issues `/rtp`, every subsequent choice (which world, which region, which shape, which vertical adjustor, cache size, price, whether to queue or search ad-hoc) is read from configuration and permission nodes. `rtp-core` never branches on world or region *name*.
 
@@ -251,7 +251,7 @@ Walk the diagram as a repair tool:
 
 ## 12. Location selection (per attempt)
 
-Canonical diagram: [`docs/architecture/09-location-selection-per-attempt.md`](../architecture/09-location-selection-per-attempt.md). Entry class: `PregenTask.runAttempt` in `rtp-core/.../common/selection/region/PregenTask.java`, called via `LocationGenerator.getLocationFuture`.
+Canonical diagram: [`docs/architecture/08-location-selection-per-attempt.md`](../architecture/08-location-selection-per-attempt.md). Entry class: `PregenTask.runAttempt` in `rtp-core/.../common/selection/region/PregenTask.java`, called via `LocationGenerator.getLocationFuture`.
 
 This is the **decision core** of the plugin. Every caller you met earlier — the `/rtp` command ([§11](#11-how-behaviors-are-decided)), the cache generator ([§3](#3-budgeted-cache-generator-queue-refill)), `/rtp scan` ([§6](#6-scan-task-crawler)) — ends up asking `ILocationGenerator` for a coordinate, and that coordinate comes out of this loop. If it emits a bad `(x, y, z)` or emits one too slowly, *everything downstream looks broken*. That is why it gets its own diagram separate from the outer attempt-loop plumbing.
 
@@ -279,7 +279,7 @@ Walk the diagram as a repair tool:
 
 ## 13. Configuration load and reload
 
-Canonical diagram: [`docs/architecture/10-configuration-load-and-reload.md`](../architecture/10-configuration-load-and-reload.md). Entry class: `Configs` in `rtp-core/.../common/configuration/Configs.java`; called from `RTPBukkitPlugin.onEnable` (first load) and from the `/rtp reload` command (subsequent reloads) via `Configs.reload -> reloadAction -> reloadConfigs + reloadRegions`.
+Canonical diagram: [`docs/architecture/09-configuration-load-and-reload.md`](../architecture/09-configuration-load-and-reload.md). Entry class: `Configs` in `rtp-core/.../common/configuration/Configs.java`; called from `RTPBukkitPlugin.onEnable` (first load) and from the `/rtp reload` command (subsequent reloads) via `Configs.reload -> reloadAction -> reloadConfigs + reloadRegions`.
 
 This section is the one to open *first* for any bug where "the config says X but RTP acts as if Y". Most such reports resolve here before you ever touch the pipeline.
 
@@ -309,7 +309,7 @@ Walk the diagram as a repair tool:
 
 ## 14. Shutdown and flush lifecycle
 
-Canonical diagram: [`docs/architecture/11-shutdown-and-flush-lifecycle.md`](../architecture/11-shutdown-and-flush-lifecycle.md). Entry classes: `RTPBukkitPlugin.onDisable` (`rtp-plugin/.../bukkit/RTPBukkitPlugin.java`) and `RTP.stop()` (`rtp-core/.../common/RTP.java`).
+Canonical diagram: [`docs/architecture/10-shutdown-and-flush-lifecycle.md`](../architecture/10-shutdown-and-flush-lifecycle.md). Entry classes: `RTPBukkitPlugin.onDisable` (`rtp-plugin/.../bukkit/RTPBukkitPlugin.java`) and `RTP.stop()` (`rtp-core/.../common/RTP.java`).
 
 Shutdown is the symmetric partner of [§10 Plugin setup lifecycle](#10-plugin-setup-lifecycle). Unlike a reload (§13), which reuses allocations, a shutdown must *release* every allocation made during `onEnable`. Two classes of bug dominate this path: **data loss** (cached locations not flushed before the DB stop flag is set) and **resource leaks** (chunk tickets not released — an S-002 violation).
 

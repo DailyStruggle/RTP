@@ -115,24 +115,36 @@ public class FoliaOwnershipTestJob extends BaseRTPCmdImpl {
     // Fire-and-forget: run the probe pipeline on the async tier so the
     // dispatch thread (possibly the main server thread on Paper/Spigot)
     // is never blocked. The pipeline is a pure CompletableFuture chain.
+    //
+    // Register with ActiveTestJobs so the umbrella `rtp test full` sweep
+    // (TestFullCmd.dispatchNoArgAndWait) blocks until our async tail
+    // unregisters in `whenComplete` below; otherwise the next stage's
+    // output interleaves with ours.
+    final Runnable[] hookHolder = new Runnable[1];
+    hookHolder[0] = ActiveTestJobs.register(
+        callerId, new ActiveTestJobs.Job("folia-ownership", () -> { /* no cancel handle */ }));
     scheduler.runTaskAsynchronously(
         () -> {
           report(callerId, "[RTP test/folia-ownership] begin synthetic=" + syntheticId);
           dispatchMockTeleport(callerId, scheduler, loc)
               .whenComplete(
                   (result, err) -> {
-                    if (err != null) {
-                      fail(
-                          callerId,
-                          "pipeline failed ("
-                              + err.getClass().getSimpleName()
-                              + ": "
-                              + err.getMessage()
-                              + ")");
-                    } else {
-                      report(callerId, "[RTP test/folia-ownership] " + result);
+                    try {
+                      if (err != null) {
+                        fail(
+                            callerId,
+                            "pipeline failed ("
+                                + err.getClass().getSimpleName()
+                                + ": "
+                                + err.getMessage()
+                                + ")");
+                      } else {
+                        report(callerId, "[RTP test/folia-ownership] " + result);
+                      }
+                      report(callerId, "[RTP test/folia-ownership] end");
+                    } finally {
+                      if (hookHolder[0] != null) hookHolder[0].run();
                     }
-                    report(callerId, "[RTP test/folia-ownership] end");
                   });
         });
     return true;

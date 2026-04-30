@@ -20,8 +20,27 @@ import org.bukkit.entity.Player;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.logging.Level;
 
 public class BukkitEffectsHandler {
+    /**
+     * Resolve a Bukkit {@link Player} from a UUID and emit an observable FINE-level
+     * log entry when the lookup returns {@code null}. Silently-skipped effects for
+     * synthetic / offline UUIDs were previously indistinguishable from skipped real
+     * players; the FINE log makes the skip auditable without spamming WARN. Returns
+     * {@code null} when the UUID does not resolve to a live Bukkit entity, in which
+     * case the caller must short-circuit (no real entity = no effect target).
+     */
+    private static Player resolveBukkitPlayer(UUID uuid, String stage) {
+        Player player = Bukkit.getPlayer(uuid);
+        if (player == null) {
+            RTP.log(Level.FINE,
+                    "[effects] skipping " + stage + " for uuid=" + uuid
+                            + " (no live Bukkit entity; synthetic or offline)");
+        }
+        return player;
+    }
+
     public static void setupEffects(RTPBukkitPlugin plugin) {
         Configs configs = RTP.configs;
         FactoryValue<PerformanceKeys> parser = configs.getParser(PerformanceKeys.class);
@@ -35,7 +54,7 @@ public class BukkitEffectsHandler {
                         if (!Boolean.parseBoolean(
                                 parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString()))
                             return;
-                        Player player = Bukkit.getPlayer(task.player().uuid());
+                        Player player = resolveBukkitPlayer(task.player().uuid(), "presetup");
                         if (player == null) return;
                         RTP.getInstance()
                                 .miscAsyncTasks
@@ -61,7 +80,7 @@ public class BukkitEffectsHandler {
                         if (!Boolean.parseBoolean(
                                 parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString()))
                             return;
-                        Player player = Bukkit.getPlayer(task.player().uuid());
+                        Player player = resolveBukkitPlayer(task.player().uuid(), "postsetup");
                         if (player == null) return;
                         RTP.getInstance()
                                 .miscAsyncTasks
@@ -87,7 +106,7 @@ public class BukkitEffectsHandler {
                         if (!Boolean.parseBoolean(
                                 parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString()))
                             return;
-                        Player player = Bukkit.getPlayer(task.player().uuid());
+                        Player player = resolveBukkitPlayer(task.player().uuid(), "preload");
                         if (player == null) return;
                         RTP.getInstance()
                                 .miscAsyncTasks
@@ -113,7 +132,7 @@ public class BukkitEffectsHandler {
                         if (!Boolean.parseBoolean(
                                 parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString()))
                             return;
-                        Player player = Bukkit.getPlayer(task.player().uuid());
+                        Player player = resolveBukkitPlayer(task.player().uuid(), "postload");
                         if (player == null) return;
                         RTP.getInstance()
                                 .miscAsyncTasks
@@ -139,7 +158,7 @@ public class BukkitEffectsHandler {
                         if (!Boolean.parseBoolean(
                                 parser.getData().getOrDefault(PerformanceKeys.effectParsing, false).toString()))
                             return;
-                        Player player = Bukkit.getPlayer(task.player().uuid());
+                        Player player = resolveBukkitPlayer(task.player().uuid(), "preteleport");
                         if (player == null) return;
                         RTP.getInstance()
                                 .miscAsyncTasks
@@ -165,7 +184,7 @@ public class BukkitEffectsHandler {
                             (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
 
                     if (task.player() != null) {
-                        Player player = Bukkit.getPlayer(task.player().uuid());
+                        Player player = resolveBukkitPlayer(task.player().uuid(), "postteleport-title");
                         if (player == null) return;
 
                         /*
@@ -249,7 +268,7 @@ public class BukkitEffectsHandler {
 
                         if (!effectParsing) return;
 
-                        Player player = Bukkit.getPlayer(task.player().uuid());
+                        Player player = resolveBukkitPlayer(task.player().uuid(), "postteleport");
                         if (player == null) return;
                         RTP.getInstance()
                                 .miscAsyncTasks
@@ -269,7 +288,7 @@ public class BukkitEffectsHandler {
         RTPTeleportCancel.postActions.add(
                 task -> {
                     UUID uuid = task.getPlayerId();
-                    Player player = Bukkit.getPlayer(uuid);
+                    Player player = resolveBukkitPlayer(uuid, "cancel");
 
                     if (player == null) return;
 
@@ -297,7 +316,7 @@ public class BukkitEffectsHandler {
 
         Region.onPlayerQueuePush.add(
                 (region, uuid) -> {
-                    Player player = Bukkit.getPlayer(uuid);
+                    Player player = resolveBukkitPlayer(uuid, "queuepush");
                     if (player == null) return;
 
                     PlayerQueuePushEvent event = new PlayerQueuePushEvent(region, uuid);
@@ -324,7 +343,7 @@ public class BukkitEffectsHandler {
 
         Region.onPlayerQueuePop.add(
                 (region, uuid) -> {
-                    Player player = Bukkit.getPlayer(uuid);
+                    Player player = resolveBukkitPlayer(uuid, "queuepop");
                     if (player == null) return;
 
                     PlayerQueuePopEvent event = new PlayerQueuePopEvent(region, uuid);

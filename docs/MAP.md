@@ -43,7 +43,7 @@ Flat one-line catalog of every normative doc. Cheapest first-fetch for an agent 
 - `ADR-013` Addons as external Gradle projects.
 - `ADR-014` Brigadier bridge via `commands-api`.
 - `ADR-015` Stale-chunk guard / Count-Bound pipes.
-- `ADR-016` Anvil subsystem (decision record; implementation detail in `architecture/06-anvil-prefilter.md`).
+- `ADR-016` Anvil subsystem.
 - `ADR-017` Block tags and state predicates in safety lists.
 - `ADR-018` `AGENTS.md` public-release structure.
 - `ADR-019` Claim plugin integrations folded into plugin.
@@ -54,7 +54,11 @@ Flat one-line catalog of every normative doc. Cheapest first-fetch for an agent 
 - [`architecture/03-chunk-ticket-lifecycle.md`](architecture/03-chunk-ticket-lifecycle.md)
 - [`architecture/04-active-gc-sweep.md`](architecture/04-active-gc-sweep.md)
 - [`architecture/05-scan-task-crawler.md`](architecture/05-scan-task-crawler.md)
-- [`architecture/06-anvil-prefilter.md`](architecture/06-anvil-prefilter.md) — Anvil prefilter/biome implementation (split from ADR-016).
+- [`architecture/06-plugin-setup-lifecycle.md`](architecture/06-plugin-setup-lifecycle.md)
+- [`architecture/07-rtp-command-region-selection.md`](architecture/07-rtp-command-region-selection.md)
+- [`architecture/08-location-selection-per-attempt.md`](architecture/08-location-selection-per-attempt.md)
+- [`architecture/09-configuration-load-and-reload.md`](architecture/09-configuration-load-and-reload.md)
+- [`architecture/10-shutdown-and-flush-lifecycle.md`](architecture/10-shutdown-and-flush-lifecycle.md)
 
 ## Operator-facing (`admin/`)
 - [`admin/QUICK_START.md`](admin/QUICK_START.md)

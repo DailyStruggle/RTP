@@ -12,8 +12,6 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import org.jetbrains.annotations.NotNull;
@@ -25,34 +23,93 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
       Arrays.stream(GenericMemoryShapeParams.values()).map(Enum::name).collect(Collectors.toList());
   private static final EnumMap<JumpAdjustorKeys, Object> defaults =
       new EnumMap<>(JumpAdjustorKeys.class);
-  private static final Set<String> unsafeBlocks = new ConcurrentSkipListSet<>();
+
   /**
-   * Cached {@link SafetyKeys#platformDepth} value, refreshed alongside
-   * {@link #unsafeBlocks}. Controls how many blocks below the candidate
-   * feet-Y the probe-side {@link #acceptProbeY} sweep checks against
-   * {@link #unsafeBlocks} — catches fluids hidden under a thin crust of
-   * solid blocks (e.g. sand-over-water) that would otherwise pass the
-   * single-cell {@code y-1} ground check and place the player on water.
+   * Snapshot of the configured safety state read at adjustor entry: the
+   * canonicalised {@link SafetyKeys#unsafeBlocks} and {@link SafetyKeys#airBlocks}
+   * sets (with ADR-017 tag tokens flattened through {@code RTP.serverAccessor
+   * .blockTagSnapshot()}) and {@link SafetyKeys#platformDepth}. Plumbed by
+   * reference through every helper predicate so a single {@code adjust(...)} /
+   * {@code adjustFromProbeWithReason(...)} invocation evaluates the entire scan
+   * against one consistent snapshot. No static cache — the parser already holds
+   * the tag-expanded list (written back by {@code SafetyTokenExpander} at config
+   * load and on {@code /rtp reload}), and the per-call {@code blockTagSnapshot()}
+   * lookup is a hash read against the cached registry map.
    */
-  private static volatile int platformDepth = 1;
+  private record SafetySnapshot(
+      Set<String> unsafeBlocks, Set<String> airBlocks, int platformDepth) {}
+
   /**
-   * Reconciled, materialised set of {@link SafetyKeys#airBlocks} — materials the
-   * operator considers passable / non-blocking (tall grass, flowers, torches, snow
-   * layer, etc.) in addition to vanilla {@code AIR}/{@code CAVE_AIR}/{@code VOID_AIR}.
-   * Refreshed on the same 5-second cadence as {@link #unsafeBlocks}. Treated as an
-   * "OR air" predicate in {@link #acceptProbeY} and the center-column scan of
-   * {@link #adjust(RTPChunk, MutableRTPCoords)} so that the probe-fast-path verdict
-   * matches the legacy {@code chunk.isSafe(...)} tolerance for walkable non-air
-   * blocks. ADR-017 {@code #namespace:tag} tokens are expanded through
-   * {@code RTP.serverAccessor.blockTagSnapshot()} inside {@link #refreshSafetySets()};
-   * {@code MATERIAL[prop=val]} state-predicated tokens are dropped from this set
-   * because the anvil probe exposes only palette identifiers without block-state
-   * properties (the legacy full-load path still honours them via
-   * {@code SafetyCompilationCache}). Executes {@code docs/dev/SAFETY_TAGS_AND_STATES_PLAN.md}
-   * Slice 3 for the two {@code JumpAdjustor}-owned safety sets.
+   * Read the current safety configuration directly from {@link RTP#configs}
+   * and the {@link io.github.dailystruggle.rtp.api.server.RTPServerAccessor#blockTagSnapshot()
+   * block-tag snapshot}. Tokens are normalised on the fly: bare materials are
+   * canonicalised, {@code #namespace:tag} tokens are expanded into their
+   * registered material members, and {@code MATERIAL[prop=val]} state-predicated
+   * tokens are dropped (the probe path has no property map; the compiled-form
+   * consumer still honours them via {@code SafetyCompilationCache}).
    */
-  private static final Set<String> airBlocks = new ConcurrentSkipListSet<>();
-  private static final AtomicLong lastUpdate = new AtomicLong();
+  @SuppressWarnings("unchecked")
+  private static SafetySnapshot readSafetySnapshot() {
+    ConfigParser<SafetyKeys> safety =
+        (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+
+    Map<String, Set<String>> tagSnapshot = Collections.emptyMap();
+    if (RTP.serverAccessor != null) {
+      try {
+        Map<String, Set<String>> snap = RTP.serverAccessor.blockTagSnapshot();
+        if (snap != null) tagSnapshot = snap;
+      } catch (Throwable ignored) {
+        // Best-effort — fall through with the empty snapshot.
+      }
+    }
+
+    Set<String> unsafe = new HashSet<>();
+    Set<String> air = new HashSet<>();
+    int depth = 1;
+    if (safety != null) {
+      expandTokens(
+          safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>()), tagSnapshot, unsafe);
+      expandTokens(
+          safety.getConfigValue(SafetyKeys.airBlocks, new ArrayList<>()), tagSnapshot, air);
+      // Ground-sweep depth — reuses SafetyKeys.safetyRadius so it stays
+      // distinct from SafetyKeys.platformDepth (which exclusively sizes the
+      // platform-creation tool in BukkitRTPWorld.platform / FoliaRTPWorld.platform).
+      // Floor of 1 so the [1..depth] sweep below feet always includes y-1.
+      depth = Math.max(1, safety.getNumber(SafetyKeys.safetyRadius, 1).intValue());
+    }
+    return new SafetySnapshot(unsafe, air, depth);
+  }
+
+  /**
+   * Expand an ADR-017 safety-token list into {@code sink} as canonical material
+   * names. Bare materials are canonicalised; {@code #namespace:tag} tokens are
+   * resolved through {@code tagSnapshot} (bare tag ids default to
+   * {@code minecraft:}); {@code MATERIAL[prop=val]} state-predicated tokens are
+   * dropped because the probe path has no property map.
+   */
+  private static void expandTokens(
+      Object raw, Map<String, Set<String>> tagSnapshot, Set<String> sink) {
+    if (!(raw instanceof Collection)) return;
+    for (Object item : (Collection<?>) raw) {
+      if (item == null) continue;
+      String token = item.toString().trim();
+      if (token.isEmpty()) continue;
+      if (token.indexOf('[') >= 0) continue; // state-predicated — drop on probe path
+      if (token.charAt(0) == '#') {
+        String tagId = token.substring(1);
+        if (tagId.indexOf(':') < 0) tagId = "minecraft:" + tagId;
+        tagId = tagId.toLowerCase(Locale.ROOT);
+        Set<String> members = tagSnapshot.get(tagId);
+        if (members == null) continue;
+        for (String m : members) {
+          if (m == null) continue;
+          sink.add(canonicaliseMaterialToken(m));
+        }
+        continue;
+      }
+      sink.add(canonicaliseMaterialToken(token));
+    }
+  }
 
   private static final List<List<Integer>> testCoords =
       Arrays.asList(
@@ -103,7 +160,8 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
    * {@link #acceptProbeY} so the live full-load fallback rejects fluids hidden
    * under a thin solid crust (sand-over-water, magma-under-cobblestone).
    */
-  private static boolean isGroundSafe(RTPChunk chunk, int x, int y, int z) {
+  private static boolean isGroundSafe(
+      RTPChunk chunk, int x, int y, int z, Set<String> unsafeBlocks, int platformDepth) {
     int depth = Math.max(1, platformDepth);
     for (int d = 1; d <= depth; d++) {
       if (!chunk.isSafe(x, y - d, z, unsafeBlocks)) return false;
@@ -133,7 +191,9 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
     step = Math.max(step, 1);
     step = Math.min(step, (maxY - minY) / 8);
 
-    refreshSafetySets();
+    SafetySnapshot snap = readSafetySnapshot();
+    Set<String> unsafeBlocks = snap.unsafeBlocks();
+    int platformDepth = snap.platformDepth();
 
     for (int j = 0; j < testCoords.size(); j++) {
       List<Integer> xz = testCoords.get(j);
@@ -176,7 +236,7 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
             && skylight > 7
             && chunk.isSafe(x, i + 1, z, unsafeBlocks)
             && chunk.isSafe(x, i, z, unsafeBlocks)
-            && isGroundSafe(chunk, x, i, z)) {
+            && isGroundSafe(chunk, x, i, z, unsafeBlocks, platformDepth)) {
           output.setWorldName(chunk.getWorld().name());
           output.setXZ(globalX, globalZ);
           output.setY(i);
@@ -258,7 +318,7 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
     int heightmapSkyFloor = computeHeightmapSkyFloor(probe, requireSkyLight);
     if (heightmapSkyFloor == Integer.MAX_VALUE) return AdjustResult.LIGHT_GATE_REJECT;
 
-    refreshSafetySets();
+    SafetySnapshot snap = readSafetySnapshot();
 
     // Multi-column probe sweep. Mirrors the live adjust(RTPChunk,...) path,
     // which iterates testCoords (5 sub-columns within the chunk). Aligning
@@ -270,7 +330,7 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
       int lx = xz.get(0);
       int lz = xz.get(1);
       for (int y = minY; y < maxY; y++) {
-        if (!acceptProbeY(probe, lx, lz, y, requireSkyLight, heightmapSkyFloor)) continue;
+        if (!acceptProbeY(probe, lx, lz, y, requireSkyLight, heightmapSkyFloor, snap)) continue;
         int globalX = (probe.chunkX() << 4) + lx;
         int globalZ = (probe.chunkZ() << 4) + lz;
         return AdjustResult.ok(new MutableRTPCoords(worldName, globalX, y, globalZ).toImmutable());
@@ -320,151 +380,6 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
   }
 
   /**
-   * Refresh the cached {@link #unsafeBlocks} and {@link #airBlocks} sets on the same
-   * 5-second cadence. Both sets are sourced from {@code safety.yml} via
-   * {@link SafetyKeys#unsafeBlocks} / {@link SafetyKeys#airBlocks} and are consumed by
-   * both {@link #adjust(RTPChunk, MutableRTPCoords)} (legacy full-load path) and
-   * {@link #acceptProbeY(ChunkColumnProbe, int, int, int, boolean, int)} (anvil probe fast path).
-   *
-   * <p>ADR-017 token grammar is expanded in-place at refresh time:
-   * <ul>
-   *   <li>{@code MATERIAL} — kept verbatim (upper-cased, namespace-stripped).</li>
-   *   <li>{@code #namespace:tag} — expanded to the set of material names
-   *       published by {@code RTP.serverAccessor.blockTagSnapshot()} (ADR-017 §4
-   *       tag-member bucket). Bare (namespace-less) tag ids default to
-   *       {@code minecraft:}.</li>
-   *   <li>{@code MATERIAL[prop=val,...]} / {@code #tag[prop=val]} / {@code *[prop=val]}
-   *       — state-predicated tokens are <b>dropped</b> from the probe-fast-path sets
-   *       because the anvil probe exposes only palette identifiers without the
-   *       block-state property map. Legacy {@code chunk.isSafe(...)} on the
-   *       full-load path still honours these tokens via the compiled-form path.</li>
-   * </ul>
-   *
-   * <p>The expanded materialised list is reapplied to the in-memory config value
-   * via {@code setConfigValue(...)} so downstream consumers reading
-   * {@code safety.getConfigValue(SafetyKeys.airBlocks, ...)} / {@code unsafeBlocks}
-   * see the pre-expanded set without repeating this work. The reapply is
-   * in-memory only — disk persistence is gated on an explicit {@code save()}
-   * which this method does not call, so operator-authored tag tokens in
-   * {@code safety.yml} are preserved on disk.
-   */
-  private static void refreshSafetySets() {
-    long t = System.currentTimeMillis();
-    long dt = t - lastUpdate.get();
-    if (dt > 5000 || dt < 0) {
-      ConfigParser<SafetyKeys> safety =
-          (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
-
-      Map<String, Set<String>> tagSnapshot = Collections.emptyMap();
-      if (RTP.serverAccessor != null) {
-        try {
-          tagSnapshot = RTP.serverAccessor.blockTagSnapshot();
-          if (tagSnapshot == null) tagSnapshot = Collections.emptyMap();
-        } catch (Throwable ex) {
-          // Tag snapshot is a best-effort hint — do not fail the refresh.
-          tagSnapshot = Collections.emptyMap();
-        }
-      }
-
-      Object unsafeValue = safety.getConfigValue(SafetyKeys.unsafeBlocks, new ArrayList<>());
-      List<String> reappliedUnsafe = expandSafetyTokens(unsafeValue, tagSnapshot, unsafeBlocks);
-
-      Object airValue = safety.getConfigValue(SafetyKeys.airBlocks, new ArrayList<>());
-      List<String> reappliedAir = expandSafetyTokens(airValue, tagSnapshot, airBlocks);
-
-      platformDepth = Math.max(1,
-          safety.getNumber(SafetyKeys.platformDepth, 1).intValue());
-
-      // Reapply the expanded lists to the in-memory config value so downstream
-      // consumers (QueueTask, LocationGenerator, SafetyCompilationCache) read the
-      // pre-expanded form on their next refresh. State-predicated tokens
-      // ({@code MATERIAL[prop=val]}) are preserved verbatim in the reapplied list
-      // so the compiled-form path on the full-load branch keeps honouring them;
-      // tag tokens ({@code #namespace:tag}) are replaced by their materialised
-      // members. The reapply is in-memory only — {@code safety.yml} on disk is
-      // not touched unless a later {@code save()} is invoked elsewhere.
-      try {
-        safety.setConfigValue(SafetyKeys.unsafeBlocks.name(), reappliedUnsafe);
-        safety.setConfigValue(SafetyKeys.airBlocks.name(), reappliedAir);
-      } catch (Throwable ex) {
-        // Non-fatal: the live sets are already updated above. Log and continue.
-        RTP.log(
-            java.util.logging.Level.FINE,
-            "[JumpAdjustor] failed to reapply expanded safety lists to config value: "
-                + ex.getClass().getSimpleName() + ": " + ex.getMessage());
-      }
-
-      lastUpdate.set(t);
-    }
-  }
-
-  /**
-   * Expand an ADR-017 safety-token list into two sinks:
-   *
-   * <ul>
-   *   <li>{@code fastSink} — the materialised set of bare material names used by
-   *       the probe-fast-path {@link #acceptProbeY} and the legacy set-lookup
-   *       branch of {@link #adjust(RTPChunk, MutableRTPCoords)}. Populated with
-   *       upper-cased, namespace-stripped material names only. State-predicated
-   *       tokens are dropped (the probe has no property map); tag tokens are
-   *       expanded via {@code tagSnapshot}.</li>
-   *   <li>Return value — the reapply-to-config list. Preserves
-   *       {@code MATERIAL[prop=val]} state-predicated tokens verbatim so the
-   *       compiled-form consumer ({@code SafetyCompilationCache} called from
-   *       {@code QueueTask.afterChunkResolved}) keeps honouring them. Tag tokens
-   *       are replaced by their materialised members; if a tag has no snapshot
-   *       entry (tag registry unavailable / custom operator tag), the original
-   *       token is preserved so {@code SafetyCompilationCache} can retry later
-   *       with its own expansion path.</li>
-   * </ul>
-   *
-   * <p>The two outputs intentionally share bare-material entries so
-   * {@code fastSink} can be read without a second pass.
-   */
-  private static List<String> expandSafetyTokens(
-      Object raw, Map<String, Set<String>> tagSnapshot, Set<String> fastSink) {
-    fastSink.clear();
-    List<String> reapply = new ArrayList<>();
-    if (!(raw instanceof Collection)) return reapply;
-    for (Object item : (Collection<?>) raw) {
-      if (item == null) continue;
-      String token = item.toString().trim();
-      if (token.isEmpty()) continue;
-
-      // State-predicated tokens: preserve in reapply list (for compiled-form
-      // consumers), drop from fast-lookup set (probe has no property map).
-      if (token.indexOf('[') >= 0) {
-        reapply.add(token);
-        continue;
-      }
-
-      if (token.charAt(0) == '#') {
-        String tagId = token.substring(1);
-        if (tagId.indexOf(':') < 0) tagId = "minecraft:" + tagId;
-        tagId = tagId.toLowerCase(Locale.ROOT);
-        Set<String> members = tagSnapshot.get(tagId);
-        if (members != null && !members.isEmpty()) {
-          for (String m : members) {
-            if (m == null) continue;
-            String canonical = canonicaliseMaterialToken(m);
-            if (fastSink.add(canonical)) reapply.add(canonical);
-          }
-        } else {
-          // Tag registry unavailable or tag has no members — preserve the
-          // token so SafetyCompilationCache can retry with its own pipeline.
-          reapply.add(token);
-        }
-        continue;
-      }
-
-      // Bare MATERIAL token.
-      String canonical = canonicaliseMaterialToken(token);
-      if (fastSink.add(canonical)) reapply.add(canonical);
-    }
-    return reapply;
-  }
-
-  /**
    * Canonicalise a material token to the upper-case, namespace-stripped form
    * used by {@code Material.name()} and by the reconciled {@code AnvilColumnProbeAdapter}
    * output. Matches {@code PaletteIdentifierNormalizer.normalize(...)}.
@@ -482,12 +397,13 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
    *
    * <p>A Y is accepted iff:
    * <ul>
-   *   <li>{@code y-1} is solid (not vanilla air AND not a member of {@link #airBlocks}) —
-   *       i.e. there is something to stand on;</li>
+   *   <li>{@code y-1} is solid (not vanilla air AND not a member of the snapshot's
+   *       {@code airBlocks}) — i.e. there is something to stand on;</li>
    *   <li>{@code y} and {@code y+1} are passable — vanilla air OR a member of
-   *       {@link #airBlocks} (tall grass, flowers, snow layer, torches, leaves, ...);</li>
-   *   <li>none of the three cells are in {@link #unsafeBlocks} — {@code unsafeBlocks}
-   *       wins over {@code airBlocks} on conflicts;</li>
+   *       the snapshot's {@code airBlocks} (tall grass, flowers, snow layer,
+   *       torches, leaves, ...);</li>
+   *   <li>none of the three cells are in the snapshot's {@code unsafeBlocks} —
+   *       {@code unsafeBlocks} wins over {@code airBlocks} on conflicts;</li>
    *   <li>when {@code requireSkyLight} is true, sky-access is satisfied either via
    *       {@code skyLightAt(lx, lz, y+1) > 7} (when the probe's lighting is trusted)
    *       or via {@code y+1 > heightmapSkyFloor} when the caller supplied a
@@ -502,7 +418,7 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
    * (center-column) heightmap and that is the only sky-light proxy used when
    * {@code isLightOn} is false.</p>
    *
-   * <p>Using {@link #airBlocks} here mirrors the live-path {@code chunk.isSafe(...)}
+   * <p>Using the snapshot's {@code airBlocks} here mirrors the live-path {@code chunk.isSafe(...)}
    * tolerance, so the anvil probe fast path no longer rejects Y candidates whose body
    * or head space contains walkable non-air blocks (flowers, tall grass, etc.). Prior
    * to this wiring, the strict {@link ChunkColumnProbe#isAirAt(int)} check was rejecting
@@ -510,7 +426,10 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
    * {@code adjustNull} tail on the ScanTask concurrency gauge.</p>
    */
   private static boolean acceptProbeY(ChunkColumnProbe probe, int lx, int lz, int y,
-                                      boolean requireSkyLight, int heightmapSkyFloor) {
+                                      boolean requireSkyLight, int heightmapSkyFloor,
+                                      SafetySnapshot snap) {
+    Set<String> unsafeBlocks = snap.unsafeBlocks();
+    Set<String> airBlocks = snap.airBlocks();
     String below = probe.blockAt(lx, lz, y - 1);
     String at = probe.blockAt(lx, lz, y);
     String above = probe.blockAt(lx, lz, y + 1);
@@ -530,7 +449,7 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
     if (unsafeBlocks.contains(aboveCanon)) return false;
     // Sweep down [1..platformDepth] for hidden fluids/unsafe materials under
     // a thin solid crust (sand-over-water, magma-under-cobblestone, ...).
-    int depth = Math.max(1, platformDepth);
+    int depth = Math.max(1, snap.platformDepth());
     for (int d = 1; d <= depth; d++) {
       String b = probe.blockAt(lx, lz, y - d);
       if (b == null) return false;

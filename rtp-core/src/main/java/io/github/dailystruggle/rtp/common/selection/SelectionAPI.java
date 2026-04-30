@@ -16,6 +16,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdj
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.logging.Level;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -135,18 +136,38 @@ public class SelectionAPI {
 
     int req = RTP.minRTPExecutions;
 
+    // Diagram 02: drain the urgent (private/biome) queue first, then the
+    // standard pipeline. FINER traces every individual task; FINE summarises
+    // the pulse's overall throughput.
+    int urgentRan = 0;
+    int standardRan = 0;
+
     while (serverAccessor.overTime() < 0 || req > 0) {
       Runnable task = selectionPipelineUrgent.poll();
       if (task == null) break;
+      RTP.log(java.util.logging.Level.FINER,
+          "[SelectionAPI] running urgent pipeline task " + task.getClass().getSimpleName());
       task.run();
+      urgentRan++;
       req--;
     }
 
     while (serverAccessor.overTime() < 0 || req > 0) {
       Runnable task = selectionPipeline.poll();
       if (task == null) break;
+      RTP.log(java.util.logging.Level.FINER,
+          "[SelectionAPI] running standard pipeline task " + task.getClass().getSimpleName());
       task.run();
+      standardRan++;
       req--;
+    }
+
+    if (urgentRan > 0 || standardRan > 0) {
+      RTP.log(java.util.logging.Level.FINE,
+          "[SelectionAPI] compute() drained urgent=" + urgentRan
+              + " standard=" + standardRan
+              + " urgentRemaining=" + selectionPipelineUrgent.size()
+              + " standardRemaining=" + selectionPipeline.size());
     }
   }
 
@@ -206,6 +227,8 @@ public class SelectionAPI {
   public Region getRegion(RTPPlayer player) {
     Set<String> worldsAttempted = new HashSet<>();
     String worldName = player.getLocation().world().name();
+    RTP.log(Level.FINE, "[SELECT_TRACE] SelectionAPI.getRegion ENTER playerId=" + player.uuid()
+        + " startingWorld=" + worldName);
     MultiConfigParser<WorldKeys> worldParsers =
         (MultiConfigParser<WorldKeys>) RTP.configs.multiConfigParserMap.get(WorldKeys.class);
     ConfigParser<WorldKeys> worldParser = worldParsers.getParser(worldName);
@@ -218,7 +241,11 @@ public class SelectionAPI {
         throw new IllegalStateException("infinite override loop detected at world - " + worldName);
       worldsAttempted.add(worldName);
 
+      String previousWorld = worldName;
       worldName = String.valueOf(worldParser.getConfigValue(WorldKeys.override, "default"));
+      RTP.log(Level.FINER, "[SELECT_TRACE] world override step playerId=" + player.uuid()
+          + " from=" + previousWorld + " to=" + worldName
+          + " attemptedSoFar=" + worldsAttempted);
       worldParser = worldParsers.getParser(worldName);
       requirePermission =
           Boolean.parseBoolean(
@@ -226,6 +253,8 @@ public class SelectionAPI {
     }
 
     String regionName = String.valueOf(worldParser.getConfigValue(WorldKeys.region, "default"));
+    RTP.log(Level.FINE, "[SELECT_TRACE] world resolved playerId=" + player.uuid()
+        + " resolvedWorld=" + worldName + " initialRegion=" + regionName);
     MultiConfigParser<RegionKeys> regionParsers =
         (MultiConfigParser<RegionKeys>) RTP.configs.multiConfigParserMap.get(RegionKeys.class);
     ConfigParser<RegionKeys> regionParser = regionParsers.getParser(regionName);
@@ -240,12 +269,18 @@ public class SelectionAPI {
             "infinite override loop detected at region - " + regionName);
       regionsAttempted.add(regionName);
 
+      String previousRegion = regionName;
       regionName = String.valueOf(regionParser.getConfigValue(RegionKeys.override, "default"));
+      RTP.log(Level.FINER, "[SELECT_TRACE] region override step playerId=" + player.uuid()
+          + " from=" + previousRegion + " to=" + regionName
+          + " attemptedSoFar=" + regionsAttempted);
       regionParser = regionParsers.getParser(regionName);
       requirePermission =
           Boolean.parseBoolean(
               regionParser.getConfigValue(RegionKeys.requirePermission, false).toString());
     }
+    RTP.log(Level.FINE, "[SELECT_TRACE] SelectionAPI.getRegion EXIT playerId=" + player.uuid()
+        + " resolvedRegion=" + regionName);
     return getRegion(regionName);
   }
 
