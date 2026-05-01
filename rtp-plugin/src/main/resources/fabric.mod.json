@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "rtp",
+  "version": "${version}",
+  "name": "RTP",
+  "description": "A fast and flexible random teleportation mod (Fabric entry point of the single-JAR multi-loader build per ADR-022).",
+  "authors": ["leaf26"],
+  "contact": {
+    "homepage": "https://github.com/dailystruggle/RTP",
+    "sources": "https://github.com/dailystruggle/RTP",
+    "issues": "https://github.com/dailystruggle/RTP/issues"
+  },
+  "license": "GPL-3.0-only",
+  "environment": "server",
+  "entrypoints": {
+    "main": [
+      "io.github.dailystruggle.rtp.fabric.RTPFabricMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.15.0",
+    "minecraft": ">=1.21",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}

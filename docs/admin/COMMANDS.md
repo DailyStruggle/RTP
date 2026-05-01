@@ -91,6 +91,8 @@ Dynamically reads and writes individual keys in any loaded configuration file. O
 
 **Required permission:** `rtp.config`
 
+> ⚠️ **In progress.** `/rtp config` is under active development — key coverage, validation, and feedback messages are incomplete and behaviour may change. For production use, prefer hand-editing the YAML files followed by `/rtp reload`.
+
 | Form | Description |
 |---|---|
 | `/rtp config <file> <key>:<value>` | Set one or more scalar keys in the named config file and reload. Only keys present in the file's own parameter registry are accepted; unrecognised keys are silently ignored. |

@@ -62,7 +62,7 @@ public class ScanResetCmd extends ScanSubCmd {
 
       MemoryShape<?> shape = (MemoryShape<?>) shapeObj;
       shape.clear();
-      shape.save(region.name + "_" + region.getWorld().getSeed(), region.getWorld().name());
+      shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
       ScanTask.delete(region.name);
 
       // restore spatialResolution from config so the region is ready for a fresh scan or normal use

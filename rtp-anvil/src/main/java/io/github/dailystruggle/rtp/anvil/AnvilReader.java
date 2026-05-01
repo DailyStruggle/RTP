@@ -439,11 +439,23 @@ public final class AnvilReader {
                 if (bs != null) biomeOut.add(bs);
             }
         }
+        // Chunk-root isLightOn flag (1.20+) — when false, on-disk SkyLight nibbles
+        // are stale or partial and the consumer must synthesize from opaque cover
+        // instead. Absent flag (older chunks / pre-1.20) is treated as true to
+        // preserve historical behaviour.
+        boolean isLightOn = true;
+        Object lightObj = root.get("isLightOn");
+        if (lightObj instanceof Number n) {
+            isLightOn = n.intValue() != 0;
+        } else if (lightObj instanceof Boolean b) {
+            isLightOn = b;
+        }
         return new AnvilChunkView(
                 dataVersion,
                 Collections.unmodifiableList(out),
                 heightmap,
-                Collections.unmodifiableList(biomeOut));
+                Collections.unmodifiableList(biomeOut),
+                isLightOn);
     }
 
     @SuppressWarnings("unchecked")

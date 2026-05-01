@@ -12,6 +12,7 @@ For specific code-level and platform-specific requirements, please refer to the 
 - [rtp-spigot Requirements](../../rtp-spigot/REQUIREMENTS.md)
 - [rtp-paper Requirements](../../rtp-paper/REQUIREMENTS.md)
 - [rtp-folia Requirements](../../rtp-folia/REQUIREMENTS.md)
+- [rtp-fabric Requirements](../../rtp-fabric/REQUIREMENTS.md)
 
 ## 0. Scope
 
@@ -21,7 +22,7 @@ For specific code-level and platform-specific requirements, please refer to the 
 - Per-region configuration of shapes, statistical distributions, biome filters, and permission nodes.
 - Integration hooks for third-party land-protection plugins (GriefPrevention, WorldGuard, Towny) and economy plugins (Vault).
 - A stable, versioned public API (`rtp-api`) for addon developers to register custom shapes, vertical adjustors, and validation checks.
-- Platform adapters for Spigot, Paper, and Folia ensuring correct thread-safety on each server type.
+- Platform adapters for Spigot, Paper, Folia, and Fabric ensuring correct thread-safety on each server type.
 
 ### Out of Scope
 - **World generation:** RTP does not generate or modify terrain. It selects locations within existing worlds only.
@@ -29,7 +30,7 @@ For specific code-level and platform-specific requirements, please refer to the 
 - **Anti-cheat:** RTP does not detect or prevent cheating. It is the responsibility of the server operator to configure compatible anti-cheat plugins.
 - **GUI / inventory menus:** RTP does not provide a graphical interface. All interaction is command- and config-based.
 - **Cross-server teleportation:** RTP operates within a single server instance. BungeeCord/Velocity network teleportation is out of scope.
-- **Non-Bukkit platforms:** RTP targets Bukkit-derived software only (Spigot, Paper, Folia). Forge, Fabric, and other mod loaders are not supported.
+- **Non-Bukkit, non-Fabric platforms:** RTP shall target Bukkit-derived software (Spigot, Paper, Folia) and Fabric. Forge, NeoForge, and other mod loaders shall not be supported. Rationale and the phased Fabric adapter plan are recorded in [ADR-022](../adr/ADR-022-fabric-platform-in-scope.md) and [MULTI_PLATFORM_PLAN.md](MULTI_PLATFORM_PLAN.md).
 - **Legacy Minecraft and Java versions:** RTP targets Java 21+ (REQ-RTP-SYS-001) and the Minecraft versions enumerated by the shipped versioned platform adapter submodules (ADR-010). Older Minecraft versions and older Java runtimes are out of scope; users on legacy servers shall be directed to the last RTP release that supported their server. Revisit conditions and rationale are recorded in [ADR-021](../adr/ADR-021-legacy-mc-and-java-support-scope.md).
 
 ## 1. Functional Requirements
@@ -102,4 +103,4 @@ These requirements describe prohibited behaviours. Each maps to one or more haza
 
 ## 4. System Requirements
 - **REQ-RTP-SYS-001 — Runtime Environment:** The system shall require Java 21 or higher.
-- **REQ-RTP-SYS-002 — Server Software:** The system shall be compatible with Bukkit-derived server software, specifically Spigot, Paper, and Folia implementations.
+- **REQ-RTP-SYS-002 — Server Software:** The system shall be compatible with Bukkit-derived server software (Spigot, Paper, and Folia) and with Fabric.

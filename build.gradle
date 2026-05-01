@@ -73,7 +73,7 @@ subprojects {
 
     processResources {
         inputs.property "version", project.version
-        filesMatching("plugin.yml") {
+        filesMatching(["plugin.yml", "fabric.mod.json"]) {
             expand "version": project.version
         }
         duplicatesStrategy = DuplicatesStrategy.INCLUDE

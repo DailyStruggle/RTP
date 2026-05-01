@@ -64,7 +64,7 @@ public class ScanStartCmd extends ScanSubCmd {
       }
 
       shape.clear();
-      shape.save(region.name + "_" + region.getWorld().getSeed(), region.getWorld().name());
+      shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
       ScanTask.delete(region.name);
       MultiConfigParser<RegionKeys> multiConfigParser = (MultiConfigParser<RegionKeys>) RTP.configs.getParser(RegionKeys.class);
       if (multiConfigParser != null) {

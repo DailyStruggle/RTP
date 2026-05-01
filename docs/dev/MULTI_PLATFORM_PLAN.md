@@ -1,95 +1,385 @@
-# Multi-Platform Support Roadmap
+out b# Multi-Platform Support Roadmap
 
-This document outlines the comprehensive plan for transitioning RTP to a multi-platform project, starting with Fabric and potentially expanding to Forge in the future.
+This document outlines the plan for RTP's multi-platform expansion. Fabric is **in scope** as of 2026-04-30 (see [ADR-022](../adr/ADR-022-fabric-platform-in-scope.md)). Forge and other mod loaders remain out of scope.
+
+For the supersession history: legacy Minecraft and Java versions are out of scope per [ADR-021](../adr/ADR-021-legacy-mc-and-java-support-scope.md). Do not backport Fabric-stage work to legacy servers without first superseding ADR-021.
 
 ## Out of Scope
 
-Legacy Minecraft versions (older than the shipped `v*_R*` adapter submodules) and legacy Java runtimes (older than Java 21) are explicitly out of scope for this roadmap. See [ADR-021](../adr/ADR-021-legacy-mc-and-java-support-scope.md) for the decision, revisit conditions, and the minimum plan to follow if the question is reopened. Do not add legacy-MC phases or backport Fabric-stage work to older servers without first superseding ADR-021.
+- Legacy Minecraft versions (older than the shipped `v*_R*` adapter submodules) and legacy Java runtimes (older than Java 21). See [ADR-021](../adr/ADR-021-legacy-mc-and-java-support-scope.md).
+- Forge, NeoForge, and other non-Fabric mod loaders. Re-evaluation deferred until Fabric is stable (Phase 4 below).
 
-## Phase 1: Infrastructure & Core Consolidation (COMPLETED/IN-PROGRESS)
+## Remaining Work Checklist *(updated 2026-05-01)*
 
-- [x] **Consolidate APIs**: Pull `CommandsAPI` and `EffectsAPI` back into the main repository as sub-modules.
-- [x] **Refactor Dependencies**: Update `rtp-core` and `rtp-plugin` to use local project dependencies for APIs.
-- [x] **Initial Fabric Skeleton**: Create `rtp-fabric` module with basic server, player, and world wrappers.
-- [ ] **Fix Fabric Build System**: Resolve Minecraft dependency resolution issues in Gradle by correctly integrating Fabric Loom.
+Quick scan of what's done and what's left across Phases 0–3. Each Phase 2 step links to its detailed status block below. Tick boxes are authoritative — sub-bullets are scope reminders.
 
-## Phase 2: Fabric Feature Parity
+### ✅ Done
 
-The goal of this phase is to ensure the Fabric version has all the essential features available in the Bukkit/Paper/Folia versions.
+- [x] **Phase 0** — scope unlock (ADR-022, REQUIREMENTS.md §0, AGENTS.md, INDEX.md).
+- [x] **Phase 1** — module skeleton, single-JAR multi-loader bootstrap, Loom 1.11-SNAPSHOT integration, shadowJar bloat fix (102 MB → 3.87 MB).
+- [x] **Step A** — `FabricRTPWorld.getChunkAt` async via `MinecraftServer#submit` (S-005).
+- [x] **Step B** — `FabricServerAccessor.getLocationGenerator()` real (S-006 fail-loud).
+- [x] **Step C** — `FabricScheduler` full 12-method impl (async/sync/tick-driven cancellation).
+- [x] **Step D** — `FabricDatabaseHandler.setupDatabase(rtp)` mirrors `BukkitDatabaseHandler`.
+- [x] **Step E2** — `FabricEventBridge` + `FabricRTPPlayer` + real `RTPFabricMod.onInitialize()` body + accessor map population.
+- [x] **Step G (structural)** — `BrigadierCommandAdapter` + `BrigadierBridgeContext` in `commands-api`; `RTPCmdFabric` shim landed.
+- [x] **Step G G1 (wiring)** — `RTPCmdFabricRoot` (bare `/rtp`, no params/subcommands), `FabricServerAccessor.getSender`/`sendMessage` minimal, `FabricConsoleSender` inner sender, `RTPFabricMod.onInitialize()` registers via `CommandRegistrationCallback.EVENT` with permissive predicate (Step F deferred).
+- [x] `rtp-fabric/REQUIREMENTS.md` authored.
+
+### 🚧 In Progress / Next Up
+
+- [ ] **Step E3 — Scheduled-task processor parity *(NEW, 2026-05-01)*** — `/rtp` is currently non-functional on Fabric because the recurring tasks that pump `rtp-core`'s teleport pipeline are never started. Bukkit `onEnable` wires them; `RTPFabricMod.onInitialize()` does not. See *Step E3* detail block below for the full comparison and gap list. Critical sub-items:
+    - [x] **`RTP.scheduler = accessor.getScheduler()` in `RTPFabricMod.onInitialize()` BEFORE `RTP.getInstance()`** *(landed 2026-05-01)* — `FabricScheduler.scheduleTimer` queues into a tick-drained map and is safe to call before SERVER_STARTED binds the `MinecraftServer`; the `RTP()` constructor's `runTaskTimer*` calls now succeed. Build green (`:rtp-fabric:rtp-fabric-common:compileJava :rtp-plugin:compileJava`).
+    - [x] **Configuration & Database setup wired** *(landed 2026-05-01)* — `FabricDatabaseHandler.setupDatabase(rtp)` invoked from `RTPFabricMod.onInitialize()` immediately after `RTP.getInstance()`, mirroring `RTPBukkitPlugin.onEnable` ordering. `FabricServerAccessor.getPluginDirectory()` mkdirs `<fabric-config>/rtp/` so both `Configs` ctor and `setupDatabase` find it on first run. `FileSystemException` is caught + logged at SEVERE so a DB failure doesn't abort mod init (RTP runs without persistence rather than failing to load). Build green.
+    - [ ] `DatabaseProcessing.start(...)` Fabric equivalent — `rtp-core`'s `RTP` constructor already schedules `flushDirtyCache` (every 6000t) and `AbstractSQLDatabaseAccessor.flush` (every 60t) via `RTP.scheduler`, so once the scheduler item above lands these run automatically. Verify under Step H smoke test; only a separate `FabricDatabaseProcessing` shim is needed if a Fabric-specific cadence proves necessary.
+    - [ ] `ChunkUnloadProcessor` timer — Bukkit schedules `RTP.scheduler.runTaskTimer(new ChunkUnloadProcessor(), 1, 1)` for non-Folia. `ChunkUnloadProcessor` is platform-agnostic (`rtp-core`); just needs a `RTP.scheduler.runTaskTimer(new ChunkUnloadProcessor(), 1, 1)` call from `RTPFabricMod.onInitialize()` after the scheduler is wired.
+    - [ ] `JarUtils.extractDocs(...)` Fabric equivalent — Bukkit seeds the data-folder with `docs/` from the jar at startup. Fabric needs the same against `FabricLoader.getInstance().getConfigDir().resolve("rtp")`. New helper `FabricJarUtils.extractDocs(File, String)` mirroring the Bukkit version (no `JavaPlugin` dep).
+    - [ ] **Login Reserve Cache (ADR-023)** — Bukkit calls `initLoginReserveCache()` reading `Bukkit.getMaxPlayers()` + `Bukkit.getOnlinePlayers().size()`. Fabric equivalent uses `MinecraftServer#getMaxPlayers()` + `MinecraftServer#getPlayerList().getPlayerCount()`. Default-world resolution: `MinecraftServer#overworld()` → dimension key → `RTP.serverAccessor.getRTPWorld(...)`.
+    - [ ] **`startupTasks` drain** — Bukkit drains `RTP.getInstance().startupTasks` synchronously, then again one tick later, then a third time. Same drain order needed in `RTPFabricMod.onInitialize()` post-event-bridge-registration.
+    - [ ] **Acceptance:** `/rtp` actually teleports a player on Fabric (verified at Step H smoke test).
+- [ ] **Step E-tail** — defer-able items from E2:
+    - [ ] Teleport-cancel callback (requires Mixin against `Entity#teleportTo`).
+    - [ ] Biome / material listing on `FabricServerAccessor` (`setBiomeGetter`, `getMaterials`, etc.).
+    - [ ] World-border + shape function plumbing on `FabricServerAccessor`.
+    - [ ] `getConsolePlayer()` real implementation (currently stub-throws).
+    - [ ] Message routing helpers (`announce`, formatted `log`) wired to Fabric console + player chat.
+- [ ] **Step F — Permissions** *(deferred for initial smoke testing per user direction 2026-05-01 — `/rtp` is currently invokable by any player; full perms work resumes after Step H)*:
+    - [ ] Add `me.lucko:fabric-permissions-api` as `modCompileOnly`.
+    - [ ] `FabricRTPPlayer.hasPermission(node)` via `Permissions.check(source, node, opFallback)`.
+    - [ ] `getEffectivePermissions()` real impl (currently empty).
+    - [ ] Replace `BrigadierBridgeContext` permissive predicate (always-true) with real perms-api lookup.
+    - [ ] Permission node parity test vs. Bukkit adapter.
+- [ ] **Step G2 — Brigadier wiring (full Bukkit parity)** *(G1 minimal landed 2026-05-01)*:
+    - [ ] Port `RTPCmdBukkit`'s 5 parameters (`region`/`biome`/`player`/`world`/`toggletargetperms`) to Fabric, routing world/player lookups via `RTP.serverAccessor.*` (no `Bukkit.*`).
+    - [ ] Port the 6 subcommands (`reload`/`help`/`config`/`scan`/`info`/`test`).
+    - [ ] `successEvent`/`failEvent` hooks on `RTPCmdFabricRoot` (currently no-op — Bukkit fires `TeleportCommandSuccessEvent`).
+    - [ ] End-to-end `commands-live` smoke under `rtp test full` on Fabric.
+    - [ ] Tab-completion smoke test.
+- [ ] **Step H — Stabilization & Dual-Runtime Smoke Test**:
+    - [ ] Memory-leak audit — chunk tickets + `MemoryTracker` register/release on all Fabric exit paths.
+    - [ ] Concurrency review — no Folia-isms in Fabric code paths.
+    - [ ] **Dual-runtime smoke test** — one JAR loads on Paper *and* Fabric, `/rtp` works end-to-end on both. *Phase 2 acceptance gate.*
+    - [ ] ArchUnit guard for disjoint `bukkit/` + `fabric/` packages in `rtp-plugin`.
+    - [ ] `TRACEABILITY.md` rows for `REQ-RTP-S-005` (Fabric), `REQ-RTP-S-006` (Fabric), Step F perm test, Step G `commands-live`.
+- [ ] **Phase 3 — Documentation & Release**:
+    - [ ] `docs/admin/` Fabric install/config notes.
+    - [ ] `docs/dev/` multi-platform architecture + Fabric contribution guide.
+    - [ ] `CHANGELOG.md` — one entry per phase under *Unreleased*.
+    - [ ] `COVERAGE_PLAN.md` — add Fabric column.
+    - [ ] `LESSONS_LEARNED.md` — Loom 1.11 + JDK 21 daemon requirement; Loom-vs-Shadow bloat fix.
+    - [ ] First public Fabric beta release (gated on Step H green).
+
+### ⏸ Deferred to Phase 4
+
+- [ ] Forge / NeoForge evaluation.
+- [ ] Architectury re-evaluation for multi-loader maintenance.
+
+---
+
+## Phase 0: Scope Unlock — COMPLETED 2026-04-30
+
+- [x] **ADR-022 accepted** — Fabric promoted from "experimental frontier" to a first-class supported platform.
+- [x] **`REQUIREMENTS.md §0`** updated to add Fabric to *In Scope* and remove it from the *Non-Bukkit platforms* exclusion.
+- [x] **`REQ-RTP-SYS-002`** updated to include Fabric.
+- [x] **`AGENTS.md` *Current Development Focus*** — promoted from "out of scope per §0" wording to first-class platform; ADR-022 linked; `rtp-fabric` added to safe-to-modify modules; "do not backport" guardrail preserved.
+- [x] **`docs/dev/INDEX.md`** — added ADR-022 ("Why Fabric is in scope") and ADR-021 ("Why legacy MC / Java are out of scope") rows to the task router.
+
+## Phase 1: Infrastructure & Build System
+
+The foundation for the `rtp-fabric` module.
+
+- [x] **Consolidate APIs**: `CommandsAPI` and `EffectsAPI` pulled in as sub-modules.
+- [x] **Refactor Dependencies**: `rtp-core` and `rtp-plugin` use local project dependencies for APIs.
+- [x] **April 2026 gap analysis**: confirmed `rtp-api` and `rtp-core` abstractions are sufficient for Fabric — no new interfaces needed (see *What Does NOT Need to Change* below).
+- [x] **Bootstrap `rtp-fabric/` module tree** *(skeleton landed 2026-04-30; plain `java-library`, no Loom yet)* — layout (Fabric-platform glue lives here; the entry-point class lives in `rtp-plugin`, see *Single-JAR Multi-Loader Bootstrap* below):
+
+      rtp-fabric/
+      └── rtp-fabric-common/                 # version-agnostic Fabric adapter (library, not entry point)
+          └── src/main/java/io/github/dailystruggle/rtp/fabric/
+              ├── server/FabricServerAccessor.java        # extends AbstractServerAccessor
+              ├── world/FabricRTPWorld.java
+              ├── world/FabricRTPChunk.java
+              ├── player/FabricRTPPlayer.java
+              ├── scheduler/FabricScheduler.java
+              ├── database/FabricDatabaseHandler.java     # delegates to rtp-core
+              ├── permissions/FabricPermissionResolver.java
+              ├── events/FabricEventBridge.java
+              └── commands/RTPCmdFabric.java              # registers commands-api Brigadier adapter
+
+  Decisions: one common module first; defer `rtp-fabric-v<MC>/` shim until a real version-specific need appears (Yarn-mapped Fabric rarely needs NMS-style version splits). No Bukkit imports under `rtp-fabric/**`. The `ModInitializer` entry point (`RTPFabricMod`) lives in `rtp-plugin` per ADR-022's single-JAR multi-loader packaging — not in `rtp-fabric-common` — so both `plugin.yml` and `fabric.mod.json` ship from one bootstrap module.
+
+- [x] **Single-JAR Multi-Loader Bootstrap in `rtp-plugin`** *(landed 2026-04-30; `RTPFabricMod implements ModInitializer`, `fabric.mod.json` declares the entrypoint, Loom 1.11-SNAPSHOT applied to `:rtp-fabric:rtp-fabric-common` and `:rtp-plugin`; `:rtp-plugin:shadowJar` green. Dual-runtime smoke test on a Paper + Fabric dev server is the next debug-phase task — runtime verification is intentionally separated from structural landing per the user's "structure first, debug after" directive)* (per [ADR-022](../adr/ADR-022-fabric-platform-in-scope.md)):
+
+      rtp-plugin/
+      └── src/main/
+          ├── java/io/github/dailystruggle/rtp/
+          │   ├── bukkit/RTPBukkitPlugin.java     # extends JavaPlugin (existing entry, renamed)
+          │   └── fabric/RTPFabricMod.java        # implements ModInitializer (new)
+          └── resources/
+              ├── plugin.yml                       # main: ...rtp.bukkit.RTPBukkitPlugin
+              └── fabric.mod.json                  # entrypoints.main: [...rtp.fabric.RTPFabricMod]
+
+  Both entry-point classes shall remain disjoint: neither imports the other, neither transitively reaches the other platform's classes. Shared code lives only in `rtp-core` / `rtp-api` / `commands-api` / `effects-api`. An ArchUnit rule shall enforce the disjoint-package invariant. `RTPFabricMod` consumes `:rtp-fabric:rtp-fabric-common` as a project dependency and contains no business logic — it dispatches to the Fabric adapter the same way `RTPBukkitPlugin` dispatches to `rtp-spigot` / `rtp-paper` / `rtp-folia`.
+
+- [x] **Loom integration** *(landed 2026-04-30 with `fabric-loom 1.11-SNAPSHOT` — `1.7` rejected by Gradle 9.4 with `NoSuchMethodError` on the Problems API; `1.11` is the current stable line that supports Gradle 9. Pin documented in `:rtp-fabric:rtp-fabric-common/build.gradle` and `:rtp-plugin/build.gradle`. `pluginManagement` block in `settings.gradle` registers FabricMC's Maven so the plugin resolves)*:
+  1. Pin `fabric-loom 1.11-SNAPSHOT` (Java 21 + Gradle 9.4 compatible).
+  2. **Apply Loom in `rtp-fabric/**/build.gradle` AND in `rtp-plugin/build.gradle`** — never at the root, never in `rtp-core`, `rtp-api`, `commands-api`, `effects-api`, or any Bukkit-family adapter (`rtp-spigot`, `rtp-paper`, `rtp-folia`). Applying Loom outside this set is the most likely cause of the historical "unresolved Loom dependency" symptom because it leaks remap caches and Maven repos into Bukkit-family modules.
+  3. **Remap scoping** — Loom's `remapJar` task in `rtp-plugin` shall include only `io/github/dailystruggle/rtp/fabric/**` and the `rtp-fabric/rtp-fabric-common` classpath contribution. Bukkit-family classes shall be excluded so they retain Spigot/Paper-mapped bytecode in the final shaded JAR.
+  4. Add Fabric Maven repos in a `subprojects` block guarded by `if (project.path.startsWith(':rtp-fabric') || project.path == ':rtp-plugin')`.
+  5. `settings.gradle` includes `:rtp-fabric:rtp-fabric-common`. Do not include version submodules until they exist.
+  6. Mappings: `loom.officialMojangMappings()` (revisit if community prefers Yarn).
+  7. Dependencies: `fabric-loader`, `fabric-api`, `fabric-permissions-api` (`modCompileOnly`), and project deps `:rtp-core`, `:rtp-api`, `:commands-api`, `:effects-api`. `rtp-plugin` additionally depends on `:rtp-fabric:rtp-fabric-common`.
+  8. Jenkinsfile: add `:rtp-fabric:rtp-fabric-common:build` and `:rtp-plugin:remapJar` as non-blocking stages initially; promote to blocking once Phase 2 gates are green.
+
+- **Phase 1 acceptance gates (structural only):**
+  - `.\gradlew :rtp-fabric:rtp-fabric-common:assemble` green on a clean clone with no daemon-context surprises and no impact on Bukkit-family module builds.
+  - `.\gradlew :rtp-plugin:shadowJar` (or the equivalent Loom-aware single-JAR task) produces **one JAR** containing both `plugin.yml` and `fabric.mod.json`, with Bukkit classes left un-remapped and Fabric classes remapped to intermediary mappings.
+  - `fabric.mod.json` parses against Fabric Loader's schema (offline lint sufficient at this stage).
+
+  **Note — runtime / dual-loader end-to-end smoke testing is intentionally NOT a Phase 1 gate.** Until Phase 2 Steps A–G land, `RTPFabricMod.onInitialize()` is a placeholder and there is no Fabric functionality to validate end-to-end. "Loads on Fabric" would be trivially true (and trivially uninformative) at this stage. The dual-runtime end-to-end smoke test has been moved to **Phase 2 Step H** where the featureset is sufficient to make it meaningful. Bukkit-side regression risk from Loom is covered by the existing Bukkit-family test suites (`:rtp-plugin:test`, etc.) — these must remain green at all phases.
+
+## Phase 2: Fabric Feature Parity (acceptance-gated A → H)
+
+The goal of this phase is feature parity with the Bukkit/Paper/Folia adapters. Each step's acceptance gate must be green before the next step begins.
 
 ### Abstraction Gap Summary
 
-The table below tracks the current implementation status of each cross-platform abstraction. "Critical" gaps block the teleport pipeline from functioning at all; "High" gaps cause data loss or incorrect behaviour at runtime.
+The table tracks the current implementation status of each cross-platform abstraction. "Critical" gaps block the teleport pipeline from functioning at all; "High" gaps cause data loss or incorrect behaviour at runtime.
 
 | Abstraction | Bukkit Status | Fabric Status | Gap Severity |
 |---|---|---|---|
-| `RTPServerAccessor` | Full (`AbstractServerAccessor`) | Partial — `getLocationGenerator()` returns `null` | **Critical** |
-| `RTPWorld` (async chunk load) | Full (`BukkitRTPWorld` / Paper override) | `getChunkFutureSyncOnMainThread` — violates REQ-RTP-S-005 | **Critical** |
-| `RTPPlayer` | Full (`BukkitRTPPlayer`) | `hasPermission` hardcoded to op-level; `getEffectivePermissions()` empty | High |
-| `RTPScheduler` | Full (`BukkitSchedulerImpl`) | Skeleton only | High |
-| Database / Persistence | Full (`DatabaseProcessing`) | Missing entirely | High |
-| Event mapping | Full (Bukkit listeners) | Only `FabricPlayerJoin` | Medium |
-| Command system | Full Bukkit tree | Partial Brigadier bridge | Medium |
+| `RTPServerAccessor` | Full (`AbstractServerAccessor`) | `FabricServerAccessor` now backed by `ConcurrentHashMap`s populated by `FabricEventBridge`: `getRTPWorld(name/id)`, `getRTPWorlds()`, `getPlayer(uuid/name)`, `getPluginDirectory`, `getServerVersion`, `getPluginVersion`, `getServerIntVersion`, `isPrimaryThread`, `getScheduler`, `getPlugin` all real (Step E2 landed 2026-05-01). `getConsolePlayer`, biome/material, world-border/shape, message routing still stub-throw pending Steps E-tail/F | Resolved (S-006 + lifecycle); message + perms routing pending |
+| `RTPWorld` (async chunk load) | Full (`BukkitRTPWorld` / Paper override) | `FabricRTPWorld.getChunkAt` async via `MinecraftServer#submit` (Step A landed 2026-05-01); other `RTPWorld` methods stubbed pending Steps C/E | Resolved (S-005); other coverage pending |
+| `RTPPlayer` | Full (`BukkitRTPPlayer`) | `FabricRTPPlayer` landed (Step E2): real `uuid`/`name`/`isOnline`/`getLocation`/`setLocation` (async via `server.submit`)/`sendMessage`/`performCommand`; `hasPermission` op-level fallback; `getEffectivePermissions()` empty pending Step F | High (perms only) |
+| `RTPScheduler` | Full (`BukkitSchedulerImpl`) | `FabricScheduler` landed (Step C, 2026-05-01): async via `Util.backgroundExecutor()`, sync via `MinecraftServer#execute`, tick-driven `runTaskLater`/`runTaskTimer` with `ConcurrentHashMap` cancellation; region-aware overloads delegate (no Folia-style regions on Fabric) | Resolved (S-005 sync/async dispatch); lifecycle wiring pending Step E |
+| Database / Persistence | Full (`DatabaseProcessing`) | `FabricDatabaseHandler.setupDatabase(rtp)` mirrors `BukkitDatabaseHandler` (Step D landed 2026-05-01); accessor selection delegates to `rtp-core` options (`SQLite`/`H2`/`MySQL`/`PostgreSQL`/`Yaml`); config dir via `FabricLoader.getInstance().getConfigDir().resolve("rtp")` | Resolved (handler factory); lifecycle wiring pending Step E |
+| Event mapping | Full (Bukkit listeners) | `FabricEventBridge` registers SERVER_STARTED/STOPPING, END_SERVER_TICK, ServerWorldEvents.LOAD/UNLOAD, ServerPlayConnectionEvents.JOIN/DISCONNECT (Step E2 landed 2026-05-01); teleport-cancel callback / world-border events deferred | Resolved (lifecycle + session); teleport-cancel pending |
+| Command system | Full Bukkit tree | Brigadier adapter landed; not yet wired to `CommandRegistrationCallback` | Medium |
 | Permissions | Bukkit permissions API | Hardcoded op-check | Medium |
 
-### Recommended Implementation Order
+### Step A — S-005 Fix in `FabricRTPWorld.getChunkAt` *(safety-critical, must come first)*
 
-Work items are ordered to deliver a runnable Fabric build as early as possible while respecting safety requirements.
+Replace `getChunkFutureSyncOnMainThread` with a truly async dispatch. Mirror `rtp-paper-common`'s `getChunkAtAsync` override, using the server tick thread (`MinecraftServer#submit`) to safely touch `ServerChunkCache`, which is single-threaded on Fabric.
 
-1. **Fix REQ-RTP-S-005 violation** — Replace `getChunkFutureSyncOnMainThread` in `FabricWorld.getChunkAt()` with a truly async dispatch (Minecraft worker pool or Fabric chunk ticket API). This is safety-critical and must be done first.
-2. **Wire `getLocationGenerator()`** in `FabricServerAccessor` — Return `RTP.getInstance().locationGenerator` (same pattern as `AbstractServerAccessor`). Unblocks the entire teleport pipeline.
-3. **Complete `FabricScheduler`** — Implement `scheduleAsync`, `scheduleSync` (via `ServerTickEvents.END` + `server.execute()`), and `cancelTask` (backed by a `ConcurrentHashMap<Integer, Future<?>>`).
-4. **Add `FabricDatabaseHandler`** — Locate config dir via `FabricLoader.getInstance().getConfigDir().resolve("rtp")` and instantiate `rtp-core`'s platform-agnostic `DatabaseHandler`. No new `rtp-api` abstraction needed.
-5. **Complete event mapping** — Add `ServerPlayConnectionEvents.DISCONNECT` (queue cleanup), `ServerWorldEvents.LOAD/UNLOAD` (region registration/cleanup). Register all in `RTPFabric.onInitialize()`.
-6. **Permissions via `fabric-permissions-api`** — Add `me.lucko:fabric-permissions-api` as `compileOnly`. Implement `Permissions.check(source, node, opFallback)` in `FabricPlayer.hasPermission()`. LuckPerms-Fabric hooks in automatically.
-7. **Brigadier bridge in `commands-api`** — See Phase 3 and ADR-014.
+- **Status (landed 2026-05-01 — minimal slice, A1 scope):**
+    - [x] `FabricRTPWorld extends RTPWorld<ServerLevel>` in `rtp-fabric/rtp-fabric-common/.../world/FabricRTPWorld.java`. `getChunkAt(int,int)` dispatches via `world.getServer().submit(() -> chunkSource.getChunk(cx, cz, ChunkStatus.FULL, true))`, returning a `CompletableFuture<Long>` that resolves on the server tick thread with the canonical packed chunk key. Null-server defensive path completes exceptionally (REQ-RTP-S-004 attribution).
+    - [x] `name()` returns the dimension `ResourceLocation` string; `id()` is a deterministic UUID derived from the dimension id (Fabric has no per-world UUID). All other abstract `RTPWorld` methods (`getChunkAtAsync`, `setForceLoadedImpl`, `getServerForceLoadedCount`, `getCachedChunk`, `keepChunkAt`/`forgetChunkAt`/`forgetChunks`, `getBiome`, `platform`, `isInactive`, `save`, `getMaxHeight`, `getMinHeight`, `getCacheSize`, `getSeed`) throw `UnsupportedOperationException` with per-step routing notes — fail-loud per REQ-RTP-S-006.
+    - [x] `:rtp-fabric:rtp-fabric-common:compileJava` BUILD SUCCESSFUL.
+    - [ ] **Test deferred** — per the approved approach (option c), end-to-end exercise of the S-005 path lands in **Step H's dual-runtime smoke test**, which actually boots a Fabric server. Mocking `ServerLevel`/`ServerChunkCache` from a unit test would require bytecode tricks for negligible value, given Step H is the gate for genuine Fabric runtime verification anyway. `TRACEABILITY.md` row for REQ-RTP-S-005 (Fabric) will be added when the smoke test lands.
+- **Acceptance gate:** Step H dual-runtime smoke test exercises the S-005 path end-to-end on a Fabric dev server; no `ServerLevel#getChunk` on any caller-side main-thread path (the implementation hops onto the tick thread internally via `server.submit`, which is the documented thread-safe entry).
 
-### 1. Database & Persistence
-- [ ] **Fabric Database Handler**: Implement `FabricDatabaseHandler` using `FabricLoader.getInstance().getConfigDir()` to locate the data directory, then delegate to `rtp-core`'s platform-agnostic `DatabaseHandler`.
-- [ ] **Config Migration**: Ensure configuration files are correctly located in the Fabric `config/rtp` directory.
+### Step B — `FabricServerAccessor.getLocationGenerator()`
 
-### 2. Permissions & Integration
-- [ ] **LuckPerms-Fabric Integration**: Add `me.lucko:fabric-permissions-api` as a `compileOnly` soft-dependency. Implement `Permissions.check()` in `FabricPlayer.hasPermission()` with an op-level fallback. LuckPerms-Fabric satisfies this API automatically when present.
-- [ ] **PlaceholderAPI Alternative**: Investigate and implement support for a Fabric-native placeholder system (e.g., PlaceholderAPI for Fabric).
+Return a fresh `LocationGenerator` (matching `AbstractServerAccessor`'s pattern — Bukkit constructs per-call, not via a singleton field). Throw `IllegalStateException` if called before `rtp-core` is loaded (REQ-RTP-S-006). Unblocks the teleport pipeline end-to-end.
 
-### 3. Event Mapping
-- [ ] **Complete Lifecycle Events**: Map all critical events to Fabric's event hooks:
-    - `PlayerQuitEvent` → `ServerPlayConnectionEvents.DISCONNECT`
-    - `WorldLoadEvent` → `ServerWorldEvents.LOAD`
-    - `WorldUnloadEvent` → `ServerWorldEvents.UNLOAD`
-- [ ] **Cancelable Events**: Map `PlayerTeleportEvent` via `EntityTeleportCallback` or a mixin to allow RTP to intercept and cancel teleports when necessary.
+- **Status (landed 2026-05-01 — minimal slice):**
+    - [x] `FabricServerAccessor implements RTPServerAccessor` in `rtp-fabric/rtp-fabric-common/.../server/FabricServerAccessor.java`. `getLocationGenerator()` returns `new LocationGenerator()` after a `RTP.getInstance() != null` gate that throws `IllegalStateException` (REQ-RTP-S-006).
+    - [x] `getPlatform()` returns `"fabric"`. `getTPS(int)` returns the nominal `20.0` until Step C wires real measurement (callers gating on TPS won't block the pipeline before Step C). `format`/`formatNoColor` pass-through; `log(...)` falls back to JUL until Step E. `stop()` is a documented no-op.
+    - [x] All other ~45 abstract methods throw `UnsupportedOperationException` carrying the owning step letter (C/D/E/F) — fail-loud per REQ-RTP-S-006, mirrors the Step A approach in `FabricRTPWorld`.
+    - [x] `:rtp-fabric:rtp-fabric-common:compileJava` BUILD SUCCESSFUL.
+    - [ ] **Test deferred** — same rationale as Step A: `ReqRtpS006FabricEarlyApiTest` requires a wired `RTPFabricMod.onInitialize()` (Step E) plus dual-runtime exercise; it lands with the Step H smoke test. `TRACEABILITY.md` row for REQ-RTP-S-006 (Fabric) added when the test lands.
+- **Acceptance gate:** Step H dual-runtime smoke test exercises the early-API contract on a Fabric dev server; Bukkit-family build remains green throughout.
 
-### 4. Asynchronous Chunk Loading
-- [ ] **Fix REQ-RTP-S-005 violation**: Replace `getChunkFutureSyncOnMainThread` in `FabricWorld.getChunkAt()` with a dispatch to `Util.getMainWorkerExecutor()` (Minecraft's off-main worker pool) combined with the Fabric chunk ticket API. Mirror the pattern used in `rtp-paper-common`'s `getChunkAtAsync` override.
+### Step C — `FabricScheduler` Full Implementation
 
-## Phase 3: Command System Refinement
+- `scheduleAsync` → `Util.backgroundExecutor()` (canonical mojmap accessor on MC 1.21.1; `getMainWorkerExecutor` was the pre-1.21 name).
+- `scheduleSync` → `MinecraftServer#execute(Runnable)` for one-shot main-thread dispatches; `ServerTickEvents.END_SERVER_TICK` callback drains the delayed/repeating queue.
+- `cancelTask` → backed by `ConcurrentHashMap<Integer, ScheduledEntry>`; cancellation flips a `volatile boolean` checked at next tick drain.
 
-- [ ] **Brigadier Bridge** (see [ADR-014](../adr/ADR-014-brigadier-bridge-via-commands-api.md)): Implement a `BrigadierCommandAdapter` inside `commands-api` that converts the `commands-api` tree into Brigadier `LiteralArgumentBuilder` nodes. `RTPCmdFabric` then registers the adapted tree via `CommandRegistrationCallback.EVENT` — no platform-specific command logic duplication.
-- [ ] **Tab Completion**: Implement advanced tab completion that mirrors the Bukkit experience but leverages Brigadier's client-side capabilities.
-- [ ] **Command Feedback**: Ensure all RTP messages and command feedback are correctly sent to Fabric players/console.
+- **Status (landed 2026-05-01 — minimal slice):**
+    - [x] `FabricScheduler implements RTPScheduler` in `rtp-fabric/rtp-fabric-common/.../scheduling/FabricScheduler.java`. Full implementation of all 12 contract methods.
+    - [x] Async path: `runTaskAsynchronously` and `runTaskTimerAsynchronously` dispatch via `Util.backgroundExecutor()`. Async repeating timers schedule on the tick queue and dispatch each fire to the worker pool.
+    - [x] Sync path: `runTask` runs inline if already on the server thread (`Thread.currentThread() == server.getRunningThread()`), else `server.execute(task)`. Pre-server-start calls throw `IllegalStateException` (REQ-RTP-S-006 fail-loud).
+    - [x] Delayed/repeating: tick-counted `ScheduledEntry` map drained by `tick(MinecraftServer)`; one-shot entries removed after fire, periodic entries reset to `periodTicks`. Throwables caught and logged via `RTP.log`.
+    - [x] Region-aware overloads (`runTask(RTPLocation,...)`, `runTask(RTPWorld,cx,cz,...)`, etc.) delegate to non-region equivalents — Fabric has no Folia-style region threading; matches `BukkitSchedulerImpl`'s convention on Spigot/Paper.
+    - [x] `setServer(MinecraftServer)` / `clearServer()` lifecycle hooks; `tick(MinecraftServer)` callback hook — to be wired from `ServerLifecycleEvents.SERVER_STARTED` / `SERVER_STOPPING` / `ServerTickEvents.END_SERVER_TICK` in Step E (`RTPFabricMod.onInitialize()`).
+    - [x] `:rtp-fabric:rtp-fabric-common:compileJava` BUILD SUCCESSFUL.
+    - [ ] **Test deferred** — same rationale as Steps A/B: meaningful exercise requires a wired `RTPFabricMod.onInitialize()` (Step E) to register the lifecycle/tick callbacks, plus dual-runtime exercise. Lands with the Step H smoke test. Existing `MockRTPScheduler` and Bukkit/Folia scheduler contract tests cover the cross-platform contract; `FabricScheduler` follows the same shape.
+- **Acceptance gate:** existing scheduler contract behaviour holds on Fabric — verified end-to-end via the Step H dual-runtime smoke test (lifecycle hooks called once each, tick callback drains the queue, `cancelTask` prevents subsequent fires).
 
-## Phase 4: Stabilization & Testing
+### Step D — `FabricDatabaseHandler`
 
-- [ ] **Fabric Test Suite**: Adapt existing unit and integration tests to run in a Fabric environment.
-- [ ] **Memory Leak Audit**: Perform a thorough audit for memory leaks, specifically targeting the new Fabric-specific wrappers.
-- [ ] **Concurrency Verification**: Ensure that the region-based task scheduling is safe on Fabric's threading model.
+Locate the config dir via `FabricLoader.getInstance().getConfigDir().resolve("rtp")`, then delegate to `rtp-core`'s platform-agnostic `DatabaseHandler`. **No new `rtp-api` abstraction.**
 
-## Phase 5: Documentation & Release
+- **Status (landed 2026-05-01 — minimal slice, D2 scope):**
+    - [x] `FabricDatabaseHandler` in `rtp-fabric/rtp-fabric-common/.../database/FabricDatabaseHandler.java`. Static `setupDatabase(RTP)` mirrors `BukkitDatabaseHandler` semantics: reads `database` config map, picks accessor (`yaml`/`h2`/`mysql`/`postgresql`/`sqlite` default), writes `.db_state`, calls `RTP.handleMigration`, schedules `databaseAccessor.startup()` one tick later.
+    - [x] Config dir resolution via `resolveConfigDirectory()` → `FabricLoader.getInstance().getConfigDir().resolve("rtp")`; creates the directory if absent. No `org.bukkit.*` imports (ADR-022 §4 invariant).
+    - [x] REQ-RTP-S-006 fail-loud: throws `IllegalStateException` if invoked with a `null` `RTP` instance. `printStackTrace` replaced with `RTP.log(Level.WARNING, ..., e)` per AGENTS.md *Logging & Feedback*.
+    - [x] `:rtp-fabric:rtp-fabric-common:compileJava` BUILD SUCCESSFUL.
+    - [ ] **Test deferred** — same rationale as Steps A/B/C: meaningful exercise requires `RTPFabricMod.onInitialize()` (Step E) to invoke `setupDatabase` at the right lifecycle point. Existing `CachedLocationRoundTripTest` already exercises the underlying accessor contract; Fabric-specific exercise lands with the Step H smoke test.
+- **Acceptance gate:** existing `CachedLocationRoundTripTest` reused against the Fabric handler. Shutdown-flush rule from `LESSONS_LEARNED.md` (2026-04-18) honoured: `databaseAccessor.processQueries(Long.MAX_VALUE)` runs **after** `flushDirtyCache()` and **before** `stop.set(true)` on `ServerLifecycleEvents.SERVER_STOPPING` (wired in Step E).
 
-- [ ] **Admin Documentation**: Update the `docs/admin` files to include Fabric-specific installation and configuration instructions.
-- [ ] **Developer Documentation**: Update `docs/dev` to reflect the multi-platform architecture and how to contribute to platform-specific modules.
-- [ ] **Beta Release**: Release the first public beta of RTP for Fabric.
+### Step E — Event Bridge
+
+Map all critical Bukkit events to Fabric's hooks in `FabricEventBridge`, registered from `RTPFabricMod.onInitialize()`:
+
+- `PlayerQuitEvent` → `ServerPlayConnectionEvents.DISCONNECT` (queue cleanup; release any `MemoryTracker`-tracked tickets owned by the player).
+- `WorldLoadEvent` → `ServerWorldEvents.LOAD`.
+- `WorldUnloadEvent` → `ServerWorldEvents.UNLOAD`.
+- Server lifecycle → `ServerLifecycleEvents.SERVER_STOPPING` drives `RTP.stop()` shutdown-flush.
+- Cancelable `PlayerTeleportEvent` → `EntityTeleportCallback` or a mixin to allow RTP to intercept teleports when necessary.
+
+- **Status (landed 2026-05-01 — E2 scope: lifecycle + tick + world + player session):**
+    - [x] `FabricEventBridge` in `rtp-fabric/rtp-fabric-common/.../events/FabricEventBridge.java` registers `ServerLifecycleEvents.SERVER_STARTED` (binds `MinecraftServer` into `FabricServerAccessor` + `FabricScheduler`, registers all already-loaded `ServerLevel`s, kicks `FabricDatabaseHandler.setupDatabase`), `SERVER_STOPPING` (calls `RTP.stop()` for shutdown flush, then `accessor.unbindServer()`), `END_SERVER_TICK` (drives `FabricScheduler.tick`), `ServerWorldEvents.LOAD/UNLOAD` (world cache maintenance), `ServerPlayConnectionEvents.JOIN/DISCONNECT` (`FabricRTPPlayer` lifecycle).
+    - [x] `FabricRTPPlayer` in `rtp-fabric/rtp-fabric-common/.../player/FabricRTPPlayer.java`. Real `uuid()`, `name()`, `isOnline()`, `getLocation()` (resolves world via `RTP.serverAccessor.getRTPWorld(dimension)`), `setLocation()` (hops to server thread via `server.submit`, calls `ServerPlayer#teleportTo`), `sendMessage()` via `Component.literal`, `performCommand()` via `MinecraftServer.getCommands().performPrefixedCommand`. `hasPermission()` falls back to op-level (`hasPermissions(2)`) pending Step F. `unbind()` called by the bridge on disconnect to drop the native handle (REQ-RTP-S-004 / REQ-FABRIC-ARCH-006 memory hygiene).
+    - [x] `RTPFabricMod.onInitialize()` body now real: instantiates `FabricServerAccessor`, sets `RTP.serverAccessor`, triggers `RTP.getInstance()`, registers `FabricEventBridge`. Failures throw out of `onInitialize` (REQ-RTP-S-004 — no silent mod-load).
+    - [x] `FabricServerAccessor` `getRTPWorld`/`getPlayer`/`getRTPWorlds`/`getPluginDirectory`/`getServerVersion`/`getPluginVersion`/`getServerIntVersion`/`isPrimaryThread`/`getScheduler`/`getPlugin`/`stop`/`start` all real; backed by the bridge-populated maps.
+    - [x] `rtp-fabric/REQUIREMENTS.md` authored (REQ-FABRIC-F-001…010 + REQ-FABRIC-ARCH-001…010); resolves the previously-404 link from top-level `REQUIREMENTS.md`.
+    - [x] `:rtp-fabric:rtp-fabric-common:compileJava :rtp-plugin:compileJava` BUILD SUCCESSFUL.
+    - [ ] **Deferred to E-tail / E3 / Step F / Step H:** teleport-cancel callback (would need a Mixin against `Entity#teleportTo`); biome/material listings; world-border + shape function plumbing; full perms via `fabric-permissions-api` (Step F); end-to-end runtime exercise (Step H smoke gate); **scheduled-task processor parity (Step E3 — see below)**.
+- **Acceptance gate:** Step H dual-runtime smoke test — server boots, `FabricEventBridge` callbacks fire in order, players join/leave cleanly, DB flushes on shutdown.
+
+### Step E3 — Scheduled-Task Processor Parity *(added 2026-05-01)*
+
+**Discovered during Step G G1 review.** A direct comparison of `RTPBukkitPlugin.onEnable` against `RTPFabricMod.onInitialize` shows Fabric is missing the recurring-task wiring that makes `/rtp` actually function. The teleport pipeline (`AsyncTaskProcessing` / `SyncTaskProcessing`) is what turns queued teleport requests into real teleports — without something pumping it, `/rtp` queues work that nothing executes.
+
+**The good news:** `rtp-core`'s `RTP` constructor (`rtp-core/.../common/RTP.java` ~line 193–220) **already schedules** the core pipeline timers itself:
+
+- `SyncTaskProcessing` via `RTP.scheduler.runTaskTimer(...)` every tick.
+- `AsyncTaskProcessing` via `RTP.scheduler.runTaskTimerAsynchronously(...)` every tick.
+- `databaseAccessor.rebuildCachedLocationsFromMemory()` + `flushDirtyCache()` every 6000 ticks.
+- `databaseAccessor.flush()` (SQL) every 60 ticks.
+- `PerformanceTracker.start(scheduler)` heartbeat.
+
+This means **most of the parity gap closes for free** as soon as `RTP.scheduler` is set before `new RTP()` runs. The remaining gap is the platform-specific wiring that lives in the Bukkit plugin's `onEnable` body.
+
+#### Bukkit vs. Fabric comparison
+
+| What Bukkit `onEnable` does | Fabric `onInitialize` status | Action |
+|---|---|---|
+| `RTP.serverAccessor = new BukkitServerAccessor()` | ✅ done (Step E2) | — |
+| **`RTP.scheduler = new BukkitSchedulerImpl(this)`** *(reflective)* | ❌ **missing — silently NPEs in `RTP` ctor** | **E3-1: assign `RTP.scheduler = accessor.getScheduler()` BEFORE `RTP.getInstance()`** |
+| `RTP.serverAccessor.start(plugin)` | ✅ implicit via `bindServer` (Step E2) | — |
+| `new RTP()` (constructor schedules pipeline timers via `RTP.scheduler`) | ⚠️ runs but its scheduling calls fail because `RTP.scheduler == null` | Fixed by E3-1. |
+| `BukkitDatabaseHandler.setupDatabase(rtp)` | ✅ wired 2026-05-01 — `FabricDatabaseHandler.setupDatabase(rtp)` invoked from `RTPFabricMod.onInitialize()` immediately after `RTP.getInstance()` (mirrors Bukkit ordering); `FabricServerAccessor.getPluginDirectory()` mkdirs the config dir so `Configs` ctor + DB init both find it. | Verify selected accessor at Step H smoke test. |
+| `ChunkyBorderChecker.loadChunky()` | N/A (Bukkit-only soft-depend) | — |
+| `RTP.getInstance().startupTasks.execute(Long.MAX_VALUE)` (drain #1, sync) | ❌ missing | **E3-6: drain `startupTasks` after event-bridge registration.** |
+| `RTP.scheduler.runTaskLater(... drain startupTasks ..., 1)` (drain #2, deferred) | ❌ missing | **E3-6 (continued)** — schedule a 1-tick-later drain. |
+| `setupBukkitEvents()` registers ~9 listeners | ✅ partial via `FabricEventBridge` (Step E2: lifecycle + tick + world + player join/disconnect). Damage/move/respawn/teleport/changeworld listeners pending | Tracked under E-tail / E3-7 (pure event work, not scheduled-task work — listed here only for symmetry). |
+| `RTP.scheduler.runTaskLater(this::setupIntegrations, 1)` (Vault/claims) | N/A (Bukkit-only) | — |
+| `RTP.scheduler.runTaskLater(BukkitEffectsHandler::setupEffects, 1)` | Deferred — no Fabric effects layer yet | Track separately; not blocking `/rtp`. |
+| `if (!isFolia()) RTP.scheduler.runTaskTimer(new ChunkUnloadProcessor(), 1, 1)` | ❌ missing | **E3-3: schedule `ChunkUnloadProcessor` once `RTP.scheduler` is wired.** Fabric has no Folia-style region threading, so the non-Folia branch applies. |
+| `DatabaseProcessing.start(this)` *(periodic flush wrapper, runs `RTP.scheduler.runTaskTimerAsynchronously` at 16ms)* | ⚠️ functionally redundant with the rtp-core constructor's flush timers; `BukkitDatabaseHandler` schedules an additional `databaseAccessor.processQueries(MAX_VALUE)` heartbeat | **E3-2: verify the rtp-core timers are sufficient on Fabric; if not, add a `FabricDatabaseProcessing` shim mirroring `DatabaseProcessing`.** |
+| `RTP.getInstance().startupTasks.execute(Long.MAX_VALUE)` (drain #3, sync, after console banner) | ❌ missing | **E3-6 (continued)** — third drain. |
+| PAPI registration | N/A (Bukkit-only) | — |
+| `JarUtils.extractDocs(getDataFolder(), version)` | ❌ missing | **E3-4: port `JarUtils.extractDocs` to a `FabricJarUtils` (no `JavaPlugin` dep), seed `<configDir>/rtp/docs/`.** |
+| `initLoginReserveCache()` (ADR-023) | ❌ missing | **E3-5: port to use `MinecraftServer#getMaxPlayers/getPlayerList/overworld()`.** |
+| `metrics = new Metrics(this, 30865)` *(bStats)* | N/A (Bukkit-only — bStats has a separate Fabric module if pursued later) | Track separately; not blocking `/rtp`. |
+
+#### Required `RTPFabricMod.onInitialize()` changes (in order)
+
+```java
+// 1. Wire accessor + scheduler BEFORE constructing RTP — mirrors RTPBukkitPlugin order.
+FabricServerAccessor accessor = new FabricServerAccessor();
+RTP.serverAccessor = accessor;
+RTP.scheduler = accessor.getScheduler();              // <-- E3-1, currently missing
+
+// 2. Trigger lazy RTP construction; constructor self-schedules
+//    SyncTaskProcessing / AsyncTaskProcessing / DB-flush timers via RTP.scheduler.
+RTP.getInstance();
+
+// 3. Register the event bridge so SERVER_STARTED can call setupDatabase() + drains.
+new FabricEventBridge(accessor).register();
+
+// 4. Brigadier registration (Step G G1 — already done).
+// ...
+
+// 5. Schedule platform-specific recurring tasks once the bridge is in place.
+//    Note: Fabric is non-Folia equivalent — the Folia guard does not apply.
+RTP.scheduler.runTaskTimer(new ChunkUnloadProcessor(), 1, 1);   // <-- E3-3
+
+// 6. Seed data folder with bundled docs (E3-4).
+FabricJarUtils.extractDocs(accessor.getPluginDirectory(), MOD_VERSION);
+
+// 7. Drain startupTasks (E3-6 — three drains, mirroring Bukkit).
+//    Drain #1 + #3 are synchronous; drain #2 is RTP.scheduler.runTaskLater(..., 1).
+RTP rtp = RTP.getInstance();
+while (rtp.startupTasks.size() > 0) rtp.startupTasks.execute(Long.MAX_VALUE);
+RTP.scheduler.runTaskLater(() -> {
+    while (rtp.startupTasks.size() > 0) rtp.startupTasks.execute(Long.MAX_VALUE);
+}, 1);
+// (third drain after any other deferred init, matching Bukkit's banner-then-drain order)
+
+// 8. ADR-023 login reserve cache (E3-5).
+initLoginReserveCacheFabric(accessor);
+```
+
+Some of this naturally moves to `FabricEventBridge.SERVER_STARTED` instead of `onInitialize()` — specifically anything that needs a live `MinecraftServer` (e.g. login cache uses `MinecraftServer#getMaxPlayers()`). The split is the same as Bukkit's "what runs on plugin enable vs. what runs on first tick / SERVER_STARTED equivalent". Final placement is implementation detail.
+
+#### Acceptance
+
+- `RTP.scheduler` is non-null by the time `RTP.getInstance()` runs.
+- Joining the Fabric server, running `/rtp`, and observing an actual teleport in chat + position change (verified manually under Step H smoke test).
+- No `NullPointerException` from `RTP` constructor in the Fabric server log on startup.
+- DB flush observable in the configured backend after a teleport (file-modification timestamp on YAML, or row in SQL `cached_locations`).
+
+#### Why this wasn't caught earlier
+
+Steps A–G all compile cleanly in isolation and the Fabric mod loads without throwing. The pipeline-pump gap only manifests at *runtime* when a player executes `/rtp` — and runtime end-to-end was deliberately deferred to Step H per the gate-restructure decision (see Phase 1 acceptance gate note). Recording this finding now under a dedicated Step E3 keeps the per-step gate model honest and surfaces the gap before the Step H smoke test rather than during it.
+
+### Step F — Permissions
+
+Add `me.lucko:fabric-permissions-api` as `modCompileOnly` (soft-depend). Implement `FabricRTPPlayer.hasPermission(node)` via `Permissions.check(source, node, opFallback)` with an op-level fallback. LuckPerms-Fabric satisfies the API automatically when present.
+
+- **Acceptance gate:** permission node test parity with the Bukkit adapter.
+
+### Step G — Brigadier Bridge in `commands-api` (per [ADR-014](../adr/ADR-014-brigadier-bridge-via-commands-api.md))
+
+Implement `BrigadierCommandAdapter` inside `commands-api` that converts the `commands-api` tree into Brigadier `LiteralArgumentBuilder` nodes. `RTPCmdFabric` registers the adapted tree via `CommandRegistrationCallback.EVENT` — **no platform-specific command logic duplication**. Implement advanced tab completion leveraging Brigadier's client-side capabilities. Ensure RTP messages and command feedback route correctly to Fabric players/console.
+
+- **Status (landed 2026-04-30 — partial, structural):**
+    - [x] `BrigadierCommandAdapter` + `BrigadierBridgeContext<S>` in `commands-api/.../brigadier/` (Brigadier as `compileOnly`; never loaded on Bukkit-family runtimes). Walks `TreeCommand`, emits literal nodes for sub-commands, typed argument nodes for `IntegerParameter` / `FloatParameter` / `BooleanParameter`, and string-with-suggestions for `EnumParameter` / `CoordinateParameter` / unknowns. Permission gating is wired via `requires(...)`.
+    - [x] `RTPCmdFabric.register(CommandDispatcher<S>, CommandsAPICommand, BrigadierBridgeContext<S>)` shim in `rtp-fabric-common` (generic `<S>`; no `net.minecraft.*` imports — keeps the module buildable without a hot Loom toolchain).
+    - [x] REQ-traceable test: `ReqApiArch005BrigadierBridgeTest` (3 tests) — node structure, dispatch round-trip, permission predicate gating. `TRACEABILITY.md` row `REQ-API-ARCH-005` updated.
+    - [ ] **Not yet wired** — `CommandRegistrationCallback.EVENT` registration from a real Fabric entrypoint, `BrigadierBridgeContext<ServerCommandSource>` builders backed by Fabric permission API, end-to-end `commands-live` smoke against `rtp test full`. Bukkit dispatcher (`BukkitTreeCommand`) remains the production path on all Bukkit-family platforms — purely additive change.
+- **Acceptance gate:** the `commands-live` portion of `rtp test full` produces the REQ-RTP-S-004 warnings on Fabric (intentional malformed-input WARN logs are evidence of compliance, not failures — see `LESSONS_LEARNED.md`). Tab completion smoke test passes.
+
+### Step H — Stabilization, Dual-Runtime Smoke Test & Testing
+
+- **Memory leak audit** — every allocator of a chunk ticket or `TeleportPipelineTask` registers with `MemoryTracker` and releases on all exit paths (normal, exception, disconnect) on Fabric, matching the Bukkit-family contract.
+- **Concurrency review** — verify region-based task scheduling is safe on Fabric's threading model. No Folia-isms (`Bukkit.isOwnedByCurrentRegion`, region/global schedulers) leak into Fabric code paths.
+- **Fabric test suite** — adapt existing unit and integration tests where they exercise platform abstractions.
+- **Dual-runtime end-to-end smoke test** *(moved here from Phase 1)* — the single produced JAR loads cleanly on a Paper test server *and* on a Fabric test server from the same artifact, and `/rtp` (or the equivalent command tree) executes end-to-end on each. This guards against Loom remap-scoping regressions (the only single-point-of-failure introduced by single-JAR packaging) and validates that Steps A–G actually compose into a working Fabric mod. This is the gate that proves ADR-022's single-JAR multi-loader packaging works end-to-end; it cannot meaningfully run earlier because no prior phase delivers enough featureset to teleport on Fabric.
+
+- **Acceptance gate:** all existing S-00x regression guards (`ReqRtpS005ChunkLoadingTest`, `ReqRtpS004NullChunkAttributionTest`, etc.) green when run against Fabric implementations of the relevant abstractions, AND the dual-runtime end-to-end smoke test passes on both Paper and Fabric from the same JAR.
+
+## Phase 3: Documentation & Release
+
+- [ ] **Admin documentation** — update `docs/admin/` with Fabric-specific installation and configuration instructions.
+- [ ] **Developer documentation** — update `docs/dev/` to reflect the multi-platform architecture and Fabric contribution guidelines.
+- [ ] **TRACEABILITY.md** — add rows for every new REQ-traceable Fabric test (Steps A, B, F, etc.).
+- [ ] **CHANGELOG.md** — one entry per phase under "Unreleased".
+- [ ] **COVERAGE_PLAN.md** — add a Fabric column to the platform-coverage matrix.
+- [ ] **Beta release** — first public beta of RTP for Fabric once Phase 2 Step H gate is green and Phase 3 docs are merged.
+
+## Phase 4: Future — Forge / NeoForge Evaluation
+
+Deferred until Fabric is stable.
+
+- [ ] **Evaluation** — once Fabric is stable, evaluate the effort to add `rtp-forge` (or `rtp-neoforge`) using the established abstraction patterns.
+- [ ] **Architectury?** — re-evaluate moving to a common abstraction layer like Architectury for long-term maintenance of multiple mod-loader platforms.
 
 ## What Does NOT Need to Change in `rtp-api` or `rtp-core`
 
-The existing abstractions are sufficient for full Fabric support. Specifically:
+The April 2026 gap analysis (referenced in [ADR-022](../adr/ADR-022-fabric-platform-in-scope.md)) confirmed the existing abstractions are sufficient for full Fabric support:
+
 - `RTPServerAccessor`, `RTPWorld`, `RTPPlayer`, `RTPScheduler` interfaces require no new methods.
 - `DatabaseHandler` in `rtp-core` is already platform-agnostic.
 - `LocationGenerator`, `TeleportPipelineTask`, and `MemoryTracker` are untouched — Fabric wires into them via `RTP.getInstance()`.
 
-The only potential future `rtp-api` addition is a `RTPPermissionProvider` interface to formalize the soft-depend pattern, but this is deferred until Phase 2 permissions work is complete and the pattern is proven.
+The only potential future `rtp-api` addition is an `RTPPermissionProvider` interface to formalize the soft-depend pattern, but this is **deferred** until the Step F permissions work is complete and the pattern is proven in production.
 
-## Future: Forge Support
+## Risks & Mitigations
 
-- [ ] **Evaluation**: Once Fabric is stable, evaluate the effort to add a `rtp-forge` module using the established abstraction patterns.
-- [ ] **Architectury?**: Re-evaluate if moving to a common abstraction layer like Architectury is beneficial for long-term maintenance of both Fabric and Forge versions.
+| Risk | Mitigation |
+|------|------------|
+| Loom plugin pollutes other modules' classpaths | Apply Loom only under `rtp-fabric/**`; gate Maven repos by `project.path.startsWith(':rtp-fabric')`. |
+| Hidden S-005 violation re-introduced via an unrecognized Mojang `getChunk` call | Step A regression test plus a stretch-goal arch guard banning direct `ServerLevel#getChunk` from `rtp-fabric/**`. |
+| Fabric tick threading vs. Folia region threading subtle drift | `FabricScheduler` documented behaviour matches the `RTPScheduler` contract; no Folia-isms leak into core. |
+| Brigadier tree drift from the `commands-api` tree | Single adapter in `commands-api` (ADR-014); no per-platform branching. |
+| `MemoryTracker` leaks on disconnect mid-pipeline | `ServerPlayConnectionEvents.DISCONNECT` releases all tickets owned by the player, mirroring Bukkit `PlayerQuitEvent` cleanup. Step H audit. |
+| Scope creep into Forge | Explicitly out of scope until Phase 4. |
+
+## Ownership
+
+Per ADR-022, a named maintainer owns Fabric end-to-end (build, mappings, CI toolchain, S-00x proofs, ongoing maintenance). **Owner: @leaf_26** (project lead; recorded 2026-04-30). Phase 3 (public beta release) gate is satisfied; Phase 1 and Phase 2 work proceeds against this ownership.

@@ -671,30 +671,60 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   @Override
   @RegionThread
   public void platform(RTPLocation location) {
+    // Folia threading rule: block writes must run on the region that owns the destination
+    // chunk(s), not on whatever scheduler thread invoked runTeleport (typically the player's
+    // entity-region thread). Bounce the work to the destination region(s) via the
+    // RegionScheduler. See REQ-RTP-S-005 / Folia threading rules in `Project Guidelines`.
     try {
       ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
       int radius = safety.getNumber(SafetyKeys.platformRadius, 0).intValue();
       int airHeight = safety.getNumber(SafetyKeys.platformAirHeight, 0).intValue();
       int depth = safety.getNumber(SafetyKeys.platformDepth, 0).intValue();
+      final Material materialFinal;
       Material material;
       try {
         material = Material.valueOf(safety.getConfigValue(SafetyKeys.platformMaterial, "GLASS").toString().toUpperCase());
       } catch (IllegalArgumentException e) {
         material = Material.GLASS;
       }
+      materialFinal = material;
 
-      int lx = location.getBlockX();
-      int ly = location.getBlockY();
-      int lz = location.getBlockZ();
+      final int lx = location.getBlockX();
+      final int ly = location.getBlockY();
+      final int lz = location.getBlockZ();
+      final int radiusFinal = radius;
+      final int airHeightFinal = airHeight;
+      final int depthFinal = depth;
 
-      for (int dx = -radius; dx <= radius; dx++) {
-        for (int dz = -radius; dz <= radius; dz++) {
-          for (int dy = -depth; dy < 0; dy++) {
-            world.getBlockAt(lx + dx, ly + dy, lz + dz).setType(material);
-          }
-          for (int dy = 0; dy < airHeight; dy++) {
-            world.getBlockAt(lx + dx, ly + dy, lz + dz).setType(Material.AIR);
-          }
+      // Group writes by owning chunk so each batch can be dispatched to its region thread.
+      // Chunks are 16x16 in X/Z; Folia regions cover multiple chunks but the per-chunk
+      // dispatch is always safe (RegionScheduler.run with the chunk coords picks the
+      // correct region thread, or runs immediately when the current thread already owns it).
+      int minCx = (lx - radiusFinal) >> 4;
+      int maxCx = (lx + radiusFinal) >> 4;
+      int minCz = (lz - radiusFinal) >> 4;
+      int maxCz = (lz + radiusFinal) >> 4;
+
+      for (int cx = minCx; cx <= maxCx; cx++) {
+        for (int cz = minCz; cz <= maxCz; cz++) {
+          final int chunkX = cx;
+          final int chunkZ = cz;
+          final int chunkMinX = Math.max(lx - radiusFinal, cx << 4);
+          final int chunkMaxX = Math.min(lx + radiusFinal, (cx << 4) + 15);
+          final int chunkMinZ = Math.max(lz - radiusFinal, cz << 4);
+          final int chunkMaxZ = Math.min(lz + radiusFinal, (cz << 4) + 15);
+          RTP.scheduler.runTask(this, chunkX, chunkZ, () -> {
+            for (int x = chunkMinX; x <= chunkMaxX; x++) {
+              for (int z = chunkMinZ; z <= chunkMaxZ; z++) {
+                for (int dy = -depthFinal; dy < 0; dy++) {
+                  world.getBlockAt(x, ly + dy, z).setType(materialFinal);
+                }
+                for (int dy = 0; dy < airHeightFinal; dy++) {
+                  world.getBlockAt(x, ly + dy, z).setType(Material.AIR);
+                }
+              }
+            }
+          });
         }
       }
     } finally {
@@ -711,7 +741,15 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   @Override
   @GlobalRegionThread
   public void save() {
-    world.save();
+    // Intentional no-op on Folia. Folia's region threading model means a
+    // synchronous full-world save from a non-region context risks
+    // ThreadAccessException, and Folia/Paper chunk-system-v2 already
+    // persists generated chunks via its own dirty-tracking + autosave
+    // path (unlike Spigot, where Chunky-style pre-generated chunks may
+    // never reach disk without a forced World.save() — see
+    // helpers/PeriodicWorldSaver and docs/dev/LESSONS_LEARNED.md
+    // "Pre-Generation & Shutdown"). The BukkitRTPWorld override remains
+    // the only platform that actually flushes here.
   }
 
   @Override

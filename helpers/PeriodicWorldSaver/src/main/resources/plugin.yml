@@ -1,0 +1,7 @@
+name: PeriodicWorldSaver
+version: 1.0-SNAPSHOT
+main: io.github.dailystruggle.helpers.periodicworldsaver.PeriodicWorldSaverPlugin
+api-version: "1.20"
+author: dailystruggle
+description: Periodically saves all worlds and unloads loaded chunks while no players are online, so unattended pre-generation runs do not bloat resident-chunk RAM and shutdown does not freeze on a giant final save.
+load: POSTWORLD

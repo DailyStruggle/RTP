@@ -20,4 +20,18 @@ public final class PaperRTPWorld extends BukkitRTPWorld {
   public PaperRTPWorld(World world) {
     super(world);
   }
+
+  /**
+   * Paper override: no-op. Paper's chunk-system-v2 persists generated chunks
+   * via its own dirty-tracking and autosave path, so the forced
+   * {@code World.save()} that {@link BukkitRTPWorld#save()} performs (to work
+   * around the Spigot+Chunky "chunks never reach disk" symptom captured in
+   * {@code docs/dev/LESSONS_LEARNED.md} → "Pre-Generation &amp; Shutdown") is
+   * unnecessary on Paper and would only add I/O pressure during long
+   * {@code rtp scan} runs. See also {@code helpers/PeriodicWorldSaver}.
+   */
+  @Override
+  public void save() {
+    // intentional no-op on Paper; see Javadoc.
+  }
 }

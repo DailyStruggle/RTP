@@ -1,3 +1,17 @@
+// pluginManagement provides fabric-loom for :rtp-fabric:** and :rtp-plugin
+// (per ADR-022 §3 Build Discipline). Loom is published only on FabricMC's Maven,
+// so we register it explicitly here. Plugin Portal stays as the default fallback
+// for shadow / spotless / etc.
+pluginManagement {
+    repositories {
+        maven {
+            name = 'Fabric'
+            url = 'https://maven.fabricmc.net/'
+        }
+        gradlePluginPortal()
+    }
+}
+
 rootProject.name = 'RTP'
 
 include 'rtp-api'
@@ -21,10 +35,18 @@ include 'rtp-spigot:rtp-spigot-v26_1_R1'
 include 'rtp-paper:rtp-paper-v26_1_R1'
 include 'rtp-folia:rtp-folia-v26_1_R1'
 include 'rtp-plugin'
-if (settings.hasProperty('includeFabric') || System.getenv('INCLUDE_FABRIC') == 'true') {
-    include 'rtp-fabric'
-}
+
+// Fabric platform adapter — first-class in-scope as of 2026-04-30 per ADR-022.
+// rtp-fabric-common applies fabric-loom (see its build.gradle); Loom is
+// scoped per ADR-022 §3 to rtp-fabric/** and rtp-plugin only — it must
+// not leak into rtp-core, rtp-api, commands-api, effects-api, or any
+// Bukkit-family adapter.
+include 'rtp-fabric:rtp-fabric-common'
 
 //include 'addons:RTP_Iris_integration'
 include 'addons:RTP_Glide'
 include 'addons:RTP_ExampleAddon'
+
+// Standalone helper plugins (no rtp-api / rtp-core dependency).
+// See helpers/PeriodicWorldSaver/README.md for the directory rationale.
+include 'helpers:PeriodicWorldSaver'

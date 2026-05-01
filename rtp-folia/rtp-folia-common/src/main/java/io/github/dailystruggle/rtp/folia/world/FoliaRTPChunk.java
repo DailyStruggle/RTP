@@ -284,10 +284,13 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
   @RegionThread
   public int getSkyLight(int x, int y, int z) {
     if (anvilView != null) {
-      // Anvil snapshots do not carry computed skylight; return a pessimistic 0
-      // so downstream "prefer bright spots" heuristics treat the candidate as
-      // ambiguous. The live re-check at teleport-commit time is authoritative.
-      return 0;
+      // Delegate to the view's lazy synthesis-aware overload. When the chunk-root
+      // isLightOn flag is true, this returns the on-disk nibble value; when false
+      // (freshly generated chunks with stale lighting), the view lazily populates
+      // a 256-column "first opaque from top" table on first call and answers
+      // subsequent queries as a binary 15/0 sky-access proxy. The live re-check
+      // at teleport-commit time remains authoritative for finer attenuation.
+      return anvilView.getSkyLight(x & 0xF, y, z & 0xF, reconciledAirBlocks());
     }
     return chunk.getBlock(x & 0xF, y, z & 0xF).getLightFromSky();
   }

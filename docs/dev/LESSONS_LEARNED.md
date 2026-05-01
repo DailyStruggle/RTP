@@ -109,6 +109,26 @@ When adding a new translatable file or locale, see `TRANSLATION_GUIDE.md`. The `
 
 ---
 
+## Pre-Generation & Shutdown
+
+### Chunky-generated chunks may never reach disk without a forced `World.save()` (2026-05-01)
+
+Discovered while building `helpers/PeriodicWorldSaver`. On a Spigot 1.20.1 server running Chunky unattended (no players online), the `world/region/` directory **did not grow at all** across multiple multi-hour Chunky runs — every restart Chunky began from scratch as if the prior run had produced nothing. Bukkit's `ticks-per.autosave` (even lowered from 6000 → 600) did not help, and `/stop` froze for minutes on the final flush.
+
+Root cause hypothesis (consistent with observation): Chunky's generated chunks accumulate in RAM but never become eligible for Bukkit's autosave path — autosave walks the dirty-chunk set, but Chunky's chunks either aren't flagged dirty in the way autosave checks or are continuously held by Chunky's own tickets so the "save on unload" path never fires. Result: chunks live and die in RAM; `/stop`'s final flush is the first time the server actually tries to persist them, and it can't finish in time.
+
+Fix that worked: a periodic `world.save()` call (currently every 60 s while no players are online, via `helpers/PeriodicWorldSaver`). After installing it, `region/` size grows steadily during the Chunky run and `/stop` returns promptly. The accompanying `unloadChunk` sweep is **not** the lever — it returns false on essentially every Chunky-ticketed chunk; the `world.save()` call is what does the work.
+
+Implications:
+
+- Do not assume `ticks-per.autosave` covers pre-generator output. It does not, at least with Chunky.
+- For any unattended pre-generation workload (Chunky, WorldBorder fill, custom generators), a forced periodic `World.save()` from a separate plugin is currently the only reliable way to bound RAM and avoid shutdown freezes on Spigot.
+- The `unloadChunk` portion of the helper is kept because it is cheap and harmless, and it picks up the small tail of chunks Chunky has already released. The `world.save()` portion is load-bearing.
+
+See `helpers/PeriodicWorldSaver/README.md` for the runtime model. Folia is excluded because the main-thread sweep would hit `ThreadAccessException`; a `RegionScheduler` variant remains future work.
+
+---
+
 ## Build & Environment
 
 ### Gradle daemon / Java version mismatch

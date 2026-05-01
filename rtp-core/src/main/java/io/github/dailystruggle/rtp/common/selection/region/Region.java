@@ -106,7 +106,7 @@ public class Region extends FactoryValue<RegionKeys> {
     // scan-task wiring happens implicitly when rebindWorld(...) swaps in freshly-loaded
     // settings produced by RegionConfigLoader.load against the now-loaded world.
     if (!this.worldFallbackBound && this.shape instanceof MemoryShape<?>) {
-      long[] progress = ScanTask.loadProgress(name);
+      long[] progress = ScanTask.loadProgress(name, cacheKey());
       if (progress != null) {
         long iter = progress[0];
         if (iter > 0 && iter < Double.valueOf(((MemoryShape<?>) this.shape).getRange()).longValue()) {
@@ -122,8 +122,13 @@ public class Region extends FactoryValue<RegionKeys> {
     // stand-in world: the DB rows reference the configured world's seed, and the seed
     // mismatch check in hydrateCacheFromDatabase would permanently delete every row.
     // Hydration is performed later by rebindWorld(...) once the real world loads.
+    //
+    // Deferred to an async task: DB I/O on the plugin-init main thread can stall server
+    // startup, and on Folia the calling thread context for synchronous DB reads is not
+    // well-defined. Scheduling onto the async pool means the queues stay empty for the
+    // first few ticks, which is harmless because no player can RTP that early anyway.
     if (!this.worldFallbackBound) {
-      hydrateFromDatabaseIfAvailable();
+      RTP.scheduler.runTaskAsynchronously(this::hydrateFromDatabaseIfAvailable);
     }
   }
 
@@ -187,7 +192,7 @@ public class Region extends FactoryValue<RegionKeys> {
     // the region was dormant. The new shape (from newSettings) has been loaded against the
     // now-available world, so getLoadFuture() has a real backing load.
     if (this.shape instanceof MemoryShape<?>) {
-      long[] progress = ScanTask.loadProgress(name);
+      long[] progress = ScanTask.loadProgress(name, cacheKey());
       if (progress != null) {
         long iter = progress[0];
         if (iter > 0 && iter < Double.valueOf(((MemoryShape<?>) this.shape).getRange()).longValue()) {
@@ -199,7 +204,8 @@ public class Region extends FactoryValue<RegionKeys> {
       }
     }
 
-    hydrateFromDatabaseIfAvailable();
+    // See note in the constructor: hydration is async to keep DB I/O off the calling thread.
+    RTP.scheduler.runTaskAsynchronously(this::hydrateFromDatabaseIfAvailable);
   }
 
   public RegionSettings getSettings() {
@@ -207,14 +213,87 @@ public class Region extends FactoryValue<RegionKeys> {
   }
 
   public void setSettings(RegionSettings settings) {
+    // Capture the old cache key BEFORE we replace shape/settings — this is what the
+    // (about-to-be-orphaned) on-disk .bin and .scan files are keyed by.
+    String oldCacheKey = cacheKey();
+
     this.settings = settings;
     this.shape = settings.shape();
     this.set(RegionKeys.spatialResolution, settings.spatialResolution());
     if (this.shape != null && this.shape instanceof MemoryShape<?> memoryShape) memoryShape.spatialResolution = settings.spatialResolution();
+
+    String newCacheKey = cacheKey();
+    if (!oldCacheKey.equals(newCacheKey)) {
+      // The shape or vertical adjustor changed in a way that invalidates the spiral
+      // 1D->2D mapping or the validity predicate. The old persisted shape data and scan
+      // progress are stale — drop them so a fresh ScanTask cycle starts on the new geometry.
+      // ADR-022 calls for safety-first invalidation here; the alternative (silently
+      // overwriting the in-memory MemoryShape with stale flags) is the latent bug we
+      // are closing.
+      RTPWorld<?> world = getWorld();
+      if (world != null) {
+        try {
+          java.io.File pluginDir = RTP.serverAccessor.getPluginDirectory();
+          java.io.File regionDataDir = new java.io.File(pluginDir,
+              "database" + java.io.File.separator + "regionData");
+          // Stale .bin under the old key. The new shape is a fresh MemoryShape; nothing
+          // currently references the old file, so deleting it is safe.
+          java.io.File staleBin = new java.io.File(regionDataDir, name + "_" + oldCacheKey + ".bin");
+          if (staleBin.exists() && !staleBin.delete()) {
+            RTP.log(Level.WARNING, "[Region:" + name + "] could not delete stale shape cache "
+                + staleBin.getName() + " after config change");
+          }
+          // Stale .scan progress under the old key.
+          java.io.File staleScan = new java.io.File(regionDataDir, name + "_" + oldCacheKey + ".scan");
+          if (staleScan.exists() && !staleScan.delete()) {
+            RTP.log(Level.WARNING, "[Region:" + name + "] could not delete stale scan progress "
+                + staleScan.getName() + " after config change");
+          }
+        } catch (RuntimeException e) {
+          RTP.log(Level.WARNING, "[Region:" + name + "] failed to clean stale cache files: "
+              + e.getMessage(), e);
+        }
+      }
+      RTP.log(Level.INFO, "[Region:" + name + "] cache key changed (" + oldCacheKey
+          + " -> " + newCacheKey + "); shape data invalidated, fresh scan required.");
+    }
+  }
+
+  /**
+   * Compute the on-disk cache key suffix for this region, of the form
+   * {@code "<seed>_<12hex>"} (see {@link RegionCacheKey#cacheKey}).
+   *
+   * <p>Used as the suffix for {@code <regionName>_<cacheKey>.bin} and the matching
+   * {@code .scan} progress file. Folds the world seed and a stable hash of the shape
+   * and vertical-adjustor configuration into one identifier so that any config edit
+   * which would shift the spiral 1D&rarr;2D mapping or the validity predicate produces
+   * a different filename and the stale cache is naturally orphaned.
+   *
+   * <p>Returns {@code "0"} when the world is not yet available (dormant region); the
+   * caller should guard against persisting in that state.
+   */
+  public String cacheKey() {
+    RTPWorld<?> world = getWorld();
+    return RegionCacheKey.cacheKey(world, this.shape, getVert());
+  }
+
+  /**
+   * Same key folded to a {@code long} for the legacy {@code rtp_cached_locations.seed}
+   * column. See {@link RegionCacheKey#cacheKeyLong}.
+   */
+  public long cacheKeyLong() {
+    RTPWorld<?> world = getWorld();
+    return RegionCacheKey.cacheKeyLong(world, this.shape, getVert());
   }
 
   public void hydrateCacheFromDatabase(List<DatabaseAccessor.StoredLocation> storedLocations) {
-    long currentSeed = getWorld().getSeed();
+    // The "seed" column historically stored world.getSeed(). It now carries the 64-bit
+    // truncation of the region's full cache-key hash (see RegionCacheKey.cacheKeyLong).
+    // The seed is part of the hash input, so a world re-roll still produces a mismatch
+    // — the predicate semantics are preserved without a schema migration. Any change
+    // to shape geometry, vertical adjustor, or SCHEMA_VERSION also produces a mismatch
+    // and invalidates the rows.
+    long currentCacheKey = cacheKeyLong();
     // The database may return rows in insertion order. That order is meaningless for our
     // caching strategy — we want players landing in different areas on reboot, not a
     // deterministic rush to whichever location happened to be saved first. Shuffle in-place.
@@ -235,9 +314,10 @@ public class Region extends FactoryValue<RegionKeys> {
     try {
       DatabaseAccessor db = RTP.getInstance().databaseAccessor;
       for (DatabaseAccessor.StoredLocation stored : storedLocations) {
-        if (stored.getSeed() != 0L && stored.getSeed() != currentSeed) {
-          // The world was wiped and repopulated with a different seed.
-          // This location is no longer safe. Delete it and skip.
+        if (stored.getSeed() != 0L && stored.getSeed() != currentCacheKey) {
+          // Either the world was re-rolled with a different seed, or a config edit
+          // changed the shape/vert in a way that invalidates the spiral mapping or
+          // validity predicate. Either way the cached location is no longer safe.
           if (db != null) db.removeCachedLocation(stored.getId());
           continue;
         }
@@ -715,7 +795,7 @@ public class Region extends FactoryValue<RegionKeys> {
 
     if (shape instanceof MemoryShape<?>) {
       ((MemoryShape<?>) shape).flushAndRebuild(((MemoryShape<?>) shape).spatialResolution);
-      ((MemoryShape<?>) shape).save(this.name + "_" + world.getSeed() + ".bin", world.name());
+      ((MemoryShape<?>) shape).save(this.name + "_" + cacheKey() + ".bin", world.name());
       ((MemoryShape<?>) shape).exportDebugJson(this.name, world.name());
     }
 

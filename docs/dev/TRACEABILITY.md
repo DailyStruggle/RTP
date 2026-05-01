@@ -56,7 +56,7 @@ This document connects each requirement to the design decision that motivated it
 | REQ-API-ARCH-002 | Non-blocking API | DESIGN.md Â§1 | ILocationGenerator | RTPArchitectureTest |
 | REQ-API-ARCH-003 | API exception handling | DESIGN.md Â§6 | TeleportPipelineTask | RTPAPIGuardTest |
 | REQ-API-ARCH-004 | Lock-free reads | DESIGN.md Â§1 | ConfigParser | ConfigParserLanguageTest |
-| REQ-API-ARCH-005 | Brigadier boundary | ADR-014 | BrigadierCommandAdapter | - |
+| REQ-API-ARCH-005 | Brigadier boundary | ADR-014 | `BrigadierCommandAdapter`, `BrigadierBridgeContext` (`commands-api`); `RTPCmdFabric` (`rtp-fabric-common`) | `ReqApiArch005BrigadierBridgeTest` (3 tests) |
 
 ---
 

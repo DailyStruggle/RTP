@@ -29,6 +29,8 @@ An ADR captures a significant architectural decision: the context that forced it
 | [ADR-019](ADR-019-claim-plugin-integrations-folded-into-plugin.md) | Claim-Plugin Integrations Folded Into `rtp-plugin`; Example Addon Retained | Accepted |
 | [ADR-020](ADR-020-language-bootstrap-and-locale-aware-configparser.md) | Language Bootstrap and Locale-Aware ConfigParser | Accepted |
 | [ADR-021](ADR-021-legacy-mc-and-java-support-scope.md) | Legacy Minecraft and Java Support Are Out of Scope | Accepted |
+| [ADR-022](ADR-022-shape-cache-key-seed-plus-config-hash.md) | Region Shape Cache Key: Seed + Canonical Config Hash | Accepted |
+| [ADR-025](ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper.md) | Replace SimpleYaml with an Internal SnakeYAML-Backed YAML Wrapper | Proposed |
 
 ## Template
 

@@ -16,6 +16,7 @@ Operational guide for AI agents and human contributors working in the RTP reposi
 6. Java 21+ is required (REQ-RTP-SYS-001).
 7. Before modifying an uncommitted **code** file, create a `.bak` copy beside it. Skip for git-clean files and for docs/markdown.
 8. **Stay on task.** If you spot an unrelated potential bug, record it in [`docs/dev/POTENTIAL_BUGS.md`](../docs/dev/POTENTIAL_BUGS.md) and keep going — do not fix it in the current change.
+9. **Maintain a task checklist** for any multi-step task, and tick items off as you complete them — this preserves state if the session is interrupted (see *Checklist-Based State Tracking*).
 
 ---
 
@@ -44,6 +45,45 @@ Before generating code or terminal commands, explicitly state and verify:
 - Name: `<original>.bak` in the same directory (e.g., `LocationGenerator.java.bak`).
 - Delete after the change is verified and committed.
 - When in doubt on code, create the `.bak`.
+
+---
+
+## Checklist-Based State Tracking
+
+Agent sessions can be interrupted (disconnect, timeout, context truncation, mode switch). To make any task resumable, maintain an explicit, durable checklist of steps for the current `Effective Issue` and update it as you progress. Treat the checklist — not chat memory — as the source of truth for "what has been done".
+
+**When required**
+
+- Any task estimated at more than ~3 steps, or any `[CODE]` / `[SETUP]` / `[NICHE]` task.
+- Skip for `[CHAT]`, trivial `[FAST_CODE]` (1–3 steps), and one-shot `[RUN_VERIFY]` commands.
+
+**Where to keep it**
+
+- If the user supplied a `UserPlan`, that *is* the checklist — mirror its numbering and tick items off in `<UPDATE>` only. Do not create a parallel file.
+- Otherwise, keep it inline in the `<UPDATE>` section every step, using a stable Markdown checklist (`- [ ]` / `- [x]`).
+- For long-running or high-risk tasks (multi-module refactor, platform bring-up, migration), additionally persist the checklist to a working note: `docs/dev/scratch/CHECKLIST-<short-task-slug>.md`. Delete the file once the task is submitted.
+- Do **not** put task checklists in `.junie/` (reserved) or in canonical docs (`REQUIREMENTS.md`, `DESIGN.md`, ADRs, `TRACEABILITY.md`).
+
+**Format**
+
+Each item must be independently verifiable and ordered so a fresh agent could resume from the first unchecked box. Minimum fields:
+
+```
+- [x] 1. <action> — <evidence: file path, test name, commit, or command output>
+- [ ] 2. <next action>
+```
+
+Include at the top: the `Effective Issue` summary (1 line), chosen mode, and any blocking decisions awaiting user approval (Rule D-005).
+
+**Update cadence**
+
+- Tick a box only after the step is verified (test passes, file saved, command succeeded) — never speculatively.
+- Re-emit the (possibly trimmed) checklist in every `<UPDATE>` so the latest state survives history truncation.
+- On resume after disconnection: re-read the checklist first, re-verify the last `[x]` item still holds (file exists, test still green), then continue from the first `[ ]`.
+
+**Submit**
+
+- The final `submit` summary should reference the completed checklist (all boxes ticked or explicitly deferred with reason). Any unchecked item at submit time must be called out under `### Notes`.
 
 ---
 
@@ -181,9 +221,9 @@ To minimise time spent on unrelated fixes, record incidental discoveries instead
 
 ## Current Development Focus
 
-Active frontier: **Fabric (`rtp-fabric`)**. Unstable — see [`MULTI_PLATFORM_PLAN.md`](../docs/dev/MULTI_PLATFORM_PLAN.md) for phase status and known blockers (S-005 violation in `FabricWorld.getChunkAt`; null stub in `FabricServerAccessor.getLocationGenerator`; unresolved Loom dependency).
+Active frontier: **Fabric (`rtp-fabric`)** — first-class, in-scope platform as of 2026-04-30 ([ADR-022](../docs/adr/ADR-022-fabric-platform-in-scope.md)). Unstable — see [`MULTI_PLATFORM_PLAN.md`](../docs/dev/MULTI_PLATFORM_PLAN.md) for phase status and known blockers (S-005 violation in `FabricWorld.getChunkAt`; null stub in `FabricServerAccessor.getLocationGenerator`; unresolved Loom dependency).
 
-Fabric is explicitly **out of scope** in [`REQUIREMENTS.md §0`](../docs/dev/REQUIREMENTS.md). Do not backport Fabric-specific patterns into `rtp-core` or `rtp-api`. Safe-to-modify modules: `rtp-core`, `rtp-api`, `rtp-spigot`, `rtp-paper`, `rtp-folia`, `addons/`. Brigadier bridge rationale: [ADR-014](../docs/adr/ADR-014-brigadier-bridge-via-commands-api.md). `rtp-api` abstractions were confirmed sufficient for Fabric (April 2026 gap analysis) — gaps are implementation gaps, not interface gaps.
+Do not backport Fabric-specific patterns into `rtp-core` or `rtp-api`. Safe-to-modify modules: `rtp-core`, `rtp-api`, `rtp-spigot`, `rtp-paper`, `rtp-folia`, `rtp-fabric`, `addons/`. Brigadier bridge rationale: [ADR-014](../docs/adr/ADR-014-brigadier-bridge-via-commands-api.md). `rtp-api` abstractions were confirmed sufficient for Fabric (April 2026 gap analysis) — gaps are implementation gaps, not interface gaps. Forge / NeoForge remain out of scope until Fabric stabilizes (Phase 4).
 
 ---
 

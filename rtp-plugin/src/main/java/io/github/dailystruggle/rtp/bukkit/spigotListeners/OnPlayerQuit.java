@@ -34,5 +34,19 @@ public final class OnPlayerQuit implements Listener {
     }
 
     new RTPTeleportCancel(uuid).run();
+
+    // ADR-023 — Login Reserve Cache lazy refill: a slot just opened up, so
+    // dispatch a single-entry promotion on every region that has the buffer
+    // enabled (in practice only the default-world region per ADR-023).
+    try {
+      for (io.github.dailystruggle.rtp.common.selection.region.Region region :
+          RTP.selectionAPI.permRegionLookup.values()) {
+        if (region.queueManager.loginLocations == null) continue;
+        new io.github.dailystruggle.rtp.common.selection.region.LoginCacheTask(region)
+            .promoteUpTo(1);
+      }
+    } catch (Throwable t) {
+      RTP.getInstance(); // no-op guard; quit listener must never throw
+    }
   }
 }

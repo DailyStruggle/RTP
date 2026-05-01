@@ -236,6 +236,11 @@ public abstract class DatabaseAccessor<D> {
       res.put("z", location.coords().z());
       res.put("attempts", location.attempts());
       res.put("timestamp", System.currentTimeMillis());
+      // The "seed" column is overwritten by saveCachedLocation(...) with the region's
+      // RegionCacheKey.cacheKeyLong (which folds the seed plus the shape/vert config hash).
+      // Falling back to the raw world seed here is safe for the rare path where toColumns
+      // is invoked outside of the saveCachedLocation entry point — the value will still
+      // mismatch on a world re-roll, only it will not pick up shape/vert edits.
       RTPWorld<?> world = RTP.serverAccessor.getRTPWorld(location.coords().worldName());
       if (world != null) res.put("seed", world.getSeed());
     }
@@ -447,6 +452,17 @@ public abstract class DatabaseAccessor<D> {
     Map<String, Object> columns = toColumns(location);
     columns.put("region", regionName);
     columns.put("player_uuid", (playerUuid != null) ? playerUuid.toString() : "shared");
+    // Repurpose the legacy "seed" column to carry RegionCacheKey.cacheKeyLong — a 64-bit
+    // hash of (world seed + shape class/params + vert class/params + SCHEMA_VERSION).
+    // Region.hydrateCacheFromDatabase compares this on load and drops mismatches, so any
+    // edit to validity-affecting region config invalidates the persisted rows automatically
+    // without a database schema migration. See ADR-022 and RegionCacheKey.
+    if (RTP.selectionAPI != null) {
+      Region region = RTP.selectionAPI.getRegion(regionName);
+      if (region != null) {
+        columns.put("seed", region.cacheKeyLong());
+      }
+    }
     // use a unique key for the cacheValue/setValue
     String key = regionName + ":" + location.coords().worldName() + ":" + location.coords().x() + ":" + location.coords().y() + ":" + location.coords().z();
     columns.put("UUID", key);

@@ -191,7 +191,6 @@ The `/rtp config set/add/remove` surface round-trips new tokens verbatim. Every 
 
 ## References
 
-- `docs/dev/SAFETY_TAGS_AND_STATES_PLAN.md` — active plan tracking remaining implementation work.
 - `docs/dev/REQUIREMENTS.md §3` — REQ-RTP-S-001 (unsafe-block prohibition) and REQ-RTP-S-004 (never-silent failure).
 - [ADR-011](ADR-011-rtp-api-separate-module.md) — no Bukkit on the `rtp-api` classpath.
 - [ADR-016](ADR-016-anvil-subsystem.md) — Anvil pre-filter advisory semantics; this ADR extends the pre-filter to consult palette `Properties`.
