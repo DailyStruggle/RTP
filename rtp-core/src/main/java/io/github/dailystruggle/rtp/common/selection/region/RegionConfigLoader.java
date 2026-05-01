@@ -116,7 +116,9 @@ public class RegionConfigLoader {
                 // Here we CAN use RTP.log if we want, but since we are debugging early init, sysout is safer
 //                System.out.println("[RTP-DEBUG] RegionLoader: [" + name + "] memory shape detected, reading location data from file...");
             }
-            ((MemoryShape<?>) shape).load(name + "_" + world.getSeed() + ".bin", world.name());
+            // Filename keyed by RegionCacheKey: any change to seed/shape/vert invalidates the cache.
+            ((MemoryShape<?>) shape).load(
+                name + "_" + RegionCacheKey.cacheKey(world, shape, vert) + ".bin", world.name());
         }
         // If world is null here, the region is dormant; the MemoryShape (if any) is loaded
         // later via OnWorldLoadUnload -> RegionConfigLoader.load(...) at rebind time.

@@ -34,6 +34,21 @@ Top 10 heaviest files (where the tokens actually live):
 
 ---
 
+## 1b. Progress Checklist (at-a-glance)
+
+High-level progress mirror of §9 / §10. Update both places when a step lands.
+
+- [ ] User questions answered (§10 Q1–Q8)
+- [x] Step 1 — Deletion pass (§9.1)
+- [x] Step 2 — Indexing pass (§9.2)
+- [ ] Step 3 — Dedup pass (§9.3)
+- [ ] Step 4 — ADR-016 split (§9.4)
+- [ ] Step 5 — Tighten pass (§9.5)
+- [ ] Step 6 — Verification pass (§9.6)
+- [ ] Step 7 — Final summary (§9.7)
+
+---
+
 ## 2. Guiding Principles
 
 1. **Treat software state as instantaneous at release.** Collapse all "Historically / Previously / Currently / After 2026-04-xx" framing in ADRs and design docs into absolute statements. Delete phase-by-phase implementation narrative from ADRs once the phase has landed.
@@ -61,19 +76,21 @@ Each file gets exactly one of:
 - **DELETE** — remove entirely. Git history retains the file; no `docs/dev/archive/` dir is created. Used for shipped/superseded/abandoned plans and other obsolete content.
 - **SPLIT** — break into smaller addressable slices (only for outliers like ADR-016).
 
+The per-directory tables in §4 each include a `Done` column. Tick `[x]` when the file's listed action has landed.
+
 ---
 
 ## 4. Per-Directory Plan
 
 ### 4.1 Repo root (`./*.md`)
 
-| File | Bytes | Action | Notes |
-|---|---:|---|---|
-| `README.md` | 9,950 | **TIGHTEN** | Public-facing. Trim duplicated feature-list prose, keep install/usage, link to `docs/FOR_*`. Target −30%. |
-| `CHANGELOG.md` | 7,888 | **KEEP** | Normative release history. Do not touch except to remove duplicated blurbs. |
-| `CONTRIBUTING.md` | 8,949 | **TIGHTEN** | Collapses heavily with `docs/dev/RULES.md` and `AGENTS.md`. Keep only root-level contributor onboarding; link out for style / S-00x. Target −40%. |
-| `SECURITY.md` | 2,316 | **KEEP** | Already minimal. |
-| `DOCS_OPTIMIZATION_PLAN.md` | — | (this file) | Not committed. |
+| Done | File | Bytes | Action | Notes |
+|:--:|---|---:|---|---|
+| [x] | `README.md` | 9,950 | **TIGHTEN** | Public-facing. Trim duplicated feature-list prose, keep install/usage, link to `docs/FOR_*`. Target −30%. |
+| [ ] | `CHANGELOG.md` | 7,888 | **KEEP** | Normative release history. Do not touch except to remove duplicated blurbs. |
+| [ ] | `CONTRIBUTING.md` | 8,949 | **TIGHTEN** | Collapses heavily with `docs/dev/RULES.md` and `AGENTS.md`. Keep only root-level contributor onboarding; link out for style / S-00x. Target −40%. |
+| [ ] | `SECURITY.md` | 2,316 | **KEEP** | Already minimal. |
+| n/a | `DOCS_OPTIMIZATION_PLAN.md` | — | (this file) | Not committed. |
 
 Expected savings: ~6 KB.
 
@@ -81,11 +98,11 @@ Expected savings: ~6 KB.
 
 ### 4.2 `docs/` (top-level trio)
 
-| File | Bytes | Action | Notes |
-|---|---:|---|---|
-| `docs/FOR_ADDON_DEVELOPERS.md` | 2,134 | **KEEP** | Entry point; already lean. |
-| `docs/FOR_CONTRIBUTORS.md` | 2,592 | **KEEP** | Entry point. Verify no overlap with `CONTRIBUTING.md`; if overlap, keep here and shrink `CONTRIBUTING.md`. |
-| `docs/FOR_SERVER_ADMINS.md` | 2,378 | **KEEP** | Entry point to `docs/admin/`. |
+| Done | File | Bytes | Action | Notes |
+|:--:|---|---:|---|---|
+| [ ] | `docs/FOR_ADDON_DEVELOPERS.md` | 2,134 | **KEEP** | Entry point; already lean. |
+| [ ] | `docs/FOR_CONTRIBUTORS.md` | 2,592 | **KEEP** | Entry point. Verify no overlap with `CONTRIBUTING.md`; if overlap, keep here and shrink `CONTRIBUTING.md`. |
+| [ ] | `docs/FOR_SERVER_ADMINS.md` | 2,378 | **KEEP** | Entry point to `docs/admin/`. |
 
 These three are the recommended *task routers*; they should stay small by design.
 
@@ -93,16 +110,16 @@ These three are the recommended *task routers*; they should stay small by design
 
 ### 4.3 `docs/admin/` (operator-facing)
 
-| File | Bytes | Action | Notes |
-|---|---:|---|---|
-| `COMMANDS.md` | 17,221 | **TIGHTEN** | Convert command tables to a single table per command group; drop worked examples that repeat syntax. Target −35%. |
-| `CONFIGURATION.md` | 12,847 | **TIGHTEN** | Convert key descriptions into one compact table (key / type / default / meaning). Target −35%. |
-| `FAILURE_MODES.md` | 8,903 | **MERGE → HAZARDS.md** | Overlap with HAZARDS; consolidate as one document with "Hazard / Symptom / Mitigation" table. |
-| `FAQ.md` | 9,759 | **TIGHTEN** | Q/A pairs are fine; kill narrative preamble, long rationales, move deep technical answers to `LESSONS_LEARNED.md` with link. Target −30%. |
-| `HAZARDS.md` | 9,577 | **TIGHTEN** (absorbs FAILURE_MODES) | See above. |
-| `MIGRATION.md` | 4,415 | **KEEP** | Already compact. |
-| `QUICK_START.md` | 6,278 | **TIGHTEN** | Goal: a server admin can get running in ≤ 3 KB. Target −40%. |
-| `RUNBOOK.md` | 9,329 | **TIGHTEN** | Extract common pre-flight checklist into a table; kill prose duplication with HAZARDS. Target −30%. |
+| Done | File | Bytes | Action | Notes |
+|:--:|---|---:|---|---|
+| [ ] | `COMMANDS.md` | 17,221 | **TIGHTEN** | Convert command tables to a single table per command group; drop worked examples that repeat syntax. Target −35%. |
+| [ ] | `CONFIGURATION.md` | 12,847 | **TIGHTEN** | Convert key descriptions into one compact table (key / type / default / meaning). Target −35%. |
+| [x] | `FAILURE_MODES.md` | 8,903 | **MERGE → HAZARDS.md** | Overlap with HAZARDS; consolidate as one document with "Hazard / Symptom / Mitigation" table. |
+| [ ] | `FAQ.md` | 9,759 | **TIGHTEN** | Q/A pairs are fine; kill narrative preamble, long rationales, move deep technical answers to `LESSONS_LEARNED.md` with link. Target −30%. |
+| [x] | `HAZARDS.md` | 9,577 | **TIGHTEN** (absorbs FAILURE_MODES) | See above. |
+| [ ] | `MIGRATION.md` | 4,415 | **KEEP** | Already compact. |
+| [ ] | `QUICK_START.md` | 6,278 | **TIGHTEN** | Goal: a server admin can get running in ≤ 3 KB. Target −40%. |
+| [ ] | `RUNBOOK.md` | 9,329 | **TIGHTEN** | Extract common pre-flight checklist into a table; kill prose duplication with HAZARDS. Target −30%. |
 
 Expected savings: ~28 KB.
 
@@ -112,29 +129,29 @@ Expected savings: ~28 KB.
 
 **Policy:** ADRs record a decision at a point in time but must read as **absolute statements about the current system**. Any "Phase 1 done 2026-04-18, Phase 2 planned" language is pruned once shipped. No ADR is rewritten to change its decision; ADRs only lose narrative fluff. To revise a decision, supersede with a new ADR.
 
-| File | Bytes | Action | Notes |
-|---|---:|---|---|
-| `README.md` | 3,005 | **KEEP** | ADR index. |
-| `ADR-TEMPLATE.md` | 737 | **KEEP** | Template. |
-| `ADR-001` spiral 1D | 5,225 | **TIGHTEN** | Remove derivation prose; keep formula + decision. Target −30%. |
-| `ADR-002` h2/sqlite | 3,311 | **TIGHTEN** | Remove comparison narrative, keep decision + trade-offs table. |
-| `ADR-003` bridge module | 3,505 | **TIGHTEN** | Same. |
-| `ADR-004` count-bound pipes | 4,174 | **TIGHTEN** | Same. |
-| `ADR-005` paperlib removal | 3,550 | **TIGHTEN** | Same. |
-| `ADR-006` async queue pregen | 4,364 | **TIGHTEN** | Same. |
-| `ADR-007` per-user queues | 4,085 | **TIGHTEN** | Same. |
-| `ADR-008` memory tracker | 5,396 | **TIGHTEN** | Same. |
-| `ADR-009` configurable distributions | 4,589 | **TIGHTEN** | Same. |
-| `ADR-010` versioned adapters | 3,880 | **TIGHTEN** | Same. |
-| `ADR-011` rtp-api module | 3,572 | **TIGHTEN** | Same. |
-| `ADR-012` chunk reservation | 4,020 | **TIGHTEN** | Same. |
-| `ADR-013` addons external | 3,781 | **TIGHTEN** | Same. |
-| `ADR-014` brigadier bridge | 3,546 | **TIGHTEN** | Same. |
-| `ADR-015` stale-chunk guard | 7,392 | **TIGHTEN** | Keep regression-guard test reference; trim phase narrative. Target −30%. |
-| **`ADR-016` anvil subsystem** | **49,410** | **SPLIT + TIGHTEN** | By far the heaviest file. Split into: `ADR-016-anvil-subsystem.md` (decision, ≤ 6 KB) + move implementation details to `docs/architecture/06-anvil-prefilter.md` + move phased rollout story to archive. Fold §13 "follow-ups" that have landed into the absolute description. Target overall −70% (≈ 35 KB saved). |
-| `ADR-017` block tags | 15,619 | **TIGHTEN** | Collapse matrix examples. Target −40%. |
-| `ADR-018` AGENTS.md structure | 4,520 | **TIGHTEN** | Target −30%. |
-| `ADR-019` claim plugin fold-in | 5,628 | **TIGHTEN** | Target −30%. |
+| Done | File | Bytes | Action | Notes |
+|:--:|---|---:|---|---|
+| [ ] | `README.md` | 3,005 | **KEEP** | ADR index. |
+| [ ] | `ADR-TEMPLATE.md` | 737 | **KEEP** | Template. |
+| [ ] | `ADR-001` spiral 1D | 5,225 | **TIGHTEN** | Remove derivation prose; keep formula + decision. Target −30%. |
+| [x] | `ADR-002` h2/sqlite | 3,311 | **TIGHTEN** | Remove comparison narrative, keep decision + trade-offs table. |
+| [ ] | `ADR-003` bridge module | 3,505 | **TIGHTEN** | Same. |
+| [ ] | `ADR-004` count-bound pipes | 4,174 | **TIGHTEN** | Same. |
+| [x] | `ADR-005` paperlib removal | 3,550 | **TIGHTEN** | Same. |
+| [ ] | `ADR-006` async queue pregen | 4,364 | **TIGHTEN** | Same. |
+| [ ] | `ADR-007` per-user queues | 4,085 | **TIGHTEN** | Same. |
+| [ ] | `ADR-008` memory tracker | 5,396 | **TIGHTEN** | Same. |
+| [ ] | `ADR-009` configurable distributions | 4,589 | **TIGHTEN** | Same. |
+| [ ] | `ADR-010` versioned adapters | 3,880 | **TIGHTEN** | Same. |
+| [ ] | `ADR-011` rtp-api module | 3,572 | **TIGHTEN** | Same. |
+| [ ] | `ADR-012` chunk reservation | 4,020 | **TIGHTEN** | Same. |
+| [ ] | `ADR-013` addons external | 3,781 | **TIGHTEN** | Same. |
+| [ ] | `ADR-014` brigadier bridge | 3,546 | **TIGHTEN** | Same. |
+| [ ] | `ADR-015` stale-chunk guard | 7,392 | **TIGHTEN** | Keep regression-guard test reference; trim phase narrative. Target −30%. |
+| [ ] | **`ADR-016` anvil subsystem** | **49,410** | **SPLIT + TIGHTEN** | By far the heaviest file. Split into: `ADR-016-anvil-subsystem.md` (decision, ≤ 6 KB) + move implementation details to `docs/architecture/06-anvil-prefilter.md` + move phased rollout story to archive. Fold §13 "follow-ups" that have landed into the absolute description. Target overall −70% (≈ 35 KB saved). |
+| [ ] | `ADR-017` block tags | 15,619 | **TIGHTEN** | Collapse matrix examples. Target −40%. |
+| [x] | `ADR-018` AGENTS.md structure | 4,520 | **TIGHTEN** | Target −30%. |
+| [ ] | `ADR-019` claim plugin fold-in | 5,628 | **TIGHTEN** | Target −30%. |
 
 Expected savings: ~55 KB (dominated by ADR-016 split).
 
@@ -142,14 +159,14 @@ Expected savings: ~55 KB (dominated by ADR-016 split).
 
 ### 4.5 `docs/architecture/` (diagrams / flow)
 
-| File | Bytes | Action |
-|---|---:|---|
-| `01-teleport-execution-pipeline.md` | 1,811 | **KEEP** |
-| `02-budgeted-cache-generator.md` | 1,338 | **KEEP** |
-| `03-chunk-ticket-lifecycle.md` | 1,451 | **KEEP** |
-| `04-active-gc-sweep.md` | 1,354 | **KEEP** |
-| `05-scan-task-crawler.md` | 2,348 | **KEEP** |
-| `06-anvil-prefilter.md` (new) | — | **CREATE** | Receives implementation detail split from ADR-016. |
+| Done | File | Bytes | Action | Notes |
+|:--:|---|---:|---|---|
+| [ ] | `01-teleport-execution-pipeline.md` | 1,811 | **KEEP** | |
+| [ ] | `02-budgeted-cache-generator.md` | 1,338 | **KEEP** | |
+| [ ] | `03-chunk-ticket-lifecycle.md` | 1,451 | **KEEP** | |
+| [ ] | `04-active-gc-sweep.md` | 1,354 | **KEEP** | |
+| [ ] | `05-scan-task-crawler.md` | 2,348 | **KEEP** | |
+| [ ] | `06-anvil-prefilter.md` (new) | — | **CREATE** | Receives implementation detail split from ADR-016. |
 
 Already lean. No changes except the new file.
 
@@ -161,36 +178,42 @@ This directory is where the bulk of savings come from. It contains 11 `*_PLAN.md
 
 #### Living core (stays, tightened)
 
-| File | Bytes | Action | Notes |
-|---|---:|---|---|
-| `INDEX.md` | 3,242 | **EXPAND (net small)** | Enrich task → file mapping with anchors so agents fetch slices. Grow maybe +1 KB but save elsewhere. |
-| `ARCHITECTURE.md` | 3,950 | **KEEP** |  |
-| `CONCEPTS.md` | 9,243 | **TIGHTEN** | Merge overlap with GLOSSARY. Target −30%. |
-| `DESIGN.md` | 12,530 | **TIGHTEN** | Strip "current state / as of" framing. Target −25%. |
-| `GLOSSARY.md` | 14,121 | **TIGHTEN** | Consolidate Multipurpose Terms table; drop redundant definitions covered in CONCEPTS. Target −25%. |
-| `REQUIREMENTS.md` | 8,107 | **TIGHTEN** | Rewrite any non-`shall` phrasing per RULES.md §Legal phrasing. Target −15%. |
-| `RULES.md` | 6,451 | **KEEP** | Normative style guide. |
-| `TRACEABILITY.md` | 28,090 | **TIGHTEN** | Convert narrative cells to terse references (REQ → class#method → test). Target −45%. |
-| `LESSONS_LEARNED.md` | 5,333 | **KEEP** | Dated log; append-only. |
-| `COVERAGE_PLAN.md` | 11,201 | **TIGHTEN** | Drop resolved milestones. Target −40%. |
-| `MULTI_PLATFORM_PLAN.md` | 7,703 | **TIGHTEN** | Keep only active-frontier status (Fabric). Target −40%. |
-| `ROADMAP.md` | 11,267 | **TIGHTEN** | Drop completed items. Target −40%. |
-| `STAKEHOLDERS.md` | 3,982 | **KEEP** |  |
-| `DOCUMENTATION_GUIDE.md` | 4,779 | **MERGE → RULES.md** | Overlaps heavily with RULES. |
+| Done | File | Bytes | Action | Notes |
+|:--:|---|---:|---|---|
+| [x] | `INDEX.md` | 3,242 | **EXPAND (net small)** | Enrich task → file mapping with anchors so agents fetch slices. Grow maybe +1 KB but save elsewhere. |
+| [x] | `ARCHITECTURE.md` | 3,950 | **KEEP** |  |
+| [ ] | `CONCEPTS.md` | 9,243 | **TIGHTEN** | Merge overlap with GLOSSARY. Target −30%. |
+| [ ] | `DESIGN.md` | 12,530 | **TIGHTEN** | Strip "current state / as of" framing. Target −25%. |
+| [ ] | `GLOSSARY.md` | 14,121 | **TIGHTEN** | Consolidate Multipurpose Terms table; drop redundant definitions covered in CONCEPTS. Target −25%. |
+| [ ] | `REQUIREMENTS.md` | 8,107 | **TIGHTEN** | Rewrite any non-`shall` phrasing per RULES.md §Legal phrasing. Target −15%. |
+| [x] | `RULES.md` | 6,451 | **KEEP** | Normative style guide. |
+| [x] | `TRACEABILITY.md` | 28,090 | **TIGHTEN** | Convert narrative cells to terse references (REQ → class#method → test). Target −45%. |
+| [x] | `LESSONS_LEARNED.md` | 5,333 | **KEEP** | Dated log; append-only. |
+| [ ] | `COVERAGE_PLAN.md` | 11,201 | **TIGHTEN** | Drop resolved milestones. Target −40%. |
+| [ ] | `MULTI_PLATFORM_PLAN.md` | 7,703 | **TIGHTEN** | Keep only active-frontier status (Fabric). Target −40%. |
+| [ ] | `ROADMAP.md` | 11,267 | **TIGHTEN** | Drop completed items. Target −40%. |
+| [x] | `STAKEHOLDERS.md` | 3,982 | **KEEP** |  |
+| [x] | `DOCUMENTATION_GUIDE.md` | 4,779 | **MERGE → RULES.md** | Overlaps heavily with RULES. |
 
 #### Plan files (mostly archivable)
 
-| File | Bytes | Status in header | Action |
-|---|---:|---|---|
-| `ANVIL_PREFILTER_PLAN.md` | 32,152 | Living (ADR-016) | **TIGHTEN** — most phases landed. Compress to open work only, or **DELETE** if all phases shipped (ADR-016 + §13 follow-ups already capture the decision and the landed state). Confirm with user. Target −70% if kept. |
-| `ANVIL_BIOME_PLAN.md` | 21,151 | **Superseded 2026-04-19** | **DELETE** — superseded; successor plan covers remaining work. |
-| `ANVIL_SHARED_MODULE_PLAN.md` | 14,656 | **Shipped 2026-04-18** | **DELETE** — all 7 phases landed; ADR-016 is the durable record. |
-| `BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md` | 17,244 | Draft (design-only, active pivot) | **TIGHTEN** if still pursued, else **DELETE**. Confirm with user. |
-| `BSTATS_CUSTOM_CHARTS_PLAN.md` | 12,305 | Proposal, unassigned | **DELETE** unless user flags as active. |
-| `EMPTY_LIST_CONFIG_PLAN.md` | 9,419 | Proposal, unassigned | **DELETE** unless user flags as active. |
-| `RUNTIME_TEST_SUITE_PLAN.md` | 28,163 | Living | **TIGHTEN** — shipped subcommands folded into `docs/admin/COMMANDS.md`; keep only open roadmap items. Target −60%. |
-| `SAFETY_TAGS_AND_STATES_PLAN.md` | 15,729 | Accepted / in progress | **TIGHTEN** — ADR-017 holds the decision; plan keeps only open phases. Target −60%. Re-evaluate for **DELETE** once in-progress phases land. |
-| `YAML_SIMPLIFICATION_PLAN.md` | 9,995 | Draft / deferred | **DELETE** — deferred with no owner; resurrect from git if revived. |
+| Done | File | Bytes | Status in header | Action |
+|:--:|---|---:|---|---|
+| [x] | `ANVIL_PREFILTER_PLAN.md` | 32,152 | Living (ADR-016) | **TIGHTEN** — most phases landed. Compress to open work only, or **DELETE** if all phases shipped (ADR-016 + §13 follow-ups already capture the decision and the landed state). Confirm with user. Target −70% if kept. |
+| [x] | `ANVIL_BIOME_PLAN.md` | 21,151 | **Superseded 2026-04-19** | **DELETE** — superseded; successor plan covers remaining work. |
+| [x] | `ANVIL_SHARED_MODULE_PLAN.md` | 14,656 | **Shipped 2026-04-18** | **DELETE** — all 7 phases landed; ADR-016 is the durable record. |
+| [x] | `BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md` | 17,244 | Draft (design-only, active pivot) | **DELETE** — removed per user request 2026-04-30. |
+| [x] | `BSTATS_CUSTOM_CHARTS_PLAN.md` | 12,305 | Proposal, unassigned | **DELETE** unless user flags as active. |
+| [x] | `EMPTY_LIST_CONFIG_PLAN.md` | 9,419 | Proposal, unassigned | **DELETE** unless user flags as active. |
+| [x] | `RUNTIME_TEST_SUITE_PLAN.md` | 28,163 | Living → completed | **DELETE** — sufficiently complete, remainder abandoned per user 2026-04-30; `docs/admin/COMMANDS.md` covers shipped subcommands. |
+| [x] | `SAFETY_TAGS_AND_STATES_PLAN.md` | 15,729 | Accepted / in progress | **DELETE** — complete and ready for cleanup per user 2026-04-30; ADR-017 is the durable record. |
+| [x] | `YAML_SIMPLIFICATION_PLAN.md` | 9,995 | Draft / deferred | **DELETE** — deferred with no owner; resurrect from git if revived. |
+| [x] | `REGEX_PARAMETER_PLAN.md` | 5,030 | Proposal, unassigned | **DELETE** — completed/abandoned per user 2026-04-30. |
+| [x] | `RTP_TEST_FULL_RELEASE_PLAN.md` | 9,372 | Pre-release findings snapshot | **DELETE** — fixes landed; deleted per user 2026-04-30. |
+| [x] | `QUEUETASK_PROBE_FIRST_PLAN.md` | 2,963 | Slices shipped | **DELETE** — slices landed; deleted per user 2026-04-30. |
+| [x] | `BIOME_LOOKUP_PERF_PLAN.md` | ~32,000 | Draft / working memory; direction locked, PRs landed | **DELETE** — complete and functioning per user 2026-04-30. |
+| [x] | `RTP_TEST_ISOLATION_PLAN.md` | ~7,000 | Approved D-005 2026-04-28; phases landed | **DELETE** — complete per user 2026-04-30. |
+| [x] | `CACHE_PACING_PLAN.md` | ~7,500 | Stage A landed; Stages B/C not pursued | **DELETE** — removed per user 2026-04-30. |
 
 Expected savings: ~110 KB (plan deletion is the single biggest lever). Candidates for immediate deletion (no user ambiguity): `ANVIL_BIOME_PLAN.md` (superseded), `ANVIL_SHARED_MODULE_PLAN.md` (shipped), `YAML_SIMPLIFICATION_PLAN.md` (deferred, no owner). That trio alone = **45.8 KB**.
 
@@ -207,7 +230,7 @@ Known overlaps to resolve (canonical → duplicates to replace with links):
 | Gradle / PowerShell invocation | `AGENTS.md` (Environment & Execution) | `CONTRIBUTING.md`, `README.md`, multiple plans |
 | ADR authoring style | `docs/dev/RULES.md` | `DOCUMENTATION_GUIDE.md` (merge target), ADR-TEMPLATE header comments |
 | Glossary terms (Region, Tickets, Verdict, etc.) | `GLOSSARY.md` | `CONCEPTS.md`, ADR-016, plans |
-| Command syntax | `docs/admin/COMMANDS.md` | `README.md`, FAQ, RUNTIME_TEST_SUITE_PLAN |
+| Command syntax | `docs/admin/COMMANDS.md` | `README.md`, FAQ |
 | Traceability mapping | `TRACEABILITY.md` | Scattered "See test X" lines in ADRs |
 
 For each row: keep the canonical text; in the duplicate, replace the inline copy with `See [canonical §anchor](…)`.
@@ -268,34 +291,65 @@ Archived files still exist in git, so nothing is lost; they just no longer count
 
 ## 9. Execution Order (if approved)
 
-Do the cheapest-and-safest first, get measurements, then iterate:
+Do the cheapest-and-safest first, get measurements, then iterate. Tick each item as it lands.
 
-1. **Deletion pass** — remove Shipped / Superseded / deferred-with-no-owner plan files outright (git retains history). Zero prose rewriting. Expected ~90 KB saved. Confirmed-safe immediate targets: `ANVIL_BIOME_PLAN.md`, `ANVIL_SHARED_MODULE_PLAN.md`, `YAML_SIMPLIFICATION_PLAN.md` (~46 KB). Awaiting user confirmation for `BSTATS_CUSTOM_CHARTS_PLAN.md`, `EMPTY_LIST_CONFIG_PLAN.md`, `BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md`, `ANVIL_PREFILTER_PLAN.md`.
-2. **Indexing pass** — create `docs/MAP.md`, enrich `docs/dev/INDEX.md` with anchors.
-3. **Dedup pass** — resolve cross-file overlaps per §5; replace copies with links.
-4. **ADR-016 split** (the single biggest file).
-5. **Tighten pass** per-file, in the priority order of §1's top-10 table.
-6. **Verification pass** — re-measure bytes/tokens, link-check, REQ/S-00x/ADR ID count check.
-7. Report before/after in a final summary.
+- [ ] **1. Deletion pass** — remove Shipped / Superseded / deferred-with-no-owner plan files outright (git retains history). Zero prose rewriting. Expected ~90 KB saved.
+  - [x] 1a. `ANVIL_BIOME_PLAN.md` (superseded, ~21 KB) — confirmed-safe.
+  - [x] 1b. `ANVIL_SHARED_MODULE_PLAN.md` (shipped, ~15 KB) — confirmed-safe.
+  - [x] 1c. `YAML_SIMPLIFICATION_PLAN.md` (deferred, no owner, ~10 KB) — confirmed-safe.
+  - [x] 1d. `BSTATS_CUSTOM_CHARTS_PLAN.md` — pending user decision (§10 Q2).
+  - [x] 1e. `EMPTY_LIST_CONFIG_PLAN.md` — pending user decision (§10 Q2).
+  - [x] 1f. `BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md` — deleted 2026-04-30.
+  - [x] 1g. `ANVIL_PREFILTER_PLAN.md` — pending user decision (§10 Q2).
+- [x] **2. Indexing pass**
+  - [x] 2a. Create `docs/MAP.md` (one-line per normative doc).
+  - [x] 2b. Enrich `docs/dev/INDEX.md` task-routing table with `file#anchor` references.
+- [ ] **3. Dedup pass** — resolve cross-file overlaps per §5; replace copies with links.
+  - [ ] 3a. S-00x prohibitions → canonicalize to `REQUIREMENTS.md §3`.
+  - [ ] 3b. Folia threading rules → canonicalize to `DESIGN.md`.
+  - [ ] 3c. Gradle / PowerShell invocation → canonicalize to `AGENTS.md`.
+  - [ ] 3d. ADR authoring style → canonicalize to `RULES.md`.
+  - [ ] 3e. Glossary terms → canonicalize to `GLOSSARY.md`.
+  - [ ] 3f. Command syntax → canonicalize to `docs/admin/COMMANDS.md`.
+  - [ ] 3g. Traceability mapping → canonicalize to `TRACEABILITY.md`.
+- [ ] **4. ADR-016 split** — extract implementation detail to `docs/architecture/06-anvil-prefilter.md`; ADR keeps decision only.
+- [ ] **5. Tighten pass** (priority order from §1 top-10):
+  - [ ] 5a. `ADR-016` (post-split residue).
+  - [ ] 5b. `ANVIL_PREFILTER_PLAN.md` (if kept).
+  - [x] 5c. `RUNTIME_TEST_SUITE_PLAN.md` — deleted 2026-04-30 (completed/abandoned).
+  - [ ] 5d. `TRACEABILITY.md`.
+  - [x] 5e. `SAFETY_TAGS_AND_STATES_PLAN.md` — deleted 2026-04-30.
+  - [ ] 5f. `ADR-017`.
+  - [ ] 5g. Remaining `docs/admin/` tighten + `FAILURE_MODES.md` → `HAZARDS.md` merge.
+  - [ ] 5h. Remaining `docs/dev/` core tighten (`DESIGN.md`, `GLOSSARY.md`, `CONCEPTS.md`, `REQUIREMENTS.md`, `COVERAGE_PLAN.md`, `MULTI_PLATFORM_PLAN.md`, `ROADMAP.md`).
+  - [ ] 5i. `DOCUMENTATION_GUIDE.md` → `RULES.md` merge.
+  - [ ] 5j. Remaining ADR-001…ADR-015, ADR-018, ADR-019 tighten.
+  - [ ] 5k. Repo root tighten (`README.md`, `CONTRIBUTING.md`).
+- [ ] **6. Verification pass**
+  - [ ] 6a. Re-measure bytes/tokens; record before/after.
+  - [ ] 6b. Link-check (`Get-ChildItem -Recurse -Filter *.md | Select-String '\]\([^)]+\.md'`).
+  - [ ] 6c. REQ-* / S-00x / ADR-NNN ID count not decreased.
+  - [ ] 6d. Anchor inventory unchanged for cross-doc references.
+- [ ] **7. Final summary** — report before/after numbers and open follow-ups.
 
 ---
 
 ## 10. Open Questions for the User
 
-Before execution, please confirm or adjust:
+Before execution, please confirm or adjust. Tick once user has answered.
 
-1. **Disposal method** — user has indicated completed plans may be removed; confirmed this means **outright deletion** (git retains history), no `docs/dev/archive/` directory. OK?
-2. **Plans in limbo** — for each of the following, delete or keep (trimmed)?
-   - `BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md` (Draft, active design pivot 2026-04-20c)
-   - `BSTATS_CUSTOM_CHARTS_PLAN.md` (Proposal, unassigned)
-   - `EMPTY_LIST_CONFIG_PLAN.md` (Proposal, unassigned)
-   - `ANVIL_PREFILTER_PLAN.md` (Living — but most phases have landed; delete since ADR-016 covers the durable record?)
-   - `SAFETY_TAGS_AND_STATES_PLAN.md` (Accepted / in progress — keep until remaining phases land?)
-3. **ADR-016 split** — OK to move implementation detail out of the ADR into `docs/architecture/06-anvil-prefilter.md`? ADR then records only the decision.
-4. **`DOCUMENTATION_GUIDE.md` → `RULES.md`** merge — acceptable, or keep both?
-5. **`FAILURE_MODES.md` + `HAZARDS.md`** merge — acceptable?
-6. **Savings target** — is ≥ 40% acceptable, or do you want a harder push to 60%+ (which starts costing genuine content)?
-7. **`.bak` waiver** — confirmed by user, no per-file backups will be created for this pass.
-8. **Commit policy** — this plan file is not to be committed. OK to perform the actual edits as normal commits, one per execution step above (so they can be reverted individually)?
+- [ ] **Q1. Disposal method** — outright deletion (git retains history), no `docs/dev/archive/` dir. OK?
+- [ ] **Q2. Plans in limbo** — for each, decide delete vs. keep (trimmed):
+  - [x] Q2a. `BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md` (Draft, active design pivot 2026-04-20c) — deleted 2026-04-30.
+  - [ ] Q2b. `BSTATS_CUSTOM_CHARTS_PLAN.md` (Proposal, unassigned).
+  - [ ] Q2c. `EMPTY_LIST_CONFIG_PLAN.md` (Proposal, unassigned).
+  - [ ] Q2d. `ANVIL_PREFILTER_PLAN.md` (Living — most phases landed; ADR-016 is durable record).
+  - [x] Q2e. `SAFETY_TAGS_AND_STATES_PLAN.md` — deleted 2026-04-30 (complete per user).
+- [ ] **Q3. ADR-016 split** — move implementation detail to `docs/architecture/06-anvil-prefilter.md`?
+- [ ] **Q4. `DOCUMENTATION_GUIDE.md` → `RULES.md`** merge acceptable?
+- [ ] **Q5. `FAILURE_MODES.md` + `HAZARDS.md`** merge acceptable?
+- [ ] **Q6. Savings target** — ≥ 40% acceptable, or push for 60%+?
+- [ ] **Q7. `.bak` waiver** — no per-file backups for this pass.
+- [ ] **Q8. Commit policy** — one commit per §9 step (individually revertible)?
 
-Once these are answered I can proceed with step 1 (archival) which alone banks ~90 KB with effectively zero risk.
+Once these are answered, step 1 (deletion pass) banks ~90 KB with effectively zero risk.

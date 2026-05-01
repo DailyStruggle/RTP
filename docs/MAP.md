@@ -21,9 +21,6 @@ Flat one-line catalog of every normative doc. Cheapest first-fetch for an agent 
 - [`dev/MULTI_PLATFORM_PLAN.md`](dev/MULTI_PLATFORM_PLAN.md) — Fabric frontier.
 - [`dev/ROADMAP.md`](dev/ROADMAP.md) — forward-looking work.
 - [`dev/STAKEHOLDERS.md`](dev/STAKEHOLDERS.md) — roles.
-- [`dev/BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md`](dev/BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md) — active plan.
-- [`dev/SAFETY_TAGS_AND_STATES_PLAN.md`](dev/SAFETY_TAGS_AND_STATES_PLAN.md) — active plan (ADR-017).
-- [`dev/RUNTIME_TEST_SUITE_PLAN.md`](dev/RUNTIME_TEST_SUITE_PLAN.md) — `rtp test full` roadmap.
 
 ## Decisions (`adr/`)
 - [`adr/README.md`](adr/README.md) — ADR index.

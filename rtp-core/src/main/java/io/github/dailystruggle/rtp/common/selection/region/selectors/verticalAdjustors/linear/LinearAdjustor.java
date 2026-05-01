@@ -1,6 +1,8 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
+import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
+import io.github.dailystruggle.commandsapi.common.parameters.IntegerParameter;
 import io.github.dailystruggle.rtp.api.world.ChunkColumnProbe;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
@@ -117,10 +119,16 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
     defaults.put(GenericVerticalAdjustorKeys.direction, 0);
     defaults.put(GenericVerticalAdjustorKeys.requireSkyLight, false);
 
-    // subParameter removed
-    // subParameter removed
-    // subParameter removed
-    // subParameter removed
+    // Curated tab-completion suggestions for /rtp vert:linear <TAB>.
+    // Mirrors V2 sub-parameter UX so users see the format and scale.
+    subParameters.put("maxy", new IntegerParameter(
+        "rtp.params", "highest possible location", (sender, s) -> true, 64, 92, 127, 256, 320));
+    subParameters.put("miny", new IntegerParameter(
+        "rtp.params", "lowest possible location", (sender, s) -> true, -64, 0, 64, 128));
+    subParameters.put("direction", new IntegerParameter(
+        "rtp.params", "which way to search for a valid location", (sender, s) -> true, 0, 1, 2, 3));
+    subParameters.put("requireskylight", new BooleanParameter(
+        "rtp.params", "require sky light for placement", (sender, s) -> true));
   }
 
   public LinearAdjustor(List<Predicate<RTPCoords>> verifiers) {

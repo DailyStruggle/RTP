@@ -1,4 +1,23 @@
+repositories {
+    // Brigadier is published on Mojang's libraries Maven; the Fabric
+    // Maven mirror in the root build.gradle's allprojects { } block also
+    // resolves it. This explicit entry keeps :commands-api buildable
+    // even if the Fabric Maven mirror lags behind.
+    maven {
+        name = 'Minecraft Libraries'
+        url  = 'https://libraries.minecraft.net/'
+    }
+}
+
 dependencies {
     compileOnly 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
+    // ADR-014 — Brigadier Bridge. compileOnly so Bukkit-family runtimes
+    // (which do not bundle Brigadier on the classpath we control) never
+    // load this dep, while Fabric (where Brigadier is provided by the
+    // Minecraft server) resolves it at runtime via the platform adapter.
+    compileOnly 'com.mojang:brigadier:1.2.9'
     implementation 'org.jetbrains:annotations:24.1.0'
+
+    // Brigadier needed at test runtime to exercise the adapter.
+    testImplementation 'com.mojang:brigadier:1.2.9'
 }

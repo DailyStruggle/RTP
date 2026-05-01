@@ -1,0 +1,25 @@
+# --- RTP-lite Performance Settings (ADR-024) ---
+# Subset of the full performance.yml. Keys removed in lite:
+#   visitorEnabled         (observation mode -- not present in lite)
+#   loginCacheEnabled      (ADR-023 login reserve cache -- not present in lite)
+#   loginCacheCap          (ADR-023 -- not present in lite)
+#   effectParsing          (per-permission startup parse -- not present in lite)
+#   onEventParsing         (per-permission startup parse -- not present in lite)
+#
+# biomeRecall is retained as a showcase feature.
+
+maxAttempts: 32           # Max search attempts before giving up
+viewDistanceSelect: 0     # Chunk radius to load during selection
+viewDistanceTeleport: 0   # Chunk radius to load before teleport
+period: 20                # Ticks between background cache cycles
+syncAllottedTime: 50      # Max ms per tick for sync tasks
+asyncAllottedTime: 50     # Max ms per tick for async tasks
+minTPS: 19.0              # Min TPS to continue background queueing
+postTeleportQueueing: false  # Refill cache immediately after teleport
+syncLoading: false        # Use sync chunk loading (NOT RECOMMENDED)
+biomeRecall: true         # Reuse found biome locations
+biomeRecallForced: false  # Only use biomes already in cache
+checkOnChunkLoads: false  # Check for safe spots in all loaded chunks
+
+# DO NOT TOUCH VERSION NUMBER
+version: "1.0"

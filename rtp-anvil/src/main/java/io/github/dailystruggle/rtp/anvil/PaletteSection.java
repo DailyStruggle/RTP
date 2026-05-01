@@ -71,6 +71,16 @@ public record PaletteSection(int sectionY, List<String> palette, long[] data, by
      */
     public int skyLightAt(int lx, int ly, int lz) {
         if (skyLight == null) return 15;
+        // if all bytes are 0, treat as absent (15)
+        boolean allZero = true;
+        for (byte b : skyLight) {
+            if (b != 0) {
+                allZero = false;
+                break;
+            }
+        }
+        if (allZero) return 15;
+
         int idx = PackedPaletteDecoder.entryIndex(lx, ly, lz);
         int b = skyLight[idx >> 1] & 0xFF;
         return ((idx & 1) == 0) ? (b & 0x0F) : ((b >>> 4) & 0x0F);

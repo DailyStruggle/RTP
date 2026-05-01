@@ -307,6 +307,7 @@ public class OnEventTeleports implements Listener {
     if (hasFirstJoin && !player.hasPlayedBefore()) {
       if (verbose)
         RTP.log(Level.INFO, "#0080FF[RTP] teleporting player:" + player + " on first join");
+      primeFromLoginCache(player);
       teleportAction(player);
     } else if (hasJoin) {
       TeleportData data = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
@@ -316,7 +317,39 @@ public class OnEventTeleports implements Listener {
         return;
       }
       if (verbose) RTP.log(Level.INFO, "#0080FF[RTP] teleporting player:" + player + " on join");
+      primeFromLoginCache(player);
       teleportAction(player);
+    }
+  }
+
+  /**
+   * ADR-023 — pre-fill the player's {@code fastLocations} entry with a
+   * pre-generated location from the default-world region's login reserve
+   * cache, when {@code PerformanceKeys.loginCacheEnabled=true}.
+   *
+   * <p>If the cache is empty, the toggle is off, or the player's region has no
+   * login buffer (i.e. is not the default-world region), this is a no-op and
+   * the existing {@code teleportAction} pipeline runs unchanged.
+   */
+  private static void primeFromLoginCache(Player player) {
+    try {
+      io.github.dailystruggle.rtp.api.entity.RTPPlayer rtpPlayer =
+          RTP.serverAccessor.getPlayer(player.getUniqueId());
+      if (rtpPlayer == null) return;
+      Region region = RTP.selectionAPI.getRegion(rtpPlayer);
+      if (region == null) return;
+      io.github.dailystruggle.rtp.common.selection.region.LockFreeLocationBuffer login =
+          region.queueManager.loginLocations;
+      if (login == null || login.isEmpty()) return;
+      RTPLocation loc = login.poll();
+      if (loc == null) return;
+      java.util.concurrent.CompletableFuture<RTPLocation> future =
+          new java.util.concurrent.CompletableFuture<>();
+      future.complete(loc);
+      region.queueManager.fastLocations.put(player.getUniqueId(), future);
+    } catch (Throwable t) {
+      // Login-cache priming is an optimization; never block the join path.
+      RTP.log(Level.FINE, "[RTP] login-cache prime skipped: " + t.getClass().getSimpleName());
     }
   }
 

@@ -1,5 +1,14 @@
+// Per ADR-022 §2 (Single-JAR Multi-Loader Packaging) this module is the
+// multi-loader bootstrap: it ships both plugin.yml (Bukkit) and
+// fabric.mod.json (Fabric) in one JAR. Loom remaps only the Fabric entry-
+// point package; Bukkit-family classes retain Spigot/Paper-mapped bytecode.
+//
+// Loom is scoped here AND in :rtp-fabric:** only — never at root or in any
+// platform-free / Bukkit-family module (ADR-022 §3, MULTI_PLATFORM_PLAN
+// Phase 1).
 plugins {
     id 'com.gradleup.shadow'
+    id 'fabric-loom' version '1.11-SNAPSHOT'
 }
 repositories {
     // Soft-dep repos for bundled claim-plugin integrations (see ADR-019).
@@ -12,6 +21,33 @@ repositories {
     maven { url 'https://repo.dmulloy2.net/repository/public/' }
 }
 dependencies {
+    // --- Loom-required Fabric / Minecraft baseline ---
+    // Loom won't configure remapJar / runtime classpaths without these.
+    // Versions mirror :rtp-fabric:rtp-fabric-common to avoid drift; if you
+    // change one, change the other.
+    //
+    // IMPORTANT: use modCompileOnly (not modImplementation) for fabric-loader
+    // and fabric-api. Both are provided by the Fabric runtime — fabric-loader
+    // is the runtime itself, and fabric-api is declared as a hard `depends`
+    // in fabric.mod.json so the user must install it as a separate mod in
+    // mods/. Bundling them via modImplementation puts them on runtimeClasspath,
+    // which Shadow then slurps into the released JAR (~5MB of nested mod jars
+    // plus duplicate Loader bytecode). compileOnly keeps them on the compile
+    // classpath only — Loom still drives remapJar correctly.
+    //
+    // The `minecraft` configuration cannot be compileOnly (Loom requires it),
+    // so we instead subtract it from shadowJar's configurations below; that
+    // strips MC server+client bytecode, fastutil, ICU4J, JNA, LWJGL, log4j,
+    // Netty, Mojang datafixers, etc. — all of which the host server provides.
+    minecraft 'com.mojang:minecraft:1.21.1'
+    mappings  loom.officialMojangMappings()
+    modCompileOnly 'net.fabricmc:fabric-loader:0.16.5'
+    modCompileOnly 'net.fabricmc.fabric-api:fabric-api:0.115.0+1.21.1'
+
+    // The Fabric platform glue lives here. RTPFabricMod (in this module) is
+    // the only class that resolves it on a Fabric runtime.
+    implementation project(':rtp-fabric:rtp-fabric-common')
+
     implementation project(':rtp-core')
     implementation project(':rtp-spigot:rtp-spigot-v1_20_R1')
     implementation project(':rtp-paper:rtp-paper-v1_20_R1')
@@ -25,9 +61,15 @@ dependencies {
     implementation project(':effects-api')
 
     compileOnly 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
-    testImplementation 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
-    testImplementation 'com.github.seeseemelk:MockBukkit-v1.21:3.111.0'
+    // Test classpath: declare folia-api / paper-api (via MockBukkit) BEFORE
+    // spigot-api so that javac resolves the `org.bukkit.Bukkit` class
+    // containing Folia's scheduler statics (getGlobalRegionScheduler etc.).
+    // spigot-api 1.20.1 ships its own Bukkit class without those methods;
+    // when Loom is applied the classpath ordering shifts and spigot-api's
+    // Bukkit can win, breaking MockFoliaScheduler. Order matters here.
     testImplementation 'dev.folia:folia-api:1.20.1-R0.1-SNAPSHOT'
+    testImplementation 'com.github.seeseemelk:MockBukkit-v1.21:3.111.0'
+    testImplementation 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
     testImplementation testFixtures(project(':rtp-core'))
     testImplementation project(':rtp-folia:rtp-folia-common')
 
@@ -75,10 +117,66 @@ processResources {
 processResources.dependsOn copyDocs
 shadowJar.dependsOn processResources
 
+// ADR-024: the existing shadowJar produces the FULL/Pro edition (RTP-Pro).
+// A sibling `shadowLiteJar` task below produces the lite edition under the
+// unclassified `RTP-<version>.jar` name. Both are built by `assemble`.
 shadowJar {
-    archiveBaseName.set('RTP')
+    archiveBaseName.set('RTP-Pro')
     archiveClassifier.set('')
     archiveVersion.set(project.version.toString())
+
+    // Strip Loom's `minecraft` configuration (and its transitive deps:
+    // MC server+client bytecode, MC assets/data, mappings.tiny, fastutil,
+    // ICU4J, JNA + native libs, LWJGL, log4j, Netty, Google libs, Mojang
+    // datafixers, SpongePowered Mixin) from the shaded JAR. All of these
+    // are provided at runtime by the host server (Paper or Fabric). Without
+    // this filter the released JAR is ~100MB; with it, ~3-5MB.
+    //
+    // We replace shadowJar's default `runtimeClasspath` input with
+    // `runtimeClasspath` minus the `minecraft` configuration's resolved
+    // artifacts. fabric-loader and fabric-api are already off runtimeClasspath
+    // because they're declared as modCompileOnly above.
+    configurations = [
+        project.configurations.runtimeClasspath.copyRecursive { dep ->
+            !(dep.group == 'com.mojang' && dep.name == 'minecraft')
+        }
+    ]
+    // Belt-and-braces: even if the configuration filter misses something,
+    // exclude the file patterns that ship inside the merged Minecraft JAR.
+    // None of these are referenced by RTP code; all are provided by the host.
+    dependencies {
+        exclude(dependency('com.mojang:minecraft'))
+        exclude(dependency('com.mojang:datafixerupper'))
+        exclude(dependency('com.mojang:authlib'))
+        exclude(dependency('com.mojang:brigadier'))
+        exclude(dependency('com.mojang:logging'))
+        exclude(dependency('com.mojang:text2speech'))
+        exclude(dependency('it.unimi.dsi:fastutil'))
+        exclude(dependency('com.ibm.icu:icu4j'))
+        exclude(dependency('net.java.dev.jna:jna'))
+        exclude(dependency('net.java.dev.jna:jna-platform'))
+        exclude(dependency('org.lwjgl:.*'))
+        exclude(dependency('org.apache.logging.log4j:.*'))
+        exclude(dependency('io.netty:.*'))
+        exclude(dependency('com.google.guava:.*'))
+        exclude(dependency('com.google.code.gson:.*'))
+        exclude(dependency('org.spongepowered:mixin'))
+        exclude(dependency('net.fabricmc:fabric-loader'))
+        exclude(dependency('net.fabricmc.fabric-api:.*'))
+        exclude(dependency('net.fabricmc:.*'))
+    }
+    // Strip Mojang asset trees and remap metadata that may sneak through
+    // any of the above (defence-in-depth — these are ~30MB combined).
+    exclude 'assets/minecraft/**'
+    exclude 'data/minecraft/**'
+    exclude 'mappings/**'
+    exclude 'net/minecraft/**'
+    exclude 'com/mojang/**'
+    exclude 'windows/**'
+    exclude 'linux-**'
+    exclude 'darwin-**'
+    exclude 'macos/**'
+    exclude 'META-INF/jars/**'
 
     relocate 'org.bstats', 'io.github.dailystruggle.rtp.bstats'
     relocate 'io.github.dailystruggle.commandsapi', 'io.github.dailystruggle.rtp.commandsapi'
@@ -94,3 +192,293 @@ artifacts {
 }
 
 assemble.dependsOn shadowJar
+
+// =============================================================================
+// ADR-024 -- RTP-lite assembly variant.
+//
+// Lite produces the unclassified `RTP-<version>.jar` (the "default" artifact);
+// the pre-existing shadowJar above produces `RTP-Pro-<version>.jar`. Both are
+// built whenever `assemble` runs.
+//
+// See docs/adr/ADR-024-rtp-lite-assembly-variant.md for the scope contract.
+// Class/resource excludes below are enforced a second time by
+// `liteJarStructureCheck` (regex audit of the produced JAR).
+// =============================================================================
+
+sourceSets {
+    lite {
+        java.srcDirs = ['src/lite/java']
+        resources.srcDirs = ['src/lite/resources']
+        compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+        runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+    }
+}
+
+tasks.named('compileLiteJava') {
+    dependsOn tasks.named('compileJava')
+}
+
+tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar) {
+    group = 'build'
+    description = 'Builds the RTP (lite) assembly variant (ADR-024). Default-named artifact.'
+
+    archiveBaseName.set('RTP')
+    archiveClassifier.set('')
+    archiveVersion.set(project.version.toString())
+
+    // Lite source set first so its plugin.yml/config.yml/etc. win over main's
+    // when DuplicatesStrategy.EXCLUDE is applied (Shadow honours first-seen).
+    from sourceSets.lite.output
+    // Include main source set output (bukkit bootstrap helpers, listeners, server
+    // provider, command classes). A freshly-registered ShadowJar task does NOT
+    // default to sourceSets.main.output -- only the auto-created `shadowJar` task
+    // does. Without this line, the lite JAR ships only RTPBukkitLitePlugin.class
+    // and crashes on enable with NoClassDefFoundError for BukkitServerProvider.
+    from sourceSets.main.output
+    from rootProject.file('LICENSE')
+
+    // Reuse the full shadowJar's already-filtered configurations (Loom-aware
+    // strips for `minecraft`, fabric-loader, fabric-api, etc.) and apply the
+    // ADR-024 SQL/Redis additional strip on top.
+    // Loom transparently injects Minecraft transitives (oshi, jline, joml,
+    // mixinextras, asm, jorbis, joptsimple, etc.) onto runtimeClasspath as
+    // top-level entries. The full shadowJar task strips them via Loom's
+    // task-level hook, but that hook fires only on the existing `shadowJar`
+    // task -- not on this newly-registered one. So we replicate the strip
+    // explicitly by group.
+    configurations = [
+        project.configurations.runtimeClasspath.copyRecursive { dep ->
+            !(dep.group == 'com.mojang') &&
+            !(dep.group?.startsWith('net.fabricmc')) &&
+            !(dep.group == 'com.github.oshi') &&
+            !(dep.group == 'org.jline') &&
+            !(dep.group == 'org.joml') &&
+            !(dep.group == 'org.ow2.asm') &&
+            !(dep.group == 'org.objectweb.asm') &&
+            !(dep.group == 'io.github.llamalad7') &&
+            !(dep.group == 'org.jcraft') &&
+            !(dep.group == 'net.sf.jopt-simple') &&
+            !(dep.group == 'it.unimi.dsi') &&
+            !(dep.group == 'com.ibm.icu') &&
+            !(dep.group == 'net.java.dev.jna') &&
+            !(dep.group == 'org.lwjgl') &&
+            !(dep.group == 'org.apache.logging.log4j') &&
+            !(dep.group == 'io.netty') &&
+            !(dep.group == 'org.apache.commons') &&
+            !(dep.group == 'commons-codec') &&
+            !(dep.group == 'commons-io') &&
+            !(dep.group == 'commons-logging') &&
+            !(dep.group == 'com.google.guava') &&
+            !(dep.group == 'com.google.code.gson') &&
+            !(dep.group == 'org.spongepowered') &&
+            !(dep.group == 'org.slf4j') &&
+            // ADR-024 specific: SQL/Redis drivers.
+            !(dep.group == 'com.h2database') &&
+            !(dep.group == 'org.xerial' && dep.name == 'sqlite-jdbc') &&
+            !(dep.group == 'mysql') &&
+            !(dep.group == 'org.postgresql') &&
+            !(dep.group == 'redis.clients') &&
+            !(dep.group == 'com.zaxxer') &&
+            // Loom/Mojang networking transitives -- not used by lite runtime.
+            !(dep.group == 'org.apache.httpcomponents') &&
+            !(dep.group == 'org.lz4') &&
+            !(dep.group == 'net.jpountz.lz4') &&
+            !(dep.group == 'org.jline') &&
+            !(dep.group == 'org.json') &&
+            !(dep.group == 'com.mojang')
+        }
+    ]
+
+    dependencies {
+        // Mojang/Loom strips (mirror full shadowJar).
+        exclude(dependency('com.mojang:minecraft'))
+        exclude(dependency('com.mojang:datafixerupper'))
+        exclude(dependency('com.mojang:authlib'))
+        exclude(dependency('com.mojang:brigadier'))
+        exclude(dependency('com.mojang:logging'))
+        exclude(dependency('com.mojang:text2speech'))
+        exclude(dependency('it.unimi.dsi:fastutil'))
+        exclude(dependency('com.ibm.icu:icu4j'))
+        exclude(dependency('net.java.dev.jna:jna'))
+        exclude(dependency('net.java.dev.jna:jna-platform'))
+        exclude(dependency('org.lwjgl:.*'))
+        exclude(dependency('org.apache.logging.log4j:.*'))
+        exclude(dependency('io.netty:.*'))
+        exclude(dependency('com.google.guava:.*'))
+        exclude(dependency('com.google.code.gson:.*'))
+        exclude(dependency('org.spongepowered:mixin'))
+        exclude(dependency('net.fabricmc:fabric-loader'))
+        exclude(dependency('net.fabricmc.fabric-api:.*'))
+        exclude(dependency('net.fabricmc:.*'))
+        // ADR-024:
+        exclude(dependency('com.h2database:.*'))
+        exclude(dependency('org.xerial:sqlite-jdbc'))
+        exclude(dependency('mysql:.*'))
+        exclude(dependency('org.postgresql:.*'))
+        exclude(dependency('redis.clients:.*'))
+        exclude(dependency('com.zaxxer:.*'))
+        exclude(dependency('org.apache.httpcomponents:.*'))
+        exclude(dependency('org.lz4:.*'))
+        exclude(dependency('net.jpountz.lz4:.*'))
+        exclude(dependency('org.jline:.*'))
+        exclude(dependency('org.json:.*'))
+    }
+
+    // Class-level excludes -- ADR-024 drops list.
+    // NOTE: rtp-anvil is INTENTIONALLY KEPT in lite (ADR-024 reversal: performance parity
+    // with Pro for benchmark comparisons; BukkitRTPWorld hard-references AnvilProbeSupport).
+    exclude 'io/github/dailystruggle/rtp/tags/**'
+    exclude 'io/github/dailystruggle/rtp/folia/**'
+    exclude 'io/github/dailystruggle/rtp/folia_*/**'
+    exclude 'io/github/dailystruggle/rtp/fabric/**'
+    exclude 'io/github/dailystruggle/rtp/fabric_*/**'
+    // Networking/CLI transitives pulled in by Loom -- unused at runtime in lite.
+    exclude 'org/apache/http/**'
+    exclude 'org/apache/commons/**'
+    exclude 'org/jline/**'
+    exclude 'org/json/**'
+    exclude 'net/jpountz/**'
+    exclude 'mozilla/**'
+    exclude 'flightrecorder-config.jfc'
+    exclude 'io/github/dailystruggle/rtp/common/database/options/H2*.class'
+    exclude 'io/github/dailystruggle/rtp/common/database/options/SQLite*.class'
+    exclude 'io/github/dailystruggle/rtp/common/database/options/MySQL*.class'
+    exclude 'io/github/dailystruggle/rtp/common/database/options/Postgre*.class'
+    // AbstractSQLDatabaseAccessor is INTENTIONALLY KEPT in lite: RTP.java references it via
+    // `instanceof` in a scheduled flush task. Excluding it caused NoClassDefFoundError at
+    // runtime. The concrete H2/SQLite/MySQL/Postgres subclasses remain excluded, so the
+    // instanceof check is always false in lite.
+    exclude 'io/github/dailystruggle/rtp/common/network/Redis*.class'
+    exclude 'io/github/dailystruggle/rtp/common/selection/region/LoginCacheTask.class'
+    // HikariCP -- pulled in transitively but only used by SQL accessors which lite drops.
+    exclude 'com/zaxxer/hikari/**'
+    exclude 'io/github/dailystruggle/rtp/hikari/**'
+    exclude 'META-INF/maven/com.zaxxer/**'
+    // Resources dropped from lite.
+    exclude 'lang/**'
+    exclude 'language.yml'
+    exclude 'economy.yml'
+    exclude 'integrations.yml'
+    exclude 'fabric.mod.json'
+    exclude 'docs/**'
+    exclude 'README.md'
+    exclude 'CHANGELOG.md'
+    exclude 'CONTRIBUTING.md'
+    exclude 'CODE_OF_CONDUCT.md'
+    exclude 'SECURITY.md'
+    exclude 'SUPPORT.md'
+    // Mojang asset trees (mirror full shadowJar).
+    exclude 'assets/minecraft/**'
+    exclude 'data/minecraft/**'
+    exclude 'mappings/**'
+    exclude 'net/minecraft/**'
+    exclude 'com/mojang/**'
+    exclude 'windows/**'
+    exclude 'linux-**'
+    exclude 'darwin-**'
+    exclude 'macos/**'
+    exclude 'META-INF/jars/**'
+    // Drop the Pro/full bootstrap class -- lite ships only RTPBukkitLitePlugin.
+    exclude 'io/github/dailystruggle/rtp/bukkit/RTPBukkitPlugin.class'
+    exclude 'io/github/dailystruggle/rtp/bukkit/RTPBukkitPlugin$*.class'
+
+    // Prefer src/lite/resources/<name> over src/main/resources/<name>
+    // (plugin.yml, performance.yml, config.yml, ...).
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    // Same relocations as full, minus H2 (not shaded).
+    relocate 'org.bstats', 'io.github.dailystruggle.rtp.bstats'
+    relocate 'io.github.dailystruggle.commandsapi', 'io.github.dailystruggle.rtp.commandsapi'
+    relocate 'io.github.dailystruggle.effectsapi', 'io.github.dailystruggle.rtp.effectsapi'
+    relocate 'org.yaml.snakeyaml', 'io.github.dailystruggle.rtp.snakeyaml'
+    relocate 'me.carleslc.Simple-YAML', 'io.github.dailystruggle.rtp.Simple-Yaml'
+
+    // Lite intentionally does NOT depend on `copyDocs` -- lite ships no docs.
+    dependsOn tasks.named('processResources')
+    dependsOn tasks.named('compileJava')
+    dependsOn tasks.named('compileLiteJava')
+}
+
+tasks.register('liteJarStructureCheck') {
+    group = 'verification'
+    description = 'Asserts that the RTP (lite) JAR contains no forbidden entries (ADR-024).'
+    dependsOn tasks.named('shadowLiteJar')
+
+    doLast {
+        def jarFile = tasks.named('shadowLiteJar').get().archiveFile.get().asFile
+        if (!jarFile.exists()) {
+            throw new GradleException("ADR-024 structure check: lite JAR not found at ${jarFile}")
+        }
+        def forbidden = [
+            // anvil intentionally retained in lite (see shadowLiteJar comment).
+            ~'^io/github/dailystruggle/rtp/tags/.*$',
+            ~'^io/github/dailystruggle/rtp/folia/.*$',
+            ~'^io/github/dailystruggle/rtp/folia_.*$',
+            ~'^io/github/dailystruggle/rtp/fabric/.*$',
+            ~'^io/github/dailystruggle/rtp/fabric_.*$',
+            ~'^io/github/dailystruggle/rtp/bukkit/RTPBukkitPlugin\\$?.*\\.class$',
+            ~'^io/github/dailystruggle/rtp/common/database/options/H2.*\\.class$',
+            ~'^io/github/dailystruggle/rtp/common/database/options/SQLite.*\\.class$',
+            ~'^io/github/dailystruggle/rtp/common/database/options/MySQL.*\\.class$',
+            ~'^io/github/dailystruggle/rtp/common/database/options/Postgre.*\\.class$',
+            ~'^io/github/dailystruggle/rtp/common/network/Redis.*\\.class$',
+            ~'^com/zaxxer/hikari/.*$',
+            ~'^io/github/dailystruggle/rtp/hikari/.*$',
+            ~'^io/github/dailystruggle/rtp/common/selection/region/LoginCacheTask\\.class$',
+            ~'^lang/.*$',
+            ~'^language\\.yml$',
+            ~'^economy\\.yml$',
+            ~'^integrations\\.yml$',
+            ~'^fabric\\.mod\\.json$',
+            ~'^docs/.*$',
+            ~'^README\\.md$',
+            ~'^CHANGELOG\\.md$',
+            ~'^org/h2/.*$',
+            ~'^org/sqlite/.*$',
+            ~'^com/mysql/.*$',
+            ~'^org/postgresql/.*$',
+            ~'^redis/clients/.*$'
+        ]
+
+        def violations = []
+        new java.util.zip.ZipFile(jarFile).withCloseable { zip ->
+            zip.entries().each { entry ->
+                def name = entry.name
+                forbidden.each { pat ->
+                    if (name ==~ pat) {
+                        violations << name
+                    }
+                }
+            }
+        }
+
+        if (!violations.isEmpty()) {
+            throw new GradleException(
+                "ADR-024 structure check FAILED. Forbidden entries in lite JAR:\n  " +
+                violations.unique().sort().join('\n  '))
+        }
+
+        new java.util.zip.ZipFile(jarFile).withCloseable { zip ->
+            def yml = zip.getEntry('plugin.yml')
+            if (yml == null) {
+                throw new GradleException("ADR-024 structure check: plugin.yml missing from lite JAR")
+            }
+            def content = zip.getInputStream(yml).getText('UTF-8')
+            if (!content.contains('io.github.dailystruggle.rtp.bukkit.lite.RTPBukkitLitePlugin')) {
+                throw new GradleException(
+                    "ADR-024 structure check: plugin.yml in lite JAR does not point at " +
+                    "RTPBukkitLitePlugin. Resource overlay (src/lite/resources/plugin.yml) " +
+                    "may not have shadowed src/main/resources/plugin.yml.")
+            }
+        }
+
+        logger.lifecycle("[ADR-024] liteJarStructureCheck passed for ${jarFile.name}")
+    }
+}
+
+tasks.named('check') { dependsOn 'liteJarStructureCheck' }
+
+artifacts {
+    archives tasks.named('shadowLiteJar')
+}
+assemble.dependsOn tasks.named('shadowLiteJar')

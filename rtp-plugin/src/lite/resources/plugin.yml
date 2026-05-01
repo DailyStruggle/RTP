@@ -1,0 +1,127 @@
+# --- RTP-lite Plugin Descriptor (ADR-024) ---
+# Distinct from src/main/resources/plugin.yml. The lite shadow JAR ships ONLY
+# this descriptor (the full descriptor is excluded from the lite artifact via
+# DuplicatesStrategy.EXCLUDE). The lite bootstrap class is divergent on purpose;
+# do not point this descriptor at io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin.
+#
+# Lite scope (per ADR-024):
+#   - No SQL/Redis persistence, no shutdown flush.
+#   - No Folia, no anvil, no tags, no claim integrations, no Vault/economy.
+#   - No multilingual support; locale hardcoded to English.
+#   - No on-event/effect permission parsing; no login reserve cache; no visitor mode.
+#
+# Permission set is a strict subset of the full descriptor. rtp.onevent.*,
+# rtp.scan, rtp.biome.* (parsing tree), and the parsed-permission machinery are
+# omitted. Operators who need any of those features should install the full JAR.
+
+name: RTP
+version: '${version}'
+main: io.github.dailystruggle.rtp.bukkit.lite.RTPBukkitLitePlugin
+api-version: 1.13
+prefix: 'RTP'
+authors: [ leaf26 ]
+description: 'Random teleport, lite edition (no SQL, no Folia, no integrations) -- see ADR-024'
+# Intentionally NO softdepend list. Lite does not link to Vault, claim plugins,
+# Chunky/ChunkyBorder, or PlaceholderAPI. Operators who need those should use
+# the full JAR.
+folia-supported: false
+
+commands:
+  rtp:
+    description: Teleport randomly
+    permission: rtp.use
+    usage: |
+      /rtp
+  wild:
+    description: Teleport randomly
+    permission: rtp.use
+    usage: |
+      /wild
+
+permissions:
+  rtp.see:
+    description: allow player to tab for rtp commands
+    default: true
+  rtp.use:
+    description: allow player to use /rtp
+    default: true
+  rtp.free:
+    description: use /rtp for free (no-op in lite -- economy is not present)
+    default: op
+  rtp.reload:
+    description: allow player to use /rtp reload
+    default: op
+  rtp.config:
+    description: allow player to use /rtp config
+    default: op
+  rtp.noDelay:
+    description: skip the teleport delay
+    default: op
+  rtp.noDelay.chunks:
+    description: skip chunk loading
+    default: op
+  rtp.noCancel:
+    description: skip teleport cancellation tasks
+    default: op
+  rtp.noCooldown:
+    description: skip the teleport cooldown
+    default: op
+  rtp.delay:
+    description: placeholder for custom delay values
+    default: false
+  rtp.cooldown:
+    description: placeholder for custom cooldown values
+    default: false
+  rtp.other:
+    description: allow player to teleport another player
+    default: op
+  rtp.notme:
+    description: don't let player be teleported by someone else
+    default: op
+  rtp.world:
+    description: allow player to specify any world they have permission for
+    default: op
+  rtp.worlds.*:
+    description: allow player to teleport to any world from any world
+    default: op
+    children:
+      rtp.world: true
+  rtp.region:
+    description: allow player to specify any region they have permission for
+    default: op
+  rtp.regions.*:
+    description: allow player to teleport to any region
+    default: op
+    children:
+      rtp.region: true
+  rtp.unqueued:
+    description: if no locations are queued, generate a new location
+    default: op
+  rtp.params:
+    description: allow player to use custom parameters for their teleport
+    default: op
+    children:
+      rtp.unqueued: true
+  rtp.info:
+    description: see plugin info and settings
+    default: op
+  rtp.*:
+    description: access all rtp subcommands available in lite
+    default: op
+    children:
+      rtp.see: true
+      rtp.use: true
+      rtp.reload: true
+      rtp.config: true
+      rtp.noCooldown: true
+      rtp.noDelay: true
+      rtp.noDelay.chunks: true
+      rtp.noCancel: true
+      rtp.other: true
+      rtp.notme: true
+      rtp.world: true
+      rtp.worlds.*: true
+      rtp.region: true
+      rtp.regions.*: true
+      rtp.params: true
+      rtp.unqueued: true

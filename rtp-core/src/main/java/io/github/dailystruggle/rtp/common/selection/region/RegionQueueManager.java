@@ -33,6 +33,24 @@ public class RegionQueueManager {
     // Cold Queue: Chunks are verified and safe, but have been released to save RAM
     public final LockFreeLocationBuffer unkeptLocations;
 
+    /**
+     * Login Reserve Queue (ADR-023): a reserved kept-cache of safe locations
+     * promoted from {@link #unkeptLocations} solely for join-time teleports
+     * routed through {@code rtp.onevent.firstjoin}/{@code rtp.onevent.join}.
+     *
+     * <p>Allocated only on the default-world region (the first world configured
+     * for RTP) and only when {@code PerformanceKeys.loginCacheEnabled=true}.
+     * On all other regions and when the toggle is off, this field is
+     * {@code null}.
+     *
+     * <p>Fill loop is event-driven and decoupled from {@code Region.execute()}:
+     * a startup burst tops it up to {@code loginCacheCap}, then
+     * {@code PlayerQuitEvent} triggers a single-slot lazy refill. This avoids
+     * sharing budget with the regular hot/cold deficit loop.
+     */
+    @org.jetbrains.annotations.Nullable
+    public LockFreeLocationBuffer loginLocations;
+
     /** When reserving/recycling locations for specific players, I want to guard against */
     public final ConcurrentHashMap<UUID, ConcurrentLinkedQueue<RTPLocation>>
             perPlayerLocationQueue = new ConcurrentHashMap<>();
@@ -84,6 +102,51 @@ public class RegionQueueManager {
         };
         this.keptLocations.setCallbacks(saveCallback, deleteCallback);
         this.unkeptLocations.setCallbacks(saveCallback, deleteCallback);
+        if (this.loginLocations != null) {
+            this.loginLocations.setCallbacks(saveCallback, deleteCallback);
+        }
+    }
+
+    /**
+     * Allocate the {@link #loginLocations} buffer for ADR-023 (Login Reserve Cache).
+     * Idempotent: a second call with the same capacity is a no-op; a call with a
+     * different non-zero capacity reallocates and drains the prior contents back
+     * to {@link #unkeptLocations} (closing reservations).
+     *
+     * <p>Should only be invoked on the default-world region when
+     * {@code PerformanceKeys.loginCacheEnabled=true}. Capacity is the snapshotted
+     * {@code loginCacheCap} (or server max-players if {@code loginCacheCap=0}).
+     *
+     * @param capacity buffer capacity; values &lt;= 0 disable the buffer.
+     */
+    public void enableLoginCache(int capacity) {
+        if (capacity <= 0) {
+            disableLoginCache();
+            return;
+        }
+        if (this.loginLocations != null) {
+            return; // already enabled; reload-time changes go through disable+enable.
+        }
+        this.loginLocations = new LockFreeLocationBuffer(capacity);
+        installDatabaseCallbacks();
+    }
+
+    /**
+     * Drain {@link #loginLocations} back to {@link #unkeptLocations} (closing
+     * reservations) and null the buffer reference. Safe to call multiple times.
+     */
+    public void disableLoginCache() {
+        LockFreeLocationBuffer login = this.loginLocations;
+        if (login == null) return;
+        this.loginLocations = null;
+        RTPLocation loc;
+        while ((loc = login.poll()) != null) {
+            if (loc.reservation() != null) loc.reservation().close();
+            // Re-offer to unkept so the location persists (without reservation)
+            // for the next startup burst.
+            unkeptLocations.offer(new RTPLocation(loc.coords(), loc.attempts(), null));
+        }
+        login.clear();
     }
 
     /**

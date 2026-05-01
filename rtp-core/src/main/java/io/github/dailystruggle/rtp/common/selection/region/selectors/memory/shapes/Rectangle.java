@@ -1,6 +1,10 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
+import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
+import io.github.dailystruggle.commandsapi.common.parameters.CoordinateParameter;
+import io.github.dailystruggle.commandsapi.common.parameters.EnumParameter;
+import io.github.dailystruggle.commandsapi.common.parameters.IntegerParameter;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams;
@@ -26,13 +30,22 @@ public class Rectangle extends MemoryShape<RectangleParams> {
     defaults.put(RectangleParams.rotation, 0);
     defaults.put(RectangleParams.uniquePlacements, false);
 
-    // subParameter removed
-    // subParameter removed
-    // subParameter removed
-    // subParameter removed
-    // subParameter removed
-    // subParameter removed
-    // subParameter removed
+    // Curated tab-completion suggestions for /rtp shape:rectangle <TAB>.
+    // Mirrors V2 sub-parameter UX so users see the format and scale.
+    subParameters.put("mode", new EnumParameter<>(
+        "rtp.params", "x-z position adjustment method", (sender, s) -> true, Mode.class));
+    subParameters.put("width", new IntegerParameter(
+        "rtp.params", "region width", (sender, s) -> true, 64, 128, 256, 512, 1024));
+    subParameters.put("height", new IntegerParameter(
+        "rtp.params", "region height", (sender, s) -> true, 64, 128, 256, 512, 1024));
+    subParameters.put("rotation", new IntegerParameter(
+        "rtp.params", "rotation in degrees", (sender, s) -> true, 0, 30, 45, 60, 90));
+    subParameters.put("centerx", new CoordinateParameter(
+        "rtp.params", "center point x", (sender, s) -> true));
+    subParameters.put("centerz", new CoordinateParameter(
+        "rtp.params", "center point z", (sender, s) -> true));
+    subParameters.put("uniqueplacements", new BooleanParameter(
+        "rtp.params", "ensure each selection is unique from prior selections", (sender, s) -> true));
   }
 
   /** Default constructor for Rectangle */

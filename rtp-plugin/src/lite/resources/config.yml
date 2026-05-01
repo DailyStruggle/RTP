@@ -1,0 +1,18 @@
+# --- RTP-lite Core Configuration (ADR-024) ---
+# Lite has no SQL/Redis backend, no economy hook, no claim integrations,
+# and no multilingual support. Locale is hardcoded to English.
+
+teleportDelay: 2          # Wait time (seconds) before teleport
+cancelDistance: 2         # Max move distance during delay before cancellation
+teleportCooldown: 300     # Wait time (seconds) between successful uses
+
+consoleCommands:
+  - "say [player] has just randomly teleported!"
+playerCommands:
+  - ""
+
+# Lite intentionally OMITS the `database:` and `network:` blocks.
+# Persistence is yaml-only and there is no Redis client on the classpath.
+
+# DO NOT TOUCH VERSION NUMBER
+version: "3.0"

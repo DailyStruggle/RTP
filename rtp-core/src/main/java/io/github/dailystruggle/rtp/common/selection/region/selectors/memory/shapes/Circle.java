@@ -1,6 +1,11 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
+import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
+import io.github.dailystruggle.commandsapi.common.parameters.CoordinateParameter;
+import io.github.dailystruggle.commandsapi.common.parameters.EnumParameter;
+import io.github.dailystruggle.commandsapi.common.parameters.FloatParameter;
+import io.github.dailystruggle.commandsapi.common.parameters.IntegerParameter;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
@@ -36,14 +41,24 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
       defaults.put(GenericMemoryShapeParams.uniquePlacements, false);
       defaults.put(GenericMemoryShapeParams.expand, false);
 
-      // subParameter removed
-      // subParameter removed
-      // subParameter removed
-      // subParameter removed
-      // subParameter removed
-      // subParameter removed
-      // subParameter removed
-      // subParameter removed
+      // Curated tab-completion suggestions for /rtp shape:circle <TAB>.
+      // Mirrors V2 sub-parameter UX so users see the format and scale.
+      subParameters.put("mode", new EnumParameter<>(
+          "rtp.params", "x-z position adjustment method", (sender, s) -> true, Mode.class));
+      subParameters.put("radius", new IntegerParameter(
+          "rtp.params", "outer radius of region", (sender, s) -> true, 64, 128, 256, 512, 1024));
+      subParameters.put("centerradius", new IntegerParameter(
+          "rtp.params", "inner radius of region", (sender, s) -> true, 16, 32, 64, 128, 256));
+      subParameters.put("centerx", new CoordinateParameter(
+          "rtp.params", "center point x", (sender, s) -> true));
+      subParameters.put("centerz", new CoordinateParameter(
+          "rtp.params", "center point z", (sender, s) -> true));
+      subParameters.put("weight", new FloatParameter(
+          "rtp.params", "weigh towards or away from center", (sender, s) -> true, 0.1, 1.0, 10.0));
+      subParameters.put("expand", new BooleanParameter(
+          "rtp.params", "expand region to keep a constant amount of usable land", (sender, s) -> true));
+      subParameters.put("uniqueplacements", new BooleanParameter(
+          "rtp.params", "ensure each selection is unique from prior selections", (sender, s) -> true));
     } catch (Exception e) {
       RTP.log(Level.WARNING, e.getMessage(), e);
     }

@@ -227,7 +227,75 @@ public final class RTPBukkitPlugin extends JavaPlugin {
 
     RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable JarUtils.extractDocs version=" + getDescription().getVersion());
     JarUtils.extractDocs(getDataFolder(), getDescription().getVersion());
+
+    // ADR-023 — Login Reserve Cache: snapshot max-players at startup, allocate
+    // the buffer on the default-world region (Bukkit.getWorlds().get(0)), and
+    // dispatch the startup burst. Decoupled from Region.execute() per ADR-023.
+    initLoginReserveCache();
+
     RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable EXIT -- plugin enabled");
+  }
+
+  /**
+   * ADR-023 — initialise the Login Reserve Cache on the default-world region
+   * if {@code PerformanceKeys.loginCacheEnabled=true}. Sized to
+   * {@code loginCacheCap} (or {@code Bukkit.getMaxPlayers()} when
+   * {@code loginCacheCap=0}). Idempotent: safe to call after reload.
+   */
+  @SuppressWarnings("unchecked")
+  private void initLoginReserveCache() {
+    try {
+      ConfigParser<PerformanceKeys> perf =
+          (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+      if (perf == null) return;
+      Object enabledObj = perf.getConfigValue(PerformanceKeys.loginCacheEnabled, false);
+      boolean enabled = (enabledObj instanceof Boolean)
+          ? (Boolean) enabledObj
+          : Boolean.parseBoolean(String.valueOf(enabledObj));
+      if (!enabled) return;
+
+      long configuredCap = perf.getNumber(PerformanceKeys.loginCacheCap, 0L).longValue();
+      int cap = (configuredCap > 0)
+          ? (int) Math.min(configuredCap, Integer.MAX_VALUE)
+          : Bukkit.getMaxPlayers();
+      if (cap <= 0) return;
+
+      if (Bukkit.getWorlds().isEmpty()) {
+        RTP.log(java.util.logging.Level.WARNING,
+            "[ADR-023] login cache enabled but no worlds loaded; skipping");
+        return;
+      }
+      String defaultWorldName = Bukkit.getWorlds().get(0).getName();
+      Region region = RTP.selectionAPI.permRegionLookup.values().stream()
+          .filter(r -> r.getWorld() != null && defaultWorldName.equals(r.getWorld().name()))
+          .findFirst()
+          .orElse(null);
+      if (region == null) {
+        RTP.log(java.util.logging.Level.WARNING,
+            "[ADR-023] login cache enabled but no region attached to default world '"
+                + defaultWorldName + "'; skipping");
+        return;
+      }
+
+      region.queueManager.enableLoginCache(cap);
+      RTP.log(java.util.logging.Level.INFO,
+          "[ADR-023] login reserve cache enabled on region '" + region.name
+              + "' cap=" + cap + " (default world '" + defaultWorldName + "')");
+
+      // Startup burst: dispatch up to (cap - currentOnline) async promotions.
+      int online = Bukkit.getOnlinePlayers().size();
+      int target = Math.max(0, cap - online);
+      if (target > 0) {
+        new io.github.dailystruggle.rtp.common.selection.region.LoginCacheTask(region)
+            .promoteUpTo(target);
+        RTP.log(java.util.logging.Level.FINE,
+            "[ADR-023] startup burst dispatched count=" + target);
+      }
+    } catch (Throwable t) {
+      RTP.log(java.util.logging.Level.WARNING,
+          "[ADR-023] login reserve cache init failed: "
+              + t.getClass().getSimpleName() + ": " + t.getMessage(), t);
+    }
   }
 
   /** whenever bukkit feels like disabling this plugin */

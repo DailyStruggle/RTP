@@ -22,12 +22,13 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | Requirement-authoring style (`shall`, no temporal framing) | [`RULES.md`](RULES.md) |
 | A decision (why something is the way it is) | [`../adr/README.md`](../adr/README.md) |
 | Fabric status / blockers | [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) |
+| Why Fabric is in scope (and Forge / NeoForge are not) | [`../adr/ADR-022-fabric-platform-in-scope.md`](../adr/ADR-022-fabric-platform-in-scope.md) |
+| Why legacy MC / Java are out of scope | [`../adr/ADR-021-legacy-mc-and-java-support-scope.md`](../adr/ADR-021-legacy-mc-and-java-support-scope.md) |
 | Adding or updating a locale / translation | [`TRANSLATION_GUIDE.md`](TRANSLATION_GUIDE.md) |
 | Spiral 1D math | [`../adr/ADR-001-archimedean-spiral-1d-mapping.md`](../adr/ADR-001-archimedean-spiral-1d-mapping.md) |
-| Anvil prefilter / biome / shared module | [`../adr/ADR-016-anvil-subsystem.md`](../adr/ADR-016-anvil-subsystem.md) + [`../architecture/06-anvil-prefilter.md`](../architecture/06-anvil-prefilter.md) |
+| Anvil prefilter / biome / shared module | [`../adr/ADR-016-anvil-subsystem.md`](../adr/ADR-016-anvil-subsystem.md) |
 | Block tags / state predicates in safety lists | [`../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists.md`](../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists.md) |
 | Coverage targets | [`COVERAGE_PLAN.md`](COVERAGE_PLAN.md) |
-| Runtime test suite (`rtp test full`) | [`RUNTIME_TEST_SUITE_PLAN.md`](RUNTIME_TEST_SUITE_PLAN.md) |
 | Server-admin docs | [`../FOR_SERVER_ADMINS.md`](../FOR_SERVER_ADMINS.md) → [`../admin/`](../admin/) ([CONFIGURATION.md](../admin/CONFIGURATION.md), [REGIONS.md](../admin/REGIONS.md), [CORE_CONFIG.md](../admin/CORE_CONFIG.md), [PERFORMANCE.md](../admin/PERFORMANCE.md), [ECONOMY.md](../admin/ECONOMY.md), [SAFETY.md](../admin/SAFETY.md)) |
 | Addon author docs | [`../FOR_ADDON_DEVELOPERS.md`](../FOR_ADDON_DEVELOPERS.md) |
 | Flat map of every doc | [`../MAP.md`](../MAP.md) |
@@ -57,14 +58,6 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | [`ROADMAP.md`](ROADMAP.md) | Forward-looking work. |
 | [`STAKEHOLDERS.md`](STAKEHOLDERS.md) | Roles and review expectations. |
 | [`LESSONS_LEARNED.md`](LESSONS_LEARNED.md) | Dated engineering notes. |
-
-## Active subsystem plans
-
-| Doc | Purpose |
-|-----|---------|
-| [`BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md`](BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md) | Biome + bad-location visitor design (active pivot). |
-| [`SAFETY_TAGS_AND_STATES_PLAN.md`](SAFETY_TAGS_AND_STATES_PLAN.md) | Block-tag / block-state predicate rollout (ADR-017). |
-| [`RUNTIME_TEST_SUITE_PLAN.md`](RUNTIME_TEST_SUITE_PLAN.md) | `rtp test full` runtime suite. |
 
 > Plans that shipped or were superseded are removed; the ADR is the durable record. Pre-deletion state is recoverable from git.
 

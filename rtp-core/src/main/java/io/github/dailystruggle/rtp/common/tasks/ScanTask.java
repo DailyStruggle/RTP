@@ -165,7 +165,7 @@ public class ScanTask extends RTPRunnable {
   public ScanTask(Region region, long start) {
     this.region = region;
     this.scanIter = new AtomicLong(start);
-    long[] progress = loadProgress(region.name);
+    long[] progress = loadProgress(region.name, region.cacheKey());
     if (progress != null) {
       if (progress.length > 3) this.currentOffset = progress[3];
       if (progress.length > 4) this.scanPhase.set((int) progress[4]);
@@ -206,7 +206,7 @@ public class ScanTask extends RTPRunnable {
     this.cps_all = cps_all;
     this.cps_divisor = divisor;
     this.cps.set(cpsVal);
-    long[] progress = loadProgress(region.name);
+    long[] progress = loadProgress(region.name, region.cacheKey());
     if (progress != null) {
       if (progress.length > 4) this.scanPhase.set((int) progress[4]);
       if (progress.length > 3) this.currentOffset = progress[3];
@@ -265,7 +265,7 @@ public class ScanTask extends RTPRunnable {
       if (pause.get() || isCancelled()) {
         if (region.getShape() instanceof MemoryShape<?> ms) {
           ms.flushAndRebuild(ms.spatialResolution);
-          ms.save(region.name, region.getWorld().name());
+          ms.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
         }
         save();
         if (isCancelled()) {
@@ -569,7 +569,20 @@ public class ScanTask extends RTPRunnable {
 
         shape.flushAndRebuild(shape.spatialResolution);
         save();
-        shape.save(region.name + "_" + region.getWorld().getSeed(), region.getWorld().name());
+        shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
+        // Persist generator-loaded chunks. On Spigot the platform RTPWorld
+        // delegates to org.bukkit.World#save() because Bukkit's autosave
+        // does not reliably flush chunks produced by external generators
+        // (see docs/dev/LESSONS_LEARNED.md → "Pre-Generation & Shutdown").
+        // On Paper / Folia / Fabric this is a no-op — those platforms'
+        // chunk systems persist via their own paths.
+        try {
+          region.getWorld().save();
+        } catch (Throwable t) {
+          RTP.log(Level.WARNING,
+              "[ScanTask] world.save() failed for region=" + region.name
+                  + " world=" + region.getWorld().name(), t);
+        }
       }
     }
 
@@ -581,7 +594,7 @@ public class ScanTask extends RTPRunnable {
         scanIter.set(0);
         shape.flushAndRebuild(shape.spatialResolution);
         save();
-        shape.save(region.name + "_" + region.getWorld().getSeed(), region.getWorld().name());
+        shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
         shape.exportDebugJson(region.name, region.getWorld().name());
         isRunning.set(false);
         if (!isCancelled() && !pause.get()) {
@@ -600,7 +613,7 @@ public class ScanTask extends RTPRunnable {
         scanIter.set(0);
         shape.flushAndRebuild(shape.spatialResolution);
         save();
-        shape.save(region.name + "_" + region.getWorld().getSeed(), region.getWorld().name());
+        shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
         shape.exportDebugJson(region.name, region.getWorld().name());
         RTP.log(Level.INFO, "[RTP] prescan complete for region=" + region.name
                 + "; starting full-load verification pass");
@@ -798,7 +811,7 @@ public class ScanTask extends RTPRunnable {
     File pluginDir = RTP.serverAccessor.getPluginDirectory();
     File dir = new File(pluginDir, "database" + File.separator + "regionData");
     if (!dir.exists()) dir.mkdirs();
-    File file = new File(dir, region.name + ".scan");
+    File file = new File(dir, region.name + "_" + region.cacheKey() + ".scan");
 
     try (java.io.FileOutputStream out = new java.io.FileOutputStream(file)) {
       // Layout: scanIter(8) | spatialResolution(8) | currentOffset(8) | isFine(1) | scanPhase(1) = 26 bytes.
@@ -815,12 +828,13 @@ public class ScanTask extends RTPRunnable {
     }
   }
 
-  public static long[] loadProgress(String regionName) {
+  public static long[] loadProgress(String regionName, String cacheKey) {
     File pluginDir = RTP.serverAccessor.getPluginDirectory();
     File file =
         new File(
             pluginDir,
-            "database" + File.separator + "regionData" + File.separator + regionName + ".scan");
+            "database" + File.separator + "regionData" + File.separator
+                + regionName + "_" + cacheKey + ".scan");
     if (!file.exists()) return null;
 
     try (java.io.FileInputStream in = new java.io.FileInputStream(file)) {
@@ -855,21 +869,29 @@ public class ScanTask extends RTPRunnable {
   }
 
   public void delete() {
-    File pluginDir = RTP.serverAccessor.getPluginDirectory();
-    File file =
-        new File(
-            pluginDir,
-            "database" + File.separator + "regionData" + File.separator + region.name + ".scan");
-    if (file.exists()) file.delete();
+    delete(region.name);
   }
 
+  /**
+   * Delete every {@code <regionName>_*.scan} progress file in the regionData directory.
+   *
+   * <p>Used by reset/start commands which do not know which cache-key suffix the previous
+   * run used (it may pre-date the current config). Sweeping by name prefix avoids leaving
+   * orphan progress files behind.
+   */
   public static void delete(String regionName) {
     File pluginDir = RTP.serverAccessor.getPluginDirectory();
-    File file =
-        new File(
-            pluginDir,
-            "database" + File.separator + "regionData" + File.separator + regionName + ".scan");
-    if (file.exists()) file.delete();
+    File dir = new File(pluginDir, "database" + File.separator + "regionData");
+    if (!dir.isDirectory()) return;
+    String prefix = regionName + "_";
+    String suffix = ".scan";
+    String bare = regionName + suffix;
+    File[] candidates =
+        dir.listFiles((d, n) -> n.endsWith(suffix) && (n.startsWith(prefix) || n.equals(bare)));
+    if (candidates == null) return;
+    for (File f : candidates) {
+      if (f.exists()) f.delete();
+    }
   }
 
   /**
@@ -1366,7 +1388,7 @@ public class ScanTask extends RTPRunnable {
       MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
       if (shape != null) {
         shape.flushAndRebuild(shape.spatialResolution);
-        shape.save(region.name + "_" + region.getWorld().getSeed(), region.getWorld().name());
+        shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
       }
       save();
       RTP.getInstance().scanTasks.remove(region.name, this);

@@ -49,7 +49,7 @@ public class ScanPauseCmd extends ScanSubCmd {
 
       scanTask.pause();
       MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
-      shape.save(region.name + "_" + region.getWorld().getSeed(), region.getWorld().name());
+      shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
 
       if (parser == null) continue;
       String msg = String.valueOf(parser.getConfigValue(MessagesKeys.scanPause, ""));
