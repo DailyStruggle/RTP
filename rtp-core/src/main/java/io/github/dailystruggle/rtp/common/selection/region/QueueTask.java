@@ -208,7 +208,7 @@ final class QueueTask {
         try {
             // PR-18 window: widen by one block below minY so adjustFromProbe's
             // standing-surface y-1 read doesn't trivially reject.
-            fut = world.probeChunkColumn(cx, cz, minY - 1, maxY, vert.requiresSkyLight());
+            fut = world.probeChunkColumn(cx, cz, minY - 1, maxY);
         } catch (Throwable t) {
             RTP.log(Level.FINE,
                     "[RTP] QueueTask probeChunkColumn threw for world=" + world.name()
@@ -613,7 +613,15 @@ final class QueueTask {
                     // a fresh view-distance ChunkSet from anvil probes.
                     ChunkSet transferred;
                     if (reservation != null) {
-                        transferred = reservation.transferOwnership();
+                        // Do NOT transferOwnership() here: the reservation is still passed
+                        // into GenerationResult and is closed by TeleportPipelineTask.runCleanup
+                        // on every exit path. Calling transferOwnership() flips the
+                        // reservation's `transferred` flag, which makes its later close()
+                        // a no-op — leaking the kept entry's pinned chunk ticket on every
+                        // successful queue-path teleport (kept count growth observed via
+                        // /rtp info). The downstream load/verify code only needs the
+                        // ChunkSet *view*, not ownership.
+                        transferred = reservation.getChunkSet();
                     } else {
                         int ccx = left.x() >> 4;
                         int ccz = left.z() >> 4;

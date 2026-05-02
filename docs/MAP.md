@@ -19,6 +19,8 @@ Flat one-line catalog of every normative doc. Cheapest first-fetch for an agent 
 - [`dev/LESSONS_LEARNED.md`](dev/LESSONS_LEARNED.md) — dated pitfalls.
 - [`dev/COVERAGE_PLAN.md`](dev/COVERAGE_PLAN.md) — JaCoCo targets.
 - [`dev/MULTI_PLATFORM_PLAN.md`](dev/MULTI_PLATFORM_PLAN.md) — Fabric frontier.
+- [`dev/MULTI_SERVER_PLAN.md`](dev/MULTI_SERVER_PLAN.md) — proxy / multi-server (Velocity, BungeeCord) roadmap; D-005 gated.
+- [`dev/METRICS_PLAN.md`](dev/METRICS_PLAN.md) — runtime metrics SPI (TPS / MSPT / heap / queue / pipeline); implementation eligible.
 - [`dev/ROADMAP.md`](dev/ROADMAP.md) — forward-looking work.
 - [`dev/STAKEHOLDERS.md`](dev/STAKEHOLDERS.md) — roles.
 
@@ -58,6 +60,7 @@ Flat one-line catalog of every normative doc. Cheapest first-fetch for an agent 
 - [`architecture/10-shutdown-and-flush-lifecycle.md`](architecture/10-shutdown-and-flush-lifecycle.md)
 
 ## Operator-facing (`admin/`)
+- [`admin/proxies/INDEX.md`](admin/proxies/INDEX.md) — proxy-mode admin docs (stub; populated as multi-server plan lands).
 - [`admin/QUICK_START.md`](admin/QUICK_START.md)
 - [`admin/CONFIGURATION.md`](admin/CONFIGURATION.md)
 - [`admin/COMMANDS.md`](admin/COMMANDS.md)

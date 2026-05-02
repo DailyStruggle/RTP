@@ -423,11 +423,6 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
     // for the y-1 / y+1 safety probes.
     if (probe.minY() > minY - 1 || probe.maxY() < maxY) return AdjustResult.WINDOW_REJECT;
 
-    // Decide sky-light source: trusted nibble array (skyLightAt), or a verified
-    // heightmap proxy, or defer to the live vert method.
-    int heightmapSkyFloor = computeHeightmapSkyFloor(probe, requireSkyLight);
-    if (heightmapSkyFloor == Integer.MAX_VALUE) return AdjustResult.LIGHT_GATE_REJECT;
-
     SafetySnapshot snap = readSafetySnapshot();
 
     // Multi-column probe sweep over the same testCoords set used by the live
@@ -435,11 +430,21 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
     // SCAN_MISS authoritative (no acceptable Y exists on any of the 5 live
     // columns), so ScanTask can short-circuit instead of paying a full chunk
     // load. Off-center reads are O(1) palette-index lookups via the probe.
+    //
+    // Sky-light gating uses a per-column block-data scan (computeColumnSkyFloor):
+    // the highest non-air Y on the column is the sky floor; any y+1 strictly
+    // above it has open sky by construction. This replaces the heightmap +
+    // isLightOn fallbacks (stored sky-light data is unreliable on unticked /
+    // freshly generated chunks) and makes the probe verdict authoritative
+    // enough that ScanTask can skip the Pass-2 vert.adjust re-scan.
     for (int j = 0; j < testCoords.size(); j++) {
       List<Integer> xz = testCoords.get(j);
       int lx = xz.get(0);
       int lz = xz.get(1);
-      int y = scanProbe(probe, lx, lz, minY, maxY, dir, requireSkyLight, heightmapSkyFloor,
+      int columnSkyFloor = requireSkyLight
+          ? computeColumnSkyFloor(probe, lx, lz)
+          : Integer.MIN_VALUE;
+      int y = scanProbe(probe, lx, lz, minY, maxY, dir, requireSkyLight, columnSkyFloor,
           snap.unsafeBlocks(), snap.platformDepth());
       if (y == Integer.MIN_VALUE) continue;
       int globalX = (probe.chunkX() << 4) + lx;
@@ -451,48 +456,30 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
   }
 
   /**
-   * Pick a sky-light source for {@link #acceptY}.
+   * Per-column sky-floor derived purely from block data (palette identifiers).
+   * The sky floor is the highest non-air Y on column {@code (lx, lz)} within
+   * the probe window; any {@code y+1} strictly above the floor has unobstructed
+   * sky access by construction (no overhang, no cave ceiling, no structure
+   * roof — every cell above the floor is air).
    *
-   * <p>Return contract:
-   * <ul>
-   *   <li>{@link Integer#MIN_VALUE} — sky-light is not required, or {@code
-   *       isLightOn} is true; use {@link ChunkColumnProbe#skyLightAt(int)}.</li>
-   *   <li>the heightmap top Y — sky-light is required, {@code isLightOn} is
-   *       false, the chunk has a {@code MOTION_BLOCKING_NO_LEAVES} heightmap,
-   *       <em>and</em> every cell from {@code top+1} through {@link
-   *       ChunkColumnProbe#maxY()} on the center column reads as air (no
-   *       overhang/cave/structure/player edit contradicts the reported top).
-   *       Callers may then treat any {@code y+1 &gt; floor} as fully sky-lit.</li>
-   *   <li>{@link Integer#MAX_VALUE} — sky-light is required, {@code isLightOn}
-   *       is false, and the heightmap is absent or contradicted. The caller
-   *       must return {@code null} and defer to the live vert method (where
-   *       light is validated at the unkept→kept chunk-load handoff).</li>
-   * </ul>
+   * <p>This replaces the previous {@code isLightOn} / stored-sky-light /
+   * heightmap-proxy chain. Stored sky-light nibbles and heightmaps are
+   * unreliable on unticked or freshly-generated chunks (the server may not
+   * have relit them yet, the {@code MOTION_BLOCKING_NO_LEAVES} heightmap may
+   * be absent on older formats, and player edits invalidate both). Walking
+   * the palette directly gives a deterministic, always-available answer.
    *
-   * <p>The verification walk is bounded by the probe's full Y window
-   * ({@code probe.maxY() - top} cells, called at most once per probed chunk)
-   * — not the adjustor's narrower {@code [minY, maxY]} — because skylight
-   * propagates from above the adjustor's scan range, so an overhang at
-   * {@code y > adjustor.maxY} but {@code y <= probe.maxY} still blocks sky
-   * access to candidates below it. Only runs on the cold {@code !isLightOn}
-   * branch, so it does not regress the hot path.
+   * <p>Returns {@link Integer#MIN_VALUE} when the column is fully air across
+   * the probe window — caller treats every Y as sky-lit (no foothold means
+   * the {@code y-1} solid check will reject anyway).
    */
-  private static int computeHeightmapSkyFloor(
-      ChunkColumnProbe probe, boolean requireSkyLight) {
-    if (!requireSkyLight) return Integer.MIN_VALUE;
-    if (probe.isLightOn()) return Integer.MIN_VALUE;
-    OptionalInt h = probe.heightmapTopY();
-    if (h.isEmpty()) return Integer.MAX_VALUE;
-    int top = h.getAsInt();
-    // Verify heightmap honesty across the probe's full Y window: anything
-    // between top+1 and probe.maxY() must be air. A non-air block anywhere
-    // above the reported top means we cannot trust "y > top → sky-lit" —
-    // defer to the live path which will relight.
-    int verifyTo = probe.maxY();
-    for (int y = top + 1; y <= verifyTo; y++) {
-      if (!probe.isAirAt(y)) return Integer.MAX_VALUE;
+  private static int computeColumnSkyFloor(ChunkColumnProbe probe, int lx, int lz) {
+    int top = probe.maxY();
+    int bottom = probe.minY();
+    for (int y = top; y >= bottom; y--) {
+      if (!probe.isAirAt(lx, lz, y)) return y;
     }
-    return top;
+    return Integer.MIN_VALUE;
   }
 
 
@@ -502,30 +489,31 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
    * testCoords sweep so the probe path can authoritatively report SCAN_MISS
    * across the same five columns.
    *
-   * @param heightmapSkyFloor sky-light source selector — see
-   *     {@link #computeHeightmapSkyFloor}: {@link Integer#MIN_VALUE} means use
-   *     {@link ChunkColumnProbe#skyLightAt(int, int, int)}, otherwise treat
-   *     any {@code y+1 > floor} as fully sky-lit.
+   * @param columnSkyFloor sky-floor for column {@code (lx, lz)} — see
+   *     {@link #computeColumnSkyFloor}: highest non-air Y on the column
+   *     (or {@link Integer#MIN_VALUE} when sky-light is not required, or the
+   *     column is fully air). Any {@code y+1 > columnSkyFloor} is treated as
+   *     fully sky-lit.
    * @return the accepted Y, or {@link Integer#MIN_VALUE} if none found.
    */
   private int scanProbe(ChunkColumnProbe probe, int lx, int lz, int minY, int maxY, int dir,
-                        boolean requireSkyLight, int heightmapSkyFloor,
+                        boolean requireSkyLight, int columnSkyFloor,
                         Set<String> unsafeBlocks, int platformDepth) {
     switch (dir) {
       case 0: // bottom up
         for (int i = minY; i < maxY; i++)
-          if (acceptY(probe, lx, lz, i, requireSkyLight, heightmapSkyFloor, unsafeBlocks, platformDepth)) return i;
+          if (acceptY(probe, lx, lz, i, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return i;
         return Integer.MIN_VALUE;
       case 1: // top down
         for (int i = maxY; i > minY; i--)
-          if (acceptY(probe, lx, lz, i, requireSkyLight, heightmapSkyFloor, unsafeBlocks, platformDepth)) return i;
+          if (acceptY(probe, lx, lz, i, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return i;
         return Integer.MIN_VALUE;
       case 2: { // middle out
         int maxDistance = (maxY - minY) / 2;
         int middle = minY + maxDistance;
         for (int i = 0; i <= maxDistance; i++) {
-          if (acceptY(probe, lx, lz, middle + i, requireSkyLight, heightmapSkyFloor, unsafeBlocks, platformDepth)) return middle + i;
-          if (acceptY(probe, lx, lz, middle - i, requireSkyLight, heightmapSkyFloor, unsafeBlocks, platformDepth)) return middle - i;
+          if (acceptY(probe, lx, lz, middle + i, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return middle + i;
+          if (acceptY(probe, lx, lz, middle - i, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return middle - i;
         }
         return Integer.MIN_VALUE;
       }
@@ -533,8 +521,8 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
         int maxDistance = (maxY - minY) / 2;
         int middle = minY + maxDistance;
         for (int i = maxDistance; i >= 0; i--) {
-          if (acceptY(probe, lx, lz, middle + i, requireSkyLight, heightmapSkyFloor, unsafeBlocks, platformDepth)) return middle + i;
-          if (acceptY(probe, lx, lz, middle - i, requireSkyLight, heightmapSkyFloor, unsafeBlocks, platformDepth)) return middle - i;
+          if (acceptY(probe, lx, lz, middle + i, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return middle + i;
+          if (acceptY(probe, lx, lz, middle - i, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return middle - i;
         }
         return Integer.MIN_VALUE;
       }
@@ -544,7 +532,7 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
         Collections.shuffle(trials, rng);
         for (int k = 0; k < trials.size(); k++) {
           int i = trials.get(k);
-          if (acceptY(probe, lx, lz, i, requireSkyLight, heightmapSkyFloor, unsafeBlocks, platformDepth)) return i;
+          if (acceptY(probe, lx, lz, i, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return i;
         }
         return Integer.MIN_VALUE;
       }
@@ -554,11 +542,11 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
   /**
    * Multi-column acceptance predicate: same logic as the legacy single-column
    * scan but reads from chunk-local column {@code (lx, lz)} via the probe's
-   * off-center accessors. Heightmap-derived sky-floor is chunk-wide because
-   * the probe retains a single (center-column) heightmap.
+   * off-center accessors. Sky-floor is computed per-column from block data
+   * (see {@link #computeColumnSkyFloor}).
    */
   private boolean acceptY(ChunkColumnProbe probe, int lx, int lz, int y,
-                          boolean requireSkyLight, int heightmapSkyFloor,
+                          boolean requireSkyLight, int columnSkyFloor,
                           Set<String> unsafeBlocks, int platformDepth) {
     // Feet stand on a non-air block; head region (y, y+1) is air.
     if (probe.isAirAt(lx, lz, y - 1)) return false;
@@ -579,12 +567,12 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
       if (b == null) return false;
       if (unsafeBlocks.contains(b)) return false;
     }
+    // Sky-light gate (block-data only): accept iff y+1 is strictly above the
+    // highest non-air block on this column. Stored sky-light nibbles and
+    // heightmap data are ignored — both are unreliable on unticked /
+    // freshly-generated chunks. Block data is always present and deterministic.
     if (requireSkyLight) {
-      if (heightmapSkyFloor != Integer.MIN_VALUE) {
-        if (y + 1 <= heightmapSkyFloor) return false;
-      } else if (probe.skyLightAt(lx, lz, y + 1) <= 7) {
-        return false;
-      }
+      if (y + 1 <= columnSkyFloor) return false;
     }
     return true;
   }

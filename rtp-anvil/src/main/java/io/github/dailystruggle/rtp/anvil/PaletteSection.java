@@ -17,32 +17,16 @@ import java.util.Objects;
  * </ul>
  *
  * <p>This record intentionally carries raw identifier strings, not normalized forms, so the
- * verdict layer (Phase 3) can apply {@link PaletteNormalizer} / the
+ * verdict layer (Phase 3) can apply {@code PaletteNormalizer} / the
  * {@code rtp-api} normalizer symmetrically against the user-supplied unsafe set. See
  * ADR-016 Decision §3.
  */
-public record PaletteSection(int sectionY, List<String> palette, long[] data, byte[] skyLight) {
-
-    /**
-     * Back-compat constructor for existing callers (tests, fixture builders) that do
-     * not supply a {@code SkyLight} nibble array. Defaults {@code skyLight} to {@code null},
-     * which is interpreted by {@link #skyLightAt(int, int, int)} as "fully lit" (15) —
-     * matching the semantics of a vanilla section whose {@code SkyLight} tag is absent
-     * because the whole section is above the opaque-block column and receives direct sky.
-     */
-    public PaletteSection(int sectionY, List<String> palette, long[] data) {
-        this(sectionY, palette, data, null);
-    }
+public record PaletteSection(int sectionY, List<String> palette, long[] data) {
 
     public PaletteSection {
         Objects.requireNonNull(palette, "palette");
         if (palette.isEmpty()) {
             throw new IllegalArgumentException("palette must have at least one entry");
-        }
-        if (skyLight != null && skyLight.length != 2048) {
-            throw new IllegalArgumentException(
-                    "skyLight nibble array must be exactly 2048 bytes when present, got "
-                            + skyLight.length);
         }
         if (palette.size() == 1 && data != null && data.length != 0) {
             // Tolerated but non-canonical: some generators emit an all-zero data array
@@ -55,35 +39,6 @@ public record PaletteSection(int sectionY, List<String> palette, long[] data, by
             // coord) rather than fail, because the pre-filter must treat malformed input
             // as UNKNOWN, not crash. See ADR-016.
         }
-    }
-
-    /**
-     * Returns the sky-light level at section-local coords {@code (lx, ly, lz)} (each
-     * in {@code 0..15}). The on-disk {@code SkyLight} tag is a 2048-byte nibble array
-     * indexed by the YZX-major entry index, two nibbles per byte: the low nibble is
-     * the lower (even) entry, the high nibble is the upper (odd) entry.
-     *
-     * <p>Returns {@code 15} when this section has no {@code SkyLight} tag — the
-     * Minecraft convention for "fully lit above the opaque column". The live
-     * {@code chunk.isSafe(...)} re-check at teleport time is the authoritative signal,
-     * so a permissive default here is safe and matches live-Chunk behaviour for
-     * sections at or above the heightmap surface.
-     */
-    public int skyLightAt(int lx, int ly, int lz) {
-        if (skyLight == null) return 15;
-        // if all bytes are 0, treat as absent (15)
-        boolean allZero = true;
-        for (byte b : skyLight) {
-            if (b != 0) {
-                allZero = false;
-                break;
-            }
-        }
-        if (allZero) return 15;
-
-        int idx = PackedPaletteDecoder.entryIndex(lx, ly, lz);
-        int b = skyLight[idx >> 1] & 0xFF;
-        return ((idx & 1) == 0) ? (b & 0x0F) : ((b >>> 4) & 0x0F);
     }
 
     /**

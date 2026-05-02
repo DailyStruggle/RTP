@@ -8,7 +8,7 @@ import redis.clients.jedis.JedisPubSub;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-public class RedisManager {
+public class RedisManager implements RTPNetworkManager {
     private final JedisPool pool;
     private final String rpcChannel = "rtp:rpc";
 
@@ -30,6 +30,7 @@ public class RedisManager {
         }
     }
 
+    @Override
     public void setCooldown(UUID playerId, long expirationTimeSeconds) {
         try (Jedis jedis = pool.getResource()) {
             String key = "rtp:cooldown:" + playerId.toString();
@@ -37,6 +38,7 @@ public class RedisManager {
         }
     }
 
+    @Override
     public long getCooldown(UUID playerId) {
         try (Jedis jedis = pool.getResource()) {
             String key = "rtp:cooldown:" + playerId.toString();
@@ -44,12 +46,14 @@ public class RedisManager {
         }
     }
 
+    @Override
     public void publish(String channel, String jsonPayload) {
         try (Jedis jedis = pool.getResource()) {
             jedis.publish(channel, jsonPayload);
         }
     }
 
+    @Override
     public void initializeAsync() {
         CompletableFuture.runAsync(() -> {
             try (Jedis jedis = pool.getResource()) {
@@ -65,6 +69,7 @@ public class RedisManager {
         });
     }
 
+    @Override
     public void shutdown() {
         if (pool != null) {
             pool.close();

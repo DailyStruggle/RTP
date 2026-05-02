@@ -31,34 +31,16 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
 
 /**
- * ADR-014 — Brigadier Bridge.
+ * ADR-014: Brigadier Bridge.
  *
- * <p>Walks a {@link CommandsAPICommand} tree and emits a Brigadier
- * {@link LiteralArgumentBuilder} that platform adapters (currently
- * {@code rtp-fabric}) can register with their command dispatcher.
+ * <p>Walks a {@link CommandsAPICommand} tree, emitting a Brigadier {@link LiteralArgumentBuilder}.
+ * Platform adapters (e.g., Fabric) register this with their dispatcher.
  *
- * <p>This adapter never invokes platform-specific code itself; all
- * source-to-UUID, permission, and message work is delegated to the
- * caller-supplied {@link BrigadierBridgeContext}. This satisfies the
- * ADR-014 boundary that Brigadier types do not leak into the rest of
- * {@code commands-api}, and the {@code rtp-core} / {@code rtp-api}
- * boundary that no platform classes appear there.
+ * <p>Delegates platform-specific tasks (permission, messages) to {@link BrigadierBridgeContext},
+ * ensuring no platform leak into {@code commands-api} or {@code rtp-core}.
  *
- * <p>Argument-type mapping (v1):
- * <ul>
- *   <li>{@link IntegerParameter}    &rarr; {@link IntegerArgumentType}</li>
- *   <li>{@link FloatParameter}      &rarr; {@link DoubleArgumentType}</li>
- *   <li>{@link BooleanParameter}    &rarr; {@link BoolArgumentType}</li>
- *   <li>{@link CoordinateParameter} &rarr; {@code StringArgumentType.word()} (relative form preserved)</li>
- *   <li>{@link EnumParameter}       &rarr; {@code StringArgumentType.word()} + suggestions from {@code values()}</li>
- *   <li>any other / unknown        &rarr; {@code StringArgumentType.word()} + suggestions from {@code values()}</li>
- * </ul>
- *
- * <p>Player / World / OfflinePlayer parameters are intentionally not handled here
- * because their concrete classes live in the {@code bukkit} sub-package of
- * {@code commands-api} and have no platform-neutral counterpart. Fabric callers
- * wanting Brigadier's native entity selectors can post-process the returned
- * builder before registration.
+ * <p>Maps {@code commands-api} parameters to Brigadier types. Excludes platform-specific
+ * entity selectors (Player, World), which Fabric callers must handle manually.
  */
 public final class BrigadierCommandAdapter {
 

@@ -26,7 +26,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
-import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
@@ -413,7 +412,7 @@ public class OnEventTeleports implements Listener {
       }
       if (verbose)
         RTP.log(Level.INFO, "#0080FF[RTP] teleporting player:" + player + " on teleport");
-      Bukkit.getScheduler().runTaskLater(RTPBukkitPlugin.getPlugin(RTPBukkitPlugin.class), () -> teleportAction(player), 5L);
+      RTP.scheduler.runTaskLater(() -> teleportAction(player), 5L);
     }
   }
 }

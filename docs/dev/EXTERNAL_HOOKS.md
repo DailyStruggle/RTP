@@ -1,0 +1,160 @@
+# External Hooks — Reflection, Soft-Depends and Behavior-Modification API
+
+> **Audience.** Plugin/addon authors who want to *modify* RTP behavior (block locations, charge money, expose placeholders, override the world border, supply pre-filter data) and AI/human contributors who need to know every site where third-party code can change what RTP does.
+
+> **Authoritative status.** Every reflection, soft-depend probe, or extension seam that exists *to accommodate other plugins modifying RTP behavior* shall appear in this file. Adding a new hook without a row here is a documentation defect (see [`AGENTS.md → Self-Updating Protocol`](../../.junie/AGENTS.md)).
+
+> **Related decisions.** [ADR-026](../adr/ADR-026-external-hook-api-surface.md) (this surface), [ADR-019](../adr/ADR-019-claim-plugin-integrations-folded-into-plugin.md) (claim integrations), [ADR-016](../adr/ADR-016-anvil-subsystem.md) (anvil prefilter), [ADR-014](../adr/ADR-014-brigadier-bridge-via-commands-api.md) (brigadier bridge).
+
+---
+
+## TL;DR — preferred entry point
+
+```java
+import io.github.dailystruggle.rtp.api.RTPAPI;
+import io.github.dailystruggle.rtp.api.hooks.RTPHooks;
+
+RTPHooks hooks = RTPAPI.hooks(); // throws IllegalStateException if core not yet loaded (S-006)
+```
+
+From `RTPHooks` you reach every behavior-modification registry in one place. Direct calls to `rtp-core` symbols (e.g. `GlobalRegionVerifiers`) still work for source compatibility but are no longer the recommended path for new code.
+
+---
+
+## Hook catalog
+
+### 1. Region verifiers — `RTPHooks#verifiers()`
+
+| | |
+|---|---|
+| **API symbol** | `io.github.dailystruggle.rtp.api.hooks.RegionVerifierRegistry` |
+| **Backing impl** | `io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers` (`rtp-core`) |
+| **Behavior modified** | Vetoes a candidate teleport location before the player is sent there. |
+| **When invoked** | Every per-attempt verification pass (`PregenTask`, `QueueTask`, `ScanTask`). |
+| **Threading** | Sync verifiers run on the verification chain — non-blocking. Async verifiers return a `CompletableFuture` and may do off-thread I/O but shall not block a region/tick thread. |
+| **Failure mode** | A throwing verifier is logged at WARNING and treated as `false` (location rejected). RTP does not silently swallow failures (REQ-RTP-S-004). |
+| **Producers (today)** | `softdepends/claims/{Factions,GriefDefender,GriefPrevention,HuskTowns,Lands,RedProtect,TownyAdvanced,WorldGuard}Checker` via `ClaimIntegrations`; `addons/RTP_ExampleAddon`; `addons/RTP_Glide`. |
+| **REQ / S-rule** | REQ-RTP-S-003, REQ-API-F-003. |
+| **Backward compat** | Legacy static methods on `GlobalRegionVerifiers` continue to work and are bidirectional with the new registry. |
+
+```java
+RTPAPI.hooks().verifiers().register(coords -> myCheckReturnsTrueIfSafe(coords));
+RTPAPI.hooks().verifiers().registerAsync(coords -> myAsyncCheck(coords));
+```
+
+### 2. Economy — `RTPHooks#economy()`
+
+| | |
+|---|---|
+| **API symbol** | `io.github.dailystruggle.rtp.api.hooks.EconomyProviderRegistry` |
+| **Provider type** | `io.github.dailystruggle.rtp.api.economy.RTPEconomy` |
+| **Backing field** | `RTP.economy` (read path inside `rtp-core`). |
+| **Behavior modified** | Charges and refunds for `/rtp` invocations. |
+| **When invoked** | `BukkitBaseRTPCmd` (and platform analogues) on cooldown/cost evaluation; refund on teleport failure. |
+| **Threading** | May be called from the async generation pipeline; implementations shall be thread-safe (REQ-API-ARCH-001). |
+| **Producers (today)** | `rtp-plugin/.../softdepends/VaultChecker.java` (Vault + EssentialsX). |
+| **Fallback when target absent** | A platform no-op `RTPEconomy` is provided by the server accessor; teleport pipeline never NPEs. |
+| **Backward compat** | Direct writes to `RTP.economy` still work; the registry simply provides an API-only path. |
+
+```java
+RTPAPI.hooks().economy().bind(myRTPEconomy);
+```
+
+### 3. Placeholders — `RTPHooks#placeholders()`
+
+| | |
+|---|---|
+| **API symbol** | `io.github.dailystruggle.rtp.api.hooks.PlaceholderProviderRegistry` |
+| **Behavior modified** | Names exposed by RTP to PlaceholderAPI / chat plugins (`%rtp_<key>%`). |
+| **When invoked** | On every chat/scoreboard/tab-list refresh that includes an `rtp_*` placeholder. |
+| **Threading** | Resolvers may be invoked from any thread; shall not block server APIs. |
+| **Consumer (today)** | `rtp-plugin/.../softdepends/PAPI_expansion.java` reads this registry and exposes each entry through PlaceholderAPI. |
+| **Producers (today)** | RTP itself registers the built-in keys (`cooldown_remaining`, etc.) once the registry is in place; third-party plugins may register additional keys. |
+
+```java
+RTPAPI.hooks().placeholders().register("my_metric",
+    (uuid, key) -> Integer.toString(myCounter.get(uuid)));
+```
+
+### 4. World border — `RTPHooks#worldBorder()`
+
+| | |
+|---|---|
+| **API symbol** | `io.github.dailystruggle.rtp.api.hooks.WorldBorderProviderRegistry` |
+| **Behavior modified** | Constrains the candidate radius and per-attempt sampling to "inside the border". |
+| **When invoked** | Region setup, per-attempt `Shape` sampling. |
+| **Threading** | Async-safe; `Provider#isInside` shall not block. |
+| **Producers (today)** | `rtp-core/.../tools/ChunkyChecker.java` (Chunky/ChunkyBorder integration); platform-native `WorldBorder` is the fallback. |
+
+```java
+RTPAPI.hooks().worldBorder().bind((world, x, z) -> myBorder.contains(world, x, z));
+```
+
+### 5. Anvil pre-filter — `RTPHooks#anvilPrefilter()`
+
+| | |
+|---|---|
+| **API symbol** | `io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry` |
+| **Provider** | `Provider#classify(world, cx, cz) → ACCEPT / REJECT / UNKNOWN`. |
+| **Behavior modified** | Allows region scanning to skip whole chunks without loading them, by reading anvil/NBT data directly. See [ADR-016](../adr/ADR-016-anvil-subsystem.md). |
+| **When invoked** | `ScanTask` per-chunk classification (REQ-RTP-S-005 — anvil pre-filter is a primary tool to avoid main-thread chunk I/O). |
+| **Producers (today)** | `rtp-anvil` module (`AnvilRegionByteCache`). The legacy reflective lookup in `ScanTask` (`Class.forName("…AnvilRegionByteCache")`) remains as a fallback for one release cycle and shall be removed once `rtp-anvil` self-registers via the registry (deferred follow-up). |
+| **Threading** | Off-main-thread on Folia (REQ-RTP-S-005); implementations shall be thread-safe. |
+
+```java
+RTPAPI.hooks().anvilPrefilter().bind((world, cx, cz) -> myDecision(world, cx, cz));
+```
+
+---
+
+## Hooks not (yet) routed through `RTPHooks`
+
+The following sites also accommodate third-party plugins but are **not** routed through `RTPHooks` for the reasons listed. They are documented here for completeness.
+
+| Hook | Symbol / file | Why outside the facade | Reference |
+|---|---|---|---|
+| **Effects pipeline** (particles / potions / sounds during teleport) | `effects-api` module | Has its own evolving SPI; folding two evolving subsystems into one facade was rejected in ADR-026. | `effects-api/src/main/java/io/github/dailystruggle/effectsapi/` |
+| **Brigadier bridge** | `BrigadierCommandAdapter` + `BrigadierBridgeContext` in `commands-api/` | Used by Paper/Folia/Velocity to attach RTP commands to native Brigadier. Not a behavior-modification seam — addons do not extend it. | [ADR-014](../adr/ADR-014-brigadier-bridge-via-commands-api.md) |
+| **Bukkit event listeners** for join / firstjoin / respawn / void RTP | `OnEventTeleports.java` (rtp-plugin) | These are RTP's *consumers* of upstream events, not extension points. Behavior is configured in `events.yml`, not by other plugins. | `docs/admin/EVENTS_AND_EFFECTS.md` |
+| **`Shape` and `VerticalAdjustor` factories** | `RTPAPI.addShape` / `RTPAPI.addVerticalAdjustor` | Already first-class API; not in `RTPHooks` because they are construction-time registrations rather than "behavior modification" seams. | `RTPAPI.java`, REQ-API-F-001/F-002 |
+
+---
+
+## Pre-existing reflection sites — not behavior modification
+
+These `Class.forName` / `getMethod` sites exist for **platform compatibility detection**, not for accommodating other plugins. They are listed for auditability; do not route them through `RTPHooks`.
+
+| Site | Purpose |
+|---|---|
+| `RTPBukkitPlugin#onLoad` — `Class.forName("io.papermc.paper.configuration.PaperConfigurations")`, `RegionizedServer`, `org.sqlite.JDBC` | Detect Paper / Folia / SQLite at runtime. |
+| `RTPBukkitPlugin#onEnable` — `Class.forName(serverModel.accessorClassName/schedulerClassName)` | Pick the platform-version-specific `RTPServerAccessor`/`RTPScheduler`. |
+| `BukkitServerProvider#resolveServerModel`, `AbstractServerAccessor` | Same purpose, factored for the lite assembly. |
+| `BukkitRTPWorld#... World.class.getMethod("getChunkAtAsync", int, int)` | Detect availability of Paper's async chunk API at link time. |
+| `FoliaOwnershipTestJob`, `TestAsyncChunkLoadCmd` | Diagnostic commands that probe Folia/Paper-only methods. |
+| `effects-api/Effect.java` — `getMethod("valueOf"|"getByName"|"clone")` | Reflective enum/value adaptation for cross-version particle/potion identifiers. |
+| `ScanTask` — `Class.forName("io.github.dailystruggle.rtp.anvil.AnvilPrefilterMetrics"|"AnvilRegionByteCache")` | The metrics lookup is platform-introspection; the `AnvilRegionByteCache` lookup is the legacy seam that ADR-026 will replace with the registry above. |
+
+---
+
+## How RTP responds when a target plugin is absent
+
+| Hook | Target plugin missing → behavior |
+|---|---|
+| Region verifiers (claim plugins) | Each `*Checker` is gated on `Bukkit.getPluginManager().isPluginEnabled(...)`; verifier is simply not registered. |
+| Economy | `RTP.economy` stays as the platform no-op; `/rtp` cost configuration is silently treated as "free". |
+| Placeholders | `PlaceholderAPI` not present → `PAPI_expansion` is not constructed; placeholders are not exported. |
+| World border | No bound provider → fall back to platform `World#getWorldBorder()` and config radius. |
+| Anvil pre-filter | No bound provider → `ScanTask` falls back to per-attempt chunk loads (slower but correct). |
+
+In every case, RTP shall not silently swallow a failure (REQ-RTP-S-004); fall-back paths log a single line at INFO/WARNING and continue.
+
+---
+
+## Adding a new hook (checklist)
+
+1. Define the SPI as a functional interface in `rtp-api/.../hooks/`.
+2. Add a registry interface (`bind`/`current`/`clear` for single-binding, `register`/`unregister` for multi-binding) and an accessor on `RTPHooks`.
+3. Implement it in `DefaultRTPHooks` (`rtp-core/.../common/hooks/`); keep the impl small and thread-safe.
+4. Wire any consumer sites in `rtp-core` to read from the registry, with a clear fallback when no provider is bound.
+5. Add a row in this file (catalog or "not yet routed" if the seam predates the facade).
+6. Add a test under `rtp-core/.../common/hooks/` covering register, unregister, throwing-implementation safety, and the absent-target fallback. Tag the class name with the appropriate `REQ-*` ID and add a row to `TRACEABILITY.md`.

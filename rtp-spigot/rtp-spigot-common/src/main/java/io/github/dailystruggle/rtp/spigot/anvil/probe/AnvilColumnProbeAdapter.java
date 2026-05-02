@@ -126,21 +126,6 @@ public final class AnvilColumnProbeAdapter implements ChunkColumnProbe {
         || path.equals("AIR") || path.equals("CAVE_AIR") || path.equals("VOID_AIR");
   }
 
-  @Override
-  public boolean isLightOn() {
-    return probe.isLightOn();
-  }
-
-  @Override
-  public int skyLightAt(int y) {
-    return probe.skyLightAt(y);
-  }
-
-  @Override
-  public int skyLightAt(int localX, int localZ, int y) {
-    return probe.skyLightAt(localX, localZ, y);
-  }
-
   private static String reconcile(String raw) {
     if (raw == null) return null;
     String n = RECONCILER.apply(raw);

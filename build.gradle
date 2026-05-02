@@ -10,6 +10,7 @@ version = '3.0.0-beta.1'
 spotless {
     java {
         target 'rtp-*/**/*.java', 'addons/**/*.java'
+        targetExclude '**/build/**', '**/.gradle/**', '**/generated/**', '**/target/**'
         removeUnusedImports()
         trimTrailingWhitespace()
         endWithNewline()

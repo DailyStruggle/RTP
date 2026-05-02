@@ -22,6 +22,8 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | Requirement-authoring style (`shall`, no temporal framing) | [`RULES.md`](RULES.md) |
 | A decision (why something is the way it is) | [`../adr/README.md`](../adr/README.md) |
 | Fabric status / blockers | [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) |
+| Multi-server / proxy (Velocity, BungeeCord) plan | [`MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md) (D-005 gated; admin stub: [`../admin/proxies/INDEX.md`](../admin/proxies/INDEX.md)) |
+| Runtime metrics SPI (TPS / MSPT / heap / pipeline samples) | [`METRICS_PLAN.md`](METRICS_PLAN.md) |
 | Why Fabric is in scope (and Forge / NeoForge are not) | [`../adr/ADR-022-fabric-platform-in-scope.md`](../adr/ADR-022-fabric-platform-in-scope.md) |
 | Why legacy MC / Java are out of scope | [`../adr/ADR-021-legacy-mc-and-java-support-scope.md`](../adr/ADR-021-legacy-mc-and-java-support-scope.md) |
 | Adding or updating a locale / translation | [`TRANSLATION_GUIDE.md`](TRANSLATION_GUIDE.md) |
@@ -34,6 +36,7 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | Flat map of every doc | [`../MAP.md`](../MAP.md) |
 | Hazards and failure modes | [`../admin/HAZARDS.md`](../admin/HAZARDS.md) |
 | Failure detection and responses | [`../admin/HAZARDS.md#failure-modes`](../admin/HAZARDS.md#failure-modes) |
+| External hooks (claim verifiers, economy, placeholders, world border, anvil prefilter) | [`EXTERNAL_HOOKS.md`](EXTERNAL_HOOKS.md) (ADR-026) |
 
 ## Normative (read before writing code)
 
@@ -55,6 +58,8 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | [`TRACEABILITY.md`](TRACEABILITY.md) | REQ-* → class/method → test mapping. |
 | [`COVERAGE_PLAN.md`](COVERAGE_PLAN.md) | JaCoCo baseline and targets. |
 | [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) | Active Fabric frontier status. |
+| [`MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md) | Proxy / multi-server (Velocity, BungeeCord) roadmap; D-005 gated. |
+| [`METRICS_PLAN.md`](METRICS_PLAN.md) | Runtime metrics SPI (TPS/MSPT/heap/queue/pipeline); implementation eligible. |
 | [`ROADMAP.md`](ROADMAP.md) | Forward-looking work. |
 | [`STAKEHOLDERS.md`](STAKEHOLDERS.md) | Roles and review expectations. |
 | [`LESSONS_LEARNED.md`](LESSONS_LEARNED.md) | Dated engineering notes. |

@@ -1,0 +1,41 @@
+// ADR-027 — Fabric multiversion v1_21_R1 submodule (reference impl).
+//
+// Pinned to MC 1.21.1, mojmap, Loom 1.11+, Java 21. This is the reference
+// FabricVersionAdapter implementation that v1_20_R1 and v26_1_R1 will port
+// from once their stubs are filled in.
+//
+// MC + fabric-api versions intentionally match rtp-fabric-common's
+// compileOnly pin so the relocation of the existing common-side glue into
+// this submodule is purely structural — no porting work in this module.
+plugins {
+    // Version pinned in settings.gradle pluginManagement.plugins {}.
+    id 'fabric-loom'
+}
+
+ext {
+    minecraftVersion       = '1.21.1'
+    loaderVersion          = '0.16.5'
+    fabricApiVersion       = '0.115.0+1.21.1'
+    permissionsApiVersion  = '0.3.1'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraftVersion}"
+    mappings  loom.officialMojangMappings()
+
+    modImplementation "net.fabricmc:fabric-loader:${loaderVersion}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabricApiVersion}"
+
+    modCompileOnly "me.lucko:fabric-permissions-api:${permissionsApiVersion}"
+
+    api project(':rtp-api')
+    api project(':rtp-core')
+    api project(':commands-api')
+    api project(':rtp-fabric:rtp-fabric-common')
+}

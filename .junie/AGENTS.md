@@ -100,10 +100,43 @@ Read only what the task requires. Do not read everything.
 | Writing or updating tests | [`docs/dev/COVERAGE_PLAN.md`](../docs/dev/COVERAGE_PLAN.md), [`docs/dev/TRACEABILITY.md`](../docs/dev/TRACEABILITY.md) |
 | Making a structural change | [`docs/adr/README.md`](../docs/adr/README.md) + relevant ADR |
 | New feature or platform work | [`docs/dev/MULTI_PLATFORM_PLAN.md`](../docs/dev/MULTI_PLATFORM_PLAN.md) |
+| Multi-server / proxy (Velocity, BungeeCord) work | [`docs/dev/MULTI_SERVER_PLAN.md`](../docs/dev/MULTI_SERVER_PLAN.md) (D-005 gated; admin docs stub: [`docs/admin/proxies/INDEX.md`](../docs/admin/proxies/INDEX.md)) |
+| Runtime metrics (TPS / MSPT / heap / queue / pipeline samples) | [`docs/dev/METRICS_PLAN.md`](../docs/dev/METRICS_PLAN.md) (implementation eligible) |
 | Database / command / shutdown work | [`docs/dev/LESSONS_LEARNED.md`](../docs/dev/LESSONS_LEARNED.md) |
 | Verifying a requirement is already satisfied | [`docs/dev/TRACEABILITY.md`](../docs/dev/TRACEABILITY.md) (REQ-* → class → test) |
+| Adding/auditing a third-party integration (claim plugin, economy, PAPI, world border, anvil prefilter) or any reflection added to accommodate other plugins | [`docs/dev/EXTERNAL_HOOKS.md`](../docs/dev/EXTERNAL_HOOKS.md) + [ADR-026](../docs/adr/ADR-026-external-hook-api-surface.md) |
 
 Full doc catalog: [`docs/dev/INDEX.md`](../docs/dev/INDEX.md).
+
+---
+
+## Domain Analogies & Aliases (informal term → canonical symbol)
+
+Informal language used in chat and issues, mapped to the actual code symbol. Use the canonical name in code, comments, requirements, and ADRs; tolerate the alias only as a search hint. **If you find an alias that's not on this list and proves useful, add a row** rather than letting it drift.
+
+| Informal alias | Canonical symbol / location | Notes |
+|----------------|-----------------------------|-------|
+| "fast cache" | `RegionQueueManager.fastLocations` (`ConcurrentHashMap<UUID, CompletableFuture<RTPLocation>>`) | **Per-player** prefilled future for an *already-online* player on this backend. Not the general region pool. Do not confuse with the kept cache. |
+| "kept cache" / "hot queue" / "hot cache" / "L1" / "L1 cache" | `RegionQueueManager.keptLocations` (`LockFreeLocationBuffer`) | The general region pool of pre-verified locations whose chunks are currently loaded with `keep(true)` applied. This is what `/rtp` normally polls. "L1" is the cache-tier shorthand: hot, in-memory, ready to serve. |
+| "cold cache" / "cold queue" / "unkept cache" / "L2" / "L2 cache" | `RegionQueueManager.unkeptLocations` (`LockFreeLocationBuffer`) | Pre-verified locations whose chunks have been released. Falls back here when the hot queue is empty; chunks are re-loaded on use. "L2" is the cache-tier shorthand: warm, on-disk-or-DB-backed, requires re-load to serve. |
+| "login cache" / "login reserve" / "join cache" | `RegionQueueManager.loginLocations` (nullable `LockFreeLocationBuffer`); see [ADR-023](../docs/adr/ADR-023-login-reserve-cache.md) | Default-world-only reserve for join-time RTP (`rtp.onevent.firstjoin` / `rtp.onevent.join`). Per-player intent, not a general pool. |
+| "per-player queue" / "personal queue" | `RegionQueueManager.perPlayerLocationQueue` + `playerQueue` | Locations reserved/recycled for specific players, plus a UUID FIFO of waiting players. The fairness primitive. |
+| "the pipeline" / "teleport pipeline" / "pipeline task" | `TeleportPipelineTask` (`rtp-core`) | The full per-attempt teleport pipeline (shape → chunk → vert → biome → safety). Counted under `MemoryTracker`. |
+| "memory tracker" | `MemoryTracker` (`rtp-core`) | Tracks chunk-ticket and `TeleportPipelineTask` allocations; release on every exit path. |
+| "active GC" / "GC sweep" | `MemoryTracker` active-GC pass; see `docs/architecture/04-active-gc-sweep.md` | Periodic reaper, not the JVM GC. |
+| "scan" / "scan task" | `ScanTask` family + `ScanPauseCmd`; see `docs/architecture/05-scan-task-crawler.md` | Region pre-fill crawler. |
+| "spiral" / "spiral math" | Archimedean spiral 1D mapping; see [ADR-001](../docs/adr/ADR-001-archimedean-spiral-1d-mapping.md) and `docs/dev/CONCEPTS.md` | The bounded-distribution algorithm. |
+| "anvil" / "anvil prefilter" | `rtp-anvil` module; see [ADR-016](../docs/adr/ADR-016-anvil-subsystem.md) | NBT-based pre-filter for biome/material checks without loading chunks. |
+| "claim plugin" / "claim integration" | Folded into plugin per [ADR-019](../docs/adr/ADR-019-claim-plugin-integrations-folded-into-plugin.md); enforced by S-003 | No inline claim calls in pipeline or commands. |
+| "Brigadier bridge" | `BrigadierCommandAdapter` + `BrigadierBridgeContext` in `commands-api/`; see [ADR-014](../docs/adr/ADR-014-brigadier-bridge-via-commands-api.md) | Used by Paper/Folia and (planned) Velocity. |
+| "DB accessor" / "database accessor" | `AbstractSQLDatabaseAccessor` (+ `H2`/`SQLite`/`MySQL`/`PostgreSQL` concrete) | Reuse for any persistence; HikariCP-backed. |
+| "the lite jar" / "lite assembly" | See [ADR-024](../docs/adr/ADR-024-rtp-lite-assembly-variant.md) | Trimmed assembly variant, not a separate codebase. |
+| "the proxy plan" / "multi-server plan" / "network mode" | [`docs/dev/MULTI_SERVER_PLAN.md`](../docs/dev/MULTI_SERVER_PLAN.md) | Velocity/BungeeCord cross-server work, D-005 gated. Distinct from `MULTI_PLATFORM_PLAN.md`. |
+| "network wait queue" / "cross-server queue" | Proposed (Phase 1+) — not yet a code symbol; see *Network Wait Queue* in `MULTI_SERVER_PLAN.md` | UUID-keyed FIFO living in the network-state member of `AbstractSQLDatabaseAccessor`. Do not confuse with `playerQueue`. |
+| "reservation token" | Proposed (Phase 2) — not yet a code symbol; see *Reservation Tokens* in `MULTI_SERVER_PLAN.md` | Allocates a single coordinate from `keptLocations`/`unkeptLocations` for a cross-network player. |
+| "AGENTS file" / "agent guide" | This file: [`.junie/AGENTS.md`](AGENTS.md) | Path is `.junie/AGENTS.md` — **not** `AGENTS.md` at repo root. From `docs/dev/`, use `../../.junie/AGENTS.md`. |
+
+Cross-references for full term definitions: [`docs/dev/GLOSSARY.md`](../docs/dev/GLOSSARY.md) (canonical glossary), [`docs/dev/INDEX.md`](../docs/dev/INDEX.md) (task router). New domain terms or overloaded words go to `GLOSSARY.md`; new informal aliases for *existing* symbols go in the table above.
 
 ---
 
@@ -248,11 +281,15 @@ When you discover something durable, record it in the **correct** file:
 | Toolset / PowerShell / Gradle environment fix | this file (`Environment & Execution` section) |
 | Dated engineering pitfall, reproduction note, non-obvious behavior | [`docs/dev/LESSONS_LEARNED.md`](../docs/dev/LESSONS_LEARNED.md) |
 | Overloaded or ambiguous domain term | [`docs/dev/GLOSSARY.md`](../docs/dev/GLOSSARY.md) (Multipurpose Terms table) |
-| Roadmap phase completion, unblocking, or plan rename | *Current Development Focus* above **and** [`MULTI_PLATFORM_PLAN.md`](../docs/dev/MULTI_PLATFORM_PLAN.md) |
+| Informal alias / nickname for an existing code symbol | this file (*Domain Analogies & Aliases* table) |
+| Roadmap phase completion, unblocking, or plan rename (multi-platform axis) | *Current Development Focus* above **and** [`MULTI_PLATFORM_PLAN.md`](../docs/dev/MULTI_PLATFORM_PLAN.md) |
+| Roadmap phase completion / decision change (multi-server proxy axis) | [`MULTI_SERVER_PLAN.md`](../docs/dev/MULTI_SERVER_PLAN.md); admin-facing notes: [`docs/admin/proxies/`](../docs/admin/proxies/) |
+| Roadmap phase completion / decision change (metrics axis) | [`METRICS_PLAN.md`](../docs/dev/METRICS_PLAN.md) |
 | Renamed / moved class referenced by a REQ-* | [`docs/dev/TRACEABILITY.md`](../docs/dev/TRACEABILITY.md) row |
 | New REQ-traceable test | [`docs/dev/TRACEABILITY.md`](../docs/dev/TRACEABILITY.md) row |
 | Architecturally significant decision | New ADR under [`docs/adr/`](../docs/adr/) (use `ADR-TEMPLATE.md`) |
 | Incidental potential bug found while doing unrelated work | [`docs/dev/POTENTIAL_BUGS.md`](../docs/dev/POTENTIAL_BUGS.md) (see *Stay-On-Task Policy*) |
+| New reflection / soft-depend / hook that accommodates a third-party plugin | [`docs/dev/EXTERNAL_HOOKS.md`](../docs/dev/EXTERNAL_HOOKS.md) (catalog row + `RTPHooks` registry; ADR-026) |
 
 Do **not** add code-level optimizations, algorithm explanations, or per-feature narratives to this file — those belong in code comments, ADRs, or `CHANGELOG.md`.
 

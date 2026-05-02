@@ -132,48 +132,6 @@ class ColumnProbeParityTest {
         }
     }
 
-    @ParameterizedTest(name = "{0}")
-    @CsvSource({"1_20_R1", "1_21_R1", "26_1_R1"})
-    @DisplayName("readColumnProbe(includeSkyLight=true) matches AnvilChunkView.getSkyLight across the window")
-    void skyLightParityWhenRequested(String dirName) throws IOException {
-        byte[] regionBytes = loadRealFixture(dirName);
-
-        AnvilChunkView view = AnvilReader.readChunkView(regionBytes, 0, 0);
-        assertNotNull(view);
-
-        int minSectionY = Integer.MAX_VALUE;
-        int maxSectionY = Integer.MIN_VALUE;
-        for (PaletteSection s : view.sections()) {
-            if (s.sectionY() < minSectionY) minSectionY = s.sectionY();
-            if (s.sectionY() > maxSectionY) maxSectionY = s.sectionY();
-        }
-        int minY = minSectionY * 16;
-        int maxY = maxSectionY * 16 + 15;
-
-        // Probe with sky-light retention requested; defaults (5-arg) must NOT retain it.
-        ColumnProbe probeLit = AnvilReader.readColumnProbe(regionBytes, 0, 0, minY, maxY, true);
-        ColumnProbe probeBare = AnvilReader.readColumnProbe(regionBytes, 0, 0, minY, maxY);
-        assertNotNull(probeLit);
-        assertNotNull(probeBare);
-
-        for (int y = minY; y <= maxY; y++) {
-            final int yFinal = y;
-            int viewSky = view.getSkyLight(
-                    ColumnProbe.CENTER_LOCAL_X, y, ColumnProbe.CENTER_LOCAL_Z);
-            assertEquals(viewSky, probeLit.skyLightAt(y),
-                    () -> "skyLight parity at y=" + yFinal + " in " + dirName
-                            + " (probe built with includeSkyLight=true)");
-        }
-
-        // Bare probe retains no SkyLight: must return the "open" default 15 for every Y,
-        // even within the window. This is the cheap-parse invariant callers rely on.
-        for (int y = minY; y <= maxY; y++) {
-            final int yFinal = y;
-            assertEquals(15, probeBare.skyLightAt(y),
-                    () -> "bare probe must report skyLight=15 at y=" + yFinal);
-        }
-    }
-
     // ---------------------------------------------------------------------------- helpers
 
     private static byte[] loadRealFixture(String dirName) throws IOException {

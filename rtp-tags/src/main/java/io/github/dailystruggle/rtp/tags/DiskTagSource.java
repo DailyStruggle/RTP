@@ -13,30 +13,13 @@ import java.util.stream.Stream;
 /**
  * Loads Minecraft block-tag JSON files from a filesystem "data root".
  *
- * <p>A data root is the directory that contains one subdirectory per namespace
- * — exactly as laid out inside a Minecraft server jar, a data pack, or a mod
- * resource tree:
+ * <p>The data root contains namespace subdirectories, structured as in data packs:
+ * {@code <dataRoot>/<namespace>/tags/{block,blocks}/...json}.
  *
- * <pre>{@code
- * <dataRoot>/
- *   minecraft/
- *     tags/
- *       block/          (>= MC 1.21)
- *       blocks/         (<= MC 1.20)
- *   mymod/
- *     tags/
- *       block/
- * }</pre>
+ * <p>Probes both {@code tags/block} (>= 1.21) and {@code tags/blocks} (<= 1.20) for compatibility.
+ * Failures are reported via the provided {@code rejectionSink} (consistent with REQ-RTP-S-004).
  *
- * <p>This implementation probes both {@code tags/block} and {@code tags/blocks}
- * so it is forward- and backward-compatible across the 1.21 rename. Each
- * discovered JSON file is parsed via {@link TagFileParser}; parse failures are
- * reported through the supplied {@code rejectionSink} and the offending file
- * is skipped — never silently dropped (matching the REQ-RTP-S-004 contract
- * extended to the tag loader).
- *
- * <p>Thread-safety: instances are immutable and the {@link #loadBlockTags()}
- * call performs only read-only filesystem I/O, so instances may be shared.
+ * <p>Immutable and thread-safe.
  */
 public final class DiskTagSource implements TagSource {
 

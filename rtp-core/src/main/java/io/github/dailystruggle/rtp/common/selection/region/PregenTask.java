@@ -242,7 +242,6 @@ final class PregenTask implements Runnable {
         int minY = vert.minY();
         int maxY = vert.maxY();
         if (minY >= maxY) return false;
-        boolean needSkyLight = vert.requiresSkyLight();
 
         CompletableFuture<io.github.dailystruggle.rtp.api.world.ChunkColumnProbe> fut;
         try {
@@ -252,7 +251,7 @@ final class PregenTask implements Runnable {
             // reject with probe.minY() > minY - 1. Without this, the fast path
             // was inert on every candidate and every probe-accept degraded to
             // a full chunk load.
-            fut = state.world.probeChunkColumn(cx, cz, minY - 1, maxY, needSkyLight);
+            fut = state.world.probeChunkColumn(cx, cz, minY - 1, maxY);
         } catch (Throwable t) {
             // Adapter threw — treat as UNKNOWN, fall through to full path.
             RTP.log(Level.FINE,

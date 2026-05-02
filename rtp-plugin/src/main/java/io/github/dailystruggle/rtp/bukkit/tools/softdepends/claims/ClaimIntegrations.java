@@ -1,10 +1,11 @@
 package io.github.dailystruggle.rtp.bukkit.tools.softdepends.claims;
 
+import io.github.dailystruggle.rtp.api.RTPAPI;
+import io.github.dailystruggle.rtp.api.hooks.RegionVerifierRegistry;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.LanguageBootstrap;
-import io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -65,37 +66,43 @@ public final class ClaimIntegrations {
         (ConfigParser<IntegrationsKeys>) RTP.configs.getParser(IntegrationsKeys.class);
     if (configParser == null) return;
 
+    // ADR-026: register through the public RTPHooks facade rather than the
+    // internal GlobalRegionVerifiers static API. Behaviour is identical (the
+    // facade delegates to GlobalRegionVerifiers); the indirection is what makes
+    // this site auditable per docs/dev/EXTERNAL_HOOKS.md.
+    RegionVerifierRegistry verifiers = RTPAPI.hooks().verifiers();
+
     if (flag(configParser, IntegrationsKeys.rerollFactions)
         && Bukkit.getPluginManager().isPluginEnabled("Factions")) {
-      GlobalRegionVerifiers.addGlobalRegionVerifier(loc -> !FactionsChecker.isInClaim(loc));
+      verifiers.register(loc -> !FactionsChecker.isInClaim(loc));
     }
     if (flag(configParser, IntegrationsKeys.rerollGriefDefender)
         && Bukkit.getPluginManager().isPluginEnabled("GriefDefender")) {
-      GlobalRegionVerifiers.addGlobalRegionVerifier(loc -> !GriefDefenderChecker.isInClaim(loc));
+      verifiers.register(loc -> !GriefDefenderChecker.isInClaim(loc));
     }
     if (flag(configParser, IntegrationsKeys.rerollGriefPrevention)
         && Bukkit.getPluginManager().isPluginEnabled("GriefPrevention")) {
-      GlobalRegionVerifiers.addGlobalRegionVerifier(loc -> !GriefPreventionChecker.isInClaim(loc));
+      verifiers.register(loc -> !GriefPreventionChecker.isInClaim(loc));
     }
     if (flag(configParser, IntegrationsKeys.rerollLands)
         && Bukkit.getPluginManager().isPluginEnabled("Lands")) {
-      GlobalRegionVerifiers.addGlobalRegionVerifier(loc -> !LandsChecker.isInClaim(loc));
+      verifiers.register(loc -> !LandsChecker.isInClaim(loc));
     }
     if (flag(configParser, IntegrationsKeys.rerollHuskTowns)
         && Bukkit.getPluginManager().isPluginEnabled("HuskTowns")) {
-      GlobalRegionVerifiers.addGlobalRegionVerifier(loc -> !HuskTownsChecker.isInClaim(loc));
+      verifiers.register(loc -> !HuskTownsChecker.isInClaim(loc));
     }
     if (flag(configParser, IntegrationsKeys.rerollRedProtect)
         && Bukkit.getPluginManager().isPluginEnabled("RedProtect")) {
-      GlobalRegionVerifiers.addGlobalRegionVerifier(loc -> !RedProtectChecker.isInClaim(loc));
+      verifiers.register(loc -> !RedProtectChecker.isInClaim(loc));
     }
     if (flag(configParser, IntegrationsKeys.rerollTownyAdvanced)
         && Bukkit.getPluginManager().isPluginEnabled("Towny")) {
-      GlobalRegionVerifiers.addGlobalRegionVerifier(loc -> !TownyAdvancedChecker.isInClaim(loc));
+      verifiers.register(loc -> !TownyAdvancedChecker.isInClaim(loc));
     }
     if (flag(configParser, IntegrationsKeys.rerollWorldGuard)
         && Bukkit.getPluginManager().isPluginEnabled("WorldGuard")) {
-      GlobalRegionVerifiers.addGlobalRegionVerifier(loc -> !WorldGuardChecker.isInClaim(loc));
+      verifiers.register(loc -> !WorldGuardChecker.isInClaim(loc));
     }
   }
 

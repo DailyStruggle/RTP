@@ -144,8 +144,6 @@ public class LinearAdjustorProbeTest {
     FakeChunkColumnProbe probe = new FakeChunkColumnProbe(0, 0, 0, 128);
     probe.setSolidRange(0, 63);
     probe.setAirRange(64, 128);
-    probe.setLightOn(true);
-    probe.setDefaultSkyLight(15);
 
     LinearAdjustor a = adj(0, 60, 80);
     a.set(GenericVerticalAdjustorKeys.requireSkyLight, true);
@@ -156,43 +154,43 @@ public class LinearAdjustorProbeTest {
   }
 
   /**
-   * requireSkyLight=true but every cell reports sky-light ≤ 7 (e.g. under an overhang) →
-   * no Y in the window passes the gate and the probe returns null (NO-MATCH, not a
-   * fallback signal — there's nothing the authoritative path would find either on the
-   * center column).
+   * requireSkyLight=true with stored sky-light values that would have failed
+   * the legacy {@code > 7} gate. The block-data sky-floor accepts because
+   * the column has open sky above the foothold; stored sky-light is no
+   * longer consulted (unreliable on unticked / freshly-generated chunks).
    */
   @Test
-  void requireSkyLight_litButDarkColumn_rejectsAll() {
+  void requireSkyLight_openColumnAcceptsRegardlessOfStoredSkyLight() {
     FakeChunkColumnProbe probe = new FakeChunkColumnProbe(0, 0, 0, 128);
     probe.setSolidRange(0, 63);
     probe.setAirRange(64, 128);
-    probe.setLightOn(true);
-    probe.setDefaultSkyLight(5); // below the > 7 threshold at every Y
 
     LinearAdjustor a = adj(0, 60, 80);
     a.set(GenericVerticalAdjustorKeys.requireSkyLight, true);
 
-    assertNull(a.adjustFromProbe(probe, "w"));
+    RTPCoords r = a.adjustFromProbe(probe, "w");
+    assertNotNull(r);
+    assertEquals(64, r.y());
   }
 
   /**
-   * requireSkyLight=true, {@code isLightOn=false}, AND the probe has no heightmap →
-   * defer (return null) so the live vert method can finish lighting. This exercises
-   * the "no trustworthy sky-light source" branch of the tiered gate.
+   * requireSkyLight=true + isLightOn=false + no heightmap. Block-data
+   * sky-floor accepts because openness is derived from the palette,
+   * independent of stored sky-light or heightmap data.
    */
   @Test
-  void requireSkyLight_lightingNotFinalized_returnsNull() {
+  void requireSkyLight_lightingNotFinalized_acceptsViaBlockScan() {
     FakeChunkColumnProbe probe = new FakeChunkColumnProbe(0, 0, 0, 128);
     probe.setSolidRange(0, 63);
     probe.setAirRange(64, 128);
-    probe.setLightOn(false);
-    probe.setDefaultSkyLight(15); // would accept if trusted, but isLightOn=false overrides
-    // Note: heightmapTopY defaults to OptionalInt.empty() — no proxy available.
 
     LinearAdjustor a = adj(0, 60, 80);
     a.set(GenericVerticalAdjustorKeys.requireSkyLight, true);
 
-    assertNull(a.adjustFromProbe(probe, "w"));
+    RTPCoords r = a.adjustFromProbe(probe, "w");
+    assertNotNull(r,
+        "block-data sky-floor must accept on unticked chunks where stored light is unreliable");
+    assertEquals(64, r.y());
   }
 
   /**
@@ -208,8 +206,6 @@ public class LinearAdjustorProbeTest {
     FakeChunkColumnProbe probe = new FakeChunkColumnProbe(0, 0, 0, 128);
     probe.setSolidRange(0, 63);
     probe.setAirRange(64, 128);
-    probe.setLightOn(false);
-    probe.setDefaultSkyLight(0); // would normally reject under strict skyLightAt
     probe.setHeightmapTop(63); // top-of-solid; everything above must be air
 
     LinearAdjustor a = adj(0, 60, 80);
@@ -221,28 +217,26 @@ public class LinearAdjustorProbeTest {
   }
 
   /**
-   * requireSkyLight=true, {@code isLightOn=false}, heightmap present BUT a
-   * non-air block sits above the reported top (overhang / cave roof / structure
-   * ceiling / player edit / older-version chunk where noise no longer
-   * correlates). Verification fails → defer to the live vert method (return
-   * null) rather than incorrectly trusting the heightmap proxy. Validates the
-   * "verify before trust" guard the user requested.
+   * requireSkyLight=true with a non-air block above the foothold (overhang /
+   * cave roof / structure ceiling). The block-data sky-floor binds at the
+   * overhang Y; every adjustor candidate at {@code y+1 <= overhang} fails
+   * the sky-light gate. With the overhang at y=90 and the adjustor range
+   * [60,80), no Y passes — the result is null (SCAN_MISS rather than the
+   * legacy LIGHT_GATE).
    */
   @Test
-  void lightOff_overhangAboveHeightmap_returnsNull() {
+  void lightOff_overhangAboveColumn_rejectsCandidatesUnderOverhang() {
     FakeChunkColumnProbe probe = new FakeChunkColumnProbe(0, 0, 0, 128);
     probe.setSolidRange(0, 63);
     probe.setAirRange(64, 128);
-    probe.withBlock(90, "minecraft:stone"); // floating overhang above the reported top
-    probe.setLightOn(false);
-    probe.setDefaultSkyLight(15);
+    probe.withBlock(90, "minecraft:stone"); // overhang above the foothold
     probe.setHeightmapTop(63);
 
     LinearAdjustor a = adj(0, 60, 80);
     a.set(GenericVerticalAdjustorKeys.requireSkyLight, true);
 
     assertNull(a.adjustFromProbe(probe, "w"),
-        "overhang above heightmap top must invalidate the proxy and force live fallback");
+        "y+1 must be strictly above the column's highest non-air block (overhang at y=90)");
   }
 
   /**
@@ -254,8 +248,6 @@ public class LinearAdjustorProbeTest {
     FakeChunkColumnProbe probe = new FakeChunkColumnProbe(0, 0, 0, 128);
     probe.setSolidRange(0, 63);
     probe.setAirRange(64, 128);
-    probe.setLightOn(false);
-    probe.setDefaultSkyLight(0);
 
     RTPCoords r = adj(0, 60, 80).adjustFromProbe(probe, "w");
     assertNotNull(r);
@@ -360,25 +352,26 @@ public class LinearAdjustorProbeTest {
   }
 
   /**
-   * requireSkyLight=true, isLightOn=false, no heightmap → {@code LIGHT_GATE}.
-   * Mirrors {@link #requireSkyLight_lightingNotFinalized_returnsNull}.
+   * requireSkyLight=true + isLightOn=false + no heightmap. Under the old
+   * tiered gate this returned {@code LIGHT_GATE}; under the block-data
+   * sky-floor the probe accepts at y=64 with reason NONE.
    */
   @Test
-  void adjustFromProbeWithReason_unverifiedLight_returnsLightGate() {
+  void adjustFromProbeWithReason_unverifiedLight_blockScanAccepts() {
     FakeChunkColumnProbe probe = new FakeChunkColumnProbe(0, 0, 0, 128);
     probe.setSolidRange(0, 63);
     probe.setAirRange(64, 128);
-    probe.setLightOn(false);
-    // No heightmap set → computeHeightmapSkyFloor returns MAX_VALUE → LIGHT_GATE.
+    // No heightmap; would have been LIGHT_GATE under the heightmap-proxy gate.
 
     LinearAdjustor a = adj(0, 60, 80);
     a.set(GenericVerticalAdjustorKeys.requireSkyLight, true);
 
     var r = a.adjustFromProbeWithReason(probe, "w");
-    assertNull(r.picked());
+    assertNotNull(r.picked());
+    assertEquals(64, r.picked().y());
     assertEquals(
         io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors
-            .VerticalAdjustor.ProbeRejectReason.LIGHT_GATE,
+            .VerticalAdjustor.ProbeRejectReason.NONE,
         r.reason());
   }
 

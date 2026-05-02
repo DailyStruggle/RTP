@@ -58,7 +58,7 @@ flowchart TD
     CancelAgain[Re-cancel any TeleportData left not completed]:::fail
     ClearProc[processingPlayers.clear]:::data
     ScanKill[ScanTask.kill -- static registry clear]:::fail
-    Redis[redisManager.shutdown -- if present]:::fail
+    Redis[networkManager.shutdown -- if present, RTPNetworkManager interface]:::fail
     AccStop[serverAccessor.stop -- scheduler + platform hooks]:::fail
 
     PendingBukkit[Cancel all RTP-owned async Bukkit tasks still pending]:::fail

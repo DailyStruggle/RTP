@@ -27,7 +27,6 @@ public final class FakeChunkColumnProbe implements ChunkColumnProbe {
   private final int maxY;
   private final Map<Integer, String> blockOverrides = new HashMap<>();
   private final Map<Integer, String> biomeOverrides = new HashMap<>();
-  private final Map<Integer, Integer> skyLightOverrides = new HashMap<>();
   // Per-column overrides keyed by ((localX << 8) | localZ) → (Y → block id).
   // Allows tests covering the multi-column probe sweep (testCoords) to make a
   // chunk where the center column has no foothold but an off-center column
@@ -40,8 +39,6 @@ public final class FakeChunkColumnProbe implements ChunkColumnProbe {
   private String defaultBlock = "minecraft:stone";
   private String defaultBiome = "minecraft:plains";
   private OptionalInt heightmapTopY = OptionalInt.empty();
-  private int defaultSkyLight = 15;
-  private boolean isLightOn = true;
 
   public FakeChunkColumnProbe(int chunkX, int chunkZ, int minY, int maxY) {
     this.chunkX = chunkX;
@@ -164,29 +161,4 @@ public final class FakeChunkColumnProbe implements ChunkColumnProbe {
     return biomeOverrides.getOrDefault(y, defaultBiome);
   }
 
-  public FakeChunkColumnProbe setSkyLight(int y, int level) {
-    skyLightOverrides.put(y, level);
-    return this;
-  }
-
-  public FakeChunkColumnProbe setDefaultSkyLight(int level) {
-    this.defaultSkyLight = level;
-    return this;
-  }
-
-  public FakeChunkColumnProbe setLightOn(boolean on) {
-    this.isLightOn = on;
-    return this;
-  }
-
-  @Override
-  public int skyLightAt(int y) {
-    if (y < minY || y > maxY) return 15;
-    return skyLightOverrides.getOrDefault(y, defaultSkyLight);
-  }
-
-  @Override
-  public boolean isLightOn() {
-    return isLightOn;
-  }
 }

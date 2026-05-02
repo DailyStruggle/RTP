@@ -1,0 +1,308 @@
+# StressTestRTP configuration.
+#
+# The default values are tuned to fill the front-page comparison table with
+# minimal admin intervention. See README.md for the columns this drives.
+
+# Target commands. Each list entry is benchmarked round-robin within a single
+# run, so multiple co-installed RTP-style plugins can be compared head-to-head
+# without restarting the server. Bukkit lets you address a specific plugin's
+# command by prefixing the plugin name (e.g. `rtp:rtp` vs `betterrtp:rtp`),
+# which is how we disambiguate plugins that all register `/rtp`.
+#
+# Each entry has a `label` (used in the CSV's `target_label` column and the
+# per-target summary breakdown) and a `command` template (`{player}` is
+# substituted with the selected target player's name).
+#
+# NOTE: RTP / RTP-Pro require the `player:<name>` key:value form. Bare
+# `/rtp <name>` is rejected as "invalid command" because RTP's command parser
+# treats positional tokens as unknown subcommands. See docs/admin/COMMANDS.md.
+#
+# The defaults below have been verified live against the listed plugin JARs
+# on a Paper 1.21 test server. Edit `world` / server tokens to match your env.
+target-commands:
+  # RTP / RTP-Pro (this project). The plugin.yml command name is `rtp`, so the
+  # prefix-qualified form is `rtp:rtp`. Uses the `key:value` argument grammar
+  # (see docs/admin/COMMANDS.md) — bare `/rtp <name>` is rejected.
+  - label: "rtp"
+    command: "rtp:rtp player:{player}"
+
+  # AsyRTP (asygames). plugin.yml: `rtp` registered with usage
+  # `/rtp [help|gui|world <world> <player>]`. The only "rtp another player"
+  # form is `world <world> <player>`, so we have to pin a world. Edit
+  # `world` if your test server's overworld is not named `world`.
+  - label: "asyrtp"
+    command: "asyrtp:rtp world world {player}"
+
+  # BetterRTP (SuperRonanCraft). plugin.yml: `betterrtp` (aliases include
+  # `rtp`/`wild`). The "rtp another player" subcommand is `player`.
+  - label: "betterrtp"
+    command: "betterrtp:betterrtp player {player}"
+
+  # EssentialsX. `/tpr` itself has no <player> argument and is self-only,
+  # so we drive it via `/sudo <player> tpr` — EssentialsX's `sudo` command
+  # makes the target player execute the given command server-side, which
+  # is the standard "rtp another player" workaround for EssentialsX.
+  # Requires the console/runner to hold `essentials.sudo` (and the target
+  # player to hold `essentials.tpr`).
+  - label: "essentialsx"
+    command: "essentials:sudo {player} tpr"
+
+  # EzRTP. plugin.yml: `forcertp <player> [world]` is the admin form that
+  # can target another player; `/rtp` itself is self-only.
+  - label: "ezrtp"
+    command: "ezrtp:forcertp {player}"
+
+  # HuskHomes. Commands are registered at runtime (no plugin.yml block);
+  # `/rtp <player>` is the documented admin form.
+  - label: "huskhomes"
+    command: "huskhomes:rtp {player}"
+
+  # SorekillRTP. plugin.yml: `/rtp <player> <server> [world]` — server
+  # argument is required. `local` is the convention for "this server".
+  - label: "sorekillrtp"
+    command: "sorekillrtp:rtp {player} local"
+
+  # AdvancedRTP. plugin.yml usage is `/rtp [world] or /rtp reload`, but the
+  # plugin gates an `advancedrtp.admin.rtpother` permission, suggesting an
+  # `/rtp <player>` admin form exists at runtime. If your test produces
+  # "invalid arguments" for this entry, remove or comment it out.
+  - label: "advancedrtp"
+    command: "advancedrtp:rtp {player}"
+
+  # JakesRTP (donvi-bz). plugin.yml registers `/rtp` and `/wild` as self-only;
+  # the admin "rtp another player" form is `/forcertp <player>` (see
+  # https://github.com/donvi-bz/JakesRTP). Prefix-qualified to disambiguate
+  # from EzRTP, which also registers `/forcertp`.
+  - label: "jakesrtp"
+    command: "jakesrtp:rtp player={player}"
+
+# Legacy single-target form (still honoured if `target-commands` is absent).
+# target-command: "rtp player:{player}"
+
+# Roster selection. The harness only drives players that are currently online.
+# - "all":    all online players (excluding the admin who issued /rtpstress).
+# - "permission:<node>": all online players with the given permission node.
+# - "names: [a, b, c]": explicit list (case-insensitive).
+roster: "all"
+
+# Per-attempt timing budget. If the player has not received a
+# PlayerTeleportEvent attributable to this attempt within this many ms,
+# the attempt is recorded as a timeout failure (success=false, fail_reason=TIMEOUT).
+attempt-timeout-ms: 5000
+
+# Console-feedback fast-fail. Many target plugins reject a dispatch with a
+# chat message ("you're already teleporting!", "on cooldown", "please wait")
+# instead of firing PlayerTeleportEvent. Without this watcher the dispatch
+# sits in flight until the attempt timeout, starving the concurrency cap.
+# When enabled, console lines matching any of `console-fail-patterns` are
+# attributed to the most plausible in-flight player (by name match, falling
+# back to the most-recently dispatched player), recorded as a CSV failure
+# with reason `CONSOLE_FAIL:<truncated line>`, and the slot is freed.
+console-fail-enabled: true
+# Regex patterns (case-insensitive). Empty list = the built-in defaults
+# documented in ConsoleWatcher.java. Customise this list to add plugin-
+# specific rejection wording (e.g. EssentialsX `\\$d.* seconds remaining`).
+console-fail-patterns: []
+#console-fail-patterns:
+#  - "you're already teleporting"
+#  - "already teleporting"
+#  - "on cooldown"
+#  - "please wait"
+#  - "cooling down"
+#  - "you must wait"
+#  - "invalid command"
+#  - "no permission"
+
+# Between-phase world save (Spigot chunk-flush bias correction).
+#
+# On Spigot, chunks loaded by the prior plugin's RTP path linger in memory
+# until the next vanilla `save-all` (default ~5 min). When the next phase
+# begins, its first attempts re-touch those still-resident chunks, which
+# inflates `chunks_loaded` for the *previous* plugin's responsibility and
+# warms the page cache for the *next* plugin's baseline. The cumulative
+# effect skews cross-plugin comparisons (notably BetterRTP's PreloadRadius
+# being billed to the wrong phase — see the 20260502-023640 stress run).
+#
+# When enabled, the runner calls `World.save()` on every loaded world after
+# each phase ends and before the gap timer starts, so each phase begins
+# from a comparable on-disk state. The save is dispatched to the main
+# thread; the configured `sequence` gap absorbs the I/O latency.
+#
+# Values:
+#   "auto"   (default) — save only on Spigot (Bukkit#getName() does not
+#                        contain "paper" or "folia"). Paper and Folia have
+#                        their own save cadences and an extra forced save
+#                        only adds noise.
+#   "always" / true   — save unconditionally on every platform.
+#   "never"  / false  — never save (legacy behaviour).
+save-worlds-between-phases: "auto"
+
+# Default duration of /rtpstress start when no [seconds] argument is given.
+default-duration-seconds: 300
+
+# Default concurrency: number of attempts allowed in flight at any time.
+# Each finished attempt (success, failure, or timeout) frees one slot.
+default-concurrency: 4
+
+# Per-player minimum gap between successive dispatches, in server ticks
+# (1 tick = 50 ms). Prevents the "you're already teleporting!" flood that
+# occurs when concurrency exceeds the roster size and the same player gets
+# re-dispatched on the very next tick after a teleport completes.
+#
+# Tuning notes from live runs: 3 ticks (150 ms) drove a Paper 1.21 test
+# server below 18 TPS because chunk-loading a full set every 3 ticks
+# saturates the main thread. 10 ticks (500 ms) held TPS ≥ 18; 30 ticks
+# (1.5 s) is the conservative default that keeps competitor plugins'
+# per-player state machines fully clear and TPS impact bounded. Range:
+# 0 (disabled) .. 100. Lower this if you want to maximise dispatch
+# pressure and you've already verified the server can absorb it.
+per-player-gap-ticks: 30
+
+# No-progress watchdog. If the runner observes no forward progress (no
+# successful dispatch, no completion attribution) for this many ms during
+# a measurement phase — not warm-up, not a sequence gap — it force-clears
+# every per-player deadline, every per-player cooldown, and resets
+# `inFlight` to 0, then logs a warning. The next tick dispatches normally.
+# Recovers from rare "freeze between targets" symptoms (deadlines wedged
+# by silent rejections + timed-out console-watch + no probe attribution +
+# no reaper firing yet) without operator intervention. Set to 0 to disable.
+no-progress-kickstart-ms: 30000
+
+# Per-attempt console echo. When enabled, every successful teleport and/or
+# every failed teleport is echoed to the server log as a one-line summary
+# (e.g. "[StressTestRTP] rtp -> leaf26 OK 58ms (39, 1895)"). Useful for
+# overnight runs where you want to see forward progress at a glance without
+# tailing the CSV file. Disable either flag if log volume is a concern.
+log-successful-teleports: true
+log-failed-teleports: true
+
+# Burst size for /rtpstress burst — populates the "TPS under 10× burst"
+# column on the front page. The 10× nomenclature is preserved here.
+default-burst: 10
+
+# Sequence mode (/rtpstress sequence) runs each target-commands entry in turn,
+# isolated from the others, with a recovery gap between targets so the server
+# (and any pre-warmed queue) can settle before the next plugin is exercised.
+# This is the recommended head-to-head methodology when you care about steady-
+# state behaviour per plugin rather than interleaved contention.
+sequence:
+  # How long each target is exercised, in seconds.
+  per-target-seconds: 60
+  # Recovery gap between targets, in seconds. The harness stops dispatching,
+  # waits for in-flight attempts to drain, then idles for this many seconds
+  # before moving to the next target. Bumped from 30s to 60s after live runs
+  # showed TPS dips bleeding from one target's phase into the next's cold
+  # start, contaminating the warm-queue baseline for the following plugin.
+  gap-seconds: 60
+  # JIT warm-up before the measurement sequence. With warmup-seconds > 0, the
+  # harness cycles every configured target for `warmup-seconds / (N * cycles)`
+  # ms each, BEFORE starting the actual measurement run. During warm-up:
+  #   - no CSV rows are written (warmup attempts wouldn't be apples-to-apples
+  #     with measured ones — JIT compilation moves under them)
+  #   - no spark profiles are started
+  #   - a per-target summary is appended to <stamp>-warmup.log next to the CSV
+  # Why this matters: HotSpot needs ~10000 invocations per hot method before
+  # promoting it from interpreter / C1 to optimised C2 native. Without warm-up,
+  # the FIRST plugin in the sequence pays the harness's own JIT cost (CSV
+  # writing, listener dispatch, scheduler hops) on top of its own. Warm-up
+  # equalises that across plugins. Set to 0 to disable.
+  warmup-seconds: 30
+  # Number of times to cycle through every target during warm-up. With 1, each
+  # target gets `warmup-seconds / N` of contiguous warm-up. With 2+, the same
+  # total warm-up time is split into shorter, repeated bursts per target,
+  # which gives slightly better HotSpot inlining for plugins with megamorphic
+  # call sites. Defaults to 1 (simpler, sufficient for most plugins).
+  warmup-target-cycles: 1
+
+# Per-chunk-load CPU cost calibration, in microseconds. Used to amend
+# `process_cpu_ms` with `chunks_loaded × chunk-load-cost-us` so preload-heavy
+# plugins aren't under-attributed (chunk-system threads are invisible to the
+# main-thread sampler). 0 = disabled.
+#
+# Calibrate by running `/rtp test chunk-probe-perf` and copying its
+# `full(cpu) avg=Nµs` (server-thread inner CPU timing of World#getChunkAt)
+# into the matching platform field — NOT the wall-latency `full avg`, which
+# on Spigot is dominated by main-thread tick-boundary scheduling. Re-baseline
+# per hardware / JVM / world.
+#
+# Platform selection (`Bukkit#getName()`, case-insensitive):
+#   "folia" → chunk-load-cost-us-folia
+#   "paper" → chunk-load-cost-us-paper
+#   else    → chunk-load-cost-us
+# A variant of 0.0 falls back to the default.
+#
+# NOTE: RTP's anvil prefilter (ADR-016) runs off the main thread and supplies
+# pre-decoded chunk data to the safety scan, displacing a fraction of the
+# work that would otherwise require a live chunk load. Measured per-chunk
+# CPU attribution for RTP will therefore look better than this raw
+# `chunk-load-cost-us` figure suggests, even though the underlying anvil
+# decode/probe still consumes CPU — it's just paid on a worker thread the
+# main-thread sampler doesn't see. This is expected and is the point of the
+# prefilter; do not "correct" the calibration value to compensate.
+chunk-load-cost-us: 28221.0           # Spigot / default — mean of 5 runs on 1.20.1, 256-sample pool, full(cpu) avg ∈ [20233, 34343] µs (2026-05-02)
+chunk-load-cost-us-paper: 0.0         # 0 = fall back to default
+chunk-load-cost-us-folia: 0.0         # 0 = fall back to default
+
+# Sampling cadence for TPS / MSPT / heap. Values are folded into rolling
+# percentiles for the run summary. 1000ms is sufficient resolution for the
+# table columns; lower values increase overhead without changing results.
+sample-period-ms: 1000
+
+# Output directory (relative to the plugin's data folder) for per-run
+# artifacts: <timestamp>.csv (per-attempt) and <timestamp>-summary.txt.
+output-subdir: "runs"
+
+# When true, a best-effort `<target>-clear-cache` style command is dispatched
+# before each /rtpstress reset-cold run. Edit `cache-reset-commands` to match
+# the plugin under test. Empty list = no-op (and that's fine — most plugins
+# don't expose a cache reset).
+cache-reset-commands: []
+#cache-reset-commands:
+#  - "rtp queue clear"
+#  - "rtp reload"
+
+# Spark profiler integration. When enabled and the `spark` plugin is
+# installed, the harness brackets each measurement phase (TIMED, BURST, and
+# every SEQUENCE per-target phase) with `/spark profiler start` and
+# `/spark profiler stop`, tagging each profile via `--comment <target_label>`
+# so spark profiles correlate 1:1 with CSV rows. Silently no-ops if spark is
+# not present, mirroring ConsoleWatcher's posture (zero hard dependency).
+spark:
+  enabled: true
+  # Start a fresh profile per phase (recommended for sequence mode so each
+  # target's profile is isolated). When false, a single profile spans the
+  # whole run.
+  profile-per-phase: true
+  # Spark's own auto-stop timeout. Should be >= sequence.per-target-seconds
+  # so the profile covers the full phase; the harness still calls `stop`
+  # explicitly at phase end.
+  timeout-seconds: 90
+  # Only sample ticks slower than this many ms. Lower = noisier profile,
+  # higher = miss minor stalls. 50ms is a good default for /rtp pipelines.
+  only-ticks-over-ms: 50
+  # When true (default), spark profiles are written to local files via
+  # `spark profiler stop --save-to-file` instead of being uploaded to
+  # bytebin (the default "live webpage" workflow). Files are written to
+  # `plugins/spark/profiles/<stamp>-<comment>.sparkprofile` and can be
+  # opened later with `/spark profiler --open <path>` or shared by
+  # uploading manually. Recommended for overnight runs (no rate limits,
+  # no live-webpage clutter, all artefacts on local disk). Set to false
+  # to restore bytebin upload behaviour.
+  save-to-file: true
+  # Intra-phase profile rotation, in seconds. While a measurement phase is
+  # active, the harness periodically stops the in-progress spark profile
+  # (which writes a `.sparkprofile` file to disk via `--save-to-file`) and
+  # immediately starts a fresh one for the same phase, suffixed with a
+  # rotation index (`-r1`, `-r2`, ...). Without this, an entire phase's
+  # profiling data is lost if the server crashes mid-phase — observed in
+  # the 20260502-023640 run where the EssentialsX phase OOM'd at minute 31
+  # and produced zero spark output. With rotation enabled, every fully
+  # elapsed slice survives the crash. The trade-off is that the per-phase
+  # profile is split across multiple files (open them individually with
+  # `/spark profiler --open <path>`); for a 60-minute phase, 300s yields
+  # ~12 slices. Set to 0 to disable rotation (legacy single-profile-per-
+  # phase behaviour). MUST be < timeout-seconds; otherwise spark's own
+  # auto-stop fires first and the slice is uploaded to bytebin instead of
+  # saved to disk (no rotation effect). 60s pairs with the default
+  # timeout-seconds: 90 and gives ~50 slices per 50-minute phase.
+  rotate-seconds: 60

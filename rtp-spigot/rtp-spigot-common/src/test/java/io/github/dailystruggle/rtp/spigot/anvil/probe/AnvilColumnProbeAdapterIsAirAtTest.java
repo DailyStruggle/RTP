@@ -68,8 +68,7 @@ class AnvilColumnProbeAdapterIsAirAtTest {
                 /* maxY = */ 31,
                 /* heightmapTopY = */ Integer.MIN_VALUE,
                 sections,
-                /* biomeSections = */ Collections.<BiomePaletteSection>emptyList(),
-                /* isLightOn = */ true);
+                /* biomeSections = */ Collections.<BiomePaletteSection>emptyList());
     }
 
     @Test

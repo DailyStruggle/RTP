@@ -7,38 +7,18 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Hand-rolled minimal JSON reader for Minecraft tag files.
+ * Minimal, hand-rolled JSON reader for Minecraft tag files.
  *
- * <p>This reader intentionally supports only the subset of JSON that appears in
- * vanilla and data-pack tag files:
+ * <p>Supports only the JSON subset used in vanilla/data-pack tags:
  * <ul>
- *   <li>Objects with string keys and scalar / array / nested-object values.</li>
- *   <li>Arrays of strings or of single-field objects.</li>
- *   <li>Scalars: string (double-quoted), {@code true}, {@code false}, integer,
- *       {@code null}.</li>
- *   <li>Line breaks and ASCII whitespace between tokens.</li>
- *   <li>Standard JSON string escape sequences:
- *       {@code \" \\ \/ \b \f \n \r \t} and {@code \}{@code uXXXX}.</li>
+ *   <li>Objects (string keys), arrays, scalars (string, bool, int, null).</li>
+ *   <li>Standard string escape sequences.</li>
  * </ul>
+ * <p>Deliberately omits floats, exponents, comments, and unquoted keys. This ensures the reader
+ * remains small and auditable, avoiding third-party dependencies for a static schema.
  *
- * <p>It does <b>not</b> support floating-point numbers, exponents, comments,
- * BOMs, or unquoted keys. This scope is deliberate:
- * <ul>
- *   <li>Tag files have not used any of those constructs in the 10+ years since
- *       Mojang introduced the system, so the limitation is theoretical.</li>
- *   <li>Keeping the reader small (~130 lines) makes it auditable in one pass,
- *       which is the point of preferring a hand-rolled parser over a
- *       third-party library whose updates could silently shift behaviour.</li>
- * </ul>
- *
- * <p>The return type is a platform-free tree of:
- * <ul>
- *   <li>{@code Map<String, Object>} for JSON objects (insertion-ordered),</li>
- *   <li>{@code List<Object>} for JSON arrays,</li>
- *   <li>{@code String} / {@code Long} / {@code Boolean} / {@code null} for scalars.</li>
- * </ul>
- *
- * <p>All methods are thread-safe because no shared state crosses a parse call.
+ * <p>Returns platform-free structures: {@code Map<String, Object>}, {@code List<Object>},
+ * and scalar types. Thread-safe.
  */
 public final class TinyJsonReader {
 

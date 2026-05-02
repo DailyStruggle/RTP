@@ -5,31 +5,13 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Immutable DTO representing the parsed contents of a single Minecraft tag JSON
- * file (e.g. {@code data/minecraft/tags/block/leaves.json}).
+ * Immutable DTO for a parsed Minecraft tag JSON (e.g. {@code tags/block/leaves.json}).
  *
- * <p>The vanilla tag schema is:
- * <pre>{@code
- * {
- *   "replace": false,
- *   "values": [
- *     "minecraft:oak_leaves",
- *     "#minecraft:wart_blocks",
- *     { "id": "minecraft:spruce_leaves", "required": false }
- *   ]
- * }
- * }</pre>
+ * <p>Schema: {@code replace} (bool, default false) and {@code values} (list).
+ * Values may be resource locations, tag references (#), or objects (with {@code required} flag).
  *
- * <p>Values may be plain resource-location strings, tag references prefixed with
- * {@code #}, or JSON objects with an {@code id} field and optional
- * {@code required} boolean. Non-required entries are silently dropped by the
- * parser if they cannot be resolved — matching vanilla's permissive loader
- * behaviour. This DTO preserves the raw string form of every retained entry;
- * reference expansion is deferred to {@link TagReferenceResolver}.
- *
- * <p>All fields are immutable and the class is thread-safe.
- *
- * @see TinyJsonReader for the parser that produces instances of this class.
+ * <p>Non-required entries are dropped if unresolved (vanilla-compatible).
+ * This DTO holds raw entries; resolution is deferred to the resolver.
  */
 public final class TagFile {
 

@@ -1,0 +1,47 @@
+// helpers/StressTestRTP — standalone Spigot/Paper/Folia helper plugin.
+//
+// Per the helpers/ contract (see helpers/PeriodicWorldSaver/README.md), this
+// module has no dependency on rtp-api / rtp-core. It is a black-box stress-
+// test driver that dispatches a configurable command (default: `rtp {player}`)
+// against a roster of online players, attributes PlayerTeleportEvent
+// completions back to dispatched attempts, and records ms-precision metrics
+// to CSV plus a summary aligned to the front-page comparison table:
+//   - Cold-start /rtp
+//   - Warm-queue /rtp
+//   - TPS under 10× burst
+//   - MSPT during eval
+//   - Memory footprint
+//
+// Folia is supported: scheduling is done through the Bukkit BukkitScheduler
+// for non-region-bound work (sampling, dispatch on global region) and through
+// PlayerTeleportEvent for attribution. We never touch chunks or perform
+// region-thread-pinned work; on Folia, dispatch happens via the Global
+// Region Scheduler reflectively to avoid a hard compile dep on Folia API.
+plugins {
+    id 'java'
+}
+
+group = 'io.github.dailystruggle'
+version = '1.0-SNAPSHOT'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+repositories {
+    mavenCentral()
+    maven { url 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
+    maven { url 'https://repo.papermc.io/repository/maven-public/' }
+}
+
+dependencies {
+    // Spigot API is sufficient for compilation. Folia features are accessed
+    // reflectively at runtime so the same JAR drops onto Spigot/Paper/Folia
+    // unchanged. This mirrors the helpers/ contract: one JAR, no platform fork.
+    compileOnly 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
+}
+
+test {
+    useJUnitPlatform()
+}

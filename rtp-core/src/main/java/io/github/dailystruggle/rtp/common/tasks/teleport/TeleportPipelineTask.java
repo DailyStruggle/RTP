@@ -37,6 +37,9 @@ public final class TeleportPipelineTask extends RTPRunnable {
   }
 
   private final java.util.concurrent.atomic.AtomicBoolean handledInFlight = new java.util.concurrent.atomic.AtomicBoolean(false);
+  /** Wall-clock start (nanos) for {@code avgPipelineMs} histogram, recorded once on cleanup. */
+  private final long pipelineStartNanos = System.nanoTime();
+  private final java.util.concurrent.atomic.AtomicBoolean pipelineHistogramRecorded = new java.util.concurrent.atomic.AtomicBoolean(false);
   public static final List<Consumer<TeleportPipelineTask>> setupPreActions = new ArrayList<>();
   public static final List<BiConsumer<TeleportPipelineTask, Boolean>> setupPostActions =
       new ArrayList<>();
@@ -590,6 +593,18 @@ public final class TeleportPipelineTask extends RTPRunnable {
   }
 
   private void runCleanup() {
+    // Phase M1: record this attempt's wall-clock duration into the global pipeline
+    // histogram exactly once. Cleanup is the unique terminal phase for every code
+    // path (success, cancel, exception, GC sweep), so this is the right place. The
+    // try/catch is defensive: a metrics record must never abort cleanup (S-004).
+    if (pipelineHistogramRecorded.compareAndSet(false, true)) {
+      try {
+        long elapsedMs = (System.nanoTime() - pipelineStartNanos) / 1_000_000L;
+        RTP.metrics.pipelineHistogram().record(elapsedMs);
+      } catch (Throwable ignored) {
+        // intentionally swallowed: metrics must not interfere with teardown.
+      }
+    }
     RTP.log(Level.FINE, "[PIPELINE_TRACE] runCleanup ENTER playerId="
             + (context != null && context.player() != null ? context.player().uuid() : "null")
             + " reservationNull=" + (reservation == null)

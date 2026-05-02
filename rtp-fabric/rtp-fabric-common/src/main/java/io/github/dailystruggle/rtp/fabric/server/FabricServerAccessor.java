@@ -4,25 +4,37 @@ import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
+import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
+import io.github.dailystruggle.rtp.common.tasks.TimeBoundTaskPipe;
 import io.github.dailystruggle.rtp.api.selection.ILocationGenerator;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
+import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.fabric.player.FabricRTPPlayer;
 import io.github.dailystruggle.rtp.fabric.scheduling.FabricScheduler;
 import io.github.dailystruggle.rtp.fabric.world.FabricRTPWorld;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
 import io.github.dailystruggle.rtp.api.RTPAPI;
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -55,6 +67,43 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   // ---------------------------------------------------------------------------
 
   private final FabricScheduler scheduler = new FabricScheduler();
+  private final Map<String, WorldBorder> nativeWorldBorderCache = new ConcurrentHashMap<>();
+  /**
+   * World-border resolver function. Defaults to {@link #createNativeWorldBorder(String)}
+   * which wraps the Fabric/Minecraft {@code net.minecraft.world.level.border.WorldBorder}
+   * exposed by {@link ServerLevel#getWorldBorder()}. Replaceable via
+   * {@link #setWorldBorderFunction(Function)} so addons can override per-world.
+   * Mirrors {@code AbstractServerAccessor.worldBorderFunction} (Bukkit parity).
+   */
+  private Function<String, ?> worldBorderFunction = this::createNativeWorldBorder;
+  /**
+   * Shape resolver function. Defaults to {@link #createNativeShape(String)} which
+   * derives a {@code SQUARE} from the world's native
+   * {@code net.minecraft.world.level.border.WorldBorder} so {@code /rtp} bounds
+   * match the server-configured border (in chunks) without any config required.
+   * Replaceable via {@link #setShapeFunction(Function)} so addons / config can
+   * override per-world. Bukkit's default is config-driven (region's shape); on
+   * Fabric we prefer worldborder-derived to give a sensible out-of-the-box bound.
+   */
+  private Function<String, ?> shapeFunction = this::createNativeShape;
+
+  /**
+   * Per-location biome resolver. Default uses the level's dynamic biome
+   * registry via {@link ServerLevel#getBiome(net.minecraft.core.BlockPos)} on
+   * the server thread; addons override via {@link #setBiomeGetter(Function)}.
+   * Mirrors {@code AbstractServerAccessor.biomeGetter} (Bukkit parity).
+   */
+  private Function<RTPLocation, String> biomeGetter = this::defaultBiomeAt;
+
+  /**
+   * Per-world biome-set resolver. Default returns every biome key registered
+   * on the bound server (via {@code MinecraftServer.registryAccess()}); falls
+   * back to an empty set when the server isn't bound yet. Addons override via
+   * {@link #setBiomesGetter(Function)}. Mirrors
+   * {@code AbstractServerAccessor.biomes} (Bukkit parity).
+   */
+  private Function<RTPWorld<?>, Set<String>> biomesGetter = this::defaultBiomesFor;
+
   private final Map<UUID, FabricRTPPlayer> playersById = new ConcurrentHashMap<>();
   private final Map<String, FabricRTPPlayer> playersByName = new ConcurrentHashMap<>();
   private final Map<String, FabricRTPWorld> worldsByName = new ConcurrentHashMap<>();
@@ -211,7 +260,11 @@ public final class FabricServerAccessor implements RTPServerAccessor {
 
   @Override
   public RTPPlayer getConsolePlayer() {
-    throw notYet("getConsolePlayer()", "F");
+    // Bukkit parity: AbstractServerAccessor.getConsolePlayer() returns
+    // getPlayer(RTPAPI.serverId). Fabric has no "console as player" — return
+    // null and let callers fall back to getSender(serverId), which yields
+    // FabricConsoleSender.
+    return null;
   }
 
   @Override
@@ -228,7 +281,9 @@ public final class FabricServerAccessor implements RTPServerAccessor {
 
   @Override
   public long overTime() {
-    throw notYet("overTime()", "C");
+    // Bukkit parity: AbstractServerAccessor.overTime() returns 0 (no
+    // pipeline-wide deadline overshoot tracking yet). Fabric mirrors.
+    return 0L;
   }
 
   @Override
@@ -256,7 +311,11 @@ public final class FabricServerAccessor implements RTPServerAccessor {
 
   @Override
   public void sendMessage(UUID target1, UUID target2, MessagesKeys msgType, String tag) {
-    throw notYet("sendMessage(UUID, UUID, MessagesKeys, String)", "E");
+    if (msgType == null) return;
+    String template = lookupMessageTemplate(msgType);
+    if (template == null) return;
+    if (target1 != null) sendMessage(target1, template, tag);
+    if (target2 != null && !target2.equals(target1)) sendMessage(target2, template, tag);
   }
 
   @Override
@@ -271,7 +330,16 @@ public final class FabricServerAccessor implements RTPServerAccessor {
 
   @Override
   public void sendMessageAndSuggest(UUID target, String message, String suggestion) {
-    throw notYet("sendMessageAndSuggest(UUID, String, String)", "E");
+    // Fabric has no native click-suggestion routing on system messages without
+    // building a clickable Component. Step E follow-up will replace this with
+    // a Component.literal(...).withStyle(s -> s.withClickEvent(SUGGEST_COMMAND))
+    // once SendMessage formatting parity lands. For now, deliver the message
+    // and append the suggestion inline so it is at least visible to the player.
+    if (target == null || message == null) return;
+    String composed = (suggestion == null || suggestion.isEmpty())
+        ? message
+        : message + " " + suggestion;
+    sendMessage(target, composed, null);
   }
 
   @Override
@@ -285,7 +353,12 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   @Override
   public void sendMessage(RTPCommandSender target, String message, String hover, String click,
                           String tag) {
-    throw notYet("sendMessage(RTPCommandSender, ...)", "E");
+    // Step G G1 minimal: hover/click/tag annotations are dropped on Fabric
+    // until Step E lands the SendMessage formatting parity that builds a
+    // styled Component (HoverEvent.SHOW_TEXT / ClickEvent.SUGGEST_COMMAND).
+    // Plain delivery preserves the message contract.
+    if (target == null || message == null) return;
+    target.sendMessage(message);
   }
 
   @Override
@@ -311,17 +384,30 @@ public final class FabricServerAccessor implements RTPServerAccessor {
 
   @Override
   public void announce(String msg, String permission, String tag) {
-    throw notYet("announce(String, String, String)", "E");
+    // Bukkit parity: iterate online players, send to those holding the
+    // permission, then route to console. Permission gating reuses the same
+    // op-level fallback that FabricRTPPlayer.hasPermission uses (Step F
+    // replaces with fabric-permissions-api).
+    if (msg == null) return;
+    for (FabricRTPPlayer p : playersById.values()) {
+      if (permission == null || permission.isEmpty() || p.hasPermission(permission)) {
+        p.sendMessage(msg);
+      }
+    }
+    MinecraftServer s = server;
+    if (s != null) {
+      s.sendSystemMessage(Component.literal(msg));
+    }
   }
 
   @Override
   public Set<String> getBiomes(RTPWorld<?> rtpWorld) {
-    throw notYet("getBiomes(RTPWorld)", "E");
+    return biomesGetter.apply(rtpWorld);
   }
 
   @Override
   public Set<String> getBiomes() {
-    throw notYet("getBiomes()", "E");
+    return biomesGetter.apply(null);
   }
 
   @Override
@@ -332,7 +418,14 @@ public final class FabricServerAccessor implements RTPServerAccessor {
 
   @Override
   public Set<String> materials() {
-    throw notYet("materials()", "E");
+    // Mirror AbstractServerAccessor.materials(): return upper-case identifiers
+    // for every block in the registry. Fabric's BuiltInRegistries.BLOCK is the
+    // direct equivalent of Bukkit's Material.values() (block subset).
+    Set<String> out = new HashSet<>();
+    for (ResourceLocation key : BuiltInRegistries.BLOCK.keySet()) {
+      out.add(key.toString().toUpperCase());
+    }
+    return out;
   }
 
   @Override
@@ -353,34 +446,102 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     start();
   }
 
-  @Override
-  public Object getWorldBorder(String worldName) {
-    throw notYet("getWorldBorder(String)", "E");
+  /**
+   * Build an RTP {@link WorldBorder} backed by the Fabric/Minecraft world's native
+   * {@code net.minecraft.world.level.border.WorldBorder}. Mirrors
+   * {@code AbstractServerAccessor.createNativeWorldBorder} so /rtp respects the
+   * server-configured border out of the box on Fabric.
+   *
+   * <p>Shape supplier produces a {@code SQUARE} sized from {@code border.getSize()/32.0}
+   * (border diameter in blocks &rarr; per-side radius in chunks) and centred at
+   * {@code (border.getCenterX()/16.0, border.getCenterZ()/16.0)} (block &rarr; chunk).
+   * The 32 vs 16 divisor pair matches the Bukkit reference implementation; the
+   * border's diameter is twice its radius, hence /32 not /16 for radius.
+   *
+   * <p>Returns {@code null} if the named world is not registered (mirrors Bukkit
+   * behaviour).
+   */
+  protected @Nullable WorldBorder createNativeWorldBorder(String worldName) {
+    return nativeWorldBorderCache.computeIfAbsent(worldName, s -> {
+      RTPWorld<?> rtpWorld = getRTPWorld(s);
+      if (!(rtpWorld instanceof FabricRTPWorld fabricWorld)) return null;
+      ServerLevel level = fabricWorld.level();
+      net.minecraft.world.level.border.WorldBorder mcBorder = level.getWorldBorder();
+      return new WorldBorder(
+          () -> {
+            Shape<?> shape =
+                (Shape<?>) RTP.factoryMap.get(RTP.factoryNames.shape).get("SQUARE");
+            if (shape instanceof Square square) {
+              square.set(GenericMemoryShapeParams.radius, (long) (mcBorder.getSize() / 32.0));
+              square.set(GenericMemoryShapeParams.centerX, (long) (mcBorder.getCenterX() / 16.0));
+              square.set(GenericMemoryShapeParams.centerZ, (long) (mcBorder.getCenterZ() / 16.0));
+            }
+            return shape;
+          },
+          rtpLocation ->
+              level.getWorldBorder().isWithinBounds((double) rtpLocation.x(), (double) rtpLocation.z()));
+    });
   }
 
   @Override
-  public Object getShape(String name) {
-    throw notYet("getShape(String)", "E");
+  public @Nullable Object getWorldBorder(String worldName) {
+    Object res = worldBorderFunction.apply(worldName);
+    if (res == null) res = createNativeWorldBorder(worldName);
+    return res;
+  }
+
+  /**
+   * Build a {@code SQUARE} {@link Shape} sized to the world's native
+   * Minecraft {@code WorldBorder}, mirroring the shape supplier inside
+   * {@link #createNativeWorldBorder(String)}. Radius is
+   * {@code border.getSize()/32.0} (border diameter in blocks &rarr; per-side
+   * radius in chunks); centre is {@code border.getCenter*()/16.0} (block &rarr;
+   * chunk). Returns {@code null} if the named world is not registered, matching
+   * the {@code @Nullable} contract on {@link RTPServerAccessor#getShape(String)}.
+   */
+  protected @Nullable Shape<?> createNativeShape(String worldName) {
+    RTPWorld<?> rtpWorld = getRTPWorld(worldName);
+    if (!(rtpWorld instanceof FabricRTPWorld fabricWorld)) return null;
+    ServerLevel level = fabricWorld.level();
+    net.minecraft.world.level.border.WorldBorder mcBorder = level.getWorldBorder();
+    Shape<?> shape = (Shape<?>) RTP.factoryMap.get(RTP.factoryNames.shape).get("SQUARE");
+    if (shape instanceof Square square) {
+      square.set(GenericMemoryShapeParams.radius, (long) (mcBorder.getSize() / 32.0));
+      square.set(GenericMemoryShapeParams.centerX, (long) (mcBorder.getCenterX() / 16.0));
+      square.set(GenericMemoryShapeParams.centerZ, (long) (mcBorder.getCenterZ() / 16.0));
+    }
+    return shape;
+  }
+
+  @Override
+  public @Nullable Object getShape(String name) {
+    return shapeFunction.apply(name);
   }
 
   @Override
   public boolean setWorldBorderFunction(Function<String, ?> function) {
-    throw notYet("setWorldBorderFunction(Function)", "E");
+    this.worldBorderFunction = function;
+    return true;
   }
 
   @Override
   public boolean setShapeFunction(Function<String, ?> shapeFunction) {
-    throw notYet("setShapeFunction(Function)", "E");
+    this.shapeFunction = shapeFunction;
+    return true;
   }
 
   @Override
-  public Object createTaskPipe() {
-    throw notYet("createTaskPipe()", "C");
+  public RTPTaskPipe createTaskPipe() {
+    // Mirror AbstractServerAccessor: TimeBoundTaskPipe is the canonical default
+    // for Spigot/Paper. Folia uses CountBound; Fabric's tick model is closest
+    // to a single-region Folia, but for Phase 2 startup parity we use the same
+    // default Bukkit ships. Step H may revisit per Folia threading nuance.
+    return new TimeBoundTaskPipe();
   }
 
   @Override
   public Object createCachePipe() {
-    throw notYet("createCachePipe()", "C");
+    return new TimeBoundTaskPipe();
   }
 
   @Override
@@ -397,20 +558,111 @@ public final class FabricServerAccessor implements RTPServerAccessor {
 
   @Override
   public double getTPS(int ticks) {
-    // Fabric's default tick-rate is 20; without server access we cannot measure
-    // actual TPS yet (Step C). Return the nominal value so callers gating on TPS
-    // do not block the pipeline on Fabric before Step C.
-    return 20.0;
+    // Compute TPS from the server's recent average tick time. Mojang exposes
+    // this via {@code MinecraftServer#getAverageTickTimeNanos()} on 1.21.x and
+    // via {@code tickTimes} (long[] of ms*1000-ish) on older releases — we
+    // resolve reflectively so the rtp-fabric-common module compiles against
+    // any in-scope mappings without a hard dependency on a single Mojang API.
+    // Falls back to the nominal 20 TPS when the server is not bound or no
+    // metric is reachable, matching the &quot;don't gate the pipeline&quot;
+    // contract documented on {@link RTPServerAccessor#getTPS}.
+    MinecraftServer s = server;
+    if (s == null) return 20.0;
+    // Tickrate is configurable since 1.20.5 via /tick rate. Resolve the cap
+    // reflectively too so we don't compile-pin a 1.21 method.
+    double cap = 20.0;
+    try {
+      java.lang.reflect.Method tickRateManager = MinecraftServer.class.getMethod("tickRateManager");
+      Object mgr = tickRateManager.invoke(s);
+      if (mgr != null) {
+        java.lang.reflect.Method tickrate = mgr.getClass().getMethod("tickrate");
+        Object v = tickrate.invoke(mgr);
+        if (v instanceof Float f) cap = f;
+        else if (v instanceof Double d) cap = d;
+      }
+    } catch (Throwable ignored) {
+      // Pre-1.20.5 server or relocated mapping — use the vanilla 20 default.
+    }
+
+    // Try nanos first (1.21+). Average over the requested window length isn't
+    // directly exposed; the running mean field is the closest approximation
+    // and is what {@code /tick} surfaces in-game.
+    try {
+      java.lang.reflect.Method m = MinecraftServer.class.getMethod("getAverageTickTimeNanos");
+      Object v = m.invoke(s);
+      if (v instanceof Long ln && ln > 0L) {
+        double tps = 1_000_000_000.0 / ln;
+        return Math.min(tps, cap);
+      }
+    } catch (Throwable ignored) {
+      // Fall through to ms / tickTimes lookup.
+    }
+    try {
+      java.lang.reflect.Method m = MinecraftServer.class.getMethod("getAverageTickTime");
+      Object v = m.invoke(s);
+      if (v instanceof Float f && f > 0f) {
+        double tps = 1000.0 / f;
+        return Math.min(tps, cap);
+      }
+    } catch (Throwable ignored) {
+      // No accessible metric — fall through.
+    }
+    return cap;
   }
 
   @Override
   public void setBiomeGetter(Function<RTPLocation, String> getter) {
-    throw notYet("setBiomeGetter(Function)", "E");
+    // Mirror AbstractServerAccessor.setBiomeGetter — addons can override the
+    // per-location biome resolver. Default lookup happens via the level's
+    // dynamic biome registry (see #defaultBiomeAt).
+    this.biomeGetter = getter;
   }
 
   @Override
   public void setBiomesGetter(Function<RTPWorld<?>, Set<String>> getter) {
-    throw notYet("setBiomesGetter(Function)", "E");
+    this.biomesGetter = getter;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Default biome resolvers (Bukkit parity)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Resolve the biome at a given {@link RTPLocation} via the level's dynamic
+   * biome registry. Returns the biome's {@code namespace:path} key, or
+   * {@code null} when the world is not a {@link FabricRTPWorld} (foreign
+   * impl) or the lookup is invoked off the server thread without a bound
+   * server. Caller is expected to hop to the server thread when needed.
+   */
+  private @Nullable String defaultBiomeAt(RTPLocation location) {
+    if (location == null) return null;
+    RTPWorld<?> w = location.world();
+    if (!(w instanceof FabricRTPWorld fw)) return null;
+    ServerLevel level = fw.level();
+    net.minecraft.core.BlockPos pos =
+        new net.minecraft.core.BlockPos(location.getBlockX(), location.getBlockY(), location.getBlockZ());
+    var holder = level.getBiome(pos);
+    return holder.unwrapKey().map(k -> k.location().toString()).orElse(null);
+  }
+
+  /**
+   * Return every biome key present in the bound server's biome registry. Falls
+   * back to an empty set when the server is not yet bound (e.g. before
+   * SERVER_STARTED) so callers get a deterministic empty result rather than
+   * an NPE. The {@code rtpWorld} argument is currently ignored — Fabric's
+   * biome registry is server-wide on 1.21.1; per-world filtering is a Step E
+   * follow-up if needed.
+   */
+  private Set<String> defaultBiomesFor(@Nullable RTPWorld<?> rtpWorld) {
+    MinecraftServer s = server;
+    if (s == null) return Collections.emptySet();
+    Registry<net.minecraft.world.level.biome.Biome> biomes =
+        s.registryAccess().registryOrThrow(Registries.BIOME);
+    Set<String> out = new HashSet<>();
+    for (ResourceLocation key : biomes.keySet()) {
+      out.add(key.toString());
+    }
+    return out;
   }
 
   // ---------------------------------------------------------------------------

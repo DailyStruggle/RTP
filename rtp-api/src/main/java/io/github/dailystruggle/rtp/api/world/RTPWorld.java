@@ -376,24 +376,15 @@ public abstract class RTPWorld<T> {
    * answer a center-column probe (currently: Bukkit-family worlds with an
    * {@code .mca}-backed chunk store) SHOULD override to return a real probe.</p>
    *
-   * <p>When {@code includeSkyLight} is {@code true} the adapter SHOULD retain the
-   * per-section {@code SkyLight} nibble arrays and the root {@code isLightOn} flag
-   * so that {@link io.github.dailystruggle.rtp.api.world.ChunkColumnProbe#skyLightAt(int)}
-   * and {@link io.github.dailystruggle.rtp.api.world.ChunkColumnProbe#isLightOn()}
-   * return authoritative values. When {@code false} the adapter MAY skip that data;
-   * callers receive the vanilla defaults (15 / true) via
-   * {@link io.github.dailystruggle.rtp.api.world.ChunkColumnProbe}.</p>
-   *
    * @param cx the chunk's X coordinate
    * @param cz the chunk's Z coordinate
    * @param minY inclusive minimum world-Y the caller cares about
    * @param maxY inclusive maximum world-Y the caller cares about
-   * @param includeSkyLight whether the caller needs sky-light data retained
    * @return a future completing with a probe, or {@code null} if no fast path is
    *     available (caller falls back to the authoritative path).
    */
   public CompletableFuture<ChunkColumnProbe> probeChunkColumn(
-      int cx, int cz, int minY, int maxY, boolean includeSkyLight) {
+      int cx, int cz, int minY, int maxY) {
     return CompletableFuture.completedFuture(null);
   }
 

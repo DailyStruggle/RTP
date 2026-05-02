@@ -1,6 +1,6 @@
 # RTP — Random Teleport
 
-**Current Version:** `3.0.0-beta.1`
+**Current Version:** `3.0.0-beta.1` — ⚠️ **beta**. Supported on Spigot / Paper / Folia. Fabric ships in-tree but is **not yet functional** — see [Beta Scope, Known Issues & Roadmap in CHANGELOG.md](CHANGELOG.md#beta-scope).
 
 A high-performance random teleportation plugin for Bukkit-derived Minecraft servers (Spigot, Paper, Folia).
 
@@ -33,7 +33,8 @@ Most random teleport plugins work by repeatedly rolling random coordinates until
 | Spigot | 1.20 | Baseline adapter |
 | Paper | 1.20 | Uses async chunk loading APIs |
 | Folia | 1.20 | Full regional-thread scheduling support |
-| Fabric | 1.21 | Native mod support (Planned) |
+| Fabric | 1.21 | Native mod support — **targeted for `3.0.0` final**, not functional in `3.0.0-beta.1` ([roadmap](docs/dev/MULTI_PLATFORM_PLAN.md)) |
+| Forge / NeoForge | — | No native adapter planned. Use a Bukkit-compatibility launcher (e.g. **Arclight** or **Mohist**) and run the Spigot/Paper build. |
 
 **Runtime:** Java 21+
 

@@ -17,6 +17,7 @@ import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.database.options.AbstractSQLDatabaseAccessor;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
@@ -82,6 +83,14 @@ public class RTP {
   public static RTPScheduler scheduler;
   public static RTPEconomy economy = null;
 
+  /**
+   * Process-wide runtime metrics aggregator. Defaults to a {@link CoreMetrics} with a
+   * {@link io.github.dailystruggle.rtp.common.metrics.MetricsBinding#NOOP NOOP} binding so
+   * callers never have to null-check; platform adapters install a real binding via
+   * {@link CoreMetrics#setBinding} during startup. See {@code METRICS_PLAN.md}.
+   */
+  public static final CoreMetrics metrics = new CoreMetrics();
+
   public static final ThreadLocal<RTPWorld> worldContext = new ThreadLocal<>();
   public static final ThreadLocal<Region> regionContext = new ThreadLocal<>();
 
@@ -113,6 +122,13 @@ public class RTP {
     io.github.dailystruggle.rtp.api.RTPAPI.vertAdder = vertObj -> {
       if (vertObj instanceof VerticalAdjustor<?>) addVerticalAdjustor((VerticalAdjustor<?>) vertObj);
     };
+
+    // ADR-026: expose the unified external-hook facade. Third-party plugins call
+    // RTPAPI.hooks() to register claim verifiers, economy, placeholders, world
+    // border, and anvil pre-filter providers without depending on rtp-core
+    // internals. See docs/dev/EXTERNAL_HOOKS.md.
+    io.github.dailystruggle.rtp.api.RTPAPI.hooks =
+        new io.github.dailystruggle.rtp.common.hooks.DefaultRTPHooks();
   }
 
   public final ConcurrentHashMap<UUID, TeleportData> priorTeleportData = new ConcurrentHashMap<>();
@@ -126,7 +142,12 @@ public class RTP {
   public final ConcurrentHashMap<UUID, Long> invulnerablePlayers = new ConcurrentHashMap<>();
   public final ConcurrentLinkedQueue<RTPChunk<?>> chunksToUnload = new ConcurrentLinkedQueue<>();
   public DatabaseAccessor<?> databaseAccessor;
-  public io.github.dailystruggle.rtp.common.network.RedisManager redisManager;
+  /**
+   * Optional cross-server messaging bus. Field type is the {@code RTPNetworkManager}
+   * interface so {@code rtp-core} carries no symbolic reference to any concrete driver
+   * class (ADR-024). Constructed reflectively below when network YAML enables a backend.
+   */
+  public io.github.dailystruggle.rtp.common.network.RTPNetworkManager networkManager;
 
   public RTP() {
     if (serverAccessor == null) throw new IllegalStateException("null serverAccessor");
@@ -168,8 +189,8 @@ public class RTP {
           int port = portObj instanceof Number ? ((Number) portObj).intValue() : 6379;
           Object passwordObj = redisMap.get("password");
           String password = String.valueOf(passwordObj != null ? passwordObj : "");
-          this.redisManager = new io.github.dailystruggle.rtp.common.network.RedisManager(host, port, password);
-          this.redisManager.initializeAsync();
+          this.networkManager = createRedisNetworkManager(host, port, password);
+          if (this.networkManager != null) this.networkManager.initializeAsync();
         }
       } else if (redisObj instanceof ConfigurationSection redisSection) {
         boolean enabled = redisSection.getBoolean("enabled", false);
@@ -177,8 +198,8 @@ public class RTP {
           String host = redisSection.getString("host", "127.0.0.1");
           int port = redisSection.getInt("port", 6379);
           String password = redisSection.getString("password", "");
-          this.redisManager = new io.github.dailystruggle.rtp.common.network.RedisManager(host, port, password);
-          this.redisManager.initializeAsync();
+          this.networkManager = createRedisNetworkManager(host, port, password);
+          if (this.networkManager != null) this.networkManager.initializeAsync();
         }
       }
     }, 10));
@@ -219,6 +240,30 @@ public class RTP {
     long asyncTime = TimeUnit.MILLISECONDS.toNanos(25); // Bumped to 5ms since async has more headroom
     trackedTasks.add(scheduler.runTaskTimerAsynchronously(new io.github.dailystruggle.rtp.common.tasks.tick.AsyncTaskProcessing(asyncTime), 1, 1));
 
+  }
+
+  /**
+   * Reflectively construct the Redis-backed {@code RTPNetworkManager}, returning
+   * {@code null} if the class (or its Jedis dependency) is not on the classpath.
+   *
+   * <p>ADR-024: the lite assembly excludes {@code RedisManager} and the Jedis
+   * driver entirely. Resolving the class via {@code Class.forName} keeps the
+   * symbolic reference inside a string literal so {@code RTP.class} itself can
+   * load on a verifier-strict JVM without the driver present.
+   */
+  private static io.github.dailystruggle.rtp.common.network.RTPNetworkManager createRedisNetworkManager(String host, int port, String password) {
+    try {
+      Class<?> redisManagerClass = Class.forName("io.github.dailystruggle.rtp.common.network.RedisManager");
+      return (io.github.dailystruggle.rtp.common.network.RTPNetworkManager)
+          redisManagerClass.getDeclaredConstructor(String.class, int.class, String.class)
+              .newInstance(host, port, password);
+    } catch (ClassNotFoundException | NoClassDefFoundError missing) {
+      log(Level.WARNING, "[NETWORK] redis enabled in config but RedisManager/Jedis is not on the classpath; skipping network bus init");
+      return null;
+    } catch (ReflectiveOperationException e) {
+      log(Level.WARNING, "[NETWORK] failed to construct RedisManager", e);
+      return null;
+    }
   }
 
   public static void handleMigration(String previousState, String currentState) {
@@ -588,9 +633,9 @@ public class RTP {
     log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop ScanTask.kill");
     ScanTask.kill();
 
-    if (instance.redisManager != null) {
-      log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop redisManager.shutdown");
-      instance.redisManager.shutdown();
+    if (instance.networkManager != null) {
+      log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop networkManager.shutdown");
+      instance.networkManager.shutdown();
     }
 
     log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop serverAccessor.stop");
