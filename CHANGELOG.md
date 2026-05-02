@@ -10,6 +10,56 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); version
 
 > ⚠️ **Major release — breaking `rtp-api` changes.** See [MIGRATION.md](docs/admin/MIGRATION.md#upgrading-to-300-beta) for upgrade instructions.
 
+### Beta Scope
+
+This is a **beta** release. The following surface is considered **in scope** and supported:
+
+- **Platforms:** Spigot, Paper, Folia (Minecraft 1.20.x / 1.21.x / 26.1, Java 21+).
+- **Persistence:** H2 (default) and SQLite. MySQL, PostgreSQL, Redis, and YAML fallback ship but are **experimental** — production use not recommended.
+- **Public API:** the `rtp-api` types listed under [Added](#added). Internals (`rtp-core`, platform adapters) may still change between betas.
+- **Claim integrations** (folded into the plugin per ADR-019): Factions, GriefDefender, GriefPrevention, HuskTowns, Lands, RedProtect, TownyAdvanced, WorldGuard.
+- **Anvil pre-filter** on Spigot (ADR-016).
+- **Brigadier bridge** for Paper/Folia (ADR-014).
+
+**Out of scope for this beta** (do not file as bugs):
+
+- **Fabric (`rtp-fabric`)** — present in the source tree but **not functional**. `/rtp` does not yet teleport on Fabric (scheduled-task processors not wired; permissions, teleport-cancel callback, and full Brigadier command tree pending). Tracking: [`docs/dev/MULTI_PLATFORM_PLAN.md`](docs/dev/MULTI_PLATFORM_PLAN.md). Do not deploy on Fabric.
+- **Native Forge / NeoForge adapter** — not planned, and **lower priority than multi-server / proxy support**. Forge-based servers are supported via Bukkit-compatibility layers such as **Arclight** or **Mohist** (run RTP as the Spigot/Paper build on those launchers). A dedicated Forge/NeoForge adapter remains deferred (ADR-022, MULTI_PLATFORM_PLAN Phase 4) and may not materialize if compatibility layers continue to cover the use case.
+- **Multi-server / proxy mode** (Velocity, BungeeCord cross-server queues, reservation tokens) — design only. See [`docs/dev/MULTI_SERVER_PLAN.md`](docs/dev/MULTI_SERVER_PLAN.md).
+- **Legacy Minecraft (< 1.20) and legacy Java (< 21)** — see [ADR-021](docs/adr/ADR-021-legacy-mc-and-java-support-scope.md).
+- **`RTPEconomy`** API — present but marked *experimental*; signature may change before `3.0.0` final.
+- **`/rtp config` command** — present but **experimental**; subcommand surface, argument grammar, and write-back semantics may change before `3.0.0` final. Prefer editing config files directly for production use.
+- **Lite assembly variant** ([ADR-024](docs/adr/ADR-024-rtp-lite-assembly-variant.md)) — produced from this build but not yet published on a fixed cadence. From `3.0.0` final onward, the Lite jar will be published as **`RTP`** (the **free tier**) a few hours-to-days after the corresponding **`RTP-Pro`** (full / paid tier) jar of the same version.
+
+### Known Issues
+
+User-visible issues that exist in this beta and are **not** considered release-blockers. File a new bug only if your symptom differs from the descriptions below.
+
+- **Fabric adapter is non-functional.** See *Out of scope* above. Bukkit-family platforms are unaffected.
+- **MySQL / PostgreSQL / Redis / YAML accessors are experimental.** Schema and migration semantics may change before `3.0.0` final. Stick with H2 or SQLite for production.
+- **`safety.yml` and biome-filter edits do not invalidate the persisted shape cache** ([`POTENTIAL_BUGS.md`](docs/dev/POTENTIAL_BUGS.md), 2026-04-30 entry). Geometry and vertical-adjustor edits are caught (ADR-022); changes to `unsafeBlocks`, `platform`, `requireSkyLight`, ADR-017 tag/state predicates, or per-region biome whitelists/blacklists may leave stale "bad sector" flags in `<region>_<seed>_<hash>.bin`. **Workaround:** `/rtp scan reset <region>` after changing safety predicates.
+- **Tag-grammar tokens in `safety.yml`** (e.g. `#minecraft:flowers`) are accepted but inert until the config-reader tag-expansion slice lands (`SAFETY_TAGS_AND_STATES_PLAN.md` Slice 3). Use explicit material names for now.
+- **Two ADR files share the number `ADR-022`** ([`POTENTIAL_BUGS.md`](docs/dev/POTENTIAL_BUGS.md), 2026-05-01). Documentation only; no runtime effect. Cross-references in this changelog disambiguate by filename.
+- **Pre-release cache invalidation:** legacy 2.x `.bin` files and existing `rtp_cached_locations` rows from any pre-`3.0.0-beta.1` build are abandoned by ADR-022's hash-keyed naming scheme. Expect a one-time re-scan on first launch.
+- **Emergency landing platform default changed.** `safety.yml` now ships `platformRadius: -1` (disabled). Set `platformRadius: 0` or higher to restore legacy 2.x behaviour.
+
+For a live backlog of incidental bugs spotted during development (not necessarily user-visible), see [`docs/dev/POTENTIAL_BUGS.md`](docs/dev/POTENTIAL_BUGS.md).
+
+### Planned for `3.0.0` final and beyond
+
+Roadmap visibility for users and addon authors. Order is intent, not commitment.
+
+- **Fabric platform** to first-class (`rtp-fabric`) — **targeted for `3.0.0` final**. Active frontier — see [`MULTI_PLATFORM_PLAN.md`](docs/dev/MULTI_PLATFORM_PLAN.md). Remaining: scheduled-task processor parity (Step E3), permissions via `fabric-permissions-api` (Step F), full Brigadier command tree (Step G2), stabilization smoke test (Step H).
+- **Fold `safety.yml` validity fields and biome filters into the region cache hash** ([`POTENTIAL_BUGS.md`](docs/dev/POTENTIAL_BUGS.md) follow-up to ADR-022).
+- **Multi-server / proxy mode** (Velocity, BungeeCord) — phased rollout per [`MULTI_SERVER_PLAN.md`](docs/dev/MULTI_SERVER_PLAN.md). D-005 gated; admin docs stub at [`docs/admin/proxies/INDEX.md`](docs/admin/proxies/INDEX.md).
+- **Runtime metrics** (TPS / MSPT / heap / queue depth / pipeline samples) — [`METRICS_PLAN.md`](docs/dev/METRICS_PLAN.md).
+- **External hook API surface** ([ADR-026](docs/adr/ADR-026-external-hook-api-surface.md), [`EXTERNAL_HOOKS.md`](docs/dev/EXTERNAL_HOOKS.md)) — formal registry for third-party reflection / soft-depend integrations.
+- **Lite assembly variant** ([ADR-024](docs/adr/ADR-024-rtp-lite-assembly-variant.md)) — trimmed jar for resource-constrained servers, **published as `RTP` (the free tier)** a few hours-to-days after the corresponding **`RTP-Pro` (full / paid tier)** jar of the same version. The Pro jar ships first; the free Lite jar (`RTP`) follows once the trimmed assembly is verified against the same release tag.
+- **Promote MySQL / PostgreSQL / Redis / YAML** accessors out of *experimental*.
+- **Stabilize `RTPEconomy`** API.
+- **Stabilize `/rtp config` command** — finalize subcommand surface, argument grammar, and write-back semantics, then drop the *experimental* label.
+- **Forge / NeoForge** — **lower priority than multi-server / proxy support.** No native adapter planned for the foreseeable future; Forge-based servers should use a Bukkit-compatibility launcher (Arclight, Mohist, or equivalent) and run the Spigot/Paper build. A dedicated adapter is only re-evaluated if those compatibility layers stop covering the platform ([ADR-022](docs/adr/ADR-022-fabric-platform-in-scope.md)).
+
 ### Highlights
 
 1. **Versioned platform submodules** — compile-time NMS separation via a `common` module plus per-version submodules for Spigot, Paper, and Folia (ADR-010).
@@ -78,6 +128,7 @@ Rationale for each decision lives in [`docs/adr/`](docs/adr/README.md).
 - Immediate-teleport timing regression and duplicate task execution on queue drain.
 - `MemoryShape` caching inconsistencies and region-boundary locational edge cases.
 - Erroneous 2D coordinate check that rejected valid surface locations.
+- **On-event teleports granted to operators by default (Paper + LuckPerms).** `ParsePermissions.hasPerm` called `sender.hasPermission(...)` directly for each candidate child node. On Paper with LuckPerms (and any permission manager that defers to op state for unset nodes), `hasPermission` short-circuits to `true` for ops regardless of the registered `default: false` we declared in `plugin.yml`. The result was that every registered on-event handler (`firstjoin`, `join`, `respawn`, `changeworld`, `move`, `teleport`) auto-fired for any op the moment they triggered the event, even when the admin had explicitly not granted the corresponding `rtp.onevent.*` node. Fix: rewrote `ParsePermissions.hasPerm` to iterate the sender's *effective* permissions (`sender.getEffectivePermissions()`, which only contains explicitly granted nodes) and match each candidate child against that set — the same pattern already used by `ParsePermissions.getInt` for numeric permission tiers. This bypasses the permission manager's op-default short-circuit entirely, restoring the documented opt-in `default: false` behaviour. The earlier removal of the `permissionPrefix + "*"` wildcard fast-path is retained on general principles but was not load-bearing on its own.
 - Initial command execution failure on first plugin load.
 
 ---

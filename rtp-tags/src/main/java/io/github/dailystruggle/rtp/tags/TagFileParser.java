@@ -5,19 +5,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Parses a single tag JSON string into a {@link TagFile}, honouring the vanilla
- * tag schema (plain resource-location strings, {@code #tag} references, and
- * object-form entries with an {@code id} field and optional {@code required}
- * flag).
+ * Parses tag JSON into {@link TagFile}, supporting plain strings, # references,
+ * and objects with {@code id} / {@code required} fields.
  *
- * <p>Object-form entries with {@code "required": false} are retained in the
- * {@link TagFile#values()} list because reference expansion is deferred to
- * {@link TagReferenceResolver}; the resolver is the component that decides
- * whether a missing reference aborts the expansion or is silently dropped. The
- * parser is oblivious to that distinction: it only extracts the raw value
- * string.
- *
- * <p>All methods are thread-safe.
+ * <p>Malformed object entries (missing ID) are skipped, matching vanilla's
+ * permissive loader. Parsing is thread-safe.
  */
 public final class TagFileParser {
 

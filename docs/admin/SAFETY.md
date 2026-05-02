@@ -11,7 +11,7 @@ This document provides a detailed reference for all configuration options availa
 | `invulnerabilityTime` | Integer | `5` | Seconds of invulnerability granted after teleporting. Prevents fall, fire, or drowning damage on arrival. |
 | `safetyRadius` | Integer | `0` | Block radius around the landing point to check for hazards. `0` = check only the landing block. |
 | `staleChunkRetryLimit` | Integer | `2` | Bounded retry budget for the stale-chunk guard (ADR-015). Prevents race conditions where a chunk unloads before evaluation. |
-| `anvilPrefilterEnabled` | Boolean | `true` | (Spigot-only) Off-thread safety probe that rejects lava/fire candidates before requesting the authoritative chunk load. |
+| `anvilPrefilterEnabled` | Boolean | `true` | Off-thread anvil prefilter. |
 
 ## Landing Platforms
 

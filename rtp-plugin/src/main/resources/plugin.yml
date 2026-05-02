@@ -117,13 +117,13 @@ permissions:
   rtp.onevent.join:
     description: randomly teleport player on every join
     default: false
-  rtp.onevent.firstJoin:
+  rtp.onevent.firstjoin:
     description: randomly teleport player on player's first join
     default: false
   rtp.onevent.respawn:
     description: randomly teleport player on respawn after death
     default: false
-  rtp.onevent.changeWorld:
+  rtp.onevent.changeworld:
     description: randomly teleport player upon changing worlds
     default: false
   rtp.onevent.move:
@@ -137,9 +137,9 @@ permissions:
     default: false
     children:
       rtp.onevent.join: true
-      rtp.onevent.firstJoin: true
+      rtp.onevent.firstjoin: true
       rtp.onevent.respawn: true
-      rtp.onevent.changeWorld: true
+      rtp.onevent.changeworld: true
       rtp.onevent.move: true
       rtp.onevent.teleport: true
   rtp.biome:

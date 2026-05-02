@@ -14,38 +14,17 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * Resolves a set of {@link TagSource}s into the
- * {@code Map<String, Set<String>>} snapshot shape consumed by
- * {@code RTPServerAccessor.blockTagSnapshot()} and by
- * {@code SafetyCompilationCache} to expand ADR-017 tag tokens.
+ * Resolves {@link TagSource}s into {@code Map<String, Set<String>>} for RTP.
  *
- * <p>The resolution algorithm:
+ * <p>Resolution:
  * <ol>
- *   <li>Collect all {@link TagFile}s from every source in input order.</li>
- *   <li>Merge files that share a {@code namespacedId}: a file with
- *       {@code replace=true} clears previously-accumulated values for that id
- *       before appending its own; otherwise values are concatenated.</li>
- *   <li>Fixed-point expansion of tag references: entries beginning with
- *       {@code #} resolve to the union of the referenced tag's entries. Cycles
- *       are detected and short-circuited (the offending branch returns its
- *       currently-resolved set without infinitely recursing).</li>
- *   <li>Normalise each resolved material entry to the platform's canonical
- *       form — upper-cased local-id (e.g. {@code "minecraft:oak_leaves"} →
- *       {@code "OAK_LEAVES"}) to match {@code Material.name()} and the
- *       {@code RTPServerAccessor.materials()} convention.</li>
- *   <li>Key each resulting set by the lowercase {@code namespace:path} tag
- *       identifier (no leading {@code #}) so the result matches the
- *       {@code RTPServerAccessor.blockTagSnapshot()} contract and the
- *       {@code SafetyToken.TAG} {@code identifier()} form.</li>
+ *   <li>Collect files; merge by {@code namespacedId} (replace vs append).</li>
+ *   <li>Fixed-point expansion of {@code #} tag references; cycle-protected.</li>
+ *   <li>Normalise materials (upper-case local-id, remove namespace).</li>
+ *   <li>Key map by canonical {@code namespace:path} identifier.</li>
  * </ol>
  *
- * <p>Per Slice 3a scope, the returned map is a <b>union</b> across sources.
- * Strict data-pack priority ordering is a future-slice concern — for a
- * safety-<i>deny</i> list, the union is strictly more conservative (more
- * blocks flagged unsafe, never fewer).
- *
- * <p>Thread-safety: the static {@link #resolve(List)} entry point holds no
- * shared state; the returned map is fully immutable.
+ * <p>The result is a union across all sources. Thread-safe and immutable.
  */
 public final class TagResolver {
 

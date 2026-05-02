@@ -284,13 +284,10 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
   @RegionThread
   public int getSkyLight(int x, int y, int z) {
     if (anvilView != null) {
-      // Delegate to the view's lazy synthesis-aware overload. When the chunk-root
-      // isLightOn flag is true, this returns the on-disk nibble value; when false
-      // (freshly generated chunks with stale lighting), the view lazily populates
-      // a 256-column "first opaque from top" table on first call and answers
-      // subsequent queries as a binary 15/0 sky-access proxy. The live re-check
-      // at teleport-commit time remains authoritative for finer attenuation.
-      return anvilView.getSkyLight(x & 0xF, y, z & 0xF, reconciledAirBlocks());
+      // Anvil-backed snapshots do not parse SkyLight nibbles. Report the
+      // vanilla "absent tag → fully lit" default; the live re-check at
+      // teleport-commit time remains authoritative for any sky-light gating.
+      return 15;
     }
     return chunk.getBlock(x & 0xF, y, z & 0xF).getLightFromSky();
   }

@@ -8,7 +8,8 @@
 // Phase 1).
 plugins {
     id 'com.gradleup.shadow'
-    id 'fabric-loom' version '1.11-SNAPSHOT'
+    // Version pinned in settings.gradle pluginManagement.plugins {}.
+    id 'fabric-loom'
 }
 repositories {
     // Soft-dep repos for bundled claim-plugin integrations (see ADR-019).
@@ -117,6 +118,7 @@ processResources {
 processResources.dependsOn copyDocs
 shadowJar.dependsOn processResources
 
+
 // ADR-024: the existing shadowJar produces the FULL/Pro edition (RTP-Pro).
 // A sibling `shadowLiteJar` task below produces the lite edition under the
 // unclassified `RTP-<version>.jar` name. Both are built by `assemble`.
@@ -185,6 +187,10 @@ shadowJar {
     relocate 'org.yaml.snakeyaml', 'io.github.dailystruggle.rtp.snakeyaml'
     relocate 'me.carleslc.Simple-YAML', 'io.github.dailystruggle.rtp.Simple-Yaml'
     relocate 'org.h2', 'io.github.dailystruggle.rtp.h2'
+    // org.lz4:lz4-java exposes its API under net.jpountz.* (legacy package).
+    // Required at runtime by rtp-anvil for LZ4-compressed chunk decode.
+    // Relocate to avoid clashing with other plugins shading the same lib.
+    relocate 'net.jpountz', 'io.github.dailystruggle.rtp.lz4'
 }
 
 artifacts {
@@ -216,6 +222,21 @@ sourceSets {
 
 tasks.named('compileLiteJava') {
     dependsOn tasks.named('compileJava')
+}
+
+// The root build.gradle configures `processResources` (main sourceSet) to
+// expand ${version} in plugin.yml / fabric.mod.json, but the `lite` sourceSet
+// declared above (ADR-024) gets its own `processLiteResources` task that
+// does NOT inherit that configuration. Without this block the lite JAR
+// ships plugin.yml with literal `${version}`, causing Bukkit to log
+// `Enabling RTP v${version}` on enable. Mirror the root config here.
+tasks.named('processLiteResources') {
+    inputs.property "version", project.version
+    filesMatching(["plugin.yml", "fabric.mod.json"]) {
+        expand "version": project.version
+    }
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    exclude '**/*.bak'
 }
 
 tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar) {
@@ -272,6 +293,7 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
             !(dep.group == 'com.google.code.gson') &&
             !(dep.group == 'org.spongepowered') &&
             !(dep.group == 'org.slf4j') &&
+            !(dep.group == 'net.minecrell') &&
             // ADR-024 specific: SQL/Redis drivers.
             !(dep.group == 'com.h2database') &&
             !(dep.group == 'org.xerial' && dep.name == 'sqlite-jdbc') &&
@@ -281,8 +303,11 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
             !(dep.group == 'com.zaxxer') &&
             // Loom/Mojang networking transitives -- not used by lite runtime.
             !(dep.group == 'org.apache.httpcomponents') &&
-            !(dep.group == 'org.lz4') &&
-            !(dep.group == 'net.jpountz.lz4') &&
+            // org.lz4:lz4-java is REQUIRED at runtime by rtp-anvil's chunk
+            // decompression path (compression mode 4 in r.X.Z.mca). rtp-anvil
+            // is intentionally kept in lite, so its lz4 transitive must be too.
+            // Stripping it caused NoClassDefFoundError: net/jpountz/lz4/LZ4FrameInputStream
+            // on every Anvil probe of an LZ4-compressed chunk. Relocated below.
             !(dep.group == 'org.jline') &&
             !(dep.group == 'org.json') &&
             !(dep.group == 'com.mojang')
@@ -311,6 +336,7 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
         exclude(dependency('net.fabricmc.fabric-api:.*'))
         exclude(dependency('net.fabricmc:.*'))
         // ADR-024:
+        exclude(dependency('net.minecrell:.*'))
         exclude(dependency('com.h2database:.*'))
         exclude(dependency('org.xerial:sqlite-jdbc'))
         exclude(dependency('mysql:.*'))
@@ -318,8 +344,7 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
         exclude(dependency('redis.clients:.*'))
         exclude(dependency('com.zaxxer:.*'))
         exclude(dependency('org.apache.httpcomponents:.*'))
-        exclude(dependency('org.lz4:.*'))
-        exclude(dependency('net.jpountz.lz4:.*'))
+        // org.lz4:lz4-java retained -- see comment in configurations filter above.
         exclude(dependency('org.jline:.*'))
         exclude(dependency('org.json:.*'))
     }
@@ -337,9 +362,29 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
     exclude 'org/apache/commons/**'
     exclude 'org/jline/**'
     exclude 'org/json/**'
-    exclude 'net/jpountz/**'
+    // net/jpountz/** retained -- rtp-anvil needs LZ4FrameInputStream at runtime.
+    // Relocated to io.github.dailystruggle.rtp.lz4 below.
     exclude 'mozilla/**'
     exclude 'flightrecorder-config.jfc'
+    // ADR-024 Phase B audit: Mojang/MC asset stubs and version manifest leak past
+    // the `assets/minecraft/**` glob because they sit at the artifact root.
+    exclude 'version.json'
+    exclude 'pack.png'
+    exclude 'data/.mcassetsroot'
+    exclude 'assets/.mcassetsroot'
+    // Folia annotation stubs (org.checkerframework astub file) -- compile-only artifact.
+    exclude 'folia-thread-stubs.astub'
+    // Paper/log4j terminal-console plugin -- not used by lite (no log4j here).
+    exclude 'net/minecrell/**'
+    // SLF4J API: lite uses RTP.log (RTPServerAccessor) routing; the host server
+    // (Spigot/Paper) provides slf4j on its own classpath.
+    exclude 'org/slf4j/**'
+    // Annotation-processor service descriptors leaked from compileOnly deps.
+    exclude 'META-INF/services/javax.annotation.processing.Processor'
+    // Orphan maven metadata for stripped libraries.
+    exclude 'META-INF/maven/org.slf4j/**'
+    exclude 'META-INF/maven/org.apache.commons/**'
+    exclude 'META-INF/maven/com.zaxxer/**'
     exclude 'io/github/dailystruggle/rtp/common/database/options/H2*.class'
     exclude 'io/github/dailystruggle/rtp/common/database/options/SQLite*.class'
     exclude 'io/github/dailystruggle/rtp/common/database/options/MySQL*.class'
@@ -359,6 +404,9 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
     exclude 'language.yml'
     exclude 'economy.yml'
     exclude 'integrations.yml'
+    // logging.yml is INTENTIONALLY KEPT in lite (src/lite/resources/logging.yml
+    // overrides the full version via duplicatesStrategy = EXCLUDE). Without it,
+    // no min_level filter loads and every FINE/FINER/FINEST log call prints.
     exclude 'fabric.mod.json'
     exclude 'docs/**'
     exclude 'README.md'
@@ -392,6 +440,9 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
     relocate 'io.github.dailystruggle.effectsapi', 'io.github.dailystruggle.rtp.effectsapi'
     relocate 'org.yaml.snakeyaml', 'io.github.dailystruggle.rtp.snakeyaml'
     relocate 'me.carleslc.Simple-YAML', 'io.github.dailystruggle.rtp.Simple-Yaml'
+    // org.lz4:lz4-java exposes its API under net.jpountz.* (legacy package).
+    // Relocate to avoid clashing with any other plugin shading the same lib.
+    relocate 'net.jpountz', 'io.github.dailystruggle.rtp.lz4'
 
     // Lite intentionally does NOT depend on `copyDocs` -- lite ships no docs.
     dependsOn tasks.named('processResources')
@@ -429,6 +480,7 @@ tasks.register('liteJarStructureCheck') {
             ~'^language\\.yml$',
             ~'^economy\\.yml$',
             ~'^integrations\\.yml$',
+            // logging.yml intentionally present in lite -- see shadowLiteJar comment.
             ~'^fabric\\.mod\\.json$',
             ~'^docs/.*$',
             ~'^README\\.md$',
@@ -437,7 +489,18 @@ tasks.register('liteJarStructureCheck') {
             ~'^org/sqlite/.*$',
             ~'^com/mysql/.*$',
             ~'^org/postgresql/.*$',
-            ~'^redis/clients/.*$'
+            ~'^redis/clients/.*$',
+            // ADR-024 Phase B audit: assert no Mojang asset stubs / Loom leftovers.
+            ~'^version\\.json$',
+            ~'^pack\\.png$',
+            ~'^(data|assets)/\\.mcassetsroot$',
+            ~'^folia-thread-stubs\\.astub$',
+            ~'^net/minecrell/.*$',
+            ~'^org/slf4j/.*$',
+            ~'^META-INF/services/javax\\.annotation\\.processing\\.Processor$',
+            ~'^META-INF/maven/org\\.slf4j/.*$',
+            ~'^META-INF/maven/org\\.apache\\.commons/.*$',
+            ~'^META-INF/maven/com\\.zaxxer/.*$'
         ]
 
         def violations = []

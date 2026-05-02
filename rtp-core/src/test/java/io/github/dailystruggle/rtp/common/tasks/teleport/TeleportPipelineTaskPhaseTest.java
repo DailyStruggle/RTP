@@ -249,6 +249,40 @@ class TeleportPipelineTaskPhaseTest {
     }
 
     // -----------------------------------------------------------------------
+    // Phase M1 — pipeline histogram wiring
+    // -----------------------------------------------------------------------
+
+    @Test
+    @Timeout(value = 1, unit = TimeUnit.SECONDS)
+    void runCleanup_records_one_sample_into_pipeline_histogram() {
+        long before = io.github.dailystruggle.rtp.common.RTP.metrics
+                .pipelineHistogram().totalRecorded();
+        TeleportPipelineTask task = buildMinimalTask();
+        task.setCancelled(true);
+        // Drives runCleanup via the cancelled-path in run().
+        assertDoesNotThrow(task::run);
+        long after = io.github.dailystruggle.rtp.common.RTP.metrics
+                .pipelineHistogram().totalRecorded();
+        assertEquals(before + 1, after,
+                "runCleanup must record exactly one pipeline sample");
+    }
+
+    @Test
+    @Timeout(value = 1, unit = TimeUnit.SECONDS)
+    void runCleanup_is_idempotent_for_pipeline_histogram() {
+        TeleportPipelineTask task = buildMinimalTask();
+        task.setCancelled(true);
+        long before = io.github.dailystruggle.rtp.common.RTP.metrics
+                .pipelineHistogram().totalRecorded();
+        assertDoesNotThrow(task::run);
+        assertDoesNotThrow(task::run); // a second invocation must not double-record
+        long after = io.github.dailystruggle.rtp.common.RTP.metrics
+                .pipelineHistogram().totalRecorded();
+        assertEquals(before + 1, after,
+                "histogram must record exactly once per task lifecycle");
+    }
+
+    // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
 

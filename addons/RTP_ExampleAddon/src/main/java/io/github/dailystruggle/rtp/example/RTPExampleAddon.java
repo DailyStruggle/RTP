@@ -1,30 +1,24 @@
 package io.github.dailystruggle.rtp.example;
 
+import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
-import io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /**
  * Reference example addon for RTP.
  *
- * <p>This class is intentionally small but exercises the four most common RTP API touch-points an
- * addon will need:
+ * <p>Demonstrates common RTP API touch-points:
+ * <ul>
+ *   <li><b>Config</b>: Registers {@link ConfigParser} with {@link ExampleKeys} for {@code /rtp reload}.</li>
+ *   <li><b>Safety</b>: Registers an async verifier predicate via {@link RTPAPI#hooks()}. (See ADR-026).</li>
+ *   <li><b>Events</b>: Implements {@link org.bukkit.event.Listener} for RTP lifecycle events.</li>
+ *   <li><b>Reload</b>: Uses {@link Configs#onReload(Runnable)} for live config updates.</li>
+ * </ul>
  *
- * <ol>
- *   <li><b>Config</b> — register a {@link ConfigParser} backed by {@link ExampleKeys} so the addon
- *       participates in {@code /rtp reload}.
- *   <li><b>Safety contribution</b> — register a {@link GlobalRegionVerifiers} predicate that is
- *       consulted asynchronously by the teleport pipeline (S-003 / S-005 compliant; never inline).
- *   <li><b>Event handling</b> — register a Bukkit {@link org.bukkit.event.Listener} for one of
- *       RTP's public events (here, {@code PostTeleportEvent}).
- *   <li><b>Reload hook</b> — use {@link Configs#onReload(Runnable)} so operator reloads are
- *       observable without a server restart.
- * </ol>
- *
- * <p>See {@code README.md} next to this file for a step-by-step walkthrough.
+ * <p>See {@code README.md} for a walkthrough.
  */
 public final class RTPExampleAddon extends JavaPlugin {
 
@@ -36,9 +30,10 @@ public final class RTPExampleAddon extends JavaPlugin {
     // 4. Re-register on /rtp reload so operators see config changes without a restart.
     Configs.onReload(() -> RTP.configs.putParser(registerParser()));
 
-    // 2. Contribute a safety predicate. The lambda is invoked asynchronously by the pipeline;
-    //    it must NOT block, perform chunk I/O on the main thread, or swallow exceptions.
-    GlobalRegionVerifiers.addGlobalRegionVerifier(
+    // 2. Contribute a safety predicate via the public RTPHooks facade (ADR-026).
+    //    The lambda is invoked asynchronously by the pipeline; it must NOT block, perform
+    //    chunk I/O on the main thread, or swallow exceptions.
+    RTPAPI.hooks().verifiers().register(
         coords -> {
           @SuppressWarnings("unchecked")
           ConfigParser<ExampleKeys> parser =

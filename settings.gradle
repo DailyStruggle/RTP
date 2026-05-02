@@ -10,6 +10,21 @@ pluginManagement {
         }
         gradlePluginPortal()
     }
+    // Declare fabric-loom's default version once here so every subproject
+    // that applies it shares a single plugin classloader. Applying the same
+    // plugin from independent `plugins { id '...' version '...' }` blocks
+    // in multiple subprojects causes Gradle to load Loom into separate
+    // classloaders, which surfaces as:
+    //   `LoomGradleExtensionImpl_Decorated cannot be cast to LoomGradleExtension`
+    // Subprojects now apply with a bare `id 'fabric-loom'` (no version).
+    // The exception is :rtp-fabric:rtp-fabric-v26_1_R1 which pins Loom 1.15+
+    // (required by deobf-26.1) — it declares its own version override and
+    // therefore does load in a separate classloader, which is acceptable
+    // because v26_1_R1 is a leaf module that no other Loom-using subproject
+    // depends on at configuration time.
+    plugins {
+        id 'fabric-loom' version '1.11-SNAPSHOT'
+    }
 }
 
 rootProject.name = 'RTP'
@@ -41,7 +56,25 @@ include 'rtp-plugin'
 // scoped per ADR-022 §3 to rtp-fabric/** and rtp-plugin only — it must
 // not leak into rtp-core, rtp-api, commands-api, effects-api, or any
 // Bukkit-family adapter.
+//
+// Per ADR-027 (Fabric multiversion submodule layout, 2026-05-01) the Fabric
+// platform mirrors the Bukkit-family <platform>-vXX_YY_R1 split: common
+// holds version-agnostic glue (with MC + fabric-api as modCompileOnly so
+// no MC classes ship from common), and each v-submodule supplies the
+// actual runtime mod jar pinned to its MC version. v1_21_R1 is the
+// reference implementation; v1_20_R1 and v26_1_R1 ship as build-correct
+// stubs and are filled in as Phase 2.5 follow-ups. Note v26_1_R1 requires
+// JDK 25 + Loom 1.15 because MC 26.1 is deobfuscated; contributors without
+// JDK 25 will see only that submodule fail toolchain provisioning.
 include 'rtp-fabric:rtp-fabric-common'
+include 'rtp-fabric:rtp-fabric-v1_20_R1'
+include 'rtp-fabric:rtp-fabric-v1_21_R1'
+// v26_1_R1 is intentionally NOT included in the default build: it requires
+// Loom 1.15+ (deobf-26.1) which cannot coexist in a single Gradle invocation
+// with the Loom 1.11-SNAPSHOT classloader used by common / v1_20 / v1_21 /
+// rtp-plugin. Build it standalone via a separate Gradle invocation when JDK 25
+// is available. See ADR-027 for rationale.
+//include 'rtp-fabric:rtp-fabric-v26_1_R1'
 
 //include 'addons:RTP_Iris_integration'
 include 'addons:RTP_Glide'
@@ -50,3 +83,7 @@ include 'addons:RTP_ExampleAddon'
 // Standalone helper plugins (no rtp-api / rtp-core dependency).
 // See helpers/PeriodicWorldSaver/README.md for the directory rationale.
 include 'helpers:PeriodicWorldSaver'
+// Black-box stress-test driver for /rtp-style commands. Drives RTP, RTP-Pro,
+// and competitor plugins under identical workloads to fill the front-page
+// comparison table. See helpers/StressTestRTP/README.md.
+include 'helpers:StressTestRTP'

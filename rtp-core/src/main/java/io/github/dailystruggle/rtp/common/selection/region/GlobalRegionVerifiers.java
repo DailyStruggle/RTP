@@ -63,6 +63,24 @@ public class GlobalRegionVerifiers {
     }
 
     /**
+     * @return the total number of currently registered verifiers (sync + async).
+     *         Used by the {@code RegionVerifierRegistry#size()} facade (ADR-026).
+     */
+    public static int registeredCount() {
+        boolean acquired = false;
+        try {
+            regionVerifiersLock.acquire();
+            acquired = true;
+            return regionVerifiers.size() + asyncRegionVerifiers.size();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return 0;
+        } finally {
+            if (acquired) regionVerifiersLock.release();
+        }
+    }
+
+    /**
      * Removes all registered global region verifiers.
      */
     public static void clearGlobalRegionVerifiers() {

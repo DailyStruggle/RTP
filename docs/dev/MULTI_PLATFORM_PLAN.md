@@ -138,6 +138,23 @@ The foundation for the `rtp-fabric` module.
 
   **Note — runtime / dual-loader end-to-end smoke testing is intentionally NOT a Phase 1 gate.** Until Phase 2 Steps A–G land, `RTPFabricMod.onInitialize()` is a placeholder and there is no Fabric functionality to validate end-to-end. "Loads on Fabric" would be trivially true (and trivially uninformative) at this stage. The dual-runtime end-to-end smoke test has been moved to **Phase 2 Step H** where the featureset is sufficient to make it meaningful. Bukkit-side regression risk from Loom is covered by the existing Bukkit-family test suites (`:rtp-plugin:test`, etc.) — these must remain green at all phases.
 
+### Phase 1 Amendment — Multiversion Submodule Layout *(2026-05-01, [ADR-027](../adr/ADR-027-fabric-multiversion-submodule-layout.md))*
+
+The original Phase 1 deferred `rtp-fabric-v<MC>/` shims until a real version-specific need appeared (line 109 above). That need has now arrived ahead of any single trigger: cross-version mojmap drift between 1.20.x and 1.21.x (e.g. `ChunkStatus` package move at 1.21.3), and — more decisively — MC 26.1's deobfuscation, which mandates Loom 1.15+, Java 25, Gradle 9.4+, and a different build-script shape (no `mappings` line, plain `implementation`/`compileOnly` instead of `modImplementation`/`modCompileOnly`, plugin id `net.fabricmc.fabric-loom`). None of those can coexist with the 1.20/1.21 build script in a single common module.
+
+ADR-027 supersedes lines 109 ("defer `rtp-fabric-v<MC>/` shim") and 129 ("Do not include version submodules until they exist") with the following layout:
+
+| Module | MC | Mappings | Loom | Java | Fabric API |
+|---|---|---|---|---|---|
+| `:rtp-fabric:rtp-fabric-common` | (compileOnly) 1.21.1 mojmap | mojmap | 1.11+ | 21 | (compileOnly) 0.115.0+1.21.1 |
+| `:rtp-fabric:rtp-fabric-v1_20_R1` | 1.20.1 | mojmap | 1.11+ | 21 | 0.92.x+1.20.1 |
+| `:rtp-fabric:rtp-fabric-v1_21_R1` | 1.21.1 | mojmap | 1.11+ | 21 | 0.115.0+1.21.1 |
+| `:rtp-fabric:rtp-fabric-v26_1_R1` | 26.1.2 | (deobfuscated) | 1.15+ | 25 | 0.143.5+26.1 |
+
+`rtp-fabric-common` switches MC + fabric-api to `compileOnly` / `modCompileOnly` so it ships no MC classes; v-submodules each supply their own runtime jar. Common defines a small `FabricVersionAdapter` SPI carrying only the version-volatile call sites (registry access, `ChunkStatus` location, chunk-loading entrypoint normalisation, biome key lookup at `BlockPos`, permissions API surface). `RTPFabricMod` (`rtp-plugin`) reads `SharedConstants.getCurrentVersion().getName()` at server-start and reflectively instantiates the matching v-submodule's adapter — direct symbol reference is forbidden so a Java 21 server never resolves v26_1_R1 (Java 25) bytecode.
+
+**Initial deliverable:** v1_21_R1 ships with the full adapter implementation (relocated from common); v1_20_R1 and v26_1_R1 ship with build-correct stubs throwing `UnsupportedOperationException` carrying the `// TODO(ADR-027)` marker. Real porting bodies for the latter two land as follow-up Phase 2.5 tasks driven by the smoke gates per MC line.
+
 ## Phase 2: Fabric Feature Parity (acceptance-gated A → H)
 
 The goal of this phase is feature parity with the Bukkit/Paper/Folia adapters. Each step's acceptance gate must be green before the next step begins.

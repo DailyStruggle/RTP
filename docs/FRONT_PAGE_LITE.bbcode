@@ -1,0 +1,254 @@
+[CENTER]
+[SIZE=6][B][COLOR=#E74C3C]R[/COLOR][COLOR=#F39C12]T[/COLOR][COLOR=#27AE60]P[/COLOR][/B][/SIZE]
+[SIZE=4][B][COLOR=#7F8C8D]Random Teleport — the free tier of the RTP engine[/COLOR][/B][/SIZE]
+
+[I]Send your players to a safe, random spot in the world — fast, fair, and designed not to lag your server.[/I]
+
+[SIZE=3][COLOR=#27AE60][B]Free.[/B][/COLOR] Same engine as [B]RTP-Pro[/B], trimmed for hobby and small-network servers.[/SIZE]
+
+[URL='https://github.com/dailystruggle/RTP'][IMG]https://img.shields.io/github/v/release/dailystruggle/RTP?label=Version&style=for-the-badge&color=2C3E50[/IMG][/URL] [URL='https://github.com/dailystruggle/RTP'][IMG]https://img.shields.io/github/license/dailystruggle/RTP?label=License&style=for-the-badge&color=2C3E50[/IMG][/URL]
+[/CENTER]
+
+[SIZE=5][B][COLOR=#27AE60]Why RTP?[/COLOR][/B][/SIZE]
+Random teleportation looks cheap and easy, but it is one of the most resource-intensive tasks on a Minecraft server: chunk loading, safe-placement checks, re-rolling, and players still wandering off afterwards. RTP was built to solve [I]all[/I] of that on the same plugin:
+
+[LIST]
+[*]🌀 [B]Spiral-based selection[/B] — bounded math instead of unbounded re-roll loops. Selection time stays predictable even on huge worlds.
+[*]🧠 [B]Spatial memory[/B] — RTP [I]learns[/I] which sectors keep failing and stops trying them. Selection gets faster the longer the server runs.
+[*]⏱️ [B]Pre-generated queue[/B] — most of the time there's already a verified destination ready before the player even types `/rtp`.
+[*]🛡️ [B]Safe placement[/B] — configurable safety radius, optional landing platform, invulnerability timer, flat material allow/deny list.
+[*]🌍 [B]Per-region, per-world configuration[/B] — square or circle, weighted curves, vertical bounds, optional sky-light check, world overrides.
+[*]🔌 [B]Works with the plugins you already run[/B] — PlaceholderAPI, ProtocolLib. ([I]Vault economy and claim-plugin integrations are an [B]RTP-Pro[/B] feature.[/I])
+[/LIST]
+
+[CENTER][I]Originally published as [URL='https://www.spigotmc.org/resources/rtp.94812/']RTP 2.x[/URL] — this resource is the free-tier successor on the rewritten 3.0 engine.[/I][/CENTER]
+
+[CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
+
+[SIZE=5][B][COLOR=#16A085]Quick Start[/COLOR][/B][/SIZE]
+[LIST=1]
+[*]Drop the `RTP-x.y.z.jar` into your server's `plugins/` folder.
+[*]Start (or restart) the server. Default config and a `default` region are generated automatically.
+[*]Type [B]`/rtp`[/B] in-game.
+[/LIST]
+
+That's it for the smoke test. Tweak `plugins/RTP/config.yml` and `plugins/RTP/regions/*.yml` once you want per-region radii, biomes, or weighting.
+
+[CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
+
+[SIZE=5][B][COLOR=#9B59B6]See It In Action[/COLOR][/B][/SIZE]
+[I]Recorded on the original `RTP 2.x` resource — the lineage this page continues. The underlying principles (spatial learning, queue-paced throughput) are unchanged in `3.0`; the on-screen numbers predate the current release.[/I]
+
+[B]Learning & deterministic-time test[/B]
+[media=youtube]PY6W7DikhAI[/media]
+[I]The plugin "learns" bad sectors, and selection time converges to a predictable lower bound.[/I]
+
+[B]Command-response & throughput test[/B]
+[media=youtube]l6KSvKxsKAQ[/media]
+[I]Pre-generated queue → near-instant `/rtp` response under load.[/I]
+
+[CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
+
+[SIZE=5][B][COLOR=#2980B9]Design Philosophy[/COLOR][/B][/SIZE]
+
+[B]Function over form.[/B] No GUI, no flashy commands — plain YAML files you can version-control and diff. Every behavior is configurable, but the defaults are sane.
+
+[B]Nuanced setup, extreme flexibility.[/B] Teleportation is controlled by [I]regions[/I] — yaml files you can hot-reload via command. Per-region: shape, radius, center, curve weighting, vertical bounds, sky-light check, world permission, unique placements, region expansion, and a fallback world if the player lacks permission. RTP also exposes events, interchangeable shapes, and an addon API so you can integrate with custom generators, claim plugins, or your own logic.
+
+[B]Designed for SMP and small networks first.[/B] That's where this functionality is most needed; that's where it's tested hardest.
+
+[CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
+
+[SIZE=5][B][COLOR=#16A085]Platform Support[/COLOR][/B][/SIZE]
+[LIST]
+[*]✅ [B][COLOR=#27AE60]Paper[/COLOR][/B] — fully async chunk loading via native `getChunkAtAsync`. The recommended setup.
+[*]✅ [B][COLOR=#27AE60]Paper forks[/COLOR][/B] — [B]Leaf[/B], [B]Leaves[/B], [B]Purpur[/B], [B]Pufferfish[/B], [B]Airplane[/B], and other Paper-derived forks are supported on the Paper code path; they inherit Paper-class async chunk loading. Use the Paper/Spigot build of RTP. ([I][B]Leaf[/B] and [B]Leaves[/B] are separate projects despite the similar names.[/I])
+[*]✅ [B][COLOR=#E67E22]Spigot[/COLOR][/B] — supported. Region files (`.mca`) are parsed off-tick to skip bad candidates [I]before[/I] a chunk load is needed, so most `/rtp` calls feel Paper-class even on vanilla Spigot.
+[*]✅ [B][COLOR=#E67E22]Spigot forks[/COLOR][/B] — Spigot-derived forks without the Paper async chunk API run the Spigot code path (Anvil pre-filter + bounded main-thread fallback).
+[*]🌱 [B][COLOR=#7F8C8D]Custom generators[/COLOR][/B] — Iris, Terra, datapack-driven worlds — work out of the box. Modded biome and block IDs are preserved.
+[*]❌ [B][COLOR=#C0392B]Folia[/COLOR][/B] — [B]not bundled in Lite[/B]. Folia operators must use [B]RTP-Pro[/B], which ships the Folia adapter (Region Scheduler, off-tick safety pre-filter, no 1-tick stalls).
+[*]✅ [B][COLOR=#27AE60]Mohist / Arclight[/COLOR][/B] — officially supported Bukkit-compatibility launchers for Forge / NeoForge servers. Use the Spigot/Paper build of RTP; the Spigot code path applies. This is the recommended way to run RTP on a Forge or NeoForge server.
+[*]🚧 [B][COLOR=#C0392B]Fabric[/COLOR][/B] — adapter ships in-tree but `/rtp` is [B]not functional[/B] yet. Planned for a later release.
+[*]🔁 [B][COLOR=#C0392B]Native Forge / NeoForge[/COLOR][/B] — no native adapter planned. Use [B]Arclight[/B] or [B]Mohist[/B] above.
+[/LIST]
+
+[B]Best setup:[/B] Paper, with memory to spare for the pre-generation queue. RTP works particularly well on servers that have already been pre-generated.
+
+[CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
+
+[SIZE=5][B][COLOR=#2C3E50]Performance vs. Other RTP Plugins[/COLOR][/B][/SIZE]
+[I]How RTP (Lite) and RTP-Pro stack up against the most-deployed RTP plugins on the three Bukkit-family server architectures. Folia is the clearest delta between the two tiers — Lite drops the Folia adapter, Pro ships it. Both rows are shown so you can see what upgrading would change.[/I]
+
+[B]Confidence legend:[/B] 🧪 = measured locally on the RTP benchmark harness · 📖 = read from the plugin's published docs / resource page · ❓ = inferred from the plugin's known architecture, not yet verified.
+
+[B]Architecture support matrix[/B]
+[TABLE]
+[TR][TD][B]Plugin[/B][/TD][TD][B]Spigot[/B][/TD][TD][B]Paper (and forks)[/B][/TD][TD][B]Folia[/B][/TD][/TR]
+[TR][TD][B]RTP (Lite)[/B][/TD][TD]✅ 🧪 Off-tick Anvil pre-filter; rare bounded main-thread fallback.[/TD][TD]✅ 🧪 Fully async via native `getChunkAtAsync`; no fallback path.[/TD][TD]❌ Folia adapter not bundled in Lite — see [B]RTP-Pro[/B].[/TD][/TR]
+[TR][TD][B]RTP-Pro[/B][/TD][TD]✅ 🧪 Same Spigot path as Lite.[/TD][TD]✅ 🧪 Same Paper path as Lite.[/TD][TD]✅ 🧪 Region Scheduler + off-tick pre-filter; no 1-tick stalls.[/TD][/TR]
+[TR][TD]BetterRTP[/TD][TD]⚠️ 📖 Synchronous chunk load on miss; TPS spikes during generation are widely reported.[/TD][TD]⚠️ 📖 Uses Paper async where available, but no off-tick safety pre-filter.[/TD][TD]❌ 📖 No native Folia adapter; runs on Paper-compat fork only.[/TD][/TR]
+[TR][TD]EzRTP[/TD][TD]❌ 🧪 Loads on Spigot 1.20.1 but its async update-checker throws `NoSuchMethodError` on the Paper-only `JavaPlugin#getPluginMeta()` ([I]SpigotUpdateChecker:28[/I]); core path otherwise statistics-driven, no Anvil pre-filter — sync chunk load on miss.[/TD][TD]✅ 📖 Built-in percentile/timing metrics on Paper.[/TD][TD]❓ 📖 Not advertised as Folia-aware.[/TD][/TR]
+[TR][TD]AsyRTP[/TD][TD]❌ 🧪 Fails to enable on Spigot 1.20.1 — `StartupBanner.print` calls the Paper-only `JavaPlugin#getPluginMeta()` during `onEnable`, throwing `NoSuchMethodError` before the plugin initializes. Effectively Paper/Folia-only despite the name.[/TD][TD]✅ 📖 Async location search.[/TD][TD]✅ 📖 Region-thread-safe; explicit Folia target.[/TD][/TR]
+[TR][TD]SorekillRTP[/TD][TD]⚠️ ❓ Functional, but the design centre is Redis-backed cross-server, not single-server perf.[/TD][TD]⚠️ ❓ Same.[/TD][TD]❓ 📖 Folia compatibility not specifically documented.[/TD][/TR]
+[TR][TD]AdvancedRTP[/TD][TD]⚠️ 📖 Safety-first; trades speed for ground/biome detection. Sync chunk load on candidate evaluation.[/TD][TD]⚠️ 📖 Same path on Paper.[/TD][TD]❌ 📖 No documented Folia support.[/TD][/TR]
+[TR][TD]JakesRTP[/TD][TD]⚠️ 📖 Async via `prefer-sync-tp: false`; configurable destination cache (`cache-locations`).[/TD][TD]✅ 📖 Same async path on Paper; widely deployed.[/TD][TD]❌ 📖 No native Folia adapter (community forks vary).[/TD][/TR]
+[TR][TD]EssentialsX `/rtp`[/TD][TD]✅ 📖 Works; main-thread chunk load on each candidate.[/TD][TD]✅ 📖 Works; same path, no async chunk API use.[/TD][TD]❌ 📖 Folia not supported by EssentialsX core.[/TD][/TR]
+[TR][TD]HuskHomes RTP[/TD][TD]✅ 📖 Works; bundled with the broader homes/teleport suite.[/TD][TD]✅ 📖 Same path on Paper.[/TD][TD]❓ 📖 Partial — see HuskHomes' own platform matrix.[/TD][/TR]
+[/TABLE]
+
+[B]Performance metrics[/B] [I](measured on the RTP benchmark harness against a freshly-generated 1.21 vanilla world; numbers labelled `<benchmark pending>` will be filled in as the harness is hardened. Lower is better for latency / MSPT; higher is better for stable TPS.)[/I]
+[TABLE]
+[TR][TD][B]Plugin[/B][/TD][TD][B]Cold-start /rtp[/B][/TD][TD][B]Warm-queue /rtp[/B][/TD][TD][B]TPS under 10× burst[/B][/TD][TD][B]MSPT during eval[/B][/TD][TD][B]Memory footprint[/B][/TD][/TR]
+[TR][TD][B]RTP (Lite)[/B][/TD][TD]🧪 `<benchmark pending>`[/TD][TD]🧪 `<benchmark pending>` ([I]queue serves pre-verified destination[/I])[/TD][TD]🧪 `<benchmark pending>`[/TD][TD]🧪 `<benchmark pending>`[/TD][TD]🧪 `<benchmark pending>`[/TD][/TR]
+[TR][TD][B]RTP-Pro[/B][/TD][TD]🧪 `<benchmark pending>`[/TD][TD]🧪 `<benchmark pending>`[/TD][TD]🧪 `<benchmark pending>`[/TD][TD]🧪 `<benchmark pending>`[/TD][TD]🧪 `<benchmark pending>`[/TD][/TR]
+[TR][TD]BetterRTP[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][/TR]
+[TR][TD]EzRTP[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][/TR]
+[TR][TD]AsyRTP[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][/TR]
+[TR][TD]SorekillRTP[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][/TR]
+[TR][TD]AdvancedRTP[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][/TR]
+[TR][TD]JakesRTP[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][/TR]
+[TR][TD]EssentialsX `/rtp`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>` ([I]no pre-warmed queue[/I])[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][/TR]
+[TR][TD]HuskHomes RTP[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][/TR]
+[/TABLE]
+
+[B]Methodology and honest caveats.[/B]
+[LIST]
+[*]Architecture-matrix verdicts marked 📖 are read from the plugin's own published documentation; ❓ verdicts are inferred from the plugin's known architecture and have not been independently verified. 🧪 verdicts are measured against the in-tree RTP harness on the same hardware.
+[*]Numeric metrics are intentionally unfilled in this beta. A dedicated stress-test helper plugin is in development to drive identical workloads through every plugin in the table; results will be backfilled (with raw logs published) before `3.0.0` final.
+[*]Competitor plugins update frequently. This comparison reflects published platform support and observed behavior at the time of writing — corrections welcome via GitHub issue, with a link to the contradicting documentation or a reproduction.
+[*]Feature breadth, GUI, and claim-plugin integration are [I]not[/I] benchmarked here. Several competitors trade speed for those features, and that's a legitimate choice — the table is about throughput and platform fit, not feature parity.
+[/LIST]
+
+[CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
+
+[SIZE=5][B][COLOR=#16A085]Features[/COLOR][/B][/SIZE]
+[LIST]
+[*][B]Any number of teleport regions per world.[/B] Each region has its own shape (square / circle / rectangle), radius, center, curve weighting, vertical bounds, world override, and permission gates.
+[*][B]Vertical adjustors[/B] — Linear and Jump. Useful for sky islands, void worlds, and Nether ceilings.
+[*][B]Multi-dimensional support[/B] — Overworld, Nether, End, custom dimensions all work.
+[*][B]Hot-reloadable configuration[/B] via `/rtp reload` (and the experimental `/rtp config` editor).
+[*][B]Teleport safety[/B] — configurable radius check, optional emergency landing platform, configurable invulnerability timer, flat material allow/deny list. ([I]Vanilla block tags and state predicates are an [B]RTP-Pro[/B] feature.[/I])
+[*][B]Pre-loading & queues[/B] — async chunk loading, per-player queues, global queues, reuse of locations from cancelled teleports, fairness-preserving allocation.
+[*][B]Self-improving[/B] — bad-placement memory persists across restarts (YAML-backed; no database to set up).
+[*][B]Configurable messages[/B] in `messages.yml` (English).
+[*][B]Permission-based sounds and effects[/B] — see the [URL='https://github.com/dailystruggle/RTP/blob/main/docs/admin/FOR_SERVER_ADMINS.md']admin guide[/URL] for the syntax.
+[*][B]Public API[/B] for addon developers — events, shapes, lifecycle hooks. Examples in the GitHub repository.
+[*][I]Not in Lite — available in [B]RTP-Pro[/B]:[/I] SQL/Redis backends, Folia adapter, claim-plugin integrations (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, Factions, HuskTowns, RedProtect), Vault economy, multilingual `lang/**`, login-reserve cache, visitor mode, vanilla block tags / state predicates in `safety.yml`.
+[/LIST]
+
+[CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
+
+[SIZE=5][B][COLOR=#16A085]Safety List[/COLOR][/B][/SIZE]
+`safety.yml` in Lite accepts a flat material allow/deny list — plain material names, one per line:
+
+[LIST]
+[*][B]Examples:[/B] `LAVA`, `MAGMA_BLOCK`, `CACTUS`, `FIRE`
+[/LIST]
+
+Unknown materials log a single warning — never silently dropped.
+
+[I]Need vanilla block tags (e.g. `#minecraft:leaves`), state predicates (`OAK_SLAB[waterlogged=true]`), or wildcards (`*[waterlogged=true]`)? That richer grammar ships in [B]RTP-Pro[/B].[/I]
+
+[CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
+
+[SIZE=5][B][COLOR=#9B59B6]FAQ[/COLOR][/B][/SIZE]
+
+[B]Q: This responds way faster than other RTP plugins. Why aren't I waiting for chunk loading?[/B]
+A: When I say [I]optimized[/I], I mean optimized. In most cases there's already a verified destination ready in the queue before you even type the command. The chunks are pre-loaded; the safety check is already done.
+
+[B]Q: How do I set up teleportation between worlds?[/B]
+A: See the [URL='https://github.com/dailystruggle/RTP/blob/main/docs/admin/FOR_SERVER_ADMINS.md']admin guide[/URL]. World resolution order on command: player's current world (or `world:` parameter) → world's target region → region's target world.
+
+[B]Q: Does it work with Iris / Terra / custom datapack generators?[/B]
+A: Yes. Region files are read directly, so modded and namespaced biome and block IDs are preserved. No special configuration needed.
+
+[B]Q: What's the difference between RTP and RTP-Pro?[/B]
+A: Same engine, same source tree. [B]RTP-Pro[/B] ships first on each release and includes SQL/shared-database backends for multi-server / proxy setups, plus priority support. The free [B]RTP[/B] (Lite) jar ships hours-to-days later with the same core engine and is fully sufficient for single-server deployments.
+
+[B]Q: Can I upgrade from Lite to Pro later?[/B]
+A: Yes — drop in the Pro jar over the Lite one. Same configuration, same data files, same commands.
+
+[B]Q: I'm on Forge / NeoForge.[/B]
+A: Run [B]Arclight[/B] or [B]Mohist[/B] (Bukkit-compatibility launchers, both officially supported) and use the Spigot/Paper build of RTP. A native Forge adapter is not planned and is lower priority than multi-server / proxy support.
+
+[B]Q: Memory and MSPT — should I worry?[/B]
+A: RTP trades memory for speed: the queue lives in RAM and the plugin keeps a small spatial-memory cache. On a healthy server you should not see TPS drop below ~19 from RTP alone, but [I]high MSPT spikes around new-area generation are expected[/I] — that's the cost of generating the chunks. The queue smooths it out so each individual `/rtp` doesn't pay the full cost.
+
+[B]Q: How do I report a bug?[/B]
+A: Open a GitHub issue with your server version, RTP version, platform (Spigot/Paper/Folia), the relevant config files, and the error log section. Discord is also fine for general questions; bug reports belong on GitHub so they don't get lost.
+
+[CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
+
+[SIZE=5][B][COLOR=#2980B9]Reference[/COLOR][/B][/SIZE]
+
+[SPOILER='Basic commands']
+[LIST]
+[*][B]`/rtp`[/B] — teleport to the default region for your current world.
+[*][B]`/rtp [parameter]:[value]`[/B] — specify region, world, player, and/or temporary region parameters before teleporting.
+[*][B]`/rtp reload`[/B] — reload all configuration from disk.
+[*][B]`/rtp scan start|pause|resume|reset|cancel`[/B] — pre-warm the spatial-memory cache by walking a region. (Renamed from `/rtp fill` in 2.x.)
+[*][B]`/rtp config`[/B] — interactive config editor. [I]Experimental in `3.0.0-beta.1`[/I]; surface and grammar may change before `3.0` final. For production, edit YAML directly.
+[/LIST]
+Console commands work but may require an explicit `player:` / `world:` / `region:` parameter, since the console is neither a player nor in a world.
+[/SPOILER]
+
+[SPOILER='PlaceholderAPI placeholders']
+[LIST]
+[*][B]`%rtp_player_status%`[/B] — the player's current teleport status (idle, waiting, teleporting, etc.).
+[*][B]`%rtp_total_queue_length%`[/B] — total locations available to the player in the region `/rtp` would use.
+[*][B]`%rtp_public_queue_length%`[/B] — locations available to everyone in that region.
+[*][B]`%rtp_personal_queue_length%`[/B] — locations reserved specifically for that player in that region.
+[*][B]`%rtp_teleport_world%`[/B], [B]`%rtp_teleport_x%`[/B], [B]`%rtp_teleport_y%`[/B], [B]`%rtp_teleport_z%`[/B] — last/current teleport destination.
+[/LIST]
+[/SPOILER]
+
+[SPOILER='Soft dependencies (optional)']
+[LIST]
+[*][B]PlaceholderAPI[/B] — exposes the placeholders above.
+[*][B]ProtocolLib[/B] — used by some effects.
+[/LIST]
+[I]PaperLib is no longer required — Paper provides native async chunk APIs.[/I]
+[I]Vault economy is not bundled in Lite. To charge for `/rtp`, use [B]RTP-Pro[/B].[/I]
+[/SPOILER]
+
+[SPOILER='Known limitations in 3.0.0-beta.1']
+[LIST]
+[*]Lite is not yet on a fixed publishing cadence; first regular Lite release lands at `3.0` GA.
+[*]Fabric is not functional in the beta — planned for a later release. Don't deploy on Fabric.
+[*]No Folia in Lite. The Folia adapter is an [B]RTP-Pro[/B] feature; on Folia, `/rtp` will not function.
+[*]No SQL/Redis backends in the Lite assembly (H2, SQLite, MySQL, PostgreSQL, Jedis are stripped). The default YAML-file database persists learned state across restarts and is fine for single-server deployments. Shared-database / multi-server backends are an [B]RTP-Pro[/B] feature.
+[*]No claim-plugin integrations, Vault economy, multilingual support, or login-reserve cache in Lite — all [B]RTP-Pro[/B] features.
+[*]The `/rtp config` command is experimental — surface, argument grammar, and write-back semantics may change before `3.0` final. Edit YAML directly for production.
+[*]Edits to `safety.yml` and biome filters do not yet invalidate the persisted shape cache. Workaround: `/rtp scan reset <region>` after changing safety predicates.
+[*]Emergency landing platform default changed: `safety.yml` now ships `platformRadius: -1` (disabled). Set it to `0` or higher to restore legacy 2.x behavior.
+[/LIST]
+For the live list, see the [URL='https://github.com/dailystruggle/RTP/blob/main/CHANGELOG.md#known-issues']CHANGELOG[/URL].
+[/SPOILER]
+
+[SPOILER='A note on AI assistance']
+I use AI coding assistants (LLM-based pair-programming tools) for scaffolding, refactoring, test generation, and documentation drafting. Every line that ships is reviewed, tested, and signed off by me. Architecture, safety invariants (thread model, chunk-ticket lifecycle, claim checks), and release decisions are mine alone. No AI output is published without human verification against the requirements and test suite. If you prefer plugins written without AI tooling in the loop at all, this isn't that plugin, and I'd rather you know up front.
+[/SPOILER]
+
+[CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
+
+[SIZE=5][B][COLOR=#27AE60]Outgrown Lite?[/COLOR][/B][/SIZE]
+[B]RTP-Pro[/B] is a drop-in upgrade — same configuration, same data files, same commands. Pro adds SQL/shared-database backends for multi-server / proxy setups, earliest releases on each version, and priority support within a documented response window.
+
+[CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
+
+[SIZE=5][B][COLOR=#7F8C8D]Links & Support[/COLOR][/B][/SIZE]
+[LIST]
+[*][URL='https://github.com/dailystruggle/RTP/blob/main/docs/admin/FOR_SERVER_ADMINS.md'][B]Admin guide[/B] — install, configure, command reference[/URL]
+[*][URL='https://github.com/dailystruggle/RTP/blob/main/docs/dev/FOR_ADDON_DEVELOPERS.md'][B]Addon developer guide[/B] — API and examples[/URL]
+[*][URL='https://github.com/dailystruggle/RTP/blob/main/CHANGELOG.md'][B]Changelog & roadmap[/B][/URL]
+[*][URL='https://github.com/dailystruggle/RTP'][B]Source on GitHub[/B] — star, watch, contribute, file issues[/URL]
+[/LIST]
+
+[B]Lite support is community-tier and best-effort.[/B] Bug reports and configuration questions are welcome on GitHub. To help me reproduce, please include your server version, RTP version, platform, the relevant config files (`config.yml`, `regions/`, `safety.yml`), and the relevant `server.log` section. Reports without these will be asked for them; if there's no follow-up, the issue will be closed and can be reopened later. Priority and response-time guarantees are reserved for [B]RTP-Pro[/B].
+
+[I]Unsupported in Lite:[/I] Fabric (planned for a later release), native Forge / NeoForge (use officially-supported Arclight or Mohist), plugin conflicts I can't reproduce, and general Minecraft-server administration questions.
+
+[CENTER]
+[COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR]
+[I][COLOR=#7F8C8D]bStats enabled — anonymous usage stats help me prioritize platform work.[/COLOR][/I]
+[/CENTER]

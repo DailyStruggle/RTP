@@ -196,6 +196,18 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   }
 
   /**
+   * Public entry point for a live chunk load that bypasses the ADR-016 anvil
+   * prefilter short-circuit. Shared by {@link #getChunkAt}'s UNKNOWN fall-through
+   * and {@code TestChunkProbePerfCmd} so the "full" timing of the calibration
+   * command reflects an actual live chunk load (the legacy "always load to
+   * evaluate" cost), not the prefilter's cached anvil view re-publish.
+   */
+  public CompletableFuture<Long> loadLiveChunk(int cx, int cz) {
+    final long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
+    return loadChunkFuture(cx, cz, key);
+  }
+
+  /**
    * BIOME_LOOKUP_PERF_PLAN.md PR-3b — fast-path probe that reads a single chunk's
    * center column from the persisted {@code r.X.Z.mca} region file and hands
    * {@code PregenTask} a {@link io.github.dailystruggle.rtp.api.world.ChunkColumnProbe}
@@ -215,7 +227,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
    */
   @Override
   public CompletableFuture<io.github.dailystruggle.rtp.api.world.ChunkColumnProbe>
-      probeChunkColumn(int cx, int cz, int minY, int maxY, boolean includeSkyLight) {
+      probeChunkColumn(int cx, int cz, int minY, int maxY) {
     if (minY > maxY) return CompletableFuture.completedFuture(null);
     if (!shouldPrefilter(cx, cz)) return CompletableFuture.completedFuture(null);
     if (world == null) return CompletableFuture.completedFuture(null);
@@ -223,7 +235,6 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     final String dim = dimensionRegionSubpath(world);
     final int finalMinY = minY;
     final int finalMaxY = maxY;
-    final boolean finalSky = includeSkyLight;
     // BIOME_LOOKUP_PERF_PLAN.md PR-9: revert PR-8's inline dispatch. The concurrency
     // gauge in ScanTask showed peak in-flight at 11–12 vs cap 50 — the driver loop
     // was serializing ~7ms of probe I/O onto its single thread. Dispatch back onto
@@ -244,7 +255,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
         int rz = Math.floorMod(cz, 32);
         io.github.dailystruggle.rtp.anvil.ColumnProbe probe =
             io.github.dailystruggle.rtp.anvil.AnvilReader.readColumnProbe(
-                regionBytes, rx, rz, finalMinY, finalMaxY, finalSky);
+                regionBytes, rx, rz, finalMinY, finalMaxY);
         if (probe == null) return null;
         return new io.github.dailystruggle.rtp.spigot.anvil.probe.AnvilColumnProbeAdapter(probe, cx, cz);
       } catch (Throwable t) {
@@ -755,6 +766,9 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     try {
       ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
       int radius = safety.getNumber(SafetyKeys.platformRadius, 0).intValue();
+      // Honour the documented "disable platforms" contract from safety.yml (platformRadius: -1).
+      // Skip even reading the rest of the config when the operator has opted out entirely.
+      if (radius < 0) return;
       int airHeight = safety.getNumber(SafetyKeys.platformAirHeight, 0).intValue();
       int depth = safety.getNumber(SafetyKeys.platformDepth, 0).intValue();
       Material material;
@@ -794,7 +808,10 @@ public class BukkitRTPWorld extends RTPWorld<World> {
 
   @Override
   public void save() {
-    world.save();
+    // World.save() is main-thread only on Spigot/Paper (AsyncCatcher will throw otherwise).
+    // ScanTask.wrapUpBatch invokes us from an async worker; RTP.scheduler.runTask
+    // executes inline when already on the primary thread, otherwise schedules to it.
+    RTP.scheduler.runTask(() -> world.save());
   }
 
   @Override

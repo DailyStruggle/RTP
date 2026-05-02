@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.api;
 
+import io.github.dailystruggle.rtp.api.hooks.RTPHooks;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import java.util.Set;
@@ -58,6 +59,14 @@ public class RTPAPI {
    * Use {@link #getBiomes(RTPWorld)} rather than calling this field directly.
    */
   public static volatile Function<RTPWorld, Set<String>> biomeProvider = null;
+  /**
+   * Singleton facade for behavior-modification hooks (claim verifiers, economy,
+   * placeholders, world border, anvil pre-filter). Populated by {@code rtp-core}
+   * during {@code onEnable}; {@code null} until then. Use {@link #hooks()} rather
+   * than reading this field directly so missing initialisation is loud
+   * (REQ-RTP-S-006). See ADR-026 and {@code docs/dev/EXTERNAL_HOOKS.md}.
+   */
+  public static volatile RTPHooks hooks = null;
 
 
   /**
@@ -168,5 +177,29 @@ public class RTPAPI {
       return biomeProvider.apply(world);
     }
     return null;
+  }
+
+  /**
+   * Returns the behavior-modification hook facade.
+   *
+   * <p>Use this from third-party plugins to register claim verifiers, an
+   * economy provider, PAPI-style placeholder resolvers, a world-border
+   * integration, or an anvil pre-filter SPI without depending on
+   * {@code rtp-core} internals (ADR-026; see {@code docs/dev/EXTERNAL_HOOKS.md}).
+   *
+   * <p><b>Thread safety:</b> Safe to call from any thread once {@code rtp-core}
+   * has completed {@code onEnable}. The returned facade is itself thread-safe.
+   *
+   * @return the non-null hooks facade
+   * @throws IllegalStateException if called before core delegates are registered
+   *     (REQ-RTP-S-006)
+   */
+  public static RTPHooks hooks() {
+    RTPHooks h = hooks;
+    if (h == null) {
+      throw new IllegalStateException(
+          "[RTP API] Cannot access hooks: Core implementation is not loaded.");
+    }
+    return h;
   }
 }

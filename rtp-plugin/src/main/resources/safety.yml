@@ -4,7 +4,7 @@
 invulnerabilityTime: 5 # Seconds of invulnerability after teleport
 safetyRadius: 0 # Block radius around landing to check for hazards
 staleChunkRetryLimit: 2 # Max retries for stale-chunk guard
-anvilPrefilterEnabled: true # Off-thread safety probe (Spigot only)
+anvilPrefilterEnabled: true # Off-thread anvil prefilter
 platformRadius: -1 # Radius of emergency platform (-1 to disable)
 platformDepth: 1 # Depth of platform
 platformAirHeight: 2 # Air space above platform

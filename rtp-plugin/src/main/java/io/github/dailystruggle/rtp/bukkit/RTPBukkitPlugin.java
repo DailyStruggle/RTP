@@ -1,11 +1,9 @@
 package io.github.dailystruggle.rtp.bukkit;
 
 import io.github.dailystruggle.effectsapi.EffectsAPI;
-import io.github.dailystruggle.rtp.bukkit.commands.RTPCmdBukkit;
 import io.github.dailystruggle.rtp.bukkit.database.BukkitDatabaseHandler;
 import io.github.dailystruggle.rtp.bukkit.effects.BukkitEffectsHandler;
 import io.github.dailystruggle.rtp.bukkit.events.*;
-import io.github.dailystruggle.rtp.bukkit.server.BukkitServerProvider;
 import io.github.dailystruggle.rtp.bukkit.spigotListeners.*;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.ChunkyBorderChecker;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.PAPI_expansion;
@@ -96,21 +94,8 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     // fallback. Reflection itself cannot log via RTP.log because the accessor isn't ready.
     if (instance == null) {
       instance = this;
-
-      BukkitServerProvider.ServerModel serverModel;
-      try {
-        serverModel = BukkitServerProvider.resolveServerModel(this);
-        RTP.serverAccessor =
-            (io.github.dailystruggle.rtp.api.server.RTPServerAccessor)
-                Class.forName(serverModel.accessorClassName).getDeclaredConstructor().newInstance();
-        RTP.scheduler =
-            (io.github.dailystruggle.rtp.api.scheduling.RTPScheduler)
-                Class.forName(serverModel.schedulerClassName)
-                    .getDeclaredConstructor(JavaPlugin.class)
-                    .newInstance(this);
-      } catch (Exception e) {
-        RTP.log(java.util.logging.Level.WARNING,
-            "[LIFECYCLE] onEnable reflection failure -- bailing out via onDisable", e);
+      // ADR-024: shared helper -- both bootstraps wire serverAccessor + scheduler the same way.
+      if (!BootstrapSupport.wireServerAccessorAndScheduler(this, "LIFECYCLE")) {
         onDisable();
         return;
       }
@@ -145,26 +130,8 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
 
     RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable binding /rtp and /wild executors and tab-completers");
-    RTPCmdBukkit mainCommand = new RTPCmdBukkit(this);
-    RTP.baseCommand = mainCommand;
-
-    org.bukkit.command.PluginCommand rtpCommand = getCommand("rtp");
-    if (rtpCommand != null) {
-      rtpCommand.setExecutor(mainCommand);
-      rtpCommand.setTabCompleter(mainCommand);
-      RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] onEnable bound /rtp executor + tab completer");
-    } else {
-      RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] onEnable /rtp PluginCommand not registered");
-    }
-
-    org.bukkit.command.PluginCommand wildCommand = getCommand("wild");
-    if (wildCommand != null) {
-      wildCommand.setExecutor(mainCommand);
-      wildCommand.setTabCompleter(mainCommand);
-      RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] onEnable bound /wild executor + tab completer");
-    } else {
-      RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] onEnable /wild PluginCommand not registered");
-    }
+    // ADR-024: shared helper -- identical command-binding logic between full and lite.
+    BootstrapSupport.registerRtpAndWildCommands(this);
 
     RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable scheduling deferred startupTasks drain (tick+1)");
     RTP.scheduler.runTaskLater(
@@ -419,8 +386,12 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     if (RTP.economy == null && Bukkit.getServer().getPluginManager().getPlugin("Vault") != null) {
       VaultChecker.setupEconomy();
       VaultChecker.setupPermissions();
-      if (VaultChecker.getEconomy() != null) RTP.economy = new VaultChecker();
-      else RTP.economy = null;
+      // ADR-026: bind through the public RTPHooks facade rather than poking RTP.economy
+      // directly. The facade also writes RTP.economy for read-path compatibility; see
+      // docs/dev/EXTERNAL_HOOKS.md.
+      if (VaultChecker.getEconomy() != null) {
+        io.github.dailystruggle.rtp.api.RTPAPI.hooks().economy().bind(new VaultChecker());
+      }
     }
 
     // Bundled claim-plugin integrations (formerly the RTP_ClaimPluginIntegrations addon).

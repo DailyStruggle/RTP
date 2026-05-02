@@ -1,0 +1,121 @@
+# --- RTP-lite Safety Configuration (ADR-024) ---
+# Flat material allow/deny list.
+# No tag (#minecraft:*) entries and no state predicates (e.g. *[waterlogged=true]).
+# Operators who need block-tag or state-predicate matching (ADR-017) use the full edition.
+
+invulnerabilityTime: 5 # Seconds of invulnerability after teleport
+safetyRadius: 0 # Block radius around landing to check for hazards
+staleChunkRetryLimit: 2 # Max retries for stale-chunk guard
+anvilPrefilterEnabled: true # Off-thread anvil prefilter
+platformRadius: -1 # Radius of emergency platform (-1 to disable)
+platformDepth: 1 # Depth of platform
+platformAirHeight: 2 # Air space above platform
+platformMaterial: GLASS # Material for platform
+
+airBlocks:
+  - AIR
+  - CAVE_AIR
+  - VOID_AIR
+  - LEGACY_AIR
+  - STRUCTURE_VOID
+  - LIGHT
+  - SHORT_GRASS
+  - TALL_GRASS
+  - SHORT_DRY_GRASS
+  - TALL_DRY_GRASS
+  - FERN
+  - LARGE_FERN
+  - DEAD_BUSH
+  - BUSH
+  - WILDFLOWERS
+  - FIREFLY_BUSH
+  - LEGACY_LONG_GRASS
+  - LEGACY_DEAD_BUSH
+  - BROWN_MUSHROOM
+  - RED_MUSHROOM
+  - CRIMSON_FUNGUS
+  - WARPED_FUNGUS
+  - MELON_STEM
+  - PUMPKIN_STEM
+  - SUGAR_CANE
+  - BAMBOO_SAPLING
+  - VINE
+  - GLOW_LICHEN
+  - WEEPING_VINES
+  - TWISTING_VINES
+  - HANGING_ROOTS
+  - PALE_HANGING_MOSS
+  - RESIN_CLUMP
+  - REDSTONE_WIRE
+  - COMPARATOR
+  - REPEATER
+  - LEVER
+  - STRING
+  - TRIPWIRE
+  - TORCH
+  - WALL_TORCH
+  - SOUL_TORCH
+  - SOUL_WALL_TORCH
+  - REDSTONE_TORCH
+  - REDSTONE_WALL_TORCH
+  - END_ROD
+  - LEGACY_SIGN
+  - LEGACY_WALL_SIGN
+  - SNOW
+  - MOSS_CARPET
+  - PALE_MOSS_CARPET
+  - LEAF_LITTER
+
+unsafeBlocks:
+  - WATER
+  - LAVA
+  - BUBBLE_COLUMN
+  - POWDER_SNOW
+  - MAGMA_BLOCK
+  - CACTUS
+  - SWEET_BERRY_BUSH
+  - WITHER_ROSE
+  - CHORUS_PLANT
+  - CHORUS_FLOWER
+  - POINTED_DRIPSTONE
+  - COBWEB
+  - CREAKING_HEART
+  - BEDROCK
+  - NETHER_PORTAL
+  - END_PORTAL
+  - END_GATEWAY
+  - TNT
+  - END_CRYSTAL
+  - RESPAWN_ANCHOR
+  - SEAGRASS
+  - TALL_SEAGRASS
+  - KELP
+  - KELP_PLANT
+
+biomeWhitelist: false # If true, 'biomes' is a whitelist; otherwise a blacklist
+biomes:
+  - OCEAN
+  - DEEP_OCEAN
+  - WARM_OCEAN
+  - LUKEWARM_OCEAN
+  - DEEP_LUKEWARM_OCEAN
+  - COLD_OCEAN
+  - DEEP_COLD_OCEAN
+  - FROZEN_OCEAN
+  - DEEP_FROZEN_OCEAN
+  - RIVER
+  - FROZEN_RIVER
+  - BEACH
+  - SNOWY_BEACH
+  - STONY_SHORE
+  - SWAMP
+  - MANGROVE_SWAMP
+  - SMALL_END_ISLANDS
+  - BASALT_DELTAS
+  - DRIPSTONE_CAVES
+  - LUSH_CAVES
+  - DEEP_DARK
+  - THE_VOID
+
+# DO NOT TOUCH VERSION NUMBER
+version: "1.0"

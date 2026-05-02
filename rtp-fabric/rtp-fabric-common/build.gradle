@@ -15,7 +15,10 @@
 // The root subprojects block is harmless because applying the same plugin
 // twice is a no-op in Gradle.
 plugins {
-    id 'fabric-loom' version '1.11-SNAPSHOT'
+    // Version pinned in settings.gradle pluginManagement.plugins {} so all
+    // Loom-using subprojects share one plugin classloader (avoids the
+    // LoomGradleExtension ClassCastException).
+    id 'fabric-loom'
 }
 
 // Loom-specific MC + Yarn/Mojmap + Fabric API versions. Pinned to the
@@ -36,8 +39,13 @@ dependencies {
     minecraft "com.mojang:minecraft:${minecraftVersion}"
     mappings  loom.officialMojangMappings()
 
-    modImplementation "net.fabricmc:fabric-loader:${loaderVersion}"
-    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabricApiVersion}"
+    // ADR-027: rtp-fabric-common ships no MC / loader / fabric-api classes —
+    // each rtp-fabric-vXX_YY_R1 submodule carries its own runtime mod jar
+    // with its own pinned MC version. Common compiles against the 1.21.1
+    // mojmap line above purely to typecheck; flipping these to
+    // `modCompileOnly` is what makes the "compile-only common" guarantee real.
+    modCompileOnly "net.fabricmc:fabric-loader:${loaderVersion}"
+    modCompileOnly "net.fabricmc.fabric-api:fabric-api:${fabricApiVersion}"
 
     // Soft-depend permissions API (Step F). compileOnly so LuckPerms-Fabric
     // satisfies it at runtime when present, and absence is non-fatal.

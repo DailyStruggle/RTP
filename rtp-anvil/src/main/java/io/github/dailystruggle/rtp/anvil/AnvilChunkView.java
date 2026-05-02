@@ -11,19 +11,13 @@ import java.util.Set;
  *
  * <p>Built by {@link AnvilReader#readChunkView(byte[], int, int)} from a parsed
  * chunk root compound. Kept deliberately minimal — block palette + heightmap +
- * (optional) biome palette + chunk-root {@code isLightOn} flag — because those
- * are the only fields the Phase 3 verdict layer reads. Extending the view is
- * additive; removing fields would be a breaking change.
+ * (optional) biome palette — because those are the only fields the Phase 3
+ * verdict layer reads. Extending the view is additive; removing fields would be
+ * a breaking change.
  *
  * <p>Sections are stored in their on-disk order (generally ascending {@link PaletteSection#sectionY()},
  * but the view does not sort). A world Y below or above the emitted section range
  * returns {@code null} from {@link #blockIdAt(int, int, int)}.
- *
- * <p><b>Note on identity:</b> this type is a regular class (not a record) because
- * it owns a lazily-computed synthesized-sky-light cache (see {@link #getSkyLight(int, int, int, Set)}).
- * Instances are still effectively immutable from the consumer's perspective —
- * the cache is a memoisation of a pure function of the immutable disk fields and
- * the supplied {@code reconciledAir} set, populated under double-checked locking.
  */
 public final class AnvilChunkView {
 
@@ -31,29 +25,6 @@ public final class AnvilChunkView {
     private final List<PaletteSection> sections;
     private final long[] motionBlockingNoLeaves;
     private final List<BiomePaletteSection> biomeSections;
-    private final boolean isLightOn;
-
-    /**
-     * Lazily-computed "first opaque from top" world-Y per chunk-local
-     * {@code (x, z)} column, indexed by {@code (z &amp; 15) * 16 + (x &amp; 15)}.
-     * Populated on first call to {@link #getSkyLight(int, int, int, Set)} when
-     * {@link #isLightOn} is {@code false}; never populated otherwise. The
-     * {@link Integer#MIN_VALUE} sentinel means "no opaque block in this column"
-     * (fully sky-exposed). Volatile + double-checked synchronisation on
-     * {@link #synthLock} provides safe publication.
-     */
-    private volatile int[] synthSkyTops;
-
-    /**
-     * Identity of the {@code reconciledAir} set used to populate
-     * {@link #synthSkyTops}. The first caller wins; subsequent calls are
-     * expected to pass the same reconciled-air instance (in practice the
-     * platform adapter caches a single reconciled set per chunk wrapper).
-     * Stored as a reference comparison only — we do not deep-equal new sets.
-     */
-    private volatile Set<String> synthAirIdentity;
-
-    private final Object synthLock = new Object();
 
     /**
      * Canonical constructor. {@code sections} and {@code biomeSections} must be
@@ -62,13 +33,11 @@ public final class AnvilChunkView {
     public AnvilChunkView(int dataVersion,
                           List<PaletteSection> sections,
                           long[] motionBlockingNoLeaves,
-                          List<BiomePaletteSection> biomeSections,
-                          boolean isLightOn) {
+                          List<BiomePaletteSection> biomeSections) {
         this.dataVersion = dataVersion;
         this.sections = Objects.requireNonNull(sections, "sections");
         this.motionBlockingNoLeaves = motionBlockingNoLeaves;
         this.biomeSections = Objects.requireNonNull(biomeSections, "biomeSections");
-        this.isLightOn = isLightOn;
     }
 
     /**
@@ -79,24 +48,9 @@ public final class AnvilChunkView {
      * reports "no biome data available" and the platform adapter falls through to
      * the live {@code world.getBiome(loc)} path. This is the correct pre-Phase-2
      * baseline.
-     *
-     * <p>Defaults {@code isLightOn} to {@code true} — pre-light-synthesis callers see
-     * the unmodified nibble-derived sky-light path.
      */
     public AnvilChunkView(int dataVersion, List<PaletteSection> sections, long[] motionBlockingNoLeaves) {
-        this(dataVersion, sections, motionBlockingNoLeaves, Collections.emptyList(), true);
-    }
-
-    /**
-     * Back-compat constructor for pre-{@code isLightOn} call sites (the Phase-2
-     * biome-aware overload). Defaults {@code isLightOn} to {@code true}, preserving
-     * the unmodified nibble-derived sky-light path.
-     */
-    public AnvilChunkView(int dataVersion,
-                          List<PaletteSection> sections,
-                          long[] motionBlockingNoLeaves,
-                          List<BiomePaletteSection> biomeSections) {
-        this(dataVersion, sections, motionBlockingNoLeaves, biomeSections, true);
+        this(dataVersion, sections, motionBlockingNoLeaves, Collections.emptyList());
     }
 
     // -------------------------------------------------- record-style accessors (kept for back-compat)
@@ -105,7 +59,6 @@ public final class AnvilChunkView {
     public List<PaletteSection> sections() { return sections; }
     public long[] motionBlockingNoLeaves() { return motionBlockingNoLeaves; }
     public List<BiomePaletteSection> biomeSections() { return biomeSections; }
-    public boolean isLightOn() { return isLightOn; }
 
     /**
      * Returns the raw palette identifier at world coordinates {@code (x, worldY, z)} inside
@@ -145,15 +98,6 @@ public final class AnvilChunkView {
             if (s.sectionY() < min) min = s.sectionY();
         }
         return (min == Integer.MAX_VALUE) ? 0 : (min * 16);
-    }
-
-    /** Looks up the {@link PaletteSection} covering world-Y {@code worldY}, or {@code null}. */
-    private PaletteSection sectionForWorldY(int worldY) {
-        int sy = Math.floorDiv(worldY, 16);
-        for (PaletteSection s : sections) {
-            if (s.sectionY() == sy) return s;
-        }
-        return null;
     }
 
     /**
@@ -226,168 +170,6 @@ public final class AnvilChunkView {
         if (id == null) return true;
         String reconciled = AnvilPrefilter.DEFAULT_RECONCILER.apply(id);
         return reconciled == null || !reconciledUnsafe.contains(reconciled);
-    }
-
-    /**
-     * Returns the sky-light level at {@code (x, worldY, z)} from the on-disk
-     * {@code SkyLight} nibble payload. If the covering section has no
-     * {@code SkyLight} tag or the Y is out of range, returns {@code 15} —
-     * matching the vanilla convention for "above the opaque column" and keeping
-     * parity with {@link PaletteSection#skyLightAt(int, int, int)}.
-     *
-     * <p>This is the raw nibble path, intended for callers that have already
-     * verified {@link #isLightOn} or are running parity checks against the
-     * live chunk. Adjustor-side callers should prefer the
-     * {@link #getSkyLight(int, int, int, Set)} overload, which transparently
-     * synthesises a sky-access proxy when on-disk lighting is stale.
-     */
-    public int getSkyLight(int x, int worldY, int z) {
-        PaletteSection s = sectionForWorldY(worldY);
-        if (s == null) return 15;
-        int ly = Math.floorMod(worldY, 16);
-        return s.skyLightAt(x, ly, z);
-    }
-
-    /**
-     * Sky-light query that transparently synthesises a binary 15/0 sky-access
-     * proxy when {@link #isLightOn} is {@code false}.
-     *
-     * <p><b>Lit chunks</b> ({@code isLightOn == true}): delegates to
-     * {@link #getSkyLight(int, int, int)} — the on-disk nibble is authoritative.
-     *
-     * <p><b>Un-lit chunks</b> ({@code isLightOn == false}): on first call,
-     * lazily populates a 256-entry "first opaque from top" world-Y table over
-     * <em>all</em> chunk-local columns using {@code reconciledAir} as the
-     * transparency set, then answers each subsequent query in O(1). Returns
-     * {@code 15} when the queried Y is strictly above the topmost non-air block
-     * in its column (or the column has no opaque block at all), and {@code 0}
-     * otherwise.
-     *
-     * <p>Rationale: freshly-generated chunks ship with {@code isLightOn=false}
-     * and a stale / partially-zero {@code SkyLight} payload, which used to make
-     * the {@code requireSkyLight} adjustor predicate ({@code skyLight > 7})
-     * reject the overwhelming majority of legitimate overworld surface
-     * candidates. The binary proxy intentionally ignores per-material
-     * attenuation (leaves, water, ice) — the live re-check at teleport-commit
-     * time remains authoritative for finer attenuation (ADR-016 §4).
-     *
-     * <p><b>Caching contract:</b> the synthesised table is cached by reference
-     * identity of the {@code reconciledAir} set. The first caller wins; any
-     * subsequent caller passing a <em>different</em> reference will read the
-     * same cached table (the platform adapter caches a single reconciled set
-     * per chunk wrapper, so this is the steady-state path). Pass a stable
-     * reference per view to avoid stale-set surprises.
-     *
-     * @param x chunk-local x, 0..15
-     * @param worldY absolute world Y
-     * @param z chunk-local z, 0..15
-     * @param reconciledAir already-reconciled {@code airBlocks} set; may be
-     *     {@code null} or empty to fall through to vanilla-air-only opacity
-     * @return synthesised 15/0 when {@code !isLightOn}, otherwise the
-     *         nibble-derived value
-     */
-    public int getSkyLight(int x, int worldY, int z, Set<String> reconciledAir) {
-        if (isLightOn) {
-            return getSkyLight(x, worldY, z);
-        }
-        int[] tops = synthSkyTops;
-        if (tops == null) {
-            synchronized (synthLock) {
-                tops = synthSkyTops;
-                if (tops == null) {
-                    tops = computeAllColumnTops(reconciledAir);
-                    synthAirIdentity = reconciledAir;
-                    synthSkyTops = tops;
-                }
-            }
-        }
-        int idx = ((z & 0xF) << 4) | (x & 0xF);
-        int firstOpaque = tops[idx];
-        return (firstOpaque == Integer.MIN_VALUE || worldY > firstOpaque) ? 15 : 0;
-    }
-
-    /**
-     * Eager full-chunk variant of the synthesis precompute: scans every
-     * chunk-local {@code (x, z)} column from the top of the highest emitted
-     * section down to {@link #minHeight()} and records the world-Y of the first
-     * non-air, non-{@code reconciledAir} block. Result indexing convention:
-     * {@code result[(z &amp; 15) * 16 + (x &amp; 15)]}; columns with no opaque
-     * block use the {@link Integer#MIN_VALUE} sentinel.
-     *
-     * <p>Bounded cost: 256 columns × build-height block reads, with early
-     * exit on the first opaque block per column. Called at most once per view
-     * (first {@link #getSkyLight(int, int, int, Set)} call when
-     * {@code !isLightOn}); subsequent queries are O(1) lookups.
-     */
-    private int[] computeAllColumnTops(Set<String> reconciledAir) {
-        int[] tops = new int[256];
-        java.util.Arrays.fill(tops, Integer.MIN_VALUE);
-        int top = Integer.MIN_VALUE;
-        for (PaletteSection ps : sections) {
-            int t = ps.sectionY() * 16 + 15;
-            if (t > top) top = t;
-        }
-        if (top == Integer.MIN_VALUE) return tops;
-        int floor = minHeight();
-        for (int z = 0; z < 16; z++) {
-            for (int x = 0; x < 16; x++) {
-                int firstOpaque = Integer.MIN_VALUE;
-                for (int y = top; y >= floor; y--) {
-                    if (!isAir(x, y, z, reconciledAir)) {
-                        firstOpaque = y;
-                        break;
-                    }
-                }
-                tops[(z << 4) | x] = firstOpaque;
-            }
-        }
-        return tops;
-    }
-
-    /**
-     * Sparse variant of the synthesis precompute, retained for tests and any
-     * caller that has a known short list of columns to scan. Builds a
-     * 256-entry table where only the listed columns are populated; every other
-     * slot remains {@link Integer#MIN_VALUE} (interpreted as "fully
-     * sky-exposed" by the lookup convention used in
-     * {@link #getSkyLight(int, int, int, Set)}).
-     *
-     * <p>Indexing convention: {@code result[(z &amp; 15) * 16 + (x &amp; 15)]}.
-     * The returned array is freshly allocated; callers may freely mutate it.
-     *
-     * <p>{@code reconciledAir} must already be in canonical form
-     * (upper-case, namespace-stripped, tag-expanded) — see
-     * {@link #isAir(int, int, int, Set)} for the contract. {@code null} or
-     * empty is tolerated and yields vanilla-air-only opacity.
-     *
-     * @param columns chunk-local {@code (x, z)} pairs to scan, each in {@code 0..15}
-     * @param reconciledAir reconciled airBlocks set, may be {@code null}/empty
-     */
-    public int[] computeSynthesizedSkyTop(int[][] columns, Set<String> reconciledAir) {
-        int[] tops = new int[256];
-        java.util.Arrays.fill(tops, Integer.MIN_VALUE);
-        if (columns == null || columns.length == 0) return tops;
-        int top = Integer.MIN_VALUE;
-        for (PaletteSection ps : sections) {
-            int t = ps.sectionY() * 16 + 15;
-            if (t > top) top = t;
-        }
-        if (top == Integer.MIN_VALUE) return tops;
-        int floor = minHeight();
-        for (int[] xz : columns) {
-            if (xz == null || xz.length < 2) continue;
-            int x = xz[0] & 0xF;
-            int z = xz[1] & 0xF;
-            int firstOpaque = Integer.MIN_VALUE;
-            for (int y = top; y >= floor; y--) {
-                if (!isAir(x, y, z, reconciledAir)) {
-                    firstOpaque = y;
-                    break;
-                }
-            }
-            tops[(z << 4) | x] = firstOpaque;
-        }
-        return tops;
     }
 
     /**

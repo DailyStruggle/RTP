@@ -1032,7 +1032,7 @@ public class ScanTask extends RTPRunnable {
       // at y-1 for standing-surface safety) doesn't trivially reject with
       // probe.minY() > minY - 1. Without this the fast path was inert on
       // every candidate and every probe-accept degraded to a full load.
-      fut = world.probeChunkColumn(cx, cz, minY - 1, maxY, vert.requiresSkyLight());
+      fut = world.probeChunkColumn(cx, cz, minY - 1, maxY);
     } catch (Throwable t) {
       RTP.log(Level.FINE,
               "[ScanTask] probeChunkColumn threw for world=" + world.name()

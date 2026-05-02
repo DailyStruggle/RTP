@@ -2,9 +2,11 @@
 
 This document outlines the plan for RTP's multi-server (proxy / network) expansion. It is **distinct from** [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md): that plan covers running on additional Minecraft server flavours (Spigot/Paper/Folia/Fabric); *this* plan covers coordinating RTP across **multiple concurrent backend servers** sitting behind a proxy (Velocity, BungeeCord, Waterfall).
 
-> Status: **Draft — Phase 0 (Scope Unlock) not yet started.** No code changes have been made; no ADR has been accepted. This document is gated by Rule D-005 (Propose Before Implementation, see [`AGENTS.md`](../../AGENTS.md)).
+> Status: **Draft — Phase 0 (Scope Unlock) not yet started.** No code changes have been made; no ADR has been accepted. This document is gated by Rule D-005 (Propose Before Implementation, see [`AGENTS.md`](../../.junie/AGENTS.md)).
 
 > Cross-references: [ADR-022 (Fabric in scope)](../adr/ADR-022-fabric-platform-in-scope.md) is **orthogonal** to this plan and is **not** superseded. A new ADR-025 (multi-server proxy support) is required before Phase 1 work begins.
+
+> Veracity audit (2026-05-01): codebase-anchored claims in this plan have been spot-checked against the repo. Confirmed present: `AbstractSQLDatabaseAccessor` (+ `H2`/`SQLite`/`MySQL`/`PostgreSQL` concrete accessors), HikariCP 5.1.0, `RegionQueueManager`, `TeleportPipelineTask`, `MemoryTracker`, `RTP.scheduler.runTaskTimer` / `runTaskTimerAsynchronously`, `BrigadierBridgeContext` + `BrigadierCommandAdapter` in `commands-api/`, `messages.yml`, `REQ-RTP-F-013`. Unverifiable here (external APIs): Velocity `ServerPreConnectEvent`, Lettuce, Postgres `LISTEN/NOTIFY` / `SKIP LOCKED` semantics — these are documented as items for ADR-025. Note: `loadBalancer.backends.<serverId>.weight` is a *proposed* key, not yet drafted in the config surface; flagged inline.
 
 ---
 
@@ -12,12 +14,102 @@ This document outlines the plan for RTP's multi-server (proxy / network) expansi
 
 **Cross-server load-balanced RTP** — a player request originating anywhere on the network is dispatched to the most appropriate backend, the destination is generated using that backend's existing async pipeline, and the player is transferred. The trigger source (command, server-join, addon event) is **configurable** so operators decide whether to call RTP via `/rtp` or pass the player through on join (mirroring the existing Bukkit join-event hook).
 
+---
+
+## Intended Usage & Deployment Model
+
+The plan is designed around a single explicit operator workflow. Anything that complicates the steps below should be treated as a regression of this plan, not a feature.
+
+### Goals
+
+- **One artifact, every target.** The same RTP JAR drops into a Spigot/Paper/Folia backend, a Fabric backend, a Velocity proxy, or a BungeeCord/Waterfall proxy. The runtime detects the host platform and activates the relevant entry point — extending the single-JAR / multi-loader pattern already established by [ADR-022](../adr/ADR-022-fabric-platform-in-scope.md) to the proxy axis as well. Operators never pick between "the proxy build" and "the backend build".
+- **Minimal proxy-side configuration.** A proxy's job is to *route* RTP requests, not to own world data. Its configuration shall reduce to: a transport / database reference (Redis or JDBC URL), a shared secret, and the trigger / load-balancer policy. No region definitions, no world tables, no per-backend mirrors of backend-side config.
+- **Verbatim copy across backends.** An operator shall be able to author `network.yml` once, copy it byte-for-byte to every backend, and only have to change a single per-host field (`network.serverId`). This rules out config sprawl: anything that *must* differ between backends is either auto-derived (e.g. heartbeat timestamps), centralised (proxy-side trigger config per D1), or limited to that one identifying field.
+- **Zero behaviour change when disabled.** With `network.enabled: false` (the shipping default), the artifact behaves byte-identically to today's single-server build. This is REQ-RTP-NET-005 and is the gate for any release.
+
+### What an operator does (target workflow)
+
+1. Drop the same JAR onto every backend and onto the proxy.
+2. Provision the shared store (Redis instance or a JDBC database — both reuse `AbstractSQLDatabaseAccessor` per D3).
+3. Author one `network.yml` with the transport endpoint, shared secret, trigger policy, and load-balancer policy.
+4. Copy that file to every host. On each backend, set `network.serverId` to a unique value. Proxy uses the same file with no `serverId` (or a reserved value).
+5. Set `network.enabled: true`. Restart. Done.
+
+### Non-goals of this section
+
+- Proxy-side region authoring, world tables, or claim-plugin integration. The proxy is intentionally a thin coordinator; world-truth lives on the backend, where it already does.
+- Per-platform forks of the artifact. Loader divergence is handled by the existing single-JAR bootstrap; the proxy adapter modules (`rtp-proxy-velocity`, `rtp-proxy-bungee`) ship inside the same JAR, not as separate downloads.
+- Anything that forces an operator to maintain a different file per backend beyond the `serverId` field. Audit any new `network.yml` key against this rule before adding it.
+
+### Implications carried into the rest of this plan
+
+- The **Config Surface (`network.yml`)** section below shall stay flat and short; long-form region/world content stays in the existing per-backend `regions.yml` / world configs.
+- The **Backend Telemetry Publication** payload is *self-describing* (it carries `serverId`, `platform`, `mcVersion`, `regionsAvailable[]`) precisely so the proxy can run with no inventory of backends declared up-front. New backends register simply by writing their first heartbeat row.
+- The **Trigger Abstraction** keeps trigger configuration proxy-side (D1) so adding a new backend requires zero proxy-config changes.
+- The **load-balancer** consumes published telemetry rather than a static backend list — same rationale; copy-paste-friendly fleet management.
+
+These constraints are part of the acceptance criteria for ADR-025; any deviation must be justified there.
+
 ### Non-Goals (v1)
 
 - No proxy-side chunk logic, world data, or entity manipulation. The proxy never owns world state.
 - No replacement of the existing single-server pipeline. With `network.enabled: false`, behaviour is byte-identical to today.
 - No Forge / NeoForge proxy support. (Out of scope until Fabric platform stabilises — see `MULTI_PLATFORM_PLAN.md` Phase 4.)
 - No cross-version protocol breakage without a `schemaVersion` bump.
+- **No post-arrival coordinate resolution.** Coordinates are resolved on the destination *before* the player transfers; see *Coordinate Resolution Timing* below.
+
+---
+
+## Coordinate Resolution Timing *(decision locked 2026-05-01)*
+
+**Coordinates are resolved on the destination backend before the player's server change**, not after arrival. The reservation token issued to the proxy carries the final `worldKey` + `x/y/z/yaw/pitch`, and the destination's join handler simply *consumes* the token rather than running a fresh pipeline.
+
+### Why this is trivial in practice
+
+The destination's existing **kept cache** (`RegionQueueManager.keptLocations` — the *Hot Queue* `LockFreeLocationBuffer` of pre-verified safe locations whose chunks are currently loaded with `keep(true)` applied) already produces ready-to-use coordinates as part of normal operation. A network teleport request becomes:
+
+1. Selector picks destination based on telemetry.
+2. Destination polls one location from `keptLocations` (the hot queue) — falling back to `unkeptLocations` (the cold queue, also pre-verified; chunks must be re-loaded) only if hot is empty.
+3. The polled `RTPLocation` is written into a **reservation token** row (under the network-state member of `AbstractSQLDatabaseAccessor`, per D3) — i.e. an exclusive cross-network allocation of a coordinate that was already going to be produced anyway.
+4. Proxy commits the transfer; destination's join handler consumes the token and teleports the player to the reserved location.
+
+In other words: the network-mode reservation token table is a **thin allocation layer over the existing kept-cache pool** — it earmarks one of the buffer's entries as "already promised to a cross-network player" so no other code path can hand out the same coordinates. No new safety-pipeline code paths are introduced.
+
+> Note: the per-player cache (`RegionQueueManager.fastLocations` — `ConcurrentHashMap<UUID, CompletableFuture<RTPLocation>>`) and the ADR-023 Login Reserve Cache (`loginLocations`) are *not* the source for cross-network allocations. They serve **already-online players on the local backend** and are intentionally left untouched by network-mode bookkeeping. Cross-network allocations draw from the general region pool (`keptLocations` → `unkeptLocations`).
+
+### Why post-arrival was rejected
+
+| Concern | Pre-resolve (chosen) | Post-arrival (rejected) |
+|--------|---------------------|------------------------|
+| S-001 / S-003 / S-005 obligations | Stay on destination's existing async pipeline. No re-litigation over the wire. | Run after transfer commits. Failure leaves the player on the wrong server with no clean recovery. |
+| S-004 attribution | Failure surfaces on origin via `messages.yml` (REQ-RTP-F-013 / REQ-RTP-NET-003) before any transfer. | Failure surfaces *after* a successful transfer; either silent (S-004 violation) or requires a second transfer to recover. |
+| Player UX | One transfer; spawn frame is the final location. | Spawn-flash at destination's spawn, then a teleport. |
+| Selector honesty | Selector pays the resolve cost on the chosen backend; mid-flight rejection retries the next-lowest-score candidate. | Selector commits before destination knows it can deliver; rejection means a re-transfer. |
+| Reservation tokens | Required (state machine: `PENDING → CLAIMED → CONSUMED`). | Avoidable, but only by paying the cost in failure UX. |
+
+The latency-on-tail downside of pre-resolve is real but additive: it is **softened by the existing cache** (most resolves are O(map lookup), not a full pipeline run), and a future network-wide pre-warmed queue (deferred F2) would close the remaining gap. Post-arrival's failure UX, by contrast, is structural and cannot be retrofitted without re-introducing a token.
+
+### Network Wait Queue (cache miss + no bypass perm)
+
+If both `keptLocations` and `unkeptLocations` are exhausted on the chosen destination (or cannot deliver within the request's deadline) and the player **lacks the bypass permission**, the request shall enroll into a **network-mode UUID wait queue**: a UUID-keyed FIFO that mirrors the existing per-user `playerQueue` pattern in `RegionQueueManager`, but lives in the network-state member so the *proxy* and *destination* can both observe it.
+
+Behaviour:
+
+- Enrollment is idempotent on UUID — a player who re-issues `/rtp` while waiting does not double-queue.
+- The destination's region cache replenishes asynchronously through the existing deficit loop in `Region.execute()`; as new entries land in `keptLocations`/`unkeptLocations`, the network wait queue drains in FIFO order, each drain pulling a coordinate, issuing a reservation token, and transferring the player.
+- The proxy may surface a configurable "you are #N in the network queue" message (REQ-RTP-F-013 / REQ-RTP-NET-003), reusing the existing single-server queue-position UX.
+- Bypass permission **reuses the existing `rtp.unqueued` node** (no new permission). When `true`, the player skips the network wait queue and the destination generates a fresh location immediately; if no backend can deliver immediately, the request fails fast with a configurable message. Use is expected to be rare — implementation is **low priority**, may land in Phase 2 or be deferred to Phase 3 without blocking acceptance.
+- The wait-queue table is **purely transient**: rows live as long as the player is connected and waiting; the reservation-token reaper also reaps stale wait-queue rows on the same TTL clock. This keeps it consistent with single-server semantics where the wait queue lives only in memory.
+
+This preserves the single-server fairness model across the network without inventing a new one: the same "hot kept-cache first, cold cache next, otherwise wait your turn" contract that exists today, just with the wait queue allocated globally instead of per-backend.
+
+### Summary
+
+- **Decision**: pre-resolve coordinates on destination, transfer with reservation token. ADR-025 acceptance criterion.
+- **Reservation token table**: thin allocation layer over the existing region kept-cache (`keptLocations`, fallback `unkeptLocations`). New code is bookkeeping, not safety-pipeline.
+- **Per-player caches stay local-only**: `fastLocations` and `loginLocations` (ADR-023) are not consumed by cross-network allocations.
+- **Cache miss + no bypass permission**: enroll into a UUID-keyed network wait queue mirroring the existing per-region `playerQueue`. Bypass permission skips the queue.
+- **No new prohibitions cross the wire**; S-001…S-006 stay attributed exactly where they are today.
 
 ---
 
@@ -30,7 +122,7 @@ These answers are taken from the issue thread that produced this document. They 
 | D1 | Network-mode default world resolution on join | **Proxy-side config.** `JoinTriggerSource` reads region/world mappings from the proxy plugin's config, not per-backend. |
 | D2 | Reservation persistence on proxy restart | **Required.** Transport must be durable. `plugin-message` is therefore a **degraded / dev-only** mode and not supported in production. |
 | D3 | Network state storage location | **Reuse `AbstractSQLDatabaseAccessor` where possible.** If a separate `AbstractNetworkStateAccessor` proves necessary, it must live **adjacent to** or **as a member of** the existing accessor — not a parallel hierarchy. |
-| D4 | HMAC key distribution | **Deferred.** User flagged this as needing more investigation before deciding between env-var, config-file, or per-backend keypair. Treat as an open item in Phase 2 design. |
+| D4 | HMAC key distribution | **Env var for v1** (`RTP_NET_SECRET`). Operators set the same value on every host; matches the copy-paste deployment model. Other mechanisms (config file with restrictive perms, per-backend keypair, OS keyring) are deferred research items — may revisit before public release without blocking Phase 2. |
 
 Additional locked-in decisions:
 
@@ -114,24 +206,130 @@ interface BackendSelector {
 
 All strategies must be **pure functions of `NetworkSnapshot`** — no I/O during `choose()`. This preserves S-005 spirit (no blocking on a tick or netty thread).
 
-### Load-Balancing Heuristics — *PLACEHOLDER*
+### Load-Balancing Heuristics — Configurable Weighted Average *(direction set 2026-05-01)*
 
-> ⚠️ **This section is intentionally unfinished.** The concrete heuristics, weights, default strategy, and tuning knobs require user input and benchmarking before they can be specified. Do **not** implement against this section until it has been filled out and approved per Rule D-005.
+User direction: **v1 ships a single configurable strategy — a weighted average over published telemetry metrics, with a per-metric response curve.** No discrete strategy zoo (no `ROUND_ROBIN` / `LEAST_LOADED` / etc. as separate selectors); those collapse to special cases of the weighted-average configuration. The proxy owns this configuration so admins tune the network from one place.
 
-Open items to resolve here:
+#### Model
 
-- **Strategy catalogue** — which of `ROUND_ROBIN` / `LEAST_LOADED` / `LOWEST_LATENCY` / `WEIGHTED` / `STICKY_REGION` / `COMPOSITE` ship in v1, and which (if any) are deferred.
-- **Default strategy** — what ships out-of-the-box when an admin enables network mode without configuring a strategy.
-- **Inputs to `NetworkSnapshot`** — confirm the heartbeat payload (`playerCount`, `softCap`, `queueDepth`, `pendingTeleports`, `avgPipelineMs`, `regionsAvailable[]`, …). Add or drop fields based on which heuristics are kept.
-- **Stale-backend filter** — multiplier on `heartbeatInterval` after which a backend is excluded from selection (current straw-man: `3×`, mirroring the stale-chunk guard pattern from [ADR-015](../adr/ADR-015-stale-chunk-guard-countbound-pipes.md)).
-- **Weight tuning** — if `COMPOSITE` is shipped, the default weight vector and the rationale for each component.
-- **Region-affinity rules** — how `STICKY_REGION` interacts with player permissions, region whitelists/blacklists, and the existing `RegionQueueManager`.
-- **Tie-breaking** — deterministic order on equal scores (matters for tests).
-- **Hot-spot avoidance** — short-window memory of recent picks so a single low-load backend isn't stampeded between heartbeats.
-- **Failure / fallback chain** — what happens when the chosen backend rejects, times out, or its heartbeat goes stale mid-flight.
-- **Configuration surface** — exact `network.yml` keys the heuristics expose (placeholder appears in the Config Surface section below).
+For each candidate backend `b` passing the availability filter, compute:
 
-Until this section is filled out, Phase 1 work may stub `BackendSelector` with `ROUND_ROBIN` only, **for tests only**, and must not be released.
+```
+score(b) = Σ_i  weight_i  *  curve_i( normalize_i( metric_i(b) ) )
+```
+
+- `metric_i(b)` — a single field from the **Backend Telemetry Publication** payload (e.g. `playerCount / softCap`, `mspt`, `queueDepth`, `avgPipelineMs`, `chunkLoadBacklog`, `1 - tps20Ratio`, `latencyMs`, …).
+- `normalize_i` — maps the raw metric into `[0, 1]` where `0` = "cheapest / best" and `1` = "most expensive / worst". Configurable per metric (`min`, `max`, `clamp`).
+- `curve_i` — the response curve applied to the normalized value (see catalogue below).
+- `weight_i` — non-negative scalar from config; `0` disables the metric.
+
+Selection picks the backend with the **lowest** score (cost-minimization framing — keeps "0 = best" intuitive across all metrics). Ties broken by `serverId` ascending for determinism in tests.
+
+#### Curve catalogue (config-selectable per metric)
+
+All curves take a normalized input `x ∈ [0, 1]` and return `y ∈ [0, 1]`.
+
+| `curve` | Formula (straw-man) | Shape | When to use |
+|--------|--------------------|-------|-------------|
+| `linear` | `y = x` | straight | metric is roughly proportional to cost (e.g. `queueDepth`) |
+| `exponential` | `y = (e^(k·x) − 1) / (e^k − 1)`, default `k = 3` | flat then sharp ramp | metric is fine until it's *very* bad (e.g. `mspt`, `chunkLoadBacklog`) |
+| `logarithmic` | `y = log(1 + k·x) / log(1 + k)`, default `k = 9` | sharp then flattens | metric saturates quickly (e.g. `playerCount` near `softCap`) |
+| `sigmoid` | `y = 1 / (1 + e^(−k·(x − 0.5)))`, default `k = 8` (renormalised to [0,1]) | "steep in the middle" — the user's request | smooth on/off threshold around the midpoint (e.g. `tps` dropoff, `heapUsedRatio`) |
+| `step` | `y = 0` if `x < threshold`, `y = 1` otherwise | hard cliff | binary fences (e.g. `acceptingRequests`, `pluginState != READY`) |
+| `power` | `y = x^p`, default `p = 2` | mild curvature | conservative quadratic for symmetry with linear |
+
+Curve params (`k`, `threshold`, `p`) are per-metric in config; defaults above. Curves must be **monotonic non-decreasing** so the score is well-ordered; the publisher's "snapshot, not deltas" contract guarantees clean inputs.
+
+#### Config surface (replaces the prior `loadBalancer.strategy: TBD` straw-man)
+
+Lives **proxy-side** (matches D1 — proxy owns trigger/selection config so admins tune the network in one place):
+
+```yaml
+network:
+  loadBalancer:
+    # Single strategy: weighted average over telemetry. No 'strategy:' enum.
+    staleAfterMs: 3000          # exclude backend if last_seen_epoch_ms older than now - this
+    tieBreaker: serverIdAsc     # deterministic
+    metrics:
+      playerLoad:
+        source: "playerCount / softCap"   # supports a small expression DSL or a fixed enum
+        weight: 1.0
+        normalize: { min: 0.0, max: 1.0, clamp: true }
+        curve:    { type: logarithmic, k: 9 }
+      mspt:
+        source: mspt
+        weight: 1.5
+        normalize: { min: 0.0, max: 100.0, clamp: true }   # 50ms = 1 tick budget
+        curve:    { type: exponential, k: 3 }
+      queueDepth:
+        source: queueDepth
+        weight: 0.5
+        normalize: { min: 0, max: 64, clamp: true }
+        curve:    { type: linear }
+      pipelineMs:
+        source: avgPipelineMs
+        weight: 0.7
+        normalize: { min: 0, max: 2000, clamp: true }
+        curve:    { type: sigmoid, k: 8 }
+      proxyLatency:
+        source: proxyMeasuredRttMs        # proxy-side, not published by backend
+        weight: 0.3
+        normalize: { min: 0, max: 200, clamp: true }
+        curve:    { type: linear }
+      heap:
+        source: "heapUsedMb / heapMaxMb"
+        weight: 0.4
+        normalize: { min: 0.0, max: 1.0, clamp: true }
+        curve:    { type: sigmoid, k: 10 }
+      regionAffinity:
+        source: stickyRegionMatch         # 0 if backend serves requested region preferentially, 1 otherwise
+        weight: 0.2
+        normalize: { min: 0, max: 1, clamp: true }
+        curve:    { type: step, threshold: 0.5 }
+```
+
+`source` is either a published-field name from the telemetry table (Backend Telemetry Publication section) or one of a small fixed set of proxy-computed values (`proxyMeasuredRttMs`, `stickyRegionMatch`, …). A full expression DSL is **out of scope for v1** — start with the field-name + small enum approach; revisit only if real configs demand it.
+
+Special cases collapse cleanly:
+- *Round-robin equivalent*: zero out all weights; selector falls back to `tieBreaker`.
+- *Least-loaded*: weight only `playerLoad` and/or `mspt`.
+- *Lowest-latency*: weight only `proxyLatency`.
+- *Sticky region*: weight `regionAffinity` heavily; everything else light.
+- *Weighted (admin-set per backend)*: not represented as a per-metric weight — admins set a per-backend multiplier (proposed key `loadBalancer.backends.<serverId>.weight`, **not yet drafted in the config surface below — to be added during Phase 1 design**) that divides the final score so a higher backend weight makes that backend preferred while keeping "lowest wins".
+
+#### Defaults shipped with v1
+
+The example block above is the **shipped default**. Rationale per metric noted inline. Operators can disable any line by setting `weight: 0`. The defaults must be benchmarked against a reference Velocity + 2× Paper devstack before Phase 2 release; tuning notes will land in `LESSONS_LEARNED.md`.
+
+#### Documentation follow-up
+
+- **Curve visualizations** — add rendered plots of each curve (`linear`, `exponential`, `logarithmic`, `sigmoid`, `step`, `power`) at their default parameters to `docs/admin/proxies/` (e.g. `LOAD_BALANCING.md` with embedded SVG/PNG) so admins can pick a curve by shape, not by formula. Generation script lives under `scripts/` (matplotlib or similar). Tracked as a Phase 3 documentation item — block on it before the first public proxy beta.
+
+#### Resolved items (formerly open)
+
+- **Hot-spot avoidance** — *confirmed*. Implemented as a per-proxy decaying counter of recent picks, added to the score as another metric row (`recentPicks`) with its own `weight`/`curve`. Lives in the same model; no special-case code path. **Default halflife: 10s** (decay constant `λ = ln(2) / 10s ≈ 0.0693 s⁻¹`); the counter is bumped by `+1` on each pick and decays exponentially between heartbeats. The 10s figure matches the operator-experience target (a single low-score backend stops being preferred within roughly two heartbeat windows after a stampede starts). Default weight ships at a moderate value so it tempers but does not dominate the cost signal.
+- **Tie-breaking** — *resolved*. `serverIdAsc` is final; ties between weighted-average scores are exceedingly rare and `serverId` ordering is sufficient for determinism. No tie-breaker enum.
+- **Curve param ranges** — *confirmed*. Validation at config load enforces sane bounds for `k`, `p`, `threshold` so a malformed config cannot produce NaN scores. Concrete bounds: `k ∈ [0.1, 20]`, `p ∈ [0.1, 8]`, `threshold ∈ [0.0, 1.0]` (subject to ratification in ADR-025).
+- **Per-backend weight key** — *added*. `loadBalancer.backends.<serverId>.weight` is now part of the config surface (see *Config Surface* below). Acts as a multiplier: final score is `rawScore / backendWeight`, so a higher weight makes a backend preferred while keeping "lowest wins".
+- **Player-count weighting** — *resolved as `weight: 0` for v1*. Player count is still **published** in telemetry (operators want it for dashboards) but is not consumed by the selector by default. Re-evaluate **after live-player testing** of the Phase 2 devstack — if `mspt` and `pendingTeleports` already capture the relevant strain under real load, the weight stays at zero permanently; if a population-driven signal proves additive, raise it then. No further design work is required before Phase 2.
+
+#### Failure / fallback chain (informed by Linux scheduler best practice)
+
+Adapted from CFS / kernel load-balancer conventions — cheap to evaluate, expensive to mis-pick, biased toward stability over reactivity:
+
+- **Capped retries**: on chosen-backend rejection or timeout, retry with the next-lowest score, capped at `loadBalancer.maxRetries` (default `3`). Beyond the cap, fail fast with a configurable `messages.yml` entry (REQ-RTP-F-013 / REQ-RTP-NET-003).
+- **Per-attempt timeout**: `loadBalancer.attemptTimeoutMs` (default `1500`). The selector treats a timeout identically to a rejection.
+- **Hysteresis on re-pick**: after a rejection, the rejected backend is excluded from selection for `loadBalancer.cooldownMs` (default `2000`) — the same idea as CFS's `imbalance_pct` / `nr_balance_failed` debounce. Prevents the proxy from re-picking the same struggling backend on the next request.
+- **Score sticking ('idle balance'-style)**: don't migrate already-pending requests to a freshly-cheaper backend mid-flight. Once a request is dispatched, it stays with the chosen backend until success, timeout, or rejection — mirrors how CFS prefers not to migrate a running task unless the imbalance is significant.
+- **Snapshot freshness**: the selector reads `NetworkSnapshot` once at request entry and uses that snapshot for the entire retry chain (analogous to a single `rebalance_domains` pass). Keeps retry decisions internally consistent.
+
+All four knobs (`maxRetries`, `attemptTimeoutMs`, `cooldownMs`, `recentPicks` half-life/weight) live in the `loadBalancer` block of `network.yml` and ship with the defaults above. Concrete tuning notes will land in `LESSONS_LEARNED.md` after the Phase 2 devstack benchmark.
+
+#### Still-open items (smaller list)
+
+- **Expression DSL vs. fixed `source:` enum** — start fixed-enum; revisit if/when configs ask for compound expressions beyond the two ratios above.
+
+This section is now **direction-locked**, not a placeholder. Phase 1 may implement against it, with the v1 default block above as the test fixture.
 
 ---
 
@@ -140,7 +338,7 @@ Until this section is filled out, Phase 1 work may stub `BackendSelector` with `
 Each backend running RTP **shall publish to its configured database** a periodic record describing two distinct concerns:
 
 1. **Plugin state — availability.** Is this backend usable as an RTP destination *right now*? This is a binary-plus-context signal: the backend is up, RTP is loaded, the pipeline is responsive, and the requested regions exist.
-2. **Server state — performance cost.** How expensive is it to serve another teleport from this backend *right now*? This is a continuous signal feeding the load balancer (see *Load-Balancing Heuristics — PLACEHOLDER*).
+2. **Server state — performance cost.** How expensive is it to serve another teleport from this backend *right now*? This is a continuous signal feeding the load balancer (see *Load-Balancing Heuristics — Configurable Weighted Average* above).
 
 These are intentionally separated so a healthy-but-overloaded backend can be filtered out of selection (availability=OK, cost=high) distinctly from a stale or degraded backend (availability=stale, cost=N/A).
 
@@ -223,9 +421,9 @@ JSON columns become `JSONB` on Postgres; TEXT/CSV on SQLite (which is dev-only a
 
 ### Open items folded into existing placeholders
 
-- The **Load-Balancing Heuristics — PLACEHOLDER** section is the single place that decides *how* these fields are weighted. The publisher commits to providing them; the selector decides which it uses.
-- Whether `tps`/`mspt` is required on Spigot (which lacks a public TPS API on older versions) is a Phase 1 design item; on Folia and Paper there are first-class APIs.
-- Per-region TPS aggregation strategy on Folia (max / mean / weighted-by-player-count) — to be decided in ADR-025.
+- The **Load-Balancing Heuristics — Configurable Weighted Average** section is the single place that decides *how* these fields are weighted. The publisher commits to providing them; the selector decides which it uses.
+- **Spigot TPS source** — *resolved*. Minimum supported Spigot is 1.20.1; raw Spigot's `Bukkit.Server` does not expose `getTPS()` on that version (it is a Paper-only addition). For Spigot-only stacks, sample tick duration locally via a 1-tick scheduled task and compute MSPT/TPS from the elapsed-nanos differential. On Paper/Folia, use `Bukkit.getTPS()` directly. Module: `rtp-spigot` adapter for the fallback sampler; see also the new metrics plan (`METRICS_PLAN.md`) for the canonical implementation.
+- **Per-region TPS aggregation on Folia** — lives in [`METRICS_PLAN.md`](METRICS_PLAN.md), not this plan. Player-count-weighting is **out** (D-confirmed 2026-05-01); the choice is between `max` and `mean`, with leaning toward `max` so a single struggling region surfaces. Final call deferred to the metrics plan.
 
 ---
 
@@ -265,6 +463,8 @@ These items must be answered in ADR-025 before Phase 3.
 
 ## Reservation Tokens
 
+The reservation token exists *because* of the *Coordinate Resolution Timing* decision above: it is the thin allocation layer that earmarks one already-resolved coordinate (drawn from the destination's region kept-cache — `RegionQueueManager.keptLocations`, falling back to `unkeptLocations`) as "promised to a cross-network player," so no local code path can hand it out twice. The per-player `fastLocations` cache and the ADR-023 `loginLocations` reserve are deliberately untouched by this layer (they serve already-local players). New code here is bookkeeping; safety-pipeline code is not duplicated.
+
 Single shared keyspace owned by the network-state member of the accessor:
 
 - Fields: `token (UUID PK)`, `playerUuid`, `targetServerId`, `worldKey`, `x/y/z/yaw/pitch`, `issuedAt`, `expiresAt`, `state ∈ {PENDING, CLAIMED, CONSUMED, EXPIRED}`.
@@ -276,7 +476,29 @@ Single shared keyspace owned by the network-state member of the accessor:
 
 Per D2, tokens **must survive a proxy restart**, which is why `plugin-message` transport is dev-only — it has no durability guarantee.
 
-A dedicated regression suite analogous to `ReqRtpS004NullChunkAttributionTest` is required before Phase 2 acceptance.
+### Lifecycle ownership matrix
+
+| State transition | Initiator | Atomicity primitive | Failure handling |
+|------------------|-----------|---------------------|------------------|
+| `—` → `PENDING` | Destination backend (after pipeline produces safe location) | INSERT under unique `(playerUuid, state=PENDING)` partial index; conflict ⇒ reuse existing row | If conflict happens during a retry, the destination returns the existing token rather than minting a new one |
+| `PENDING` → `CLAIMED` | Proxy (just before issuing the transfer) | `UPDATE … SET state='CLAIMED', claimedAtEpochMs=now WHERE token=? AND state='PENDING'` returning row-count | row-count `= 0` ⇒ race lost (token expired or was claimed by a parallel proxy instance); proxy aborts the transfer and surfaces a `messages.yml` failure (REQ-RTP-NET-003) |
+| `CLAIMED` → `CONSUMED` | Destination backend (in the join handler) | `UPDATE … SET state='CONSUMED' WHERE token=? AND state='CLAIMED'` returning row-count | row-count `> 1` ⇒ replay attempt; reject the duplicate join, log under S-004 |
+| `PENDING` \| `CLAIMED` → `EXPIRED` | Reaper (each backend, async timer) | `UPDATE … SET state='EXPIRED' WHERE expiresAtEpochMs<now AND state IN ('PENDING','CLAIMED')` | Token is no longer valid; if it was `CLAIMED`, the destination releases the underlying `keptLocations` entry back to its source buffer and emits a `MemoryTracker` release; an audit row is logged |
+
+Proxy-restart recovery: on startup the proxy runs `UPDATE … SET state='PENDING' WHERE state='CLAIMED' AND claimedAtEpochMs < now - claimReanimateMs` (default `claimReanimateMs = 5000`). This re-opens any token claimed by a proxy that died before completing the transfer, letting the next proxy instance pick it up rather than orphaning it until TTL expiry.
+
+Destination-restart recovery: on startup the destination runs the local reaper at half its normal interval for the first `2 * heartbeatInterval` so any tokens it issued just before crashing are aged out promptly. Tokens issued by a *different* destination are out of scope — only that backend can release the underlying `keptLocations` entry, so a permanently-dead backend's tokens age out via TTL.
+
+### Required regression coverage
+
+A dedicated regression suite analogous to `ReqRtpS004NullChunkAttributionTest` is required before Phase 2 acceptance, covering at minimum:
+
+- Replay protection: a `CLAIMED → CONSUMED` transition that races itself across two backend instances must succeed exactly once.
+- TTL expiry: a `PENDING` token whose `expiresAt < now` must transition to `EXPIRED` and release its `MemoryTracker` entry within one reaper interval.
+- Orphaned-allocation prevention: a backend crash mid-issue (`PENDING` written but no proxy ever claims) must not leak a `keptLocations` entry beyond TTL.
+- Proxy-restart reanimation: a `CLAIMED` token whose proxy died is observed in `PENDING` again after `claimReanimateMs`, and the next proxy instance can claim it.
+- Schema-version mismatch: a token written under an older `schemaVersion` is rejected (or upgraded, depending on the version-skew policy ratified in ADR-025).
+- HMAC reject: a token whose envelope HMAC fails verification is dropped and an S-004 audit log is emitted; the player request fails through the configured `messages.yml` entry, not silently.
 
 ---
 
@@ -305,9 +527,21 @@ network:
     pluginMessage: { channel: "rtp:net" }   # NOT for production (D2)
 
   loadBalancer:
-    # See "Load-Balancing Heuristics — PLACEHOLDER" above.
-    # Concrete keys deferred until that section is filled out.
-    strategy: TBD
+    # Direction-locked: configurable weighted average over telemetry. See
+    # "Load-Balancing Heuristics — Configurable Weighted Average" above.
+    staleAfterMs:       3000
+    maxRetries:         3       # capped fallback chain (Linux-scheduler-inspired)
+    attemptTimeoutMs:   1500    # per-attempt timeout; treated as rejection
+    cooldownMs:         2000    # hysteresis: rejected backend excluded this long
+    metrics:
+      # ... see heuristics section for full per-metric block (source/weight/
+      # normalize/curve). Includes a `recentPicks` row for hot-spot avoidance
+      # and `playerLoad: { weight: 0 }` (telemetry published, not weighted).
+    backends:
+      # Optional per-backend multiplier; final score is rawScore / weight.
+      # Higher weight → preferred. Omitted entries default to weight 1.0.
+      # survival-1: { weight: 1.0 }
+      # survival-2: { weight: 0.5 }   # capacity-asymmetric host, picked half as often
 
   triggers:
     command: { enabled: true }
@@ -319,7 +553,7 @@ network:
     reaperIntervalTicks: 40
 
   security:
-    sharedSecret: TBD             # per D4 — distribution mechanism not yet decided
+    sharedSecret: "${RTP_NET_SECRET}"   # env var (D4 v1); same value on every host
 ```
 
 Acceptance contract: with `network.enabled: false`, all single-server tests must remain byte-identical green. A dedicated no-op test is required.
@@ -335,8 +569,11 @@ Acceptance contract: with `network.enabled: false`, all single-server tests must
 | `REQ-RTP-NET-003` | All proxy-mediated user-facing messages shall route through `messages.yml` (extends REQ-RTP-F-013). |
 | `REQ-RTP-NET-004` | Network transport shall not perform synchronous I/O on a tick or netty thread. |
 | `REQ-RTP-NET-005` | When `network.enabled` is false, behaviour shall be byte-identical to single-server operation. |
+| `REQ-RTP-NET-006` | Every transport packet shall carry a `schemaVersion` and an HMAC envelope; packets failing verification shall be dropped and audited under S-004. |
+| `REQ-RTP-NET-007` | A reservation token claim shall be exactly-once across the network; a duplicate `CLAIMED → CONSUMED` transition shall be refused and audited under S-004. |
+| `REQ-RTP-NET-008` | Backend telemetry shall be writable to *any* `AbstractSQLDatabaseAccessor` flavour the project ships (H2/SQLite/MySQL/PostgreSQL). |
 
-Authoring rules: see [`docs/dev/RULES.md`](RULES.md) and the *Requirement Documentation Rules* section of [`AGENTS.md`](../../AGENTS.md). The statements above are placeholders — final wording must use `shall` / `shall not`, no implementation actions.
+Authoring rules: see [`docs/dev/RULES.md`](RULES.md) and the *Requirement Documentation Rules* section of [`AGENTS.md`](../../.junie/AGENTS.md). The statements above are placeholders — final wording must use `shall` / `shall not`, no implementation actions.
 
 ---
 
@@ -403,6 +640,12 @@ Mirrors the structure of [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) so c
 
 ## Risk & Pitfall Inventory
 
+- **Thread-context map for cross-wire callbacks** — the SPI must explicitly document on which thread each callback fires:
+  - Transport publisher writes — always async (`runTaskTimerAsynchronously`).
+  - Transport listener delivery — netty / Lettuce / Postgres-driver thread; consumers must hop via `RTP.scheduler.runTaskTimer` (or the entity scheduler on Folia) before touching world or player state.
+  - Selector `choose()` — invoked by the dispatcher; pure-function contract; safe to call from any thread.
+  - Reservation reaper — always async; releases `MemoryTracker` entries.
+  - HMAC verify — same thread as the inbound packet; cheap (`Mac.doFinal`); never blocks.
 - **Folia + proxy interaction** — proxy reply lands on a netty thread on the backend; consumers must hop to the right region scheduler before touching the player (`Bukkit.isOwnedByCurrentRegion`). Same discipline as `AGENTS.md > Folia Threading`, just over the wire.
 - **Reservation tokens are a distributed-systems problem** — TTL, idempotency, replay protection are easy to get subtly wrong. Treat the regression suite as a Phase 2 acceptance gate, not a "nice to have".
 - **Velocity vs. BungeeCord API divergence** — too large to share a runtime; share only the SPI. Don't water down the Velocity design to match Bungee.
@@ -413,12 +656,36 @@ Mirrors the structure of [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) so c
 
 ---
 
+## Sufficiency Audit (2026-05-01)
+
+This plan has been reviewed for implementer-sufficiency against `AGENTS.md`, `RULES.md`, and the existing S-001…S-007 prohibitions. The items below were identified as gaps and either filled in this revision or explicitly deferred:
+
+- **Reservation token state machine** — explicit ownership matrix added (who initiates each transition, atomicity primitive, failure handling, proxy-restart reanimation).
+- **Thread-context map** — added to *Risk & Pitfall Inventory* so each callback's expected thread is documented.
+- **Wire-protocol envelope** — captured as REQ-RTP-NET-006 (schemaVersion + HMAC). Final wire format (CBOR / JSON / length-prefixed bytes) deferred to ADR-025.
+- **Exactly-once claim semantics** — captured as REQ-RTP-NET-007.
+- **Multi-DB compatibility** — captured as REQ-RTP-NET-008 (any of H2/SQLite/MySQL/PostgreSQL must be acceptable for backend-side telemetry).
+- **Required regression coverage** — enumerated under *Reservation Tokens* (replay, TTL, orphan, reanimation, schema-version, HMAC reject) so the Phase 2 acceptance suite is unambiguous.
+- **Test fixture provenance** — the v1 default `loadBalancer` block is now explicitly the test fixture (no separate fixture file).
+
+**Items deliberately left open** (tracked in *Open Items / Follow-Ups* below):
+
+- Wire-format choice (CBOR vs. JSON vs. binary) — ADR-025.
+- Postgres-vs-Redis benchmark — post-implementation.
+- `commands-api` proxy surface concrete shapes — early Phase 1 design.
+- HMAC distribution beyond env-var — deferred research.
+- Player-count weighting — awaits Phase 2 live-player evidence.
+
+---
+
 ## Open Items / Follow-Ups
 
-- **Load-balancing heuristics section** — currently a placeholder. Must be filled out before Phase 1 ships any non-trivial selector.
-- **D4 — HMAC key distribution** — user flagged as needing more investigation. Candidates to evaluate: env var, file with restrictive perms, per-backend keypair, OS keyring. Block Phase 2 release on resolution.
-- **Postgres-vs-Redis benchmark** — required input for ADR-025 to justify the "Redis preferred, Postgres co-equal" framing.
-- **`commands-api` proxy-side surface** — exact shape of `ProxySender` and `NetworkAwareCommand` to be ratified during Phase 1 design.
+- **D4 — HMAC key distribution beyond env var** — v1 ships env-var (`RTP_NET_SECRET`). Research alternatives (config file with restrictive perms, per-backend keypair, OS keyring) before public release; not a Phase 2 blocker.
+- **Postgres-vs-Redis comparative benchmark** — *to be performed after each transport's individual implementation and testing has stabilised*. Not a prerequisite for ADR-025 ratification (their selection rationale stands on responsiveness characteristics); benchmark drives ops guidance and the eventual `LESSONS_LEARNED.md` entry.
+- **`commands-api` proxy-side surface** — **early TODO for Phase 1 design**. Concrete shapes needed: `ProxySender` (adapts Velocity `CommandSource` and Bungee `CommandSender`), `NetworkAwareCommand` mixin (routes execution through `RtpDispatcher`), tab-completion routing across the transport. Resolve before any proxy adapter module is opened.
+- **Player-count weighting** — published in telemetry; selector weight stays `0` until live-player testing on the Phase 2 devstack provides evidence either way. No design action required before Phase 2.
+- **`rtp.unqueued` bypass implementation** — low priority; expected use is rare. Acceptable to defer past Phase 2 acceptance.
+- **Folia per-region TPS aggregation** — owned by [`METRICS_PLAN.md`](METRICS_PLAN.md); this plan consumes whatever the metrics plan publishes.
 
 ---
 

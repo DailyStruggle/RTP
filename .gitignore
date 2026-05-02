@@ -130,3 +130,19 @@ rtp-core/database/regionData/testRegion.fill
 tmp.txt
 test_output.txt
 .output.txt
+
+# JVM heap / crash dumps
+*.hprof
+java_pid*.hprof
+
+# Stray files occasionally produced by misquoted shell redirects
+/-w
+/archive_rtp.html
+
+# Loom (Fabric) per-module gradle cache
+rtp-fabric/**/.gradle/
+
+# StressTestRTP raw run data and analysis artifacts (not source)
+helpers/StressTestRTP/runs_analysis/input/
+helpers/StressTestRTP/runs_analysis/out/
+helpers/StressTestRTP/runs/

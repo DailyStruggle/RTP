@@ -1,0 +1,111 @@
+# --- RTP-lite User-Facing Messages (ADR-024) ---
+# Trimmed subset of the full messages.yml. Lite drops:
+#   - notEnoughMoney        (economy/Vault not bundled in lite)
+#   - locationSaved/Loaded  (no SQL persistence in lite)
+#   - PAPI status keys      (no PlaceholderAPI integration in lite)
+#
+# REQ-RTP-F-013: every user-facing message lite emits is configurable here.
+
+placeholders:
+  - "[RTP]" #P0
+
+# Teleportation
+alreadyTeleporting: "&e[P0] you're already teleporting!"
+teleportDeniedReloading: "&e[P0] teleports are temporarily disabled while the plugin reloads. Please try again shortly."
+delayMessage: "&e[P0] Teleporting in [delay]. Don't move"
+chunkLoading: "&e[P0] Loading chunks! please wait..."
+teleportMessage: "&e[P0] Teleported in [attempts] attempts, in [processingTime]"
+teleportCancel: "&e[P0] Teleport cancelled!"
+unsafe: "&e[P0] could not find a safe location within [attempts] attempts"
+cooldownMessage: "&e[P0] You can't teleport again for [remainingCooldown]"
+noLocationsQueued: "#f5eb73[P0] no locations ready at this time"
+queueUpdate: "#2636ef[P0] your spot in line: [spot]"
+
+# Time formatting
+days: "d"
+hours: "h"
+minutes: "m"
+seconds: "s"
+millis: "ms"
+
+# System & Management
+oldFile: "&b[P0] old [filename] detected. Updating"
+newWorld: "&b[P0] detected a new world '[world]'"
+invalidWorld: "&e[P0] could not find world '[world]'"
+reloading: "&b[P0] loading [filename]..."
+reloaded: "&b[P0] successfully loaded [filename]."
+updating: "&a[P0] updating [filename]..."
+updated: "&a[P0] successfully updated [filename]."
+badArg: "&c[P0] invalid command argument [arg]"
+consoleCmdNotAllowed: "&c[P0] You must be an in-game player to execute this command."
+busy: "&c[P0] busy"
+invalidCommand: "&c[P0] invalid command - [arg]"
+noPerms: "&eI'm sorry, but you do not have permission to perform this command. Please contact the server administrators if you believe that this is in error."
+
+# Scan command (retained in lite per ADR-024)
+scanStart: "&a[P0] scan task started for regions: [scan_regions]"
+scanReset: "&e[P0] scan queue reset for regions: [scan_regions]"
+scanCancel: "&e[P0] scan task cancelled for regions: [scan_regions]"
+scanPause: "#A020F0[P0] scan task paused for regions: [scan_regions]"
+scanResume: "#10A5F5[P0] scan task resumed for regions: [scan_regions]"
+scanRunning: "&c[P0] scan task already running for regions: [scan_regions]"
+scanNotRunning: "&c[P0] scan task not running for regions: [scan_regions]"
+scanStatus: "&a[P0] completed [scan_chunks] / [scan_totalChunks] chunks for regions: [scan_regions]. [scan_cps] cps. Land Percentage: [scan_landPercentage]%. ETA: [scan_eta]"
+
+# Info command
+infoTitle: "&a======RTP Info======"
+infoTickets: "&7Global Active Chunk Tickets: &f[tickets]"
+infoTeleports: "&7Active Teleport State Machines: &f[teleports]"
+infoMSPT: "&7Current Plugin MSPT: &f[mspt]"
+infoTotalLoads: "&7Lifetime Chunks Loaded: &f[loads]"
+infoLeakRate: "&7Current Chunk Leak Rate: &f[leakRate]"
+infoDisclaimerHeader: "&7--- Diagnostic Disclaimer ---"
+infoDisclaimer: "&7Diagnostic Note: If the server's total orphaned chunk count exceeds this plugin's lifetime loads ([loads]), this plugin is not the sole source of the memory leak."
+infoWorldHeader: "#008080Worlds:"
+infoConsoleWorldHeader: "&7--- Worlds ---"
+infoWorld: "  #21ADA8[world]"
+infoRegionHeader: "#63C5DARegions:"
+infoConsoleRegionHeader: "&7--- Regions ---"
+infoRegion: "  #52B2BF[region]"
+
+# sub-info listings
+# placeholders: [world], [region], [requirePermission], [override], [shape], [worldBorderOverride], [cacheCap], [cached], [keptCache]
+worldInfo:
+  - "#21ADA8[world]:"
+  - "#99EEBB  - region: [region]"
+  - "#99EEBB  - requirePermission: [requirePermission]"
+  - "#99EEBB  - override: [override]"
+
+regionInfo:
+  - "#52B2BF[region]:"
+  - "#58CCED  - world: [world]"
+  - "#58CCED  - shape: [shape]"
+  - "#58CCED  - requirePermission: [requirePermission]"
+  - "#58CCED  - worldBorderOverride: [worldBorderOverride]"
+  - "#58CCED  - cacheCap: [cacheCap]"
+  - "#58CCED  - keptCache: [keptCache]"
+  - "#58CCED  - cached: [cached]"
+
+# Command descriptions (help)
+rtp: "&b/rtp - teleport to a random location"
+rtp_description: "teleport to a random location"
+help: "&b/rtp help - see this"
+help_description: "describe commands"
+reload: "&b/rtp reload - reload config files"
+reload_description: "reload config files"
+scan: "&b/rtp scan - try all possible region placements to improve load times"
+scan_description: "clear stored data and try all possible region placements"
+config_description: "update configuration files at runtime"
+info_description: "check the current state of the plugin"
+test_description: "test RTP functions"
+
+# Visuals
+title: "#FF6B6BT#FF8560e#FF9F55l#FFBA4Ae#FFD53Fp#E8E040o#BFED41r#96F542t#6DF543e#44F2A0d#3BEFC8!#38ECF0"
+subtitle: "#A78BFAh#B47EF8a#C171F6v#CE64F4e#DB57F2 #E84AF0f#E855D8u#E860C0n#E86BA8!#E876A0"
+fadeIn: 20
+stay: 20
+fadeOut: 20
+actionbar: ""
+
+# DO NOT TOUCH VERSION NUMBER
+version: "1.0"

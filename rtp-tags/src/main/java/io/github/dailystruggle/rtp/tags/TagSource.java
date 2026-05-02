@@ -3,19 +3,12 @@ package io.github.dailystruggle.rtp.tags;
 import java.util.List;
 
 /**
- * A pull-based enumeration of tag files from some underlying store — a
- * filesystem tree, a jar entry, an in-memory fixture, or a data-pack archive.
+ * A pull-based source of tag files (e.g., filesystem, jar, in-memory).
  *
- * <p>Sources are ordered in the {@link TagResolver} input list; earlier sources
- * are loaded first. Sources with {@code replace=true} entries override earlier
- * sources' values for the same tag id. Because this safety-list compiler takes
- * the <b>union</b> of reachable materials across all sources (per Slice 3a
- * scope), data-pack ordering is advisory only — strict vanilla ordering is a
- * future-slice concern for non-safety use cases.
+ * <p>Sources are ordered; {@code replace=true} overrides previous values.
+ * The resolver computes the union of all sources.
  *
- * <p>Implementations shall be thread-safe if they are intended to be shared
- * across resolver invocations; the bundled {@link DiskTagSource} is stateless
- * and therefore trivially thread-safe.
+ * <p>Implementations should be thread-safe.
  */
 public interface TagSource {
 

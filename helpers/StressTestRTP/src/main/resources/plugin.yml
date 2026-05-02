@@ -1,0 +1,27 @@
+name: StressTestRTP
+version: 1.0-SNAPSHOT
+main: io.github.dailystruggle.helpers.stresstestrtp.StressTestRTPPlugin
+api-version: "1.20"
+author: dailystruggle
+description: Black-box stress-test driver for /rtp-style commands. Dispatches a configurable command against online players, attributes PlayerTeleportEvent completions, and writes ms-precision CSV + summary aligned to the RTP front-page benchmark table.
+load: POSTWORLD
+folia-supported: true
+
+commands:
+  rtpstress:
+    description: Drive a stress test against an /rtp-style command.
+    usage: |
+      /rtpstress start [seconds] [concurrency]  - begin a run
+      /rtpstress stop                           - end the current run early
+      /rtpstress status                         - rolling p50/p95/p99, TPS, MSPT, heap
+      /rtpstress burst [n]                      - fire n concurrent dispatches once (default 10, for "TPS under 10x burst")
+      /rtpstress sequence [perSec] [gapSec] [concurrency] - run each target-commands entry in turn, with a recovery gap between targets
+      /rtpstress reset-cold                     - clear caches between cold-start measurements (best-effort)
+      /rtpstress export                         - flush CSV and write summary.txt
+    permission: stresstestrtp.admin
+    aliases: [rtps]
+
+permissions:
+  stresstestrtp.admin:
+    description: Operate the StressTestRTP harness.
+    default: op

@@ -1,10 +1,9 @@
 package io.github.dailystruggle.rtp.bukkit.lite;
 
+import io.github.dailystruggle.rtp.bukkit.BootstrapSupport;
 import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
-import io.github.dailystruggle.rtp.bukkit.commands.RTPCmdBukkit;
 import io.github.dailystruggle.rtp.bukkit.spigotListeners.OnPlayerJoin;
 import io.github.dailystruggle.rtp.bukkit.spigotListeners.OnPlayerQuit;
-import io.github.dailystruggle.rtp.bukkit.server.BukkitServerProvider;
 import io.github.dailystruggle.rtp.bukkit.spigotListeners.OnEventTeleports;
 import io.github.dailystruggle.rtp.bukkit.spigotListeners.OnWorldLoadUnload;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -84,30 +83,18 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
       // Lite supports Spigot and Paper only (no Folia branch). BukkitServerProvider
       // already returns the correct accessor/scheduler pair for the host; lite simply
       // never reaches the Folia code path because :rtp-folia:** is not on the classpath.
-      BukkitServerProvider.ServerModel serverModel;
-      try {
-        serverModel = BukkitServerProvider.resolveServerModel(this);
-        RTP.serverAccessor =
-            (io.github.dailystruggle.rtp.api.server.RTPServerAccessor)
-                Class.forName(serverModel.accessorClassName)
-                    .getDeclaredConstructor().newInstance();
-        RTP.scheduler =
-            (io.github.dailystruggle.rtp.api.scheduling.RTPScheduler)
-                Class.forName(serverModel.schedulerClassName)
-                    .getDeclaredConstructor(JavaPlugin.class).newInstance(this);
-      } catch (Exception e) {
-        RTP.log(Level.WARNING,
-            "[LIFECYCLE-LITE] onEnable reflection failure -- bailing out via onDisable", e);
+      // Shared helper with the full bootstrap (ADR-024).
+      if (!BootstrapSupport.wireServerAccessorAndScheduler(this, "LIFECYCLE-LITE")) {
         onDisable();
         return;
       }
     }
 
     // Step 2: bStats with a distinct pluginId so lite installs are tracked separately.
-    // TODO(ADR-024): allocate a dedicated bStats plugin id and replace the placeholder
-    // below before the lite JAR ships publicly.
-    RTP.log(Level.FINE, "[LIFECYCLE-LITE] onEnable initializing bStats (lite id)");
-    metrics = new Metrics(this, /* TODO replace */ 30865);
+    // ADR-024: lite uses the v2-branch bStats id (12277) to keep historical continuity
+    // for the lite-style install base; full uses 30865.
+    RTP.log(Level.FINE, "[LIFECYCLE-LITE] onEnable initializing bStats id=12277");
+    metrics = new Metrics(this, 12277);
 
     if (RTP.getInstance() == null) {
       RTP.serverAccessor.start(this);
@@ -141,27 +128,13 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
       }
     }
 
-    // Step 3: command registration. Shared with the full bootstrap.
-    // TODO(ADR-024): RTPCmdBukkit currently takes a JavaPlugin parameter; this works
-    // for both bootstraps unchanged. Verify no tab-completer code reaches into
-    // RTPBukkitPlugin.getInstance() expecting the full type.
-    RTPCmdBukkit mainCommand = new RTPCmdBukkit(/* see TODO */ null);
-    RTP.baseCommand = mainCommand;
-    org.bukkit.command.PluginCommand rtpCommand = getCommand("rtp");
-    if (rtpCommand != null) {
-      rtpCommand.setExecutor(mainCommand);
-      rtpCommand.setTabCompleter(mainCommand);
-    }
-    org.bukkit.command.PluginCommand wildCommand = getCommand("wild");
-    if (wildCommand != null) {
-      wildCommand.setExecutor(mainCommand);
-      wildCommand.setTabCompleter(mainCommand);
-    }
+    // Step 3: command registration. Shared with the full bootstrap (ADR-024 helper).
+    // RTPCmdBukkit takes a Plugin parameter; passing `this` (the lite JavaPlugin)
+    // is the parity-correct call for both editions.
+    BootstrapSupport.registerRtpAndWildCommands(this);
 
-    // Step 4: drain startup tasks (region binding etc.).
-    while (RTP.getInstance().startupTasks.size() > 0) {
-      RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
-    }
+    // Step 4: drain startup tasks (region binding etc.). Shared helper (ADR-024).
+    BootstrapSupport.drainStartupTasks();
 
     // Step 5: register listeners. Lite registers a strict subset:
     //   - OnPlayerJoin, OnPlayerQuit, OnWorldLoadUnload (required for region lifecycle)
@@ -186,10 +159,8 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
 
     SendMessage.sendMessage(Bukkit.getConsoleSender(), "");
 
-    // Step 8: drain late startup tasks.
-    while (RTP.getInstance().startupTasks.size() > 0) {
-      RTP.getInstance().startupTasks.execute(Long.MAX_VALUE);
-    }
+    // Step 8: drain late startup tasks. Shared helper (ADR-024).
+    BootstrapSupport.drainStartupTasks();
 
     // Lite OMITS:
     //   - initLoginReserveCache()                (ADR-023)

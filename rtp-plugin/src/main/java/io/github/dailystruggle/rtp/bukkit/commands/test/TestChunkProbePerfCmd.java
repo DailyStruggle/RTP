@@ -29,11 +29,41 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * {@code rtp test chunk-probe-perf} &mdash; A/B micro-benchmark comparing the
- * probe-first fast path ({@link RTPWorld#probeChunkColumn(int, int, int, int,
- * boolean)}) against the authoritative full-chunk load path
- * ({@link RTPWorld#getChunkAtAsync(int, int)}), sampled over a random set of
+ * probe-first fast path ({@link RTPWorld#probeChunkColumn(int, int, int, int)})
+ * against the authoritative full-chunk load path, sampled over a random set of
  * <em>pregenerated</em> chunks discovered by scanning the world's {@code region/}
  * folder.
+ *
+ * <p>Two distinct "full" measurements are reported:
+ * <ul>
+ *   <li><b>{@code full} (wall latency)</b> — wall-clock time observed from a
+ *       worker thread for {@code loadLiveChunk(cx, cz).join()}. Routes through
+ *       the shared {@code BukkitRTPWorld#loadLiveChunk} /
+ *       {@code FoliaRTPWorld#loadLiveChunk} entry point — the same method that
+ *       {@code getChunkAt}'s UNKNOWN fall-through uses for a real chunk-load
+ *       request — bypassing the ADR-016 anvil prefilter short-circuit. On
+ *       vanilla Spigot, where {@code World#getChunkAtAsync} internally hops to
+ *       the main thread, this number is dominated by tick-boundary latency,
+ *       not by chunk-load CPU. On Paper/Folia (true async chunk gen) it
+ *       converges with the CPU number below. Useful for throughput models
+ *       that {@code .join()} on a future (e.g. {@code StressTestRTP}'s probe).
+ *       </li>
+ *   <li><b>{@code full(cpu)} (server-thread CPU)</b> — main-thread (or
+ *       region-thread on Folia) inner timing of {@code World#getChunkAt}, with
+ *       no future plumbing. This is the metric that should be compared to
+ *       {@code anvil avg} and consumed by {@code StressTestRTP} /
+ *       {@code MetricsRecorder} for CPU/MSPT attribution. Capped at
+ *       {@link #CPU_SAMPLES_CAP} samples so the calibration command does not
+ *       stall the server for ~10 s on a 256-sample run.</li>
+ * </ul>
+ *
+ * <p>Calling {@code getChunkAtAsync} directly on a vanilla world with the
+ * prefilter enabled would resolve from the warmed {@code AnvilRegionByteCache}
+ * and under-attribute live-load CPU cost by ~170×, which previously broke
+ * {@code StressTestRTP} / {@code MetricsRecorder} calibration. Adapters that
+ * do not expose the helper (Fabric, test doubles) fall back to
+ * {@link RTPWorld#getChunkAtAsync(int, int)} transparently for the wall-latency
+ * column; the CPU column is omitted on those adapters.
  *
  * <p>Rationale for the pregenerated-chunk sampling strategy: the previous
  * near-spawn spiral produced misleading ratios (~0.95x) because every sampled
@@ -58,6 +88,17 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
   static final int MIN_SAMPLES = 1;
   static final int MAX_SAMPLES = 4096;
   static final int DEFAULT_SAMPLES = 256;
+
+  /**
+   * Upper bound on samples used for the {@code full(cpu)} server-thread inner
+   * timing stage. Each sample stalls the primary (or region) thread for one
+   * live {@code getChunkAt} call, so we cap this independently of the main
+   * sample count to keep the calibration command from stalling the server for
+   * the full run on Spigot. 64 × ~150 ms ≈ ~10 s worst-case main-thread
+   * occupancy, which is acceptable for an opt-in {@code /rtp test} command;
+   * Paper/Folia complete the same set in well under a second.
+   */
+  static final int CPU_SAMPLES_CAP = 64;
 
   /** Matches vanilla region filenames {@code r.<cx>.<cz>.mca}. */
   private static final Pattern REGION_FILE = Pattern.compile("r\\.(-?\\d+)\\.(-?\\d+)\\.mca");
@@ -211,7 +252,7 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
 
       long t0 = System.nanoTime();
       try {
-        ChunkColumnProbe p = world.probeChunkColumn(cx, cz, minY, maxY, false).join();
+        ChunkColumnProbe p = world.probeChunkColumn(cx, cz, minY, maxY).join();
         probeTotalNs += System.nanoTime() - t0;
         if (p == null) probeNulls++;
       } catch (Throwable t) {
@@ -221,7 +262,22 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
 
       long t1 = System.nanoTime();
       try {
-        world.getChunkAtAsync(cx, cz).join();
+        // ADR-016 fix: route through the shared live-load entry point
+        // (BukkitRTPWorld#loadLiveChunk / FoliaRTPWorld#loadLiveChunk),
+        // the same method getChunkAt's UNKNOWN fall-through invokes, so
+        // this measurement is an actual live chunk load, not the
+        // prefilter's cached-anvil-view republish path. Calling
+        // world.getChunkAtAsync on a vanilla world with prefilter enabled
+        // would short-circuit through the warmed AnvilRegionByteCache and
+        // under-report live-load cost by ~170×, breaking StressTestRTP /
+        // MetricsRecorder calibration. Falls back to getChunkAtAsync for
+        // platforms / test doubles that don't expose the helper (Fabric).
+        java.util.concurrent.CompletableFuture<?> fullFuture =
+            invokeBenchmarkLiveLoad(world, cx, cz);
+        if (fullFuture == null) {
+          fullFuture = world.getChunkAtAsync(cx, cz);
+        }
+        fullFuture.join();
         fullTotalNs += System.nanoTime() - t1;
       } catch (Throwable t) {
         fullTotalNs += System.nanoTime() - t1;
@@ -251,12 +307,24 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
       }
     }
 
+    // full(cpu): server-thread inner timing of World#getChunkAt, capped at
+    // CPU_SAMPLES_CAP so we don't stall the primary thread for the entire pool.
+    // Returns {totalNs, samples, failures}; all-zero if the platform doesn't
+    // expose a usable primary-thread hook (Fabric, test doubles).
+    long[] cpuStats = measureCpuChunkLoad(world, pool, Math.min(effective, CPU_SAMPLES_CAP));
+    long fullCpuTotalNs = cpuStats[0];
+    int fullCpuSamples = (int) cpuStats[1];
+    int fullCpuFailures = (int) cpuStats[2];
+
     long probeAvgNs = effective == 0 ? 0 : probeTotalNs / effective;
     long fullAvgNs = effective == 0 ? 0 : fullTotalNs / effective;
     long anvilAvgNs = anvilSamples == 0 ? 0 : anvilTotalNs / anvilSamples;
+    long fullCpuAvgNs = fullCpuSamples == 0 ? 0 : fullCpuTotalNs / fullCpuSamples;
     double ratio = probeAvgNs == 0 ? 0.0 : (double) fullAvgNs / (double) probeAvgNs;
     double anvilRatio = probeAvgNs == 0 ? 0.0 : (double) anvilAvgNs / (double) probeAvgNs;
     double fullOverAnvil = anvilAvgNs == 0 ? 0.0 : (double) fullAvgNs / (double) anvilAvgNs;
+    double fullCpuOverAnvil =
+        anvilAvgNs == 0 ? 0.0 : (double) fullCpuAvgNs / (double) anvilAvgNs;
     double nullRate = effective == 0 ? 0.0 : (double) probeNulls / (double) effective;
 
     String summary =
@@ -264,8 +332,10 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
             "[RTP test/chunk-probe-perf] done: poolSize=%d samples=%d"
                 + " probe total=%dms avg=%dµs failures=%d nullRate=%.3f"
                 + " full  total=%dms avg=%dµs failures=%d"
+                + " full(cpu) total=%dms avg=%dµs failures=%d samples=%d"
                 + " anvil total=%dms avg=%dµs failures=%d samples=%d"
-                + " full/probe=%.2fx anvil/probe=%.2fx full/anvil=%.2fx",
+                + " full/probe=%.2fx anvil/probe=%.2fx full/anvil=%.2fx"
+                + " full(cpu)/anvil=%.2fx",
             pool.size(),
             effective,
             TimeUnit.NANOSECONDS.toMillis(probeTotalNs),
@@ -275,13 +345,18 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
             TimeUnit.NANOSECONDS.toMillis(fullTotalNs),
             TimeUnit.NANOSECONDS.toMicros(fullAvgNs),
             fullFailures,
+            TimeUnit.NANOSECONDS.toMillis(fullCpuTotalNs),
+            TimeUnit.NANOSECONDS.toMicros(fullCpuAvgNs),
+            fullCpuFailures,
+            fullCpuSamples,
             TimeUnit.NANOSECONDS.toMillis(anvilTotalNs),
             TimeUnit.NANOSECONDS.toMicros(anvilAvgNs),
             anvilFailures,
             anvilSamples,
             ratio,
             anvilRatio,
-            fullOverAnvil);
+            fullOverAnvil,
+            fullCpuOverAnvil);
     if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
       RTP.serverAccessor.sendMessage(callerId, summary);
     }
@@ -423,5 +498,229 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
     if (v < lo) return lo;
     if (v > hi) return hi;
     return v;
+  }
+
+  /**
+   * Cache of {@code loadLiveChunk(int,int)} reflective handles per concrete
+   * {@link RTPWorld} class. Sentinel value {@link #BENCHMARK_METHOD_ABSENT}
+   * marks classes that don't expose the helper (Fabric, test doubles), so we
+   * don't repeat the {@code getMethod} lookup per sample.
+   */
+  private static final java.util.concurrent.ConcurrentHashMap<Class<?>, java.lang.reflect.Method>
+      BENCHMARK_LIVE_LOAD_METHODS = new java.util.concurrent.ConcurrentHashMap<>();
+
+  private static final java.lang.reflect.Method BENCHMARK_METHOD_ABSENT;
+
+  static {
+    java.lang.reflect.Method sentinel;
+    try {
+      sentinel = TestChunkProbePerfCmd.class.getDeclaredMethod("clamp", int.class, int.class, int.class);
+    } catch (NoSuchMethodException nse) {
+      sentinel = null;
+    }
+    BENCHMARK_METHOD_ABSENT = sentinel;
+  }
+
+  /**
+   * Time {@code World#getChunkAt(cx, cz)} on the server thread for up to
+   * {@code limit} samples drawn from {@code pool}. Returns {@code {totalNs,
+   * samples, failures}}. The CPU stage stalls the primary (or region) thread
+   * for the duration of the loop; callers must cap {@code limit} (see
+   * {@link #CPU_SAMPLES_CAP}). All-zero return indicates the platform did not
+   * expose a usable primary-thread scheduling hook (Fabric / unit-test
+   * doubles); the caller falls back to omitting the CPU column from the
+   * summary.
+   *
+   * <p>On Folia, the global {@link org.bukkit.scheduler.BukkitScheduler#runTask}
+   * call throws {@code UnsupportedOperationException}; we then dispatch each
+   * sample via {@code Bukkit.getRegionScheduler().execute(plugin, world,
+   * cx, cz, ...)} which adds one region-scheduler hop per sample (typically
+   * sub-millisecond). The {@code full(cpu)} number on Folia therefore still
+   * includes a small per-sample hop cost.
+   */
+  private static long[] measureCpuChunkLoad(
+      RTPWorld<?> world, List<long[]> pool, int limit) {
+    long[] empty = new long[] {0L, 0L, 0L};
+    if (world == null || pool == null || pool.isEmpty() || limit <= 0) return empty;
+
+    World bukkitWorld;
+    try {
+      bukkitWorld = Bukkit.getWorld(world.id());
+    } catch (Throwable t) {
+      return empty;
+    }
+    if (bukkitWorld == null) return empty;
+
+    org.bukkit.plugin.Plugin plugin;
+    try {
+      plugin = Bukkit.getPluginManager().getPlugin("RTP");
+    } catch (Throwable t) {
+      return empty;
+    }
+    if (plugin == null) return empty;
+
+    int n = Math.min(limit, pool.size());
+    List<long[]> samples = new ArrayList<>(n);
+    for (int i = 0; i < n; i++) samples.add(pool.get(i));
+
+    java.util.concurrent.CompletableFuture<long[]> result = new java.util.concurrent.CompletableFuture<>();
+
+    // Try the legacy global scheduler first (Spigot/Paper). On Folia this
+    // throws UnsupportedOperationException — fall through to per-chunk region
+    // scheduling.
+    try {
+      Bukkit.getScheduler().runTask(plugin, () -> {
+        long total = 0L;
+        int fails = 0;
+        for (long[] xz : samples) {
+          int cx = (int) xz[0];
+          int cz = (int) xz[1];
+          long t0 = System.nanoTime();
+          try {
+            org.bukkit.Chunk chunk = bukkitWorld.getChunkAt(cx, cz);
+            total += System.nanoTime() - t0;
+            if (chunk == null) fails++;
+          } catch (Throwable t) {
+            total += System.nanoTime() - t0;
+            fails++;
+          }
+        }
+        result.complete(new long[] {total, samples.size(), fails});
+      });
+    } catch (UnsupportedOperationException folia) {
+      // Folia: dispatch each sample via the region scheduler.
+      return measureCpuChunkLoadFolia(plugin, bukkitWorld, samples);
+    } catch (Throwable t) {
+      RTP.log(Level.FINE,
+          "[RTP test/chunk-probe-perf] full(cpu) global scheduler dispatch failed: "
+              + t.getClass().getSimpleName() + ": " + t.getMessage());
+      return empty;
+    }
+
+    try {
+      // Bound the wait. Spigot worst-case is roughly limit × 200 ms; pad it.
+      return result.get(samples.size() * 2L + 30L, TimeUnit.SECONDS);
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING,
+          "[RTP test/chunk-probe-perf] full(cpu) timed out or failed: "
+              + t.getClass().getSimpleName() + ": " + t.getMessage());
+      return empty;
+    }
+  }
+
+  /**
+   * Folia-specific {@code full(cpu)} dispatch: schedule each sample on its
+   * owning region via reflection (so this class does not need to compile
+   * against Folia API). Each sample completes a per-call future; the
+   * worker-thread caller aggregates totals. Per-sample region-scheduler hop
+   * is included in the timing but is bounded (typically sub-millisecond on
+   * idle servers).
+   */
+  private static long[] measureCpuChunkLoadFolia(
+      org.bukkit.plugin.Plugin plugin, World bukkitWorld, List<long[]> samples) {
+    long[] empty = new long[] {0L, 0L, 0L};
+    Object regionScheduler;
+    java.lang.reflect.Method execute;
+    try {
+      java.lang.reflect.Method getRegionScheduler =
+          Bukkit.class.getMethod("getRegionScheduler");
+      regionScheduler = getRegionScheduler.invoke(null);
+      if (regionScheduler == null) return empty;
+      execute = regionScheduler.getClass().getMethod(
+          "execute",
+          org.bukkit.plugin.Plugin.class,
+          World.class,
+          int.class,
+          int.class,
+          Runnable.class);
+    } catch (Throwable t) {
+      RTP.log(Level.FINE,
+          "[RTP test/chunk-probe-perf] full(cpu) region scheduler unavailable: "
+              + t.getClass().getSimpleName() + ": " + t.getMessage());
+      return empty;
+    }
+
+    long totalNs = 0L;
+    int fails = 0;
+    for (long[] xz : samples) {
+      int cx = (int) xz[0];
+      int cz = (int) xz[1];
+      java.util.concurrent.CompletableFuture<long[]> f =
+          new java.util.concurrent.CompletableFuture<>();
+      Runnable task = () -> {
+        long t0 = System.nanoTime();
+        try {
+          org.bukkit.Chunk chunk = bukkitWorld.getChunkAt(cx, cz);
+          long elapsed = System.nanoTime() - t0;
+          f.complete(new long[] {elapsed, chunk == null ? 1L : 0L});
+        } catch (Throwable th) {
+          long elapsed = System.nanoTime() - t0;
+          f.complete(new long[] {elapsed, 1L});
+        }
+      };
+      try {
+        execute.invoke(regionScheduler, plugin, bukkitWorld, cx, cz, task);
+      } catch (Throwable t) {
+        RTP.log(Level.FINE,
+            "[RTP test/chunk-probe-perf] full(cpu) region dispatch failed for ("
+                + cx + "," + cz + "): "
+                + t.getClass().getSimpleName() + ": " + t.getMessage());
+        fails++;
+        continue;
+      }
+      try {
+        long[] r = f.get(30L, TimeUnit.SECONDS);
+        totalNs += r[0];
+        if (r[1] != 0L) fails++;
+      } catch (Throwable t) {
+        fails++;
+      }
+    }
+    return new long[] {totalNs, samples.size(), fails};
+  }
+
+  /**
+   * Reflectively invoke {@code loadLiveChunk(cx, cz)} on the given world if
+   * the concrete adapter (BukkitRTPWorld / FoliaRTPWorld) exposes it,
+   * bypassing the ADR-016 anvil prefilter short-circuit so the "full" timing
+   * measures an actual live chunk load.
+   *
+   * @return the {@code CompletableFuture} returned by the helper, or
+   *     {@code null} if the world's class does not expose it (caller should
+   *     fall back to {@link RTPWorld#getChunkAtAsync(int, int)}).
+   */
+  @Nullable
+  private static java.util.concurrent.CompletableFuture<?> invokeBenchmarkLiveLoad(
+      RTPWorld<?> world, int cx, int cz) {
+    if (world == null) return null;
+    java.lang.reflect.Method m =
+        BENCHMARK_LIVE_LOAD_METHODS.computeIfAbsent(
+            world.getClass(),
+            cls -> {
+              Class<?> c = cls;
+              while (c != null && c != Object.class) {
+                try {
+                  return c.getDeclaredMethod("loadLiveChunk", int.class, int.class);
+                } catch (NoSuchMethodException ignored) {
+                  c = c.getSuperclass();
+                }
+              }
+              return BENCHMARK_METHOD_ABSENT;
+            });
+    if (m == null || m == BENCHMARK_METHOD_ABSENT) return null;
+    try {
+      m.setAccessible(true);
+      Object result = m.invoke(world, cx, cz);
+      if (result instanceof java.util.concurrent.CompletableFuture<?> cf) {
+        return cf;
+      }
+      return null;
+    } catch (Throwable t) {
+      RTP.log(Level.FINE,
+          "[RTP test/chunk-probe-perf] reflective loadLiveChunk failed for "
+              + world.getClass().getName() + ": "
+              + t.getClass().getSimpleName() + ": " + t.getMessage());
+      return null;
+    }
   }
 }

@@ -7,6 +7,7 @@
 [SIZE=3][I]A deterministic, bounded, audited RTP engine, built for operators and open to contributors.[/I][/SIZE]
 
 [SIZE=3][B][COLOR=#27AE60]Beta launch pricing: $7.50 during the Early Access window. Regular price $15 at 3.0.0 GA. Early buyers keep the resource at no extra cost.[/COLOR][/B][/SIZE]
+[SIZE=3][I]Looking for the free tier? See [B]RTP[/B] (Lite) — published a few hours-to-days after each [B]RTP-Pro[/B] release, starting at `3.0.0` final.[/I][/SIZE]
 
 [URL='https://github.com/dailystruggle/RTP'][IMG]https://img.shields.io/github/v/release/dailystruggle/RTP?label=Version&style=for-the-badge&color=2980B9[/IMG][/URL] [URL='https://github.com/dailystruggle/RTP'][IMG]https://img.shields.io/github/license/dailystruggle/RTP?label=License&style=for-the-badge&color=2C3E50[/IMG][/URL]
 
@@ -18,7 +19,7 @@ RTP-Pro is a specialist tool. A few things to confirm before you purchase. If an
 
 [LIST]
 [*][B]Java 21 or newer[/B] on your host. This one is non-negotiable (REQ-RTP-SYS-001).
-[*][B]Paper, Folia, or Spigot.[/B] Fabric isn't supported. Other Bukkit-family forks outside those three are untested.
+[*][B]Paper, Folia, or Spigot[/B] (including officially-supported Bukkit-compatibility launchers [B]Arclight[/B] and [B]Mohist[/B] for Forge / NeoForge servers). Fabric isn't yet functional in this beta and is planned for a later release; a native Forge adapter is not planned and is lower priority than multi-server / proxy support.
 [*][B]Comfortable editing YAML[/B] and reading a wiki. There's no GUI by design, configuration is plain text files you can version and diff.
 [*][B]Willing to read the admin guide before asking for help.[/B] See the Support Policy below, this one is enforced.
 [*][B]Running a real server,[/B] not a 2-player LAN world. The engineering here targets networks where teleport latency and TPS stability add up to real cost. For a friends-only SMP it is overkill.
@@ -37,7 +38,7 @@ RTP was rebuilt from scratch to fix the performance and reliability problems tha
 [*][B]Platform-native performance.[/B] Not just compatible with modern servers, optimized for them. Spigot, Paper, and Folia each get the threading model that actually fits them.
 [*][B]Active resource watchdog.[/B] A background sweep reclaims chunk tickets from abandoned teleports via WeakReferences, so stalled tasks can't pin resources and no chunk stays force-loaded past its reservation window.
 [*][B]Direct region I/O pre-filter.[/B] On Spigot and Folia, `.mca` region files are parsed off-tick on a background pool. That gives Paper-grade safety evaluation on Spigot, and skips per-candidate Region-Thread hops on Folia. The same reader resolves biomes off-tick, including custom namespaced biomes like Iris.
-[*][B]Self-warming background sampler.[/B] Once the cache is full, selection switches to observational mode. It keeps walking the spiral with the same off-tick safety evaluation, but discards the results instead of enqueuing them. The side effects (bad-sector learning, observed biomes) still stick. The longer your server runs, the more of your world gets mapped — whether or not anyone is teleporting.
+[*][B]Admin-driven background mapping.[/B] The `/rtp scan` lifecycle (`start` / `pause` / `resume` / `reset` / `cancel`) lets an operator walk the spiral during idle periods, applying the same off-tick safety evaluation so bad-sector learning and observed biomes accumulate without waiting for player traffic. A fully automatic self-warming sampler is on the roadmap for `3.0.0` final.
 [/LIST]
 
 [CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
@@ -46,24 +47,71 @@ RTP was rebuilt from scratch to fix the performance and reliability problems tha
 Chunk I/O is the single biggest source of teleport lag. Most RTP plugins treat every platform the same and end up paying the cost of the [I]worst[/I] one. I wasn't willing to do that. Here is what actually happens when a candidate chunk is evaluated on your server:
 
 [LIST]
-[*][B][COLOR=#27AE60]Paper, fully async.[/COLOR][/B] Paper's native `World#getChunkAtAsync` returns a `CompletableFuture<Chunk>`, and RTP uses it directly. Safety evaluation runs off-tick, with no pre-filter and no main-thread fallback. This is the reference platform.
+[*][B][COLOR=#27AE60]Paper, fully async.[/COLOR][/B] Paper's native `World#getChunkAtAsync` returns a `CompletableFuture<Chunk>`, and RTP uses it directly. Safety evaluation runs off-tick, with no pre-filter and — uniquely on Paper — no main-thread fallback. This is the reference platform.
+[*][B][COLOR=#27AE60]Paper forks (Leaf, Leaves, Purpur, Pufferfish, Airplane, …).[/COLOR][/B] Paper-derived forks run the Paper code path and inherit fully-async chunk loading. Use the Paper/Spigot build; no special configuration needed. Folia-derived forks similarly run the Folia code path. ([I]Note: [B]Leaf[/B] and [B]Leaves[/B] are separate projects despite the similar names — both are supported on the Paper code path.[/I])
 [*][B][COLOR=#2980B9]Folia, off-tick pre-filter plus the native Region Scheduler.[/COLOR][/B] Folia's chunk API is Region-Thread-bound, which normally costs a scheduler hop per candidate. RTP runs its Anvil read-only pre-filter on `ForkJoinPool.commonPool()` before the Region Scheduler, so rejected candidates never hop a thread. Confirmed candidates load through Folia's native async API, and teleports dispatch through the Entity Scheduler.
 [*][B][COLOR=#E67E22]Spigot, where the Anvil pre-filter does most of the heavy lifting.[/COLOR][/B] Vanilla Spigot has no `CompletableFuture`-returning async chunk API (that overload is a Paper addition), so without mitigation every candidate would drive a synchronous main-thread `getChunkAt`. RTP parses `.mca` region files off-tick instead. `isAir`, `isSafe`, surface-height, and sky-light checks all run on `ForkJoinPool.commonPool()` against an `AnvilChunkView`. The practical result is Paper-class throughput on Spigot, without having to run a Paper fork.
+[*][B][COLOR=#E67E22]Spigot forks ([B]Universe Spigot[/B], …).[/COLOR][/B] Spigot-derived forks without Paper's async chunk API run the Spigot code path (off-tick Anvil pre-filter + bounded main-thread fallback). If your fork is Paper-based, see the Paper-forks bullet above.
 [*][B][COLOR=#C0392B]Honest caveats on the Spigot and Folia fallback path.[/COLOR][/B] The Anvil pre-filter is a data source, not a universal gate. It falls through to the platform's native chunk API in two cases: when the chunk is already loaded (live data wins), and when the probe returns [I]unknown[/I] (no region file, unsupported data version, decode error, or un-populated). On Spigot the fallback is one on-tick `getChunkAt`. On Folia it's one Region-Scheduler hop. Custom generators like Iris, Terra, and datapacks are [I]not[/I] a fallback trigger, since populated `.mca` palettes are read directly, preserving modded and namespaced IDs that the Bukkit enum would otherwise collapse.
 [*][B][COLOR=#8E44AD]Upgrade-drift proof biome filtering.[/COLOR][/B] When you bump your Paper or Folia server across a Minecraft version, Mojang's seed-based biome assignment can change for coordinates already written to disk. The Anvil-first biome read — applied on every Bukkit-family platform — keeps the `.mca` palette authoritative for populated chunks, so the biome the player actually lands in is the biome your `biomes:` allow-list was written against. No re-pregen, no re-tuning after an upgrade.
-[*][B][COLOR=#8E44AD]Fabric is not supported.[/COLOR][/B] It's on the roadmap but explicitly out of scope for this release. Don't run RTP on Fabric and expect production behavior.
+[*][B][COLOR=#27AE60]Mohist and Arclight, officially supported.[/COLOR][/B] Mohist (Forge ↔ Bukkit) and Arclight (Forge / NeoForge ↔ Bukkit) are first-class supported platforms — use the Spigot/Paper build of RTP and the Spigot code path applies (off-tick Anvil pre-filter + bounded main-thread fallback). This is the recommended way to run RTP on a Forge or NeoForge server.
+[*][B][COLOR=#8E44AD]Fabric: planned support, not functional in `3.0.0-beta.1`.[/COLOR][/B] The `rtp-fabric` adapter ships in-tree but `/rtp` does not yet teleport on Fabric. Don't deploy on Fabric in this beta — Fabric is planned for a later release.
 [/LIST]
 
 [B]Operator takeaway:[/B] Paper and Folia run chunk I/O fully off-tick by design. On vanilla Spigot the Anvil pre-filter covers the common case (any unloaded chunk already populated on disk, vanilla or custom-generated), which is the vast majority of candidates. The rare main-thread fallback is bounded by your configured tick-budget, and no platform silently blocks the tick loop without reporting it.
 
 [CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
 
+[SIZE=5][B][COLOR=#2C3E50]Performance vs. Other RTP Plugins[/COLOR][/B][/SIZE]
+[I]How RTP-Pro stacks up against the most-deployed RTP plugins on the three Bukkit-family server architectures it actually targets. The matrix below is the [B]"where it works and how well"[/B] view; the metrics block below it is the [B]"how fast"[/B] view. Forge/NeoForge (via Arclight or Mohist) inherits the Spigot column. Multi-server / proxy and Fabric are out of scope here — Fabric is planned, multi-server is on the roadmap.[/I]
+
+[B]Confidence legend:[/B] 🧪 = measured locally on the RTP benchmark harness · 📖 = read from the plugin's published docs / resource page · ❓ = inferred from the plugin's known architecture, not yet verified.
+
+[B]Architecture support matrix[/B]
+[TABLE]
+[TR][TD][B]Plugin[/B][/TD][TD][B]Spigot[/B][/TD][TD][B]Paper (and forks)[/B][/TD][TD][B]Folia[/B][/TD][/TR]
+[TR][TD][B]RTP-Pro 3.0.0-beta.1[/B][/TD][TD]✅ 🧪 Off-tick Anvil pre-filter; rare bounded main-thread fallback.[/TD][TD]✅ 🧪 Fully async via native `getChunkAtAsync`; no fallback path.[/TD][TD]✅ 🧪 Region Scheduler + off-tick pre-filter; no 1-tick stalls.[/TD][/TR]
+[TR][TD]BetterRTP[/TD][TD]⚠️ 📖 Synchronous chunk load on miss; TPS spikes during generation are widely reported.[/TD][TD]⚠️ 📖 Uses Paper async where available, but no off-tick safety pre-filter.[/TD][TD]❌ 📖 No native Folia adapter; runs on Paper-compat fork only.[/TD][/TR]
+[TR][TD]EzRTP[/TD][TD]❌ 🧪 Loads on Spigot 1.20.1 but its async update-checker throws `NoSuchMethodError` on the Paper-only `JavaPlugin#getPluginMeta()` ([I]SpigotUpdateChecker:28[/I]); core teleport path otherwise statistics-driven, no Anvil pre-filter — sync chunk load on miss.[/TD][TD]✅ 📖 Built-in percentile/timing metrics on Paper.[/TD][TD]❓ 📖 Not advertised as Folia-aware.[/TD][/TR]
+[TR][TD]AsyRTP[/TD][TD]❌ 🧪 Fails to enable on Spigot 1.20.1 — `StartupBanner.print` calls the Paper-only `JavaPlugin#getPluginMeta()` during `onEnable`, throwing `NoSuchMethodError` before the plugin initializes. Effectively Paper/Folia-only despite the name.[/TD][TD]✅ 📖 Async location search.[/TD][TD]✅ 📖 Region-thread-safe; explicit Folia target.[/TD][/TR]
+[TR][TD]SorekillRTP[/TD][TD]⚠️ ❓ Functional, but the design centre is Redis-backed cross-server, not single-server perf.[/TD][TD]⚠️ ❓ Same.[/TD][TD]❓ 📖 Folia compatibility not specifically documented.[/TD][/TR]
+[TR][TD]AdvancedRTP[/TD][TD]⚠️ 📖 Safety-first; trades speed for ground/biome detection. Sync chunk load on candidate evaluation.[/TD][TD]⚠️ 📖 Same path on Paper.[/TD][TD]❌ 📖 No documented Folia support.[/TD][/TR]
+[TR][TD]JakesRTP[/TD][TD]⚠️ 📖 Async via `prefer-sync-tp: false`; configurable destination cache (`cache-locations`).[/TD][TD]✅ 📖 Same async path on Paper; widely deployed.[/TD][TD]❌ 📖 No native Folia adapter (community forks vary).[/TD][/TR]
+[TR][TD]EssentialsX `/rtp`[/TD][TD]✅ 📖 Works; main-thread chunk load on each candidate.[/TD][TD]✅ 📖 Works; same path, no async chunk API use.[/TD][TD]❌ 📖 Folia not supported by EssentialsX core.[/TD][/TR]
+[TR][TD]HuskHomes RTP[/TD][TD]✅ 📖 Works; bundled with the broader homes/teleport suite.[/TD][TD]✅ 📖 Same path on Paper.[/TD][TD]❓ 📖 Partial — see HuskHomes' own platform matrix.[/TD][/TR]
+[/TABLE]
+
+[B]Performance metrics[/B] [I](measured on the RTP benchmark harness against a freshly-generated 1.21 vanilla world; numbers labelled `<benchmark pending>` will be filled in as the harness is hardened. Lower is better for latency / MSPT; higher is better for stable TPS.)[/I]
+[TABLE]
+[TR][TD][B]Plugin[/B][/TD][TD][B]Cold-start /rtp[/B][/TD][TD][B]Warm-queue /rtp[/B][/TD][TD][B]TPS under 10× burst[/B][/TD][TD][B]MSPT during eval[/B][/TD][TD][B]Memory footprint[/B][/TD][/TR]
+[TR][TD][B]RTP-Pro[/B][/TD][TD]🧪 `<benchmark pending>`[/TD][TD]🧪 `<benchmark pending>` ([I]queue serves pre-verified destination[/I])[/TD][TD]🧪 `<benchmark pending>`[/TD][TD]🧪 `<benchmark pending>`[/TD][TD]🧪 `<benchmark pending>`[/TD][/TR]
+[TR][TD]BetterRTP[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][/TR]
+[TR][TD]EzRTP[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][/TR]
+[TR][TD]AsyRTP[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][/TR]
+[TR][TD]SorekillRTP[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][/TR]
+[TR][TD]AdvancedRTP[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][/TR]
+[TR][TD]JakesRTP[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][/TR]
+[TR][TD]EssentialsX `/rtp`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>` ([I]no pre-warmed queue[/I])[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][/TR]
+[TR][TD]HuskHomes RTP[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][/TR]
+[/TABLE]
+
+[B]Methodology and honest caveats.[/B]
+[LIST]
+[*]Architecture-matrix verdicts marked 📖 are read from the plugin's own published documentation; ❓ verdicts are inferred from the plugin's known architecture and have not been independently verified. 🧪 verdicts are measured against the in-tree RTP harness on the same hardware.
+[*]Numeric metrics are intentionally unfilled in this beta. A dedicated stress-test helper plugin is in development to drive identical workloads through every plugin in the table; results will be backfilled (with raw logs published) before `3.0.0` final.
+[*]Competitor plugins update frequently. This comparison reflects published platform support and observed behavior at the time of writing — corrections welcome via GitHub issue, with a link to the contradicting documentation or a reproduction.
+[*]Feature breadth, GUI, and claim-plugin integration are [I]not[/I] benchmarked here. Several competitors trade speed for those features, and that's a legitimate choice — the table is about throughput and platform fit, not feature parity.
+[/LIST]
+
+[CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
+
 [SIZE=5][B][COLOR=#E67E22]The Engineering: A Deeper Dive[/COLOR][/B][/SIZE]
 
 [B]Algorithmic spatial memory, instead of brute-force guessing[/B]
-Without spatial indexing, teleportation is a guessing game, and the numbers are ugly. A typical Overworld is only around 45% safely teleportable (oceans, rivers, ravines, and steep terrain eat the rest), the Nether is dominated by lava seas and wall-to-wall stone, and the End is [I]almost entirely[/I] void. Standard RTPs pay full chunk-load cost to discover this one candidate at a time, forever.
-RTP plots your world's geometry as it evaluates candidates. When it hits a massive ocean or an unsafe biome, it remembers that sector and shrinks its searchable area, so known bad sectors never get loaded again. The longer it runs, the faster it gets — and the observational sampler keeps that learning going during idle periods without forcing chunk generation.
-[B]Persistence across restarts:[/B] learned bad-sector state is written to H2 or SQLite and reloaded on startup, so a seasoned server doesn't pay the cold-cache cost when the JVM bounces.
+Without spatial indexing, teleportation is a guessing game, and the numbers are ugly. A typical Overworld is only around 45% safely teleportable[SUP]†[/SUP] (oceans, rivers, ravines, and steep terrain eat the rest), the Nether is dominated by lava seas and wall-to-wall stone, and the End is [I]almost entirely[/I] void. Standard RTPs pay full chunk-load cost to discover this one candidate at a time, forever.
+[SIZE=2][I]† Local-profile estimate from a vanilla 1.21 seed set; Nether and End ratios are still qualitative. Anonymous opt-in telemetry is on the roadmap to source this number properly — see [I]Roadmap[/I] below.[/I][/SIZE]
+RTP plots your world's geometry as it evaluates candidates. When it hits a massive ocean or an unsafe biome, it remembers that sector and shrinks its searchable area, so known bad sectors never get loaded again. The longer it runs, the faster it gets — and the admin-driven `/rtp scan` lifecycle keeps that learning going during idle periods.
+[B]Persistence across restarts:[/B] the configuration cache (compiled safety sets, region geometry) is written to H2 or SQLite and reloaded on startup. Full round-trip persistence of the learned bad-sector state is targeted for `3.0.0` final; today the spatial memory rebuilds from a warm cache rather than a cold one, but does not yet survive a JVM bounce in its entirety.
 
 [CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
 
@@ -82,13 +130,14 @@ RTP plots your world's geometry as it evaluates candidates. When it hits a massi
 [*][B]Persistent learned state[/B] across restarts via H2 / SQLite
 [/LIST]
 [B]Supported Claim Plugins:[/B]
-Native, thread-safe integrations for the following are provided via our addons system:
+Native, thread-safe integrations for the following are built into the plugin (no separate addon download required, folded in per ADR-019):
 [LIST]
 [*]Factions (and derivatives)
 [*]GriefDefender
 [*]GriefPrevention
 [*]HuskTowns
 [*]Lands
+[*]RedProtect
 [*]TownyAdvanced
 [*]WorldGuard
 [/LIST]
@@ -100,6 +149,7 @@ RTP exposes its core pipelines through modular configuration, allowing you to ta
 [*]Apply dimension locks and unique safety configs (e.g., Nether vs. Overworld).
 [*]Establish variable pricing for different teleport types.
 [*]Complete localization and player-facing text isolation.
+[*][I]Note:[/I] the [B]`/rtp config`[/B] command is shipped as [B]experimental[/B] in `3.0.0-beta.1`. Subcommand surface, argument grammar, and write-back semantics may change before `3.0.0` final. Prefer editing the YAML files directly for production until the experimental label is dropped.
 [/LIST]
 
 [CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
@@ -110,7 +160,7 @@ RTP exposes its core pipelines through modular configuration, allowing you to ta
 [LIST]
 [*][B]Plain material:[/B] `LAVA`, `MAGMA_BLOCK`. Exactly what you'd expect.
 [*][B]Material with a state predicate:[/B] `OAK_SLAB[waterlogged=true]` matches oak slabs [I]only when waterlogged[/I]. Multiple predicates are AND-ed, like `OAK_SLAB[waterlogged=true,type=top]`.
-[*][B]Vanilla block tag:[/B] `#minecraft:leaves`, `#minecraft:fire`, `#minecraft:campfires`. These are expanded at config-load time from the server's live tag registry, so they update automatically when Mojang adds new blocks to a tag. You don't have to edit your config on every MC update.
+[*][B]Vanilla block tag:[/B] `#minecraft:leaves`, `#minecraft:fire`, `#minecraft:campfires`. The grammar is accepted today; live-registry expansion at config-load time (so the set updates automatically when Mojang adds new blocks to a tag) lands in `3.0.0` final — see [I]Roadmap[/I] below. Use explicit material names alongside tag tokens during the beta.
 [*][B]Tag with a state predicate:[/B] `#minecraft:slabs[waterlogged=true]`, i.e. "any slab, but only when waterlogged". No more manually listing every slab variant.
 [*][B]Wildcard with a state predicate:[/B] `*[waterlogged=true]`, i.e. "any block at all, matched when `waterlogged=true`". One line replaces the entire waterloggable-block enumeration (iron bars, lanterns, chains, fences, all of them).
 [/LIST]
@@ -140,7 +190,7 @@ I don't hide the rough edges. Here is what I already know is incomplete in `3.0.
 [*][B]Vanilla Spigot still pays a rare main-thread fallback.[/B] When the Anvil pre-filter can't resolve a chunk, one on-tick load fills the gap. Planned: expose per-minute fallback counters so operators can see the real cost, and ship an optional strict mode that skips the fallback entirely for zero main-thread time.
 [*][B]Folia candidates can still pay one scheduler hop.[/B] Only for candidates the pre-filter couldn't resolve, but the cost is currently unmeasured. Planned: publish actual p50/p95 numbers, and look at amortising the hop across adjacent candidates.
 [*][B]Un-populated chunks always fall through to a live load.[/B] This is correct by design, since the live load is the authoritative safety net, but telemetry doesn't distinguish this path from other fallbacks today. Planned: a dedicated attribution bucket so operators can tell these apart at a glance, and documented guidance on warming populations ahead of time via the admin scan lifecycle.
-[*][B]Fabric is not supported.[/B] Out of scope for this release, with known blockers (async chunk I/O, location-generator wiring, build tooling). Planned: resolve the three blockers, then decide whether Fabric ships alongside the Bukkit family or on its own preview track.
+[*][B]Fabric is not functional in this beta, but is planned for a later release.[/B] Known blockers: scheduled-task processor parity, permissions integration, full Brigadier command tree. Planned: resolve the remaining blockers and ship Fabric alongside the Bukkit family in a future release. Forge / NeoForge remains lower priority than multi-server / proxy work; the officially-supported path today is Arclight or Mohist with the Spigot/Paper build.
 [*][B]Only one marketing number is sourced so far.[/B] The ~45% Overworld-safe figure above comes from local profiling of a vanilla 1.21 seed set; Nether and End ratios are still qualitative. Planned: anonymous opt-in usage telemetry and a published reference benchmark, so every figure on this page can cite a real number.
 [*][B]Demonstration videos predate this release.[/B] The clips below still illustrate the learning and queue principles accurately, but the numbers shown aren't current-release benchmarks. Planned: fresh footage recorded against `3.0.0` before the `-beta` tag comes off.
 [/LIST]
@@ -194,7 +244,7 @@ A: Existing plain-material entries keep working unchanged, since the new grammar
 [*][B]Support is for bugs and configuration questions,[/B] after you've read the admin guide linked above and the in-repo wiki.
 [*][B]Bug reports need a reproduction:[/B] server version, plugin version, platform (Spigot, Paper, or Folia), attached `config.yml`, `regions/`, and `safety.yml`, plus the relevant `server.log` section. Reports without these will be asked for them once, then closed.
 [*][B]"It doesn't work" is not a bug report.[/B] Neither is "it's broken on my server." Tell me what you did, what you expected, and what actually happened instead.
-[*][B]Unsupported scenarios include[/B] Fabric, modded servers outside the Bukkit family, plugin conflicts I can't reproduce, and general Minecraft-server administration questions. For that last one, the SpigotMC help forum is the right venue.
+[*][B]Unsupported scenarios include[/B] Fabric (planned for a later release), Forge / NeoForge except via Arclight or Mohist (both officially supported), plugin conflicts I can't reproduce, and general Minecraft-server administration questions. For that last one, the SpigotMC help forum is the right venue.
 [*][B]Response time:[/B] I'm a solo maintainer. Expect 24 to 72 hours on weekdays for properly-filed reports. Critical safety issues (S-001 through S-007 violations) jump the queue.
 [*][B]Feature requests[/B] are welcome via GitHub issues, not the resource discussion thread. Priority is driven by the published roadmap, not ticket volume.
 [/LIST]

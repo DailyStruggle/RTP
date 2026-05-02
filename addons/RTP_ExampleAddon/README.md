@@ -44,13 +44,14 @@ RTP.configs.putParser(
         this.getClass().getClassLoader()));
 ```
 
-### 2. Safety contribution — `GlobalRegionVerifiers`
+### 2. Safety contribution — `RTPAPI.hooks().verifiers()`
 
 Contribute a predicate that the pipeline evaluates **asynchronously** for every candidate
-location:
+location. Register through the public `RTPHooks` facade (ADR-026 — see
+[`docs/dev/EXTERNAL_HOOKS.md`](../../docs/dev/EXTERNAL_HOOKS.md)):
 
 ```java
-GlobalRegionVerifiers.addGlobalRegionVerifier(coords -> myCheckReturnsTrueIfSafe(coords));
+RTPAPI.hooks().verifiers().register(coords -> myCheckReturnsTrueIfSafe(coords));
 ```
 
 Rules of engagement (see `AGENTS.md`, `docs/dev/REQUIREMENTS.md §3`):
@@ -61,7 +62,10 @@ Rules of engagement (see `AGENTS.md`, `docs/dev/REQUIREMENTS.md §3`):
 - `return true` to accept the location, `return false` to reject it (RTP will reroll).
 
 For an async variant (e.g., when your check awaits a database or network call) use
-`GlobalRegionVerifiers.addGlobalRegionVerifierAsync`.
+`RTPAPI.hooks().verifiers().registerAsync(...)`.
+
+> The legacy static API `GlobalRegionVerifiers.addGlobalRegionVerifier(...)` still works for
+> source compatibility but is no longer the recommended path for new addons.
 
 ### 3. Events — Bukkit listeners
 
