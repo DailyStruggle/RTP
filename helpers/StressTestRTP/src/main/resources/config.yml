@@ -19,24 +19,106 @@
 #
 # The defaults below have been verified live against the listed plugin JARs
 # on a Paper 1.21 test server. Edit `world` / server tokens to match your env.
+#
+# Sender selection. By default the harness dispatches each `target-commands`
+# entry AS THE TARGET PLAYER (Player#performCommand), so commands run with
+# only the player's default permission set — the configuration real users
+# hit. Set `dispatch-as-player: false` to fall back to the legacy console
+# sender (holds every permission, bypasses player-side gates). Note that
+# admin-form commands like `essentials:sudo {player} tpr` only work from
+# the console; switch to a self-form (e.g. `tpr` issued by the player) when
+# `dispatch-as-player: true`. The `{player}` placeholder still expands to
+# the dispatching player's name and is largely redundant in player-sender
+# mode but kept for compatibility with admin-form entries.
+dispatch-as-player: true
+
 target-commands:
   # RTP / RTP-Pro (this project). The plugin.yml command name is `rtp`, so the
-  # prefix-qualified form is `rtp:rtp`. Uses the `key:value` argument grammar
-  # (see docs/admin/COMMANDS.md) — bare `/rtp <name>` is rejected.
+  # prefix-qualified form is `rtp:rtp`. Self-form when `dispatch-as-player`
+  # is true; the player teleports themselves under default permissions.
   - label: "rtp"
-    command: "rtp:rtp player:{player}"
+    command: "rtp:rtp"
+
+  # BetterRTP (SuperRonanCraft). plugin.yml: `betterrtp` (aliases include
+  # `rtp`/`wild`). Self-form: `/betterrtp` teleports the sender. Switch
+  # back to the admin form `betterrtp:betterrtp player {player}` if you
+  # set `dispatch-as-player: false`.
+  - label: "betterrtp"
+    command: "betterrtp:betterrtp"
+
+  # HuskHomes. Commands are registered at runtime (no plugin.yml block).
+  # Self-form: `/rtp` teleports the sender. Use `huskhomes:rtp {player}`
+  # under `dispatch-as-player: false` for the admin form.
+  - label: "huskhomes"
+    command: "huskhomes:rtp"
+
+  # JakesRTP (donvi-bz). plugin.yml registers `/rtp` and `/wild`, but on a
+  # server where another plugin (e.g. our RTP) also registers `/rtp`, the
+  # bare `/rtp` resolves to whichever plugin registered first — and even
+  # the namespaced `jakesrtp:rtp` form can defer to the other plugin's
+  # PluginCommand instance because Bukkit shares one Command object across
+  # registered aliases. Symptom: `/jakesrtp:rtp <TAB>` shows the OTHER
+  # plugin's subcommands and dispatch produces the OTHER plugin's chat
+  # messages. To unambiguously hit JakesRTP's own pipeline, drive the
+  # admin form `forcertp` (registered only by JakesRTP and only as
+  # `forcertp` / `jakesrtp:forcertp`, no collision possible). Requires
+  # `dispatch-as-player: false` (forcertp gates `jakesrtp.others`,
+  # default: op — players don't have it). The harness will fall back to
+  # console for this one entry; this is the documented exception alongside
+  # `essentialsx:sudo`.
+  - label: "jakesrtp"
+    command: "jakesrtp:forcertp {player} -c default-settings"
 
   # AsyRTP (asygames). plugin.yml: `rtp` registered with usage
   # `/rtp [help|gui|world <world> <player>]`. The only "rtp another player"
   # form is `world <world> <player>`, so we have to pin a world. Edit
   # `world` if your test server's overworld is not named `world`.
+  #
+  # Pre-run config: AsyRTP `config.yml` `profiles.default.cooldown-seconds:
+  # 0` (vip profile is 20 s but unprivileged test players fall into
+  # default). Per-player queueing not exposed as a config knob.
   - label: "asyrtp"
     command: "asyrtp:rtp world world {player}"
 
-  # BetterRTP (SuperRonanCraft). plugin.yml: `betterrtp` (aliases include
-  # `rtp`/`wild`). The "rtp another player" subcommand is `player`.
-  - label: "betterrtp"
-    command: "betterrtp:betterrtp player {player}"
+  # EzRTP. plugin.yml: `forcertp <player> [world]` is the admin form that
+  # can target another player; `/rtp` itself is self-only. The world arg is
+  # required in practice — `/ezrtp:forcertp <player>` (no world) silently
+  # times out (see PRE_WRITEUP §5k). Edit `world` if your test server's
+  # overworld has a different name.
+  #
+  # Pre-run config: EzRTP `limits.yml` cooldown-seconds zeroed across all
+  # tiers; `queue.yml` `enabled: false`; `rtp.yml` countdown-seconds 0.
+  - label: "ezrtp"
+    command: "ezrtp:forcertp {player} world"
+
+  # SorekillRTP. plugin.yml registers ONLY `/rtp` (with aliases
+  # `randomtp`, `wild`) and the admin form is `/rtp <player> <server>
+  # [world]`. There is no `forcertp` or other namespace-unique command, so
+  # the `sorekillrtp:` prefix collides with our own /rtp registration on
+  # the Bukkit command map (same class as the JakesRTP collision in §5g —
+  # the prefixed lookup may resolve to the wrong PluginCommand depending
+  # on plugin load order). Workaround: dispatch via the admin alias
+  # `randomtp` which is unique to SorekillRTP. Verify with `/version`
+  # before publishing any SorekillRTP numbers.
+  #
+  # Pre-run config: SorekillRTP `config.yml` cooldown-seconds 0,
+  # countdown-seconds 0. Cross-server features default-disabled.
+  - label: "sorekillrtp"
+    command: "sorekillrtp:randomtp {player} local world"
+
+  # AdvancedRTP. plugin.yml usage is `/rtp [world] or /rtp reload`, but the
+  # plugin gates an `advancedrtp.admin.rtpother` permission, suggesting an
+  # `/rtp <player>` admin form exists at runtime. AdvancedRTP also collides
+  # on the `/rtp` command name with our own plugin (and BetterRTP, JakesRTP,
+  # SorekillRTP) — verify with `/version` and TAB completion before
+  # publishing any cross-plugin comparison. If the prefixed lookup resolves
+  # to the wrong PluginCommand, this row will measure our plugin, not
+  # AdvancedRTP. No collision-free admin alias is exposed by plugin.yml.
+  #
+  # Pre-run config: AdvancedRTP `config.yml` `attempt-delay: 0`,
+  # `teleport-delay: 0`, `cooldown.duration: 0`.
+  - label: "advancedrtp"
+    command: "advancedrtp:rtp {player}"
 
   # EssentialsX. `/tpr` itself has no <player> argument and is self-only,
   # so we drive it via `/sudo <player> tpr` — EssentialsX's `sudo` command
@@ -45,36 +127,7 @@ target-commands:
   # Requires the console/runner to hold `essentials.sudo` (and the target
   # player to hold `essentials.tpr`).
   - label: "essentialsx"
-    command: "essentials:sudo {player} tpr"
-
-  # EzRTP. plugin.yml: `forcertp <player> [world]` is the admin form that
-  # can target another player; `/rtp` itself is self-only.
-  - label: "ezrtp"
-    command: "ezrtp:forcertp {player}"
-
-  # HuskHomes. Commands are registered at runtime (no plugin.yml block);
-  # `/rtp <player>` is the documented admin form.
-  - label: "huskhomes"
-    command: "huskhomes:rtp {player}"
-
-  # SorekillRTP. plugin.yml: `/rtp <player> <server> [world]` — server
-  # argument is required. `local` is the convention for "this server".
-  - label: "sorekillrtp"
-    command: "sorekillrtp:rtp {player} local"
-
-  # AdvancedRTP. plugin.yml usage is `/rtp [world] or /rtp reload`, but the
-  # plugin gates an `advancedrtp.admin.rtpother` permission, suggesting an
-  # `/rtp <player>` admin form exists at runtime. If your test produces
-  # "invalid arguments" for this entry, remove or comment it out.
-  - label: "advancedrtp"
-    command: "advancedrtp:rtp {player}"
-
-  # JakesRTP (donvi-bz). plugin.yml registers `/rtp` and `/wild` as self-only;
-  # the admin "rtp another player" form is `/forcertp <player>` (see
-  # https://github.com/donvi-bz/JakesRTP). Prefix-qualified to disambiguate
-  # from EzRTP, which also registers `/forcertp`.
-  - label: "jakesrtp"
-    command: "jakesrtp:rtp player={player}"
+    command: "essentials:tpr"
 
 # Legacy single-target form (still honoured if `target-commands` is absent).
 # target-command: "rtp player:{player}"
@@ -187,13 +240,20 @@ default-burst: 10
 # state behaviour per plugin rather than interleaved contention.
 sequence:
   # How long each target is exercised, in seconds.
-  per-target-seconds: 60
+  # Bumped 60 → 600 (10 min) for the 2026-05-02 long-form run: §5e showed
+  # huskhomes still drifting at end-of-60s, and per-plugin steady-state
+  # claims need a window long enough that JIT, queue-drain transients, and
+  # the first GC cycle are all behind us before the publishable window.
+  per-target-seconds: 600
   # Recovery gap between targets, in seconds. The harness stops dispatching,
   # waits for in-flight attempts to drain, then idles for this many seconds
   # before moving to the next target. Bumped from 30s to 60s after live runs
   # showed TPS dips bleeding from one target's phase into the next's cold
   # start, contaminating the warm-queue baseline for the following plugin.
-  gap-seconds: 60
+  # Bumped 60 → 120 (2 min) alongside the 10-min phase length: with longer
+  # phases, more chunks accumulate and need more time to age out under
+  # Spigot's lazy-unload window before the next phase's cold start.
+  gap-seconds: 120
   # JIT warm-up before the measurement sequence. With warmup-seconds > 0, the
   # harness cycles every configured target for `warmup-seconds / (N * cycles)`
   # ms each, BEFORE starting the actual measurement run. During warm-up:
@@ -276,10 +336,19 @@ spark:
   # Spark's own auto-stop timeout. Should be >= sequence.per-target-seconds
   # so the profile covers the full phase; the harness still calls `stop`
   # explicitly at phase end.
-  timeout-seconds: 90
-  # Only sample ticks slower than this many ms. Lower = noisier profile,
-  # higher = miss minor stalls. 50ms is a good default for /rtp pipelines.
-  only-ticks-over-ms: 50
+  # Must be >= per-target-seconds (600); set with headroom so spark's own
+  # auto-stop never beats the harness's explicit stop.
+  timeout-seconds: 660
+  # Only sample ticks slower than this many ms. When > 0, spark filters
+  # samples to only those captured during ticks that exceeded the
+  # threshold; if no tick in a rotation slice crosses the threshold the
+  # resulting `.sparkprofile` is effectively empty (no "Server Thread"
+  # data on the viewer). Set to 0 (default) to capture every sample so
+  # baseline profile data is always present — the cost of `/rtp` work
+  # itself is still clearly visible against an idle baseline. Raise
+  # above 0 only when you need to isolate spike-only behaviour and
+  # accept the risk of empty slices.
+  only-ticks-over-ms: 0
   # When true (default), spark profiles are written to local files via
   # `spark profiler stop --save-to-file` instead of being uploaded to
   # bytebin (the default "live webpage" workflow). Files are written to
@@ -306,3 +375,27 @@ spark:
   # saved to disk (no rotation effect). 60s pairs with the default
   # timeout-seconds: 90 and gives ~50 slices per 50-minute phase.
   rotate-seconds: 60
+  # When true (default), every saved `.sparkprofile` (whether produced by a
+  # phase-end stop or a rotation slice) is automatically decoded by the
+  # harness and a `<name>.summary.json` sidecar is written next to it. The
+  # JSON contains TPS rolling stats, MSPT rolling + per-window aggregates,
+  # per-window CPU process/system, and the top per-thread CPU shares — the
+  # same fields surfaced by spark's web viewer, in a flat shape suited to
+  # AI analysis or markdown table generation. Decoding is offline (no
+  # spark.lucko.me round-trip) and dependency-free (pure-Java protobuf
+  # wire-format reader). Adds ~50ms per profile on a 1MB file. Set to
+  # false to skip the sidecar (e.g. when iterating quickly and you don't
+  # need parsed output).
+  auto-summary: true
+  # Delay (in server ticks) between dispatching `spark profiler stop
+  # --save-to-file` and scanning `plugins/spark/` for the newest
+  # `.sparkprofile` to summarise. Spark writes the file asynchronously;
+  # the default 60-tick (~3s) delay is comfortably longer than typical
+  # flush latency. Increase if your disk is slow or you see "no
+  # .sparkprofile newer than stop" warnings in the log.
+  auto-summary-delay-ticks: 60
+  # Optional override for the spark plugin folder. By default the harness
+  # uses spark's own getDataFolder() (or, as a fallback, `plugins/spark`
+  # / `plugins/Spark` relative to the server CWD). Set this only if your
+  # spark install lives in a non-standard location.
+  plugin-folder: ""

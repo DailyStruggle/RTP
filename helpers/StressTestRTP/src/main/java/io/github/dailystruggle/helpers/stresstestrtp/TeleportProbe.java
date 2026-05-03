@@ -70,6 +70,33 @@ public final class TeleportProbe implements Listener {
         return expecting.remove(playerId);
     }
 
+    /** Snapshot of UUIDs currently expecting a teleport, for poll fallbacks. */
+    public java.util.Set<UUID> expectingIds() {
+        return new java.util.HashSet<>(expecting.keySet());
+    }
+
+    /** Look up an in-flight attempt for {@code playerId} without removing it. */
+    public MetricsRecorder.Attempt peek(UUID playerId) {
+        return expecting.get(playerId);
+    }
+
+    /**
+     * Position-poll fallback used on platforms where {@code PlayerTeleportEvent}
+     * is unreliable (notably Folia: see HuskHomes #824). Atomically removes the
+     * expectation for {@code playerId} and, if found, records the attempt as a
+     * success at {@code (toX, toZ)} and notifies the {@code onAttributed}
+     * callback (so {@link Runner} releases the in-flight slot).
+     *
+     * <p>Returns {@code true} iff an expectation was claimed by this call.
+     */
+    public boolean attributeByPosition(UUID playerId, double toX, double toZ) {
+        MetricsRecorder.Attempt attempt = expecting.remove(playerId);
+        if (attempt == null) return false;
+        recorder.onComplete(attempt, true, "", toX, toZ);
+        onAttributed.accept(playerId);
+        return true;
+    }
+
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onTeleport(PlayerTeleportEvent event) {
         Player player = event.getPlayer();

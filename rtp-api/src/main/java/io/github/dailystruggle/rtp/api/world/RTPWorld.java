@@ -23,6 +23,27 @@ public abstract class RTPWorld<T> {
   protected final T world;
 
   public final AtomicLong activeChunkTickets = new AtomicLong(0);
+  /**
+   * Lifetime count of live chunk-load attempts this world has dispatched to the
+   * native chunk system. Each call into the platform adapter's <em>live-load</em>
+   * path increments this counter exactly once, regardless of whether the caller
+   * entered via {@code getChunkAt}, {@code getChunkAtAsync}, or
+   * {@link #getOrLoadChunk(int, int)} (which composes both).
+   *
+   * <p><strong>Excluded</strong>:</p>
+   * <ul>
+   *   <li>The ADR-016 anvil pre-filter probe path — it reads the on-disk region
+   *       file and never asks the chunk system to load anything.</li>
+   *   <li>Probe-cache hits in {@code getOrLoadChunk}, which return the cached
+   *       anvil-backed view without a live load.</li>
+   *   <li>Kept-cache replays — chunks already pinned by a previous load are
+   *       reused, not re-loaded.</li>
+   * </ul>
+   *
+   * <p>This is the value surfaced by the {@code [loads]} placeholder /
+   * {@code infoTotalLoads} message in {@code /rtp info}, where operators
+   * expect "the chunk system loaded N chunks for us" semantics.</p>
+   */
   public final AtomicLong totalChunkLoads = new AtomicLong(0);
   /**
    * Lifetime count of chunk tickets observed by the {@link #releaseOrphanedTickets(Set)} GC
@@ -39,8 +60,8 @@ public abstract class RTPWorld<T> {
    * acquire (including ref-counted increments on an already-ticketed chunk), so this
    * represents the cumulative number of chunks-with-tickets the plugin has produced —
    * the correct divisor for the {@code leakRate} placeholder, distinct from
-   * {@link #totalChunkLoads} which counts chunk-load attempts (including probe-only
-   * paths that never tie a ticket).
+   * {@link #totalChunkLoads} which counts only live chunk-load attempts (and would
+   * undercount tickets ref-counted onto already-loaded chunks).
    */
   public final AtomicLong lifetimeTicketsIssued = new AtomicLong(0);
   protected final Map<Long, AtomicInteger> chunkTickets = new ConcurrentHashMap<>();

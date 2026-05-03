@@ -55,12 +55,16 @@ public class MetricsRecorder {
         public volatile double tpsAtDispatch = -1.0;
         public volatile double msptAtDispatch = -1.0;
         public volatile long heapUsedMbAtDispatch = -1L;
-        /** Global chunk-load counter snapshot taken at dispatch. */
-        public volatile long chunkLoadsAtDispatch = -1L;
-        /** Global chunk-load counter snapshot taken at completion (or
-         *  timeout). The delta {@code chunkLoadsAtComplete - chunkLoadsAtDispatch}
-         *  approximates the chunk I/O caused by this attempt. */
-        public volatile long chunkLoadsAtComplete = -1L;
+        /** Chunk loads attributed to this attempt by
+         *  {@link ChunkLoadCounter}'s per-attempt attribution chain (Paper
+         *  plugin-ticket lookup, then main-thread temporal fallback). Set by
+         *  {@link ChunkLoadCounter#endAttempt} on completion or timeout.
+         *  Remains {@code -1L} when no counter is wired or the attempt was
+         *  never registered. Replaces the old
+         *  {@code chunkLoadsAtDispatch}/{@code chunkLoadsAtComplete} snapshot
+         *  pair, which double-counted concurrent attempts because the
+         *  underlying counter was global. */
+        public volatile long attributedChunkLoads = -1L;
 
         public Attempt(UUID id, String player, String world, String targetLabel, long dispatchEpochMs,
                        double fromX, double fromZ,
@@ -97,7 +101,8 @@ public class MetricsRecorder {
             "phase_label,start_epoch_ms,end_epoch_ms,wall_ms,attempts,successes,"
                     + "process_cpu_ms,main_thread_cpu_ms,"
                     + "cpu_ms_per_attempt_total,cpu_ms_per_attempt_main,"
-                    + "chunks_loaded,chunks_per_attempt,"
+                    + "chunks_loaded,chunks_loaded_attributed,chunks_loaded_background,"
+                    + "chunks_per_attempt,"
                     + "chunk_load_cost_ms,cpu_ms_with_chunks,cpu_ms_with_chunks_per_attempt";
 
     private final Path csvPath;
@@ -157,8 +162,11 @@ public class MetricsRecorder {
     private volatile long chunkLoadCostNs = 0L;
     public void setChunkLoadCostNs(long ns) { this.chunkLoadCostNs = Math.max(0L, ns); }
     public long chunkLoadCostNs() { return chunkLoadCostNs; }
-    /** Read-only accessor used by {@link Runner} to snapshot the global total
-     *  at dispatch time. Returns {@code -1L} when no counter is wired. */
+    /** Read-only accessor for the global chunk-load total. Retained for
+     *  diagnostics; per-attempt attribution now flows through
+     *  {@link ChunkLoadCounter#beginAttempt(Attempt)} /
+     *  {@link ChunkLoadCounter#endAttempt(Attempt)} rather than dispatch /
+     *  completion snapshots. Returns {@code -1L} when no counter is wired. */
     public long chunkLoadsTotal() {
         ChunkLoadCounter c = chunkCounter;
         return c == null ? -1L : c.total();
@@ -188,9 +196,17 @@ public class MetricsRecorder {
 
     public Path csvPath() { return csvPath; }
 
-    public void onDispatch(@SuppressWarnings("unused") Attempt a) {
+    public void onDispatch(Attempt a) {
         inFlight.incrementAndGet();
         total.incrementAndGet();
+        // Register the attempt with the chunk counter so that subsequent
+        // ChunkLoadEvents can be attributed to it via the per-attempt
+        // attribution chain (Paper plugin-ticket lookup, then main-thread
+        // temporal fallback). Replaces the old
+        // a.chunkLoadsAtDispatch = counter.total() snapshot, which silently
+        // double-counted concurrent attempts.
+        ChunkLoadCounter cc = chunkCounter;
+        if (cc != null) cc.beginAttempt(a);
     }
 
     /** Called by {@link TeleportProbe} when a PlayerTeleportEvent is attributed. */
@@ -203,7 +219,7 @@ public class MetricsRecorder {
         a.toX = toX;
         a.toZ = toZ;
         ChunkLoadCounter cc = chunkCounter;
-        if (cc != null) a.chunkLoadsAtComplete = cc.total();
+        if (cc != null) cc.endAttempt(a);
         if (success) {
             double dx = a.toX - a.fromX, dz = a.toZ - a.fromZ;
             a.distance = Math.sqrt(dx * dx + dz * dz);
@@ -225,7 +241,7 @@ public class MetricsRecorder {
         a.success = false;
         a.failReason = "TIMEOUT";
         ChunkLoadCounter cc = chunkCounter;
-        if (cc != null) a.chunkLoadsAtComplete = cc.total();
+        if (cc != null) cc.endAttempt(a);
         inFlight.decrementAndGet();
         finished.add(a);
         if (recording) {
@@ -350,8 +366,17 @@ public class MetricsRecorder {
 
         ChunkLoadCounter cc = chunkCounter;
         long chunksLoaded = cc != null ? cc.phaseTotal() : -1L;
-        double chunksPerAtt = (chunksLoaded >= 0 && attempts > 0)
-                ? (double) chunksLoaded / attempts : -1.0;
+        long chunksAttributed = cc != null ? cc.phaseAttributed() : -1L;
+        long chunksBackground = cc != null ? cc.phaseBackground() : -1L;
+        // chunks_per_attempt now reports attributed loads (i.e. loads charged
+        // to a specific in-flight teleport via plugin-ticket / main-thread
+        // attribution) rather than the global phase total. The total and
+        // background columns remain available for sanity checking; pre-fix
+        // runs that compared global-total/attempt across plugins were
+        // measuring "all chunk loads anywhere on the server" / attempts and
+        // double-counted with concurrent dispatch.
+        double chunksPerAtt = (chunksAttributed >= 0 && attempts > 0)
+                ? (double) chunksAttributed / attempts : -1.0;
 
         // Chunk-load cost amendment. When a calibration value is set
         // (chunkLoadCostNs > 0, typically obtained from `/rtp test
@@ -361,12 +386,13 @@ public class MetricsRecorder {
         // sampler does NOT, and which the cpu_ms_per_attempt_total column
         // therefore underweights for plugins that synchronously load many
         // chunks per teleport (BetterRTP's PreloadRadius is the motivating
-        // case). Emits chunk_load_cost_ms (raw amendment) and
-        // cpu_ms_with_chunks (process_cpu_ms + amendment) so consumers can
-        // see both the unmodified and amended views side-by-side.
+        // case). Use the attributed count rather than the phase total so
+        // background loads (view-distance follow-ups, other-plugin loads)
+        // do not inflate per-plugin CPU.
         long ns = chunkLoadCostNs;
-        double chunkLoadCostMs = (ns > 0L && chunksLoaded > 0)
-                ? ((double) chunksLoaded * (double) ns) / 1_000_000.0d : -1.0;
+        long chunksForCost = chunksAttributed >= 0 ? chunksAttributed : chunksLoaded;
+        double chunkLoadCostMs = (ns > 0L && chunksForCost > 0)
+                ? ((double) chunksForCost * (double) ns) / 1_000_000.0d : -1.0;
         long cpuMsWithChunks = (procCpuMs >= 0 && chunkLoadCostMs >= 0)
                 ? procCpuMs + Math.round(chunkLoadCostMs) : -1L;
         double cpuWithChunksPerAtt = (cpuMsWithChunks >= 0 && attempts > 0)
@@ -384,6 +410,8 @@ public class MetricsRecorder {
                 perTotal >= 0 ? fmt(perTotal) : "",
                 perMain  >= 0 ? fmt(perMain)  : "",
                 chunksLoaded >= 0 ? Long.toString(chunksLoaded) : "",
+                chunksAttributed >= 0 ? Long.toString(chunksAttributed) : "",
+                chunksBackground >= 0 ? Long.toString(chunksBackground) : "",
                 chunksPerAtt >= 0 ? fmt(chunksPerAtt) : "",
                 chunkLoadCostMs >= 0 ? fmt(chunkLoadCostMs) : "",
                 cpuMsWithChunks >= 0 ? Long.toString(cpuMsWithChunks) : "",
@@ -408,14 +436,12 @@ public class MetricsRecorder {
         return "\"" + s.replace("\"", "\"\"") + "\"";
     }
 
-    /** Per-attempt chunk-load delta. Empty when either snapshot is missing
-     *  (no counter wired, or completion never fired — the latter is
-     *  unreachable since onComplete/onTimeout always populate the second
-     *  snapshot before appendRow runs, but the guard keeps the column
-     *  schema-stable across future code paths). */
+    /** Per-attempt chunk-load count, attributed via the {@link ChunkLoadCounter}
+     *  chain (Paper plugin-ticket lookup, then main-thread temporal fallback).
+     *  Empty when no counter is wired or the attempt was never registered. */
     private static String chunkDeltaCol(Attempt a) {
-        if (a.chunkLoadsAtDispatch < 0 || a.chunkLoadsAtComplete < 0) return "";
-        return Long.toString(Math.max(0L, a.chunkLoadsAtComplete - a.chunkLoadsAtDispatch));
+        if (a.attributedChunkLoads < 0) return "";
+        return Long.toString(a.attributedChunkLoads);
     }
 
     private static String fmt(double d) {

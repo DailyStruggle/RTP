@@ -3,6 +3,11 @@ package io.github.dailystruggle.helpers.stresstestrtp;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 
+import java.io.IOException;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -102,7 +107,14 @@ public final class SparkHook {
      *  {@link #currentRotation}; callers manage those. */
     private void startSliceInternal(String sliceLabel) {
         long timeout = Math.max(5L, config.getLong("spark.timeout-seconds", 60L));
-        long onlyTicksOver = Math.max(0L, config.getLong("spark.only-ticks-over-ms", 50L));
+        // Default 0 = no filter (capture every sample). Spark's
+        // `--only-ticks-over` makes a slice's saved profile effectively empty
+        // when no tick in that slice exceeds the threshold — exactly the
+        // "no data on the website" symptom seen on idle/light phases. The
+        // baseline overhead of running `/rtp` is still clearly visible
+        // against an idle server, so unfiltered profiling is the safer
+        // default. Override in config.yml for spike-isolation runs.
+        long onlyTicksOver = Math.max(0L, config.getLong("spark.only-ticks-over-ms", 0L));
         StringBuilder sb = new StringBuilder("spark profiler start --timeout ").append(timeout);
         if (onlyTicksOver > 0L) {
             sb.append(" --only-ticks-over ").append(onlyTicksOver);
@@ -153,6 +165,9 @@ public final class SparkHook {
             log.info("[StressTestRTP] spark profiler stopped for phase: " + slice
                 + (saveToFile ? " (saved to plugins/spark/profiles/)" : " (uploaded to bytebin)"));
         }
+        if (saveToFile) {
+            scheduleSummarise(slice);
+        }
     }
 
     /** Rotate the in-progress profile if {@link #rotateSeconds()} has elapsed
@@ -194,6 +209,9 @@ public final class SparkHook {
             log.info("[StressTestRTP] spark profiler rotated slice: " + stoppingSlice
                 + (saveToFile ? " (saved to plugins/spark/profiles/)" : " (uploaded to bytebin)"));
         }
+        if (saveToFile) {
+            scheduleSummarise(stoppingSlice);
+        }
 
         currentRotation++;
         lastRotationStartMs = nowMs;
@@ -202,21 +220,117 @@ public final class SparkHook {
         return true;
     }
 
+    /** Schedule an async task that, after a short delay (giving spark time to
+     *  flush the profile to disk), locates the newest {@code .sparkprofile}
+     *  in the spark plugin folder and writes a {@code .summary.json} sidecar
+     *  next to it via {@link SparkProfileSummariser}. The sidecar contains
+     *  TPS / MSPT / per-thread CPU aggregates suitable for direct AI
+     *  consumption — replacing the spark.lucko.me website round-trip.
+     *
+     *  <p>No-op if spark isn't installed or the spark folder can't be located. */
+    private void scheduleSummarise(String label) {
+        if (!config.getBoolean("spark.auto-summary", true)) return;
+        long delayTicks = Math.max(1L, config.getLong("spark.auto-summary-delay-ticks", 60L));
+        Path sparkDir = locateSparkDir();
+        if (sparkDir == null) {
+            if (log != null) log.fine("[StressTestRTP] spark auto-summary: spark dir not found, skipping.");
+            return;
+        }
+        long stopEpochMs = System.currentTimeMillis();
+        org.bukkit.plugin.Plugin owner = Bukkit.getPluginManager().getPlugin("StressTestRTP");
+        long delayMs = delayTicks * 50L;
+        try {
+            // The summary work is pure file I/O — it must run async on every
+            // platform. On Folia, BukkitScheduler#runTaskLaterAsynchronously
+            // is still legal for Async tasks, but we route through Sched for
+            // consistency: a tiny sleep on a fresh async thread, then summarise.
+            Sched.runAsync(owner, () -> {
+                try { Thread.sleep(delayMs); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); return; }
+                doSummarise(sparkDir, label, stopEpochMs);
+            });
+        } catch (Throwable t) {
+            // Shutdown path or scheduler unavailable — fall back to inline best-effort.
+            doSummarise(sparkDir, label, stopEpochMs);
+        }
+    }
+
+    private void doSummarise(Path sparkDir, String label, long sinceEpochMs) {
+        Path newest = findNewestProfile(sparkDir, sinceEpochMs);
+        if (newest == null) {
+            if (log != null) log.warning(
+                    "[StressTestRTP] spark auto-summary: no .sparkprofile newer than stop in "
+                            + sparkDir + " (label=" + label + ").");
+            return;
+        }
+        try {
+            Path out = SparkProfileSummariser.summariseToSidecar(newest, label);
+            if (log != null) log.info("[StressTestRTP] spark auto-summary written: " + out);
+        } catch (Throwable t) {
+            if (log != null) log.log(Level.WARNING,
+                    "[StressTestRTP] spark auto-summary failed for " + newest, t);
+        }
+    }
+
+    /** Locate spark's plugin folder. Defaults to {@code plugins/spark} (or
+     *  {@code plugins/Spark}); operators may override via
+     *  {@code spark.plugin-folder} in {@code config.yml}. */
+    private Path locateSparkDir() {
+        String override = config.getString("spark.plugin-folder", "");
+        if (override != null && !override.isEmpty()) {
+            Path p = Paths.get(override);
+            return Files.isDirectory(p) ? p : null;
+        }
+        try {
+            org.bukkit.plugin.Plugin spark = Bukkit.getPluginManager().getPlugin("spark");
+            if (spark == null) spark = Bukkit.getPluginManager().getPlugin("Spark");
+            if (spark != null) return spark.getDataFolder().toPath();
+        } catch (Throwable ignored) { }
+        // Best-effort fallback: relative to CWD.
+        for (String name : new String[] { "plugins/spark", "plugins/Spark" }) {
+            Path p = Paths.get(name);
+            if (Files.isDirectory(p)) return p;
+        }
+        return null;
+    }
+
+    /** Newest {@code *.sparkprofile} in {@code dir} with mtime >= the
+     *  given epoch (with a small slack), or any newest if none qualify. */
+    private static Path findNewestProfile(Path dir, long sinceEpochMs) {
+        Path newest = null;
+        long newestMs = Long.MIN_VALUE;
+        long slack = 5_000L; // accept files written up to 5s before the stop call
+        long cutoff = sinceEpochMs - slack;
+        try (DirectoryStream<Path> ds = Files.newDirectoryStream(dir, "*.sparkprofile")) {
+            for (Path p : ds) {
+                try {
+                    long m = Files.getLastModifiedTime(p).toMillis();
+                    if (m >= cutoff && m > newestMs) {
+                        newestMs = m;
+                        newest = p;
+                    }
+                } catch (IOException ignored) { }
+            }
+        } catch (IOException ignored) { }
+        return newest;
+    }
+
     private void dispatch(String cmd) {
+        org.bukkit.plugin.Plugin owner = Bukkit.getPluginManager().getPlugin("StressTestRTP");
         try {
             // spark commands are safe to invoke from console; spark itself
-            // hops to its own thread for sampling.
-            Bukkit.getScheduler().runTask(
-                    Bukkit.getPluginManager().getPlugin("StressTestRTP"),
-                    () -> {
-                        try {
-                            Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), cmd);
-                        } catch (Throwable t) {
-                            if (log != null) log.log(Level.WARNING, "[StressTestRTP] spark dispatch failed: " + cmd, t);
-                        }
-                    });
+            // hops to its own thread for sampling. Route through Sched.runGlobal
+            // so on Folia we land on the GlobalRegionScheduler (where console
+            // command dispatch is allowed); on Spigot/Paper this falls through
+            // to the main thread.
+            Sched.runGlobal(owner, () -> {
+                try {
+                    Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), cmd);
+                } catch (Throwable t) {
+                    if (log != null) log.log(Level.WARNING, "[StressTestRTP] spark dispatch failed: " + cmd, t);
+                }
+            });
         } catch (Throwable t) {
-            // Folia or shutdown path: fall back to direct dispatch.
+            // Shutdown path: fall back to direct dispatch.
             try {
                 Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), cmd);
             } catch (Throwable ignored) { }

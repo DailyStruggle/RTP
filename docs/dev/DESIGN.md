@@ -15,6 +15,37 @@ The core reliability mechanism of RTP is its `RegionQueueManager`. The system ma
 - **Bounded Computation Overhead**: The system asynchronously replenishes the queue within strict computational bounds, preventing server CPU spikes.
 - **State Isolation**: Both global and isolated per-user queues are maintained to prevent resource starvation and handle concurrent high-frequency requests reliably.
 
+#### 1.1 Cache Tier Model (L1 / L2 / L3)
+
+The general-purpose location pool inside `RegionQueueManager` is layered into tiers, each with a distinct cost / readiness profile. Tiers drain top-down on `/rtp` and are refilled bottom-up by `Region.execute()`.
+
+| Tier | Field | State of entries | Chunk I/O on use | Configuration cap | Persisted to DB |
+|---|---|---|---|---|---|
+| **L1 — hot / kept** | `keptLocations` (`LockFreeLocationBuffer`) | Fully verified; chunks currently held with `keep(true)` (plugin chunk ticket) | None — chunks already loaded | `activeChunkCap` | Yes |
+| **L2 — cold / unkept** | `unkeptLocations` (`LockFreeLocationBuffer`) | Fully verified through the teleport pipeline; chunk reservations released | One async chunk re-load on promotion to L1 | `cacheCap` | Yes |
+| **L3 — backlog / binned** *(proposed, [ADR-028](../adr/ADR-028-l3-backlog-cache.md))* | `backlogLocations` (new `BacklogLocationBuffer`, nullable) | **Unverified** spiral picks with a per-entry `verified` flag; head-blocking FIFO | None on L3 itself; verification is anvil-prefilter only ([ADR-016](../adr/ADR-016-anvil-subsystem.md)) | `backlogCacheCap` (default `1000`; lite default `0` ⇒ disabled) | No |
+
+Refill / promotion flow:
+
+```
+shape pick ─▶ L3 backlog ─(anvil-verified, in-order)─▶ L2 unkept ─▶ L1 kept ─▶ /rtp
+                     ▲ refill (pure math, no chunk I/O)
+                     │ verify: one bin (32×32 chunks = one .mca) per Region.execute() pulse
+```
+
+L3 design invariants ([ADR-028](../adr/ADR-028-l3-backlog-cache.md)):
+
+- **Order preservation.** Entries are inserted in spiral-selection order and never reordered. The promotion contract to L2 is *head-only, contiguous-verified*: an unverified entry at L3 head blocks all later entries from advancing, even if those later entries have already been anvil-verified. This preserves the spatial-distribution semantics established by the Archimedean spiral mapping ([ADR-001](../adr/ADR-001-archimedean-spiral-1d-mapping.md)).
+- **One bin per pulse.** Each `Region.execute()` pulse picks the bin (`.mca` region file = 32 × 32 chunks) containing the *oldest* unverified L3 entry, runs the anvil pre-filter for every L3 entry whose chunk lies inside that bin, and marks each entry's `verified` flag. This bounds per-pulse work (count-bound on Folia per [ADR-015](../adr/ADR-015-stale-chunk-guard-countbound-pipes.md)) and amortizes the single `.mca` read across all in-bin candidates.
+- **Anvil-only verification.** L3 verification is a cheap *rejection filter* — anvil-passes still face the full pipeline (chunk load + vert + biome + safety) at L2 → L1 promotion. Anvil-rejects are dropped without chunk I/O, DB row, or chunk reservation. On platforms / worlds where the anvil pre-filter is unavailable (e.g. unflushed region files, custom generators, Fabric pre-stabilization), L3 entries fall through as "verified by default" so L3 never stalls a freshly generated world.
+- **No DB persistence.** Unverified entries are not written through `installDatabaseCallbacks`; spiral re-selection after restart is cheap and avoids a "tentative row" schema delta.
+- **Default-off in lite.** The `rtp-lite` assembly ([ADR-024](../adr/ADR-024-rtp-lite-assembly-variant.md)) ships with the key omitted; runtime default `0` keeps the trimmed memory profile. The full assembly defaults to `1000`, sized well above `cacheCap` so binning yields meaningful amortization.
+
+Two further per-region buffers exist outside this tier model and are documented for completeness (they are *not* general-purpose tiers):
+
+- **Login reserve** — `loginLocations` (nullable, default-world only), [ADR-023](../adr/ADR-023-login-reserve-cache.md). Filled by `LoginCacheTask` on its own event-driven loop (startup burst + `PlayerQuitEvent`); consumed at join time before the regular `/rtp` path.
+- **Per-player queue / fast cache** — `perPlayerLocationQueue` + `playerQueue` + `fastLocations`. The fairness primitive for queued players and the per-player prefilled future for already-online clients.
+
 ### 2. Concurrency and Platform-Specific Thread Safety
 RTP employs platform-specific adapters to ensure strict thread safety and optimal concurrent execution across disparate server environments:
 - **`rtp-spigot`**: The Bukkit API exposes only `Consumer`-based async chunk overloads (the `CompletableFuture`-returning `World#getChunkAtAsync(int,int)` is a Paper addition). On pure Spigot the adapter reflectively probes for the Paper overload and, when absent, falls back to a synchronous `world.getChunkAt(...)` scheduled onto the primary thread via `Bukkit.getScheduler().runTask(...)`. The caller's `CompletableFuture` is unblocked, but the chunk I/O itself is not off-tick. Off-tick *safety evaluation* on pure Spigot is achieved only for candidates covered by the Anvil read-only pre-filter (ADR-016).

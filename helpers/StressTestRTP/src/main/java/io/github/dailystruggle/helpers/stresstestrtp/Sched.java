@@ -106,14 +106,54 @@ public final class Sched {
         Bukkit.getScheduler().runTask(plugin, r);
     }
 
-    /** Schedule {@code r} on the async scheduler at a fixed period in ms. */
-    public static int runAsyncTimer(Plugin plugin, Runnable r, long periodMs) {
+    /**
+     * Schedule {@code r} on the async scheduler at a fixed period in ms.
+     *
+     * <p>Returns an opaque handle: on Spigot/Paper it boxes the BukkitScheduler
+     * task id; on Folia it is the {@code ScheduledTask} returned by
+     * {@code AsyncScheduler#runAtFixedRate}. Pass it back to {@link #cancel(Object)}.
+     *
+     * <p>Folia rejects {@code BukkitScheduler#runTaskTimerAsynchronously} with
+     * {@link UnsupportedOperationException}, so we must reflectively target the
+     * AsyncScheduler there.
+     */
+    public static Object runAsyncTimer(Plugin plugin, Runnable r, long periodMs) {
+        long period = Math.max(1L, periodMs);
+        if (isFolia()) {
+            try {
+                Object asyncSched = Bukkit.getServer().getClass()
+                        .getMethod("getAsyncScheduler").invoke(Bukkit.getServer());
+                Method m = asyncSched.getClass().getMethod(
+                        "runAtFixedRate", Plugin.class, java.util.function.Consumer.class,
+                        long.class, long.class, java.util.concurrent.TimeUnit.class);
+                return m.invoke(asyncSched, plugin,
+                        (java.util.function.Consumer<Object>) task -> r.run(),
+                        period, period, java.util.concurrent.TimeUnit.MILLISECONDS);
+            } catch (ReflectiveOperationException e) {
+                // fall through to BukkitScheduler — likely to throw on Folia,
+                // but at least surfaces a useful stack trace.
+            }
+        }
         long ticks = Math.max(1L, periodMs / 50L);
-        return Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, r, ticks, ticks).getTaskId();
+        return Integer.valueOf(
+                Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, r, ticks, ticks).getTaskId());
     }
 
-    public static void cancel(int taskId) {
-        if (taskId > 0) Bukkit.getScheduler().cancelTask(taskId);
+    /** Cancel a handle previously returned by {@link #runAsyncTimer}. Null-safe. */
+    public static void cancel(Object handle) {
+        if (handle == null) return;
+        if (handle instanceof Integer) {
+            int id = (Integer) handle;
+            if (id > 0) Bukkit.getScheduler().cancelTask(id);
+            return;
+        }
+        // Folia ScheduledTask — call cancel() reflectively to avoid compile-time
+        // dependency on io.papermc.paper.threadedregions.scheduler.ScheduledTask.
+        try {
+            handle.getClass().getMethod("cancel").invoke(handle);
+        } catch (ReflectiveOperationException ignored) {
+            // best effort
+        }
     }
 
     private Sched() {}

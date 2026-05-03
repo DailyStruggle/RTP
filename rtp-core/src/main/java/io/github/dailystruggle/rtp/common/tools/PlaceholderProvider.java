@@ -219,9 +219,11 @@ public class PlaceholderProvider {
                     // tickets ever observed, divided by the cumulative number of chunk
                     // tickets we have ever issued (lifetimeTicketsIssued). Note: we
                     // deliberately do NOT use totalChunkLoads as the divisor — that counter
-                    // is incremented on every chunk-load attempt (including probe-only
-                    // paths that never tie a ticket), which would understate the leak rate
-                    // by inflating the denominator with non-ticketed loads.
+                    // tracks only live chunk-load attempts, so it would undercount the
+                    // denominator by missing tickets that were ref-counted onto an
+                    // already-loaded chunk (a kept-cache replay or sibling-of-already-pinned
+                    // candidate). lifetimeTicketsIssued increments on every acquire and is
+                    // the correct denominator for "fraction of issued tickets that leaked".
                     long lifetimeOrphaned = 0;
                     long ticketsIssued = 0;
                     for (RTPWorld<?> world : RTP.serverAccessor.getRTPWorlds()) {
