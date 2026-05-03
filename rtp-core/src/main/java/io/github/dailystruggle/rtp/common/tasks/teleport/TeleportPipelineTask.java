@@ -54,6 +54,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
     public static String unsafe = "";
     public static String teleportMessage = "";
     public static long viewDistanceTeleport = 0;
+    public static boolean postTeleportQueueing = false;
 
     static {
       Configs.onReload(ConfigCache::reload);
@@ -69,6 +70,8 @@ public final class TeleportPipelineTask extends RTPRunnable {
       ConfigParser<PerformanceKeys> perf =
           (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
       viewDistanceTeleport = perf.getNumber(PerformanceKeys.viewDistanceTeleport, 0L).longValue();
+      postTeleportQueueing = Boolean.parseBoolean(
+          perf.getConfigValue(PerformanceKeys.postTeleportQueueing, false).toString());
     }
   }
 
@@ -504,6 +507,25 @@ public final class TeleportPipelineTask extends RTPRunnable {
                   SupportLogger.logException(Level.WARNING, "Error in teleportPostAction", e);
                 }
               });
+
+              // postTeleportQueueing: opportunistically schedule one cache-refill
+              // task on the region's cachePipeline after a successful teleport.
+              // Mirrors the periodic deficit loop in Region (Region.java:720); the
+              // task self-gates on cache fullness, so this is at worst a no-op
+              // when the cache is already at cacheCap. Default off (PerformanceKeys).
+              if (aBoolean != null && aBoolean
+                  && ConfigCache.postTeleportQueueing
+                  && region != null
+                  && region.cachePipeline != null) {
+                try {
+                  region.cachePipeline.add(
+                      new io.github.dailystruggle.rtp.common.selection.region.RegionCacheTask(
+                          region, 1_000_000L));
+                } catch (Throwable t) {
+                  RTP.log(Level.WARNING,
+                      "[RTP] postTeleportQueueing dispatch failed: " + t, t);
+                }
+              }
 
             } catch (Exception e) {
               SupportLogger.logException(Level.SEVERE, "Fatal error in teleport callback", e);

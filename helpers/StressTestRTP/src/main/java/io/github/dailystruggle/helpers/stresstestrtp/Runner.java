@@ -7,10 +7,7 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -58,7 +55,7 @@ public final class Runner {
     private final java.util.concurrent.atomic.AtomicReference<UUID> lastDispatched =
             new java.util.concurrent.atomic.AtomicReference<>();
 
-    private volatile int taskId = -1;
+    private volatile Object taskId = null;
     private volatile long endEpochMs = 0L;
     private volatile int concurrencyCap = 4;
     private volatile Mode mode = Mode.TIMED;
@@ -301,7 +298,7 @@ public final class Runner {
     public void stop() {
         if (!running.compareAndSet(true, false)) return;
         Sched.cancel(taskId);
-        taskId = -1;
+        taskId = null;
         // If we were stopped mid-warmup, leave the recorder ready for the next
         // run and close the warmup log file.
         if (warmupActive) {
@@ -387,6 +384,44 @@ public final class Runner {
                     if (a != null) recorder.onTimeout(a);
                     deadlines.remove(id);
                     inFlight.decrementAndGet();
+                }
+            }
+
+            // 1.5) Position-poll fallback (Folia only).
+            //      On Folia, PlayerTeleportEvent dispatch from teleportAsync
+            //      is known to be unreliable for some plugins (see HuskHomes
+            //      #824 and Folia #330). When an expectation lingers after
+            //      the listener should have fired, fall back to checking the
+            //      player's current position against the recorded `from`. If
+            //      the planar XZ distance exceeds the threshold (default 16
+            //      blocks, configurable via `folia.poll-distance-threshold`),
+            //      attribute the attempt as a success at the new coordinates.
+            //      The location read must happen on the entity's owning
+            //      region thread, so we hop via Sched.runOnPlayer.
+            if (Sched.isFolia()) {
+                double thr = config.getDouble("folia.poll-distance-threshold", 16.0);
+                double thr2 = thr * thr;
+                for (UUID id : probe.expectingIds()) {
+                    MetricsRecorder.Attempt a = probe.peek(id);
+                    if (a == null) continue;
+                    Player p = Bukkit.getPlayer(id);
+                    if (p == null || !p.isOnline()) continue;
+                    double fromX = a.fromX, fromZ = a.fromZ;
+                    Sched.runOnPlayer(plugin, p, () -> {
+                        try {
+                            if (!p.isOnline()) return;
+                            Location loc = p.getLocation();
+                            double dx = loc.getX() - fromX;
+                            double dz = loc.getZ() - fromZ;
+                            if ((dx * dx + dz * dz) >= thr2) {
+                                if (probe.attributeByPosition(id, loc.getX(), loc.getZ())) {
+                                    lastProgressEpochMs = System.currentTimeMillis();
+                                }
+                            }
+                        } catch (Throwable ignored) {
+                            // best-effort: never break the runner tick
+                        }
+                    });
                 }
             }
 
@@ -654,12 +689,14 @@ public final class Runner {
                 System.currentTimeMillis(),
                 from.getX(), from.getZ(),
                 snap.tps(), snap.mspt(), snap.heapUsedMb());
-        // Snapshot the global chunk-load counter as the per-attempt
-        // baseline. The matching read happens in
-        // MetricsRecorder.onComplete / onTimeout; the delta is the
-        // chunk-I/O cost the harness attributes to this attempt.
-        // Returns -1 when no counter is wired (chunk accounting disabled).
-        attempt.chunkLoadsAtDispatch = recorder.chunkLoadsTotal();
+        // Per-attempt chunk-load attribution is now handled inside
+        // MetricsRecorder.onDispatch via ChunkLoadCounter#beginAttempt(a):
+        // the counter registers this attempt as in-flight and routes
+        // subsequent ChunkLoadEvents to it (via Paper plugin-ticket lookup
+        // or main-thread temporal fallback). The previous design here
+        // snapshotted a global counter at dispatch and again at completion
+        // and reported the delta, which silently double-counted concurrent
+        // attempts and folded in background view-distance loads.
 
         // Race-condition fix: install runner-side bookkeeping (deadlines,
         // nextDispatchAt, lastDispatched, inFlight) BEFORE registering the
@@ -698,9 +735,28 @@ public final class Runner {
         // Without this, every per-attempt latency includes that wait —
         // observable as a baseline floor of ~50 ms even when the target
         // plugin teleports in microseconds (e.g. RTP queue-served).
+        // Sender selection: by default we dispatch as the target player so
+        // the command runs through the player's default permission set —
+        // this is the configuration real users hit, and it exercises any
+        // permission-gated fast-paths in the target plugin (cooldown
+        // bypasses, admin-form rejections, etc.). Set `dispatch-as-player:
+        // false` to fall back to the legacy console sender, which holds
+        // every permission and bypasses player-side gates (useful for
+        // measuring raw pipeline cost without permission checks, or for
+        // commands like `essentials:sudo` that *must* run from console).
+        final boolean asPlayer = config.getBoolean("dispatch-as-player", true);
         Sched.runOnPlayer(plugin, target, () -> {
             attempt.commandDispatchedEpochMs = System.currentTimeMillis();
-            Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), cmd);
+            if (asPlayer) {
+                // Player#performCommand strips a leading slash if present and
+                // dispatches with the player as CommandSender. Returns false
+                // for unknown commands; we don't use the return value because
+                // the probe / console-watcher / timeout already cover the
+                // fail paths.
+                target.performCommand(cmd);
+            } else {
+                Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), cmd);
+            }
         });
     }
 
@@ -790,7 +846,11 @@ public final class Runner {
         }
         if (!save) return;
         try {
-            Bukkit.getScheduler().runTask(plugin, () -> {
+            // Route through Sched.runGlobal so this works on Folia too: there
+            // it lands on the GlobalRegionScheduler (correct owner of world-
+            // wide state); on Spigot/Paper it falls through to the main
+            // thread, which is where World#save() must run.
+            Sched.runGlobal(plugin, () -> {
                 long t0 = System.currentTimeMillis();
                 int n = 0;
                 for (org.bukkit.World w : Bukkit.getWorlds()) {
@@ -807,9 +867,6 @@ public final class Runner {
                         endingLabel, n, System.currentTimeMillis() - t0));
             });
         } catch (Throwable t) {
-            // Folia (if "always" was forced): runTask on the global region
-            // scheduler is the wrong API. We don't fight that here — the
-            // "auto" default already excludes Folia. Just log and move on.
             plugin.getLogger().log(Level.WARNING,
                     "[StressTestRTP] between-phase world save scheduling failed", t);
         }

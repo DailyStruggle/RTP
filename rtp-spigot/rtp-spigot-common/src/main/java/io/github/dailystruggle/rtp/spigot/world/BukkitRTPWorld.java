@@ -135,7 +135,6 @@ public class BukkitRTPWorld extends RTPWorld<World> {
 
   @Override
   public CompletableFuture<Long> getChunkAt(int cx, int cz) {
-    totalChunkLoads.incrementAndGet();
     final long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
 
     // ADR-016 — Anvil read-only data source (no longer a gate).
@@ -413,6 +412,12 @@ public class BukkitRTPWorld extends RTPWorld<World> {
    * summary's {@code nullChunk} bucket (REQ-RTP-S-004).
    */
   private CompletableFuture<Long> loadChunkFuture(int cx, int cz, long key) {
+    // Count only actual live chunk-load attempts dispatched to the chunk system.
+    // Probe-only paths (ADR-016 anvil pre-filter) and probe-cache hits MUST NOT bump
+    // this counter — see the Javadoc on RTPWorld.totalChunkLoads. This avoids the
+    // double-count that previously occurred when RTPWorld.getOrLoadChunk called both
+    // getChunkAt (probe) and getChunkAtAsync (live) for the same logical attempt.
+    totalChunkLoads.incrementAndGet();
     // Prefer Bukkit's async chunk API (present in Spigot since 1.13). This avoids
     // hopping work back onto the primary thread for a synchronous world.getChunkAt()
     // call and keeps the location pipeline off the tick thread wherever the server

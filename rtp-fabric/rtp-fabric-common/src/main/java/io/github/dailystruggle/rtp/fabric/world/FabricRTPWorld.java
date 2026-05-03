@@ -125,7 +125,10 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
      */
     @Override
     public CompletableFuture<Long> getChunkAt(int chunkX, int chunkZ) {
-        totalChunkLoads.incrementAndGet();
+        // Probe-entry: do NOT bump totalChunkLoads here. The increment happens inside
+        // the server.submit body below, on the actual live chunk load. This avoids the
+        // double-count via RTPWorld.getOrLoadChunk's probe-then-live composition; see
+        // the Javadoc on RTPWorld.totalChunkLoads.
         final long key = ((long) chunkX & 0xffffffffL) | ((long) chunkZ << 32);
         final MinecraftServer server = world.getServer();
         if (server == null) {
@@ -139,6 +142,10 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
             return failed;
         }
         return server.submit(() -> {
+            // Live chunk-load attempt — count it exactly once here, regardless of
+            // whether the caller entered via getChunkAt directly or via getChunkAtAsync
+            // (which delegates to this method).
+            totalChunkLoads.incrementAndGet();
             ServerChunkCache cache = world.getChunkSource();
             ChunkAccess chunk = cache.getChunk(chunkX, chunkZ, ChunkStatus.FULL, true);
             if (chunk != null) {

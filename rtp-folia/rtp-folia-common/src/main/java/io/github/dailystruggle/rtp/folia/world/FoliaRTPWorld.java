@@ -119,7 +119,10 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   @Override
   @RegionThread
   public CompletableFuture<Long> getChunkAt(int cx, int cz) {
-    totalChunkLoads.incrementAndGet();
+    // Probe-entry: do NOT bump totalChunkLoads here. The counter is incremented by
+    // the live-load path (getChunkAtAsync) so RTPWorld.getOrLoadChunk's probe-then-live
+    // composition counts each logical chunk-load attempt exactly once. See the Javadoc
+    // on RTPWorld.totalChunkLoads.
     final long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
 
     // ADR-016 §11 — Anvil read-only data source, same probe-then-fall-through
@@ -228,6 +231,9 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
    */
   @RegionThread
   private CompletableFuture<Long> loadLiveChunk(int cx, int cz, long key) {
+    // Count only actual live chunk-load attempts (post probe-cache miss). The probe
+    // entry getChunkAt MUST NOT bump this; see RTPWorld.totalChunkLoads Javadoc.
+    totalChunkLoads.incrementAndGet();
     return world
         .getChunkAtAsync(cx, cz, true)
         .thenApply(

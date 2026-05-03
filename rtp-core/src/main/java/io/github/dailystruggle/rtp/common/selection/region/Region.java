@@ -742,9 +742,11 @@ public class Region extends FactoryValue<RegionKeys> {
   /**
    * isObservationalModeEnabled - consults {@code PerformanceKeys.visitorEnabled}
    * as the single master switch for the observational cache-fill mode
-   * (plan §§2, 3). Defaults to {@code true} (beta telemetry direction,
-   * 2026-04-19). Returns {@code false} if the config parser is unavailable
-   * so a cold-boot race cannot produce spurious observational tasks.
+   * (plan §§2, 3). Defaults to {@code false} so the lite assembly (and any
+   * deployment without an explicit opt-in) does not perform background
+   * data-gathering work. Returns {@code false} if the config parser is
+   * unavailable so a cold-boot race cannot produce spurious observational
+   * tasks.
    */
   private boolean isObservationalModeEnabled() {
     io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> perf;
@@ -759,7 +761,7 @@ public class Region extends FactoryValue<RegionKeys> {
     }
     if (perf == null) return false;
     return Boolean.parseBoolean(
-        perf.getConfigValue(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.visitorEnabled, true).toString());
+        perf.getConfigValue(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.visitorEnabled, false).toString());
   }
 
   /**

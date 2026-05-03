@@ -15,8 +15,21 @@ import java.util.concurrent.atomic.AtomicReference;
  *
  * <p>Reads {@code Server#getTPS()} and {@code Server#getAverageTickTime()}
  * reflectively because they are Paper / Folia API additions absent from
- * pure Spigot. On Spigot we fall back to a simple wall-clock TPS estimator
- * that runs on the main thread once per second; MSPT is reported as -1.
+ * pure Spigot. On Spigot, both metrics fall back to main-thread wall-clock
+ * sampling:
+ * <ul>
+ *   <li><b>TPS</b>: a 20-tick timer measures wall delta and reports
+ *       {@code min(20, 20 / secs)}.</li>
+ *   <li><b>MSPT</b>: a 1-tick timer measures the wall delta between
+ *       consecutive ticks. The reported value is <em>tick wall time</em>,
+ *       not Paper's "work performed per tick" — when the server is idle
+ *       it is padded to ~50 ms by the scheduler. During a stress run
+ *       (the only regime we publish from) the server is never idle, so
+ *       wall-MSPT and Paper's MSPT converge above 50 ms and the same
+ *       p95/max aggregates are meaningful. Below 50 ms wall-MSPT is
+ *       capped — finer resolution would require NMS/agent instrumentation
+ *       and is intentionally out of scope.</li>
+ * </ul>
  *
  * <p>Heap-used is read from the JVM's {@code MemoryMXBean#getHeapMemoryUsage()}.
  * No GC is forced (that would skew the very metric we're measuring).
@@ -39,11 +52,14 @@ public final class TpsMsptHeapSampler {
     private final List<Double> msptSamples = new ArrayList<>(1024);
     private final List<Long>   heapSamples = new ArrayList<>(1024);
 
-    private int taskId = -1;
+    private Object taskId = null;
     private int spigotTpsTaskId = -1;
+    private int spigotMsptTaskId = -1;
     private long spigotTpsLastTick = -1L;
     private long spigotTpsLastWallNs = -1L;
+    private long spigotMsptLastWallNs = -1L;
     private final AtomicReference<Double> spigotTps = new AtomicReference<>(-1.0);
+    private final AtomicReference<Double> spigotMspt = new AtomicReference<>(-1.0);
 
     // Reflective access — resolved once.
     private final Method getTpsMethod;
@@ -65,7 +81,7 @@ public final class TpsMsptHeapSampler {
     }
 
     public void start() {
-        if (taskId > 0) return;
+        if (taskId != null) return;
         // Snapshot loop runs async — pure JMX + already-computed Bukkit values.
         taskId = Sched.runAsyncTimer(plugin, this::sample, periodMs);
 
@@ -77,11 +93,20 @@ public final class TpsMsptHeapSampler {
             spigotTpsTaskId = Bukkit.getScheduler()
                     .runTaskTimer(plugin, this::spigotTpsTick, 20L, 20L).getTaskId();
         }
+        // Spigot fallback for MSPT: poll on every tick and record the
+        // wall-time delta. Only active when Paper's getAverageTickTime
+        // is unavailable; on Folia the BukkitScheduler sync timer would
+        // throw, so it's restricted to non-Folia like the TPS fallback.
+        if (getAvgTickTimeMethod == null && !Sched.isFolia()) {
+            spigotMsptTaskId = Bukkit.getScheduler()
+                    .runTaskTimer(plugin, this::spigotMsptTick, 1L, 1L).getTaskId();
+        }
     }
 
     public void stop() {
-        Sched.cancel(taskId); taskId = -1;
+        Sched.cancel(taskId); taskId = null;
         if (spigotTpsTaskId > 0) { Bukkit.getScheduler().cancelTask(spigotTpsTaskId); spigotTpsTaskId = -1; }
+        if (spigotMsptTaskId > 0) { Bukkit.getScheduler().cancelTask(spigotMsptTaskId); spigotMsptTaskId = -1; }
     }
 
     /** Snapshot reads are concurrent; safe for the dispatch hot path. */
@@ -95,7 +120,12 @@ public final class TpsMsptHeapSampler {
         latest = new Snapshot(tps, mspt, heapMb);
         synchronized (tpsSamples) {
             if (tps  >= 0) tpsSamples.add(tps);
-            if (mspt >= 0) msptSamples.add(mspt);
+            // On Paper/Folia, push the polled MSPT into the rolling list.
+            // On Spigot, msptSamples is fed by spigotMsptTick() at 1-tick
+            // resolution — pushing the polled value here would double-count
+            // and bias the p95 toward whichever value happens to be cached
+            // in spigotMspt at sample time.
+            if (mspt >= 0 && getAvgTickTimeMethod != null) msptSamples.add(mspt);
             heapSamples.add(heapMb);
         }
     }
@@ -117,7 +147,25 @@ public final class TpsMsptHeapSampler {
                 if (res instanceof Number n) return n.doubleValue();
             } catch (ReflectiveOperationException ignored) { /* fall through */ }
         }
-        return -1.0;
+        return spigotMspt.get();
+    }
+
+    private void spigotMsptTick() {
+        // Scheduled every tick. The wall delta between consecutive
+        // invocations is the wall time of one tick — equivalent to
+        // Paper's MSPT above 50 ms (the regime we care about), padded
+        // to ~50 ms when the server is idle. See class Javadoc.
+        long now = System.nanoTime();
+        if (spigotMsptLastWallNs > 0) {
+            double ms = (now - spigotMsptLastWallNs) / 1_000_000.0;
+            if (ms >= 0.0) {
+                spigotMspt.set(ms);
+                synchronized (tpsSamples) {
+                    msptSamples.add(ms);
+                }
+            }
+        }
+        spigotMsptLastWallNs = now;
     }
 
     private void spigotTpsTick() {
