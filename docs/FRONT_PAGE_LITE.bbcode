@@ -1,10 +1,10 @@
-[CENTER]
+﻿[CENTER]
 [SIZE=6][B][COLOR=#E74C3C]R[/COLOR][COLOR=#F39C12]T[/COLOR][COLOR=#27AE60]P[/COLOR][/B][/SIZE]
-[SIZE=4][B][COLOR=#7F8C8D]Random Teleport — the free tier of the RTP engine[/COLOR][/B][/SIZE]
+[SIZE=4][B][COLOR=#7F8C8D]Random Teleport — the RTP engine[/COLOR][/B][/SIZE]
 
 [I]Send your players to a safe, random spot in the world — fast, fair, and designed not to lag your server.[/I]
 
-[SIZE=3][COLOR=#27AE60][B]Free.[/B][/COLOR] Same engine as [B]RTP-Pro[/B], trimmed for hobby and small-network servers.[/SIZE]
+[SIZE=3][COLOR=#27AE60][B]Free.[/B][/COLOR] [B]RTP-Pro[/B] is an optional upgrade for Folia, multi-server / proxy networks, claim-plugin integrations, and priority support.[/SIZE]
 
 [URL='https://github.com/dailystruggle/RTP'][IMG]https://img.shields.io/github/v/release/dailystruggle/RTP?label=Version&style=for-the-badge&color=2C3E50[/IMG][/URL] [URL='https://github.com/dailystruggle/RTP'][IMG]https://img.shields.io/github/license/dailystruggle/RTP?label=License&style=for-the-badge&color=2C3E50[/IMG][/URL]
 [/CENTER]
@@ -21,7 +21,7 @@ Random teleportation looks cheap and easy, but it is one of the most resource-in
 [*]🔌 [B]Works with the plugins you already run[/B] — PlaceholderAPI, ProtocolLib. ([I]Vault economy and claim-plugin integrations are an [B]RTP-Pro[/B] feature.[/I])
 [/LIST]
 
-[CENTER][I]Originally published as [URL='https://www.spigotmc.org/resources/rtp.94812/']RTP 2.x[/URL] — this resource is the free-tier successor on the rewritten 3.0 engine.[/I][/CENTER]
+[CENTER][I]Originally published as [URL='https://www.spigotmc.org/resources/rtp.94812/']RTP 2.x[/URL] — this resource is the successor on the rewritten 3.0 engine.[/I][/CENTER]
 
 [CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
 
@@ -66,7 +66,7 @@ That's it for the smoke test. Tweak `plugins/RTP/config.yml` and `plugins/RTP/re
 [*]✅ [B][COLOR=#E67E22]Spigot[/COLOR][/B] — supported. Region files (`.mca`) are parsed off-tick to skip bad candidates [I]before[/I] a chunk load is needed, so most `/rtp` calls feel Paper-class even on vanilla Spigot.
 [*]✅ [B][COLOR=#E67E22]Spigot forks[/COLOR][/B] — Spigot-derived forks without the Paper async chunk API run the Spigot code path (Anvil pre-filter + bounded main-thread fallback).
 [*]🌱 [B][COLOR=#7F8C8D]Custom generators[/COLOR][/B] — Iris, Terra, datapack-driven worlds — work out of the box. Modded biome and block IDs are preserved.
-[*]❌ [B][COLOR=#C0392B]Folia[/COLOR][/B] — [B]not bundled in Lite[/B]. Folia operators must use [B]RTP-Pro[/B], which ships the Folia adapter (Region Scheduler, off-tick safety pre-filter, no 1-tick stalls).
+[*]❌ [B][COLOR=#C0392B]Folia[/COLOR][/B] — [B]not bundled in this build[/B]. Folia operators must use [B]RTP-Pro[/B], which ships the Folia adapter (Region Scheduler, off-tick safety pre-filter, no 1-tick stalls).
 [*]✅ [B][COLOR=#27AE60]Mohist / Arclight[/COLOR][/B] — officially supported Bukkit-compatibility launchers for Forge / NeoForge servers. Use the Spigot/Paper build of RTP; the Spigot code path applies. This is the recommended way to run RTP on a Forge or NeoForge server.
 [*]🚧 [B][COLOR=#C0392B]Fabric[/COLOR][/B] — adapter ships in-tree but `/rtp` is [B]not functional[/B] yet. Planned for a later release.
 [*]🔁 [B][COLOR=#C0392B]Native Forge / NeoForge[/COLOR][/B] — no native adapter planned. Use [B]Arclight[/B] or [B]Mohist[/B] above.
@@ -77,45 +77,107 @@ That's it for the smoke test. Tweak `plugins/RTP/config.yml` and `plugins/RTP/re
 [CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
 
 [SIZE=5][B][COLOR=#2C3E50]Performance vs. Other RTP Plugins[/COLOR][/B][/SIZE]
-[I]How RTP (Lite) and RTP-Pro stack up against the most-deployed RTP plugins on the three Bukkit-family server architectures. Folia is the clearest delta between the two tiers — Lite drops the Folia adapter, Pro ships it. Both rows are shown so you can see what upgrading would change.[/I]
+[I]How RTP and RTP-Pro stack up against the most-deployed RTP plugins on the three Bukkit-family server architectures. Folia is the clearest delta between the two — the base build does not ship the Folia adapter, Pro does. Both rows are shown so you can see what upgrading would change.[/I]
 
 [B]Confidence legend:[/B] 🧪 = measured locally on the RTP benchmark harness · 📖 = read from the plugin's published docs / resource page · ❓ = inferred from the plugin's known architecture, not yet verified.
 
 [B]Architecture support matrix[/B]
-[TABLE]
-[TR][TD][B]Plugin[/B][/TD][TD][B]Spigot[/B][/TD][TD][B]Paper (and forks)[/B][/TD][TD][B]Folia[/B][/TD][/TR]
-[TR][TD][B]RTP (Lite)[/B][/TD][TD]✅ 🧪 Off-tick Anvil pre-filter; rare bounded main-thread fallback.[/TD][TD]✅ 🧪 Fully async via native `getChunkAtAsync`; no fallback path.[/TD][TD]❌ Folia adapter not bundled in Lite — see [B]RTP-Pro[/B].[/TD][/TR]
-[TR][TD][B]RTP-Pro[/B][/TD][TD]✅ 🧪 Same Spigot path as Lite.[/TD][TD]✅ 🧪 Same Paper path as Lite.[/TD][TD]✅ 🧪 Region Scheduler + off-tick pre-filter; no 1-tick stalls.[/TD][/TR]
-[TR][TD]BetterRTP[/TD][TD]⚠️ 📖 Synchronous chunk load on miss; TPS spikes during generation are widely reported.[/TD][TD]⚠️ 📖 Uses Paper async where available, but no off-tick safety pre-filter.[/TD][TD]❌ 📖 No native Folia adapter; runs on Paper-compat fork only.[/TD][/TR]
-[TR][TD]EzRTP[/TD][TD]❌ 🧪 Loads on Spigot 1.20.1 but its async update-checker throws `NoSuchMethodError` on the Paper-only `JavaPlugin#getPluginMeta()` ([I]SpigotUpdateChecker:28[/I]); core path otherwise statistics-driven, no Anvil pre-filter — sync chunk load on miss.[/TD][TD]✅ 📖 Built-in percentile/timing metrics on Paper.[/TD][TD]❓ 📖 Not advertised as Folia-aware.[/TD][/TR]
-[TR][TD]AsyRTP[/TD][TD]❌ 🧪 Fails to enable on Spigot 1.20.1 — `StartupBanner.print` calls the Paper-only `JavaPlugin#getPluginMeta()` during `onEnable`, throwing `NoSuchMethodError` before the plugin initializes. Effectively Paper/Folia-only despite the name.[/TD][TD]✅ 📖 Async location search.[/TD][TD]✅ 📖 Region-thread-safe; explicit Folia target.[/TD][/TR]
-[TR][TD]SorekillRTP[/TD][TD]⚠️ ❓ Functional, but the design centre is Redis-backed cross-server, not single-server perf.[/TD][TD]⚠️ ❓ Same.[/TD][TD]❓ 📖 Folia compatibility not specifically documented.[/TD][/TR]
-[TR][TD]AdvancedRTP[/TD][TD]⚠️ 📖 Safety-first; trades speed for ground/biome detection. Sync chunk load on candidate evaluation.[/TD][TD]⚠️ 📖 Same path on Paper.[/TD][TD]❌ 📖 No documented Folia support.[/TD][/TR]
-[TR][TD]JakesRTP[/TD][TD]⚠️ 📖 Async via `prefer-sync-tp: false`; configurable destination cache (`cache-locations`).[/TD][TD]✅ 📖 Same async path on Paper; widely deployed.[/TD][TD]❌ 📖 No native Folia adapter (community forks vary).[/TD][/TR]
-[TR][TD]EssentialsX `/rtp`[/TD][TD]✅ 📖 Works; main-thread chunk load on each candidate.[/TD][TD]✅ 📖 Works; same path, no async chunk API use.[/TD][TD]❌ 📖 Folia not supported by EssentialsX core.[/TD][/TR]
-[TR][TD]HuskHomes RTP[/TD][TD]✅ 📖 Works; bundled with the broader homes/teleport suite.[/TD][TD]✅ 📖 Same path on Paper.[/TD][TD]❓ 📖 Partial — see HuskHomes' own platform matrix.[/TD][/TR]
-[/TABLE]
+[I](Format: [B]Spigot[/B] / [B]Paper (and forks)[/B] / [B]Folia[/B])[/I]
 
-[B]Performance metrics[/B] [I](measured on the RTP benchmark harness against a freshly-generated 1.21 vanilla world; numbers labelled `<benchmark pending>` will be filled in as the harness is hardened. Lower is better for latency / MSPT; higher is better for stable TPS.)[/I]
+[LIST]
+[*][B]RTP[/B]
+[INDENT]Spigot: ✅ 🧪 Off-tick Anvil pre-filter; rare bounded main-thread fallback.
+Paper: ✅ 🧪 Fully async via native `getChunkAtAsync`; no fallback path.
+Folia: ❌ Folia adapter not bundled in this build — see [B]RTP-Pro[/B].[/INDENT]
+[*][B]RTP-Pro[/B]
+[INDENT]Spigot: ✅ 🧪 Same Spigot path as the base build.
+Paper: ✅ 🧪 Same Paper path as the base build.
+Folia: ✅ 🧪 Region Scheduler + off-tick pre-filter; no 1-tick stalls.[/INDENT]
+[*][B]BetterRTP[/B]
+[INDENT]Spigot: ⚠️ 📖 Synchronous chunk load on miss; TPS spikes during generation are widely reported.
+Paper: ⚠️ 📖 Uses Paper async where available, but no off-tick safety pre-filter.
+Folia: ✅ 🧪 Functional on Folia 1.21.11 (own pipeline, 100 % success); p99 ~1.2 s — region scheduler absorbs the per-attempt cost.[/INDENT]
+[*][B]EzRTP[/B]
+[INDENT]Spigot: ❌ 🧪 Loads on Spigot 1.20.1 but its async update-checker throws `NoSuchMethodError` on the Paper-only `JavaPlugin#getPluginMeta()` ([I]SpigotUpdateChecker:28[/I]); core path otherwise statistics-driven, no Anvil pre-filter — sync chunk load on miss.
+Paper: ✅ 📖 Built-in percentile/timing metrics on Paper.
+Folia: ❓ 📖 Not advertised as Folia-aware.[/INDENT]
+[*][B]AsyRTP[/B]
+[INDENT]Spigot: ❌ 🧪 Fails to enable on Spigot 1.20.1 — `StartupBanner.print` calls the Paper-only `JavaPlugin#getPluginMeta()` during `onEnable`, throwing `NoSuchMethodError` before the plugin initializes. Effectively Paper/Folia-only despite the name.
+Paper: ✅ 📖 Async location search.
+Folia: ✅ 📖 Region-thread-safe; explicit Folia target.[/INDENT]
+[*][B]SorekillRTP[/B]
+[INDENT]Spigot: ⚠️ ❓ Functional, but the design centre is Redis-backed cross-server, not single-server perf.
+Paper: ⚠️ ❓ Same.
+Folia: ❓ 📖 Folia compatibility not specifically documented.[/INDENT]
+[*][B]AdvancedRTP[/B]
+[INDENT]Spigot: ⚠️ 📖 Safety-first; trades speed for ground/biome detection. Sync chunk load on candidate evaluation.
+Paper: ⚠️ 📖 Same path on Paper.
+Folia: ❌ 📖 No documented Folia support.[/INDENT]
+[*][B]JakesRTP[/B]
+[INDENT]Spigot: ⚠️ 📖 Async via `prefer-sync-tp: false`; configurable destination cache (`cache-locations`).
+Paper: ✅ 📖 Same async path on Paper; widely deployed.
+Folia: ❌ 📖 No native Folia adapter (community forks vary).[/INDENT]
+[*][B]EssentialsX `/rtp`[/B]
+[INDENT]Spigot: ✅ 📖 Works; main-thread chunk load on each candidate.
+Paper: ✅ 📖 Works; same path, no async chunk API use.
+Folia: ❌ 📖 Folia not supported by EssentialsX core.[/INDENT]
+[*][B]HuskHomes RTP[/B]
+[INDENT]Spigot: ✅ 📖 Works; bundled with the broader homes/teleport suite.
+Paper: ✅ 📖 Same path on Paper.
+Folia: ✅ 🧪 Functional on Folia 1.21.11 (100 % success, p99 ~900 ms); the no-queue Spigot/Paper failure mode largely disappears on Folia.[/INDENT]
+[/LIST]
+
+[B]Measured performance — head-to-head, three platforms[/B] [I](2 OPed real clients spamming `/rtp` back-to-back, queues enabled where the plugin offers them, cooldowns/delays zeroed. RTP and RTP-Pro share the same engine on Spigot/Paper; the only difference is that Folia ships in Pro. Full methodology, raw CSVs, and reproduction harness: [URL=https://github.com/dailystruggle/RTP/tree/main/helpers/StressTestRTP]`helpers/StressTestRTP/`[/URL].)[/I]
+
+[I]Four familiar metrics per row:[/I]
+[LIST]
+[*][B]Throughput[/B] — successful `/rtp`s per second, sustained across the phase. Higher is better.
+[*][B]MSPT p99[/B] — worst 1-in-100 main-thread tick cost during the phase, in milliseconds. Lower is better; under ~50 ms means the spike doesn't drop a tick.
+[*][B]Min TPS[/B] — lowest server TPS observed during the phase. 20.00 means the server never hiccupped.
+[*][B]CPU / TP[/B] — main-thread CPU spent per successful teleport, in milliseconds. The "how much MSPT does each teleport cost" number.
+[/LIST]
+
+[B]Paper 1.21.11[/B] — canonical head-to-head dataset (Paper is the recommended platform).
 [TABLE]
-[TR][TD][B]Plugin[/B][/TD][TD][B]Cold-start /rtp[/B][/TD][TD][B]Warm-queue /rtp[/B][/TD][TD][B]TPS under 10× burst[/B][/TD][TD][B]MSPT during eval[/B][/TD][TD][B]Memory footprint[/B][/TD][/TR]
-[TR][TD][B]RTP (Lite)[/B][/TD][TD]🧪 `<benchmark pending>`[/TD][TD]🧪 `<benchmark pending>` ([I]queue serves pre-verified destination[/I])[/TD][TD]🧪 `<benchmark pending>`[/TD][TD]🧪 `<benchmark pending>`[/TD][TD]🧪 `<benchmark pending>`[/TD][/TR]
-[TR][TD][B]RTP-Pro[/B][/TD][TD]🧪 `<benchmark pending>`[/TD][TD]🧪 `<benchmark pending>`[/TD][TD]🧪 `<benchmark pending>`[/TD][TD]🧪 `<benchmark pending>`[/TD][TD]🧪 `<benchmark pending>`[/TD][/TR]
-[TR][TD]BetterRTP[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][/TR]
-[TR][TD]EzRTP[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][/TR]
-[TR][TD]AsyRTP[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][/TR]
-[TR][TD]SorekillRTP[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][/TR]
-[TR][TD]AdvancedRTP[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][/TR]
-[TR][TD]JakesRTP[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][/TR]
-[TR][TD]EssentialsX `/rtp`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>` ([I]no pre-warmed queue[/I])[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][/TR]
-[TR][TD]HuskHomes RTP[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][TD]❓ `<benchmark pending>`[/TD][/TR]
+[TR][TH]Plugin[/TH][TH]Throughput (TP/s)[/TH][TH]MSPT p99 (ms)[/TH][TH]Min TPS[/TH][TH]CPU / TP (ms)[/TH][/TR]
+[TR][TD][B]🧪 RTP[/B][/TD][TD][B]19.8[/B][/TD][TD][B]4[/B][/TD][TD][B]20.00[/B][/TD][TD][B]16.9[/B][/TD][/TR]
+[TR][TD]🧪 JakesRTP[/TD][TD]20.0[/TD][TD]70[/TD][TD]20.00[/TD][TD]26.0[/TD][/TR]
+[TR][TD]🧪 BetterRTP[/TD][TD]7.1[/TD][TD]771[/TD][TD]20.00[/TD][TD]53.6[/TD][/TR]
+[TR][TD]🧪 HuskHomes[/TD][TD]6.2[/TD][TD]335[/TD][TD]20.00[/TD][TD]52.2[/TD][/TR]
 [/TABLE]
+[I]Reading: RTP serves the same throughput as JakesRTP at roughly [B]17×[/B] lower worst-case MSPT and [B]35 %[/B] lower CPU per teleport. BetterRTP and HuskHomes both spend 3× the CPU per teleport for ⅓ the throughput — and their tick spikes (335–771 ms p99) are large enough to be felt on a busy server even though average TPS holds at 20.[/I]
+
+[B]Spigot 1.20.1[/B]
+[TABLE]
+[TR][TH]Plugin[/TH][TH]Throughput (TP/s)[/TH][TH]MSPT p99 (ms)[/TH][TH]Min TPS[/TH][TH]CPU / TP (ms)[/TH][/TR]
+[TR][TD][B]🧪 RTP[/B][/TD][TD][B]1.52[/B][/TD][TD][B]3[/B][/TD][TD][B]6.4[/B][/TD][TD]572[/TD][/TR]
+[TR][TD]🧪 JakesRTP[/TD][TD]1.04[/TD][TD]2 252[/TD][TD]—†[/TD][TD]—†[/TD][/TR]
+[TR][TD]🧪 BetterRTP[/TD][TD]1.33[/TD][TD]3 790[/TD][TD]2.18[/TD][TD]584[/TD][/TR]
+[TR][TD]🧪 HuskHomes[/TD][TD]0.93[/TD][TD]4 939[/TD][TD]2.59[/TD][TD]868[/TD][/TR]
+[/TABLE]
+[I]Reading: on Spigot the platform-wide chunk-gen ceiling caps everyone at 3.5–4.5 TPS during the burst, but the [B]MSPT spike[/B] tells you who is parking the main thread. RTP's queued, off-tick path keeps the worst tick at [B]3 ms[/B] — a non-event — while BetterRTP and HuskHomes drive single ticks past 3.7 s, the sort of spike that causes player rubber-banding and watchdog warnings. † JakesRTP ran in slot 4 of a 4-phase chain on Spigot, so its Min TPS / CPU-per-TP figures are confounded by carry-over from the prior HuskHomes phase and are withheld until a slot-1 (or solo) rerun; the dispatch-time numbers (throughput, p99) are reported because they measure per-attempt work, not accumulated server state.[/I]
+
+[B]Folia 1.21.11[/B] (RTP-Pro only — the Folia adapter is not bundled in this build)
+[TABLE]
+[TR][TH]Plugin[/TH][TH]Throughput (TP/s)[/TH][TH]Region MSPT p99 (ms)[/TH][TH]Success[/TH][TH]CPU / TP (ms)[/TH][/TR]
+[TR][TD][B]🧪 RTP-Pro[/B][/TD][TD][B]9.87[/B][/TD][TD][B]157[/B][/TD][TD][B]99.97 %[/B][/TD][TD][B]18.0[/B][/TD][/TR]
+[TR][TD]🧪 BetterRTP[/TD][TD]3.82[/TD][TD]1 200[/TD][TD]100 %[/TD][TD]34.8[/TD][/TR]
+[TR][TD]🧪 HuskHomes[/TD][TD]3.32[/TD][TD]901[/TD][TD]100 %[/TD][TD]28.4[/TD][/TR]
+[/TABLE]
+[I]Reading: on Folia, "MSPT" means the per-region tick — Folia's whole point is that bad regions don't stall the server. RTP-Pro still wins by ~2.5× on throughput and ~7× on worst-region tick cost, because the off-tick Anvil pre-filter runs before the region scheduler ever sees the candidate.[/I]
+
+[B]Bottom line.[/B] On Paper (recommended) RTP delivers the same throughput as the other queue-based competitor at a fraction of the MSPT and CPU cost, and on Spigot the off-tick Anvil pre-filter keeps the worst tick three orders of magnitude smaller than non-queued plugins. On Folia (RTP-Pro), the same pattern holds.
+
+[B]Memory and server TPS.[/B] The queue is bounded (`cacheCap` entries, default 10, recommended 100 on Paper) and each entry is a small POJO — multi-megabyte queue costs on a tuned configuration are not observed. Server TPS held at [B]20.00[/B] throughout all Paper runs across every plugin in the roster; on Spigot, every plugin saturated to 3.5–4.5 TPS regardless of choice (platform chunk-gen ceiling, not plugin-specific) — RTP just spends those ticks doing fewer things.
+
+‡ Paper RTP row is reproduced across two consecutive runs (n=2, within a few percent of each other). Other rows are n=1 on a single rig — read as "this rig, this version, this configuration", not as universal claims.
 
 [B]Methodology and honest caveats.[/B]
 [LIST]
-[*]Architecture-matrix verdicts marked 📖 are read from the plugin's own published documentation; ❓ verdicts are inferred from the plugin's known architecture and have not been independently verified. 🧪 verdicts are measured against the in-tree RTP harness on the same hardware.
-[*]Numeric metrics are intentionally unfilled in this beta. A dedicated stress-test helper plugin is in development to drive identical workloads through every plugin in the table; results will be backfilled (with raw logs published) before `3.0.0` final.
-[*]Competitor plugins update frequently. This comparison reflects published platform support and observed behavior at the time of writing — corrections welcome via GitHub issue, with a link to the contradicting documentation or a reproduction.
+[*]Architecture-matrix verdicts marked 📖 are read from the plugin's own published documentation; ❓ verdicts are inferred from the plugin's known architecture. 🧪 verdicts in both tables are measured against the in-tree [URL=https://github.com/dailystruggle/RTP/tree/main/helpers/StressTestRTP]StressTestRTP[/URL] harness on the same hardware.
+[*]Two real OPed clients only; higher-concurrency saturation curves require a bot harness and are pending future work. The 2-client number is a floor, not a ceiling.
+[*]Numbers are not predictions for [I]your[/I] server. Hardware, view distance, world generation state, other plugins, and player count will all move them. The harness, raw CSVs, and per-run analyses (with retractions and reproducibility bands) are public so you can re-run on your rig.
+[*]Competitor plugins update frequently. This comparison reflects observed behavior at the time of writing — corrections welcome via GitHub issue, with a link to the contradicting documentation or a reproduction.
 [*]Feature breadth, GUI, and claim-plugin integration are [I]not[/I] benchmarked here. Several competitors trade speed for those features, and that's a legitimate choice — the table is about throughput and platform fit, not feature parity.
 [/LIST]
 
@@ -133,13 +195,13 @@ That's it for the smoke test. Tweak `plugins/RTP/config.yml` and `plugins/RTP/re
 [*][B]Configurable messages[/B] in `messages.yml` (English).
 [*][B]Permission-based sounds and effects[/B] — see the [URL='https://github.com/dailystruggle/RTP/blob/main/docs/admin/FOR_SERVER_ADMINS.md']admin guide[/URL] for the syntax.
 [*][B]Public API[/B] for addon developers — events, shapes, lifecycle hooks. Examples in the GitHub repository.
-[*][I]Not in Lite — available in [B]RTP-Pro[/B]:[/I] SQL/Redis backends, Folia adapter, claim-plugin integrations (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, Factions, HuskTowns, RedProtect), Vault economy, multilingual `lang/**`, login-reserve cache, visitor mode, vanilla block tags / state predicates in `safety.yml`.
+[*][I]Available in [B]RTP-Pro[/B] only:[/I] SQL/Redis backends, Folia adapter, claim-plugin integrations (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, Factions, HuskTowns, RedProtect), Vault economy, multilingual `lang/**`, login-reserve cache, visitor mode, vanilla block tags / state predicates in `safety.yml`.
 [/LIST]
 
 [CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
 
 [SIZE=5][B][COLOR=#16A085]Safety List[/COLOR][/B][/SIZE]
-`safety.yml` in Lite accepts a flat material allow/deny list — plain material names, one per line:
+`safety.yml` in this build accepts a flat material allow/deny list — plain material names, one per line:
 
 [LIST]
 [*][B]Examples:[/B] `LAVA`, `MAGMA_BLOCK`, `CACTUS`, `FIRE`
@@ -163,10 +225,10 @@ A: See the [URL='https://github.com/dailystruggle/RTP/blob/main/docs/admin/FOR_S
 A: Yes. Region files are read directly, so modded and namespaced biome and block IDs are preserved. No special configuration needed.
 
 [B]Q: What's the difference between RTP and RTP-Pro?[/B]
-A: Same engine, same source tree. [B]RTP-Pro[/B] ships first on each release and includes SQL/shared-database backends for multi-server / proxy setups, plus priority support. The free [B]RTP[/B] (Lite) jar ships hours-to-days later with the same core engine and is fully sufficient for single-server deployments.
+A: Same engine, same source tree. [B]RTP-Pro[/B] ships first on each release and includes SQL/shared-database backends for multi-server / proxy setups, the Folia adapter, claim-plugin integrations, Vault economy, and priority support. The free [B]RTP[/B] jar ships hours-to-days later with the same core engine and is fully sufficient for single-server deployments.
 
-[B]Q: Can I upgrade from Lite to Pro later?[/B]
-A: Yes — drop in the Pro jar over the Lite one. Same configuration, same data files, same commands.
+[B]Q: Can I upgrade to Pro later?[/B]
+A: Yes — drop in the Pro jar over this one. Same configuration, same data files, same commands.
 
 [B]Q: I'm on Forge / NeoForge.[/B]
 A: Run [B]Arclight[/B] or [B]Mohist[/B] (Bukkit-compatibility launchers, both officially supported) and use the Spigot/Paper build of RTP. A native Forge adapter is not planned and is lower priority than multi-server / proxy support.
@@ -208,16 +270,16 @@ Console commands work but may require an explicit `player:` / `world:` / `region
 [*][B]ProtocolLib[/B] — used by some effects.
 [/LIST]
 [I]PaperLib is no longer required — Paper provides native async chunk APIs.[/I]
-[I]Vault economy is not bundled in Lite. To charge for `/rtp`, use [B]RTP-Pro[/B].[/I]
+[I]Vault economy is not bundled in this build. To charge for `/rtp`, use [B]RTP-Pro[/B].[/I]
 [/SPOILER]
 
 [SPOILER='Known limitations in 3.0.0-beta.1']
 [LIST]
-[*]Lite is not yet on a fixed publishing cadence; first regular Lite release lands at `3.0` GA.
+[*]This build is not yet on a fixed publishing cadence; first regular release lands at `3.0` GA.
 [*]Fabric is not functional in the beta — planned for a later release. Don't deploy on Fabric.
-[*]No Folia in Lite. The Folia adapter is an [B]RTP-Pro[/B] feature; on Folia, `/rtp` will not function.
-[*]No SQL/Redis backends in the Lite assembly (H2, SQLite, MySQL, PostgreSQL, Jedis are stripped). The default YAML-file database persists learned state across restarts and is fine for single-server deployments. Shared-database / multi-server backends are an [B]RTP-Pro[/B] feature.
-[*]No claim-plugin integrations, Vault economy, multilingual support, or login-reserve cache in Lite — all [B]RTP-Pro[/B] features.
+[*]No Folia support in this build. The Folia adapter is an [B]RTP-Pro[/B] feature; on Folia, `/rtp` will not function.
+[*]No SQL/Redis backends in this assembly (H2, SQLite, MySQL, PostgreSQL, Jedis are stripped). The default YAML-file database persists learned state across restarts and is fine for single-server deployments. Shared-database / multi-server backends are an [B]RTP-Pro[/B] feature.
+[*]No claim-plugin integrations, Vault economy, multilingual support, or login-reserve cache in this build — all [B]RTP-Pro[/B] features.
 [*]The `/rtp config` command is experimental — surface, argument grammar, and write-back semantics may change before `3.0` final. Edit YAML directly for production.
 [*]Edits to `safety.yml` and biome filters do not yet invalidate the persisted shape cache. Workaround: `/rtp scan reset <region>` after changing safety predicates.
 [*]Emergency landing platform default changed: `safety.yml` now ships `platformRadius: -1` (disabled). Set it to `0` or higher to restore legacy 2.x behavior.
@@ -231,8 +293,8 @@ I use AI coding assistants (LLM-based pair-programming tools) for scaffolding, r
 
 [CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
 
-[SIZE=5][B][COLOR=#27AE60]Outgrown Lite?[/COLOR][/B][/SIZE]
-[B]RTP-Pro[/B] is a drop-in upgrade — same configuration, same data files, same commands. Pro adds SQL/shared-database backends for multi-server / proxy setups, earliest releases on each version, and priority support within a documented response window.
+[SIZE=5][B][COLOR=#27AE60]Need more?[/COLOR][/B][/SIZE]
+[B]RTP-Pro[/B] is a drop-in upgrade — same configuration, same data files, same commands. Pro adds the Folia adapter, SQL/shared-database backends for multi-server / proxy setups, claim-plugin integrations, Vault economy, earliest releases on each version, and priority support within a documented response window.
 
 [CENTER][COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR][/CENTER]
 
@@ -244,9 +306,9 @@ I use AI coding assistants (LLM-based pair-programming tools) for scaffolding, r
 [*][URL='https://github.com/dailystruggle/RTP'][B]Source on GitHub[/B] — star, watch, contribute, file issues[/URL]
 [/LIST]
 
-[B]Lite support is community-tier and best-effort.[/B] Bug reports and configuration questions are welcome on GitHub. To help me reproduce, please include your server version, RTP version, platform, the relevant config files (`config.yml`, `regions/`, `safety.yml`), and the relevant `server.log` section. Reports without these will be asked for them; if there's no follow-up, the issue will be closed and can be reopened later. Priority and response-time guarantees are reserved for [B]RTP-Pro[/B].
+[B]Support for the free build is community-tier and best-effort.[/B] Bug reports and configuration questions are welcome on GitHub. To help me reproduce, please include your server version, RTP version, platform, the relevant config files (`config.yml`, `regions/`, `safety.yml`), and the relevant `server.log` section. Reports without these will be asked for them; if there's no follow-up, the issue will be closed and can be reopened later. Priority and response-time guarantees are reserved for [B]RTP-Pro[/B].
 
-[I]Unsupported in Lite:[/I] Fabric (planned for a later release), native Forge / NeoForge (use officially-supported Arclight or Mohist), plugin conflicts I can't reproduce, and general Minecraft-server administration questions.
+[I]Unsupported in the free build:[/I] Fabric (planned for a later release), native Forge / NeoForge (use officially-supported Arclight or Mohist), plugin conflicts I can't reproduce, and general Minecraft-server administration questions.
 
 [CENTER]
 [COLOR=#D1D1D1]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/COLOR]
