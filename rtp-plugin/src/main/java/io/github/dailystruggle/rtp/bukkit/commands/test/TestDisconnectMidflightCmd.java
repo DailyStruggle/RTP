@@ -15,50 +15,14 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code rtp test disconnect-midflight} &mdash; verifies that a synthetic
- * player disconnecting mid-teleport does not leak {@code processingPlayers},
- * {@code invulnerablePlayers}, or {@code latestTeleportData} state, and that
- * its pending {@link RTPRunnable} ({@code nextTask}) is marked cancelled.
- *
- * <p>Runtime value: this is the single highest-value probe for REQ-RTP-S-002
- * leak prevention. The production cleanup path lives in
- * {@code OnPlayerQuit#onPlayerQuit}, which mutates three separate
- * singleton collections and delegates to {@link RTPTeleportCancel}.
- * Unit tests in {@code rtp-core} exercise {@code RTPTeleportCancel} in
- * isolation; they do <b>not</b> verify that the plugin-level quit listener
- * correctly orchestrates all three collections in the order the
- * pipeline assumes. A silent regression in that ordering (e.g. clearing
- * {@code processingPlayers} <i>before</i> cancelling {@code nextTask}, or
- * skipping {@code invulnerablePlayers} entirely) would leave a player
- * wedged with no way to issue {@code /rtp} again until a server restart
- * &mdash; exactly the "silently discarded" failure REQ-RTP-S-004 forbids.
- *
- * <p>Design choice: we do <b>not</b> drive the Bukkit {@code PlayerQuitEvent}
- * through the event bus. That would require a live Bukkit server, depend
- * on listener priority ordering we do not control, and mask tracker-layer
- * regressions with event-dispatch regressions (same reasoning as the
- * sentinel-over-pipeline choice in {@link TestChunkTicketCmd}). Instead,
- * we reproduce the exact cleanup sequence {@code OnPlayerQuit} performs
- * &mdash; remove from {@code invulnerablePlayers} &amp; {@code processingPlayers},
- * cancel the pending task, delegate to {@link RTPTeleportCancel} &mdash;
- * against a synthetic {@link UUID} whose state we fully own. If
- * {@code OnPlayerQuit} is ever refactored, this probe must be updated in
- * lock-step so it stays a faithful mirror.
- *
- * <p>Safety compliance:
- *
- * <ul>
- *   <li><b>S-002</b>: synthetic UUID never acquires a real chunk ticket;
- *       the fake {@code nextTask} is a plain {@link RTPRunnable} whose
- *       {@code setCancelled(true)} is the only side effect.</li>
- *   <li><b>S-004</b>: every assertion failure is reported to the caller
- *       and logged at {@link Level#WARNING}.</li>
- *   <li><b>S-005</b>: no chunk I/O; all operations are in-memory map
- *       mutations on the caller's thread.</li>
- * </ul>
- *
- * <p>Traces REQ-RTP-S-002, REQ-RTP-S-004. See
- * {@code docs/dev/RUNTIME_TEST_SUITE_PLAN.md &sect;3.9}.
+ * {@code rtp test disconnect-midflight} &mdash; mirrors {@code OnPlayerQuit}'s
+ * cleanup against a synthetic UUID and asserts {@code processingPlayers},
+ * {@code invulnerablePlayers}, and {@code latestTeleportData} are cleared
+ * and the pending {@link RTPRunnable} is cancelled. We replay the cleanup
+ * directly (rather than firing {@code PlayerQuitEvent}) so listener-priority
+ * regressions cannot mask tracker-layer regressions; if {@code OnPlayerQuit}
+ * is refactored, this probe must be updated in lock-step. Traces
+ * REQ-RTP-S-002 / S-004; see {@code RUNTIME_TEST_SUITE_PLAN.md &sect;3.9}.
  */
 public class TestDisconnectMidflightCmd extends BaseRTPCmdImpl {
 

@@ -10,58 +10,35 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Platform-agnostic representation of a world.
+ * Platform-agnostic world wrapper. Wraps a native world object {@code T}, delegates
+ * world operations to it, and ref-counts chunk tickets for async pipelines.
  *
- * <p>This abstract class provides a common interface for interacting with worlds
- * across different server implementations. It encapsulates a platform-specific
- * world object and delegates method calls to it. It also manages chunk tickets
- * to keep chunks loaded during asynchronous operations.
- *
- * @param <T> the type of the underlying platform-specific world object
+ * @param <T> underlying platform world type
  */
 public abstract class RTPWorld<T> {
   protected final T world;
 
   public final AtomicLong activeChunkTickets = new AtomicLong(0);
   /**
-   * Lifetime count of live chunk-load attempts this world has dispatched to the
-   * native chunk system. Each call into the platform adapter's <em>live-load</em>
-   * path increments this counter exactly once, regardless of whether the caller
-   * entered via {@code getChunkAt}, {@code getChunkAtAsync}, or
-   * {@link #getOrLoadChunk(int, int)} (which composes both).
-   *
-   * <p><strong>Excluded</strong>:</p>
-   * <ul>
-   *   <li>The ADR-016 anvil pre-filter probe path — it reads the on-disk region
-   *       file and never asks the chunk system to load anything.</li>
-   *   <li>Probe-cache hits in {@code getOrLoadChunk}, which return the cached
-   *       anvil-backed view without a live load.</li>
-   *   <li>Kept-cache replays — chunks already pinned by a previous load are
-   *       reused, not re-loaded.</li>
-   * </ul>
-   *
-   * <p>This is the value surfaced by the {@code [loads]} placeholder /
-   * {@code infoTotalLoads} message in {@code /rtp info}, where operators
-   * expect "the chunk system loaded N chunks for us" semantics.</p>
+   * Lifetime count of live chunk-load attempts dispatched to the native chunk system.
+   * Incremented once per live-load entry ({@code getChunkAt}, {@code getChunkAtAsync},
+   * {@link #getOrLoadChunk(int, int)}). Excludes ADR-016 anvil probes, probe-cache hits,
+   * and kept-cache replays. Surfaced as {@code [loads]} / {@code infoTotalLoads} in
+   * {@code /rtp info}.
    */
   public final AtomicLong totalChunkLoads = new AtomicLong(0);
   /**
-   * Lifetime count of chunk tickets observed by the {@link #releaseOrphanedTickets(Set)} GC
-   * sweep that were not present in the supplied keep-alive set. Each such observation
-   * indicates a ticket the plugin was holding without a matching kept-cache / per-player-
-   * queue / in-flight-teleport entry — i.e. a defensively-detected leak. Used by the
-   * {@code leakRate} placeholder to report the cumulative leak ratio against
-   * {@link #lifetimeTicketsIssued} (the number of chunk tickets we have ever issued).
+   * Lifetime count of orphaned tickets caught by {@link #releaseOrphanedTickets(Set)} —
+   * tickets held without a matching kept-cache / per-player-queue / in-flight entry.
+   * Numerator of the {@code leakRate} placeholder; denominator is
+   * {@link #lifetimeTicketsIssued}.
    */
   public final AtomicLong lifetimeOrphanedTicketsScanned = new AtomicLong(0);
   /**
-   * Lifetime count of chunk tickets ever issued by this world via
-   * {@link #setForceLoaded(int, int, boolean)} with {@code forceLoad=true}. Counts every
-   * acquire (including ref-counted increments on an already-ticketed chunk), so this
-   * represents the cumulative number of chunks-with-tickets the plugin has produced —
-   * the correct divisor for the {@code leakRate} placeholder, distinct from
-   * {@link #totalChunkLoads} which counts only live chunk-load attempts (and would
-   * undercount tickets ref-counted onto already-loaded chunks).
+   * Lifetime count of ticket acquires via {@link #setForceLoaded(int, int, boolean)} with
+   * {@code forceLoad=true} — including ref-counted increments on already-ticketed chunks.
+   * Correct denominator for {@code leakRate}; distinct from {@link #totalChunkLoads},
+   * which counts only live loads and would undercount ref-counted acquires.
    */
   public final AtomicLong lifetimeTicketsIssued = new AtomicLong(0);
   protected final Map<Long, AtomicInteger> chunkTickets = new ConcurrentHashMap<>();
@@ -112,59 +89,28 @@ public abstract class RTPWorld<T> {
   public abstract CompletableFuture<ChunkSet> getChunkAtAsync(int cx, int cz);
 
   /**
-   * Non-blocking check for whether the chunk at the specified coordinates is currently loaded
-   * on the native server. Implementations MUST NOT trigger a chunk load or block the calling
-   * thread; this call is used as a stale-chunk guard between an async chunk-load future
-   * resolution and the subsequent block-evaluation task being executed on a Count-Bound
-   * task pipe (see ADR-015 — Stale-Chunk Guard for Count-Bound Pipes).
-   *
-   * <p>The default returns {@code true} to preserve legacy behavior on adapters that have
-   * not yet overridden this contract; callers therefore treat "unknown" as "assume loaded".
-   * Platform adapters (Folia, Paper, Spigot) SHOULD override to query the native
-   * {@code World#isChunkLoaded(int,int)} (or equivalent non-loading lookup).</p>
-   *
-   * @param cx the x coordinate of the chunk
-   * @param cz the z coordinate of the chunk
-   * @return {@code true} if the chunk is currently loaded on the native server,
-   *         {@code false} if it has been unloaded (e.g. by Folia native chunk GC)
+   * Non-blocking stale-chunk guard (ADR-015): is this chunk currently loaded? Must not
+   * trigger a load or block. Default returns {@code true} ("assume loaded") for adapter
+   * back-compat; platform adapters SHOULD override with the native non-loading lookup
+   * (e.g. {@code World#isChunkLoaded}).
    */
   public boolean isChunkLoaded(int cx, int cz) {
     return true;
   }
 
   /**
-   * Tracks the latest {@code setForceLoadedImpl(true)} application future per chunk key so
-   * ref-counted no-op callers can still await the actual ticket application rather than
-   * seeing a stale "ready" signal.
-   *
-   * <p>Motivation (ADR-015 Paper chunk-system-v2 follow-up): on the Bukkit/Paper adapter the
-   * raw {@code addPluginChunkTicket} call is scheduled onto the primary thread via
-   * {@code runTask} when invoked off-thread. Callers running on
-   * {@code Craft Scheduler Thread - 1 - RTP} (the pregen / location-generator path) would
-   * otherwise return from {@code setForceLoaded(true)} before the ticket was actually applied,
-   * re-opening the exact race the stale-chunk guard (REQ-RTP-S-005) exists to detect and
-   * causing every candidate to be falsely rejected on Paper chunk-system-v2.</p>
+   * Per-chunk in-flight ticket-apply future, so ref-counted no-op callers wait for the
+   * actual {@code addPluginChunkTicket} to land instead of seeing a premature "ready".
+   * Closes the Paper chunk-system-v2 race that REQ-RTP-S-005 / ADR-015 detect.
    */
   protected final Map<Long, CompletableFuture<Void>> ticketApplyFutures = new ConcurrentHashMap<>();
 
   /**
-   * Sets the force-loaded state of a chunk using a reference-counting system.
-   *
-   * <p>Returns a {@link CompletableFuture} that completes when the underlying platform call
-   * ({@code addPluginChunkTicket} / {@code removePluginChunkTicket}) has actually been applied.
-   * Callers on off-thread contexts (e.g. the location generator running on an async scheduler
-   * thread) must await this future before relying on {@code isChunkLoaded} or treating the
-   * chunk as pinned.</p>
-   *
-   * <p>Ref-counted no-op invocations (i.e. {@code setForceLoaded(true)} on a chunk whose
-   * count is already &gt;0) return the in-flight apply future for the original call, so a
-   * second caller cannot bypass the ticket-application wait by incrementing past a still-
-   * pending first application.</p>
-   *
-   * @param cx        the chunk's X coordinate
-   * @param cz        the chunk's Z coordinate
-   * @param forceLoad {@code true} to increment the force-load count, {@code false} to decrement
-   * @return a future that completes when the platform call has actually been applied
+   * Ref-counted force-load toggle. The returned future completes when the native
+   * {@code addPluginChunkTicket} / {@code removePluginChunkTicket} actually lands; off-thread
+   * callers MUST await it before relying on {@code isChunkLoaded} or treating the chunk as
+   * pinned. Ref-counted no-ops return the original in-flight apply future, so a second caller
+   * cannot race past a still-pending first application.
    */
   public final CompletableFuture<Void> setForceLoaded(int cx, int cz, boolean forceLoad) {
     long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
@@ -208,14 +154,9 @@ public abstract class RTPWorld<T> {
   }
 
   /**
-   * The platform-specific implementation for setting the force-loaded state of a chunk.
-   *
-   * <p>Implementations MUST return a {@link CompletableFuture} that completes only after the
-   * native {@code addPluginChunkTicket} / {@code removePluginChunkTicket} call has executed
-   * on the appropriate scheduler. On platforms where the call is synchronous on the current
-   * thread, return a completed future; on platforms where the call is scheduled onto the
-   * primary/region thread, complete the future inside the scheduled lambda (ADR-015 Paper
-   * follow-up: ticket-application race).</p>
+   * Adapter hook for {@link #setForceLoaded}. The returned future MUST complete only after
+   * the native ticket call has executed; if the call is scheduled onto another thread,
+   * complete the future from inside that lambda (ADR-015).
    *
    * @param cx        the chunk's X coordinate
    * @param cz        the chunk's Z coordinate
@@ -250,26 +191,9 @@ public abstract class RTPWorld<T> {
   public abstract RTPChunk<?> getCachedChunk(long key);
 
   /**
-   * Resolve an {@link RTPChunk} for {@code (cx, cz)}, loading or probing the chunk
-   * on demand when it is not already cached.
-   *
-   * <p>Contract (ADR-016 §13.1 follow-up, 2026-04-20):</p>
-   * <ol>
-   *   <li>If an anvil-backed or live-backed entry is already cached for this key,
-   *       return it without I/O.</li>
-   *   <li>Otherwise run the probe-first path ({@link #getChunkAt(int, int)}) to
-   *       populate the anvil cache; on success, return an anvil-backed chunk.</li>
-   *   <li>Otherwise fall back to a live chunk load via
-   *       {@link #getChunkAtAsync(int, int)} and return a live-backed chunk.</li>
-   * </ol>
-   *
-   * <p>The default implementation composes the existing primitives and works on
-   * every adapter. Platform adapters MAY override to skip redundant work.</p>
-   *
-   * @param cx the chunk's X coordinate
-   * @param cz the chunk's Z coordinate
-   * @return a future that completes with an {@link RTPChunk}, or {@code null} on
-   *         unrecoverable load failure
+   * Resolve an {@link RTPChunk} for {@code (cx, cz)}: cached → anvil probe → live load
+   * (ADR-016 §13.1 precedence). Default composes the primitives; adapters MAY override
+   * to skip redundant work. Returns {@code null} on unrecoverable load failure.
    */
   public CompletableFuture<RTPChunk<?>> getOrLoadChunk(int cx, int cz) {
     final long key = ((long) cx & 0xffffffffL) | ((long) cz << 32);
@@ -332,77 +256,32 @@ public abstract class RTPWorld<T> {
   public abstract String getBiome(int x, int y, int z);
 
   /**
-   * Reports whether this world is generated by the unmodified vanilla Minecraft generator
-   * and hosts only vanilla-namespace biomes.
-   *
-   * <p>ADR-016 §13.3 — the "vanilla-generator exemption" that gates whether the selection
-   * pipeline may fall back to the live {@code world.getBiome(x, y, z)} getter (synthesised
-   * from the world seed) for ungenerated chunks. On non-vanilla worlds (Iris, Terra,
-   * datapack presets, mod-installed generators) the seed-based answer does not match the
-   * palette the player will actually see once the chunk is populated, and falling back
-   * to it causes the biome allow-list to produce false positives/negatives. Returning
-   * {@code false} instructs {@code LocationGenerator} to skip its pre-chunk-load biome
-   * pre-check and defer to the post-load biome read, which is routed through the
-   * §13.1 chunk-data precedence chain (loaded chunk → AnvilChunkView → live getter).</p>
-   *
-   * <p>The default is {@code false} (conservative — assume non-vanilla unless an adapter
-   * can positively attest to vanilla generation).</p>
-   *
-   * @return {@code true} if and only if this world uses the vanilla generator and biome
-   *     source; {@code false} otherwise (including when detection is unavailable).
+   * Vanilla-generator exemption flag (ADR-016 §13.3). When {@code true}, the selection
+   * pipeline may use the seed-synthesised {@code world.getBiome(x,y,z)} for ungenerated
+   * chunks; otherwise it must defer to the post-load biome read (§13.1 chain:
+   * loaded chunk → AnvilChunkView → live getter). Default {@code false} (conservative —
+   * Iris/Terra/datapack worlds do not match the seed answer).
    */
   public boolean isVanilla() {
     return false;
   }
 
   /**
-   * Non-blocking check for whether the chunk at the specified coordinates has already
-   * been generated and persisted to disk (i.e. an {@code .mca} entry exists for it).
-   * Implementations MUST NOT trigger generation or block the calling thread.
-   *
-   * <p>ADR-016 §13.3 — the "vanilla-generator exemption" originally allowed the
-   * pre-chunk-load biome check to fall back to the seed-synthesised
-   * {@code world.getBiome(x,y,z)} on vanilla worlds. That is still wrong when the
-   * chunk has already been generated by a previous (possibly older-MC-version) session,
-   * because Mojang's biome source can drift across version upgrades and the persisted
-   * {@code .mca} palette is the source of truth. The pre-check is therefore additionally
-   * gated on {@code !isChunkGenerated(cx,cz)} — even on vanilla worlds, generated chunks
-   * defer to the §13.1 chunk-data precedence chain (loaded chunk → AnvilChunkView →
-   * live getter) via the post-load biome read.</p>
-   *
-   * <p>The default returns {@code true} (conservative — assume generated, skip the
-   * pre-check) to preserve correctness on adapters that cannot answer the question.
-   * Platform adapters SHOULD override to delegate to the native non-blocking lookup
-   * (e.g. {@code org.bukkit.World#isChunkGenerated(int,int)}).</p>
-   *
-   * @param cx the chunk's X coordinate
-   * @param cz the chunk's Z coordinate
-   * @return {@code true} if the chunk has been generated (or if detection is unavailable),
-   *     {@code false} only when the adapter can positively attest that the chunk is
-   *     ungenerated.
+   * Non-blocking "is this chunk on disk?" check (ADR-016 §13.3). Must not trigger
+   * generation or block. Gates the seed-synthesised biome pre-check off for already-generated
+   * chunks even on vanilla worlds — Mojang's biome source drifts across MC versions, so the
+   * persisted {@code .mca} palette is authoritative. Default {@code true} (conservative);
+   * adapters SHOULD override with the native lookup ({@code World#isChunkGenerated}).
    */
   public boolean isChunkGenerated(int cx, int cz) {
     return true;
   }
 
   /**
-   * Asynchronously produces a lean {@link ChunkColumnProbe} for the center column of
-   * chunk {@code (cx, cz)} over the world-Y window {@code [minY, maxY]}, used by
-   * {@code PregenTask} as a probe-first fast path before falling back to the
-   * authoritative full-chunk load.
-   *
-   * <p>The default returns {@code completedFuture(null)} — "no probe available",
-   * which instructs callers to skip the fast path and resolve the chunk the normal
-   * way (ADR-016 §13.1 precedence chain). Platform adapters that can cheaply
-   * answer a center-column probe (currently: Bukkit-family worlds with an
-   * {@code .mca}-backed chunk store) SHOULD override to return a real probe.</p>
-   *
-   * @param cx the chunk's X coordinate
-   * @param cz the chunk's Z coordinate
-   * @param minY inclusive minimum world-Y the caller cares about
-   * @param maxY inclusive maximum world-Y the caller cares about
-   * @return a future completing with a probe, or {@code null} if no fast path is
-   *     available (caller falls back to the authoritative path).
+   * Probe-first fast path for {@code PregenTask}: a lean center-column probe over
+   * world-Y {@code [minY, maxY]}, or {@code null} when the adapter has no probe (caller
+   * falls back to the ADR-016 §13.1 chain). Adapters with {@code .mca}-backed stores
+   * SHOULD override.
    */
   public CompletableFuture<ChunkColumnProbe> probeChunkColumn(
       int cx, int cz, int minY, int maxY) {

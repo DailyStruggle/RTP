@@ -12,28 +12,13 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.function.Consumer;
 
 /**
- * Thread-safe cache that memoizes {@link SafetyTokenParser#parseAll(Collection)} +
- * {@link CompiledUnsafeSet#compile(Collection)} against the raw {@code Set<String>} form
- * that legacy callers pass through {@code RTPChunk.isSafe(..., Set&lt;String&gt;)}.
+ * Process-wide thread-safe memo of {@link SafetyTokenParser#parseAll(Collection)} +
+ * {@link CompiledUnsafeSet#compile(Collection)}, keyed on an immutable snapshot of the
+ * raw token set so {@code chunk.isSafe(...)} doesn't re-parse and re-compile per candidate.
  *
- * <p>The hot path in {@code LocationGenerator} calls {@code chunk.isSafe(...)} once per
- * candidate column. Without caching, every call would re-parse the same token list and
- * re-compile the same {@link CompiledUnsafeSet}. This cache short-circuits that
- * recompile by keying on an immutable canonical snapshot of the raw token set.</p>
- *
- * <p>Rejected tokens produced during parsing are surfaced to a caller-supplied
- * {@link Consumer} <strong>once</strong> per distinct key, to honour REQ-RTP-S-004's
- * "never silent" rule without spamming the log on every candidate. After the first
- * warning for a given key, subsequent lookups reuse the cached result silently.</p>
- *
- * <p>Cache entries are held behind {@link SoftReference}s so the cache never pins
- * compiled sets during GC pressure, and the cache itself is {@link ConcurrentHashMap}-backed
- * for wait-free lookups. The cache is a process-wide singleton because the raw
- * {@code Set<String>} identity is determined by config load, not by any per-world or
- * per-region state.</p>
- *
- * <p>This class is immutable in its API surface (no mutable public state); only the
- * internal memoization table changes over time. All methods are thread-safe.</p>
+ * <p>Rejected tokens fire {@code rejectionSink} <strong>once</strong> per distinct key
+ * (REQ-RTP-S-004 — audit, not spam). Entries are {@link SoftReference}-held so the cache
+ * never pins compiled sets during GC pressure.
  */
 public final class SafetyCompilationCache {
 
@@ -45,20 +30,11 @@ public final class SafetyCompilationCache {
   }
 
   /**
-   * Look up or compute a {@link CompiledUnsafeSet} for the given raw token set.
-   *
-   * <p>The lookup key is an immutable snapshot of {@code rawTokens}; callers may continue
-   * to mutate their original set without invalidating the cached entry. If
-   * {@code rawTokens} is {@code null} or empty, {@link CompiledUnsafeSet#EMPTY} is
-   * returned without touching the cache.</p>
-   *
-   * @param rawTokens raw token strings as read from config; may be {@code null}.
-   * @param rejectionSink optional consumer invoked <strong>once per distinct key</strong>
-   *     with the human-readable form of each rejected token (REQ-RTP-S-004). May be
-   *     {@code null} to suppress the warning callback entirely — the rejected list is
-   *     still reachable via {@link SafetyTokenParser#parseAll(Collection)} if the caller
-   *     wants to drive its own logging.
-   * @return a non-null {@link CompiledUnsafeSet}.
+   * Look up or compute a {@link CompiledUnsafeSet} for {@code rawTokens}. Key is an
+   * immutable snapshot, so callers may keep mutating their original set. {@code null} or
+   * empty input returns {@link CompiledUnsafeSet#EMPTY} without touching the cache.
+   * {@code rejectionSink} fires once per distinct key (REQ-RTP-S-004); pass {@code null}
+   * to suppress.
    */
   public static CompiledUnsafeSet getOrCompile(
       Collection<String> rawTokens, Consumer<SafetyTokenParser.Rejection> rejectionSink) {
@@ -106,32 +82,11 @@ public final class SafetyCompilationCache {
   }
 
   /**
-   * Snapshot-aware variant that post-expands tag tokens in the compiled set via
-   * {@link CompiledUnsafeSet#withTagsExpanded(Map)}. The returned set has no
-   * tag buckets — every tag token's constituent materials have been baked into
-   * the plain-material / material-state-predicate fields — so the hot path in
-   * {@code RTPChunk.isSafe(...)} never needs to consult the snapshot per
-   * candidate.
-   *
-   * <p>Cache identity: entries are keyed on the pair
-   * {@code (rawTokens, System.identityHashCode(tagSnapshot))}. Callers are
-   * therefore required to pass the same snapshot reference between reloads;
-   * rebuilding the snapshot (see
-   * {@code RTPServerAccessor.rebuildBlockTagSnapshot()}) invalidates cache
-   * entries automatically because the new snapshot yields a different
-   * identity hash. A {@code null} snapshot is treated as empty and keyed on
-   * identity {@code 0} — distinct from an empty non-null snapshot.
-   *
-   * <p>When the compiled token set has no tag buckets at all, the snapshot is
-   * ignored and the underlying non-snapshot entry is returned (tag-free tokens
-   * do not depend on the snapshot).
-   *
-   * @param rawTokens raw token strings as read from config; may be {@code null}.
-   * @param tagSnapshot lowercase {@code namespace:path} → upper-case material
-   *     names; may be {@code null} or empty.
-   * @param rejectionSink optional consumer invoked once per distinct key.
-   * @return a non-null {@link CompiledUnsafeSet} with tag tokens baked into
-   *     plain-material entries.
+   * Tag-snapshot-aware variant: bakes tag-bucket members into the plain-material fields via
+   * {@link CompiledUnsafeSet#withTagsExpanded(Map)} so the hot path skips the snapshot
+   * lookup. Caller MUST reuse the same {@code tagSnapshot} reference between reloads —
+   * {@code RTPServerAccessor.rebuildBlockTagSnapshot()} produces a fresh reference, which
+   * invalidates these entries by identity. Tag-free token sets bypass expansion.
    */
   public static CompiledUnsafeSet getOrCompile(
       Collection<String> rawTokens,
@@ -144,12 +99,7 @@ public final class SafetyCompilationCache {
     return base.withTagsExpanded(tagSnapshot);
   }
 
-  /**
-   * Clear the entire cache. Intended for use during {@code /rtp reload} when a config
-   * change may have invalidated previously-cached compilations for other reasons (e.g.
-   * a platform tag-registry snapshot refresh in a future slice). Test code also calls
-   * this between scenarios to prevent cross-test leakage.
-   */
+  /** Drop all entries; called by {@code /rtp reload} and between tests. */
   public static void clear() {
     CACHE.clear();
   }

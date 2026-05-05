@@ -182,10 +182,14 @@ console-fail-patterns: []
 # thread; the configured `sequence` gap absorbs the I/O latency.
 #
 # Values:
-#   "auto"   (default) — save only on Spigot (Bukkit#getName() does not
-#                        contain "paper" or "folia"). Paper and Folia have
-#                        their own save cadences and an extra forced save
-#                        only adds noise.
+#   "auto"   (default) — save only on Spigot. Detection is by marker-class
+#                        presence (Paper API + Folia region scheduler), not
+#                        by `Bukkit#getName()`, so Paper- and Folia-derived
+#                        forks (Purpur, Pufferfish, Leaves, Luminol, …) are
+#                        identified correctly even when they override the
+#                        server brand string. Paper and Folia have their own
+#                        save cadences and an extra forced save only adds
+#                        noise.
 #   "always" / true   — save unconditionally on every platform.
 #   "never"  / false  — never save (legacy behaviour).
 save-worlds-between-phases: "auto"

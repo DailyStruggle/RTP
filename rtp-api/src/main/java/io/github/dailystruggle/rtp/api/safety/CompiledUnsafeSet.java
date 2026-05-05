@@ -12,35 +12,13 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Compiled, evaluation-ready form of a safety list (e.g. the {@code unsafeBlocks}
- * entries of {@code safety.yml}).
- *
- * <p>This is the immutable structure described by
- * <a href="../../../../../../../../../../docs/adr/ADR-017-block-tags-and-state-predicates-in-safety-lists.md">ADR-017</a>
- * &sect;2. It carries five disjoint buckets computed once at config load:</p>
- *
- * <ol>
- *   <li>Plain material names (fast path, set-membership).</li>
- *   <li>Resolved tag keys (lowercase {@code namespace:path} strings).</li>
- *   <li>Per-material state predicates.</li>
- *   <li>Per-tag state predicates.</li>
- *   <li>Wildcard state predicates (applied to every candidate when non-empty).</li>
- * </ol>
- *
- * <p>The hot evaluation order is defined in {@link #isUnsafe(String, Map)} and mirrors
- * ADR-017 &sect;4: plain name first, tag membership second, state predicates last. The
- * implementation avoids touching the caller's property map unless at least one
- * state-predicate bucket is populated for the material (or the wildcard bucket is
- * non-empty).</p>
- *
- * <p><strong>Tag expansion is not performed here.</strong> Tag resolution is a platform
- * concern (see ADR-017 &sect;2). The evaluation path accepts an optional
- * <em>live tag membership</em> supplier in {@link #isUnsafe(String, Collection, Map)} that
- * platforms populate from their own {@code Tag} registry snapshot. When tag membership is
- * unknown (empty collection), the tag buckets are effectively inert — the fail-open
- * behaviour documented in ADR-017 &sect;3 Consequences.</p>
- *
- * <p>This class is immutable and thread-safe.</p>
+ * Compiled, evaluation-ready form of a safety list (ADR-017 §2). Five disjoint
+ * buckets computed once at config load: plain materials, resolved tag keys,
+ * per-material state predicates, per-tag state predicates, wildcard state
+ * predicates. Hot eval order (ADR-017 §4): plain name → tag membership →
+ * state predicates. Tag expansion is a platform concern; live tag membership
+ * is supplied by the caller via {@link #isUnsafe(String, Collection, Map)}.
+ * Empty membership is fail-open per ADR-017 §3. Immutable and thread-safe.
  */
 public final class CompiledUnsafeSet {
 
@@ -71,16 +49,9 @@ public final class CompiledUnsafeSet {
   }
 
   /**
-   * Compile a list of parsed tokens into an evaluation-ready structure.
-   *
-   * <p>Tokens are bucketed by kind: plain vs predicated, material vs tag vs wildcard.
-   * Duplicate plain entries are coalesced (the underlying sets are insertion-ordered for
-   * deterministic iteration during diagnostics).</p>
-   *
-   * @param tokens parsed tokens (typically from {@link SafetyTokenParser#parseAll}).
-   *     {@code null} is treated as an empty list.
-   * @return a new {@code CompiledUnsafeSet}. Never {@code null}; returns {@link #EMPTY}
-   *     when {@code tokens} is {@code null} or empty.
+   * Compile parsed tokens (from {@link SafetyTokenParser#parseAll}) into an
+   * evaluation-ready structure. Bucketed by kind; duplicates coalesce; sets are
+   * insertion-ordered for diagnostics. Returns {@link #EMPTY} for null/empty input.
    */
   public static CompiledUnsafeSet compile(Collection<SafetyToken> tokens) {
     if (tokens == null || tokens.isEmpty()) return EMPTY;
@@ -286,31 +257,12 @@ public final class CompiledUnsafeSet {
   }
 
   /**
-   * Evaluate whether a candidate block should be treated as unsafe.
-   *
-   * <p>Evaluation order (cheapest first, per ADR-017 &sect;4):</p>
-   * <ol>
-   *   <li>Plain-material membership.</li>
-   *   <li>Plain-tag membership (intersect {@code liveTagMembership} with
-   *       {@link #plainTags()}).</li>
-   *   <li>Material-scoped state predicates.</li>
-   *   <li>Tag-scoped state predicates (iterate over {@code liveTagMembership} ∩
-   *       {@link #tagStatePredicates()}).</li>
-   *   <li>Wildcard state predicates.</li>
-   * </ol>
-   *
-   * <p>The first matching rule wins; later rules are not evaluated. A {@code null} or
-   * empty {@code liveProperties} is fine for materials with no state predicate
-   * configured; if a state predicate applies and no property map is supplied, the
-   * predicate simply fails to match (fail-open).</p>
-   *
-   * @param materialName upper-snake {@code Material.name()} of the candidate block; may
-   *     be {@code null} (treated as no match).
-   * @param liveTagMembership lowercase {@code namespace:path} keys of every tag the
-   *     candidate belongs to, as resolved by the platform's live tag registry. May be
-   *     empty (e.g. on the Anvil off-tick path when no snapshot is available).
-   * @param liveProperties lowercase block-property map; may be {@code null} or empty.
-   * @return {@code true} iff any rule matches.
+   * Is this block unsafe? Evaluation order, first match wins (ADR-017 §4, cheapest first):
+   * plain material → plain tag → material-scoped state preds → tag-scoped state preds →
+   * wildcard state preds. {@code materialName} {@code null}/empty → no match.
+   * {@code liveTagMembership} may be empty (Anvil off-tick has no snapshot).
+   * {@code liveProperties} {@code null}/empty fail-opens any state predicate that would
+   * otherwise apply.
    */
   public boolean isUnsafe(String materialName,
                           Collection<String> liveTagMembership,

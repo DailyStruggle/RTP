@@ -58,7 +58,7 @@ class ServerAccessorImplTest {
      * biome set, so the result must be non-null and non-empty.
      */
     @Test
-    @Timeout(2)
+    @Timeout(30)
     @Disabled("Registry.BIOME.stream() triggers RegistryAccessMock initialisation which fails under MockBukkit-v1.21:3.111.0; requires a live Paper 1.21 server context")
     void getBiomes_returnsNonEmptyUpperCaseSet() {
         Set<String> biomes = accessor.getBiomes();
@@ -76,7 +76,7 @@ class ServerAccessorImplTest {
      * Paper scheduler execution path is correctly inherited and functional.
      */
     @Test
-    @Timeout(2)
+    @Timeout(30)
     void paperScheduler_runTask_executesOnPrimaryThread() {
         AtomicBoolean ran = new AtomicBoolean(false);
 

@@ -1,12 +1,10 @@
 package io.github.dailystruggle.effectsapi.LocalEffects;
 
 import io.github.dailystruggle.effectsapi.Effect;
-import io.github.dailystruggle.effectsapi.LocalEffects.enums.FireworkTypeNames;
 import io.github.dailystruggle.effectsapi.LocalEffects.enums.NoteTypeNames;
-import org.bukkit.*;
-import org.bukkit.block.Block;
-import org.bukkit.block.data.BlockData;
-import org.bukkit.block.data.type.NoteBlock;
+import org.bukkit.Instrument;
+import org.bukkit.Location;
+import org.bukkit.Note;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -21,8 +19,6 @@ import java.util.stream.Collectors;
 
 public class NoteEffect extends Effect<NoteTypeNames> {
     private BukkitTask makeNoteSoundTask = null;
-    private BukkitTask cleanupTask = null;
-    private BlockData oldBlockData;
 
     public NoteEffect() throws IllegalArgumentException {
         super(new EnumMap<>(NoteTypeNames.class));
@@ -34,38 +30,36 @@ public class NoteEffect extends Effect<NoteTypeNames> {
     }
 
     /**
-     * this is technically a runnable, so a run function needs to be filled out for what to do.
-     * In this case,
+     * Historically this placed a temporary {@code NOTE_BLOCK} at {@code target}
+     * so the next-tick {@code MakeNoteSound} could play it; the block was
+     * restored 1 tick later by a {@code Cleanup} task. That dance is no longer
+     * needed: {@link Player#playNote(Location, Instrument, Note)} is a
+     * clientbound packet that does not require a real note block at the
+     * location, and the place/restore pair tripped Paper's AsyncCatcher
+     * (`Asynchronous block remove!`) and Folia's region ownership check, while
+     * also briefly mutating world state visible to other plugins.
+     *
+     * <p>{@code run()} is intentionally a no-op now; the sound is emitted by
+     * the {@link MakeNoteSound} task scheduled in {@link #runTask(Plugin)}.
      */
     @Override
     public void run() {
         if (target instanceof Entity) target = ((Entity) target).getLocation();
-        NoteBlock noteData = (NoteBlock) Bukkit.createBlockData(Material.NOTE_BLOCK);
-        noteData.setInstrument((Instrument) data.get(NoteTypeNames.TYPE));
-        noteData.setNote(new Note((Integer) data.get(NoteTypeNames.TONE)));
-
-        Block block = ((Location) target).getBlock();
-        oldBlockData = block.getBlockData().clone();
-        block.setBlockData(noteData);
+        // No block placement: playNote does not require a NoteBlock at target.
     }
 
     @Override
     @NotNull
     public synchronized BukkitTask runTask(@NotNull Plugin plugin) {
         BukkitTask res = super.runTask(plugin);
-
-        //delay 1 tick to ensure note block placement on client side
+        // 1-tick delay preserves prior timing relative to other postteleport effects.
         makeNoteSoundTask = new MakeNoteSound().runTaskLater(plugin, 1);
-
-        //delay 1 more tick to ensure note plays before removal
-        cleanupTask = new Cleanup().runTaskLater(plugin, 2);
         return res;
     }
 
     @Override
     public void cancel() {
         if (makeNoteSoundTask != null) makeNoteSoundTask.cancel();
-        if (cleanupTask != null) cleanupTask.cancel();
     }
 
     @Override
@@ -94,15 +88,6 @@ public class NoteEffect extends Effect<NoteTypeNames> {
                         new Note(tone));
             }
             makeNoteSoundTask = null;
-        }
-    }
-
-    private final class Cleanup extends BukkitRunnable {
-        @Override
-        public void run() {
-            Location location = ((Location) target);
-            location.getBlock().setBlockData(oldBlockData);
-            cleanupTask = null;
         }
     }
 

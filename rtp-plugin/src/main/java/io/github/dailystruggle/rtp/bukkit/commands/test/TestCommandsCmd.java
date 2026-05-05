@@ -14,48 +14,15 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code rtp test commands} &mdash; combined dispatch &amp; permission audit of
- * the whole RTP command tree. Walks from this node up to the root
- * ({@code parent() == null}) via {@link #parent()}, then recursively enumerates
- * every {@link TreeCommand} under the root via {@link TreeCommand#getCommandLookup()}
- * and asserts operator-facing contracts that are hard to cover in unit tests:
- *
- * <ul>
- *   <li><b>Every node declares a non-blank {@code name()} and {@code permission()}</b>.
- *       A blank {@code permission()} means the command is effectively ungated at runtime,
- *       which is an operator surprise and an implicit S-004 violation (commands that
- *       would otherwise refuse silently when invoked by an unprivileged sender).</li>
- *   <li><b>Lookup keys agree with their stored nodes' names</b>. {@link TreeCommand}
- *       upper-cases lookup keys at insertion; a node registered with a lower-cased
- *       key cannot be dispatched by its own declared {@code name()}, only by alias.
- *       This is the bug that was noted in the {@code rtp test cancel} review.</li>
- *   <li><b>Permission strings are unique per role, or explicitly shared</b>. The audit
- *       reports every permission string that is used by more than one structurally
- *       distinct node (e.g. a leaf and a subtree parent), as an advisory &mdash; it
- *       does not fail the run.</li>
- * </ul>
- *
- * <p>This command is read-only: it does <b>not</b> dispatch any audited command.
- * Dispatch-level behaviour (does a command produce a message? log at WARNING on
- * failure?) is inherently live-server-only and the place to grow this command,
- * not something to add here speculatively.
- *
- * <p>Deliberately skips the {@code test} subtree itself &mdash; re-entering
- * {@link TestStressCmd}, {@link TestReloadSafetyCmd}, {@link TestCancelCmd} or
- * {@link TestFullCmd} from inside an audit would be self-defeating (stress would
- * start, reload-safety would run its admin-gated loop, cancel would abort every
- * job including the audit itself).
- *
- * <p>Safety compliance:
- * <ul>
- *   <li><b>S-004</b>: every audit finding (missing name, missing permission, key/name
- *       mismatch) is logged at {@link Level#WARNING} and mirrored to the caller.
- *       A clean audit is logged at {@link Level#INFO}.</li>
- *   <li><b>S-005</b>: performs no chunk I/O and no blocking; traversal is pure
- *       in-memory map walking.</li>
- * </ul>
- *
- * <p>Traces REQ-RTP-S-004. See {@code docs/dev/RUNTIME_TEST_SUITE_PLAN.md &sect;3.6}.
+ * {@code rtp test commands} &mdash; read-only audit of the whole RTP command tree.
+ * Walks up to the root, then enumerates every {@link TreeCommand} via
+ * {@link TreeCommand#getCommandLookup()} and asserts: each node has a non-blank
+ * {@code name()} and {@code permission()}; lookup keys match their stored nodes'
+ * names ({@code TreeCommand} upper-cases keys at insertion, so a lower-cased
+ * registration is undispatchable by its own name); permission strings reused by
+ * structurally distinct nodes are reported as advisory. Skips the {@code test}
+ * subtree itself to avoid self-cancel/self-reload loops. Traces REQ-RTP-S-004;
+ * see {@code RUNTIME_TEST_SUITE_PLAN.md &sect;3.6}.
  */
 public class TestCommandsCmd extends BaseRTPCmdImpl {
 

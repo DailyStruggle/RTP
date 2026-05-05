@@ -10,33 +10,12 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Platform-neutral orchestration helper shared by every adapter that wires the
- * ADR-016 Anvil subsystem into its {@code RTPWorld.getChunkAt} path (currently
- * Bukkit/Spigot and Folia; Fabric pending).
- *
- * <p>Previously, the per-world Anvil-view cache + FIFO eviction + publish/consume
- * lifecycle was duplicated inside {@code BukkitRTPWorld}. This helper owns that
- * state so platform adapters only need to:
- * <ol>
- *   <li>Decide (per-platform applicability gate) whether to probe,</li>
- *   <li>Call {@link #probeAndPublish} to run {@link AnvilPrefilter#probeDetailed}
- *       off-thread and publish any decoded view into the cache,</li>
- *   <li>In their {@code getCachedChunk(long)} override, call {@link #takeCached}
- *       and wrap the returned view in their platform-specific source-union
- *       {@code RTPChunk} when no live chunk is cached.</li>
- * </ol>
- *
- * <p><b>No platform or RTP-module dependencies.</b> This class operates purely
- * on primitives, {@link AnvilChunkView}, and caller-provided
- * {@link java.nio.file.Path}s + reconciler functions, per the {@code rtp-anvil}
- * module invariants enforced by {@code AnvilPackageBoundaryArchTest}.</p>
- *
- * <p>This class is thread-safe: the underlying cache is a
- * {@link ConcurrentHashMap} and the insertion-order FIFO is a
- * {@link ConcurrentLinkedDeque}. {@link #takeCached} is a non-destructive read
- * (matching the legacy {@code BukkitRTPWorld.getCachedChunk} semantics, which
- * allowed the same view to answer multiple candidate-loop queries for the same
- * chunk key before eviction).</p>
+ * Platform-neutral helper that owns the per-world Anvil-view cache + FIFO
+ * eviction + publish/consume lifecycle for ADR-016 adapters. Adapters: gate
+ * applicability, call {@link #probeAndPublish}, and call {@link #takeCached}
+ * from their {@code getCachedChunk}. Pure on primitives + {@link AnvilChunkView}
+ * + caller-supplied paths/reconciler ({@code rtp-anvil} module invariants).
+ * Thread-safe; {@link #takeCached} is a non-destructive read.
  */
 public final class AnvilProbeSupport {
 

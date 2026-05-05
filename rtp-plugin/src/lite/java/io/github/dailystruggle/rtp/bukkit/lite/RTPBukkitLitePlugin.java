@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.bukkit.lite;
 
 import io.github.dailystruggle.rtp.bukkit.BootstrapSupport;
 import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
+import io.github.dailystruggle.rtp.bukkit.effects.BukkitEffectsHandler;
 import io.github.dailystruggle.rtp.bukkit.spigotListeners.OnPlayerJoin;
 import io.github.dailystruggle.rtp.bukkit.spigotListeners.OnPlayerQuit;
 import io.github.dailystruggle.rtp.bukkit.spigotListeners.OnEventTeleports;
@@ -29,8 +30,6 @@ import java.util.logging.Level;
  *       (or an in-memory accessor) wired by {@link RTP}'s default constructor path.</li>
  *   <li>Login reserve cache initialization (ADR-023).</li>
  *   <li>{@code setupIntegrations()} -- claim plugin softdepends (ADR-019).</li>
- *   <li>{@code BukkitEffectsHandler.setupEffects} -- effects pipeline runs without the
- *       per-permission startup parse ({@code PerformanceKeys.effectParsing}).</li>
  *   <li>{@code isFolia()} branching -- lite is Spigot/Paper only.</li>
  *   <li>PlaceholderAPI registration -- lite does not declare PAPI as a softdepend.</li>
  *   <li>Multilingual bootstrap (ADR-020) -- locale is hardcoded to English; the lite
@@ -162,10 +161,23 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
     // Step 8: drain late startup tasks. Shared helper (ADR-024).
     BootstrapSupport.drainStartupTasks();
 
+    // Step 9: per-permission effects parse, deferred to tick+1 to mirror the
+    // full bootstrap. Lite ships effects-api shaded so per-permission effects
+    // (e.g. rtp.effects.<name>) must fire identically to the full edition.
+    RTP.log(Level.FINE,
+        "[LIFECYCLE-LITE] onEnable scheduling deferred BukkitEffectsHandler.setupEffects (tick+1)");
+    RTP.scheduler.runTaskLater(() -> {
+      RTP.log(Level.FINER,
+          "[LIFECYCLE-LITE] deferred BukkitEffectsHandler.setupEffects firing");
+      // The `plugin` parameter is unused inside setupEffects (event dispatch
+      // goes through Bukkit.getPluginManager()), so passing null is safe and
+      // avoids touching the full-edition singleton from the lite bootstrap.
+      BukkitEffectsHandler.setupEffects(null);
+    }, 1);
+
     // Lite OMITS:
     //   - initLoginReserveCache()                (ADR-023)
     //   - setupIntegrations()                    (ADR-019 claim plugins)
-    //   - BukkitEffectsHandler.setupEffects(...) (effectParsing tree)
     //   - PlaceholderAPI hook
     //   - Visitor-mode wiring                    (PerformanceKeys.visitorEnabled)
     //

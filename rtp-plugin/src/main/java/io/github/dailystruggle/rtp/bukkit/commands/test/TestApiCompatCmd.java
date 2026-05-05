@@ -13,35 +13,12 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code rtp test api-compat} &mdash; read-only reflective probe of every
- * Bukkit/Paper/Folia API method RTP actually calls at runtime. Surfaces a
- * {@link NoSuchMethodError} risk at test-invocation time instead of at the
- * first teleport.
- *
- * <p>See {@code docs/dev/RUNTIME_TEST_SUITE_PLAN.md &sect;3.7} for the
- * rationale (why API-surface probing beats NMS-package-name matching).
- *
- * <p>The probe list is intentionally curated rather than derived from
- * bytecode scanning: most of the call sites that matter live behind
- * platform adapters ({@code rtp-spigot}, {@code rtp-paper}, {@code
- * rtp-folia}), so a scanner would need to load every shaded adapter jar.
- * A curated list is also easier to keep in lock-step with the
- * {@code Already satisfied by:} notes in {@code .junie/AGENTS.md}.
- *
- * <p>Probes whose declaring class is not on the classpath (e.g. the Folia
- * {@code RegionScheduler} on a plain Spigot server) are reported as
- * {@code skipped}, not {@code missing-method} &mdash; missing-class is the
- * expected state for platform-conditional APIs.
- *
- * <p>Safety compliance:
- * <ul>
- *   <li><b>S-004:</b> every miss emits a {@link Level#WARNING} log line
- *       and a player-visible {@code sendMessage}.</li>
- *   <li><b>S-005:</b> pure reflection; no chunk I/O, no main-thread
- *       wait. Safe on any scheduler.</li>
- *   <li><b>Read-only:</b> no resolved method is <i>invoked</i>. Safe to
- *       include in {@code rtp test full}.</li>
- * </ul>
+ * {@code rtp test api-compat} — read-only reflective probe of every
+ * Bukkit/Paper/Folia API method RTP relies on; surfaces {@link NoSuchMethodError}
+ * risk at test time (RUNTIME_TEST_SUITE_PLAN §3.7). Curated list (not bytecode-scanned)
+ * to stay in lock-step with adapter notes. Missing classes report as {@code skipped}
+ * (expected for platform-conditional APIs); missing methods report as failures.
+ * S-004 (warn + send on miss), S-005 (pure reflection), no method is invoked.
  */
 public class TestApiCompatCmd extends BaseRTPCmdImpl {
 

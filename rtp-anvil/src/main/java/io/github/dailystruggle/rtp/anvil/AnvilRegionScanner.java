@@ -14,40 +14,20 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Pregen-scan utility that walks every {@code r.X.Z.mca} file under a dimension's
- * {@code region/} folder and returns the union of every namespaced biome identifier
- * it can decode (ADR-016 (biome) §6.1, Step 2 of §10).
+ * Pregen-scan utility (ADR-016 biome §6.1) that walks every {@code r.X.Z.mca}
+ * under a dimension's {@code region/} folder and returns the union of every
+ * decodable namespaced biome id. Consumed by the platform's {@code setBiomesGetter}
+ * tab-completion hook.
  *
- * <p>Intended consumer: the platform adapter's {@code setBiomesGetter} hook (Step 3),
- * which uses the returned set as the "populated" half of a tab-completion enumerator.
- * Worlds whose pregen is complete get a complete roster; partial pregen yields the
- * subset that has actually been written to disk (addons that can enumerate from a
- * generator engine — e.g. {@code RTP_Iris_integration} — remain the authoritative
- * source in that case, see ADR-016 (biome) §7).
+ * <p>Threading: {@link #scanBiomesAsync(Path, String)} dispatches on
+ * {@link ForkJoinPool#commonPool()} and is the intended entry point;
+ * {@link #scanBiomes(Path, String)} runs inline and must already be off-tick.
  *
- * <h2>Threading</h2>
- * <ul>
- *   <li>{@link #scanBiomesAsync(Path, String)} dispatches on {@link ForkJoinPool#commonPool()}
- *       and never touches the calling thread. This is the intended entry point.</li>
- *   <li>{@link #scanBiomes(Path, String)} runs inline. Callers from a Bukkit tick
- *       thread must ensure the call is already off-tick — the platform wiring in
- *       Step 3 will always go through {@code scanBiomesAsync}.</li>
- * </ul>
+ * <p>Cache key is {@code (regionFolder, mtimeSignature)} where the signature is
+ * the max {@code lastModified} across {@code r.*.*.mca}; any change re-runs.
  *
- * <h2>Caching</h2>
- * <p>Results are memoised per {@code (regionFolder, mtimeSignature)} pair. The mtime
- * signature is the maximum {@link Files#getLastModifiedTime(Path, java.nio.file.LinkOption...) lastModified}
- * across every {@code r.*.*.mca} file in the folder. If any region file is added,
- * removed, or modified, the signature changes and the scan re-runs on the next call;
- * otherwise the cache hit returns in O(directory-listing) time, which is adequate for
- * startup-scan-plus-tab-completion usage.
- *
- * <h2>Failure mode</h2>
- * <p>Per ADR-016 (biome) §8 and ADR-016's "malformed → UNKNOWN, never crash" posture,
- * any individual chunk or file decode failure is silently skipped. The scanner returns
- * only the biome identifiers it could successfully decode; it never throws on bad data.
- * A missing region folder yields an empty set, not an exception (an unpopulated world
- * legitimately has no region files).
+ * <p>Per ADR-016 §8 "malformed → UNKNOWN, never crash": individual decode
+ * failures are skipped; missing region folder → empty set, never an exception.
  */
 public final class AnvilRegionScanner {
 

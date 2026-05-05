@@ -23,72 +23,18 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code rtp test async-reply player:<name>} &mdash; verifies that the
- * asynchronous {@code /rtp} pipeline marshals its final player-facing reply
- * (typically the {@code Teleporting...} or {@code Searching...} message) back
- * to a thread that is permitted by the active platform's messaging rules.
- *
- * <p><b>Why this test exists.</b> The teleport pipeline legitimately runs the
- * bulk of its work off-thread (async chunk loads, claim verifiers, spiral
- * math) but the <i>reply</i> to the caller must land somewhere safe:
- * <ul>
- *   <li>On Paper / Spigot, messages should be delivered on the main server
- *       thread (the classic "sync chat" contract). An async-only reply is
- *       tolerated by the API but is a smell that precedes Adventure-API
- *       breakage.</li>
- *   <li>On Folia, the main-thread rule is replaced by region/global
- *       schedulers; delivering a message from an arbitrary worker thread is
- *       acceptable <i>only</i> because Paper's {@code CommandSender} catches
- *       async messaging and routes it. Delivering from a
- *       {@code Region Thread} that doesn't own the target entity would
- *       throw {@code ThreadAccessException}.</li>
- * </ul>
- * This probe records the actual delivery thread and asserts it is one of
- * the permitted categories for the current platform.
- *
- * <p><b>How it works.</b> We wrap {@link RTP#serverAccessor} in a JDK
- * dynamic proxy that delegates every call to the real accessor but, for
- * {@code sendMessage*} invocations whose textual payload contains one of
- * the tracked needles ({@code "Teleporting"} / {@code "Searching"}) and
- * whose target UUID matches the test player, captures
- * {@link Thread#currentThread()} into a {@link CompletableFuture}. We then
- * delegate a normal {@code /rtp} invocation through
- * {@link RTPCmd#compute(UUID, Map, CommandsAPICommand)} (the same entry
- * point the real command uses), wait up to {@link #REPLY_TIMEOUT_MS} for
- * the first matching reply, and report the thread class / name plus the
- * platform verdict.
- *
- * <p>The accessor is restored in a {@code finally} block regardless of
- * outcome, so a timeout cannot leave the proxy installed and silently
- * break subsequent messaging (which would violate REQ-RTP-S-004 for every
- * later teleport).
- *
- * <p>Safety compliance:
- * <ul>
- *   <li><b>REQ-RTP-S-004</b> &mdash; every outcome (success, timeout,
- *       reject) produces a player-visible line and a
- *       {@link Level#INFO} / {@link Level#WARNING} log entry; the proxy
- *       forwards all delegated {@code sendMessage} calls unchanged.</li>
- *   <li><b>REQ-RTP-S-005</b> &mdash; the probe triggers {@code /rtp}
- *       through the existing pipeline and does not load chunks itself;
- *       the wait happens on the async scheduler, not the main thread.</li>
- *   <li><b>REQ-RTP-S-006</b> &mdash; if {@code RTP.serverAccessor} or
- *       {@code RTP.scheduler} is null (core not yet loaded) the command
- *       logs WARN and returns rather than NPEing.</li>
- * </ul>
+ * {@code rtp test async-reply player:<name>} &mdash; records which thread the
+ * {@code /rtp} pipeline uses to deliver its first player-facing reply
+ * ({@code Teleporting/Searching/Loading}) and asserts it is permitted by the
+ * active platform's messaging rules. Wraps {@link RTP#serverAccessor} in a JDK
+ * dynamic proxy that captures {@link Thread#currentThread()} on matching
+ * {@code sendMessage*} calls; the proxy is always restored in {@code finally}.
+ * Covers REQ-RTP-S-004/005/006.
  */
 public class AsyncReplyTestJob extends BaseRTPCmdImpl {
 
-  /**
-   * Case-insensitive substrings that identify the teleport pipeline's first
-   * player-facing reply.
-   *
-   * <p>The needles cover both English defaults
-   * ({@code "Teleporting in [delay]"}, {@code "Teleported in [attempts]"})
-   * and the loading / searching states used in localized {@code messages.yml}
-   * variants. {@code "teleport"} matches both "teleporting" and "teleported";
-   * {@code "loading"} covers the chunk-loading state.
-   */
+  /** Lowercase substrings identifying the pipeline's first player-facing reply
+   *  across English defaults and localized {@code messages.yml} variants. */
   static final String[] REPLY_NEEDLES = {
       "teleport", "searching", "loading", "setup"
   };

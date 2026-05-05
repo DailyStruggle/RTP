@@ -5,27 +5,13 @@ import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import java.util.UUID;
 
 /**
- * A {@link RTPRunnable} wrapper that records timing and lifecycle state for an
- * underlying task and removes it from the server accessor's active-task map upon
- * completion or cancellation.
+ * {@link RTPRunnable} wrapper recording queued/start/end timestamps and unregistering
+ * itself from {@code RTPServerAccessor#activeTasks} in {@code finally} (REQ-API-ARCH-003).
+ * Powers the in-flight count and per-task age in {@code /rtp info}.
  *
- * <p>Instances are created by the scheduling subsystem and stored in
- * {@link io.github.dailystruggle.rtp.api.server.RTPServerAccessor#activeTasks} under their
- * {@link #getTrackingId()} key. The {@code /rtp info} command reads this map to report
- * in-flight teleport count and per-task age.
- *
- * <p><b>State machine:</b>
- * <pre>
- *   PENDING  ──run()──&gt;  RUNNING  ──finally──&gt;  COMPLETED
- * </pre>
- * A task moves from {@code PENDING} to {@code RUNNING} when {@link #run()} is
- * entered, and to {@code COMPLETED} in the {@code finally} block regardless of
- * success or exception, satisfying REQ-API-ARCH-003.
- *
- * <p><b>Thread safety:</b> All timing fields are written exactly once by the
- * thread executing {@link #run()}, and are only read after that thread exits the
- * method. {@link #getState()} and {@link #getDuration()} are therefore safe to
- * call from any thread after the task has started.
+ * <p>States: PENDING → RUNNING (on {@link #run()} entry) → COMPLETED (in {@code finally}).
+ * Timing fields are written once by the executing thread; getters are safe to call from
+ * any thread once the task has started.
  *
  * @see io.github.dailystruggle.rtp.api.server.RTPServerAccessor#activeTasks
  * @see TaskState

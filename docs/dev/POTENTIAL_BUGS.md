@@ -48,6 +48,40 @@ Append to the *Open* section below using the template. Keep entries short — on
 - **Impact:** narrower than the original report (geometry edits are now caught), but a tightened safety rule that the cache silently ignores remains possible. Likely rare; admins seldom flip safety predicates post-deployment.
 - **Suggested next step:** extend `RegionCacheKey.canonicalize(...)` to fold sorted `safety.yml` validity keys and the region's biome lists, and bump `SCHEMA_VERSION`. A unit test enumerating each candidate config key (in or out of the hash) keeps the boundary honest.
 
+### 2026-05-03 — Pre-existing unresolved Javadoc links in `rtp-anvil`
+
+- **Discovered during:** comment-stripping triage pass (analyzer top-15 offenders)
+- **Location:** `rtp-anvil/src/main/java/io/github/dailystruggle/rtp/anvil/AnvilPrefilter.java` — class Javadoc and `probeSync` Javadoc
+- **Symptom / hypothesis:** Javadoc references `{@link #probe(World, int, int, Set)}` and `{@link PaletteNormalizer#reconcileAll}`, but neither `org.bukkit.World` nor `PaletteNormalizer` is importable from `rtp-anvil` (zero-dep module per ADR-016). The references were already in the original (pre-trim) file and resolve to nothing.
+- **Impact:** Javadoc link warnings only; no runtime effect, no compile failure. Slightly misleading IDE navigation.
+- **Suggested next step:** replace with prose ("the asynchronous {@code probe} method" / "the platform reconciler") or delete the broken anchors. Two-line fix.
+
+### 2026-05-03 — `effects-api` `SoundEffect` unparseable on MC ≥ 1.21.3 — RESOLVED 2026-05-03
+
+- **Discovered during:** Folia 1.21.11 demo of `rtp.effect.*` permission nodes.
+- **Location:** `effects-api/src/main/java/io/github/dailystruggle/effectsapi/Effect.java` (`str2Obj`); `effects-api/.../LocalEffects/SoundEffect.java` (default seed).
+- **Resolution (2026-05-03):** `Effect.str2Obj` now special-cases `Sound`, mapping legacy underscored names (`ENTITY_ENDERMAN_TELEPORT`) and namespaced keys (`minecraft:entity.enderman.teleport` / `entity.enderman.teleport`) to a `Registry.SOUNDS.get(NamespacedKey)` lookup, with a reflective `Sound.valueOf` fallback for pre-1.21.3 enum builds. `SoundEffect.defaultSound()` replaces the enum-only `Sound.values()[0]` seed: tries reflective `values()`, then iterates `Registry.SOUNDS`, then resolves `minecraft:entity.enderman.teleport`. `:effects-api:compileJava` and `:effects-api:test` BUILD SUCCESSFUL.
+
+### 2026-05-03 — `effects-api` `PotionEffect.run` violates Folia threading — RESOLVED 2026-05-03
+
+- **Discovered during:** Folia 1.21.11 demo of `rtp.effect.*` permission nodes.
+- **Location:** `effects-api/src/main/java/io/github/dailystruggle/effectsapi/LocalEffects/PotionEffect.java`.
+- **Resolution (2026-05-03):** `PotionEffect.run` now routes every `Player.addPotionEffect(...)` through a new `applyOnEntityThread(Player, PotionEffect)` helper. The helper invokes `Player#getScheduler().run(plugin, task, retired)` reflectively when present (Folia / modern Paper EntityScheduler) and falls back to `Bukkit.getScheduler().runTask` otherwise. Reflection keeps `effects-api` free of a Folia compile-time dependency. `:effects-api:compileJava` and `:effects-api:test` BUILD SUCCESSFUL.
+
+### 2026-05-03 — `effects-api` `FireworkEffect.run` uses non-Folia scheduler — RESOLVED 2026-05-03
+
+- **Discovered during:** Folia 1.21.11 demo of `rtp.effect.*` permission nodes.
+- **Location:** `effects-api/src/main/java/io/github/dailystruggle/effectsapi/LocalEffects/FireworkEffect.java`.
+- **Resolution (2026-05-03):** `FireworkEffect.run` now branches on a `RegionizedServer` class-probe. On Folia it dispatches to `Bukkit.getRegionScheduler().run(plugin, location, Consumer)` (resolved reflectively to avoid a Folia compile-time dependency) and spawns via the new `spawnFirework(Location)` helper. On Spigot/Paper the existing `Bukkit.isPrimaryThread()` / `Bukkit.getScheduler().runTask(...)` path is preserved. `:effects-api:compileJava` and `:effects-api:test` BUILD SUCCESSFUL.
+
+### 2026-05-03 — `EVENTS_AND_EFFECTS.md` documents wrong types for SOUND / NOTE arguments
+
+- **Discovered during:** Folia 1.21.11 demo of `rtp.effect.*` permission nodes.
+- **Location:** `docs/admin/EVENTS_AND_EFFECTS.md` Part 1 — argument tables for `SOUND` and `NOTE`; example block lines 144 and 156.
+- **Symptom / hypothesis:** (a) `NOTE` table claims `TONE` is a letter (`A`–`G`), but `NoteEffect`'s default for `NoteTypeNames.TONE` is `Integer 0` (line 31), and `Effect.str2Obj` therefore calls `Integer.parseInt("A")` → `NumberFormatException`. Tones are integers `0–24`. (b) `SOUND` examples use legacy enum names (`ENTITY_ENDERMAN_TELEPORT`, `BLOCK_ANVIL_LAND`, `BLOCK_ENCHANTMENT_TABLE_USE`) that no longer parse on MC 1.21.3+ (see `Sound`-registry entry above). (c) `FIREWORK` example trailing booleans (`…true.true.true`) hit `Float.parseFloat("TRUE")` because at least one preceding positional default is `Float`, breaking the documented column order.
+- **Impact:** Operators following the doc see `NumberFormatException` / `unexpected input` warnings on every teleport stage they granted; no effect plays. Increases support load and erodes trust in the doc.
+- **Suggested next step:** correct the `NOTE` `TONE` column to `int 0–24` with a small lookup table for common tones; add a "MC ≥ 1.21.3" warning to the `SOUND` row pending the registry fix; verify the `FIREWORK` argument order matches `FireworkEffect.setData(...)` actual positional reads and either fix the doc or fix the parser. Cross-link this entry from the doc when corrected.
+
 <!-- Append new entries above this comment, newest first. -->
 
 ## Resolved

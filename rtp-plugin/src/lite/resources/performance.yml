@@ -3,10 +3,12 @@
 #   visitorEnabled         (observation mode -- not present in lite)
 #   loginCacheEnabled      (ADR-023 login reserve cache -- not present in lite)
 #   loginCacheCap          (ADR-023 -- not present in lite)
-#   effectParsing          (per-permission startup parse -- not present in lite)
 #   onEventParsing         (per-permission startup parse -- not present in lite)
 #
 # biomeRecall is retained as a showcase feature.
+# effectParsing defaults to true in lite so per-permission effects
+# (rtp.effect.<stage>) fire identically to the full edition.
+effectParsing: true
 
 maxAttempts: 32           # Max search attempts before giving up
 viewDistanceSelect: 0     # Chunk radius to load during selection

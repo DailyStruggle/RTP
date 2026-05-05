@@ -7,27 +7,13 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Immutable key/value predicate applied to a block's {@code BlockData} properties.
- *
- * <p>A {@code StatePredicate} represents the bracketed portion of a safety-list token
- * as defined by <a href="../../../../../../../../../../docs/adr/ADR-017-block-tags-and-state-predicates-in-safety-lists.md">ADR-017</a>
- * &sect;1 — e.g. the {@code waterlogged=true} in {@code OAK_SLAB[waterlogged=true]}.
- * Multiple properties combine with logical <strong>AND</strong>: a live block matches
- * iff every configured property equals (case-insensitively) the block's property of the
- * same name.</p>
- *
- * <p>Both keys and values are stored as lowercase {@link String} to avoid the
- * Turkish-i locale trap and to mirror the string form produced by
- * {@code org.bukkit.block.data.BlockData#getAsString()} (which the platform adapter
- * parses into a {@code Map<String, String>} before calling {@link #matches(Map)}). No
- * typed {@code BlockData} resolution is performed at construction time — the compiler
- * intentionally has zero Bukkit dependency so it can live in {@code rtp-api}.</p>
- *
- * <p>The original token (e.g. {@code "OAK_SLAB[waterlogged=true]"}) is retained in
- * {@link #sourceToken()} for diagnostic WARN logging of failed predicate evaluation —
- * never silent per REQ-RTP-S-004.</p>
- *
- * <p>Instances are deeply immutable and therefore thread-safe.</p>
+ * Immutable AND-of-equalities predicate over a block's {@code BlockData} properties —
+ * the bracketed part of a safety-list token, e.g. {@code [waterlogged=true]} in
+ * {@code OAK_SLAB[waterlogged=true]} (ADR-017 §1). Keys and values are stored lowercase
+ * (Turkish-i safe) and compared as strings against the parsed form of
+ * {@code BlockData#getAsString()}; no typed Bukkit resolution — {@code rtp-api} stays
+ * platform-free. {@link #sourceToken()} retains the original token for REQ-RTP-S-004
+ * diagnostic logging. Deeply immutable, thread-safe.
  */
 public final class StatePredicate {
 

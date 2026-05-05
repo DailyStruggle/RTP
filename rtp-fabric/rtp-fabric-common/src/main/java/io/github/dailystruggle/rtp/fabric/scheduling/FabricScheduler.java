@@ -12,40 +12,44 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
-import net.minecraft.Util;
 import net.minecraft.server.MinecraftServer;
 
 /**
- * Fabric implementation of {@link RTPScheduler}.
- *
- * <p>Threading model (Phase 2 Step C of MULTI_PLATFORM_PLAN.md):
- * <ul>
- *   <li><b>Async</b> — dispatched via {@link Util#backgroundExecutor()}, the canonical
- *       Mojang-provided shared executor for off-thread work on MC 1.21.1. Mirrors
- *       {@code rtp-paper-common}'s async chunk pool semantics.</li>
- *   <li><b>Sync</b> — dispatched via {@link MinecraftServer#execute(Runnable)} which queues
- *       the task onto the next tick on the server thread. If already on the server thread,
- *       runs inline (0-tick delay), matching {@code BukkitSchedulerImpl}.</li>
- *   <li><b>Delayed / repeating</b> — backed by a {@link ConcurrentHashMap} of tick-counted
- *       entries; {@link #tick(MinecraftServer)} is invoked from {@code ServerTickEvents
- *       .END_SERVER_TICK} (registered by {@code RTPFabricMod} in Step E) and drains due
- *       entries onto the server thread.</li>
- *   <li><b>Region-aware overloads</b> — Fabric has no Folia-style region threading; these
- *       delegate to the non-region overloads. Same convention as {@code BukkitSchedulerImpl}
- *       on Spigot/Paper.</li>
- * </ul>
- *
- * <p>Lifecycle: the {@link MinecraftServer} reference is set via {@link #setServer} from
- * {@code ServerLifecycleEvents.SERVER_STARTED} (Step E). Until then, sync paths fall back to
- * inline execution if already on the server thread, or {@link IllegalStateException} otherwise
- * (REQ-RTP-S-006 fail-loud).
- *
- * <p>Cancellation: {@link #cancelTask(Object)} accepts the {@link Integer} task id returned by
- * the timer methods. Unknown task types are tolerated as no-ops to match {@code
- * BukkitSchedulerImpl}'s lenient contract.
+ * Fabric {@link RTPScheduler} (MULTI_PLATFORM_PLAN Phase 2 Step C).
+ * Async: a private cached thread-pool executor (see {@link #ASYNC_EXECUTOR}).
+ * We deliberately do NOT use {@code net.minecraft.Util#backgroundExecutor()} —
+ * its intermediary mapping ({@code class_156.method_18349}) drifts across MC
+ * patch versions and triggers {@link NoSuchMethodError} at runtime, mirroring
+ * the {@code SharedConstants} drift documented in {@code RTPFabricMod}. A
+ * private executor is loader-API independent and version-stable.
+ * Sync: {@link MinecraftServer#execute}
+ * (inline if already on server thread). Delayed/repeating: tick-counted entries
+ * drained by {@link #tick(MinecraftServer)} from {@code END_SERVER_TICK}.
+ * Region-aware overloads delegate (no Folia regions on Fabric). Server ref is
+ * set in {@link #setServer} from {@code SERVER_STARTED}; until then sync paths
+ * fail loud per REQ-RTP-S-006. {@link #cancelTask} expects the Integer task id;
+ * unknown types are tolerated as no-ops.
  */
 public class FabricScheduler implements RTPScheduler {
+
+  /**
+   * Private cached thread pool used for all async work. Replaces
+   * {@code net.minecraft.Util.backgroundExecutor()} which goes through
+   * intermediary-named MC bytecode whose method id drifts between MC
+   * releases. Daemon threads so a stuck task can't keep the JVM alive.
+   */
+  private static final Executor ASYNC_EXECUTOR = Executors.newCachedThreadPool(new ThreadFactory() {
+    private final AtomicInteger n = new AtomicInteger(1);
+    @Override public Thread newThread(Runnable r) {
+      Thread t = new Thread(r, "RTP-Fabric-Async-" + n.getAndIncrement());
+      t.setDaemon(true);
+      return t;
+    }
+  });
 
   private volatile MinecraftServer server;
 
@@ -103,14 +107,14 @@ public class FabricScheduler implements RTPScheduler {
     if (RTPAPI.serverAccessor != null) {
       RTPAPI.serverAccessor.registerAction(tracked);
     }
-    Util.backgroundExecutor().execute(tracked);
+    ASYNC_EXECUTOR.execute(tracked);
     return tracked;
   }
 
   @Override
   public Object runTaskTimerAsynchronously(Runnable task, long delay, long period) {
     // Async repeating: schedule on the tick queue but dispatch each fire to the worker pool.
-    return scheduleTimer(() -> Util.backgroundExecutor().execute(task), delay, period);
+    return scheduleTimer(() -> ASYNC_EXECUTOR.execute(task), delay, period);
   }
 
   // ----------------------------------------------------------------- sync ---

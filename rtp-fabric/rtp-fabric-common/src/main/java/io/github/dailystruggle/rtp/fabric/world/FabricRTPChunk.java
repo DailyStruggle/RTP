@@ -21,33 +21,13 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Fabric-side {@link RTPChunk} implementation. Live-chunk only — no Anvil-backed
- * variant on Fabric (per ADR-016 §13.2 the on-disk Anvil pre-filter is Bukkit-family
- * only). Wraps a {@link ChunkAccess} (typically a {@code LevelChunk} produced by
- * {@code ServerChunkCache#getChunk(...)} at {@code ChunkStatus.FULL}).
- *
- * <p><b>Architectural invariants (ADR-022 §4):</b></p>
- * <ul>
- *   <li>No {@code org.bukkit.*} imports.</li>
- *   <li>All block-data queries go through Mojang mappings on the resident
- *       {@link ChunkAccess} — they do not trigger chunk loads (S-005). Queries
- *       on a chunk that has since been unloaded are answered from whatever
- *       state the chunk object still carries; the stale-chunk guard
- *       (ADR-015 / {@code FabricRTPWorld#isChunkLoaded}) is the caller's
- *       responsibility.</li>
- *   <li>Material identifiers are upper-cased {@code namespace:path} strings
- *       (e.g. {@code MINECRAFT:STONE}) to match the canonical form
- *       {@code SafetyKeys.unsafeBlocks} is reconciled into by
- *       {@code rtp-core} before being passed to {@link #isSafe}.</li>
- * </ul>
- *
- * <p><b>State predicates / tags.</b> The {@link CompiledUnsafeSet} overload of
- * {@link #isSafe} currently delegates to the plain-material bucket only; full
- * state-predicate parity with the Bukkit live path requires extracting
- * {@code BlockState} property → string maps for Mojang property keys, which
- * is straightforward but deferred to a follow-up to keep this slice focused
- * on the cached-safety unblock. The teleport pipeline still re-checks the
- * landing block at commit time, so no unsafe placement can leak through.</p>
+ * Fabric {@link RTPChunk}. Live-chunk only (Anvil pre-filter is Bukkit-family,
+ * ADR-016 §13.2). Wraps a {@link ChunkAccess} at {@code ChunkStatus.FULL}.
+ * ADR-022 §4: no {@code org.bukkit.*}; queries do not trigger loads (S-005);
+ * stale-chunk guard is caller-side (ADR-015). Material IDs are upper-cased
+ * {@code NAMESPACE:PATH}. The {@link CompiledUnsafeSet} overload of
+ * {@link #isSafe} delegates to the plain-material bucket only — state-predicate
+ * parity with Bukkit is deferred; commit-time recheck still guards landing.
  */
 public final class FabricRTPChunk extends RTPChunk<ChunkAccess> {
 

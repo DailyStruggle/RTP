@@ -99,23 +99,11 @@ public class RTPAPI {
   }
 
   /**
-   * Registers a custom {@code Shape} implementation with the core registry.
+   * Register a custom {@code Shape} (REQ-API-F-001). Call from the addon's {@code onEnable}
+   * on the main thread, after {@code rtp-core} has loaded; afterwards the shape is
+   * selectable by its registered name in region config.
    *
-   * <p><b>Preconditions:</b>
-   * <ul>
-   *   <li>{@code shape} must not be {@code null} and must implement the
-   *       platform shape contract expected by {@code rtp-core}.</li>
-   *   <li>{@code rtp-core} must have completed its {@code onEnable}.</li>
-   * </ul>
-   *
-   * <p><b>Postconditions:</b> The shape is available for use in region
-   * configuration by its registered name.
-   *
-   * <p><b>Thread safety:</b> Must be called from the main server thread during
-   * the addon's {@code onEnable} (REQ-API-F-001).
-   *
-   * @param shape the shape implementation to register; must not be {@code null}
-   * @throws IllegalStateException if called before core delegates are registered
+   * @throws IllegalStateException if {@code rtp-core} has not registered its delegate yet
    */
   public static void addShape(Object shape) {
     if (shapeAdder != null) {
@@ -126,24 +114,10 @@ public class RTPAPI {
   }
 
   /**
-   * Registers a custom vertical adjustor implementation with the core registry.
+   * Register a custom vertical adjustor (REQ-API-F-002). Call from the addon's
+   * {@code onEnable} on the main thread, after {@code rtp-core} has loaded.
    *
-   * <p><b>Preconditions:</b>
-   * <ul>
-   *   <li>{@code verticalAdjustor} must not be {@code null}.</li>
-   *   <li>{@code rtp-core} must have completed its {@code onEnable}.</li>
-   * </ul>
-   *
-   * <p><b>Postconditions:</b>
-   * <ul>
-   *   <li>The adjustor is available for use in region configuration by its registered name.</li>
-   * </ul>
-   *
-   * <p><b>Throws:</b> {@link IllegalStateException} if called before core delegates are
-   * registered.
-   *
-   * <p><b>Thread safety:</b> Must be called from the main server thread during
-   * the addon's {@code onEnable}.
+   * @throws IllegalStateException if {@code rtp-core} has not registered its delegate yet
    */
   public static void addVerticalAdjustor(Object verticalAdjustor) {
     if (vertAdder != null) {
@@ -154,23 +128,9 @@ public class RTPAPI {
   }
 
   /**
-   * Returns the set of biome names available in the given world.
-   *
-   * <p><b>Preconditions:</b>
-   * <ul>
-   *   <li>{@code world} must not be {@code null}.</li>
-   * </ul>
-   *
-   * <p><b>Postconditions:</b>
-   * <ul>
-   *   <li>Returns a non-null {@link Set} of biome name strings if the core biome
-   *       provider has been registered.</li>
-   *   <li>Returns {@code null} if called before {@code rtp-core} has registered
-   *       the biome provider — callers must null-check the return value.</li>
-   * </ul>
-   *
-   * <p><b>Thread safety:</b> Safe to call from any thread once {@code rtp-core}
-   * has completed {@code onEnable}.
+   * Biome names available in {@code world}. Returns {@code null} if the core biome
+   * provider has not been registered yet (callers MUST null-check). Thread-safe once
+   * {@code rtp-core} is loaded.
    */
   public static Set<String> getBiomes(RTPWorld world) {
     if (biomeProvider != null) {

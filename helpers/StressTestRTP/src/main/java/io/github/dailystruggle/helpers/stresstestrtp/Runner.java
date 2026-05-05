@@ -836,12 +836,16 @@ public final class Runner {
                 break;
             case "auto":
             default:
-                // Auto: save on Spigot only. Heuristic: Bukkit#getName() is
-                // "CraftBukkit" on Spigot, "Paper" on Paper, "Folia" on Folia.
-                // Treat anything that is NOT Paper/Folia as Spigot for safety.
-                String serverName = Bukkit.getName();
-                String s = serverName == null ? "" : serverName.toLowerCase(Locale.ROOT);
-                save = !(s.contains("paper") || s.contains("folia"));
+                // Auto: save on Spigot only. We deliberately do NOT use
+                // Bukkit#getName() here: forks (Purpur, Pufferfish, Leaves,
+                // Luminol, etc.) override the brand string and would be
+                // mis-detected as Spigot, triggering an unnecessary forced
+                // save on a Paper-family or Folia-family server. Instead,
+                // probe for marker classes that only ship with the relevant
+                // upstream — every Paper fork carries Paper's API, and every
+                // Folia fork carries Folia's region scheduler. Mirrors
+                // AbstractServerAccessor#isPaper / #isFolia in rtp-spigot.
+                save = !(isPaperFamily() || isFoliaFamily());
                 break;
         }
         if (!save) return;
@@ -886,4 +890,33 @@ public final class Runner {
     public Mode mode() { return mode; }
     public long endEpochMs() { return endEpochMs; }
     public int concurrencyCap() { return concurrencyCap; }
+
+    /**
+     * True on any Paper-family server (Paper, Purpur, Pufferfish, Leaves,
+     * Luminol, Folia, …). Tested by probing for a Paper-only API class so
+     * the result is independent of {@link Bukkit#getName()}, which forks
+     * routinely override.
+     */
+    private static boolean isPaperFamily() {
+        try {
+            Class.forName("com.destroystokyo.paper.PaperConfig");
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
+    }
+
+    /**
+     * True on any Folia-family server (Folia and downstream forks such as
+     * Luminol). Tested by probing for the regionised-server class that only
+     * Folia-derived builds ship.
+     */
+    private static boolean isFoliaFamily() {
+        try {
+            Class.forName("io.papermc.paper.threadedregions.RegionizedServer");
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
+    }
 }

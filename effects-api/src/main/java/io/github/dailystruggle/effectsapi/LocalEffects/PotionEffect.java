@@ -6,6 +6,7 @@ import io.github.dailystruggle.effectsapi.LocalEffects.enums.FireworkTypeNames;
 import io.github.dailystruggle.effectsapi.LocalEffects.enums.NoteTypeNames;
 import io.github.dailystruggle.effectsapi.LocalEffects.enums.ParticleTypeNames;
 import io.github.dailystruggle.effectsapi.LocalEffects.enums.PotionTypeNames;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
@@ -57,7 +58,7 @@ public class PotionEffect extends Effect<PotionTypeNames> {
                 ? new org.bukkit.potion.PotionEffect(potionEffectType, duration, amp, amb, part, icon)
                 : new org.bukkit.potion.PotionEffect(potionEffectType, duration, amp, amb, part);
         if (target instanceof Player) {
-            ((Player) target).addPotionEffect(potionEffect);
+            applyOnEntityThread((Player) target, potionEffect);
         } else {
             if (target instanceof Entity) target = ((Entity) target).getLocation();
             Location location = (Location) target;
@@ -65,8 +66,65 @@ public class PotionEffect extends Effect<PotionTypeNames> {
                     .parallelStream().filter(player -> (player.getLocation().distance(location) < 48))
                     .collect(Collectors.toList());
             for (Player player : players) {
-                player.addPotionEffect(potionEffect);
+                applyOnEntityThread(player, potionEffect);
             }
+        }
+    }
+
+    /**
+     * Apply a {@link org.bukkit.potion.PotionEffect} to a player on the correct
+     * thread. On Folia entity-mutating Bukkit calls (including
+     * {@code addPotionEffect}) must be run on the player's
+     * {@code EntityScheduler}; on Spigot/Paper they must be run on the main
+     * thread. Dispatch goes through {@link #entityDispatcher} (reflective on
+     * production, swappable in tests) so {@code effects-api} keeps zero
+     * compile-time dependency on the Folia API.
+     */
+    /**
+     * Test seam: callable that dispatches a task on the entity's correct
+     * thread. Returns {@code true} when the task was dispatched (or executed)
+     * by an entity-aware scheduler; {@code false} when no such scheduler is
+     * available so the caller can fall back to the main-thread path. Tests
+     * override this to assert that Folia's {@code Player#getScheduler().run}
+     * is the path taken.
+     */
+    @FunctionalInterface
+    interface EntityDispatcher {
+        boolean dispatch(Player player, org.bukkit.plugin.Plugin caller, Runnable task);
+    }
+
+    /** Default dispatcher: reflective Folia/Paper {@code Player#getScheduler}. */
+    static volatile EntityDispatcher entityDispatcher = (player, caller, task) -> {
+        try {
+            Object entityScheduler = Player.class.getMethod("getScheduler").invoke(player);
+            if (entityScheduler != null) {
+                entityScheduler.getClass()
+                        .getMethod("run", org.bukkit.plugin.Plugin.class,
+                                java.util.function.Consumer.class, Runnable.class)
+                        .invoke(entityScheduler, caller,
+                                (java.util.function.Consumer<Object>) t -> task.run(),
+                                (Runnable) null);
+                return true;
+            }
+        } catch (NoSuchMethodException notFolia) {
+            // Spigot/Paper without EntityScheduler — fall back.
+        } catch (Throwable ignored) {
+            // Reflection failure — fall back.
+        }
+        return false;
+    };
+
+    static void applyOnEntityThread(Player player, org.bukkit.potion.PotionEffect potionEffect) {
+        org.bukkit.plugin.Plugin caller = EffectsAPI.getInstance();
+        Runnable apply = () -> player.addPotionEffect(potionEffect);
+        if (entityDispatcher.dispatch(player, caller, apply)) return;
+        if (Bukkit.isPrimaryThread()) {
+            apply.run();
+        } else if (caller != null) {
+            Bukkit.getScheduler().runTask(caller, apply);
+        } else {
+            // No plugin handle: best-effort direct call (legacy behavior).
+            apply.run();
         }
     }
 

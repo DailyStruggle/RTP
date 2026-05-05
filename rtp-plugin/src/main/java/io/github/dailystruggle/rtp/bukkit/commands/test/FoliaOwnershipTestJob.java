@@ -18,46 +18,16 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code rtp test folia-ownership} &mdash; runtime test job that proves
- * teleports are safely handed off to the Folia Entity Scheduler without
- * stalling a Region Thread.
- *
- * <p>This job dispatches a mock teleport task for a synthetic (or caller)
- * player through the {@link RTPScheduler} region tier, and immediately
- * before the final location modification it injects an assertion using
- * {@code Bukkit.isOwnedByCurrentRegion(Location)} to verify that the
- * callback is actually executing under the correct Entity Scheduler lock.
- *
- * <h2>Safety compliance</h2>
- * <ul>
- *   <li><b>REQ-RTP-S-005</b> &mdash; no chunk I/O; the pipeline is
- *       driven entirely by {@link CompletableFuture} chains. The assertion
- *       step confirms that the region hand-off actually occurred on the
- *       owning Entity Scheduler thread rather than silently running on
- *       the main server thread.</li>
- *   <li><b>REQ-RTP-S-004</b> &mdash; every outcome (pass, fail,
- *       unsupported, timeout) produces a player-visible line and a
- *       matching log entry at {@link Level#INFO} / {@link Level#WARNING}.</li>
- * </ul>
- *
- * <h2>Implementation notes</h2>
- * <p>{@code Bukkit.isOwnedByCurrentRegion(Location)} only exists on Folia
- * and Paper 1.20+; it throws {@code UnsupportedOperationException} on
- * Spigot. We therefore invoke it reflectively and treat a missing method
- * as a neutral "unsupported" outcome rather than a hard failure.
- *
- * <p>On Folia, calling region-sensitive APIs from a non-owning thread
- * raises {@code io.papermc.paper.threadedregions.ThreadAccessException}
- * (or {@code IllegalStateException} on some builds). The invocation is
- * wrapped in a {@link Throwable} catch so such exceptions are formatted
- * into the test output instead of propagating up the server-accessor
- * loop and crashing it.
- *
- * <p>The entire pipeline uses {@link CompletableFuture} chaining
- * ({@code thenCompose} / {@code whenComplete}); no {@code .get()} or
- * {@code .join()} is called on any scheduler thread. The terminal
- * {@code awaitReport} step uses {@code get(timeout)} only from the
- * dedicated async probe thread so no tick thread can stall.
+ * {@code rtp test folia-ownership} &mdash; dispatches a mock teleport via
+ * {@link RTPScheduler}'s region tier and asserts that immediately before the
+ * final location modification {@code Bukkit.isOwnedByCurrentRegion(Location)}
+ * returns true (i.e. the callback runs under the Entity Scheduler lock, not
+ * on the main thread). The Bukkit API is invoked reflectively because it
+ * only exists on Folia and Paper 1.20+; missing → "unsupported" outcome,
+ * not a hard failure. Wraps {@link Throwable} so a {@code ThreadAccessException}
+ * from a wrong-region call is reported, not propagated. Pure
+ * {@link CompletableFuture} chaining; only the dedicated probe thread blocks
+ * (with timeout). Traces REQ-RTP-S-004 / S-005.
  */
 public class FoliaOwnershipTestJob extends BaseRTPCmdImpl {
 

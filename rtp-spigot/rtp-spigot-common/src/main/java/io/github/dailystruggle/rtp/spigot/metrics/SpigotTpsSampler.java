@@ -7,36 +7,11 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 
 /**
- * Local TPS / MSPT sampler for raw Spigot 1.20.1 — the lowest-supported MC
- * version that does <strong>not</strong> expose {@code Server#getTPS()}
- * (Paper-only addition). This {@link MetricsBinding} measures inter-tick
- * deltas itself and reports rolling {@code tps1m / tps5m / tps15m} and
- * {@code mspt}.
- *
- * <p>Algorithm (per {@code METRICS_PLAN.md > Spigot TPS Fallback}):
- * <ul>
- *   <li>{@link #tick()} is invoked once per server tick from a 1-tick
- *       repeating task scheduled on {@code RTP.scheduler}. Each call
- *       records a {@link System#nanoTime()} sample.</li>
- *   <li>The inter-fire delta (in nanoseconds) feeds three exponential
- *       moving averages with windows of 1m / 5m / 15m worth of ticks
- *       (1200 / 6000 / 18000 ticks at the nominal 20 TPS).</li>
- *   <li>TPS is reported as {@code 1e9 / movingAverageNanos}, clamped to
- *       {@code [0.0, 20.0]}. MSPT is reported as the 1m EMA delta in
- *       milliseconds.</li>
- *   <li>Until the very first inter-tick delta is observed (i.e. before
- *       the second {@link #tick()} call), all four getters return
- *       {@link MetricsSnapshot#UNSAMPLED}.</li>
- * </ul>
- *
- * <p>The sampler is lock-free for the read path: getters perform plain
- * volatile reads of three {@code double} EMA fields. {@link #tick()} is
- * intended to be called on a single thread (the platform's main / global
- * scheduler) and updates the EMAs sequentially.
- *
- * <p>The class is testable without Bukkit: the package-private
- * {@link #SpigotTpsSampler(LongSupplier)} constructor accepts an
- * injectable {@link System#nanoTime()} clock.
+ * Local TPS/MSPT sampler for raw Spigot 1.20.1 (no {@code Server#getTPS()}).
+ * Per METRICS_PLAN > Spigot TPS Fallback: {@link #tick()} feeds inter-tick
+ * deltas into 1m/5m/15m EMAs (1200/6000/18000 ticks @ 20 TPS); TPS = 1e9/ema
+ * clamped to [0,20], MSPT = 1m EMA in ms. Returns {@link MetricsSnapshot#UNSAMPLED}
+ * before the second tick. Lock-free reads; {@link #tick()} is single-threaded.
  */
 public final class SpigotTpsSampler implements MetricsBinding {
 

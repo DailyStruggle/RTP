@@ -7,41 +7,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Process-global telemetry counters for ADR-016 §13.1 biome-source attribution.
- *
- * <p>Each biome read through a platform adapter's {@code getBiome(x,y,z)} increments
- * exactly one bucket. A legacy binary API exposes the two high-level totals
- * ({@link #anvilHits}, {@link #liveHits}); the reason-keyed breakdown in
- * {@link #reasonCounters()} adds a finer-grained view so operators can tell
- * <em>why</em> a live-tier read happened (no probe ever ran for this key,
- * probe returned UNKNOWN, view had no biome entry for this Y, etc.) without
- * relying on log-level-gated diagnostic lines.
- *
- * <p>Recognized reasons (see {@link Reasons}):
- * <ul>
- *   <li>{@link Reasons#ANVIL_HIT} &mdash; Anvil view answered the read.</li>
- *   <li>{@link Reasons#NO_VIEW_CACHED} &mdash; no Anvil view was in the cache
- *       for this chunk key at read time (probe not run, gate-skipped, UNKNOWN,
- *       or evicted).</li>
- *   <li>{@link Reasons#VIEW_MISSING_BIOME} &mdash; view was present but
- *       {@code getBiomeAt(x,y,z)} returned {@code null} (pre-1.18 chunk,
- *       malformed section, outside the decoded Y window).</li>
- *   <li>{@link Reasons#ANVIL_THROW} &mdash; the Anvil-tier read threw; the
- *       adapter swallowed the throwable and fell through to the live getter.</li>
- * </ul>
- *
- * <p>Every reason except {@link Reasons#ANVIL_HIT} implies a live-tier read.
- * The high-level {@link #anvilHits} / {@link #liveHits} atomics are updated in
- * lock-step with the reason map so existing callers (tests, external plugins)
- * keep working unchanged.
- *
- * <p>Surfaced at runtime via {@code rtp test biome-source} (and the umbrella
- * {@code rtp test full}).
- *
- * <p>Safety compliance:
- * <ul>
- *   <li><b>S-005:</b> atomics + ConcurrentHashMap only &mdash; no chunk I/O.</li>
- * </ul>
+ * Process-global telemetry for ADR-016 §13.1 biome-source attribution.
+ * Each {@code getBiome(x,y,z)} increments exactly one reason bucket; the
+ * legacy {@link #anvilHits} / {@link #liveHits} totals are updated in lock-step
+ * so the two views cannot drift. See {@link Reasons} for the canonical keys.
+ * Surfaced via {@code rtp test biome-source}. Atomics + ConcurrentHashMap
+ * only — no chunk I/O (S-005).
  */
 public final class BiomeSourceMetrics {
 

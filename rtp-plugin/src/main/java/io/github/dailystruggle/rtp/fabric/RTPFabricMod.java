@@ -12,7 +12,7 @@ import io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter;
 import io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-import net.minecraft.SharedConstants;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -170,12 +170,25 @@ public final class RTPFabricMod implements ModInitializer {
      * Failing here at bootstrap is louder and easier to diagnose.</p>
      */
     private static void installVersionAdapter() {
+        // Resolve MC version via FabricLoader rather than SharedConstants.
+        // SharedConstants.getCurrentVersion().getName() goes through Minecraft
+        // bytecode whose intermediary mapping (e.g. class_6489.method_48019)
+        // shifts between MC releases, causing NoSuchMethodError on adjacent
+        // patch versions. FabricLoader's mod-container metadata is stable
+        // across MC versions and is the recommended source per the Fabric
+        // wiki ("Mappings" — intermediary names for MC internals are not
+        // guaranteed stable; loader API is).
         String mcVersion;
         try {
-            mcVersion = SharedConstants.getCurrentVersion().getName();
+            mcVersion = FabricLoader.getInstance()
+                    .getModContainer("minecraft")
+                    .map(c -> c.getMetadata().getVersion().getFriendlyString())
+                    .orElseThrow(() -> new IllegalStateException(
+                            "FabricLoader reports no 'minecraft' mod container — "
+                                    + "cannot select Fabric version adapter (ADR-027)."));
         } catch (Throwable t) {
             throw new IllegalStateException(
-                    "Unable to determine running Minecraft version via SharedConstants — "
+                    "Unable to determine running Minecraft version via FabricLoader — "
                             + "cannot select Fabric version adapter (ADR-027).", t);
         }
 

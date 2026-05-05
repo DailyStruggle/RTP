@@ -13,34 +13,11 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Regression guard for the {@link FactoryValue} concurrent-config-read race
- * that surfaced as a {@link java.util.ConcurrentModificationException} during
- * pregen with the probe-first pipeline (BIOME_LOOKUP_PERF_PLAN.md PR-9+).
- *
- * <p>Pre-fix, {@link FactoryValue#getNumber} unconditionally wrote the parsed
- * value back to the underlying {@link EnumMap} on every call. Multiple pregen
- * workers reading {@code vert.minY()} / {@code vert.maxY()} in parallel raced
- * the resulting {@code data.put} against fail-fast iterators in
- * {@code toString} / {@code toYAML} / {@code setData(EnumMap)}, producing CME
- * in production logs (see commit message and the gauge-line transcript on
- * 2026-04-26).</p>
- *
- * <p>Post-fix invariants asserted here:
- * <ul>
- *   <li>{@code getNumber} on a {@link Number}-typed value never writes back
- *       (hot path), so concurrent readers do not contend at all.</li>
- *   <li>{@code getNumber} on a {@link String}-typed value writes back once,
- *       under {@code synchronized (data)}, so even racing first-parse calls
- *       cannot trip a concurrent {@code toString} / {@code getData} iterator.</li>
- *   <li>{@code setData(EnumMap)} is coherent with concurrent reads: snapshot
- *       semantics are preserved by {@code getData()}'s synchronized clone.</li>
- * </ul>
- *
- * <p>The test does not reference a specific REQ-RTP-* — the race is a
- * cross-cutting concern affecting any safety-critical thread reading config
- * values (relates to S-005 in spirit: a CME on the probe synchronous prefix
- * silently degraded one chunk to UNKNOWN, masking a real thread-safety bug
- * behind the existing UNKNOWN→full-load fallback).</p>
+ * Regression for {@link FactoryValue#getNumber} CME race (BIOME_LOOKUP_PERF_PLAN
+ * PR-9+, 2026-04-26): pre-fix unconditional cache-back races fail-fast iterators
+ * on {@code toString}/{@code toYAML}/{@code setData}. Asserts post-fix:
+ * Number-typed reads never write back; String-typed reads cache once under
+ * {@code synchronized(data)}; {@code getData()} returns a snapshot.
  */
 class FactoryValueGetNumberConcurrencyTest {
 

@@ -12,61 +12,14 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * {@code rtp test chunk-ticket} &mdash; positive-path probe of the
- * {@link MemoryTracker} lifecycle, which is the registry that backs every
- * chunk ticket RTP acquires (REQ-RTP-S-002).
- *
- * <p>Context: the existing unit-test suite exercises the <i>watchdog</i>
- * path &mdash; i.e. {@link MemoryTracker#runDiagnostics()} correctly
- * force-closing a <b>leaked</b> {@code TeleportPipelineTask}. That leaves
- * the <i>happy</i> path unverified at runtime: when code explicitly
- * releases a tracked object (the common case), does the registry actually
- * drop it, and does {@code runDiagnostics()} leave the correctly-released
- * set alone? A silent regression here would let tickets pile up for a
- * full reservation window before the watchdog noticed &mdash; exactly the
- * class of leak REQ-RTP-S-002 forbids.
- *
- * <p>This probe exercises every release path {@link MemoryTracker}
- * currently exposes, using sentinel objects so no real chunk ticket or
- * teleport pipeline is involved:
- *
- * <ol>
- *   <li><b>Explicit {@code untrack(UUID)}</b> &mdash; mirrors the normal
- *       {@code TeleportPipelineTask.runCleanup()} release path.</li>
- *   <li><b>Explicit {@code untrack(Object)}</b> &mdash; mirrors the
- *       {@code RTPRunnable.untrackHook} invocation used by
- *       {@link io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask}.</li>
- *   <li><b>Drop-and-diagnose</b> &mdash; registers a short-lifespan sentinel,
- *       drops the strong reference, runs diagnostics, and asserts the
- *       entry is gone. Verifies the watchdog's steady-state behaviour
- *       against correctly-released objects (should be a no-op warning-wise).</li>
- * </ol>
- *
- * <p>Each sentinel is tagged with a unique label
- * ({@link #SENTINEL_LABEL}) so the probe's assertions are isolated from
- * any concurrent live teleport activity on the server &mdash; the probe
- * only asserts against its own label's count, never the global count.
- *
- * <p>Safety compliance:
- *
- * <ul>
- *   <li><b>S-002</b>: sentinels use primitive {@code Object}s, not real
- *       chunk tickets, so a bug in this probe cannot itself leak a ticket.</li>
- *   <li><b>S-004</b>: any non-zero residual count after the full sequence
- *       is logged at {@link Level#WARNING} and surfaced to the caller.</li>
- *   <li><b>S-005</b>: no chunk I/O; every step is an in-memory registry
- *       operation. Runs on the caller's thread.</li>
- * </ul>
- *
- * <p>Traces REQ-RTP-S-002. See {@code docs/dev/RUNTIME_TEST_SUITE_PLAN.md &sect;3.8}.
+ * {@link MemoryTracker} release paths (REQ-RTP-S-002): {@code untrack(UUID)},
+ * {@code untrack(Object)}, and drop-and-diagnose. Uses sentinel {@code Object}s
+ * (no real ticket) tagged with {@link #SENTINEL_LABEL} so it never collides
+ * with live teleport activity. See {@code RUNTIME_TEST_SUITE_PLAN.md &sect;3.8}.
  */
 public class TestChunkTicketCmd extends BaseRTPCmdImpl {
 
-  /**
-   * Label applied to every sentinel this probe registers. Chosen to be
-   * unmistakable in log scraping and distinct from any production label
-   * (production labels are typically {@code TeleportPipelineTask:<uuid>} or
-   * {@code TrackedRTPTask[...]}).
-   */
+  /** Sentinel label, distinct from any production tracker label. */
   static final String SENTINEL_LABEL = "rtp-test-chunk-ticket-sentinel";
 
   /** Sentinel lifespan for the drop-and-diagnose case. */
@@ -101,11 +54,7 @@ public class TestChunkTicketCmd extends BaseRTPCmdImpl {
     return true;
   }
 
-  /**
-   * Core probe, extracted for unit-testing without a CommandsAPI dispatch.
-   * Returns a structured {@link Result} rather than emitting directly so
-   * tests can assert on counts without capturing log output.
-   */
+  /** Core probe, extracted for unit-testing without a CommandsAPI dispatch. */
   static Result runProbe() {
     Result r = new Result();
 

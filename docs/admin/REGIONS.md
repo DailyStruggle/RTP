@@ -79,6 +79,13 @@ A thorough scan of every Y level in a specific order.
   - `3`: **IN_OUT** — Start at the middle and scan toward both ends.
   - `4`: **SHUFFLE** — Scan all levels in a randomized order. Best for "anywhere in this range" logic.
 
+#### `FIXED`
+Places the player at a single configured Y level in **mid-air**, with no terrain scan. Designed for skyblock-style worlds where the platform tool builds a foothold around the player after teleport.
+- `y`: The exact Y-level for placement. Default `64`.
+- The destination cell `(x, y, z)` and the head cell `(x, y+1, z)` must both be air; any non-air block at either cell is treated as unsafe and the chunk is rejected so a different one is rolled.
+- Ignores `minY`, `maxY`, `direction`, `requireSkyLight`, and the `unsafeBlocks` ground sweep — none of those apply to mid-air placement.
+- **Enable a platform builder** when using `FIXED`. Without one the player will fall straight through air.
+
 ---
 
 ## Tips for Customization
@@ -86,3 +93,4 @@ A thorough scan of every Y level in a specific order.
 1. **Nether Support**: Use `vert: JUMP` with `maxY: 120` and `requireSkyLight: false` to land on the nether floor rather than the roof.
 2. **Cave Teleports**: Use `vert: LINEAR` with `direction: 1` (UP) and a low `maxY` to favor underground locations.
 3. **Massive Radii**: If your radius is > 50,000 blocks, use `mode: NONE` to avoid long pre-calculation times on startup.
+4. **Skyblock / Mid-Air Drops**: Use `vert: FIXED` with `y: 128` and a platform tool enabled. The platform spawns under the player so they don't fall through the void.

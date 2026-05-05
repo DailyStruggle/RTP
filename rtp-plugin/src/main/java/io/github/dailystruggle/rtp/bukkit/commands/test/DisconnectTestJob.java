@@ -21,58 +21,24 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code rtp test disconnect-job} &mdash; asynchronously proves that a
- * dropped connection <i>mid</i>-teleport (i.e. while an async chunk
- * generation {@link CompletableFuture} chain is still in-flight) flawlessly
- * releases the player lock and the surrounding chunk tickets.
- *
- * <p>This probe complements {@link TestDisconnectMidflightCmd}, which
- * verifies the <i>steady-state</i> cleanup contract of
- * {@code OnPlayerQuit} against in-memory singleton maps. The present probe
- * drives the <i>temporal</i> contract: an in-flight
- * {@link CompletableFuture} chain representing the chunk-generation stage
- * of the pipeline is interrupted by a simulated disconnect, and we assert
- * that the surrounding {@code try-finally} releases the (synthetic)
- * chunk-ticket counter to zero, the reservation is closed exactly once,
- * and the player UUID is wiped from {@code processingPlayers} before the
- * future completes.
- *
- * <p><b>Design choice — no live {@link io.github.dailystruggle.rtp.api.world.ChunkReservation}:</b>
- * On Folia we must not call {@code chunk.keep(true)} because it would
- * require region-thread ownership and would interact with the real
- * platform ticket registry from a runtime diagnostic command (which may
- * be invoked from any thread). Instead, the probe models the
- * {@code ChunkReservation} contract with a lightweight in-probe
- * {@link SyntheticReservation} whose {@code close()} decrements a local
- * {@link AtomicInteger} ticket counter. This preserves the invariant we
- * are actually verifying (every ticket acquired is released on every
- * exit path, including disconnect) while staying strictly compliant with
- * S-002 (never leak a real ticket), S-005 (no chunk I/O on the calling
- * thread), and the Folia rule of never calling {@code keep()} from a
- * command dispatch thread.
- *
- * <p><b>Asynchronous contract:</b> the probe runs the pipeline simulation
- * on the common {@link ForkJoinPool}, not on the caller's tick thread.
- * The disconnect is scheduled from a second async stage; the final
- * assertions are observed on a {@link CompletableFuture} which the
- * caller may chain against but never joins from a tick thread. The
- * command handler returns immediately; the result is emitted via
- * {@link #emit(UUID, Result)} when the future resolves.
- *
- * <p>Traces REQ-RTP-S-002 (no persistent force-loaded chunks) and
- * REQ-RTP-S-004 (no silent failure). See
- * {@code docs/dev/RUNTIME_TEST_SUITE_PLAN.md &sect;3.9}.
+ * {@code rtp test disconnect-job} &mdash; the temporal counterpart to
+ * {@link TestDisconnectMidflightCmd}: simulates a disconnect during an
+ * in-flight chunk-generation {@link CompletableFuture} chain and asserts the
+ * surrounding {@code try-finally} releases the synthetic ticket counter to
+ * zero, closes the reservation exactly once, and clears the UUID from
+ * {@code processingPlayers}. Models {@code ChunkReservation} via
+ * {@link SyntheticReservation} (no real ticket, no {@code keep(true)}) to stay
+ * S-002/S-005-clean and Folia-safe. Runs on {@link ForkJoinPool#commonPool()};
+ * the command returns immediately and emits via {@link #emit(UUID, Result)}.
+ * Traces REQ-RTP-S-002 / S-004; see {@code RUNTIME_TEST_SUITE_PLAN.md &sect;3.9}.
  */
 public class DisconnectTestJob extends BaseRTPCmdImpl {
 
   /** Prefix for the synthetic probe UUID label, for log-scraping friendliness. */
   static final String PROBE_TAG = "rtp-test-disconnect-job";
 
-  /**
-   * Maximum time we allow the simulated chunk-generation chain to run
-   * before we consider the probe hung. Bounded so the probe can never
-   * wedge the ActiveTestJobs registry indefinitely.
-   */
+  /** Bound on the simulated chunk-gen chain; guarantees the probe never wedges
+   *  the ActiveTestJobs registry. */
   static final long DEFAULT_TIMEOUT_MS = 2_000L;
 
   public DisconnectTestJob(@Nullable CommandsAPICommand parent) {

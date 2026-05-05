@@ -14,77 +14,38 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Read-only Anvil pre-filter entry point (ADR-016 Phase 3a).
+ * Read-only Anvil pre-filter (ADR-016 Phase 3a). Off-tick parses {@code r.X.Z.mca}
+ * to reject candidates whose on-disk surface stack hits the caller's unsafe set;
+ * all other outcomes ({@link Verdict#ACCEPT} / {@link Verdict#UNKNOWN}) fall through
+ * to the live chunk load, where {@code RTPChunk.isSafe(...)} remains authoritative.
  *
- * <p>Given a world and a region-local chunk coordinate pair, attempts to reject clearly
- * unsafe candidates off the tick thread by parsing the persisted {@code r.X.Z.mca}
- * region file directly. A candidate is rejected ({@link Verdict#REJECT}) only when the
- * on-disk block stack at the heightmap-reported surface contains an identifier from the
- * caller-supplied unsafe set. All other outcomes — unsupported format, missing region
- * file, decode error, or simply a clean column — yield {@link Verdict#ACCEPT} or
- * {@link Verdict#UNKNOWN}, both of which <strong>fall through to the live chunk load</strong>
- * in {@code BukkitRTPWorld.getChunkAt}. The live {@code RTPChunk.isSafe(...)} re-check
- * remains the authoritative source of truth; the pre-filter only short-circuits the
- * common-case rejection.
+ * <p>{@link #probe(World, int, int, Set)} schedules I/O + NBT walk on
+ * {@link ForkJoinPool#commonPool()}; do not block the returned future on a tick thread.
+ * Only thread-safe Bukkit accessors are touched ({@code getWorldFolder},
+ * {@code getEnvironment}, {@code getGenerator}).
  *
- * <h3>Thread placement</h3>
+ * <p>Callers gate the probe behind the four checks from ADR-016 §3 (config flag,
+ * chunk not loaded, no custom generator, structural cache miss). Internally the only
+ * additional gate is {@link DataVersionSupport#isSupported(int)}; out-of-whitelist
+ * versions return {@link Verdict#UNKNOWN}.
  *
- * <p>{@link #probe(World, int, int, Set)} schedules the I/O + NBT walk on
- * {@link ForkJoinPool#commonPool()} and returns a {@link CompletableFuture}. Callers
- * (currently only {@code BukkitRTPWorld.getChunkAt}) must not block the returned future
- * on the primary thread. The probe never touches any Bukkit state beyond
- * {@link World#getWorldFolder()}, {@link World#getEnvironment()}, and
- * {@link World#getGenerator()} — all of which are documented as safe from any thread.
- *
- * <h3>Applicability gating</h3>
- *
- * <p>Callers are expected to gate the probe behind the four checks from
- * {@code ADR-016 §3} (config flag, chunk not loaded, no custom
- * generator, structural cache miss). The probe itself enforces only the
- * {@link DataVersionSupport#isSupported(int)} format-support gate internally — any
- * out-of-whitelist {@code DataVersion} yields {@link Verdict#UNKNOWN}.
- *
- * <h3>Heightmap interpretation</h3>
- *
- * <p>{@code MOTION_BLOCKING_NO_LEAVES} is stored as a packed {@code long[]} with
- * {@code bitsPerEntry = 9} in 1.18+ worlds (range {@code [0, 384]} covering
- * {@code minHeight..minHeight+height}). Values in the array are column heights relative
- * to the world's minimum build height — a value of {@code 0} means "bedrock or no
- * blocks present at all". Blocks above that height are guaranteed non-motion-blocking
- * (air, leaves excluded, etc.); the block <em>at</em> {@code (height - 1) + minHeight}
- * is the first motion-blocking block scanning downward. That is the block the pre-filter
- * samples as the teleport ground. The feet (surface) and head (surface+1) blocks are
- * also sampled and must not be in the unsafe set.
+ * <p>Heightmap: {@code MOTION_BLOCKING_NO_LEAVES} is a packed {@code long[]} at
+ * 9 bits/entry on 1.18+. The array stores column heights relative to {@code minHeight};
+ * the first motion-blocking block (scanning down) is at {@code (height-1)+minHeight}.
+ * The pre-filter samples that ground block plus feet (surface) and head (surface+1).
  */
 public final class AnvilPrefilter {
 
-  /**
-   * Logger used for diagnostic output from the Anvil pre-filter. Local to the
-   * {@code rtp-anvil} module to preserve its zero-dependency contract (no
-   * Bukkit, no rtp-core imports — see {@code AnvilPackageBoundaryArchTest}).
-   * Routed to the JDK root logger, which the Bukkit/Paper/Folia server forwards
-   * to its own log; the platform adapter's log formatter handles the rest.
-   */
+  /** Module-local JDK logger (zero RTP/Bukkit deps; see {@code AnvilPackageBoundaryArchTest}). */
   private static final Logger LOG = Logger.getLogger(AnvilPrefilter.class.getName());
 
-  /**
-   * Number of bits per entry in the 1.18+ {@code MOTION_BLOCKING_NO_LEAVES} packed long
-   * array. Derived from {@code ceil(log2(worldHeight + 1))}; for a 384-block overworld
-   * (min {@code -64}, max {@code 319}) this is {@code 9} bits per entry, yielding
-   * {@code 37} packed longs for 256 columns ({@code ceil(256 / (64/9))}).
-   */
+  /** 1.18+ {@code MOTION_BLOCKING_NO_LEAVES} packed-array bits/entry
+   *  ({@code ceil(log2(worldHeight+1))}; 9 for a 384-block overworld). */
   private static final int MOTION_BLOCKING_NO_LEAVES_BITS = 9;
 
-  /**
-   * Default palette identifier reconciler used when callers do not supply one.
-   *
-   * <p>Strips a {@code namespace:} prefix and uppercases the remainder via
-   * {@link Locale#ROOT}. Equivalent to {@code rtp-api}'s
-   * {@code PaletteIdentifierNormalizer#normalize} for vanilla identifiers, but
-   * inlined here so that {@code rtp-anvil} keeps zero RTP and zero platform
-   * dependencies (per ADR-016). Platform adapters layer a registry-aware
-   * reconciler on top via the {@code UnaryOperator<String>} overloads.
-   */
+  /** Default reconciler: strip {@code namespace:}, uppercase via {@link Locale#ROOT}.
+   *  Inlined (not delegated to {@code PaletteIdentifierNormalizer}) to keep this
+   *  module zero-RTP-dep per ADR-016. */
   public static final UnaryOperator<String> DEFAULT_RECONCILER = raw -> {
     if (raw == null) return null;
     int colon = raw.indexOf(':');
@@ -96,13 +57,7 @@ public final class AnvilPrefilter {
     // Utility class.
   }
 
-  /**
-   * Rate-limit budget for each distinct UNKNOWN/verdict-diagnostic log reason
-   * (per JVM). The probe is called once per candidate chunk, so unbounded
-   * INFO-level logging would drown the console on a cold server. A small cap
-   * is enough to surface "0 Anvil hits" root causes to operators without
-   * sustained spam; once the cap is reached further emissions drop to FINE.
-   */
+  /** Per-JVM, per-reason cap on diagnostic INFO logs (drops to FINE thereafter). */
   private static final int DIAG_LOG_BUDGET_PER_REASON = 5;
 
   private static final ConcurrentHashMap<String, AtomicInteger> DIAG_LOG_COUNTERS =

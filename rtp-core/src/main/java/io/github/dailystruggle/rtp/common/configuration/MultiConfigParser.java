@@ -156,7 +156,7 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
 
   @NotNull
   public ConfigParser<E> getParser(String name) {
-    name = name.toUpperCase();
+    name = ConfigParser.sanitizeName(name).toUpperCase();
     if (!name.endsWith(".YML")) name = name + ".YML";
     if (configParserFactory.contains(name)) return configParserFactory.map.get(name);
     else {
@@ -174,8 +174,9 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
   }
 
   public void addParser(String name) {
-    ConfigParser<E> value = (ConfigParser<E>) configParserFactory.construct(name);
-    if (value != null) configParserFactory.add(name, value);
+    String safe = ConfigParser.sanitizeName(name);
+    ConfigParser<E> value = (ConfigParser<E>) configParserFactory.construct(safe);
+    if (value != null) configParserFactory.add(safe, value);
   }
 
   public void addParser(ConfigParser<?> parser) {

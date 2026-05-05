@@ -7,17 +7,10 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Immutable typed view over the subset of chunk NBT the pre-filter actually consults.
- *
- * <p>Built by {@link AnvilReader#readChunkView(byte[], int, int)} from a parsed
- * chunk root compound. Kept deliberately minimal — block palette + heightmap +
- * (optional) biome palette — because those are the only fields the Phase 3
- * verdict layer reads. Extending the view is additive; removing fields would be
- * a breaking change.
- *
- * <p>Sections are stored in their on-disk order (generally ascending {@link PaletteSection#sectionY()},
- * but the view does not sort). A world Y below or above the emitted section range
- * returns {@code null} from {@link #blockIdAt(int, int, int)}.
+ * Immutable view over the subset of chunk NBT the pre-filter consults: block
+ * palette + heightmap + optional biome palette. Built by
+ * {@link AnvilReader#readChunkView(byte[], int, int)}. Sections are kept in
+ * on-disk order (no sort). Extending fields is additive; removing is breaking.
  */
 public final class AnvilChunkView {
 

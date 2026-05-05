@@ -28,60 +28,24 @@ import org.bukkit.World;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code rtp test chunk-probe-perf} &mdash; A/B micro-benchmark comparing the
- * probe-first fast path ({@link RTPWorld#probeChunkColumn(int, int, int, int)})
- * against the authoritative full-chunk load path, sampled over a random set of
- * <em>pregenerated</em> chunks discovered by scanning the world's {@code region/}
- * folder.
+ * {@code rtp test chunk-probe-perf} &mdash; A/B benchmark of
+ * {@link RTPWorld#probeChunkColumn(int, int, int, int)} vs full chunk load,
+ * sampled across random {@code r.X.Z.mca} files (random sampling avoids
+ * the misleading ~0.95x ratio you get from re-hitting the live chunk cache).
  *
- * <p>Two distinct "full" measurements are reported:
+ * <p>Reports two "full" timings:
  * <ul>
- *   <li><b>{@code full} (wall latency)</b> — wall-clock time observed from a
- *       worker thread for {@code loadLiveChunk(cx, cz).join()}. Routes through
- *       the shared {@code BukkitRTPWorld#loadLiveChunk} /
- *       {@code FoliaRTPWorld#loadLiveChunk} entry point — the same method that
- *       {@code getChunkAt}'s UNKNOWN fall-through uses for a real chunk-load
- *       request — bypassing the ADR-016 anvil prefilter short-circuit. On
- *       vanilla Spigot, where {@code World#getChunkAtAsync} internally hops to
- *       the main thread, this number is dominated by tick-boundary latency,
- *       not by chunk-load CPU. On Paper/Folia (true async chunk gen) it
- *       converges with the CPU number below. Useful for throughput models
- *       that {@code .join()} on a future (e.g. {@code StressTestRTP}'s probe).
- *       </li>
- *   <li><b>{@code full(cpu)} (server-thread CPU)</b> — main-thread (or
- *       region-thread on Folia) inner timing of {@code World#getChunkAt}, with
- *       no future plumbing. This is the metric that should be compared to
- *       {@code anvil avg} and consumed by {@code StressTestRTP} /
- *       {@code MetricsRecorder} for CPU/MSPT attribution. Capped at
- *       {@link #CPU_SAMPLES_CAP} samples so the calibration command does not
- *       stall the server for ~10 s on a 256-sample run.</li>
+ *   <li>{@code full}: worker-thread wall latency of {@code loadLiveChunk().join()}.
+ *       Routes through {@code loadLiveChunk} (NOT {@code getChunkAtAsync}) to bypass
+ *       the ADR-016 anvil prefilter short-circuit, which would otherwise resolve
+ *       from {@code AnvilRegionByteCache} and under-attribute CPU by ~170×.</li>
+ *   <li>{@code full(cpu)}: server/region-thread inner timing of {@code World#getChunkAt},
+ *       capped at {@link #CPU_SAMPLES_CAP} samples to bound main-thread occupancy.
+ *       Omitted on adapters without the helper (Fabric, test doubles).</li>
  * </ul>
  *
- * <p>Calling {@code getChunkAtAsync} directly on a vanilla world with the
- * prefilter enabled would resolve from the warmed {@code AnvilRegionByteCache}
- * and under-attribute live-load CPU cost by ~170×, which previously broke
- * {@code StressTestRTP} / {@code MetricsRecorder} calibration. Adapters that
- * do not expose the helper (Fabric, test doubles) fall back to
- * {@link RTPWorld#getChunkAtAsync(int, int)} transparently for the wall-latency
- * column; the CPU column is omitted on those adapters.
- *
- * <p>Rationale for the pregenerated-chunk sampling strategy: the previous
- * near-spawn spiral produced misleading ratios (~0.95x) because every sampled
- * chunk was already in the server's live chunk cache — {@code getChunkAtAsync}
- * became an in-memory lookup while {@code probeChunkColumn} unconditionally went
- * to disk. Sampling randomly across all existing {@code r.X.Z.mca} files gives
- * an aggregate picture of the probe vs full-load tradeoff on chunks the server
- * may or may not have loaded, which is closer to what {@code PregenTask} sees at
- * steady state.
- *
- * <p>Safety compliance:
- * <ul>
- *   <li><b>S-004:</b> surfaces a single {@code INFO} summary; per-sample
- *       exceptions are counted and still published.</li>
- *   <li><b>S-005:</b> runs entirely on the async scheduler; the region-folder
- *       scan and per-header reads are off-thread file I/O.</li>
- *   <li>Read-only: no teleport, no chunk ticket, no config mutation.</li>
- * </ul>
+ * <p>Read-only; runs on the async scheduler (S-005 compliant) and emits a single
+ * INFO summary (S-004).
  */
 public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
 
@@ -89,15 +53,8 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
   static final int MAX_SAMPLES = 4096;
   static final int DEFAULT_SAMPLES = 256;
 
-  /**
-   * Upper bound on samples used for the {@code full(cpu)} server-thread inner
-   * timing stage. Each sample stalls the primary (or region) thread for one
-   * live {@code getChunkAt} call, so we cap this independently of the main
-   * sample count to keep the calibration command from stalling the server for
-   * the full run on Spigot. 64 × ~150 ms ≈ ~10 s worst-case main-thread
-   * occupancy, which is acceptable for an opt-in {@code /rtp test} command;
-   * Paper/Folia complete the same set in well under a second.
-   */
+  /** Server/region-thread sample cap for the {@code full(cpu)} stage. 64 × ~150 ms
+   *  ≈ ~10 s worst-case on Spigot; near-instant on Paper/Folia. */
   static final int CPU_SAMPLES_CAP = 64;
 
   /** Matches vanilla region filenames {@code r.<cx>.<cz>.mca}. */

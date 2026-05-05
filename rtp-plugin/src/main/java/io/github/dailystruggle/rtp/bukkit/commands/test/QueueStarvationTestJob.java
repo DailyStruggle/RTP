@@ -20,62 +20,24 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code rtp test queue-starvation region:&lt;R&gt; [samples:N]}.
- *
- * <p>Validates the Archimedean spiral (O(log n)) selection math and the
- * ADR-006 async pre-generator refill pulse against queue starvation. The
- * job rapidly requests {@value #DEFAULT_SAMPLES} dummy locations from the
- * target region to partially drain its cache, measures the per-candidate
- * wall-clock timings, then invokes
- * {@link io.github.dailystruggle.rtp.common.selection.SelectionAPI#compute()}
- * as a refill pulse and records the refill latency.
- *
- * <p>This job deliberately <b>does not</b> dispatch through
- * {@link io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask}
- * — it measures the generator / pre-generator tier directly so that a
- * regression in the spiral math, the region queue, or the refill pulse is
- * not masked by cooldowns, verifiers, or the economy layer.
- *
- * <p>Safety compliance:
- * <ul>
- *   <li><b>REQ-RTP-S-004</b> — every skipped sample and non-success result
- *       emits a WARN log entry; a final summary is sent to the caller.</li>
- *   <li><b>REQ-RTP-S-005</b> — the sampling loop runs on
- *       {@code runTaskAsynchronously}; {@link Region#getLocation} uses
- *       {@code getChunkAtAsync} internally, so no chunk I/O lands on the
- *       main thread.</li>
- *   <li><b>REQ-RTP-S-002</b> — no tickets are acquired here; each
- *       {@code GenerationResult} is discarded without holding a
- *       reservation.</li>
- * </ul>
- *
- * <p>Platform routing (requirement #3 of the job spec):
- * <ul>
- *   <li><b>Folia</b> — the async scheduler routes to a Count-Bound pipe
- *       (bounded number of pending refill tasks) to avoid stalling a
- *       Region Thread. This job asserts {@code platform == "Folia"} before
- *       running so the Folia-specific expectation is surfaced.</li>
- *   <li><b>Paper / Spigot</b> — a Time-Bound pipe is permitted, since
- *       there are no region threads to stall.</li>
- * </ul>
- *
- * <p>Traceability: ADR-006 (queue refill cadence), REQ-RTP-F-005 (bounded
- * selection complexity), REQ-RTP-F-006 (no naive rerolling), REQ-RTP-F-008
- * (non-blocking execution).
+ * {@code rtp test queue-starvation region:<R> [samples:N]} — drains N dummy
+ * locations from a region (bypassing {@code TeleportPipelineTask} so cooldowns/
+ * verifiers/economy can't mask the regression), then triggers a
+ * {@code SelectionAPI.compute()} refill pulse and records its latency. Targets
+ * the Archimedean-spiral math (O(log n)) and ADR-006 pre-generator. No tickets
+ * acquired; sampling loop is async (S-002 / S-005). On Folia the refill must
+ * route through a Count-Bound pipe; on Paper/Spigot a Time-Bound pipe is OK.
+ * Traces ADR-006 and REQ-RTP-F-005 / F-006 / F-008.
  */
 public class QueueStarvationTestJob extends BaseRTPCmdImpl {
 
-  /** Per-issue-spec requirement #1: rapidly request 15 dummy locations. */
+  /** Default dummy-location burst size. */
   static final int DEFAULT_SAMPLES = 15;
 
   static final int MIN_SAMPLES = 1;
   static final int MAX_SAMPLES = 500;
 
-  /**
-   * Soft ceiling on a single {@link Region#getLocation} wall-clock. Above
-   * this, we flag the sample as a possible O(n) stall in the generator
-   * loop (requirement #4).
-   */
+  /** Per-sample wall-clock ceiling; above this we flag a possible O(n) stall. */
   static final long LOG_N_STALL_THRESHOLD_MS = 5_000L;
 
   public QueueStarvationTestJob(@Nullable CommandsAPICommand parent) {
