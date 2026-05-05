@@ -80,6 +80,22 @@ The runtime config-edit command (`/rtp config <file> <key>:<value> …`, plus `a
 
 ---
 
+## 6. RTP Glide — Internalise as Vertical Adjustor + Effect
+
+Currently shipped as the standalone `addons/RTP_Glide` addon. The behaviour ("drop the player from height, glide them down safely") decomposes cleanly into two existing extension points already present in core: a **vertical adjustor** (to lift the destination Y to drop-height) and an **effect** (to apply slow-fall / elytra / damage-immunity during descent). Folding it in removes the addon's reflection surface and gives all platforms first-class glide.
+
+- [ ] **Decompose the addon.** Read `addons/RTP_Glide` end-to-end and map each behaviour to either (a) a `VerticalAdjustor` implementation or (b) an `effects-api` effect. Record the mapping in a short design note before code (Rule D-005 if it crosses modules).
+- [ ] **`GlideVerticalAdjustor` in `rtp-core`.** New adjustor that raises the resolved Y to a configured drop-height (absolute or `+offset` above terrain), respecting world max-Y and the existing safety pipeline. Unit-test against the spiral output and a stubbed world height.
+- [ ] **`GlideEffect` in `effects-api`.** Applies slow-falling / fall-damage immunity (and optionally elytra equip + firework boost parity with the addon) for the descent window. Must declare its thread-safety contract and clean up on early disconnect / death.
+- [ ] **Config wiring.** Expose under the existing region/effects config (e.g. `verticalAdjustor: GLIDE` + `effects: [GLIDE]`) with keys for drop-height, descent effect duration, and fall-damage policy. Document defaults; lite-jar default off ([ADR-024](../adr/ADR-024-rtp-lite-assembly-variant.md)).
+- [ ] **Platform parity.** Verify behaviour on Spigot, Paper, Folia (Entity Scheduler for the effect application — see *Folia Threading*), and Fabric (effects-api parity item in §1). No region-thread blocking; no synchronous chunk loads (S-005).
+- [ ] **Safety interaction.** Confirm the adjustor's raised Y still goes through standard safety checks before teleport (S-001) — gliding does **not** bypass unsafe-block rejection, only relocates the landing search.
+- [ ] **Deprecate the addon.** Once parity is verified, mark `addons/RTP_Glide` deprecated with a one-release migration note pointing to the built-in config keys; remove after the deprecation window. Update [`EXTERNAL_HOOKS.md`](EXTERNAL_HOOKS.md) if the addon registered any hook.
+- [ ] **Tests + traceability.** Add `ReqRtp*Glide*` coverage (adjustor math, effect lifecycle, S-001 interaction); update [`TRACEABILITY.md`](TRACEABILITY.md). New ADR if the decomposition introduces any new public API on `rtp-api` / `effects-api`.
+- [ ] **Docs.** Add a `docs/admin/` section describing the feature and config; update `CHANGELOG.md` on landing.
+
+---
+
 ## Closing Out This File
 
-When **all five sections** are fully ticked, fold the residue into [`ROADMAP.md`](ROADMAP.md) (or `CHANGELOG.md` for shipped items) and delete this file. Until then, prefer ticking boxes here over rewriting the structure.
+When **all six sections** are fully ticked, fold the residue into [`ROADMAP.md`](ROADMAP.md) (or `CHANGELOG.md` for shipped items) and delete this file. Until then, prefer ticking boxes here over rewriting the structure.
