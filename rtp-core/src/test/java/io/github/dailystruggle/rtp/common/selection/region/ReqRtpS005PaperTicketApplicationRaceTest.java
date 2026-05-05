@@ -33,46 +33,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * REQ-RTP-S-005 / ADR-015 (Paper chunk-system-v2 ticket-application race follow-up).
+ * REQ-RTP-S-005 / ADR-015: Paper chunk-system-v2 ticket-application race.
  *
- * <p>The companion test {@link ReqRtpS005PaperStaleGuardFalsePositiveTest} assumed
- * {@code setForceLoadedImpl(true)} applies its plugin chunk ticket synchronously —
- * that assumption is true for Spigot when the call already runs on the primary
- * thread, but it is <b>not</b> true for the real failure the user reported on
- * Paper 26.1.
+ * <p>On Paper, {@code setForceLoadedImpl(true)} schedules {@code addPluginChunkTicket}
+ * onto the next primary-thread tick, so {@code new ChunkReservation(...)} returns
+ * before the ticket is applied. Without {@code awaitReady}, the stale-chunk guard
+ * sees {@code isChunkLoaded=false} (chunk-system-v2 GC'd the async-returned chunk)
+ * and every candidate fails with {@code staleChunkBeforeVert}.
  *
- * <p>On Paper the location generator runs on {@code Craft Scheduler Thread - 1 - RTP}
- * (async) and {@code BukkitRTPWorld.setForceLoadedImpl} therefore schedules the
- * raw {@code addPluginChunkTicket} call via {@code Bukkit.getScheduler().runTask(...)}
- * — i.e. onto the <b>next</b> primary-thread tick. Without the ADR-015 ticket-
- * application follow-up, {@code new ChunkReservation(...)} returns before the
- * scheduled task fires, and the subsequent stale-chunk guard sees
- * {@code isChunkLoaded=false} because Paper chunk-system-v2 has already GC'd the
- * async-returned chunk. Every candidate is then rejected with
- * {@code cause=nullChunk reason=staleChunkBeforeVert fails=N}.
- *
- * <p>This test installs a deferred-apply mock world that reproduces exactly that
- * mechanic: {@code setForceLoadedImpl(true)} returns an <b>incomplete</b> future
- * and <b>does not</b> increment the active ticket counter until a background
- * "primary-thread simulator" drains the pending-apply queue. The test then
- * asserts that {@link LocationGenerator#getLocation(Region, Set)}:
- *
- * <ol>
- *   <li>Blocks in {@link io.github.dailystruggle.rtp.api.world.ChunkReservation#awaitReady(long, TimeUnit) reservation.awaitReady(...)}
- *       until the background thread drains the queue.</li>
- *   <li>Only then proceeds past the stale-chunk guard and invokes
- *       {@code MockRTPChunk.isSafe} — proving the guard sees the ticket as
- *       applied (as opposed to the Paper production reproduction where it did
- *       not).</li>
- *   <li>Releases every ticket on exit via {@code finally { reservation.close(); }}
- *       — the active ticket counter must drain to zero after the background
- *       thread runs the release-side apply callbacks too.</li>
- * </ol>
- *
- * <p>Regression intent: without the {@code awaitReady} call in
- * {@link LocationGenerator#getLocation(Region, Set)}, the stale-chunk guard
- * would fire before the background drain and the test would fail exactly as the
- * user's Paper 26.1 log showed {@code fails=10 reason=staleChunkBeforeVert}.
+ * <p>This test uses a deferred-apply mock world (ticket count only increments
+ * after a background "primary-thread simulator" drains the queue) and asserts
+ * {@link LocationGenerator#getLocation(Region, Set)} blocks in
+ * {@code reservation.awaitReady(...)} until drain, then proceeds past the guard
+ * and releases all tickets to zero on exit.
  */
 @DisplayName("REQ-RTP-S-005 / ADR-015: Paper chunk-system-v2 ticket-application race is covered by awaitReady")
 public class ReqRtpS005PaperTicketApplicationRaceTest {

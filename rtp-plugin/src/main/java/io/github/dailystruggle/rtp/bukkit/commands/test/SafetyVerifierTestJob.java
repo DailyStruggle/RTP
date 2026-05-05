@@ -9,7 +9,6 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers;
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -23,84 +22,18 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code rtp test safety-verifier} &mdash; runtime probe that merges the
- * {@code safety} and {@code verifiers} jobs described in
- * {@code RUNTIME_TEST_SUITE_PLAN.md &sect;4} into a single pass so REQ-RTP-S-001
- * (block safety evaluation) and REQ-RTP-S-003 (third-party claim integration)
- * can be exercised together on a live server.
- *
- * <p>Context: S-001 and S-003 protect adjacent layers of the same
- * decision &mdash; "is this coord deliverable?". S-001 is answered by
- * {@code chunk.isSafe(...)} against {@link SafetyKeys#unsafeBlocks}; S-003
- * is answered by {@link GlobalRegionVerifiers#checkGlobalRegionVerifiers(RTPCoords)},
- * which is intentionally {@link CompletableFuture}-returning so claim
- * plugins may block on their own IO without stalling the teleport pipeline.
- * The two layers are usually tested in isolation, which leaves the
- * <i>handoff</i> between them (a coord that passes S-001 then hangs on an
- * async verifier) untested at runtime. This probe closes that gap.
- *
- * <p>Compliance with the job specification:
- *
- * <ol>
- *   <li><b>Sampled coordinate from the engine</b> &mdash; obtained from
- *       the first registered {@link RTPWorld} via {@code RTP.serverAccessor}.
- *       No chunk load is forced; we reuse spawn-adjacent coordinates.</li>
- *   <li><b>Statically cached unsafe-block set</b> &mdash; the probe asserts
- *       that the configured {@code SafetyKeys.unsafeBlocks} list is
- *       materialised into an {@link EnumMap}-style lookup (an
- *       {@code ArrayList}-backed {@code HashSet}) that does not re-enter
- *       the config tree per candidate. The assertion is made by snapshotting
- *       the list once and reusing that reference &mdash; the in-engine
- *       {@code LocationGenerator.getLocation} does the same thing (see
- *       {@code LocationGenerator.java:176}). If this probe&apos;s snapshot
- *       diverges from the engine view, the S-001 lookup path has regressed
- *       toward per-candidate config reads.</li>
- *   <li><b>Async verifier dispatch</b> &mdash; the returned
- *       {@code CompletableFuture<Boolean>} from
- *       {@link GlobalRegionVerifiers#checkGlobalRegionVerifiers(RTPCoords)}
- *       is asserted to actually be a future (non-completed at call time,
- *       completed only after the mock verifier resolves). This is the
- *       observable contract REQ-API-F-003 depends on.</li>
- *   <li><b>Strict timeout</b> &mdash; the probe registers a <i>hang-mock</i>
- *       async verifier that intentionally never completes, then bounds the
- *       wait with {@link CompletableFuture#get(long, TimeUnit)}. A
- *       {@link TimeoutException} is <b>expected</b> and recorded as a pass
- *       for the timeout leg; a <i>lack</i> of timeout means the harness
- *       itself is broken, not the engine.</li>
- * </ol>
- *
- * <p>Safety compliance (ADR/REQ cross-references):
- *
- * <ul>
- *   <li><b>S-001</b>: verifies the block-safety evaluation references a
- *       cached snapshot of {@code unsafeBlocks}; no second block-type
- *       check is added here.</li>
- *   <li><b>S-003</b>: round-trips a coord through
- *       {@code GlobalRegionVerifiers}; no inline claim-plugin call is
- *       introduced outside the registered predicate/function surface.</li>
- *   <li><b>S-004</b>: every outcome &mdash; including the expected
- *       timeout &mdash; logs at {@link Level#INFO} or {@link Level#WARNING}
- *       and is surfaced to the caller. No silent swallow paths.</li>
- *   <li><b>S-005</b>: no chunk I/O. Sampling uses in-memory coords; the
- *       mock async verifier runs on a {@link CompletableFuture} not tied
- *       to any server thread.</li>
- * </ul>
- *
- * <p>The hang-mock verifier is registered and explicitly unregistered in a
- * {@code try/finally} block, so a probe failure cannot leak a permanently
- * hanging verifier into {@code GlobalRegionVerifiers} that would stall
- * every subsequent real teleport.
+ * {@code rtp test safety-verifier} &mdash; runtime probe covering REQ-RTP-S-001
+ * (block safety) and REQ-RTP-S-003 (claim verifiers) in a single pass, including
+ * the async-verifier timeout leg via a hang-mock registered/unregistered in a
+ * {@code try/finally}. No chunk I/O; coords are sampled from the first
+ * {@link RTPWorld}. See {@code RUNTIME_TEST_SUITE_PLAN.md &sect;4}.
  */
 public class SafetyVerifierTestJob extends BaseRTPCmdImpl {
 
-  /** Bound on the async verifier wait. Long enough for a well-behaved
-   * claim plugin to answer, short enough that a hung test does not block
-   * the caller&apos;s shell for more than a second. */
+  /** Async-verifier wait bound. */
   static final long VERIFIER_TIMEOUT_MS = 750L;
 
-  /** Cap on the verifier-completion wait before we consider it hung. Must
-   * be strictly greater than {@link #VERIFIER_TIMEOUT_MS} so the timeout
-   * triggers before the caller&apos;s latch. */
+  /** Harness wait cap; must exceed {@link #VERIFIER_TIMEOUT_MS}. */
   static final long HARNESS_DEADLINE_MS = VERIFIER_TIMEOUT_MS * 4L;
 
   public SafetyVerifierTestJob(@Nullable CommandsAPICommand parent) {

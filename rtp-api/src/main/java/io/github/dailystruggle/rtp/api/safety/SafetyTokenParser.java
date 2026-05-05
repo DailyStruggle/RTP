@@ -11,40 +11,15 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
- * Pure-string grammar parser for the safety-list tokens defined by
- * <a href="../../../../../../../../../../docs/adr/ADR-017-block-tags-and-state-predicates-in-safety-lists.md">ADR-017</a>
- * &sect;1.
- *
- * <p>Accepted token shapes:</p>
- * <ul>
- *   <li>{@code LAVA} — bare material (upper-snake {@code Material.name()}).</li>
- *   <li>{@code #minecraft:leaves} — tag reference.</li>
- *   <li>{@code OAK_SLAB[waterlogged=true]} — material with state predicate(s).</li>
- *   <li>{@code #minecraft:slabs[waterlogged=true]} — tag with state predicate(s).</li>
- *   <li>{@code *[waterlogged=true]} — wildcard material with state predicate(s).</li>
- * </ul>
- *
- * <p>Rejected tokens (all reported as {@link ParseResult#rejected()} entries with a
- * reason — never silent per REQ-RTP-S-004):</p>
- * <ul>
- *   <li>Empty or whitespace-only strings.</li>
- *   <li>Bare {@code *} (wildcard requires at least one predicate).</li>
- *   <li>Unbalanced {@code [} / {@code ]} brackets.</li>
- *   <li>Empty or malformed {@code [...]} body (e.g. {@code OAK_SLAB[]}, {@code OAK_SLAB[=true]}, {@code OAK_SLAB[waterlogged]}).</li>
- *   <li>Tag with an empty namespace or path (e.g. {@code #:leaves}, {@code #minecraft:}).</li>
- *   <li>Material identifier that fails {@code [A-Za-z0-9_]+} (other than the {@code *} wildcard).</li>
- * </ul>
- *
- * <p>The parser performs <strong>no</strong> reconciliation against a running Bukkit
- * registry. Unknown materials and unknown tags pass through — it is the caller's job to
- * expand tags and reconcile unknown materials (typically via
- * {@link io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer}).</p>
- *
- * <p>Case normalization: material identifiers are uppercased under {@link Locale#ROOT}
- * (matching {@code Material.name()}); tag namespaces/paths are lowercased; property keys
- * and values are lowercased (per ADR-017 &sect;1 "case-insensitive lowercase strings").</p>
- *
- * <p>This class is stateless and thread-safe.</p>
+ * Pure-string grammar parser for safety-list tokens (ADR-017 §1). Accepts
+ * {@code LAVA}, {@code #minecraft:leaves}, {@code OAK_SLAB[waterlogged=true]},
+ * {@code #minecraft:slabs[waterlogged=true]}, {@code *[waterlogged=true]}.
+ * Every reject (empty, bare {@code *}, unbalanced brackets, malformed body,
+ * empty tag ns/path, bad identifier) is reported via {@link ParseResult#rejected()}
+ * with a reason — never silent (REQ-RTP-S-004). No registry reconciliation here;
+ * callers expand tags and reconcile unknowns. Material ids upper-cased under
+ * {@link Locale#ROOT}; tag ns/path and property keys/values lower-cased.
+ * Stateless and thread-safe.
  */
 public final class SafetyTokenParser {
 

@@ -4,36 +4,13 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Base class for all tasks in the RTP execution pipeline.
- *
- * <p>Combines {@link RTPCancellable}, {@link RTPDelayable}, and {@link Runnable} into a
- * single lifecycle-aware unit that integrates with the plugin's memory-tracking
- * and scheduling subsystems (REQ-API-ARCH-003).
- *
- * <p><b>Lifecycle hooks (static, injectable):</b>
- * <ul>
- *   <li>{@link #trackHook} — called on construction; assigns a {@link java.util.UUID}
- *       tracking ID and registers the task in the active-task map. Defaults to a
- *       no-op returning {@code null}.</li>
- *   <li>{@link #updateHook} — called at the start of each {@link #run()} invocation to
- *       refresh the task's last-seen timestamp in the tracker.</li>
- *   <li>{@link #untrackHook} — called when the task is cancelled or after it finishes
- *       via {@link #runWithTracking()}, to remove it from the active-task map and release
- *       associated resources (e.g. chunk tickets).</li>
- * </ul>
- *
- * <p><b>Thread safety:</b> {@link #cancelled} and {@link #isRunning} are
- * {@link java.util.concurrent.atomic.AtomicBoolean} instances and are safe to read/write
- * from any thread. All other fields should be treated as effectively immutable after
- * construction.
- *
- * <p><b>Subclassing:</b> Override {@link #run()} to provide task logic. Call
- * {@link #runWithTracking()} (rather than {@link #run()} directly) when submitting to the
- * scheduler so that MSPT accounting and lifecycle cleanup are applied automatically.
- *
- * @see RTPCancellable
- * @see RTPDelayable
- * @see io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask
+ * Base task for the RTP execution pipeline (REQ-API-ARCH-003): combines
+ * {@link RTPCancellable}, {@link RTPDelayable}, {@link Runnable}. Static hooks
+ * {@link #trackHook}/{@link #updateHook}/{@link #untrackHook} integrate with the
+ * memory tracker; defaults are no-ops, replaced by core at startup. Submit via
+ * {@link #runWithTracking()} for MSPT accounting + lifecycle cleanup.
+ * Override {@link #run()} for task logic. {@link #cancelled}/{@link #isRunning}
+ * are atomic; other fields effectively immutable after construction.
  */
 public class RTPRunnable implements Runnable, RTPCancellable, RTPDelayable {
   /**

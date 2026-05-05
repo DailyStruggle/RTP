@@ -5,33 +5,12 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * A single parsed entry of a safety-list YAML value (e.g. one element of
- * {@code unsafeBlocks}).
- *
- * <p>Corresponds to the {@code token} production of the grammar defined in
- * <a href="../../../../../../../../../../docs/adr/ADR-017-block-tags-and-state-predicates-in-safety-lists.md">ADR-017</a>
- * &sect;1. A {@code SafetyToken} carries the parsed shape of the token but performs no
- * tag expansion — that is the platform adapter's responsibility (see ADR-017 &sect;2).</p>
- *
- * <p>Three shapes exist:</p>
- * <ul>
- *   <li><strong>Material</strong> — {@link Kind#MATERIAL}. {@link #identifier()} is a
- *       non-empty upper-snake Bukkit {@code Material.name()} or the wildcard token
- *       {@code "*"}. {@link #predicates()} is empty for a plain material, non-empty for
- *       a predicated material. Wildcard materials are always predicated per ADR-017
- *       &sect;1 (bare {@code *} is rejected at parse time).</li>
- *   <li><strong>Tag</strong> — {@link Kind#TAG}. {@link #identifier()} is a
- *       lowercase {@code namespace:path} string (no leading {@code #}).
- *       {@link #predicates()} is empty for a plain tag, non-empty for a predicated
- *       tag.</li>
- * </ul>
- *
- * <p>The wildcard material is distinguished by {@link #isWildcard()} and carries the
- * literal identifier {@code "*"}. Consumers must gate this case explicitly because a
- * wildcard forces the hot evaluation path to extract the block's property map (see
- * ADR-017 &sect;4).</p>
- *
- * <p>Instances are immutable and thread-safe.</p>
+ * Single parsed entry of a safety-list value (ADR-017 §1 grammar). Shapes:
+ * MATERIAL with upper-snake {@code Material.name()} or wildcard {@code "*"};
+ * TAG with lowercase {@code namespace:path} (no leading {@code #}). Predicates
+ * may be empty (plain) or non-empty. Bare {@code *} is rejected at parse time.
+ * No tag expansion performed here (platform adapter's responsibility, ADR-017 §2).
+ * Immutable and thread-safe.
  */
 public final class SafetyToken {
 

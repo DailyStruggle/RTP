@@ -23,37 +23,12 @@ import java.util.regex.Pattern;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * REQ-RTP-F-013 / ADR-020 — content-level regression tests for the shipped
- * Spanish translation at {@code rtp-plugin/src/main/resources/lang/es/messages.yml}.
- *
- * <p>ADR-020 contract recap (the part this test validates):
- * <ul>
- *   <li>The English {@code messages.yml} is the authoritative key set; every
- *       {@link MessagesKeys} enum entry maps to exactly one entry there.</li>
- *   <li>Each locale ships a {@code messages.lang.yml} that maps the internal
- *       enum key (left) to the user-visible key name used inside that locale's
- *       {@code messages.yml} (right). The locale's {@code messages.yml}
- *       therefore uses <i>translated key names</i>, not the English ones.</li>
- *   <li>If the locale's {@code messages.lang.yml} omits an entry, the baseline
- *       {@code lang/messages.lang.yml} is consulted; if both omit it, the enum
- *       name itself is the effective key (identity fallback).</li>
- * </ul>
- *
- * <p>Equivalent regression bait this test catches:
- * <ol>
- *   <li>The locale ships fewer {@code messages.yml} entries than the baseline
- *       (i.e. a key is missing from the translation).</li>
- *   <li>A locale key cannot be resolved back to a {@link MessagesKeys} enum via
- *       the effective key-name map (typo or stale entry).</li>
- *   <li>A typed key (list / int / bool / placeholder-bearing string) is shipped
- *       with the wrong YAML type after translation.</li>
- *   <li>YAML 1.1's "Norway problem" — values like {@code no}/{@code off}
- *       silently parsing as booleans because they weren't quoted.</li>
- * </ol>
- *
- * <p>Spanish is used as the canonical example locale. Adding another locale in
- * the future means parameterising {@link #SPANISH_PATH} / {@link #SPANISH_LANG_MAP_PATH},
- * not duplicating the assertion logic.
+ * REQ-RTP-F-013 / ADR-020 — content-parity regression tests for the shipped
+ * Spanish {@code messages.yml}. Per-locale {@code messages.lang.yml} maps enum
+ * key → translated key name; baseline + identity fallback. Catches: missing
+ * keys, unresolvable keys, wrong YAML type for typed keys (list/int/bool),
+ * dropped placeholders, and YAML 1.1 "Norway problem" (no/off → boolean).
+ * Spanish is the canonical example; new locales parameterise {@link #SPANISH_PATH}.
  */
 @DisplayName("REQ-RTP-F-013 / ADR-020 — Spanish locale content parity with English baseline")
 public class ReqRtpF013SpanishLocaleContentTest {

@@ -24,6 +24,7 @@ import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.*;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.fixed.FixedAdjustor;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.jump.JumpAdjustor;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
 import io.github.dailystruggle.rtp.common.tasks.ScanTask;
@@ -170,6 +171,7 @@ public class RTP {
     RTPAPI.addShape(new Square_Normal());
     RTPAPI.addVerticalAdjustor(new LinearAdjustor(new ArrayList<>())); // todo: make this work
     RTPAPI.addVerticalAdjustor(new JumpAdjustor(new ArrayList<>()));
+    RTPAPI.addVerticalAdjustor(new FixedAdjustor(new ArrayList<>()));
 
     configs = new Configs(serverAccessor.getPluginDirectory());
 

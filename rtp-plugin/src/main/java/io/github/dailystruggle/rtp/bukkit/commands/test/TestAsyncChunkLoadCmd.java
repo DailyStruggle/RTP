@@ -15,42 +15,14 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code rtp test async-chunk-load} &mdash; runtime probe that verifies a
- * single already-generated chunk can be obtained asynchronously through the
- * {@link RTPWorld#getChunkAt(int, int)} abstraction without blocking the
- * main server thread (REQ-RTP-S-005).
- *
- * <p>Motivation. REQ-RTP-S-005 forbids synchronous chunk loading from any
- * main-thread path. The existing unit-test coverage exercises the policy
- * via static analysis ({@code rtp-core} ArchUnit rules) and via the
- * {@code rtp-spigot} {@code AnvilPrefilterTest} suite. Neither of those
- * exercises the live Bukkit adapter on a running server. This probe
- * closes the gap: it calls {@code world.getChunkAt(cx,cz)} from the
- * caller's thread, captures the thread that resolves the future, and
- * asserts that the future did not complete inline on the primary thread.
- *
- * <p>Target chunk selection. The probe targets {@code (cx=0, cz=0)} of the
- * first world returned by {@link io.github.dailystruggle.rtp.api.server.RTPServerAccessor#getRTPWorlds()}.
- * This coordinate is conventionally pre-generated on every Bukkit world
- * (it contains the world spawn), so the probe verifies the
- * <i>async-dispatch</i> invariant &mdash; not generation correctness.
- *
- * <p>Safety compliance.
- * <ul>
- *   <li><b>S-005</b>: the probe dispatches through the platform adapter's
- *       async {@code getChunkAt} and never calls
- *       {@code World#getChunkAt(int,int)} directly. The assertion itself
- *       is the purpose of the probe.</li>
- *   <li><b>S-004</b>: every failure mode (no worlds registered, timeout,
- *       inline completion on the primary thread) produces a
- *       {@link Level#WARNING} log entry and a player-visible message.</li>
- *   <li><b>S-002</b>: the probe does not request a chunk ticket; it only
- *       warms the cache of an already-generated chunk. No ticket to
- *       leak.</li>
- * </ul>
- *
- * <p>See {@code docs/dev/RUNTIME_TEST_SUITE_PLAN.md} and
- * {@code docs/dev/TRACEABILITY.md} (REQ-RTP-S-005).
+ * {@code rtp test async-chunk-load} — runtime probe for REQ-RTP-S-005.
+ * Calls {@link RTPWorld#getChunkAt(int, int)} on chunk {@code (0,0)} of the
+ * first registered world, captures the resolving thread, and asserts the
+ * future did not complete inline on the primary thread. Targets a chunk
+ * conventionally pre-generated (world spawn) so this verifies async-dispatch,
+ * not generation. Failure modes (no worlds, timeout, inline completion)
+ * each emit a WARNING log and player message (S-004). No chunk ticket is
+ * requested (S-002). See {@code RUNTIME_TEST_SUITE_PLAN.md} / {@code TRACEABILITY.md}.
  */
 public class TestAsyncChunkLoadCmd extends BaseRTPCmdImpl {
 

@@ -49,6 +49,18 @@ dependencies {
     // the only class that resolves it on a Fabric runtime.
     implementation project(':rtp-fabric:rtp-fabric-common')
 
+    // ADR-027 — version-specific Fabric adapters. RTPFabricMod.installVersionAdapter()
+    // resolves these by FQN at runtime via Class.forName, so the bytecode must
+    // be present in the shaded jar but is never compile-time imported here.
+    // Mirrors the rtp-spigot/-paper/-folia v-submodule inclusion pattern above.
+    implementation project(':rtp-fabric:rtp-fabric-v1_20_R1')
+    implementation project(':rtp-fabric:rtp-fabric-v1_21_R1')
+    // :rtp-fabric:rtp-fabric-v26_1_R1 intentionally NOT included — that
+    // submodule pins MC 26.1 / Java 25 and is gated out of settings.gradle
+    // until Loom 1.15+ stabilizes. RTPFabricMod.installVersionAdapter()
+    // resolves it by FQN string only on a 26.1 runtime; on 1.20.x / 1.21.x
+    // runtimes the class is never named, so Class.forName is never invoked.
+
     implementation project(':rtp-core')
     implementation project(':rtp-spigot:rtp-spigot-v1_20_R1')
     implementation project(':rtp-paper:rtp-paper-v1_20_R1')
@@ -100,6 +112,14 @@ dependencies {
 
     implementation 'org.bstats:bstats-bukkit:3.0.3'
     implementation 'xyz.tozymc.spigot:title-api:1.0'
+
+    // SQLite JDBC driver. rtp-core declares this as compileOnly because
+    // Spigot/Paper/Folia bundle it at runtime, but the Fabric runtime does
+    // NOT — so without bundling it here, FabricDatabaseHandler.setupDatabase
+    // crashes with `No suitable driver found for jdbc:sqlite:...`. Shaded
+    // into the Pro jar; the Lite shadowJar block below explicitly excludes
+    // it (ADR-024 — lite has no persistent backends).
+    implementation 'org.xerial:sqlite-jdbc:3.45.1.0'
 }
 
 tasks.register('copyDocs', Copy) {
@@ -124,7 +144,10 @@ shadowJar.dependsOn processResources
 // unclassified `RTP-<version>.jar` name. Both are built by `assemble`.
 shadowJar {
     archiveBaseName.set('RTP-Pro')
-    archiveClassifier.set('')
+    // Mojang-mapped intermediate; remapJar consumes this and writes the
+    // unclassified `RTP-Pro-<version>.jar` (intermediary-mapped, the
+    // released artifact). See remapJar block below.
+    archiveClassifier.set('dev')
     archiveVersion.set(project.version.toString())
 
     // Strip Loom's `minecraft` configuration (and its transitive deps:
@@ -193,11 +216,28 @@ shadowJar {
     relocate 'net.jpountz', 'io.github.dailystruggle.rtp.lz4'
 }
 
+// Loom's remapJar reads from `jar` by default and produces an intermediary-
+// mapped artifact suitable for the Fabric runtime. Our released artifact is
+// the shaded uber-jar, so redirect remapJar's input to shadowJar's output.
+// Without this, RTPFabricMod's Mojang-mapped MC references (e.g.
+// net.minecraft.network.chat.Component) survive into the released jar and
+// fail at entrypoint creation with NoClassDefFoundError on a real Fabric
+// runtime (which only knows the intermediary names net.minecraft.class_*).
+remapJar {
+    dependsOn shadowJar
+    inputFile.set(shadowJar.archiveFile)
+    archiveBaseName.set('RTP-Pro')
+    archiveClassifier.set('')
+    archiveVersion.set(project.version.toString())
+}
+
 artifacts {
     archives shadowJar
+    archives remapJar
 }
 
 assemble.dependsOn shadowJar
+assemble.dependsOn remapJar
 
 // =============================================================================
 // ADR-024 -- RTP-lite assembly variant.

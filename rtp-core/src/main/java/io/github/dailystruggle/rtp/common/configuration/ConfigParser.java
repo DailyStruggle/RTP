@@ -94,9 +94,10 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       YamlFileDatabase fileDatabase,
       ClassLoader classLoader,
       String locale) {
-    super(eClass, name);
+    super(eClass, sanitizeName(name));
     this.fileDatabase = fileDatabase;
-    this.name = (name.endsWith(".yml")) ? name : name + ".yml";
+    String sn = sanitizeName(name);
+    this.name = (sn.endsWith(".yml")) ? sn : sn + ".yml";
     this.version = version;
     this.pluginDirectory = pluginDirectory;
     this.classLoader = classLoader;
@@ -136,9 +137,10 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       File langFile,
       YamlFileDatabase fileDatabase,
       String locale) {
-    super(eClass, name);
+    super(eClass, sanitizeName(name));
     this.fileDatabase = fileDatabase;
-    this.name = (name.endsWith(".yml")) ? name : name + ".yml";
+    String sn = sanitizeName(name);
+    this.name = (sn.endsWith(".yml")) ? sn : sn + ".yml";
     this.version = version;
     this.pluginDirectory = pluginDirectory;
     this.locale = LanguageBootstrap.sanitize(locale);
@@ -173,13 +175,26 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       final File pluginDirectory,
       YamlFileDatabase fileDatabase,
       String locale) {
-    super(eClass, name);
+    super(eClass, sanitizeName(name));
     this.fileDatabase = fileDatabase;
-    this.name = (name.endsWith(".yml")) ? name : name + ".yml";
+    String sn = sanitizeName(name);
+    this.name = (sn.endsWith(".yml")) ? sn : sn + ".yml";
     this.version = version;
     this.pluginDirectory = pluginDirectory;
     this.locale = LanguageBootstrap.sanitize(locale);
     check(version, pluginDirectory, null);
+  }
+
+  /**
+   * Sanitize a configuration name for use as a filesystem path component. Replaces characters
+   * that are illegal on Windows ({@code : \ / * ? " < > |}) with {@code _}. Necessary for
+   * Fabric world identifiers like {@code minecraft:overworld} that would otherwise crash
+   * with {@link java.nio.file.InvalidPathException} when used to build a per-world config or
+   * lang file path.
+   */
+  static String sanitizeName(String name) {
+    if (name == null) return null;
+    return name.replaceAll("[:\\\\/*?\"<>|]", "_");
   }
 
   private static void setSection(ConfigurationSection section, Map<?, ?> map) {

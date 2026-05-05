@@ -4,35 +4,12 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Immutable view of a single chunk section's biome palette and packed-index array.
- *
- * <p>Phase 2 of ADR-016 ({@code ADR-016}). Mirrors the on-disk
- * shape of {@code sections[i].biomes}, which is structurally identical to
- * {@code sections[i].block_states} but differs in two observable ways:
- *
- * <ul>
- *   <li><b>Cell resolution is 4×4×4 blocks</b> (64 cells per section), not 1×1×1
- *       like blocks. The packed-index array, when present, therefore has 64 entries
- *       rather than 4096.</li>
- *   <li><b>Bit-width is {@code max(1, ceil(log2(paletteSize)))}</b> — biome palettes
- *       honour a 1-bit minimum, whereas block palettes are clamped to a 4-bit
- *       minimum by the vanilla writer. Reusing {@link PackedPaletteDecoder#decode}
- *       would therefore mis-decode a 2- or 3-entry biome palette, so this record
- *       carries its own tiny decoder in {@link #biomeIdAt(int, int, int)}.</li>
- * </ul>
- *
- * <p>Cell index mapping (§3 of the plan):
- * <pre>
- *   cellX = (x & 15) >> 2        // 0..3
- *   cellY = (y - sy*16) >> 2     // 0..3
- *   cellZ = (z & 15) >> 2        // 0..3
- *   idx   = (cellY << 4) | (cellZ << 2) | cellX  // 0..63
- * </pre>
- *
- * <p>As with {@link PaletteSection}, identifiers are the raw on-disk strings
- * (e.g. {@code "minecraft:plains"}, {@code "iris:volcanic_ash_plains"}) — the
- * caller applies the normaliser when an RTP-configuration-comparable form is
- * needed. See ADR-016 (biome) §4.
+ * Immutable view of a section's biome palette + packed-index array (ADR-016
+ * Phase 2 / §4). Like {@link PaletteSection} but: 4×4×4 cell resolution
+ * (64 cells/section) and bits-per-entry {@code max(1, ceil(log2(size)))} —
+ * biome palettes have a 1-bit minimum (blocks: 4-bit), so this carries its
+ * own decoder. Layout is YZX-major: {@code idx = (cellY<<4)|(cellZ<<2)|cellX}.
+ * Identifiers are raw on-disk strings; caller normalises.
  */
 public record BiomePaletteSection(int sectionY, List<String> palette, long[] data) {
 

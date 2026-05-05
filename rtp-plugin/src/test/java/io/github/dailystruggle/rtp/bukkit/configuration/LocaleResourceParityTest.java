@@ -23,32 +23,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
- * REQ-RTP-F-013 / ADR-020 — generic, locale-agnostic parity test for every
- * shipped translation under {@code rtp-plugin/src/main/resources/lang/<locale>/}.
- *
- * <p>For each locale directory containing at least one {@code *.lang.yml} and
- * matching {@code *.yml}, this test asserts:
- * <ol>
- *   <li><b>No backup files shipped:</b> no {@code *.bak} files anywhere under
- *       {@code lang/} (resources should never carry editor/agent backups).</li>
- *   <li><b>Lang-map / value-file key consistency:</b> the values on the right
- *       side of {@code <file>.lang.yml} must equal the top-level keys of the
- *       sibling {@code <file>.yml} (modulo identity fallback). A right-side
- *       key like {@code teleportMessage: mensajeTeletransporte} requires
- *       {@code mensajeTeletransporte} to be a top-level key in the locale's
- *       {@code <file>.yml}, otherwise lookups silently return empty strings
- *       (the original {@code rtp info} bug under Spanish).</li>
- *   <li><b>Placeholder fidelity:</b> every bracketed token
- *       ({@code [player]}, {@code [delay]}, ...) appearing in the English
- *       baseline {@code messages.yml} must appear with the same name in the
- *       locale's {@code messages.yml}. Translators occasionally rename
- *       placeholders by accident; those would never substitute.</li>
- * </ol>
- *
- * <p>The test does <i>not</i> require translations to be complete (identity
- * mappings are tolerated); it only flags positive divergence — entries the
- * lang map promises that the value file does not deliver. This keeps the test
- * a guardrail against silent breakage rather than a coverage gate.
+ * REQ-RTP-F-013 / ADR-020 — locale-agnostic parity guard for every shipped
+ * {@code lang/<locale>/}. Asserts: no {@code .bak} files under {@code lang/};
+ * every right-hand key in {@code *.lang.yml} resolves to a top-level key in
+ * the sibling {@code *.yml}; bracketed placeholders in baseline {@code messages.yml}
+ * survive translation. Identity mappings are tolerated — divergence-only guard,
+ * not a coverage gate.
  */
 @DisplayName("REQ-RTP-F-013 / ADR-020 — locale resource parity (all shipped locales)")
 public class LocaleResourceParityTest {

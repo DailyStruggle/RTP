@@ -3,37 +3,17 @@ package io.github.dailystruggle.rtp.common.network;
 import java.util.UUID;
 
 /**
- * Cross-server messaging + ephemeral coordination contract.
+ * Optional cross-server messaging + ephemeral coordination contract (ADR-024).
+ * TTL-based player cooldowns and pub/sub fan-out;
+ * {@link io.github.dailystruggle.rtp.common.RTP#networkManager} is {@code null}
+ * unless network YAML enables a backend. Keeping the static type at this
+ * interface lets the lite assembly resolve {@code RTP.class} without ever
+ * touching driver classes ({@code redis.clients.jedis.*}, ...).
  *
- * <p>Defines the surface required for RTP's optional network bus: TTL-based player
- * cooldowns and a pub/sub channel for cross-server RPC. Implementations are an
- * <i>optional</i> runtime concern — the field {@link io.github.dailystruggle.rtp.common.RTP#networkManager}
- * is {@code null} unless network YAML enables a backend.
- *
- * <p>Decoupling rationale (ADR-024): {@code rtp-core} must not carry a hard symbolic
- * reference to any concrete network driver class (e.g. {@code RedisManager} pulls in
- * {@code redis.clients.jedis.*}). The lite assembly excludes those drivers entirely;
- * keeping the field's static type at this interface lets the lite JVM resolve
- * {@code RTP.class} without ever touching the missing driver class.
- *
- * <p>This contract is intentionally narrow: it covers <i>only</i> what {@code rtp-core}
- * itself dispatches today. Driver-specific configuration (host / port / password /
- * pool sizing) is the implementation's concern and is constructed reflectively from
- * config YAML by {@link io.github.dailystruggle.rtp.common.RTP}.
- *
- * <p>This is <b>not</b> a persistence abstraction — see
- * {@link io.github.dailystruggle.rtp.common.database.DatabaseAccessor} for tabular
- * CRUD with cache flushing. The two roles intentionally do not merge:
- * <ul>
- *   <li>{@code DatabaseAccessor} has no TTL primitive (no {@code setex}/{@code ttl}).</li>
- *   <li>{@code DatabaseAccessor} has no pub/sub broadcast.</li>
- *   <li>{@code DatabaseAccessor} is a batched-query store; pub/sub requires a
- *       long-lived async subscriber.</li>
- * </ul>
- * Forcing these methods onto every SQL accessor would be a wrong-abstraction no-op.
- *
- * <p>Implementations must remain free of {@code org.bukkit.*} imports and must route
- * any logging through {@link io.github.dailystruggle.rtp.common.RTP#log}.
+ * <p>Distinct from {@link io.github.dailystruggle.rtp.common.database.DatabaseAccessor}:
+ * no TTL primitive, no pub/sub there. Implementations must not import
+ * {@code org.bukkit.*} and must log via
+ * {@link io.github.dailystruggle.rtp.common.RTP#log}.
  */
 public interface RTPNetworkManager {
 

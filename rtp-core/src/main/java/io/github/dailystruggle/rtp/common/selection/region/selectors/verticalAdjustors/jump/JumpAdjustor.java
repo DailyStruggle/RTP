@@ -256,43 +256,9 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
   }
 
   /**
-   * Probe-backed fast path mirroring {@link #adjust(RTPChunk, MutableRTPCoords)} on the
-   * center column of the supplied probe (local {@code x=8, z=8}).
-   *
-   * <p>Returns {@code null} (fall back to the live {@link #adjust} vert method) when:
-   * <ul>
-   *   <li>the probe's window does not cover the adjustor's {@code [minY, maxY]},</li>
-   *   <li>{@code requireSkyLight} is true and the probe's on-disk sky-light is
-   *       stale ({@link ChunkColumnProbe#isLightOn()} false) <em>and</em> the
-   *       heightmap-derived sky-access proxy can't be trusted either (no
-   *       heightmap, or the column has a non-air block above the reported top —
-   *       cave roof, ravine overhang, structure ceiling, player edit, or an
-   *       older-version chunk whose noise maps no longer correlate with the
-   *       heightmap),</li>
-   *   <li>no acceptable Y was found on the center column.</li>
-   * </ul>
-   *
-   * <p>Sky-light decision tree when {@code requireSkyLight} is true:
-   * <ol>
-   *   <li>{@code isLightOn} true → trust {@link ChunkColumnProbe#skyLightAt(int)}
-   *       and apply the same {@code &gt; 7} threshold as {@link #adjust}.</li>
-   *   <li>{@code isLightOn} false + heightmap present + verified open from
-   *       {@code heightmapTopY+1} through {@code maxY} → accept any
-   *       {@code y+1 &gt; heightmapTopY} as sky-access. The verification step
-   *       exists because the heightmap alone is not authoritative —
-   *       caves/ravines/structures and player edits routinely contradict it;
-   *       we re-check the column blocks the probe already carries before
-   *       trusting the proxy. Light data is validated separately at the
-   *       unkept→kept chunk-load handoff (live vert fallback path).</li>
-   *   <li>{@code isLightOn} false + heightmap absent or contradicted →
-   *       return {@code null} and let the live vert method handle it.</li>
-   * </ol>
-   *
-   * <p>The step-halving binary-descent of the legacy path is collapsed to a linear
-   * bottom-up scan on the probe path: the legacy optimization exists to reduce
-   * live {@code chunk.isAir} calls across a 5-column sweep, and the probe already
-   * answers those queries in O(1) from the decoded palette, so amortising with a
-   * step-halved traversal no longer pays.</p>
+   * Probe-backed fast path mirroring {@link #adjust(RTPChunk, MutableRTPCoords)}.
+   * Returns {@code null} (fall back to live {@link #adjust}) when the probe window
+   * doesn't cover {@code [minY, maxY]} or no acceptable Y was found.
    */
   @Override
   public @Nullable RTPCoords adjustFromProbe(
@@ -396,38 +362,13 @@ public class JumpAdjustor extends VerticalAdjustor<JumpAdjustorKeys> {
   }
 
   /**
-   * Decide whether {@code y} is an acceptable standing coordinate on the probe at
-   * chunk-local column {@code (lx, lz)}.
-   *
-   * <p>A Y is accepted iff:
-   * <ul>
-   *   <li>{@code y-1} is solid (not vanilla air AND not a member of the snapshot's
-   *       {@code airBlocks}) — i.e. there is something to stand on;</li>
-   *   <li>{@code y} and {@code y+1} are passable — vanilla air OR a member of
-   *       the snapshot's {@code airBlocks} (tall grass, flowers, snow layer,
-   *       torches, leaves, ...);</li>
-   *   <li>none of the three cells are in the snapshot's {@code unsafeBlocks} —
-   *       {@code unsafeBlocks} wins over {@code airBlocks} on conflicts;</li>
-   *   <li>when {@code requireSkyLight} is true, sky-access is satisfied via
-   *       {@code y+1 > columnSkyFloor} where {@code columnSkyFloor} is the
-   *       highest non-air Y on this column (see {@link #computeColumnSkyFloor}).
-   *       Stored sky-light nibbles and heightmaps are ignored — both are
-   *       unreliable on unticked / freshly-generated chunks.</li>
-   * </ul>
-   *
-   * <p>Multi-column variant: parameterised on chunk-local {@code (lx, lz)} so the
-   * probe path mirrors the live {@code adjust(RTPChunk, MutableRTPCoords)} sweep
-   * over {@code testCoords}. Off-center reads are O(1) palette-index lookups via
-   * {@link ChunkColumnProbe#blockAt(int, int, int)}; the sky-light floor is
-   * recomputed per-column from the same palette data so each column gets its
-   * own authoritative open-sky cut-off.</p>
-   *
-   * <p>Using the snapshot's {@code airBlocks} here mirrors the live-path {@code chunk.isSafe(...)}
-   * tolerance, so the anvil probe fast path no longer rejects Y candidates whose body
-   * or head space contains walkable non-air blocks (flowers, tall grass, etc.). Prior
-   * to this wiring, the strict {@link ChunkColumnProbe#isAirAt(int)} check was rejecting
-   * every such chunk and routing it to the full-load path, showing up as the residual
-   * {@code adjustNull} tail on the ScanTask concurrency gauge.</p>
+   * Accept {@code y} on column {@code (lx, lz)} iff: y-1 is solid (not vanilla
+   * air and not in {@code airBlocks}); y and y+1 are passable (vanilla air or
+   * in {@code airBlocks}); none of the three cells are in {@code unsafeBlocks}
+   * (unsafe wins on conflict); and when {@code requireSkyLight}, {@code y+1
+   * > columnSkyFloor} (block-data derived; stored sky-light/heightmaps ignored
+   * as unreliable on unticked chunks). Mirrors live {@code chunk.isSafe(...)}
+   * tolerance for walkable non-air (flowers, tall grass, snow, ...).
    */
   private static boolean acceptProbeY(ChunkColumnProbe probe, int lx, int lz, int y,
                                       boolean requireSkyLight, int columnSkyFloor,

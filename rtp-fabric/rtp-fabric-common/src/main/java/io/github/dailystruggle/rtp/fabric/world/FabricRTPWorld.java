@@ -22,38 +22,15 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Fabric {@link RTPWorld} implementation.
+ * Fabric {@link RTPWorld} implementation (ADR-022). No {@code org.bukkit.*}
+ * imports; holds a {@link ServerLevel} and reaches the server via
+ * {@link ServerLevel#getServer()}. Every native chunk-system call
+ * ({@code ServerChunkCache#getChunk}, {@code setChunkForced},
+ * {@code getForcedChunks}) is dispatched onto the server tick thread via
+ * {@link MinecraftServer#submit(java.util.function.Supplier)} (S-005).
  *
- * <p><b>Phase 2 status:</b> Step A &amp; Step C parity (chunk lifecycle) plus Step E
- * read-only world data (height/seed/biome/platform/isInactive). The S-005-compliant
- * async chunk load (Step A) is preserved as the baseline; this revision fills in the
- * abstract surface needed to drive the teleport pipeline end-to-end on Fabric.</p>
- *
- * <p><b>Architectural invariants (ADR-022 §4):</b></p>
- * <ul>
- *   <li>No {@code org.bukkit.*} imports.</li>
- *   <li>Holds a {@link ServerLevel} reference; the owning server is reached
- *       via {@link ServerLevel#getServer()} so the executor hop is robust to
- *       multi-world setups.</li>
- *   <li>Every native chunk-system call ({@code ServerChunkCache#getChunk},
- *       {@code ServerLevel#setChunkForced}, {@code ServerLevel#getForcedChunks})
- *       is dispatched onto the server tick thread via
- *       {@link MinecraftServer#submit(java.util.function.Supplier)}; calling
- *       them from any other thread is undefined per Mojang internals
- *       (S-005 compliance).</li>
- * </ul>
- *
- * <p><b>Caching.</b> {@link #getCachedChunk(long)} currently returns {@code null} —
- * the {@code FabricRTPChunk} adapter (8 abstract methods including {@code isSafe},
- * {@code getBiome}, {@code isAir}, {@code getSurfaceHeight}) is a separate Step C
- * deliverable. Returning {@code null} is the safe contract: {@code QueueTask},
- * {@code ScanTask}, and {@code TeleportPipelineTask} all gate on a non-null
- * cached chunk before calling {@code isSafe}. The on-disk Anvil pre-filter is
- * Bukkit-family only (ADR-016 §13.2), so no cache hand-off is required here yet.</p>
- *
- * <p><b>Verification.</b> Per the Phase 1 → Step H gate move recorded in
- * {@code MULTI_PLATFORM_PLAN.md}, end-to-end exercise of the chunk path is
- * deferred to Phase 2 Step H's dual-runtime smoke test.</p>
+ * <p>End-to-end verification is deferred to Phase 2 Step H per
+ * {@code MULTI_PLATFORM_PLAN.md}.
  */
 public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
 
@@ -118,10 +95,34 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
     // ---------------------------------------------------------------------------
 
     /**
-     * S-005-compliant async chunk load. Hops onto the server tick thread via
-     * {@link MinecraftServer#submit} to touch {@link ServerChunkCache}, requests
-     * the chunk at {@link ChunkStatus#FULL}, caches a weak reference, and resolves
-     * the returned future with the canonical packed chunk key.
+     * S-005-compliant async chunk load.
+     *
+     * <p><b>Generation contract.</b> Calls
+     * {@code ServerChunkCache#getChunk(x, z, ChunkStatus.FULL, /*load=*&#47;true)}
+     * inside {@link MinecraftServer#submit}. The {@code load=true} flag is
+     * what tells vanilla to <i>generate the chunk if absent</i> — without it,
+     * an unloaded coordinate resolves to {@code null} and the RTP pipeline
+     * attributes every attempt to {@code nullChunk/asyncLoadNull}, which is
+     * exactly what we observed in the 2026-05-03 Fabric 1.21.1 smoke test.
+     *
+     * <p><b>Why not the non-blocking {@code getChunkFutureMainThread} path?</b>
+     * An earlier revision routed through reflective {@code getChunkFutureMainThread}
+     * to avoid blocking the tick thread on generation, but that method's
+     * intermediary mapping varies across MC patch releases AND it can resolve
+     * with an "unloaded" payload that the unwrapper legitimately
+     * decodes as {@code null} — producing the same 32×{@code asyncLoadNull}
+     * failure mode but for a different reason. The simpler
+     * {@code cache.getChunk(..., true)} call is the public, version-stable
+     * vanilla API and is the same call vanilla itself uses for
+     * {@code /forceload} and command-driven generation.
+     *
+     * <p><b>Tick-lag note.</b> This call <i>does</i> block the server tick
+     * thread for the duration of generation on a cache miss. In practice the
+     * RTP pipeline's anvil pre-filter (ADR-016) reads NBT directly from
+     * {@code .mca} files without loading chunks, so the bulk of pre-fill
+     * work bypasses this path entirely; only the final placement chunk is
+     * loaded synchronously here. Acceptable per user-confirmed scope on
+     * 2026-05-03.
      */
     @Override
     public CompletableFuture<Long> getChunkAt(int chunkX, int chunkZ) {
@@ -147,6 +148,8 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
             // (which delegates to this method).
             totalChunkLoads.incrementAndGet();
             ServerChunkCache cache = world.getChunkSource();
+            // load=true => generate-if-absent. This is the contract that makes
+            // RTP work on freshly-explored coordinates; do NOT change to false.
             ChunkAccess chunk = cache.getChunk(chunkX, chunkZ, ChunkStatus.FULL, true);
             if (chunk != null) {
                 chunkCache.put(key, new WeakReference<>(chunk));

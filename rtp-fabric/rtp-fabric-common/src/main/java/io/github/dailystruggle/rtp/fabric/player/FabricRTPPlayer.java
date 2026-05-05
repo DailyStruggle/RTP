@@ -36,8 +36,25 @@ public final class FabricRTPPlayer implements RTPPlayer {
 
     public FabricRTPPlayer(ServerPlayer player) {
         this.uuid = player.getUUID();
-        this.name = player.getGameProfile().getName();
+        this.name = resolveName(player);
         this.handle = player;
+    }
+
+    /**
+     * Resolves the player's name in a way that is resilient to authlib API drift.
+     * <p>In authlib versions shipped with Minecraft 1.21.6+, {@link com.mojang.authlib.GameProfile}
+     * was converted to a record and the legacy {@code getName()} accessor was removed in favour
+     * of the record component {@code name()}. Calling the old method via reflection-free linkage
+     * raises {@link NoSuchMethodError} at runtime (see crash on 1.21.11). Falling back to the
+     * Entity-level display name avoids binding to either {@code GameProfile} accessor shape.
+     */
+    private static String resolveName(ServerPlayer player) {
+        try {
+            return player.getGameProfile().getName();
+        } catch (NoSuchMethodError ignored) {
+            // authlib record-shape: no getName(); fall through to Entity name.
+        }
+        return player.getName().getString();
     }
 
     /** Called by the event bridge when a player rejoins; refreshes the handle. */
@@ -64,9 +81,22 @@ public final class FabricRTPPlayer implements RTPPlayer {
     public boolean hasPermission(String permission) {
         // Step F replaces this with fabric-permissions-api lookup.
         // Fallback: op level >= 2 is the closest Fabric analogue to a permission grant.
+        // NOTE: We deliberately avoid ServerPlayer#hasPermissions(int) — its
+        // intermediary mapping (class_3222.method_5687) drifts across MC patch
+        // releases and triggers NoSuchMethodError at runtime (same family as
+        // SharedConstants.getCurrentVersion().getName() and Util.backgroundExecutor()
+        // documented in RTPFabricMod / FabricScheduler). Route through the
+        // server's PlayerList op check, which uses GameProfile-keyed lookup
+        // and is stable across versions.
         ServerPlayer p = handle;
         if (p == null) return false;
-        return p.hasPermissions(2);
+        try {
+            return p.server.getPlayerList().isOp(p.getGameProfile());
+        } catch (Throwable t) {
+            // Best-effort: if even this drifts on a future MC release, fall
+            // back to "no permission" rather than crashing the pipeline.
+            return false;
+        }
     }
 
     @Override

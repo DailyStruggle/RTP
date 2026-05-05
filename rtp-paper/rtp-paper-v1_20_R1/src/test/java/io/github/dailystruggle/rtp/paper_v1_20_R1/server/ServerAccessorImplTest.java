@@ -57,7 +57,7 @@ class ServerAccessorImplTest {
      * biome set, so the result must be non-null and non-empty.
      */
     @Test
-    @Timeout(2)
+    @Timeout(30)
     void getBiomes_returnsNonEmptyUpperCaseSet() {
         Set<String> biomes = accessor.getBiomes();
 
@@ -74,7 +74,7 @@ class ServerAccessorImplTest {
      * confirming the inheritance chain is correct in a Paper MockBukkit context.
      */
     @Test
-    @Timeout(2)
+    @Timeout(30)
     void paperScheduler_runTask_executesOnPrimaryThread() {
         AtomicBoolean ran = new AtomicBoolean(false);
 

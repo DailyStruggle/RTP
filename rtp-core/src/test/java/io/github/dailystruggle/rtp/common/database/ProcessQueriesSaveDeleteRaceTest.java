@@ -16,35 +16,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Regression test for the "Successfully loaded 121 locations for default" bug.
- *
- * <p>Root cause:
- *
- * <p>{@link DatabaseAccessor#saveCachedLocation} parks the row in
- * {@link DatabaseAccessor#dirtyCache} and is only promoted onto
- * {@code writeQueue} when {@link DatabaseAccessor#flushDirtyCache()} runs (every
- * 5 minutes via {@code RTP.start}). But {@link DatabaseAccessor#deleteCachedLocation}
- * (and {@link DatabaseAccessor#removeCachedLocation}) bypass {@code dirtyCache}
- * and append directly to {@code deleteQueue}. The per-tick flush
- * ({@code processQueries}, every 60 ticks via {@code AbstractSQLDatabaseAccessor.flush})
- * drains both queues.
- *
- * <p>The result is an order inversion: when a location is offered (save into
- * {@code dirtyCache}) and then polled (delete enqueued onto {@code deleteQueue})
- * inside the same flush window, {@code processQueries} can run the delete
- * BEFORE the save has been promoted out of {@code dirtyCache}. The delete is
- * a no-op (the row isn't in the table yet) and the subsequent
- * {@code flushDirtyCache} cycle then merges the row into the table. The
- * paired {@code deleteCachedLocation} call has already been consumed —
- * nothing else will remove the row.
- *
- * <p>Each save+poll cycle that hits this race leaves one ghost row behind.
- * Over a few hours of normal traffic the {@code rtp_cached_locations} table
- * accumulates dozens to hundreds of rows for locations that no longer exist
- * in memory. On the next boot, hydration reads them all back and emits the
- * impossible "Successfully loaded 121 locations for default" banner.
- *
- * <p>This test reproduces the inversion deterministically.
+ * Regression for the "Successfully loaded N locations" ghost-row bug.
+ * Race: {@code saveCachedLocation} parks rows in {@code dirtyCache} (promoted
+ * onto {@code writeQueue} only every 5 min by {@code flushDirtyCache}), while
+ * {@code deleteCachedLocation} bypasses {@code dirtyCache} and goes straight
+ * to {@code deleteQueue}. The per-tick {@code processQueries} drain can run
+ * the delete before the save is promoted, leaving the delete a no-op; the
+ * later {@code flushDirtyCache} then merges the orphaned row.
  */
 class ProcessQueriesSaveDeleteRaceTest {
 

@@ -54,34 +54,10 @@ public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E
   public abstract int maxY();
 
   /**
-   * Probe-backed fast path for Y selection, used by the biome-lookup pipeline
-   * (see {@code docs/dev/BIOME_LOOKUP_PERF_PLAN.md}).
-   *
-   * <p>Implementations inspect the supplied {@link ChunkColumnProbe}'s center
-   * column over {@code [probe.minY(), probe.maxY()]} and return the absolute
-   * world coordinates of an acceptable Y, or {@code null} if:
-   * <ul>
-   *   <li>no acceptable Y was found on the center column, or</li>
-   *   <li>the adjustor's policy relies on data the probe cannot answer
-   *       (e.g. sky-light, non-center columns) — the caller shall fall back
-   *       to the authoritative {@link #adjust(RTPChunk)} path.</li>
-   * </ul>
-   *
-   * <p>The default implementation returns {@code null} (UNKNOWN). Concrete
-   * subclasses override to provide a probe-backed scan; the authoritative
-   * {@link #adjust(RTPChunk)} path remains the source of truth and is still
-   * invoked for every candidate this method returns, unless the caller
-   * opts into a probe-only pipeline.</p>
-   *
-   * <p>This method is called on the same async thread as {@code biomeAt}
-   * lookups; implementations must not perform synchronous chunk I/O
-   * (<strong>S-005</strong>).</p>
-   *
-   * @param probe     lean center-column view of a single chunk.
-   * @param worldName name of the world the probe belongs to, used to
-   *     populate the returned {@link RTPCoords}.
-   * @return world-space coordinates of an acceptable Y, or {@code null}
-   *     for UNKNOWN / NO-MATCH — callers treat these two the same.
+   * Probe-backed fast path for Y selection (BIOME_LOOKUP_PERF_PLAN). Default returns
+   * null (UNKNOWN); subclasses override to scan the probe's center column over
+   * {@code [probe.minY(), probe.maxY()]}. Returning null means UNKNOWN or NO-MATCH
+   * — caller falls back to {@link #adjust(RTPChunk)}. Async-safe; no chunk I/O (S-005).
    */
   public @Nullable RTPCoords adjustFromProbe(
       @NotNull ChunkColumnProbe probe, @NotNull String worldName) {
@@ -148,19 +124,9 @@ public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E
   }
 
   /**
-   * Reports whether this adjustor's Y-acceptance policy consults sky-light at the
-   * column (i.e. whether it needs authoritative {@code SkyLight} + {@code isLightOn}
-   * data retained by a {@link ChunkColumnProbe}). Callers use this flag to set
-   * {@code includeSkyLight} when requesting a probe from
-   * {@link io.github.dailystruggle.rtp.api.world.RTPWorld#probeChunkColumn(int, int, int, int, boolean)},
-   * avoiding the ~2 KiB / retained-section cost of the {@code SkyLight} tag when
-   * the adjustor would ignore it anyway.
-   *
-   * <p>The default is {@code false} (no sky-light consultation). Concrete adjustors
-   * with a configurable {@code requireSkyLight} option override to reflect the
-   * current config value.</p>
-   *
-   * @return {@code true} iff this adjustor currently requires sky-light data.
+   * Whether this adjustor consults sky-light. Callers use this to set
+   * {@code includeSkyLight} on probe requests, saving ~2 KiB per retained section
+   * when false. Default false; override when {@code requireSkyLight} is configurable.
    */
   public boolean requiresSkyLight() {
     return false;

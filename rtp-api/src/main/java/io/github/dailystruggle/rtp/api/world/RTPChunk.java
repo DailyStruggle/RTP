@@ -86,27 +86,11 @@ public abstract class RTPChunk<T> {
   public abstract boolean isSafe(int x, int y, int z, Set<String> unsafeBlocks);
 
   /**
-   * Compiled-form overload of {@link #isSafe(int, int, int, Set)} introduced by ADR-017.
-   *
-   * <p>Platform adapters that can extract live tag membership and block-property data
-   * from their native {@code BlockData} / {@code Tag} APIs override this to evaluate
-   * the candidate directly against the supplied {@link CompiledUnsafeSet}, skipping the
-   * per-call parse-and-compile step that the legacy {@code Set<String>} overload
-   * performs via {@code SafetyCompilationCache}. Adapters that do not override fall back
-   * to a best-effort evaluation against the compiled set's plain-material bucket only;
-   * state and tag predicates are silently inert on such adapters.</p>
-   *
-   * <p>The default implementation delegates to the legacy {@link #isSafe(int, int, int, Set)}
-   * overload using {@link CompiledUnsafeSet#plainMaterials()} as the string set, which
-   * preserves backward-compatible behaviour for adapters that have not yet migrated.
-   * New platform implementations should override this method.</p>
-   *
-   * @param x the block's X coordinate relative to the chunk (0-15).
-   * @param y the block's Y coordinate.
-   * @param z the block's Z coordinate relative to the chunk (0-15).
-   * @param unsafeBlocks pre-compiled safety rules. Must not be {@code null}; pass
-   *     {@link CompiledUnsafeSet#EMPTY} for "nothing is unsafe".
-   * @return {@code true} iff the block at the given coordinates is considered safe.
+   * Compiled-form overload (ADR-017). Adapters with native tag/property access
+   * should override and evaluate against the {@link CompiledUnsafeSet} directly;
+   * the default delegates to {@link #isSafe(int, int, int, Set)} using the plain
+   * materials bucket only — tag/state predicates are inert until overridden.
+   * Pass {@link CompiledUnsafeSet#EMPTY} for "nothing unsafe".
    */
   public boolean isSafe(int x, int y, int z, CompiledUnsafeSet unsafeBlocks) {
     Objects.requireNonNull(unsafeBlocks, "unsafeBlocks");

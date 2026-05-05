@@ -65,7 +65,11 @@ public class BukkitEffectsHandler {
                                                     .forEach(
                                                             effect -> {
                                                                 effect.setTarget(player);
-                                                                effect.run();
+                                                                // Schedule on the main thread so platform-restricted ops
+                                                                // inside Effect#run (NoteEffect#setBlockData, FireworkEffect
+                                                                // spawn) don't trip Paper's AsyncCatcher. Effect extends
+                                                                // BukkitRunnable, so runTask handles main-thread dispatch.
+                                                                try { effect.runTask(plugin); } catch (Throwable t) { effect.run(); }
                                                             });
                                         });
                     }
@@ -91,7 +95,11 @@ public class BukkitEffectsHandler {
                                                     .forEach(
                                                             effect -> {
                                                                 effect.setTarget(player);
-                                                                effect.run();
+                                                                // Schedule on the main thread so platform-restricted ops
+                                                                // inside Effect#run (NoteEffect#setBlockData, FireworkEffect
+                                                                // spawn) don't trip Paper's AsyncCatcher. Effect extends
+                                                                // BukkitRunnable, so runTask handles main-thread dispatch.
+                                                                try { effect.runTask(plugin); } catch (Throwable t) { effect.run(); }
                                                             });
                                         });
                     }
@@ -117,7 +125,11 @@ public class BukkitEffectsHandler {
                                                     .forEach(
                                                             effect -> {
                                                                 effect.setTarget(player);
-                                                                effect.run();
+                                                                // Schedule on the main thread so platform-restricted ops
+                                                                // inside Effect#run (NoteEffect#setBlockData, FireworkEffect
+                                                                // spawn) don't trip Paper's AsyncCatcher. Effect extends
+                                                                // BukkitRunnable, so runTask handles main-thread dispatch.
+                                                                try { effect.runTask(plugin); } catch (Throwable t) { effect.run(); }
                                                             });
                                         });
                     }
@@ -143,7 +155,11 @@ public class BukkitEffectsHandler {
                                                     .forEach(
                                                             effect -> {
                                                                 effect.setTarget(player);
-                                                                effect.run();
+                                                                // Schedule on the main thread so platform-restricted ops
+                                                                // inside Effect#run (NoteEffect#setBlockData, FireworkEffect
+                                                                // spawn) don't trip Paper's AsyncCatcher. Effect extends
+                                                                // BukkitRunnable, so runTask handles main-thread dispatch.
+                                                                try { effect.runTask(plugin); } catch (Throwable t) { effect.run(); }
                                                             });
                                         });
                     }
@@ -169,7 +185,11 @@ public class BukkitEffectsHandler {
                                                     .forEach(
                                                             effect -> {
                                                                 effect.setTarget(player);
-                                                                effect.run();
+                                                                // Schedule on the main thread so platform-restricted ops
+                                                                // inside Effect#run (NoteEffect#setBlockData, FireworkEffect
+                                                                // spawn) don't trip Paper's AsyncCatcher. Effect extends
+                                                                // BukkitRunnable, so runTask handles main-thread dispatch.
+                                                                try { effect.runTask(plugin); } catch (Throwable t) { effect.run(); }
                                                             });
                                         });
                     }
@@ -279,7 +299,11 @@ public class BukkitEffectsHandler {
                                                     .forEach(
                                                             effect -> {
                                                                 effect.setTarget(player);
-                                                                effect.run();
+                                                                // Schedule on the main thread so platform-restricted ops
+                                                                // inside Effect#run (NoteEffect#setBlockData, FireworkEffect
+                                                                // spawn) don't trip Paper's AsyncCatcher. Effect extends
+                                                                // BukkitRunnable, so runTask handles main-thread dispatch.
+                                                                try { effect.runTask(plugin); } catch (Throwable t) { effect.run(); }
                                                             });
                                         });
                     }
@@ -309,7 +333,8 @@ public class BukkitEffectsHandler {
                                                 .forEach(
                                                         effect -> {
                                                             effect.setTarget(player);
-                                                            effect.run();
+                                                            // Main-thread dispatch (see comment at presetup site).
+                                                            try { effect.runTask(plugin); } catch (Throwable t) { effect.run(); }
                                                         });
                                     });
                 });
@@ -336,7 +361,8 @@ public class BukkitEffectsHandler {
                                                 .forEach(
                                                         effect -> {
                                                             effect.setTarget(player);
-                                                            effect.run();
+                                                            // Main-thread dispatch (see comment at presetup site).
+                                                            try { effect.runTask(plugin); } catch (Throwable t) { effect.run(); }
                                                         });
                                     });
                 });
@@ -363,7 +389,8 @@ public class BukkitEffectsHandler {
                                                 .forEach(
                                                         effect -> {
                                                             effect.setTarget(player);
-                                                            effect.run();
+                                                            // Main-thread dispatch (see comment at presetup site).
+                                                            try { effect.runTask(plugin); } catch (Throwable t) { effect.run(); }
                                                         });
                                     });
                 });

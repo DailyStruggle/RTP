@@ -36,15 +36,70 @@ public class FireworkEffect extends Effect<FireworkTypeNames> {
         this.defaults = data.clone();
     }
 
+    /**
+     * Test seam: dispatch a region-bound task at {@code location}. Returns
+     * {@code true} when the task was dispatched (or executed) by a Folia-style
+     * region scheduler; {@code false} otherwise. Default implementation
+     * resolves {@code Bukkit.getRegionScheduler()} reflectively so
+     * {@code effects-api} keeps zero compile-time dependency on the Folia API.
+     */
+    @FunctionalInterface
+    interface RegionDispatcher {
+        boolean dispatch(org.bukkit.plugin.Plugin caller, Location location, Runnable task);
+    }
+
+    static volatile RegionDispatcher regionDispatcher = (caller, loc, task) -> {
+        if (!isFolia()) return false;
+        try {
+            Object regionScheduler = Bukkit.class
+                    .getMethod("getRegionScheduler").invoke(null);
+            regionScheduler.getClass()
+                    .getMethod("run", org.bukkit.plugin.Plugin.class, Location.class,
+                            java.util.function.Consumer.class)
+                    .invoke(regionScheduler, caller, loc,
+                            (java.util.function.Consumer<Object>) t -> task.run());
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
+    };
+
     @Override
     public void run() {
         if (target instanceof Entity) target = ((Entity) target).getLocation();
-        if(!Bukkit.isPrimaryThread()) {
-            Bukkit.getScheduler().runTask(EffectsAPI.fireworkSafetyListener.caller, this);
+        // Folia: there is no global "primary thread"; chunk/region scheduling is
+        // required. Use the RegionScheduler keyed on the spawn location so the
+        // firework spawn happens on the owning region thread. On Spigot/Paper
+        // Bukkit.isPrimaryThread() works as before.
+        org.bukkit.plugin.Plugin caller = (EffectsAPI.fireworkSafetyListener != null)
+                ? EffectsAPI.fireworkSafetyListener.caller
+                : EffectsAPI.getInstance();
+        Location loc = (Location) target;
+        if (regionDispatcher.dispatch(caller, loc, () -> spawnFirework(loc))) {
             return;
         }
+        if(!Bukkit.isPrimaryThread()) {
+            Bukkit.getScheduler().runTask(caller, this);
+            return;
+        }
+        spawnFirework(loc);
+    }
 
-        Location location = (Location) target;
+    /**
+     * Class-probe for Folia. Independent of any plugin instance and safe to
+     * evaluate from {@code effects-api} (which has no compile-time dependency
+     * on Folia API).
+     */
+    static boolean isFolia() {
+        try {
+            Class.forName("io.papermc.paper.threadedregions.RegionizedServer");
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
+    }
+
+    private void spawnFirework(Location location) {
 
         int numFireworks = 1;
         double dx=0, dy=1, dz=0;

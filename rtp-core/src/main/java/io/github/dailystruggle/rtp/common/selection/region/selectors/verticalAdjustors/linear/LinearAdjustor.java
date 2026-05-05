@@ -360,39 +360,9 @@ public class LinearAdjustor extends VerticalAdjustor<GenericVerticalAdjustorKeys
   }
 
   /**
-   * Probe-backed fast path mirroring {@link #adjust(RTPChunk, MutableRTPCoords)}'s scan modes
-   * on the center column of the supplied probe (local {@code x=8, z=8}).
-   *
-   * <p>Returns {@code null} (fall back to the live {@link #adjust} vert method) when:
-   * <ul>
-   *   <li>the probe's window does not cover the adjustor's {@code [minY, maxY]},</li>
-   *   <li>{@code requireSkyLight} is true and the probe's on-disk sky-light is
-   *       stale ({@link ChunkColumnProbe#isLightOn()} false) <em>and</em> the
-   *       heightmap-derived sky-access proxy can't be trusted either (no
-   *       heightmap, or the column has a non-air block above the reported top —
-   *       cave roof, ravine overhang, structure ceiling, player edit, or an
-   *       older-version chunk whose noise maps no longer correlate with the
-   *       heightmap),</li>
-   *   <li>no acceptable Y was found on the center column.</li>
-   * </ul>
-   *
-   * <p>Sky-light decision tree when {@code requireSkyLight} is true:
-   * <ol>
-   *   <li>{@code isLightOn} true → trust {@link ChunkColumnProbe#skyLightAt(int)}
-   *       and apply the same {@code &gt; 7} threshold as {@link #adjust}.</li>
-   *   <li>{@code isLightOn} false + heightmap present + verified open from
-   *       {@code heightmapTopY+1} through {@code maxY} → accept any
-   *       {@code y+1 &gt; heightmapTopY} as sky-access (vanilla guarantees
-   *       sky-light = 15 above the {@code MOTION_BLOCKING_NO_LEAVES} top once
-   *       the light engine finalises). The verification step exists because
-   *       the heightmap alone is not authoritative — caves/ravines/structures
-   *       and player edits routinely contradict it; we re-check the column
-   *       blocks the probe already carries before trusting the proxy. Light
-   *       data is validated separately at the unkept→kept chunk-load handoff
-   *       (live vert fallback path).</li>
-   *   <li>{@code isLightOn} false + heightmap absent or contradicted →
-   *       return {@code null} and let the live vert method handle it.</li>
-   * </ol>
+   * Probe-backed fast path mirroring {@link #adjust(RTPChunk, MutableRTPCoords)}.
+   * Returns {@code null} (fall back to live {@link #adjust}) when the probe
+   * window doesn't cover {@code [minY, maxY]} or no acceptable Y was found.
    */
   @Override
   public @Nullable RTPCoords adjustFromProbe(

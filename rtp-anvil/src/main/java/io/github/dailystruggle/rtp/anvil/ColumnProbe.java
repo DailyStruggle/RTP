@@ -5,36 +5,14 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Lean, read-only view of a single chunk's <em>center column</em> ({@code lx=8, lz=8})
- * over a caller-supplied world-Y window, produced by
- * {@link AnvilReader#readColumnProbe(byte[], int, int, int, int)}.
- *
- * <p>Built from a <i>selectively</i>-parsed chunk NBT root (see
- * {@link Nbt#readRootCompoundSelective}): non-relevant root children (e.g.
- * {@code block_entities}, {@code structures}, {@code Entities}, tick queues) and
- * non-relevant section children ({@code BlockLight}, {@code SkyLight}) are never
- * materialised. For center-column queries — the only queries this probe answers —
- * this yields the same answers
- * {@link AnvilChunkView#blockIdAt}/{@link AnvilChunkView#getBiomeAt} would at
- * {@code (8, y, 8)}, while doing substantially less allocation and NBT-parse work.
- *
- * <p>The probe is intentionally minimal. It does <b>not</b> answer queries at arbitrary
- * {@code (x, z)} coordinates — {@link AnvilChunkView} is the right target for those. The
- * per-candidate biome-lookup optimization (see {@code docs/dev/BIOME_LOOKUP_PERF_PLAN.md})
- * is framed around "one candidate per chunk, center column", which is what this type
- * serves.
- *
- * @param minY               inclusive lower world-Y bound supplied at construction
- * @param maxY               inclusive upper world-Y bound supplied at construction
- * @param heightmapTopY      world-Y of the top motion-blocking, no-leaves block at the
- *                           chunk's {@code (8, 8)} column, or {@link Integer#MIN_VALUE}
- *                           when the {@code MOTION_BLOCKING_NO_LEAVES} heightmap was
- *                           absent/malformed (callers should treat as a hint, not as
- *                           authoritative)
- * @param sections           block-state sections covering the probe's Y window (may
- *                           overshoot when sections straddle {@code minY}/{@code maxY};
- *                           callers use {@link #blockAt(int)} which bounds-checks)
- * @param biomeSections      biome sections paralleling {@code sections}
+ * Lean read-only view of a chunk's center column ({@code lx=8, lz=8}) over a
+ * caller-supplied Y window, produced by
+ * {@link AnvilReader#readColumnProbe(byte[], int, int, int, int)}. Built from a
+ * selectively-parsed NBT root (block_entities, structures, Entities, light
+ * sections are skipped). {@code blockAt(int)} answers the same as
+ * {@link AnvilChunkView#blockIdAt} at {@code (8, y, 8)} with much less alloc.
+ * {@code heightmapTopY = Integer.MIN_VALUE} when the {@code MOTION_BLOCKING_NO_LEAVES}
+ * heightmap is absent/malformed.
  */
 public record ColumnProbe(int minY,
                           int maxY,

@@ -6,7 +6,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); version
 
 ---
 
-## [3.0.0-beta.1] — Unreleased
+## [3.0.0-beta.2] — Unreleased
+
+### Fixed
+
+- **Per-permission effects did not fire under RTP-lite.** The lite bootstrap (`RTPBukkitLitePlugin`) omitted the deferred `BukkitEffectsHandler.setupEffects(...)` call that the full bootstrap schedules at tick+1, and the lite `performance.yml` removed the `effectParsing` key, so the per-stage `rtp.effect.<stage>` permission gate inside the effects handler evaluated to `false` and no effects were ever registered against the teleport pipeline. Fix: schedule `BukkitEffectsHandler.setupEffects(null)` at tick+1 from the lite bootstrap (the `plugin` parameter is unused inside `setupEffects` — event dispatch goes through `Bukkit.getPluginManager()`, so passing `null` avoids the lite bootstrap touching the full-edition singleton), and re-introduce `effectParsing: true` in the lite-shaded `performance.yml`. ADR-024's "lite OMITS" list is amended to drop `effectParsing`; `onEventParsing`, `loginCacheEnabled`, `loginCacheCap`, and `visitorEnabled` remain omitted as ADR-024 specifies.
+
+### Added
+
+- **`FixedAdjustor` vertical adjustor (`vert: FIXED`).** Third vertical-adjustor engine alongside `LINEAR` and `JUMP`: places the player at a single configured Y level in mid-air, with no terrain scan. Intended for skyblock-style worlds where the platform tool builds a foothold around the player after teleport. Single config key `y` (default `64`). Acceptance rule: the destination cell `(x, y, z)` and the head cell `(x, y+1, z)` must both be air; any non-air block in either cell is treated as unsafe and the chunk is rejected so `ScanTask` rolls a different one. Implements both the live-chunk and `ChunkColumnProbe` paths so it stays S-005-compliant on every platform; `requiresSkyLight()` returns `false` and `minY`/`maxY` expose the configured Y window. Registered under factory name `"fixed"` next to `LinearAdjustor` / `JumpAdjustor`. Admins **must** enable the platform tool when selecting `FIXED` — without it, players fall straight through air. Documented in `docs/admin/REGIONS.md` (new `FIXED` section + skyblock tip). Covered by `FixedAdjustorTest` (8 tests).
+
+---
+
+## [3.0.0-beta.1] — 2026-05-03
 
 > ⚠️ **Major release — breaking `rtp-api` changes.** See [MIGRATION.md](docs/admin/MIGRATION.md#upgrading-to-300-beta) for upgrade instructions.
 

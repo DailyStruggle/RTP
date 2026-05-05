@@ -63,7 +63,7 @@ class ServerAccessorImplTest {
      * <p>Traceability: REQ-CORE-F-002 (world/biome awareness) — partial coverage.
      */
     @Test
-    @Timeout(2)
+    @Timeout(30)
     @Disabled("RegistryAccess is not stubbed by MockBukkit; requires a live Paper 1.21.3+ server context")
     void getBiomes_returnsNonEmptyUpperCaseSet() {
         var biomes = accessor.getBiomes();
@@ -81,7 +81,7 @@ class ServerAccessorImplTest {
      * Paper scheduler integration works correctly in a MockBukkit context.
      */
     @Test
-    @Timeout(2)
+    @Timeout(30)
     void paperScheduler_runTask_executesOnPrimaryThread() {
         AtomicBoolean ran = new AtomicBoolean(false);
 

@@ -14,44 +14,13 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code rtp test economy-isolation} &mdash; proves that economy (Vault)
- * transactions are dispatched off of Folia Region Tick Threads and onto
- * the Global Region Scheduler or the Async Scheduler, per the
- * {@code Vault Isolation} rule in {@code .junie/AGENTS.md} and
- * {@code RUNTIME_TEST_SUITE_PLAN.md §rtp test economy}.
- *
- * <p>The job does not require Vault to be installed: it injects a
- * synthetic debit transaction (a no-op {@link Runnable} tagged with an
- * amount) and verifies the <i>execution context</i> of that transaction.
- * What it asserts:
- * <ol>
- *   <li>The transaction Runnable actually runs (i.e. the dispatch
- *       reaches a scheduler tier and completes within
- *       {@link #PROBE_TIMEOUT_MS}).</li>
- *   <li>The thread that executes the Runnable is <b>not</b> the Region
- *       Tick Thread that owns the caller's current chunk &mdash; it is
- *       either the Global Region Scheduler, the Async Scheduler, or (on
- *       non-Folia platforms) the primary server thread.</li>
- *   <li>No {@code ThreadAccessException} (or any other
- *       {@link Throwable}) escapes the probe; if one is thrown it is
- *       caught, reported as a test failure, and the server continues.
- *       This satisfies REQ-RTP-S-004 (no silent failure) without
- *       crashing the host.</li>
- * </ol>
- *
- * <p>Folia's {@code ThreadAccessException} is referenced by simple name
- * only (via {@link Throwable#getClass()}), so this class compiles on all
- * Bukkit-family platforms including Spigot and Paper where that
- * exception type does not exist.
- *
- * <p>Safety compliance:
- * <ul>
- *   <li><b>REQ-RTP-S-004</b> &mdash; every outcome (ok, wrong-thread,
- *       timeout, exception) produces a player-visible line and a log
- *       entry at {@link Level#INFO} or {@link Level#WARNING}.</li>
- *   <li><b>REQ-RTP-S-005</b> &mdash; the probe performs no chunk I/O;
- *       it dispatches an empty transaction Runnable.</li>
- * </ul>
+ * {@code rtp test economy-isolation} — verifies Vault-style debits dispatch off
+ * Folia Region Tick Threads (AGENTS.md "Vault Isolation"). Injects a synthetic
+ * Runnable, asserts it runs within {@link #PROBE_TIMEOUT_MS} on a thread other
+ * than the caller's region thread, and reports any {@code ThreadAccessException}
+ * as a test failure (REQ-RTP-S-004). Performs no chunk I/O (REQ-RTP-S-005).
+ * {@code ThreadAccessException} is referenced by simple name only so this class
+ * compiles on Spigot/Paper where the type doesn't exist.
  */
 public class EconomyIsolationTestJob extends BaseRTPCmdImpl {
 
