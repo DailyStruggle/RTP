@@ -129,7 +129,7 @@ Informal language used in chat and issues, mapped to the actual code symbol. Use
 | "spiral" / "spiral math" | Archimedean spiral 1D mapping; see [ADR-001](../docs/adr/ADR-001-archimedean-spiral-1d-mapping.md) and `docs/dev/CONCEPTS.md` | The bounded-distribution algorithm. |
 | "anvil" / "anvil prefilter" | `rtp-anvil` module; see [ADR-016](../docs/adr/ADR-016-anvil-subsystem.md) | NBT-based pre-filter for biome/material checks without loading chunks. |
 | "claim plugin" / "claim integration" | Folded into plugin per [ADR-019](../docs/adr/ADR-019-claim-plugin-integrations-folded-into-plugin.md); enforced by S-003 | No inline claim calls in pipeline or commands. |
-| "Brigadier bridge" | `BrigadierCommandAdapter` + `BrigadierBridgeContext` in `commands-api/`; see [ADR-014](../docs/adr/ADR-014-brigadier-bridge-via-commands-api.md) | Used by Paper/Folia and (planned) Velocity. |
+| "Brigadier bridge" | `BrigadierCommandAdapter` + `BrigadierBridgeContext` in `commands-api/`; see [commands-api-ADR-001](../commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md) | Used by Paper/Folia and (planned) Velocity. |
 | "DB accessor" / "database accessor" | `AbstractSQLDatabaseAccessor` (+ `H2`/`SQLite`/`MySQL`/`PostgreSQL` concrete) | Reuse for any persistence; HikariCP-backed. |
 | "the lite jar" / "lite assembly" | See [ADR-024](../docs/adr/ADR-024-rtp-lite-assembly-variant.md) | Trimmed assembly variant, not a separate codebase. |
 | "the proxy plan" / "multi-server plan" / "network mode" | [`docs/dev/MULTI_SERVER_PLAN.md`](../docs/dev/MULTI_SERVER_PLAN.md) | Velocity/BungeeCord cross-server work, D-005 gated. Distinct from `MULTI_PLATFORM_PLAN.md`. |
@@ -218,6 +218,21 @@ To minimise time spent on unrelated fixes, record incidental discoveries instead
 
 ---
 
+## CHANGELOG Hygiene (diff against the last released tag, not the working tree)
+
+`CHANGELOG.md` entries under an unreleased version (e.g., `[3.0.0-beta.2] — Unreleased`) describe the **net delta from the last released version** (e.g., `v3.0.0-beta.1`), not the delta between any two intermediate working-tree states. In-progress work that was added and later reverted within the same unreleased cycle is a **net-zero change** and must not appear in the changelog.
+
+Before adding, editing, or reframing any bullet under an unreleased heading:
+
+1. Identify the last released git tag for the version line (e.g., `git describe --tags --abbrev=0` or check the `[X.Y.Z]: https://github.com/...compare/...` link table at the bottom of `CHANGELOG.md`).
+2. Diff the relevant files against that tag, **not** against `HEAD~1` or the working tree: `git diff <last-released-tag> -- <path>`.
+3. Only document what is true in that diff. If a knob, default, or symbol is identical in the working tree and at the released tag, do **not** mention it — even if it was touched in intermediate commits.
+4. Avoid framing entries as a delta from another *unreleased* state ("now also ...", "matching the project-wide default already documented in `beta.1`"). Describe the version's contents in absolute terms.
+
+Common failure mode (and the trigger for this rule): rewriting a changelog bullet using only the most recent commit's diff or the current `git status`, which exposes intra-cycle churn (added-then-removed defaults, added-then-renamed symbols) that the released audience never sees.
+
+---
+
 ## Logging & Feedback
 
 - Use `RTP.log()` / `RTPServerAccessor.log()` in `rtp-core` and `rtp-api`. Never `Bukkit.getLogger()` or `System.out.println`.
@@ -255,9 +270,9 @@ To minimise time spent on unrelated fixes, record incidental discoveries instead
 
 ## Current Development Focus
 
-Active frontier: **Fabric (`rtp-fabric`)** — first-class, in-scope platform as of 2026-04-30 ([ADR-022](../docs/adr/ADR-022-fabric-platform-in-scope.md)). Unstable — see [`MULTI_PLATFORM_PLAN.md`](../docs/dev/MULTI_PLATFORM_PLAN.md) for phase status and known blockers (S-005 violation in `FabricWorld.getChunkAt`; null stub in `FabricServerAccessor.getLocationGenerator`; unresolved Loom dependency).
+Active frontier: **Fabric (`rtp-fabric`)** — first-class, in-scope platform as of 2026-04-30 ([rtp-fabric-ADR-002](../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md), renumbered from ADR-022 on 2026-05-05). Unstable — see [`MULTI_PLATFORM_PLAN.md`](../docs/dev/MULTI_PLATFORM_PLAN.md) for phase status and known blockers (S-005 violation in `FabricWorld.getChunkAt`; null stub in `FabricServerAccessor.getLocationGenerator`; unresolved Loom dependency).
 
-Do not backport Fabric-specific patterns into `rtp-core` or `rtp-api`. Safe-to-modify modules: `rtp-core`, `rtp-api`, `rtp-spigot`, `rtp-paper`, `rtp-folia`, `rtp-fabric`, `addons/`. Brigadier bridge rationale: [ADR-014](../docs/adr/ADR-014-brigadier-bridge-via-commands-api.md). `rtp-api` abstractions were confirmed sufficient for Fabric (April 2026 gap analysis) — gaps are implementation gaps, not interface gaps. Forge / NeoForge remain out of scope until Fabric stabilizes (Phase 4).
+Do not backport Fabric-specific patterns into `rtp-core` or `rtp-api`. Safe-to-modify modules: `rtp-core`, `rtp-api`, `rtp-spigot`, `rtp-paper`, `rtp-folia`, `rtp-fabric`, `addons/`. Brigadier bridge rationale: [commands-api-ADR-001](../commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md). `rtp-api` abstractions were confirmed sufficient for Fabric (April 2026 gap analysis) — gaps are implementation gaps, not interface gaps. Forge / NeoForge remain out of scope until Fabric stabilizes (Phase 4).
 
 ---
 
@@ -288,7 +303,8 @@ When you discover something durable, record it in the **correct** file:
 | Roadmap phase completion / decision change (metrics axis) | [`METRICS_PLAN.md`](../docs/dev/METRICS_PLAN.md) |
 | Renamed / moved class referenced by a REQ-* | [`docs/dev/TRACEABILITY.md`](../docs/dev/TRACEABILITY.md) row |
 | New REQ-traceable test | [`docs/dev/TRACEABILITY.md`](../docs/dev/TRACEABILITY.md) row |
-| Architecturally significant decision | New ADR under [`docs/adr/`](../docs/adr/) (use `ADR-TEMPLATE.md`) |
+| Architecturally significant decision (project-wide) | New ADR under [`docs/adr/`](../docs/adr/) (use `ADR-TEMPLATE.md`) |
+| Architecturally significant decision (single subproject — e.g. `effects-api`, `commands-api`, `rtp-api`, an addon) | New ADR under `<subproject>/docs/adr/` (e.g. [`effects-api/docs/adr/`](../effects-api/docs/adr/)); use the **per-directory naming `<subproject>-ADR-NNN-<slug>.md`** with numbering that restarts at `001` inside that directory (e.g. `effects-api-ADR-003-…`), and add a row to the *Subproject ADRs* table in [`docs/adr/README.md`](../docs/adr/README.md). The global `docs/adr/` directory keeps its own independent `ADR-NNN-…` sequence. |
 | Incidental potential bug found while doing unrelated work | [`docs/dev/POTENTIAL_BUGS.md`](../docs/dev/POTENTIAL_BUGS.md) (see *Stay-On-Task Policy*) |
 | New reflection / soft-depend / hook that accommodates a third-party plugin | [`docs/dev/EXTERNAL_HOOKS.md`](../docs/dev/EXTERNAL_HOOKS.md) (catalog row + `RTPHooks` registry; ADR-026) |
 

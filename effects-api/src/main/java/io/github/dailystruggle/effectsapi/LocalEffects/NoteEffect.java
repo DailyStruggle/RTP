@@ -64,10 +64,10 @@ public class NoteEffect extends Effect<NoteTypeNames> {
 
     @Override
     public void setData(String... data) {
-        if(data.length>0) this.data.put(NoteTypeNames.TYPE, data[0]);
-        if(data.length>1) this.data.put(NoteTypeNames.TONE, data[1]);
-        this.data = fixData(this.data);
+        applyByType(KEY_ORDER, data);
     }
+
+    private static final NoteTypeNames[] KEY_ORDER = { NoteTypeNames.TYPE, NoteTypeNames.TONE };
 
     private final class MakeNoteSound extends BukkitRunnable {
         @Override

@@ -1,10 +1,16 @@
 package io.github.dailystruggle.rtp.fabric.world;
 
+import io.github.dailystruggle.rtp.api.world.ChunkColumnProbe;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.fabric.anvil.FabricAnvilColumnProbeAdapter;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerChunkCache;
@@ -25,9 +31,12 @@ import java.util.concurrent.ConcurrentHashMap;
  * Fabric {@link RTPWorld} implementation (ADR-022). No {@code org.bukkit.*}
  * imports; holds a {@link ServerLevel} and reaches the server via
  * {@link ServerLevel#getServer()}. Every native chunk-system call
- * ({@code ServerChunkCache#getChunk}, {@code setChunkForced},
- * {@code getForcedChunks}) is dispatched onto the server tick thread via
- * {@link MinecraftServer#submit(java.util.function.Supplier)} (S-005).
+ * ({@code ServerChunkCache#getChunk}, {@code DistanceManager#addRegionTicket}
+ * via the version adapter, {@code getForcedChunks}) is dispatched onto the
+ * server tick thread via {@link MinecraftServer#submit(java.util.function.Supplier)}
+ * (S-005). Chunk tickets use a non-persistent {@code TicketType} rather than
+ * vanilla {@code setChunkForced} to avoid persisting RTP-owned chunks to
+ * {@code level.dat} (S-002).
  *
  * <p>End-to-end verification is deferred to Phase 2 Step H per
  * {@code MULTI_PLATFORM_PLAN.md}.
@@ -55,6 +64,17 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
      * dropped when their backing {@link ChunkAccess} is GC'd.
      */
     private final ConcurrentHashMap<Long, WeakReference<FabricRTPChunk>> rtpChunkCache = new ConcurrentHashMap<>();
+
+    /**
+     * ADR-016 anvil-backed chunk-snapshot cache. Populated by
+     * {@link #getChunkAt(int, int)} when the persisted {@code .mca} probe
+     * succeeds and consulted by {@link #getCachedChunk(long)} as a fall-through
+     * after the live caches miss. FIFO-eviction lifecycle is owned by
+     * {@link io.github.dailystruggle.rtp.anvil.AnvilProbeSupport}, mirroring
+     * the Spigot-side wiring in {@code BukkitRTPWorld}.
+     */
+    private final io.github.dailystruggle.rtp.anvil.AnvilProbeSupport anvilProbeSupport =
+            new io.github.dailystruggle.rtp.anvil.AnvilProbeSupport();
 
     public FabricRTPWorld(@NotNull ServerLevel level) {
         super(level);
@@ -131,6 +151,94 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
         // double-count via RTPWorld.getOrLoadChunk's probe-then-live composition; see
         // the Javadoc on RTPWorld.totalChunkLoads.
         final long key = ((long) chunkX & 0xffffffffL) | ((long) chunkZ << 32);
+
+        // ADR-016 — Anvil read-only data source (parity with BukkitRTPWorld#getChunkAt).
+        //
+        // For candidate chunks that are not currently loaded we probe the
+        // persisted r.X.Z.mca region file off-thread. The prefilter is a
+        // *data source*, not a short-circuit: whenever the probe yields a
+        // decoded AnvilChunkView (regardless of the advisory ACCEPT/REJECT
+        // verdict) we publish that view into the Anvil cache and return the
+        // same chunk key the live path would use, so the immediately-following
+        // getCachedChunk(key) call in LocationGenerator receives an
+        // Anvil-backed FabricRTPChunk and lets the vert adjustor scan across
+        // the whole decoded Y range without forcing a live chunk load on the
+        // tick thread.
+        //
+        // Only when the probe returns no view at all (UNKNOWN: no region file /
+        // unsupported DataVersion / decode error / no emitted sections) do we
+        // fall through to the live-load path below. The live re-check at
+        // teleport commit (ADR-016 §4) remains the authoritative arbiter.
+        if (shouldPrefilter(chunkX, chunkZ)) {
+            ServerLevel probeLevel = world;
+            MinecraftServer probeServer = (probeLevel != null) ? probeLevel.getServer() : null;
+            if (probeLevel != null && probeServer != null) {
+                java.nio.file.Path worldFolder;
+                try {
+                    worldFolder = probeServer.getWorldPath(LevelResource.ROOT);
+                } catch (Throwable t) {
+                    worldFolder = null;
+                }
+                if (worldFolder != null) {
+                    String dim = dimensionRegionSubpath(probeLevel);
+                    java.util.Set<String> rawUnsafe = currentUnsafeBlocks();
+                    return anvilProbeSupport
+                            .probeAndPublish(worldFolder, dim, chunkX, chunkZ, key, rawUnsafe,
+                                    io.github.dailystruggle.rtp.fabric.anvil.FabricPaletteNormalizer::reconcile)
+                            .thenCompose(result -> {
+                                io.github.dailystruggle.rtp.anvil.AnvilChunkView view = result.view();
+                                if (view != null) {
+                                    if (result.verdict() == io.github.dailystruggle.rtp.anvil.Verdict.REJECT) {
+                                        RTP.log(java.util.logging.Level.FINE,
+                                                "[RTP] Anvil surface-unsafe (advisory) world=" + name
+                                                        + " chunk=(" + chunkX + "," + chunkZ
+                                                        + ") — handing view to vert adjustor");
+                                    }
+                                    return CompletableFuture.completedFuture(key);
+                                }
+                                // No view available (UNKNOWN) → live load is authoritative.
+                                return loadLiveChunk(chunkX, chunkZ, key);
+                            });
+                }
+            }
+        }
+
+        return loadLiveChunk(chunkX, chunkZ, key);
+    }
+
+    /**
+     * Snapshot the current {@code SafetyKeys.unsafeBlocks} list as a plain
+     * {@code Set<String>}. Returns an empty set on any lookup failure — the
+     * pre-filter treats an empty set as "never reject", which is the safe
+     * default. Mirrors {@code BukkitRTPWorld.currentUnsafeBlocks}.
+     */
+    @SuppressWarnings("unchecked")
+    private static java.util.Set<String> currentUnsafeBlocks() {
+        try {
+            ConfigParser<SafetyKeys> safety =
+                    (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+            if (safety == null) return java.util.Collections.emptySet();
+            Object raw = safety.getConfigValue(SafetyKeys.unsafeBlocks, new java.util.ArrayList<>());
+            if (raw instanceof java.util.Collection<?> c) {
+                java.util.Set<String> out = new java.util.HashSet<>(c.size());
+                for (Object o : c) if (o != null) out.add(o.toString());
+                return out;
+            }
+        } catch (Throwable ignored) {
+            // Fall through to empty.
+        }
+        return java.util.Collections.emptySet();
+    }
+
+    /**
+     * Live-chunk load path. Extracted from {@link #getChunkAt} so the ADR-016
+     * anvil pre-filter can fall through to it on UNKNOWN. Calls
+     * {@code ServerChunkCache#getChunk(x, z, ChunkStatus.FULL, /*load=*&#47;true)}
+     * on the server tick thread via {@link MinecraftServer#submit}; this is the
+     * same vanilla API {@code /forceload} uses and is the only documented way
+     * to trigger generation.
+     */
+    private CompletableFuture<Long> loadLiveChunk(int chunkX, int chunkZ, long key) {
         final MinecraftServer server = world.getServer();
         if (server == null) {
             // Defensive: a ServerLevel without a server is a torn-down state.
@@ -155,6 +263,10 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
                 chunkCache.put(key, new WeakReference<>(chunk));
                 rtpChunkCache.put(key,
                     new WeakReference<>(new FabricRTPChunk(chunk, world, id)));
+                // A live chunk now supersedes any anvil snapshot — drop the
+                // stale view so subsequent getCachedChunk lookups don't return
+                // outdated palette data.
+                anvilProbeSupport.evict(key);
             }
             return key;
         });
@@ -189,6 +301,157 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
             return cache != null && cache.hasChunk(cx, cz);
         } catch (Throwable ignored) {
             return false;
+        }
+    }
+
+    // ---------------------------------------------------------------------------
+    // ADR-016 anvil pre-filter — column probe (parity with BukkitRTPWorld)
+    // ---------------------------------------------------------------------------
+
+    /**
+     * S-005-compliant column probe that reads a single chunk's center column
+     * directly from the persisted {@code r.X.Z.mca} region file, completely
+     * bypassing {@link #getChunkAt} (and therefore the synchronous tick-thread
+     * {@code cache.getChunk(..., FULL, true)} generation).
+     *
+     * <p>This is the Fabric mirror of {@code BukkitRTPWorld#probeChunkColumn}
+     * (see {@code rtp-spigot-common}, lines 227–268, and ADR-016). The only
+     * platform deltas are world-folder resolution
+     * ({@link MinecraftServer#getWorldPath(LevelResource)}) and dimension
+     * subpath derivation ({@link #dimensionRegionSubpath(ServerLevel)}),
+     * because Fabric has no {@code World.Environment} enum.</p>
+     *
+     * <p>Gates (see {@link #shouldPrefilter}):
+     * <ul>
+     *   <li>{@code SafetyKeys.anvilPrefilterEnabled} truthy (default {@code true})</li>
+     *   <li>chunk currently <i>not</i> loaded (live state is authoritative when loaded)</li>
+     * </ul>
+     * On a closed gate or any decode failure the future resolves to {@code null}
+     * (UNKNOWN) and {@code ScanTask} / {@code QueueTask} / {@code PregenTask}
+     * fall back to the live-load path — preserving the
+     * {@code .mca}-as-advisory invariant of ADR-016.</p>
+     *
+     * <p>S-005: file I/O is dispatched onto
+     * {@link io.github.dailystruggle.rtp.anvil.AnvilIoPool} (the same dedicated
+     * blocking-I/O executor Spigot/Folia use), never on the server tick thread.</p>
+     */
+    @Override
+    public CompletableFuture<ChunkColumnProbe> probeChunkColumn(
+            int cx, int cz, int minY, int maxY) {
+        if (minY > maxY) return CompletableFuture.completedFuture(null);
+        if (!shouldPrefilter(cx, cz)) return CompletableFuture.completedFuture(null);
+        ServerLevel level = world;
+        if (level == null) return CompletableFuture.completedFuture(null);
+        MinecraftServer server = level.getServer();
+        if (server == null) return CompletableFuture.completedFuture(null);
+
+        final java.nio.file.Path worldFolder;
+        try {
+            // Mojang official mappings: MinecraftServer#getWorldPath(LevelResource)
+            // returns the per-server save root for the requested resource. ROOT
+            // points at the world's base directory — the Fabric equivalent of
+            // Bukkit's World#getWorldFolder().
+            worldFolder = server.getWorldPath(LevelResource.ROOT);
+        } catch (Throwable t) {
+            RTP.log(java.util.logging.Level.FINE,
+                "[RTP] FabricRTPWorld.probeChunkColumn: getWorldPath threw for world="
+                    + name + ": " + t.getClass().getSimpleName() + ": " + t.getMessage());
+            return CompletableFuture.completedFuture(null);
+        }
+        final String dim = dimensionRegionSubpath(level);
+        final int finalMinY = minY;
+        final int finalMaxY = maxY;
+
+        // Mirrors the Spigot dispatch contract: AnvilIoPool runs blocking .mca
+        // reads off-tick with disk-parallelism sizing. Probe-cache hit / miss
+        // metrics are owned by ScanTask's probeOutcome* counters and the anvil
+        // module's own diagLog channel — no per-call counter is owned here.
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                java.nio.file.Path regionFile =
+                    io.github.dailystruggle.rtp.anvil.AnvilPrefilter
+                        .regionFileFor(worldFolder, dim, cx, cz);
+                byte[] regionBytes =
+                    io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache.get(regionFile);
+                if (regionBytes == null) return null;
+                int rx = Math.floorMod(cx, 32);
+                int rz = Math.floorMod(cz, 32);
+                io.github.dailystruggle.rtp.anvil.ColumnProbe probe =
+                    io.github.dailystruggle.rtp.anvil.AnvilReader.readColumnProbe(
+                        regionBytes, rx, rz, finalMinY, finalMaxY);
+                if (probe == null) return null;
+                return (ChunkColumnProbe) new FabricAnvilColumnProbeAdapter(probe, cx, cz);
+            } catch (Throwable t) {
+                RTP.log(java.util.logging.Level.FINE,
+                    "[RTP] FabricRTPWorld.probeChunkColumn failed for world=" + name
+                        + " chunk=(" + cx + "," + cz + "): "
+                        + t.getClass().getSimpleName() + ": " + t.getMessage());
+                return null;
+            }
+        }, io.github.dailystruggle.rtp.anvil.AnvilIoPool.get());
+    }
+
+    /**
+     * Applicability gate for the column probe — parity with
+     * {@code BukkitRTPWorld#shouldPrefilter}. Returns {@code true} only when
+     * the chunk is not currently loaded and the
+     * {@code SafetyKeys.anvilPrefilterEnabled} config is truthy. Any failure
+     * defaults to "skip prefilter" rather than "force-load" so the pipeline
+     * always has a safe fall-through.
+     */
+    private boolean shouldPrefilter(int cx, int cz) {
+        if (world == null) return false;
+        try {
+            if (isChunkLoaded(cx, cz)) return false;
+        } catch (Throwable ignored) {
+            return false;
+        }
+        try {
+            @SuppressWarnings("unchecked")
+            ConfigParser<SafetyKeys> safety =
+                (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+            if (safety == null) return true; // Config not yet loaded — default-on.
+            Object raw = safety.getConfigValue(SafetyKeys.anvilPrefilterEnabled, Boolean.TRUE);
+            if (raw instanceof Boolean b) return b;
+            if (raw != null) return Boolean.parseBoolean(raw.toString());
+            return true;
+        } catch (Throwable ignored) {
+            return true;
+        }
+    }
+
+    /**
+     * Map a {@link ServerLevel}'s dimension {@link ResourceLocation} to the
+     * on-disk region subdirectory used by vanilla. Mirrors
+     * {@code BukkitRTPWorld.dimensionRegionSubpath} but keyed off the
+     * {@code ResourceLocation} (Fabric / vanilla don't expose
+     * {@code World.Environment}).
+     *
+     * <p>Vanilla layout (consumed by {@code AnvilPrefilter.regionFileFor}):
+     * <ul>
+     *   <li>{@code minecraft:overworld} → {@code ""} (root + {@code region/r.X.Z.mca})</li>
+     *   <li>{@code minecraft:the_nether} → {@code "DIM-1"}</li>
+     *   <li>{@code minecraft:the_end}    → {@code "DIM1"}</li>
+     *   <li>any other registry key      → {@code "dimensions/<namespace>/<path>"}
+     *       (the Fabric-API custom-dimension layout)</li>
+     * </ul>
+     */
+    private static String dimensionRegionSubpath(ServerLevel level) {
+        if (level == null) return "";
+        try {
+            ResourceLocation loc = level.dimension().location();
+            String ns = loc.getNamespace();
+            String path = loc.getPath();
+            if ("minecraft".equals(ns)) {
+                if ("overworld".equals(path)) return "";
+                if ("the_nether".equals(path)) return "DIM-1";
+                if ("the_end".equals(path))    return "DIM1";
+            }
+            // Custom dimension: Fabric/vanilla store these under
+            // <world>/dimensions/<namespace>/<path>/region/r.X.Z.mca.
+            return "dimensions/" + ns + "/" + path;
+        } catch (Throwable ignored) {
+            return "";
         }
     }
 
@@ -323,22 +586,32 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
     // ---------------------------------------------------------------------------
 
     /**
-     * Apply / remove a force-load ticket on the server tick thread.
+     * Apply / remove a non-persistent RTP-owned chunk ticket on the server tick
+     * thread, equivalent in lifetime to Bukkit's {@code addPluginChunkTicket} /
+     * {@code removePluginChunkTicket}.
      *
-     * <p>Mojang's {@link ServerLevel#setChunkForced(int, int, boolean)} is the
-     * Fabric equivalent of Bukkit's {@code addPluginChunkTicket} /
-     * {@code removePluginChunkTicket}. It MUST be called on the server tick
-     * thread (it mutates {@code ServerChunkCache.distanceManager}); we hop via
+     * <p><b>Why not {@link ServerLevel#setChunkForced(int, int, boolean)}?</b>
+     * Vanilla {@code setChunkForced} writes through to
+     * {@code level.dat#ForcedChunks}, so a watchdog crash mid-pipeline (or any
+     * unclean shutdown) leaves RTP-owned forced flags persisted to disk and
+     * re-applied on the next world load — an S-002 hazard specific to Fabric
+     * (the Bukkit/Folia plugin-ticket APIs are non-persistent). We instead
+     * delegate to the active {@code FabricVersionAdapter}, which issues a
+     * {@code DistanceManager#addRegionTicket} call with a custom
+     * {@code TicketType("rtp", …, timeout=0)} — non-persistent, removed on
+     * shutdown automatically.</p>
+     *
+     * <p>The native ticket call MUST run on the server tick thread (it mutates
+     * {@code ServerChunkCache.distanceManager}); we hop via
      * {@link MinecraftServer#submit}. The returned future completes when the
-     * native call has actually executed, satisfying the ADR-015 ticket-application
-     * race contract that {@link RTPWorld#setForceLoaded(int, int, boolean)} relies
-     * on.</p>
+     * native call has actually executed, satisfying the ADR-015
+     * ticket-application race contract that
+     * {@link RTPWorld#setForceLoaded(int, int, boolean)} relies on.</p>
      *
-     * <p>Vanilla Fabric has no per-plugin ticket namespace — {@code setChunkForced}
-     * sets a single &quot;forced&quot; flag persisted to {@code level.dat}. The
-     * parent class's ref-counting in {@link RTPWorld#chunkTickets} guards against
-     * us toggling the flag back to {@code false} while another caller still holds
-     * a logical ticket; that is sufficient for correctness.</p>
+     * <p>The parent class's ref-counting in {@link RTPWorld#chunkTickets} guards
+     * against double-add / double-remove from multiple caller paths; the adapter
+     * itself relies on {@code DistanceManager}'s internal de-duplication for
+     * the rare race where two callers simultaneously target the same coordinate.</p>
      */
     @Override
     protected CompletableFuture<Void> setForceLoadedImpl(int cx, int cz, boolean forceLoad) {
@@ -347,14 +620,46 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
             // Torn-down world: complete normally so callers don't block forever.
             return CompletableFuture.completedFuture(null);
         }
-        return CompletableFuture.runAsync(() -> {
+        // Delegate to the per-MC-version adapter, which issues a non-persistent
+        // RTP-owned chunk ticket via DistanceManager#addRegionTicket. We must
+        // NOT call ServerLevel#setChunkForced — that writes through to
+        // level.dat#ForcedChunks and a watchdog crash mid-pipeline would
+        // permanently leak forced flags (S-002). The adapter dispatches
+        // synchronously assuming the caller is on the server thread; we hop
+        // via MinecraftServer#submit so callers off-tick remain safe.
+        final io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter =
+                io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
+        if (adapter == null) {
+            // Pre-bootstrap call (should not happen — RTPFabricMod installs the
+            // adapter before any keep/forget call site is reachable). Fail loud
+            // per S-006 rather than silently no-op.
+            CompletableFuture<Void> failed = new CompletableFuture<>();
+            failed.completeExceptionally(new IllegalStateException(
+                    "FabricRTPWorld.setForceLoadedImpl: FabricVersionAdapter not yet installed"
+                            + " (world=" + name + " chunk=(" + cx + "," + cz + "))"));
+            return failed;
+        }
+        return CompletableFuture.supplyAsync(() -> {
             try {
-                world.setChunkForced(cx, cz, forceLoad);
+                // ADR-007: wrap the ServerLevel in an RTPLevelHandle so the
+                // SPI signature stays Mojmap-name-stable. Adapter unwraps via
+                // handle.as(ServerLevel.class).
+                io.github.dailystruggle.rtp.fabric.version.RTPLevelHandle levelHandle =
+                        io.github.dailystruggle.rtp.fabric.version.RTPLevelHandle.of(world);
+                CompletableFuture<Void> f = forceLoad
+                        ? adapter.applyTicket(levelHandle, cx, cz)
+                        : adapter.releaseTicket(levelHandle, cx, cz);
+                // Adapter completes its own future inline (single tick-thread call)
+                // — getNow short-circuits without blocking and surfaces any
+                // exception via join below. Reduces to a no-op if already done.
+                f.getNow(null);
+                return null;
             } catch (Throwable t) {
                 RTP.log(java.util.logging.Level.WARNING,
-                    "[RTP] FabricRTPWorld.setChunkForced failed for world=" + name
-                        + " chunk=(" + cx + "," + cz + ") forceLoad=" + forceLoad
-                        + ": " + t.getClass().getSimpleName() + ": " + t.getMessage());
+                        "[RTP] FabricRTPWorld.setForceLoadedImpl failed for world=" + name
+                                + " chunk=(" + cx + "," + cz + ") forceLoad=" + forceLoad
+                                + ": " + t.getClass().getSimpleName() + ": " + t.getMessage());
+                return null;
             }
         }, server);
     }
@@ -393,10 +698,15 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
      */
     @Override
     public RTPChunk<?> getCachedChunk(long key) {
+        // Live chunk takes precedence over any Anvil snapshot — once a real
+        // chunk has been loaded, the live path is authoritative.
         WeakReference<FabricRTPChunk> rtpRef = rtpChunkCache.get(key);
         if (rtpRef != null) {
             FabricRTPChunk wrapper = rtpRef.get();
-            if (wrapper != null) return wrapper;
+            if (wrapper != null) {
+                anvilProbeSupport.evict(key);
+                return wrapper;
+            }
             rtpChunkCache.remove(key);
         }
         // Fallback: backing chunk may still be live but the wrapper was GC'd.
@@ -404,13 +714,24 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
         WeakReference<ChunkAccess> ref = chunkCache.get(key);
         if (ref != null) {
             ChunkAccess chunk = ref.get();
-            if (chunk == null) {
-                chunkCache.remove(key);
-                return null;
+            if (chunk != null) {
+                FabricRTPChunk wrapper = new FabricRTPChunk(chunk, world, id);
+                rtpChunkCache.put(key, new WeakReference<>(wrapper));
+                anvilProbeSupport.evict(key);
+                return wrapper;
             }
-            FabricRTPChunk wrapper = new FabricRTPChunk(chunk, world, id);
-            rtpChunkCache.put(key, new WeakReference<>(wrapper));
-            return wrapper;
+            chunkCache.remove(key);
+        }
+        // ADR-016 fallback: no live chunk cached, but the prefilter may have
+        // produced an Anvil-backed view earlier in this candidate's evaluation.
+        io.github.dailystruggle.rtp.anvil.AnvilChunkView view = anvilProbeSupport.takeCached(key);
+        if (view != null) {
+            int cx = (int) (key & 0xffffffffL);
+            int cz = (int) (key >> 32);
+            java.util.Set<String> reconciled =
+                    io.github.dailystruggle.rtp.fabric.anvil.FabricPaletteNormalizer
+                            .reconcileAll(currentUnsafeBlocks());
+            return new FabricRTPChunk(view, cx, cz, id, reconciled);
         }
         return null;
     }
@@ -427,6 +748,7 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
             long key = ((long) chunkX & 0xffffffffL) | ((long) chunkZ << 32);
             chunkCache.remove(key);
             rtpChunkCache.remove(key);
+            anvilProbeSupport.evict(key);
         });
     }
 
@@ -446,6 +768,7 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
         });
         chunkCache.clear();
         rtpChunkCache.clear();
+        anvilProbeSupport.clear();
     }
 
     @Override

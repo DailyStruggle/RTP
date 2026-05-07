@@ -49,12 +49,19 @@ dependencies {
     // the only class that resolves it on a Fabric runtime.
     implementation project(':rtp-fabric:rtp-fabric-common')
 
-    // ADR-027 — version-specific Fabric adapters. RTPFabricMod.installVersionAdapter()
+    // rtp-fabric-ADR-001 — version-specific Fabric adapters. RTPFabricMod.installVersionAdapter()
     // resolves these by FQN at runtime via Class.forName, so the bytecode must
     // be present in the shaded jar but is never compile-time imported here.
     // Mirrors the rtp-spigot/-paper/-folia v-submodule inclusion pattern above.
     implementation project(':rtp-fabric:rtp-fabric-v1_20_R1')
     implementation project(':rtp-fabric:rtp-fabric-v1_21_R1')
+    implementation project(':rtp-fabric:rtp-fabric-v1_21_R5')
+    // :rtp-fabric:rtp-fabric-v1_21_R11 — re-enabled 2026-05-06 after rtp-fabric-ADR-007
+    // (Mojmap-name-decoupling) landed and the R11 adapter was ported to the new
+    // wrapper-based FabricVersionAdapter SPI. RTPFabricMod.adapterFqnFor now resolves
+    // V1_21_R11FabricVersionAdapter on a 1.21.11+ runtime; on 1.21.5–1.21.10 the R5
+    // adapter still wins. See settings.gradle and CHECKLIST-fabric-1.21.11-multiversion.md.
+    implementation project(':rtp-fabric:rtp-fabric-v1_21_R11')
     // :rtp-fabric:rtp-fabric-v26_1_R1 intentionally NOT included — that
     // submodule pins MC 26.1 / Java 25 and is gated out of settings.gradle
     // until Loom 1.15+ stabilizes. RTPFabricMod.installVersionAdapter()
@@ -113,21 +120,54 @@ dependencies {
     implementation 'org.bstats:bstats-bukkit:3.0.3'
     implementation 'xyz.tozymc.spigot:title-api:1.0'
 
-    // SQLite JDBC driver. rtp-core declares this as compileOnly because
-    // Spigot/Paper/Folia bundle it at runtime, but the Fabric runtime does
-    // NOT — so without bundling it here, FabricDatabaseHandler.setupDatabase
-    // crashes with `No suitable driver found for jdbc:sqlite:...`. Shaded
-    // into the Pro jar; the Lite shadowJar block below explicitly excludes
-    // it (ADR-024 — lite has no persistent backends).
-    implementation 'org.xerial:sqlite-jdbc:3.45.1.0'
+    // H2 JDBC driver is BUNDLED in the Pro jar (and excluded from the lite jar
+    // by the explicit `com.h2database:.*` filter on shadowLiteJar). It is the
+    // documented Fabric default when SQLite is unavailable, and is referenced
+    // by H2DatabaseAccessor's static initializer via Class.forName("org.h2.Driver"),
+    // which Shadow's `relocate 'org.h2', 'io.github.dailystruggle.rtp.h2'` rule
+    // (below) rewrites to the relocated FQN at build time. Without this
+    // implementation declaration, the relocate rule has nothing to relocate
+    // and the Fabric runtime crashes with
+    // ClassNotFoundException: io.github.dailystruggle.rtp.h2.Driver
+    // on H2DatabaseAccessor.<clinit>. See FabricDatabaseHandler.setupDatabase.
+    implementation 'com.h2database:h2:2.2.224'
+
+    // SQLite JDBC driver intentionally NOT bundled. Spigot/Paper/Folia ship it
+    // as a server-side runtime dependency, and Fabric users who explicitly opt
+    // into `database.type: sqlite` must drop `sqlite-jdbc.jar` into their server
+    // classpath themselves (FabricDatabaseHandler falls back to H2 with a loud
+    // warning otherwise). Bundling it added ~7 MB of native OS/arch binaries to
+    // every release jar. See FabricDatabaseHandler.setupDatabase.
 }
 
 tasks.register('copyDocs', Copy) {
-    from rootProject.file('docs')
+    // Ship only audience-A (server admin) and audience-B (addon author) docs.
+    // Contributor-facing material (`docs/dev/**`, `docs/adr/**`,
+    // `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `FOR_CONTRIBUTORS.md`,
+    // SpigotMC `*.bbcode` listing sources, `DOCS_OPTIMIZATION_PLAN.md`, ...)
+    // is intentionally NOT bundled — it remains available in the public
+    // repository. The `docs/admin/**` and `docs/architecture/**` trees stay
+    // in the jar so admins who unzip the release can read Quick Start,
+    // Configuration, the runtime/architecture diagrams, etc., without
+    // needing GitHub access. See CHANGELOG `[3.0.0-beta.2]`.
+    from(rootProject.file('docs')) {
+        // Top-level audience landing pages (the ones that actually live under docs/).
+        include 'MAP.md'
+        include 'FOR_SERVER_ADMINS.md'
+        include 'FOR_ADDON_DEVELOPERS.md'
+        // Audience-A: server-admin docs and runtime/architecture diagrams.
+        include 'admin/**'
+        include 'architecture/**'
+    }
     from(rootProject.projectDir) {
-        include '*.md'
         include 'LICENSE'
     }
+    // Defensive: never ship editor/agent backup files even if a `.bak`
+    // slips into a kept subtree (AGENTS.md backup policy + 2026-05-05
+    // Pro-jar audit, where two `docs/*.bak` files leaked into the released
+    // jar because `processResources`'s `**/*.bak` exclude does not reach
+    // this `Copy` task's output).
+    exclude '**/*.bak'
     into layout.buildDirectory.dir('resources/main/docs')
 }
 

@@ -85,6 +85,35 @@ The `commands-live` portion of the full test suite intentionally dispatches malf
 
 ## Performance & Throughput
 
+### Vanilla `addRegionTicket` / `addTicketWithRadius` third arg is *distance*, not *level* (2026-05-06)
+
+On Fabric (and any direct-vanilla-API caller), the third argument of:
+
+- `DistanceManager#addRegionTicket(TicketType, ChunkPos, int distance, T value)` (≤ 1.21.4)
+- `ServerChunkCache#addTicketWithRadius(TicketType, ChunkPos, int radius)` (≥ 1.21.5)
+
+is a **distance/radius in chunks**, not the underlying effective ticket level. Vanilla converts via `effectiveLevel = ChunkMap.MAX_CHUNK_DISTANCE - radius` (i.e. `33 - radius`). For a chunk to reach `FULL` (block reads valid, `hasChunk` true), `effectiveLevel` must be ≤ 33; for `ENTITY_TICKING` (parity with `TicketType.FORCED` and Bukkit's `addPluginChunkTicket`), use **`radius = 3`** → effective level `30`.
+
+Passing `31` into this slot under the mistaken belief it is the ticket level either:
+
+- Requests effective level `2` (clamped/rejected on the `addRegionTicket` path); ticket never lands at the expected level and the chunk is not pinned at `FULL`. Symptom: `RTPWorld#chunkTickets` ref-count shows the ticket as held, but `world.getChunkSource().hasChunk(cx, cz)` returns `false` shortly after — kept-cache entries silently unpin.
+- Requests a `(2·radius + 1)² = 3969`-chunk square force-load on the `addTicketWithRadius` path; clamped/rejected by the chunk system, same end state.
+
+When the kept-cache invariant breaks, the consumer `/rtp` path falls back to `FabricRTPWorld.getChunkAt`'s synchronous `cache.getChunk(cx, cz, ChunkStatus.FULL, true)` on the server tick (~14 ms/command vs Bukkit's ~1 ms). See `rtp-fabric-ADR-006`.
+
+When auditing a new per-version Fabric adapter (or any non-Bukkit platform that talks to the chunk system directly), verify after `applyTicket` that `world.getChunkSource().hasChunk(cx, cz)` is `true` and remains `true` until `releaseTicket` fires; sample over a multi-second window because `TicketType.UNKNOWN` carries a built-in timeout and any auto-expiry will surface within a few ticks.
+
+### Don't borrow `TicketType.UNKNOWN` for kept-cache pinning on 1.21.5+ (2026-05-06)
+
+Follow-up to the previous entry. `javap` on the Mojmap-remapped 1.21.5 server jar (`minecraft-merged-…-v2.jar`, path under `~/.gradle/caches/fabric-loom/minecraftMaven/net/minecraft/minecraft-merged/`) confirms `TicketType` is now a record `(long timeout, boolean persist, TicketType.TicketUse use)` with `TicketUse ∈ { LOADING, SIMULATION, LOADING_AND_SIMULATION }`, and the public static `UNKNOWN` constant is registered with `timeout = 1L` (a **1-tick** auto-expiry, not 1 second) and `use = LOADING`. Both are wrong for kept-cache pinning:
+
+- `timeout = 1L` ⇒ the chunk evicts on the next tick after `applyTicket`, even if `removeTicketWithRadius` is paired with it.
+- `use = LOADING` ⇒ no entity ticking, so the chunk does not match the Bukkit `addPluginChunkTicket` `ENTITY_TICKING` end state even if the timeout were ignored.
+
+Vanilla `FORCED` is the right shape (`timeout = 0`, `use = LOADING_AND_SIMULATION`), but its `persist = true` writes into `level.dat#ForcedChunks` (S-002 hazard). The fix used by `V1_21_R5FabricVersionAdapter` is a single static instance constructed via the public record constructor: `new TicketType(TicketType.NO_TIMEOUT, /*persist=*/ false, TicketUse.LOADING_AND_SIMULATION)`. Identity-equality is what `addTicketWithRadius` / `removeTicketWithRadius` compare on, and reusing one static instance for every call from the adapter keeps add/remove paired. No registry call is needed (so no chunk-subsystem class-init ordering hazard). See `rtp-fabric-ADR-006`.
+
+To verify a `TicketType` constant's actual `timeout` / `use` on any future MC patch, extract the class and run `javap -p -c` on it — the `<clinit>` block lists the literal `register("name", timeout, persist, use)` call sequence (e.g. `ldc "unknown"; lconst_1; iconst_0; getstatic …TicketUse.LOADING; invokestatic …register`). The `Loom`-cached Mojmap jar lives at `~/.gradle/caches/fabric-loom/minecraftMaven/net/minecraft/minecraft-merged/<mc>-loom.mappings…/minecraft-merged-<mc>-loom.mappings…-v2.jar` and is the right artifact to extract from (the intermediary jars under `~/.gradle/caches/fabric-loom/<mc>/minecraft-*.jar` do not contain the Mojmap-named class).
+
 ### Paper 26.1 scan throughput parity with Spigot/Folia (2026-04-21)
 
 Paper 26.1 with the non-blocking `LocationGenerator` state machine (ADR-015 post-refactor) achieves roughly **300 cps effective scan throughput**, on parity with the Spigot/Folia Anvil-based scan path. This confirms that ADR-016 §1.1 (the adapter-internal `[RTP] Anvil gate skipped reason=chunk-already-loaded` gate firing on essentially every candidate on Paper chunk-system-v2) is **not** a performance regression relative to the pure-Anvil path — Paper's live-chunk `getBiome` on an already-loaded chunk is cheap enough to close the gap.
@@ -451,6 +480,36 @@ Methodological consequences:
 - **Pre-warmup contamination**: 73 rtp / 43 betterrtp / 34 huskhomes rows fell outside their respective phase windows. They are not in `phases.csv`, but they *are* in the per-attempt CSV. Cold-start figures must be filtered to in-window rows; the first in-window RTP dispatch for this run was 146 ms vs typical p50 = 101 ms — consistent with cold-cache rebuild after warm-up.
 - **Mid-run reads of `phases.csv` are dangerous.** An earlier draft of this entry (and §5M) published BetterRTP at 1.13 TP/s based on a partial mid-run snapshot — the harness flushes per-attempt rows continuously but `phases.csv` only finalises at phase end. **Always wait for the run-final `phases.csv` row count to match the configured phase count before publishing any per-plugin number.**
 - **n=1 on Folia for all three plugins.** Quote ranges (or rerun) before any two-significant-figure publication; the §5j ±15–25 % main-CPU/att band applies until proven otherwise on Folia.
+
+---
+
+## 2026-05-06 - Mojang renames Mojmap symbols across 1.21.x point releases; Loom does not auto-remap project-dependency JARs per consumer
+
+The 1.21.5 → 1.21.11 jump renamed at least four publicly-used Mojmap symbols on the `rtp-fabric` SPI footprint:
+
+| 1.21.5 Mojmap | 1.21.11 Mojmap | Intermediary |
+|---------------|----------------|--------------|
+| `net.minecraft.resources.ResourceLocation` | `net.minecraft.resources.Identifier` | `class_2960` |
+| `TicketType(long, boolean, TicketUse)` (record) | `TicketType(long, int)` (record; flags bitfield) | `class_3230` |
+| `TicketType.TicketUse` (inner enum) | **removed** | `class_3230$class_10558` → `$class_12084` (now an `@interface` marker) |
+| `TicketType.NO_TIMEOUT` | `TicketType.NO_EXPIRATION` | `field_55598` |
+
+Mojang historically rarely renamed Mojmap symbols, but the 1.21.11 → 26.1 transition (deobfuscation, "Mojmap becomes the source") prompted a rename pass to align Mojmap with conventional naming. Expect more of this through 26.1.
+
+**Why this hit `rtp-fabric` specifically.** `rtp-fabric-common` was compiled once against a fixed Mojmap snapshot (1.21.5) and exposed `FabricVersionAdapter` with method signatures referencing `ResourceLocation`, `ServerLevel`, `ChunkAccess`, `BlockPos`, etc. That bytecode bakes in the *literal* Mojmap names. When the 1.21.11 adapter (compiled against a Mojmap snapshot where the same intermediary `class_2960` is now named `Identifier`) tried to override common's `ResourceLocation`-typed method, javac failed with `cannot access ResourceLocation: class file for net.minecraft.resources.ResourceLocation not found` — Loom does **not** auto-remap project-dependency JARs per the consumer's mappings. Remapping is a publication-time step driven by `remapJar`, not a per-consumer view.
+
+Resolution (rtp-fabric-ADR-007, accepted 2026-05-06): remove all `net.minecraft.*` types from the SPI signature surface. The adapter interface now uses project-owned wrapper records (`RTPLevelHandle`, `RTPBlockHandle`, `RTPBlockStateHandle`, `RTPChunkHandle`, `RTPRegistryKey`) carrying an `Object` payload + `as(Class<T>)` for in-adapter casting. Coordinates pass as primitives. The 1.21.11 (`R11`) adapter then compiles cleanly against the rename and was re-included in the default build.
+
+Durable consequences:
+
+- **Treat the Mojmap symbol surface as unstable across MC point releases**, not just across major versions. Any cross-version Fabric SPI in this project must avoid leaking `net.minecraft.*` types in method signatures. Wrapper records with `as(Class<T>)` are the project pattern; primitives where reasonable.
+- **Bukkit/Paper/Folia v-submodules are not exposed to this risk** because Bukkit's API package (`org.bukkit.*`) is the cross-version contract — Mojang is free to rename internals because Bukkit pins the ABI. The Fabric platform has no such layer; every adapter sees raw Mojmap.
+- **Loom build implication.** `fabric-loom`'s remapping does not reach into project dependencies. A multi-module Loom build where module A is compiled against MC vX and module B (depending on A) compiles against MC vY will fail on any Mojmap symbol renamed between vX and vY. There is no `remapDependencies` knob; the only mechanical fix is to keep MC types out of cross-module API.
+- **Diagnostic signature.** A user-visible `NoClassDefFoundError: net/minecraft/class_<NNNN>$class_<NNNN>` at Fabric mod startup, on a runtime newer than the adapter's compile target, is the symptom — confirms the runtime Mojang jar no longer contains the inner class the older adapter's `<clinit>` references. Always check whether the inner class was renamed (intermediary number changed) or removed entirely (became an `@interface` marker, became a top-level class, or was inlined into the outer class).
+
+Cross-references: `rtp-fabric/docs/adr/rtp-fabric-ADR-007-mojmap-name-decoupling.md` (the ADR), `rtp-fabric/docs/adr/rtp-fabric-ADR-006-ticket-radius-and-non-expiring-type.md` (the radius/flag analysis for 1.21.5+ that fed into the R11 flag computation).
+
+**Operator-confirmed (2026-05-06):** `/rtp` functional on a live 1.21.11 Fabric server via the wrapper SPI + R11 adapter; observed average latency ~4 ms (high relative to Paper but within acceptable range for Fabric). Closes the 1.21.11 multiversion track started at the top of this entry.
 
 ---
 

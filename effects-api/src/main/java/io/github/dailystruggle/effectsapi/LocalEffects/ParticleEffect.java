@@ -36,10 +36,10 @@ public class ParticleEffect extends Effect<ParticleTypeNames> {
 
     @Override
     public void setData(String... data) {
-        if(data.length>0) this.data.put(ParticleTypeNames.TYPE, data[0]);
-        if(data.length>1) this.data.put(ParticleTypeNames.NUMBER, data[1]);
-        this.data = fixData(this.data);
+        applyByType(KEY_ORDER, data);
     }
+
+    private static final ParticleTypeNames[] KEY_ORDER = { ParticleTypeNames.TYPE, ParticleTypeNames.NUMBER };
 
     @Override
     public String toPermission() {

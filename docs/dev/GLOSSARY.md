@@ -41,7 +41,7 @@ A validation check that rejects candidate teleport locations based on their Mine
 A design constraint requiring that all algorithms complete within a deterministic, pre-calculated time or step budget. RTP explicitly forbids unbounded retry loops ("rerolling") in favor of preemptive sector subtraction.
 
 **Brigadier Bridge**
-The `BrigadierCommandAdapter` inside `commands-api` that converts the shared `commands-api` command tree into Brigadier nodes for Minecraft platforms (notably Fabric) that dispatch through Brigadier natively. Platform adapters (e.g., `rtp-fabric`) are thin registration shims that delegate to this adapter. Brigadier is a `compileOnly` dependency and is not loaded on Bukkit platforms. See ADR-014.
+The `BrigadierCommandAdapter` inside `commands-api` that converts the shared `commands-api` command tree into Brigadier nodes for Minecraft platforms (notably Fabric) that dispatch through Brigadier natively. Platform adapters (e.g., `rtp-fabric`) are thin registration shims that delegate to this adapter. Brigadier is a `compileOnly` dependency and is not loaded on Bukkit platforms. See commands-api-ADR-001.
 
 **Bundle Plugin**
 The `rtp-plugin` module — a dedicated bridge module that combines `rtp-core` logic, a `JavaPlugin` entry point, and the active platform adapter into the final shaded distribution JAR. It is the only module permitted to depend simultaneously on `rtp-core` and Bukkit-family server classes. See ADR-003.

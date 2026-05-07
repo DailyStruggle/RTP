@@ -1,4 +1,6 @@
-# ADR-022 — Fabric Platform Is In Scope (Multi-Version Single-JAR Multi-Loader Packaging)
+# rtp-fabric-ADR-002 — Fabric Platform Is In Scope (Multi-Version Single-JAR Multi-Loader Packaging)
+
+> Renumber history: originally project-wide **ADR-022**; renumbered to **ADR-031** on 2026-05-05 to resolve a collision with [ADR-022 (Region Shape Cache Key)](../../../docs/adr/ADR-022-shape-cache-key-seed-plus-config-hash.md); restructured to subproject-scoped **rtp-fabric-ADR-002** the same day when subproject ADRs were given per-directory numbering. Pre-rename commits and external docs may still say "ADR-022" or "ADR-031".
 
 **Status:** Accepted
 **Date:** 2026-04-30
@@ -141,7 +143,7 @@ A **named maintainer** shall own the Fabric adapter end-to-end (build, mappings,
 - `docs/dev/MULTI_PLATFORM_PLAN.md` — phased plan, abstraction gap summary, acceptance gates, multi-version skeleton-first sub-phase
 - ADR-005 — PaperLib removal (preserves the "no async-chunk shim" stance Fabric must respect)
 - ADR-010 — Versioned platform adapter submodules (this ADR brings Fabric into the same pattern)
-- ADR-014 — Brigadier bridge via `commands-api` (each per-version Fabric adapter consumes the bridge, does not duplicate it)
+- commands-api-ADR-001 (formerly ADR-014) — Brigadier bridge via `commands-api` (each per-version Fabric adapter consumes the bridge, does not duplicate it)
 - ADR-018 — `AGENTS.md` public-release structure (compatible with multi-version single-JAR multi-loader)
 - ADR-021 — Legacy Minecraft and Java support out of scope (untouched by this ADR; Fabric ≠ legacy)
 - REQ-RTP-S-005 — No synchronous chunk I/O on the main thread (Step A acceptance gate)

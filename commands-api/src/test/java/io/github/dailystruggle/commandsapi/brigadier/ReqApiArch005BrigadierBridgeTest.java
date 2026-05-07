@@ -25,7 +25,7 @@ import java.util.function.Predicate;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * REQ-API-ARCH-005 — Brigadier boundary (ADR-014).
+ * REQ-API-ARCH-005 — Brigadier boundary (commands-api-ADR-001).
  *
  * Verifies the Brigadier bridge produced by {@link BrigadierCommandAdapter}:
  *  - emits literal nodes for sub-commands,
@@ -111,6 +111,100 @@ class ReqApiArch005BrigadierBridgeTest {
         // Root execution path → no extra slots beyond the implicit literal.
         assertEquals(0, capturedArgs.get().length, "root path produces empty args[] (literal not duplicated)");
         assertTrue(source.messages.contains("ok"), "messageMethod routed through BrigadierBridgeContext");
+    }
+
+    @Test
+    @DisplayName("Sub-command dispatch routes through the ROOT's TreeCommand.onCommand so parent pre-processing (queued CommandExecutor) is preserved (regression: Brigadier path must match Bukkit dispatcher semantics, not skip the parent)")
+    void subCommandDispatchRoutesThroughRootForParity() throws CommandSyntaxException {
+        AtomicReference<String[]> subArgs = new AtomicReference<>();
+        AtomicReference<Integer> subIndex = new AtomicReference<>();
+
+        // Root uses the DEFAULT TreeCommand.onCommand -- it must recursively
+        // descend into the sub-command exactly as the Bukkit dispatcher does.
+        StubTreeCommand root = new StubTreeCommand("rtp", "");
+        StubTreeCommand info = new StubTreeCommand("info", "") {
+            @Override
+            public CompletableFuture<Boolean> onCommand(UUID callerId,
+                                                       Predicate<String> permissionCheckMethod,
+                                                       Consumer<String> messageMethod,
+                                                       String[] args, int i,
+                                                       Map<String, CommandParameter> tempParameters) {
+                subArgs.set(args);
+                subIndex.set(i);
+                return CompletableFuture.completedFuture(Boolean.TRUE);
+            }
+        };
+        root.addSubCommand(info);
+
+        Source source = new Source();
+        BrigadierBridgeContext<Source> ctx = new BrigadierBridgeContext<>(
+                src -> src.id,
+                (src, perm) -> true,
+                (src, msg) -> src.messages.add(msg));
+
+        CommandDispatcher<Source> dispatcher = new CommandDispatcher<>();
+        dispatcher.register(BrigadierCommandAdapter.toBrigadier(root, ctx));
+
+        int result = dispatcher.execute("rtp info", source);
+        assertEquals(1, result);
+        // Drain commands-api's tick-driven pipeline so the queued parent
+        // CommandExecutor fires and the recursion into the sub-command
+        // completes (this mirrors what the platform tick loop does at
+        // runtime). The continuation that invokes the sub-command runs via
+        // CompletableFuture.whenCompleteAsync on the common ForkJoin pool,
+        // so we busy-wait briefly for it to fire.
+        io.github.dailystruggle.commandsapi.common.CommandsAPI.execute();
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(2);
+        while (subArgs.get() == null && System.nanoTime() < deadline) {
+            Thread.onSpinWait();
+        }
+        // The Brigadier bridge MUST hand args=["info"] to the root's
+        // TreeCommand.onCommand so the standard recursion fires:
+        //   1. root.onCommand sees "info", queues a CommandExecutor on the
+        //      commands-api pipeline for any parent-level pre-processing,
+        //   2. then invokes info.onCommand(args, i=1).
+        // Skipping step 1 would break parity with the Bukkit dispatcher and
+        // drop side-effects that depend on the parent running first.
+        assertNotNull(subArgs.get(),
+                "sub-command must be invoked via the root's recursive TreeCommand.onCommand");
+        assertArrayEquals(new String[]{"info"}, subArgs.get(),
+                "args[] passed to sub-command must include the literal 'info' at index 0 (Bukkit-parity wire format)");
+        assertEquals(1, subIndex.get().intValue(),
+                "sub-command's onCommand must be entered with i=1 (post-literal cursor)");
+    }
+
+    @Test
+    @DisplayName("Parameter dispatch reconstructs args as 'name=value' (commands-api wire format)")
+    void parameterDispatchReconstructsWireFormat() throws CommandSyntaxException {
+        AtomicReference<String[]> capturedArgs = new AtomicReference<>();
+
+        StubTreeCommand root = new StubTreeCommand("rtp", "") {
+            @Override
+            public CompletableFuture<Boolean> onCommand(UUID callerId,
+                                                       Predicate<String> permissionCheckMethod,
+                                                       Consumer<String> messageMethod,
+                                                       String[] args, int i,
+                                                       Map<String, CommandParameter> tempParameters) {
+                capturedArgs.set(args);
+                return CompletableFuture.completedFuture(Boolean.TRUE);
+            }
+        };
+        root.addParameter("count", new IntegerParameter("", "count", (uuid, s) -> true));
+
+        Source source = new Source();
+        BrigadierBridgeContext<Source> ctx = new BrigadierBridgeContext<>(
+                src -> src.id,
+                (src, perm) -> true,
+                (src, msg) -> src.messages.add(msg));
+
+        CommandDispatcher<Source> dispatcher = new CommandDispatcher<>();
+        dispatcher.register(BrigadierCommandAdapter.toBrigadier(root, ctx));
+
+        dispatcher.execute("rtp 7", source);
+        assertNotNull(capturedArgs.get());
+        assertEquals(1, capturedArgs.get().length);
+        assertEquals("count=7", capturedArgs.get()[0],
+                "parameter args must be reconstructed in commands-api 'name=value' wire format");
     }
 
     @Test

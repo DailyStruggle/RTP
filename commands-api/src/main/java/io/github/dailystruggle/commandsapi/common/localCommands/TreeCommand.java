@@ -362,6 +362,16 @@ public interface TreeCommand extends CommandsAPICommand {
      * the parameter's caller-relevant value set; literal tokens are passed
      * through unchanged. A malformed pattern falls back to a literal token so
      * a typo does not abort the whole command.
+     *
+     * <p>Security invariant (commands-api-ADR-001 addendum 2026-05-06):
+     * regex expansion <b>must</b> filter through the execute-time validator
+     * {@link CommandParameter#isRelevant} directly, not through
+     * {@link CommandParameter#relevantValues(UUID)} which is now suggestion-relevance
+     * (default permissive) per the Brigadier-bridge addendum. Mixing the two
+     * would let a {@code reg:.*} token surface values the caller cannot use,
+     * defeating {@link io.github.dailystruggle.commandsapi.common.CommandParameter}'s
+     * authorisation contract. This is the same guarantee {@code RegexParameterSecurityTest}
+     * pins (S-INJ-1 .. S-INJ-18).
      */
     static Stream<String> expandRegexToken(String token, CommandParameter parameter, UUID callerId) {
         if (token == null) return Stream.empty();
@@ -374,7 +384,8 @@ public interface TreeCommand extends CommandsAPICommand {
             // malformed regex -> treat as literal so the command does not abort
             return Stream.of(token);
         }
-        return parameter.relevantValues(callerId).stream()
+        return parameter.values().stream()
+                .filter(v -> parameter.isRelevant.apply(callerId, v))
                 .filter(v -> pattern.matcher(v).matches());
     }
 

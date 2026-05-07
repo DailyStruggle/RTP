@@ -1,0 +1,51 @@
+// rtp-fabric-ADR-001 — Fabric multiversion v1_21_R11 submodule.
+// rtp-fabric-ADR-007 — TicketType refactor at MC 1.21.11.
+//
+// Pinned to MC 1.21.11, mojmap, Loom 1.11+, Java 21. Covers MC 1.21.11
+// onward (until the next breaking ChunkTicketType / ServerChunkCache
+// change). Mojang refactored ChunkTicketType from a record
+// (long timeout, boolean persist, TicketUse use) [1.21.5–1.21.10] into
+// (long expiryTicks, int flags) [1.21.11+], where `flags` is a bitfield
+// over five named constants (SERIALIZE, FOR_LOADING, FOR_SIMULATION,
+// RESETS_IDLE_TIMEOUT, CAN_EXPIRE_BEFORE_LOAD). The R5 adapter cannot
+// load on a 1.21.11 runtime because its bytecode names the now-deleted
+// inner enum TicketType.TicketUse.
+plugins {
+    id 'fabric-loom'
+}
+
+ext {
+    // Per fabricmc.net release notes (2025-12-05): MC 1.21.11 → Loom 1.14,
+    // Fabric Loader 0.18.1, Fabric API 0.136.0+1.21.11. Loom version is
+    // controlled centrally in settings.gradle's `pluginManagement` block;
+    // changing it project-wide risks breaking the v1_21_R5 / v1_21_R1 /
+    // v1_20_R1 modules that pin Loom 1.11. We attempt to resolve 1.21.11
+    // mappings under Loom 1.11; if Loom rejects the MC version (manifest
+    // post-dates Loom 1.11), this submodule must be moved to a separate
+    // Gradle invocation, mirroring the v26_1_R1 carve-out in settings.gradle.
+    minecraftVersion       = '1.21.11'
+    loaderVersion          = '0.18.1'
+    fabricApiVersion       = '0.136.0+1.21.11'
+    permissionsApiVersion  = '0.3.1'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraftVersion}"
+    mappings  loom.officialMojangMappings()
+
+    modImplementation "net.fabricmc:fabric-loader:${loaderVersion}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabricApiVersion}"
+
+    modCompileOnly "me.lucko:fabric-permissions-api:${permissionsApiVersion}"
+
+    api project(':rtp-api')
+    api project(':rtp-core')
+    api project(':commands-api')
+    api project(':rtp-fabric:rtp-fabric-common')
+}

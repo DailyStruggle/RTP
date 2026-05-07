@@ -30,7 +30,7 @@ For specific code-level and platform-specific requirements, please refer to the 
 - **Anti-cheat:** RTP does not detect or prevent cheating. It is the responsibility of the server operator to configure compatible anti-cheat plugins.
 - **GUI / inventory menus:** RTP does not provide a graphical interface. All interaction is command- and config-based.
 - **Cross-server teleportation:** RTP operates within a single server instance. BungeeCord/Velocity network teleportation is out of scope.
-- **Non-Bukkit, non-Fabric platforms:** RTP shall target Bukkit-derived software (Spigot, Paper, Folia) and Fabric. Forge, NeoForge, and other mod loaders shall not be supported. Rationale and the phased Fabric adapter plan are recorded in [ADR-022](../adr/ADR-022-fabric-platform-in-scope.md) and [MULTI_PLATFORM_PLAN.md](MULTI_PLATFORM_PLAN.md).
+- **Non-Bukkit, non-Fabric platforms:** RTP shall target Bukkit-derived software (Spigot, Paper, Folia) and Fabric. Forge, NeoForge, and other mod loaders shall not be supported. Rationale and the phased Fabric adapter plan are recorded in [ADR-022](../adr/rtp-fabric-ADR-002-platform-in-scope.md) and [MULTI_PLATFORM_PLAN.md](MULTI_PLATFORM_PLAN.md).
 - **Legacy Minecraft and Java versions:** RTP targets Java 21+ (REQ-RTP-SYS-001) and the Minecraft versions enumerated by the shipped versioned platform adapter submodules (ADR-010). Older Minecraft versions and older Java runtimes are out of scope; users on legacy servers shall be directed to the last RTP release that supported their server. Revisit conditions and rationale are recorded in [ADR-021](../adr/ADR-021-legacy-mc-and-java-support-scope.md).
 
 ## 1. Functional Requirements

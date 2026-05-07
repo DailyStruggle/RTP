@@ -13,7 +13,7 @@ import java.util.function.Function;
  *
  * <p>Carrying lambdas in this context keeps Brigadier's source type out of
  * {@link io.github.dailystruggle.commandsapi.common.CommandsAPICommand} (per
- * ADR-014: "the adapter bridges them without leaking Brigadier types into
+ * commands-api-ADR-001: "the adapter bridges them without leaking Brigadier types into
  * commands-api core interfaces").
  *
  * @param <S> Brigadier command source type (e.g. {@code ServerCommandSource} on Fabric).

@@ -24,7 +24,7 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | Fabric status / blockers | [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) |
 | Multi-server / proxy (Velocity, BungeeCord) plan | [`MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md) (D-005 gated; admin stub: [`../admin/proxies/INDEX.md`](../admin/proxies/INDEX.md)) |
 | Runtime metrics SPI (TPS / MSPT / heap / pipeline samples) | [`METRICS_PLAN.md`](METRICS_PLAN.md) |
-| Why Fabric is in scope (and Forge / NeoForge are not) | [`../adr/ADR-022-fabric-platform-in-scope.md`](../adr/ADR-022-fabric-platform-in-scope.md) |
+| Why Fabric is in scope (and Forge / NeoForge are not) | [`../../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md`](../../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) (renumbered from ADR-022) |
 | Why legacy MC / Java are out of scope | [`../adr/ADR-021-legacy-mc-and-java-support-scope.md`](../adr/ADR-021-legacy-mc-and-java-support-scope.md) |
 | Adding or updating a locale / translation | [`TRANSLATION_GUIDE.md`](TRANSLATION_GUIDE.md) |
 | Spiral 1D math | [`../adr/ADR-001-archimedean-spiral-1d-mapping.md`](../adr/ADR-001-archimedean-spiral-1d-mapping.md) |

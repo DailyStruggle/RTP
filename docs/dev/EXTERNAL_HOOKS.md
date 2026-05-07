@@ -4,7 +4,7 @@
 
 > **Authoritative status.** Every reflection, soft-depend probe, or extension seam that exists *to accommodate other plugins modifying RTP behavior* shall appear in this file. Adding a new hook without a row here is a documentation defect (see [`AGENTS.md → Self-Updating Protocol`](../../.junie/AGENTS.md)).
 
-> **Related decisions.** [ADR-026](../adr/ADR-026-external-hook-api-surface.md) (this surface), [ADR-019](../adr/ADR-019-claim-plugin-integrations-folded-into-plugin.md) (claim integrations), [ADR-016](../adr/ADR-016-anvil-subsystem.md) (anvil prefilter), [ADR-014](../adr/ADR-014-brigadier-bridge-via-commands-api.md) (brigadier bridge).
+> **Related decisions.** [ADR-026](../adr/ADR-026-external-hook-api-surface.md) (this surface), [ADR-019](../adr/ADR-019-claim-plugin-integrations-folded-into-plugin.md) (claim integrations), [ADR-016](../adr/ADR-016-anvil-subsystem.md) (anvil prefilter), [commands-api-ADR-001](../../commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md) (brigadier bridge).
 
 ---
 
@@ -114,9 +114,10 @@ The following sites also accommodate third-party plugins but are **not** routed 
 | Hook | Symbol / file | Why outside the facade | Reference |
 |---|---|---|---|
 | **Effects pipeline** (particles / potions / sounds during teleport) | `effects-api` module | Has its own evolving SPI; folding two evolving subsystems into one facade was rejected in ADR-026. | `effects-api/src/main/java/io/github/dailystruggle/effectsapi/` |
-| **Brigadier bridge** | `BrigadierCommandAdapter` + `BrigadierBridgeContext` in `commands-api/` | Used by Paper/Folia/Velocity to attach RTP commands to native Brigadier. Not a behavior-modification seam — addons do not extend it. | [ADR-014](../adr/ADR-014-brigadier-bridge-via-commands-api.md) |
+| **Brigadier bridge** | `BrigadierCommandAdapter` + `BrigadierBridgeContext` in `commands-api/` | Used by Paper/Folia/Velocity to attach RTP commands to native Brigadier. Not a behavior-modification seam — addons do not extend it. | [commands-api-ADR-001](../../commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md) |
 | **Bukkit event listeners** for join / firstjoin / respawn / void RTP | `OnEventTeleports.java` (rtp-plugin) | These are RTP's *consumers* of upstream events, not extension points. Behavior is configured in `events.yml`, not by other plugins. | `docs/admin/EVENTS_AND_EFFECTS.md` |
 | **`Shape` and `VerticalAdjustor` factories** | `RTPAPI.addShape` / `RTPAPI.addVerticalAdjustor` | Already first-class API; not in `RTPHooks` because they are construction-time registrations rather than "behavior modification" seams. | `RTPAPI.java`, REQ-API-F-001/F-002 |
+| **Fabric permissions** (`fabric-permissions-api`) | `me.lucko.fabric.api.permissions.v0.Permissions.check(player, node, 2)` invoked from `FabricRTPPlayer#hasPermission` (and transitively `FabricServerAccessor#announce`, `RTPCmdFabricRoot` suggestion gating). | Per-platform soft-depend (modCompileOnly `me.lucko:fabric-permissions-api`); analogous to Vault on Bukkit. Not a behavior-modification seam — implementations (LuckPerms-Fabric, Cyan, Ledger, …) provide the same permission contract addons already use through `RTPCommandSender#hasPermission`. | `rtp-fabric/rtp-fabric-common/build.gradle`, `FabricRTPPlayer.java` |
 
 ---
 
@@ -145,6 +146,7 @@ These `Class.forName` / `getMethod` sites exist for **platform compatibility det
 | Placeholders | `PlaceholderAPI` not present → `PAPI_expansion` is not constructed; placeholders are not exported. |
 | World border | No bound provider → fall back to platform `World#getWorldBorder()` and config radius. |
 | Anvil pre-filter | No bound provider → `ScanTask` falls back to per-attempt chunk loads (slower but correct). |
+| Fabric permissions (`fabric-permissions-api`) | No implementer registered → `Permissions.check(player, node, 2)` returns the vanilla op-level verdict (op level ≥ 2 grants). On `LinkageError` (perms-api jar genuinely absent at runtime) `FabricRTPPlayer#hasPermission` falls back to `PlayerList#isOp(GameProfile)`, preserving the previous op-only behaviour. |
 
 In every case, RTP shall not silently swallow a failure (REQ-RTP-S-004); fall-back paths log a single line at INFO/WARNING and continue.
 

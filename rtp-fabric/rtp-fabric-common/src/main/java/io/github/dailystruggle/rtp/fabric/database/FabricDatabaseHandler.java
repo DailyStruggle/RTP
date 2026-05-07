@@ -37,6 +37,20 @@ public final class FabricDatabaseHandler {
     }
 
     /**
+     * Probe whether the SQLite JDBC driver class is reachable from the current classloader.
+     * Used to gracefully fall back to H2 on Fabric when the user-selected backend is "sqlite"
+     * but the driver was not provided as a server-side library.
+     */
+    private static boolean isSqliteDriverAvailable() {
+        try {
+            Class.forName("org.sqlite.JDBC", false, FabricDatabaseHandler.class.getClassLoader());
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
+    }
+
+    /**
      * Resolve the Fabric config dir for RTP and return it, creating it if absent.
      *
      * @return {@code <fabric config dir>/rtp/}
@@ -79,7 +93,14 @@ public final class FabricDatabaseHandler {
         ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
         Map<String, Object> databaseMap = configParser.getMap(ConfigKeys.database);
 
-        String type = String.valueOf(databaseMap.getOrDefault("type", "sqlite"));
+        // Fabric defaults to H2 (shaded into the RTP jar). SQLite is still selectable but
+        // the SQLite JDBC driver is no longer bundled — Bukkit-family servers ship it as a
+        // server-side runtime, but Fabric does not. Choosing "sqlite" on Fabric requires the
+        // user to drop `sqlite-jdbc.jar` into their server classpath; otherwise the accessor
+        // fails fast with `No suitable driver found`. Keeping H2 as the Fabric default avoids
+        // shading ~7 MB of native sqlite-jdbc binaries (issue: "fix the need for sqlite for
+        // fabric, it bloats our binary"). See rtp-plugin/build.gradle.
+        String type = String.valueOf(databaseMap.getOrDefault("type", "h2"));
         String host = String.valueOf(databaseMap.getOrDefault("host", "127.0.0.1"));
         int port = ((Number) databaseMap.getOrDefault("port", 3306)).intValue();
         String name = String.valueOf(databaseMap.getOrDefault("name", "rtp"));
@@ -118,9 +139,27 @@ public final class FabricDatabaseHandler {
                 rtp.databaseAccessor = new PostgreSQLDatabaseAccessor(host, port, name, username, password);
                 break;
             case "sqlite":
+                // SQLite JDBC driver is no longer bundled with the Fabric jar (it added ~7 MB
+                // of native binaries for every supported OS/arch). Probe for the driver on the
+                // server classpath; fall back to H2 with a loud warning if absent so the server
+                // still boots instead of crashing on `No suitable driver found`.
+                if (isSqliteDriverAvailable()) {
+                    rtp.databaseAccessor = new SQLiteDatabaseAccessor(
+                            "jdbc:sqlite:" + databaseDirectory.getAbsolutePath() + File.separator + "RTP.db");
+                } else {
+                    RTP.log(Level.WARNING,
+                            "FabricDatabaseHandler: database.type=sqlite but `org.sqlite.JDBC` is not on the "
+                                    + "server classpath. The SQLite JDBC driver is no longer bundled with the "
+                                    + "RTP Fabric jar. Drop `sqlite-jdbc.jar` into your server's library "
+                                    + "directory or set database.type to `h2` in config.yml. Falling back to H2 "
+                                    + "for this session.");
+                    rtp.databaseAccessor = new H2DatabaseAccessor();
+                    type = "h2";
+                }
+                break;
             default:
-                rtp.databaseAccessor = new SQLiteDatabaseAccessor(
-                        "jdbc:sqlite:" + databaseDirectory.getAbsolutePath() + File.separator + "RTP.db");
+                rtp.databaseAccessor = new H2DatabaseAccessor();
+                type = "h2";
                 break;
         }
 

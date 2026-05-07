@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -30,8 +31,10 @@ import net.minecraft.server.MinecraftServer;
  * (inline if already on server thread). Delayed/repeating: tick-counted entries
  * drained by {@link #tick(MinecraftServer)} from {@code END_SERVER_TICK}.
  * Region-aware overloads delegate (no Folia regions on Fabric). Server ref is
- * set in {@link #setServer} from {@code SERVER_STARTED}; until then sync paths
- * fail loud per REQ-RTP-S-006. {@link #cancelTask} expects the Integer task id;
+ * set in {@link #setServer} from {@code SERVER_STARTED}; sync submissions made
+ * before that point are buffered in {@link #preStartQueue} and drained once
+ * the server thread becomes available, matching Bukkit's always-queue
+ * {@code runTask} semantics. {@link #cancelTask} expects the Integer task id;
  * unknown types are tolerated as no-ops.
  */
 public class FabricScheduler implements RTPScheduler {
@@ -56,15 +59,40 @@ public class FabricScheduler implements RTPScheduler {
   private final AtomicInteger nextTaskId = new AtomicInteger(1);
   private final ConcurrentHashMap<Integer, ScheduledEntry> scheduled = new ConcurrentHashMap<>();
 
-  /** Sets the live server reference. Called from {@code ServerLifecycleEvents.SERVER_STARTED}. */
+  /**
+   * Pre-start buffer. Tasks submitted to {@link #runTask(Runnable)} before
+   * {@link #setServer(MinecraftServer)} has been invoked from
+   * {@code ServerLifecycleEvents.SERVER_STARTED} are queued here and drained
+   * once the server is available, mirroring Bukkit's {@code runTask} which
+   * always queues onto the next tick rather than failing. This protects the
+   * region pre-fill / database startup path from dropping work during the
+   * narrow window between mod-init and {@code SERVER_STARTED}.
+   */
+  private final ConcurrentLinkedQueue<Runnable> preStartQueue = new ConcurrentLinkedQueue<>();
+
+  /**
+   * Sets the live server reference. Called from {@code ServerLifecycleEvents.SERVER_STARTED}.
+   * Drains any tasks that were submitted before the server was available.
+   */
   public void setServer(MinecraftServer server) {
     this.server = server;
+    // Drain pre-start submissions onto the server thread now that it exists.
+    Runnable r;
+    while ((r = preStartQueue.poll()) != null) {
+      try {
+        server.execute(r);
+      } catch (Throwable t) {
+        RTP.log(java.util.logging.Level.WARNING,
+            "[FabricScheduler] failed to drain pre-start task", t);
+      }
+    }
   }
 
   /** Clears the server reference. Called from {@code ServerLifecycleEvents.SERVER_STOPPING}. */
   public void clearServer() {
     this.server = null;
     this.scheduled.clear();
+    this.preStartQueue.clear();
   }
 
   /**
@@ -121,6 +149,7 @@ public class FabricScheduler implements RTPScheduler {
 
   @Override
   public void runTask(Runnable task) {
+    if (task == null) return;
     MinecraftServer s = this.server;
     if (s != null && Thread.currentThread() == s.getRunningThread()) {
       task.run();
@@ -130,10 +159,11 @@ public class FabricScheduler implements RTPScheduler {
       s.execute(task);
       return;
     }
-    // No server yet — fail loud per REQ-RTP-S-006.
-    throw new IllegalStateException(
-        "FabricScheduler.runTask called before MinecraftServer started "
-            + "(register ServerLifecycleEvents.SERVER_STARTED -> setServer first)");
+    // No server yet — buffer the task and drain on SERVER_STARTED. This
+    // matches Bukkit's runTask semantics (always-queue, never fail) and
+    // prevents the early-dispatch warning cascade observed on Fabric where
+    // region-thread evaluation fired before setServer had been called.
+    preStartQueue.offer(task);
   }
 
   @Override

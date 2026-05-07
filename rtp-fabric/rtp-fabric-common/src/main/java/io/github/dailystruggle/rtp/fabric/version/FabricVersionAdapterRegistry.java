@@ -18,7 +18,7 @@ import java.util.logging.Level;
  * surface — it is internal Fabric platform glue, callable only by code under
  * {@code io.github.dailystruggle.rtp.fabric.**}.</p>
  *
- * <p><b>See also:</b> ADR-027 §"Runtime selection".</p>
+ * <p><b>See also:</b> rtp-fabric-ADR-001 §"Runtime selection".</p>
  */
 public final class FabricVersionAdapterRegistry {
 
@@ -63,7 +63,7 @@ public final class FabricVersionAdapterRegistry {
         if (a == null) {
             throw new IllegalStateException(
                     "FabricVersionAdapter not yet installed — RTPFabricMod.onInitialize must run before"
-                            + " any rtp-fabric version-sensitive call site (see ADR-027).");
+                            + " any rtp-fabric version-sensitive call site (see rtp-fabric-ADR-001).");
         }
         return a;
     }

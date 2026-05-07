@@ -1,6 +1,7 @@
 package io.github.dailystruggle.effectsapi;
 
 import io.github.dailystruggle.effectsapi.SpigotListeners.FireworkSafetyListener;
+import io.github.dailystruggle.effectsapi.SpigotListeners.GlideSafetyListener;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.Nullable;
@@ -13,6 +14,7 @@ public final class EffectsAPI {
     public static Plugin instance = null;
     //referentiable listener, for updating
     public static FireworkSafetyListener fireworkSafetyListener = null;
+    public static GlideSafetyListener glideSafetyListener = null;
     //server version checking
     private static String version = null;
     private static Integer intVersion = null;
@@ -85,6 +87,30 @@ public final class EffectsAPI {
             //on first initialization, register firework safety events
             fireworkSafetyListener = new FireworkSafetyListener(caller);
             Bukkit.getPluginManager().registerEvents(fireworkSafetyListener, caller);
+        }
+        if (glideSafetyListener == null) {
+            // GlideEffect (effects-api-ADR-001): tracks gliders, suppresses
+            // firework rockets when configured, and places players on
+            // shutdown via placeAllOnShutdown().
+            glideSafetyListener = new GlideSafetyListener(caller);
+            Bukkit.getPluginManager().registerEvents(glideSafetyListener, caller);
+        }
+    }
+
+    /**
+     * Plugin-disable hook. Caller is expected to invoke this from its
+     * {@code onDisable()} so still-gliding players can be placed at the
+     * highest safe block below them (or on a synthesized platform) before
+     * the server stops. Idempotent.
+     */
+    public static void disable() {
+        if (glideSafetyListener != null) {
+            try {
+                glideSafetyListener.placeAllOnShutdown();
+            } catch (Throwable t) {
+                Bukkit.getLogger().log(Level.WARNING,
+                        "EffectsAPI.disable: GlideEffect shutdown placement threw", t);
+            }
         }
     }
 }

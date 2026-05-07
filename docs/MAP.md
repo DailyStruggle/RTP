@@ -40,7 +40,7 @@ Flat one-line catalog of every normative doc. Cheapest first-fetch for an agent 
 - `ADR-011` `rtp-api` separate module.
 - `ADR-012` Chunk reservation abstraction.
 - `ADR-013` Addons as external Gradle projects.
-- `ADR-014` Brigadier bridge via `commands-api`.
+- `commands-api-ADR-001` Brigadier bridge via `commands-api`.
 - `ADR-015` Stale-chunk guard / Count-Bound pipes.
 - `ADR-016` Anvil subsystem.
 - `ADR-017` Block tags and state predicates in safety lists.

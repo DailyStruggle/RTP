@@ -39,7 +39,7 @@ dependencies {
     minecraft "com.mojang:minecraft:${minecraftVersion}"
     mappings  loom.officialMojangMappings()
 
-    // ADR-027: rtp-fabric-common ships no MC / loader / fabric-api classes —
+    // rtp-fabric-ADR-001: rtp-fabric-common ships no MC / loader / fabric-api classes —
     // each rtp-fabric-vXX_YY_R1 submodule carries its own runtime mod jar
     // with its own pinned MC version. Common compiles against the 1.21.1
     // mojmap line above purely to typecheck; flipping these to
@@ -54,7 +54,12 @@ dependencies {
     // Platform-free abstractions consumed by every Fabric adapter class.
     api project(':rtp-api')
     api project(':rtp-core')
-    // ADR-014 — Brigadier Bridge. The bridge classes live in :commands-api;
+    // commands-api-ADR-001 — Brigadier Bridge. The bridge classes live in :commands-api;
     // this module supplies the Fabric-side registration shim (RTPCmdFabric).
     api project(':commands-api')
+    // ADR-016 — anvil pre-filter. Platform-neutral .mca decoder used by
+    // FabricRTPWorld#probeChunkColumn so the ScanTask refill loop can serve
+    // most candidates without a synchronous tick-thread chunk generation.
+    // See rtp-fabric-ADR-005-anvil-prefilter-parity.md.
+    api project(':rtp-anvil')
 }

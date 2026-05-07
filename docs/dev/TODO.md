@@ -8,12 +8,12 @@
 
 ## 1. Fabric Support
 
-Active frontier per [ADR-022](../adr/ADR-022-fabric-platform-in-scope.md). Tracked in detail under [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md); items below are the must-finish set to call Fabric "stable".
+Active frontier per [rtp-fabric-ADR-002](../../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md). Tracked in detail under [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md); items below are the must-finish set to call Fabric "stable".
 
 - [ ] **Resolve Loom dependency.** `rtp-fabric` build currently does not resolve cleanly across all `v1_20_R1` / `v1_21_R1` / `v26_1_R1` submodules. Document the toolchain (Loom version, Yarn / Mojmap choice) in an ADR before merging build changes.
 - [ ] **Eliminate the S-005 violation in `FabricWorld.getChunkAt`.** Replace the synchronous load with the async chunk abstraction used on Paper/Folia. Cover with a `ReqRtpS005*` test in the Fabric module.
 - [ ] **Implement `FabricServerAccessor.getLocationGenerator`.** Currently a null stub — addons calling the API on Fabric will hit S-006 territory. Wire to the real `LocationGenerator` and add a contract test mirroring the Paper one.
-- [ ] **Brigadier bridge wiring.** Confirm `BrigadierCommandAdapter` + `BrigadierBridgeContext` ([ADR-014](../adr/ADR-014-brigadier-bridge-via-commands-api.md)) bind cleanly under Fabric's `CommandRegistrationCallback`. Add an integration test that registers `/rtp` and asserts tab-completion parity with Paper.
+- [ ] **Brigadier bridge wiring.** Confirm `BrigadierCommandAdapter` + `BrigadierBridgeContext` ([commands-api-ADR-001](../../commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md)) bind cleanly under Fabric's `CommandRegistrationCallback`. Add an integration test that registers `/rtp` and asserts tab-completion parity with Paper.
 - [ ] **Effects-API parity.** Audit `effects-api` consumers (`FireworkEffect`, sound, particle) for Fabric-side equivalents; stub or implement so loading the jar on a vanilla Fabric server does not warn.
 - [ ] **Platform smoke test.** Add a Fabric entry to whatever `rtp test full` analogue exists (or create one) so a CI / manual run produces the same pass/fail matrix as Paper and Folia.
 - [ ] **Promote out of "unstable" in `MULTI_PLATFORM_PLAN.md` and `AGENTS.md` *Current Development Focus*** once the above are green.

@@ -138,13 +138,23 @@ public class PotionEffect extends Effect<PotionTypeNames> {
                 this.data.get(PotionTypeNames.ICON).toString().replaceAll("\\.*", "");
     }
 
+    /**
+     * Positional / type-driven key order for {@link PotionEffect}.
+     * Note: {@code DURATION} is intentionally absent — it was never part of
+     * the legacy positional {@code setData(String...)} contract for this
+     * effect, so retaining its omission preserves backward compatibility
+     * for permission-node round-trips.
+     */
+    private static final PotionTypeNames[] KEY_ORDER = {
+            PotionTypeNames.TYPE,
+            PotionTypeNames.AMPLIFIER,
+            PotionTypeNames.AMBIENT,
+            PotionTypeNames.PARTICLES,
+            PotionTypeNames.ICON
+    };
+
     @Override
     public void setData(String... data) {
-        if(data.length>0) this.data.put(PotionTypeNames.TYPE, data[0]);
-        if(data.length>1) this.data.put(PotionTypeNames.AMPLIFIER, data[1]);
-        if(data.length>2) this.data.put(PotionTypeNames.AMBIENT, data[2]);
-        if(data.length>3) this.data.put(PotionTypeNames.PARTICLES, data[3]);
-        if(data.length>4) this.data.put(PotionTypeNames.ICON, data[4]);
-        this.data = fixData(this.data);
+        applyByType(KEY_ORDER, data);
     }
 }

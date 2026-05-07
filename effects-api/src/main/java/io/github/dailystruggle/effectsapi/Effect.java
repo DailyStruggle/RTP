@@ -11,9 +11,12 @@ import org.bukkit.scheduler.BukkitRunnable;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.ParameterizedType;
+import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 
 public abstract class Effect<T extends Enum<T>> extends BukkitRunnable implements Cloneable {
     public final Class<T> persistentClass;
@@ -42,6 +45,160 @@ public abstract class Effect<T extends Enum<T>> extends BukkitRunnable implement
     public abstract String toPermission();
 
     public abstract void setData(String... data);
+
+    /**
+     * Default diagnostic sink for {@link #applyByType} when an effect doesn't
+     * route through a caller-supplied {@link Consumer}. Mirrors the
+     * {@code commands-api} pattern of injecting a {@code Consumer<String>}
+     * message method instead of binding {@code effects-api} to {@code rtp-core}
+     * logging. Tests / hosts can swap it out via
+     * {@link #setDefaultWarn(Consumer)}.
+     *
+     * <p>Default routes to {@link System#err}, which is strictly an
+     * improvement over the prior {@code printStackTrace()} behavior on
+     * mistyped permission tokens (see AGENTS.md: "Zero
+     * {@code printStackTrace()}").
+     */
+    private static volatile Consumer<String> defaultWarn = msg -> System.err.println("[effects-api] " + msg);
+
+    /**
+     * Replace the default diagnostic sink used by {@link #applyByType} when
+     * an effect calls it without an explicit {@link Consumer}. Intended for
+     * the host plugin to wire its own logger (e.g. {@code RTP.log(WARNING, …)}).
+     */
+    public static void setDefaultWarn(Consumer<String> warn) {
+        defaultWarn = (warn != null) ? warn : msg -> {};
+    }
+
+    /**
+     * Convenience: parse positional tokens against {@code keyOrder} using
+     * the host-configured default warn sink. See
+     * {@link #applyByType(Enum[], String[], Consumer)}.
+     */
+    protected final void applyByType(T[] keyOrder, String[] tokens) {
+        applyByType(keyOrder, tokens, defaultWarn);
+    }
+
+    /**
+     * Type-driven adaptive positional fill (effects-api-ADR-002).
+     *
+     * <p>Walks {@code keyOrder} with a non-rewinding cursor. For each input
+     * {@code token}, advances the cursor to the first remaining key whose
+     * default-type can parse the token ({@link #canParse(Object, String)}),
+     * assigns it, and advances past that key. Tokens that no remaining key
+     * accepts are reported once via {@code warn} (S-004 — never silently
+     * dropped) and the cursor is not advanced. Keys that are never assigned
+     * keep their constructor-set defaults.
+     *
+     * <p>Order of acceptance is preserved (left-to-right): the cursor never
+     * rewinds, so {@link #toPermission()} round-trips remain deterministic.
+     *
+     * <p>This method is pure with respect to chunks/IO: {@link #canParse} only
+     * performs in-memory map / enum / number parsing. S-005 compliant.
+     *
+     * @param keyOrder positional / declared key order (typically the enum
+     *                 constants array of {@code T})
+     * @param tokens   raw permission/config tokens (may be shorter than
+     *                 {@code keyOrder})
+     * @param warn     consumer invoked with a single human-readable diagnostic
+     *                 line per unparsed token; may be {@code null} for a
+     *                 no-op (caller is then responsible for surfacing
+     *                 misconfiguration in some other way — discouraged)
+     */
+    protected final void applyByType(T[] keyOrder, String[] tokens, Consumer<String> warn) {
+        if (keyOrder == null || keyOrder.length == 0) return;
+        if (tokens == null || tokens.length == 0) {
+            this.data = fixData(this.data);
+            return;
+        }
+        int cursor = 0;
+        List<String> unparsed = null;
+        for (String token : tokens) {
+            if (token == null) continue;
+            int chosen = -1;
+            for (int j = cursor; j < keyOrder.length; j++) {
+                Object def = defaults.get(keyOrder[j]);
+                if (canParse(def, token)) {
+                    chosen = j;
+                    break;
+                }
+            }
+            if (chosen < 0) {
+                if (unparsed == null) unparsed = new ArrayList<>();
+                unparsed.add(token);
+                continue;
+            }
+            this.data.put(keyOrder[chosen], token);
+            cursor = chosen + 1;
+            if (cursor >= keyOrder.length) {
+                // remaining tokens cannot land anywhere — record them
+                // as unparsed rather than silently dropping (S-004).
+                continue;
+            }
+        }
+        this.data = fixData(this.data);
+        if (unparsed != null && warn != null) {
+            warn.accept("[" + getClass().getSimpleName()
+                    + "] ignored " + unparsed.size()
+                    + " token(s) that matched no remaining key: " + unparsed);
+        }
+    }
+
+    /**
+     * Side-effect-free predicate: would {@code token} parse to a value
+     * compatible with {@code def}'s runtime type? Mirrors the type ladder in
+     * {@link #str2Obj} but never throws and performs no Bukkit world load /
+     * chunk I/O (S-005).
+     */
+    protected final boolean canParse(Object def, String token) {
+        if (token == null) return false;
+        if (def == null) {
+            // Unknown default type — be permissive so a token can land
+            // somewhere rather than getting stuck on an empty slot.
+            return true;
+        }
+        if (def instanceof String) return true;
+        String upper = token.toUpperCase();
+        if (def instanceof Boolean) {
+            return upper.equals("TRUE") || upper.equals("FALSE");
+        }
+        if (def instanceof Long || def instanceof Integer) {
+            try { Long.parseLong(token); return true; }
+            catch (NumberFormatException nfe) { return false; }
+        }
+        if (def instanceof Double || def instanceof Float) {
+            try {
+                float f = Float.parseFloat(token);
+                return !Float.isNaN(f) && !Float.isInfinite(f);
+            } catch (NumberFormatException nfe) { return false; }
+        }
+        if (def instanceof Color) {
+            if (resolveNamedColor(token) != null) return true;
+            try { Integer.parseInt(token, 16); return true; }
+            catch (NumberFormatException nfe) { return false; }
+        }
+        if (def instanceof Sound || def.getClass().getName().equals("org.bukkit.Sound")) {
+            return resolveSound(token) != null;
+        }
+        // Generic enum / registry-backed: try valueOf, getByName, then registry.
+        try {
+            def.getClass().getMethod("valueOf", String.class).invoke(null, upper);
+            return true;
+        } catch (NoSuchMethodException | IllegalAccessException ignored) {
+            // try next
+        } catch (InvocationTargetException ite) {
+            // valueOf threw — token didn't match
+        }
+        try {
+            Object r = def.getClass().getMethod("getByName", String.class).invoke(null, token);
+            if (r != null) return true;
+        } catch (NoSuchMethodException | IllegalAccessException ignored) {
+            // try next
+        } catch (InvocationTargetException ite) {
+            // getByName threw — token didn't match
+        }
+        return resolveViaRegistry(def.getClass(), token) != null;
+    }
 
     //get parameters. Make sure to use setData to make changes
     public void setTarget(Object target) throws IllegalArgumentException {
