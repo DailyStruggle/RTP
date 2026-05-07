@@ -39,8 +39,186 @@ This document is the canonical plan for **runtime metrics** in RTP — the platf
 | `chunkLoadBacklog` | int | Count of incomplete chunk-load `CompletableFuture`s tracked through the platform's async chunk API. |
 | `memoryTrackerEntries` | int | `MemoryTracker.size()`. |
 | `databaseLatencyMs` | int | Last write/read RTT against the configured `AbstractSQLDatabaseAccessor`. |
+| `commandRatePerMin` | rolling double | `/rtp` (and aliased) command-entry counter sampled per-second in `BaseRTPCmd`, exposed as 1m / 5m / 15m EMAs scaled to per-minute units (mirrors the TPS shape so operators can read the two side-by-side). |
+| `refillRatePerMin` | rolling double | Net rate at which `keptLocations` (L1) + `unkeptLocations` (L2) gain entries across all regions, sampled by `RegionQueueManager` on the same async cadence. EMA over the same 1m / 5m / 15m windows. |
+| `commandOverflowRatePerMin` | rolling double | `max(0.0, commandRatePerMin - refillRatePerMin)` — by how much sustained command demand exceeds the cache's ability to refill. Drives the *Command-Demand vs Refill Tracking* admin readout below and is the input signal for any future auto-adjustment of pre-gen / scan budgets. |
+| `commandOverflowEvents` | long | Cumulative count of sample windows in which `commandRatePerMin > refillRatePerMin` for at least `metrics.demand.overflowMinSamples` consecutive samples (default 3). Surfaces sustained pressure as a single integer for alerting. |
+| `tickStressEvents` | long | Cumulative count of sample windows in which `mspt` exceeded `metrics.demand.stressMsptThreshold` (default 45 ms) on the same async cadence. Joined with `commandOverflowEvents` to attribute pressure (server-bound vs cache-bound). |
+| `biomeRerolls` | `Map<String, Long>` (destination biome name → cumulative user-reroll count) | Counted at command entry in `BaseRTPCmd` (and platform overrides) by inspecting the invoking player's prior `TeleportData` in `RTP.priorTeleportData` (extended with a `destinationBiome` field). If the player re-issues `/rtp` within a configurable window after their last successful landing, the destination biome of the *previous* teleport is incremented. Keyed by biome to surface which **outcomes** drive players to re-roll, informing server-design decisions about biome allow/deny tuning. See *Biome Reroll Tracking* below. |
+| `sustainableRatePerMin` | rolling double | Trailing p95 of `refillRatePerMin` over samples in which `tickStressEvents` did **not** increment. Computed in `CoreMetrics` alongside the existing demand sampler. The denominator a proxy needs for capacity headroom; cannot be derived externally because it conditions one signal on another's *non*-increment within a single host's history. See *Cross-Server Load-Balancing Inputs* below. |
+| `cacheServeRateLast60s` | rolling double | Successful `keptLocations.poll()` per second over the last 60 s, summed across regions. Counted at the *poll* sites in `LockFreeLocationBuffer` / `RegionQueueManager` (distinct from the existing `refillRatePerMin` *add*-side counter). Detects "cache full but nobody served" — invisible from snapshot rates alone. |
+| `coldServeRatio` | double `[0.0, 1.0]` | `unkeptServes / (keptServes + unkeptServes)` over the same 60 s window. High value ⇒ host is paying L2 chunk-reload cost on most teleports. Hot-vs-cold split is internal to `RegionQueueManager`; the proxy cannot reconstruct it from `queueDepth` or `refillRatePerMin`. |
+| `pregenSaturation` | double `[0.0, 1.0]` | `min(1.0, scanTaskBudgetUsed / scanTaskBudget)` sampled from the active `ScanTask` budgeting state. Tells the LB whether a host is coasting (room to refill faster) or already flat-out — a backend-internal control surface, not externally observable. |
+| `pipelineFailureRate` | rolling double | `pipelineFailures / pipelineCompletions` over the last sample window. `pipelineFailures` is the sum across `PregenState.failMap` increments since the previous sample; `pipelineCompletions` is incremented on the existing `TeleportPipelineTask.runCleanup` success path (next to `pipelineHistogram.record(...)`). |
+| `pipelineFailureBreakdown` | fixed-shape `Map<FailKind, Long>` | Cumulative `PregenState.failMap` rollup, keyed by a small fixed enum (`biome`, `prefilterBiome`, `unsafe`, `nullChunk`, `other`) — not raw `FailTypes` to keep the publish shape stable across versions. Lets the LB deprioritise hosts failing on `nullChunk` (S-005 spirit) vs. hosts failing only on `biome` (operator filter config). |
+| `loginReserveExhaustion` | long | Cumulative count of `firstjoin` / `join`-triggered RTPs that fell through an empty `loginLocations` (ADR-023) and had to use the general queue. Incremented at the fall-through branch in the login-reserve consumer; distinct from `queueDepth`, which lumps all waiters together. |
+| `gcPauseRecent` | int (ms) | Largest GC pause observed in the last sample window. Sourced from `java.lang.management.GarbageCollectorMXBean` deltas (cumulative `getCollectionTime()` per collector) on the same 1 s async cadence as the demand sampler. Distinguishes GC stall (recovers fast) from chunk-I/O stall (persistent) — different LB routing implications even when both produce identical TPS dips. |
+| `effectiveQueueWaitMs` | rolling double | EMA of (player-enqueue → pipeline-start) latency observed in `RegionQueueManager`. Stamp time at `playerQueue` enqueue; sample at the dequeue site that hands off to `TeleportPipelineTask`. The proxy proxy-estimate `queueDepth × avgPipelineMs` is wrong on heterogeneous regions; only the host has the per-enqueue timestamps. |
+| `regionQueueStatus` | fixed-shape `Map<RegionKey, RegionQueueRow>` | Per-region rollup of queue / cache fill so a cross-server selector can route to a *specific* region rather than only to the host. Each row carries `playerQueueDepth`, `keptFill` / `keptCap`, `unkeptFill` / `unkeptCap`, `loginFill` / `loginCap` (nullable when no login reserve is configured), and a derived `status` enum (`OK` / `LOW` / `EMPTY` / `SATURATED`). `RegionKey` is the existing region identifier (world key + region name); see *Per-Region Queue Status* below for cardinality bounds and the privacy posture in network mode. The summed `queueDepth` and host-level `cacheServeRateLast60s` hide which region is hot vs. starved; this row is the per-region detail an LB cannot reconstruct from host-level scalars. |
 
 All values are accessible via a single read-only call: `Metrics.snapshot()` returns a `MetricsSnapshot` immutable record. Individual getters exist for callers that want a single field.
+
+---
+
+## Biome Reroll Tracking
+
+The high-signal question this metric answers is **"which destination biomes do players reject by re-rolling?"** — i.e., the biomes whose teleport outcome makes a player immediately type `/rtp` again. This is a *user-driven* satisfaction signal, distinct from the internal location-selection bounces tracked by `LocationGenerator.FailTypes.biome` / `FailTypes.prefilterBiome` (those remain in `PregenState.failMap` for pipeline diagnostics and are **not** what this metric measures).
+
+**Data flow:**
+
+No new per-player map is introduced. The existing `RTP.priorTeleportData: ConcurrentHashMap<UUID, TeleportData>` already retains the most recent completed `TeleportData` per player (populated in `RTPCmd` on success and consumed by `RTPTeleportCancel`). `TeleportData` is extended with a single nullable `String destinationBiome` field, set when the pipeline resolves a final `selectedCoords`. The existing `TeleportData.time` field (command-initiation epoch ms) is reused as the window anchor — no separate timestamp is added.
+
+1. When a `TeleportPipelineTask` completes successfully, the resolved destination biome name is written to `teleportData.destinationBiome` before the task's existing `priorTeleportData.put(uuid, data)` call in `RTPCmd`. No new storage; the field rides along with the record that is already kept.
+2. On every `/rtp` command entry (canonical: `BaseRTPCmd.execute`, plus the Bukkit-family `BukkitBaseRTPCmd` override), before any new selection runs, the metric reads `RTP.priorTeleportData.get(uuid)`. If the entry is non-null, has a non-null `destinationBiome`, and `now - prior.time` is within `metrics.biomeRerolls.windowSeconds` (default 300s), increment `biomeRerolls[prior.destinationBiome]` and `biomeRerollsTotal`.
+3. The metric does **not** remove the entry — `priorTeleportData` is owned by the teleport-cancel / disconnect-mid-flight machinery and must not be mutated from the metrics path. To prevent double-counting, the metric clears `prior.destinationBiome` (sets it to `null`) after the increment; a subsequent `/rtp` within the same window finds a null biome and counts as a fresh invocation.
+4. Successful completion of the new teleport overwrites the same `TeleportData` slot with the new destination biome, restarting the window via the new `time` value.
+
+This instrumentation is additive: the recording step is a single field assignment at task-completion in `TeleportPipelineTask`/`RTPCmd`, and the increment step is a small read-and-clear at command entry. Both ride existing data structures (`TeleportData`, `priorTeleportData`); no new map, no new lifecycle hook, and no new disconnect-cleanup path are needed (the existing `priorTeleportData` lifecycle already covers quit / cancel / mid-flight disconnect).
+
+**Aggregation rules:**
+
+- Keys are the canonical biome identifier as supplied by the platform (matches the biome strings used elsewhere in `failMap`). The metrics SPI does not normalise — if upstream biome naming changes, this metric follows.
+- `ConcurrentHashMap` plus per-key `LongAdder` so increments are wait-free; snapshot is a cheap `keySet()` walk with a defensive copy at read time.
+- A separate `biomeRerollsTotal` long counter is exposed alongside the map for the common case of "what fraction of `/rtp` invocations are rerolls?" — avoids forcing every consumer to sum the map. Pair with `biomeAcceptancesTotal` (incremented when a player's window expires *without* a reroll, so the ratio `rerolls / (rerolls + acceptances)` is well-defined).
+- The reroll window is configurable (`metrics.biomeRerolls.windowSeconds`, default 300). Outside the window the previous destination is discarded and the next `/rtp` counts as a fresh invocation, not a reroll.
+- Bounding follows the existing `priorTeleportData` map — no separate sweep is added; the metric is a pure reader of state already maintained for teleport-cancel and disconnect-mid-flight handling.
+
+**Cardinality bound.** Same as the prior internal-retry map: ~60 vanilla biomes, low hundreds for modded servers. Naturally bounded; no cap needed in v1. If a modpack ever pushes cardinality high enough to matter, add `metrics.biomeRerolls.topN` (deferred — see *Open Items*).
+
+**Privacy / bStats.** The raw map is **not** suitable for bStats because biome lists can fingerprint custom biome packs. The bStats chart instead reports the *shape* of the distribution (top-3 biome share, long-tail share, overall reroll rate) — see *bStats Integration > Recommended chart catalogue*. Per-player UUIDs never leave the host: `priorTeleportData` (and the new `destinationBiome` field) is purely an in-memory join key and is never serialised into a snapshot, bStats payload, or proxy telemetry frame.
+
+**Consumers:**
+
+- `/rtp info verbose` — shown as a small "top biomes by reroll" table (top 5 biomes, plus a `(other: N)` rollup, plus the overall reroll rate), gated behind `verbose` to keep the compact view tight.
+- `rtp test full` — printed in full as part of the `MetricsSnapshot.toString()` dump.
+- `BackendStatePublisher` (Phase M3 cross-plan) — published as a small fixed-shape rollup (`top1Share`, `top3Share`, `rerollRate`, `total`) rather than the raw map, so cross-server traffic stays bounded and the published shape doesn't fingerprint backend biome configuration.
+
+**Distinction from internal retries.** `PregenState.failMap` continues to bucket `FailTypes.biome` and `FailTypes.prefilterBiome` for pipeline diagnostics (`rtp test full` deep dives, anvil-prefilter tuning). Those buckets count *generator* rejections — candidates the system threw away. `biomeRerolls` counts *player* rejections — outcomes the human threw away. Both are useful; they answer different questions and must not be conflated.
+
+Instrumentation cost is minimal: one new field on `TeleportData` (`destinationBiome`), one assignment at successful pipeline exit, and one read-and-clear at command entry. Phase M1 wiring covers those plus the `metrics.biomeRerolls.windowSeconds` config key. No new player-quit hook is needed — the existing `priorTeleportData` lifecycle already handles disconnects.
+
+---
+
+## Command-Demand vs Refill Tracking
+
+Operators repeatedly hit the same diagnostic question during a player rush: *"is RTP slow because the server is struggling, or because the cache cannot refill fast enough for the rate of `/rtp` invocations?"* The metrics here answer that locally, on every backend, with no proxy or external monitoring required. The same signal is the input lever for any future internal auto-adjustment of pre-gen pacing (scan budget, pipeline parallelism, login-reserve sizing) — recording it now keeps the door open without committing to a control loop in v1.
+
+**Why local + admin-visible first.** Auto-tuning a chunk-gen workload from a single rolling sample is risky (chunk-gen cost is bursty and asymmetric — slowing pre-gen during a tick stall makes the stall worse, not better). Surfacing the raw signal first lets operators sanity-check thresholds against real load before any closed-loop adjustment ships. v1 is therefore *measurement only*; auto-adjustment is gated behind a follow-up ADR.
+
+**Data flow:**
+
+1. **Command counter.** `BaseRTPCmd.execute` increments a process-wide `LongAdder` (`commandInvocations`) at entry, before permission / cooldown / parameter checks — counts *intent*, not successful teleports, since intent is what stresses the cache.
+2. **Refill counter.** `RegionQueueManager` increments a process-wide `LongAdder` (`cacheRefills`) every time a location is *added* to `keptLocations` or `unkeptLocations` (the existing add path in `LockFreeLocationBuffer`). Removals are not counted — net depletion shows up as an empty L1/L2 in the existing cache health row.
+3. **Sampler.** A 1-second async tick on `RTP.scheduler` reads both adders, computes per-second deltas, and feeds three EMAs each (1m / 5m / 15m windows) following the same shape as the Spigot TPS fallback. Snapshots expose the EMAs scaled to per-minute units (`× 60`) so the readout matches operator intuition (`/rtp` per minute is more useful than per second).
+4. **Overflow & stress events.** On every sample, if `commandRatePerMin > refillRatePerMin` for `metrics.demand.overflowMinSamples` consecutive samples, increment `commandOverflowEvents`. Independently, if `mspt > metrics.demand.stressMsptThreshold` on the same sample, increment `tickStressEvents`. Joining the two counters lets operators distinguish *cache-bound* pressure (overflow up, stress flat) from *server-bound* pressure (stress up, overflow may follow).
+5. **Joint attribution at snapshot read.** `MetricsSnapshot` exposes both rates and both event counters; the `/rtp info` health view (and `rtp test full`) prints the pair on adjacent lines so the comparison is one glance.
+
+**Sampler placement.** The 1-second tick lives in `CoreMetrics` (process-wide singleton already created in M0) and is registered by each platform's bring-up step alongside the existing `Metrics.setBinding(...)` call. It does not run on a region thread (Folia: scheduled via `RTP.scheduler` async path) and reads only `LongAdder` counters, so S-005 / Folia threading rules are trivially satisfied.
+
+**Configuration keys (all under `metrics.demand`):**
+
+- `metrics.demand.overflowMinSamples` — consecutive samples (1s each) before an overflow window counts. Default `3` (3 s sustained).
+- `metrics.demand.stressMsptThreshold` — MSPT (ms) above which a sample counts as a tick-stress event. Default `45.0`.
+- `metrics.demand.emaWindowsSeconds` — straw-man `[60, 300, 900]`, mirroring TPS windows. Reconfigurable but not expected to change.
+- `metrics.demand.autoAdjust.enabled` — reserved for the future control loop, default `false`. Reading and exposing the metric does not require this flag; the flag only gates internal feedback wiring once it ships.
+
+**Admin readout (`/rtp info`).** Adds a small *Demand* sub-block to the existing *Health — pipeline* group:
+
+- `commandRate (1m/5m/15m)` — `/rtp` invocations per minute.
+- `refillRate (1m/5m/15m)` — net cache refill per minute (L1 + L2 across all regions).
+- `overflow` — current `commandOverflowRatePerMin`, plus the cumulative `commandOverflowEvents` counter.
+- `stress` — cumulative `tickStressEvents` counter, alongside the already-shown `mspt`.
+
+Colour coding follows the existing thresholds (green/yellow/red); a non-zero `overflow` paints yellow, and a non-zero `overflow` *combined* with a recent stress event paints red.
+
+**bStats.** Bucketised only — never raw rates (could fingerprint server population). New charts:
+
+- `command_rate_buckets` (`AdvancedPie`) — bucketised `commandRatePerMin`: `<5` / `5-30` / `30-120` / `120+`.
+- `refill_overflow_rate` (`AdvancedPie`) — bucketised `commandOverflowRatePerMin / commandRatePerMin`: `0%` / `<10%` / `10-30%` / `30%+`. Captures *what fraction of demand the cache cannot service in real time*, independent of absolute server size.
+- `stress_overflow_correlation` (`SimplePie`) — categorical: `neither` / `overflow-only` / `stress-only` / `both` over the submission window. Lets fleet analysis confirm whether RTP-bound pressure is driving tick stress or merely co-occurring with it.
+
+**Future auto-adjustment hook (deferred).** When (and if) auto-adjustment ships, the inputs are already published: `commandOverflowRatePerMin` (the error term), `tickStressEvents` (the safety brake — never tighten pre-gen during tick stress), and `chunkLoadBacklog` / `memoryTrackerEntries` (secondary safety brakes). The control surfaces would be `ScanTask` budget, `TeleportPipelineTask` parallelism cap, and login-reserve top-up cadence. This requires a dedicated ADR (open item below) before any code lands; v1 of this plan only commits to *measuring* the signal.
+
+**Distinction from existing counters.** `queueDepth` measures *current* size; `pendingTeleports` measures *in-flight pipeline* count; this section measures *flow rates* — the time derivatives that determine whether the steady-state queue is shrinking or growing. The three together fully describe the cache's behaviour under load.
+
+---
+
+## Cross-Server Load-Balancing Inputs
+
+A proxy / selector ranking RTP backends against each other does not need every backend-internal counter — most of what an LB would compute (capacity headroom, ETA, slope/trend, eligibility flags, composite scores, hot/cold fill ratios) is **derivable on the proxy** from `MetricsSnapshot` fields the publisher already sends: ratios, simple subtractions, and short snapshot histories on the proxy side handle it. Keeping that math on the proxy avoids hard-coding LB policy into backends and lets operators tune weights centrally.
+
+What the proxy **cannot** reconstruct, even given a stream of snapshots, is signal that depends on (a) per-event timing only the backend observes, (b) one counter conditioned on another counter's *non*-increment, (c) backend-internal control-surface state, or (d) JVM-level facts external to the published fields. The catalogue rows added above (`sustainableRatePerMin`, `cacheServeRateLast60s`, `coldServeRatio`, `pregenSaturation`, `pipelineFailureRate` + `pipelineFailureBreakdown`, `loginReserveExhaustion`, `gcPauseRecent`, `effectiveQueueWaitMs`) are exactly that residue: each is a thing only the backend can compute, and each is a first-class input to the cross-server selector spec'd in `MULTI_SERVER_PLAN.md > Backend Telemetry Publication`.
+
+**Why these and not more.** The previous draft of this section also listed `rtpCapacityHeadroom`, `firstAvailableEtaMs`, `routableCapacityNow`, `loadScore`, `eligibility`, `tps*Trend`, `mspt*Trend`, `heapPressureTrend`, `chunkLoadBacklogTrend`, `playerCountDelta1m`, `keptFillRatio` minima, and `lastSelfReportEpochMs`. All were dropped because the proxy can compute each from existing snapshot fields plus a short snapshot history (or the publish frame's own timestamp). Publishing them on the backend would duplicate logic and freeze LB policy at backend release time; leaving them to the proxy keeps `loadBalancer.metrics` weights as the single tuning surface.
+
+**Sampler placement.** All seven additions ride existing infrastructure:
+
+- `sustainableRatePerMin`: extends the 1 s demand sampler in `CoreMetrics`. Maintains a rolling reservoir (e.g. 900-sample circular buffer for 15 m at 1 Hz) of `refillRatePerMin` values *gated* on "did `tickStressEvents` increment this sample?". p95 is read at snapshot time.
+- `cacheServeRateLast60s`, `coldServeRatio`: two `LongAdder`s in `RegionQueueManager`/`LockFreeLocationBuffer` incremented at the L1 and L2 *poll-success* sites; sampled by the same 1 s tick that already reads the refill adders. No new schedulers.
+- `pregenSaturation`: read directly from `ScanTask` budget state at snapshot time (no sampler needed; `ScanTask` already maintains `budgetUsed` / `budget` for its own pacing).
+- `pipelineFailureRate`, `pipelineFailureBreakdown`: failure side already exists in `PregenState.failMap`. Add a `pipelineCompletions` `LongAdder` next to the existing `PipelineHistogram.record(...)` call in `TeleportPipelineTask.runCleanup`. The breakdown is a pure read of `failMap` mapped through the fixed `FailKind` enum at snapshot time.
+- `loginReserveExhaustion`: one `LongAdder` increment at the fall-through branch in the login-reserve consumer (per ADR-023). No sampler.
+- `gcPauseRecent`: read on each demand-sampler tick — sum `(now - prev)` deltas of `GarbageCollectorMXBean.getCollectionTime()` across collectors, track the max within the current 1 s window, expose at snapshot time. No allocation per sample.
+- `effectiveQueueWaitMs`: enqueue timestamp stored in the existing `playerQueue` entry (the entry already carries a UUID; widen the value type to a small holder). EMA updated at the dequeue site that hands off to `TeleportPipelineTask`.
+
+S-005 / Folia threading: every sampler reads only `LongAdder` / volatile state on the demand-sampler async tick and does no chunk I/O. None of the increment sites add main-thread blocking work.
+
+**Snapshot shape.** All scalars; `pipelineFailureBreakdown` is the only map and is bounded to ~5 fixed `FailKind` keys (chosen so the publish shape stays stable even if `FailTypes` gains internal cases — new `FailTypes` values without a `FailKind` mapping fall under `other`). Total memory footprint added to `MetricsSnapshot` is on the order of 8 doubles + 1 small map; well within the *Memory cost of `MetricsSnapshot`* open item bound.
+
+**Privacy.** Same posture as the rest of the catalogue: scalars and a fixed-shape enum-keyed map. No biome names, region names, world keys, player UUIDs, or `serverId`s involved. bStats publication, if added, must bucketise the rates (matching the `command_rate_buckets` precedent) — never raw values — to avoid fingerprinting backend hardware.
+
+**Phasing.**
+
+- **Phase M1**: `pipelineFailureRate` + `pipelineFailureBreakdown` (rides existing `failMap` + the histogram-completion site already wired this phase); `loginReserveExhaustion` (single increment site); `gcPauseRecent` (one MXBean read per sampler tick).
+- **Phase M2**: `cacheServeRateLast60s`, `coldServeRatio`, `effectiveQueueWaitMs` (touch `RegionQueueManager` / `LockFreeLocationBuffer` instrumentation, which is more invasive than the M1 sites).
+- **Phase M2/M3**: `sustainableRatePerMin`, `pregenSaturation` — `sustainableRatePerMin` depends on the demand-tracking p95 reservoir landing first; `pregenSaturation` depends on confirming `ScanTask` exposes `budgetUsed` / `budget` cleanly (single-line accessor; no design work).
+
+**Distinction from `commandOverflowRatePerMin`.** Demand tracking (added in the previous section) tells operators *whether the cache is keeping up locally*. The fields here tell a remote selector *which of N backends is best to send the next teleport to*. Operators see the demand block; selectors consume the LB block. Both flow through the same `MetricsSnapshot` so there is no second SPI.
+
+---
+
+## Per-Region Queue Status
+
+The LB-input fields above are **host-level** scalars (one number per backend). For cross-server load balancing they answer *which backend* should serve the next teleport, but they cannot answer *which region on that backend* should serve it. A host with two configured regions — one starved (`keptLocations` empty, long `playerQueue`) and one idle (`keptLocations` full, empty `playerQueue`) — looks healthy on every host-level scalar (averaged refill rate, mean serve ratio, summed queue depth) while one of its regions is in fact unservable. A selector that only sees host-level data either over-routes to the starved region or under-utilises the idle one.
+
+`regionQueueStatus` exposes the per-region detail the host already maintains, in a single fixed-shape map keyed by `RegionKey`. It is the **only** field in the catalogue that a proxy genuinely cannot reconstruct from host-level scalars: averaging across regions on the publisher side throws away exactly the signal the selector needs.
+
+**Row shape (`RegionQueueRow`).** All ints / shorts; no floats, no allocation per sample beyond the row record itself:
+
+- `playerQueueDepth` — `RegionQueueManager.playerQueue` size for this region (the per-region slice of the existing summed `queueDepth`).
+- `keptFill` / `keptCap` — current `keptLocations` (L1) size and configured cap.
+- `unkeptFill` / `unkeptCap` — current `unkeptLocations` (L2) size and configured cap.
+- `loginFill` / `loginCap` — current `loginLocations` size and cap, both null when no login reserve is configured for this region (ADR-023).
+- `status` — derived enum:
+  - `EMPTY` when `keptFill == 0 && unkeptFill == 0` (next teleport will pay full pipeline cost).
+  - `LOW` when `keptFill < keptCap / 4` (about to fall through to L2).
+  - `SATURATED` when `playerQueueDepth > 0 && keptFill == 0` (waiters present, no hot cache to drain).
+  - `OK` otherwise.
+  - Status is computed at snapshot time from the other fields; the enum is published alongside them so consumers don't re-derive it.
+
+**Sampler placement.** No new sampler. `regionQueueStatus` is built lazily inside `Metrics.snapshot()` by walking `RTP.selectionAPI.regions` and reading each `RegionQueueManager`'s already-exposed `LockFreeLocationBuffer.size()` / configured caps / `playerQueue.size()`. All reads are O(1) wait-free; no chunk I/O; no region thread is touched (S-005 / Folia threading rules trivially satisfied). Cost scales linearly with region count, which is bounded — see cardinality below.
+
+**Cardinality bound.** Region count is operator-configured and small in practice (single-digit on most servers, low double-digit on the largest). A hard cap of `metrics.regionQueueStatus.maxRegions` (straw-man `64`) protects the snapshot shape against pathological configs; regions beyond the cap are summarised under a synthetic `__overflow__` row carrying summed `playerQueueDepth` / `keptFill` / `unkeptFill` and the worst per-region `status`. The cap is well above any realistic deployment and is documented as a safety bound, not a tuning surface.
+
+**Privacy / network publication.** `RegionKey` (world key + region name) is operator-chosen and may be sensitive (event servers, staging worlds). Two posture rules:
+
+- **Local consumers** (`/rtp info`, `rtp test full`, in-process bStats lambda): full keys, no redaction.
+- **Network publication** (`BackendStatePublisher` per `MULTI_SERVER_PLAN.md`): keys are replaced with stable opaque ids (`region-0`, `region-1`, …) assigned at backend startup and held constant for the process lifetime. The selector only needs *identity* (so subsequent reservation tokens can target the same region), not the human-readable name. The id ↔ name mapping never crosses the wire.
+- **bStats**: `regionQueueStatus` is never published raw to bStats. The existing `cache_pool_health` chart already covers the average-fill question without per-region detail; adding per-region rollups would risk fingerprinting unique world layouts.
+
+**Reservation-token interaction.** When `MULTI_SERVER_PLAN.md` Phase 2 reservation tokens land, the token allocator on the backend uses the same per-region read to pick which region's `keptLocations`/`unkeptLocations` to draw the reserved coordinate from. Publishing `regionQueueStatus` lets the proxy hint the desired region in the reservation request (e.g. "reserve from `region-2`") without the proxy ever learning the region's real name.
+
+**Snapshot memory cost.** Each row is ~40 bytes (8 small ints + 1 enum + 1 nullable int pair). At the `64`-region cap, total worst case is ~2.5 KB per snapshot — comfortably within the *Memory cost of `MetricsSnapshot`* open-item bound and well under the 1 Hz publish budget for proxy mode.
+
+**Consumers.**
+
+- `/rtp info` *Health — cache* sub-block (already specified) becomes a direct render of `regionQueueStatus` rather than re-walking regions; one source of truth.
+- `BackendStatePublisher` (Phase M3 cross-plan) — published as the redacted-key map described above.
+- `rtp test full` — printed as a small table for operator triage.
+
+**Phasing.** Phase M2, alongside the other `RegionQueueManager` instrumentation (`cacheServeRateLast60s`, `coldServeRatio`, `effectiveQueueWaitMs`). The read path is trivial — the M2 cost is the snapshot-shape and `MetricsSnapshotTest` updates plus the redaction layer in `BackendStatePublisher` (which is itself M3 cross-plan, so the redaction code lands when the publisher does).
+
+**Distinction from existing fields.** `queueDepth` is the *summed* `playerQueue` size; `regionQueueStatus[k].playerQueueDepth` is its per-region slice. `cacheServeRateLast60s` is a *host-level rate*; `regionQueueStatus[k].keptFill` is the *current per-region inventory*. The two layers complement each other — rates describe motion, inventories describe state — and a selector needs both.
 
 ---
 
@@ -110,6 +288,7 @@ rtp-fabric/    -- FabricMetricsBinding (server tick callbacks)
 - [x] `SpigotTpsSampler` for Spigot 1.20.1 fallback — landed 2026-05-01 in `rtp-spigot/rtp-spigot-common/.../spigot/metrics/SpigotTpsSampler.java`. Implements `MetricsBinding`; `tick()` is invoked once per server tick from a 1-tick repeating task on `RTP.scheduler` and feeds three EMAs (1m / 5m / 15m windows in ticks at nominal 20 TPS). TPS is clamped to `[0.0, 20.0]`; MSPT is the raw 1m EMA in ms; pre-tick / single-tick / non-progressing-clock paths return `MetricsSnapshot.UNSAMPLED`. Covered by `SpigotTpsSamplerTest` (7/7 green: pre-tick sentinel, seed-only first call, steady-50ms→20 TPS / 50 MSPT, slow-100ms→10 TPS / 100 MSPT, faster-than-20-clamp, non-progressing clock, 1m-vs-15m EMA divergence). Plugin-enable wiring (instantiate, `RTP.metrics.setBinding(sampler)`, `RTP.scheduler.runTaskTimer(sampler::tick, 1L, 1L)`) deferred to the same platform-bring-up slice as `PaperMetricsBinding` and `rtp test full`.
 - [x] `HeapSampler` via `ManagementFactory`. *(landed in M0; carried forward.)*
 - [ ] Wire `rtp test full` to print `MetricsSnapshot.toString()` (replace the ad-hoc dump).
+- [ ] **Amend `InfoCmd` to render the M1 health groups** (*server*, *pipeline*, *demand*) from a single `Metrics.snapshot()` call per invocation. Compact view by default; `verbose` / `-v` flag expands to the full per-region cache table (deferred to M2 for Folia detail). Reuse `rtp.info` permission. New `InfoCmdTest` rows: (a) snapshot is read exactly once per invocation, (b) demand block is suppressed when `metrics.demand` is disabled, (c) compact-vs-verbose output divergence.
 - [x] Unit tests for the histogram, sampler, and snapshot immutability — `PipelineHistogramTest`, `HeapSamplerTest`, `MetricsSnapshotTest`, `CoreMetricsTest` (15/15 green) plus `TeleportPipelineTaskPhaseTest` histogram-wiring cases (22/22 green).
 
 ### Phase M2 — Folia + Fabric
@@ -117,10 +296,12 @@ rtp-fabric/    -- FabricMetricsBinding (server tick callbacks)
 - [ ] `FoliaMetricsBinding` with the `max` / `mean` defaults from *Folia Aggregation* and the `metrics.folia.aggregation.*` config keys.
 - [ ] `FabricMetricsBinding` using the server tick callback chain wired in Step E2 of `MULTI_PLATFORM_PLAN.md`.
 - [ ] Per-platform smoke tests confirming `MetricsSnapshot` returns sane values on each runtime.
+- [ ] **Extend `InfoCmd`** with the per-region *Health — cache* table (L1/L2/login fills + status flag), the verbose Folia per-region TPS/MSPT table, and the *load-balancer inputs* sub-block (`cacheServeRateLast60s`, `coldServeRatio`, `pregenSaturation`, `sustainableRatePerMin`). Add the `/rtp info json` output path emitting the full `MetricsSnapshot` record.
 
 ### Phase M3 — Multi-server consumer (cross-plan)
 
 - [ ] `BackendStatePublisher` in `MULTI_SERVER_PLAN.md > Backend Telemetry Publication` consumes `Metrics.snapshot()` directly. No new metric code; pure consumer.
+- [ ] **`InfoCmd` network block** — `networkMode`, `transport` last-success age, `recentReservations`, `networkWaitQueue`, `lastSelectorPick`, stale-backend warnings. Suppressed when `network.enabled: false`. Gated by the multi-server plan's Phase 2 reservation-token table.
 - [ ] This phase is gated by the multi-server plan's Phase 2.
 
 ### Phase M4 — Optional exporters *(stretch)*
@@ -140,10 +321,22 @@ rtp-fabric/    -- FabricMetricsBinding (server tick callbacks)
 
 ## Open Items / Follow-Ups
 
-- **`avgPipelineMs` window length and reset semantics** — straw-man: 256-sample ring buffer, never resets. Confirm during M1 review.
+- **`avgPipelineMs` window length and reset semantics** — resolved by [ADR-032](../adr/ADR-032-teleport-pipeline-latency-histogram.md): 256-sample wait-free ring, never resets, mean-only readout.
+- **`biomeRerolls` cap / top-N policy** — straw-man: no cap (vanilla biome cardinality is naturally bounded). Revisit if a modpack pushes the map past ~500 keys, at which point introduce `metrics.biomeRerolls.topN` (default 32). Confirm during M1.
+- **`biomeRerolls` reset semantics** — straw-man: cumulative since process start. Operators wanting deltas compute them from successive snapshots, consistent with the *Snapshot, not stream* goal.
+- **`biomeRerolls` window default** — straw-man: 300s. Short enough to attribute the next `/rtp` to dissatisfaction with the prior outcome, long enough to absorb a player looking around before deciding. Confirm during M1 from beta-server data.
 - **`databaseLatencyMs` measurement cadence** — sample on every write or only on a dedicated probe? Sampling on every write conflates pool-saturation with latency. Decide during M1.
+- **`metrics.demand.overflowMinSamples` / `stressMsptThreshold` defaults** — straw-man `3` and `45.0` ms. Confirm during M1 from beta-server data; expect lite-assembly servers to want a higher MSPT threshold (lower-end hardware baseline).
+- **Auto-adjustment control loop** — deferred behind a dedicated ADR. Required before `metrics.demand.autoAdjust.enabled` does anything; the metric publishes the inputs in v1, but no closed-loop adjustment ships until the ADR specifies error term, safety interlocks (never tighten during `tickStressEvents` rise), and which control surfaces (`ScanTask` budget, pipeline parallelism, login-reserve cadence) are eligible.
 - **Folia per-region detail opt-in key** — straw-man `metrics.folia.includeRegions: false`. Confirm during M2.
 - **Memory cost of `MetricsSnapshot`** — must stay small enough to be cheap to publish at 1Hz under proxy mode (multi-server consumer constraint).
+- **`sustainableRatePerMin` reservoir window & percentile** — straw-man 900-sample circular buffer (15 m at 1 Hz), p95. Confirm during M2 from beta-server data; very small fleets may want p90 to react faster, very large fleets p99 to absorb noise.
+- **`cacheServeRateLast60s` / `coldServeRatio` window length** — straw-man 60 s. Long enough to absorb a single quiet minute, short enough to react to a config change. Confirm during M2.
+- **`FailKind` enum mapping** — fixed-shape rollup over `FailTypes` (`biome`, `prefilterBiome`, `unsafe`, `nullChunk`, `other`). Lock the mapping during M1 alongside the `pipelineFailureBreakdown` field; new `FailTypes` values default to `other` until the mapping is amended.
+- **`gcPauseRecent` window** — straw-man "max within the current 1 s sample window". Decide during M1 whether to expose a longer rolling max (e.g. 60 s) for the LB consumer or leave windowing to the proxy.
+- **`effectiveQueueWaitMs` enqueue-stamp storage** — `playerQueue` entries currently carry a UUID; the cheap option is to wrap into a `(UUID, long enqueueNanos)` holder. Confirm during M2 that no caller depends on the raw `UUID` element type.
+- **`regionQueueStatus.maxRegions` cap** — straw-man `64`. Well above any realistic deployment; confirm during M2 that no production config exceeds it before locking the default. Overflow rows are summarised under a synthetic `__overflow__` key.
+- **`regionQueueStatus` redaction in network mode** — straw-man: stable opaque ids (`region-0`, `region-1`, …) assigned at startup, never crosses the wire as the human name. Confirm during M3 that the reservation-token allocator can round-trip the opaque id back to the local `RegionQueueManager` without the proxy needing the real name.
 
 ---
 
@@ -171,6 +364,34 @@ The existing config-oriented output stays; a new **Health** block appends below 
 - `pendingTeleports`: count of in-flight `TeleportPipelineTask`s.
 - `avgPipelineMs`: rolling mean over the histogram window.
 - `chunkLoadBacklog`: incomplete async chunk-load futures.
+- `effectiveQueueWaitMs`: rolling EMA of player-enqueue → pipeline-start latency. Shown next to `queueDepth` so operators can compare *size* vs *experienced wait*.
+- `pipelineFailureRate`: rolling `failures / completions` over the last sample window, plus the top-3 entries of `pipelineFailureBreakdown` (e.g. `biome:42, unsafe:9, nullChunk:1`). A non-zero `nullChunk` count paints red regardless of overall rate (S-005 spirit; surfaces a regression even when raw throughput looks fine).
+- `gcPauseRecent`: largest GC pause (ms) observed in the last sample window. Distinguishes a GC stall (recovers fast) from a chunk-I/O stall (`chunkLoadBacklog` rising) when both look identical in a TPS dip.
+
+#### Health — demand (always shown)
+
+Direct readout of the *Command-Demand vs Refill Tracking* counters; one block, four lines, designed to answer the rush-hour question at a glance:
+
+- `commandRate (1m/5m/15m)`: `/rtp` invocations per minute.
+- `refillRate (1m/5m/15m)`: net cache refill per minute (L1 + L2 across regions).
+- `overflow`: current `commandOverflowRatePerMin` + cumulative `commandOverflowEvents`. Yellow when non-zero; red when paired with a recent `tickStressEvents` increment.
+- `stress`: cumulative `tickStressEvents` alongside the already-shown `mspt`.
+- `sustainableRatePerMin` (verbose only): the trailing p95 of `refillRatePerMin` while `tickStressEvents` did not increment — the operator-visible "how much could this host service if asked?" number.
+
+#### Health — player satisfaction (verbose only)
+
+- `biomeRerolls`: top-5 destination biomes by reroll count, plus an `(other: N)` rollup, plus the overall reroll rate `biomeRerollsTotal / (biomeRerollsTotal + biomeAcceptancesTotal)`. Gated to verbose to keep the compact view tight.
+- `loginReserveExhaustion`: cumulative count of join-time RTPs that fell through an empty `loginLocations` (ADR-023). Highlighted yellow if it incremented in the last sample window.
+
+#### Health — load-balancer inputs (verbose only, network mode only)
+
+When `network.enabled: true`, expose the LB-only fields a proxy consumes so an operator can see what's being published:
+
+- `cacheServeRateLast60s` / `coldServeRatio`: hot-vs-cold serve split.
+- `pregenSaturation`: `ScanTask` budget utilisation `[0.0, 1.0]`.
+- `regionQueueStatus` summary: count of regions in each `status` bucket (`OK` / `LOW` / `EMPTY` / `SATURATED`). The full per-region table is rendered by *Health — cache* (above); this line is the one-glance rollup the LB sees.
+
+Rendered as a single line in compact view (`lb-inputs: hot=…, cold=…%, pregen=…%, regions=ok/low/empty/saturated`); broken out per-line under verbose.
 
 #### Health — cache (per region; collapsed/expanded per *Verbosity* below)
 
@@ -221,8 +442,9 @@ The existing `InfoCmdTest` covers structural behaviour (subcommand permission, p
 
 ### Phasing
 
-- **Phase M1**: ship the *server* and *pipeline* health groups (drives off the same M1 work).
-- **Phase M2**: per-region cache table + Folia per-region detail (depends on `FoliaMetricsBinding` from M2).
+- **Phase M1**: ship the *server*, *pipeline*, and *demand* health groups (drives off the same M1 work). Includes `effectiveQueueWaitMs`, `pipelineFailureRate` + breakdown top-3, and `gcPauseRecent` lines once their catalogue rows land.
+- **Phase M1 (gated on biome-reroll wiring)**: the *player satisfaction* group's `biomeRerolls` table; `loginReserveExhaustion` rides the same M1 slice as the rest of the LB-input M1 candidates.
+- **Phase M2**: per-region cache table + Folia per-region detail (depends on `FoliaMetricsBinding` from M2). Adds `cacheServeRateLast60s` / `coldServeRatio` / `pregenSaturation` to the *load-balancer inputs* sub-block once their catalogue rows land. `sustainableRatePerMin` joins the *demand* group (verbose) when the reservoir lands.
 - **Phase M3**: network block (depends on `MULTI_SERVER_PLAN.md` Phase 2 reservation-token table being live).
 - **Out of band**: `json` output and `messages.yml` threshold tuning can land in any phase that ships the underlying group.
 
@@ -271,6 +493,8 @@ Mapped to bStats v3 chart types (`SimplePie`, `AdvancedPie`, `DrilldownPie`, `Si
 | `memory_tracker_pressure` | `AdvancedPie` | bucketised `memoryTrackerEntries`: `<10` / `10-50` / `50-200` / `200+` |
 | `chunk_load_backlog_pressure` | `AdvancedPie` | bucketised `chunkLoadBacklog`: `0` / `1-5` / `6-20` / `21+` |
 | `s005_violations_recent` | `SingleLineChart` | count of S-005 attribution events surfaced via `ReqRtpS004NullChunkAttributionTest`-style runtime guards in the last submission window. **Rare but high-signal**: a sustained nonzero count across the bStats fleet flags a regression we'd want to know about. |
+| `biome_reroll_distribution_shape` | `AdvancedPie` | bucketised reroll-share concentration from `biomeRerolls`: `top1>=80%` / `top1>=50%` / `top3>=80%` / `flat`. Reports **shape** of the distribution, not biome names — answers "do most servers have one biome that players reject, or is it spread out?" for server-design guidance. Biome names are deliberately omitted to avoid fingerprinting modded biome packs. |
+| `biome_reroll_rate` | `AdvancedPie` | bucketised reroll rate `biomeRerollsTotal / (biomeRerollsTotal + biomeAcceptancesTotal)` per submission window: `<5%` / `5-15%` / `15-30%` / `30%+`. Indicates how often players are dissatisfied with their `/rtp` outcome. |
 
 #### Feature-shape rollups (drilldowns)
 

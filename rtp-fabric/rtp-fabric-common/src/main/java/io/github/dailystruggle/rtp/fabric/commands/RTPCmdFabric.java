@@ -8,7 +8,7 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * ADR-014 — Brigadier Bridge: Fabric-side registration shim.
+ * commands-api-ADR-001 — Brigadier Bridge: Fabric-side registration shim.
  *
  * <p>Thin wrapper that turns a {@code commands-api} root command into a
  * Brigadier {@link LiteralArgumentBuilder} and registers it with a Fabric

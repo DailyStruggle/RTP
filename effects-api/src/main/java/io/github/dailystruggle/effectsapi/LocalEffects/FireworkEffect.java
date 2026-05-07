@@ -157,20 +157,30 @@ public class FireworkEffect extends Effect<FireworkTypeNames> {
         if (fwm.getPower() == 0) f.detonate();
     }
 
+    /**
+     * Positional / type-driven key order for {@link FireworkEffect}.
+     * Mirrors the order documented in {@code LocalEffects/Readme.md} and
+     * the per-position assignment used by the prior strict-positional
+     * implementation. Promoted to a constant so {@link #setData(String...)}
+     * can hand it to {@link Effect#applyByType(Enum[], String[])}.
+     */
+    private static final FireworkTypeNames[] KEY_ORDER = {
+            FireworkTypeNames.TYPE,
+            FireworkTypeNames.NUMBER,
+            FireworkTypeNames.POWER,
+            FireworkTypeNames.COLOR,
+            FireworkTypeNames.FADE,
+            FireworkTypeNames.FLICKER,
+            FireworkTypeNames.TRAIL,
+            FireworkTypeNames.SAFE,
+            FireworkTypeNames.DX,
+            FireworkTypeNames.DY,
+            FireworkTypeNames.DZ
+    };
+
     @Override
     public void setData(String... data) {
-        if(data.length>0) this.data.put(FireworkTypeNames.TYPE, data[0]);
-        if(data.length>1) this.data.put(FireworkTypeNames.NUMBER, data[1]);
-        if(data.length>2) this.data.put(FireworkTypeNames.POWER, data[2]);
-        if(data.length>3) this.data.put(FireworkTypeNames.COLOR, data[3]);
-        if(data.length>4) this.data.put(FireworkTypeNames.FADE, data[4]);
-        if(data.length>5) this.data.put(FireworkTypeNames.FLICKER, data[5]);
-        if(data.length>6) this.data.put(FireworkTypeNames.TRAIL, data[6]);
-        if(data.length>7) this.data.put(FireworkTypeNames.SAFE, data[7]);
-        if(data.length>8) this.data.put(FireworkTypeNames.DX, data[8]);
-        if(data.length>9) this.data.put(FireworkTypeNames.DY, data[9]);
-        if(data.length>10) this.data.put(FireworkTypeNames.DZ, data[10]);
-        this.data = fixData(this.data);
+        applyByType(KEY_ORDER, data);
     }
 
     @Override

@@ -32,6 +32,8 @@ public class EffectFactory {
         if(EffectsAPI.getServerIntVersion()>8) addEffect("PARTICLE", new ParticleEffect());
         addEffect("POTION", new PotionEffect());
         addEffect("SOUND", new SoundEffect());
+        // Glide requires elytra (1.9+); register conditionally to keep older servers happy.
+        if(EffectsAPI.getServerIntVersion() >= 9) addEffect("GLIDE", new GlideEffect());
     }
 
     public static void addEffect(String effectName, Effect<?> effect) {

@@ -1,6 +1,6 @@
 # RTP Fabric Adapter Requirements
 
-This document outlines the strict requirements for the `rtp-fabric` module. Fabric is a non-Bukkit mod-loader platform brought into scope by [ADR-022](../docs/adr/ADR-022-fabric-platform-in-scope.md); the adapter mediates between Mojang-mapped server APIs and the platform-agnostic abstractions in `rtp-api` / `rtp-core`.
+This document outlines the strict requirements for the `rtp-fabric` module. Fabric is a non-Bukkit mod-loader platform brought into scope by [rtp-fabric-ADR-002](docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) (renumbered from ADR-022 on 2026-05-05); the adapter mediates between Mojang-mapped server APIs and the platform-agnostic abstractions in `rtp-api` / `rtp-core`.
 
 For design and implementation details that satisfy these requirements, see [`docs/dev/DESIGN.md`](../docs/dev/DESIGN.md) and the per-step plan in [`docs/dev/MULTI_PLATFORM_PLAN.md`](../docs/dev/MULTI_PLATFORM_PLAN.md).
 

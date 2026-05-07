@@ -1,11 +1,13 @@
-# ADR-027 — Fabric Multiversion Submodule Layout
+# rtp-fabric-ADR-001 — Fabric Multiversion Submodule Layout
+
+*(Renumbered from project-wide ADR-027 on 2026-05-05 when subproject ADRs were given per-directory numbering. Prior commits and historical references may still say "ADR-027".)*
 
 **Status:** Accepted
 **Date:** 2026-05-01
 
 ## Context
 
-[ADR-022 — Fabric Platform In Scope](ADR-022-fabric-platform-in-scope.md) established `rtp-fabric` as a first-class platform, with one submodule (`rtp-fabric-common`) pinning a single Minecraft version (1.21.1 at the time of writing). The Bukkit-family adapters have long since adopted a `<platform>-common` plus `<platform>-vXX_YY_R1` layout (e.g. `rtp-paper-common`, `rtp-paper-v1_20_R1`, `rtp-paper-v1_21_R1`, `rtp-paper-v26_1_R1`). Fabric did not.
+[rtp-fabric-ADR-002 — Fabric Platform In Scope](rtp-fabric-ADR-002-platform-in-scope.md) (originally numbered ADR-022, then ADR-031) established `rtp-fabric` as a first-class platform, with one submodule (`rtp-fabric-common`) pinning a single Minecraft version (1.21.1 at the time of writing). The Bukkit-family adapters have long since adopted a `<platform>-common` plus `<platform>-vXX_YY_R1` layout (e.g. `rtp-paper-common`, `rtp-paper-v1_20_R1`, `rtp-paper-v1_21_R1`, `rtp-paper-v26_1_R1`). Fabric did not.
 
 Three forces now require Fabric to follow the same shape:
 
@@ -27,7 +29,7 @@ Adopt a Fabric submodule layout that mirrors the Bukkit-family pattern:
 ### Common module rules
 
 - `rtp-fabric-common` keeps `fabric-loom` applied (so it can compile against MC types) but declares Minecraft and `fabric-api` as `compileOnly` / `modCompileOnly` rather than `modImplementation`. **No MC or fabric-api classes are shipped from common.** Each v-submodule supplies the actual runtime mod jar.
-- Common defines a small SPI — `FabricVersionAdapter` and a handful of helper sub-interfaces — that absorb the version-volatile call sites identified in the symbol-surface inventory done during ADR-027 drafting:
+- Common defines a small SPI — `FabricVersionAdapter` and a handful of helper sub-interfaces — that absorb the version-volatile call sites identified in the symbol-surface inventory done during this ADR's (formerly ADR-027) drafting:
   - **Registry access** (block / biome / dimension `ResourceLocation` lookups). Wrapper rationale: `BuiltInRegistries` field names and the `Registries`-vs-`BuiltInRegistries` split shifted across 1.20 → 1.21 → 26.1.
   - **`ChunkStatus` location** (package move at 1.21.3).
   - **Chunk loading entrypoint** (`ServerChunkCache#getChunk` signature is stable, but the `boolean load` / `boolean generate` argument semantics drift across versions; the adapter normalises them).
@@ -50,7 +52,7 @@ Adopt a Fabric submodule layout that mirrors the Bukkit-family pattern:
 
 ### Forge / NeoForge
 
-Out of scope. ADR-022 §2 keeps Forge / NeoForge deferred until Fabric stabilises, and this ADR does not change that.
+Out of scope. rtp-fabric-ADR-002 (formerly ADR-031) §2 keeps Forge / NeoForge deferred until Fabric stabilises, and this ADR does not change that.
 
 ## Alternatives Considered
 
@@ -76,10 +78,10 @@ Out of scope. ADR-022 §2 keeps Forge / NeoForge deferred until Fabric stabilise
 
 ## References
 
-- [ADR-022 — Fabric platform in scope](ADR-022-fabric-platform-in-scope.md)
-- [ADR-014 — Brigadier bridge via commands-api](ADR-014-brigadier-bridge-via-commands-api.md)
-- [ADR-016 — Anvil subsystem](ADR-016-anvil-subsystem.md)
-- [`docs/dev/MULTI_PLATFORM_PLAN.md`](../dev/MULTI_PLATFORM_PLAN.md) — Fabric phase entry
+- [rtp-fabric-ADR-002 — Fabric platform in scope](rtp-fabric-ADR-002-platform-in-scope.md) (originally ADR-022, then ADR-031)
+- [commands-api-ADR-001 — Brigadier bridge via commands-api](../../../commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md)
+- [ADR-016 — Anvil subsystem](../../../docs/adr/ADR-016-anvil-subsystem.md)
+- [`docs/dev/MULTI_PLATFORM_PLAN.md`](../../../docs/dev/MULTI_PLATFORM_PLAN.md) — Fabric phase entry
 - Fabric 26.1 porting guide — <https://docs.fabricmc.net/develop/porting/>
 - Fabric for Minecraft 26.1 (2026-03-14) — <https://fabricmc.net/2026/03/14/261.html>
-- Symbol-surface inventory (recorded in the issue thread for ADR-027 drafting): 10 files in `rtp-fabric-common/src/main/java`, MC type usage limited to: `MinecraftServer`, `ServerLevel`, `ServerPlayer`, `Component`, `BuiltInRegistries`/`Registries`, `Registry`, `ResourceLocation`, `BlockPos`, `ChunkPos`, `ChunkAccess`, `ChunkStatus`, `LightLayer`, `Block`, `BlockState`, `Heightmap`, `ServerChunkCache`, `Util`.
+- Symbol-surface inventory (recorded in the issue thread for this ADR's drafting (formerly ADR-027)): 10 files in `rtp-fabric-common/src/main/java`, MC type usage limited to: `MinecraftServer`, `ServerLevel`, `ServerPlayer`, `Component`, `BuiltInRegistries`/`Registries`, `Registry`, `ResourceLocation`, `BlockPos`, `ChunkPos`, `ChunkAccess`, `ChunkStatus`, `LightLayer`, `Block`, `BlockState`, `Heightmap`, `ServerChunkCache`, `Util`.

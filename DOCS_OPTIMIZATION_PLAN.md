@@ -146,7 +146,7 @@ Expected savings: ~28 KB.
 | [ ] | `ADR-011` rtp-api module | 3,572 | **TIGHTEN** | Same. |
 | [ ] | `ADR-012` chunk reservation | 4,020 | **TIGHTEN** | Same. |
 | [ ] | `ADR-013` addons external | 3,781 | **TIGHTEN** | Same. |
-| [ ] | `ADR-014` brigadier bridge | 3,546 | **TIGHTEN** | Same. |
+| [ ] | `commands-api-ADR-001` brigadier bridge | 3,546 | **TIGHTEN** | Same. |
 | [ ] | `ADR-015` stale-chunk guard | 7,392 | **TIGHTEN** | Keep regression-guard test reference; trim phase narrative. Target −30%. |
 | [ ] | **`ADR-016` anvil subsystem** | **49,410** | **SPLIT + TIGHTEN** | By far the heaviest file. Split into: `ADR-016-anvil-subsystem.md` (decision, ≤ 6 KB) + move implementation details to `docs/architecture/06-anvil-prefilter.md` + move phased rollout story to archive. Fold §13 "follow-ups" that have landed into the absolute description. Target overall −70% (≈ 35 KB saved). |
 | [ ] | `ADR-017` block tags | 15,619 | **TIGHTEN** | Collapse matrix examples. Target −40%. |

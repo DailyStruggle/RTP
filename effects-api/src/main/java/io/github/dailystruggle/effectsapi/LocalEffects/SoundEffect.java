@@ -105,12 +105,15 @@ public class SoundEffect extends Effect<SoundTypeNames> {
 
     @Override
     public void setData(String... data) {
-        if(data.length>0) this.data.put(SoundTypeNames.TYPE, data[0]);
-        if(data.length>1) this.data.put(SoundTypeNames.VOLUME, data[1]);
-        if(data.length>2) this.data.put(SoundTypeNames.PITCH, data[2]);
-        if(data.length>3) this.data.put(SoundTypeNames.DX, data[3]);
-        if(data.length>4) this.data.put(SoundTypeNames.DY, data[4]);
-        if(data.length>5) this.data.put(SoundTypeNames.DZ, data[5]);
-        this.data = fixData(this.data);
+        applyByType(KEY_ORDER, data);
     }
+
+    private static final SoundTypeNames[] KEY_ORDER = {
+            SoundTypeNames.TYPE,
+            SoundTypeNames.VOLUME,
+            SoundTypeNames.PITCH,
+            SoundTypeNames.DX,
+            SoundTypeNames.DY,
+            SoundTypeNames.DZ
+    };
 }

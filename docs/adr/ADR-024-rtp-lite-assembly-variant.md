@@ -51,7 +51,7 @@ RTP-lite:
    - **Scan / spatial memory subsystem** (`MemoryShape`, `/rtp scan` command tree). Retained in lite — required for performance comparison against the full edition; removing it would conflate "lite" with "slow" and defeat A/B benchmarking.
    - **Full selection surface.** All shapes (`Circle`, `Square`, `Rectangle`, `Circle_Normal`, `Square_Normal`), all selection modes, and all vertical adjustors remain available in lite. Required so operators can A/B identical region configs across lite and full.
    - **Pregen queue with all tunables.** Per-region queue + `cache cap` + queue tuning keys remain in lite, identical to full.
-   - `commands-api` + Brigadier bridge (ADR-014).
+   - `commands-api` + Brigadier bridge (commands-api-ADR-001).
    - `effects-api` runtime, without the per-permission startup parse.
    - **Spigot and Paper adapters** across all currently supported NMS revisions, to maintain parity with RTP v2's Paper-native chunk-load path. Lite does not ship the Folia adapter; Folia operators must use the full edition. PaperLib is **not** reintroduced (ADR-005 still applies — its sync fallback violates S-005). Paper-native async chunk loading is reached through the existing Paper adapter, not through PaperLib.
    - bStats, configured with a distinct `pluginId` so lite installs are tracked independently.

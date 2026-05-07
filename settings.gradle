@@ -57,7 +57,7 @@ include 'rtp-plugin'
 // not leak into rtp-core, rtp-api, commands-api, effects-api, or any
 // Bukkit-family adapter.
 //
-// Per ADR-027 (Fabric multiversion submodule layout, 2026-05-01) the Fabric
+// Per rtp-fabric-ADR-001 (Fabric multiversion submodule layout, 2026-05-01) the Fabric
 // platform mirrors the Bukkit-family <platform>-vXX_YY_R1 split: common
 // holds version-agnostic glue (with MC + fabric-api as modCompileOnly so
 // no MC classes ship from common), and each v-submodule supplies the
@@ -69,11 +69,22 @@ include 'rtp-plugin'
 include 'rtp-fabric:rtp-fabric-common'
 include 'rtp-fabric:rtp-fabric-v1_20_R1'
 include 'rtp-fabric:rtp-fabric-v1_21_R1'
+include 'rtp-fabric:rtp-fabric-v1_21_R5'
+// rtp-fabric-v1_21_R11 — re-included 2026-05-06 after rtp-fabric-ADR-007
+// (Mojmap-name-decoupling) landed. The FabricVersionAdapter SPI now uses
+// project-owned wrapper records (RTPLevelHandle / RTPBlockHandle / etc.)
+// instead of net.minecraft.* types whose Mojmap names drift across point
+// releases (notably ResourceLocation -> Identifier at 1.21.11). The R11
+// adapter has been ported to the new contract and uses the new
+// TicketType(long expiryTicks, int flags) constructor with flags = 14
+// (FOR_LOADING | FOR_SIMULATION | RESETS_IDLE_TIMEOUT) — vanilla FORCED
+// minus the SERIALIZE bit, S-002 safe.
+include 'rtp-fabric:rtp-fabric-v1_21_R11'
 // v26_1_R1 is intentionally NOT included in the default build: it requires
 // Loom 1.15+ (deobf-26.1) which cannot coexist in a single Gradle invocation
 // with the Loom 1.11-SNAPSHOT classloader used by common / v1_20 / v1_21 /
 // rtp-plugin. Build it standalone via a separate Gradle invocation when JDK 25
-// is available. See ADR-027 for rationale.
+// is available. See rtp-fabric-ADR-001 for rationale.
 //include 'rtp-fabric:rtp-fabric-v26_1_R1'
 
 //include 'addons:RTP_Iris_integration'

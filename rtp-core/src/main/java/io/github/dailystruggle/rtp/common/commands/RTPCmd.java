@@ -154,9 +154,18 @@ public interface RTPCmd extends BaseRTPCmd {
 
   @Override
   default boolean onCommand(UUID senderId, Map<String, List<String>> rtpArgs, CommandsAPICommand nextCommand, java.util.function.Consumer<String> messageMethod) {
-    if (nextCommand != null) return true;
+    RTP.log(Level.FINER, "[RTP][trace] RTPCmd.onCommand(4-arg default) ENTER senderId=" + senderId
+            + " rtpArgs=" + rtpArgs
+            + " nextCommand=" + (nextCommand == null ? "null" : nextCommand.name())
+            + " thread=" + Thread.currentThread().getName());
+    if (nextCommand != null) {
+      RTP.log(Level.FINER, "[RTP][trace] RTPCmd.onCommand(4-arg default) returning early (nextCommand != null)");
+      return true;
+    }
 
-    return compute(senderId, rtpArgs, nextCommand, messageMethod);
+    boolean res = compute(senderId, rtpArgs, nextCommand, messageMethod);
+    RTP.log(Level.FINER, "[RTP][trace] RTPCmd.onCommand(4-arg default) compute returned " + res);
+    return res;
   }
 
   // CommandsAPI puts the responsibility on the plugin to decide when and how to run compute() - called via CommandsAPI.execute() in SyncTaskProcessing
@@ -182,7 +191,7 @@ public interface RTPCmd extends BaseRTPCmd {
     }
 
     RTPCommandSender sender = RTP.serverAccessor.getSender(senderId);
-    RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.compute ENTER senderId=" + senderId
+    RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute ENTER senderId=" + senderId
             + " senderName=" + (sender != null ? sender.name() : "null")
             + " args=" + rtpArgs
             + " thread=" + Thread.currentThread().getName());
@@ -294,12 +303,12 @@ public interface RTPCmd extends BaseRTPCmd {
 
       // get their data
       TeleportData data = RTP.getInstance().latestTeleportData.get(player.uuid());
-      RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.compute per-player loop playerId=" + player.uuid()
+      RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute per-player loop playerId=" + player.uuid()
               + " priorData=" + (data == null ? "null" : ("completed=" + data.completed + " age=" + (System.currentTimeMillis() - data.time) + "ms")));
       // if player has an incomplete teleport
       if (data != null) {
         if (!data.completed) {
-          RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.compute short-circuit ALREADY_TELEPORTING playerId=" + player.uuid() + " -> skipping pipeline");
+          RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute short-circuit ALREADY_TELEPORTING playerId=" + player.uuid() + " -> skipping pipeline (sending alreadyTeleporting message via serverAccessor)");
           String msg = (String) langParser.getConfigValue(MessagesKeys.alreadyTeleporting, "");
           RTP.serverAccessor.sendMessage(senderId, player.uuid(), msg);
           failEvent(sender, msg);
@@ -345,7 +354,7 @@ public interface RTPCmd extends BaseRTPCmd {
           String msg = (String) langParser.getConfigValue(MessagesKeys.badArg, "world:" + worldName);
           if(messageMethod != null) messageMethod.accept(msg);
           else RTP.serverAccessor.sendMessage(senderId, msg);
-          RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.compute REJECT badArg world senderId=" + senderId
+          RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute REJECT badArg world senderId=" + senderId
                   + " worldName=" + worldName);
           RTP.log(Level.WARNING, msg);
           RTP.getInstance().processingPlayers.remove(senderId);
@@ -360,12 +369,12 @@ public interface RTPCmd extends BaseRTPCmd {
       Region region;
       try {
         region = selectionAPI.getRegionOrDefault(regionName);
-        RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.compute region resolved senderId=" + senderId
+        RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute region resolved senderId=" + senderId
                 + " requestedRegion=" + regionName + " resolvedRegion=" + region.name);
       } catch (IllegalArgumentException | IllegalStateException exception) {
         String msg = (String) langParser.getConfigValue(MessagesKeys.badArg, "region:" + regionName);
         RTP.serverAccessor.sendMessage(senderId, msg);
-        RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.compute REJECT badArg region senderId=" + senderId
+        RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute REJECT badArg region senderId=" + senderId
                 + " regionName=" + regionName + " cause=" + exception.getClass().getSimpleName());
         RTP.log(Level.WARNING, msg);
         RTP.getInstance().processingPlayers.remove(senderId);
@@ -539,7 +548,7 @@ public interface RTPCmd extends BaseRTPCmd {
 
       TeleportPipelineTask pipelineTask = new TeleportPipelineTask(new GenerationContext(sender, player, biomes), region);
       data.nextTask = pipelineTask;
-      RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.compute TeleportPipelineTask constructed playerId=" + player.uuid()
+      RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute TeleportPipelineTask constructed playerId=" + player.uuid()
               + " region=" + region.name
               + " biomes=" + biomes
               + " syncLoading=" + syncLoading);
@@ -556,11 +565,11 @@ public interface RTPCmd extends BaseRTPCmd {
       }
 
       if (syncLoading) {
-        RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.compute SUBMIT pipelineTask SYNC playerId=" + player.uuid());
+        RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute SUBMIT pipelineTask SYNC playerId=" + player.uuid());
         region.inFlightCalculations.incrementAndGet();
         pipelineTask.run();
       } else {
-        RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.compute SUBMIT pipelineTask ASYNC playerId=" + player.uuid());
+        RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute SUBMIT pipelineTask ASYNC playerId=" + player.uuid());
         region.inFlightCalculations.incrementAndGet();
         RTP.scheduler.runTaskAsynchronously(pipelineTask);
       }

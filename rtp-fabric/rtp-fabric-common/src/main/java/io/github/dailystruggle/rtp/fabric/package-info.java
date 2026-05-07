@@ -8,7 +8,7 @@
  * {@code docs/dev/MULTI_PLATFORM_PLAN.md}.</p>
  *
  * <p><strong>Architectural invariants</strong> (per
- * {@code docs/adr/ADR-022-fabric-platform-in-scope.md} §4): code in this
+ * {@code rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md} §4): code in this
  * package and its sub-packages shall import Fabric APIs only. {@code
  * org.bukkit.*} imports are forbidden here. Shared, platform-free logic
  * lives in {@code rtp-core} / {@code rtp-api} / {@code commands-api} /

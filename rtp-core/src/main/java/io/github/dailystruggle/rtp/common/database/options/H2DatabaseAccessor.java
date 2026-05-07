@@ -10,6 +10,24 @@ import java.util.logging.Level;
 import org.jetbrains.annotations.NotNull;
 
 public class H2DatabaseAccessor extends AbstractSQLDatabaseAccessor {
+  static {
+    // Explicitly register the H2 JDBC driver. Required on Fabric, where the
+    // RTP mod jar is loaded by Knot's classloader and the JVM's automatic
+    // ServiceLoader-based driver discovery (which scans the system
+    // classloader) cannot see drivers shipped inside the mod jar — leading
+    // to "No suitable driver found for jdbc:h2:..." at DriverManager.getConnection.
+    //
+    // The string literal below is rewritten by Shadow's relocator to the
+    // shaded package (io.github.dailystruggle.rtp.h2.Driver) at build time,
+    // so the same source works for both the relocated Pro/Fabric jar and
+    // any non-relocated test/dev classpath that has plain org.h2 on it.
+    try {
+      Class.forName("org.h2.Driver");
+    } catch (ClassNotFoundException e) {
+      RTP.log(Level.WARNING, "H2 JDBC driver not on classpath: " + e.getMessage(), e);
+    }
+  }
+
   private final String url;
   private Connection connection;
 

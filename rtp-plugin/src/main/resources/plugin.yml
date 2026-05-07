@@ -21,7 +21,7 @@ folia-supported: true
 
 # --- Commands ---
 # Registered command aliases. Argument parsing itself is dispatched through
-# the TreeCommand framework (see ADR-014 / commands-api).
+# the TreeCommand framework (see commands-api-ADR-001 / commands-api).
 commands:
   rtp:
     description: Teleport randomly

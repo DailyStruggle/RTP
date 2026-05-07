@@ -11,7 +11,7 @@ repositories {
 
 dependencies {
     compileOnly 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
-    // ADR-014 — Brigadier Bridge. compileOnly so Bukkit-family runtimes
+    // commands-api-ADR-001 — Brigadier Bridge. compileOnly so Bukkit-family runtimes
     // (which do not bundle Brigadier on the classpath we control) never
     // load this dep, while Fabric (where Brigadier is provided by the
     // Minecraft server) resolves it at runtime via the platform adapter.

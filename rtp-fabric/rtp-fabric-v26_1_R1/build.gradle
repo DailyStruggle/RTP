@@ -1,4 +1,4 @@
-// ADR-027 — Fabric multiversion v26_1_R1 submodule.
+// rtp-fabric-ADR-001 — Fabric multiversion v26_1_R1 submodule.
 //
 // Pinned to MC 26.1.2, the FIRST DEOBFUSCATED Minecraft release. Build-script
 // shape diverges from the obf-era (1.20 / 1.21) submodules in five ways

@@ -8,6 +8,7 @@ import io.github.dailystruggle.rtp.fabric.commands.RTPCmdFabricRoot;
 import io.github.dailystruggle.rtp.fabric.database.FabricDatabaseHandler;
 import io.github.dailystruggle.rtp.fabric.events.FabricEventBridge;
 import io.github.dailystruggle.rtp.fabric.server.FabricServerAccessor;
+import io.github.dailystruggle.rtp.fabric.tools.FabricLegacyText;
 import io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter;
 import io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry;
 import net.fabricmc.api.ModInitializer;
@@ -15,16 +16,17 @@ import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundSystemChatPacket;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.UUID;
 import java.util.logging.Level;
 
 /**
- * Fabric entry point — single-JAR multi-loader bootstrap (ADR-022 §2).
+ * Fabric entry point — single-JAR multi-loader bootstrap (rtp-fabric-ADR-002 §2, formerly ADR-022/ADR-031).
  *
  * <p>Counterpart to {@code io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin}. Referenced from
- * {@code fabric.mod.json} as the {@code main} entrypoint. Per ADR-022 §4 (Architectural
+ * {@code fabric.mod.json} as the {@code main} entrypoint. Per rtp-fabric-ADR-002 §4 (Architectural
  * Invariants) this class:
  *
  * <ul>
@@ -39,7 +41,7 @@ import java.util.logging.Level;
  * <p><strong>Current state:</strong> structural skeleton — the wiring body is intentionally
  * minimal so the build structure (Loom + remapJar + multi-loader manifest) can be brought up
  * and verified end-to-end before Phase 2 Steps A–H land. The real wiring (FabricServerAccessor,
- * FabricEventBridge, Brigadier-bridged command tree per ADR-014) is deferred to those steps.
+ * FabricEventBridge, Brigadier-bridged command tree per commands-api-ADR-001) is deferred to those steps.
  *
  * @see io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin
  */
@@ -48,12 +50,12 @@ public final class RTPFabricMod implements ModInitializer {
     @Override
     public void onInitialize() {
         // Phase 2 Step E2 + Step G G1 wiring. Body kept minimal per
-        // REQ-RTP-NF-003 (applied per-entry-point under ADR-022 §2). Heavy
+        // REQ-RTP-NF-003 (applied per-entry-point under rtp-fabric-ADR-002 §2). Heavy
         // lifting is in FabricServerAccessor / FabricEventBridge / the
         // commands-api Brigadier adapter.
         try {
             // ----------------------------------------------------------------
-            // ADR-027 — Fabric multiversion: select the per-MC version adapter
+            // rtp-fabric-ADR-001 — Fabric multiversion: select the per-MC version adapter
             // FIRST, before anything in rtp-fabric-common touches a
             // version-volatile call site. Reflective instantiation ensures a
             // Java-21 server never resolves the Java-25 v26_1_R1 class
@@ -116,12 +118,110 @@ public final class RTPFabricMod implements ModInitializer {
                             (src, perm) -> true,
                             (src, msg) -> {
                                 if (msg == null) return;
-                                src.sendSystemMessage(Component.literal(msg));
+                                // Route through FabricLegacyText so &-codes / #RRGGBB
+                                // hex / placeholders pre-resolved upstream render with
+                                // colour and don't show as raw "&c[...]" to the player
+                                // (parity with FabricRTPPlayer.sendMessage path).
+                                //
+                                // NOTE: We deliberately avoid CommandSourceStack#sendSystemMessage —
+                                // ServerPlayer#sendSystemMessage(Component) (intermediary
+                                // class_3222.method_43496) drifts across MC patch releases
+                                // (NoSuchMethodError on 1.21.11, same family as the
+                                // hasPermission(int) drift). Send the system chat packet
+                                // directly through the player's network connection where
+                                // we have one; for non-player sources fall back to the
+                                // CommandSourceStack#sendSuccess path which goes through
+                                // a different, stable mapping.
+                                Component component = FabricLegacyText.parse(msg);
+                                try {
+                                    if (src.getEntity() instanceof ServerPlayer p && p.connection != null) {
+                                        p.connection.send(new ClientboundSystemChatPacket(component, false));
+                                    } else {
+                                        // Console / command-block source — sendSuccess is
+                                        // stable and shows in the server log.
+                                        src.sendSuccess(() -> component, false);
+                                    }
+                                } catch (Throwable t) {
+                                    RTP.log(Level.WARNING,
+                                            "[RTP][trace] Brigadier sendMessage failed: " + t.getMessage());
+                                }
+                                RTP.log(Level.FINE,
+                                        "[RTP][trace] Brigadier sendMessage delivered: " + msg);
                             });
 
             CommandRegistrationCallback.EVENT.register(
-                    (dispatcher, registry, env) ->
-                            RTPCmdFabric.register(dispatcher, root, bridgeCtx));
+                    (dispatcher, registry, env) -> {
+                        RTP.log(Level.INFO,
+                                "[RTP] Registering /rtp Brigadier root with dispatcher (env=" + env + ").");
+                        RTPCmdFabric.register(dispatcher, root, bridgeCtx);
+                    });
+
+            // ----------------------------------------------------------------
+            // Step E3-3 — non-Folia ChunkUnloadProcessor timer.
+            // Mirrors RTPBukkitPlugin.onEnable's `if (!isFolia()) ...` branch.
+            // Fabric has no Folia-style region threading, so the non-Folia
+            // branch always applies. Without this, chunks loaded by the
+            // teleport pipeline with keep(true) are never released and
+            // MemoryTracker tickets accumulate (see ADR-022 §4 / S-002).
+            // ----------------------------------------------------------------
+            RTP.scheduler.runTaskTimer(
+                    new io.github.dailystruggle.rtp.common.tasks.ChunkUnloadProcessor(),
+                    1, 1);
+
+            // ----------------------------------------------------------------
+            // Per-adapter periodic ticket refresh — only adapters that use
+            // auto-expiring tickets (1.21.5+, see rtp-fabric-ADR-004) override
+            // tickRefresh(); for all others this is a no-op. Period 100 ticks
+            // (5 s) is comfortably below the R5 adapter's REFRESH_TICKS_LEFT
+            // (200 = 10 s), so each held chunk always has ≥ 5 s remaining
+            // lifetime even if a refresh is delayed by a tick or two.
+            // ----------------------------------------------------------------
+            RTP.scheduler.runTaskTimer(() -> {
+                FabricVersionAdapter adapter = FabricVersionAdapterRegistry.peek();
+                if (adapter != null) {
+                    try {
+                        adapter.tickRefresh();
+                    } catch (Throwable t) {
+                        RTP.log(Level.WARNING,
+                                "[RTP] FabricVersionAdapter.tickRefresh failed: "
+                                        + t.getClass().getSimpleName() + ": " + t.getMessage());
+                    }
+                }
+            }, 100, 100);
+
+            // ----------------------------------------------------------------
+            // Step E3-6 — drain RTP.startupTasks the same way Bukkit does.
+            // The RTP() constructor enqueues region parsing, world rebind,
+            // scan-task seeding, and softdepend probes onto startupTasks
+            // rather than running them inline. Without these drains the
+            // region prefill never starts, keptLocations / unkeptLocations
+            // stay empty, and /rtp falls through to "no location available"
+            // (or hangs in the per-player polling loop).
+            //
+            //   drain #1: synchronous, immediately
+            //   drain #2: scheduled +1 tick (deferred work needing live server)
+            //   drain #3: synchronous post-banner
+            //
+            // Mirrors RTPBukkitPlugin.onEnable lines ~130 / ~141 / ~184 and
+            // BootstrapSupport.drainStartupTasks. Empty drains are no-ops, so
+            // matching Bukkit's three-drain pattern is cheap insurance.
+            // ----------------------------------------------------------------
+            if (rtp != null) {
+                while (rtp.startupTasks.size() > 0) {
+                    rtp.startupTasks.execute(Long.MAX_VALUE);
+                }
+                RTP.scheduler.runTaskLater(() -> {
+                    RTP r2 = RTP.getInstance();
+                    if (r2 != null) {
+                        while (r2.startupTasks.size() > 0) {
+                            r2.startupTasks.execute(Long.MAX_VALUE);
+                        }
+                    }
+                }, 1);
+                while (rtp.startupTasks.size() > 0) {
+                    rtp.startupTasks.execute(Long.MAX_VALUE);
+                }
+            }
 
             RTP.log(Level.INFO,
                     "[RTP] Fabric entry point initialized — event bridge + /rtp Brigadier root registered.");
@@ -148,7 +248,7 @@ public final class RTPFabricMod implements ModInitializer {
     }
 
     /**
-     * ADR-027 — classify the running MC version and reflectively instantiate
+     * rtp-fabric-ADR-001 — classify the running MC version and reflectively instantiate
      * the matching {@link FabricVersionAdapter} from the appropriate
      * {@code rtp-fabric-vXX_YY_R1} submodule, then install it into
      * {@link FabricVersionAdapterRegistry}.
@@ -185,18 +285,18 @@ public final class RTPFabricMod implements ModInitializer {
                     .map(c -> c.getMetadata().getVersion().getFriendlyString())
                     .orElseThrow(() -> new IllegalStateException(
                             "FabricLoader reports no 'minecraft' mod container — "
-                                    + "cannot select Fabric version adapter (ADR-027)."));
+                                    + "cannot select Fabric version adapter (rtp-fabric-ADR-001)."));
         } catch (Throwable t) {
             throw new IllegalStateException(
                     "Unable to determine running Minecraft version via FabricLoader — "
-                            + "cannot select Fabric version adapter (ADR-027).", t);
+                            + "cannot select Fabric version adapter (rtp-fabric-ADR-001).", t);
         }
 
         String adapterFqn = adapterFqnFor(mcVersion);
         if (adapterFqn == null) {
             throw new IllegalStateException(
                     "No Fabric version adapter is mapped for running MC version '" + mcVersion
-                            + "'. Supported lines: 1.20.x, 1.21.x, 26.1.x. See ADR-027.");
+                            + "'. Supported lines: 1.20.x, 1.21.x, 26.1.x. See rtp-fabric-ADR-001.");
         }
 
         try {
@@ -207,11 +307,11 @@ public final class RTPFabricMod implements ModInitializer {
             throw new IllegalStateException(
                     "Fabric version adapter class '" + adapterFqn + "' not on classpath. "
                             + "The matching rtp-fabric-vXX_YY_R1 submodule must be included "
-                            + "in the shaded jar for MC " + mcVersion + " (ADR-027).", e);
+                            + "in the shaded jar for MC " + mcVersion + " (rtp-fabric-ADR-001).", e);
         } catch (ReflectiveOperationException | ClassCastException e) {
             throw new IllegalStateException(
                     "Failed to instantiate Fabric version adapter '" + adapterFqn
-                            + "' for MC " + mcVersion + " (ADR-027).", e);
+                            + "' for MC " + mcVersion + " (rtp-fabric-ADR-001).", e);
         }
     }
 
@@ -222,10 +322,13 @@ public final class RTPFabricMod implements ModInitializer {
      * MC line. Returns {@code null} if the version is unsupported.
      *
      * <p>Classification is by major-minor prefix; patch versions within a
-     * line share the same adapter (e.g. 1.21.1 / 1.21.3 / 1.21.5 all route
-     * to {@code v1_21_R1}). When a future MC line lands that needs its own
-     * adapter (e.g. {@code v26_2_R1}), add a row here and create the
-     * matching submodule.</p>
+     * line usually share the same adapter, but the 1.21 line is split at
+     * patch 5 because Mojang refactored {@code DistanceManager} there
+     * (4-arg {@code addRegionTicket} → {@code addTicket(long, Ticket)} —
+     * see {@code rtp-fabric-ADR-004}). 1.21.0–1.21.4 → {@code v1_21_R1};
+     * 1.21.5 onward → {@code v1_21_R5}. When a future MC line lands that
+     * needs its own adapter (e.g. {@code v26_2_R1}), add a row here and
+     * create the matching submodule.</p>
      */
     private static String adapterFqnFor(String mcVersion) {
         if (mcVersion == null) return null;
@@ -233,6 +336,21 @@ public final class RTPFabricMod implements ModInitializer {
             return "io.github.dailystruggle.rtp.fabric.v1_20_R1.V1_20_R1FabricVersionAdapter";
         }
         if (mcVersion.startsWith("1.21")) {
+            // The DistanceManager / TicketType API broke twice in this line:
+            //   1.21.0–1.21.4 → 4-arg `addRegionTicket(TicketType, ChunkPos, int, T)` (R1).
+            //   1.21.5–1.21.10 → record `TicketType(long timeout, boolean persist, TicketUse use)`
+            //                    + `ServerChunkCache#addTicketWithRadius` (R5; see ADR-004).
+            //   1.21.11+ → record `TicketType(long expiryTicks, int flags)` with the
+            //              `TicketUse` inner enum removed entirely (R11; see ADR-007 for
+            //              the Mojmap-name-decoupling SPI refactor that unblocked this
+            //              submodule's inclusion in the default build).
+            int patch = patchOf121(mcVersion);
+            if (patch >= 11) {
+                return "io.github.dailystruggle.rtp.fabric.v1_21_R11.V1_21_R11FabricVersionAdapter";
+            }
+            if (patch >= 5) {
+                return "io.github.dailystruggle.rtp.fabric.v1_21_R5.V1_21_R5FabricVersionAdapter";
+            }
             return "io.github.dailystruggle.rtp.fabric.v1_21_R1.V1_21_R1FabricVersionAdapter";
         }
         if (mcVersion.startsWith("26.1")) {
@@ -240,5 +358,32 @@ public final class RTPFabricMod implements ModInitializer {
             return "io.github.dailystruggle.rtp.fabric.v26_1_R1.V26_1_R1FabricVersionAdapter";
         }
         return null;
+    }
+
+    /**
+     * Parse the patch component of a {@code 1.21.x} version string.
+     * Returns {@code 0} for {@code "1.21"} (no patch component) and the
+     * integer value of the third dot-separated component otherwise.
+     * Unparseable suffixes (e.g. {@code "1.21.5-rc1"}) are tolerated by
+     * stripping non-digits before parsing. Returns {@code 0} on any failure
+     * — callers default to the R1 adapter in that case.
+     */
+    private static int patchOf121(String mcVersion) {
+        // mcVersion guaranteed to startWith("1.21") by callers.
+        if (mcVersion.length() < 5) return 0; // exactly "1.21"
+        if (mcVersion.charAt(4) != '.') return 0; // e.g. "1.210" — not actually 1.21.x
+        String tail = mcVersion.substring(5);
+        StringBuilder digits = new StringBuilder();
+        for (int i = 0; i < tail.length(); i++) {
+            char ch = tail.charAt(i);
+            if (ch < '0' || ch > '9') break;
+            digits.append(ch);
+        }
+        if (digits.length() == 0) return 0;
+        try {
+            return Integer.parseInt(digits.toString());
+        } catch (NumberFormatException nfe) {
+            return 0;
+        }
     }
 }

@@ -249,7 +249,7 @@ w.subParamMap.put("world_nether", Map.of("portal", new BooleanParameter(...)));
   `msgBadParameter` must `RTP.log(Level.WARNING, msg)` to satisfy
   REQ-RTP-S-004 auditing and surface in `rtp test full`.
 - Brigadier integration belongs in `commands-api`, not per-platform
-  adapters — see ADR-014 (`docs/adr/ADR-014-brigadier-bridge-via-commands-api.md`).
+  adapters — see commands-api-ADR-001 (`commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md`).
 
 ---
 

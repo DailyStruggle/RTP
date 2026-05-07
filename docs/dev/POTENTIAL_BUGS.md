@@ -22,24 +22,6 @@ Append to the *Open* section below using the template. Keep entries short — on
 
 ## Open
 
-### 2026-05-01 — `RTP.redisManager` field hard-references `RedisManager` in `rtp-core` (ADR-024 lite hazard) — RESOLVED 2026-05-01
-- **Discovered during:** ADR-024 lite assembly wiring (Phase A, helper extraction).
-- **Location:** `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/RTP.java` line 145 (field declaration), 187/196 (construction), 607–609 (shutdown). The lite shadow excludes `io/github/dailystruggle/rtp/common/network/Redis*.class`.
-- **Symptom / hypothesis:** Even though `RedisManager` is only constructed when network YAML enables it (and lite never enables it), the field type and `instanceof`/method-ref linkage in `RTP.java` mean any class-loader that resolves `RTP.class` must be able to find `RedisManager.class`. Lite drops `RedisManager` outright, so on any verifier-strict JVM the first `RTP.class` resolve risks `NoClassDefFoundError`. In practice HotSpot's lazy linking masks this until a code path touches `redisManager` — but `RTP.stop()` line 607 (`if (instance.redisManager != null)`) does, on every shutdown, force the field-type class to resolve.
-- **Impact:** lite shutdown could throw `NoClassDefFoundError: …/network/RedisManager` after the regression first manifests on a strict JVM (post-Java 21 verifier tightening, or with `-Xverify:all`). Today's HotSpot tolerates the missing class because `redisManager` is always null in lite.
-- **Resolution (2026-05-01):** introduced `io.github.dailystruggle.rtp.common.network.RTPNetworkManager` interface; `RedisManager implements RTPNetworkManager`; renamed/retyped `RTP.redisManager` → `RTP.networkManager` (interface type). Construction is now reflective via `RTP.createRedisNetworkManager` (`Class.forName("…RedisManager")`), so the only symbolic reference to `RedisManager` in `rtp-core/RTP.java` lives inside a string literal. Verified via `:rtp-core:test`, `:rtp-plugin:test`, and `:rtp-plugin:liteJarStructureCheck` — all BUILD SUCCESSFUL. `DatabaseAccessor` was reviewed and confirmed not adaptable for this role (no TTL primitive, no pub/sub, batched-query lifecycle vs. long-lived async subscriber).
-
-### 2026-05-01 — Two ADR files share the number ADR-022
-- **Discovered during:** Fabric multiversion support work (ADR-027 drafting).
-- **Location:** `docs/adr/ADR-022-shape-cache-key-seed-plus-config-hash.md` and `docs/adr/ADR-022-fabric-platform-in-scope.md`.
-- **Symptom / hypothesis:** Both files exist with the same `ADR-022-` prefix, so any cross-reference written as just "ADR-022" is ambiguous. `AGENTS.md`, `MULTI_PLATFORM_PLAN.md`, and `rtp-fabric/**/build.gradle` comments all use "ADR-022" to mean the Fabric-in-scope decision; the shape-cache ADR has the same number.
-- **Impact:** Documentation/navigation only — no runtime effect. Search-by-number returns two hits; future ADRs that supersede "ADR-022" must disambiguate.
-- **Suggested next step:** Renumber one of them (likely the shape-cache ADR, which has narrower external references) to the next free slot, update its filename, internal `ADR-NNN` line, and any in-repo links. Out of scope for the current Fabric multiversion task.
-
-### 2026-04-30 — Region shape cache key (geometry/vert subset) — RESOLVED via ADR-022
-- ~~Discovered during: discussion on tying region shape data to a hash of seed plus configurable values that change location validity or spiral start.~~
-- **Resolution:** [ADR-022](../adr/ADR-022-shape-cache-key-seed-plus-config-hash.md) implemented 2026-04-30. `.bin`/`.scan` files are now keyed `<regionName>_<seed>_<12hex>.bin`; the legacy `rtp_cached_locations.seed BIGINT` column carries the 64-bit truncation of the same hash so no schema migration was needed. `Region.setSettings(...)` deletes the stale on-disk artefacts when the hash changes.
-- **Follow-up still open:** `safety.yml` validity fields (`unsafeBlocks`, `platform`, `requireSkyLight`, tag/state predicates) and biome whitelist/blacklist are **not** yet folded into the hash. A separate entry below tracks that gap.
 
 ### 2026-04-30 — Region cache hash does not yet cover safety.yml / biome filters
 - **Discovered during:** ADR-022 implementation; deferred per scope decision.
@@ -56,23 +38,6 @@ Append to the *Open* section below using the template. Keep entries short — on
 - **Impact:** Javadoc link warnings only; no runtime effect, no compile failure. Slightly misleading IDE navigation.
 - **Suggested next step:** replace with prose ("the asynchronous {@code probe} method" / "the platform reconciler") or delete the broken anchors. Two-line fix.
 
-### 2026-05-03 — `effects-api` `SoundEffect` unparseable on MC ≥ 1.21.3 — RESOLVED 2026-05-03
-
-- **Discovered during:** Folia 1.21.11 demo of `rtp.effect.*` permission nodes.
-- **Location:** `effects-api/src/main/java/io/github/dailystruggle/effectsapi/Effect.java` (`str2Obj`); `effects-api/.../LocalEffects/SoundEffect.java` (default seed).
-- **Resolution (2026-05-03):** `Effect.str2Obj` now special-cases `Sound`, mapping legacy underscored names (`ENTITY_ENDERMAN_TELEPORT`) and namespaced keys (`minecraft:entity.enderman.teleport` / `entity.enderman.teleport`) to a `Registry.SOUNDS.get(NamespacedKey)` lookup, with a reflective `Sound.valueOf` fallback for pre-1.21.3 enum builds. `SoundEffect.defaultSound()` replaces the enum-only `Sound.values()[0]` seed: tries reflective `values()`, then iterates `Registry.SOUNDS`, then resolves `minecraft:entity.enderman.teleport`. `:effects-api:compileJava` and `:effects-api:test` BUILD SUCCESSFUL.
-
-### 2026-05-03 — `effects-api` `PotionEffect.run` violates Folia threading — RESOLVED 2026-05-03
-
-- **Discovered during:** Folia 1.21.11 demo of `rtp.effect.*` permission nodes.
-- **Location:** `effects-api/src/main/java/io/github/dailystruggle/effectsapi/LocalEffects/PotionEffect.java`.
-- **Resolution (2026-05-03):** `PotionEffect.run` now routes every `Player.addPotionEffect(...)` through a new `applyOnEntityThread(Player, PotionEffect)` helper. The helper invokes `Player#getScheduler().run(plugin, task, retired)` reflectively when present (Folia / modern Paper EntityScheduler) and falls back to `Bukkit.getScheduler().runTask` otherwise. Reflection keeps `effects-api` free of a Folia compile-time dependency. `:effects-api:compileJava` and `:effects-api:test` BUILD SUCCESSFUL.
-
-### 2026-05-03 — `effects-api` `FireworkEffect.run` uses non-Folia scheduler — RESOLVED 2026-05-03
-
-- **Discovered during:** Folia 1.21.11 demo of `rtp.effect.*` permission nodes.
-- **Location:** `effects-api/src/main/java/io/github/dailystruggle/effectsapi/LocalEffects/FireworkEffect.java`.
-- **Resolution (2026-05-03):** `FireworkEffect.run` now branches on a `RegionizedServer` class-probe. On Folia it dispatches to `Bukkit.getRegionScheduler().run(plugin, location, Consumer)` (resolved reflectively to avoid a Folia compile-time dependency) and spawns via the new `spawnFirework(Location)` helper. On Spigot/Paper the existing `Bukkit.isPrimaryThread()` / `Bukkit.getScheduler().runTask(...)` path is preserved. `:effects-api:compileJava` and `:effects-api:test` BUILD SUCCESSFUL.
 
 ### 2026-05-03 — `EVENTS_AND_EFFECTS.md` documents wrong types for SOUND / NOTE arguments
 
@@ -82,8 +47,49 @@ Append to the *Open* section below using the template. Keep entries short — on
 - **Impact:** Operators following the doc see `NumberFormatException` / `unexpected input` warnings on every teleport stage they granted; no effect plays. Increases support load and erodes trust in the doc.
 - **Suggested next step:** correct the `NOTE` `TONE` column to `int 0–24` with a small lookup table for common tones; add a "MC ≥ 1.21.3" warning to the `SOUND` row pending the registry fix; verify the `FIREWORK` argument order matches `FireworkEffect.setData(...)` actual positional reads and either fix the doc or fix the parser. Cross-link this entry from the doc when corrected.
 
+
+### 2026-05-05 — `docs/adr/README.md` Index missing rows for ADR-023, ADR-024, ADR-026, ADR-028
+
+- **Discovered during:** ADR audit / subproject-ADR migration (this task).
+- **Location:** `docs/adr/README.md` "Index" table.
+- **Symptom / hypothesis:** Several existing ADRs (`ADR-023-login-reserve-cache.md`, `ADR-024-rtp-lite-assembly-variant.md`, `ADR-026-external-hook-api-surface.md`, `ADR-028-l3-backlog-cache.md`) are present on disk but never had a row added to the index table; the table jumps from ADR-022 straight to ADR-025. ADR-027 is now in `rtp-fabric/docs/adr/` and is captured under the new *Subproject ADRs* section, so it doesn't need a main-table row, but the four others do.
+- **Impact:** Documentation/navigation only — search by ADR number still works, but the README claims to be the catalog and isn't. Risks future ADRs being added in the wrong slot or tools that scrape the table missing entries.
+- **Suggested next step:** insert the four missing rows in the existing chronological table; double-check status (Accepted vs. Proposed) against each ADR file's header. Out of scope for the current ADR-relocation task.
+
+### 2026-05-06 — Pre-existing unresolved Javadoc link `BuiltInRegistries#BIOME` in `V1_21_R1FabricVersionAdapter`
+
+- **Discovered during:** ADR-007 (Mojmap-name decoupling) refactor — surfaced when linting the migrated adapter.
+- **Location:** `rtp-fabric/rtp-fabric-v1_21_R1/.../V1_21_R1FabricVersionAdapter.java` line 51-52, class Javadoc: `{@link BuiltInRegistries#BIOME}`.
+- **Symptom / hypothesis:** `BuiltInRegistries.BIOME` does not exist on 1.21.1 Mojmap (biome registry is accessed via the level's registry access, not a static `BuiltInRegistries` field). The Javadoc reference resolves to nothing. Pre-existed ADR-007 work — not introduced by the wrapper migration.
+- **Impact:** Javadoc warning only; no compile failure, no runtime effect. Slightly misleading IDE navigation.
+- **Suggested next step:** replace the broken `{@link …#BIOME}` with prose ("the biome registry, accessed via {@code level.registryAccess()}") or remove the bullet entirely. One-line fix.
+
+### 2026-05-06 — `ReqApiArch005BrigadierBridgeTest` carries 2 unsatisfied assertions in HEAD adapter
+
+- **Discovered during:** Fabric live `/rtp <TAB>` blank + `/rtp scan <TAB>` showing `default` instead of `region:` investigation.
+- **Location:** `commands-api/src/test/.../ReqApiArch005BrigadierBridgeTest.java` — `parameterDispatchReconstructsWireFormat` (line 206) and `subCommandDispatchRoutesThroughRootForParity` (line 172).
+- **Symptom / hypothesis:** Both tests pin a `name=value` Brigadier-side wire-format reconstruction (e.g., `args[0] == "count=7"`) and a sub-command `i=1` post-literal cursor contract. Running the tests against the **HEAD** `BrigadierCommandAdapter` reproduces both failures (`expected: <count=7> but was: <7>`; `expected: <1> but was: <0>`). The tests were added in the prior session as forward-looking pins; the adapter hasn't been updated to satisfy them yet. Out of scope for the current Fabric tab-complete issue.
+- **Impact:** None on running Bukkit/Fabric servers (the adapter still routes execution and the Bukkit-style `name:value` wire-format is what `TreeCommand.onCommand` actually consumes); CI noise only when the suite is run.
+- **Suggested next step:** either (a) align the adapter's `reconstructArgs(...)` to emit `name=value` and adjust `execute(...)` to enter sub-commands at `i=1`, or (b) relax the test assertions to accept either format. The "real" wire format used end-to-end is `name:value` (Bukkit `TabCompleter` historic + REQ-RTP-S-007 `msgInvalidCommand` parser), so option (b) is likely correct — but confirm with the parser before flipping.
+
+### 2026-05-06 — `emitsExpectedNodeStructure` regresses when shadow `_` greedyString is attached at every literal
+
+- **Discovered during:** Fabric `/rtp scan <TAB>` flat-fallback recursion attempt.
+- **Location:** `commands-api/src/main/java/.../BrigadierCommandAdapter.java` — `attachFlatFallback(...)` recursion call inside `attachChildren` sub-command loop.
+- **Symptom / hypothesis:** When `attachFlatFallback` is called for a sub-command literal (e.g., `reload`) BEFORE that literal is `parentBuilder.then(reloadLiteral)`-attached to the root, the root's `getChildren()` no longer contains `reload` (`children.containsKey("reload") == false`). Suggests Brigadier's `LiteralArgumentBuilder.build()` interaction with a `RequiredArgumentBuilder("_", greedyString())` child that `executes(...)` is collapsing the parent literal in some merge path. Need to verify against `1.2.9` Brigadier `addChild` semantics — the LinkedHashMap should preserve both, but maybe `redirect` is being inferred.
+- **Impact:** Only when the recursive flat-fallback pattern is enabled. Currently disabled (only the root-level shadow remains). Without the recursion, `/rtp scan <TAB>` will continue to surface region-name suggestions like `default` instead of the Bukkit-parity `region:` prefix.
+- **Suggested next step:** investigate whether attaching the shadow as a `LiteralArgumentBuilder("__rtp_flat__")` (literal name, not RequiredArgument) avoids the displacement; or whether emitting subcommand-name tokens directly into the per-parameter `SuggestionProvider` (so `RegionParameter.relevantValues(...)` returns `["region:DEFAULT", "region:nether", ...]` rather than `["default", "nether"]`) is the cleaner fix. The latter aligns with Bukkit `TabCompleter` historical wire format.
+
 <!-- Append new entries above this comment, newest first. -->
 
 ## Resolved
 
 <!-- Move entries here (or delete) once addressed. Keep last 10 for context. -->
+
+### 2026-05-06 — ~~`TicketType.UNKNOWN` auto-expiry on the 1.21.5+ Fabric kept-cache path~~
+
+- **Resolved:** confirmed via `javap` on the Mojmap-remapped 1.21.5 server jar that `TicketType.UNKNOWN` is registered with `timeout = 1L` (1-tick auto-expiry, not the historically rumoured 1 s) and `use = LOADING` only — both wrong for kept-cache pinning. `V1_21_R5FabricVersionAdapter` now allocates a static `RTP_TICKET_TYPE = new TicketType(TicketType.NO_TIMEOUT, /*persist=*/ false, TicketUse.LOADING_AND_SIMULATION)` (the public record constructor; no registry call) and uses it for both `addTicketWithRadius` / `removeTicketWithRadius`. Identity-equality matches across add/remove because a single static instance is reused. ADR-006 updated to record the type-instance decision; the radius-correctness portion is unchanged. Build: `:rtp-fabric:rtp-fabric-v1_21_R5:build` SUCCESSFUL.
+
+### 2026-05-06 — ~~`FabricScheduler.runTask` repeatedly invoked before server-started during early region dispatch~~
+
+- **Resolved:** `FabricScheduler` now buffers pre-`SERVER_STARTED` `runTask` submissions in a `preStartQueue` (a `ConcurrentLinkedQueue<Runnable>`) and drains them onto `MinecraftServer.execute` from `setServer(...)`. This mirrors Bukkit's always-queue `runTask` semantics (the user-requested "route through our own scheduler" behaviour) and eliminates the `IllegalStateException` cascade observed on Fabric 1.21.11. `clearServer()` clears the buffer on `SERVER_STOPPING`.

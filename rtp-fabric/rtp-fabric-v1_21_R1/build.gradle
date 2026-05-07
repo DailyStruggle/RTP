@@ -1,4 +1,4 @@
-// ADR-027 — Fabric multiversion v1_21_R1 submodule (reference impl).
+// rtp-fabric-ADR-001 — Fabric multiversion v1_21_R1 submodule (reference impl).
 //
 // Pinned to MC 1.21.1, mojmap, Loom 1.11+, Java 21. This is the reference
 // FabricVersionAdapter implementation that v1_20_R1 and v26_1_R1 will port

@@ -49,14 +49,14 @@ This document connects each requirement to the design decision that motivated it
 | REQ-API-F-002 | Vertical adjustors | ARCH.md | VerticalAdjustor | - |
 | REQ-API-F-003 | Validation hooks | DESIGN.md Â§2 | GlobalRegionVerifiers | - |
 | REQ-API-F-004 | Agnostic models | ARCH.md | RTPLocation | - |
-| REQ-API-F-005 | Command contract | ADR-014 | commands-api | - |
+| REQ-API-F-005 | Command contract | commands-api-ADR-001 | commands-api | - |
 | REQ-API-NF-001 | Semantic versioning | `build.gradle` version declarations | â€” | â€” |
 | REQ-API-NF-002 | Decoupling | ARCH.md | RTPServerAccessor | RTPArchitectureTest |
 | REQ-API-ARCH-001 | Thread-safe API | DESIGN.md Â§2 | FactoryValue | - |
 | REQ-API-ARCH-002 | Non-blocking API | DESIGN.md Â§1 | ILocationGenerator | RTPArchitectureTest |
 | REQ-API-ARCH-003 | API exception handling | DESIGN.md Â§6 | TeleportPipelineTask | RTPAPIGuardTest |
 | REQ-API-ARCH-004 | Lock-free reads | DESIGN.md Â§1 | ConfigParser | ConfigParserLanguageTest |
-| REQ-API-ARCH-005 | Brigadier boundary | ADR-014 | `BrigadierCommandAdapter`, `BrigadierBridgeContext` (`commands-api`); `RTPCmdFabric` (`rtp-fabric-common`) | `ReqApiArch005BrigadierBridgeTest` (3 tests) |
+| REQ-API-ARCH-005 | Brigadier boundary | commands-api-ADR-001 (+ Addendum 2026-05-06, incl. Silent-failure isolation follow-up) | `BrigadierCommandAdapter`, `BrigadierBridgeContext` (`commands-api`); `RTPCmdFabric` (`rtp-fabric-common`) | `ReqApiArch005BrigadierBridgeTest` (4 tests), `BrigadierTreeShapeTest` (9 tests — recursion + sibling-chain + cycle-guard + per-subcommand/parameter/suggestion/requires throw isolation, 2026-05-06) |
 
 ---
 

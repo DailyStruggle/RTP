@@ -1,6 +1,6 @@
 out b# Multi-Platform Support Roadmap
 
-This document outlines the plan for RTP's multi-platform expansion. Fabric is **in scope** as of 2026-04-30 (see [ADR-022](../adr/ADR-022-fabric-platform-in-scope.md)). Forge and other mod loaders remain out of scope.
+This document outlines the plan for RTP's multi-platform expansion. Fabric is **in scope** as of 2026-04-30 (see [rtp-fabric-ADR-002](../../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md)). Forge and other mod loaders remain out of scope.
 
 For the supersession history: legacy Minecraft and Java versions are out of scope per [ADR-021](../adr/ADR-021-legacy-mc-and-java-support-scope.md). Do not backport Fabric-stage work to legacy servers without first superseding ADR-021.
 
@@ -43,18 +43,35 @@ Quick scan of what's done and what's left across Phases 0–3. Each Phase 2 step
     - [ ] World-border + shape function plumbing on `FabricServerAccessor`.
     - [ ] `getConsolePlayer()` real implementation (currently stub-throws).
     - [ ] Message routing helpers (`announce`, formatted `log`) wired to Fabric console + player chat.
+- [x] **Step E-perf — Anvil pre-filter parity (ADR-016)** *(landed 2026-05-06, [rtp-fabric-ADR-005](../../rtp-fabric/docs/adr/rtp-fabric-ADR-005-anvil-prefilter-parity.md))* — without this override every `ScanTask` refill candidate fell through `RTPWorld#probeChunkColumn`'s default `null` (UNKNOWN) into `runFullLoadPath` → `FabricRTPWorld.getChunkAt` → synchronous `cache.getChunk(..., FULL, /*load=*/true)` on the server tick. Operators reported `/rtp` cost rising from ~1 ms (Bukkit baseline) to ~14 ms on Fabric under steady-state queue refill — exactly that tick-thread chunk-generation cost surfacing as command latency. Resolution:
+    - [x] `api project(':rtp-anvil')` added to `:rtp-fabric:rtp-fabric-common`.
+    - [x] `FabricRTPWorld#probeChunkColumn` overrides the default — gates on `SafetyKeys.anvilPrefilterEnabled` + `isChunkLoaded`, resolves world folder via `MinecraftServer#getWorldPath(LevelResource.ROOT)` and dimension subpath via `ServerLevel#dimension().location()` (`overworld → ""`, `the_nether → "DIM-1"`, `the_end → "DIM1"`, custom → `"dimensions/<ns>/<path>"`). Dispatches onto `AnvilIoPool.get()`; all failures resolve to UNKNOWN so the live-path fallback remains authoritative (ADR-016).
+    - [x] `FabricAnvilColumnProbeAdapter` added (mirrors `rtp-spigot-common`'s `AnvilColumnProbeAdapter`; uses platform-neutral `PaletteIdentifierNormalizer` instead of Spigot's `Material`-aware `PaletteNormalizer`).
+    - [x] **Follow-up:** anvil-backed `FabricRTPChunk` for the safety stage (parity with `BukkitRTPChunk`'s anvil mode). *(landed 2026-05-06, [rtp-fabric-ADR-005 Addendum 2026-05-06](../../rtp-fabric/docs/adr/rtp-fabric-ADR-005-anvil-prefilter-parity.md#addendum-2026-05-06--full-anvil-backed-fabricrtpchunk-deferral-lifted))* — `FabricRTPChunk` is now dual-mode (live `ChunkAccess` or anvil `AnvilChunkView`); `FabricRTPWorld.getChunkAt` wires `AnvilProbeSupport.probeAndPublish` so accepted prefilter candidates evaluate entirely off-tick against the decoded view, with `getCachedChunk` falling through to a fresh anvil-backed `FabricRTPChunk` when the live caches miss. New `FabricPaletteNormalizer` + `ReqRtpS005FabricAnvilChunkTest` + `FabricPaletteNormalizerTest` cover the regression.
+    - [ ] **Follow-up:** hoist `*AnvilColumnProbeAdapter` into `rtp-anvil` (requires moving `PaletteNormalizer`'s Material coupling out first).
 - [ ] **Step F — Permissions** *(deferred for initial smoke testing per user direction 2026-05-01 — `/rtp` is currently invokable by any player; full perms work resumes after Step H)*:
     - [ ] Add `me.lucko:fabric-permissions-api` as `modCompileOnly`.
     - [ ] `FabricRTPPlayer.hasPermission(node)` via `Permissions.check(source, node, opFallback)`.
     - [ ] `getEffectivePermissions()` real impl (currently empty).
     - [ ] Replace `BrigadierBridgeContext` permissive predicate (always-true) with real perms-api lookup.
     - [ ] Permission node parity test vs. Bukkit adapter.
-- [ ] **Step G2 — Brigadier wiring (full Bukkit parity)** *(G1 minimal landed 2026-05-01)*:
-    - [ ] Port `RTPCmdBukkit`'s 5 parameters (`region`/`biome`/`player`/`world`/`toggletargetperms`) to Fabric, routing world/player lookups via `RTP.serverAccessor.*` (no `Bukkit.*`).
-    - [ ] Port the 6 subcommands (`reload`/`help`/`config`/`scan`/`info`/`test`).
+- [ ] **Step G2 — Brigadier wiring (full Bukkit parity)** *(G1 minimal landed 2026-05-01; parameter + subcommand parity landed 2026-05-06)*:
+    - [x] Port `RTPCmdBukkit`'s 5 parameters (`region`/`biome`/`player`/`world`/`toggletargetperms`) to Fabric, routing world/player lookups via `RTP.serverAccessor.*` (no `Bukkit.*`). *(landed 2026-05-06 — `RTPCmdFabricRoot` ctor; `Locale.ROOT` biome casing and `rtp.notme` opt-out preserved; `player` parameter uses an inline `CommandParameter` subclass with empty `values()` until an online-player listing helper is added to `FabricServerAccessor` under Step E-tail.)*
+    - [x] Port 5 of 6 subcommands (`reload`/`help`/`config`/`scan`/`info`). *(landed 2026-05-06.)* `test` deferred — `TestCmd` lives in `rtp-plugin/.../bukkit/commands/test/` and is Bukkit-only; a platform-neutral lift is a separate Step G2 follow-up.
+    - [ ] `TestCmd` — port or lift to platform-neutral.
     - [ ] `successEvent`/`failEvent` hooks on `RTPCmdFabricRoot` (currently no-op — Bukkit fires `TeleportCommandSuccessEvent`).
     - [ ] End-to-end `commands-live` smoke under `rtp test full` on Fabric.
-    - [ ] Tab-completion smoke test.
+    - [x] Tab-completion smoke test. *(2026-05-06: Brigadier-tree audit
+      landed — `BrigadierCommandAdapter.attachChildren` now recurses through
+      `CommandParameter.subParams` and chains sibling parameters with a
+      cycle guard; `CommandParameter.isSuggestionRelevant` decoupled from
+      `isRelevant` so non-op Fabric players get a populated suggestion
+      list pre-`fabric-permissions-api`; `FabricServerAccessor.getOnlinePlayerNames`
+      backs the `player` parameter's `values()`. See
+      [commands-api-ADR-001 §Addendum 2026-05-06](../../commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md#addendum--2026-05-06-recursion-contract-sibling-chaining-and-suggestion-relevance-split)
+      and `BrigadierTreeShapeTest`. End-to-end live tab-completion in a
+      running Fabric server is still gated on a fresh build of
+      `rtp-fabric-common` + the platform's `commands-api` jar.)*
 - [ ] **Step H — Stabilization & Dual-Runtime Smoke Test**:
     - [ ] Memory-leak audit — chunk tickets + `MemoryTracker` register/release on all Fabric exit paths.
     - [ ] Concurrency review — no Folia-isms in Fabric code paths.
@@ -108,7 +125,7 @@ The foundation for the `rtp-fabric` module.
 
   Decisions: one common module first; defer `rtp-fabric-v<MC>/` shim until a real version-specific need appears (Yarn-mapped Fabric rarely needs NMS-style version splits). No Bukkit imports under `rtp-fabric/**`. The `ModInitializer` entry point (`RTPFabricMod`) lives in `rtp-plugin` per ADR-022's single-JAR multi-loader packaging — not in `rtp-fabric-common` — so both `plugin.yml` and `fabric.mod.json` ship from one bootstrap module.
 
-- [x] **Single-JAR Multi-Loader Bootstrap in `rtp-plugin`** *(landed 2026-04-30; `RTPFabricMod implements ModInitializer`, `fabric.mod.json` declares the entrypoint, Loom 1.11-SNAPSHOT applied to `:rtp-fabric:rtp-fabric-common` and `:rtp-plugin`; `:rtp-plugin:shadowJar` green. Dual-runtime smoke test on a Paper + Fabric dev server is the next debug-phase task — runtime verification is intentionally separated from structural landing per the user's "structure first, debug after" directive)* (per [ADR-022](../adr/ADR-022-fabric-platform-in-scope.md)):
+- [x] **Single-JAR Multi-Loader Bootstrap in `rtp-plugin`** *(landed 2026-04-30; `RTPFabricMod implements ModInitializer`, `fabric.mod.json` declares the entrypoint, Loom 1.11-SNAPSHOT applied to `:rtp-fabric:rtp-fabric-common` and `:rtp-plugin`; `:rtp-plugin:shadowJar` green. Dual-runtime smoke test on a Paper + Fabric dev server is the next debug-phase task — runtime verification is intentionally separated from structural landing per the user's "structure first, debug after" directive)* (per [rtp-fabric-ADR-002](../../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md)):
 
       rtp-plugin/
       └── src/main/
@@ -138,11 +155,11 @@ The foundation for the `rtp-fabric` module.
 
   **Note — runtime / dual-loader end-to-end smoke testing is intentionally NOT a Phase 1 gate.** Until Phase 2 Steps A–G land, `RTPFabricMod.onInitialize()` is a placeholder and there is no Fabric functionality to validate end-to-end. "Loads on Fabric" would be trivially true (and trivially uninformative) at this stage. The dual-runtime end-to-end smoke test has been moved to **Phase 2 Step H** where the featureset is sufficient to make it meaningful. Bukkit-side regression risk from Loom is covered by the existing Bukkit-family test suites (`:rtp-plugin:test`, etc.) — these must remain green at all phases.
 
-### Phase 1 Amendment — Multiversion Submodule Layout *(2026-05-01, [ADR-027](../adr/ADR-027-fabric-multiversion-submodule-layout.md))*
+### Phase 1 Amendment — Multiversion Submodule Layout *(2026-05-01, [rtp-fabric-ADR-001](../../rtp-fabric/docs/adr/rtp-fabric-ADR-001-multiversion-submodule-layout.md))*
 
 The original Phase 1 deferred `rtp-fabric-v<MC>/` shims until a real version-specific need appeared (line 109 above). That need has now arrived ahead of any single trigger: cross-version mojmap drift between 1.20.x and 1.21.x (e.g. `ChunkStatus` package move at 1.21.3), and — more decisively — MC 26.1's deobfuscation, which mandates Loom 1.15+, Java 25, Gradle 9.4+, and a different build-script shape (no `mappings` line, plain `implementation`/`compileOnly` instead of `modImplementation`/`modCompileOnly`, plugin id `net.fabricmc.fabric-loom`). None of those can coexist with the 1.20/1.21 build script in a single common module.
 
-ADR-027 supersedes lines 109 ("defer `rtp-fabric-v<MC>/` shim") and 129 ("Do not include version submodules until they exist") with the following layout:
+rtp-fabric-ADR-001 supersedes lines 109 ("defer `rtp-fabric-v<MC>/` shim") and 129 ("Do not include version submodules until they exist") with the following layout:
 
 | Module | MC | Mappings | Loom | Java | Fabric API |
 |---|---|---|---|---|---|
@@ -153,7 +170,7 @@ ADR-027 supersedes lines 109 ("defer `rtp-fabric-v<MC>/` shim") and 129 ("Do not
 
 `rtp-fabric-common` switches MC + fabric-api to `compileOnly` / `modCompileOnly` so it ships no MC classes; v-submodules each supply their own runtime jar. Common defines a small `FabricVersionAdapter` SPI carrying only the version-volatile call sites (registry access, `ChunkStatus` location, chunk-loading entrypoint normalisation, biome key lookup at `BlockPos`, permissions API surface). `RTPFabricMod` (`rtp-plugin`) reads `SharedConstants.getCurrentVersion().getName()` at server-start and reflectively instantiates the matching v-submodule's adapter — direct symbol reference is forbidden so a Java 21 server never resolves v26_1_R1 (Java 25) bytecode.
 
-**Initial deliverable:** v1_21_R1 ships with the full adapter implementation (relocated from common); v1_20_R1 and v26_1_R1 ship with build-correct stubs throwing `UnsupportedOperationException` carrying the `// TODO(ADR-027)` marker. Real porting bodies for the latter two land as follow-up Phase 2.5 tasks driven by the smoke gates per MC line.
+**Initial deliverable:** v1_21_R1 ships with the full adapter implementation (relocated from common); v1_20_R1 and v26_1_R1 ship with build-correct stubs throwing `UnsupportedOperationException` carrying the `// TODO(rtp-fabric-ADR-001)` marker. Real porting bodies for the latter two land as follow-up Phase 2.5 tasks driven by the smoke gates per MC line.
 
 ## Phase 2: Fabric Feature Parity (acceptance-gated A → H)
 
@@ -323,6 +340,41 @@ initLoginReserveCacheFabric(accessor);
 
 Some of this naturally moves to `FabricEventBridge.SERVER_STARTED` instead of `onInitialize()` — specifically anything that needs a live `MinecraftServer` (e.g. login cache uses `MinecraftServer#getMaxPlayers()`). The split is the same as Bukkit's "what runs on plugin enable vs. what runs on first tick / SERVER_STARTED equivalent". Final placement is implementation detail.
 
+#### Status (landed 2026-05-05)
+
+- [x] **E3-1** — `RTP.scheduler = accessor.getScheduler()` is set before `new RTP()` in `RTPFabricMod.onInitialize()`. The `RTP` constructor's self-scheduled `SyncTaskProcessing` / `AsyncTaskProcessing` / DB-flush timers (`rtp-core/.../common/RTP.java` lines ~211–243) register into `FabricScheduler` and are pumped by `FabricEventBridge`'s `END_SERVER_TICK` callback.
+- [x] **E3-2** — `FabricDatabaseHandler.setupDatabase(rtp)` is invoked from `onInitialize` immediately after `RTP.getInstance()`. The rtp-core constructor's 60-tick SQL flush timer + 6000-tick cached-locations rebuild are sufficient on Fabric — no `FabricDatabaseProcessing` shim required.
+- [x] **E3-3** — `RTP.scheduler.runTaskTimer(new ChunkUnloadProcessor(), 1, 1)` scheduled in `RTPFabricMod.onInitialize()` after Brigadier registration (non-Folia branch always applies on Fabric).
+- [ ] **E3-4** — `JarUtils.extractDocs` not yet ported to a `FabricJarUtils` (cosmetic; not blocking `/rtp`).
+- [ ] **E3-5** — `initLoginReserveCache()` (ADR-023) not yet ported (only matters if `loginCacheEnabled=true`).
+- [x] **E3-6** — Three `startupTasks.execute(Long.MAX_VALUE)` drains added (sync, +1-tick deferred, sync post-banner) mirroring `RTPBukkitPlugin.onEnable` / `BootstrapSupport.drainStartupTasks`. Without this the region prefill never started, leaving `keptLocations`/`unkeptLocations` empty so `/rtp` could not produce a destination.
+- [ ] **E3-7** — Damage / move / respawn / teleport / changeworld listener parity in `FabricEventBridge` — tracked under E-tail; not blocking `/rtp` itself.
+- [x] `:rtp-plugin:compileJava` BUILD SUCCESSFUL after the E3-3 + E3-6 changes (2026-05-05).
+
+#### Runtime mitigation (landed 2026-05-05) — adaptive promotion cap + dropped periodic ticket sweep
+
+The first end-to-end Fabric `/rtp` smoke after E3-3/E3-6 produced a 60-second watchdog crash (60s tick on the server thread, ~6 seconds after `Done!`). Triage trail in chat history; root cause: `Region.execute()` previously dispatched up to `activeChunkCap` concurrent `getChunkAtAsync` calls on each tick when `currentHot=0` and `inFlight=0` — fine on Bukkit's async chunk loader but crash-inducing on Fabric where `FabricRTPWorld.getChunkAt` round-trips through `server.submit` + `cache.getChunk(..., FULL, true)` and effectively serialises on the tick thread. Compounding: `RegionQueueManager.validateTickets` was called unconditionally on the first `Region.execute()` after rebind (`lastValidationTime = 0`), dispatching another N concurrent `getChunkAtAsync` on every kept entry.
+
+Code change in `rtp-core/.../selection/region/Region.java`:
+- Removed the periodic `queueManager.validateTickets(getWorld())` sweep from `Region.execute()` and the `lastValidationTime` field. Tickets are freshly applied at the L2→L1 promotion site below; the `ChunkReservation` owns the ticket lifecycle, so a periodic re-validate duplicated work and was the boot-time chunk-load storm trigger. If a sanity sweep is needed in future for tickets stripped by external commands (`/forceload remove`), it should be a low-frequency async timer outside `Region.execute()`.
+- Added an EMA-based adaptive per-tick promotion cap: `chunkLoadEmaNanos` (volatile long, alpha = 1/8) tracks observed promotion duration, sampled at every terminal path (success, unsafe-drop, cache-full, load-failure). The deficit loop caps iterations at `max(1, 25_000_000ns / emaNs)`. Bootstrap: zero EMA → 1 promotion/tick on the first tick, relaxes upward as samples accumulate. Cheap pre-genned chunks → high cap → fast warm-up; expensive ungenerated chunks → low cap → sustainable warm-up.
+
+#### S-002 fix (landed 2026-05-05) — non-persistent chunk tickets
+
+Follow-up #1 from the prior session's submit ("S-002 audit of `FabricRTPWorld.getOrLoadChunk` ticket-release on `TimeoutException`") was rescoped after investigation: the actual hazard was not in `getOrLoadChunk` (which does not apply tickets) but in `FabricRTPWorld.setForceLoadedImpl`, which used vanilla `ServerLevel#setChunkForced(...)`. That call **persists to `level.dat#ForcedChunks`**, so a watchdog crash mid-pipeline (which the user hit on the 2026-05-05 smoke test, log line `13 force loaded chunks were found in minecraft:overworld at: [...]`) leaks RTP-owned forced chunks to disk and re-applies them on the next world load. Bukkit's `addPluginChunkTicket` is non-persistent and Folia inherits the Bukkit semantics, so this hazard is Fabric-specific.
+
+Code change:
+
+- `FabricVersionAdapter` SPI: added `applyTicket(ServerLevel, cx, cz)` and `releaseTicket(ServerLevel, cx, cz)` returning `CompletableFuture<Void>`. Default implementations return failed futures (`UnsupportedOperationException`) per S-006 (no silent no-ops).
+- `V1_21_R1FabricVersionAdapter` (the active target): implements both via `DistanceManager#addRegionTicket` / `#removeRegionTicket` with a process-wide `TicketType<ChunkPos>` registered as `TicketType.create("rtp", Comparator.comparingLong(ChunkPos::toLong), 0)` — non-persistent, no auto-expiry. Reflective access to the package-private `DistanceManager` methods (cached `Method` handles); switching to an access-widener is deferred to the Loom-stable phase.
+- `FabricRTPWorld.setForceLoadedImpl` rewritten to delegate to the active `FabricVersionAdapter` instead of calling `world.setChunkForced(...)`. Class- and method-level Javadocs updated to document why `setChunkForced` is forbidden on this path.
+
+See [`rtp-fabric/docs/adr/rtp-fabric-ADR-003-non-persistent-chunk-tickets.md`](../../rtp-fabric/docs/adr/rtp-fabric-ADR-003-non-persistent-chunk-tickets.md) for the full decision record. `V1_20_R1FabricVersionAdapter` and `V26_1_R1FabricVersionAdapter` inherit the SPI default and will throw on `keep(true)` until ported — tracked under E-tail. Pre-existing leaked entries in `level.dat#ForcedChunks` from earlier Fabric builds require a one-time admin `/forceload remove` cleanup (no automatic migration).
+
+#### Operational recommendation — pre-generate the world (Fabric)
+
+Even with the adaptive cap, on a *fresh* unexplored Fabric world the per-chunk generation cost can be 200–2000 ms. The cap absorbs that (at the cost of slower kept-cache warm-up: ~1–10 seconds typical, longer on extreme terrain). For production Fabric servers it is **strongly recommended** to pre-generate the relevant region radii using Chunky or an equivalent before enabling RTP, so `cache.getChunk` resolves from disk (~5 ms typical) rather than triggering generation. This is **not enforced** at runtime — RTP boots fine without pre-gen, and the cap ensures no watchdog crash — but unprepared servers will see slower first-`/rtp` responses for the first ~10–30 seconds of warm-up and slow per-`/rtp` chunk-tickets when the spiral lands outside any pre-genned area. (No equivalent recommendation is made for Spigot/Paper, where the platform's async chunk loader handles concurrent generation efficiently.)
+
 #### Acceptance
 
 - `RTP.scheduler` is non-null by the time `RTP.getInstance()` runs.
@@ -340,7 +392,7 @@ Add `me.lucko:fabric-permissions-api` as `modCompileOnly` (soft-depend). Impleme
 
 - **Acceptance gate:** permission node test parity with the Bukkit adapter.
 
-### Step G — Brigadier Bridge in `commands-api` (per [ADR-014](../adr/ADR-014-brigadier-bridge-via-commands-api.md))
+### Step G — Brigadier Bridge in `commands-api` (per [commands-api-ADR-001](../../commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md))
 
 Implement `BrigadierCommandAdapter` inside `commands-api` that converts the `commands-api` tree into Brigadier `LiteralArgumentBuilder` nodes. `RTPCmdFabric` registers the adapted tree via `CommandRegistrationCallback.EVENT` — **no platform-specific command logic duplication**. Implement advanced tab completion leveraging Brigadier's client-side capabilities. Ensure RTP messages and command feedback route correctly to Fabric players/console.
 
@@ -378,7 +430,7 @@ Deferred until Fabric is stable.
 
 ## What Does NOT Need to Change in `rtp-api` or `rtp-core`
 
-The April 2026 gap analysis (referenced in [ADR-022](../adr/ADR-022-fabric-platform-in-scope.md)) confirmed the existing abstractions are sufficient for full Fabric support:
+The April 2026 gap analysis (referenced in [rtp-fabric-ADR-002](../../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md)) confirmed the existing abstractions are sufficient for full Fabric support:
 
 - `RTPServerAccessor`, `RTPWorld`, `RTPPlayer`, `RTPScheduler` interfaces require no new methods.
 - `DatabaseHandler` in `rtp-core` is already platform-agnostic.
@@ -393,7 +445,7 @@ The only potential future `rtp-api` addition is an `RTPPermissionProvider` inter
 | Loom plugin pollutes other modules' classpaths | Apply Loom only under `rtp-fabric/**`; gate Maven repos by `project.path.startsWith(':rtp-fabric')`. |
 | Hidden S-005 violation re-introduced via an unrecognized Mojang `getChunk` call | Step A regression test plus a stretch-goal arch guard banning direct `ServerLevel#getChunk` from `rtp-fabric/**`. |
 | Fabric tick threading vs. Folia region threading subtle drift | `FabricScheduler` documented behaviour matches the `RTPScheduler` contract; no Folia-isms leak into core. |
-| Brigadier tree drift from the `commands-api` tree | Single adapter in `commands-api` (ADR-014); no per-platform branching. |
+| Brigadier tree drift from the `commands-api` tree | Single adapter in `commands-api` (commands-api-ADR-001); no per-platform branching. |
 | `MemoryTracker` leaks on disconnect mid-pipeline | `ServerPlayConnectionEvents.DISCONNECT` releases all tickets owned by the player, mirroring Bukkit `PlayerQuitEvent` cleanup. Step H audit. |
 | Scope creep into Forge | Explicitly out of scope until Phase 4. |
 
