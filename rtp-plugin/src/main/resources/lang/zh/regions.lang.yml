@@ -1,0 +1,16 @@
+# --- 语言映射: regions/*.yml ---
+# 将内部区域键名（左侧）映射为 `regions/` 下所有文件中用户可见的键名（右侧）。
+# 仅可修改右侧以重命名或翻译选项；左侧为代码常量，请勿更改。
+# 若此文件缺失，插件会自动重新生成左右一致的英文默认映射。
+
+world: 世界
+worldBorderOverride: 覆盖世界边界
+shape: 形状
+vert: 垂直
+requirePermission: 需要权限
+cacheCap: 缓存上限
+activeChunkCap: 活动区块上限
+price: 价格
+spatialResolution: 空间分辨率
+override: 覆盖
+version: version

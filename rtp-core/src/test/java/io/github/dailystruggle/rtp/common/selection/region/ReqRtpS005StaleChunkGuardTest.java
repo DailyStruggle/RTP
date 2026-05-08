@@ -96,6 +96,7 @@ public class ReqRtpS005StaleChunkGuardTest {
                 false,
                 false,
                 10L,
+                1000L,
                 5,
                 0.0,
                 1L,

@@ -255,7 +255,7 @@ public class ReqRtpWorldFallbackRebindTest {
                 name, world,
                 new Circle(), new LinearAdjustor(new ArrayList<>()),
                 false, false,
-                16L, 8,
+                16L, 1000L, 8,
                 0.0, 1L, "", false);
     }
 }

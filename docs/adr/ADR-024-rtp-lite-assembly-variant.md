@@ -1,7 +1,33 @@
 # ADR-024 — RTP-lite Assembly Variant
 
-**Status:** Accepted
+**Status:** Accepted (amended 2026-05-07 — Fabric in scope for lite)
 **Date:** 2026-04-30
+
+## 2026-05-07 amendment — Fabric in scope for lite
+
+The original decision below scoped lite as **Spigot+Paper only**, with Folia and
+Fabric routed to the full edition. As of 2026-05-07 that scope is widened:
+**Fabric is supported in lite**. Folia remains full-only.
+
+Concretely:
+
+- `RTPFabricMod` and `rtp-fabric-common` classes (`io/github/dailystruggle/rtp/fabric/**`)
+  ship in the lite jar.
+- `fabric.mod.json` ships in the lite jar so Fabric Loader discovers
+  `RTPFabricMod` as the entrypoint.
+- **JDBC drivers stay stripped from lite** (no H2, SQLite, MySQL, or PostgreSQL).
+  Fabric+lite operators land on `FabricDatabaseHandler.setupDatabase`'s flat-file
+  YAML fallback (a loud warning is logged) — consistent with lite's "no SQL"
+  stance below.
+- The `liteJarStructureCheck` audit no longer forbids `io/github/dailystruggle/rtp/fabric/**`
+  or `fabric.mod.json`.
+- Folia (`io/github/dailystruggle/rtp/folia/**`) remains forbidden in lite —
+  Folia operators continue to use the full edition.
+
+The rest of the original ADR (drops, alternatives, consequences) still applies
+to the lite edition; only the "Spigot+Paper only" framing is superseded.
+
+---
 
 ## Context
 

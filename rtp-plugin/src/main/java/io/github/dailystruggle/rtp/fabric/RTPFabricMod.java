@@ -101,6 +101,236 @@ public final class RTPFabricMod implements ModInitializer {
             new FabricEventBridge(accessor).register();
 
             // ----------------------------------------------------------------
+            // effects-api-ADR-003 — wire the Fabric effects layer.
+            // FabricEffectsHandler.setupEffects:
+            //   1. Binds the MinecraftServer into FabricEffectRuntime so
+            //      runtime.schedule() has a server to execute() onto.
+            //   2. Calls FabricEffectsInitializer.registerAll() — binds the
+            //      FabricValueCoercer (ADR-004) and registers SOUND/PARTICLE/
+            //      TITLE/POTION effect prototypes (Phase-1 scope per ADR-003).
+            //   3. Attaches the rtp.effect.* lifecycle hooks (presetup,
+            //      postsetup, preload, postload, preteleport, postteleport,
+            //      cancel, queuepush, queuepop) onto TeleportPipelineTask /
+            //      RTPTeleportCancel / Region — mirroring BukkitEffectsHandler.
+            //
+            // Deferred to SERVER_STARTED because BuiltInRegistries (used by
+            // FabricValueCoercer + the four concrete effects' default values)
+            // is only fully populated after server start; calling registerAll()
+            // earlier risks resolving sounds/particles/potions to null at
+            // construction time on some 1.21+ MC versions.
+            //
+            // Also: also bind the runtime when the integrated server stops
+            // (ServerLifecycleEvents.SERVER_STOPPED) so a subsequent restart
+            // in the same JVM (singleplayer world reload) doesn't keep a
+            // dangling reference to a torn-down server.
+            // ----------------------------------------------------------------
+            net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
+                    .SERVER_STARTED.register(server -> {
+                        try {
+                            io.github.dailystruggle.rtp.fabric.effects.FabricEffectsHandler
+                                    .setupEffects(server);
+                        } catch (Throwable t) {
+                            RTP.log(Level.WARNING,
+                                    "[RTP] Fabric effects wiring failed: "
+                                            + t.getClass().getSimpleName() + ": " + t.getMessage());
+                        }
+                    });
+            net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
+                    .SERVER_STOPPED.register(server ->
+                            io.github.dailystruggle.effectsapi.fabric.FabricEffectRuntime.unbindServer());
+
+            // ----------------------------------------------------------------
+            // Post-teleport title / subtitle / actionbar — `messages.yml`
+            // parity with BukkitEffectsHandler. Without this hook the
+            // `title`, `subtitle`, `fadeIn`, `stay`, `fadeOut`, and
+            // `actionbar` keys are silent no-ops on Fabric, so admins who
+            // configure a "successfully teleported" splash on Bukkit see
+            // nothing on Fabric.
+            //
+            // Resolution model:
+            //   - Resolve config values up-front (cheap, thread-safe).
+            //   - Hop to RTP.scheduler.runTask before sending packets so
+            //     the player connection is touched on the server tick
+            //     thread (mirrors Bukkit's runTask hop, which is itself
+            //     a Folia AsyncCatcher requirement).
+            //   - sendTitle / sendActionbar handle empty values internally
+            //     so a partially-configured messages.yml (e.g. only
+            //     subtitle set) still works.
+            // ----------------------------------------------------------------
+            io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask
+                    .teleportPostActions.add(task -> {
+                try {
+                    if (task == null || task.player() == null) return;
+                    if (!(task.player() instanceof io.github.dailystruggle.rtp.fabric.player.FabricRTPPlayer fp)) {
+                        return;
+                    }
+
+                    @SuppressWarnings("unchecked")
+                    io.github.dailystruggle.rtp.common.configuration.ConfigParser<
+                            io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys> lang =
+                            (io.github.dailystruggle.rtp.common.configuration.ConfigParser<
+                                    io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys>)
+                                    RTP.configs.getParser(
+                                            io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys.class);
+                    if (lang == null) return;
+
+                    final String title = lang.getConfigValue(
+                            io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys.title, "").toString();
+                    final String subtitle = lang.getConfigValue(
+                            io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys.subtitle, "").toString();
+                    final int fadeIn = lang.getNumber(
+                            io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys.fadeIn, 0).intValue();
+                    final int stay = lang.getNumber(
+                            io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys.stay, 0).intValue();
+                    final int fadeOut = lang.getNumber(
+                            io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys.fadeOut, 0).intValue();
+                    final String actionbar = lang.getConfigValue(
+                            io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys.actionbar, "").toString();
+
+                    if ((title == null || title.isEmpty())
+                            && (subtitle == null || subtitle.isEmpty())
+                            && (actionbar == null || actionbar.isEmpty())) {
+                        return;
+                    }
+
+                    RTP.scheduler.runTask(() -> {
+                        fp.sendTitle(title, subtitle, fadeIn, stay, fadeOut);
+                        fp.sendActionbar(actionbar);
+                    });
+                } catch (Throwable t) {
+                    RTP.log(Level.WARNING,
+                            "[RTP] Fabric post-teleport title dispatch failed: "
+                                    + t.getClass().getSimpleName() + ": " + t.getMessage());
+                }
+            });
+
+            // ----------------------------------------------------------------
+            // Post-teleport command dispatch — config.yml `consoleCommands` /
+            // `playerCommands` parity with BukkitEffectsHandler. Without this
+            // hook the two config lists are silent no-ops on Fabric, leaving
+            // operators no way to run e.g. `give [player] map` or `effect give
+            // [player] resistance` after a successful /rtp on a Fabric server.
+            //
+            // Both lists tolerate a leading slash, substitute the literal
+            // `[player]` token with the teleported player's name, and skip
+            // blank entries. Console commands run as the server console
+            // (op-level CommandSourceStack); player commands run as the
+            // player (player.createCommandSourceStack via FabricRTPPlayer).
+            // Dispatch is deferred to the main thread via RTP.scheduler.runTask
+            // because Brigadier dispatch on Fabric must run on the server tick
+            // thread (CommandSourceStack#performPrefixedCommand mutates server
+            // state and is not thread-safe). Mirrors the Folia-aware Bukkit
+            // path which routes commands to the global region scheduler for
+            // the same reason.
+            // ----------------------------------------------------------------
+            io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask
+                    .teleportPostActions.add(task -> {
+                try {
+                    if (task == null || task.player() == null) return;
+                    io.github.dailystruggle.rtp.api.entity.RTPPlayer rtpPlayer = task.player();
+                    String playerName = rtpPlayer.name();
+                    if (playerName == null || playerName.isBlank()) return;
+
+                    @SuppressWarnings("unchecked")
+                    io.github.dailystruggle.rtp.common.configuration.ConfigParser<
+                            io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys> configParser =
+                            (io.github.dailystruggle.rtp.common.configuration.ConfigParser<
+                                    io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys>)
+                                    RTP.configs.getParser(
+                                            io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.class);
+                    if (configParser == null) return;
+
+                    java.util.List<String> consoleCommandsToRun = new java.util.ArrayList<>();
+                    Object consoleObj = configParser.getConfigValue(
+                            io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.consoleCommands,
+                            new java.util.ArrayList<>());
+                    if (consoleObj instanceof java.util.List<?> consoleList) {
+                        for (Object cmd : consoleList) {
+                            if (cmd == null) continue;
+                            String c = cmd.toString().replace("[player]", playerName);
+                            if (c.isBlank()) continue;
+                            // performPrefixedCommand tolerates a leading slash
+                            // but normalize anyway for log-clarity parity with Bukkit.
+                            if (c.startsWith("/")) c = c.substring(1);
+                            consoleCommandsToRun.add(c);
+                        }
+                    }
+
+                    java.util.List<String> playerCommandsToRun = new java.util.ArrayList<>();
+                    Object playerObj = configParser.getConfigValue(
+                            io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.playerCommands,
+                            new java.util.ArrayList<>());
+                    if (playerObj instanceof java.util.List<?> playerList) {
+                        for (Object cmd : playerList) {
+                            if (cmd == null) continue;
+                            String c = cmd.toString().replace("[player]", playerName);
+                            if (c.isBlank()) continue;
+                            if (c.startsWith("/")) c = c.substring(1);
+                            playerCommandsToRun.add(c);
+                        }
+                    }
+
+                    if (consoleCommandsToRun.isEmpty() && playerCommandsToRun.isEmpty()) return;
+
+                    final java.util.List<String> consoleFinal = consoleCommandsToRun;
+                    final java.util.List<String> playerFinal = playerCommandsToRun;
+                    final io.github.dailystruggle.rtp.api.entity.RTPPlayer playerRef = rtpPlayer;
+                    RTP.scheduler.runTask(() -> {
+                        if (!consoleFinal.isEmpty()) {
+                            io.github.dailystruggle.rtp.api.entity.RTPCommandSender console =
+                                    RTP.serverAccessor.getSender(
+                                            io.github.dailystruggle.rtp.api.RTPAPI.serverId);
+                            if (console != null) {
+                                for (String c : consoleFinal) {
+                                    try {
+                                        console.performCommand(playerRef, c);
+                                    } catch (Throwable t) {
+                                        RTP.log(Level.WARNING,
+                                                "[RTP] consoleCommand dispatch failed ('" + c + "'): "
+                                                        + t.getClass().getSimpleName() + ": " + t.getMessage());
+                                    }
+                                }
+                            }
+                        }
+                        for (String c : playerFinal) {
+                            try {
+                                playerRef.performCommand(playerRef, c);
+                            } catch (Throwable t) {
+                                RTP.log(Level.WARNING,
+                                        "[RTP] playerCommand dispatch failed ('" + c + "'): "
+                                                + t.getClass().getSimpleName() + ": " + t.getMessage());
+                            }
+                        }
+                    });
+                } catch (Throwable t) {
+                    RTP.log(Level.WARNING,
+                            "[RTP] Fabric post-teleport command dispatch failed: "
+                                    + t.getClass().getSimpleName() + ": " + t.getMessage());
+                }
+            });
+
+            // ----------------------------------------------------------------
+            // Brigadier custom-ArgumentType registration: NOT performed.
+            //
+            // commands-api-ADR-001 addendum 2026-05-06e: the bridge no longer
+            // declares any custom Brigadier ArgumentType. The previous
+            // WhitespaceTerminatedArgumentType (registered here under namespace
+            // `rtp:wsword`) made the server's command tree contain a non-vanilla
+            // type, which caused vanilla clients to be kicked on join with
+            // "This server requires Fabric Loader and Fabric API installed on
+            // your client!". The bridge now uses only vanilla
+            // StringArgumentType.greedyString() and tokenises the captured
+            // string server-side, so vanilla clients can join Fabric servers
+            // running RTP without any client-side mod.
+            //
+            // Do NOT re-introduce ArgumentTypeRegistry.registerArgumentType
+            // here without first checking that the registered class is one
+            // vanilla clients already know — anything under the `rtp:` (or any
+            // non-`brigadier:` / non-`minecraft:`) namespace will re-trigger
+            // the kick.
+            // ----------------------------------------------------------------
+
+            // ----------------------------------------------------------------
             // Step G G1 — Brigadier registration of the bare /rtp root.
             // Permissions deferred to Step F (always-true predicate here so
             // any player can invoke /rtp during initial smoke testing).
@@ -113,9 +343,20 @@ public final class RTPFabricMod implements ModInitializer {
             BrigadierBridgeContext<CommandSourceStack> bridgeCtx =
                     new BrigadierBridgeContext<>(
                             RTPFabricMod::resolveSenderUuid,
-                            // G1: permission gating disabled for initial smoke test.
-                            // Step F replaces with fabric-permissions-api lookup.
-                            (src, perm) -> true,
+                            // Permission gating: defer to RTP.serverAccessor.getSender(uuid)
+                            // .hasPermission(perm), which on Fabric routes through
+                            // FabricRTPPlayer.hasPermission — that consults
+                            // fabric-permissions-api first (LuckPerms-Fabric, etc.) and
+                            // falls back to the vanilla op-level check by reading
+                            // ops.json via stable APIs (see FabricRTPPlayer Javadoc).
+                            // Plugin.yml is the source of truth for which nodes default
+                            // to op vs. true vs. false (rtp.use=true, rtp.reload=op,
+                            // rtp.scan=op, rtp.config=op, rtp.other=op, rtp.world=op,
+                            // rtp.region=op, rtp.biome=op, rtp.params=op, ...).
+                            // Non-player sources (console / command blocks / serverId
+                            // sentinel) are treated as fully privileged — same as Bukkit
+                            // ConsoleCommandSender.hasPermission() returning true.
+                            RTPFabricMod::checkBrigadierPermission,
                             (src, msg) -> {
                                 if (msg == null) return;
                                 // Route through FabricLegacyText so &-codes / #RRGGBB
@@ -245,6 +486,69 @@ public final class RTPFabricMod implements ModInitializer {
             return player.getUUID();
         }
         return RTPAPI.serverId;
+    }
+
+    /**
+     * Permission predicate for the Brigadier bridge. Mirrors the Bukkit-side
+     * {@code CommandSender.hasPermission(node)} contract:
+     *
+     * <ul>
+     *   <li>Non-player sources (console, command blocks, the {@code serverId}
+     *       sentinel) bypass permission checks — Bukkit's
+     *       {@code ConsoleCommandSender.hasPermission()} is unconditionally
+     *       {@code true}, and plugin.yml's defaults are written assuming that.
+     *   </li>
+     *   <li>Player sources route through
+     *       {@code RTP.serverAccessor.getSender(uuid).hasPermission(perm)},
+     *       which on Fabric is implemented by
+     *       {@link io.github.dailystruggle.rtp.fabric.player.FabricRTPPlayer#hasPermission(String)}.
+     *       That implementation consults {@code fabric-permissions-api}
+     *       (LuckPerms-Fabric / Cyan / Ledger) first and falls back to the
+     *       vanilla op-level check (reading {@code ops.json} via stable
+     *       APIs) when no permissions implementer is registered.
+     *   </li>
+     *   <li>A {@code null} or empty {@code permission} string is treated as
+     *       "no permission required" ({@code true}), matching Bukkit's
+     *       documented behaviour for {@code commands-api} parameters that
+     *       elect not to declare a node.</li>
+     * </ul>
+     *
+     * <p>The actual default for each node (op vs. true vs. false) is owned
+     * by {@code rtp-plugin/src/main/resources/plugin.yml}; the Fabric side
+     * inherits those defaults via the op-level fallback in
+     * {@code FabricRTPPlayer.hasPermission}, so e.g. {@code rtp.reload},
+     * {@code rtp.scan}, {@code rtp.config}, {@code rtp.other}, and the
+     * {@code rtp.world*} / {@code rtp.region*} / {@code rtp.biome*} /
+     * {@code rtp.params} families default to op-only on both platforms
+     * without duplicating the table here.
+     */
+    private static boolean checkBrigadierPermission(CommandSourceStack src, String permission) {
+        if (permission == null || permission.isEmpty()) return true;
+        UUID uuid = resolveSenderUuid(src);
+        // Non-player sources collapse to RTPAPI.serverId — treat as console
+        // (full access). This also covers the early-init window where the
+        // accessor may not yet have a sender entry for the sentinel.
+        if (RTPAPI.serverId.equals(uuid)) return true;
+        try {
+            io.github.dailystruggle.rtp.api.entity.RTPCommandSender sender =
+                    RTP.serverAccessor.getSender(uuid);
+            if (sender == null) {
+                // Player source whose sender entry has not yet been bound
+                // (e.g., command issued before FabricEventBridge.onJoin
+                // wired the player). Deny rather than silently allow —
+                // matches the strict reading of plugin.yml op-only defaults.
+                return false;
+            }
+            return sender.hasPermission(permission);
+        } catch (Throwable t) {
+            // Defensive: never let a permission lookup crash command parsing.
+            // Failing closed (deny) is the safer choice for op-only nodes.
+            RTP.log(Level.WARNING,
+                    "[RTP] Brigadier permission check failed for '" + permission
+                            + "' (uuid=" + uuid + "): "
+                            + t.getClass().getSimpleName() + ": " + t.getMessage());
+            return false;
+        }
     }
 
     /**

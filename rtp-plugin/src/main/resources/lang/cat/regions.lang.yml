@@ -1,0 +1,14 @@
+# --- Language Mapping: regions/*.yml (cat dialect) ---
+# A cat's territory map. Edit only the right side.
+
+world: box
+worldBorderOverride: fence_override
+shape: pounce_shape
+vert: vertical_pounce
+requirePermission: requires_pets
+cacheCap: kibble_jar_lid
+activeChunkCap: active_kibble_jar_lid
+price: treat_cost
+spatialResolution: whisker_resolution
+override: paw_over
+version: meowsion

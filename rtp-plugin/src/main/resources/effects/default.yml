@@ -1,0 +1,138 @@
+# --- effects/default.yml — unconditional fallback group ---
+#
+# One file per effect group. Filename (minus .yml) is the group name.
+# See effects-api-ADR-005 for the full schema.
+#
+# Schema (fixed inner keys):
+#   when:        pipeline stage that fires this group (REQUIRED)
+#                vocabulary: firstjoin | join | presetup | postsetup
+#                          | preload | postload | preteleport | postteleport
+#                          | cancel | queuepush | queuepop
+#   permission:  permission node that gates membership (optional; Bukkit-style)
+#   players:     explicit UUID/name allowlist (optional; permission-less
+#                escape hatch — primary path on Fabric servers without
+#                fabric-permissions-api)
+#   inherit:     other group names whose effects are prepended (optional;
+#                defaults to the stage's `default` group when omitted; pass
+#                `inherit: []` to opt out)
+#   effects:     ordered list of <effect-name>.<arg1>.<arg2>... tokens
+#                (REQUIRED; same grammar as the suffix of an
+#                rtp.effect.<stage>.* permission node)
+#
+# The `default` group is HARDCODED — even if this file is deleted, the
+# loader synthesises an empty `default` (when: postteleport, no effects)
+# so resolution never fails. Edit this file to customise the fallback.
+#
+# ---------------------------------------------------------------------
+# COPYABLE EFFECT CATALOG (commented out by default)
+#
+# Uncomment any line under `effects:` below to exercise that effect at
+# runtime. The catalog covers every bundled effect type and the full
+# positional argument list documented in
+# `effects-api/src/main/java/io/github/dailystruggle/effectsapi/bukkit/LocalEffects/Readme.md`.
+#
+# Token grammar (dot-separated, consumed left-to-right by
+# `EffectFactory.buildEffects` / `Effect.setData(String...)`):
+#
+#   SOUND   .TYPE.VOLUME.PITCH.DX.DY.DZ
+#   PARTICLE.TYPE.NUMBER                       (server >= 1.9)
+#   POTION  .TYPE.DURATION.AMPLIFIER.AMBIENT.PARTICLES.ICON
+#   NOTE    .TYPE.TONE                         (>=1.17 uses Instrument enum)
+#   FIREWORK.TYPE.NUMBER.POWER.DX.DY.DZ.COLOR.FADE.FLICKER.TRAIL.SAFE
+#   GLIDE   .TYPE                              (rtp-Glide addon)
+#
+# Trailing args are optional — omitted positions fall back to the
+# effect's seeded defaults. Type tokens are matched case-insensitively
+# against the platform registry (Bukkit `Sound`/`Particle`/...; Fabric
+# `ResourceLocation` namespaced as `minecraft:<lower>` when un-prefixed).
+# ---------------------------------------------------------------------
+
+when: postteleport
+effects:
+  # --- Active fallback set (kept minimal so unmodified servers stay quiet) ---
+  - SOUND.ENTITY_ENDERMAN_TELEPORT.1.0.1.0
+  - PARTICLE.PORTAL.32
+  - POTION.SLOW_FALLING.60.1
+  - POTION.BLINDNESS.40.1
+
+  # --- SOUND catalog (TYPE.VOLUME.PITCH.DX.DY.DZ) ---
+  #- SOUND.ENTITY_PLAYER_LEVELUP.1.0.1.0
+  #- SOUND.ENTITY_EXPERIENCE_ORB_PICKUP.0.6.1.2
+  #- SOUND.BLOCK_PORTAL_TRAVEL.0.4.0.8
+  #- SOUND.BLOCK_NOTE_BLOCK_PLING.1.0.2.0
+  #- SOUND.UI_TOAST_CHALLENGE_COMPLETE.1.0.1.0
+  #- SOUND.ENTITY_FIREWORK_ROCKET_BLAST.1.0.1.0
+  #- SOUND.ENTITY_LIGHTNING_BOLT_THUNDER.0.5.1.0
+  #- SOUND.AMBIENT_CAVE.1.0.1.0
+  # Offset variants (DX/DY/DZ) — emit relative to player by 5 blocks east:
+  #- SOUND.ENTITY_ENDERMAN_TELEPORT.1.0.1.0.5.0.0
+
+  # --- PARTICLE catalog (TYPE.NUMBER) — server >= 1.9 only ---
+  #- PARTICLE.FLAME.40
+  #- PARTICLE.HEART.8
+  #- PARTICLE.CLOUD.32
+  #- PARTICLE.END_ROD.24
+  #- PARTICLE.DRAGON_BREATH.24
+  #- PARTICLE.SOUL_FIRE_FLAME.32
+  #- PARTICLE.TOTEM_OF_UNDYING.40
+  #- PARTICLE.ENCHANTED_HIT.16
+  #- PARTICLE.HAPPY_VILLAGER.16
+  #- PARTICLE.WAX_ON.12
+  #- PARTICLE.SCULK_SOUL.16
+
+  # --- POTION catalog (TYPE.DURATION.AMPLIFIER.AMBIENT.PARTICLES.ICON) ---
+  # DURATION is in ticks (20 = 1 s). AMPLIFIER is 0-based (1 == "II").
+  # AMBIENT/PARTICLES/ICON take true|false.
+  #- POTION.SPEED.200.1.false.true.true
+  #- POTION.JUMP_BOOST.200.2.false.true.true
+  #- POTION.REGENERATION.100.0.false.true.true
+  #- POTION.RESISTANCE.100.2.false.true.true
+  #- POTION.FIRE_RESISTANCE.200.0.false.true.true
+  #- POTION.NIGHT_VISION.400.0.false.false.true
+  #- POTION.INVISIBILITY.200.0.true.false.true
+  #- POTION.SLOW_FALLING.120.0.false.true.true
+  #- POTION.LEVITATION.40.0.false.true.true
+  #- POTION.GLOWING.100.0.false.false.true
+  #- POTION.ABSORPTION.200.1.false.true.true
+  # Ambient + hidden-particle variant:
+  #- POTION.SPEED.600.0.true.false.false
+
+  # --- NOTE catalog (TYPE.TONE) ---
+  # TYPE: PIANO, BASS_DRUM, SNARE_DRUM, STICKS, BASS_GUITAR, FLUTE, BELL,
+  #       GUITAR, CHIME, XYLOPHONE, IRON_XYLOPHONE, COW_BELL, DIDGERIDOO,
+  #       BIT, BANJO, PLING (1.17+ Instrument enum)
+  # TONE: 0..24 (chromatic, 2 octaves)
+  #- NOTE.PIANO.12
+  #- NOTE.BELL.18
+  #- NOTE.CHIME.20
+  #- NOTE.XYLOPHONE.16
+  #- NOTE.PLING.10
+  #- NOTE.HARP.7
+
+  # --- FIREWORK catalog
+  #     (TYPE.NUMBER.POWER.DX.DY.DZ.COLOR.FADE.FLICKER.TRAIL.SAFE) ---
+  # TYPE:    BALL, BALL_LARGE, STAR, BURST, CREEPER
+  # NUMBER:  detonation count (>1 spawns extra explosions from the meta)
+  # POWER:   flight power (rough seconds in air)
+  # DX/DY/DZ:spawn offset from target
+  # COLOR:   primary color name (Bukkit Color enum: RED, AQUA, ...)
+  # FADE:    fade color (same vocabulary as COLOR)
+  # FLICKER: true|false  TRAIL: true|false
+  # SAFE:    true => FireworkSafetyListener absorbs damage to nearby entities
+  #          (requires EffectsAPI.init(plugin))
+  #- FIREWORK.BALL.1.1.0.0.0.RED.YELLOW.true.true.true
+  #- FIREWORK.BALL_LARGE.1.2.0.1.0.AQUA.WHITE.false.true.true
+  #- FIREWORK.STAR.1.1.0.0.0.LIME.PURPLE.true.false.true
+  #- FIREWORK.BURST.2.1.0.0.0.ORANGE.YELLOW.true.true.true
+  #- FIREWORK.CREEPER.1.1.0.0.0.GREEN.BLACK.false.false.true
+
+  # --- GLIDE (built-in via effects-api; registered on Bukkit servers >= 1.9) ---
+  # Folded from the legacy `addons/RTP_Glide` plugin into `effects-api`
+  # by effects-api-ADR-001; the standalone addon is deprecated and
+  # scheduled for removal. No addon install is required to use GLIDE.
+  # TYPE: ELYTRA  (single-arg toggle that gives the player a one-shot
+  #                temporary elytra glide on teleport arrival)
+  #- GLIDE.ELYTRA
+
+# DO NOT TOUCH VERSION NUMBER
+version: "1.0"

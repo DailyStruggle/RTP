@@ -94,6 +94,9 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
     // for the lite-style install base; full uses 30865.
     RTP.log(Level.FINE, "[LIFECYCLE-LITE] onEnable initializing bStats id=12277");
     metrics = new Metrics(this, 12277);
+    // Same cost-metrics chart catalogue as the full assembly, with the
+    // assembly_variant pie reporting "lite" so dashboards can split.
+    io.github.dailystruggle.rtp.bukkit.metrics.RTPCostMetricsCharts.register(metrics, "lite");
 
     if (RTP.getInstance() == null) {
       RTP.serverAccessor.start(this);

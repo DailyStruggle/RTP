@@ -34,6 +34,41 @@ public class RegionQueueManager {
     public final LockFreeLocationBuffer unkeptLocations;
 
     /**
+     * L3 backlog cache (ADR-028). Order-preserving FIFO of unverified candidate
+     * locations produced by shape-only picks (no chunk I/O — S-005 safe). Each
+     * entry carries a tri-state validity flag
+     * ({@code UNVERIFIED}/{@code VALIDATED}/{@code INVALIDATED}); per
+     * {@link Region#execute(long)} pulse, exactly one Anvil-region-file bin is
+     * verified via the bound {@link io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry}
+     * provider, and the contiguous-{@code VALIDATED} head is drained into
+     * {@link #unkeptLocations}.
+     *
+     * <p>Allocated only when {@code backlogCacheCap > 0}; {@code null} otherwise
+     * (lite default per ADR-028 / lite YAML overlay). Storage of truth lives
+     * here; the world-level {@link WorldBacklogBinIndex} only holds weak
+     * references for cross-RTP-region Anvil amortization.
+     */
+    @org.jetbrains.annotations.Nullable
+    public final BacklogLocationBuffer backlogLocations;
+
+    /**
+     * World-keyed registry of {@link WorldBacklogBinIndex} instances shared
+     * across every {@link Region} that targets the same world. Lazily allocated
+     * on first access by {@link #binIndexFor(String)}.
+     */
+    private static final java.util.concurrent.ConcurrentHashMap<String, WorldBacklogBinIndex>
+            WORLD_BIN_INDEX_BY_WORLD_NAME = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * @param worldName canonical world name; never {@code null}
+     * @return the world-scoped backlog bin index, creating it on first call
+     */
+    public static WorldBacklogBinIndex binIndexFor(String worldName) {
+        return WORLD_BIN_INDEX_BY_WORLD_NAME.computeIfAbsent(
+                worldName, k -> new WorldBacklogBinIndex());
+    }
+
+    /**
      * Login Reserve Queue (ADR-023): a reserved kept-cache of safe locations
      * promoted from {@link #unkeptLocations} solely for join-time teleports
      * routed through {@code rtp.onevent.firstjoin}/{@code rtp.onevent.join}.
@@ -67,9 +102,14 @@ public class RegionQueueManager {
         if(settings!=null) {
             this.unkeptLocations = new LockFreeLocationBuffer((int) settings.cacheCap());
             this.keptLocations = new LockFreeLocationBuffer(settings.activeChunkCap());
+            long backlogCap = settings.backlogCacheCap();
+            this.backlogLocations = (backlogCap > 0)
+                    ? new BacklogLocationBuffer((int) Math.min(backlogCap, Integer.MAX_VALUE))
+                    : null;
         } else {
             this.unkeptLocations = new LockFreeLocationBuffer(1024);
             this.keptLocations = new LockFreeLocationBuffer(1024);
+            this.backlogLocations = null;
         }
 
         installDatabaseCallbacks();
@@ -267,6 +307,11 @@ public class RegionQueueManager {
         unkeptLocations.setCallbacks(null, null);
         keptLocations.clear();
         unkeptLocations.clear();
+        // ADR-028 Phase 4.1: drop L3 backlog on shutdown. Entries are unverified candidate
+        // locations with no chunk tickets and no DB rows, so a clear() is sufficient.
+        // The world-level WorldBacklogBinIndex holds only weak references to per-bin lists
+        // and becomes GC-eligible automatically once the BacklogEntry strong-pins are gone.
+        if (backlogLocations != null) backlogLocations.clear();
         perPlayerLocationQueue.forEach((uuid, queue) -> {
             RTPLocation loc;
             while ((loc = queue.poll()) != null) {

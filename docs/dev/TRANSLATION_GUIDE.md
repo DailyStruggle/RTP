@@ -2,18 +2,15 @@
 
 Operational rules for adding or updating a locale under `rtp-plugin/src/main/resources/lang/<locale>/`. Keep this guide short — it is enforced by `LocaleResourceParityTest` (`rtp-plugin/src/test/.../configuration/LocaleResourceParityTest.java`); read that test if you need to know exactly what CI rejects.
 
-> Locales currently shipped: `de`, `es`, `fr`, `nl`. The canonical baseline is the un-suffixed English files at `rtp-plugin/src/main/resources/*.yml`.
+> Locales currently shipped: `de`, `es`, `fr`, `ja`, `ko`, `nl`, `zh`. The canonical baseline is the un-suffixed English files at `rtp-plugin/src/main/resources/*.yml`.
 
 **Planned locales (contributions welcome):**
 
 | Code | Language | Notes |
 |------|----------|-------|
-| `zh` | Chinese (Simplified) | Largest Minecraft player base outside the West |
 | `pt` | Portuguese (Brazilian) | 4th most spoken language globally; large Brazilian server community |
 | `ru` | Russian | Large Eastern European server community |
-| `ja` | Japanese | Active Minecraft community; tests multi-byte character encoding |
 | `pl` | Polish | Very active Minecraft modding/server community in Europe |
-| `ko` | Korean | Growing Minecraft community; tests multi-byte character encoding |
 | `it` | Italian | Completes the major Romance languages alongside `es` and `fr` |
 
 ---

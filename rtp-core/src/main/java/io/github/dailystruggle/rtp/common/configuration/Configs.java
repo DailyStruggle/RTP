@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
+import io.github.dailystruggle.effectsapi.common.EffectsGroupKeys;
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -263,6 +264,16 @@ public class Configs {
     MultiConfigParser<WorldKeys> worlds =
             new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", pluginDirectory);
     newMultiConfigParserMap.put(WorldKeys.class, worlds);
+
+    // effects-api-ADR-005: declarative effect groups under <pluginDir>/effects/<group>.yml.
+    // Each per-group file uses the EffectsGroupKeys schema (when / permission / players /
+    // inherit / effects). Outer keys (group names) are admin-chosen, hence MultiConfigParser
+    // (one ConfigParser per file). EffectsResolver in rtp-plugin reads this on every
+    // teleport so /rtp reload is honored automatically by the parser-map atomic swap above.
+    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building MultiConfigParser effects/*.yml");
+    MultiConfigParser<EffectsGroupKeys> effectsGroups =
+            new MultiConfigParser<>(EffectsGroupKeys.class, "effects", "1.0", pluginDirectory);
+    newMultiConfigParserMap.put(EffectsGroupKeys.class, effectsGroups);
 
     int worldCount = 0;
     for (RTPWorld world : RTP.serverAccessor.getRTPWorlds()) {

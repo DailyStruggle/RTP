@@ -1,0 +1,13 @@
+# --- Mapeo de idioma: effects.yml ---
+# Asigna los nombres internos de las claves de configuración (izquierda)
+# a los nombres visibles para el operador en effects.yml (derecha).
+# Edita solo la columna derecha para renombrar o traducir las opciones;
+# la izquierda es una constante de código, no la modifiques.
+# Si este archivo no existe, el plugin lo regenerará automáticamente con una
+# versión en inglés con valores idénticos a ambos lados.
+when: cuando
+permission: permiso
+players: jugadores
+inherit: hereda
+effects: efectos
+version: version

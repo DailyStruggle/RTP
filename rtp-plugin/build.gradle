@@ -120,24 +120,13 @@ dependencies {
     implementation 'org.bstats:bstats-bukkit:3.0.3'
     implementation 'xyz.tozymc.spigot:title-api:1.0'
 
-    // H2 JDBC driver is BUNDLED in the Pro jar (and excluded from the lite jar
-    // by the explicit `com.h2database:.*` filter on shadowLiteJar). It is the
-    // documented Fabric default when SQLite is unavailable, and is referenced
-    // by H2DatabaseAccessor's static initializer via Class.forName("org.h2.Driver"),
-    // which Shadow's `relocate 'org.h2', 'io.github.dailystruggle.rtp.h2'` rule
-    // (below) rewrites to the relocated FQN at build time. Without this
-    // implementation declaration, the relocate rule has nothing to relocate
-    // and the Fabric runtime crashes with
-    // ClassNotFoundException: io.github.dailystruggle.rtp.h2.Driver
-    // on H2DatabaseAccessor.<clinit>. See FabricDatabaseHandler.setupDatabase.
-    implementation 'com.h2database:h2:2.2.224'
-
-    // SQLite JDBC driver intentionally NOT bundled. Spigot/Paper/Folia ship it
-    // as a server-side runtime dependency, and Fabric users who explicitly opt
-    // into `database.type: sqlite` must drop `sqlite-jdbc.jar` into their server
-    // classpath themselves (FabricDatabaseHandler falls back to H2 with a loud
-    // warning otherwise). Bundling it added ~7 MB of native OS/arch binaries to
-    // every release jar. See FabricDatabaseHandler.setupDatabase.
+    // JDBC drivers (H2, SQLite, MySQL, PostgreSQL) are intentionally NOT bundled.
+    // We cannot shade in every database dependency (size, license, native binaries),
+    // so DatabaseAccessorFactory probes Class.forName at runtime and falls back along
+    // requested -> H2 -> flat-file YAML. Spigot/Paper/Folia typically ship SQLite as a
+    // server-side runtime dep; admins who want H2/SQLite/MySQL/Postgres on Fabric (or
+    // on a server that doesn't bundle them) must drop the appropriate driver jar onto
+    // the server classpath. See DatabaseAccessorFactory and FabricDatabaseHandler.
 }
 
 tasks.register('copyDocs', Copy) {
@@ -249,7 +238,6 @@ shadowJar {
     relocate 'com.zaxxer.hikari', 'io.github.dailystruggle.rtp.hikari'
     relocate 'org.yaml.snakeyaml', 'io.github.dailystruggle.rtp.snakeyaml'
     relocate 'me.carleslc.Simple-YAML', 'io.github.dailystruggle.rtp.Simple-Yaml'
-    relocate 'org.h2', 'io.github.dailystruggle.rtp.h2'
     // org.lz4:lz4-java exposes its API under net.jpountz.* (legacy package).
     // Required at runtime by rtp-anvil for LZ4-compressed chunk decode.
     // Relocate to avoid clashing with other plugins shading the same lib.
@@ -429,14 +417,15 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
         exclude(dependency('org.json:.*'))
     }
 
-    // Class-level excludes -- ADR-024 drops list.
+    // Class-level excludes -- ADR-024 drops list (as amended 2026-05-07: Fabric retained in lite).
     // NOTE: rtp-anvil is INTENTIONALLY KEPT in lite (ADR-024 reversal: performance parity
     // with Pro for benchmark comparisons; BukkitRTPWorld hard-references AnvilProbeSupport).
+    // NOTE: Fabric (RTPFabricMod + rtp-fabric-common classes) is INTENTIONALLY KEPT in lite
+    // as of the 2026-05-07 ADR-024 amendment. Lite still ships no JDBC drivers, so Fabric+lite
+    // falls through FabricDatabaseHandler.setupDatabase to YamlFileDatabase (loud warning).
     exclude 'io/github/dailystruggle/rtp/tags/**'
     exclude 'io/github/dailystruggle/rtp/folia/**'
     exclude 'io/github/dailystruggle/rtp/folia_*/**'
-    exclude 'io/github/dailystruggle/rtp/fabric/**'
-    exclude 'io/github/dailystruggle/rtp/fabric_*/**'
     // Networking/CLI transitives pulled in by Loom -- unused at runtime in lite.
     exclude 'org/apache/http/**'
     exclude 'org/apache/commons/**'
@@ -487,7 +476,8 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
     // logging.yml is INTENTIONALLY KEPT in lite (src/lite/resources/logging.yml
     // overrides the full version via duplicatesStrategy = EXCLUDE). Without it,
     // no min_level filter loads and every FINE/FINER/FINEST log call prints.
-    exclude 'fabric.mod.json'
+    // fabric.mod.json is INTENTIONALLY KEPT in lite as of the 2026-05-07 ADR-024 amendment
+    // so Fabric Loader can discover RTPFabricMod from the lite jar.
     exclude 'docs/**'
     exclude 'README.md'
     exclude 'CHANGELOG.md'
@@ -545,8 +535,8 @@ tasks.register('liteJarStructureCheck') {
             ~'^io/github/dailystruggle/rtp/tags/.*$',
             ~'^io/github/dailystruggle/rtp/folia/.*$',
             ~'^io/github/dailystruggle/rtp/folia_.*$',
-            ~'^io/github/dailystruggle/rtp/fabric/.*$',
-            ~'^io/github/dailystruggle/rtp/fabric_.*$',
+            // Fabric (rtp/fabric/**) intentionally retained in lite as of the 2026-05-07
+            // ADR-024 amendment -- see shadowLiteJar comment.
             ~'^io/github/dailystruggle/rtp/bukkit/RTPBukkitPlugin\\$?.*\\.class$',
             ~'^io/github/dailystruggle/rtp/common/database/options/H2.*\\.class$',
             ~'^io/github/dailystruggle/rtp/common/database/options/SQLite.*\\.class$',
@@ -561,7 +551,8 @@ tasks.register('liteJarStructureCheck') {
             ~'^economy\\.yml$',
             ~'^integrations\\.yml$',
             // logging.yml intentionally present in lite -- see shadowLiteJar comment.
-            ~'^fabric\\.mod\\.json$',
+            // fabric.mod.json intentionally present in lite as of the 2026-05-07
+            // ADR-024 amendment -- see shadowLiteJar comment.
             ~'^docs/.*$',
             ~'^README\\.md$',
             ~'^CHANGELOG\\.md$',

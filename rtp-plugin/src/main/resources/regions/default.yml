@@ -25,6 +25,7 @@ vert:
 requirePermission: false # If true, rtp.regions.<name> is required
 override: "default" # Region to redirect to if no permission
 cacheCap: 50 # Max pre-calculated safe locations
+backlogCacheCap: 1000 # L3 backlog cache capacity (ADR-028); unverified candidates pre-filtered by anvil one .mca-bin per pulse. 0 disables L3.
 activeChunkCap: 10 # Max chunks kept loaded for zero-latency
 price: 0.0 # Economy cost override for this region
 spatialResolution: 3 # Precision for bad-location tracking (1-5)

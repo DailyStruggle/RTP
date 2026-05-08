@@ -1,0 +1,18 @@
+# --- Language Mapping: performance.yml (cat dialect) ---
+# How fast a kitty can pounce. Edit only the right side.
+
+period: tail_swish_period
+viewDistanceSelect: stalking_distance
+biomeRecall: smell_memory
+version: meowsion
+maxAttempts: max_pounces
+biomeRecallForced: forced_smell_memory
+onEventParsing: sniff_on_event
+checkOnChunkLoads: check_when_kibble_arrives
+postTeleportQueueing: line_up_after_pounce
+syncLoading: synced_kibble
+effectParsing: sparkle_parsing
+viewDistanceTeleport: pounce_distance
+minTPS: minimum_purrs_per_second
+syncAllottedTime: sync_nap_time
+asyncAllottedTime: async_nap_time

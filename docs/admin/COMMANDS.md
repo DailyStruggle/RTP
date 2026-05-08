@@ -317,6 +317,7 @@ When PlaceholderAPI is installed, the following `%rtp_<key>%` placeholders are a
 | `%rtp_region%` | Player's current region name |
 | `%rtp_shape%` | Region shape type |
 | `%rtp_cacheCap%` | Region cache capacity |
+| `%rtp_backlogCacheCap%` | L3 backlog cache capacity (ADR-028); 0 disables L3 |
 | `%rtp_cached%` | Number of currently cached locations |
 | `%rtp_locationQueue%` | Location queue depth |
 | `%rtp_inFlightCalculations%` | In-flight async calculations |

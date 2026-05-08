@@ -1,0 +1,13 @@
+# --- Language Mapping: config.yml (cat dialect) ---
+# Mrrp! Left = code key (do not touch, sacred catnip).
+# Right = the meow-name shown to the human staff.
+# Purr only on the right side. ฅ^•ﻌ•^ฅ
+
+database: scratching_post
+playerCommands: human_tricks
+teleportCooldown: nap_time
+cancelDistance: too_far_to_chase
+teleportDelay: stalk_delay
+consoleCommands: tall_human_tricks
+version: meowsion
+network: yarn_ball

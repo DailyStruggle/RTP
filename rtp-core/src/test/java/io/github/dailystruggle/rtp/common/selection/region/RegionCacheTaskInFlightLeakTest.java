@@ -71,6 +71,7 @@ public class RegionCacheTaskInFlightLeakTest {
                 false,
                 false,
                 4L,          // cacheCap: small but non-zero so the default-mode gate opens
+                1000L,
                 5,
                 0.0,
                 1L,

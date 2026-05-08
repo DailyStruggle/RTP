@@ -91,6 +91,7 @@ public class Region extends FactoryValue<RegionKeys> {
           settings.worldBorderOverride(),
           settings.requirePermission(),
           settings.cacheCap(),
+          settings.backlogCacheCap(),
           settings.activeChunkCap(),
           settings.price(),
           settings.spatialResolution(),
@@ -371,6 +372,15 @@ public class Region extends FactoryValue<RegionKeys> {
     long currentAvailable = availableTime;
 
 //    System.out.println("[RTP-DEBUG] Region '" + name + "' execute() STARTED. Initial budget: " + availableTime + "ns");
+
+    // ADR-028 — L3 backlog cache pulse. Three inline steps (no producer/consumer
+    // split), in order: refill the per-region buffer with shape-only picks
+    // (S-005 safe — no chunk I/O), verify exactly one Anvil-region-file bin via
+    // the bound AnvilPrefilter provider (cross-RTP-region amortization through
+    // the world-shared bin index), and drain the contiguous-VALIDATED head into
+    // unkeptLocations subject to its capacity. Skipped when backlogCacheCap=0
+    // (lite default; backlogLocations is null).
+    processBacklog(availableTime, start);
 
     // Region.java - inside execute()
     long activeCap = settings.activeChunkCap();
@@ -740,6 +750,135 @@ public class Region extends FactoryValue<RegionKeys> {
   }
 
   /**
+   * ADR-028 L3 backlog cache pulse. Inline 3-step linear flow:
+   * <ol>
+   *   <li><b>Refill.</b> While the per-region {@link BacklogLocationBuffer}
+   *       has spare capacity and the time slice has not been exhausted,
+   *       perform a shape-only pick (no chunk I/O — S-005 safe), enqueue it
+   *       as {@code UNVERIFIED}, and index it into the world-shared
+   *       {@link WorldBacklogBinIndex} for cross-RTP-region Anvil amortization.</li>
+   *   <li><b>Verify one bin.</b> Take the bin coordinate of this region's
+   *       oldest {@code UNVERIFIED} entry, snapshot the world bin's list
+   *       (entries contributed by every region targeting this world that fall
+   *       in the same {@code .mca}), and run the bound
+   *       {@link io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry}
+   *       provider against each. Set each entry's validity to
+   *       {@code VALIDATED} on {@code ACCEPT}/{@code UNKNOWN}/(no provider) and
+   *       {@code INVALIDATED} on {@code REJECT}. Exactly one bin per pulse.</li>
+   *   <li><b>Drain.</b> Poll the contiguous-{@code VALIDATED} head of this
+   *       region's buffer (skipping {@code INVALIDATED} heads, stopping at
+   *       the first {@code UNVERIFIED}) and offer each location to
+   *       {@code unkeptLocations} until it is full or the head is exhausted.</li>
+   * </ol>
+   *
+   * <p>No-op when {@code queueManager.backlogLocations == null} (i.e.
+   * {@code backlogCacheCap == 0}, lite default).
+   *
+   * @param availableTime original pulse budget (ns)
+   * @param startNanos    {@code System.nanoTime()} captured at pulse start
+   */
+  private void processBacklog(long availableTime, long startNanos) {
+    BacklogLocationBuffer backlog = queueManager.backlogLocations;
+    if (backlog == null) return;
+    RTPWorld<?> world = getWorld();
+    if (world == null) return;
+
+    // Step 1 — refill (shape-only, time-sliced). Cap the refill spend at a
+    // small fraction of the pulse budget so the rest of execute() (deficit
+    // loop, player queue, miscPipeline, cachePipeline) is not starved.
+    final long refillBudget = Math.max(0L, availableTime / 4L);
+    Shape<?> currentShape = this.shape;
+    int verticalY;
+    {
+      VerticalAdjustor<?> v = getVert();
+      if (v != null) verticalY = (v.maxY() + v.minY()) / 2;
+      else verticalY = 64;
+    }
+    String worldName = world.name();
+    WorldBacklogBinIndex binIndex = RegionQueueManager.binIndexFor(worldName);
+    if (currentShape != null) {
+      while (backlog.size() < backlog.capacity()
+          && (System.nanoTime() - startNanos) < refillBudget) {
+        int[] sel;
+        try {
+          sel = currentShape.select();
+        } catch (Throwable t) {
+          break;
+        }
+        if (sel == null || sel.length < 2) break;
+        int blockX = (sel[0] << 4) + 8;
+        int blockZ = (sel[1] << 4) + 8;
+        RTPCoords coords = new RTPCoords(worldName, blockX, verticalY, blockZ);
+        RTPLocation loc = new RTPLocation(coords, 0L);
+        BacklogLocationBuffer.BacklogEntry entry = backlog.offerUnverified(loc);
+        if (entry == null) break; // capacity rejection
+        binIndex.insert(RegionFileCoord.of(coords), entry);
+      }
+    }
+
+    // Step 2 — verify exactly one bin per pulse, derived from this region's
+    // oldest UNVERIFIED entry.
+    BacklogLocationBuffer.BacklogEntry oldest = backlog.peekOldestUnverified();
+    if (oldest != null) {
+      RegionFileCoord binKey = RegionFileCoord.of(oldest.location().coords());
+      List<BacklogLocationBuffer.BacklogEntry> snapshot = binIndex.snapshot(binKey);
+      io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry.Provider provider = null;
+      try {
+        io.github.dailystruggle.rtp.api.hooks.RTPHooks hooks =
+            io.github.dailystruggle.rtp.api.RTPAPI.hooks();
+        if (hooks != null) provider = hooks.anvilPrefilter().current();
+      } catch (Throwable t) {
+        provider = null;
+      }
+      for (BacklogLocationBuffer.BacklogEntry e : snapshot) {
+        if (e.validity() != BacklogLocationBuffer.Validity.UNVERIFIED) continue;
+        BacklogLocationBuffer.Validity next;
+        if (provider == null) {
+          // Fallback: no Anvil prefilter bound — treat as VALIDATED to avoid
+          // stalling L3 (checklist 3.4). Live-load safety re-verification still
+          // runs at the unkept→kept promotion in the existing deficit loop.
+          next = BacklogLocationBuffer.Validity.VALIDATED;
+        } else {
+          int cx = e.location().coords().x() >> 4;
+          int cz = e.location().coords().z() >> 4;
+          io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry.Provider.Decision d;
+          try {
+            d = provider.classify(world, cx, cz);
+          } catch (Throwable t) {
+            d = io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry.Provider.Decision.UNKNOWN;
+          }
+          if (d == null) d =
+              io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry.Provider.Decision.UNKNOWN;
+          switch (d) {
+            case REJECT -> next = BacklogLocationBuffer.Validity.INVALIDATED;
+            case ACCEPT, UNKNOWN -> next = BacklogLocationBuffer.Validity.VALIDATED;
+            default -> next = BacklogLocationBuffer.Validity.VALIDATED;
+          }
+        }
+        e.setValidity(next);
+      }
+    }
+
+    // Step 3 — drain the contiguous-VALIDATED head into unkeptLocations,
+    // bounded by L2 capacity. INVALIDATED heads are dropped silently;
+    // pollContiguousValidatedHead stops at the first UNVERIFIED.
+    long l2Cap = settings.cacheCap();
+    long l2Free = Math.max(0L, l2Cap - queueManager.unkeptLocations.size());
+    if (l2Free > 0L) {
+      List<BacklogLocationBuffer.BacklogEntry> drained =
+          backlog.pollContiguousValidatedHead((int) Math.min(l2Free, Integer.MAX_VALUE));
+      for (BacklogLocationBuffer.BacklogEntry e : drained) {
+        if (!queueManager.unkeptLocations.offer(e.location())) {
+          // L2 filled mid-drain; the rest of the drained batch is dropped on
+          // the floor. Acceptable: the L3 entry was already removed from the
+          // backlog, the next pulse will refill.
+          break;
+        }
+      }
+    }
+  }
+
+  /**
    * isObservationalModeEnabled - consults {@code PerformanceKeys.visitorEnabled}
    * as the single master switch for the observational cache-fill mode
    * (plan §§2, 3). Defaults to {@code false} so the lite assembly (and any
@@ -908,6 +1047,7 @@ public class Region extends FactoryValue<RegionKeys> {
             settings.worldBorderOverride(),
             settings.requirePermission(),
             settings.cacheCap(),
+            settings.backlogCacheCap(),
             settings.activeChunkCap(),
             settings.price(),
             settings.spatialResolution(),

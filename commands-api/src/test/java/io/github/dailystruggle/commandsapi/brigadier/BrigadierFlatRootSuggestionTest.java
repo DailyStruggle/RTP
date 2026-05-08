@@ -83,18 +83,18 @@ class BrigadierFlatRootSuggestionTest {
         Set<String> out = suggestionsFor("rtp ");
         assertTrue(out.contains("scan"),  "expected literal 'scan' at root: " + out);
         assertTrue(out.contains("info"),  "expected literal 'info' at root: " + out);
-        assertTrue(out.contains("region:"), "expected 'region:' (Bukkit wire format): " + out);
-        assertTrue(out.contains("biome:"),  "expected 'biome:' (Bukkit wire format): " + out);
+        assertTrue(out.contains("region="), "expected 'region=' (canonical wire format): " + out);
+        assertTrue(out.contains("biome="),  "expected 'biome=' (canonical wire format): " + out);
     }
 
     @Test
-    @DisplayName("/rtp re — flat list narrows to 'region:' (case-insensitive prefix match)")
+    @DisplayName("/rtp re — flat list narrows to 'region=' (case-insensitive prefix match)")
     void prefixFiltersToRegion() throws Exception {
         Set<String> out = suggestionsFor("rtp re");
-        assertTrue(out.contains("region:"),
-                "expected 'region:' for prefix 're': " + out);
-        assertFalse(out.contains("biome:"),
-                "did not expect 'biome:' for prefix 're': " + out);
+        assertTrue(out.contains("region="),
+                "expected 'region=' for prefix 're': " + out);
+        assertFalse(out.contains("biome="),
+                "did not expect 'biome=' for prefix 're': " + out);
         assertFalse(out.contains("scan"),
                 "did not expect 'scan' for prefix 're': " + out);
     }
@@ -105,8 +105,8 @@ class BrigadierFlatRootSuggestionTest {
         Set<String> out = suggestionsFor("rtp sc");
         assertTrue(out.contains("scan"),
                 "expected 'scan' (from literal child and/or flat fallback) for prefix 'sc': " + out);
-        assertFalse(out.contains("region:"),
-                "did not expect 'region:' for prefix 'sc': " + out);
+        assertFalse(out.contains("region="),
+                "did not expect 'region=' for prefix 'sc': " + out);
     }
 
     // ------------------------------------------------------------------

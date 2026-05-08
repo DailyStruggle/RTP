@@ -1,0 +1,12 @@
+# --- 语言映射: economy.yml ---
+# 将内部配置键名（左侧）映射为 economy.yml 中用户可见的键名（右侧）。
+# 仅可修改右侧以重命名或翻译选项；左侧为代码常量，请勿更改。
+# 若此文件缺失，插件会自动重新生成左右一致的英文默认映射。
+
+balanceFloor: 最低余额
+price: 价格
+priceOther: 价格其他
+refundOnCancel: 取消时退款
+biomePrice: 生物群系价格
+paramsPrice: 参数价格
+version: version

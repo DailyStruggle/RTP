@@ -1,0 +1,7 @@
+# --- Language Mapping: worlds/*.yml (cat dialect) ---
+# Each world is just another cardboard box. Edit only the right side.
+
+region: territory
+requirePermission: requires_pets
+override: paw_over
+version: meowsion

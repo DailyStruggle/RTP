@@ -103,6 +103,11 @@ public final class RTPBukkitPlugin extends JavaPlugin {
 
     RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable ENTER -- initializing bStats Metrics(id=30865)");
     metrics = new Metrics(this, 30865);
+    // Register the RTP cost-metrics chart catalogue. All chart lambdas read
+    // RTP.metrics.snapshot() (METRICS_PLAN.md SPI) and bucketise to keep
+    // submissions privacy-safe and low-cardinality. See METRICS_PLAN.md
+    // > bStats Integration and BStatsChartIds for the catalogue.
+    io.github.dailystruggle.rtp.bukkit.metrics.RTPCostMetricsCharts.register(metrics, "full");
 
     if (RTP.getInstance() == null) {
       RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] onEnable accessor/scheduler wired; starting accessor");

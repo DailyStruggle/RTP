@@ -3,11 +3,7 @@ package io.github.dailystruggle.rtp.fabric.database;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
-import io.github.dailystruggle.rtp.common.database.options.H2DatabaseAccessor;
-import io.github.dailystruggle.rtp.common.database.options.MySQLDatabaseAccessor;
-import io.github.dailystruggle.rtp.common.database.options.PostgreSQLDatabaseAccessor;
-import io.github.dailystruggle.rtp.common.database.options.SQLiteDatabaseAccessor;
-import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
+import io.github.dailystruggle.rtp.common.database.options.DatabaseAccessorFactory;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.File;
@@ -36,19 +32,6 @@ public final class FabricDatabaseHandler {
     private FabricDatabaseHandler() {
     }
 
-    /**
-     * Probe whether the SQLite JDBC driver class is reachable from the current classloader.
-     * Used to gracefully fall back to H2 on Fabric when the user-selected backend is "sqlite"
-     * but the driver was not provided as a server-side library.
-     */
-    private static boolean isSqliteDriverAvailable() {
-        try {
-            Class.forName("org.sqlite.JDBC", false, FabricDatabaseHandler.class.getClassLoader());
-            return true;
-        } catch (ClassNotFoundException e) {
-            return false;
-        }
-    }
 
     /**
      * Resolve the Fabric config dir for RTP and return it, creating it if absent.
@@ -125,47 +108,16 @@ public final class FabricDatabaseHandler {
             }
         }
 
-        switch (type.toLowerCase()) {
-            case "yaml":
-                rtp.databaseAccessor = new YamlFileDatabase(databaseDirectory);
-                break;
-            case "h2":
-                rtp.databaseAccessor = new H2DatabaseAccessor();
-                break;
-            case "mysql":
-                rtp.databaseAccessor = new MySQLDatabaseAccessor(host, port, name, username, password);
-                break;
-            case "postgresql":
-                rtp.databaseAccessor = new PostgreSQLDatabaseAccessor(host, port, name, username, password);
-                break;
-            case "sqlite":
-                // SQLite JDBC driver is no longer bundled with the Fabric jar (it added ~7 MB
-                // of native binaries for every supported OS/arch). Probe for the driver on the
-                // server classpath; fall back to H2 with a loud warning if absent so the server
-                // still boots instead of crashing on `No suitable driver found`.
-                if (isSqliteDriverAvailable()) {
-                    rtp.databaseAccessor = new SQLiteDatabaseAccessor(
-                            "jdbc:sqlite:" + databaseDirectory.getAbsolutePath() + File.separator + "RTP.db");
-                } else {
-                    RTP.log(Level.WARNING,
-                            "FabricDatabaseHandler: database.type=sqlite but `org.sqlite.JDBC` is not on the "
-                                    + "server classpath. The SQLite JDBC driver is no longer bundled with the "
-                                    + "RTP Fabric jar. Drop `sqlite-jdbc.jar` into your server's library "
-                                    + "directory or set database.type to `h2` in config.yml. Falling back to H2 "
-                                    + "for this session.");
-                    rtp.databaseAccessor = new H2DatabaseAccessor();
-                    type = "h2";
-                }
-                break;
-            default:
-                rtp.databaseAccessor = new H2DatabaseAccessor();
-                type = "h2";
-                break;
-        }
+        // Delegate to the shared factory: requested → H2 → flat-file fallback chain so a
+        // missing JDBC driver (we cannot shade every backend) does not crash startup.
+        DatabaseAccessorFactory.Result dbResult = DatabaseAccessorFactory.create(
+                type, databaseDirectory, host, port, name, username, password);
+        rtp.databaseAccessor = dbResult.accessor;
+        String effectiveType = dbResult.effectiveType;
 
-        RTP.handleMigration(previousType, type);
+        RTP.handleMigration(previousType, effectiveType);
         try {
-            Files.write(dbStateFile.toPath(), type.getBytes());
+            Files.write(dbStateFile.toPath(), effectiveType.getBytes());
         } catch (Exception e) {
             RTP.log(Level.WARNING, "FabricDatabaseHandler: failed to write .db_state", e);
         }

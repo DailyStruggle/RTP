@@ -16,8 +16,6 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.potion.PotionEffect;
-import org.bukkit.potion.PotionEffectType;
 import io.github.dailystruggle.rtp.folia.thread.RegionThread;
 
 public final class FoliaRTPPlayer implements RTPPlayer {
@@ -138,17 +136,12 @@ public final class FoliaRTPPlayer implements RTPPlayer {
 
           // Jump to the Entity Scheduler using: player.getScheduler().run(...)
           player.getScheduler().run((Plugin) RTP.getInstance().getPlugin(), task -> {
-            // Inside the Entity Scheduler task: Set player.setFallDistance(0.0f), apply SLOW_FALLING (60 ticks) and BLINDNESS (40 ticks),
-            // and perform a micro-rubberband by calling player.teleportAsync(destinationLocation) again to snap them safely onto the newly built platform.
+            // Inside the Entity Scheduler task: Set player.setFallDistance(0.0f) and perform a
+            // micro-rubberband by calling player.teleportAsync(destinationLocation) again to snap
+            // the player safely onto the newly built platform. The previously hardcoded
+            // SLOW_FALLING / BLINDNESS effects now live in effects/default.yml (postteleport
+            // fallback group) so admins can customise or remove them without a code change.
             player.setFallDistance(0.0f);
-            PotionEffect currentSlowFalling = player.getPotionEffect(PotionEffectType.SLOW_FALLING);
-            if (currentSlowFalling == null || currentSlowFalling.getDuration() < 60) {
-              player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, 60, 1));
-            }
-            PotionEffect currentBlindness = player.getPotionEffect(PotionEffectType.BLINDNESS);
-            if (currentBlindness == null || currentBlindness.getDuration() < 40) {
-              player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 40, 1));
-            }
             player.teleportAsync(destinationLocation).thenAccept(s -> completionFuture.complete(true));
           }, null);
         } catch (Exception e) {

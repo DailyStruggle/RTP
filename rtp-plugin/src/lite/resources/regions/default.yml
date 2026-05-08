@@ -1,0 +1,38 @@
+# --- RTP Region Configuration (lite assembly) ---
+# Documentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/REGIONS.md
+#
+# Lite override (ADR-024): identical to the full assembly's regions/default.yml
+# except the L3 backlog-cache knob (`backlogCacheCap`) is intentionally omitted
+# to keep the lite UX simple. The full assembly documents and ships
+# `backlogCacheCap` (ADR-028); lite users do not need to know about it.
+
+world: "[0]" # Target world. [0] = main world.
+worldBorderOverride: false # Use vanilla /worldborder radius if true
+
+shape:
+  name: "CIRCLE"
+  mode: "ACCUMULATE"
+  radius: 256
+  centerRadius: 64
+  centerX: 0
+  centerZ: 0
+  weight: 1.0
+  uniquePlacements: false
+  expand: false
+
+vert:
+  name: "JUMP"
+  minY: 32
+  maxY: 255
+  step: 16
+  requireSkyLight: false
+
+requirePermission: false # If true, rtp.regions.<name> is required
+override: "default" # Region to redirect to if no permission
+cacheCap: 50 # Max pre-calculated safe locations
+activeChunkCap: 10 # Max chunks kept loaded for zero-latency
+price: 0.0 # Economy cost override for this region
+spatialResolution: 3 # Precision for bad-location tracking (1-5)
+
+# DO NOT TOUCH VERSION NUMBER
+version: "1.0"

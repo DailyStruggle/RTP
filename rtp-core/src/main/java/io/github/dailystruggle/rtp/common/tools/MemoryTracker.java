@@ -213,10 +213,15 @@ public class MemoryTracker {
         RegionSettings settings = region.getSettings();
         totalCacheCap += settings.cacheCap();
         totalCacheCap += settings.activeChunkCap();
+        // ADR-028 Phase 4.3: account for L3 backlog capacity in the global cache budget.
+        totalCacheCap += settings.backlogCacheCap();
         totalActiveChunkCap += settings.activeChunkCap();
 
         totalLocationQueueSize += region.queueManager.keptLocations.size();
         totalLocationQueueSize += region.queueManager.unkeptLocations.size();
+        if (region.queueManager.backlogLocations != null) {
+          totalLocationQueueSize += region.queueManager.backlogLocations.size();
+        }
         for (java.util.concurrent.ConcurrentLinkedQueue<RTPLocation> queue : region.queueManager.getPerPlayerQueues()) {
           totalPerPlayerLocationQueueSize += queue.size();
         }

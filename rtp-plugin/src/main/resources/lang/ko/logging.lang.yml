@@ -1,0 +1,20 @@
+# --- 언어 매핑: logging.yml ---
+# 내부 설정 키 이름(왼쪽)을 logging.yml 에서 운영자에게 보이는 키 이름(오른쪽)에 매핑합니다.
+# 옵션 이름을 변경하거나 번역하려면 오른쪽만 편집하세요.
+# 왼쪽은 코드 상수이므로 변경하지 마세요.
+# 이 파일이 존재하지 않으면 플러그인은 좌우가 동일한 영어 버전을 다시 생성합니다.
+
+event_changeworld: 이벤트_월드변경
+event_respawn: 이벤트_리스폰
+detailed_reload: 상세_리로드
+teleport: 텔레포트
+event_join: 이벤트_접속
+selection_failure: 선택실패
+system_memory_tracker: 시스템_메모리추적기
+system_database: 시스템_데이터베이스
+event_teleport: 이벤트_텔레포트
+version: version
+detailed_region_init: 상세_리전초기화
+command: 명령어
+event_move: 이벤트_이동
+min_level: 최소레벨

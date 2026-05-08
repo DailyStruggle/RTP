@@ -122,6 +122,15 @@ public class InfoCmd extends BaseRTPCmdImpl {
       String infoMSPT = lang.getConfigValue(MessagesKeys.infoMSPT, "").toString();
       String infoTotalLoads = lang.getConfigValue(MessagesKeys.infoTotalLoads, "").toString();
       String infoLeakRate = lang.getConfigValue(MessagesKeys.infoLeakRate, "").toString();
+      // Metrics SPI health block — surfaces the same MetricsSnapshot data that the
+      // bStats integration and (planned) multi-server publisher consume. Per
+      // METRICS_PLAN.md > /rtp info Surface, these are operator-facing live signals
+      // for triage. Empty templates skip silently so existing locale files without
+      // the new keys keep working unchanged.
+      String infoQueueDepth = lang.getConfigValue(MessagesKeys.infoQueueDepth, "").toString();
+      String infoPendingTeleports = lang.getConfigValue(MessagesKeys.infoPendingTeleports, "").toString();
+      String infoAvgPipelineMs = lang.getConfigValue(MessagesKeys.infoAvgPipelineMs, "").toString();
+      String infoHeap = lang.getConfigValue(MessagesKeys.infoHeap, "").toString();
       String infoDisclaimerHeader = lang.getConfigValue(MessagesKeys.infoDisclaimerHeader, "").toString();
       String infoDisclaimer = lang.getConfigValue(MessagesKeys.infoDisclaimer, "").toString();
 
@@ -130,6 +139,10 @@ public class InfoCmd extends BaseRTPCmdImpl {
       if (!infoMSPT.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoMSPT);
       if (!infoTotalLoads.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoTotalLoads);
       if (!infoLeakRate.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoLeakRate);
+      if (!infoQueueDepth.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoQueueDepth);
+      if (!infoPendingTeleports.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoPendingTeleports);
+      if (!infoAvgPipelineMs.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoAvgPipelineMs);
+      if (!infoHeap.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoHeap);
 
       if (!infoDisclaimerHeader.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoDisclaimerHeader);
       if (!infoDisclaimer.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoDisclaimer);
