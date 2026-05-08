@@ -81,7 +81,7 @@ RTP shall ship as a **single JAR** that loads on both Bukkit-family servers and 
 
 ### 4. Build Discipline
 
-- **Loom application.** `fabric-loom` shall be applied to every `rtp-fabric/rtp-fabric-<ver>` submodule and to `rtp-plugin`. It shall **not** be applied at the root, to `rtp-core`, to `rtp-api`, to `commands-api`, to `effects-api`, or to any Bukkit-family adapter.
+- **Loom application.** `fabric-loom` shall be applied to every `rtp-fabric/rtp-fabric-<ver>` submodule, to `rtp-plugin`, and to `effects-api` (per `effects-api-ADR-003`, to support the in-module `effectsapi/fabric` subpackage). It shall **not** be applied at the root, to `rtp-core`, to `rtp-api`, to `commands-api`, or to any Bukkit-family adapter.
 - **Per-version Loom plugin.** Each per-version module pins its own Loom plugin version compatible with the MC line it targets. The version-agnostic `rtp-fabric-common` does **not** apply Loom — it compiles as a plain Java module against `rtp-api`/`rtp-core` and the stable Fabric-Loader API surface only.
 - **Shadow ingestion.** `rtp-plugin/build.gradle`'s `shadowJar` task shall include the **`remapJar` output** of each per-version module. Including raw compile output would re-mix Mojang-mapped class files across versions and produce a JAR Loader cannot load.
 - **Mappings.** `loom.officialMojangMappings()` for every per-version module. Yarn is reserved for re-evaluation if the community requests it.

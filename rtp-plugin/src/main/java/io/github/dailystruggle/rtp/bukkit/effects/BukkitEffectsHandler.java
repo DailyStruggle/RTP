@@ -1,7 +1,10 @@
 package io.github.dailystruggle.rtp.bukkit.effects;
 
-import io.github.dailystruggle.effectsapi.EffectFactory;
+import io.github.dailystruggle.effectsapi.bukkit.BukkitEffectsInitializer;
+import io.github.dailystruggle.effectsapi.common.Effect;
+import io.github.dailystruggle.effectsapi.common.EffectFactory;
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
+import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import io.github.dailystruggle.rtp.bukkit.events.*;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -13,12 +16,17 @@ import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
+import io.github.dailystruggle.rtp.effects.EffectsResolver;
 import io.github.dailystruggle.rtp.spigot.tools.SendMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
+import org.bukkit.permissions.PermissionAttachmentInfo;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Level;
 
@@ -41,7 +49,75 @@ public class BukkitEffectsHandler {
         return player;
     }
 
+    /**
+     * Build, retarget, and dispatch every effect that applies to {@code player}
+     * at {@code prefix} (e.g. {@code "rtp.effect.postteleport"}).
+     *
+     * <p>Sources unioned every call so that {@code /rtp reload} (which
+     * atomically swaps the {@code multiConfigParserMap}) is honored without
+     * any local cache invalidation:
+     * <ol>
+     *   <li>{@code player.getEffectivePermissions()} — historical
+     *       permission-driven path; preserved verbatim for backwards compat.</li>
+     *   <li>{@link EffectsResolver#resolveTokens(String, RTPPlayer, String)}
+     *       — declarative {@code effects/<group>.yml} groups whose
+     *       {@code when:} matches this stage and whose {@code permission:} /
+     *       {@code players:} gating the player passes (effects-api-ADR-005).</li>
+     * </ol>
+     *
+     * <p>S-005: resolution is in-memory; the effect itself is dispatched via
+     * {@code BukkitEffectsInitializer.runEffect} which already routes to the
+     * main thread.
+     */
+    private static void dispatchEffects(RTPBukkitPlugin plugin, String prefix, Player player) {
+        // 1) Convert permission-attachment infos to flat node strings (the same
+        //    transformation BukkitEffectsInitializer.buildEffects(prefix, perms)
+        //    performs internally).
+        Set<String> nodes = new LinkedHashSet<>();
+        for (PermissionAttachmentInfo info : player.getEffectivePermissions()) {
+            if (info != null && info.getValue()) {
+                nodes.add(info.getPermission());
+            }
+        }
+
+        // 2) Look up an RTPPlayer view for the resolver's gating
+        //    (hasPermission / uuid() / name()). Falls back to a permission-only
+        //    union when the platform accessor isn't ready.
+        String stage = stageOf(prefix);
+        RTPPlayer rp = (RTP.serverAccessor != null)
+                ? RTP.serverAccessor.getPlayer(player.getUniqueId())
+                : null;
+        Collection<String> union = (rp != null)
+                ? EffectsResolver.resolveUnioned(stage, rp, prefix, nodes)
+                : nodes;
+        if (union.isEmpty()) return;
+
+        // 3) Build and dispatch.
+        List<Effect<?>> effects = EffectFactory.buildEffects(prefix, union);
+        for (Effect<?> effect : effects) {
+            effect.setTarget(player);
+            // Schedule on the main thread so platform-restricted ops inside
+            // Effect#run (NoteEffect#setBlockData, FireworkEffect spawn) don't
+            // trip Paper's AsyncCatcher. Effect extends BukkitRunnable, so
+            // runTask handles main-thread dispatch.
+            BukkitEffectsInitializer.runEffect(plugin, effect);
+        }
+    }
+
+    /**
+     * Extract the pipeline stage token (e.g. {@code "postteleport"}) from a
+     * permission prefix of the shape {@code "rtp.effect.<stage>"}.
+     */
+    private static String stageOf(String prefix) {
+        int dot = prefix.lastIndexOf('.');
+        return (dot >= 0 && dot < prefix.length() - 1) ? prefix.substring(dot + 1) : prefix;
+    }
+
     public static void setupEffects(RTPBukkitPlugin plugin) {
+        // Per effects-api-ADR-003: EffectFactory no longer registers Bukkit
+        // effects in a static block — the platform initializer must be invoked
+        // explicitly. Idempotent.
+        BukkitEffectsInitializer.registerAll();
         Configs configs = RTP.configs;
         FactoryValue<PerformanceKeys> parser = configs.getParser(PerformanceKeys.class);
 
@@ -58,20 +134,7 @@ public class BukkitEffectsHandler {
                         if (player == null) return;
                         RTP.getInstance()
                                 .miscAsyncTasks
-                                .add(
-                                        () -> {
-                                            EffectFactory.buildEffects(
-                                                            "rtp.effect.presetup", player.getEffectivePermissions())
-                                                    .forEach(
-                                                            effect -> {
-                                                                effect.setTarget(player);
-                                                                // Schedule on the main thread so platform-restricted ops
-                                                                // inside Effect#run (NoteEffect#setBlockData, FireworkEffect
-                                                                // spawn) don't trip Paper's AsyncCatcher. Effect extends
-                                                                // BukkitRunnable, so runTask handles main-thread dispatch.
-                                                                try { effect.runTask(plugin); } catch (Throwable t) { effect.run(); }
-                                                            });
-                                        });
+                                .add(() -> dispatchEffects(plugin, "rtp.effect.presetup", player));
                     }
                 });
 
@@ -88,20 +151,7 @@ public class BukkitEffectsHandler {
                         if (player == null) return;
                         RTP.getInstance()
                                 .miscAsyncTasks
-                                .add(
-                                        () -> {
-                                            EffectFactory.buildEffects(
-                                                            "rtp.effect.postsetup", player.getEffectivePermissions())
-                                                    .forEach(
-                                                            effect -> {
-                                                                effect.setTarget(player);
-                                                                // Schedule on the main thread so platform-restricted ops
-                                                                // inside Effect#run (NoteEffect#setBlockData, FireworkEffect
-                                                                // spawn) don't trip Paper's AsyncCatcher. Effect extends
-                                                                // BukkitRunnable, so runTask handles main-thread dispatch.
-                                                                try { effect.runTask(plugin); } catch (Throwable t) { effect.run(); }
-                                                            });
-                                        });
+                                .add(() -> dispatchEffects(plugin, "rtp.effect.postsetup", player));
                     }
                 });
 
@@ -118,20 +168,7 @@ public class BukkitEffectsHandler {
                         if (player == null) return;
                         RTP.getInstance()
                                 .miscAsyncTasks
-                                .add(
-                                        () -> {
-                                            EffectFactory.buildEffects(
-                                                            "rtp.effect.presetup", player.getEffectivePermissions())
-                                                    .forEach(
-                                                            effect -> {
-                                                                effect.setTarget(player);
-                                                                // Schedule on the main thread so platform-restricted ops
-                                                                // inside Effect#run (NoteEffect#setBlockData, FireworkEffect
-                                                                // spawn) don't trip Paper's AsyncCatcher. Effect extends
-                                                                // BukkitRunnable, so runTask handles main-thread dispatch.
-                                                                try { effect.runTask(plugin); } catch (Throwable t) { effect.run(); }
-                                                            });
-                                        });
+                                .add(() -> dispatchEffects(plugin, "rtp.effect.preload", player));
                     }
                 });
 
@@ -148,20 +185,7 @@ public class BukkitEffectsHandler {
                         if (player == null) return;
                         RTP.getInstance()
                                 .miscAsyncTasks
-                                .add(
-                                        () -> {
-                                            EffectFactory.buildEffects(
-                                                            "rtp.effect.postload", player.getEffectivePermissions())
-                                                    .forEach(
-                                                            effect -> {
-                                                                effect.setTarget(player);
-                                                                // Schedule on the main thread so platform-restricted ops
-                                                                // inside Effect#run (NoteEffect#setBlockData, FireworkEffect
-                                                                // spawn) don't trip Paper's AsyncCatcher. Effect extends
-                                                                // BukkitRunnable, so runTask handles main-thread dispatch.
-                                                                try { effect.runTask(plugin); } catch (Throwable t) { effect.run(); }
-                                                            });
-                                        });
+                                .add(() -> dispatchEffects(plugin, "rtp.effect.postload", player));
                     }
                 });
 
@@ -178,20 +202,7 @@ public class BukkitEffectsHandler {
                         if (player == null) return;
                         RTP.getInstance()
                                 .miscAsyncTasks
-                                .add(
-                                        () -> {
-                                            EffectFactory.buildEffects(
-                                                            "rtp.effect.preteleport", player.getEffectivePermissions())
-                                                    .forEach(
-                                                            effect -> {
-                                                                effect.setTarget(player);
-                                                                // Schedule on the main thread so platform-restricted ops
-                                                                // inside Effect#run (NoteEffect#setBlockData, FireworkEffect
-                                                                // spawn) don't trip Paper's AsyncCatcher. Effect extends
-                                                                // BukkitRunnable, so runTask handles main-thread dispatch.
-                                                                try { effect.runTask(plugin); } catch (Throwable t) { effect.run(); }
-                                                            });
-                                        });
+                                .add(() -> dispatchEffects(plugin, "rtp.effect.preteleport", player));
                     }
                 });
 
@@ -292,20 +303,7 @@ public class BukkitEffectsHandler {
                         if (player == null) return;
                         RTP.getInstance()
                                 .miscAsyncTasks
-                                .add(
-                                        () -> {
-                                            EffectFactory.buildEffects(
-                                                            "rtp.effect.postteleport", player.getEffectivePermissions())
-                                                    .forEach(
-                                                            effect -> {
-                                                                effect.setTarget(player);
-                                                                // Schedule on the main thread so platform-restricted ops
-                                                                // inside Effect#run (NoteEffect#setBlockData, FireworkEffect
-                                                                // spawn) don't trip Paper's AsyncCatcher. Effect extends
-                                                                // BukkitRunnable, so runTask handles main-thread dispatch.
-                                                                try { effect.runTask(plugin); } catch (Throwable t) { effect.run(); }
-                                                            });
-                                        });
+                                .add(() -> dispatchEffects(plugin, "rtp.effect.postteleport", player));
                     }
                 });
 
@@ -328,14 +326,7 @@ public class BukkitEffectsHandler {
                                                         .getData()
                                                         .getOrDefault(PerformanceKeys.effectParsing, false)
                                                         .toString())) return;
-                                        EffectFactory.buildEffects(
-                                                        "rtp.effect.cancel", player.getEffectivePermissions())
-                                                .forEach(
-                                                        effect -> {
-                                                            effect.setTarget(player);
-                                                            // Main-thread dispatch (see comment at presetup site).
-                                                            try { effect.runTask(plugin); } catch (Throwable t) { effect.run(); }
-                                                        });
+                                        dispatchEffects(plugin, "rtp.effect.cancel", player);
                                     });
                 });
 
@@ -356,14 +347,7 @@ public class BukkitEffectsHandler {
                                                         .getData()
                                                         .getOrDefault(PerformanceKeys.effectParsing, false)
                                                         .toString())) return;
-                                        EffectFactory.buildEffects(
-                                                        "rtp.effect.queuepush", player.getEffectivePermissions())
-                                                .forEach(
-                                                        effect -> {
-                                                            effect.setTarget(player);
-                                                            // Main-thread dispatch (see comment at presetup site).
-                                                            try { effect.runTask(plugin); } catch (Throwable t) { effect.run(); }
-                                                        });
+                                        dispatchEffects(plugin, "rtp.effect.queuepush", player);
                                     });
                 });
 
@@ -384,14 +368,7 @@ public class BukkitEffectsHandler {
                                                         .getData()
                                                         .getOrDefault(PerformanceKeys.effectParsing, false)
                                                         .toString())) return;
-                                        EffectFactory.buildEffects(
-                                                        "rtp.effect.queuepop", player.getEffectivePermissions())
-                                                .forEach(
-                                                        effect -> {
-                                                            effect.setTarget(player);
-                                                            // Main-thread dispatch (see comment at presetup site).
-                                                            try { effect.runTask(plugin); } catch (Throwable t) { effect.run(); }
-                                                        });
+                                        dispatchEffects(plugin, "rtp.effect.queuepop", player);
                                     });
                 });
     }

@@ -1,9 +1,12 @@
 package io.github.dailystruggle.effectsapi;
 
-import io.github.dailystruggle.effectsapi.LocalEffects.PotionEffect;
-import io.github.dailystruggle.effectsapi.LocalEffects.SoundEffect;
-import io.github.dailystruggle.effectsapi.LocalEffects.enums.PotionTypeNames;
-import io.github.dailystruggle.effectsapi.LocalEffects.enums.SoundTypeNames;
+import io.github.dailystruggle.effectsapi.bukkit.BukkitValueCoercer;
+import io.github.dailystruggle.effectsapi.common.Effect;
+import io.github.dailystruggle.effectsapi.common.EffectFactory;
+import io.github.dailystruggle.effectsapi.bukkit.LocalEffects.PotionEffect;
+import io.github.dailystruggle.effectsapi.bukkit.LocalEffects.SoundEffect;
+import io.github.dailystruggle.effectsapi.bukkit.LocalEffects.enums.PotionTypeNames;
+import io.github.dailystruggle.effectsapi.bukkit.LocalEffects.enums.SoundTypeNames;
 import org.bukkit.potion.PotionEffectType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,6 +50,10 @@ class EffectsApiAdaptiveReadingOrderTest {
         // Reflectively snapshot is overkill — Effect exposes a setter.
         savedDefaultWarn = msg -> {}; // we don't need the prior value, only restoration to a no-op-equivalent
         Effect.setDefaultWarn(warnings::add);
+        // effects-api-ADR-004: Effect#canParse / #str2Obj / #fixData delegate
+        // to the bound ValueCoercer. The platform initializer runs in a real
+        // server; tests bind it explicitly.
+        EffectFactory.setCoercer(new BukkitValueCoercer());
     }
 
     @AfterEach

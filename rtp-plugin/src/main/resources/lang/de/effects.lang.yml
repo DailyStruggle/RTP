@@ -1,0 +1,13 @@
+# --- Sprachzuordnung: effects.yml ---
+# Bildet interne Konfigurationsschlüssel (links) auf die in effects.yml
+# für Operatoren sichtbaren Schlüssel (rechts) ab.
+# Nur die rechte Seite bearbeiten, um Optionen umzubenennen oder zu übersetzen;
+# die linke Seite ist eine Code-Konstante und darf nicht geändert werden.
+# Fehlt diese Datei, generiert das Plugin automatisch eine englische Fassung
+# mit identischen linken und rechten Werten neu.
+when: ausloeser
+permission: berechtigung
+players: spieler
+inherit: erbt
+effects: effekte
+version: version

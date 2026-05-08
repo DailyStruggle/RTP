@@ -1,6 +1,55 @@
+// effects-api-ADR-003 — In-module platform split.
+//
+// This module hosts three sibling subpackages in a single Gradle module
+// (mirrors the commands-api precedent of common/ + bukkit/ + brigadier/):
+//   - effectsapi/common  : platform-neutral SPI + base types
+//   - effectsapi/bukkit  : Bukkit-backed runtime + concrete effects
+//   - effectsapi/fabric  : Fabric-backed runtime + concrete effects
+//
+// Both platforms are declared compileOnly / modCompileOnly so neither leaks
+// into the runtime classpath of the wrong adapter. Loom is required so the
+// fabric/ subpackage can resolve net.minecraft.* at compile time. This is
+// the same single-module mixed-platform precedent already used by
+// :rtp-plugin (see rtp-plugin/build.gradle Phase-1 comment block).
+//
+// Loom allow-list amendment landed in lockstep with effects-api-ADR-003:
+//   - rtp-fabric-ADR-002 §4 Build Discipline (now lists effects-api).
+//   - rtp-fabric/REQUIREMENTS.md REQ-FABRIC-ARCH-003 (now lists
+//     effects-api and remap scope io/github/dailystruggle/effectsapi/fabric/**).
+plugins {
+    // Version pinned centrally in settings.gradle pluginManagement.plugins {}.
+    // Bare id (no version) avoids the LoomGradleExtension classloader split
+    // documented in settings.gradle.
+    id 'fabric-loom'
+}
+
+ext {
+    // Mirrors :rtp-fabric:rtp-fabric-common; bump in lockstep to avoid drift.
+    minecraftVersion = '1.21.1'
+    loaderVersion    = '0.16.5'
+    fabricApiVersion = '0.115.0+1.21.1'
+}
+
 dependencies {
-    implementation project(':commands-api')
+    // --- common/ + bukkit/ subpackages ---
     compileOnly 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
     testImplementation 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
+
+    // --- fabric/ subpackage ---
+    // Loom-managed Mojmap MC + Fabric loader/api. modCompileOnly (not
+    // modImplementation) keeps fabric-loader and fabric-api off
+    // runtimeClasspath — same reasoning as :rtp-plugin/build.gradle.
+    minecraft "com.mojang:minecraft:${minecraftVersion}"
+    mappings  loom.officialMojangMappings()
+    modCompileOnly "net.fabricmc:fabric-loader:${loaderVersion}"
+    modCompileOnly "net.fabricmc.fabric-api:fabric-api:${fabricApiVersion}"
+
+    // --- pre-existing ---
+    implementation project(':commands-api')
     implementation 'org.jetbrains:annotations:24.1.0'
+
+    // effects-api-ADR-003: the common/ SPI types reference RTPPlayer +
+    // RTPLocation from rtp-api. No cycle — rtp-api has no internal deps,
+    // and rtp-core already depends on both rtp-api and effects-api.
+    implementation project(':rtp-api')
 }

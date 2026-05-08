@@ -88,11 +88,11 @@ class BrigadierTreeShapeTest {
         CommandDispatcher<Source> dispatcher = new CommandDispatcher<>();
         dispatcher.register(BrigadierCommandAdapter.toBrigadier(fixtureRoot(), permissive()));
         // Non-throwing parse + execute is the success criterion; exit code is 1 because StubTreeCommand.onCommand returns true.
-        // The user types only the value at the dispatcher; the adapter reconstructs
-        // the commands-api 'name=value' wire format internally (see
-        // BrigadierCommandAdapter.reconstructArgs and the parity test
-        // ReqApiArch005BrigadierBridgeTest#parameterDispatchReconstructsWireFormat).
-        dispatcher.execute("rtp sub hello", new Source());
+        // The user now types the full 'name=value' token at the dispatcher
+        // (commands-api-ADR-001 addendum 2026-05-06d): each parameter
+        // Brigadier node accepts a single word matching the wire format, and
+        // BrigadierCommandAdapter.reconstructArgs passes it through verbatim.
+        dispatcher.execute("rtp sub p=hello", new Source());
     }
 
     @Test
@@ -100,9 +100,8 @@ class BrigadierTreeShapeTest {
     void siblingChainReachable() throws CommandSyntaxException {
         CommandDispatcher<Source> dispatcher = new CommandDispatcher<>();
         dispatcher.register(BrigadierCommandAdapter.toBrigadier(fixtureRoot(), permissive()));
-        // The user types positional tokens; the bridge maps them to parameter slots in
-        // the order Brigadier walks the tree. With sibling chaining the order is free.
-        dispatcher.execute("rtp foo bar", new Source());
+        // The user types name=value tokens; sibling chaining lets them appear in any order.
+        dispatcher.execute("rtp a=foo b=bar", new Source());
     }
 
     @Test
@@ -111,8 +110,8 @@ class BrigadierTreeShapeTest {
         CommandDispatcher<Source> dispatcher = new CommandDispatcher<>();
         dispatcher.register(BrigadierCommandAdapter.toBrigadier(fixtureRoot(), permissive()));
         // 'a' followed by nested 'x' / 'y' (subParams). Two positional values.
-        dispatcher.execute("rtp foo qux", new Source());
-        dispatcher.execute("rtp foo quux", new Source());
+        dispatcher.execute("rtp a=foo x=qux", new Source());
+        dispatcher.execute("rtp a=foo y=quux", new Source());
     }
 
     @Test
@@ -148,23 +147,22 @@ class BrigadierTreeShapeTest {
     }
 
     @Test
-    @DisplayName("Sub-commands are NOT attached after a parameter has been consumed")
+    @DisplayName("Sub-commands are NOT attached as children of the greedy `args` parameter slot")
     void subCommandNotReachableAfterParameter() {
-        CommandDispatcher<Source> dispatcher = new CommandDispatcher<>();
-        dispatcher.register(BrigadierCommandAdapter.toBrigadier(fixtureRoot(), permissive()));
-        // Per the audit: sub-commands stay positional at the head of args[]; once
-        // a parameter is consumed, sub-command literals are no longer reachable.
-        // Structural assertion: walk the tree, find the 'a' argument node, and
-        // assert it has no 'sub' child. (Brigadier strings parse positionally
-        // so we can't easily distinguish a literal-after-param from a positional
-        // value via dispatcher.execute; the structural check is more reliable.)
+        // commands-api-ADR-001 addendum 2026-05-06e ("Option A" / vanilla-only
+        // greedy slot): per-parameter Brigadier nodes ('a', 'b', etc.) no
+        // longer exist — all wire-format params are captured by a single
+        // RequiredArgument("args", greedyString()) child of the root literal.
+        // The original audit invariant ("sub-commands stay positional, not
+        // children of a parameter slot") is now expressed structurally as:
+        // the greedy `args` slot must not have a literal `sub` child.
         LiteralCommandNode<Source> rootNode = BrigadierCommandAdapter
                 .toBrigadier(fixtureRoot(), permissive())
                 .build();
-        CommandNode<Source> aNode = rootNode.getChild("a");
-        assertNotNull(aNode, "argument node 'a' must exist at the root");
-        assertNull(aNode.getChild("sub"),
-                "sub-command literal must NOT be attached as a child of a parameter node");
+        CommandNode<Source> argsNode = rootNode.getChild("args");
+        assertNotNull(argsNode, "greedy 'args' slot must exist at the root");
+        assertNull(argsNode.getChild("sub"),
+                "sub-command literal must NOT be attached as a child of the greedy args slot");
     }
 
     @Test
@@ -175,10 +173,13 @@ class BrigadierTreeShapeTest {
                 .build();
         int count = countNodes(rootNode);
         // Fixture: 2 top-level params (a + nested {x,y}, b) + 1 sub-command (sub + p).
-        // With sibling chaining + cycle guard, the root branch enumerates permutations
-        // of {a, b} (and under 'a': nested {x,y} also chained as siblings of {b}). The
-        // bound below (<= 64) is generous: a regression that drops the cycle guard
-        // would explode the tree well past this.
+        // commands-api-ADR-001 addendum 2026-05-06e collapsed every per-parameter
+        // Brigadier chain into a single greedy `args` slot, so the new tree has
+        // a tight count: root + greedy `args` slot + 'sub' literal + 'sub's
+        // greedy `args` slot = 4 nodes for this fixture. The previous bound
+        // (<= 64) still holds and is left in place as a generous regression
+        // ceiling — if a future change re-introduces sibling chaining the
+        // bound is what catches a factorial blow-up.
         assertTrue(count <= 64,
                 "Brigadier tree node count " + count + " exceeds documented bound (<= 64); "
                         + "did the cycle guard regress?");
@@ -219,13 +220,17 @@ class BrigadierTreeShapeTest {
     }
 
     @Test
-    @DisplayName("Throwing parameter is skipped, sibling parameter and base /root still register")
-    void throwingParameterIsIsolated() {
+    @DisplayName("Throwing parameter does not abort tree build; greedy args slot still attaches and `/rtp good=val` still parses")
+    void throwingParameterIsIsolated() throws CommandSyntaxException {
         StubTreeCommand root = new StubTreeCommand("rtp");
         root.addParameter("good", new StringParam());
-        // A parameter whose values() throws is fine for tree-build (only invoked
-        // at suggestion time, where we already catch). Simulate a registration-
-        // time throw via a CommandParameter whose subParams() throws.
+        // commands-api-ADR-001 addendum 2026-05-06e: parameters are no longer
+        // attached as their own Brigadier nodes, so a throw inside a single
+        // parameter's metadata callbacks (e.g., subParams()) cannot strip a
+        // sibling node — there are no per-parameter Brigadier nodes to strip.
+        // The relevant isolation invariant is now: the throwing parameter must
+        // not abort the whole tree-build (root + greedy `args` slot must still
+        // exist) AND `/rtp good=val` must still execute through the greedy slot.
         root.addParameter("bad", new StringParam() {
             @Override public Map<String, CommandParameter> subParams(String parameter) {
                 throw new RuntimeException("boom: subParams() failure");
@@ -235,8 +240,14 @@ class BrigadierTreeShapeTest {
         LiteralCommandNode<Source> built = BrigadierCommandAdapter
                 .toBrigadier(root, permissive()).build();
         assertNotNull(built, "root literal must still build despite a throwing parameter");
-        assertNotNull(built.getChild("good"),
-                "well-behaved sibling parameter must remain reachable");
+        assertNotNull(built.getChild("args"),
+                "greedy 'args' slot must still attach despite a throwing parameter");
+
+        CommandDispatcher<Source> dispatcher = new CommandDispatcher<>();
+        dispatcher.register(BrigadierCommandAdapter.toBrigadier(root, permissive()));
+        // The well-behaved parameter is still reachable through the greedy
+        // slot — wire-format token parses and executes server-side.
+        dispatcher.execute("rtp good=foo", new Source());
     }
 
     @Test
@@ -256,7 +267,7 @@ class BrigadierTreeShapeTest {
         dispatcher.register(BrigadierCommandAdapter.toBrigadier(root, permissive()));
         // The parameter node must still parse a typed value (suggestions are a
         // separate path; throwing values() must not strip the node).
-        dispatcher.execute("rtp anything", new Source());
+        dispatcher.execute("rtp p=anything", new Source());
     }
 
     // ------------------------------------------------------------------

@@ -1,0 +1,8 @@
+# --- effects/default-cancel.yml — fallback for the cancel stage ---
+# See effects/default.yml for full schema documentation.
+
+when: cancel
+effects:
+  - SOUND.BLOCK_NOTE_BLOCK_BASS.1.0.0.5
+
+version: "1.0"

@@ -7,6 +7,7 @@ public enum RegionKeys {
   vert,
   requirePermission,
   cacheCap,
+  backlogCacheCap,
   activeChunkCap,
   price,
   spatialResolution,

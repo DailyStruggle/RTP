@@ -1,0 +1,8 @@
+# --- effects/default-pre.yml — fallback for the preteleport stage ---
+# See effects/default.yml for full schema documentation.
+
+when: preteleport
+effects:
+  - POTION.BLINDNESS.40.0
+
+version: "1.0"

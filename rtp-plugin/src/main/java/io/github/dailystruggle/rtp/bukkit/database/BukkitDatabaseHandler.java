@@ -49,29 +49,16 @@ public class BukkitDatabaseHandler {
             }
         }
 
-        switch (type.toLowerCase()) {
-            case "yaml":
-                rtp.databaseAccessor = new YamlFileDatabase(databaseDirectory);
-                break;
-            case "h2":
-                rtp.databaseAccessor = new H2DatabaseAccessor();
-                break;
-            case "mysql":
-                rtp.databaseAccessor = new MySQLDatabaseAccessor(host, port, name, username, password);
-                break;
-            case "postgresql":
-                rtp.databaseAccessor = new PostgreSQLDatabaseAccessor(host, port, name, username, password);
-                break;
-            case "sqlite":
-            default:
-                rtp.databaseAccessor = new SQLiteDatabaseAccessor(
-                        "jdbc:sqlite:" + databaseDirectory.getAbsolutePath() + File.separator + "RTP.db");
-                break;
-        }
+        // Resolve via the shared factory so an unavailable JDBC driver (we cannot shade
+        // every backend) falls back through H2 → flat-file instead of crashing startup.
+        DatabaseAccessorFactory.Result dbResult = DatabaseAccessorFactory.create(
+                type, databaseDirectory, host, port, name, username, password);
+        rtp.databaseAccessor = dbResult.accessor;
+        String effectiveType = dbResult.effectiveType;
 
-        RTP.handleMigration(previousType, type);
+        RTP.handleMigration(previousType, effectiveType);
         try {
-            Files.write(dbStateFile.toPath(), type.getBytes());
+            Files.write(dbStateFile.toPath(), effectiveType.getBytes());
         } catch (Exception e) {
             e.printStackTrace();
         }

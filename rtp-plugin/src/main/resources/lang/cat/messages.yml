@@ -1,0 +1,222 @@
+# --- RTP User-Facing Messages (cat dialect) ---
+# Every meow, hiss, and purr the kitty wants the human staff to read.
+#
+# Formatting:
+#   - Bukkit legacy color codes (e.g. &a, &e, &c)
+#   - Hex color codes (e.g. #2636ef)
+#   - PlaceholderAPI placeholders (when PAPI is installed)
+#
+# Placeholders:
+#   - Shared "[Pn]" placeholders are defined in the `empty_bowls` list below.
+#     [P0] is the RTP prefix by default.
+#   - Per-message placeholders (e.g. [attempts], [world]) are documented inline
+#     above each message that uses them.
+#
+# REQ-RTP-F-013: every user-facing message is configurable here.
+# Note: keys like `busy` and `invalidCommand` are not key-renamed in
+# messages.lang.yml, so they keep their English left-hand names below.
+
+################################################################################
+# Section 1: General Configuration
+################################################################################
+# list of additional placeholders
+# format: Pn - where n is the index in this list
+empty_bowls:
+  - "[RTP]" #P0
+
+################################################################################
+# Section 2: Pouncing
+################################################################################
+# already mid-pounce
+already_pouncing: "&e[P0] mrrp! you're already pouncing!"
+
+# plugin is grooming itself
+pounce_denied_grooming: "&e[P0] pounces are paused while the kitty grooms. try again after a few licks."
+hold_paw_message: "&e[P0] Pouncing in [delay]. Don't twitch your tail"
+kibble_loading: "&e[P0] Loading kibble! please wait..."
+pounce_message: "&e[P0] Pounced in [attempts] attempts, in [processingTime]"
+
+# pounce cancelled
+pounce_cancelled: "&e[P0] Pounce cancelled! mrow."
+
+# couldn't find a safe spot
+# placeholder: [attempts] - the maximum number of attempts
+spooky: "&e[P0] could not find a safe paw-spot within [attempts] attempts"
+
+# kitty is napping (cooldown)
+# placeholder: [remainingCooldown] - the remaining time
+nap_message: "&e[P0] you can't pounce again for [remainingCooldown]. nap first."
+
+# no warm spots ready
+no_warm_spots_left: "#f5eb73[P0] no warm spots ready at this time"
+
+# the line of waiting kitties shifted
+# placeholder: [spot] - the current position in line
+line_of_kitties_updated: "#2636ef[P0] your spot in line: [spot]"
+
+# not enough treats
+# placeholder: [money] - how much money is required for the command
+not_enough_treats: "&e[P0] you need at least $[money] treats for that."
+
+################################################################################
+# Section 3: Time Formatting
+################################################################################
+# for time placeholders: how a kitty counts time
+many_naps: "d"
+long_naps: "h"
+yawns: "m"
+tail_flicks: "s"
+whisker_twitches: "ms"
+
+################################################################################
+# Section 4: System & Management
+################################################################################
+# a config file 'version' is older than the latest
+# placeholder: [filename] - name of file, including file extension
+ancient_scroll: "&b[P0] old [filename] detected. Updating"
+
+# detected a new world
+# placeholder: [world] - the world detected
+new_box: "&b[P0] sniffed a new box '[world]'"
+
+# world doesn't exist
+# placeholder: [world] - the world name
+not_a_real_box: "&e[P0] could not find box '[world]'"
+
+# plugin reload/update text
+# placeholder: [filename] - name of file
+grooming: "&b[P0] grooming [filename]..."
+groomed_complete: "&b[P0] finished grooming [filename]."
+rearranging_whiskers: "&a[P0] rearranging [filename]..."
+groomed: "&a[P0] [filename] all tidy."
+
+# unknown command argument
+# placeholder: [arg] - the argument attempted
+silly_word: "&c[P0] silly word, kitty: [arg]"
+
+# console-only kitty trying a player command
+tall_human_forbidden: "&c[P0] only an in-game kitty can do that, tall human."
+
+# kitty is grooming and busy
+busy: "&c[P0] busy grooming"
+
+# unknown subcommand
+# placeholder: [arg] - the argument attempted
+invalidCommand: "&c[P0] invalid command - [arg]"
+
+# no permission
+no_treats_for_you: "&eI'm sorry, but no treats for you. please ask the head kitty if you think this is wrong."
+
+################################################################################
+# Section 5: Administrative Logs
+################################################################################
+# logged when warm-spots are saved/loaded from the scratching post
+# placeholder: [amount] - number of locations
+# placeholder: [region] - name of region
+warm_spot_saved: "&e[P0] saved [amount] warm-spots for [region]"
+warm_spot_remembered: "&e[P0] remembered [amount] warm-spots for [region]"
+
+################################################################################
+# Section 6: Sniff (Scan) Command
+################################################################################
+# sniff command status messages
+# placeholder: [scan_regions] - list of regions
+start_sniffing: "&a[P0] sniff started for territories: [scan_regions]"
+forget_the_smell: "&e[P0] sniff queue forgotten for territories: [scan_regions]"
+stop_sniffing: "&e[P0] sniff cancelled for territories: [scan_regions]"
+pause_sniffing: "#A020F0[P0] sniff paused for territories: [scan_regions]"
+resume_sniffing: "#10A5F5[P0] sniff resumed for territories: [scan_regions]"
+sniffing_now: "&c[P0] already sniffing territories: [scan_regions]"
+not_sniffing: "&c[P0] not sniffing territories: [scan_regions]"
+# placeholders: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
+sniff_status: "&a[P0] sniffed [scan_chunks] / [scan_totalChunks] kibble for territories: [scan_regions]. [scan_cps] cps. land smell: [scan_landPercentage]%. ETA: [scan_eta]"
+
+################################################################################
+# Section 7: Info (Meow) Command
+################################################################################
+# info command output
+meow_title: "&a======RTP Meow Info======"
+paw_tickets: "&7Global active kibble tickets: &f[tickets]"
+pounces: "&7Active pounce state machines: &f[teleports]"
+meows_per_tick: "&7Current plugin meows-per-tick: &f[mspt]"
+total_naps_disturbed: "&7Lifetime kibble loaded: &f[loads]"
+drool_rate: "&7Current drool (chunk leak) rate: &f[leakRate]"
+hairball_warning_header: "&7--- Hairball disclaimer ---"
+hairball_warning: "&7Hairball note: if the server's total orphaned-kibble count exceeds this kitty's lifetime loads ([loads]), this kitty is not the only droolster."
+box_header: "#008080Boxes:"
+tall_human_box_header: "&7--- Boxes ---"
+box_info_meow: "  #21ADA8[world]"
+territory_header: "#63C5DATerritories:"
+tall_human_territory_header: "&7--- Territories ---"
+territory_meow: "  #52B2BF[region]"
+
+# sub-info listings
+# placeholders: [world], [region], [requirePermission], [override], [shape], [worldBorderOverride], [cacheCap], [cached], [keptCache]
+box_info:
+  - "#21ADA8[world]:"
+  - "#99EEBB  - territory: [region]"
+  - "#99EEBB  - requires_pets: [requirePermission]"
+  - "#99EEBB  - paw_over: [override]"
+
+territory_info:
+  - "#52B2BF[region]:"
+  - "#58CCED  - box: [world]"
+  - "#58CCED  - pounce_shape: [shape]"
+  - "#58CCED  - requires_pets: [requirePermission]"
+  - "#58CCED  - fence_override: [worldBorderOverride]"
+  - "#58CCED  - kibble_jar_lid: [cacheCap]"
+  - "#58CCED  - hot_pile: [keptCache]"
+  - "#58CCED  - cached: [cached]"
+
+################################################################################
+# Section 8: Command Descriptions
+################################################################################
+# shown in the help (ask-for-pets) command
+pounce: "&b/rtp - pounce to a random spot"
+pounce_description: "pounce to a random spot"
+ask_for_pets: "&b/rtp help - mrrp, see this list"
+ask_for_pets_description: "describe commands"
+groom: "&b/rtp reload - re-lick config files"
+groom_description: "re-lick config files"
+sniff: "&b/rtp scan - try every territory placement to make pouncing faster"
+sniff_description: "forget stored data and try every territory placement"
+setup_description: "update config files at runtime"
+meow_info_description: "check the kitty's current state"
+practice_pounce_description: "practice-test RTP functions"
+
+################################################################################
+# Section 9: PlaceholderAPI Support
+################################################################################
+# kitty status placeholders
+KITTY_READY: "&aREADY TO POUNCE"
+KITTY_NAP: "&eNAPPING"
+KITTY_PREP: "&bPICKING A WARM SPOT"
+KITTY_WAKING_UP: "&bLOADING KIBBLE"
+KITTY_POUNCING: "&bPOUNCING"
+
+################################################################################
+# Section 10: Visuals
+################################################################################
+# title settings
+# remove or set big_meow to "" to disable
+# PlaceholderAPI is recommended for coordinates
+big_meow: "#FF6B6BM#FF8560e#FF9F55o#FFBA4Aw#FFD53F!#E8E040 #BFED41p#96F542o#6DF543u#44F2A0n#3BEFC8c#38ECF0e#38ECF0d#38ECF0!"
+little_meow: "#A78BFAm#B47EF8r#C171F6r#CE64F4p#DB57F2 #E84AF0h#E855D8a#E860C0v#E86BA8e#E876A0 #E876A0f#E876A0u#E876A0n#E876A0!"
+slow_blink_in: 20
+stay_visible: 20
+slow_blink_out: 20
+
+# tummy_strip (actionbar) setting
+tummy_strip: ""
+
+################################################################################
+# Section 11: Metadata
+################################################################################
+# Do not bite the version number, sacred catnip
+meowsion: "1.0"
+
+################################################################################
+# Section 12: Developer Options
+################################################################################
+# set to true to append a kitten tag (e.g. §8(RTP:ClassName)) to every message
+show_kitten_tag: false

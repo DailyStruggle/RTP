@@ -1,7 +1,7 @@
 # ADR-028 — L3 Backlog Cache (`backlogLocations`)
 
-- **Status**: Proposed
-- **Date**: 2026-05-02
+- **Status**: Accepted (amended 2026-05-08)
+- **Date**: 2026-05-08 (amended; accepted 2026-05-07; originally proposed 2026-05-02)
 - **Supersedes**: —
 - **Related**: ADR-006 (async queue pre-generation), ADR-015 (stale-chunk guard / count-bound pipes), ADR-016 (anvil subsystem), ADR-023 (login reserve cache), `REQ-RTP-S-005` (no chunk loading on the main thread)
 
@@ -45,19 +45,43 @@ shape pick ──▶ L3 backlog ──(anvil-verified, in original order)──�
 
 ### Semantics
 
-- **Order-preserving FIFO with a `verified` flag.** Each entry carries a
-  boolean `verified` flag. Entries are inserted in selection order and **are
-  never reordered**.
-- **Head-blocking promotion.** Only contiguous verified entries at the head
-  of L3 are eligible for promotion to L2. An unverified entry at position 0
-  blocks all later entries from advancing, even if those later entries have
-  already been verified.
+- **Storage.** Per-RTP-region `BacklogLocationBuffer` (order-preserving
+  FIFO, capacity-bounded by `backlogCacheCap`). Entries are inserted in
+  selection order and **are never reordered**. The buffer is the sole
+  storage of an L3 entry.
+- **Three-state validity.** Each entry carries a tri-state validity tag:
+  `UNVERIFIED` (not yet probed), `VALIDATED` (anvil pre-filter passed),
+  or `INVALIDATED` (anvil pre-filter rejected). This replaces the earlier
+  two-state `verified` boolean.
+- **Cross-region bin index (world-level).** Each `RTPWorld` carries a
+  `Map<RegionFileCoord, WeakReference<List<BacklogEntry>>>` indexing every
+  in-flight L3 entry across all RTP regions targeting that world by its
+  `.mca` region-file coordinate. Entries are added to *both* the owning
+  RTP region's buffer and the world-level bin list at insertion; the
+  world map is **not** a second storage — bin lists hold references back
+  into the region buffers' entries, so a single anvil pass over a bin
+  updates the validity tag for every contributing region simultaneously.
+  Weak references allow a bin's list to be GC'd when no contributing
+  region still holds it; the next entry inserted into that bin re-creates
+  the list. Bin-list size is implicitly bounded by Σ(`backlogCacheCap`)
+  across regions sharing the world; `backlogCacheCap` itself caps only
+  the per-region buffer, not the world map.
+- **Head-blocking promotion.** Only contiguous `VALIDATED` entries at the
+  head of an L3 buffer are eligible for promotion to L2. An `UNVERIFIED`
+  or `INVALIDATED` entry at position 0 blocks all later entries from
+  advancing, even if those later entries have already been validated.
+  (`INVALIDATED` head entries are dropped on the next pulse, then the
+  next contiguous-`VALIDATED` run is promoted.)
 - **One bin per `Region.execute()` pulse.** On each pulse, the verifier
   picks the bin (32 × 32 chunks = one `.mca` region file) containing the
-  *oldest* unverified L3 entry, runs the Anvil pre-filter for every L3
-  entry whose chunk lies inside that bin, and marks each entry's `verified`
-  flag accordingly. This bounds per-pulse work and amortizes the
-  region-file read across all candidates in the bin.
+  *oldest* `UNVERIFIED` entry of *this region's* L3 buffer, looks up the
+  world-level bin list for that `RegionFileCoord`, runs the Anvil
+  pre-filter for every entry in the bin list (cross-region amortization),
+  and updates each entry's validity tag to `VALIDATED` or `INVALIDATED`.
+  This bounds per-pulse work, amortizes the region-file read across all
+  candidates in the bin regardless of which RTP region contributed them,
+  and preserves L3 buffer order (no reordering — the bin index is just a
+  lookup keyed by `RegionFileCoord`).
 - **Verification path is anvil-prefilter only.** Full pipeline verification
   (chunk-load + vert + safety) still happens later, at L2 → L1 promotion,
   unchanged. L3 verification is purely a cheap *rejection* pass — entries
@@ -102,11 +126,15 @@ until the buffer reaches `backlogCacheCap`. This is S-005-safe because
 shape selection is pure math — no chunk loads occur during L3 refill.
 
 The existing L2 deficit loop is **not modified**, with one addition: at the
-top of each pulse, after the L3 refill, the verifier promotes any
-contiguous head-of-L3 verified entries into L2 (subject to L2's
-`cacheCap`). If L2 is already at cap, head-of-L3 entries simply wait — the
-buffer is intentionally allowed to sit idle when downstream cannot drain
-it.
+top of each pulse, after the L3 refill and the bin-verification step,
+`Region.execute()` drains the head of this region's L3 buffer while the
+head entry's validity is `VALIDATED`, promoting each into L2 (subject to
+L2's `cacheCap`); `INVALIDATED` head entries are discarded; iteration
+stops at the first `UNVERIFIED` head entry or when L2 reaches cap. If L2
+is already at cap, head-of-L3 validated entries simply wait — the buffer
+is intentionally allowed to sit idle when downstream cannot drain it.
+All three steps (refill, verify-one-bin, drain-head-validated) execute
+linearly within `Region.execute()`; there is no producer/consumer split.
 
 ## Alternatives Considered
 
@@ -184,11 +212,13 @@ change. Anticipated touch points:
 |---|---|
 | Config key | `RegionKeys.backlogCacheCap` |
 | Settings field | `RegionSettings.backlogCacheCap` (record component) |
-| Buffer | `RegionQueueManager.backlogLocations` (nullable) |
-| Buffer type | New `BacklogLocationBuffer` (order-preserving, per-entry `verified` flag) |
+| Buffer (per RTP region) | `RegionQueueManager.backlogLocations` (nullable) |
+| Buffer type | New `BacklogLocationBuffer` (order-preserving, per-entry tri-state validity tag) |
+| Cross-region bin index | New `RTPWorld.backlogBinsByRegionFile` — `Map<RegionFileCoord, WeakReference<List<BacklogEntry>>>`; populated on insert, weakly held |
+| Bin coord type | New `RegionFileCoord` value type (`(cx>>5, cz>>5)`) |
 | Refill | extension to `Region.execute()` ahead of the existing L2 deficit loop |
-| Verify | new per-pulse step: pick oldest-unverified bin → anvil pre-filter → mark `verified` |
-| Promote | head-only contiguous-verified promotion to `unkeptLocations` |
+| Verify | new per-pulse step: pick this region's oldest-`UNVERIFIED` entry → look up world bin → anvil pre-filter every entry in the bin list → set tri-state validity |
+| Promote | head-only contiguous-`VALIDATED` promotion to `unkeptLocations` (drop `INVALIDATED` head, stop on `UNVERIFIED`), inline within `Region.execute()` |
 | Templates | `rtp-plugin/src/main/resources/regions/default.yml`, `rtp-plugin/src/main/resources/lang/regions.lang.yml` (+ de/es/fr/nl) |
 | Placeholder | `%rtp_backlogCacheCap%` (mirror of `%rtp_cacheCap%`) |
 | Memory accounting | `MemoryTracker.totalCacheCap` includes `backlogCacheCap` |

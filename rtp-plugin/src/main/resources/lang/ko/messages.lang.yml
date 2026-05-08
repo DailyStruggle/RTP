@@ -1,0 +1,84 @@
+# --- 언어 매핑: messages.yml ---
+# 내부 메시지 키 이름(왼쪽)을 messages.yml 에서 운영자에게 보이는 키 이름(오른쪽)에 매핑합니다.
+# 키 이름을 변경하거나 번역하려면 오른쪽만 편집하세요.
+# 왼쪽은 코드 상수이므로 변경하지 마세요.
+# 참고: 이 파일은 키 이름만 매핑합니다. 번역된 메시지 본문은 messages.yml 에 있습니다.
+# 이 파일이 존재하지 않으면 플러그인은 좌우가 동일한 영어 버전을 다시 생성합니다.
+
+oldFile: 구파일
+infoTitle: 정보제목
+worldInfo: 월드정보
+placeholders: 자리표시자
+teleportMessage: 텔레포트메시지
+noLocationsQueued: 가능한위치없음
+scanNotRunning: 스캔미실행
+scanCancel: 스캔취소
+PLAYER_COOLDOWN: 플레이어_쿨다운
+seconds: 초
+scanPause: 스캔일시중지
+updating: 업데이트중
+regionInfo: 리전정보
+PLAYER_AVAILABLE: 플레이어_사용가능
+consoleCmdNotAllowed: 콘솔불가
+queueUpdate: 큐업데이트
+delayMessage: 지연메시지
+PLAYER_TELEPORTING: 플레이어_텔레포트중
+alreadyTeleporting: 이미텔레포트중
+teleportDeniedReloading: 텔레포트거부_리로드중
+invalidWorld: 잘못된월드
+infoTickets: 정보_티켓
+infoTeleports: 정보_텔레포트
+infoMSPT: 정보_MSPT
+infoTotalLoads: 정보_총로드수
+infoLeakRate: 정보_누수율
+infoDisclaimerHeader: 정보_면책_헤더
+infoDisclaimer: 정보_면책
+infoConsoleWorldHeader: 정보_콘솔_월드헤더
+infoConsoleRegionHeader: 정보_콘솔_리전헤더
+minutes: 분
+teleportCancel: 텔레포트취소
+infoWorldHeader: 정보_월드헤더
+noPerms: 권한없음
+scan: 스캔
+version: version
+notEnoughMoney: 잔액부족
+cooldownMessage: 쿨다운메시지
+scanResume: 스캔재개
+subtitle: 서브타이틀
+millis: 밀리초
+updated: 업데이트완료
+fadeOut: 페이드아웃
+reloading: 리로드중
+reloaded: 리로드완료
+PLAYER_LOADING: 플레이어_로딩중
+unsafe: 위험
+scanStart: 스캔시작
+scanReset: 스캔리셋
+title: 타이틀
+actionbar: 액션바
+badArg: 잘못된인수
+locationSaved: 위치저장
+locationLoaded: 위치로드
+reload: 리로드
+fadeIn: 페이드인
+infoRegionHeader: 정보_리전헤더
+hours: 시간
+PLAYER_SETUP: 플레이어_준비
+rtp: rtp
+stay: 표시시간
+help: 도움말
+rtp_description: rtp_설명
+help_description: 도움말_설명
+reload_description: 리로드_설명
+scan_description: 스캔_설명
+config_description: 설정_설명
+info_description: 정보_설명
+test_description: 테스트_설명
+scanStatus: 스캔상태
+infoWorld: 정보월드
+chunkLoading: 청크로딩중
+newWorld: 신규월드
+scanRunning: 스캔실행중
+days: 일
+infoRegion: 정보리전
+showDevTag: 개발태그표시

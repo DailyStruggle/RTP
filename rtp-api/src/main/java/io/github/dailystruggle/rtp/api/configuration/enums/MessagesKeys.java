@@ -109,6 +109,27 @@ public enum MessagesKeys {
   infoTotalLoads,
   /** Info line showing the chunk-ticket leak rate (tickets not released in time). */
   infoLeakRate,
+  /**
+   * Info line showing the cumulative depth of {@code RegionQueueManager.playerQueue}
+   * (the {@code [queueDepth]} placeholder, sourced from {@code Metrics.snapshot()}).
+   * Part of the metrics health block — see {@code docs/dev/METRICS_PLAN.md > /rtp info}.
+   */
+  infoQueueDepth,
+  /**
+   * Info line showing the count of in-flight {@code TeleportPipelineTask}s
+   * (the {@code [pendingTeleports]} placeholder).
+   */
+  infoPendingTeleports,
+  /**
+   * Info line showing the rolling-mean pipeline latency
+   * (the {@code [avgPipelineMs]} placeholder).
+   */
+  infoAvgPipelineMs,
+  /**
+   * Info line showing JVM heap usage
+   * (the {@code [heapUsedMb]} / {@code [heapMaxMb]} placeholders).
+   */
+  infoHeap,
   /** Header for the diagnostic disclaimer block in {@code /rtp info} output. */
   infoDisclaimerHeader,
   /** Disclaimer text reminding server operators to include info output in bug reports. */

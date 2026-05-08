@@ -1,0 +1,215 @@
+package io.github.dailystruggle.rtp.common.selection.region;
+
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Bounded, order-preserving FIFO buffer of pre-selected but not-yet-fully-verified
+ * candidate locations for the L3 backlog cache (ADR-028).
+ *
+ * <p>Each entry carries a tri-state {@link Validity} tag:
+ * <ul>
+ *   <li>{@link Validity#UNVERIFIED} — the candidate has not yet been examined by
+ *       the Anvil pre-filter.</li>
+ *   <li>{@link Validity#VALIDATED} — the candidate passed the Anvil pre-filter
+ *       and is ready to be promoted into L2 ({@code unkeptLocations}).</li>
+ *   <li>{@link Validity#INVALIDATED} — the candidate failed the Anvil pre-filter
+ *       and must be discarded; it does not stall promotion of younger entries.</li>
+ * </ul>
+ *
+ * <h2>Order preservation</h2>
+ * Insertion order is preserved. Promotion via {@link #pollContiguousValidatedHead(int)}
+ * drains the head while it is {@link Validity#VALIDATED}, dropping any
+ * {@link Validity#INVALIDATED} entries it encounters at the head, and stops at
+ * the first {@link Validity#UNVERIFIED} entry. This is the &quot;head-blocking&quot;
+ * semantics that lets L3 behave as a virtual L2 from the consumer's perspective.
+ *
+ * <h2>Capacity</h2>
+ * The buffer is bounded by its construction-time capacity (mirroring
+ * {@code backlogCacheCap} from the owning region's {@link RegionSettings}). Once
+ * full, {@link #offerUnverified(RTPLocation)} returns {@code null} and the caller
+ * is expected to skip the insert; older entries are <em>not</em> evicted.
+ *
+ * <h2>Thread-safety</h2>
+ * This class is not internally synchronized. The expected usage model is
+ * single-writer from {@code Region.execute()}; cross-thread visibility of
+ * validity transitions is provided by the {@code volatile} field on
+ * {@link BacklogEntry}. If multi-threaded mutation is ever required, callers
+ * must add their own synchronization.
+ *
+ * @see BacklogEntry
+ * @see Validity
+ * @see RegionFileCoord
+ */
+public final class BacklogLocationBuffer {
+
+  /** Tri-state per-entry validity tag. */
+  public enum Validity {
+    /** Not yet examined by the Anvil pre-filter. Blocks promotion at the head. */
+    UNVERIFIED,
+    /** Passed the Anvil pre-filter; eligible for promotion. */
+    VALIDATED,
+    /** Failed the Anvil pre-filter; dropped from the head, never promoted. */
+    INVALIDATED
+  }
+
+  /**
+   * One unverified-or-verified entry in the L3 backlog. Identity-equal
+   * (intentional): the same entry instance is shared between the owning
+   * {@link BacklogLocationBuffer} and the world-level cross-region bin index, so
+   * a single validity write is observable from both readers.
+   */
+  public static final class BacklogEntry {
+    private final RTPLocation location;
+    private volatile Validity validity;
+    /**
+     * Strong reference to the world-bin list this entry was inserted into, if any.
+     * Pinning the list here keeps it alive in the {@link WorldBacklogBinIndex}'s
+     * {@link java.lang.ref.WeakReference} for as long as the entry itself is
+     * live in some {@link BacklogLocationBuffer}. Once every contributing entry
+     * is removed (buffer drains or clears), the list becomes GC-eligible.
+     */
+    @SuppressWarnings("unused")
+    private Object pinnedBinList;
+
+    BacklogEntry(RTPLocation location) {
+      this.location = Objects.requireNonNull(location, "location");
+      this.validity = Validity.UNVERIFIED;
+    }
+
+    /**
+     * Pins the world-bin list reference so it stays alive while this entry is.
+     * Called by {@link WorldBacklogBinIndex#insert}. Idempotent within a single
+     * insert; subsequent calls overwrite (only one bin per entry by design).
+     *
+     * @param binList list reference to pin; never {@code null}
+     */
+    void pinBinList(Object binList) {
+      this.pinnedBinList = Objects.requireNonNull(binList, "binList");
+    }
+
+    /** @return the candidate location; never {@code null}. */
+    public RTPLocation location() {
+      return location;
+    }
+
+    /** @return current validity; reads are visible across threads ({@code volatile}). */
+    public Validity validity() {
+      return validity;
+    }
+
+    /**
+     * Sets the validity tag. Intended to be called by the verification stage
+     * inside {@code Region.execute()}. Writes are visible to any thread that
+     * subsequently reads {@link #validity()}.
+     *
+     * @param next new tag; never {@code null}
+     */
+    public void setValidity(Validity next) {
+      this.validity = Objects.requireNonNull(next, "validity");
+    }
+  }
+
+  private final int capacity;
+  private final Deque<BacklogEntry> entries;
+
+  /**
+   * @param capacity maximum number of entries; must be positive. Mirrors
+   *                 {@code RegionSettings.backlogCacheCap}.
+   * @throws IllegalArgumentException if {@code capacity <= 0}
+   */
+  public BacklogLocationBuffer(int capacity) {
+    if (capacity <= 0) {
+      throw new IllegalArgumentException("capacity must be positive: " + capacity);
+    }
+    this.capacity = capacity;
+    this.entries = new ArrayDeque<>(Math.min(capacity, 1024));
+  }
+
+  /** @return the buffer's maximum capacity. */
+  public int capacity() {
+    return capacity;
+  }
+
+  /**
+   * Appends a fresh {@link Validity#UNVERIFIED} entry wrapping {@code location}.
+   *
+   * @param location candidate location; never {@code null}
+   * @return the newly created entry, or {@code null} if the buffer is at capacity
+   */
+  public BacklogEntry offerUnverified(RTPLocation location) {
+    Objects.requireNonNull(location, "location");
+    if (entries.size() >= capacity) return null;
+    BacklogEntry entry = new BacklogEntry(location);
+    entries.addLast(entry);
+    return entry;
+  }
+
+  /**
+   * Drains contiguous {@link Validity#VALIDATED} entries from the head, dropping
+   * any {@link Validity#INVALIDATED} head entries it encounters along the way.
+   * Stops at the first {@link Validity#UNVERIFIED} entry, when {@code maxN}
+   * validated entries have been collected, or when the buffer is empty.
+   *
+   * @param maxN maximum number of validated entries to return; must be
+   *             non-negative. {@code 0} returns an empty list (but still drops
+   *             any {@code INVALIDATED} head entries as a side effect).
+   * @return validated entries in insertion order; never {@code null}, possibly empty
+   */
+  public List<BacklogEntry> pollContiguousValidatedHead(int maxN) {
+    if (maxN < 0) throw new IllegalArgumentException("maxN must be non-negative: " + maxN);
+    List<BacklogEntry> out = new ArrayList<>(Math.min(maxN, 16));
+    while (!entries.isEmpty()) {
+      BacklogEntry head = entries.peekFirst();
+      Validity v = head.validity();
+      if (v == Validity.INVALIDATED) {
+        entries.pollFirst();
+        continue;
+      }
+      if (v == Validity.UNVERIFIED) break;
+      // VALIDATED
+      if (out.size() >= maxN) break;
+      out.add(entries.pollFirst());
+    }
+    return out;
+  }
+
+  /**
+   * @return the oldest entry whose validity is still {@link Validity#UNVERIFIED},
+   *         or {@code null} if the buffer contains no such entry. Used to pick
+   *         the next bin to verify in {@code Region.execute()}.
+   */
+  public BacklogEntry peekOldestUnverified() {
+    for (BacklogEntry e : entries) {
+      if (e.validity() == Validity.UNVERIFIED) return e;
+    }
+    return null;
+  }
+
+  /** @return current entry count, including all validity states. */
+  public int size() {
+    return entries.size();
+  }
+
+  /** @return number of entries currently tagged {@link Validity#VALIDATED}. */
+  public int validatedSize() {
+    int n = 0;
+    for (BacklogEntry e : entries) {
+      if (e.validity() == Validity.VALIDATED) n++;
+    }
+    return n;
+  }
+
+  /** @return {@code true} if no entries are present. */
+  public boolean isEmpty() {
+    return entries.isEmpty();
+  }
+
+  /** Removes all entries. Validity tags on already-issued entries are unaffected. */
+  public void clear() {
+    entries.clear();
+  }
+}

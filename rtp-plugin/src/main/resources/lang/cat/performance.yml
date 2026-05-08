@@ -1,0 +1,23 @@
+# --- RTP Performance Settings (cat dialect) ---
+# How fast a kitty can stalk and pounce without knocking over the lamp.
+
+max_pounces: 32                       # Max pounce attempts before giving up
+stalking_distance: 0                  # Kibble (chunk) radius to load while stalking
+pounce_distance: 0                    # Kibble (chunk) radius to load just before pouncing
+tail_swish_period: 20                 # Tail flicks (ticks) between background sniff cycles
+sync_nap_time: 50                     # Max whisker-twitches per tick for sync errands
+async_nap_time: 50                    # Max whisker-twitches per tick for async errands
+minimum_purrs_per_second: 19.0        # Minimum purrs/sec (TPS) to keep sniffing in the background
+line_up_after_pounce: false           # Refill the warm-spot pile right after a pounce
+synced_kibble: false                  # Use sync chunk loading (NOT RECOMMENDED, may pull tail)
+sniff_on_event: false                 # Re-sniff permissions on every event
+sparkle_parsing: true                 # Parse sparkle (effect) permissions at startup
+smell_memory: true                    # Reuse already-known biome warm-spots
+forced_smell_memory: false            # Only use biomes already remembered (no new sniffing)
+check_when_kibble_arrives: false      # Check for warm-spots in every loaded kibble (chunk)
+visitorEnabled: false                 # Enable background data gathering by visiting kitties
+loginCacheEnabled: false              # Keep a reserved warm-spot pile for join-time pounces (rtp.onevent.firstjoin / rtp.onevent.join). Sized by remaining empty kitty slots.
+loginCacheCap: 0                      # Hard lid for the join warm-spot pile. 0 = auto (server max-kitties at startup).
+
+# Do not bite the version number, sacred catnip
+meowsion: "1.0"

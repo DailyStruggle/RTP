@@ -1,0 +1,21 @@
+# --- 언어 매핑: performance.yml ---
+# 내부 설정 키 이름(왼쪽)을 performance.yml 에서 운영자에게 보이는 키 이름(오른쪽)에 매핑합니다.
+# 옵션 이름을 변경하거나 번역하려면 오른쪽만 편집하세요.
+# 왼쪽은 코드 상수이므로 변경하지 마세요.
+# 이 파일이 존재하지 않으면 플러그인은 좌우가 동일한 영어 버전을 다시 생성합니다.
+
+period: 주기
+viewDistanceSelect: 시야거리_선택
+biomeRecall: 바이옴기억
+version: version
+maxAttempts: 최대시도횟수
+biomeRecallForced: 바이옴기억_강제
+onEventParsing: 이벤트시파싱
+checkOnChunkLoads: 청크로드시검사
+postTeleportQueueing: 텔레포트후큐잉
+syncLoading: 동기로딩
+effectParsing: 이펙트파싱
+viewDistanceTeleport: 시야거리_텔레포트
+minTPS: 최소TPS
+syncAllottedTime: 할당시간_동기
+asyncAllottedTime: 할당시간_비동기

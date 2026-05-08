@@ -1,0 +1,56 @@
+# --- RTP Main Settings (cat dialect) ---
+# Mrrp! The language the human staff sees in their messages.
+# Default: "en" (English baseline bundled with messages.yml).
+# Other dialects live under lang/<locale>/messages.yml and are layered on top.
+# Missing keys silently fall back to English. Unknown locales hiss a warning
+# and also fall back to English.
+# See ADR-020 and REQ-RTP-F-013.
+language: "en"
+
+# Stalk delay (tail flicks)
+# How long the kitty crouches before the actual pounce.
+# Gives the server time to pre-load destination kibble.
+stalk_delay: 2
+
+# Too-far-to-chase (blocks)
+# If the kitty wanders this far during the crouch, the pounce is cancelled.
+# Set -1 to disable.
+too_far_to_chase: 2
+
+# Nap time (tail flicks)
+# How long a kitty must nap before pouncing again.
+nap_time: 300
+
+# Post-pounce tricks
+# Commands the tall human runs after a successful pounce.
+# Placeholder [player] is the kitty's name.
+tall_human_tricks:
+  - "say [player] has just randomly pounced! Mrrow!"
+human_tricks:
+  - ""
+
+# --- Scratching post (database) ---
+# Where cached warm-spots and kitty data are remembered.
+scratching_post:
+  # Allowed types: yaml, sqlite, mysql, postgresql
+  # - yaml/sqlite: local file (no extra setup)
+  # - mysql/postgresql: remote post (credentials below)
+  type: "sqlite"
+  # Network post credentials (ignored for local types)
+  host: "127.0.0.1"
+  port: 3306
+  name: "rtp"
+  username: "root"
+  password: "password"
+
+# --- Yarn ball (network sync) ---
+# Redis is used to share warm-spots between many tall-human boxes.
+yarn_ball:
+  redis:
+    enabled: false
+    host: "127.0.0.1"
+    port: 6379
+    password: ""
+
+# Do not bite the version number, sacred catnip
+meowsion: "3.0"

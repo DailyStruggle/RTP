@@ -17,10 +17,12 @@ public class H2DatabaseAccessor extends AbstractSQLDatabaseAccessor {
     // classloader) cannot see drivers shipped inside the mod jar — leading
     // to "No suitable driver found for jdbc:h2:..." at DriverManager.getConnection.
     //
-    // The string literal below is rewritten by Shadow's relocator to the
-    // shaded package (io.github.dailystruggle.rtp.h2.Driver) at build time,
-    // so the same source works for both the relocated Pro/Fabric jar and
-    // any non-relocated test/dev classpath that has plain org.h2 on it.
+    // H2 is no longer shaded into the RTP jar (we cannot bundle every JDBC
+    // driver — see DatabaseAccessorFactory). Admins who select database.type=h2
+    // must drop `h2-*.jar` onto the server classpath; otherwise the factory's
+    // Class.forName probe falls back to flat-file YAML before this accessor is
+    // ever constructed, so reaching the catch below should be effectively
+    // impossible at runtime.
     try {
       Class.forName("org.h2.Driver");
     } catch (ClassNotFoundException e) {

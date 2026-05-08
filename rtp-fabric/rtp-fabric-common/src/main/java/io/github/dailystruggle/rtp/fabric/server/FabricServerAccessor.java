@@ -118,6 +118,17 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     this.scheduler.setServer(server);
   }
 
+  /**
+   * Return the bound {@link MinecraftServer}, or {@code null} when the server
+   * has not yet started (pre-SERVER_STARTED) or has stopped. Exposed so
+   * post-teleport hooks (effects, console/player command dispatch) can route
+   * through the server thread without each call site re-deriving the server
+   * reference.
+   */
+  public @Nullable MinecraftServer getServer() {
+    return this.server;
+  }
+
   /** Called by {@code FabricEventBridge} on SERVER_STOPPING. */
   public void unbindServer() {
     this.scheduler.clearServer();

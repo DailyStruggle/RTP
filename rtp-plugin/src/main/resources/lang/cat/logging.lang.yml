@@ -1,0 +1,17 @@
+# --- Language Mapping: logging.yml (cat dialect) ---
+# The diary of every hiss and purr. Edit only the right side.
+
+event_changeworld: hopped_to_new_box
+event_respawn: nine_lives_used
+detailed_reload: long_grooming_session
+teleport: pounce
+event_join: new_kitty_arrived
+selection_failure: missed_the_pounce
+system_memory_tracker: snack_inventory
+system_database: scratching_post
+event_teleport: pounce_event
+version: meowsion
+detailed_region_init: territory_marking
+command: human_trick
+event_move: prowl
+min_level: minimum_meow_volume

@@ -43,7 +43,7 @@ class ReqApiArch005BrigadierBridgeTest {
     }
 
     @Test
-    @DisplayName("toBrigadier emits root literal, sub-literal, and integer argument nodes")
+    @DisplayName("toBrigadier emits root literal, sub-literal, and the unified greedy `args` slot (no per-parameter Brigadier nodes)")
     void emitsExpectedNodeStructure() {
         TreeCommand root = new StubTreeCommand("rtp", "");
         TreeCommand reload = new StubTreeCommand("reload", "rtp.reload");
@@ -61,14 +61,26 @@ class ReqApiArch005BrigadierBridgeTest {
         assertEquals("rtp", rootNode.getName(), "root literal name");
 
         Map<String, ? extends CommandNode<Source>> children = mapByName(rootNode.getChildren());
+        // commands-api-ADR-001 addendum 2026-05-06e ("Option A" / vanilla-only
+        // greedy slot): per-parameter Brigadier nodes (e.g. 'count') are no
+        // longer emitted. Parameters live behind a single greedy `args` slot
+        // and are tokenised server-side. The expected children are therefore:
+        //   - 'reload' (sub-command literal), and
+        //   - 'args' (RequiredArgument with greedyString() ArgumentType).
+        // A regression that re-introduced a custom ArgumentType per parameter
+        // would re-add a 'count' node here AND \u2014 critically \u2014 re-trigger the
+        // vanilla-client kick on Fabric.
         assertTrue(children.containsKey("reload"), "expected literal sub-command 'reload'");
-        assertTrue(children.containsKey("count"), "expected argument node 'count'");
+        assertTrue(children.containsKey("args"),
+                "expected greedy 'args' parameter slot at the root");
+        assertFalse(children.containsKey("count"),
+                "per-parameter Brigadier node 'count' must NOT exist \u2014 parameters live behind the greedy args slot");
 
-        // 'count' must be a typed argument node, not a literal.
-        CommandNode<Source> countNode = children.get("count");
-        assertEquals("count", countNode.getName());
-        assertFalse(countNode instanceof LiteralCommandNode,
-                "'count' should be a RequiredArgumentBuilder node, not a literal");
+        // 'args' must be a typed argument node, not a literal.
+        CommandNode<Source> argsNode = children.get("args");
+        assertEquals("args", argsNode.getName());
+        assertFalse(argsNode instanceof LiteralCommandNode,
+                "'args' should be a RequiredArgumentBuilder node, not a literal");
     }
 
     @Test
@@ -200,7 +212,7 @@ class ReqApiArch005BrigadierBridgeTest {
         CommandDispatcher<Source> dispatcher = new CommandDispatcher<>();
         dispatcher.register(BrigadierCommandAdapter.toBrigadier(root, ctx));
 
-        dispatcher.execute("rtp 7", source);
+        dispatcher.execute("rtp count=7", source);
         assertNotNull(capturedArgs.get());
         assertEquals(1, capturedArgs.get().length);
         assertEquals("count=7", capturedArgs.get()[0],

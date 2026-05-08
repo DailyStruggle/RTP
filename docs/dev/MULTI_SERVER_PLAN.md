@@ -1,6 +1,6 @@
 # Multi-Server (Proxy) Support Roadmap
 
-This document outlines the plan for RTP's multi-server (proxy / network) expansion. It is **distinct from** [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md): that plan covers running on additional Minecraft server flavours (Spigot/Paper/Folia/Fabric); *this* plan covers coordinating RTP across **multiple concurrent backend servers** sitting behind a proxy (Velocity, BungeeCord, Waterfall).
+This document outlines the plan for RTP's multi-server (proxy / network) expansion. It is **distinct from** [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md): that plan covers running on additional Minecraft server flavours (Spigot/Paper/Folia/Fabric); *this* plan covers coordinating RTP across **multiple concurrent backend servers** — and, as of 2026-05-07, **multiple concurrent proxy instances** — sitting in front of those backends (Velocity, BungeeCord, Waterfall).
 
 > Status: **Draft — Phase 0 (Scope Unlock) not yet started.** No code changes have been made; no ADR has been accepted. This document is gated by Rule D-005 (Propose Before Implementation, see [`AGENTS.md`](../../.junie/AGENTS.md)).
 
@@ -23,16 +23,17 @@ The plan is designed around a single explicit operator workflow. Anything that c
 ### Goals
 
 - **One artifact, every target.** The same RTP JAR drops into a Spigot/Paper/Folia backend, a Fabric backend, a Velocity proxy, or a BungeeCord/Waterfall proxy. The runtime detects the host platform and activates the relevant entry point — extending the single-JAR / multi-loader pattern already established by [rtp-fabric-ADR-002](../../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) to the proxy axis as well. Operators never pick between "the proxy build" and "the backend build".
+- **Multi-proxy by default.** Operators may run any number of proxy instances concurrently — for HA failover, geo-distributed front-doors, or capacity scaling — and the same `network.yml` (with a per-host `proxyId`, analogous to `serverId`) drops onto every proxy. Coordination between proxies is achieved entirely through the durable shared store (D2/D3); proxies do **not** talk to each other directly. See *Multi-Proxy Deployment* below.
 - **Minimal proxy-side configuration.** A proxy's job is to *route* RTP requests, not to own world data. Its configuration shall reduce to: a transport / database reference (Redis or JDBC URL), a shared secret, and the trigger / load-balancer policy. No region definitions, no world tables, no per-backend mirrors of backend-side config.
-- **Verbatim copy across backends.** An operator shall be able to author `network.yml` once, copy it byte-for-byte to every backend, and only have to change a single per-host field (`network.serverId`). This rules out config sprawl: anything that *must* differ between backends is either auto-derived (e.g. heartbeat timestamps), centralised (proxy-side trigger config per D1), or limited to that one identifying field.
+- **Verbatim copy across backends and proxies.** An operator shall be able to author `network.yml` once, copy it byte-for-byte to every backend **and every proxy**, and only have to change a single per-host field — `network.serverId` on backends, `network.proxyId` on proxies. This rules out config sprawl: anything that *must* differ between hosts is either auto-derived (e.g. heartbeat timestamps), centralised (proxy-side trigger config per D1, replicated through the shared store so all proxies see the same view), or limited to that one identifying field.
 - **Zero behaviour change when disabled.** With `network.enabled: false` (the shipping default), the artifact behaves byte-identically to today's single-server build. This is REQ-RTP-NET-005 and is the gate for any release.
 
 ### What an operator does (target workflow)
 
 1. Drop the same JAR onto every backend and onto the proxy.
-2. Provision the shared store (Redis instance or a JDBC database — both reuse `AbstractSQLDatabaseAccessor` per D3).
+2. Provision the shared store (Redis instance — or any RESP-compatible drop-in such as DragonflyDB / KeyDB — or a JDBC database; both reuse `AbstractSQLDatabaseAccessor` per D3).
 3. Author one `network.yml` with the transport endpoint, shared secret, trigger policy, and load-balancer policy.
-4. Copy that file to every host. On each backend, set `network.serverId` to a unique value. Proxy uses the same file with no `serverId` (or a reserved value).
+4. Copy that file to every host. On each backend, set `network.serverId` to a unique value; on each proxy, set `network.proxyId` to a unique value. Backends leave `proxyId` unset; proxies leave `serverId` unset. Running a single proxy is just the degenerate case of running one with `proxyId: "proxy-1"`.
 5. Set `network.enabled: true`. Restart. Done.
 
 ### Non-goals of this section
@@ -57,6 +58,48 @@ These constraints are part of the acceptance criteria for ADR-025; any deviation
 - No Forge / NeoForge proxy support. (Out of scope until Fabric platform stabilises — see `MULTI_PLATFORM_PLAN.md` Phase 4.)
 - No cross-version protocol breakage without a `schemaVersion` bump.
 - **No post-arrival coordinate resolution.** Coordinates are resolved on the destination *before* the player transfers; see *Coordinate Resolution Timing* below.
+
+---
+
+## Multi-Proxy Deployment *(decision locked 2026-05-07)*
+
+RTP's network mode treats **multiple concurrent proxy instances** as a first-class deployment, not an edge case. The single-proxy case is just `N = 1`.
+
+### Use cases
+
+- **HA / failover.** Two or more proxies fronted by an L4 load balancer (HAProxy, nginx stream, cloud LB, anycast). One proxy may drop without the network losing `/rtp` capability; in-flight reservations issued by the dead proxy are reanimated by any surviving proxy via the existing `claimReanimateMs` path under *Reservation Tokens*.
+- **Geo-distributed proxies.** Per-region proxy instances (e.g. NA / EU / APAC) sharing the same backend fleet. Players connect to the geographically closest proxy; `proxyMeasuredRttMs` is computed per-proxy so the load balancer naturally biases each proxy toward backends with low RTT *from that proxy*.
+- **Capacity scaling.** Large networks where a single proxy is the netty / connection bottleneck. Adding a proxy is a copy-paste of `network.yml` plus a new `proxyId`.
+- **Blue/green proxy upgrades.** Roll out a new proxy version alongside the old one, drain the old one, drop it. The shared store sees both as ordinary participants.
+
+### Design rules
+
+1. **No proxy-to-proxy chatter.** Proxies never directly call other proxies. All cross-proxy coordination is mediated by the durable shared store (D3) — the same Redis / Postgres / generic-SQL binding that backends already use. This keeps the topology a hub-and-spokes star around the store rather than a mesh, and avoids re-introducing proxy-platform-specific RPC.
+2. **No proxy singleton assumption.** Anywhere this plan says "the proxy" it shall be read as "some proxy". A request enters one proxy, that proxy claims a reservation token, and the destination consumes it. No code path may assume the same proxy that issued a side effect is the proxy that observes its consequence.
+3. **Idempotent proxy operations.** Every proxy-initiated state mutation (token claim, wait-queue enroll, hot-spot decay update) shall be safe to retry from a *different* proxy without producing duplicate work. The `PENDING → CLAIMED` transition's `WHERE state='PENDING'` guard already enforces this for tokens; the wait queue's UUID-keyed FIFO already enforces it for enrollment.
+4. **Per-proxy local state is advisory only.** A proxy may keep local caches (tab-completion results, snapshot-freshness counters, the `recentPicks` decaying counter — see *Hot-Spot Avoidance Across Proxies* below) for performance, but those caches must never be load-bearing for correctness. Anything required for safety lives in the shared store.
+5. **Proxy heartbeat row.** Each proxy publishes its own row to a `proxy_state` table — the proxy-side analogue of `backend_state` — keyed by `proxyId` (see *Proxy Telemetry Publication* below). This lets operators observe the proxy fleet, lets the reservation reaper detect dead proxies for `claimReanimateMs`, and lets ADR-025-acceptance tests discover proxies dynamically rather than hard-coding an inventory.
+6. **Trigger config replication.** Per D1, proxy-side trigger / load-balancer config is authoritative over the backend equivalent. With multiple proxies, the *same* `network.yml` lands on each, so the trigger view is identical by construction. Operators who want runtime-mutable, network-wide trigger config (rather than file-and-restart) shall use the optional `ConfigVersionTable` member of the network-state accessor (D3) — already drafted in the storage section — and read it on each `/rtp` request rather than at startup. v1 ships file-only; runtime sync is a Phase 3 hardening item.
+
+### Hot-Spot Avoidance Across Proxies
+
+The `recentPicks` metric documented under *Load-Balancing Heuristics* is a per-proxy decaying counter (default halflife 10s). With multiple proxies, each proxy's counter is **local**, which leaves a theoretical hot-spotting window: two proxies can independently pick the same low-score backend in the same heartbeat interval before either's `recentPicks` rises.
+
+This is *largely* self-correcting via the published telemetry: a backend that just absorbed picks from N proxies sees its `mspt`, `pendingTeleports`, `queueDepth`, and `chunkLoadBacklog` rise within one heartbeat, which all proxies observe in the next snapshot. The `recentPicks` row exists to dampen *intra-heartbeat* stampedes, not inter-heartbeat ones.
+
+For operators who require strict cross-proxy coordination (e.g. very low `staleAfterMs` paired with bursty traffic), v2 may add an optional **shared `recentPicks`** mode that writes the bump to the network-state member rather than to a local map, paying one round-trip per pick in exchange for proxy-fleet-wide visibility. This is **deferred** out of v1 — the telemetry-driven path is sufficient for the typical 1–4 proxy deployments we expect, and adding round-trips to the hot path is the kind of regression D-005 exists to prevent without explicit approval. Tracked in *Open Items / Follow-Ups*.
+
+### Reservation tokens under multiple proxies
+
+The state machine in *Reservation Tokens — Lifecycle ownership matrix* already covers the multi-proxy race: the `PENDING → CLAIMED` transition uses `UPDATE … WHERE state='PENDING'` row-count atomicity, so two proxies racing for the same token observe row-count `1` and row-count `0` respectively; the loser surfaces `messages.yml` failure (REQ-RTP-NET-003) and falls back to the next-lowest-score candidate via the existing capped-retry chain. The `claimReanimateMs` path, originally written for proxy *restart*, is the same primitive used for proxy *death* in a multi-proxy fleet — a token claimed by a dead proxy is re-opened to `PENDING` after the reanimation window so a surviving proxy can pick it up. No additional state is required.
+
+### Network wait queue under multiple proxies
+
+The UUID-keyed network wait queue lives in the network-state member (per D3), which means all proxies observe the same FIFO. A player who enrolls via proxy A and reconnects through proxy B sees the same queue position. Drain happens on the destination backend and is therefore proxy-agnostic by construction — the destination writes the reservation token, *some* proxy commits the transfer, and the player arrives. Idempotent UUID-keyed enroll (already specified) means a proxy A failure mid-enroll followed by a retry on proxy B does not produce duplicate queue rows.
+
+### Acceptance tests
+
+The Phase 2 devstack acceptance baseline is **2 proxies + 2 backends + 1 transport** (was: 1 proxy + 2 backends). The added proxy exercises the multi-proxy guarantees above without doubling test infrastructure cost — the Velocity adapter is the only new component, and the L4 in front of the proxy fleet is a one-line `nginx stream` block in the devstack compose file. Existing single-proxy tests remain valid as the `N = 1` degenerate case.
 
 ---
 
@@ -127,7 +170,7 @@ These answers are taken from the issue thread that produced this document. They 
 Additional locked-in decisions:
 
 - **Proxy primary**: Velocity. **Secondary**: BungeeCord/Waterfall. Both eventually required.
-- **Transport preference order**: Redis (most responsive), Postgres (co-equal candidate, needs analysis), generic SQL (MySQL/MariaDB) for universal fallback, `plugin-message` for dev only.
+- **Transport preference order**: Redis (most responsive — and any RESP-compatible drop-in such as DragonflyDB or KeyDB; Redis is the reference implementation), Postgres (co-equal candidate, needs analysis), generic SQL (MySQL/MariaDB) for universal fallback, `plugin-message` for dev only.
 - **Commands**: extend `commands-api` rather than fork. Brigadier bridge work (Step G of `MULTI_PLATFORM_PLAN.md`) carries over for Velocity.
 
 ---
@@ -445,7 +488,7 @@ AbstractSQLDatabaseAccessor                        (existing — per-backend per
 
 Transport implementations bind to the same accessor:
 
-- `RedisNetworkStateBinding` — Lettuce, async, optional dependency. Pub/sub for heartbeats + reservation events. Preferred for responsiveness.
+- `RedisNetworkStateBinding` — Lettuce, async, optional dependency. Pub/sub for heartbeats + reservation events. Preferred for responsiveness. **RESP-compatible drop-ins (DragonflyDB, KeyDB) are supported by the same binding** — the connection URL is the only thing that changes; no flavour sniffing, no `transport.flavour` knob. Redis is the reference implementation; Dragonfly is exercised by a Phase 2 acceptance container alongside Redis (see *Phase 2*). Any RESP behavioural divergence observed in practice (Lua/`EVAL` edge cases, `XADD/XREAD` consumer-group semantics, persistence model) is captured in `LESSONS_LEARNED.md` rather than as a code branch.
 - `PostgresNetworkStateBinding` — `LISTEN/NOTIFY` for push semantics; `SELECT … FOR UPDATE SKIP LOCKED` for race-free reservation claim. Shares HikariCP with the existing accessor — zero new pool surface.
 - `GenericSqlNetworkStateBinding` — MySQL/MariaDB with polling fallback. Universal but higher latency.
 - `InMemoryNetworkStateBinding` — single-JVM tests and the no-op default when `network.enabled: false`.
@@ -516,11 +559,17 @@ A dedicated regression suite analogous to `ReqRtpS004NullChunkAttributionTest` i
 ```yaml
 network:
   enabled: false                  # hard kill switch, default off → zero behavioural change
-  serverId: "survival-1"          # unique per backend
+  # Identity. Exactly one of serverId / proxyId is set per host.
+  # Backends set serverId; proxies set proxyId. Both fields are unique
+  # within their respective tables in the shared store.
+  serverId: "survival-1"          # unique per backend (omit on proxies)
+  proxyId:  "proxy-1"             # unique per proxy   (omit on backends)
   schemaVersion: 1
 
   transport:
     type: redis                   # redis | postgres | sql | plugin-message (dev only, per D2)
+                                  # `redis` covers any RESP-compatible server: Redis, DragonflyDB, KeyDB.
+                                  # No separate `dragonfly` / `keydb` types — only the URL differs.
     redis:    { host, port, password, channelPrefix }
     postgres: { jdbcUrl, user, password, listenChannel }
     sql:      { jdbcUrl, user, password, pollIntervalMs }
@@ -572,6 +621,8 @@ Acceptance contract: with `network.enabled: false`, all single-server tests must
 | `REQ-RTP-NET-006` | Every transport packet shall carry a `schemaVersion` and an HMAC envelope; packets failing verification shall be dropped and audited under S-004. |
 | `REQ-RTP-NET-007` | A reservation token claim shall be exactly-once across the network; a duplicate `CLAIMED → CONSUMED` transition shall be refused and audited under S-004. |
 | `REQ-RTP-NET-008` | Backend telemetry shall be writable to *any* `AbstractSQLDatabaseAccessor` flavour the project ships (H2/SQLite/MySQL/PostgreSQL). |
+| `REQ-RTP-NET-009` | Multiple proxy instances shall be supported concurrently against a single shared store; no code path shall assume a singleton proxy, and no proxy-to-proxy direct communication shall be required for correctness. |
+| `REQ-RTP-NET-010` | A reservation token claimed by a proxy that subsequently dies shall become claimable by any surviving proxy after `claimReanimateMs`, without operator intervention. |
 
 Authoring rules: see [`docs/dev/RULES.md`](RULES.md) and the *Requirement Documentation Rules* section of [`AGENTS.md`](../../.junie/AGENTS.md). The statements above are placeholders — final wording must use `shall` / `shall not`, no implementation actions.
 
@@ -600,7 +651,7 @@ Mirrors the structure of [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) so c
 - [ ] Single-JVM tests with two simulated backends.
 - [ ] No-op test proving `network.enabled: false` is byte-identical.
 
-### Phase 2 — Velocity adapter + Redis transport
+### Phase 2 — Velocity adapter + Redis transport (incl. DragonflyDB validation)
 
 - [ ] `rtp-proxy-common` + `rtp-proxy-velocity` modules.
 - [ ] `RedisNetworkStateBinding` (Lettuce, async).
@@ -608,7 +659,8 @@ Mirrors the structure of [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) so c
 - [ ] `ServerPreConnectEvent` hook (Velocity) for backend rewrite.
 - [ ] `CommandTriggerSource` wired through dispatcher.
 - [ ] Resolve D4 (HMAC key distribution) before security review.
-- [ ] **Acceptance**: cross-server `/rtp` round-trip on Velocity + 2× Paper devstack with Redis.
+- [ ] **Acceptance**: cross-server `/rtp` round-trip on **2× Velocity (behind L4) + 2× Paper** devstack with Redis. The two-proxy baseline exercises REQ-RTP-NET-009 / REQ-RTP-NET-010; single-proxy is the `N=1` degenerate case and remains green by construction.
+- [ ] **Acceptance (RESP compatibility)**: same cross-server `/rtp` round-trip green against **DragonflyDB** as the shared store, using the unmodified `RedisNetworkStateBinding`. One extra container in the devstack compose; no new code paths. Any observed RESP divergence (Lua/`EVAL`, Streams consumer groups, persistence semantics) is recorded in `LESSONS_LEARNED.md`, not branched on in code.
 - [ ] Regression suite for reservation token replay / TTL / orphaned-MemoryTracker scenarios.
 
 ### Phase 3 — Postgres transport + Join trigger + BungeeCord adapter
@@ -650,7 +702,7 @@ Mirrors the structure of [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) so c
 - **Reservation tokens are a distributed-systems problem** — TTL, idempotency, replay protection are easy to get subtly wrong. Treat the regression suite as a Phase 2 acceptance gate, not a "nice to have".
 - **Velocity vs. BungeeCord API divergence** — too large to share a runtime; share only the SPI. Don't water down the Velocity design to match Bungee.
 - **Version skew** — backend running RTP `X` talking to a proxy plugin running `X+1`. Requires `schemaVersion` negotiation on first packet, with graceful degrade ("falls back to single-server behaviour").
-- **Security** — Redis especially: any other plugin on the same Redis can spoof requests. HMAC + a kill switch in config are mandatory. D4 must be resolved before Phase 2 ships.
+- **Security** — Redis (and any RESP-compatible drop-in such as DragonflyDB / KeyDB) especially: any other plugin sharing the same store can spoof requests. HMAC + a kill switch in config are mandatory. D4 must be resolved before Phase 2 ships.
 - **Existing single-server tests must not regress** — REQ-RTP-NET-005 makes this explicit; the Phase 1 no-op test is the gate.
 - **Plugin-message transport is dev-only** (D2) — must be loudly documented and emit a startup warning when selected outside a dev profile.
 
@@ -671,7 +723,7 @@ This plan has been reviewed for implementer-sufficiency against `AGENTS.md`, `RU
 **Items deliberately left open** (tracked in *Open Items / Follow-Ups* below):
 
 - Wire-format choice (CBOR vs. JSON vs. binary) — ADR-025.
-- Postgres-vs-Redis benchmark — post-implementation.
+- Postgres-vs-Redis(/Dragonfly) benchmark — post-implementation.
 - `commands-api` proxy surface concrete shapes — early Phase 1 design.
 - HMAC distribution beyond env-var — deferred research.
 - Player-count weighting — awaits Phase 2 live-player evidence.
@@ -681,7 +733,10 @@ This plan has been reviewed for implementer-sufficiency against `AGENTS.md`, `RU
 ## Open Items / Follow-Ups
 
 - **D4 — HMAC key distribution beyond env var** — v1 ships env-var (`RTP_NET_SECRET`). Research alternatives (config file with restrictive perms, per-backend keypair, OS keyring) before public release; not a Phase 2 blocker.
-- **Postgres-vs-Redis comparative benchmark** — *to be performed after each transport's individual implementation and testing has stabilised*. Not a prerequisite for ADR-025 ratification (their selection rationale stands on responsiveness characteristics); benchmark drives ops guidance and the eventual `LESSONS_LEARNED.md` entry.
+- **Shared `recentPicks` across proxies** — v1 keeps `recentPicks` per-proxy and relies on backend telemetry to dampen inter-heartbeat stampedes (see *Hot-Spot Avoidance Across Proxies*). A v2 opt-in mode that writes `recentPicks` bumps to the network-state member would close the intra-heartbeat window at the cost of one round-trip per pick. Revisit only if Phase 2+ devstack data shows multi-proxy stampedes that telemetry feedback fails to absorb.
+- **Runtime-mutable proxy trigger/load-balancer config replication** — v1 is file-and-restart on every proxy. A Phase 3 hardening item is to read the optional `ConfigVersionTable` row on each `/rtp` request so a single edit propagates across the proxy fleet without a restart sweep.
+- **Proxy telemetry table (`proxy_state`)** — sketched under *Multi-Proxy Deployment* but not yet table-level specified the way `backend_state` is. Concrete column list lands in ADR-025 alongside the backend table; expected fields: `proxyId`, `schemaVersion`, `rtpVersion`, `proxyPlatform` (`velocity` | `bungee` | `waterfall`), `proxyState`, `connectedPlayers`, `lastSeenEpochMs`. No performance fields — proxies are not selection candidates.
+- **Postgres-vs-Redis comparative benchmark** — *to be performed after each transport's individual implementation and testing has stabilised*. Not a prerequisite for ADR-025 ratification (their selection rationale stands on responsiveness characteristics); benchmark drives ops guidance and the eventual `LESSONS_LEARNED.md` entry. **DragonflyDB is a third row in the same benchmark matrix** — same `RedisNetworkStateBinding`, different server — to give operators evidence-based guidance on when its multi-threaded single-node design beats vanilla Redis (typically: high reservation-claim contention, single large host) and when it doesn't (typically: small fleets, where the difference is in the noise).
 - **`commands-api` proxy-side surface** — **early TODO for Phase 1 design**. Concrete shapes needed: `ProxySender` (adapts Velocity `CommandSource` and Bungee `CommandSender`), `NetworkAwareCommand` mixin (routes execution through `RtpDispatcher`), tab-completion routing across the transport. Resolve before any proxy adapter module is opened.
 - **Player-count weighting** — published in telemetry; selector weight stays `0` until live-player testing on the Phase 2 devstack provides evidence either way. No design action required before Phase 2.
 - **`rtp.unqueued` bypass implementation** — low priority; expected use is rare. Acceptable to defer past Phase 2 acceptance.

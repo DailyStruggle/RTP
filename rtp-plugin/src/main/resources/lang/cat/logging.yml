@@ -1,0 +1,27 @@
+# --- Plugin Logging Toggles (cat dialect) ---
+# The diary of every hiss and purr the kitty wants to remember.
+
+long_grooming_session: false       # Log all files re-licked during /rtp reload
+territory_marking: false           # Log territory (region) initialisation details
+
+human_trick: false                 # Log player-executed RTP commands
+pounce: true                       # Log successful pounce events
+
+hopped_to_new_box: true            # Log RTP triggered by world changes
+new_kitty_arrived: true            # Log RTP triggered on join
+nine_lives_used: true              # Log RTP triggered on respawn
+prowl: true                        # Log move event processing
+pounce_event: true                 # Log teleport event processing
+
+missed_the_pounce: true            # Log info when a warm-spot search fails
+
+snack_inventory: false             # Debug logs for snack (memory) activity
+scratching_post: false             # Debug logs for scratching-post (database) activity
+
+# Minimum meow volume. Effective filter is the finer of this and the
+# tall-human logger's own level. Accepts: SEVERE, WARNING, INFO, CONFIG,
+# FINE, FINER, FINEST, ALL, OFF. Default ALL behaves like the tall-human logger.
+minimum_meow_volume: INFO
+
+# Do not bite the version number, sacred catnip
+meowsion: "1.0"

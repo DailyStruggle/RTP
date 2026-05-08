@@ -233,6 +233,40 @@ public class PlaceholderProvider {
                     double leakRate = (ticketsIssued > 0) ? ((double) lifetimeOrphaned / ticketsIssued) * 100.0 : 0.0;
                     return String.format("%.4f%%", leakRate);
                 });
+
+        // --- Metrics SPI placeholders (METRICS_PLAN.md > /rtp info Surface) ---
+        // All read RTP.metrics.snapshot() exactly once per placeholder invocation.
+        // The snapshot itself is O(R) integer reads (R = configured regions) and
+        // never blocks. A future optimisation may cache one snapshot per message,
+        // but the current cost is well below the existing colour-code regex pass.
+        placeholders.put(
+                "queueDepth",
+                uuid -> String.valueOf(RTP.metrics.snapshot().queueDepth));
+        placeholders.put(
+                "pendingTeleports",
+                uuid -> String.valueOf(RTP.metrics.snapshot().pendingTeleports));
+        placeholders.put(
+                "avgPipelineMs",
+                uuid -> {
+                    double v = RTP.metrics.snapshot().avgPipelineMs;
+                    return Double.isNaN(v) ? "n/a" : String.format("%.2f", v);
+                });
+        placeholders.put(
+                "heapUsedMb",
+                uuid -> String.valueOf(RTP.metrics.snapshot().heapUsedMb()));
+        placeholders.put(
+                "heapMaxMb",
+                uuid -> {
+                    long mb = RTP.metrics.snapshot().heapMaxMb();
+                    return (mb < 0) ? "unbounded" : String.valueOf(mb);
+                });
+        placeholders.put(
+                "memoryEntries",
+                uuid -> String.valueOf(RTP.metrics.snapshot().memoryTrackerEntries));
+        placeholders.put(
+                "chunkLoadBacklog",
+                uuid -> String.valueOf(RTP.metrics.snapshot().chunkLoadBacklog));
+
         placeholders.put(
                 "attempts",
                 uuid -> {

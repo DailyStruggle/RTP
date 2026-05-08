@@ -102,57 +102,78 @@ public final class BrigadierCommandAdapter {
         // anything else, which then routes to the root's onCommand and
         // the configurable `msgInvalidCommand` (REQ-RTP-S-007).
         // ----------------------------------------------------------------
-        attachFlatFallback(literal, root, root, ctx, /*argSlots*/ List.of());
+        attachGreedyArgsSlot(literal, root, root, ctx, /*argSlots*/ List.of());
         // Build-marker log line: makes it trivial to confirm in-game that
         // the freshly built jar actually contains commands-api-ADR-001
-        // addendum 2026-05-06c (recursive flat-suggestion fallback). If
-        // the user's `latest.log` lacks this banner immediately after the
+        // addendum 2026-05-06e (vanilla-client-safe greedy args slot —
+        // Option A in the Fabric custom-ArgumentType kick fix). If the
+        // user's `latest.log` lacks this banner immediately after the
         // existing "Registering /rtp Brigadier root with dispatcher" line,
         // the running mod jar is stale.
         java.util.logging.Logger.getLogger("RTP").log(java.util.logging.Level.INFO,
-                "[RTP] Brigadier bridge build-marker: commands-api-ADR-001 addendum 2026-05-06c "
-                        + "(flat fallback at every literal) for root='" + root.name() + "'");
+                "[RTP] Brigadier bridge build-marker: commands-api-ADR-001 addendum 2026-05-06e "
+                        + "(vanilla-only greedy 'args' slot, no custom ArgumentType) for root='"
+                        + root.name() + "'");
         return literal;
     }
 
     /**
-     * Attach the Bukkit-parity flat-suggestion fallback as a permissive
-     * {@code RequiredArgument("_", greedyString)} sibling under the given
-     * literal builder. The provider emits every subcommand literal name
-     * and every parameter prefix in {@code name:} wire format for the
-     * supplied {@code node} (the TreeCommand whose level we are at).
+     * Attach the unified greedy {@code args} slot under the given literal builder.
      *
-     * <p>Always-on at every literal level (root and every subcommand
-     * literal): on Fabric the user reported that {@code /rtp scan <TAB>}
-     * surfaces a region-name (e.g., {@code default}) instead of the
-     * Bukkit-parity {@code region:} prefix, because the per-parameter
-     * {@code suggests(...)} provider on the {@code region} RequiredArgument
-     * fires before any literal-name hint. Attaching the same flat
-     * fallback at every level restores the historic Bukkit
-     * {@code TabCompleter} UX (a flat list of "what the next token can
-     * be") at every depth, not just the root. See
-     * commands-api-ADR-001 addendum 2026-05-06c.
+     * <p>Vanilla-client-safe replacement for the previous custom
+     * {@code WhitespaceTerminatedArgumentType} per-parameter chain (commands-api-ADR-001
+     * addendum 2026-05-06e — "Option A"). The slot is a single
+     * {@code RequiredArgument("args", StringArgumentType.greedyString())} carrying:
+     * <ul>
+     *   <li>a {@link SuggestionProvider} that emits, in two stages, both subcommand
+     *       names and {@code paramName=}/{@code paramName=value} hints for the
+     *       last whitespace-separated token of {@code builder.getRemaining()};</li>
+     *   <li>an executor that captures the entire greedy string and feeds the
+     *       whitespace-tokenized {@code name=value} run into the root's
+     *       {@link TreeCommand#onCommand} via {@link #reconstructArgs}.</li>
+     * </ul>
+     *
+     * <p>The greedy slot is the ONLY parameter-carrying Brigadier node in the tree —
+     * sibling chaining, nested {@code subParams} chaining, and the previous
+     * {@code WhitespaceTerminatedArgumentType} are all collapsed into this single node.
+     * That is what keeps the server-built command tree using purely vanilla
+     * Brigadier types, so vanilla clients can join without the
+     * "This server requires Fabric Loader and Fabric API installed on your client!"
+     * kick that the prior custom-type approach caused on Fabric (2026-05-06).
+     *
+     * <p>Sub-command literals are still attached as their own Brigadier nodes by
+     * {@link #attachChildren} so command-completion at the literal head behaves
+     * identically to vanilla Brigadier; each subcommand literal in turn gets its
+     * own greedy {@code args} slot via this method.
      */
-    private static <S> void attachFlatFallback(@NotNull LiteralArgumentBuilder<S> literal,
-                                               @NotNull CommandsAPICommand root,
-                                               @NotNull CommandsAPICommand node,
-                                               @NotNull BrigadierBridgeContext<S> ctx,
-                                               @NotNull List<ArgSlot> pathSoFar) {
+    private static <S> void attachGreedyArgsSlot(@NotNull LiteralArgumentBuilder<S> literal,
+                                                 @NotNull CommandsAPICommand root,
+                                                 @NotNull CommandsAPICommand node,
+                                                 @NotNull BrigadierBridgeContext<S> ctx,
+                                                 @NotNull List<ArgSlot> pathSoFar) {
         try {
-            RequiredArgumentBuilder<S, ?> shadow =
-                    RequiredArgumentBuilder.argument("_", StringArgumentType.greedyString());
-            // Permissive: never strip via requires(), so suggestion gathering
-            // always reaches our flat provider regardless of the source's perms.
-            shadow.requires(s -> true);
-            shadow.suggests(flatSuggestionsFor(node));
-            shadow.executes(execute(root, ctx, pathSoFar));
-            literal.then(shadow);
+            RequiredArgumentBuilder<S, ?> argsNode =
+                    RequiredArgumentBuilder.argument("args", StringArgumentType.greedyString());
+            // Permissive: never strip via requires() at this level. Per-parameter
+            // permission filtering is enforced server-side by TreeCommand.onCommand
+            // (the same place Bukkit performs it), so the greedy slot itself stays
+            // open for tab-completion gathering.
+            argsNode.requires(s -> true);
+            argsNode.suggests(argsSuggestionsFor(node, ctx));
+            // The greedy slot is added to the path as a single parameter slot named
+            // "args" with a null delimiter marker; reconstructArgs detects it and
+            // splits the captured greedy string on whitespace into individual
+            // name=value tokens (Bukkit-parity wire format).
+            List<ArgSlot> argsPath = append(pathSoFar, ArgSlot.greedyArgs());
+            argsNode.executes(execute(root, ctx, argsPath));
+            literal.then(argsNode);
         } catch (Throwable t) {
-            // Best-effort: the existing literal+children tree still works
-            // on its own; the flat fallback is purely additive UX.
+            // Best-effort: the literal still executes via its own .executes() target.
+            // Without the greedy slot, only the bare /literal form works (no params),
+            // which mirrors the pre-bridge state and is strictly safer than aborting.
             java.util.logging.Logger.getLogger("RTP").log(java.util.logging.Level.WARNING,
-                    "[RTP] Brigadier flat-suggestion fallback attach failed for literal='"
-                            + node.name() + "'; tab-complete will fall back to per-child providers. cause="
+                    "[RTP] Brigadier greedy args-slot attach failed for literal='"
+                            + node.name() + "'; only the bare literal will execute. cause="
                             + t.getClass().getSimpleName() + ": " + t.getMessage(), t);
         }
     }
@@ -162,37 +183,84 @@ public final class BrigadierCommandAdapter {
     // ------------------------------------------------------------------
 
     /**
-     * Build a flat {@link SuggestionProvider} that emits every subcommand
-     * literal name and every parameter prefix (in {@code name:} form) of
-     * {@code root}, filtered by the builder's remaining prefix
-     * (case-insensitive).
+     * Build the {@link SuggestionProvider} for the unified greedy {@code args} slot.
      *
-     * <p>Mirrors the Bukkit {@code TabCompleter} contract: at the root
-     * boundary, hand the player every accepted next token as a flat list
-     * — Brigadier-side parsing/validation still happens on dispatch, so
-     * suggestions are intentionally unfiltered by permission (parity
-     * with the historic Bukkit behaviour; permission filtering is
-     * deferred to Step F / fabric-permissions-api).
+     * <p>Two-stage Bukkit-parity wire-format suggestions, operating on the LAST
+     * whitespace-separated token of the greedy {@code builder.getRemaining()}
+     * string (so that {@code /rtp player=leaf26 reg<TAB>} correctly suggests
+     * {@code region=}, not {@code player=}):
+     *
+     * <ol>
+     *   <li><b>Stage 1</b> — token has no {@code =} or {@code :} yet: emit every
+     *       subcommand name (filtered to the prefix) AND every {@code paramName=}
+     *       wire-format key for parameters of {@code node}. Subcommand names are
+     *       only suggested when the greedy slot is empty / at the start (no prior
+     *       whitespace-separated tokens), since subcommands are positional at the
+     *       head of args[] in Bukkit semantics.</li>
+     *   <li><b>Stage 2</b> — token contains a delimiter (the user has typed
+     *       {@code paramName=}): walk {@link CommandParameter#relevantValues(UUID)}
+     *       for the matching parameter and emit {@code paramName=value} for each
+     *       value matching the typed value-prefix. Per the user's explicit
+     *       constraint, the value list does not surface until the {@code =} has
+     *       been typed.</li>
+     * </ol>
+     *
+     * <p>The replacement string passed to {@link SuggestionsBuilder#suggest(String)}
+     * is computed against {@code builder.createOffset(start)} so that Brigadier
+     * only replaces the last token, not the whole greedy capture — this is what
+     * lets multi-parameter input like {@code /rtp player=leaf26 region=<TAB>}
+     * tab-complete cleanly.
+     *
+     * <p>Suggestions are intentionally unfiltered by permission, mirroring the
+     * historic Bukkit {@code TabCompleter} contract; permission filtering happens
+     * server-side at execution time.
      */
-    private static <S> @NotNull SuggestionProvider<S> flatSuggestionsFor(@NotNull CommandsAPICommand root) {
+    private static <S> @NotNull SuggestionProvider<S> argsSuggestionsFor(@NotNull CommandsAPICommand node,
+                                                                         @NotNull BrigadierBridgeContext<S> ctx) {
         return (brigadierCtx, builder) -> {
-            // Suggestion-time isolation: a throw inside the lookup maps
-            // (e.g., RTP.serverAccessor not yet bound on a very early
-            // tab-complete) must not propagate out — Brigadier swallows
-            // it into the suggestion future and the player sees an
-            // empty list with no log. Catch, log, and return whatever
-            // was already built. Mirrors `suggestionsFrom`.
+            // Suggestion-time isolation: any throw inside the lookup maps must NOT
+            // propagate out — Brigadier swallows it into the suggestion future and
+            // the player sees an empty list with no log. Catch, log, return what
+            // we already built.
             try {
-                String remaining = builder.getRemaining().toLowerCase(Locale.ROOT);
-                if (root instanceof TreeCommand tree) {
-                    Map<String, CommandsAPICommand> subs = tree.getCommandLookup();
-                    if (subs != null) {
-                        for (CommandsAPICommand sub : subs.values()) {
-                            if (sub == null) continue;
-                            String name = sub.name();
-                            if (name == null || name.isEmpty()) continue;
-                            if (name.toLowerCase(Locale.ROOT).startsWith(remaining)) {
-                                builder.suggest(name);
+                String remainingRaw = builder.getRemaining();
+                // Locate the start of the LAST whitespace-separated token in the
+                // greedy capture; everything before it ("prior" tokens) has
+                // already been typed and accepted, and only the last token is
+                // what tab-completion is currently editing.
+                int lastWs = lastWhitespaceIndex(remainingRaw);
+                int tokenStart = (lastWs < 0) ? 0 : lastWs + 1;
+                boolean atHead = (tokenStart == 0); // no prior tokens — subcommand head position
+                String token = remainingRaw.substring(tokenStart);
+                String tokenLc = token.toLowerCase(Locale.ROOT);
+                // Build a SuggestionsBuilder offset to the start of the last token,
+                // so suggest(...) replaces only that token in the client UI.
+                SuggestionsBuilder tokenBuilder =
+                        builder.createOffset(builder.getStart() + tokenStart);
+
+                char delim = io.github.dailystruggle.commandsapi.common.CommandsAPI.parameterDelimiter;
+                char delimAlt = io.github.dailystruggle.commandsapi.common.CommandsAPI.parameterDelimiterAlt;
+                int delimIdx = token.indexOf(delim);
+                if (delimIdx < 0) delimIdx = token.indexOf(delimAlt);
+
+                if (!(node instanceof TreeCommand tree)) {
+                    return tokenBuilder.buildFuture();
+                }
+
+                if (delimIdx < 0) {
+                    // Stage 1: no delimiter typed yet in the current token.
+                    // Surface subcommand literal names (only at the head — subcommands
+                    // are positional in Bukkit semantics) AND every `paramName=` key.
+                    if (atHead) {
+                        Map<String, CommandsAPICommand> subs = tree.getCommandLookup();
+                        if (subs != null) {
+                            for (CommandsAPICommand sub : subs.values()) {
+                                if (sub == null) continue;
+                                String name = sub.name();
+                                if (name == null || name.isEmpty()) continue;
+                                if (name.toLowerCase(Locale.ROOT).startsWith(tokenLc)) {
+                                    tokenBuilder.suggest(name);
+                                }
                             }
                         }
                     }
@@ -200,23 +268,63 @@ public final class BrigadierCommandAdapter {
                     if (params != null) {
                         for (String paramName : params.keySet()) {
                             if (paramName == null || paramName.isEmpty()) continue;
-                            // Bukkit wire format: `region:`, `biome:`, etc.
-                            String suggestion = paramName + ":";
-                            if (suggestion.toLowerCase(Locale.ROOT).startsWith(remaining)
-                                    || paramName.toLowerCase(Locale.ROOT).startsWith(remaining)) {
-                                builder.suggest(suggestion);
+                            String suggestion = paramName + delim;
+                            String suggestionLc = suggestion.toLowerCase(Locale.ROOT);
+                            if (suggestionLc.startsWith(tokenLc)
+                                    || paramName.toLowerCase(Locale.ROOT).startsWith(tokenLc)) {
+                                tokenBuilder.suggest(suggestion);
+                            }
+                        }
+                    }
+                } else {
+                    // Stage 2: token contains `=` (or `:`). Match the typed key to a
+                    // parameter and offer its value list, filtered by the typed
+                    // value-prefix. If no parameter matches the typed key, return
+                    // empty (do not leak unrelated value lists).
+                    String typedKey = token.substring(0, delimIdx);
+                    String typedValue = token.substring(delimIdx + 1);
+                    String typedValueLc = typedValue.toLowerCase(Locale.ROOT);
+                    Map<String, CommandParameter> params = tree.getParameterLookup();
+                    if (params != null) {
+                        CommandParameter matched = null;
+                        String matchedName = null;
+                        for (Map.Entry<String, CommandParameter> entry : params.entrySet()) {
+                            String pn = entry.getKey();
+                            if (pn != null && pn.equalsIgnoreCase(typedKey)) {
+                                matched = entry.getValue();
+                                matchedName = pn;
+                                break;
+                            }
+                        }
+                        if (matched != null && matchedName != null) {
+                            String prefix = matchedName + delim;
+                            UUID callerId = ctx.senderToUuid().apply(brigadierCtx.getSource());
+                            for (String value : matched.relevantValues(callerId)) {
+                                if (value == null) continue;
+                                if (value.toLowerCase(Locale.ROOT).startsWith(typedValueLc)) {
+                                    tokenBuilder.suggest(prefix + value);
+                                }
                             }
                         }
                     }
                 }
+                return tokenBuilder.buildFuture();
             } catch (Throwable t) {
                 java.util.logging.Logger.getLogger("RTP").log(java.util.logging.Level.WARNING,
-                        "[RTP] Brigadier flat suggestion provider threw for root='"
-                                + root.name() + "'; returning partial. cause="
+                        "[RTP] Brigadier args suggestion provider threw for node='"
+                                + node.name() + "'; returning partial. cause="
                                 + t.getClass().getSimpleName() + ": " + t.getMessage(), t);
             }
             return builder.buildFuture();
         };
+    }
+
+    /** Index of the last whitespace character in {@code s}, or {@code -1} if none. */
+    private static int lastWhitespaceIndex(@NotNull String s) {
+        for (int i = s.length() - 1; i >= 0; i--) {
+            if (Character.isWhitespace(s.charAt(i))) return i;
+        }
+        return -1;
     }
 
     // ------------------------------------------------------------------
@@ -280,6 +388,11 @@ public final class BrigadierCommandAdapter {
                     // tracks its own visited set, so siblings of one branch
                     // do not bleed into another.
                     attachChildren(subLiteral, root, sub, ctx, subPath, new HashSet<>());
+                    // Vanilla-client-safe greedy `args` slot for this sub-command,
+                    // so `/rtp scan region=default biome=plains ...` etc. can be
+                    // typed and tab-completed against `sub`'s parameters.
+                    // commands-api-ADR-001 addendum 2026-05-06e (Option A).
+                    attachGreedyArgsSlot(subLiteral, root, sub, ctx, subPath);
                     parentBuilder.then(subLiteral);
                 } catch (Throwable t) {
                     java.util.logging.Logger.getLogger("RTP").log(java.util.logging.Level.WARNING,
@@ -290,135 +403,29 @@ public final class BrigadierCommandAdapter {
             }
         }
 
-        // Parameters — chained as required argument nodes off the current node.
+        // Parameters: NOT attached as a per-parameter Brigadier chain.
         //
-        // Per commands-api-ADR-001 addendum (2026-05-06):
-        //  (1) Each parameter node may be followed by *sibling* parameters of
-        //      the same TreeCommand, because Bukkit's free-token wire format
-        //      accepts /rtp region:R biome:B world:W in any order. Brigadier
-        //      requires explicit graph edges, so we enumerate them here.
-        //  (2) Each parameter node may be followed by *nested* parameters
-        //      registered via CommandParameter.subParams(name) (e.g.,
-        //      region.world / region.shape / region.vert). These continue
-        //      to refine the *same* level of the TreeCommand, so they are
-        //      attached as further required-argument children of argNode.
-        //  (3) A cycle guard (paramsSeen) prevents infinite expansion of the
-        //      sibling chain (region -> world -> region -> ...). Once a
-        //      parameter name appears in the path it is not re-attached as
-        //      a sibling further down the same branch.
-        Map<String, CommandParameter> params = tree.getParameterLookup();
-        if (params != null && !params.isEmpty()) {
-            for (Map.Entry<String, CommandParameter> entry : params.entrySet()) {
-                String paramName = entry.getKey();
-                // Per-parameter isolation: see the equivalent guard around
-                // sub-command attach above. A throw inside any one parameter's
-                // setup must not strip the whole node tree.
-                try {
-                    CommandParameter param = entry.getValue();
-                    if (param == null) continue;
-                    if (paramsSeen.contains(paramName)) {
-                        // Cycle guard: do not re-attach a parameter we've already
-                        // walked through on this branch. Brigadier would otherwise
-                        // expand the tree factorially.
-                        continue;
-                    }
-                    ArgumentType<?> argType = mapArgumentType(param);
-                    RequiredArgumentBuilder<S, ?> argNode =
-                            RequiredArgumentBuilder.argument(paramName, argType);
-                    applyRequires(argNode, param.permission(), ctx);
-
-                    // Suggestions for non-numeric / non-boolean types: surface the
-                    // values() set so Brigadier's client-side completion picks them up.
-                    if (needsSuggestions(param)) {
-                        argNode.suggests(suggestionsFrom(param, ctx));
-                    }
-
-                    List<ArgSlot> subPath = append(pathSoFar, ArgSlot.parameter(paramName, argType));
-                    // Always target ROOT: parameter values appear in args[] as
-                    // "name=value" tokens after any leading literals, so the root's
-                    // onCommand can recurse through the same path the Bukkit
-                    // dispatcher would have walked.
-                    argNode.executes(execute(root, ctx, subPath));
-
-                    // Build the visited set for this branch (path-local).
-                    Set<String> nextSeen = new HashSet<>(paramsSeen);
-                    nextSeen.add(paramName);
-
-                    // (2) Nested params under this parameter (e.g., region.world).
-                    Map<String, CommandParameter> nested = param.subParams(paramName);
-                    if (nested != null && !nested.isEmpty()) {
-                        attachParameterChildren(argNode, root, ctx, subPath, nested, nextSeen);
-                    }
-
-                    // (1) Sibling parameters of the current TreeCommand.
-                    attachParameterChildren(argNode, root, ctx, subPath, params, nextSeen);
-
-                    parentBuilder.then(argNode);
-                } catch (Throwable t) {
-                    java.util.logging.Logger.getLogger("RTP").log(java.util.logging.Level.WARNING,
-                            "[RTP] Brigadier parameter attach failed for name='" + paramName
-                                    + "' under parent='" + parent.name() + "'; skipping. cause="
-                                    + t.getClass().getSimpleName() + ": " + t.getMessage(), t);
-                }
-            }
-        }
-    }
-
-    /**
-     * Attach each parameter in {@code params} as a {@link RequiredArgumentBuilder} child of
-     * {@code parentBuilder}, skipping any parameter whose name is already in {@code paramsSeen}
-     * (cycle guard). Each child further recurses for nested + sibling chaining.
-     *
-     * <p>commands-api-ADR-001 addendum 2026-05-06: this is the recursion entry point used by
-     * both nested-param ({@code subParams}) and sibling-param chaining; centralising it keeps
-     * the cycle-guard contract uniform.
-     */
-    private static <S> void attachParameterChildren(@NotNull ArgumentBuilder<S, ?> parentBuilder,
-                                                    @NotNull CommandsAPICommand root,
-                                                    @NotNull BrigadierBridgeContext<S> ctx,
-                                                    @NotNull List<ArgSlot> pathSoFar,
-                                                    @NotNull Map<String, CommandParameter> params,
-                                                    @NotNull Set<String> paramsSeen) {
-        for (Map.Entry<String, CommandParameter> entry : params.entrySet()) {
-            String childName = entry.getKey();
-            // Per-parameter isolation in the recursive helper too —
-            // see attachChildren for rationale.
-            try {
-                CommandParameter childParam = entry.getValue();
-                if (childParam == null) continue;
-                if (paramsSeen.contains(childName)) continue;
-
-                ArgumentType<?> childType = mapArgumentType(childParam);
-                RequiredArgumentBuilder<S, ?> childNode =
-                        RequiredArgumentBuilder.argument(childName, childType);
-                applyRequires(childNode, childParam.permission(), ctx);
-                if (needsSuggestions(childParam)) {
-                    childNode.suggests(suggestionsFrom(childParam, ctx));
-                }
-
-                List<ArgSlot> childPath = append(pathSoFar, ArgSlot.parameter(childName, childType));
-                childNode.executes(execute(root, ctx, childPath));
-
-                Set<String> nextSeen = new HashSet<>(paramsSeen);
-                nextSeen.add(childName);
-
-                // Nested params under this child (rare for sibling chaining, common for subParams).
-                Map<String, CommandParameter> childNested = childParam.subParams(childName);
-                if (childNested != null && !childNested.isEmpty()) {
-                    attachParameterChildren(childNode, root, ctx, childPath, childNested, nextSeen);
-                }
-
-                // Continue the sibling chain on the same level.
-                attachParameterChildren(childNode, root, ctx, childPath, params, nextSeen);
-
-                parentBuilder.then(childNode);
-            } catch (Throwable t) {
-                java.util.logging.Logger.getLogger("RTP").log(java.util.logging.Level.WARNING,
-                        "[RTP] Brigadier nested-parameter attach failed for name='" + childName
-                                + "'; skipping. cause="
-                                + t.getClass().getSimpleName() + ": " + t.getMessage(), t);
-            }
-        }
+        // commands-api-ADR-001 addendum 2026-05-06e ("Option A", vanilla-only
+        // greedy slot): the previous design attached one RequiredArgumentBuilder
+        // per parameter and chained siblings/nested children. That required a
+        // custom whitespace-terminated ArgumentType (so `name=value` would parse
+        // as a single token), which Fabric serialised under namespace
+        // `rtp:wsword` and which vanilla clients reject on join — they kick with
+        // "This server requires Fabric Loader and Fabric API installed on your
+        // client!". To keep the server-built tree using ONLY vanilla Brigadier
+        // types, all per-parameter wire-format handling is collapsed into a
+        // single greedy `args` slot per literal level (root and each
+        // sub-command literal), attached at the call sites of attachChildren.
+        // The greedy slot's SuggestionProvider emits the same `paramName=` /
+        // `paramName=value` two-stage hints the per-parameter chain previously
+        // produced; reconstructArgs whitespace-tokenises the captured greedy
+        // string back into the args[] form TreeCommand.onCommand expects, so
+        // sibling chaining (`/rtp player=leaf26 region=default`), nested
+        // subParams, and the cycle guard are all subsumed by a single node.
+        // The `paramsSeen` parameter is preserved on the method signature for
+        // future use but is currently unused on this code path.
+        @SuppressWarnings("unused")
+        Set<String> _unusedParamsSeen = paramsSeen;
     }
 
     // ------------------------------------------------------------------
@@ -491,61 +498,55 @@ public final class BrigadierCommandAdapter {
                 out.add(slot.name);
                 continue;
             }
-            Object raw = brigadierCtx.getArgument(slot.name, Object.class);
-            // Reconstruct the commands-api wire format: "<paramName>=<value>".
-            // TreeCommand.onCommand parses this with splitOnParamDelimiter().
-            out.add(slot.name + io.github.dailystruggle.commandsapi.common.CommandsAPI.parameterDelimiter
-                    + (raw == null ? "" : raw.toString()));
+            // The greedy `args` slot (commands-api-ADR-001 addendum 2026-05-06e,
+            // "Option A"): a single Brigadier RequiredArgument("args",
+            // greedyString()) captures the whole tail of the command line as one
+            // String. We split it on whitespace into individual tokens here, so
+            // TreeCommand.onCommand sees args=["player=leaf26", "region=default",
+            // ...] exactly as the Bukkit dispatcher would deliver them. This is
+            // what restores Bukkit-parity wire format (`/rtp player=leaf26
+            // region=default`) without requiring a custom Brigadier ArgumentType
+            // (which kicks vanilla clients on Fabric).
+            String raw;
+            try {
+                raw = brigadierCtx.getArgument(slot.name, String.class);
+            } catch (Throwable t) {
+                // Defensive: if Brigadier returns a non-String (future-proofing)
+                // or the slot was somehow not bound, fall through to empty so the
+                // bare /literal form still executes.
+                try {
+                    Object o = brigadierCtx.getArgument(slot.name, Object.class);
+                    raw = (o == null) ? "" : o.toString();
+                } catch (Throwable ignored) {
+                    raw = "";
+                }
+            }
+            String rawStr = (raw == null) ? "" : raw;
+            if (rawStr.isEmpty()) continue;
+            // Whitespace-tokenise the greedy capture. We use a regex split on
+            // \\s+ rather than String.split(" ") so any whitespace run (tabs,
+            // multiple spaces) is treated uniformly, matching Brigadier's own
+            // command-line splitting.
+            for (String tok : rawStr.trim().split("\\s+")) {
+                if (tok != null && !tok.isEmpty()) {
+                    out.add(tok);
+                }
+            }
         }
         return out.toArray(new String[0]);
     }
 
     // ------------------------------------------------------------------
-    // Argument-type mapping
+    // Argument-type mapping / per-parameter suggestion providers / custom
+    // WhitespaceTerminatedArgumentType: REMOVED. commands-api-ADR-001
+    // addendum 2026-05-06e collapsed the per-parameter Brigadier chain
+    // into a single greedy `args` slot per literal level so the
+    // server-built command tree uses ONLY vanilla Brigadier types,
+    // letting vanilla clients join Fabric servers without the
+    // "This server requires Fabric Loader and Fabric API installed on
+    // your client!" kick. See `attachGreedyArgsSlot` and
+    // `argsSuggestionsFor` above.
     // ------------------------------------------------------------------
-
-    private static @NotNull ArgumentType<?> mapArgumentType(@NotNull CommandParameter param) {
-        if (param instanceof IntegerParameter) return IntegerArgumentType.integer();
-        if (param instanceof FloatParameter)   return DoubleArgumentType.doubleArg();
-        if (param instanceof BooleanParameter) return BoolArgumentType.bool();
-        // Coordinates, enums, and unknowns: treat as words; suggestions provide UX.
-        return StringArgumentType.word();
-    }
-
-    private static boolean needsSuggestions(@NotNull CommandParameter param) {
-        return !(param instanceof IntegerParameter
-              || param instanceof FloatParameter
-              || param instanceof BooleanParameter);
-    }
-
-    private static <S> @NotNull SuggestionProvider<S> suggestionsFrom(@NotNull CommandParameter param,
-                                                                     @NotNull BrigadierBridgeContext<S> ctx) {
-        return (brigadierCtx, builder) -> {
-            // Suggestion-time isolation: any throw inside `values()` /
-            // `relevantValues()` (e.g., NPE because RTP.serverAccessor is
-            // not yet bound, or a Bukkit-only call sneaking into a
-            // platform-neutral CommandParameter override) must NOT propagate
-            // out of the SuggestionProvider — Brigadier swallows the
-            // resulting Throwable into the suggestion future and the player
-            // sees an empty / missing tab-completion with no log.
-            // Catch, log, and return whatever was already built.
-            try {
-                UUID callerId = ctx.senderToUuid().apply(brigadierCtx.getSource());
-                String remaining = builder.getRemaining().toLowerCase(Locale.ROOT);
-                for (String value : param.relevantValues(callerId)) {
-                    if (value == null) continue;
-                    if (value.toLowerCase(Locale.ROOT).startsWith(remaining)) {
-                        builder.suggest(value);
-                    }
-                }
-            } catch (Throwable t) {
-                java.util.logging.Logger.getLogger("RTP").log(java.util.logging.Level.WARNING,
-                        "[RTP] Brigadier suggestion provider threw for parameter; returning empty. cause="
-                                + t.getClass().getSimpleName() + ": " + t.getMessage(), t);
-            }
-            return builder.buildFuture();
-        };
-    }
 
     // ------------------------------------------------------------------
     // Permission gating
@@ -588,25 +589,42 @@ public final class BrigadierCommandAdapter {
         return next;
     }
 
+    /**
+     * Path-slot record describing one Brigadier node visited en route to the
+     * executor. There are two kinds in the Option-A tree shape:
+     * <ul>
+     *   <li>{@link #literal(String)} — a sub-command literal node; emitted
+     *       verbatim into args[] by {@link #reconstructArgs}.</li>
+     *   <li>{@link #greedyArgs()} — the single greedy {@code args}
+     *       {@link StringArgumentType#greedyString()} slot; its captured value
+     *       is whitespace-tokenised by {@link #reconstructArgs} into individual
+     *       {@code name=value} tokens.</li>
+     * </ul>
+     * Per-parameter slots no longer exist (commands-api-ADR-001 addendum
+     * 2026-05-06e — "Option A" / vanilla-client-safe greedy args slot).
+     */
     private static final class ArgSlot {
+        /** Brigadier argument name for a non-literal slot, or the literal label. */
         final String name;
-        final ArgumentType<?> type; // null when literal
+        /** {@code true} when this is a Brigadier literal sub-command node. */
+        private final boolean literal;
 
-        private ArgSlot(String name, ArgumentType<?> type) {
+        private ArgSlot(String name, boolean literal) {
             this.name = name;
-            this.type = type;
+            this.literal = literal;
         }
 
         static ArgSlot literal(String name) {
-            return new ArgSlot(name, null);
+            return new ArgSlot(name, true);
         }
 
-        static ArgSlot parameter(String name, ArgumentType<?> type) {
-            return new ArgSlot(name, type);
+        /** The unified greedy `args` slot (one per literal level). */
+        static ArgSlot greedyArgs() {
+            return new ArgSlot("args", false);
         }
 
         boolean isLiteral() {
-            return type == null;
+            return literal;
         }
     }
 
@@ -614,4 +632,14 @@ public final class BrigadierCommandAdapter {
     // future refactors trim them; they remain referenced by SuggestionProvider.
     @SuppressWarnings("unused")
     private static void __referenceKeepers(Suggestions s, SuggestionsBuilder b) { }
+
+    // ------------------------------------------------------------------
+    // (The custom WhitespaceTerminatedArgumentType has been removed.
+    // commands-api-ADR-001 addendum 2026-05-06e: vanilla clients reject any
+    // non-vanilla ArgumentType in the server's command-tree packet, so the
+    // Brigadier bridge now uses only vanilla types. The full `name=value`
+    // wire-format token, including `=`, is now captured by a single
+    // greedyString() slot named "args" and split on whitespace server-side
+    // by reconstructArgs.)
+    // ------------------------------------------------------------------
 }

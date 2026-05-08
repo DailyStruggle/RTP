@@ -64,6 +64,16 @@ public final class FabricRTPPlayer implements RTPPlayer {
         this.handle = player;
     }
 
+    /**
+     * @return the underlying Mojmap {@link ServerPlayer} handle, or {@code null}
+     *         if the player has disconnected. Used by the Fabric effects layer
+     *         (effects-api-ADR-003) to feed concrete Fabric effects with the
+     *         platform-typed target object via {@code Effect#setTarget(Object)}.
+     */
+    public @Nullable ServerPlayer handle() {
+        return handle;
+    }
+
     /** Called by the event bridge on disconnect; subsequent calls treat the player as offline. */
     public void unbind() {
         this.handle = null;
@@ -234,6 +244,70 @@ public final class FabricRTPPlayer implements RTPPlayer {
             // Best-effort: never let a chat send escalate into a pipeline crash.
             RTP.log(java.util.logging.Level.WARNING,
                     "[RTP] Failed to deliver system message to " + name + ": " + t.getMessage());
+        }
+    }
+
+    /**
+     * Send a title / subtitle pair with explicit fade/stay timings (ticks).
+     *
+     * <p>Mirrors Bukkit's {@code Player.sendTitle} / Spigot {@code SendMessage.title} sink so
+     * that Fabric honours {@code messages.yml} {@code title}, {@code subtitle},
+     * {@code fadeIn}, {@code stay}, {@code fadeOut}. Both strings are parsed through
+     * {@link FabricLegacyText} so legacy {@code &}-codes and {@code #RRGGBB} hex render
+     * the same as on Bukkit/Paper. Empty / null strings are silently dropped (matching
+     * Bukkit's behaviour of suppressing the title line when the config value is blank).
+     *
+     * <p>Packets used (intermediary-stable across 1.20+):
+     * {@code ClientboundSetTitlesAnimationPacket}, {@code ClientboundSetTitleTextPacket},
+     * {@code ClientboundSetSubtitleTextPacket}. Sent directly through the player's
+     * {@code connection} for the same reason {@link #sendComponent(Component)} avoids
+     * {@code ServerPlayer#sendSystemMessage} — higher-level helpers drift across MC
+     * patch releases (NoSuchMethodError on 1.21.11).
+     */
+    public void sendTitle(String title, String subtitle, int fadeIn, int stay, int fadeOut) {
+        ServerPlayer p = handle;
+        if (p == null) return;
+        if ((title == null || title.isEmpty()) && (subtitle == null || subtitle.isEmpty())) return;
+        try {
+            if (p.connection == null) return;
+            // Animation timings always sent first so the client applies them before the text.
+            p.connection.send(new net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket(
+                    fadeIn, stay, fadeOut));
+            if (subtitle != null && !subtitle.isEmpty()) {
+                p.connection.send(new net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket(
+                        FabricLegacyText.parse(subtitle)));
+            }
+            if (title != null && !title.isEmpty()) {
+                // Title packet is what actually shows the title; if only subtitle is set
+                // vanilla still requires a (possibly empty) title for the subtitle to render,
+                // but Bukkit's parity behaviour is "no title = no display", so we skip.
+                p.connection.send(new net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket(
+                        FabricLegacyText.parse(title)));
+            }
+        } catch (Throwable t) {
+            RTP.log(java.util.logging.Level.WARNING,
+                    "[RTP] Failed to deliver title to " + name + ": " + t.getMessage());
+        }
+    }
+
+    /**
+     * Send an actionbar message (the text that hovers above the hotbar). Mirrors
+     * {@code SendMessage.actionbar} on Bukkit. Empty / null is silently dropped.
+     *
+     * <p>Uses {@code ClientboundSetActionBarTextPacket} via {@code connection.send} —
+     * same intermediary-stability rationale as {@link #sendTitle}.
+     */
+    public void sendActionbar(String message) {
+        ServerPlayer p = handle;
+        if (p == null) return;
+        if (message == null || message.isEmpty()) return;
+        try {
+            if (p.connection == null) return;
+            p.connection.send(new net.minecraft.network.protocol.game.ClientboundSetActionBarTextPacket(
+                    FabricLegacyText.parse(message)));
+        } catch (Throwable t) {
+            RTP.log(java.util.logging.Level.WARNING,
+                    "[RTP] Failed to deliver actionbar to " + name + ": " + t.getMessage());
         }
     }
 

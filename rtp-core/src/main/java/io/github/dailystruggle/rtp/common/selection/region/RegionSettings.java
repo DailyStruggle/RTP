@@ -16,6 +16,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdj
  * @param worldBorderOverride Whether to override the region's shape with the world border.
  * @param requirePermission   Whether a player needs a specific permission to use this region.
  * @param cacheCap            The maximum number of pre-generated locations to keep in the cache.
+ * @param backlogCacheCap     The maximum number of unverified locations held in the L3 backlog cache (ADR-028). 0 disables L3.
  * @param activeChunkCap      The maximum number of chunks to keep actively loaded for new locations.
  * @param price               The cost to use this region.
  * @param spatialResolution   The resolution for spatial hashing in memory-based shapes.
@@ -30,6 +31,7 @@ public record RegionSettings(
     boolean worldBorderOverride,
     boolean requirePermission,
     long cacheCap,
+    long backlogCacheCap,
     int activeChunkCap,
     double price,
     long spatialResolution,

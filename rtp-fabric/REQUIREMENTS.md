@@ -27,7 +27,7 @@ For design and implementation details that satisfy these requirements, see [`doc
 ### 2.1 Architectural Invariants (ADR-022 §4)
 - **REQ-FABRIC-ARCH-001 — No Bukkit Imports:** No source file under `rtp-fabric/**` shall import from `org.bukkit.*`, `io.papermc.*`, or `dev.folia.*`.
 - **REQ-FABRIC-ARCH-002 — No Core Pollution:** Fabric-specific patterns, types, or imports shall not be introduced into `rtp-core` or `rtp-api`.
-- **REQ-FABRIC-ARCH-003 — Loom Plugin Scope:** The `fabric-loom` Gradle plugin shall be applied only within `rtp-fabric/**` and `rtp-plugin` (the latter solely for single-JAR remap), and shall remap only classes under `io/github/dailystruggle/rtp/fabric/**`.
+- **REQ-FABRIC-ARCH-003 — Loom Plugin Scope:** The `fabric-loom` Gradle plugin shall be applied only within `rtp-fabric/**`, `rtp-plugin` (the latter solely for single-JAR remap), and `effects-api` (per `effects-api-ADR-003`, to support the in-module `effectsapi/fabric` subpackage), and shall remap only classes under `io/github/dailystruggle/rtp/fabric/**` and `io/github/dailystruggle/effectsapi/fabric/**`.
 
 ### 2.2 Safety-Critical Compliance
 - **REQ-FABRIC-ARCH-004 — Asynchronous Chunk Loading (S-005):** Chunk loads triggered from the teleport pipeline shall not synchronously block the calling thread; the adapter shall dispatch via `MinecraftServer#submit` (or a documented equivalent) so the calling thread receives a `CompletableFuture` that completes off-tick.

@@ -1,0 +1,17 @@
+# --- 언어 매핑: safety.yml ---
+# 내부 설정 키 이름(왼쪽)을 safety.yml 에서 운영자에게 보이는 키 이름(오른쪽)에 매핑합니다.
+# 옵션 이름을 변경하거나 번역하려면 오른쪽만 편집하세요.
+# 왼쪽은 코드 상수이므로 변경하지 마세요.
+# 이 파일이 존재하지 않으면 플러그인은 좌우가 동일한 영어 버전을 다시 생성합니다.
+
+safetyRadius: 안전반경
+biomeWhitelist: 바이옴화이트리스트
+airBlocks: 공기블록
+biomes: 바이옴
+unsafeBlocks: 위험블록
+platformRadius: 플랫폼반경
+platformAirHeight: 플랫폼공기높이
+platformMaterial: 플랫폼재질
+invulnerabilityTime: 무적시간
+version: version
+platformDepth: 플랫폼깊이

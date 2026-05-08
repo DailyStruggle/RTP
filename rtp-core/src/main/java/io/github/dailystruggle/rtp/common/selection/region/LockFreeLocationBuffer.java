@@ -201,6 +201,18 @@ public class LockFreeLocationBuffer {
     }
 
     /**
+     * Returns the buffer's allocated capacity (next power of two ≥ the value passed
+     * to the constructor). Exposed for fill-ratio metrics consumed by {@code /rtp info}
+     * health output and bStats {@code cache_pool_health} chart per
+     * {@code docs/dev/METRICS_PLAN.md}.
+     *
+     * @return Total slot count of the underlying ring buffer.
+     */
+    public int capacity() {
+        return mask + 1;
+    }
+
+    /**
      * Checks if the buffer is empty.
      *
      * @return {@code true} if the buffer is empty, {@code false} otherwise.

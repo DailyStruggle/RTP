@@ -58,6 +58,30 @@ For specific code-level and platform-specific requirements, please refer to the 
 ### 1.5 Configuration
 - **REQ-RTP-F-013 — Configurable User Messages:** The system shall allow all user-facing messages to be configurable via the `messages.yml` configuration file.
 
+### 1.6 Network / Proxy Support
+
+These requirements establish the overarching contract for operating RTP across multiple backend servers connected through a proxy. They are deliberately implementation-agnostic: transport choice, persistence schema, routing algorithms, reservation semantics, and proxy-vendor specifics (Velocity, BungeeCord, Waterfall) are design-level concerns and shall be specified in the relevant ADR, the [Multi-Server Plan](MULTI_SERVER_PLAN.md), and forthcoming proxy-adapter module requirements.
+
+- **REQ-RTP-NET-001 — Optional Network Mode:** The system shall provide a network mode that coordinates teleportation across multiple backend servers connected through a proxy. Network mode shall be disabled by default.
+
+- **REQ-RTP-NET-002 — Behavioural Parity When Disabled:** When network mode is disabled, the system's externally observable behaviour shall be indistinguishable from a single-server deployment.
+
+- **REQ-RTP-NET-003 — Single Distribution Artifact:** The system shall ship a single distribution artifact that activates the appropriate role — backend or proxy coordinator — based on the host runtime, without requiring operators to select between separate proxy and backend builds.
+
+- **REQ-RTP-NET-004 — Safety Preservation Across the Network:** A network-mediated teleport shall preserve every prohibition in §3 end-to-end. No prohibition shall be weakened, deferred, or transferred to the proxy.
+
+- **REQ-RTP-NET-005 — Authoritative World State on Backends:** The proxy shall not own world state, region definitions, or chunk data. Location validation, chunk handling, and safety checks shall execute on a backend server.
+
+- **REQ-RTP-NET-006 — Configurable Network Messaging:** All user-facing messages produced during network-mediated teleportation, including failure, queueing, and routing messages, shall be configurable through the message-configuration mechanism defined by REQ-RTP-F-013.
+
+- **REQ-RTP-NET-007 — Non-Blocking Network I/O:** Network-mode communication, persistence, and coordination shall not perform blocking I/O on a server tick thread, a region thread, or a proxy event-loop thread. This requirement extends REQ-RTP-F-008 and REQ-RTP-S-005 to the network surface.
+
+- **REQ-RTP-NET-008 — Cross-Network Fairness:** When network mode is enabled, the system shall preserve the fairness contract of single-server queueing. A player whose request cannot be served immediately shall be enrolled in a deterministic wait order, and bypass permissions defined for single-server operation shall retain equivalent semantics across the network.
+
+- **REQ-RTP-NET-009 — Authenticated, Versioned Inter-Server Data Relay:** The system shall relay teleport-coordination data between participating servers — backend-to-proxy, proxy-to-backend, and where required backend-to-backend — through a defined relay channel. The relay channel shall carry a protocol version identifier and shall authenticate every message; messages that fail version negotiation or authentication shall be rejected and audited under REQ-RTP-S-004.
+
+- **REQ-RTP-NET-010 — Proxy Load-Balancing Policy:** The proxy coordinator shall offer operator-configurable load-balancing of teleport requests across participating backend servers. The available policies shall include at minimum a default round-robin or least-loaded strategy and shall allow operators to disable load-balancing in favour of a fixed routing rule.
+
 ## 2. Non-Functional Requirements
 
 ### 2.1 Fault Tolerance
