@@ -149,4 +149,48 @@ class FabricSoundEffectSmokeTest {
             throw new AssertionError("Task must not run when no server is bound");
         }, 0L));
     }
+
+    /**
+     * Verifies the functional dispatch hook contract introduced as the
+     * durable replacement for the in-tree reflective resolvers: a per-version
+     * Loom adapter (rtp-fabric-v*) registers a {@link FabricEffectRuntime.SoundDispatcher},
+     * effects-api consults it from {@link FabricSoundEffect#run()} ahead of the
+     * reflective fallback. We can't construct a real {@code ServerPlayer} in
+     * the test JVM, so this case exercises only the registry round-trip and
+     * the unregister-clears-default contract.
+     */
+    @Test
+    void runtime_soundDispatcher_registerGetUnregister() {
+        try {
+            assertNull(FabricEffectRuntime.getSoundDispatcher(),
+                    "Precondition: no SoundDispatcher registered at start of test");
+            FabricEffectRuntime.SoundDispatcher d =
+                    (player, sound, source, x, y, z, vol, pitch) -> { /* no-op */ };
+            FabricEffectRuntime.registerSound(d);
+            assertSame(d, FabricEffectRuntime.getSoundDispatcher(),
+                    "registerSound must store the most-recent dispatcher");
+        } finally {
+            FabricEffectRuntime.registerSound(null);
+        }
+        assertNull(FabricEffectRuntime.getSoundDispatcher(),
+                "registerSound(null) must clear the registration");
+    }
+
+    /** Mirror of {@link #runtime_soundDispatcher_registerGetUnregister} for particles. */
+    @Test
+    void runtime_particleDispatcher_registerGetUnregister() {
+        try {
+            assertNull(FabricEffectRuntime.getParticleDispatcher(),
+                    "Precondition: no ParticleDispatcher registered at start of test");
+            FabricEffectRuntime.ParticleDispatcher d =
+                    (recipient, opts, x, y, z, count, dx, dy, dz, speed) -> { /* no-op */ };
+            FabricEffectRuntime.registerParticle(d);
+            assertSame(d, FabricEffectRuntime.getParticleDispatcher(),
+                    "registerParticle must store the most-recent dispatcher");
+        } finally {
+            FabricEffectRuntime.registerParticle(null);
+        }
+        assertNull(FabricEffectRuntime.getParticleDispatcher(),
+                "registerParticle(null) must clear the registration");
+    }
 }

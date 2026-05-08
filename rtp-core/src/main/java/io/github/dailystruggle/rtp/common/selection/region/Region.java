@@ -65,6 +65,22 @@ public class Region extends FactoryValue<RegionKeys> {
    */
   public volatile String configuredWorldName = null;
 
+  /**
+   * Set true once this region's {@link ScanTask} has finished its full-load
+   * verification pass (i.e. world pre-generation is sufficient for the
+   * region's footprint). Used to gate the L3 backlog cache pulse
+   * ({@link #processBacklog}) so that backlog refill/verify/drain — which
+   * ultimately drives live chunk loads through the deficit loop — does not
+   * compete with ongoing pre-generation work.
+   *
+   * <p>Default {@code false}; flipped to {@code true} by {@code ScanTask}
+   * at the end of its FULLSCAN pass. Remains {@code true} for the lifetime
+   * of the region (a completed scan does not need to be re-run unless the
+   * scan progress files are deleted, in which case a new {@code Region}
+   * instance is created).
+   */
+  public volatile boolean scanCompleted = false;
+
   public Region(String name, RegionSettings settings) {
     this(name, settings, false, null);
   }
@@ -412,6 +428,7 @@ public class Region extends FactoryValue<RegionKeys> {
       int cx = coldLoc.coords().x() >> 4;
       int cz = coldLoc.coords().z() >> 4;
 
+      getWorld().recordChunkLoadOrigin("Region.coldPromote");
       getWorld().getChunkAtAsync(cx, cz).thenAccept(chunkSet -> {
         chunkSet.complete().whenComplete((success, throwable) -> {
           if (success == null || !success) {
@@ -628,6 +645,7 @@ public class Region extends FactoryValue<RegionKeys> {
           java.util.List<CompletableFuture<Long>> chunks = new java.util.ArrayList<>();
           for (int dx = -radius; dx <= radius; dx++) {
             for (int dz = -radius; dz <= radius; dz++) {
+              rtpWorld.recordChunkLoadOrigin("Region.synthesizeReservation");
               chunks.add(rtpWorld.getChunkAt(cx + dx, cz + dz));
             }
           }
@@ -730,13 +748,17 @@ public class Region extends FactoryValue<RegionKeys> {
         cachePipeline.add(new RegionCacheTask(this, availableTime - (System.nanoTime() - start)));
       }
 
-      // Phase 8.2 pivot (2026-04-20c): schedule at most one observational
-      // RegionCacheTask alongside the default-mode deficit loop. The task
-      // itself self-gates on the inverted cache condition
-      // (unkeptLocations.size() >= cacheCap), reuses LocationGenerator, and
-      // drops any safe result instead of enqueuing it. Config surface is a
-      // single master switch (PerformanceKeys.visitorEnabled); cadence is
-      // inherited from the existing cache-fill `period`. See
+      // Phase 8.2 pivot (2026-04-20c), gate inverted (2026-05-08): schedule
+      // at most one observational RegionCacheTask alongside the default-mode
+      // deficit loop. The task self-gates on `unkeptLocations.size() >=
+      // cacheCap` and skips when L2 is full (originally it ran only when
+      // full; the gate was inverted after the visitor walk's chunk-I/O cost
+      // was found to dominate its side-effect benefits on saturated caches —
+      // it was driving up RTPWorld.totalChunkLoads without producing TP
+      // attempts). Reuses LocationGenerator and drops any safe result
+      // instead of enqueuing it. Config surface is a single master switch
+      // (PerformanceKeys.visitorEnabled); cadence is inherited from the
+      // existing cache-fill `period`. See
       // docs/dev/BIOME_AND_BAD_LOCATION_VISITOR_PLAN.md §§2, 4.2–4.3.
       if (isObservationalModeEnabled()) {
         cachePipeline.add(RegionCacheTask.observe(this, availableTime - (System.nanoTime() - start)));
@@ -782,6 +804,13 @@ public class Region extends FactoryValue<RegionKeys> {
     if (backlog == null) return;
     RTPWorld<?> world = getWorld();
     if (world == null) return;
+    // Gate L3 on scan completion: until the region's ScanTask has finished its
+    // full-load verification pass the world is not sufficiently pre-generated,
+    // and draining backlog entries into unkeptLocations would only feed the
+    // deficit loop's live-load path with cold coordinates — driving up
+    // RTPWorld.totalChunkLoads without producing successful attempts. Wait for
+    // pre-generation to settle before competing for tick-thread chunk I/O.
+    if (!scanCompleted) return;
 
     // Step 1 — refill (shape-only, time-sliced). Cap the refill spend at a
     // small fraction of the pulse budget so the rest of execute() (deficit

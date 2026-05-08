@@ -88,6 +88,7 @@ public final class LoginCacheTask implements Runnable {
         int cx = coldLoc.coords().x() >> 4;
         int cz = coldLoc.coords().z() >> 4;
 
+        region.getWorld().recordChunkLoadOrigin("LoginCacheTask.promote");
         region.getWorld().getChunkAtAsync(cx, cz).thenAccept(chunkSet -> {
             chunkSet.complete().whenComplete((success, throwable) -> {
                 if (success == null || !success) {

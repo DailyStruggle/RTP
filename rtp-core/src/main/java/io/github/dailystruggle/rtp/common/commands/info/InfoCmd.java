@@ -121,6 +121,7 @@ public class InfoCmd extends BaseRTPCmdImpl {
       String infoTeleports = lang.getConfigValue(MessagesKeys.infoTeleports, "").toString();
       String infoMSPT = lang.getConfigValue(MessagesKeys.infoMSPT, "").toString();
       String infoTotalLoads = lang.getConfigValue(MessagesKeys.infoTotalLoads, "").toString();
+      String infoLoadsByOrigin = lang.getConfigValue(MessagesKeys.infoLoadsByOrigin, "").toString();
       String infoLeakRate = lang.getConfigValue(MessagesKeys.infoLeakRate, "").toString();
       // Metrics SPI health block — surfaces the same MetricsSnapshot data that the
       // bStats integration and (planned) multi-server publisher consume. Per
@@ -138,6 +139,7 @@ public class InfoCmd extends BaseRTPCmdImpl {
       if (!infoTeleports.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoTeleports);
       if (!infoMSPT.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoMSPT);
       if (!infoTotalLoads.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoTotalLoads);
+      if (!infoLoadsByOrigin.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoLoadsByOrigin);
       if (!infoLeakRate.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoLeakRate);
       if (!infoQueueDepth.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoQueueDepth);
       if (!infoPendingTeleports.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoPendingTeleports);

@@ -40,6 +40,19 @@ Most random teleport plugins work by repeatedly rolling random coordinates until
 
 ---
 
+## ⚠️ Pregenerate Your World First — and Pick a Capable Server
+
+RTP loads chunks asynchronously on demand (S-005 — never sync chunk I/O on the main thread). On a freshly-explored world, the first teleports and the first `/rtp scan` are bound by **the host server's chunk-generation throughput**, not by RTP. On suboptimal server software — most notably stock **Fabric / vanilla** chunk systems on 1.20.1 — generation runs largely on the tick thread and can take several seconds per chunk, which will stall the queue (and even mass-pregeneration tools such as [Chunky](https://modrinth.com/plugin/chunky) can stall the server on the same hardware).
+
+**Strongly recommended:**
+
+1. **Use a server software with a parallel chunk system for production traffic.** **Paper** and **Folia** scale well; vanilla **Fabric** is supported but is single-tick-thread bound for FULL-status generation and will struggle on cold worlds regardless of how RTP is tuned.
+2. **Pregenerate every world you'll add to RTP** (e.g. with Chunky or WorldBorder) sized to match each region's configured radius **before** putting RTP into production traffic. On Fabric specifically, expect pregeneration itself to be slow and to require a maintenance window — not something to do on a live server. See [QUICK_START Step 0](docs/admin/QUICK_START.md#step-0--prerequisites--pregenerate-the-world) for sizing guidance.
+
+If you're on Fabric and the world is not pregenerated, RTP will keep working, but `/rtp` attempt rates and queue fill rates will be capped by the server's generation throughput, not by RTP's pipeline.
+
+---
+
 ## Features
 
 - **Shapes:** Circle, square, rectangle, each supporting flat, normal, and exponential distributions.

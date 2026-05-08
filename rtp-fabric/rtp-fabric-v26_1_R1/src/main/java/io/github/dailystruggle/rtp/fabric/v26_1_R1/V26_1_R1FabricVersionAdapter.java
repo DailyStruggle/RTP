@@ -74,4 +74,10 @@ public final class V26_1_R1FabricVersionAdapter implements FabricVersionAdapter 
         // TODO(rtp-fabric-ADR-001): RTPBlockStateHandle.of(Blocks.AIR.defaultBlockState()).
         throw new UnsupportedOperationException("v26_1_R1 adapter not yet implemented (rtp-fabric-ADR-001)");
     }
+
+    @Override
+    public void installEffectsDispatchers() {
+        // Independent of the unimplemented stubs above — see V26_1_R1FabricEffectDispatchers.
+        V26_1_R1FabricEffectDispatchers.install();
+    }
 }

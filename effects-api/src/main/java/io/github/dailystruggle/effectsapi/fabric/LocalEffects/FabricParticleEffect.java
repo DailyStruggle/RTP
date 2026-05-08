@@ -1,6 +1,7 @@
 package io.github.dailystruggle.effectsapi.fabric.LocalEffects;
 
 import io.github.dailystruggle.effectsapi.common.Effect;
+import io.github.dailystruggle.effectsapi.fabric.FabricEffectRuntime;
 import io.github.dailystruggle.effectsapi.fabric.LocalEffects.enums.FabricParticleKeys;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleType;
@@ -20,6 +21,14 @@ import java.util.EnumMap;
  */
 public class FabricParticleEffect extends Effect<FabricParticleKeys> {
 
+    // One-shot diagnostic: prints the first run() invocation so deployments
+    // can prove whether FabricParticleEffect.run() is actually reached at
+    // all. User-reported on 1.21.11 (2026-05-08): sound's first-run diag
+    // appears, but no particle diag and no visible particles after the
+    // first teleport — which is consistent with run() never being invoked
+    // for particles (rather than the dispatcher silently failing).
+    private static volatile boolean LOGGED_FIRST_RUN = false;
+
     public FabricParticleEffect() throws IllegalArgumentException {
         super(new EnumMap<>(FabricParticleKeys.class));
         EnumMap<FabricParticleKeys, Object> d = getData();
@@ -35,17 +44,30 @@ public class FabricParticleEffect extends Effect<FabricParticleKeys> {
 
     @Override
     public void run() {
+        if (!LOGGED_FIRST_RUN) {
+            LOGGED_FIRST_RUN = true;
+            FabricEffectRuntime.ParticleDispatcher pd = FabricEffectRuntime.getParticleDispatcher();
+            System.err.println("[effects-api] [FabricParticleEffect] first run() — dispatcher="
+                    + (pd == null ? "<none, will use reflective fallback>" : pd.getClass().getName())
+                    + " target=" + (target == null ? "null" : target.getClass().getName())
+                    + " typeData=" + (data.get(FabricParticleKeys.TYPE) == null
+                        ? "null"
+                        : data.get(FabricParticleKeys.TYPE).getClass().getName() + "=" + data.get(FabricParticleKeys.TYPE)));
+        }
         if (!(target instanceof ServerPlayer)) {
             System.err.println("[effects-api] [FabricParticleEffect] skip: target is not ServerPlayer (got "
                     + (target == null ? "null" : target.getClass().getName()) + ")");
             return;
         }
         ServerPlayer player = (ServerPlayer) target;
-        ServerLevel level = player.serverLevel();
-        if (level == null) {
-            System.err.println("[effects-api] [FabricParticleEffect] skip: ServerPlayer.serverLevel() returned null");
-            return;
-        }
+        // NOTE: do NOT resolve a ServerLevel here. On MC 1.21.11 mojmap,
+        // Entity#level() (method_37908) was removed/renamed, and any
+        // call to it from this 1.21.1-compiled bytecode throws a silent
+        // NoSuchMethodError BEFORE reaching the dispatcher consultation
+        // below — which is precisely the per-version dispatcher SPI's
+        // job to bypass. Loom-mapped per-version dispatchers
+        // (rtp-fabric-v*) resolve the level themselves; the level is
+        // only needed for the reflective fallbacks further down.
 
         Object typeObj = data.get(FabricParticleKeys.TYPE);
         ParticleOptions opts;
@@ -71,6 +93,31 @@ public class FabricParticleEffect extends Effect<FabricParticleKeys> {
         double dz = numAsDouble(data.get(FabricParticleKeys.DZ), 1.0);
         double speed = numAsDouble(data.get(FabricParticleKeys.SPEED), 0.0);
 
+        double px = player.getX();
+        double py = player.getY() + 1.0;
+        double pz = player.getZ();
+
+        // Preferred path: a per-version Loom adapter (rtp-fabric-v*) has
+        // registered a ParticleDispatcher that calls the mapped vanilla
+        // API directly. Reflective fallbacks below stay for un-adapted
+        // runtimes (brand-new MC version before a v* module ships).
+        FabricEffectRuntime.ParticleDispatcher dispatcher = FabricEffectRuntime.getParticleDispatcher();
+        if (dispatcher != null) {
+            try {
+                dispatcher.send(player, opts, px, py, pz, count, dx, dy, dz, speed);
+                return;
+            } catch (Throwable e) {
+                // See FabricSoundEffect: catch Throwable so a LinkageError
+                // (missing intermediary in a per-version Loom dispatcher
+                // on a brand-new MC patch) surfaces as a log line and
+                // falls back to the reflective path, instead of
+                // propagating uncaught and silently aborting dispatch.
+                System.err.println("[effects-api] [FabricParticleEffect] registered ParticleDispatcher threw "
+                        + e.getClass().getSimpleName() + ": " + e.getMessage()
+                        + "; falling back to reflective dispatch");
+            }
+        }
+
         // Prefer the targeted (ServerPlayer-recipient) overload of
         // sendParticles so the packet bypasses the chunk tracker. After a
         // long teleport the player is briefly outside the destination
@@ -78,11 +125,24 @@ public class FabricParticleEffect extends Effect<FabricParticleKeys> {
         // client-side and particles are silently invisible (matches the
         // user-reported 1.21.11 behavior, 2026-05-07: resolved
         // sendParticles = method_14199 but no visible particles).
+        // Resolve the level lazily here, guarded against the 1.21.11
+        // NoSuchMethodError on Entity#level(). Failing this lookup just
+        // skips the reflective fallback, which is acceptable on
+        // adapted runtimes where the dispatcher above already ran.
+        ServerLevel level;
+        try {
+            level = (ServerLevel) player.level();
+        } catch (NoSuchMethodError | ClassCastException e) {
+            System.err.println("[effects-api] [FabricParticleEffect] reflective fallback skipped: "
+                    + e.getClass().getSimpleName() + ": " + e.getMessage());
+            return;
+        }
+        if (level == null) return;
         if (!invokeSendParticlesTargeted(level, player, opts,
-                player.getX(), player.getY() + 1.0, player.getZ(),
+                px, py, pz,
                 count, dx, dy, dz, speed)) {
             invokeSendParticles(level, opts,
-                    player.getX(), player.getY() + 1.0, player.getZ(),
+                    px, py, pz,
                     count, dx, dy, dz, speed);
         }
     }

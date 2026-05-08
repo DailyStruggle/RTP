@@ -1,7 +1,12 @@
 package io.github.dailystruggle.effectsapi.fabric;
 
 import io.github.dailystruggle.effectsapi.common.Effect;
+import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.effect.MobEffect;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -81,5 +86,129 @@ public final class FabricEffectRuntime {
             return;
         }
         s.execute(task);
+    }
+
+    // ---------------------------------------------------------------------
+    // Functional dispatch hooks for mapping-dependent effect surfaces
+    // (sound, particle). Per-version Loom adapters (rtp-fabric-v*) register
+    // a lambda at startup that uses direct, compiler-bound mapped calls;
+    // effects-api falls back to its in-tree reflective implementation when
+    // nothing has been registered (default behavior on every runtime today,
+    // preserves bug-for-bug compatibility with the prior code path).
+    //
+    // Rationale: effects-api is non-Loom and platform-agnostic, so it can
+    // only reach ServerPlayer#playNotifySound / ServerLevel#sendParticles
+    // by reflection across MC versions (1.20 → 1.21.11). That reflection
+    // is fragile (constructor arity changes, Holder<SoundEvent> vs raw
+    // SoundEvent, boolean-prefix on sendParticles, intermediary remapping).
+    // Per-version adapters compile against Yarn/intermediary mappings via
+    // Loom and don't have those degrees of freedom — registering a lambda
+    // from there bypasses the resolver entirely.
+    //
+    // See effects-api/docs/adr/effects-api-ADR-003-… (Fabric platform split)
+    // and AGENTS.md "Architecture Boundaries".
+    // ---------------------------------------------------------------------
+
+    /**
+     * Plays a sound directly to {@code player}. Implementations may target the
+     * player's connection (preferred — bypasses the chunk tracker, which drops
+     * broadcast packets right after a long teleport) or fall back to a level
+     * broadcast.
+     */
+    @FunctionalInterface
+    public interface SoundDispatcher {
+        void play(@NotNull ServerPlayer player,
+                  @NotNull SoundEvent sound,
+                  @NotNull SoundSource source,
+                  double x, double y, double z,
+                  float volume, float pitch);
+    }
+
+    /**
+     * Spawns particles at {@code (x,y,z)} for {@code recipient} (or broadcast
+     * to the level when implementations choose). Implementations should prefer
+     * the targeted overload of sendParticles so the packet bypasses the chunk
+     * tracker (same post-teleport drop hazard as sound).
+     */
+    @FunctionalInterface
+    public interface ParticleDispatcher {
+        void send(@NotNull ServerPlayer recipient,
+                  @NotNull ParticleOptions options,
+                  double x, double y, double z,
+                  int count,
+                  double dx, double dy, double dz, double speed);
+    }
+
+    private static final AtomicReference<SoundDispatcher> SOUND_DISPATCHER = new AtomicReference<>();
+    private static final AtomicReference<ParticleDispatcher> PARTICLE_DISPATCHER = new AtomicReference<>();
+
+    /**
+     * Register a sound dispatcher. The most-recent registration wins; passing
+     * {@code null} clears the registration and reverts to the in-tree default
+     * (typically the reflective fallback installed by {@code FabricSoundEffect}).
+     */
+    public static void registerSound(@Nullable SoundDispatcher dispatcher) {
+        SoundDispatcher prev = SOUND_DISPATCHER.getAndSet(dispatcher);
+        if (prev != null && dispatcher != null && prev != dispatcher) {
+            System.err.println("[effects-api] [FabricEffectRuntime] sound dispatcher overridden ("
+                    + prev.getClass().getName() + " -> " + dispatcher.getClass().getName() + ")");
+        }
+    }
+
+    /** @return the currently registered sound dispatcher, or {@code null}. */
+    public static @Nullable SoundDispatcher getSoundDispatcher() {
+        return SOUND_DISPATCHER.get();
+    }
+
+    /** Register a particle dispatcher. Same semantics as {@link #registerSound}. */
+    public static void registerParticle(@Nullable ParticleDispatcher dispatcher) {
+        ParticleDispatcher prev = PARTICLE_DISPATCHER.getAndSet(dispatcher);
+        if (prev != null && dispatcher != null && prev != dispatcher) {
+            System.err.println("[effects-api] [FabricEffectRuntime] particle dispatcher overridden ("
+                    + prev.getClass().getName() + " -> " + dispatcher.getClass().getName() + ")");
+        }
+    }
+
+    /** @return the currently registered particle dispatcher, or {@code null}. */
+    public static @Nullable ParticleDispatcher getParticleDispatcher() {
+        return PARTICLE_DISPATCHER.get();
+    }
+
+    /**
+     * Builds and applies a {@code MobEffectInstance} to {@code player}.
+     *
+     * <p>Required because the {@code MobEffectInstance} ctor changed shape in
+     * 1.20.5 ({@code MobEffect} → {@code Holder<MobEffect>}); effects-api is
+     * non-Loom and cannot pick the correct ctor at compile time. Per-version
+     * Loom adapters (rtp-fabric-v*) register an implementation that calls the
+     * mapped ctor directly. Per AGENTS.md "no reflection in the api — if we
+     * need Mojang mappings we use an interface completed by each server
+     * version adapter".
+     */
+    @FunctionalInterface
+    public interface PotionDispatcher {
+        void apply(@NotNull ServerPlayer player,
+                   @NotNull MobEffect effect,
+                   int duration,
+                   int amplifier,
+                   boolean ambient,
+                   boolean visible,
+                   boolean showIcon);
+    }
+
+    private static final AtomicReference<PotionDispatcher> POTION_DISPATCHER = new AtomicReference<>();
+
+    /** Register a potion dispatcher. Same semantics as {@link #registerSound}. */
+    public static void registerPotion(@Nullable PotionDispatcher dispatcher) {
+        PotionDispatcher prev = POTION_DISPATCHER.getAndSet(dispatcher);
+        if (prev != null && dispatcher != null && prev != dispatcher) {
+            System.err.println("[effects-api] [FabricEffectRuntime] potion dispatcher overridden ("
+                    + prev.getClass().getName() + " -> " + dispatcher.getClass().getName() + ")");
+        }
+    }
+
+    /** @return the currently registered potion dispatcher, or {@code null}. */
+    public static @Nullable PotionDispatcher getPotionDispatcher() {
+        return POTION_DISPATCHER.get();
     }
 }

@@ -38,4 +38,6 @@ dependencies {
     api project(':rtp-core')
     api project(':commands-api')
     api project(':rtp-fabric:rtp-fabric-common')
+    // See V1_21_R1FabricEffectDispatchers — Loom-compiled effect dispatchers.
+    compileOnly project(':effects-api')
 }

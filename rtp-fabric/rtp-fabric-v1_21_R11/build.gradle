@@ -48,4 +48,11 @@ dependencies {
     api project(':rtp-core')
     api project(':commands-api')
     api project(':rtp-fabric:rtp-fabric-common')
+    // effects-api is referenced from V1_21_R11FabricEffectDispatchers to
+    // register a Loom-compiled SoundDispatcher / ParticleDispatcher,
+    // replacing effects-api's reflective resolvers on this MC version.
+    // compileOnly: effects-api is shaded into the rtp-plugin jar, so it
+    // is on the runtime classpath there; using compileOnly here avoids
+    // double-shading and keeps this submodule's own jar slim.
+    compileOnly project(':effects-api')
 }

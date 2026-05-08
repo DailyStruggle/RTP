@@ -22,8 +22,27 @@ pluginManagement {
     // therefore does load in a separate classloader, which is acceptable
     // because v26_1_R1 is a leaf module that no other Loom-using subproject
     // depends on at configuration time.
+    // Loom 1.15-SNAPSHOT (2026-05-07): bumped from 1.11-SNAPSHOT to support
+    // the deobfuscated MC 26.1 submodule (rtp-fabric-v26_1_R1). Loom 1.11
+    // already required Java 21 to RUN Gradle but mods could target lower
+    // bytecode; per the Loom 1.15 release notes, the same forward
+    // compatibility holds — older-MC submodules still pin their own
+    // toolchain (Java 21) and `modImplementation` / `modCompileOnly` /
+    // `mappings loom.officialMojangMappings()` remain supported. v26_1_R1
+    // no longer needs its own version override (deleted from its
+    // build.gradle alongside this bump). See settings.gradle history for
+    // the prior side-build attempt that this supersedes.
+    // Loom 1.15+ exposes TWO plugin IDs from one artifact:
+    //   * net.fabricmc.fabric-loom        — for UNOBFUSCATED MC (26.1+)
+    //   * net.fabricmc.fabric-loom-remap  — for OBFUSCATED MC (1.21.11 and older)
+    // The legacy bare `fabric-loom` ID is supported only for the obfuscated
+    // path. Both IDs come from the same plugin artifact, so a single version
+    // pin keeps every Loom-using subproject in one classloader and avoids
+    // the LoomGradleExtension ClassCastException.
     plugins {
-        id 'fabric-loom' version '1.11-SNAPSHOT'
+        id 'fabric-loom'                       version '1.15-SNAPSHOT'
+        id 'net.fabricmc.fabric-loom'          version '1.15-SNAPSHOT'
+        id 'net.fabricmc.fabric-loom-remap'    version '1.15-SNAPSHOT'
     }
 }
 
@@ -80,12 +99,23 @@ include 'rtp-fabric:rtp-fabric-v1_21_R5'
 // (FOR_LOADING | FOR_SIMULATION | RESETS_IDLE_TIMEOUT) — vanilla FORCED
 // minus the SERIALIZE bit, S-002 safe.
 include 'rtp-fabric:rtp-fabric-v1_21_R11'
-// v26_1_R1 is intentionally NOT included in the default build: it requires
-// Loom 1.15+ (deobf-26.1) which cannot coexist in a single Gradle invocation
-// with the Loom 1.11-SNAPSHOT classloader used by common / v1_20 / v1_21 /
-// rtp-plugin. Build it standalone via a separate Gradle invocation when JDK 25
-// is available. See rtp-fabric-ADR-001 for rationale.
-//include 'rtp-fabric:rtp-fabric-v26_1_R1'
+// v26_1_R1 -- pinned to MC 26.1 (deobfuscated). Requires JDK 25 + fabric-loom 1.15+.
+// Re-enabled 2026-05-07 to test the inline-dependency hypothesis: per
+// rtp-fabric-ADR-001, the prior reason for excluding it was the
+// `LoomGradleExtensionImpl_Decorated cannot be cast to LoomGradleExtension`
+// error that appears when two Loom plugin versions are loaded into the
+// same Gradle plugin classloader. v26_1_R1 declares its own
+// `id 'net.fabricmc.fabric-loom' version '1.15-SNAPSHOT'` (independent
+// classloader, leaf module not configured by other Loom modules), so the
+// hypothesis is that the cast bug only fires when two Loom-using
+// subprojects share a classloader scope -- which is not the case here as
+// long as no rtp-plugin / rtp-fabric-common code path triggers Loom 1.11
+// to read v26_1_R1's LoomGradleExtension.
+//
+// JDK 25 is provisioned per-subproject via Gradle's toolchain plugin --
+// the rest of the build remains on JDK 21. CI must have JDK 25 installed
+// (or `org.gradle.java.installations.auto-download=true`).
+include 'rtp-fabric:rtp-fabric-v26_1_R1'
 
 //include 'addons:RTP_Iris_integration'
 include 'addons:RTP_Glide'

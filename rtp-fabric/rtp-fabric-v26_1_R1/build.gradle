@@ -15,9 +15,12 @@
 // load Java 21 bytecode from common / v1_20_R1 / v1_21_R1 in the same
 // shaded jar — bytecode compatibility is forward-only.
 plugins {
-    // (1) Plugin id changes from `fabric-loom` to `net.fabricmc.fabric-loom`
-    //     in Loom 1.15+ (the version that supports 26.1).
-    id 'net.fabricmc.fabric-loom' version '1.15-SNAPSHOT'
+    // Loom 1.15 splits its plugin IDs by obfuscation status: 26.1+ is
+    // UNOBFUSCATED so it uses `net.fabricmc.fabric-loom` (no `mappings`
+    // configuration). The legacy `fabric-loom` / `net.fabricmc.fabric-loom-remap`
+    // IDs are for 1.21.11 and older. Version pinned in root settings.gradle
+    // pluginManagement.plugins {} (project-wide bump on 2026-05-07).
+    id 'net.fabricmc.fabric-loom'
 }
 
 ext {
@@ -52,4 +55,6 @@ dependencies {
     api project(':rtp-core')
     api project(':commands-api')
     api project(':rtp-fabric:rtp-fabric-common')
+    // See V26_1_R1FabricEffectDispatchers — Loom-compiled effect dispatchers.
+    compileOnly project(':effects-api')
 }

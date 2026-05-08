@@ -21,6 +21,26 @@ repositories {
     maven { url 'https://ci.ender.zone/plugin/repository/everything/' }
     maven { url 'https://repo.dmulloy2.net/repository/public/' }
 }
+
+// Bytecode-only configuration for the Java-25 v26_1_R1 adapter (2026-05-07).
+// Standard `implementation` cannot accept it because Gradle's variant-aware
+// resolution sees JVM-25 incompatibility against rtp-plugin's JDK-21
+// compileClasspath. This configuration:
+//   * has no transitive dependencies (we only want the v26_1_R1 jar itself);
+//   * relaxes the TARGET_JVM_VERSION attribute so the JDK-25 variant resolves;
+//   * is consumed only by shadowJar (never compileJava) -- RTPFabricMod
+//     references the adapter by FQN string only.
+configurations {
+    fabric26Bytecode {
+        canBeResolved = true
+        canBeConsumed = false
+        transitive = false
+        attributes {
+            attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 25)
+        }
+    }
+}
+
 dependencies {
     // --- Loom-required Fabric / Minecraft baseline ---
     // Loom won't configure remapJar / runtime classpaths without these.
@@ -62,11 +82,26 @@ dependencies {
     // V1_21_R11FabricVersionAdapter on a 1.21.11+ runtime; on 1.21.5–1.21.10 the R5
     // adapter still wins. See settings.gradle and CHECKLIST-fabric-1.21.11-multiversion.md.
     implementation project(':rtp-fabric:rtp-fabric-v1_21_R11')
-    // :rtp-fabric:rtp-fabric-v26_1_R1 intentionally NOT included — that
-    // submodule pins MC 26.1 / Java 25 and is gated out of settings.gradle
-    // until Loom 1.15+ stabilizes. RTPFabricMod.installVersionAdapter()
-    // resolves it by FQN string only on a 26.1 runtime; on 1.20.x / 1.21.x
-    // runtimes the class is never named, so Class.forName is never invoked.
+    // :rtp-fabric:rtp-fabric-v26_1_R1 — re-enabled 2026-05-07 after the
+    // project-wide bump to fabric-loom 1.15-SNAPSHOT (settings.gradle
+    // pluginManagement). With one Loom version across all subprojects
+    // the LoomGradleExtension ClassCastException no longer fires, and
+    // v26_1_R1 builds inline like the other Fabric submodules.
+    //
+    // Cannot use plain `implementation project(...)` here: v26_1_R1's
+    // toolchain is JDK 25, so its published variant declares JVM-25
+    // compatibility, and Gradle's variant-aware dependency resolution
+    // refuses to mix it onto rtp-plugin's JDK-21 compileClasspath
+    // ("Dependency resolution is looking for a library compatible with
+    // JVM runtime version 21, but ... is only compatible with JVM
+    // runtime version 25 or newer").
+    //
+    // RTPFabricMod#adapterFqnFor only references V26_1_R1FabricVersionAdapter
+    // by FQN string (Class.forName), so we never need v26_1_R1 on the
+    // compile classpath. Instead, declare a dedicated `fabric26Bytecode`
+    // configuration that targets the Java-25 jar variant explicitly and
+    // is consumed only by `shadowJar` (see configurations block below).
+    fabric26Bytecode project(':rtp-fabric:rtp-fabric-v26_1_R1')
 
     implementation project(':rtp-core')
     implementation project(':rtp-spigot:rtp-spigot-v1_20_R1')
@@ -242,6 +277,44 @@ shadowJar {
     // Required at runtime by rtp-anvil for LZ4-compressed chunk decode.
     // Relocate to avoid clashing with other plugins shading the same lib.
     relocate 'net.jpountz', 'io.github.dailystruggle.rtp.lz4'
+
+    // Merge the JDK-25 v26_1_R1 adapter bytecode in. See the
+    // `configurations { fabric26Bytecode }` block above for rationale.
+    // The bytecode lives at the canonical FQN
+    // io.github.dailystruggle.rtp.fabric.v26_1_R1.* — never imported at
+    // compile time, only resolved by Class.forName from RTPFabricMod on
+    // an MC 26.1 runtime. Strip the side jar's own META-INF / fabric.mod.json
+    // so rtp-plugin's resources/fabric.mod.json remains the only descriptor.
+    //
+    // Loom 1.15's `net.fabricmc.fabric-loom` (unobfuscated 26.1+) does NOT
+    // register a `remapJar` task -- there's no obfuscation to remap. Plain
+    // `jar` produces the deployable artifact.
+    //
+    // Variant-aware resolution does NOT auto-add the producer task to
+    // shadowJar's task graph because `fabric26Bytecode` overrides the
+    // TARGET_JVM_VERSION attribute (we relax JVM 21 -> JVM 25 to permit
+    // the cross-toolchain merge), which severs Gradle's dependency-on-task
+    // inference. Add an explicit dependency on v26_1_R1's `jar` task.
+    //
+    // Use `project.configurations` (NOT bare `configurations`): inside the
+    // shadowJar { } closure the local property `configurations` is assigned
+    // above to the filtered runtimeClasspath copy, which would shadow the
+    // project-level configuration container and trigger
+    // "Could not get unknown property 'fabric26Bytecode' for configuration
+    // ':rtp-plugin:runtimeClasspathCopy'".
+    dependsOn ':rtp-fabric:rtp-fabric-v26_1_R1:jar'
+    from(provider {
+        zipTree(project.configurations.fabric26Bytecode.singleFile)
+    }) {
+        exclude 'fabric.mod.json'
+        exclude 'META-INF/MANIFEST.MF'
+        exclude 'META-INF/mods.toml'
+        exclude 'META-INF/services/**'
+        exclude 'pack.mcmeta'
+        exclude 'assets/**'
+        exclude 'data/**'
+        exclude 'mappings/**'
+    }
 }
 
 // Loom's remapJar reads from `jar` by default and produces an intermediary-

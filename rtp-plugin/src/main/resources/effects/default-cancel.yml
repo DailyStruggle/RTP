@@ -3,6 +3,9 @@
 
 when: cancel
 effects:
-  - SOUND.BLOCK_NOTE_BLOCK_BASS.1.0.0.5
+  # VOLUME / PITCH are integer percent (0..100), not decimals — the
+  # `.` is also the token separator, so `1.0` would tokenize as two
+  # tokens and leave volume at 1% (silent). Use whole numbers.
+  - SOUND.BLOCK_NOTE_BLOCK_BASS.100.50.0.0.0
 
 version: "1.0"

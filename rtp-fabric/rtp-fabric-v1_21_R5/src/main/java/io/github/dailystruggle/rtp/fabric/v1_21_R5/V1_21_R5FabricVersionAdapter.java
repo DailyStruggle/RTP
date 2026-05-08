@@ -24,6 +24,7 @@ import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import org.jetbrains.annotations.Nullable;
 
+import java.lang.reflect.Method;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 
@@ -164,6 +165,105 @@ public final class V1_21_R5FabricVersionAdapter implements FabricVersionAdapter 
         }
     }
 
+    // Non-blocking chunk-future dispatch — see rtp-fabric-ADR-008.
+    private static volatile Method GET_CHUNK_FUTURE_METHOD;
+
+    private static Method resolveGetChunkFutureMethod(ServerChunkCache cache) throws ReflectiveOperationException {
+        Method cached = GET_CHUNK_FUTURE_METHOD;
+        if (cached != null) return cached;
+        synchronized (V1_21_R5FabricVersionAdapter.class) {
+            cached = GET_CHUNK_FUTURE_METHOD;
+            if (cached != null) return cached;
+            Method found = null;
+            for (Class<?> c = cache.getClass(); c != null && found == null; c = c.getSuperclass()) {
+                for (Method m : c.getDeclaredMethods()) {
+                    if (!CompletableFuture.class.isAssignableFrom(m.getReturnType())) continue;
+                    Class<?>[] p = m.getParameterTypes();
+                    if (p.length != 4) continue;
+                    if (p[0] != int.class || p[1] != int.class) continue;
+                    if (p[2] != ChunkStatus.class) continue;
+                    if (p[3] != boolean.class) continue;
+                    m.setAccessible(true);
+                    found = m;
+                    break;
+                }
+            }
+            if (found == null) {
+                throw new NoSuchMethodException(
+                        "ServerChunkCache#getChunkFuture(int,int,ChunkStatus,boolean) not found on "
+                                + cache.getClass().getName());
+            }
+            GET_CHUNK_FUTURE_METHOD = found;
+            return found;
+        }
+    }
+
+    @Override
+    public CompletableFuture<RTPChunkHandle> requestFullChunkAsync(RTPLevelHandle level, int cx, int cz) {
+        if (level == null) {
+            return CompletableFuture.failedFuture(new IllegalStateException("null ServerLevel"));
+        }
+        try {
+            ServerLevel sl = level.as(ServerLevel.class);
+            ServerChunkCache cache = sl.getChunkSource();
+            Method getter = resolveGetChunkFutureMethod(cache);
+
+            // Temporary load-ticket — see V1_20_R1FabricVersionAdapter#requestFullChunkAsync
+            // for the rationale. 1.21.5 uses the public addTicketWithRadius /
+            // removeTicketWithRadius API.
+            ChunkPos cp = new ChunkPos(cx, cz);
+            boolean ticketAdded = false;
+            try {
+                cache.addTicketWithRadius(RTP_TICKET_TYPE, cp, RTP_TICKET_RADIUS);
+                ticketAdded = true;
+            } catch (Throwable t) {
+                RTP.log(Level.WARNING,
+                        "[RTP][Fabric 1.21.5+] temp load-ticket apply failed for chunk=("
+                                + cx + "," + cz + "): " + t.getClass().getSimpleName() + ": " + t.getMessage());
+            }
+            final boolean addedTicket = ticketAdded;
+
+            Object raw = getter.invoke(cache, cx, cz, ChunkStatus.FULL, /*create=*/ true);
+            if (!(raw instanceof CompletableFuture<?> cf)) {
+                if (addedTicket) tryRemoveLoadTicket(cache, cp);
+                return CompletableFuture.failedFuture(new IllegalStateException(
+                        "getChunkFuture returned non-CompletableFuture: " + (raw == null ? "null" : raw.getClass())));
+            }
+            return cf.thenApply(either -> {
+                if (either == null) return null;
+                ChunkAccess chunk = unwrapEitherLeft(either);
+                return chunk == null ? null : RTPChunkHandle.of(chunk);
+            }).whenComplete((handle, ex) -> {
+                if (addedTicket) tryRemoveLoadTicket(cache, cp);
+            });
+        } catch (Throwable t) {
+            return CompletableFuture.failedFuture(t);
+        }
+    }
+
+    private static void tryRemoveLoadTicket(ServerChunkCache cache, ChunkPos cp) {
+        try {
+            cache.removeTicketWithRadius(RTP_TICKET_TYPE, cp, RTP_TICKET_RADIUS);
+        } catch (Throwable t) {
+            RTP.log(Level.WARNING,
+                    "[RTP][Fabric 1.21.5+] temp load-ticket release failed for chunk=("
+                            + cp.x + "," + cp.z + "): " + t.getClass().getSimpleName() + ": " + t.getMessage());
+        }
+    }
+
+    private static ChunkAccess unwrapEitherLeft(Object either) {
+        try {
+            Method leftMethod = either.getClass().getMethod("left");
+            Object opt = leftMethod.invoke(either);
+            if (opt == null) return null;
+            Method orElse = opt.getClass().getMethod("orElse", Object.class);
+            Object value = orElse.invoke(opt, (Object) null);
+            return (value instanceof ChunkAccess ca) ? ca : null;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
     @Override
     public RTPBlockStateHandle airState() {
         return RTPBlockStateHandle.of(Blocks.AIR.defaultBlockState());
@@ -185,6 +285,11 @@ public final class V1_21_R5FabricVersionAdapter implements FabricVersionAdapter 
                             + t.getClass().getSimpleName() + ": " + t.getMessage());
             return CompletableFuture.failedFuture(t);
         }
+    }
+
+    @Override
+    public void installEffectsDispatchers() {
+        V1_21_R5FabricEffectDispatchers.install();
     }
 
     @Override

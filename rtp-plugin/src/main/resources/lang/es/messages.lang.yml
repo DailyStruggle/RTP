@@ -33,6 +33,7 @@ infoTickets: infoTickets
 infoTeleports: infoTeletransportes
 infoMSPT: infoMSPT
 infoTotalLoads: infoCargasTotales
+infoLoadsByOrigin: infoCargasPorOrigen
 infoLeakRate: infoTasaFuga
 infoDisclaimerHeader: cabeceraAvisoInfo
 infoDisclaimer: avisoInfo

@@ -125,9 +125,12 @@ public class RegionCacheTask extends RTPRunnable {
             long cacheCap = region.getSettings().cacheCap();
             boolean cacheFull = region.queueManager.unkeptLocations.size() >= cacheCap;
             if (observationalOnly) {
-                // Observational mode runs only when the cache has NO headroom;
-                // the default-mode task retains priority while it still has
-                // work to do. See plan §2.
+                // Phase 8.2 pivot (2026-04-20c): observational mode runs
+                // only when L2 is full — i.e. when the default-mode deficit
+                // loop has nothing to do, the visitor walks LocationGenerator
+                // for its bad-location/biome side-effects and discards the
+                // candidate. Skip when L2 has headroom; the default-mode
+                // deficit loop will fill that headroom on this pulse.
                 if (!cacheFull) {
                     MemoryTracker.untrack(this);
                     return;
@@ -205,6 +208,7 @@ public class RegionCacheTask extends RTPRunnable {
 
                         for (int i = -radius; i <= radius; i++) {
                             for (int j = -radius; j <= radius; j++) {
+                                world.recordChunkLoadOrigin("RegionCacheTask.viewDistance");
                                 chunks.add(world.getChunkAt(cx + i, cz + j));
                             }
                         }

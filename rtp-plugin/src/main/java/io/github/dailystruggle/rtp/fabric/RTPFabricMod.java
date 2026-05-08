@@ -606,7 +606,23 @@ public final class RTPFabricMod implements ModInitializer {
         try {
             Class<?> cls = Class.forName(adapterFqn);
             Object instance = cls.getDeclaredConstructor().newInstance();
-            FabricVersionAdapterRegistry.install((FabricVersionAdapter) instance);
+            FabricVersionAdapter adapter = (FabricVersionAdapter) instance;
+            FabricVersionAdapterRegistry.install(adapter);
+            // Per-version Loom-compiled effect dispatchers — replaces the
+            // fragile reflective resolvers in effects-api on this MC version.
+            // Default impl is no-op; only adapters that ship dispatchers
+            // (currently v1_21_R11) actually do anything here. Failures must
+            // not abort bootstrap — sound/particle are cosmetic and fall
+            // back to the reflective path on error.
+            try {
+                adapter.installEffectsDispatchers();
+            } catch (Throwable t) {
+                RTP.log(Level.WARNING,
+                        "[RTP][Fabric] installEffectsDispatchers failed for adapter "
+                                + adapter.getClass().getName() + " (mcVersion=" + adapter.mcVersion()
+                                + "); effects-api will fall back to reflective dispatch: "
+                                + t.getClass().getSimpleName() + ": " + t.getMessage());
+            }
         } catch (ClassNotFoundException e) {
             throw new IllegalStateException(
                     "Fabric version adapter class '" + adapterFqn + "' not on classpath. "
