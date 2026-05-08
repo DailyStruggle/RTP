@@ -114,6 +114,60 @@ Vanilla `FORCED` is the right shape (`timeout = 0`, `use = LOADING_AND_SIMULATIO
 
 To verify a `TicketType` constant's actual `timeout` / `use` on any future MC patch, extract the class and run `javap -p -c` on it — the `<clinit>` block lists the literal `register("name", timeout, persist, use)` call sequence (e.g. `ldc "unknown"; lconst_1; iconst_0; getstatic …TicketUse.LOADING; invokestatic …register`). The `Loom`-cached Mojmap jar lives at `~/.gradle/caches/fabric-loom/minecraftMaven/net/minecraft/minecraft-merged/<mc>-loom.mappings…/minecraft-merged-<mc>-loom.mappings…-v2.jar` and is the right artifact to extract from (the intermediary jars under `~/.gradle/caches/fabric-loom/<mc>/minecraft-*.jar` do not contain the Mojmap-named class).
 
+### Never `Semaphore.acquire()` blockingly from a common-pool worker — self-reschedule instead (2026-05-08)
+
+Companion lesson to `rtp-fabric-ADR-008`. The original `FabricRTPWorld.liveLoadPipe` (a 2-permit `Semaphore` gating entry into `loadLiveChunk`) was acquired with a blocking `acquire()` call from inside a `CompletableFuture.runAsync(...)` lambda — i.e., from a `ForkJoinPool.commonPool` worker. When the two permit-holders parked on the tick thread (the deeper bug fixed by ADR-008), every other commonPool worker that reached the gate parked on `Semaphore$FairSync`. The 2026-05-08 crash report shows all 14 commonPool workers stuck there simultaneously, freezing every other `CompletableFuture` chain on the JVM (not just RTP's).
+
+The deeper principle, separate from ADR-008's "don't block the tick thread": **a bounded-pipe primitive that lives on the common pool must never `Semaphore.acquire()` (or any other indefinite park) on contention.** When no permit is available, the correct shape is to *self-reschedule* and free the worker:
+
+```java
+if (!gate.tryAcquire()) {
+    return CompletableFuture.supplyAsync(
+        () -> /* retry */,
+        CompletableFuture.delayedExecutor(BACKOFF_MS, TimeUnit.MILLISECONDS)
+    ).thenCompose(f -> f);
+}
+```
+
+This keeps the worker available for unrelated work while back-pressure is in effect, can't deadlock if permit-holders block on a different scheduler, and degrades gracefully under load instead of cliff-edge stalling. The blocking shape is only safe on a thread you own (a dedicated executor) where you've reasoned about the *full* dependency graph of every task that could hold a permit — a property that's almost never true on the shared common pool.
+
+`ScanTask.inFlightGate` is the project's canonical bounded-pipe pattern; it's safe specifically because its permit-holders complete on the same scheduler that drives the gate, not on a foreign one (the tick thread, an IO worker, etc.). When the holders' completion path *does* live on a foreign scheduler, prefer the `tryAcquire` + `delayedExecutor` shape above. ADR-008 sidestepped the question by removing `liveLoadPipe` entirely (vanilla's chunk system already provides back-pressure), but if a future bounded pipe is needed in `FabricRTPWorld` or any other adapter, this is the shape to reach for.
+
+### Don't `.orTimeout` chunk-load futures at orchestration sites — let the world adapter own the per-chunk deadline (2026-05-08)
+
+Companion to ADR-008 and the `Semaphore.acquire()` lesson above. `rtp-core`'s `QueueTask` and `PregenTask` historically wrapped every `world.getOrLoadChunk(cx, cz)` and `world.getChunkAt(cx, cz)` neighbour-grid `allOf` in `.orTimeout(5, SECONDS)`. The reasoning at the time was "bound the wait so a stuck chunk can't pin an attempt forever". The reality on Fabric (1.20.1 vanilla chunk system, ADR-008 non-blocking dispatch in place) is that cold-start generation routinely takes 5–10 s under early-server scan/pre-fill load — long enough for the wrapper to fire and reject *every* in-progress generation that would have completed seconds later, while the `Region.execute()` pulse already provides natural per-attempt budgeting.
+
+Two anti-patterns this exposed:
+
+- **The wrapper does not cancel the underlying load**, only the future the orchestrator is waiting on. Vanilla generation keeps running and warms `rtpChunkCache` for the next attempt at the same coordinate — but the current attempt is rejected and the `[RTP] getOrLoadChunk failed … TimeoutException: null` log line is emitted, framing useful pre-fetch work as a failure.
+- **Orchestration sites have no knowledge of the underlying chunk system's SLA.** A 5 s ceiling is right for Folia (Paper chunk-system-v2, parallel) and roughly right for Paper, but wrong for Fabric vanilla and unknowable for any future platform. Hardcoding it cross-platform meant every platform either lived with the wrong cap or had to be papered over with adapter-side `completeOnTimeout` shims that "undercut" the orchestration cap (the early shape of `FabricRTPWorld.getOrLoadChunk`).
+
+The architectural rule, going forward: **per-chunk timeouts live inside the `RTPWorld` adapter at the leaf where it actually calls the server.** The adapter is the only layer that knows when "the server is incapable of loading this particular chunk" — `FabricRTPWorld` uses `completeOnTimeout(null, FABRIC_GENERATION_DEADLINE_MS)` at the live-load leaf for exactly this reason. Orchestration code (`QueueTask`, `PregenTask`, `ScanTask` outside its own scan-budget wrapper) should chain `.thenAccept` / `.whenComplete` and let the future complete naturally; rejection on `null` / exception still flows through the existing `FailTypes.nullChunk` attribution path, so `S-004` is preserved.
+
+The 2 s `reservation.readyFuture().orTimeout(2, SECONDS)` at `QueueTask:306` / `PregenTask:433` is *not* a chunk-load deadline — it's the ADR-015 ticket-apply race, a self-contained synchronization on a future that the adapter completes deterministically as soon as the ticket lands. Leave it alone.
+
+If you find yourself reaching for `.orTimeout` on a chunk-load future at an orchestration site, push the timeout down into the relevant `RTPWorld` override instead.
+
+### Don't reschedule via `continueInline` from a `CompletableFuture` callback — submit fresh (2026-05-08)
+
+When a self-rescheduling task (e.g. `PregenTask.rescheduleNextAttempt`) is invoked from a `CompletableFuture.whenComplete` / `thenAccept` callback, calling the task's `run()` (or any equivalent inline continuation) on the callback thread attaches the next attempt's *new* dependents (`whenComplete`, `allOf`, etc.) as children of the current callback's source future. The source future is itself retained as a dependent of an upstream future, so the chain compounds: each iteration grows the `BiApply` / `CoCompletion` / `BiRelay` graph by one node, and nothing drains until the *original* root future at the top of the chain completes. With `maxAttempts × in-flight pregens × neighbour-grid allOf` depth this is multiplicative.
+
+Heap-histogram signature observed 2026-05-08 on Fabric 1.20.1 (no pregen, C2ME) — `~33 M BiApply + 44 M CompletableFuture + 21 M CoCompletion + 8 M BiRelay`, **~6 GB retained on a 16 GB heap**, with RTP's own data structures (kept-cache 6, active tickets 6, L3 backlog 0) holding well under 1 GB. The graph itself was the leak.
+
+The architectural rule: **a self-rescheduling task that re-enters via a `CompletableFuture` callback must always submit fresh on the async scheduler**, never call its own `run()` (or any `continueInline`-style trampoline) directly from the callback. The trampoline / `inRunAttempt` flag pattern is correct *only* for the synchronous in-loop case; the async-callback path must hop:
+
+```java
+if (inRunAttempt) {
+    needsReschedule = true;                                   // synchronous trampoline
+} else {
+    RTP.serverAccessor.getScheduler().runTaskAsynchronously(this); // CF callback path
+}
+```
+
+This mirrors the original Folia fix shape (`getChunkAtAsync` → `.thenAccept` lets the prior `Region.execute()` pulse end before the next attempt starts). Failure mode crept in during the timeout-removal pass when `.orTimeout` was replaced by `continueInline(this::rescheduleNextAttempt)` from inside `whenComplete` callbacks.
+
+`continueInline(...)` is still safe for *fall-through within a single attempt* (bounded depth, e.g. probe-fast-path falling back to full path) — the multiplicative growth requires re-entry into the *outer* loop. If you reach for `continueInline(this::rescheduleNextAttempt)` (or any equivalent) from inside a CF callback, that's the bug.
+
 ### Paper 26.1 scan throughput parity with Spigot/Folia (2026-04-21)
 
 Paper 26.1 with the non-blocking `LocationGenerator` state machine (ADR-015 post-refactor) achieves roughly **300 cps effective scan throughput**, on parity with the Spigot/Folia Anvil-based scan path. This confirms that ADR-016 §1.1 (the adapter-internal `[RTP] Anvil gate skipped reason=chunk-already-loaded` gate firing on essentially every candidate on Paper chunk-system-v2) is **not** a performance regression relative to the pure-Anvil path — Paper's live-chunk `getBiome` on an already-loaded chunk is cheap enough to close the gap.

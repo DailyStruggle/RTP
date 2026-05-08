@@ -41,6 +41,17 @@ public abstract class RTPWorld<T> {
    * which counts only live loads and would undercount ref-counted acquires.
    */
   public final AtomicLong lifetimeTicketsIssued = new AtomicLong(0);
+  /**
+   * Per-origin breakdown of chunk-load requests routed through
+   * {@link #getOrLoadChunk(int, int, String)}. Each entry is incremented once per call
+   * regardless of whether the load hits cache, anvil, or live generation; sum across all
+   * origins is an upper bound on (and typically equal to) the orchestration-layer load
+   * volume. Use to attribute climbs in {@link #totalChunkLoads} to a specific call site
+   * (e.g. {@code "QueueTask.runFullLoadAndResolve"}, {@code "ScanTask"},
+   * {@code "Region.processBacklog"}). The 2-arg {@link #getOrLoadChunk(int, int)} accrues
+   * under {@code "unknown"}.
+   */
+  public final Map<String, AtomicLong> chunkLoadsByOrigin = new ConcurrentHashMap<>();
   protected final Map<Long, AtomicInteger> chunkTickets = new ConcurrentHashMap<>();
 
   protected RTPWorld(T world) {
@@ -191,6 +202,53 @@ public abstract class RTPWorld<T> {
   public abstract RTPChunk<?> getCachedChunk(long key);
 
   /**
+   * Tagged variant of {@link #getOrLoadChunk(int, int)}: records the call site under
+   * {@link #chunkLoadsByOrigin} for diagnostic attribution, then delegates to the 2-arg
+   * implementation. Callers should pass a short stable tag identifying the source
+   * (e.g. {@code "QueueTask.runFullLoadAndResolve"}, {@code "PregenTask.neighbourGrid"},
+   * {@code "ScanTask"}, {@code "Region.processBacklog"},
+   * {@code "RegionCacheTask.observational"}).
+   *
+   * @param cx     chunk X
+   * @param cz     chunk Z
+   * @param origin short stable call-site tag (non-null; use {@code "unknown"} if no tag)
+   * @return same future contract as {@link #getOrLoadChunk(int, int)}
+   */
+  public CompletableFuture<RTPChunk<?>> getOrLoadChunk(int cx, int cz, String origin) {
+    // Record the origin ONLY for calls that actually fall through to a live load —
+    // cache hits and probe-cache hits do not increment totalChunkLoads, so recording
+    // them here would inflate chunkLoadsByOrigin past the real total. Mirrors the
+    // ADR-016 §13.1 precedence used by the 2-arg getOrLoadChunk: cached → anvil probe → live.
+    final long key = ((long) cx & 0xffffffffL) | ((long) cz << 32);
+    RTPChunk<?> cached = getCachedChunk(key);
+    if (cached != null) {
+      return CompletableFuture.completedFuture(cached);
+    }
+    return getChunkAt(cx, cz).thenCompose(probeKey -> {
+      RTPChunk<?> afterProbe = (probeKey != null) ? getCachedChunk(probeKey) : null;
+      if (afterProbe != null) {
+        return CompletableFuture.completedFuture(afterProbe);
+      }
+      // Live-load fallthrough: this is the path that increments totalChunkLoads,
+      // so attribute the origin here.
+      recordChunkLoadOrigin(origin);
+      return getChunkAtAsync(cx, cz).thenApply(chunkSet -> {
+        if (chunkSet == null) return null;
+        return getCachedChunk(key);
+      });
+    });
+  }
+
+  /**
+   * Records a chunk-load request under the given origin tag. Safe to call from any
+   * thread; {@code null} tags are normalised to {@code "unknown"}.
+   */
+  public final void recordChunkLoadOrigin(String origin) {
+    String tag = (origin == null) ? "unknown" : origin;
+    chunkLoadsByOrigin.computeIfAbsent(tag, k -> new AtomicLong(0)).incrementAndGet();
+  }
+
+  /**
    * Resolve an {@link RTPChunk} for {@code (cx, cz)}: cached → anvil probe → live load
    * (ADR-016 §13.1 precedence). Default composes the primitives; adapters MAY override
    * to skip redundant work. Returns {@code null} on unrecoverable load failure.
@@ -207,7 +265,10 @@ public abstract class RTPWorld<T> {
       if (afterProbe != null) {
         return CompletableFuture.completedFuture(afterProbe);
       }
-      // Fall back to live load.
+      // Fall back to live load. Untagged callers still attribute to "unknown" so
+      // chunkLoadsByOrigin always sums to totalChunkLoads — see the 3-arg overload
+      // for the recommended tagging convention.
+      recordChunkLoadOrigin("unknown");
       return getChunkAtAsync(cx, cz).thenApply(chunkSet -> {
         if (chunkSet == null) return null;
         return getCachedChunk(key);

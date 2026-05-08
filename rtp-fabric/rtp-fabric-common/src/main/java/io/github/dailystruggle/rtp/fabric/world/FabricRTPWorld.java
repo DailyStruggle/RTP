@@ -16,7 +16,6 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.ChunkAccess;
-import net.minecraft.world.level.chunk.status.ChunkStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -25,7 +24,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Fabric {@link RTPWorld} implementation (ADR-022). No {@code org.bukkit.*}
@@ -232,11 +233,37 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
 
     /**
      * Live-chunk load path. Extracted from {@link #getChunkAt} so the ADR-016
-     * anvil pre-filter can fall through to it on UNKNOWN. Calls
-     * {@code ServerChunkCache#getChunk(x, z, ChunkStatus.FULL, /*load=*&#47;true)}
-     * on the server tick thread via {@link MinecraftServer#submit}; this is the
-     * same vanilla API {@code /forceload} uses and is the only documented way
-     * to trigger generation.
+     * anvil pre-filter can fall through to it on UNKNOWN.
+     *
+     * <p><b>Non-blocking dispatch (rtp-fabric-ADR-008).</b> Calls
+     * {@code FabricVersionAdapter#requestFullChunkAsync}, which under the
+     * hood invokes {@code ServerChunkCache#getChunkFuture(cx, cz, FULL,
+     * /*create=*&#47;true)} — vanilla's non-blocking generation entry point.
+     * The dispatch itself runs on the server tick thread via
+     * {@link MinecraftServer#submit} and returns in microseconds; vanilla's
+     * own internal scheduler drives generation across {@code Worker-Main}
+     * threads and completes the inner future when the chunk is ready.</p>
+     *
+     * <p><b>What we used to do (and why it crashed).</b> Previously this
+     * method called the synchronous-blocking
+     * {@code ServerChunkCache#getChunk(cx, cz, FULL, /*load=*&#47;true)} from
+     * inside an {@code AsyncSupply} we submitted to the server thread. That
+     * variant parks the calling thread on the server's own task queue while
+     * waiting for generation — when the calling thread <i>is</i> the server
+     * tick thread (which it always is, here), it ends up driving its own
+     * queue from inside one of its tasks, deadlocking with any other task
+     * in the chunk-generation dependency graph. Crash report
+     * 2026-05-08_01.22.29-server.txt captured exactly that: tick thread
+     * parked on {@code class_3215.method_12121}, all 14 commonPool workers
+     * parked on {@code liveLoadPipe}, two never-released permits.</p>
+     *
+     * <p>Per-coordinate dedup ({@link #inFlightLiveLoads}) is preserved —
+     * concurrent callers for the same {@code (cx,cz)} still share one
+     * future. The bounded-pipe {@code Semaphore} is gone: with non-blocking
+     * dispatch there is no multi-second wait to back-pressure, and vanilla's
+     * own chunk-system has internal back-pressure. Outer 4-second
+     * {@code completeOnTimeout} on {@link #getOrLoadChunk} remains as a
+     * defense-in-depth deadline.</p>
      */
     private CompletableFuture<Long> loadLiveChunk(int chunkX, int chunkZ, long key) {
         final MinecraftServer server = world.getServer();
@@ -250,27 +277,203 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
                 "FabricRTPWorld.getChunkAt: ServerLevel has no MinecraftServer (world=" + name + ")"));
             return failed;
         }
-        return server.submit(() -> {
-            // Live chunk-load attempt — count it exactly once here, regardless of
-            // whether the caller entered via getChunkAt directly or via getChunkAtAsync
-            // (which delegates to this method).
-            totalChunkLoads.incrementAndGet();
-            ServerChunkCache cache = world.getChunkSource();
-            // load=true => generate-if-absent. This is the contract that makes
-            // RTP work on freshly-explored coordinates; do NOT change to false.
-            ChunkAccess chunk = cache.getChunk(chunkX, chunkZ, ChunkStatus.FULL, true);
-            if (chunk != null) {
-                chunkCache.put(key, new WeakReference<>(chunk));
-                rtpChunkCache.put(key,
-                    new WeakReference<>(new FabricRTPChunk(chunk, world, id)));
-                // A live chunk now supersedes any anvil snapshot — drop the
-                // stale view so subsequent getCachedChunk lookups don't return
-                // outdated palette data.
-                anvilProbeSupport.evict(key);
-            }
-            return key;
-        });
+
+        // (1) Per-coordinate de-duplication — concurrent callers for the
+        // same (cx,cz) share one in-flight future.
+        CompletableFuture<Long> existing = inFlightLiveLoads.get(key);
+        if (existing != null) return existing;
+
+        CompletableFuture<Long> result = new CompletableFuture<>();
+        CompletableFuture<Long> raced = inFlightLiveLoads.putIfAbsent(key, result);
+        if (raced != null) return raced;
+
+        // (2) Resolve the active version adapter. peek() is preferred over
+        // require() because a caller racing with shutdown should fall through
+        // to a clean failure rather than throw an IllegalStateException on
+        // the common-pool worker.
+        final io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter =
+                io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
+        if (adapter == null) {
+            inFlightLiveLoads.remove(key, result);
+            result.completeExceptionally(new IllegalStateException(
+                    "FabricRTPWorld.loadLiveChunk: FabricVersionAdapter not yet installed"));
+            return result;
+        }
+
+        // (3) Non-blocking dispatch. We invoke adapter.requestFullChunkAsync
+        // directly from the caller's thread (typically a common-pool worker).
+        // Vanilla's getChunkFutureMainThread internally re-dispatches to the
+        // server's mainThreadExecutor when called off-thread, returning a
+        // future that completes on whichever worker vanilla finishes on.
+        //
+        // CRITICAL: do NOT wrap this call in server.submit(...). Crash report
+        // 2026-05-08_11.19.30 captured the failure mode — when invoked from
+        // an AsyncSupply running on the tick thread, getChunkFutureMainThread
+        // ran inline and drove its own task queue (yielding via
+        // BlockableEventLoop#managedBlock), tripping the watchdog. Letting
+        // vanilla self-dispatch from off-thread avoids that re-entrancy.
+        fabricLiveLoadInFlight.incrementAndGet();
+        totalChunkLoads.incrementAndGet();
+        final io.github.dailystruggle.rtp.fabric.version.RTPLevelHandle levelHandle =
+                io.github.dailystruggle.rtp.fabric.version.RTPLevelHandle.of(world);
+
+        // Dispatch the adapter call ON the server tick thread. With C2ME
+        // installed, getChunkFuture(..., FULL, /*create=*/true) only enqueues
+        // generation work into the chunk system's pulse loop when invoked on
+        // the tick thread; off-thread invocations resolve immediately to a
+        // ChunkLoadingFailure (Either.right) and our adapter unwraps that to
+        // null — manifesting as the nullChunk/asyncLoadNull burst seen in
+        // the 2026-05-08 13:27 test run with C2ME 0.2.0-alpha.11.16.
+        //
+        // Routing the dispatch via server.execute(...) hands the request to
+        // C2ME's queue exactly the way Chunky does. The reflective getChunk-
+        // Future call returns its CompletableFuture immediately (vanilla
+        // 1.20.1 does not park on it), so the tick thread is not blocked.
+        // The actual generation completes off-thread on vanilla/C2ME's own
+        // worker pool, so we do not reintroduce the ADR-008 deadlock.
+        final MinecraftServer dispatchServer = world.getServer();
+        CompletableFuture<io.github.dailystruggle.rtp.fabric.version.RTPChunkHandle> dispatch;
+        if (dispatchServer == null) {
+            dispatch = CompletableFuture.completedFuture(null);
+        } else {
+            CompletableFuture<CompletableFuture<io.github.dailystruggle.rtp.fabric.version.RTPChunkHandle>> bridge =
+                    new CompletableFuture<>();
+            dispatchServer.execute(() -> {
+                try {
+                    CompletableFuture<io.github.dailystruggle.rtp.fabric.version.RTPChunkHandle> inner =
+                            adapter.requestFullChunkAsync(levelHandle, chunkX, chunkZ);
+                    bridge.complete(inner);
+                } catch (Throwable t) {
+                    bridge.completeExceptionally(t);
+                }
+            });
+            dispatch = bridge.thenCompose(f -> f == null ? CompletableFuture.completedFuture(null) : f);
+        }
+
+        dispatch.whenComplete((handle, error) -> {
+                    // Lifecycle bookkeeping on EVERY exit path (success,
+                    // exception, deadline) — mirrors the MemoryTracker contract.
+                    fabricLiveLoadInFlight.decrementAndGet();
+                    inFlightLiveLoads.remove(key, result);
+                    if (error != null) {
+                        Throwable cause = (error instanceof CompletionException && error.getCause() != null)
+                                ? error.getCause() : error;
+                        result.completeExceptionally(cause);
+                        return;
+                    }
+                    if (handle != null) {
+                        ChunkAccess chunk = handle.as(ChunkAccess.class);
+                        if (chunk != null) {
+                            chunkCache.put(key, new WeakReference<>(chunk));
+                            rtpChunkCache.put(key,
+                                    new WeakReference<>(new FabricRTPChunk(chunk, world, id)));
+                            // A live chunk supersedes any anvil snapshot — drop the
+                            // stale view so subsequent getCachedChunk lookups don't
+                            // return outdated palette data.
+                            anvilProbeSupport.evict(key);
+                        }
+                    }
+                    result.complete(key);
+                });
+
+        return result;
     }
+
+    /**
+     * Historical note: a {@code Semaphore liveLoadPipe} (2 permits) used to
+     * gate entry into a synchronous {@code cache.getChunk(..., FULL, true)}
+     * call dispatched onto the tick thread. That call was removed in
+     * rtp-fabric-ADR-008 because it deadlocked the tick thread against its
+     * own task queue (see {@link #loadLiveChunk} Javadoc). Non-blocking
+     * dispatch via {@code getChunkFuture} makes the permit pool unnecessary,
+     * since vanilla's chunk system has its own internal back-pressure and
+     * our submit returns in microseconds.
+     */
+    /**
+     * Per-coordinate de-duplication map. Concurrent requests for the same
+     * {@code (cx,cz)} share one in-flight future instead of stacking duplicate
+     * tick-thread submits behind the same permit. Entries are removed in the
+     * {@code whenComplete} stage of {@link #loadLiveChunk} on every exit path.
+     */
+    private final ConcurrentHashMap<Long, CompletableFuture<Long>> inFlightLiveLoads = new ConcurrentHashMap<>();
+
+    /**
+     * Diagnostic counter of generation dispatches currently in flight
+     * (between {@code server.submit} and the submit's completion). Intended
+     * for future metrics surface (METRICS_PLAN), not consulted by control
+     * flow.
+     */
+    private final AtomicInteger fabricLiveLoadInFlight = new AtomicInteger();
+
+    /**
+     * Fabric-only override of {@link RTPWorld#getOrLoadChunk(int, int)}.
+     *
+     * <p><b>Why this exists.</b> The world adapter is the canonical owner
+     * of any per-chunk deadline (per the 2026-05-08 architectural decision
+     * to remove orchestration-level {@code .orTimeout} from
+     * {@code rtp-core}'s {@code QueueTask}/{@code PregenTask}). On Fabric
+     * the live-load path is dispatched non-blocking via ADR-008
+     * ({@code adapter.requestFullChunkAsync} → vanilla's worker pool), but
+     * vanilla's chunk system can still take many seconds on a freshly-explored
+     * coordinate during early-server scan/pre-fill before the kept-cache is
+     * warm. This override caps that per-chunk wait so a single stuck
+     * coordinate doesn't pin the calling task indefinitely.</p>
+     *
+     * <p><b>Strategy.</b> Probe-first: cached → anvil → live-load. The
+     * live-load future is bounded by {@link #FABRIC_GENERATION_DEADLINE_MS}
+     * via {@link CompletableFuture#completeOnTimeout(Object, long,
+     * java.util.concurrent.TimeUnit)} — completing with {@code null} on
+     * deadline. Generation continues to run off-thread and warms
+     * {@link #rtpChunkCache} for the next attempt at the same coordinate,
+     * so the work is not wasted; only the wait is curtailed.</p>
+     *
+     * <p>S-004 compliance: a deadline-{@code null} resolution is not a
+     * silent discard — the calling task ({@code QueueTask}) treats it as a
+     * "no chunk available right now" rejection and routes the attempt
+     * through the standard {@code FailTypes.nullChunk} attribution path.
+     * Genuine load failures (exceptions thrown inside
+     * {@link #loadLiveChunk}) still surface as failed futures and are
+     * logged by the parent task.</p>
+     */
+    @Override
+    public CompletableFuture<RTPChunk<?>> getOrLoadChunk(int cx, int cz) {
+        final long key = ((long) cx & 0xffffffffL) | ((long) cz << 32);
+        RTPChunk<?> cached = getCachedChunk(key);
+        if (cached != null) {
+            return CompletableFuture.completedFuture(cached);
+        }
+        return getChunkAt(cx, cz).thenCompose(probeKey -> {
+            RTPChunk<?> afterProbe = (probeKey != null) ? getCachedChunk(probeKey) : null;
+            if (afterProbe != null) {
+                return CompletableFuture.completedFuture(afterProbe);
+            }
+            // Mirror the base RTPWorld#getOrLoadChunk(cx,cz) safety-net: untagged
+            // callers still attribute to "unknown" so chunkLoadsByOrigin sums to
+            // totalChunkLoads. Tagged callers should use the 3-arg overload, which
+            // calls getChunkAtAsync directly and bypasses this override.
+            recordChunkLoadOrigin("unknown");
+            return getChunkAtAsync(cx, cz).thenApply(chunkSet -> {
+                if (chunkSet == null) return null;
+                return getCachedChunk(key);
+            });
+        }).completeOnTimeout(null, FABRIC_GENERATION_DEADLINE_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * Hard per-chunk ceiling for {@link #getOrLoadChunk}. Resolves the
+     * future with {@code null} if vanilla's chunk system hasn't completed
+     * the load by this deadline. As of the 2026-05-08 rtp-core change
+     * removing orchestration-level {@code .orTimeout(5,SECONDS)} from
+     * {@code QueueTask}/{@code PregenTask}, this is the authoritative
+     * cap on how long any caller will wait for a single Fabric chunk
+     * load. Generation that doesn't meet this deadline is not cancelled
+     * — it continues and warms the cache for the next attempt at the
+     * same coordinate. Tuned generously: cold-start vanilla generation
+     * can take 5–10 s on 1.20.1 under early-server load; 30 s gives
+     * headroom without letting genuinely stuck coordinates pin a task
+     * indefinitely.
+     */
+    private static final long FABRIC_GENERATION_DEADLINE_MS = 30_000L;
 
     /**
      * Step A scope: minimal {@link ChunkSet} mirroring {@code BukkitRTPWorld#getChunkAtAsync}.

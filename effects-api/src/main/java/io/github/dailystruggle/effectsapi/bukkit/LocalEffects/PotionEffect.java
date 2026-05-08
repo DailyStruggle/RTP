@@ -54,9 +54,9 @@ public class PotionEffect extends Effect<PotionTypeNames> {
         PotionEffectType potionEffectType = (PotionEffectType) data.get(PotionTypeNames.TYPE);
         if(potionEffectType == null) return;
 
-        org.bukkit.potion.PotionEffect potionEffect = EffectsAPI.getServerIntVersion()>12
-                ? new org.bukkit.potion.PotionEffect(potionEffectType, duration, amp, amb, part, icon)
-                : new org.bukkit.potion.PotionEffect(potionEffectType, duration, amp, amb, part);
+        // Min MC 1.20.1: 6-arg ctor (with icon) is always available.
+        org.bukkit.potion.PotionEffect potionEffect =
+                new org.bukkit.potion.PotionEffect(potionEffectType, duration, amp, amb, part, icon);
         if (target instanceof Player) {
             applyOnEntityThread((Player) target, potionEffect);
         } else {
@@ -140,13 +140,14 @@ public class PotionEffect extends Effect<PotionTypeNames> {
 
     /**
      * Positional / type-driven key order for {@link PotionEffect}.
-     * Note: {@code DURATION} is intentionally absent — it was never part of
-     * the legacy positional {@code setData(String...)} contract for this
-     * effect, so retaining its omission preserves backward compatibility
-     * for permission-node round-trips.
+     * Unified across Bukkit and Fabric so a single shipped token
+     * ({@code POTION.<TYPE>.<DURATION>.<AMPLIFIER>.<AMBIENT>.<PARTICLES>.<ICON>})
+     * parses identically on both platforms. Trailing fields are optional and
+     * fall back to the defaults set in the ctor.
      */
     private static final PotionTypeNames[] KEY_ORDER = {
             PotionTypeNames.TYPE,
+            PotionTypeNames.DURATION,
             PotionTypeNames.AMPLIFIER,
             PotionTypeNames.AMBIENT,
             PotionTypeNames.PARTICLES,

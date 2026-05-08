@@ -446,6 +446,7 @@ public class RegionQueueManager {
             // Asynchronously guarantee the chunk is still loaded.
             // Re-calling refresh() is idempotent and will restore the plugin ticket
             // if an admin command stripped it, without blocking Folia tick threads.
+            world.recordChunkLoadOrigin("RegionQueueManager.validateTickets");
             world.getChunkAtAsync(cx, cz).thenAccept(chunkSet -> {
                 try {
                     loc.reservation().refresh();

@@ -201,6 +201,8 @@ Each `/rtp config` write is saved to disk immediately. Follow it with `/rtp relo
 
 ## Step 9 — Pre-warm with `/rtp scan` (Spatial Memory)
 
+> ⚠️ **Run scan only after pregeneration is complete.** `/rtp scan` (and the background scan that starts automatically when a region first loads) probes every spiral coordinate in the region; if the underlying chunks have not been pregenerated, each probe pays full chunkgen cost and competes with the server's chunk system for tick-thread I/O. On Fabric this can drag steady-state TPS noticeably; on any platform it makes scan throughput abysmal. **Always finish your Chunky / WorldBorder pregeneration pass first** (Step 0), then start the scan.
+
 Once worlds are pregenerated (Step 0) and regions are configured (Steps 4 and 8), map them so future teleports skip known-bad coordinates instantly. Scanning is async on every platform and never blocks tick threads.
 
 ```

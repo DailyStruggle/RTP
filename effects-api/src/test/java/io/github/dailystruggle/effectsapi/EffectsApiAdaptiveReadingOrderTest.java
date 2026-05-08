@@ -64,19 +64,21 @@ class EffectsApiAdaptiveReadingOrderTest {
     }
 
     @Test
-    @DisplayName("PotionEffect: type mismatch on TYPE skips to AMPLIFIER without losing the rest")
+    @DisplayName("PotionEffect: type mismatch on TYPE skips to DURATION without losing the rest")
     void potionEffectSkipsKeyOnTypeMismatch() {
-        // "5" cannot parse as a PotionEffectType, but it parses as Integer
-        // (AMPLIFIER). Adaptive order must skip TYPE, assign 5 to AMPLIFIER,
-        // and continue with the remaining tokens (ambient/particles/icon).
+        // "5" cannot parse as a PotionEffectType, but it parses as Integer.
+        // Under the unified Bukkit/Fabric KEY_ORDER
+        // (TYPE, DURATION, AMPLIFIER, AMBIENT, PARTICLES, ICON), the first
+        // Integer-typed key after TYPE is DURATION. Adaptive order must skip
+        // TYPE, assign 5 to DURATION, and continue with the remaining tokens.
         PotionEffect effect = new PotionEffect();
         effect.setData("5", "true", "false", "true");
 
         // TYPE retains its constructor default — was not clobbered with "5".
         assertEquals(PotionEffectType.BLINDNESS, effect.getData().get(PotionTypeNames.TYPE),
                 "TYPE must keep its default when no token parses as a PotionEffectType");
-        assertEquals(5, ((Number) effect.getData().get(PotionTypeNames.AMPLIFIER)).intValue(),
-                "AMPLIFIER must receive the integer token that TYPE rejected");
+        assertEquals(5, ((Number) effect.getData().get(PotionTypeNames.DURATION)).intValue(),
+                "DURATION must receive the integer token that TYPE rejected");
         assertEquals(Boolean.TRUE, effect.getData().get(PotionTypeNames.AMBIENT));
         assertEquals(Boolean.FALSE, effect.getData().get(PotionTypeNames.PARTICLES));
         assertEquals(Boolean.TRUE, effect.getData().get(PotionTypeNames.ICON));
@@ -147,22 +149,25 @@ class EffectsApiAdaptiveReadingOrderTest {
     @Test
     @DisplayName("Cursor never rewinds: once a later key is assigned, earlier keys stay at default")
     void cursorDoesNotRewind() {
-        // Token sequence forces TYPE to be skipped (so AMPLIFIER takes the int
-        // token); then a *second* int-shaped token cannot rewind to TYPE.
-        // It must land on AMBIENT? No — AMBIENT is Boolean. So it has to be
-        // reported as unparsable (no remaining numeric key after AMPLIFIER).
+        // Token sequence forces TYPE to be skipped (so DURATION takes the
+        // first int token, AMPLIFIER takes the second); then a third int-shaped
+        // token cannot rewind to TYPE and must be reported as unparsable
+        // (no remaining numeric key after AMPLIFIER under the unified
+        // KEY_ORDER {TYPE, DURATION, AMPLIFIER, AMBIENT, PARTICLES, ICON}).
         PotionEffect effect = new PotionEffect();
-        effect.setData("3", "7", "false");
+        effect.setData("3", "7", "11", "false");
 
         assertEquals(PotionEffectType.BLINDNESS, effect.getData().get(PotionTypeNames.TYPE),
-                "TYPE must NOT have been retroactively assigned the second int — cursor doesn't rewind");
-        assertEquals(3, ((Number) effect.getData().get(PotionTypeNames.AMPLIFIER)).intValue(),
-                "First int landed on AMPLIFIER");
+                "TYPE must NOT have been retroactively assigned a later int — cursor doesn't rewind");
+        assertEquals(3, ((Number) effect.getData().get(PotionTypeNames.DURATION)).intValue(),
+                "First int landed on DURATION");
+        assertEquals(7, ((Number) effect.getData().get(PotionTypeNames.AMPLIFIER)).intValue(),
+                "Second int landed on AMPLIFIER");
         assertEquals(Boolean.FALSE, effect.getData().get(PotionTypeNames.AMBIENT),
                 "Boolean token landed on AMBIENT (next boolean-typed key)");
         assertEquals(1, warnings.size(),
-                "The second int token had nowhere to land and should be reported once. Got: " + warnings);
-        assertTrue(warnings.get(0).contains("7"),
+                "The third int token had nowhere to land and should be reported once. Got: " + warnings);
+        assertTrue(warnings.get(0).contains("11"),
                 "Diagnostic must mention the orphan token. Got: " + warnings.get(0));
     }
 }

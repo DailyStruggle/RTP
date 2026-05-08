@@ -631,6 +631,11 @@ public class ScanTask extends RTPRunnable {
       save(); // Ensure final pass is securely flushed before deletion
       RTP.getInstance().scanTasks.remove(region.name, this);
       delete();
+      // Mark the region as sufficiently pre-generated. This unlocks the L3
+      // backlog cache pulse (Region.processBacklog), which is gated on
+      // scanCompleted to avoid driving live-load chunk traffic while the
+      // pre-generation crawler is still consuming tick-thread budget.
+      region.scanCompleted = true;
       done.complete(true);
       super.setCancelled(true);
       isRunning.set(false);

@@ -48,11 +48,14 @@ final class PregenTask implements Runnable {
 
     /**
      * Advance to the next attempt. If we are currently inside {@link #runAttempt()}
-     * on this thread (either synchronously or via an inline CF callback), set a
-     * flag so the while-loop in {@link #run()} continues; otherwise invoke
-     * {@link #run()} directly on the current thread (which is an async worker
-     * because CF callbacks running on a tick thread are not permitted by the
-     * scheduler contract).
+     * on this thread (synchronous trampoline path), set a flag so the while-loop
+     * in {@link #run()} continues. Otherwise — typically when invoked from a
+     * {@link CompletableFuture} callback after an async chunk-load resolves —
+     * submit a fresh task to the async scheduler. Calling {@link #run()}
+     * directly from a CF callback would attach the next attempt's dependents
+     * to the current callback's future, growing the {@code BiApply}/
+     * {@code CoCompletion} graph by one node per iteration until the source
+     * upstream future drains.
      */
     private void rescheduleNextAttempt() {
         i++;
@@ -60,7 +63,19 @@ final class PregenTask implements Runnable {
         if (inRunAttempt) {
             needsReschedule = true;
         } else {
-            run();
+            // Critical: never call run() directly from a CompletableFuture
+            // callback. Doing so attaches the next attempt's whenComplete
+            // node as a *dependent* of the current callback's source future,
+            // which is itself retained as a dependent of an upstream future.
+            // With maxAttempts × in-flight pregens × neighbour-grid allOf
+            // depth, the dependents graph grows multiplicatively and pins
+            // tens of millions of BiApply/CoCompletion nodes (heap-histogram
+            // signature observed 2026-05-08, ~6 GB retained on a 16 GB heap).
+            // Always submit fresh so each iteration starts a new dependents
+            // tree that drains on its own. Mirrors the Folia fix shape.
+            // See LESSONS_LEARNED.md "Don't reschedule via continueInline
+            // from a CompletableFuture callback".
+            RTP.serverAccessor.getScheduler().runTaskAsynchronously(this);
         }
     }
 
@@ -366,8 +381,12 @@ final class PregenTask implements Runnable {
      * {@link PregenState#staleChunkRetryLimit} times before advancing the spiral index.
      */
     private void requestChunk(int cx, int cz, long finalL, int staleRetries) {
-        state.world.getOrLoadChunk(cx, cz)
-                .orTimeout(5, TimeUnit.SECONDS)
+        // Per-attempt chunk-load: per-chunk deadline lives in the world adapter
+        // (it knows when the server is incapable of loading a particular chunk).
+        // Letting the future complete naturally means slow loads still warm
+        // rtpChunkCache for the next attempt; rejection on null/exception still
+        // routes through the existing FailTypes.nullChunk attribution path.
+        state.world.getOrLoadChunk(cx, cz, "PregenTask.requestChunk")
                 .whenComplete((chunk, ex) -> {
                     if (ex != null) {
                         RTP.log(Level.WARNING,
@@ -514,6 +533,27 @@ final class PregenTask implements Runnable {
     private void proceedWithEvaluation(int cx, int cz, long finalL, RTPChunk<?> chunk,
                                        @org.jetbrains.annotations.Nullable ChunkReservation reservation) {
 
+        // Defensive re-resolve (Option 2+3, 2026-05-08): for live-backed chunks
+        // a window exists between the dispatchLiveEvaluation isChunkLoaded guard
+        // and this consumer reading block state. Re-fetch the cached reference;
+        // on null, reject via existing FailTypes.nullChunk attribution. Anvil
+        // (isSelfContained) snapshots can't go stale and bypass the guard.
+        if (chunk != null && !chunk.isSelfContained()) {
+            long centerKey = ((long) cx & 0xffffffffL) | ((long) cz << 32);
+            RTPChunk<?> live = state.world.getCachedChunk(centerKey);
+            if (live == null || !state.world.isChunkLoaded(cx, cz)) {
+                if (state.verbose) {
+                    state.failMap.get(LocationGenerator.FailTypes.nullChunk)
+                            .compute("reason=staleAfterDispatch", (s, a) -> (a == null) ? 1L : ++a);
+                }
+                recordOutcome("nullChunk/staleAfterDispatch chunk=(" + cx + "," + cz + ")");
+                closeIfPresent(reservation);
+                rescheduleNextAttempt();
+                return;
+            }
+            chunk = live;
+        }
+
         // --- vert.adjust ---
         RTPCoords res = state.vert.adjust(chunk);
         if (res == null) {
@@ -570,6 +610,7 @@ final class PregenTask implements Runnable {
                 int ncx = centerChunkX + dx;
                 int ncz = centerChunkZ + dz;
                 int idx = (dx + safe) * L + (dz + safe);
+                state.world.recordChunkLoadOrigin("PregenTask.safetyNeighbourGrid");
                 neighbourFutures.add(state.world.getChunkAt(ncx, ncz));
                 neighbourIdx.add(new int[]{idx});
             }
@@ -581,8 +622,9 @@ final class PregenTask implements Runnable {
             return;
         }
 
+        // Neighbour-grid load: per-chunk deadlines live inside the world adapter.
+        // We orchestrate via allOf and let it complete naturally.
         CompletableFuture.allOf(neighbourFutures.toArray(new CompletableFuture[0]))
-                .orTimeout(5, TimeUnit.SECONDS)
                 .whenComplete((v, ex) -> {
                     if (ex != null) {
                         RTP.log(Level.WARNING,
@@ -727,6 +769,7 @@ final class PregenTask implements Runnable {
         List<CompletableFuture<Long>> chunks = new ArrayList<>();
         for (int x = -radius; x <= radius; x++) {
             for (int z = -radius; z <= radius; z++) {
+                state.world.recordChunkLoadOrigin("PregenTask.viewDistanceSuccess");
                 chunks.add(state.world.getChunkAt(ccx + x, ccz + z));
             }
         }

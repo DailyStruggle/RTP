@@ -206,6 +206,28 @@ public class PlaceholderProvider {
                 });
 
         placeholders.put(
+                "loadsByOrigin",
+                uuid -> {
+                    // Aggregate per-origin chunk-load counts across all worlds. Each
+                    // origin tag is registered by RTPWorld.recordChunkLoadOrigin at
+                    // every getOrLoadChunk(cx,cz,origin) call site (QueueTask.*,
+                    // PregenTask.*, ScanTask.fullLoad, Region.coldPromote, etc.).
+                    // Formatted as a comma-separated "tag=N" list, sorted by count
+                    // descending so the noisiest origin sits first. Empty when no
+                    // origin has been recorded yet (e.g. fresh server, no loads).
+                    java.util.Map<String, Long> totals = new java.util.HashMap<>();
+                    for (RTPWorld<?> world : RTP.serverAccessor.getRTPWorlds()) {
+                        world.chunkLoadsByOrigin.forEach((tag, ctr) ->
+                                totals.merge(tag, ctr.get(), Long::sum));
+                    }
+                    if (totals.isEmpty()) return "";
+                    return totals.entrySet().stream()
+                            .sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
+                            .map(e -> e.getKey() + "=" + e.getValue())
+                            .collect(java.util.stream.Collectors.joining(", "));
+                });
+
+        placeholders.put(
                 "leakRate",
                 uuid -> {
                     // Defensive leak-rate accounting: rather than trusting that everything in
@@ -470,7 +492,7 @@ public class PlaceholderProvider {
                     int cz = data.selectedCoords.z() >> 4;
                     try {
                         io.github.dailystruggle.rtp.api.world.RTPChunk<?> chunk =
-                                world.getOrLoadChunk(cx, cz).get(5, TimeUnit.SECONDS);
+                                world.getOrLoadChunk(cx, cz, "PlaceholderProvider.teleportBiome").get(5, TimeUnit.SECONDS);
                         if (chunk != null) {
                             return chunk.getBiome(
                                     data.selectedCoords.x(),

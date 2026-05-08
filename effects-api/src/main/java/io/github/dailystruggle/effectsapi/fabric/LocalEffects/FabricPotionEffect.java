@@ -1,28 +1,33 @@
 package io.github.dailystruggle.effectsapi.fabric.LocalEffects;
 
 import io.github.dailystruggle.effectsapi.common.Effect;
+import io.github.dailystruggle.effectsapi.fabric.FabricEffectRuntime;
 import io.github.dailystruggle.effectsapi.fabric.FabricRegistryCompat;
 import io.github.dailystruggle.effectsapi.fabric.LocalEffects.enums.FabricPotionKeys;
-import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffect;
-import net.minecraft.world.effect.MobEffectInstance;
 
 import java.util.EnumMap;
 
 /**
  * Fabric counterpart of
  * {@code io.github.dailystruggle.effectsapi.bukkit.LocalEffects.PotionEffect}.
- * Applies a Mojmap {@link MobEffect} to the target {@link ServerPlayer}
- * via {@code ServerPlayer#addEffect}.
  *
- * <p>Note on Mojmap drift: {@code MobEffectInstance(MobEffect, int, int)}
- * was the long-stable shape through 1.20.x. On 1.20.5+ it became
- * {@code MobEffectInstance(Holder<MobEffect>, int, int)}. We construct via
- * the Holder overload (matching the 1.21.1 build target) and let earlier
- * MC versions get patched via the rtp-fabric multi-version directories.
+ * <p>Mojmap drift across versions: {@code MobEffectInstance} took a raw
+ * {@code MobEffect} as its first ctor arg through 1.20.x, then was rewritten
+ * to take {@code Holder<MobEffect>} in 1.20.5. effects-api is non-Loom and
+ * platform-agnostic, so it cannot pick the right ctor at compile time.
+ *
+ * <p>Per the project rule "no reflection in the api — if we need Mojang
+ * mappings we use an interface completed by each server version adapter",
+ * actual {@code MobEffectInstance} construction and application is delegated
+ * to {@link FabricEffectRuntime.PotionDispatcher}, registered by the active
+ * {@code rtp-fabric-v*} adapter via {@code installEffectsDispatchers()}.
+ *
+ * <p>S-004: if no dispatcher has been registered for this runtime, the
+ * effect is dropped with a single diagnostic line — never silently swallowed.
  */
 public class FabricPotionEffect extends Effect<FabricPotionKeys> {
 
@@ -36,6 +41,9 @@ public class FabricPotionEffect extends Effect<FabricPotionKeys> {
         d.put(FabricPotionKeys.TYPE, DEFAULT_POTION);
         d.put(FabricPotionKeys.DURATION, 200); // 10s
         d.put(FabricPotionKeys.AMPLIFIER, 0);
+        d.put(FabricPotionKeys.AMBIENT, false);
+        d.put(FabricPotionKeys.PARTICLES, true);
+        d.put(FabricPotionKeys.ICON, true);
         this.data = d;
         this.defaults = d.clone();
     }
@@ -51,16 +59,32 @@ public class FabricPotionEffect extends Effect<FabricPotionKeys> {
 
         int duration  = numAsInt(data.get(FabricPotionKeys.DURATION),  200);
         int amplifier = numAsInt(data.get(FabricPotionKeys.AMPLIFIER), 0);
+        boolean ambient   = boolOrDefault(data.get(FabricPotionKeys.AMBIENT),   false);
+        boolean particles = boolOrDefault(data.get(FabricPotionKeys.PARTICLES), true);
+        boolean icon      = boolOrDefault(data.get(FabricPotionKeys.ICON),      true);
 
-        Holder<MobEffect> holder = BuiltInRegistries.MOB_EFFECT.wrapAsHolder(potion);
-        player.addEffect(new MobEffectInstance(holder, duration, amplifier));
+        FabricEffectRuntime.PotionDispatcher dispatcher = FabricEffectRuntime.getPotionDispatcher();
+        if (dispatcher == null) {
+            // S-004: don't silently swallow; one diagnostic line so admins can
+            // see why /rtp on-teleport potion effects don't fire on an
+            // unsupported MC build (rtp-fabric-v* adapter missing or older
+            // than the running server).
+            System.err.println("[effects-api] [FabricPotionEffect] no PotionDispatcher registered; "
+                    + "dropping potion effect (rtp-fabric-v* adapter for this MC version is missing "
+                    + "or did not call installEffectsDispatchers).");
+            return;
+        }
+        dispatcher.apply(player, potion, duration, amplifier, ambient, particles, icon);
     }
 
     @Override
     public String toPermission() {
         return String.valueOf(data.get(FabricPotionKeys.TYPE)) + "."
                 + data.get(FabricPotionKeys.DURATION) + "."
-                + data.get(FabricPotionKeys.AMPLIFIER);
+                + data.get(FabricPotionKeys.AMPLIFIER) + "."
+                + data.get(FabricPotionKeys.AMBIENT) + "."
+                + data.get(FabricPotionKeys.PARTICLES) + "."
+                + data.get(FabricPotionKeys.ICON);
     }
 
     @Override
@@ -68,11 +92,27 @@ public class FabricPotionEffect extends Effect<FabricPotionKeys> {
         applyByType(KEY_ORDER, data);
     }
 
+    /**
+     * Unified Bukkit/Fabric POTION token order:
+     * {@code POTION.<TYPE>.<DURATION>.<AMPLIFIER>.<AMBIENT>.<PARTICLES>.<ICON>}.
+     * Trailing fields are optional and fall back to ctor defaults.
+     */
     private static final FabricPotionKeys[] KEY_ORDER = {
-            FabricPotionKeys.TYPE, FabricPotionKeys.DURATION, FabricPotionKeys.AMPLIFIER
+            FabricPotionKeys.TYPE,
+            FabricPotionKeys.DURATION,
+            FabricPotionKeys.AMPLIFIER,
+            FabricPotionKeys.AMBIENT,
+            FabricPotionKeys.PARTICLES,
+            FabricPotionKeys.ICON
     };
 
     private static int numAsInt(Object o, int fallback) {
         return (o instanceof Number) ? ((Number) o).intValue() : fallback;
+    }
+
+    private static boolean boolOrDefault(Object o, boolean fallback) {
+        if (o instanceof Boolean) return (Boolean) o;
+        if (o instanceof String) return Boolean.parseBoolean((String) o);
+        return fallback;
     }
 }

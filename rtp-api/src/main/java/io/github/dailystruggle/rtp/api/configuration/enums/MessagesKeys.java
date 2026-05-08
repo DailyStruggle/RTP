@@ -107,6 +107,13 @@ public enum MessagesKeys {
   infoMSPT,
   /** Info line showing the total number of chunk loads performed since startup. */
   infoTotalLoads,
+  /**
+   * Info line showing the per-origin breakdown of chunk loads
+   * (the {@code [loadsByOrigin]} placeholder, sourced from
+   * {@link io.github.dailystruggle.rtp.api.world.RTPWorld#chunkLoadsByOrigin}).
+   * Empty template skips silently — locales without this key keep working.
+   */
+  infoLoadsByOrigin,
   /** Info line showing the chunk-ticket leak rate (tickets not released in time). */
   infoLeakRate,
   /**

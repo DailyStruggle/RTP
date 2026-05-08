@@ -1,6 +1,7 @@
 package io.github.dailystruggle.effectsapi.fabric.LocalEffects;
 
 import io.github.dailystruggle.effectsapi.common.Effect;
+import io.github.dailystruggle.effectsapi.fabric.FabricEffectRuntime;
 import io.github.dailystruggle.effectsapi.fabric.LocalEffects.enums.FabricSoundKeys;
 import io.github.dailystruggle.effectsapi.fabric.FabricRegistryCompat;
 import net.minecraft.core.Holder;
@@ -28,6 +29,13 @@ public class FabricSoundEffect extends Effect<FabricSoundKeys> {
             BuiltInRegistries.SOUND_EVENT,
             ResourceLocation.tryParse("minecraft:entity.player.levelup"));
 
+    /**
+     * One-shot guard so the first-run diagnostic in {@link #run()} prints
+     * exactly once per JVM, not on every teleport. Volatile is sufficient —
+     * a duplicate line under a startup race is harmless.
+     */
+    private static volatile boolean LOGGED_FIRST_RUN = false;
+
     public FabricSoundEffect() throws IllegalArgumentException {
         super(new EnumMap<>(FabricSoundKeys.class));
         EnumMap<FabricSoundKeys, Object> d = getData();
@@ -43,17 +51,35 @@ public class FabricSoundEffect extends Effect<FabricSoundKeys> {
 
     @Override
     public void run() {
+        // One-shot diagnostic: prove run() is being entered at all and
+        // whether a per-version SoundDispatcher is currently registered.
+        // User-reported "no logs, no audio, no particles" on 1.21.11 is
+        // ambiguous between (a) run() never invoked and (b) dispatcher
+        // path silently succeeding without producing audio. This line
+        // disambiguates the two on the next deploy. Suppress repeats per
+        // teleport burst by gating on a static volatile flag.
+        if (!LOGGED_FIRST_RUN) {
+            LOGGED_FIRST_RUN = true;
+            FabricEffectRuntime.SoundDispatcher d = FabricEffectRuntime.getSoundDispatcher();
+            System.err.println("[effects-api] [FabricSoundEffect] first run() — dispatcher="
+                    + (d == null ? "<none, will use reflective fallback>" : d.getClass().getName())
+                    + " target=" + (target == null ? "null" : target.getClass().getName()));
+        }
         if (!(target instanceof ServerPlayer)) {
             System.err.println("[effects-api] [FabricSoundEffect] skip: target is not ServerPlayer (got "
                     + (target == null ? "null" : target.getClass().getName()) + ")");
             return;
         }
         ServerPlayer player = (ServerPlayer) target;
-        ServerLevel level = player.serverLevel();
-        if (level == null) {
-            System.err.println("[effects-api] [FabricSoundEffect] skip: ServerPlayer.serverLevel() returned null");
-            return;
-        }
+        // NOTE: do NOT resolve a ServerLevel here. On MC 1.21.11 mojmap,
+        // Entity#level() (method_37908) was removed/renamed, and any
+        // call to it from this effects-api/-1.21.1-compiled bytecode
+        // throws NoSuchMethodError BEFORE we reach the dispatcher path,
+        // which is exactly the "no audio, no particles" silent failure
+        // the per-version dispatcher SPI exists to avoid. The registered
+        // dispatcher (rtp-fabric-v*) uses Loom-mapped vanilla calls and
+        // resolves the level itself; we only need the level for the
+        // reflective fallback further below.
 
         Object typeObj = data.get(FabricSoundKeys.TYPE);
         if (!(typeObj instanceof SoundEvent)) {
@@ -68,6 +94,35 @@ public class FabricSoundEffect extends Effect<FabricSoundKeys> {
         double dx = numAsDouble(data.get(FabricSoundKeys.DX), 0.0);
         double dy = numAsDouble(data.get(FabricSoundKeys.DY), 0.0);
         double dz = numAsDouble(data.get(FabricSoundKeys.DZ), 0.0);
+
+        // Preferred path: a per-version Loom adapter (rtp-fabric-v*) has
+        // registered a SoundDispatcher that calls the mapped vanilla API
+        // directly (no reflection, version-stable). When nothing is
+        // registered we fall through to the in-tree reflective resolvers
+        // below, which preserves bug-for-bug behavior on un-adapted
+        // runtimes (e.g. brand-new MC version before a v* module ships).
+        FabricEffectRuntime.SoundDispatcher dispatcher = FabricEffectRuntime.getSoundDispatcher();
+        if (dispatcher != null) {
+            try {
+                dispatcher.play(player, sound, SoundSource.MASTER,
+                        player.getX() + dx, player.getY() + dy, player.getZ() + dz,
+                        volume, pitch);
+                return;
+            } catch (Throwable e) {
+                // Sound is cosmetic; never break teleport. Catch Throwable
+                // (not just RuntimeException) so a LinkageError /
+                // NoSuchMethodError / NoClassDefFoundError thrown from a
+                // Loom-mapped per-version dispatcher (e.g. an Entity#level()
+                // intermediary missing on a brand-new MC patch) is logged
+                // and falls back instead of propagating up uncaught and
+                // silently aborting all subsequent dispatch attempts on
+                // this teleport — the user-reported "no logs, particles
+                // worked once then never again" symptom on 1.21.11.
+                System.err.println("[effects-api] [FabricSoundEffect] registered SoundDispatcher threw "
+                        + e.getClass().getSimpleName() + ": " + e.getMessage()
+                        + "; falling back to reflective dispatch");
+            }
+        }
 
         // Send the sound DIRECTLY to this player's connection rather than
         // broadcasting via ServerLevel#playSound. After a long teleport the
@@ -89,7 +144,21 @@ public class FabricSoundEffect extends Effect<FabricSoundKeys> {
                 player.getX() + dx, player.getY() + dy, player.getZ() + dz,
                 volume, pitch)) return;
         // Fallback B: level broadcast (legacy path; may still be
-        // dropped post-teleport but it's the last resort).
+        // dropped post-teleport but it's the last resort). Resolve the
+        // level lazily here, guarded against the 1.21.11
+        // NoSuchMethodError described above — failing this lookup just
+        // skips the legacy broadcast, which is acceptable since the
+        // dispatcher and packet paths above have already had their
+        // chance.
+        ServerLevel level;
+        try {
+            level = (ServerLevel) player.level();
+        } catch (NoSuchMethodError | ClassCastException e) {
+            System.err.println("[effects-api] [FabricSoundEffect] reflective fallback B skipped: "
+                    + e.getClass().getSimpleName() + ": " + e.getMessage());
+            return;
+        }
+        if (level == null) return;
         invokePlaySound(level, player.getX() + dx, player.getY() + dy, player.getZ() + dz,
                 sound, SoundSource.MASTER, volume, pitch);
     }

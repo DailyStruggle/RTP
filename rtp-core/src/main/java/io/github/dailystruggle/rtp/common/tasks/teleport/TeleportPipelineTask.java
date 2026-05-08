@@ -285,6 +285,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
             List<CompletableFuture<Long>> chunks = new ArrayList<>();
             for (int x = -radius; x <= radius; x++) {
               for (int z = -radius; z <= radius; z++) {
+                rtpWorld.recordChunkLoadOrigin("TeleportPipelineTask.viewDistance");
                 chunks.add(rtpWorld.getChunkAt(cx + x, cz + z));
               }
             }

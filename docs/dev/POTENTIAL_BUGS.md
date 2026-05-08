@@ -93,3 +93,7 @@ Append to the *Open* section below using the template. Keep entries short — on
 ### 2026-05-06 — ~~`FabricScheduler.runTask` repeatedly invoked before server-started during early region dispatch~~
 
 - **Resolved:** `FabricScheduler` now buffers pre-`SERVER_STARTED` `runTask` submissions in a `preStartQueue` (a `ConcurrentLinkedQueue<Runnable>`) and drains them onto `MinecraftServer.execute` from `setServer(...)`. This mirrors Bukkit's always-queue `runTask` semantics (the user-requested "route through our own scheduler" behaviour) and eliminates the `IllegalStateException` cascade observed on Fabric 1.21.11. `clearServer()` clears the buffer on `SERVER_STOPPING`.
+
+### 2026-05-07 — ~~POTION effect token grammar diverges between Bukkit and Fabric parsers~~
+
+- **Resolved:** unified `KEY_ORDER` to `{TYPE, DURATION, AMPLIFIER, AMBIENT, PARTICLES, ICON}` in both `PotionEffect` (Bukkit) and `FabricPotionEffect`. Bukkit drops the legacy 5-arg `org.bukkit.potion.PotionEffect` ctor branch (min MC 1.20.1, per user direction); Fabric uses the 6-arg `MobEffectInstance(holder, duration, amplifier, ambient, visible, showIcon)` ctor. `FabricPotionKeys` enum extended with `AMBIENT, PARTICLES, ICON`. `default.yml` schema header + POTION catalog rewritten to a single grammar. Breaking change for any hand-tuned Bukkit `POTION.X.<amp>...` configs that had been working under the old 5-field order — to be called out in the next CHANGELOG bullet.
