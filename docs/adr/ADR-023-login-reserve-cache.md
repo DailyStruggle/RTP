@@ -105,11 +105,16 @@ provenance becomes operationally useful (see follow-up tracking in
 
 ### Neutral
 
-- Fabric: stubbed. The fill task is platform-agnostic core code, but the
-  startup-burst and quit-listener wiring lives in `rtp-plugin` (Bukkit-family).
-  A Fabric-equivalent listener pair will be added when `rtp-fabric` graduates
-  past the S-005 / `FabricServerAccessor` blockers tracked in
-  `MULTI_PLATFORM_PLAN.md`.
+- Fabric port landed 2026-05-11 (see *Fabric port* below). The core fill task
+  was already platform-agnostic; only the startup-burst, quit-refill, and
+  join-consumption listeners needed Fabric mirrors. No `rtp-core` change
+  was required.
+- Cross-server / proxy interaction: per `MULTI_SERVER_PLAN.md` *Per-player
+  caches stay local-only*, the login reserve is **not consulted** by the
+  proxy network wait queue. Cross-network joins receive a reservation token
+  drawn from `keptLocations` / `unkeptLocations` instead, bypassing this
+  buffer entirely. The local consumption path in `OnEventTeleports` /
+  `FabricOnEventTeleports` is unaffected.
 
 ## Configuration
 
@@ -128,10 +133,55 @@ loginCacheCap: 0          # 0 = auto = Bukkit.getMaxPlayers() at plugin enable
 | Buffer | `RegionQueueManager.loginLocations` (nullable) |
 | Lifecycle | `RegionQueueManager.enableLoginCache(int)`, `RegionQueueManager.disableLoginCache()` |
 | Fill task | `io.github.dailystruggle.rtp.common.selection.region.LoginCacheTask` |
-| Startup burst | `RTPBukkitPlugin.initLoginReserveCache` (called from `onEnable`) |
-| Lazy refill | `OnPlayerQuit` → `LoginCacheTask.promoteUpTo(1)` |
-| Consumption | `OnEventTeleports.primeFromLoginCache` |
+| Startup burst (Bukkit) | `RTPBukkitPlugin.initLoginReserveCache` (called from `onEnable`) |
+| Startup burst (Fabric) | `FabricEventBridge.initLoginReserveCache` (called from `onServerStarted`) |
+| Lazy refill (Bukkit) | `OnPlayerQuit` → `LoginCacheTask.promoteUpTo(1)` |
+| Lazy refill (Fabric) | `FabricEventBridge.refillLoginReserveOnQuit` (called from the `Disconnect` proxy) |
+| Consumption (Bukkit) | `OnEventTeleports.primeFromLoginCache` |
+| Consumption (Fabric) | `FabricOnEventTeleports.onJoin` → `primeFromLoginCache` |
+| First-join probe (Fabric) | `FabricOnEventTeleports.hasPlayedBefore` (probes `<worldRoot>/playerdata/<uuid>.dat`) |
+| Permission gate (Fabric) | `FabricRTPPlayer.hasPermission` → `fabric-permissions-api` with `ops.json` fallback |
 | Template | `rtp-plugin/src/main/resources/performance.yml` |
+
+## Fabric port (2026-05-11)
+
+The login reserve cache is fully wired on Fabric:
+
+- **Bootstrap.** `FabricEventBridge.initLoginReserveCache(server)` runs at
+  `SERVER_STARTED` (after worlds are registered and the DB is initialised),
+  resolves the overworld region by name via `MinecraftServer.overworld()`
+  (reflective; tolerates `method_30002` intermediary drift), and sizes the
+  buffer to `loginCacheCap` or `MinecraftServer.getMaxPlayers()` when the
+  key is `0`. The startup burst dispatches `LoginCacheTask.promoteUpTo(cap - online)`.
+- **Refill.** The reflective `ServerPlayConnectionEvents$Disconnect` proxy in
+  `FabricEventBridge` calls `refillLoginReserveOnQuit()`, which iterates
+  `permRegionLookup` and dispatches `LoginCacheTask.promoteUpTo(1)` per region
+  whose `loginLocations` is non-null — exact mirror of Bukkit `OnPlayerQuit`.
+- **Consumption.** `FabricOnEventTeleports.onJoin` mirrors
+  `OnEventTeleports#onPlayerJoin`: perm gate (`rtp.onevent.firstjoin` vs.
+  `rtp.onevent.join`) → cooldown check → `primeFromLoginCache` →
+  `teleportAction`. The join proxy in `FabricEventBridge` calls a
+  `dispatchJoinRtp(Object)` bridge so the proxy's synthetic class does not
+  pin `ServerPlayer` (intermediary `class_3222`) into its bytecode constant
+  pool — same pattern as `FabricServerAccessor.registerPlayerObject`.
+- **Permissions.** No Fabric-specific perm wrapper was needed:
+  `FabricRTPPlayer.hasPermission` already consults `fabric-permissions-api`
+  (LuckPerms-Fabric et al.) with an op-level `ops.json` fallback, so
+  `ParsePermissions.hasPerm(sender, "rtp.onevent.", …)` works unchanged.
+- **First-join detection.** Vanilla has no `Player.hasPlayedBefore()`
+  equivalent. `FabricOnEventTeleports.hasPlayedBefore` probes
+  `<worldRoot>/playerdata/<uuid>.dat` via
+  `MinecraftServer.getWorldPath(LevelResource.ROOT)` with a reflective
+  fallback for mapping drift. Vanilla writes that file on first auto-save
+  after a player joins, so its absence at JOIN time is a reliable
+  "never-seen-before" signal — parity with Bukkit, which reads the same
+  file under the hood.
+- **Tests.** `ReqFabricAdr023HasPlayedBeforeTest` covers the first-join
+  probe (6 cases: missing file / empty playerdata dir / file present /
+  unrelated UUID present / file-is-directory edge case / null inputs).
+  6/6 green.
+
+Closes MULTI_PLATFORM_PLAN.md E3-5 for the login-reserve path.
 
 ## Follow-ups (out of v1 scope)
 
@@ -139,6 +189,9 @@ loginCacheCap: 0          # 0 = auto = Bukkit.getMaxPlayers() at plugin enable
 - `loginCacheMode = EVERY_LOGIN | FIRST_LOGIN` toggle (currently both modes
   are covered implicitly by the existing `rtp.onevent.firstjoin` /
   `rtp.onevent.join` permissions).
-- Fabric port — wait until `rtp-fabric` is unblocked.
-- REQ-traceable test classes: `LoginCachePromotionTest` (mirror of the kept
-  promotion test against the new task) and `LoginCacheJoinPrimeTest`.
+- REQ-traceable test classes for the Bukkit-side promotion + join-prime paths:
+  `LoginCachePromotionTest` (mirror of the kept promotion test against the
+  new task) and `LoginCacheJoinPrimeTest`. The Fabric first-join branch is
+  already covered by `ReqFabricAdr023HasPlayedBeforeTest`.
+- Telemetry: `loginReserveExhaustion`, `loginFill`, `loginCap` exporters
+  (METRICS_PLAN.md).

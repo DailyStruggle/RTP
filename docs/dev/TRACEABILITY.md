@@ -140,6 +140,14 @@ This document connects each requirement to the design decision that motivated it
 
 ---
 
+## rtp-fabric Requirements
+
+| Req ID | Summary | Design Ref | Implementing Class(es) | Test(s) |
+|---|---|---|---|---|
+| REQ-FABRIC-F-011 | Login reserve cache wiring (ADR-023): default-world bootstrap + Disconnect refill + Join consumption (firstjoin via `playerdata/<uuid>.dat`) | [ADR-023](../adr/ADR-023-login-reserve-cache.md) *Fabric port*, [MULTI_PLATFORM_PLAN.md](MULTI_PLATFORM_PLAN.md) E3-5 | `FabricEventBridge.initLoginReserveCache` / `refillLoginReserveOnQuit` / `dispatchJoinRtp`; `FabricOnEventTeleports.onJoin` / `primeFromLoginCache` / `hasPlayedBefore`; perm gate via `FabricRTPPlayer.hasPermission` | `ReqFabricAdr023HasPlayedBeforeTest` (6 tests — covers the first-join branch of the consumption path; promotion + region attachment paths are exercised via `rtp-core`'s `RegionPipelineTest`) |
+
+---
+
 ## Coverage Summary
 
 | Module | Total Reqs | Automated Test Coverage |
@@ -150,7 +158,8 @@ This document connects each requirement to the design decision that motivated it
 | rtp-spigot | 9 | 4 (REQ-SPIGOT-F-001, REQ-SPIGOT-ARCH-001/005 via `ChunkTicketLifecycleTest`, REQ-SPIGOT-ARCH-003/004 via `BukkitSchedulerImplTest`) |
 | rtp-paper | 9 | 5 (REQ-PAPER-F-002 via architecture rule, REQ-PAPER-F-003 and REQ-PAPER-ARCH-003 via `ServerAccessorImplTest`, REQ-PAPER-ARCH-001/005 via `ChunkTicketLifecycleTest`) |
 | rtp-folia | 14 | 1 (REQ-FOLIA-F-002 via architecture rule) |
-| **Total** | **75** | **~43** |
+| rtp-fabric | 1 | 1 (REQ-FABRIC-F-011 via `ReqFabricAdr023HasPlayedBeforeTest`) |
+| **Total** | **76** | **~44** |
 
 > **Deterministic RNG seam:** `MemoryShape.setRng(Random)`, `LocationGenerator.setRng(Random)`, and `RTPCmd.setRng(Random)` allow any test to inject a seeded `java.util.Random` and eliminate RNG as a source of flakiness. `DeterministicShapeTest` (12 tests) exercises this seam for `Circle`, `Square`, and `Rectangle`. The biome-recall path in `LocationGenerator` uses the same seam.
 
