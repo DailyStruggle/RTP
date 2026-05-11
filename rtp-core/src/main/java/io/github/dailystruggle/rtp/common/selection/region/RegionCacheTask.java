@@ -7,6 +7,7 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
+import io.github.dailystruggle.rtp.common.tools.CfDiag;
 import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
 import io.github.dailystruggle.rtp.common.tools.PerformanceTracker;
 
@@ -140,15 +141,36 @@ public class RegionCacheTask extends RTPRunnable {
                 return;
             }
 
-            // THROTTLE: Cap the number of concurrent asynchronous generations allowed per region.
-            // When the TaskPipe rapidly loops 60 times in a tick, 58 of them will cleanly abort here,
-            // naturally pacing the generation to 2 chunks at a time.
-            if (region.inFlightCalculations.get() > 2) {
+            // THROTTLE: At most ONE in-flight public-cache generation per region.
+            // Tightened 2026-05-08 from `> 2` (up to 3 concurrent) to single-flight
+            // after the Fabric heap dump showed `RegionCacheTask` was the rate-
+            // multiplier behind the CompletableFuture graph leak: every concurrent
+            // PregenTask under it allocated its own neighbour-grid `allOf` fan-out
+            // (~48 BiApply / ~48 BiRelay per safetyRadius=3 attempt, retained for
+            // up to 5 s under the new orTimeout). With the cap at 3 and a sub-
+            // second per-attempt cadence, three independent retry trains stacked
+            // their CF graphs continuously; a single-flight cap collapses that to
+            // one train and lets the per-task `maxAttempts` ceiling actually bound
+            // the working set.
+            //
+            // The TaskPipe's per-pulse loop still calls run() repeatedly; the
+            // surplus calls cleanly abort here, naturally pacing generation to
+            // one chunk at a time. Per-player tasks (playerId != null) bypass
+            // this gate intentionally — they are bounded by the number of
+            // waiting players, which is upstream-rate-limited by the per-player
+            // single-flight enforced in QueueTask/RegionQueueManager.
+            if (region.inFlightCalculations.get() >= 1) {
                 MemoryTracker.untrack(this);
                 return;
             }
         }
 
+        // Diagnostic counter: bumped only on the actual issuance path (after
+        // throttle / cache-full short-circuits). The CFDIAG dump pairs this
+        // with locationGenPregenEntry to expose the multiplier between
+        // "cache-fill issuance attempts" and "PregenTask attempts".
+        CfDiag.regionCacheTaskIssue.increment();
+        CfDiag.ensureStarted();
         region.inFlightCalculations.incrementAndGet();
         CompletableFuture<GenerationResult> locationFuture = RTP.serverAccessor.getLocationGenerator().getLocation(region, (java.util.Set<String>) null);
 
@@ -212,6 +234,7 @@ public class RegionCacheTask extends RTPRunnable {
                                 chunks.add(world.getChunkAt(cx + i, cz + j));
                             }
                         }
+                        CfDiag.chunkSetRegionCache.increment();
                         chunkSet = new ChunkSet(world, cx, cz, chunks, new CompletableFuture<>());
 
                         final ChunkSet finalSet = chunkSet;

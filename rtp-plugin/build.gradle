@@ -39,6 +39,49 @@ configurations {
             attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 25)
         }
     }
+    // Bytecode-only configuration for the JDK-25 / unobf-Loom-compiled
+    // `rtp-fabric-common-unobf` carrier. Same variant-incompatibility
+    // story as `fabric26Bytecode` above: the module's published variant
+    // declares JVM-25 compatibility, so we cannot pull it onto
+    // rtp-plugin's JDK-21 compileClasspath via plain `implementation
+    // project(...)`. Instead, declare it here and merge it into the
+    // released jar AFTER Loom's remapJar, so its Mojang-named
+    // `net.minecraft.*` references survive intact (Loom would otherwise
+    // rewrite them to intermediary `class_NNNN` and they'd fail to link
+    // on the deobf MC 26.1.2 runtime). Required so that the v26_1_R1
+    // adapter's `installEffectsWiring` path (which references
+    // FabricEffectsHandlerUnobf and friends) does not throw
+    // NoClassDefFoundError at SERVER_STARTED time. Effects-api wiring
+    // would otherwise silently degrade — see effects-api-ADR-006 and
+    // POTENTIAL_BUGS.md `2026-05-08 — Fabric effects-api wiring leaks
+    // intermediary symbols on MC 26.1.2`.
+    fabricCommonUnobfBytecode {
+        canBeResolved = true
+        canBeConsumed = false
+        transitive = false
+        attributes {
+            attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 25)
+        }
+    }
+    // Bytecode-only configuration for the effects-api fabric-unobf
+    // carrier (effects-api/effects-api-fabric-unobf). Hosts
+    // FabricEffectRuntimeUnobf and the Mojmap-named LocalEffects
+    // implementations consumed transitively by FabricEffectsHandlerUnobf
+    // on MC 26.1.2. Same JDK-25 / Loom-1.15-unobf variant story as
+    // fabricCommonUnobfBytecode — must merge post-remap so its
+    // `net.minecraft.*` references survive into the released jar.
+    // Without this, the v26_1_R1 adapter's installEffectsWiring path
+    // raises `NoClassDefFoundError:
+    // io/github/dailystruggle/effectsapi/fabric_unobf/FabricEffectRuntimeUnobf`
+    // at SERVER_STARTED time. See effects-api-ADR-006.
+    effectsApiFabricUnobfBytecode {
+        canBeResolved = true
+        canBeConsumed = false
+        transitive = false
+        attributes {
+            attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 25)
+        }
+    }
 }
 
 dependencies {
@@ -102,6 +145,21 @@ dependencies {
     // configuration that targets the Java-25 jar variant explicitly and
     // is consumed only by `shadowJar` (see configurations block below).
     fabric26Bytecode project(':rtp-fabric:rtp-fabric-v26_1_R1')
+
+    // Sibling to fabric26Bytecode above. The unobf carrier hosts the
+    // Mojang-named NM-typed surfaces (FabricEffectsHandlerUnobf, the
+    // *Unobf world/chunk/player wrappers) consumed by the 26.1+
+    // version adapters. Merged into the released jar post-remap via
+    // the `mergeCommonUnobf` step below so Loom never rewrites its
+    // `net.minecraft.*` references to intermediary names. See ADR-009
+    // and effects-api-ADR-006.
+    fabricCommonUnobfBytecode project(':rtp-fabric:rtp-fabric-common-unobf')
+
+    // Sibling: the effects-api unobf carrier (FabricEffectRuntimeUnobf
+    // and Mojmap-named LocalEffects). Consumed by FabricEffectsHandlerUnobf
+    // on MC 26.1.2 via the v26_1_R1 adapter's installEffectsWiring path.
+    // See effects-api-ADR-006 and POTENTIAL_BUGS.md 2026-05-08.
+    effectsApiFabricUnobfBytecode project(':effects-api:effects-api-fabric-unobf')
 
     implementation project(':rtp-core')
     implementation project(':rtp-spigot:rtp-spigot-v1_20_R1')
@@ -278,43 +336,21 @@ shadowJar {
     // Relocate to avoid clashing with other plugins shading the same lib.
     relocate 'net.jpountz', 'io.github.dailystruggle.rtp.lz4'
 
-    // Merge the JDK-25 v26_1_R1 adapter bytecode in. See the
-    // `configurations { fabric26Bytecode }` block above for rationale.
-    // The bytecode lives at the canonical FQN
-    // io.github.dailystruggle.rtp.fabric.v26_1_R1.* — never imported at
-    // compile time, only resolved by Class.forName from RTPFabricMod on
-    // an MC 26.1 runtime. Strip the side jar's own META-INF / fabric.mod.json
-    // so rtp-plugin's resources/fabric.mod.json remains the only descriptor.
+    // The JDK-25 v26_1_R1 adapter bytecode is INTENTIONALLY NOT merged here.
     //
-    // Loom 1.15's `net.fabricmc.fabric-loom` (unobfuscated 26.1+) does NOT
-    // register a `remapJar` task -- there's no obfuscation to remap. Plain
-    // `jar` produces the deployable artifact.
+    // Why: Loom's `remapJar` (which consumes shadowJar's output, see below)
+    // remaps the ENTIRE jar's net.minecraft.* references from Mojmap to
+    // intermediary. The v26_1_R1 module's bytecode is built without
+    // intermediary remapping (its build.gradle uses `net.fabricmc.fabric-loom`
+    // — Loom 1.15+ unobfuscated plugin, no `mappings` line) because MC 26.1.2
+    // ships fully deobfuscated and has NO intermediary lookup table at runtime.
+    // If its classes pass through remapJar, Mojang names like
+    // `net/minecraft/server/level/ServerPlayer` get rewritten to intermediary
+    // (`net/minecraft/class_3222`), which then fail to link on the deobf 26.1.2
+    // runtime with NoClassDefFoundError.
     //
-    // Variant-aware resolution does NOT auto-add the producer task to
-    // shadowJar's task graph because `fabric26Bytecode` overrides the
-    // TARGET_JVM_VERSION attribute (we relax JVM 21 -> JVM 25 to permit
-    // the cross-toolchain merge), which severs Gradle's dependency-on-task
-    // inference. Add an explicit dependency on v26_1_R1's `jar` task.
-    //
-    // Use `project.configurations` (NOT bare `configurations`): inside the
-    // shadowJar { } closure the local property `configurations` is assigned
-    // above to the filtered runtimeClasspath copy, which would shadow the
-    // project-level configuration container and trigger
-    // "Could not get unknown property 'fabric26Bytecode' for configuration
-    // ':rtp-plugin:runtimeClasspathCopy'".
-    dependsOn ':rtp-fabric:rtp-fabric-v26_1_R1:jar'
-    from(provider {
-        zipTree(project.configurations.fabric26Bytecode.singleFile)
-    }) {
-        exclude 'fabric.mod.json'
-        exclude 'META-INF/MANIFEST.MF'
-        exclude 'META-INF/mods.toml'
-        exclude 'META-INF/services/**'
-        exclude 'pack.mcmeta'
-        exclude 'assets/**'
-        exclude 'data/**'
-        exclude 'mappings/**'
-    }
+    // Solution: merge v26_1_R1 bytecode AFTER remapJar via the `mergeV26`
+    // task below, so its classes survive intact.
 }
 
 // Loom's remapJar reads from `jar` by default and produces an intermediary-
@@ -330,6 +366,194 @@ remapJar {
     archiveBaseName.set('RTP-Pro')
     archiveClassifier.set('')
     archiveVersion.set(project.version.toString())
+}
+
+// Post-process remapJar to merge in the v26_1_R1 adapter bytecode WITHOUT
+// passing it through Loom's intermediary remap. See the rationale comment in
+// shadowJar above. We open the just-remapped jar and append the v26 module's
+// classes in place; Loom never sees them, so their Mojang names stay intact
+// and link cleanly on the deobfuscated MC 26.1.2 runtime.
+//
+// Implementation: pure java.util.zip on the produced jar. We rebuild the jar
+// to a sibling tempfile, copy every existing entry through unchanged, then
+// stream the v26 module's classes in (skipping META-INF/manifest/mod-json/
+// resources that would clash with rtp-plugin's own descriptor). Finally the
+// tempfile replaces the original output. No Gradle Copy task is involved
+// because the v26 jar is JDK-25 bytecode and the variant-aware classpath
+// resolution would refuse to wire it onto remapJar's task inputs.
+remapJar {
+    dependsOn ':rtp-fabric:rtp-fabric-v26_1_R1:jar'
+    dependsOn ':rtp-fabric:rtp-fabric-common-unobf:jar'
+    dependsOn ':effects-api:effects-api-fabric-unobf:jar'
+    doLast {
+        def out = remapJar.archiveFile.get().asFile
+        def v26 = project.configurations.fabric26Bytecode.singleFile
+        def commonUnobf = project.configurations.fabricCommonUnobfBytecode.singleFile
+        def effectsUnobf = project.configurations.effectsApiFabricUnobfBytecode.singleFile
+        def tmp = new File(out.parentFile, out.name + '.v26merge.tmp')
+        def skipPatterns = [
+            ~'^fabric\\.mod\\.json$',
+            ~'^META-INF/MANIFEST\\.MF$',
+            ~'^META-INF/mods\\.toml$',
+            ~'^META-INF/services/.*$',
+            ~'^pack\\.mcmeta$',
+            ~'^assets/.*$',
+            ~'^data/.*$',
+            ~'^mappings/.*$'
+        ]
+        def shouldSkipFromMerge = { String name ->
+            for (p in skipPatterns) {
+                if (name ==~ p) return true
+            }
+            return false
+        }
+        def addedFromV26 = 0
+        def addedFromCommonUnobf = 0
+        def addedFromEffectsUnobf = 0
+        def existing = new HashSet<String>()
+        // Package remapping for merged unobf class bytecode. The shadowJar
+        // task relocates these packages (see relocate() calls below), and
+        // since our merge runs AFTER remapJar (which itself runs after
+        // shadowJar), the unrelocated reference bytes inside the unobf
+        // jars would dangle in the released artifact. Rewrite them with
+        // ASM SimpleRemapper. Keys/values are JVM internal names.
+        def pkgRemap = [
+            'io/github/dailystruggle/effectsapi/'  : 'io/github/dailystruggle/rtp/effectsapi/',
+            'io/github/dailystruggle/commandsapi/' : 'io/github/dailystruggle/rtp/commandsapi/'
+        ]
+        def remapClassBytes = { byte[] input ->
+            def cr = new org.objectweb.asm.ClassReader(input)
+            def cw = new org.objectweb.asm.ClassWriter(0)
+            def remapper = new org.objectweb.asm.commons.Remapper() {
+                @Override
+                String map(String internalName) {
+                    for (entry in pkgRemap.entrySet()) {
+                        if (internalName.startsWith(entry.key)) {
+                            return entry.value + internalName.substring(entry.key.length())
+                        }
+                    }
+                    return internalName
+                }
+            }
+            cr.accept(new org.objectweb.asm.commons.ClassRemapper(cw, remapper), 0)
+            return cw.toByteArray()
+        }
+        // Also rewrite the entry path itself if it falls under a remapped
+        // package (so the class is filed under its post-shadow path inside
+        // the jar). Returns the possibly-rewritten zip entry name.
+        def remapEntryName = { String name ->
+            for (entry in pkgRemap.entrySet()) {
+                if (name.startsWith(entry.key)) {
+                    return entry.value + name.substring(entry.key.length())
+                }
+            }
+            return name
+        }
+        new java.util.zip.ZipFile(out).withCloseable { src ->
+            new java.util.zip.ZipOutputStream(new java.io.FileOutputStream(tmp)).withCloseable { zos ->
+                // 1. Copy all existing entries from the remapped jar.
+                def srcEntries = src.entries()
+                while (srcEntries.hasMoreElements()) {
+                    def e = srcEntries.nextElement()
+                    existing.add(e.name)
+                    def newEntry = new java.util.zip.ZipEntry(e.name)
+                    newEntry.time = e.time
+                    zos.putNextEntry(newEntry)
+                    if (!e.isDirectory()) {
+                        src.getInputStream(e).withCloseable { ins -> ins.transferTo(zos) }
+                    }
+                    zos.closeEntry()
+                }
+                // 2. Append v26 module classes that don't clash and aren't in skip list.
+                new java.util.zip.ZipFile(v26).withCloseable { v26zip ->
+                    def v26Entries = v26zip.entries()
+                    while (v26Entries.hasMoreElements()) {
+                        def e = v26Entries.nextElement()
+                        if (e.isDirectory()) continue
+                        if (shouldSkipFromMerge(e.name)) continue
+                        def outName = e.name.endsWith('.class') ? remapEntryName(e.name) : e.name
+                        if (existing.contains(outName)) continue
+                        byte[] payload = v26zip.getInputStream(e).withCloseable { ins -> ins.readAllBytes() }
+                        if (e.name.endsWith('.class')) {
+                            payload = remapClassBytes(payload)
+                        }
+                        def newEntry = new java.util.zip.ZipEntry(outName)
+                        newEntry.time = e.time
+                        zos.putNextEntry(newEntry)
+                        zos.write(payload)
+                        zos.closeEntry()
+                        existing.add(outName)
+                        addedFromV26++
+                    }
+                }
+                // 3. Append rtp-fabric-common-unobf classes (Mojang-named NM
+                //    surfaces — FabricEffectsHandlerUnobf, *Unobf carriers
+                //    consumed by the 26.1+ adapter's installEffectsWiring
+                //    path). Same merge-post-remap rationale as v26 above:
+                //    Loom would otherwise rewrite their net.minecraft.*
+                //    references to intermediary names and break linkage
+                //    on the deobf MC 26.1.2 runtime. See ADR-009 and
+                //    effects-api-ADR-006.
+                new java.util.zip.ZipFile(commonUnobf).withCloseable { cuzip ->
+                    def cuEntries = cuzip.entries()
+                    while (cuEntries.hasMoreElements()) {
+                        def e = cuEntries.nextElement()
+                        if (e.isDirectory()) continue
+                        if (shouldSkipFromMerge(e.name)) continue
+                        def outName = e.name.endsWith('.class') ? remapEntryName(e.name) : e.name
+                        if (existing.contains(outName)) continue
+                        byte[] payload = cuzip.getInputStream(e).withCloseable { ins -> ins.readAllBytes() }
+                        if (e.name.endsWith('.class')) {
+                            payload = remapClassBytes(payload)
+                        }
+                        def newEntry = new java.util.zip.ZipEntry(outName)
+                        newEntry.time = e.time
+                        zos.putNextEntry(newEntry)
+                        zos.write(payload)
+                        zos.closeEntry()
+                        existing.add(outName)
+                        addedFromCommonUnobf++
+                    }
+                }
+                // 4. Append effects-api fabric-unobf classes (FabricEffectRuntimeUnobf
+                //    + Mojmap-named LocalEffects). Same rationale: merge post-remap
+                //    so net.minecraft.* references survive on the deobf 26.1.2 runtime.
+                //    See effects-api-ADR-006.
+                new java.util.zip.ZipFile(effectsUnobf).withCloseable { euzip ->
+                    def euEntries = euzip.entries()
+                    while (euEntries.hasMoreElements()) {
+                        def e = euEntries.nextElement()
+                        if (e.isDirectory()) continue
+                        if (shouldSkipFromMerge(e.name)) continue
+                        def outName = e.name.endsWith('.class') ? remapEntryName(e.name) : e.name
+                        if (existing.contains(outName)) continue
+                        byte[] payload = euzip.getInputStream(e).withCloseable { ins -> ins.readAllBytes() }
+                        if (e.name.endsWith('.class')) {
+                            payload = remapClassBytes(payload)
+                        }
+                        def newEntry = new java.util.zip.ZipEntry(outName)
+                        newEntry.time = e.time
+                        zos.putNextEntry(newEntry)
+                        zos.write(payload)
+                        zos.closeEntry()
+                        existing.add(outName)
+                        addedFromEffectsUnobf++
+                    }
+                }
+            }
+        }
+        // 4. Replace the remapJar output with the merged tempfile.
+        if (!out.delete()) {
+            throw new GradleException("Failed to delete original remapJar output: " + out)
+        }
+        if (!tmp.renameTo(out)) {
+            // Fallback: copy + delete (handles cross-volume corner cases on Windows).
+            java.nio.file.Files.copy(tmp.toPath(), out.toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            tmp.delete()
+        }
+        logger.lifecycle("[rtp-plugin] Merged ${addedFromV26} v26_1_R1 adapter classes + ${addedFromCommonUnobf} rtp-fabric-common-unobf classes + ${addedFromEffectsUnobf} effects-api-fabric-unobf classes into ${out.name} (post-remap, Mojang names preserved).")
+    }
 }
 
 artifacts {

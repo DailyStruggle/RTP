@@ -1,5 +1,7 @@
 package io.github.dailystruggle.effectsapi.fabric.LocalEffects;
 
+import java.util.logging.Level;
+
 import io.github.dailystruggle.effectsapi.common.Effect;
 import io.github.dailystruggle.effectsapi.fabric.FabricEffectRuntime;
 import io.github.dailystruggle.effectsapi.fabric.FabricRegistryCompat;
@@ -20,14 +22,14 @@ import java.util.EnumMap;
  * to take {@code Holder<MobEffect>} in 1.20.5. effects-api is non-Loom and
  * platform-agnostic, so it cannot pick the right ctor at compile time.
  *
- * <p>Per the project rule "no reflection in the api — if we need Mojang
+ * <p>Per the project rule "no reflection in the api -- if we need Mojang
  * mappings we use an interface completed by each server version adapter",
  * actual {@code MobEffectInstance} construction and application is delegated
  * to {@link FabricEffectRuntime.PotionDispatcher}, registered by the active
  * {@code rtp-fabric-v*} adapter via {@code installEffectsDispatchers()}.
  *
  * <p>S-004: if no dispatcher has been registered for this runtime, the
- * effect is dropped with a single diagnostic line — never silently swallowed.
+ * effect is dropped with a single diagnostic line -- never silently swallowed.
  */
 public class FabricPotionEffect extends Effect<FabricPotionKeys> {
 
@@ -69,7 +71,7 @@ public class FabricPotionEffect extends Effect<FabricPotionKeys> {
             // see why /rtp on-teleport potion effects don't fire on an
             // unsupported MC build (rtp-fabric-v* adapter missing or older
             // than the running server).
-            System.err.println("[effects-api] [FabricPotionEffect] no PotionDispatcher registered; "
+            FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricPotionEffect] no PotionDispatcher registered; "
                     + "dropping potion effect (rtp-fabric-v* adapter for this MC version is missing "
                     + "or did not call installEffectsDispatchers).");
             return;

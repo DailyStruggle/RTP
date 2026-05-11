@@ -1,5 +1,7 @@
 package io.github.dailystruggle.effectsapi.fabric;
 
+import java.util.logging.Level;
+
 import io.github.dailystruggle.effectsapi.common.spi.TypeKey;
 import io.github.dailystruggle.effectsapi.common.spi.ValueCoercer;
 import net.minecraft.core.Registry;
@@ -21,7 +23,7 @@ import java.util.List;
  *   <li>{@link TypeKey#SOUND}    → {@link BuiltInRegistries#SOUND_EVENT}</li>
  *   <li>{@link TypeKey#PARTICLE} → {@link BuiltInRegistries#PARTICLE_TYPE}</li>
  *   <li>{@link TypeKey#POTION_EFFECT} → {@link BuiltInRegistries#MOB_EFFECT}</li>
- *   <li>Primitives (STRING / BOOLEAN / INT / LONG / DOUBLE / FLOAT) — parsed
+ *   <li>Primitives (STRING / BOOLEAN / INT / LONG / DOUBLE / FLOAT) -- parsed
  *       directly without registry lookup.</li>
  * </ul>
  *
@@ -97,7 +99,7 @@ public final class FabricValueCoercer implements ValueCoercer {
             case SOUND: {
                 SoundEvent v = resolveRegistry(BuiltInRegistries.SOUND_EVENT, raw);
                 if (v == null) {
-                    System.err.println("[effects-api] [FabricValueCoercer] SOUND miss for token='" + raw
+                    FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricValueCoercer] SOUND miss for token='" + raw
                             + "'; tried keys: [" + triedKeys(raw) + "]");
                     throw new IllegalArgumentException("Unknown sound: " + raw);
                 }
@@ -106,7 +108,7 @@ public final class FabricValueCoercer implements ValueCoercer {
             case PARTICLE: {
                 ParticleType<?> v = resolveRegistry(BuiltInRegistries.PARTICLE_TYPE, raw);
                 if (v == null) {
-                    System.err.println("[effects-api] [FabricValueCoercer] PARTICLE miss for token='" + raw
+                    FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricValueCoercer] PARTICLE miss for token='" + raw
                             + "'; tried keys: [" + triedKeys(raw) + "]");
                     throw new IllegalArgumentException("Unknown particle: " + raw);
                 }
@@ -115,7 +117,7 @@ public final class FabricValueCoercer implements ValueCoercer {
             case POTION_EFFECT: {
                 MobEffect v = resolveRegistry(BuiltInRegistries.MOB_EFFECT, raw);
                 if (v == null) {
-                    System.err.println("[effects-api] [FabricValueCoercer] POTION_EFFECT miss for token='" + raw
+                    FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricValueCoercer] POTION_EFFECT miss for token='" + raw
                             + "'; tried keys: [" + triedKeys(raw) + "]");
                     throw new IllegalArgumentException("Unknown potion effect: " + raw);
                 }
@@ -135,13 +137,13 @@ public final class FabricValueCoercer implements ValueCoercer {
     @Override
     public Object resolveReflective(Class<?> targetType, String raw) {
         if (targetType == null || raw == null) return null;
-        // Mojmap registries first — these cover the overwhelmingly common case
+        // Mojmap registries first -- these cover the overwhelmingly common case
         // for un-{classify}'d targetTypes (e.g. Holder<SoundEvent>).
         if (SoundEvent.class.isAssignableFrom(targetType)) return resolveRegistry(BuiltInRegistries.SOUND_EVENT, raw);
         if (ParticleType.class.isAssignableFrom(targetType)) return resolveRegistry(BuiltInRegistries.PARTICLE_TYPE, raw);
         if (MobEffect.class.isAssignableFrom(targetType)) return resolveRegistry(BuiltInRegistries.MOB_EFFECT, raw);
 
-        // Generic reflective fallback — Enum#valueOf, then static valueOf(String), then static getByName(String).
+        // Generic reflective fallback -- Enum#valueOf, then static valueOf(String), then static getByName(String).
         if (targetType.isEnum()) {
             try {
                 @SuppressWarnings({"unchecked", "rawtypes"})
@@ -186,7 +188,7 @@ public final class FabricValueCoercer implements ValueCoercer {
             T resolved = FabricRegistryCompat.resolve(registry, key);
             if (resolved != null) return resolved;
         }
-        // Retry with lowercased input — legacy Bukkit-style configs ship
+        // Retry with lowercased input -- legacy Bukkit-style configs ship
         // tokens like "PORTAL"/"BLINDNESS" inherited from Spigot enums.
         // Mojmap registry keys are lowercase (`minecraft:portal`,
         // `minecraft:blindness`); without this fallback those tokens are

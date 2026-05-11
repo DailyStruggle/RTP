@@ -21,9 +21,17 @@ import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
 // 1.20.1 ChunkStatus lives at .chunk.ChunkStatus (the package move to
-// .chunk.status happened in 1.21.3 — see V1_21_R1FabricVersionAdapter Javadoc).
+// .chunk.status happened in 1.21.3 â€” see V1_21_R1FabricVersionAdapter Javadoc).
 import net.minecraft.world.level.chunk.ChunkStatus;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Field;
@@ -100,7 +108,7 @@ public final class V1_20_R1FabricVersionAdapter implements FabricVersionAdapter 
     }
 
     // -------------------------------------------------------------------------
-    // Non-blocking chunk-future dispatch — see rtp-fabric-ADR-008 and the
+    // Non-blocking chunk-future dispatch â€” see rtp-fabric-ADR-008 and the
     // crash-report 2026-05-08_01.22.29-server.txt deadlock analysis.
     //
     // Resolves ServerChunkCache#getChunkFuture(int, int, ChunkStatus, boolean)
@@ -148,7 +156,7 @@ public final class V1_20_R1FabricVersionAdapter implements FabricVersionAdapter 
      * future. The inner vanilla future yields {@code Either<ChunkAccess,
      * ChunkLoadingFailure>}; we treat the Right (failure) case as {@code null}
      * so callers can route it through {@code FailTypes.nullChunk} per
-     * REQ-RTP-S-004 — no silent discards.</p>
+     * REQ-RTP-S-004 â€” no silent discards.</p>
      */
     @Override
     public CompletableFuture<RTPChunkHandle> requestFullChunkAsync(RTPLevelHandle level, int cx, int cz) {
@@ -163,7 +171,7 @@ public final class V1_20_R1FabricVersionAdapter implements FabricVersionAdapter 
             // Add a temporary RTP-typed ticket on the chunk *before* requesting
             // generation. Without an explicit ticket, ServerChunkCache#getChunkFuture
             // (with create=true) allocates a chunk holder at a level too high
-            // (>33) for the chunk system to drive generation through to FULL —
+            // (>33) for the chunk system to drive generation through to FULL â€”
             // the future then completes with Either.right(ChunkLoadingFailure)
             // and we'd unwrap that to null, manifesting as the
             // nullChunk/asyncLoadNull burst seen on 1.20.1+C2ME runs.
@@ -171,7 +179,7 @@ public final class V1_20_R1FabricVersionAdapter implements FabricVersionAdapter 
             // The ticket is paired with a removeRegionTicket in whenComplete so
             // it is alive only for the load itself; the caller's later
             // setForceLoaded (when keeping the chunk) is a separate, longer-lived
-            // ticket of the same type — vanilla DistanceManager handles
+            // ticket of the same type â€” vanilla DistanceManager handles
             // overlapping tickets of the same TicketType correctly.
             ChunkPos cp = new ChunkPos(cx, cz);
             boolean ticketAdded = false;
@@ -213,7 +221,7 @@ public final class V1_20_R1FabricVersionAdapter implements FabricVersionAdapter 
     /**
      * Best-effort removal of the temporary load ticket added in
      * {@link #requestFullChunkAsync}. Failure here is logged but never
-     * propagated — the load itself has already produced its outcome and
+     * propagated â€” the load itself has already produced its outcome and
      * the caller's pipeline must not be re-failed by ticket cleanup.
      */
     private static void tryRemoveLoadTicket(ServerChunkCache cache, ChunkPos cp) {
@@ -231,7 +239,7 @@ public final class V1_20_R1FabricVersionAdapter implements FabricVersionAdapter 
      * Unwrap {@code com.mojang.datafixers.util.Either<L,R>} via reflection.
      * Returns {@code left().orElse(null)} if {@code left} is a {@link ChunkAccess},
      * otherwise {@code null} (treats the Right "failure" branch as a no-chunk
-     * outcome — see {@link #requestFullChunkAsync} Javadoc).
+     * outcome â€” see {@link #requestFullChunkAsync} Javadoc).
      */
     private static ChunkAccess unwrapEitherLeft(Object either) {
         try {
@@ -253,7 +261,7 @@ public final class V1_20_R1FabricVersionAdapter implements FabricVersionAdapter 
     }
 
     // -------------------------------------------------------------------------
-    // Non-persistent chunk-ticket support — see V1_21_R1FabricVersionAdapter
+    // Non-persistent chunk-ticket support â€” see V1_21_R1FabricVersionAdapter
     // Javadoc for the design rationale (rtp-fabric-ADR-006). Approach is
     // identical here; DistanceManager#addRegionTicket(TicketType, ChunkPos,
     // int distance, T value) is structurally identical on 1.20.1.
@@ -266,7 +274,17 @@ public final class V1_20_R1FabricVersionAdapter implements FabricVersionAdapter 
     private static volatile Method GET_DISTANCE_MANAGER_METHOD;
     private static volatile Field GET_DISTANCE_MANAGER_FIELD;
 
-    private static final int RTP_TICKET_DISTANCE = 3;
+    // 2026-05-08: dropped from 3 â†’ 1 (effective ticket level 33âˆ’1 = 32 / BORDER)
+    // to stop a 1.20.1-specific CF-graph leak where ENTITY_TICKING (level 30) chunks
+    // accumulate vanilla-internal CompletableFuture chains (scheduled ticks, mob
+    // spawning, weather, BE updates) that are reachable from the held ticket and
+    // therefore pinned forever. Symptom: memory grew ~13 MB/s â‰ˆ 400K CFs/s with all
+    // RTP-side CFDIAG counters reading 0.00/s, scaling proportional to held tickets.
+    // 1.21.11 (R11) does not exhibit this â€” the bug is specific to 1.20.1's
+    // entity-ticking pipeline. Kept-cache locations only need block-read access
+    // (RTPChunk#isSafe), which BORDER provides; entity ticking was unnecessary.
+    // Supersedes ADR-006 for R1 only â€” see follow-up ADR on the version-specific leak.
+    private static final int RTP_TICKET_DISTANCE = 1;
 
     private static TicketType<ChunkPos> ticketType() {
         TicketType<ChunkPos> t = RTP_TICKET_TYPE;
@@ -485,5 +503,83 @@ public final class V1_20_R1FabricVersionAdapter implements FabricVersionAdapter 
         // Effect dispatchers were already implemented for 1.20.1 ahead of the
         // rest of this adapter; see V1_20_R1FabricEffectDispatchers.
         V1_20_R1FabricEffectDispatchers.install();
+    }
+
+    /**
+     * Typed intermediary implementation of
+     * {@link io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter#extractPlayerFromConnection}.
+     * Pre-26 intermediary mappings expose the player as the public field
+     * {@code player} (mojmap field name preserved by Fabric intermediary even
+     * when the {@code getPlayer()} method name is obfuscated to {@code method_xxxxx}).
+     * No reflection.
+     */
+    @Override
+    public Object extractPlayerFromConnection(Object handler) {
+        if (!(handler instanceof ServerGamePacketListenerImpl impl)) return null;
+        return impl.player;
+    }
+
+    /**
+     * Implementation of {@link io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter#getPlayerUUID}.
+     * Typed call to {@code ServerPlayer.getUUID()}; Loom remaps the descriptor
+     * to intermediary {@code method_5667} at compile time.
+     */
+    @Override
+    public java.util.UUID getPlayerUUID(Object player) {
+        if (!(player instanceof ServerPlayer sp)) return null;
+        return sp.getUUID();
+    }
+
+    /**
+     * Implementation of {@link io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter#resolveSenderUuid}.
+     * Typed CommandSourceStack#getEntity() + Entity#getUUID() dispatch; Loom remaps
+     * the descriptors to intermediary class_2168/class_1297/method_5667 at compile time.
+     * Returns null for non-player sources (console / command block); the bridge
+     * interprets that as the RTPAPI.serverId sentinel.
+     */
+    @Override
+    public java.util.UUID resolveSenderUuid(Object src) {
+        if (!(src instanceof CommandSourceStack css)) return null;
+        Entity entity = css.getEntity();
+        if (!(entity instanceof ServerPlayer sp)) return null;
+        return sp.getUUID();
+    }
+
+    /**
+     * Typed override â€” direct {@code MinecraftServer.getCommands().performPrefixedCommand(
+     * server.createCommandSourceStack(), command)}. Loom remaps the descriptors
+     * to intermediary {@code class_3176#method_3734} / {@code method_3739} at
+     * compile time, eliminating the reflective {@code getMethod("getCommands")}
+     * lookup in {@code FabricServerAccessor.FabricConsoleSender#performCommand}
+     * which fails with {@code NoSuchMethodException} on intermediary 1.20.x /
+     * 1.21.x runtimes.
+     */
+    @Override
+    public boolean dispatchConsoleCommand(Object server, String command) {
+        if (!(server instanceof net.minecraft.server.MinecraftServer s) || command == null) return false;
+        s.getCommands().performPrefixedCommand(s.createCommandSourceStack(), command);
+        return true;
+    }
+
+    /**
+     * Per-version typed factory for the common {@code FabricRTPPlayer} wrapper.
+     * Compiled against intermediary mappings via Loom so the {@code ServerPlayer}
+     * cast and the {@code FabricRTPPlayer} constructor reference resolve to the
+     * correct runtime descriptors. Replaces the name+arity reflective
+     * {@code registerPlayer(...)} lookup that used to live in
+     * {@code FabricServerAccessor.registerPlayerObject}.
+     */
+    @Override
+    public io.github.dailystruggle.rtp.api.entity.RTPPlayer createPlayer(Object serverPlayer) {
+        if (!(serverPlayer instanceof ServerPlayer sp)) return null;
+        return new io.github.dailystruggle.rtp.fabric.player.FabricRTPPlayer(sp);
+    }
+
+    @Override
+    public void rebindPlayer(io.github.dailystruggle.rtp.api.entity.RTPPlayer existing, Object serverPlayer) {
+        if (existing instanceof io.github.dailystruggle.rtp.fabric.player.FabricRTPPlayer fp
+                && serverPlayer instanceof ServerPlayer sp) {
+            fp.rebind(sp);
+        }
     }
 }

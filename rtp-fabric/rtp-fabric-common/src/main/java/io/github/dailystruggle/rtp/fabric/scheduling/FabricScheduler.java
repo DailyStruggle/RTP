@@ -151,7 +151,7 @@ public class FabricScheduler implements RTPScheduler {
   public void runTask(Runnable task) {
     if (task == null) return;
     MinecraftServer s = this.server;
-    if (s != null && Thread.currentThread() == s.getRunningThread()) {
+    if (s != null && Thread.currentThread() == serverRunningThread(s)) {
       task.run();
       return;
     }
@@ -213,7 +213,7 @@ public class FabricScheduler implements RTPScheduler {
       RTPAPI.serverAccessor.registerAction(tracked);
     }
     MinecraftServer s = this.server;
-    if (delayTicks < 1 && s != null && Thread.currentThread() == s.getRunningThread()) {
+    if (delayTicks < 1 && s != null && Thread.currentThread() == serverRunningThread(s)) {
       tracked.run();
     } else if (delayTicks > 0) {
       scheduleTimer(tracked, delayTicks, 0L);
@@ -232,6 +232,42 @@ public class FabricScheduler implements RTPScheduler {
     e.periodTicks = Math.max(0L, period);
     scheduled.put(id, e);
     return id;
+  }
+
+  // Cached reflective accessor for MinecraftServer's main-thread getter.
+  // The common module is compiled with Loom + officialMojangMappings (1.21.1
+  // namespace), so a direct call to s.getRunningThread() ends up baked into
+  // bytecode as the intermediary method_3777, which does not exist on the
+  // deobfuscated MC 26.1.2 runtime. Resolve the method by name from the live
+  // class instance to avoid pinning any intermediary descriptor in the
+  // constant pool. On 1.20/1.21 runtimes the same call still resolves cleanly.
+  private static volatile java.lang.reflect.Method GET_RUNNING_THREAD;
+
+  private static Thread serverRunningThread(MinecraftServer s) {
+    // Prefer the per-version adapter's typed override (Phase 4 migration of
+    // the prior reflective patch). Falls through to the reflective resolver
+    // for adapters that don't override (1.20 / 1.21 family).
+    try {
+      io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter =
+          io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
+      if (adapter != null) {
+        Thread t = adapter.getServerThread(s);
+        if (t != null) return t;
+      }
+    } catch (Throwable ignored) {
+      // adapter registry not yet bound (early bootstrap) — fall through
+    }
+    try {
+      java.lang.reflect.Method m = GET_RUNNING_THREAD;
+      if (m == null) {
+        m = s.getClass().getMethod("getRunningThread");
+        m.setAccessible(true);
+        GET_RUNNING_THREAD = m;
+      }
+      return (Thread) m.invoke(s);
+    } catch (ReflectiveOperationException e) {
+      return null;
+    }
   }
 
   private static RTPRunnable asRtpRunnable(Runnable task) {

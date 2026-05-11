@@ -567,3 +567,22 @@ Cross-references: `rtp-fabric/docs/adr/rtp-fabric-ADR-007-mojmap-name-decoupling
 
 ---
 
+## 2026-05-08 - Don't "simplify" `Object`-typed accessor wrappers on the Fabric early-startup path
+
+When working on Fabric MC 26.1 (deobfuscated runtime, `rtp-fabric-ADR-007`), several `FabricServerAccessor` / `FabricEventBridge` methods were deliberately reshaped to **route any cross-class call that touches a `net.minecraft.*` type through an `Object`-typed wrapper, with the actual cast/dispatch performed reflectively (`Class.forName` + `Method.invoke`)**. Examples in `rtp-fabric-common`:
+
+- `FabricServerAccessor.registerWorldObject(Object)` / `unregisterWorldObject(Object)` — keeps `class_3218` (`ServerLevel`) out of `FabricEventBridge.onServerStarted`'s bytecode constant pool.
+- `FabricEventBridge.registerWorldEventsReflective()` / `registerPlayConnectionEventsReflective()` — keeps `ServerWorldEvents`, `ServerPlayConnectionEvents`, and their callback-parameter types (`class_3244` etc.) out of the bridge's `<init>` / `register` bytecode.
+- `FabricCommandRegistrar.registerRtpCommand(Object root, Object bridgeCtx)` — keeps `CommandRegistrationCallback` and `CommandBuildContext` (`class_7157`) out of `RTPFabricMod.onInitialize`.
+- `FabricBrigadierSourceBridge.resolveSenderUuid(Object)` / `checkPermission(Object,String)` — keeps `CommandSourceStack` (`class_2168`) and `ServerPlayer` (`class_3222`) out of `RTPFabricMod`.
+
+These wrappers look like dead code or pointless indirection on every other platform; they are **load-bearing** on 26.1+. JVM verification of a method *also* verifies every type in its constant pool, including types referenced only by `instanceof` / `checkcast`. On a runtime where `class_NNNN` does not resolve, *any* of those methods will fail to link the moment they are first executed — even if the method body would never have actually used the type.
+
+**Mistake to avoid (committed once, 2026-05-08):** during a follow-up pass to silence the `class_7923` warning loop, the `registerWorldObject` body was "simplified" from a reflective dispatch back to `if (level instanceof ServerLevel sl) registerWorld(sl);`. That re-introduced `class_3218` into the wrapper's constant pool and brought back the exact `NoClassDefFoundError` warnings the wrapper was created to absorb (3× at server start). The user immediately caught it ("did you inline make a change for a reason then revert it to 'simplify'?"); I had to restore the reflective form and add this entry.
+
+**Rule going forward:** when you see one of these `Object`-typed wrappers in `rtp-fabric-common`, treat the verbose-looking reflective body as the contract and **do not collapse it to a typed cast**, even if it compiles and passes the unit tests on every other MC version. The contract is "this method's bytecode references zero `net.minecraft.*` symbols"; the test suite cannot prove that on a 26.1 runtime because we don't have one in CI. The bytecode-scan regression tests for `RTPFabricMod` and `FabricAnsiText` exist for exactly this reason — when adding a new such wrapper, add a matching scan test if practical.
+
+If genuine simplification is desired, the path is to add a bytecode-scan test for the wrapper (asserting no `net/minecraft/` references in its `.class`) *first*, then verify any refactor still passes — not the other way around.
+
+---
+

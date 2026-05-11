@@ -76,14 +76,9 @@ public final class FabricDatabaseHandler {
         ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
         Map<String, Object> databaseMap = configParser.getMap(ConfigKeys.database);
 
-        // Fabric defaults to H2 (shaded into the RTP jar). SQLite is still selectable but
-        // the SQLite JDBC driver is no longer bundled — Bukkit-family servers ship it as a
-        // server-side runtime, but Fabric does not. Choosing "sqlite" on Fabric requires the
-        // user to drop `sqlite-jdbc.jar` into their server classpath; otherwise the accessor
-        // fails fast with `No suitable driver found`. Keeping H2 as the Fabric default avoids
-        // shading ~7 MB of native sqlite-jdbc binaries (issue: "fix the need for sqlite for
-        // fabric, it bloats our binary"). See rtp-plugin/build.gradle.
-        String type = String.valueOf(databaseMap.getOrDefault("type", "h2"));
+        // Mirror BukkitDatabaseHandler defaults so the requested → H2 → flat-file fallback
+        // chain in DatabaseAccessorFactory is preserved verbatim across platforms.
+        String type = String.valueOf(databaseMap.getOrDefault("type", "sqlite"));
         String host = String.valueOf(databaseMap.getOrDefault("host", "127.0.0.1"));
         int port = ((Number) databaseMap.getOrDefault("port", 3306)).intValue();
         String name = String.valueOf(databaseMap.getOrDefault("name", "rtp"));
@@ -92,6 +87,7 @@ public final class FabricDatabaseHandler {
 
         File dbStateFile = new File(databaseDirectory, ".db_state");
         String previousType;
+        boolean freshInstall = false;
         if (dbStateFile.exists()) {
             try {
                 previousType = new String(Files.readAllBytes(dbStateFile.toPath())).trim();
@@ -105,6 +101,34 @@ public final class FabricDatabaseHandler {
                 previousType = "yaml";
             } else {
                 previousType = type;
+                freshInstall = true;
+            }
+        }
+
+        // Fabric-only first-setup nudge: on a truly fresh install (no .db_state, no
+        // existing teleportData/*.yml) coerce the requested type to "yaml". The shipped
+        // config.yml ships `type: "sqlite"` for parity with Bukkit-family servers, which
+        // bundle the sqlite-jdbc driver as a server runtime; Fabric does not, so SQLite
+        // would fall through DatabaseAccessorFactory's requested→H2→flat-file chain and
+        // emit a "No suitable driver found" warning before settling on YAML. Coercing the
+        // value here keeps the fallback chain intact (admins who explicitly set h2/mysql/
+        // postgres/sqlite in config.yml after first run still get exactly what they asked
+        // for, including the chain) while sparing fresh installs from the warning. Issue:
+        // "we still bother the user with warnings. The config value given should be yaml,
+        // we shouldn't remove the chaining."
+        if (freshInstall && "sqlite".equalsIgnoreCase(type)) {
+            type = "yaml";
+            previousType = "yaml";
+            // Persist the coerced value back to config.yml so subsequent starts read
+            // "yaml" directly (no repeated coercion, no surprise if the admin later
+            // inspects config.yml). Issue: "write yaml back to config as well".
+            try {
+                databaseMap.put("type", "yaml");
+                configParser.set(ConfigKeys.database, databaseMap);
+                configParser.save();
+            } catch (Exception e) {
+                RTP.log(Level.WARNING,
+                        "FabricDatabaseHandler: failed to persist database.type=yaml to config.yml", e);
             }
         }
 

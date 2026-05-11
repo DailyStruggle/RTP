@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.fabric.v26_1_R1;
 
 import io.github.dailystruggle.effectsapi.fabric.FabricEffectRuntime;
+import io.github.dailystruggle.effectsapi.fabric_unobf.FabricEffectRuntimeUnobf;
 import io.github.dailystruggle.rtp.common.RTP;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -31,13 +32,32 @@ final class V26_1_R1FabricEffectDispatchers {
     private V26_1_R1FabricEffectDispatchers() {}
 
     static void install() {
+        // Register against the obf-side FabricEffectRuntime for older code paths.
         try {
             FabricEffectRuntime.registerSound(V26_1_R1FabricEffectDispatchers::playSound);
             FabricEffectRuntime.registerParticle(V26_1_R1FabricEffectDispatchers::sendParticle);
             FabricEffectRuntime.registerPotion(V26_1_R1FabricEffectDispatchers::applyPotion);
         } catch (NoClassDefFoundError ncdfe) {
             RTP.log(Level.FINE,
-                    "[RTP][Fabric 26.1.x] effects-api not on classpath; skipping effect dispatcher registration: "
+                    "[RTP][Fabric 26.1.x] effects-api (obf) not on classpath; skipping obf dispatcher registration: "
+                            + ncdfe.getMessage());
+        }
+        // ADR-006 amendment 2026-05-11 — on the deobf 26.1.2 runtime,
+        // FabricEffectsInitializer (fabric_unobf) is the variant used by
+        // EffectFactory, so its LocalEffects read FabricEffectRuntimeUnobf
+        // (not FabricEffectRuntime). FabricParticleEffect/FabricSoundEffect
+        // have reflective fallbacks and worked without this, but
+        // FabricPotionEffect strictly requires a registered PotionDispatcher
+        // (MobEffectInstance ctor drift across 1.20.4 → 1.20.5 means no
+        // safe reflective fallback). Register the same dispatchers against
+        // the unobf runtime so all three effect types fire on 26.1.x.
+        try {
+            FabricEffectRuntimeUnobf.registerSound(V26_1_R1FabricEffectDispatchers::playSound);
+            FabricEffectRuntimeUnobf.registerParticle(V26_1_R1FabricEffectDispatchers::sendParticle);
+            FabricEffectRuntimeUnobf.registerPotion(V26_1_R1FabricEffectDispatchers::applyPotion);
+        } catch (NoClassDefFoundError ncdfe) {
+            RTP.log(Level.FINE,
+                    "[RTP][Fabric 26.1.x] effects-api-fabric-unobf not on classpath; skipping unobf dispatcher registration: "
                             + ncdfe.getMessage());
         }
     }

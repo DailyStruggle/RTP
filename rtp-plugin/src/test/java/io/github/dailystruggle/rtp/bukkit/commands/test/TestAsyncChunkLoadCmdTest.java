@@ -66,8 +66,13 @@ class TestAsyncChunkLoadCmdTest {
             () -> TestAsyncChunkLoadCmd.runProbe(world, 0, 0, 5_000L));
 
     // Give the probe a beat to attach its whenComplete callback, then
-    // unblock the async chunk load.
-    Thread.sleep(20L);
+    // unblock the async chunk load. The 100 ms delay (paired with the
+    // 100 ms sleep inside FakeAsyncWorld#getChunkAt) is generous on
+    // purpose: under loaded CI a 20 ms pre-gate sleep can race the
+    // probe's whenComplete registration, causing inline completion on
+    // the caller thread and a spurious assertEquals failure at the
+    // completingThread check below.
+    Thread.sleep(100L);
     gate.complete(null);
 
     TestAsyncChunkLoadCmd.Result r = async.get(5, TimeUnit.SECONDS);

@@ -1,0 +1,76 @@
+// effects-api-ADR-006 (amended 2026-05-09) — nested sibling Gradle module
+// hosting the Mojmap-unobfuscated carrier for effectsapi/fabric_unobf/*.
+//
+// Why a separate module instead of a second source set inside :effects-api?
+// fabric-loom owns the project's MC + mappings configuration at the project
+// level: a single `loom` extension, a single `minecraft "..."` coordinate, a
+// single `mappings` mode. There is no supported facility to compile one
+// source set under intermediary mappings (1.21.1 / officialMojangMappings)
+// and another under unobfuscated 26.x mappings within the same Gradle
+// invocation. Either both source sets share one regime (defeating the
+// split) or Loom configuration fails outright. The structurally correct fix
+// is a separate Gradle module with its own Loom plugin instance — exactly
+// the precedent rtp-fabric-ADR-009 set in lockstep with this ADR for
+// :rtp-fabric:rtp-fabric-common-unobf. To honour ADR-003's "no new root
+// directories" constraint, this module is nested under effects-api/ rather
+// than promoted to a top-level repo-root sibling.
+//
+// IMPORTANT: this module requires JDK 25 to build. Contributors without
+// JDK 25 will see only this submodule (and rtp-fabric-v26_1_R1 +
+// rtp-fabric-common-unobf) fail toolchain provisioning; the rest of the
+// project (Java 21) is unaffected. com.mojang:minecraft:26.1.2 ships as
+// Java-25 bytecode and Loom reads it at *configuration* time to assemble
+// the compile classpath, so Java 21 fails with UnsupportedClassVersionError
+// before any source in this module is compiled. Same constraint that pins
+// rtp-fabric-v26_1_R1 and rtp-fabric-common-unobf to Java 25.
+plugins {
+    // Loom 1.15 (pinned in root settings.gradle pluginManagement.plugins {})
+    // splits its plugin IDs by obfuscation status: 26.1+ is UNOBFUSCATED so
+    // it uses `net.fabricmc.fabric-loom` (no `mappings` configuration). The
+    // legacy bare `fabric-loom` ID is for the obfuscated path.
+    id 'net.fabricmc.fabric-loom'
+}
+
+ext {
+    // Mirrors :rtp-fabric:rtp-fabric-common-unobf and :rtp-fabric:rtp-fabric-v26_1_R1
+    // exactly. Drift between the three is the maintenance hazard called out
+    // in rtp-fabric-ADR-009 *Negative / costs*; the same gradle.properties
+    // follow-up will share these pins across all three modules.
+    minecraftVersion       = '26.1.2'
+    loaderVersion          = '0.18.4'
+    fabricApiVersion       = '0.143.5+26.1'
+    permissionsApiVersion  = '0.3.1'
+}
+
+java {
+    toolchain {
+        // Java 25 (NOT the project baseline of 21) — required because
+        // com.mojang:minecraft:26.1.2 is Java-25 bytecode and Loom reads it
+        // at configuration time. See header comment for full rationale.
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraftVersion}"
+    // No `mappings` line — 26.1+ ships deobfuscated; Loom must NOT remap
+    // the resulting bytecode or the unobf carrier degenerates into the obf
+    // carrier (defeating the whole point of this module).
+
+    // modImplementation / modCompileOnly collapse to plain implementation /
+    // compileOnly because the deobf game classes don't need Loom remapping.
+    implementation "net.fabricmc:fabric-loader:${loaderVersion}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${fabricApiVersion}"
+
+    compileOnly "me.lucko:fabric-permissions-api:${permissionsApiVersion}"
+
+    // The unobf carrier names types from effects-api's common/ SPI
+    // (Effect, EffectFactory, EffectRuntime, …) and from rtp-api
+    // (RTPPlayer, RTPLocation). compileOnly keeps both edges off this
+    // module's runtime classpath; the actual runtime consumer is
+    // :rtp-fabric:rtp-fabric-common-unobf, which brings effects-api +
+    // rtp-api in via its own classpath. See effects-api-ADR-006 §
+    // `effects-api/effects-api-fabric-unobf/build.gradle` shape.
+    compileOnly project(':effects-api')
+    compileOnly project(':rtp-api')
+}

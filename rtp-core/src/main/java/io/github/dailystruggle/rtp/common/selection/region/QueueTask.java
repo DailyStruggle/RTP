@@ -12,6 +12,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.tools.CfDiag;
 import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
 import org.jetbrains.annotations.Nullable;
 
@@ -298,6 +299,7 @@ final class QueueTask {
                     }
                     // Live branch: allocate reservation, await ticket apply, dispatch to region thread.
                     long chunkKey = ((long) cx & 0xffffffffL) | ((long) cz << 32);
+                    CfDiag.chunkSetQueueLive.increment();
                     ChunkSet ticket = new ChunkSet(
                             world, cx, cz,
                             Collections.singletonList(CompletableFuture.completedFuture(chunkKey)),
@@ -446,10 +448,12 @@ final class QueueTask {
         for (int[] entry : neighbourIdx) {
             nFutures.add(world.getChunkAt(entry[0], entry[1]));
         }
+        CfDiag.queueAllOfDispatch.increment();
         CompletableFuture.allOf(nFutures.toArray(new CompletableFuture[0]))
                 .orTimeout(5, TimeUnit.SECONDS)
                 .whenComplete((v, ex) -> {
                     if (ex != null) {
+                        CfDiag.queueAllOfTimeout.increment();
                         finishRejected(reservation);
                         return;
                     }
@@ -632,6 +636,7 @@ final class QueueTask {
                                 vd.add(world.getChunkAt(ccx + dx, ccz + dz));
                             }
                         }
+                        CfDiag.chunkSetQueueVd.increment();
                         transferred = new ChunkSet(world, ccx, ccz, vd, new CompletableFuture<>());
                     }
                     result.complete(new GenerationResult(left, fpair.attempts(), transferred, reservation));

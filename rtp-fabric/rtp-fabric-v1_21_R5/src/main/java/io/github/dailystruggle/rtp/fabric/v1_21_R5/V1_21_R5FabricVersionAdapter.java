@@ -22,14 +22,24 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.tags.TagKey;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Method;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 
 /**
- * MC 1.21.5+ implementation of {@link FabricVersionAdapter} — covers the
+ * MC 1.21.5+ implementation of {@link FabricVersionAdapter} â€” covers the
  * post-refactor {@code DistanceManager}/{@code TicketStorage} API range
  * (1.21.5 through the next breaking change). See {@code rtp-fabric-ADR-004}.
  *
@@ -42,13 +52,13 @@ import java.util.logging.Level;
  * adapter cannot bridge that on a 1.21.5+ runtime because the old methods
  * literally do not exist.</p>
  *
- * <p><b>Implementation:</b> direct typed Mojang-mappings calls — no
- * reflection — using {@code addTicketWithRadius} / {@code removeTicketWithRadius}
+ * <p><b>Implementation:</b> direct typed Mojang-mappings calls â€” no
+ * reflection â€” using {@code addTicketWithRadius} / {@code removeTicketWithRadius}
  * with an RTP-owned {@link TicketType} ({@code timeout = NO_TIMEOUT},
- * {@code persist = false}, {@code use = LOADING_AND_SIMULATION} — the same
+ * {@code persist = false}, {@code use = LOADING_AND_SIMULATION} â€” the same
  * shape as vanilla {@code FORCED}, minus the {@code persist} flag) and a
  * radius of {@code 3}, which yields effective ticket level
- * {@code 33 - 3 = 30} = {@code ENTITY_TICKING} — parity with Bukkit's
+ * {@code 33 - 3 = 30} = {@code ENTITY_TICKING} â€” parity with Bukkit's
  * {@code addPluginChunkTicket} and with {@code TicketType.FORCED}. Because
  * explicit removal is supported and the type carries no auto-expiry, no
  * periodic refresh is needed; the {@link #tickRefresh()} SPI hook stays at
@@ -67,7 +77,7 @@ import java.util.logging.Level;
  * <p><b>S-002 / non-persistent guarantee:</b> we deliberately do not call
  * {@link ServerChunkCache#updateChunkForced} (which persists into
  * {@code level.dat}). The radius-based ticket created here lives only for
- * the JVM lifetime — same contract as Bukkit's {@code addPluginChunkTicket}
+ * the JVM lifetime â€” same contract as Bukkit's {@code addPluginChunkTicket}
  * and the v1_21_R1 adapter's behaviour.</p>
  */
 public final class V1_21_R5FabricVersionAdapter implements FabricVersionAdapter {
@@ -84,8 +94,8 @@ public final class V1_21_R5FabricVersionAdapter implements FabricVersionAdapter 
      * {@code TicketType.FORCED} uses.</p>
      *
      * <p>Earlier revisions of this adapter passed {@code 31} as the radius
-     * under the mistaken belief it was a ticket level — that would have
-     * force-loaded a {@code (2*31+1)² = 3969}-chunk square per kept
+     * under the mistaken belief it was a ticket level â€” that would have
+     * force-loaded a {@code (2*31+1)Â² = 3969}-chunk square per kept
      * location, which the chunk system clamps/rejects, leaving kept-cache
      * entries unpinned and silently evicted. See
      * {@code rtp-fabric-ADR-006-ticket-radius-and-non-expiring-type.md}.</p>
@@ -96,7 +106,7 @@ public final class V1_21_R5FabricVersionAdapter implements FabricVersionAdapter 
      * RTP-owned non-persistent, no-timeout {@link TicketType} used for both
      * {@code addTicketWithRadius} and the matching {@code removeTicketWithRadius}
      * call. Equivalent to {@code TicketType.FORCED}'s shape minus the
-     * {@code persist = true} flag — i.e.
+     * {@code persist = true} flag â€” i.e.
      * {@code (timeout = NO_TIMEOUT, persist = false, use = LOADING_AND_SIMULATION)}.
      *
      * <p>The public record constructor is sufficient; no registry call (and
@@ -108,7 +118,7 @@ public final class V1_21_R5FabricVersionAdapter implements FabricVersionAdapter 
      *
      * <p>This deliberately replaces an earlier use of {@link TicketType#UNKNOWN},
      * whose vanilla registration has {@code timeout = 1L} (1-tick auto-expiry)
-     * and {@code use = LOADING} only — both wrong for kept-cache pinning. See
+     * and {@code use = LOADING} only â€” both wrong for kept-cache pinning. See
      * {@code rtp-fabric-ADR-006-ticket-radius-and-non-expiring-type.md}.</p>
      */
     private static final TicketType RTP_TICKET_TYPE =
@@ -141,6 +151,47 @@ public final class V1_21_R5FabricVersionAdapter implements FabricVersionAdapter 
         }
     }
 
+    /**
+     * Typed block-tag snapshot for MC 1.21.5+ (rtp-fabric-ADR-010). Walks
+     * {@link BuiltInRegistries#BLOCK} via Loom-mapped types — no reflection —
+     * and inverts each block's {@code builtInRegistryHolder().tags()} stream
+     * into the {@code namespace:path -> upper-case "namespace:path"} multimap
+     * shape documented on {@link FabricVersionAdapter#snapshotBlockTags()}.
+     */
+    @Override
+    public @Nullable Map<String, Set<String>> snapshotBlockTags() {
+        try {
+            Map<String, Set<String>> out = new HashMap<>();
+            for (Block block : BuiltInRegistries.BLOCK) {
+                ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(block);
+                if (blockId == null) continue;
+                String materialName = blockId.toString().toUpperCase();
+                Holder.Reference<Block> holder;
+                try { holder = block.builtInRegistryHolder(); } catch (Throwable t) { continue; }
+                if (holder == null) continue;
+                java.util.stream.Stream<TagKey<Block>> tagStream;
+                try { tagStream = holder.tags(); } catch (Throwable t) { continue; }
+                if (tagStream == null) continue;
+                java.util.Iterator<TagKey<Block>> it = tagStream.iterator();
+                while (it.hasNext()) {
+                    TagKey<Block> tagKey = it.next();
+                    if (tagKey == null) continue;
+                    ResourceLocation tagId = tagKey.location();
+                    if (tagId == null) continue;
+                    String key = tagId.getNamespace() + ":" + tagId.getPath();
+                    out.computeIfAbsent(key, k -> new HashSet<>()).add(materialName);
+                }
+            }
+            Map<String, Set<String>> immutable = new HashMap<>(out.size());
+            for (Map.Entry<String, Set<String>> e : out.entrySet()) {
+                immutable.put(e.getKey(), Collections.unmodifiableSet(e.getValue()));
+            }
+            return Collections.unmodifiableMap(immutable);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
     @Override
     public CompletableFuture<RTPChunkHandle> getChunkFull(RTPLevelHandle level, int cx, int cz) {
         if (level == null) {
@@ -165,7 +216,7 @@ public final class V1_21_R5FabricVersionAdapter implements FabricVersionAdapter 
         }
     }
 
-    // Non-blocking chunk-future dispatch — see rtp-fabric-ADR-008.
+    // Non-blocking chunk-future dispatch â€” see rtp-fabric-ADR-008.
     private static volatile Method GET_CHUNK_FUTURE_METHOD;
 
     private static Method resolveGetChunkFutureMethod(ServerChunkCache cache) throws ReflectiveOperationException {
@@ -208,7 +259,7 @@ public final class V1_21_R5FabricVersionAdapter implements FabricVersionAdapter 
             ServerChunkCache cache = sl.getChunkSource();
             Method getter = resolveGetChunkFutureMethod(cache);
 
-            // Temporary load-ticket — see V1_20_R1FabricVersionAdapter#requestFullChunkAsync
+            // Temporary load-ticket â€” see V1_20_R1FabricVersionAdapter#requestFullChunkAsync
             // for the rationale. 1.21.5 uses the public addTicketWithRadius /
             // removeTicketWithRadius API.
             ChunkPos cp = new ChunkPos(cx, cz);
@@ -307,6 +358,84 @@ public final class V1_21_R5FabricVersionAdapter implements FabricVersionAdapter 
                     "[RTP][Fabric 1.21.5+] releaseTicket failed for chunk=(" + cx + "," + cz + "): "
                             + t.getClass().getSimpleName() + ": " + t.getMessage());
             return CompletableFuture.failedFuture(t);
+        }
+    }
+
+    /**
+     * Typed intermediary implementation of
+     * {@link io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter#extractPlayerFromConnection}.
+     * Pre-26 intermediary mappings expose the player as the public field
+     * {@code player} (mojmap field name preserved by Fabric intermediary even
+     * when the {@code getPlayer()} method name is obfuscated to {@code method_xxxxx}).
+     * No reflection.
+     */
+    @Override
+    public Object extractPlayerFromConnection(Object handler) {
+        if (!(handler instanceof ServerGamePacketListenerImpl impl)) return null;
+        return impl.player;
+    }
+
+    /**
+     * Implementation of {@link io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter#getPlayerUUID}.
+     * Typed call to {@code ServerPlayer.getUUID()}; Loom remaps the descriptor
+     * to intermediary {@code method_5667} at compile time.
+     */
+    @Override
+    public java.util.UUID getPlayerUUID(Object player) {
+        if (!(player instanceof ServerPlayer sp)) return null;
+        return sp.getUUID();
+    }
+
+    /**
+     * Implementation of {@link io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter#resolveSenderUuid}.
+     * Typed CommandSourceStack#getEntity() + Entity#getUUID() dispatch; Loom remaps
+     * the descriptors to intermediary class_2168/class_1297/method_5667 at compile time.
+     * Returns null for non-player sources (console / command block); the bridge
+     * interprets that as the RTPAPI.serverId sentinel.
+     */
+    @Override
+    public java.util.UUID resolveSenderUuid(Object src) {
+        if (!(src instanceof CommandSourceStack css)) return null;
+        Entity entity = css.getEntity();
+        if (!(entity instanceof ServerPlayer sp)) return null;
+        return sp.getUUID();
+    }
+
+    /**
+     * Typed override â€” direct {@code MinecraftServer.getCommands().performPrefixedCommand(
+     * server.createCommandSourceStack(), command)}. Loom remaps the descriptors
+     * to intermediary {@code class_3176#method_3734} / {@code method_3739} at
+     * compile time, eliminating the reflective {@code getMethod("getCommands")}
+     * lookup in {@code FabricServerAccessor.FabricConsoleSender#performCommand}
+     * which fails with {@code NoSuchMethodException} on intermediary 1.20.x /
+     * 1.21.x runtimes.
+     */
+    @Override
+    public boolean dispatchConsoleCommand(Object server, String command) {
+        if (!(server instanceof net.minecraft.server.MinecraftServer s) || command == null) return false;
+        s.getCommands().performPrefixedCommand(s.createCommandSourceStack(), command);
+        return true;
+    }
+
+    /**
+     * Per-version typed factory for the common {@code FabricRTPPlayer} wrapper.
+     * Compiled against intermediary mappings via Loom so the {@code ServerPlayer}
+     * cast and the {@code FabricRTPPlayer} constructor reference resolve to the
+     * correct runtime descriptors. Replaces the name+arity reflective
+     * {@code registerPlayer(...)} lookup that used to live in
+     * {@code FabricServerAccessor.registerPlayerObject}.
+     */
+    @Override
+    public io.github.dailystruggle.rtp.api.entity.RTPPlayer createPlayer(Object serverPlayer) {
+        if (!(serverPlayer instanceof ServerPlayer sp)) return null;
+        return new io.github.dailystruggle.rtp.fabric.player.FabricRTPPlayer(sp);
+    }
+
+    @Override
+    public void rebindPlayer(io.github.dailystruggle.rtp.api.entity.RTPPlayer existing, Object serverPlayer) {
+        if (existing instanceof io.github.dailystruggle.rtp.fabric.player.FabricRTPPlayer fp
+                && serverPlayer instanceof ServerPlayer sp) {
+            fp.rebind(sp);
         }
     }
 }

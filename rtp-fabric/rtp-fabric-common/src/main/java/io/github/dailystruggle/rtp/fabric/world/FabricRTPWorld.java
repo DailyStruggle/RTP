@@ -26,6 +26,10 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -266,6 +270,7 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
      * defense-in-depth deadline.</p>
      */
     private CompletableFuture<Long> loadLiveChunk(int chunkX, int chunkZ, long key) {
+        io.github.dailystruggle.rtp.common.tools.CfDiag.fabricLoadLiveChunk.increment();
         final MinecraftServer server = world.getServer();
         if (server == null) {
             // Defensive: a ServerLevel without a server is a torn-down state.
@@ -332,51 +337,199 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
         // The actual generation completes off-thread on vanilla/C2ME's own
         // worker pool, so we do not reintroduce the ADR-008 deadlock.
         final MinecraftServer dispatchServer = world.getServer();
-        CompletableFuture<io.github.dailystruggle.rtp.fabric.version.RTPChunkHandle> dispatch;
         if (dispatchServer == null) {
-            dispatch = CompletableFuture.completedFuture(null);
-        } else {
-            CompletableFuture<CompletableFuture<io.github.dailystruggle.rtp.fabric.version.RTPChunkHandle>> bridge =
-                    new CompletableFuture<>();
-            dispatchServer.execute(() -> {
-                try {
-                    CompletableFuture<io.github.dailystruggle.rtp.fabric.version.RTPChunkHandle> inner =
-                            adapter.requestFullChunkAsync(levelHandle, chunkX, chunkZ);
-                    bridge.complete(inner);
-                } catch (Throwable t) {
-                    bridge.completeExceptionally(t);
-                }
-            });
-            dispatch = bridge.thenCompose(f -> f == null ? CompletableFuture.completedFuture(null) : f);
+            // Tear-down race: complete the result on the dispatch path so the
+            // single whenComplete cleanup below handles it uniformly. We mark
+            // the gate as not-acquired since we never tried to acquire one.
+            CompletableFuture<io.github.dailystruggle.rtp.fabric.version.RTPChunkHandle> dispatch =
+                    CompletableFuture.completedFuture(null);
+            attachDispatchCompletion(dispatch, key, result, /*acquiredPermit=*/false);
+            return result;
         }
 
-        dispatch.whenComplete((handle, error) -> {
-                    // Lifecycle bookkeeping on EVERY exit path (success,
-                    // exception, deadline) — mirrors the MemoryTracker contract.
-                    fabricLiveLoadInFlight.decrementAndGet();
-                    inFlightLiveLoads.remove(key, result);
-                    if (error != null) {
-                        Throwable cause = (error instanceof CompletionException && error.getCause() != null)
-                                ? error.getCause() : error;
-                        result.completeExceptionally(cause);
-                        return;
-                    }
-                    if (handle != null) {
-                        ChunkAccess chunk = handle.as(ChunkAccess.class);
-                        if (chunk != null) {
-                            chunkCache.put(key, new WeakReference<>(chunk));
-                            rtpChunkCache.put(key,
-                                    new WeakReference<>(new FabricRTPChunk(chunk, world, id)));
-                            // A live chunk supersedes any anvil snapshot — drop the
-                            // stale view so subsequent getCachedChunk lookups don't
-                            // return outdated palette data.
-                            anvilProbeSupport.evict(key);
-                        }
-                    }
-                    result.complete(key);
-                });
+        // (4) Concurrency gate — see liveLoadGate javadoc. Tries an immediate
+        // permit; if none is available the dispatch is parked on a bounded FIFO
+        // and resumed by the next chunk's whenComplete (no recursion). When the
+        // queue is also full we fail-fast with BusyException so the pipeline
+        // attributes the failure cleanly (REQ-RTP-S-004) instead of unbounded
+        // queuing.
+        Runnable dispatchLogic = () -> dispatchAdapterCall(
+                dispatchServer, adapter, levelHandle, chunkX, chunkZ, key, result);
+        if (liveLoadGate.tryAcquire()) {
+            dispatchLogic.run();
+        } else {
+            if (!liveLoadWaiters.offer(dispatchLogic)) {
+                inFlightLiveLoads.remove(key, result);
+                fabricLiveLoadInFlight.decrementAndGet();
+                totalChunkLoads.decrementAndGet();
+                result.completeExceptionally(new IllegalStateException(
+                        "FabricRTPWorld.loadLiveChunk: gate saturated (queue full) world=" + name
+                                + " chunk=(" + chunkX + "," + chunkZ + ")"));
+                return result;
+            }
+            // Re-check: a permit may have been released between tryAcquire and offer.
+            drainWaitersIfPermitFree();
+        }
 
         return result;
+    }
+
+    /**
+     * Performs the actual {@code dispatchServer.execute(...)} → adapter call,
+     * then attaches the unified completion handler. Must only be invoked when
+     * the caller holds one permit on {@link #liveLoadGate}.
+     */
+    private void dispatchAdapterCall(
+            MinecraftServer dispatchServer,
+            io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter,
+            io.github.dailystruggle.rtp.fabric.version.RTPLevelHandle levelHandle,
+            int chunkX, int chunkZ, long key,
+            CompletableFuture<Long> result) {
+        CompletableFuture<CompletableFuture<io.github.dailystruggle.rtp.fabric.version.RTPChunkHandle>> bridge =
+                new CompletableFuture<>();
+
+        dispatchServer.execute(() -> {
+            try {
+                CompletableFuture<io.github.dailystruggle.rtp.fabric.version.RTPChunkHandle> inner =
+                        adapter.requestFullChunkAsync(levelHandle, chunkX, chunkZ);
+                bridge.complete(inner);
+            } catch (Throwable t) {
+                bridge.completeExceptionally(t);
+            }
+        });
+        // Bridge watchdog: dispatchServer.execute(...) silently drops the runnable
+        // when the server is stopping. Without this, bridge would never complete,
+        // dispatch would never complete, attachDispatchCompletion's whenComplete
+        // would never fire, the gate permit would never release, and
+        // inFlightLiveLoads would retain a dead future for this key forever —
+        // every subsequent getChunkAt(cx,cz) caller would receive the dead future
+        // immediately, return null upstream, and the orchestration layer
+        // (QueueTask/PregenTask, both with 5 s orTimeout) would re-issue
+        // unboundedly, accumulating millions of CompletableFuture nodes
+        // (BiApply / BiRelay / CoCompletion). Heap-histogram signature: see
+        // 2026-05-08 dump (~96 M CF, ~94 M CoCompletion, ~48 M BiApply).
+        bridge.orTimeout(BRIDGE_DISPATCH_DEADLINE_MS, TimeUnit.MILLISECONDS);
+        CompletableFuture<io.github.dailystruggle.rtp.fabric.version.RTPChunkHandle> dispatch =
+                bridge.thenCompose(f -> f == null ? CompletableFuture.completedFuture(null) : f);
+        // Hard per-load deadline. If vanilla's chunk system never completes the
+        // future (server stopping, C2ME stall, watchdog crash mid-generation),
+        // the timeout completes `dispatch` exceptionally — which fires the
+        // whenComplete in attachDispatchCompletion, releasing the gate permit,
+        // removing the inFlightLiveLoads entry, and propagating the failure to
+        // the caller's result CF. Tuned just under the orchestration layer's
+        // 5 s orTimeout (QueueTask:153 / QueueTask:282) so we surface the
+        // failure as an exceptional inner future rather than letting upstream
+        // see a stale null while the inner work is still pinned.
+        dispatch = dispatch.orTimeout(LIVE_LOAD_DEADLINE_MS, TimeUnit.MILLISECONDS);
+        attachDispatchCompletion(dispatch, key, result, /*acquiredPermit=*/true);
+    }
+
+    /**
+     * Watchdog timeout for {@code dispatchServer.execute(...)} → adapter.
+     * If the server's execute() drops the runnable (shutdown), bridge never
+     * completes — this timeout converts that into an exceptional completion
+     * so the gate-release path runs. Tight because the body of the runnable
+     * is "create a CompletableFuture and complete it with the adapter's
+     * inner future" — microseconds of work.
+     */
+    private static final long BRIDGE_DISPATCH_DEADLINE_MS = 1_500L;
+
+    /**
+     * Hard ceiling on how long a single live-load future may stay pinned in
+     * {@link #inFlightLiveLoads}. Crucially this acts on the inner adapter
+     * future, NOT on the outer {@link #getOrLoadChunk} CF — the previous
+     * design used {@code completeOnTimeout(null, …)} which resolved the
+     * outer caller but left the inner future (and its gate permit and
+     * inFlightLiveLoads entry) live forever. See the bridge-watchdog javadoc
+     * above for the failure mode this prevents.
+     *
+     * <p>Tuned just under the orchestration layer's 5 s orTimeout
+     * (QueueTask:153 / QueueTask:282 / PregenTask reservation:452) so the
+     * inner failure surfaces before upstream gives up; mismatched deadlines
+     * were how 2026-05-08's CF leak avoided detection for so long.</p>
+     */
+    private static final long LIVE_LOAD_DEADLINE_MS = 4_000L;
+
+    /**
+     * Wires the unified whenComplete handler that performs lifecycle bookkeeping,
+     * cache publication, gate release, and waiter drain.
+     *
+     * @param acquiredPermit whether the caller is holding a {@link #liveLoadGate}
+     *                       permit that must be released here.
+     */
+    private void attachDispatchCompletion(
+            CompletableFuture<io.github.dailystruggle.rtp.fabric.version.RTPChunkHandle> dispatch,
+            long key,
+            CompletableFuture<Long> result,
+            boolean acquiredPermit) {
+        dispatch.whenComplete((handle, error) -> {
+            try {
+                // Lifecycle bookkeeping on EVERY exit path (success,
+                // exception, deadline) — mirrors the MemoryTracker contract.
+                fabricLiveLoadInFlight.decrementAndGet();
+                inFlightLiveLoads.remove(key, result);
+                if (error != null) {
+                    Throwable cause = (error instanceof CompletionException && error.getCause() != null)
+                            ? error.getCause() : error;
+                    result.completeExceptionally(cause);
+                    return;
+                }
+                if (handle != null) {
+                    ChunkAccess chunk = handle.as(ChunkAccess.class);
+                    if (chunk != null) {
+                        chunkCache.put(key, new WeakReference<>(chunk));
+                        rtpChunkCache.put(key,
+                                new WeakReference<>(new FabricRTPChunk(chunk, world, id)));
+                        // A live chunk supersedes any anvil snapshot — drop the
+                        // stale view so subsequent getCachedChunk lookups don't
+                        // return outdated palette data.
+                        anvilProbeSupport.evict(key);
+                    }
+                }
+                result.complete(key);
+            } finally {
+                if (acquiredPermit) {
+                    // Release first, then resume one waiter (non-recursive: we
+                    // only ever pop one waiter per release, and the waiter's
+                    // dispatchServer.execute(...) returns immediately, so the
+                    // call stack does not grow with queue depth).
+                    liveLoadGate.release();
+                    drainWaitersIfPermitFree();
+                }
+            }
+        });
+    }
+
+    /**
+     * Pull the next parked dispatch off {@link #liveLoadWaiters} if a permit
+     * is currently free. Loops only while we successfully claim a permit AND
+     * find a waiter — bounded by the number of currently-released permits, so
+     * the call is O(permits) per invocation, never recursive.
+     */
+    private void drainWaitersIfPermitFree() {
+        while (true) {
+            Runnable next = liveLoadWaiters.peek();
+            if (next == null) return;
+            if (!liveLoadGate.tryAcquire()) return;
+            // Atomically claim the same waiter we peeked at; if another thread
+            // already took it, return the permit and retry.
+            if (!liveLoadWaiters.remove(next)) {
+                liveLoadGate.release();
+                continue;
+            }
+            try {
+                next.run();
+            } catch (Throwable t) {
+                // dispatchAdapterCall is the only producer of waiters and it
+                // never throws synchronously, but defend against future change:
+                // release the permit so the gate doesn't deadlock.
+                liveLoadGate.release();
+                RTP.log(java.util.logging.Level.WARNING,
+                        "[RTP][Fabric] Waiter dispatch threw — gate permit released defensively", t);
+            }
+            // Loop: a single drain call may resume multiple waiters if multiple
+            // permits were freed concurrently (e.g. burst completion).
+        }
     }
 
     /**
@@ -406,6 +559,71 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
     private final AtomicInteger fabricLiveLoadInFlight = new AtomicInteger();
 
     /**
+     * Concurrent-generation cap for {@link #loadLiveChunk}.
+     *
+     * <p>1.20.1's chunk-system implementation holds onto significantly more
+     * working memory per in-flight generation than 1.21.11+ — empirically the
+     * backend OOMs on 1.20.1 with the unbounded dispatch that the rest of the
+     * version line tolerates without issue. The gate caps how many adapter
+     * calls can be parked in vanilla's chunk-future pipeline at once. Excess
+     * callers park on {@link #liveLoadWaiters}; on each completion the gate
+     * pulls the next waiter (non-recursive — see {@link #drainWaitersIfPermitFree}).</p>
+     *
+     * <p>Hardcoded for now (per 2026-05-08 user direction); a config knob may
+     * be added if dynamic tuning proves necessary. Permit count is selected
+     * from the active {@link io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter}'s
+     * {@code mcVersion()}: 2 for the 1.20.x line, 4 elsewhere.</p>
+     */
+    private final Semaphore liveLoadGate = new Semaphore(resolveLiveLoadPermits(), /*fair=*/true);
+
+    /**
+     * Bounded FIFO of dispatch tasks parked because {@link #liveLoadGate} was
+     * full at request time. Bounded so we fail-fast (with a clean exceptional
+     * future) rather than letting a stuck chunk system grow this queue
+     * without limit. The size is generous relative to the gate width — under
+     * normal load the queue stays empty; it only fills during pre-fill bursts
+     * or while vanilla is recovering from a slow tick.
+     */
+    private static final int LIVE_LOAD_WAITER_CAPACITY = 256;
+
+    /**
+     * FIFO of parked dispatch runnables. Drained by
+     * {@link #drainWaitersIfPermitFree} whenever a permit becomes available.
+     * {@link ConcurrentLinkedQueue#offer} never returns false, so the
+     * capacity check is performed against {@link #liveLoadWaiters}'s size.
+     */
+    private final ConcurrentLinkedQueue<Runnable> liveLoadWaiters =
+            new ConcurrentLinkedQueue<>() {
+                @Override
+                public boolean offer(Runnable r) {
+                    if (size() >= LIVE_LOAD_WAITER_CAPACITY) return false;
+                    return super.offer(r);
+                }
+            };
+
+    /**
+     * Pick the permit count for {@link #liveLoadGate} based on the active
+     * version adapter's {@code mcVersion()}. 1.20.x is the heavy line (2);
+     * everything else (1.21+, 26.1) gets 4. Defaults to 2 (conservative) if
+     * the adapter isn't yet installed at construction time — this is safe:
+     * the world is created before adapter installation only in tests, and a
+     * tighter cap there is harmless.
+     */
+    private static int resolveLiveLoadPermits() {
+        try {
+            io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter =
+                    io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
+            if (adapter == null) return 2;
+            String v = adapter.mcVersion();
+            if (v == null) return 2;
+            if (v.startsWith("1.20")) return 2;
+            return 4;
+        } catch (Throwable ignored) {
+            return 2;
+        }
+    }
+
+    /**
      * Fabric-only override of {@link RTPWorld#getOrLoadChunk(int, int)}.
      *
      * <p><b>Why this exists.</b> The world adapter is the canonical owner
@@ -420,12 +638,13 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
      * coordinate doesn't pin the calling task indefinitely.</p>
      *
      * <p><b>Strategy.</b> Probe-first: cached → anvil → live-load. The
-     * live-load future is bounded by {@link #FABRIC_GENERATION_DEADLINE_MS}
-     * via {@link CompletableFuture#completeOnTimeout(Object, long,
-     * java.util.concurrent.TimeUnit)} — completing with {@code null} on
-     * deadline. Generation continues to run off-thread and warms
-     * {@link #rtpChunkCache} for the next attempt at the same coordinate,
-     * so the work is not wasted; only the wait is curtailed.</p>
+     * live-load future is bounded by {@link #LIVE_LOAD_DEADLINE_MS} via
+     * {@code dispatch.orTimeout(...)} inside
+     * {@link #dispatchAdapterCall} — failing the inner future
+     * exceptionally on deadline so the gate permit, the
+     * {@link #inFlightLiveLoads} entry, and any attached cleanup release
+     * cleanly. The outer caller sees a {@link TimeoutException} mapped to
+     * {@code null} via the {@code exceptionally} stage below.</p>
      *
      * <p>S-004 compliance: a deadline-{@code null} resolution is not a
      * silent discard — the calling task ({@code QueueTask}) treats it as a
@@ -442,6 +661,14 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
         if (cached != null) {
             return CompletableFuture.completedFuture(cached);
         }
+        // Per-load deadline lives inside loadLiveChunk's dispatch chain
+        // (LIVE_LOAD_DEADLINE_MS). We do NOT add an outer completeOnTimeout
+        // here: that pattern resolved the caller's CF with null while leaving
+        // the inner future (with its gate permit and inFlightLiveLoads entry)
+        // live forever, which is the leak shape captured in the 2026-05-08
+        // heap dump. Letting the inner future fail exceptionally lets the
+        // existing whenComplete cleanup release every resource on every exit
+        // path, matching the MemoryTracker contract elsewhere in rtp-core.
         return getChunkAt(cx, cz).thenCompose(probeKey -> {
             RTPChunk<?> afterProbe = (probeKey != null) ? getCachedChunk(probeKey) : null;
             if (afterProbe != null) {
@@ -456,38 +683,77 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
                 if (chunkSet == null) return null;
                 return getCachedChunk(key);
             });
-        }).completeOnTimeout(null, FABRIC_GENERATION_DEADLINE_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+        }).exceptionally(ex -> {
+            // The orchestration layer (QueueTask/PregenTask) treats a null
+            // resolution as "no chunk available right now" via the standard
+            // FailTypes.nullChunk attribution path, satisfying REQ-RTP-S-004.
+            // We map TimeoutException + adapter throwables to null here rather
+            // than re-throw because the caller side uses .whenComplete(chunk,ex)
+            // and ex != null is logged at WARNING — and a routine deadline is
+            // not warning-worthy. Genuine bugs (NPE, IllegalStateException
+            // thrown synchronously) still propagate via the exceptional path
+            // above this catch.
+            Throwable cause = (ex instanceof CompletionException && ex.getCause() != null)
+                    ? ex.getCause() : ex;
+            if (cause instanceof TimeoutException) {
+                RTP.log(java.util.logging.Level.FINE,
+                        "[RTP][Fabric] getOrLoadChunk deadline (" + LIVE_LOAD_DEADLINE_MS
+                                + "ms) for " + name + " chunk=(" + cx + "," + cz + ")");
+                return null;
+            }
+            // Non-timeout failures: log at FINE (the upstream WARNING in
+            // QueueTask/PregenTask is sufficient) and surface as null.
+            RTP.log(java.util.logging.Level.FINE,
+                    "[RTP][Fabric] getOrLoadChunk failed for " + name
+                            + " chunk=(" + cx + "," + cz + "): "
+                            + cause.getClass().getSimpleName() + ": " + cause.getMessage());
+            return null;
+        });
     }
 
-    /**
-     * Hard per-chunk ceiling for {@link #getOrLoadChunk}. Resolves the
-     * future with {@code null} if vanilla's chunk system hasn't completed
-     * the load by this deadline. As of the 2026-05-08 rtp-core change
-     * removing orchestration-level {@code .orTimeout(5,SECONDS)} from
-     * {@code QueueTask}/{@code PregenTask}, this is the authoritative
-     * cap on how long any caller will wait for a single Fabric chunk
-     * load. Generation that doesn't meet this deadline is not cancelled
-     * — it continues and warms the cache for the next attempt at the
-     * same coordinate. Tuned generously: cold-start vanilla generation
-     * can take 5–10 s on 1.20.1 under early-server load; 30 s gives
-     * headroom without letting genuinely stuck coordinates pin a task
-     * indefinitely.
-     */
-    private static final long FABRIC_GENERATION_DEADLINE_MS = 30_000L;
+    // FABRIC_GENERATION_DEADLINE_MS removed 2026-05-08: superseded by the
+    // inner-future deadline in dispatchAdapterCall (LIVE_LOAD_DEADLINE_MS).
+    // The 30 s outer-CF completeOnTimeout(null) it backed left the inner
+    // future + gate permit + inFlightLiveLoads entry pinned indefinitely on
+    // shutdown drops, which manifested as the CF-graph leak (>10 GB) in the
+    // 2026-05-08 heap dump.
 
     /**
-     * Step A scope: minimal {@link ChunkSet} mirroring {@code BukkitRTPWorld#getChunkAtAsync}.
-     * Single-chunk set with the load future as its only entry; the &quot;done&quot; future
-     * is never completed because the Fabric pipeline currently does not consume it
-     * (Bukkit only fires it for the ADR-016 stale-chunk guard — which is Bukkit-family
-     * only per ADR-016 §13.2).
+     * Minimal {@link ChunkSet} mirroring {@code BukkitRTPWorld#getChunkAtAsync}.
+     * Single-chunk set with the load future as its only entry; the {@code done}
+     * future is completed (with {@code null}) on the same callback that resolves
+     * the load future, so any cross-platform consumer that attaches via
+     * {@code thenCombine}/{@code allOf}/{@code whenComplete} to {@code done()}
+     * is released and its dependent-stage graph becomes GC-eligible.
+     *
+     * <p><b>Why this matters.</b> Prior to 2026-05-08 the {@code done} future
+     * was deliberately left uncompleted because the Fabric pipeline did not
+     * consume it. But {@code rtp-core} is platform-agnostic — any future
+     * cross-platform feature attaching to {@code done} would silently leak its
+     * entire dependent-stage graph until JVM exit on Fabric. The completed-on-
+     * resolve contract here matches Bukkit semantics (where {@code done} is
+     * fired by the ADR-016 stale-chunk guard) and removes the foot-gun. See
+     * {@code POTENTIAL_BUGS.md} 2026-05-08 entry for the original report.</p>
      */
     @Override
     public CompletableFuture<ChunkSet> getChunkAtAsync(int cx, int cz) {
-        return getChunkAt(cx, cz).thenApply(key ->
-            new ChunkSet(this, cx, cz,
+        io.github.dailystruggle.rtp.common.tools.CfDiag.fabricGetChunkAtAsync.increment();
+        return getChunkAt(cx, cz).thenApply(key -> {
+            io.github.dailystruggle.rtp.common.tools.CfDiag.chunkSetFabricGetChunk.increment();
+            CompletableFuture<Boolean> done = new CompletableFuture<>();
+            ChunkSet set = new ChunkSet(this, cx, cz,
                 Collections.singletonList(CompletableFuture.completedFuture(key)),
-                new CompletableFuture<>()));
+                done);
+            // Fire-and-forget release so any attached dependents (cross-
+            // platform stale-chunk guards, future allOf consumers) drain
+            // their CF graph instead of pinning it. Completion value mirrors
+            // whether a chunk key was resolved — the Bukkit consumers only
+            // branch on completion, not on the value, but Boolean.TRUE on
+            // success / FALSE on null preserves a useful signal for future
+            // cross-platform listeners.
+            done.complete(key != null);
+            return set;
+        });
     }
 
     /**

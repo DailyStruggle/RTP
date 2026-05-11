@@ -228,6 +228,8 @@ public class ScanTask extends RTPRunnable {
 
   @Override
   public void run() {
+    io.github.dailystruggle.rtp.common.tools.CfDiag.scanRunBatch.increment();
+    io.github.dailystruggle.rtp.common.tools.CfDiag.ensureStarted();
     if (trackingId != null) {
       io.github.dailystruggle.rtp.common.tools.MemoryTracker.updateTracking(trackingId);
     }
@@ -923,6 +925,7 @@ public class ScanTask extends RTPRunnable {
           Set<String> defaultBiomes,
           boolean biomeRecall,
           WorldBorder border) {
+    io.github.dailystruggle.rtp.common.tools.CfDiag.scanTestPos.increment();
 
     try {
       safetyRadius = Math.min(safetyRadius, 7);
@@ -941,7 +944,10 @@ public class ScanTask extends RTPRunnable {
 
       // Fast mathematical rejection ONLY for World Border.
       // Mathematical biome check is completely removed to force chunk generation.
-      if (!border.isInside().apply(new RTPLocation(world, blockX, (vert.maxY() + vert.minY()) / 2, blockZ))) {
+      // Null-guard: an absent border (e.g. platform adapter returned null for
+      // this world) means "no border in effect" — accept the candidate here
+      // and let downstream shape/region constraints bound the selection.
+      if (border != null && !border.isInside().apply(new RTPLocation(world, blockX, (vert.maxY() + vert.minY()) / 2, blockZ))) {
         RTP.log(Level.FINER, "[ScanTask] border-reject region=" + region.name
                 + " pos=" + pos + " block=(" + blockX + "," + blockZ + ")");
         shape.addBadLocation(pos);
@@ -1228,6 +1234,7 @@ public class ScanTask extends RTPRunnable {
           Set<String> defaultBiomes,
           boolean biomeRecall,
           CompletableFuture<Boolean> res) {
+      io.github.dailystruggle.rtp.common.tools.CfDiag.scanRunFullLoad.increment();
       final long fullLoadStartNanos = System.nanoTime();
       res.whenComplete((r, e) -> {
         fullLoadCount.incrementAndGet();

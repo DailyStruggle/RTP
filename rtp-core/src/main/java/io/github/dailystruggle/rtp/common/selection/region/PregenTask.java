@@ -4,6 +4,7 @@ import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.api.world.*;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
+import io.github.dailystruggle.rtp.common.tools.CfDiag;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 
@@ -60,6 +61,7 @@ final class PregenTask implements Runnable {
     private void rescheduleNextAttempt() {
         i++;
         if (result.isDone()) return;
+        CfDiag.pregenReschedule.increment();
         if (inRunAttempt) {
             needsReschedule = true;
         } else {
@@ -134,6 +136,7 @@ final class PregenTask implements Runnable {
     }
 
     private void runAttempt() {
+        CfDiag.pregenAttemptStart.increment();
         if (i > state.maxAttempts) {
             completeExhausted();
             return;
@@ -184,6 +187,12 @@ final class PregenTask implements Runnable {
         }
 
         // --- worldborder ---
+        // Null-guard: a platform adapter may return no border for a world (e.g. a
+        // per-version Fabric RTPWorld impl that the common accessor's
+        // createNativeWorldBorder doesn't recognise via its instanceof check).
+        // Treat absent border as "no border in effect" — accept the candidate
+        // rather than NPE'ing this attempt every tick. The downstream
+        // shape/region constraints still bound the selection space.
         WorldBorder border = (WorldBorder) RTP.serverAccessor.getWorldBorder(state.world.name());
         io.github.dailystruggle.rtp.api.world.RTPLocation borderProbe =
                 new io.github.dailystruggle.rtp.api.world.RTPLocation(
@@ -191,7 +200,7 @@ final class PregenTask implements Runnable {
                         blockX,
                         (state.vert.maxY() + state.vert.minY()) / 2,
                         blockZ);
-        if (!border.isInside().apply(borderProbe)) {
+        if (border != null && !border.isInside().apply(borderProbe)) {
             if (state.maxAttempts < state.maxAttemptsCeiling) state.maxAttempts++;
             state.worldBorderFails++;
             if (state.worldBorderFails > 1000L) {
@@ -443,6 +452,7 @@ final class PregenTask implements Runnable {
         // Live-backed: allocate reservation + await ticket apply, then dispatch
         // to the region-owning thread for the stale guard and block reads.
         final long chunkKey = ((long) cx & 0xffffffffL) | ((long) cz << 32);
+        CfDiag.chunkSetPregenLive.increment();
         ChunkSet ticket = new ChunkSet(
                 state.world, cx, cz,
                 Collections.singletonList(CompletableFuture.completedFuture(chunkKey)),
@@ -622,11 +632,23 @@ final class PregenTask implements Runnable {
             return;
         }
 
-        // Neighbour-grid load: per-chunk deadlines live inside the world adapter.
-        // We orchestrate via allOf and let it complete naturally.
+        // Neighbour-grid load: per-chunk deadlines live inside the world adapter,
+        // BUT we still need an outer ceiling here so that a single never-completing
+        // neighbour future (e.g. a Fabric live-load whose downstream gate-release
+        // never fires due to a server-shutdown drop) does not pin this allOf node
+        // and its dependents graph forever. Without this orTimeout, the heap
+        // signature (~48M BiApply / ~48M BiRelay / ~94M CoCompletion observed in
+        // the 2026-05-08 Fabric dump) accumulates one full neighbour-grid fan-out
+        // per stuck attempt because the whenComplete below never fires →
+        // rescheduleNextAttempt never runs → the per-task maxAttempts cap can't
+        // engage. 5 s is generous for a (2r+1)² grid where each chunk has its
+        // own platform-internal load deadline.
+        CfDiag.pregenAllOfDispatch.increment();
         CompletableFuture.allOf(neighbourFutures.toArray(new CompletableFuture[0]))
+                .orTimeout(5, TimeUnit.SECONDS)
                 .whenComplete((v, ex) -> {
                     if (ex != null) {
+                        CfDiag.pregenAllOfTimeout.increment();
                         RTP.log(Level.WARNING,
                                 "[RTP] Safety-check neighbour loads failed ("
                                         + state.world.name() + " center=(" + cx + "," + cz + ")): " + ex);
@@ -773,6 +795,7 @@ final class PregenTask implements Runnable {
                 chunks.add(state.world.getChunkAt(ccx + x, ccz + z));
             }
         }
+        CfDiag.chunkSetPregenVerified.increment();
         ChunkSet verifiedChunks = new ChunkSet(state.world, ccx, ccz, chunks, new CompletableFuture<>());
         // Close the per-iteration reservation; ownership of the verifiedChunks set
         // transfers via the returned GenerationResult (matches the prior contract).

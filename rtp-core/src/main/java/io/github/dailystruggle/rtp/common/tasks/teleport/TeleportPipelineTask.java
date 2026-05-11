@@ -289,6 +289,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
                 chunks.add(rtpWorld.getChunkAt(cx + x, cz + z));
               }
             }
+            io.github.dailystruggle.rtp.common.tools.CfDiag.chunkSetPipeline.increment();
             this.chunkSet = new ChunkSet(rtpWorld, cx, cz, chunks, new CompletableFuture<>());
             this.reservation = new ChunkReservation(chunkSet, rtpWorld);
           } else {

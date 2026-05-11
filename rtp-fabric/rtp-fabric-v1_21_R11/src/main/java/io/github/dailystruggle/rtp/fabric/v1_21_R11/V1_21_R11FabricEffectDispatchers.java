@@ -62,7 +62,7 @@ final class V1_21_R11FabricEffectDispatchers {
             // per-version dispatcher path is wired (user reported "no
             // logs at all" symptom on 1.21.11 — without this line there's
             // no positive evidence of registration in the server log).
-            System.err.println("[RTP][Fabric 1.21.11+] effect dispatchers registered "
+            RTP.log(Level.FINER, "[RTP][Fabric 1.21.11+] effect dispatchers registered "
                     + "(SoundDispatcher + ParticleDispatcher) — "
                     + V1_21_R11FabricEffectDispatchers.class.getName());
         } catch (NoClassDefFoundError ncdfe) {
@@ -82,10 +82,11 @@ final class V1_21_R11FabricEffectDispatchers {
         // make the client treat the embedded ResourceLocation as a custom
         // resource-pack path → silent miss for built-in sounds.
         Holder<SoundEvent> holder = BuiltInRegistries.SOUND_EVENT.wrapAsHolder(sound);
-        if (!LOGGED_FIRST_SOUND) {
+        boolean firstSound = !LOGGED_FIRST_SOUND;
+        if (firstSound) {
             LOGGED_FIRST_SOUND = true;
             try {
-                System.err.println("[RTP][Fabric 1.21.11+] sound dispatch #1: "
+                RTP.log(Level.FINER, "[RTP][Fabric 1.21.11+] sound dispatch #1: "
                         + "soundClass=" + sound.getClass().getName()
                         + " holderKind=" + holder.kind()
                         + " holderRegistered=" + holder.isBound()
@@ -95,7 +96,7 @@ final class V1_21_R11FabricEffectDispatchers {
                         + " connectionNull=" + (player.connection == null)
                         + " pos=" + x + "," + y + "," + z + " v=" + volume + " p=" + pitch);
             } catch (Throwable t) {
-                System.err.println("[RTP][Fabric 1.21.11+] sound dispatch #1 diag failed: " + t);
+                RTP.log(Level.FINER, "[RTP][Fabric 1.21.11+] sound dispatch #1 diag failed: " + t);
             }
         }
         // Avoid touching player.level() / serverLevel() entirely. The user-
@@ -110,12 +111,8 @@ final class V1_21_R11FabricEffectDispatchers {
         ClientboundSoundPacket pkt = new ClientboundSoundPacket(
                 holder, source, x, y, z, volume, pitch, seed);
         player.connection.send(pkt);
-        if (LOGGED_FIRST_SOUND) {
-            // gated by the same flag; emits exactly once after the diag block above
-            // to confirm send() returned without throwing.
-            LOGGED_FIRST_SOUND = false; // allow one more pass to print confirmation
-            System.err.println("[RTP][Fabric 1.21.11+] sound packet sent OK (ClientboundSoundPacket, ctor 8-arg holder+seed)");
-            LOGGED_FIRST_SOUND = true;
+        if (firstSound) {
+            RTP.log(Level.FINER, "[RTP][Fabric 1.21.11+] sound packet sent OK (ClientboundSoundPacket, ctor 8-arg holder+seed)");
         }
     }
 
@@ -163,24 +160,23 @@ final class V1_21_R11FabricEffectDispatchers {
                         (float) dx, (float) dy, (float) dz,
                         (float) speed,
                         count);
-        if (!LOGGED_FIRST_PARTICLE) {
+        boolean firstParticle = !LOGGED_FIRST_PARTICLE;
+        if (firstParticle) {
             LOGGED_FIRST_PARTICLE = true;
             try {
-                System.err.println("[RTP][Fabric 1.21.11+] particle dispatch #1: "
+                RTP.log(Level.FINER, "[RTP][Fabric 1.21.11+] particle dispatch #1: "
                         + "optionsClass=" + options.getClass().getName()
                         + " typeClass=" + (options.getType() == null ? "null" : options.getType().getClass().getName())
                         + " connectionNull=" + (recipient.connection == null)
                         + " pos=" + x + "," + y + "," + z + " count=" + count
                         + " offset=" + dx + "," + dy + "," + dz + " speed=" + speed);
             } catch (Throwable t) {
-                System.err.println("[RTP][Fabric 1.21.11+] particle dispatch #1 diag failed: " + t);
+                RTP.log(Level.FINER, "[RTP][Fabric 1.21.11+] particle dispatch #1 diag failed: " + t);
             }
         }
         recipient.connection.send(pkt);
-        if (LOGGED_FIRST_PARTICLE) {
-            LOGGED_FIRST_PARTICLE = false;
-            System.err.println("[RTP][Fabric 1.21.11+] particle packet sent OK (ClientboundLevelParticlesPacket, 2-bool form)");
-            LOGGED_FIRST_PARTICLE = true;
+        if (firstParticle) {
+            RTP.log(Level.FINER, "[RTP][Fabric 1.21.11+] particle packet sent OK (ClientboundLevelParticlesPacket, 2-bool form)");
         }
     }
 }

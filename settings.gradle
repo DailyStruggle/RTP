@@ -51,6 +51,17 @@ rootProject.name = 'RTP'
 include 'rtp-api'
 include 'commands-api'
 include 'effects-api'
+// effects-api-fabric-unobf -- nested sibling Gradle module hosting the
+// Mojmap-unobfuscated carrier for effectsapi/fabric_unobf/*. Compiled under
+// unobfuscated 1.15 Loom (same regime as rtp-fabric-v26_1_R1 and
+// rtp-fabric-common-unobf) so its NM constant-pool entries survive on a
+// deobf MC 26.x runtime. Required because fabric-loom owns project-level MC
+// + mappings config and cannot host both intermediary (1.21.1) and
+// unobfuscated (26.1.2) mappings inside :effects-api itself. Mirrors the
+// :rtp-fabric:rtp-fabric-common-unobf precedent. Requires JDK 25 +
+// fabric-loom 1.15+ (same toolchain as v26_1_R1). See effects-api-ADR-006
+// (amendment 2026-05-09) and rtp-fabric-ADR-009.
+include 'effects-api:effects-api-fabric-unobf'
 include 'rtp-anvil'
 include 'rtp-tags'
 include 'rtp-core'
@@ -86,6 +97,13 @@ include 'rtp-plugin'
 // JDK 25 + Loom 1.15 because MC 26.1 is deobfuscated; contributors without
 // JDK 25 will see only that submodule fail toolchain provisioning.
 include 'rtp-fabric:rtp-fabric-common'
+// rtp-fabric-common-unobf -- mojmap-bytecode sibling of rtp-fabric-common
+// (rtp-fabric-ADR-009, paired with effects-api-ADR-006). Compiled under
+// unobfuscated 1.15 Loom (same regime as rtp-fabric-v26_1_R1) so its NM
+// constant-pool entries survive on a deobf MC 26.x runtime; consumed by
+// V26_*_R1FabricVersionAdapter via `api project(...)`. Requires JDK 25 +
+// fabric-loom 1.15+ (same toolchain as v26_1_R1).
+include 'rtp-fabric:rtp-fabric-common-unobf'
 include 'rtp-fabric:rtp-fabric-v1_20_R1'
 include 'rtp-fabric:rtp-fabric-v1_21_R1'
 include 'rtp-fabric:rtp-fabric-v1_21_R5'

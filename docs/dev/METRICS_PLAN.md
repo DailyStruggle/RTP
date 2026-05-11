@@ -55,6 +55,9 @@ This document is the canonical plan for **runtime metrics** in RTP — the platf
 | `gcPauseRecent` | int (ms) | Largest GC pause observed in the last sample window. Sourced from `java.lang.management.GarbageCollectorMXBean` deltas (cumulative `getCollectionTime()` per collector) on the same 1 s async cadence as the demand sampler. Distinguishes GC stall (recovers fast) from chunk-I/O stall (persistent) — different LB routing implications even when both produce identical TPS dips. |
 | `effectiveQueueWaitMs` | rolling double | EMA of (player-enqueue → pipeline-start) latency observed in `RegionQueueManager`. Stamp time at `playerQueue` enqueue; sample at the dequeue site that hands off to `TeleportPipelineTask`. The proxy proxy-estimate `queueDepth × avgPipelineMs` is wrong on heterogeneous regions; only the host has the per-enqueue timestamps. |
 | `regionQueueStatus` | fixed-shape `Map<RegionKey, RegionQueueRow>` | Per-region rollup of queue / cache fill so a cross-server selector can route to a *specific* region rather than only to the host. Each row carries `playerQueueDepth`, `keptFill` / `keptCap`, `unkeptFill` / `unkeptCap`, `loginFill` / `loginCap` (nullable when no login reserve is configured), and a derived `status` enum (`OK` / `LOW` / `EMPTY` / `SATURATED`). `RegionKey` is the existing region identifier (world key + region name); see *Per-Region Queue Status* below for cardinality bounds and the privacy posture in network mode. The summed `queueDepth` and host-level `cacheServeRateLast60s` hide which region is hot vs. starved; this row is the per-region detail an LB cannot reconstruct from host-level scalars. |
+| `tickCpuBudgetMsAnalytical` | fixed-shape `Map<TickConsumer, Double>` | Analytical worst-case CPU time (ms) RTP can consume on a single region/main tick, computed as `Σ (cap × wcetPerIteration)` for each count-bounded per-tick consumer (region pulse, pipeline stages, L3 anvil verification, active-GC sweep, periodic replenishment). Computed at startup from configuration (caps) and a small set of microbenchmarked per-iteration WCETs persisted as build-time constants; recomputed on `/rtp reload`. Constant for a given configuration — published as a *contract*, not a measurement. See *Real-Time Per-Tick CPU Budget* below. |
+| `tickCpuMsP99` / `tickCpuMsP999` | rolling double | Empirical p99 / p99.9 of the same per-tick CPU time, sampled per tick from `System.nanoTime()` deltas around each tracked consumer's per-tick entry/exit and aggregated into a wait-free reservoir over a configurable window (straw-man 60 s at 20 Hz = 1200 samples). The realistic expectation operators see, alongside the analytical contract. |
+| `tickCpuOvershoots` | long | Cumulative count of ticks in which the *measured* per-tick total exceeded `tickCpuBudgetMsAnalytical`. Should be zero; a non-zero count is a contract regression and is surfaced as red in `/rtp info` (S-005-spirit alarm — count-bound caps are no longer holding). |
 
 All values are accessible via a single read-only call: `Metrics.snapshot()` returns a `MetricsSnapshot` immutable record. Individual getters exist for callers that want a single field.
 
@@ -222,6 +225,126 @@ The LB-input fields above are **host-level** scalars (one number per backend). F
 
 ---
 
+## Real-Time Per-Tick CPU Budget
+
+A defensible firm-real-time claim for `/rtp` requires a **published worst-case CPU budget per tick** for the RTP-owned compute path — not just "we count-bound, trust us." Every per-tick consumer in `rtp-core` is already count-bounded by an explicit configuration value or a format-fixed constant; multiplying each cap by a microbenchmarked per-iteration WCET yields an analytical upper bound that holds under any input. This section defines the methodology, the sampler, and the contract.
+
+> Status: **planned (Phase M2, gated on M1 sampler infrastructure).** This is *measurement and publication only* — no behaviour change, no new caps, no new tuning surface beyond reading the config that already exists. The analytical bound is computed from values RTP already holds; the empirical p99 / p99.9 ride the same 1 s async sampler that *Command-Demand vs Refill Tracking* and *Cross-Server Load-Balancing Inputs* already establish.
+
+### What we publish
+
+Two numbers per per-tick consumer, plus a host-level total:
+
+- **Analytical WCET** — `Σ (cap × wcetPerIteration)`. The contract. Constant for a given configuration. Recomputed on `/rtp reload`. Published as `tickCpuBudgetMsAnalytical[<consumer>]` and the host total `tickCpuBudgetMsAnalytical[__total__]`.
+- **Empirical p99 / p99.9** — measured per tick via `System.nanoTime()` around each consumer's per-tick entry/exit, aggregated into a wait-free reservoir over the configured window. Published as `tickCpuMsP99[<consumer>]` / `tickCpuMsP999[<consumer>]` and host totals.
+- **Overshoot counter** — `tickCpuOvershoots`, incremented when the measured total exceeds the analytical bound. Should never increment; non-zero is a regression (a count-bound cap leaked or a per-iteration WCET regressed past its build-time constant).
+
+### Tracked consumers (`TickConsumer` enum)
+
+Fixed-shape, stable enum so the publish shape doesn't drift:
+
+| Consumer | Cap source | WCET-per-iteration source | Notes |
+|---|---|---|---|
+| `REGION_PULSE` | ADR-015 count-bound pipe iteration cap (`Region.execute` per-pulse iterations) | Microbenchmark of one bounded `Region.execute` iteration excluding nested consumers | Outer envelope; inner consumers below are subtracted to avoid double-counting. |
+| `PIPELINE_SHAPE` | Spiral 1D bounded math (ADR-001) — single-iteration | Microbenchmark of one shape-stage call | Constant-bounded by ADR-001. |
+| `PIPELINE_VERT` | Count-bound per pulse | Microbenchmark of one vert-stage call | |
+| `PIPELINE_BIOME` | Count-bound per pulse | Microbenchmark of one biome-stage call | |
+| `PIPELINE_SAFETY` | Count-bound per pulse | Microbenchmark of one safety-stage call | |
+| `L3_ANVIL_VERIFY` | **Format-fixed**: 1 `.mca` file per pulse, ≤ 1024 chunks per region | NBT-parse cost (file size constant) + per-chunk verify cost (anvil prefilter) | Analytically bounded with no measurement needed — see *L3 analytical bound* below. |
+| `ACTIVE_GC_SWEEP` | `MemoryTracker` tracked-set cap | Microbenchmark of one `MemoryTracker` entry release | Bounded by the tracked-set cap, which is itself bounded by `pendingTeleports` cap. |
+| `SCAN_REPLENISH` | ADR-006 fixed-cadence scan budget | Microbenchmark of one scan iteration | Periodic, jitter-bounded by ADR-006. |
+| `DISPATCH_OVERHEAD` | Capped by `BRIDGE_DISPATCH_DEADLINE_MS` and `LIVE_LOAD_DEADLINE_MS` | Direct read of the deadline constants | Wraps non-RT `getChunk`; the deadline *is* the WCET contract for this row. |
+
+New `FailKind`-style values default to a synthetic `OTHER` row so the publish shape stays stable when a future consumer is added. The mapping locks in M2 alongside the catalogue rows.
+
+### L3 analytical bound (no measurement required)
+
+`L3_ANVIL_VERIFY` is the cleanest row in the table because every input is format-fixed:
+
+```
+WCET_L3 = WCET_mca_read + 1024 × WCET_chunk_verify
+```
+
+- `WCET_mca_read`: bounded by `.mca` format (32×32 chunks, header + section table + section payload, ≤ a few MB; read is one I/O on a memory-mapped file).
+- `WCET_chunk_verify`: bounded by the anvil prefilter's per-chunk NBT walk (ADR-016), independent of biome.
+- `1024`: maximum chunks per region file (32×32).
+
+No biome, no structure, no chunk-system call influences this number. L3 contributes a fixed analytical constant to the per-tick budget — the strongest contract in the table. See [ADR-016](../adr/ADR-016-anvil-subsystem.md) (anvil subsystem) and [ADR-028](../adr/ADR-028-l3-backlog-cache.md) (L3 backlog cache).
+
+### Sampler placement
+
+No new schedulers; the budget sampler rides the infrastructure already specified above:
+
+- **Per-tick measurement**: each tracked consumer's per-tick entry/exit captures a `System.nanoTime()` delta into a per-consumer `LongAdder` (sum) and a per-consumer reservoir (wait-free; same shape as `sustainableRatePerMin`'s 900-sample circular buffer, sized at `metrics.tickCpuBudget.reservoirSamples`, straw-man 1200 = 60 s at 20 Hz).
+- **Per-tick total**: a single `volatile long` for the most recent tick's measured total, compared against `tickCpuBudgetMsAnalytical[__total__]`; on overshoot, increment `tickCpuOvershoots` (no allocation, no logging — surfaces in the next snapshot).
+- **Snapshot read**: at `Metrics.snapshot()` time, walk each reservoir for p99 / p99.9. O(samples × consumers) but bounded by the reservoir size × ~9 consumers — negligible cost on a snapshot path that already does worse work for `regionQueueStatus`.
+- **Folia**: each region thread maintains its own reservoir; aggregation follows the existing *Folia Aggregation* policy (`max` for `mspt`-shaped values, so the loudest region surfaces). A `metrics.folia.tickCpuBudget.aggregation` key parallels `metrics.folia.aggregation.mspt` (default `max`).
+
+S-005 / Folia threading: every measurement is `nanoTime()` + `LongAdder.add()` + a single bounded-array write — no chunk I/O, no main-thread blocking, no allocation per sample.
+
+### Configuration keys (all under `metrics.tickCpuBudget`)
+
+- `metrics.tickCpuBudget.enabled` — straw-man `true`. Off by default on lite (the lite assembly has no L3 and a smaller pipeline; the budget is uninteresting there).
+- `metrics.tickCpuBudget.reservoirSamples` — straw-man `1200` (60 s at 20 Hz). Larger windows trade memory for stability.
+- `metrics.tickCpuBudget.publishPercentiles` — straw-man `[99, 99.9]`. Locked at v1; a future addition (e.g. p99.99) would be additive.
+- `metrics.tickCpuBudget.overshootMargin` — straw-man `0.0` (strict). A small positive margin (e.g. `0.10` = 10%) absorbs measurement jitter from `nanoTime()` resolution if false-positive overshoots prove noisy in beta.
+
+### Computing the analytical bound at startup
+
+1. On every `RTP.metrics` bring-up (and on `/rtp reload`), the platform adapter reads each cap from configuration (`Region.execute` iteration cap, anvil bin size, `MemoryTracker` cap, `ScanTask` budget, …).
+2. Per-iteration WCETs are persisted as `wcetPerIterationNs[TickConsumer]` build-time constants, generated once by a microbenchmark harness in `helpers/StressTestRTP` (or a dedicated `helpers/PerTickWcetBenchmark` slice — TBD in the M2 ADR) and committed under `rtp-core/.../metrics/TickCpuWcet.java`. Regenerated when a stage's per-iteration cost changes materially.
+3. `tickCpuBudgetMsAnalytical[<consumer>]` = `cap × wcetPerIterationNs / 1_000_000.0`. The `__total__` row is the sum.
+
+The build-time WCETs are themselves a published contract: any PR that regresses a per-iteration WCET past its constant must update the constant *and* the `CHANGELOG.md` entry under the next release. A regression test (`TickCpuWcetRegressionTest`, M2) asserts the microbenchmarked values against the persisted constants within a configurable margin and fails the build on regression.
+
+### Admin readout (`/rtp info verbose`)
+
+Under a new sub-block of *Health — server* (verbose only):
+
+- `tickCpuBudget`: `<measured-total-p99-ms> / <analytical-total-ms>` (e.g. `3.2 / 8.5 ms`). Green when p99 ≤ 50% of analytical; yellow when ≤ 100%; red on any non-zero `tickCpuOvershoots`.
+- `tickCpuOvershoots`: cumulative counter; red on non-zero.
+- A breakdown table (verbose only) of per-consumer `analytical / p99 / p99.9` so operators can see which row is dominating.
+
+### bStats integration
+
+Bucketised only — never raw values:
+
+- `tick_cpu_budget_headroom` (`AdvancedPie`) — bucketised `1 - (p99 / analytical)`: `≥75%` / `50–75%` / `25–50%` / `<25%`. Captures *how much of the analytical budget servers actually use* without leaking absolute numbers.
+- `tick_cpu_overshoot_seen` (`SimplePie`) — `none` / `≥1` / `≥10` / `≥100` over the submission window. Surfaces contract regressions across the fleet without identifying individual hosts.
+
+### Cross-server load-balancing input
+
+`tickCpuBudgetMsAnalytical[__total__]` (constant per backend) and `tickCpuMsP99[__total__]` (per-snapshot scalar) are exposed in the publish frame so the proxy can compute *headroom* (`analytical - p99`) without re-deriving it from per-consumer detail. Per-consumer detail stays local — the LB needs the rollup, not the breakdown.
+
+Privacy: the analytical and empirical numbers are floats with no operator-chosen identifiers; safe to publish. The build-time WCET constants are public anyway (committed in source). No new redaction layer required.
+
+### Phasing
+
+- **Phase M1 (preparatory)**: persist the per-iteration WCET constants in `TickCpuWcet.java` (or equivalent) once the M1 sampler infrastructure (`CoreMetrics`, demand-tracking 1 Hz tick) is in place. No publish surface yet.
+- **Phase M2**: ship the catalogue rows (`tickCpuBudgetMsAnalytical`, `tickCpuMsP99`, `tickCpuMsP999`, `tickCpuOvershoots`), the per-tick measurement, the `/rtp info verbose` sub-block, and the `TickCpuWcetRegressionTest`. Folia aggregation defaults to `max` (loudest region surfaces).
+- **Phase M2 (tail)**: bStats `tick_cpu_budget_headroom` and `tick_cpu_overshoot_seen` charts.
+- **Phase M3 (cross-plan)**: include the host-total scalars in the cross-server publish frame.
+
+### Distinction from existing fields
+
+- `mspt` is the *whole server's* per-tick time, including everything other plugins and vanilla do. `tickCpuBudgetMsAnalytical[__total__]` is **only RTP's per-tick consumption** — the part we control and contract.
+- `pipelineFailureRate` measures *attempt-level* failure; this measures *resource* consumption. Both can be high simultaneously (cache miss → many failed attempts → high CPU) or independently (steady cache hit at high command rate → high CPU, zero failures).
+- `tickBudgetUtilisation` (`mspt / 50.0`) is host-level utilisation; this is RTP-attributable utilisation. Their *ratio* is RTP's share of the host tick — useful for capacity planning, computed on the proxy as `tickCpuMsP99[__total__] / mspt`.
+
+### Open Items / Follow-Ups (specific to this section)
+
+Added to *Open Items / Follow-Ups* below:
+
+- WCET microbenchmark harness location (`helpers/PerTickWcetBenchmark` vs extending `helpers/StressTestRTP`) — decide during M2.
+- Whether to expose per-stage WCET *constants* in the snapshot (so the proxy can recompute the analytical bound itself) or only the precomputed total — straw-man: total only, simpler publish shape, recomputation on the proxy is unnecessary because the constant is constant.
+- Lite-assembly baseline: confirm during M2 that the lite-assembly subset of consumers (no L3, smaller pipeline) still produces a meaningful headroom number, or default `metrics.tickCpuBudget.enabled` to `false` on lite.
+
+### ADR linkage
+
+A dedicated project-wide ADR (`docs/adr/ADR-NNN-rtp-per-tick-cpu-budget-contract.md`) records the methodology and locks the `TickConsumer` enum shape. Recommended title: *RTP per-tick CPU budget contract*. Should be drafted alongside the M2 implementation slice and ratified before the M2 PR lands so the build-time WCET constants have a home.
+
+---
+
 ## Spigot TPS Fallback (1.20.1+ minimum)
 
 Raw Spigot's `Bukkit.Server` does **not** expose `getTPS()` on the lowest-supported MC version (1.20.1). It is a Paper-only addition. The `rtp-spigot` adapter therefore ships a local sampler:
@@ -297,6 +420,7 @@ rtp-fabric/    -- FabricMetricsBinding (server tick callbacks)
 - [ ] `FabricMetricsBinding` using the server tick callback chain wired in Step E2 of `MULTI_PLATFORM_PLAN.md`.
 - [ ] Per-platform smoke tests confirming `MetricsSnapshot` returns sane values on each runtime.
 - [ ] **Extend `InfoCmd`** with the per-region *Health — cache* table (L1/L2/login fills + status flag), the verbose Folia per-region TPS/MSPT table, and the *load-balancer inputs* sub-block (`cacheServeRateLast60s`, `coldServeRatio`, `pregenSaturation`, `sustainableRatePerMin`). Add the `/rtp info json` output path emitting the full `MetricsSnapshot` record.
+- [ ] **Real-time per-tick CPU budget** (per *Real-Time Per-Tick CPU Budget*): persist per-iteration WCET constants in `rtp-core/.../metrics/TickCpuWcet.java`; ship `tickCpuBudgetMsAnalytical` / `tickCpuMsP99` / `tickCpuMsP999` / `tickCpuOvershoots` catalogue rows; wire per-tick `nanoTime()` measurement around each `TickConsumer`; add the verbose `/rtp info` sub-block; land `TickCpuWcetRegressionTest`. Folia aggregation defaults to `max`. Gated on the dedicated ADR (`docs/adr/ADR-NNN-rtp-per-tick-cpu-budget-contract.md`) being ratified before the implementation PR lands.
 
 ### Phase M3 — Multi-server consumer (cross-plan)
 
@@ -337,6 +461,10 @@ rtp-fabric/    -- FabricMetricsBinding (server tick callbacks)
 - **`effectiveQueueWaitMs` enqueue-stamp storage** — `playerQueue` entries currently carry a UUID; the cheap option is to wrap into a `(UUID, long enqueueNanos)` holder. Confirm during M2 that no caller depends on the raw `UUID` element type.
 - **`regionQueueStatus.maxRegions` cap** — straw-man `64`. Well above any realistic deployment; confirm during M2 that no production config exceeds it before locking the default. Overflow rows are summarised under a synthetic `__overflow__` key.
 - **`regionQueueStatus` redaction in network mode** — straw-man: stable opaque ids (`region-0`, `region-1`, …) assigned at startup, never crosses the wire as the human name. Confirm during M3 that the reservation-token allocator can round-trip the opaque id back to the local `RegionQueueManager` without the proxy needing the real name.
+- **Per-tick CPU budget WCET harness** — `helpers/PerTickWcetBenchmark` (new slice) vs extending `helpers/StressTestRTP`. Decide during M2 alongside the *Real-Time Per-Tick CPU Budget* implementation. Microbenchmarked values feed `TickCpuWcet.java` build-time constants.
+- **Per-tick CPU budget reservoir size & percentile set** — straw-man `1200` samples (60 s at 20 Hz) and `[p99, p99.9]`. Confirm during M2 from beta-server data; very large fleets may want a longer window.
+- **Per-tick CPU budget overshoot margin** — straw-man `0.0` (strict). Bump to `0.10` if `nanoTime()`-resolution jitter produces false-positive overshoots in beta.
+- **`tickCpuBudget` lite-assembly default** — straw-man: same `true` default as full. Confirm during M2 that the lite consumer subset still produces a meaningful headroom number; flip to `false` on lite if not.
 
 ---
 

@@ -68,8 +68,8 @@ effects:
   # by 100. Use whole numbers; full volume is `100`, normal pitch `100`.
   - SOUND.ENTITY_ENDERMAN_TELEPORT.100.100.0.0.0
   - PARTICLE.PORTAL.32
-  - POTION.SLOW_FALLING.60.1.0.0.0
-  - POTION.BLINDNESS.40.1.0.0.0
+  - POTION.SLOW_FALLING.60.1.false.false.false
+  - POTION.BLINDNESS.40.1.false.false.false
 
   # --- SOUND catalog (TYPE.VOLUME.PITCH.DX.DY.DZ) ---
   # VOLUME / PITCH are integer percent (0..100). `100` == 1.0 (full).

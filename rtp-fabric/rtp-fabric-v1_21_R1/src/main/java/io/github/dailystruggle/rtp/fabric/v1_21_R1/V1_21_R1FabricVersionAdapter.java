@@ -22,25 +22,35 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.tags.TagKey;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 
 /**
- * MC 1.21.0–1.21.4 implementation of {@link FabricVersionAdapter} — the reference
+ * MC 1.21.0â€“1.21.4 implementation of {@link FabricVersionAdapter} â€” the reference
  * implementation per rtp-fabric-ADR-001.
  *
  * <p><b>Scope:</b> this adapter targets the {@code DistanceManager} API as
- * it existed before the 1.21.5 refactor — i.e. the 4-arg
+ * it existed before the 1.21.5 refactor â€” i.e. the 4-arg
  * {@code addRegionTicket(TicketType, ChunkPos, int, T)} /
  * {@code removeRegionTicket(...)} pair. From 1.21.5 onward Mojang replaced
  * that pair with {@code addTicket(long, Ticket)} on a value-object
  * {@code Ticket}; routing for 1.21.5+ goes to
- * {@code v1_21_R5} instead — see {@code rtp-fabric-ADR-004}.</p>
+ * {@code v1_21_R5} instead â€” see {@code rtp-fabric-ADR-004}.</p>
  *
  * <p>v1_20_R1 and v26_1_R1 will port from this class. Notable per-version
  * concerns this implementation captures:</p>
@@ -83,6 +93,65 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
         }
     }
 
+    /**
+     * Typed block-tag snapshot for MC 1.21.0–1.21.4. Walks
+     * {@link BuiltInRegistries#BLOCK} directly via Loom-mapped types — no
+     * reflection — and inverts each block's
+     * {@link Block#builtInRegistryHolder()}.{@code tags()} stream into the
+     * {@code namespace:path -> upper-case "namespace:path"} multimap shape
+     * documented on {@link FabricVersionAdapter#snapshotBlockTags()} and
+     * {@link io.github.dailystruggle.rtp.api.server.RTPServerAccessor#blockTagSnapshot()}.
+     *
+     * <p>Returning an empty map (rather than {@code null}) is intentional when
+     * the registry is reachable but tag bindings haven't been attached yet —
+     * caller preserves {@code #tag} tokens for a later retry rather than
+     * falling back to the reflective walk, which would yield the same empty
+     * result for the same reason.
+     */
+    @Override
+    public @Nullable Map<String, Set<String>> snapshotBlockTags() {
+        try {
+            Map<String, Set<String>> out = new HashMap<>();
+            for (Block block : BuiltInRegistries.BLOCK) {
+                ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(block);
+                if (blockId == null) continue;
+                String materialName = blockId.toString().toUpperCase();
+                Holder.Reference<Block> holder;
+                try {
+                    holder = block.builtInRegistryHolder();
+                } catch (Throwable t) {
+                    continue;
+                }
+                if (holder == null) continue;
+                java.util.stream.Stream<TagKey<Block>> tagStream;
+                try {
+                    tagStream = holder.tags();
+                } catch (Throwable t) {
+                    continue;
+                }
+                if (tagStream == null) continue;
+                java.util.Iterator<TagKey<Block>> it = tagStream.iterator();
+                while (it.hasNext()) {
+                    TagKey<Block> tagKey = it.next();
+                    if (tagKey == null) continue;
+                    ResourceLocation tagId = tagKey.location();
+                    if (tagId == null) continue;
+                    String key = tagId.getNamespace() + ":" + tagId.getPath();
+                    out.computeIfAbsent(key, k -> new HashSet<>()).add(materialName);
+                }
+            }
+            Map<String, Set<String>> immutable = new HashMap<>(out.size());
+            for (Map.Entry<String, Set<String>> e : out.entrySet()) {
+                immutable.put(e.getKey(), Collections.unmodifiableSet(e.getValue()));
+            }
+            return Collections.unmodifiableMap(immutable);
+        } catch (Throwable t) {
+            // Hard failure (linkage, registry torn down) — fall back to the
+            // reflective walk in FabricServerAccessor by returning null.
+            return null;
+        }
+    }
+
     @Override
     public CompletableFuture<RTPChunkHandle> getChunkFull(RTPLevelHandle level, int cx, int cz) {
         if (level == null) {
@@ -108,7 +177,7 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
     }
 
     // -------------------------------------------------------------------------
-    // Non-blocking chunk-future dispatch — see rtp-fabric-ADR-008.
+    // Non-blocking chunk-future dispatch â€” see rtp-fabric-ADR-008.
     // Structurally resolves ServerChunkCache#getChunkFuture(int, int,
     // ChunkStatus, boolean) so it works under both Mojmap and Fabric
     // intermediary mappings on 1.21.x.
@@ -156,10 +225,10 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
             ServerChunkCache cache = sl.getChunkSource();
             Method getter = resolveGetChunkFutureMethod(cache);
 
-            // Temporary load-ticket — see V1_20_R1FabricVersionAdapter#requestFullChunkAsync
+            // Temporary load-ticket â€” see V1_20_R1FabricVersionAdapter#requestFullChunkAsync
             // for the rationale (without an explicit ticket the chunk holder
             // sits at a level too high for FULL-status generation, so the
-            // future resolves to Either.right(ChunkLoadingFailure) → null).
+            // future resolves to Either.right(ChunkLoadingFailure) â†’ null).
             ChunkPos cp = new ChunkPos(cx, cz);
             boolean ticketAdded = false;
             try {
@@ -222,14 +291,14 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
     }
 
     // -------------------------------------------------------------------------
-    // Non-persistent chunk-ticket support — see FabricVersionAdapter Javadoc.
+    // Non-persistent chunk-ticket support â€” see FabricVersionAdapter Javadoc.
     //
     // We allocate a process-wide non-persistent TicketType ("rtp") and hand
     // it to DistanceManager#addRegionTicket. {@code TicketType.create(name,
     // comparator, /*timeout*/ 0)} produces a non-persistent type (the
     // PERSISTENT set in TicketType is opt-in via the deprecated
     // {@code #createPersistent} factory; the public {@code #create} factory
-    // never marks the type as such). Timeout 0 means "no auto-expiry —
+    // never marks the type as such). Timeout 0 means "no auto-expiry â€”
     // lives until removeRegionTicket is called", matching Bukkit's
     // addPluginChunkTicket lifetime contract.
     //
@@ -282,7 +351,7 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
      * distance and resolves to effective level {@code 30} = {@code ENTITY_TICKING},
      * the same end state Bukkit's {@code World#addPluginChunkTicket} produces.
      * Earlier revisions of this adapter passed {@code 31} into this slot under
-     * the mistaken belief it was the ticket level — that yielded effective
+     * the mistaken belief it was the ticket level â€” that yielded effective
      * level {@code 2} which the chunk system clamps/rejects, leaving kept-cache
      * entries unpinned and silently evicted. See
      * {@code rtp-fabric-ADR-006-ticket-radius-and-non-expiring-type.md}.</p>
@@ -295,7 +364,7 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
         synchronized (V1_21_R1FabricVersionAdapter.class) {
             t = RTP_TICKET_TYPE;
             if (t != null) return t;
-            // create(name, comparator, timeout) — non-persistent variant.
+            // create(name, comparator, timeout) â€” non-persistent variant.
             t = TicketType.create("rtp", Comparator.comparingLong(ChunkPos::toLong), 0);
             RTP_TICKET_TYPE = t;
             return t;
@@ -305,7 +374,7 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
     /**
      * Resolve a structural accessor (method or field) for the
      * {@link DistanceManager} on the given {@link ServerChunkCache}. Returns
-     * {@code null} when only a field accessor was found — in that case
+     * {@code null} when only a field accessor was found â€” in that case
      * {@link #GET_DISTANCE_MANAGER_FIELD} is populated as a side effect.
      */
     private static Method resolveDistanceManagerGetter(ServerChunkCache cache) throws ReflectiveOperationException {
@@ -354,7 +423,7 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
             // become e.g. `method_17290`).
             Class<?> dmClass = dm.getClass();
             // Signature-based scan. The 4th parameter is generic `T` which erases to Object,
-            // but some toolchains may surface it as the bound type — accept any reference type.
+            // but some toolchains may surface it as the bound type â€” accept any reference type.
             Method add = null;
             Method remove = null;
             for (Class<?> c = dmClass; c != null && (add == null || remove == null); c = c.getSuperclass()) {
@@ -380,7 +449,7 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
             }
             // Fallback: if name-based discrimination failed (e.g. obfuscated names like
             // method_17290 / method_17291), pick the two matching-signature methods in
-            // declaration order — addRegionTicket is declared before removeRegionTicket
+            // declaration order â€” addRegionTicket is declared before removeRegionTicket
             // in DistanceManager on 1.21.1.
             if (add == null || remove == null) {
                 java.util.List<Method> candidates = new java.util.ArrayList<>();
@@ -410,7 +479,7 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
             // Final fallback: relax parameter-type checks. Accept any 4-arg void
             // method declared on DistanceManager (or a superclass) where param[2]
             // is `int` and the other three are reference types. This survives
-            // remapped/reloaded TicketType/ChunkPos classes — at this point we
+            // remapped/reloaded TicketType/ChunkPos classes â€” at this point we
             // trust the structural shape because DistanceManager only declares
             // two such methods (the add/remove pair).
             if (add == null || remove == null) {
@@ -522,6 +591,84 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
                     "[RTP][Fabric 1.21.1] releaseTicket failed for chunk=(" + cx + "," + cz + "): "
                             + t.getClass().getSimpleName() + ": " + t.getMessage());
             return CompletableFuture.failedFuture(t);
+        }
+    }
+
+    /**
+     * Typed intermediary implementation of
+     * {@link io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter#extractPlayerFromConnection}.
+     * Pre-26 intermediary mappings expose the player as the public field
+     * {@code player} (mojmap field name preserved by Fabric intermediary even
+     * when the {@code getPlayer()} method name is obfuscated to {@code method_xxxxx}).
+     * No reflection.
+     */
+    @Override
+    public Object extractPlayerFromConnection(Object handler) {
+        if (!(handler instanceof ServerGamePacketListenerImpl impl)) return null;
+        return impl.player;
+    }
+
+    /**
+     * Implementation of {@link io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter#getPlayerUUID}.
+     * Typed call to {@code ServerPlayer.getUUID()}; Loom remaps the descriptor
+     * to intermediary {@code method_5667} at compile time.
+     */
+    @Override
+    public java.util.UUID getPlayerUUID(Object player) {
+        if (!(player instanceof ServerPlayer sp)) return null;
+        return sp.getUUID();
+    }
+
+    /**
+     * Implementation of {@link io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter#resolveSenderUuid}.
+     * Typed CommandSourceStack#getEntity() + Entity#getUUID() dispatch; Loom remaps
+     * the descriptors to intermediary class_2168/class_1297/method_5667 at compile time.
+     * Returns null for non-player sources (console / command block); the bridge
+     * interprets that as the RTPAPI.serverId sentinel.
+     */
+    @Override
+    public java.util.UUID resolveSenderUuid(Object src) {
+        if (!(src instanceof CommandSourceStack css)) return null;
+        Entity entity = css.getEntity();
+        if (!(entity instanceof ServerPlayer sp)) return null;
+        return sp.getUUID();
+    }
+
+    /**
+     * Typed override â€” direct {@code MinecraftServer.getCommands().performPrefixedCommand(
+     * server.createCommandSourceStack(), command)}. Loom remaps the descriptors
+     * to intermediary {@code class_3176#method_3734} / {@code method_3739} at
+     * compile time, eliminating the reflective {@code getMethod("getCommands")}
+     * lookup in {@code FabricServerAccessor.FabricConsoleSender#performCommand}
+     * which fails with {@code NoSuchMethodException} on intermediary 1.20.x /
+     * 1.21.x runtimes.
+     */
+    @Override
+    public boolean dispatchConsoleCommand(Object server, String command) {
+        if (!(server instanceof net.minecraft.server.MinecraftServer s) || command == null) return false;
+        s.getCommands().performPrefixedCommand(s.createCommandSourceStack(), command);
+        return true;
+    }
+
+    /**
+     * Per-version typed factory for the common {@code FabricRTPPlayer} wrapper.
+     * Compiled against intermediary mappings via Loom so the {@code ServerPlayer}
+     * cast and the {@code FabricRTPPlayer} constructor reference resolve to the
+     * correct runtime descriptors. Replaces the name+arity reflective
+     * {@code registerPlayer(...)} lookup that used to live in
+     * {@code FabricServerAccessor.registerPlayerObject}.
+     */
+    @Override
+    public io.github.dailystruggle.rtp.api.entity.RTPPlayer createPlayer(Object serverPlayer) {
+        if (!(serverPlayer instanceof ServerPlayer sp)) return null;
+        return new io.github.dailystruggle.rtp.fabric.player.FabricRTPPlayer(sp);
+    }
+
+    @Override
+    public void rebindPlayer(io.github.dailystruggle.rtp.api.entity.RTPPlayer existing, Object serverPlayer) {
+        if (existing instanceof io.github.dailystruggle.rtp.fabric.player.FabricRTPPlayer fp
+                && serverPlayer instanceof ServerPlayer sp) {
+            fp.rebind(sp);
         }
     }
 }

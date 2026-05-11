@@ -1,23 +1,15 @@
 package io.github.dailystruggle.rtp.fabric;
 
 import io.github.dailystruggle.commandsapi.brigadier.BrigadierBridgeContext;
-import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.fabric.commands.RTPCmdFabric;
 import io.github.dailystruggle.rtp.fabric.commands.RTPCmdFabricRoot;
 import io.github.dailystruggle.rtp.fabric.database.FabricDatabaseHandler;
 import io.github.dailystruggle.rtp.fabric.events.FabricEventBridge;
 import io.github.dailystruggle.rtp.fabric.server.FabricServerAccessor;
-import io.github.dailystruggle.rtp.fabric.tools.FabricLegacyText;
 import io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter;
 import io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry;
 import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.protocol.game.ClientboundSystemChatPacket;
-import net.minecraft.server.level.ServerPlayer;
 
 import java.util.UUID;
 import java.util.logging.Level;
@@ -55,6 +47,23 @@ public final class RTPFabricMod implements ModInitializer {
         // commands-api Brigadier adapter.
         try {
             // ----------------------------------------------------------------
+            // effects-api LogSink wiring. effects-api lives below rtp-core in
+            // the module graph and cannot import RTP.log directly, so it
+            // exposes a static LogSink SPI; we adapt it here so all
+            // FINER-level diagnostics from FabricEffectRuntime / FabricSoundEffect
+            // / FabricParticleEffect / FabricRegistryCompat / FabricValueCoercer
+            // route through RTP.log instead of System.err. This eliminates the
+            // raw "[STDERR]" lines (and their Windows-console em-dash mojibake)
+            // that previously appeared at INFO regardless of log-level config.
+            // ----------------------------------------------------------------
+            try {
+                io.github.dailystruggle.effectsapi.fabric.FabricEffectRuntime
+                        .setLogSink(RTP::log);
+            } catch (NoClassDefFoundError ignored) {
+                // effects-api stripped (rtp-lite assembly) — nothing to wire.
+            }
+
+            // ----------------------------------------------------------------
             // rtp-fabric-ADR-001 — Fabric multiversion: select the per-MC version adapter
             // FIRST, before anything in rtp-fabric-common touches a
             // version-volatile call site. Reflective instantiation ensures a
@@ -91,12 +100,20 @@ public final class RTPFabricMod implements ModInitializer {
             // RTPBukkitPlugin.onEnable. Selects the DatabaseAccessor from
             // configs (sqlite default, h2/mysql/postgresql/yaml supported)
             // and schedules databaseAccessor.startup() via RTP.scheduler.
-            try {
-                FabricDatabaseHandler.setupDatabase(rtp);
-            } catch (java.nio.file.FileSystemException fse) {
-                RTP.log(Level.SEVERE,
-                        "[RTP] Fabric database setup failed — RTP will run without persistence.", fse);
-            }
+            //
+            // Deferred to SERVER_STARTED: setupDatabase() invokes
+            // Configs.reloadConfigs() → SafetyTokenExpander, which walks
+            // BuiltInRegistries.BLOCK to flatten #tag tokens in
+            // safety.airBlocks/unsafeBlocks. On MC 26.1+ (and arguably any
+            // version) BuiltInRegistries is not fully populated during
+            // onInitialize, so doing this work pre-start either yields an
+            // empty tag snapshot or — on deobfuscated runtimes — fails JVM
+            // verification on intermediary aliases. Running it from
+            // SERVER_STARTED guarantees the registry is live, so #tag
+            // expansion succeeds on the first pass without retry storms.
+            // Bukkit doesn't have this problem because onEnable() fires
+            // after the server is fully constructed and registries are
+            // populated.
 
             new FabricEventBridge(accessor).register();
 
@@ -124,11 +141,54 @@ public final class RTPFabricMod implements ModInitializer {
             // in the same JVM (singleplayer world reload) doesn't keep a
             // dangling reference to a torn-down server.
             // ----------------------------------------------------------------
+            final RTP rtpForStart = rtp;
             net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
                     .SERVER_STARTED.register(server -> {
+                        // Database + Configs (incl. SafetyTokenExpander #tag
+                        // flattening) deferred from onInitialize so it runs
+                        // against a fully-populated BuiltInRegistries. See
+                        // the comment block at the setupDatabase call site
+                        // earlier in onInitialize for rationale.
                         try {
-                            io.github.dailystruggle.rtp.fabric.effects.FabricEffectsHandler
-                                    .setupEffects(server);
+                            FabricDatabaseHandler.setupDatabase(rtpForStart);
+                        } catch (java.nio.file.FileSystemException fse) {
+                            RTP.log(Level.SEVERE,
+                                    "[RTP] Fabric database setup failed — RTP will run without persistence.", fse);
+                        } catch (Throwable t) {
+                            RTP.log(Level.SEVERE,
+                                    "[RTP] Fabric database setup failed: "
+                                            + t.getClass().getSimpleName() + ": " + t.getMessage(), t);
+                        }
+                        try {
+                            // Give the per-version adapter first crack at effects
+                            // wiring — on deobfuscated 26.1.x the default obf path
+                            // (FabricEffectsHandler.setupEffects → FabricEffectRuntime
+                            // .bindServer) raises NoClassDefFoundError on link due
+                            // to intermediary aliases (class_3222, class_2596, ...)
+                            // in its constant pool, so effects never set up. The
+                            // 26.1 adapter routes the same setup through the unobf
+                            // carrier (FabricEffectsHandlerUnobf), whose bytecode
+                            // names Mojang names natively. See V26_1_R1FabricVersion-
+                            // Adapter#installEffectsWiring and effects-api-ADR-006.
+                            // Pre-26 adapters return false (default) and we fall
+                            // through to the obf carrier unchanged.
+                            boolean handled = false;
+                            try {
+                                io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter =
+                                        io.github.dailystruggle.rtp.fabric.version
+                                                .FabricVersionAdapterRegistry.peek();
+                                if (adapter != null) {
+                                    handled = adapter.installEffectsWiring(server);
+                                }
+                            } catch (Throwable t) {
+                                RTP.log(Level.WARNING,
+                                        "[RTP] Fabric effects wiring (adapter override) failed: "
+                                                + t.getClass().getSimpleName() + ": " + t.getMessage());
+                            }
+                            if (!handled) {
+                                io.github.dailystruggle.rtp.fabric.effects.FabricEffectsHandler
+                                        .setupEffects(server);
+                            }
                         } catch (Throwable t) {
                             RTP.log(Level.WARNING,
                                     "[RTP] Fabric effects wiring failed: "
@@ -161,7 +221,31 @@ public final class RTPFabricMod implements ModInitializer {
                     .teleportPostActions.add(task -> {
                 try {
                     if (task == null || task.player() == null) return;
-                    if (!(task.player() instanceof io.github.dailystruggle.rtp.fabric.player.FabricRTPPlayer fp)) {
+                    final io.github.dailystruggle.rtp.api.entity.RTPPlayer rtpPlayer = task.player();
+
+                    // Duck-type on sendTitle/sendActionbar rather than instanceof
+                    // FabricRTPPlayer. Reason: per-MC adapter modules (e.g.
+                    // V26_1_R1FabricRTPPlayer compiled under unobf Loom for the
+                    // deobf MC 26.1.x runtime) implement RTPPlayer directly and
+                    // do NOT extend the intermediary FabricRTPPlayer — so a
+                    // FabricRTPPlayer instanceof check silently drops every
+                    // post-teleport title/subtitle/actionbar on 26.1.x.
+                    // Reflective dispatch keeps this hook adapter-agnostic for
+                    // future per-version players too.
+                    final java.lang.reflect.Method sendTitleM;
+                    final java.lang.reflect.Method sendActionbarM;
+                    try {
+                        sendTitleM = rtpPlayer.getClass().getMethod(
+                                "sendTitle", String.class, String.class,
+                                int.class, int.class, int.class);
+                        sendActionbarM = rtpPlayer.getClass().getMethod(
+                                "sendActionbar", String.class);
+                    } catch (NoSuchMethodException nsme) {
+                        // RTPPlayer implementation doesn't expose the Fabric
+                        // title/actionbar sinks — silently skip (matches the
+                        // pre-2026-05 behaviour for non-Fabric players, e.g.
+                        // a console-driven /rtp where task.player() is a
+                        // DetachedClone).
                         return;
                     }
 
@@ -194,8 +278,14 @@ public final class RTPFabricMod implements ModInitializer {
                     }
 
                     RTP.scheduler.runTask(() -> {
-                        fp.sendTitle(title, subtitle, fadeIn, stay, fadeOut);
-                        fp.sendActionbar(actionbar);
+                        try {
+                            sendTitleM.invoke(rtpPlayer, title, subtitle, fadeIn, stay, fadeOut);
+                            sendActionbarM.invoke(rtpPlayer, actionbar);
+                        } catch (ReflectiveOperationException roe) {
+                            RTP.log(Level.WARNING,
+                                    "[RTP] Fabric post-teleport title dispatch (reflective invoke) failed: "
+                                            + roe.getClass().getSimpleName() + ": " + roe.getMessage());
+                        }
                     });
                 } catch (Throwable t) {
                     RTP.log(Level.WARNING,
@@ -338,11 +428,28 @@ public final class RTPFabricMod implements ModInitializer {
             // RTPCmdFabricRoot Javadoc for the parity TODO checklist.
             // ----------------------------------------------------------------
             RTPCmdFabricRoot root = new RTPCmdFabricRoot();
+            // Register the `rtp test` runtime self-test subtree on Fabric.
+            // We use the platform-neutral TestCmd directly (NOT BukkitTestCmd)
+            // because four of its subcommands hard-import org.bukkit.* /
+            // commandsapi.bukkit.* / rtp.spigot.* and would NoClassDefFoundError
+            // on a Fabric runtime. See TestCmd Javadoc for the constructor
+            // split rationale; this path covers the Step G2 follow-up flagged
+            // in MULTI_PLATFORM_PLAN.md and the RTPCmdFabricRoot Javadoc.
+            try {
+                root.addSubCommand(
+                        new io.github.dailystruggle.rtp.bukkit.commands.test.TestCmd(root));
+            } catch (Throwable t) {
+                // S-004: never silently swallow. Log and continue — losing
+                // `rtp test` on Fabric must not abort the whole mod init.
+                RTP.log(Level.WARNING,
+                        "[RTP][fabric] failed to register `rtp test` subtree: "
+                                + t.getMessage(), t);
+            }
             RTP.baseCommand = root;
 
-            BrigadierBridgeContext<CommandSourceStack> bridgeCtx =
+            BrigadierBridgeContext<Object> bridgeCtx =
                     new BrigadierBridgeContext<>(
-                            RTPFabricMod::resolveSenderUuid,
+                            io.github.dailystruggle.rtp.fabric.tools.FabricBrigadierSourceBridge::resolveSenderUuid,
                             // Permission gating: defer to RTP.serverAccessor.getSender(uuid)
                             // .hasPermission(perm), which on Fabric routes through
                             // FabricRTPPlayer.hasPermission — that consults
@@ -356,31 +463,36 @@ public final class RTPFabricMod implements ModInitializer {
                             // Non-player sources (console / command blocks / serverId
                             // sentinel) are treated as fully privileged — same as Bukkit
                             // ConsoleCommandSender.hasPermission() returning true.
-                            RTPFabricMod::checkBrigadierPermission,
+                            io.github.dailystruggle.rtp.fabric.tools.FabricBrigadierSourceBridge::checkPermission,
                             (src, msg) -> {
                                 if (msg == null) return;
-                                // Route through FabricLegacyText so &-codes / #RRGGBB
-                                // hex / placeholders pre-resolved upstream render with
-                                // colour and don't show as raw "&c[...]" to the player
-                                // (parity with FabricRTPPlayer.sendMessage path).
-                                //
-                                // NOTE: We deliberately avoid CommandSourceStack#sendSystemMessage —
-                                // ServerPlayer#sendSystemMessage(Component) (intermediary
-                                // class_3222.method_43496) drifts across MC patch releases
-                                // (NoSuchMethodError on 1.21.11, same family as the
-                                // hasPermission(int) drift). Send the system chat packet
-                                // directly through the player's network connection where
-                                // we have one; for non-player sources fall back to the
-                                // CommandSourceStack#sendSuccess path which goes through
-                                // a different, stable mapping.
-                                Component component = FabricLegacyText.parse(msg);
+                                // Delegate to FabricServerAccessor.sendMessage, which routes
+                                // through FabricRTPPlayer.sendMessage — the canonical
+                                // NM-touching chat path in rtp-fabric-common. Keeping the
+                                // entrypoint class free of net.minecraft.network.chat /
+                                // net.minecraft.network.protocol references avoids JVM
+                                // class-verification failures on MC versions where the
+                                // intermediary names for those types (e.g. class_2596 =
+                                // Packet) are not exposed on the runtime classpath
+                                // (rtp-fabric-ADR-002, rtp-fabric-ADR-007). The 26.1
+                                // deobfuscated release was the first to surface this as
+                                // a hard NoClassDefFoundError on entrypoint load.
                                 try {
-                                    if (src.getEntity() instanceof ServerPlayer p && p.connection != null) {
-                                        p.connection.send(new ClientboundSystemChatPacket(component, false));
+                                    UUID uuid = io.github.dailystruggle.rtp.fabric.tools.FabricBrigadierSourceBridge.resolveSenderUuid(src);
+                                    if (uuid != null && !uuid.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+                                        // Player source — formats placeholders + legacy
+                                        // colour codes and dispatches through the player's
+                                        // RTPCommandSender. tag is reserved for future
+                                        // styled-tag wrapping; null is the documented
+                                        // "no tag" value (see FabricServerAccessor#sendMessage).
+                                        RTP.serverAccessor.sendMessage(uuid, msg, null);
                                     } else {
-                                        // Console / command-block source — sendSuccess is
-                                        // stable and shows in the server log.
-                                        src.sendSuccess(() -> component, false);
+                                        // Console / command-block / serverId sentinel:
+                                        // route through RTP.log so the message lands in
+                                        // the server console with colour codes preserved
+                                        // (RTPServerAccessor.log path), matching the prior
+                                        // CommandSourceStack#sendSuccess behaviour.
+                                        RTP.log(Level.INFO, msg);
                                     }
                                 } catch (Throwable t) {
                                     RTP.log(Level.WARNING,
@@ -390,12 +502,15 @@ public final class RTPFabricMod implements ModInitializer {
                                         "[RTP][trace] Brigadier sendMessage delivered: " + msg);
                             });
 
-            CommandRegistrationCallback.EVENT.register(
-                    (dispatcher, registry, env) -> {
-                        RTP.log(Level.INFO,
-                                "[RTP] Registering /rtp Brigadier root with dispatcher (env=" + env + ").");
-                        RTPCmdFabric.register(dispatcher, root, bridgeCtx);
-                    });
+            // Delegate the CommandRegistrationCallback registration to
+            // FabricCommandRegistrar (rtp-fabric-common). This keeps
+            // CommandBuildContext (class_7157), CommandSelection, and
+            // CommandSourceStack (class_2168) out of this entrypoint's
+            // constant pool — those intermediary names are not exposed on
+            // MC 26.1's deobfuscated runtime and would otherwise fail JVM
+            // verify on entrypoint load (rtp-fabric-ADR-002 / ADR-007).
+            io.github.dailystruggle.rtp.fabric.commands.FabricCommandRegistrar
+                    .registerRtpCommand(root, bridgeCtx);
 
             // ----------------------------------------------------------------
             // Step E3-3 — non-Folia ChunkUnloadProcessor timer.
@@ -475,81 +590,7 @@ public final class RTPFabricMod implements ModInitializer {
         }
     }
 
-    /**
-     * Bridge a Brigadier {@link CommandSourceStack} to the canonical caller UUID
-     * used by {@code commands-api} / {@code rtp-core}. Players resolve to their
-     * own UUID; non-player sources (console, command blocks) collapse to the
-     * sentinel {@link RTPAPI#serverId} — same convention as the Bukkit side.
-     */
-    private static UUID resolveSenderUuid(CommandSourceStack src) {
-        if (src.getEntity() instanceof ServerPlayer player) {
-            return player.getUUID();
-        }
-        return RTPAPI.serverId;
-    }
 
-    /**
-     * Permission predicate for the Brigadier bridge. Mirrors the Bukkit-side
-     * {@code CommandSender.hasPermission(node)} contract:
-     *
-     * <ul>
-     *   <li>Non-player sources (console, command blocks, the {@code serverId}
-     *       sentinel) bypass permission checks — Bukkit's
-     *       {@code ConsoleCommandSender.hasPermission()} is unconditionally
-     *       {@code true}, and plugin.yml's defaults are written assuming that.
-     *   </li>
-     *   <li>Player sources route through
-     *       {@code RTP.serverAccessor.getSender(uuid).hasPermission(perm)},
-     *       which on Fabric is implemented by
-     *       {@link io.github.dailystruggle.rtp.fabric.player.FabricRTPPlayer#hasPermission(String)}.
-     *       That implementation consults {@code fabric-permissions-api}
-     *       (LuckPerms-Fabric / Cyan / Ledger) first and falls back to the
-     *       vanilla op-level check (reading {@code ops.json} via stable
-     *       APIs) when no permissions implementer is registered.
-     *   </li>
-     *   <li>A {@code null} or empty {@code permission} string is treated as
-     *       "no permission required" ({@code true}), matching Bukkit's
-     *       documented behaviour for {@code commands-api} parameters that
-     *       elect not to declare a node.</li>
-     * </ul>
-     *
-     * <p>The actual default for each node (op vs. true vs. false) is owned
-     * by {@code rtp-plugin/src/main/resources/plugin.yml}; the Fabric side
-     * inherits those defaults via the op-level fallback in
-     * {@code FabricRTPPlayer.hasPermission}, so e.g. {@code rtp.reload},
-     * {@code rtp.scan}, {@code rtp.config}, {@code rtp.other}, and the
-     * {@code rtp.world*} / {@code rtp.region*} / {@code rtp.biome*} /
-     * {@code rtp.params} families default to op-only on both platforms
-     * without duplicating the table here.
-     */
-    private static boolean checkBrigadierPermission(CommandSourceStack src, String permission) {
-        if (permission == null || permission.isEmpty()) return true;
-        UUID uuid = resolveSenderUuid(src);
-        // Non-player sources collapse to RTPAPI.serverId — treat as console
-        // (full access). This also covers the early-init window where the
-        // accessor may not yet have a sender entry for the sentinel.
-        if (RTPAPI.serverId.equals(uuid)) return true;
-        try {
-            io.github.dailystruggle.rtp.api.entity.RTPCommandSender sender =
-                    RTP.serverAccessor.getSender(uuid);
-            if (sender == null) {
-                // Player source whose sender entry has not yet been bound
-                // (e.g., command issued before FabricEventBridge.onJoin
-                // wired the player). Deny rather than silently allow —
-                // matches the strict reading of plugin.yml op-only defaults.
-                return false;
-            }
-            return sender.hasPermission(permission);
-        } catch (Throwable t) {
-            // Defensive: never let a permission lookup crash command parsing.
-            // Failing closed (deny) is the safer choice for op-only nodes.
-            RTP.log(Level.WARNING,
-                    "[RTP] Brigadier permission check failed for '" + permission
-                            + "' (uuid=" + uuid + "): "
-                            + t.getClass().getSimpleName() + ": " + t.getMessage());
-            return false;
-        }
-    }
 
     /**
      * rtp-fabric-ADR-001 — classify the running MC version and reflectively instantiate

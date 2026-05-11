@@ -1,5 +1,7 @@
 package io.github.dailystruggle.effectsapi.fabric.LocalEffects;
 
+import java.util.logging.Level;
+
 import io.github.dailystruggle.effectsapi.common.Effect;
 import io.github.dailystruggle.effectsapi.fabric.FabricEffectRuntime;
 import io.github.dailystruggle.effectsapi.fabric.LocalEffects.enums.FabricParticleKeys;
@@ -25,7 +27,7 @@ public class FabricParticleEffect extends Effect<FabricParticleKeys> {
     // can prove whether FabricParticleEffect.run() is actually reached at
     // all. User-reported on 1.21.11 (2026-05-08): sound's first-run diag
     // appears, but no particle diag and no visible particles after the
-    // first teleport — which is consistent with run() never being invoked
+    // first teleport -- which is consistent with run() never being invoked
     // for particles (rather than the dispatcher silently failing).
     private static volatile boolean LOGGED_FIRST_RUN = false;
 
@@ -47,7 +49,7 @@ public class FabricParticleEffect extends Effect<FabricParticleKeys> {
         if (!LOGGED_FIRST_RUN) {
             LOGGED_FIRST_RUN = true;
             FabricEffectRuntime.ParticleDispatcher pd = FabricEffectRuntime.getParticleDispatcher();
-            System.err.println("[effects-api] [FabricParticleEffect] first run() — dispatcher="
+            FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricParticleEffect] first run() -- dispatcher="
                     + (pd == null ? "<none, will use reflective fallback>" : pd.getClass().getName())
                     + " target=" + (target == null ? "null" : target.getClass().getName())
                     + " typeData=" + (data.get(FabricParticleKeys.TYPE) == null
@@ -55,7 +57,7 @@ public class FabricParticleEffect extends Effect<FabricParticleKeys> {
                         : data.get(FabricParticleKeys.TYPE).getClass().getName() + "=" + data.get(FabricParticleKeys.TYPE)));
         }
         if (!(target instanceof ServerPlayer)) {
-            System.err.println("[effects-api] [FabricParticleEffect] skip: target is not ServerPlayer (got "
+            FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricParticleEffect] skip: target is not ServerPlayer (got "
                     + (target == null ? "null" : target.getClass().getName()) + ")");
             return;
         }
@@ -64,7 +66,7 @@ public class FabricParticleEffect extends Effect<FabricParticleKeys> {
         // Entity#level() (method_37908) was removed/renamed, and any
         // call to it from this 1.21.1-compiled bytecode throws a silent
         // NoSuchMethodError BEFORE reaching the dispatcher consultation
-        // below — which is precisely the per-version dispatcher SPI's
+        // below -- which is precisely the per-version dispatcher SPI's
         // job to bypass. Loom-mapped per-version dispatchers
         // (rtp-fabric-v*) resolve the level themselves; the level is
         // only needed for the reflective fallbacks further down.
@@ -78,11 +80,11 @@ public class FabricParticleEffect extends Effect<FabricParticleKeys> {
         } else if (typeObj instanceof ParticleType<?>) {
             // Non-simple particle types require additional config we don't have;
             // fall back to a known-safe default rather than crashing.
-            System.err.println("[effects-api] [FabricParticleEffect] non-Simple ParticleType '" + typeObj
+            FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricParticleEffect] non-Simple ParticleType '" + typeObj
                     + "' has no configured options; falling back to HAPPY_VILLAGER");
             opts = ParticleTypes.HAPPY_VILLAGER;
         } else {
-            System.err.println("[effects-api] [FabricParticleEffect] skip: TYPE is not a ParticleType (got "
+            FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricParticleEffect] skip: TYPE is not a ParticleType (got "
                     + (typeObj == null ? "null" : typeObj.getClass().getName()) + "=" + typeObj + ")");
             return;
         }
@@ -112,7 +114,7 @@ public class FabricParticleEffect extends Effect<FabricParticleKeys> {
                 // on a brand-new MC patch) surfaces as a log line and
                 // falls back to the reflective path, instead of
                 // propagating uncaught and silently aborting dispatch.
-                System.err.println("[effects-api] [FabricParticleEffect] registered ParticleDispatcher threw "
+                FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricParticleEffect] registered ParticleDispatcher threw "
                         + e.getClass().getSimpleName() + ": " + e.getMessage()
                         + "; falling back to reflective dispatch");
             }
@@ -133,7 +135,7 @@ public class FabricParticleEffect extends Effect<FabricParticleKeys> {
         try {
             level = (ServerLevel) player.level();
         } catch (NoSuchMethodError | ClassCastException e) {
-            System.err.println("[effects-api] [FabricParticleEffect] reflective fallback skipped: "
+            FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricParticleEffect] reflective fallback skipped: "
                     + e.getClass().getSimpleName() + ": " + e.getMessage());
             return;
         }
@@ -188,11 +190,11 @@ public class FabricParticleEffect extends Effect<FabricParticleKeys> {
                     SEND_PARTICLES_TARGETED_BOOL_PREFIX = boolPrefix;
                     SEND_PARTICLES_TARGETED_RESOLVED = true;
                     if (found == null) {
-                        System.err.println("[effects-api] [FabricParticleEffect] no targeted sendParticles"
+                        FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricParticleEffect] no targeted sendParticles"
                                 + " (ServerPlayer,ParticleOptions,[bool[,bool]],xyz,count,4d) on "
                                 + ServerLevel.class.getName() + "; falling back to broadcast");
                     } else {
-                        System.err.println("[effects-api] [FabricParticleEffect] resolved targeted sendParticles: "
+                        FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricParticleEffect] resolved targeted sendParticles: "
                                 + found.getName() + " arity=" + found.getParameterCount()
                                 + " boolPrefix=" + boolPrefix);
                     }
@@ -220,7 +222,7 @@ public class FabricParticleEffect extends Effect<FabricParticleKeys> {
             }
             return true;
         } catch (ReflectiveOperationException e) {
-            System.err.println("[effects-api] [FabricParticleEffect] targeted sendParticles invoke failed via "
+            FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricParticleEffect] targeted sendParticles invoke failed via "
                     + m.getName() + ": " + (e.getCause() != null ? e.getCause() : e));
             return false;
         }
@@ -287,10 +289,10 @@ public class FabricParticleEffect extends Effect<FabricParticleKeys> {
                     }
                     avail.append(")->").append(m.getReturnType().getSimpleName()).append("; ");
                 }
-                System.err.println("[effects-api] [FabricParticleEffect] no sendParticles overload matched on "
+                FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricParticleEffect] no sendParticles overload matched on "
                         + ServerLevel.class.getName() + "; ParticleOptions-bearing candidates: " + avail);
             } else {
-                System.err.println("[effects-api] [FabricParticleEffect] resolved sendParticles: "
+                FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricParticleEffect] resolved sendParticles: "
                         + found.getName() + " arity=" + found.getParameterCount()
                         + " boolPrefix=" + boolPrefix);
             }
@@ -303,7 +305,7 @@ public class FabricParticleEffect extends Effect<FabricParticleKeys> {
         resolveSendParticles();
         Method m = SEND_PARTICLES;
         if (m == null) {
-            System.err.println("[effects-api] [FabricParticleEffect] cannot send '" + opts
+            FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricParticleEffect] cannot send '" + opts
                     + "': no resolved sendParticles overload (see resolveSendParticles diagnostic above)");
             return;
         }
@@ -324,7 +326,7 @@ public class FabricParticleEffect extends Effect<FabricParticleKeys> {
         } catch (ReflectiveOperationException e) {
             // Particles are cosmetic; never break teleport. Log once with full
             // context so the operator can see why a resolved overload refused.
-            System.err.println("[effects-api] [FabricParticleEffect] sendParticles invoke failed via "
+            FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricParticleEffect] sendParticles invoke failed via "
                     + m.getName() + " arity=" + m.getParameterCount()
                     + " boolPrefix=" + SEND_PARTICLES_BOOL_PREFIX
                     + ": " + (e.getCause() != null ? e.getCause() : e));

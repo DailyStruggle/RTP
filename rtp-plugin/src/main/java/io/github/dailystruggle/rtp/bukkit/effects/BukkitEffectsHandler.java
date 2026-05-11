@@ -5,7 +5,6 @@ import io.github.dailystruggle.effectsapi.common.Effect;
 import io.github.dailystruggle.effectsapi.common.EffectFactory;
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import io.github.dailystruggle.rtp.bukkit.events.*;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -20,6 +19,7 @@ import io.github.dailystruggle.rtp.effects.EffectsResolver;
 import io.github.dailystruggle.rtp.spigot.tools.SendMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.permissions.PermissionAttachmentInfo;
 
 import java.util.ArrayList;
@@ -69,7 +69,7 @@ public class BukkitEffectsHandler {
      * {@code BukkitEffectsInitializer.runEffect} which already routes to the
      * main thread.
      */
-    private static void dispatchEffects(RTPBukkitPlugin plugin, String prefix, Player player) {
+    private static void dispatchEffects(JavaPlugin plugin, String prefix, Player player) {
         // 1) Convert permission-attachment infos to flat node strings (the same
         //    transformation BukkitEffectsInitializer.buildEffects(prefix, perms)
         //    performs internally).
@@ -113,7 +113,7 @@ public class BukkitEffectsHandler {
         return (dot >= 0 && dot < prefix.length() - 1) ? prefix.substring(dot + 1) : prefix;
     }
 
-    public static void setupEffects(RTPBukkitPlugin plugin) {
+    public static void setupEffects(JavaPlugin plugin) {
         // Per effects-api-ADR-003: EffectFactory no longer registers Bukkit
         // effects in a static block — the platform initializer must be invoked
         // explicitly. Idempotent.

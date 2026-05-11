@@ -1,5 +1,7 @@
 package io.github.dailystruggle.effectsapi.fabric;
 
+import java.util.logging.Level;
+
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceLocation;
 
@@ -55,7 +57,7 @@ public final class FabricRegistryCompat {
                         try {
                             return (T) holder.getClass().getMethod("value").invoke(holder);
                         } catch (Throwable t) {
-                            System.err.println("[effects-api] [FabricRegistryCompat] "
+                            FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricRegistryCompat] "
                                     + "Holder.value() failed for key=" + key + " on "
                                     + registry.getClass().getName() + ": " + t);
                             return null;
@@ -68,7 +70,7 @@ public final class FabricRegistryCompat {
                     return null;
             }
         } catch (Throwable t) {
-            System.err.println("[effects-api] [FabricRegistryCompat] resolve("
+            FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricRegistryCompat] resolve("
                     + registry.getClass().getSimpleName() + ", " + key
                     + ") threw via shape=" + r.shape + ": " + t);
             return null;
@@ -98,7 +100,7 @@ public final class FabricRegistryCompat {
 
         // Fallback: scan by signature instead of by name. On a production
         // Fabric server with intermediary mappings (the common case), the
-        // Mojmap method names "getValue" / "get" do NOT exist at runtime —
+        // Mojmap method names "getValue" / "get" do NOT exist at runtime --
         // Loom only remaps method *references* in bytecode, not the string
         // literals passed to reflection / MethodHandles. So a name-based
         // findVirtual misses on a real server, but the *signature*
@@ -140,10 +142,10 @@ public final class FabricRegistryCompat {
                 return new Resolved(Shape.OPTIONAL_HOLDER, lookup.unreflect(opt));
             } catch (Throwable ignored) { /* fall through */ }
         }
-        // No method bound — log loudly so the operator can see why every
+        // No method bound -- log loudly so the operator can see why every
         // sound/particle/potion token resolves to null (cosmetic effects
         // would otherwise silently no-op).
-        System.err.println("[effects-api] [FabricRegistryCompat] no "
+        FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricRegistryCompat] no "
                 + "(ResourceLocation -> T) getter found on " + registryClass.getName()
                 + "; available 1-arg public methods: " + describeOneArgMethods(registryClass));
         return new Resolved(Shape.NONE, null);
