@@ -101,8 +101,6 @@ flowchart LR
     Root --> AddonsDir["addons/<br/>(depend on rtp-api)"]
     Root --> HelpersDir["helpers/<br/>(standalone server plugins)"]
     Root --> CoreModules["rtp-core, rtp-api, ..."]
-    AddonsDir --> Glide["RTP_Glide"]
-    AddonsDir --> Iris["RTP_Iris_integration"]
     AddonsDir --> Example["RTP_ExampleAddon"]
     HelpersDir --> Saver["PeriodicWorldSaver"]
 ```

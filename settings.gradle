@@ -135,8 +135,6 @@ include 'rtp-fabric:rtp-fabric-v1_21_R11'
 // (or `org.gradle.java.installations.auto-download=true`).
 include 'rtp-fabric:rtp-fabric-v26_1_R1'
 
-//include 'addons:RTP_Iris_integration'
-include 'addons:RTP_Glide'
 include 'addons:RTP_ExampleAddon'
 
 // Standalone helper plugins (no rtp-api / rtp-core dependency).
