@@ -1,0 +1,64 @@
+// rtp-fabric-ADR-009 — Obf/unobf split of rtp-fabric-common.
+//
+// Sibling module to `rtp-fabric-common`. Compiled under unobfuscated 1.15 Loom
+// (mirroring `rtp-fabric-v26_1_R1`) so its `net.minecraft.*` constant-pool
+// entries survive on a deobf MC 26.x runtime where intermediary `class_NNNN`
+// references would fail to link.
+//
+// Hosts the version-agnostic, NM-typed surfaces consumed by deobf-MC
+// version-adapters (V26_1_R1FabricVersionAdapter, …). Per-MC submodules
+// (rtp-fabric-v26_*_R1) depend on this module via `api project(...)` so they
+// can name FabricWorldUnobf / FabricEffectsHandlerUnobf without crossing the
+// obf↔unobf line.
+//
+// Companion: effects-api/docs/adr/effects-api-ADR-006-fabric-obf-unobf-split.md.
+plugins {
+    // Loom 1.15 unobfuscated plugin ID — same as rtp-fabric-v26_1_R1.
+    // Version pinned in root settings.gradle pluginManagement.plugins {}.
+    id 'net.fabricmc.fabric-loom'
+}
+
+ext {
+    // Pin to the lowest deobf MC line that consumes this carrier so Loom
+    // resolves a usable mojmap-bytecode artifact at compile time. The
+    // bytecode is forward-compatible with later deobf 26.x lines because
+    // every consumer (rtp-fabric-v26_*_R1) ships its own pinned MC.
+    minecraftVersion       = '26.1.2'
+    loaderVersion          = '0.18.4'
+    fabricApiVersion       = '0.143.5+26.1'
+    permissionsApiVersion  = '0.3.1'
+}
+
+java {
+    toolchain {
+        // MC 26.1 ships as Java-25 bytecode; Loom must be able to read it.
+        // The compiled output of this module is Java 21-targeted via Loom's
+        // default; consumers (v26_*_R1) run on Java 25.
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraftVersion}"
+    // No `mappings` line — 26.1+ ships deobfuscated.
+    implementation "net.fabricmc:fabric-loader:${loaderVersion}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${fabricApiVersion}"
+    compileOnly "me.lucko:fabric-permissions-api:${permissionsApiVersion}"
+
+    api project(':rtp-api')
+    api project(':rtp-core')
+    api project(':commands-api')
+    api project(':rtp-anvil')
+    // Compile-only against rtp-fabric-common so the unobf carrier can reuse
+    // platform-neutral types (interfaces, base classes that don't name NM)
+    // without dragging intermediary bytecode into the unobf jar.
+    compileOnly project(':rtp-fabric:rtp-fabric-common')
+    // Compile-only against effects-api so FabricEffectsHandlerUnobf can name
+    // the unobf carrier (effectsapi.fabric_unobf.*). The unobf source set
+    // from effects-api-ADR-006 is the actual artifact consumed at runtime;
+    // see that ADR for the source-set wiring.
+    compileOnly project(':effects-api')
+    // Phase D2 — names effectsapi.fabric_unobf.FabricEffectRuntimeUnobf and
+    // effectsapi.fabric_unobf.FabricEffectsInitializer from FabricEffectsHandlerUnobf.
+    compileOnly project(':effects-api:effects-api-fabric-unobf')
+}

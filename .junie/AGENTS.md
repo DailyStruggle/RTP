@@ -216,6 +216,21 @@ To minimise time spent on unrelated fixes, record incidental discoveries instead
   - The user has explicitly broadened scope in an `<issue_update>`.
 - Otherwise: record, mention the entry in your `<UPDATE>` / submit summary, and continue.
 
+### What POTENTIAL_BUGS.md is NOT (common misuse — do not do this)
+
+`POTENTIAL_BUGS.md` is a backlog of **incidental findings the current task left unfixed**. It is **not** a worklog, scratchpad, changelog, or session-state store. Before appending, ask yourself: *"Did I notice this while doing something else, and am I deliberately walking away from it?"* If the answer is no, the entry belongs somewhere else.
+
+Do **not** use `POTENTIAL_BUGS.md` for any of the following:
+
+- **Work you are doing or just finished as part of the current `Effective Issue`.** That belongs in your `<UPDATE>` checklist, the `submit` summary, the commit message, and (if user-visible) `CHANGELOG.md` — never as a "potential bug" entry.
+- **A diary of fix attempts, build outputs, packaging chains, or follow-up resolutions on entries you yourself just authored.** If you fix it in the same session, the entry should not have been opened — delete it. If it was on disk from a prior session and you genuinely resolved it, **delete it** as well; this file does not maintain a resolved-bug archive.
+- **Durable engineering lore, repro recipes, or "things that bit me".** Those go in [`LESSONS_LEARNED.md`](../docs/dev/LESSONS_LEARNED.md).
+- **Roadmap items, planned features, or deferred design work.** Those go in the relevant plan doc (`MULTI_PLATFORM_PLAN.md`, `MULTI_SERVER_PLAN.md`, `METRICS_PLAN.md`) or an ADR.
+- **Session resumption state.** That is what the `<UPDATE>` checklist and `docs/dev/scratch/CHECKLIST-<slug>.md` are for (see *Checklist-Based State Tracking*).
+- **Test failures, build errors, or CI noise from the current change.** Fix them, defer them to the user, or document them in the submit summary — not here.
+
+A correct entry describes **someone else's future problem** that the current task is choosing not to solve. If you find yourself adding a `**Resolved:**` or `**Follow-up:**` bullet to an entry you opened in the same session, stop — that's the signature of misuse, and the entry should be removed rather than annotated.
+
 ---
 
 ## CHANGELOG Hygiene (diff against the last released tag, not the working tree)

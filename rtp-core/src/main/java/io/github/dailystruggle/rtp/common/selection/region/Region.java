@@ -373,6 +373,7 @@ public class Region extends FactoryValue<RegionKeys> {
    * @param availableTime available time in nanoseconds
    */
   public void execute(long availableTime) {
+    io.github.dailystruggle.rtp.common.tools.CfDiag.regionExecute.increment();
     // Dormant regions (configured world not yet loaded) must not attempt chunk I/O,
     // ticket validation, or cache generation — they activate via rebindWorld once
     // WorldLoadEvent delivers the configured world.
@@ -429,6 +430,7 @@ public class Region extends FactoryValue<RegionKeys> {
       int cz = coldLoc.coords().z() >> 4;
 
       getWorld().recordChunkLoadOrigin("Region.coldPromote");
+      io.github.dailystruggle.rtp.common.tools.CfDiag.regionDeficitDispatch.increment();
       getWorld().getChunkAtAsync(cx, cz).thenAccept(chunkSet -> {
         chunkSet.complete().whenComplete((success, throwable) -> {
           if (success == null || !success) {
@@ -649,6 +651,7 @@ public class Region extends FactoryValue<RegionKeys> {
               chunks.add(rtpWorld.getChunkAt(cx + dx, cz + dz));
             }
           }
+          io.github.dailystruggle.rtp.common.tools.CfDiag.chunkSetRegion.increment();
           ChunkSet synthesized = new ChunkSet(rtpWorld, cx, cz, chunks, new CompletableFuture<>());
           reservationForTask = new ChunkReservation(synthesized, rtpWorld);
         }

@@ -1,7 +1,11 @@
 package io.github.dailystruggle.rtp.fabric.version;
 
+import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
+import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -55,6 +59,36 @@ public interface FabricVersionAdapter {
      * Mojmap-name-stable even if {@code BlockPos} ever renames.
      */
     @Nullable RTPRegistryKey biomeKeyAt(RTPLevelHandle level, int x, int y, int z);
+
+    /**
+     * Snapshot of the runtime's {@code minecraft:block} tag bindings, in the
+     * {@code namespace:path -> upper-case "namespace:path"} multimap shape
+     * documented on {@link io.github.dailystruggle.rtp.api.server.RTPServerAccessor#blockTagSnapshot()}.
+     *
+     * <p>Per-version adapters compiled against Loom-mapped MC types should walk
+     * {@code BuiltInRegistries.BLOCK} directly via typed calls and invert each
+     * block's {@code builtInRegistryHolder().tags()} stream. This bypasses the
+     * fragile reflective fallback in {@code FabricServerAccessor} on every
+     * runtime where a typed adapter is registered, eliminating Mojmap /
+     * intermediary name drift across the 1.20 → 1.21.11 → 26.x window
+     * (see rtp-fabric-ADR-010).
+     *
+     * <p>Return {@code null} to signal "adapter cannot resolve — fall back".
+     * The accessor will then attempt its reflective walk. Returning an empty
+     * map is a valid result that means "registry walked successfully but
+     * yielded zero tags" (e.g. data-pack tag bindings not yet attached); the
+     * caller will preserve {@code #tag} tokens for a later retry.
+     *
+     * <p>Default implementation returns {@code null}, so adapters whose MC
+     * version exposes an unstable / intermediary-only registry surface (e.g.
+     * the deobfuscated 26.1.x stub) inherit the reflective fallback for free
+     * without forcing a half-implemented typed walk.
+     *
+     * @return a deeply-immutable snapshot, or {@code null} to fall back
+     */
+    default @Nullable Map<String, Set<String>> snapshotBlockTags() {
+        return null;
+    }
 
     // -------------------------------------------------------------------------
     // Chunk access — `ServerChunkCache#getChunk` argument semantics drift
@@ -242,5 +276,277 @@ public interface FabricVersionAdapter {
      */
     default void installEffectsDispatchers() {
         // no-op — adapters that ship Loom-compiled effect dispatchers override this.
+    }
+
+    // -------------------------------------------------------------------------
+    // Player factory — per-version registration of an RTPPlayer wrapper that
+    // owns the platform-typed ServerPlayer handle.
+    //
+    // Why this lives on the SPI: rtp-fabric-common's default FabricRTPPlayer
+    // is compiled by Loom against intermediary mappings (class_3222 et al.).
+    // On the deobfuscated MC 26.1.2 runtime those aliases do not exist, and
+    // any class-linkage operation against FabricRTPPlayer (constructor lookup,
+    // method dispatch, even MethodHandles.findConstructor) raises
+    // NoClassDefFoundError before the body executes. Per-version modules
+    // compiled against Mojang names (rtp-fabric-v26_1_R1 uses Loom's
+    // unobfuscated plugin and skips the mappings step) can ship a player
+    // wrapper whose constant pool references the correct names for that
+    // runtime.
+    //
+    // Default: returns {@code null} so the caller falls back to the legacy
+    // {@code new FabricRTPPlayer(...)} path; older adapters (1.20 / 1.21)
+    // need not override and continue to work unchanged.
+    // -------------------------------------------------------------------------
+
+    /**
+     * Construct an {@link RTPPlayer} wrapper around a platform-typed
+     * {@code ServerPlayer} handle. The {@code serverPlayer} argument is the
+     * raw NM object exactly as supplied by Fabric's connection event (or by
+     * a lazy lookup against {@code MinecraftServer.getPlayerList()}).
+     *
+     * <p>Default implementation returns {@code null}, indicating the caller
+     * should use its built-in fallback (typically {@code new FabricRTPPlayer(
+     * (ServerPlayer) serverPlayer)}). Adapters compiled for runtimes where
+     * the legacy fallback's bytecode cannot link (e.g. deobfuscated MC 26.1+)
+     * MUST override this and return a non-null wrapper.
+     */
+    default @Nullable RTPPlayer createPlayer(Object serverPlayer) {
+        return null;
+    }
+
+    /**
+     * Refresh an existing wrapper's underlying {@code ServerPlayer} handle.
+     * Mirrors {@code FabricRTPPlayer#rebind(ServerPlayer)} but Object-typed so
+     * the calling site (in {@code rtp-fabric-common}) doesn't need to name
+     * the platform type. Default no-op for adapters that don't need rebinding.
+     */
+    default void rebindPlayer(RTPPlayer existing, Object serverPlayer) {
+        // no-op — adapters that own a custom RTPPlayer impl override this.
+    }
+
+    // -------------------------------------------------------------------------
+    // World factory — same rationale as createPlayer above. The default
+    // FabricRTPWorld in rtp-fabric-common is Loom-remapped to intermediary
+    // names (class_3218 ServerLevel, class_2818 LevelChunk, ...) which do not
+    // exist on the deobfuscated MC 26.1.2 runtime. Per-version modules can
+    // ship a slim RTPWorld whose constant pool resolves cleanly.
+    //
+    // Default returns null so callers fall back to the legacy typed
+    // {@code new FabricRTPWorld((ServerLevel) level)} path; adapters for
+    // runtimes where that fails (26.1.2+) override and return a non-null
+    // wrapper.
+    // -------------------------------------------------------------------------
+
+    /**
+     * Construct an {@link RTPWorld} wrapper around a platform-typed
+     * {@code ServerLevel} handle. The {@code serverLevel} argument is the
+     * raw NM object as supplied by Fabric's world-load callback or by the
+     * server-started bootstrap walking {@code MinecraftServer#getAllLevels}.
+     *
+     * <p>Default implementation returns {@code null}, indicating the caller
+     * should use its built-in fallback (typically {@code new FabricRTPWorld(
+     * (ServerLevel) serverLevel)}). Adapters compiled for runtimes where the
+     * legacy fallback's bytecode cannot link (e.g. deobfuscated MC 26.1+)
+     * MUST override this and return a non-null wrapper.
+     */
+    default @Nullable RTPWorld<?> createWorld(Object serverLevel) {
+        return null;
+    }
+
+    // -------------------------------------------------------------------------
+    // Native worldborder factory — same per-version rationale. Common's
+    // {@code createNativeWorldBorder} is typed against {@code FabricRTPWorld}
+    // and constructs an {@code io.github.dailystruggle.rtp.common.selection
+    // .worldborder.WorldBorder} via direct {@code level.getWorldBorder()}
+    // calls. On the 26.1.2 deobf runtime that bytecode cannot link, and the
+    // {@code instanceof FabricRTPWorld} check fails for v26 wrappers anyway.
+    // Per-version modules can supply a typed border that compiles cleanly.
+    //
+    // Default returns null so the caller falls back to the legacy typed
+    // path; older 1.20/1.21 adapters need not override.
+    // -------------------------------------------------------------------------
+
+    /**
+     * Construct a native-backed {@link io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder}
+     * for the given platform-typed {@code ServerLevel} handle, or {@code null}
+     * if the adapter doesn't ship a per-version implementation. The result is
+     * cached by {@code FabricServerAccessor}; never called again for the same
+     * {@code worldName} once non-null.
+     */
+    default @Nullable io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder
+            createNativeWorldBorder(Object serverLevel) {
+        return null;
+    }
+
+    // -------------------------------------------------------------------------
+    // Server-thread / console-command typed overrides — see Phase 4 of the
+    // 26.1.2 bring-up checklist. Common-module call sites (FabricScheduler,
+    // FabricServerAccessor.isPrimaryThread, FabricConsoleSender) previously
+    // resolved MinecraftServer#getRunningThread / #getCommands /
+    // #createCommandSourceStack reflectively to dodge intermediary aliases
+    // baked in by Loom + officialMojangMappings (e.g. method_3777, method_3734)
+    // that don't exist on MC 26.1.2's deobfuscated runtime. Per-version
+    // adapters compiled against actual runtime mappings can now provide
+    // typed implementations; the common reflective path remains as a
+    // fallback for any adapter that doesn't override.
+    // -------------------------------------------------------------------------
+
+    /**
+     * Return the server's main tick thread (typed equivalent of
+     * {@code MinecraftServer#getRunningThread}). The {@code server} argument
+     * is the live {@code MinecraftServer} instance.
+     *
+     * <p>Default: {@code null} — caller falls through to its reflective lookup.
+     */
+    default @Nullable Thread getServerThread(Object server) {
+        return null;
+    }
+
+    /**
+     * Dispatch a console command on the server's primary command stack
+     * (equivalent to {@code server.getCommands().performPrefixedCommand(
+     * server.createCommandSourceStack(), command)}).
+     *
+     * <p>Return {@code true} if the adapter executed the command; {@code false}
+     * to let the caller fall back to its reflective implementation. Default
+     * returns {@code false}.
+     */
+    default boolean dispatchConsoleCommand(Object server, String command) {
+        return false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Brigadier source bridge — Phase 4 item 19c. Common's
+    // {@code FabricBrigadierSourceBridge.resolveSenderUuid} reflectively walks
+    // {@code CommandSourceStack#getEntity()} + {@code Entity#getUUID()} +
+    // simple-name match for {@code ServerPlayer}, since the typed
+    // {@code instanceof CommandSourceStack} / {@code ServerPlayer} bytecode
+    // baked by Loom + officialMojangMappings would name intermediary aliases
+    // ({@code class_2168}, {@code class_3222}) absent on MC 26.1.2's deobf
+    // runtime. Per-version adapters compiled against the live runtime
+    // mappings can supply a typed implementation; the common reflective path
+    // remains as a fallback for any adapter that doesn't override.
+    // -------------------------------------------------------------------------
+
+    /**
+     * Resolve the {@link java.util.UUID} of the player driving a Brigadier
+     * {@code CommandSourceStack}, or {@code null} when the source is not a
+     * player (console / command block / unknown). The {@code src} argument is
+     * the raw NM object as supplied by Brigadier's
+     * {@code requires()}/{@code execute()} callbacks.
+     *
+     * <p>Default: {@code null} — caller falls through to the reflective path
+     * in {@code FabricBrigadierSourceBridge}.
+     */
+    default @Nullable java.util.UUID resolveSenderUuid(Object src) {
+        return null;
+    }
+
+    // -------------------------------------------------------------------------
+    // Effects-api per-version typed wiring — Phase 5 of the 26.1.2 bring-up
+    // checklist (item 21). The default effects-api/fabric bytecode (FabricEff-
+    // ectRuntime, FabricEffectsInitializer) and the legacy v26 install path
+    // carry intermediary-leaked NM types in their constant pools (class_3222
+    // ServerPlayer, class_2596 Packet, class_1291 MobEffect, class_2400
+    // ParticleOptions, class_7923 BuiltInRegistries) which fail to link on
+    // the deobfuscated MC 26.1.2 runtime. Per-version adapters compiled
+    // against the live runtime mappings can supply typed implementations;
+    // the common path keeps its existing typed fallback for 1.20 / 1.21.
+    //
+    // All three default to {@code false}, meaning "I did not handle this —
+    // caller, please fall through to your existing typed path." Older
+    // 1.20 / 1.21 adapters therefore need not override.
+    // -------------------------------------------------------------------------
+
+    /**
+     * Install effects-api wiring (registry walk, packet sinks, mob-effect
+     * dispatch, particle dispatch) against the live {@code MinecraftServer}.
+     * The {@code server} argument is the raw NM object as supplied by Fabric's
+     * {@code SERVER_STARTED} lifecycle callback.
+     *
+     * <p>Return {@code true} if the adapter installed the wiring; {@code false}
+     * to let the caller fall back to its existing typed path
+     * ({@code FabricEffectsHandler.setupEffects(server)} →
+     * {@code FabricEffectRuntime.bindServer}). Default returns {@code false}.
+     */
+    default boolean installEffectsWiring(Object server) {
+        return false;
+    }
+
+    /**
+     * Extract the {@code ServerPlayer} from a {@code ServerGamePacketListenerImpl}
+     * (mojmap) / {@code class_3244} (intermediary) handler delivered by Fabric's
+     * {@code ServerPlayConnectionEvents$Join} / {@code Disconnect} callbacks.
+     *
+     * <p>Returned object is the live {@code ServerPlayer}, typed as {@code Object}
+     * here to keep this SPI NM-free in {@code rtp-fabric-common} (which is
+     * intermediary-typed). Callers must be prepared for {@code null} (adapter
+     * miss → S-006 fail-loud-but-survive in {@code FabricEventBridge}).
+     *
+     * <p>Default returns {@code null}. Per-version adapters compiled against
+     * the live runtime mappings should provide a typed implementation:
+     * <ul>
+     *   <li>Pre-26 (intermediary): {@code ((ServerGamePacketListenerImpl) handler).player}
+     *       — public field, stable across 1.20.x → 1.21.x.</li>
+     *   <li>v26.x (mojmap): {@code ((ServerGamePacketListenerImpl) handler).getPlayer()}
+     *       — typed method exists.</li>
+     * </ul>
+     */
+    default @Nullable Object extractPlayerFromConnection(Object handler) {
+        return null;
+    }
+
+    /**
+     * Extract the player's {@link java.util.UUID} from a {@code ServerPlayer}
+     * (mojmap) / {@code class_3222} (intermediary) instance via a typed call site.
+     *
+     * <p>Returning {@code null} signals "adapter cannot resolve" — callers
+     * (e.g. {@code FabricServerAccessor.registerPlayerObject}) must fall through
+     * with S-006 fail-loud-but-survive semantics.
+     *
+     * <p>Per-version overrides type-cast to their own {@code ServerPlayer} and
+     * call {@code getUUID()} directly; Loom remaps the method descriptor to the
+     * runtime's mapping (e.g. {@code method_5667} on intermediary 1.20/1.21.x,
+     * mojmap {@code getUUID} on 26.x) at compile time. The bridge stays
+     * NM-free in {@code rtp-fabric-common}.
+     *
+     * @param player the player object from a Fabric connection event
+     * @return the player's UUID, or {@code null} if the adapter cannot resolve it
+     */
+    default @Nullable java.util.UUID getPlayerUUID(Object player) {
+        return null;
+    }
+
+    /**
+     * Dispatch a title / subtitle splash to the given player (equivalent to
+     * sending {@code ClientboundSetTitleTextPacket} +
+     * {@code ClientboundSetSubtitleTextPacket} +
+     * {@code ClientboundSetTitlesAnimationPacket}). The {@code player}
+     * argument is the raw NM {@code ServerPlayer} object.
+     *
+     * <p>Return {@code true} if the adapter dispatched the title; {@code false}
+     * to let the caller fall back to its existing typed path. Default
+     * returns {@code false}.
+     */
+    default boolean dispatchTitle(Object player,
+                                  String title,
+                                  String subtitle,
+                                  int fadeIn,
+                                  int stay,
+                                  int fadeOut) {
+        return false;
+    }
+
+    /**
+     * Dispatch an action-bar message to the given player (equivalent to
+     * sending {@code ClientboundSetActionBarTextPacket}). The {@code player}
+     * argument is the raw NM {@code ServerPlayer} object.
+     *
+     * <p>Return {@code true} if the adapter dispatched the message;
+     * {@code false} to let the caller fall back to its existing typed path.
+     * Default returns {@code false}.
+     */
+    default boolean dispatchActionbar(Object player, String text) {
+        return false;
     }
 }

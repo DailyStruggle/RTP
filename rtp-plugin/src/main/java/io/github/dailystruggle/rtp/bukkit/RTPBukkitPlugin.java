@@ -357,6 +357,29 @@ public final class RTPBukkitPlugin extends JavaPlugin {
           "[LIFECYCLE] onDisable releaseAllChunkTickets skipped (serverAccessor null)");
     }
 
+    // Folia (and Spigot's /reload) does not unregister a plugin's permissions
+    // when the plugin instance is disabled. On re-enable Bukkit re-runs
+    // SimplePluginManager.loadPlugin, which calls addPermission(...) for every
+    // entry under plugin.yml's `permissions:` block; those calls collide with
+    // the still-registered Permission objects from the previous lifecycle and
+    // the server logs a "tried to register permission '...' but it's already
+    // registered" warning per node. Defensively remove our declared permissions
+    // here so the next enable starts from a clean slate.
+    try {
+      org.bukkit.plugin.PluginManager pm = Bukkit.getPluginManager();
+      for (org.bukkit.permissions.Permission perm : getDescription().getPermissions()) {
+        if (pm.getPermission(perm.getName()) != null) {
+          pm.removePermission(perm.getName());
+        }
+      }
+      RTP.log(java.util.logging.Level.FINER,
+          "[LIFECYCLE] onDisable unregistered declared permissions to silence Folia re-enable warnings");
+    } catch (Throwable t) {
+      RTP.log(java.util.logging.Level.FINER,
+          "[LIFECYCLE] onDisable permission cleanup skipped: "
+              + t.getClass().getSimpleName() + ": " + t.getMessage());
+    }
+
     RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onDisable EXIT -- plugin disabled");
     super.onDisable();
   }

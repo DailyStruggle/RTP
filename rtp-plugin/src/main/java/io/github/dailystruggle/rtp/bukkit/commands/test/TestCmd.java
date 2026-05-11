@@ -18,22 +18,30 @@ import org.jetbrains.annotations.Nullable;
  * Parent node for the {@code rtp test …} runtime test suite.
  *
  * <p>See {@code docs/dev/RUNTIME_TEST_SUITE_PLAN.md} for the full design,
- * roadmap, and requirements traceability. This initial drop ships only
- * {@link TestStressCmd}; further subcommands ({@code queue}, {@code safety},
- * {@code verifiers}, {@code memory}, {@code platform}, {@code full}) are
- * intentionally deferred to follow-up PRs to keep each change scoped.
+ * roadmap, and requirements traceability.
  *
- * <p>Lives in {@code rtp-plugin} (not {@code rtp-core}) because
- * {@link TestStressCmd} uses {@link
- * io.github.dailystruggle.commandsapi.bukkit.LocalParameters.OnlinePlayerParameter},
- * which depends on {@code org.bukkit.*}. Per architecture rules, {@code rtp-core}
- * must remain platform-agnostic.
+ * <p>Lives in {@code rtp-plugin} (not {@code rtp-core}) because several
+ * subcommands depend on {@code org.bukkit.*} or {@code rtp-spigot} symbols.
+ * Per architecture rules, {@code rtp-core} must remain platform-agnostic.
+ *
+ * <p><b>Cross-platform constructor split.</b> The constructor registers only
+ * the subcommands that are safe to class-load on every platform that ships
+ * {@code rtp-plugin} — currently Bukkit and Fabric (the JAR is multi-loader
+ * per ADR-022 §2). Subcommands that hard-import Bukkit / Spigot types
+ * ({@link TestStressCmd}, {@link TestChunkProbePerfCmd}, {@link TestFullCmd},
+ * {@link AsyncReplyTestJob}) are registered by the {@link BukkitTestCmd}
+ * subclass instead, so loading {@code TestCmd} on Fabric does not trigger
+ * a {@code NoClassDefFoundError} on {@code org.bukkit.*} /
+ * {@code commandsapi.bukkit.*} / {@code rtp.spigot.*}.
+ *
+ * <p>Bukkit callers MUST instantiate {@link BukkitTestCmd}; Fabric callers
+ * (e.g. {@code RTPFabricMod}) instantiate this class directly.
  */
 public class TestCmd extends BaseRTPCmdImpl {
 
   public TestCmd(@Nullable CommandsAPICommand parent) {
     super(parent);
-    addSubCommand(new TestStressCmd(this));
+    // --- Platform-neutral subcommands (safe to class-load on Bukkit + Fabric). ---
     addSubCommand(new TestCancelCmd(this));
     addSubCommand(new TestSchedulerCmd(this));
     addSubCommand(new TestReloadSafetyCmd(this));
@@ -45,22 +53,27 @@ public class TestCmd extends BaseRTPCmdImpl {
     addSubCommand(new TestAnvilPrefilterCmd(this));
     addSubCommand(new TestBiomeSourceCmd(this));
     addSubCommand(new TestAsyncChunkLoadCmd(this));
-    addSubCommand(new TestChunkProbePerfCmd(this));
-    addSubCommand(new AsyncReplyTestJob(this));
     addSubCommand(new QueueStarvationTestJob(this));
     addSubCommand(new EconomyIsolationTestJob(this));
     addSubCommand(new FoliaOwnershipTestJob(this));
     addSubCommand(new DisconnectTestJob(this));
     addSubCommand(new SafetyVerifierTestJob(this));
 
-    // `full` is the umbrella entry point (see RUNTIME_TEST_SUITE_PLAN.md §3.2).
-    // It is wired in last so `findChild` in TestFullCmd can resolve every
-    // sibling. `all` is registered as an alias by pointing the same
-    // instance at an additional key; TreeCommand uses upper-case keys
-    // (see TreeCommand#addSubCommand).
-    TestFullCmd fullCmd = new TestFullCmd(this);
-    addSubCommand(fullCmd);
-    commandLookup.put("ALL", fullCmd);
+    // Bukkit-bound subcommands and the `full`/`all` umbrella are registered
+    // by BukkitTestCmd (see its Javadoc) so this class stays class-load-safe
+    // on Fabric. `full` references SendMessage (rtp-spigot), so even the
+    // umbrella has to stay Bukkit-only for now — Fabric users still get every
+    // platform-neutral subcommand individually.
+    registerPlatformSpecificChildren();
+  }
+
+  /**
+   * Hook for platform-specific subclasses to register subcommands whose
+   * class-loading would fail on the current platform. Default implementation
+   * is a no-op (Fabric path); {@link BukkitTestCmd} overrides it.
+   */
+  protected void registerPlatformSpecificChildren() {
+    // no-op by default — Fabric and any other non-Bukkit platform.
   }
 
   @Override

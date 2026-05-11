@@ -55,6 +55,12 @@ dependencies {
     api project(':rtp-core')
     api project(':commands-api')
     api project(':rtp-fabric:rtp-fabric-common')
+    // ADR-009 step 4 — unobf carrier of NM-typed common surfaces (FabricEffectsHandlerUnobf,
+    // FabricRTP{World,Chunk,Player}Unobf). Edge is `api` because v26.x adapters call into
+    // these types directly from Mojmap-typed shims (see V26_1_R1FabricVersionAdapter#installEffectsWiring).
+    api project(':rtp-fabric:rtp-fabric-common-unobf')
     // See V26_1_R1FabricEffectDispatchers — Loom-compiled effect dispatchers.
     compileOnly project(':effects-api')
+    // ADR-006 amendment 2026-05-09 — unobf carrier of NM-typed effect runtime.
+    compileOnly project(':effects-api:effects-api-fabric-unobf')
 }

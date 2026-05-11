@@ -1,5 +1,7 @@
 package io.github.dailystruggle.effectsapi.fabric.LocalEffects;
 
+import java.util.logging.Level;
+
 import io.github.dailystruggle.effectsapi.common.Effect;
 import io.github.dailystruggle.effectsapi.fabric.FabricEffectRuntime;
 import io.github.dailystruggle.effectsapi.fabric.LocalEffects.enums.FabricSoundKeys;
@@ -31,7 +33,7 @@ public class FabricSoundEffect extends Effect<FabricSoundKeys> {
 
     /**
      * One-shot guard so the first-run diagnostic in {@link #run()} prints
-     * exactly once per JVM, not on every teleport. Volatile is sufficient —
+     * exactly once per JVM, not on every teleport. Volatile is sufficient --
      * a duplicate line under a startup race is harmless.
      */
     private static volatile boolean LOGGED_FIRST_RUN = false;
@@ -61,12 +63,12 @@ public class FabricSoundEffect extends Effect<FabricSoundKeys> {
         if (!LOGGED_FIRST_RUN) {
             LOGGED_FIRST_RUN = true;
             FabricEffectRuntime.SoundDispatcher d = FabricEffectRuntime.getSoundDispatcher();
-            System.err.println("[effects-api] [FabricSoundEffect] first run() — dispatcher="
+            FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricSoundEffect] first run() -- dispatcher="
                     + (d == null ? "<none, will use reflective fallback>" : d.getClass().getName())
                     + " target=" + (target == null ? "null" : target.getClass().getName()));
         }
         if (!(target instanceof ServerPlayer)) {
-            System.err.println("[effects-api] [FabricSoundEffect] skip: target is not ServerPlayer (got "
+            FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricSoundEffect] skip: target is not ServerPlayer (got "
                     + (target == null ? "null" : target.getClass().getName()) + ")");
             return;
         }
@@ -83,7 +85,7 @@ public class FabricSoundEffect extends Effect<FabricSoundKeys> {
 
         Object typeObj = data.get(FabricSoundKeys.TYPE);
         if (!(typeObj instanceof SoundEvent)) {
-            System.err.println("[effects-api] [FabricSoundEffect] skip: TYPE is not SoundEvent (got "
+            FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricSoundEffect] skip: TYPE is not SoundEvent (got "
                     + (typeObj == null ? "null" : typeObj.getClass().getName()) + "=" + typeObj + ")");
             return;
         }
@@ -116,9 +118,9 @@ public class FabricSoundEffect extends Effect<FabricSoundKeys> {
                 // intermediary missing on a brand-new MC patch) is logged
                 // and falls back instead of propagating up uncaught and
                 // silently aborting all subsequent dispatch attempts on
-                // this teleport — the user-reported "no logs, particles
+                // this teleport -- the user-reported "no logs, particles
                 // worked once then never again" symptom on 1.21.11.
-                System.err.println("[effects-api] [FabricSoundEffect] registered SoundDispatcher threw "
+                FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricSoundEffect] registered SoundDispatcher threw "
                         + e.getClass().getSimpleName() + ": " + e.getMessage()
                         + "; falling back to reflective dispatch");
             }
@@ -146,7 +148,7 @@ public class FabricSoundEffect extends Effect<FabricSoundKeys> {
         // Fallback B: level broadcast (legacy path; may still be
         // dropped post-teleport but it's the last resort). Resolve the
         // level lazily here, guarded against the 1.21.11
-        // NoSuchMethodError described above — failing this lookup just
+        // NoSuchMethodError described above -- failing this lookup just
         // skips the legacy broadcast, which is acceptable since the
         // dispatcher and packet paths above have already had their
         // chance.
@@ -154,7 +156,7 @@ public class FabricSoundEffect extends Effect<FabricSoundKeys> {
         try {
             level = (ServerLevel) player.level();
         } catch (NoSuchMethodError | ClassCastException e) {
-            System.err.println("[effects-api] [FabricSoundEffect] reflective fallback B skipped: "
+            FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricSoundEffect] reflective fallback B skipped: "
                     + e.getClass().getSimpleName() + ": " + e.getMessage());
             return;
         }
@@ -224,11 +226,11 @@ public class FabricSoundEffect extends Effect<FabricSoundKeys> {
                         SOUND_PACKET_HOLDER = bestHolder;
                         SOUND_PACKET_HAS_SEED = bestSeed;
                         if (best != null) {
-                            System.err.println("[effects-api] [FabricSoundEffect] resolved ClientboundSoundPacket"
+                            FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricSoundEffect] resolved ClientboundSoundPacket"
                                     + " ctor: arity=" + bestLen + " holder=" + bestHolder
                                     + " hasSeed=" + bestSeed);
                         } else {
-                            System.err.println("[effects-api] [FabricSoundEffect] no ClientboundSoundPacket"
+                            FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricSoundEffect] no ClientboundSoundPacket"
                                     + " ctor matched (Holder|SoundEvent,SoundSource,d,d,d,f,f[,long])");
                         }
                         // Resolve ServerPlayer.connection field + send(Packet) method
@@ -273,11 +275,11 @@ public class FabricSoundEffect extends Effect<FabricSoundKeys> {
                             }
                         }
                         if (CONNECTION_FIELD == null || CONNECTION_SEND == null) {
-                            System.err.println("[effects-api] [FabricSoundEffect] could not resolve"
+                            FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricSoundEffect] could not resolve"
                                     + " ServerPlayer.connection / send(Packet); packet fallback disabled");
                         }
                     } catch (Throwable t) {
-                        System.err.println("[effects-api] [FabricSoundEffect] sound-packet resolve failed: " + t);
+                        FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricSoundEffect] sound-packet resolve failed: " + t);
                     } finally {
                         SOUND_PACKET_RESOLVED = true;
                     }
@@ -308,7 +310,7 @@ public class FabricSoundEffect extends Effect<FabricSoundKeys> {
             CONNECTION_SEND.invoke(conn, packet);
             return true;
         } catch (ReflectiveOperationException e) {
-            System.err.println("[effects-api] [FabricSoundEffect] sound-packet send failed: "
+            FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricSoundEffect] sound-packet send failed: "
                     + (e.getCause() != null ? e.getCause() : e));
             return false;
         }
@@ -389,7 +391,7 @@ public class FabricSoundEffect extends Effect<FabricSoundKeys> {
                     NOTIFY_SOUND_HOLDER = foundHolder;
                     NOTIFY_SOUND_RESOLVED = true;
                     if (found == null) {
-                        System.err.println("[effects-api] [FabricSoundEffect] no playNotifySound"
+                        FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricSoundEffect] no playNotifySound"
                                 + " overload (SoundEvent|Holder,SoundSource,f,f)->void on "
                                 + ServerPlayer.class.getName()
                                 + "; 4-arg SoundSource-bearing candidates: "
@@ -398,7 +400,7 @@ public class FabricSoundEffect extends Effect<FabricSoundKeys> {
                                 + (allFour.length() == 0 ? "<none>" : allFour.toString())
                                 + "falling back to packet send");
                     } else {
-                        System.err.println("[effects-api] [FabricSoundEffect] resolved playNotifySound: "
+                        FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricSoundEffect] resolved playNotifySound: "
                                 + found.getDeclaringClass().getSimpleName() + "#" + found.getName()
                                 + " holder=" + foundHolder);
                     }
@@ -415,7 +417,7 @@ public class FabricSoundEffect extends Effect<FabricSoundKeys> {
             m.invoke(player, soundArg, source, volume, pitch);
             return true;
         } catch (ReflectiveOperationException e) {
-            System.err.println("[effects-api] [FabricSoundEffect] playNotifySound invoke failed via "
+            FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricSoundEffect] playNotifySound invoke failed via "
                     + m.getName() + ": " + (e.getCause() != null ? e.getCause() : e));
             return false;
         }
@@ -424,7 +426,7 @@ public class FabricSoundEffect extends Effect<FabricSoundKeys> {
     // Cross-version reflective dispatch for ServerLevel#playSound. The
     // 8-arg shape (Player, double, double, double, SoundEvent, SoundSource,
     // float, float) was stable through 1.21.x but 1.21.11 (and some
-    // intermediate snapshots) added/removed parameters — notably a trailing
+    // intermediate snapshots) added/removed parameters -- notably a trailing
     // `long seed`, and on certain lines a `Holder<SoundEvent>` overload.
     // Compiled bytecode bound to the 1.21.1 signature throws
     // NoSuchMethodError on those servers (see user-reported stack trace,
@@ -491,12 +493,12 @@ public class FabricSoundEffect extends Effect<FabricSoundKeys> {
                     }
                     avail.append(")->").append(m.getReturnType().getSimpleName()).append("; ");
                 }
-                System.err.println("[effects-api] [FabricSoundEffect] no playSound overload matched signature "
+                FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricSoundEffect] no playSound overload matched signature "
                         + "(Entity,d,d,d,SoundEvent|Holder,SoundSource,f,f[,long]) on "
                         + ServerLevel.class.getName()
                         + "; SoundSource-bearing candidates: " + avail);
             } else {
-                System.err.println("[effects-api] [FabricSoundEffect] resolved playSound: "
+                FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricSoundEffect] resolved playSound: "
                         + best.getName() + " arity=" + bestLen + " holder=" + bestHolder
                         + " hasSeed=" + (bestLen == 9));
             }
@@ -509,7 +511,7 @@ public class FabricSoundEffect extends Effect<FabricSoundKeys> {
         resolvePlaySound();
         Method m = PLAY_SOUND;
         if (m == null) {
-            System.err.println("[effects-api] [FabricSoundEffect] cannot play '" + sound
+            FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricSoundEffect] cannot play '" + sound
                     + "': no resolved playSound overload (see resolvePlaySound diagnostic above)");
             return;
         }
@@ -524,7 +526,7 @@ public class FabricSoundEffect extends Effect<FabricSoundKeys> {
             // Sound is cosmetic; never break teleport. Log once with full
             // context so the operator can see why a resolved overload still
             // refused the call (e.g. unexpected Holder vs raw mismatch).
-            System.err.println("[effects-api] [FabricSoundEffect] playSound invoke failed via "
+            FabricEffectRuntime.log(Level.FINER, "[effects-api] [FabricSoundEffect] playSound invoke failed via "
                     + m.getName() + " arity=" + m.getParameterCount()
                     + " holder=" + PLAY_SOUND_HOLDER + " hasSeed=" + PLAY_SOUND_HAS_SEED
                     + ": " + (e.getCause() != null ? e.getCause() : e));

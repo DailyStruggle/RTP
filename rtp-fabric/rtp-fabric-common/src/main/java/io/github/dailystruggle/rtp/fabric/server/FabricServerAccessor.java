@@ -18,6 +18,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shap
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.fabric.player.FabricRTPPlayer;
 import io.github.dailystruggle.rtp.fabric.scheduling.FabricScheduler;
+import io.github.dailystruggle.rtp.fabric.tools.FabricAnsiText;
 import io.github.dailystruggle.rtp.fabric.tools.FabricLegacyText;
 import io.github.dailystruggle.rtp.fabric.world.FabricRTPWorld;
 import io.github.dailystruggle.rtp.common.tools.PlaceholderProvider;
@@ -106,16 +107,38 @@ public final class FabricServerAccessor implements RTPServerAccessor {
    */
   private Function<RTPWorld<?>, Set<String>> biomesGetter = this::defaultBiomesFor;
 
-  private final Map<UUID, FabricRTPPlayer> playersById = new ConcurrentHashMap<>();
-  private final Map<String, FabricRTPPlayer> playersByName = new ConcurrentHashMap<>();
-  private final Map<String, FabricRTPWorld> worldsByName = new ConcurrentHashMap<>();
-  private final Map<UUID, FabricRTPWorld> worldsById = new ConcurrentHashMap<>();
+  // Map values are typed as the rtp-api RTPPlayer interface (not FabricRTPPlayer)
+  // so that per-version adapters can register a wrapper compiled against their
+  // own MC mappings (see FabricVersionAdapter#createPlayer). On deobfuscated
+  // runtimes (MC 26.1+) the legacy FabricRTPPlayer's bytecode cannot link, but
+  // its class file still loads fine when only used as a default fallback —
+  // older adapters (1.20 / 1.21) don't override createPlayer and continue to
+  // use FabricRTPPlayer transparently.
+  private final Map<UUID, RTPPlayer> playersById = new ConcurrentHashMap<>();
+  private final Map<String, RTPPlayer> playersByName = new ConcurrentHashMap<>();
+  private final Map<String, io.github.dailystruggle.rtp.api.world.RTPWorld<?>> worldsByName = new ConcurrentHashMap<>();
+  private final Map<UUID, io.github.dailystruggle.rtp.api.world.RTPWorld<?>> worldsById = new ConcurrentHashMap<>();
   private volatile @Nullable MinecraftServer server;
 
   /** Called by {@code FabricEventBridge} on SERVER_STARTED. */
   public void bindServer(MinecraftServer server) {
     this.server = server;
     this.scheduler.setServer(server);
+    // Registries (BuiltInRegistries.BLOCK and per-block tag bindings) are only
+    // fully populated by the time SERVER_STARTED fires. Pre-server rebuild
+    // attempts (driven by Configs.reloadConfigs → SafetyTokenExpander during
+    // onInitialize) intentionally returned an empty snapshot without sticky-
+    // flagging; rebuild now so #tag tokens in safety.airBlocks/unsafeBlocks
+    // get flattened against the live registry. Any failure here is logged
+    // inside buildBlockTagSnapshot and falls back to the existing empty-map
+    // behaviour, so mod startup is never blocked.
+    try {
+      rebuildBlockTagSnapshot();
+    } catch (Throwable t) {
+      log(Level.WARNING,
+          "[RTP][Fabric] Post-SERVER_STARTED block-tag snapshot rebuild failed: "
+              + t.getClass().getSimpleName() + ": " + t.getMessage());
+    }
   }
 
   /**
@@ -150,15 +173,93 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   /** Called by {@code FabricEventBridge} on world unload. */
   public void unregisterWorld(ServerLevel level) {
     String name = level.dimension().location().toString();
-    FabricRTPWorld removed = worldsByName.remove(name);
+    io.github.dailystruggle.rtp.api.world.RTPWorld<?> removed = worldsByName.remove(name);
     if (removed != null) worldsById.remove(removed.id());
   }
 
+  /**
+   * Object-typed entry point for {@code FabricEventBridge.onServerStarted}'s reflective-free
+   * world iteration path. Avoids pinning {@code net.minecraft.server.level.ServerLevel}
+   * (intermediary {@code class_3218}) into the bridge's bytecode constant pool, which fails
+   * JVM verify on MC 26.1's deobfuscated runtime where the intermediary name is not exposed.
+   * The cast lives here, in the accessor, where {@code ServerLevel} is already on the
+   * resolved-class set (the class compiles fine on every supported MC version).
+   */
+  public io.github.dailystruggle.rtp.api.world.RTPWorld<?> registerWorldObject(Object level) {
+    if (level == null) return null;
+    Class<?> serverLevelCls;
+    try {
+      serverLevelCls = Class.forName("net.minecraft.server.level.ServerLevel");
+    } catch (Throwable t) {
+      return null; // ServerLevel not resolvable on this runtime (e.g. 26.1 deobf) — skip.
+    }
+    if (!serverLevelCls.isInstance(level)) return null;
+
+    // PRIMARY PATH: route through the active version adapter's createWorld
+    // factory. Per-version modules compiled against the runtime's own
+    // mappings (e.g. rtp-fabric-v26_1_R1) ship a wrapper whose bytecode
+    // links cleanly. See FabricVersionAdapter#createWorld.
+    try {
+      io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter =
+          io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
+      if (adapter != null) {
+        io.github.dailystruggle.rtp.api.world.RTPWorld<?> wrapped = adapter.createWorld(level);
+        if (wrapped != null) {
+          worldsByName.put(wrapped.name(), wrapped);
+          worldsById.put(wrapped.id(), wrapped);
+          RTP.log(Level.INFO,
+              "[RTP][Fabric] Registered world " + wrapped.name()
+                  + " (id=" + wrapped.id() + ") via adapter "
+                  + adapter.mcVersion() + ".");
+          return wrapped;
+        }
+      }
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING,
+          "[RTP][Fabric] registerWorldObject: adapter.createWorld threw "
+              + t.getClass().getSimpleName() + ": " + t.getMessage(), t);
+      // fall through to legacy path
+    }
+
+    // FALLBACK PATH (1.20 / 1.21 obf-era runtimes): construct the legacy
+    // FabricRTPWorld via the existing typed registerWorld((ServerLevel) level)
+    // — invoked reflectively so this method's own constant pool stays free
+    // of intermediary aliases.
+    try {
+      java.lang.reflect.Method m = FabricServerAccessor.class.getDeclaredMethod("registerWorld", serverLevelCls);
+      Object result = m.invoke(this, level);
+      return (io.github.dailystruggle.rtp.api.world.RTPWorld<?>) result;
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING,
+          "[RTP][Fabric] registerWorldObject: legacy reflective dispatch threw "
+              + t.getClass().getSimpleName() + ": " + t.getMessage());
+      return null;
+    }
+  }
+
+  /** See {@link #registerWorldObject(Object)}. */
+  public void unregisterWorldObject(Object level) {
+    if (level == null) return;
+    Class<?> serverLevelCls;
+    try {
+      serverLevelCls = Class.forName("net.minecraft.server.level.ServerLevel");
+    } catch (Throwable t) {
+      return;
+    }
+    if (!serverLevelCls.isInstance(level)) return;
+    try {
+      java.lang.reflect.Method m = FabricServerAccessor.class.getDeclaredMethod("unregisterWorld", serverLevelCls);
+      m.invoke(this, level);
+    } catch (Throwable t) {
+      // swallow — sticky-fail behaviour matches register path.
+    }
+  }
+
   /** Called by {@code FabricEventBridge} on player JOIN. */
-  public FabricRTPPlayer registerPlayer(net.minecraft.server.level.ServerPlayer player) {
-    FabricRTPPlayer existing = playersById.get(player.getUUID());
+  public RTPPlayer registerPlayer(net.minecraft.server.level.ServerPlayer player) {
+    RTPPlayer existing = playersById.get(player.getUUID());
     if (existing != null) {
-      existing.rebind(player);
+      if (existing instanceof FabricRTPPlayer fp) fp.rebind(player);
       return existing;
     }
     FabricRTPPlayer wrapper = new FabricRTPPlayer(player);
@@ -169,10 +270,116 @@ public final class FabricServerAccessor implements RTPServerAccessor {
 
   /** Called by {@code FabricEventBridge} on player DISCONNECT. */
   public void unregisterPlayer(UUID uuid) {
-    FabricRTPPlayer removed = playersById.remove(uuid);
+    RTPPlayer removed = playersById.remove(uuid);
     if (removed != null) {
       playersByName.remove(removed.name());
-      removed.unbind();
+      if (removed instanceof FabricRTPPlayer fp) fp.unbind();
+    }
+  }
+
+  /**
+   * Object-typed entry point for the Fabric event bridge's JOIN proxy.
+   * Avoids pinning {@code net.minecraft.server.level.ServerPlayer} (intermediary
+   * {@code class_3222}) into the bridge's bytecode constant pool — that alias
+   * is absent on MC 26.1.2's deobfuscated runtime and would fail JVM verify.
+   * The cast lives here in the accessor where {@code ServerPlayer} resolves
+   * fine on every supported MC version.
+   */
+  public RTPPlayer registerPlayerObject(Object player) {
+    if (player == null) return null;
+    // All player wrapping is delegated to the active FabricVersionAdapter SPI:
+    //   - getPlayerUUID(Object) -> typed ServerPlayer.getUUID() per adapter.
+    //   - createPlayer(Object)  -> per-version-typed RTPPlayer construction.
+    //   - rebindPlayer(...)     -> re-bind existing wrapper on re-JOIN.
+    // The previous name+arity reflective scan into FabricServerAccessor.
+    // registerPlayer(ServerPlayer) has been removed (Rule D-005 refactor,
+    // 2026-05-10): every shipped per-version adapter now overrides
+    // createPlayer / rebindPlayer, so there is no surface left for a typed
+    // fallback to handle. If the registered adapter does not implement the
+    // player SPI, registration fails loud-but-survive (REQ-RTP-S-006).
+    io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter =
+        io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
+    if (adapter == null) {
+      RTP.log(Level.WARNING,
+          "[RTP][Fabric] registerPlayerObject: no FabricVersionAdapter registered; "
+              + "player " + player.getClass().getName() + " not registered.");
+      return null;
+    }
+    try {
+      UUID uuid = adapter.getPlayerUUID(player);
+      if (uuid == null) {
+        // No-adapter-knowledge fallback for an exotic player object (e.g. a
+        // test double): try the mojmap method name reflectively. On a real
+        // server this branch is dead because every shipped adapter overrides
+        // getPlayerUUID.
+        try {
+          java.lang.reflect.Method getUUID = player.getClass().getMethod("getUUID");
+          uuid = (UUID) getUUID.invoke(player);
+        } catch (NoSuchMethodException nsme) {
+          RTP.log(Level.WARNING,
+              "[RTP][Fabric] registerPlayerObject: adapter " + adapter.mcVersion()
+                  + " returned null UUID and " + player.getClass().getName()
+                  + " exposes no getUUID() method; player not registered.");
+          return null;
+        }
+      }
+      RTPPlayer existing = playersById.get(uuid);
+      if (existing != null) {
+        adapter.rebindPlayer(existing, player);
+        return existing;
+      }
+      RTPPlayer wrapped = adapter.createPlayer(player);
+      if (wrapped == null) {
+        RTP.log(Level.WARNING,
+            "[RTP][Fabric] registerPlayerObject: adapter " + adapter.mcVersion()
+                + ".createPlayer returned null for " + player.getClass().getName()
+                + "; player not registered.");
+        return null;
+      }
+      playersById.put(wrapped.uuid(), wrapped);
+      playersByName.put(wrapped.name(), wrapped);
+      RTP.log(Level.INFO,
+          "[RTP][Fabric] Registered player " + wrapped.name()
+              + " (uuid=" + wrapped.uuid() + ") via adapter "
+              + adapter.mcVersion() + ".");
+      return wrapped;
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING,
+          "[RTP][Fabric] registerPlayerObject: adapter dispatch threw "
+              + t.getClass().getSimpleName() + ": " + t.getMessage(), t);
+      return null;
+    }
+  }
+
+  /**
+   * Object-typed entry point for the Fabric event bridge's DISCONNECT proxy.
+   * Extracts the player's UUID reflectively (via {@code getUUID()}) so the
+   * caller never names {@code ServerPlayer} in its bytecode.
+   */
+  public void unregisterPlayerObject(Object player) {
+    if (player == null) return;
+    try {
+      // Prefer the typed FabricVersionAdapter.getPlayerUUID SPI so Loom
+      // remaps the descriptor per-runtime (mojmap getUUID on 26.x; intermediary
+      // method_5667 on 1.20/1.21.x). Reflective getMethod("getUUID") fails on
+      // intermediary because the mojmap method name is obfuscated there.
+      io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter =
+          io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
+      UUID uuid = adapter != null ? adapter.getPlayerUUID(player) : null;
+      if (uuid == null) {
+        try {
+          java.lang.reflect.Method getUuid = player.getClass().getMethod("getUUID");
+          Object u = getUuid.invoke(player);
+          if (u instanceof UUID resolved) uuid = resolved;
+        } catch (NoSuchMethodException ignored) {
+          // Adapter unavailable AND mojmap name absent → cleanup deferred to
+          // sweep; not fatal.
+          return;
+        }
+      }
+      if (uuid != null) unregisterPlayer(uuid);
+    } catch (Throwable t) {
+      // swallow — DISCONNECT cleanup is best-effort.
     }
   }
 
@@ -239,11 +446,11 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   @Override
   public RTPWorld<?> getRTPWorld(String name) {
     if (name == null) return null;
-    FabricRTPWorld w = worldsByName.get(name);
+    RTPWorld<?> w = worldsByName.get(name);
     if (w != null) return w;
     // Fall back: callers may pass a bare path (e.g. "world") matching the
     // dimension's location path component. Linear scan over a small map.
-    for (FabricRTPWorld candidate : worldsByName.values()) {
+    for (RTPWorld<?> candidate : worldsByName.values()) {
       if (candidate.name().equals(name) || candidate.name().endsWith(":" + name)) {
         return candidate;
       }
@@ -263,12 +470,82 @@ public final class FabricServerAccessor implements RTPServerAccessor {
 
   @Override
   public RTPPlayer getPlayer(UUID uuid) {
-    return uuid == null ? null : playersById.get(uuid);
+    if (uuid == null) return null;
+    RTPPlayer cached = playersById.get(uuid);
+    if (cached != null) return cached;
+    // Lazy fallback: JOIN event registration may have failed silently
+    // (e.g. fabric-api version drift on 26.1+). Look up live on the server.
+    return lazyResolveAndRegisterByUuid(uuid);
   }
 
   @Override
   public RTPPlayer getPlayer(String name) {
-    return name == null ? null : playersByName.get(name);
+    if (name == null) return null;
+    RTPPlayer cached = playersByName.get(name);
+    if (cached != null) return cached;
+    return lazyResolveAndRegisterByName(name);
+  }
+
+  /**
+   * Lazy-register a player who is online on the bound {@link MinecraftServer}
+   * but missing from {@link #playersByName} (typically because the JOIN event
+   * proxy failed to fire on this MC/fabric-api combo). Returns {@code null}
+   * if no server is bound or no player matches.
+   *
+   * <p>Resolved entirely reflectively so this method's bytecode never pins
+   * intermediary aliases for {@code PlayerList} / {@code ServerPlayer} on
+   * deobfuscated 26.1+ runtimes.</p>
+   */
+  private RTPPlayer lazyResolveAndRegisterByName(String name) {
+    Object sp = lookupOnlineServerPlayerByName(name);
+    if (sp == null) return null;
+    return registerPlayerObject(sp);
+  }
+
+  private RTPPlayer lazyResolveAndRegisterByUuid(UUID uuid) {
+    Object sp = lookupOnlineServerPlayerByUuid(uuid);
+    if (sp == null) return null;
+    return registerPlayerObject(sp);
+  }
+
+  private Object lookupOnlineServerPlayerByName(String name) {
+    MinecraftServer s = this.server;
+    if (s == null) return null;
+    try {
+      Object playerList = s.getClass().getMethod("getPlayerList").invoke(s);
+      if (playerList == null) return null;
+      for (String candidate : new String[]{"getPlayerByName", "getPlayer"}) {
+        try {
+          java.lang.reflect.Method m = playerList.getClass().getMethod(candidate, String.class);
+          Object res = m.invoke(playerList, name);
+          if (res != null) return res;
+        } catch (NoSuchMethodException ignored) {}
+      }
+    } catch (Throwable t) {
+      RTP.log(Level.FINE,
+          "[RTP][Fabric] lazyResolveByName failed: " + t.getClass().getSimpleName()
+              + ": " + t.getMessage());
+    }
+    return null;
+  }
+
+  private Object lookupOnlineServerPlayerByUuid(UUID uuid) {
+    MinecraftServer s = this.server;
+    if (s == null) return null;
+    try {
+      Object playerList = s.getClass().getMethod("getPlayerList").invoke(s);
+      if (playerList == null) return null;
+      try {
+        java.lang.reflect.Method m = playerList.getClass().getMethod("getPlayer", UUID.class);
+        Object res = m.invoke(playerList, uuid);
+        if (res != null) return res;
+      } catch (NoSuchMethodException ignored) {}
+    } catch (Throwable t) {
+      RTP.log(Level.FINE,
+          "[RTP][Fabric] lazyResolveByUuid failed: " + t.getClass().getSimpleName()
+              + ": " + t.getMessage());
+    }
+    return null;
   }
 
   /**
@@ -311,7 +588,13 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     if (uuid.equals(RTPAPI.serverId)) {
       return new FabricConsoleSender(server);
     }
-    return playersById.get(uuid);
+    RTPPlayer cached = playersById.get(uuid);
+    if (cached != null) return cached;
+    // Same lazy fallback as getPlayer(uuid): allow command-time recovery when
+    // the JOIN event proxy didn't fire (e.g. fabric-api drift on 26.1+).
+    Object sp = lookupOnlineServerPlayerByUuid(uuid);
+    if (sp == null) return null;
+    return registerPlayerObject(sp);
   }
 
   @Override
@@ -388,6 +671,16 @@ public final class FabricServerAccessor implements RTPServerAccessor {
         fp.sendComponent(component);
         return;
       }
+      // Online player whose sink isn't the common FabricRTPPlayer (e.g. the
+      // v26.1+ unobf adapter `V26_1_R1FabricRTPPlayer` lives in a per-version
+      // module and parses its own legacy text). Deliver via the player's own
+      // sendMessage exactly once — DO NOT append the suggestion inline, which
+      // produced the "over-printing" regression on 26.1 (the click-to-suggest
+      // target would render as a second visible token after every prompt).
+      if (player != null && player.isOnline()) {
+        player.sendMessage(formattedMsg);
+        return;
+      }
     } catch (Throwable t) {
       RTP.log(Level.WARNING,
           "[RTP] sendMessageAndSuggest interactive path failed (" + t.getClass().getSimpleName()
@@ -395,7 +688,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     }
     // Console / detached sender (or interactive path failure): click-to-suggest
     // can't render. Fall back to the inline composition so the suggestion
-    // remains visible.
+    // remains visible to non-player recipients (consoles can't click).
     String composed = (suggestion == null || suggestion.isEmpty())
         ? formattedMsg
         : formattedMsg + " " + suggestion;
@@ -437,6 +730,15 @@ public final class FabricServerAccessor implements RTPServerAccessor {
         fp.sendComponent(component);
         return;
       }
+      // Online player on a per-version sink (e.g. v26.1 unobf adapter): hover/
+      // click cannot be attached without that module's legacy-text parser, so
+      // deliver the plain formatted message exactly once. Appending the click
+      // target inline would produce visible "over-printing" noise (regression
+      // observed on Fabric 26.1, 2026-05-10).
+      if (player != null && player.isOnline()) {
+        player.sendMessage(formattedMsg);
+        return;
+      }
     } catch (Throwable t) {
       RTP.log(Level.WARNING,
           "[RTP] sendMessage(hover/click) interactive path failed ("
@@ -468,7 +770,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     if (langParser() != null) {
       text = PlaceholderProvider.fillNumericPlaceholders(text);
     }
-    return FabricLegacyText.stripColor(text);
+    return FabricAnsiText.stripColor(text);
   }
 
   /** Resolve the {@code messages.yml} parser, or null before configs are loaded. */
@@ -498,7 +800,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     // server's TerminalConsoleAppender translates §-codes to ANSI on the
     // console. Apply a level-coloured prefix that mirrors Spigot's
     // SendMessage.log so SEVERE/WARNING are visually distinct.
-    String ansi = FabricLegacyText.toAnsiString(prefixForLevel(level) + formatted);
+    String ansi = FabricAnsiText.toAnsiString(prefixForLevel(level) + formatted);
     org.apache.logging.log4j.Logger logger = org.apache.logging.log4j.LogManager.getLogger("RTP");
     logger.log(toLog4jLevel(level), ansi);
   }
@@ -507,7 +809,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   public void log(Level level, String msg, Throwable throwable) {
     if (!isLoggable(level)) return;
     String formatted = (msg == null) ? "" : formatForLog(msg);
-    String ansi = FabricLegacyText.toAnsiString(prefixForLevel(level) + formatted);
+    String ansi = FabricAnsiText.toAnsiString(prefixForLevel(level) + formatted);
     org.apache.logging.log4j.Logger logger = org.apache.logging.log4j.LogManager.getLogger("RTP");
     logger.log(toLog4jLevel(level), ansi, throwable);
   }
@@ -573,7 +875,21 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     }
   }
 
-  /** Map JUL level → Log4j2 level for routing. */
+  /**
+   * Map JUL level → Log4j2 level for routing.
+   *
+   * <p>Sub-INFO records (FINE/FINER/FINEST) only reach this method when
+   * {@link #isLoggable(Level)} already accepted them — i.e. when the admin set
+   * {@code logging.yml#min_level} to FINE or finer (or left it at the default
+   * {@code ALL}). In that case the operator has explicitly opted into verbose
+   * output, so route FINE/FINER/FINEST to Log4j {@code INFO} rather than
+   * {@code DEBUG}: Minecraft's stock {@code log4j2.xml} suppresses DEBUG at
+   * the console appender, which would otherwise silently drop every line that
+   * passed our gate. Promoting the visible-on-purpose lines to INFO mirrors
+   * the rtp-spigot behaviour, where {@code SendMessage.log} writes via
+   * {@code Bukkit.getConsoleSender().sendMessage}, which does not have a
+   * threshold below INFO equivalent in the appender chain.
+   */
   private static org.apache.logging.log4j.Level toLog4jLevel(Level level) {
     if (level == null) return org.apache.logging.log4j.Level.INFO;
     int v = level.intValue();
@@ -581,7 +897,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     if (v >= 900)  return org.apache.logging.log4j.Level.WARN;    // WARNING
     if (v >= 800)  return org.apache.logging.log4j.Level.INFO;    // INFO
     if (v >= 700)  return org.apache.logging.log4j.Level.INFO;    // CONFIG
-    return org.apache.logging.log4j.Level.DEBUG;                  // FINE/FINER/FINEST
+    return org.apache.logging.log4j.Level.INFO;                   // FINE/FINER/FINEST (gated upstream)
   }
 
   /**
@@ -611,7 +927,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     // and [scan_eta] are resolved before the message reaches players or
     // the console. Mirrors rtp-spigot AbstractServerAccessor.announce, which
     // routes through SendMessage.sendMessage (which formats internally).
-    for (FabricRTPPlayer p : playersById.values()) {
+    for (RTPPlayer p : playersById.values()) {
       if (permission == null || permission.isEmpty() || p.hasPermission(permission)) {
         p.sendMessage(format(p.uuid(), msg));
       }
@@ -620,7 +936,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     // (sendSystemMessage(Component) logs plain text on the dedicated server).
     String consoleMsg = format(null, msg);
     org.apache.logging.log4j.LogManager.getLogger("RTP")
-        .info(FabricLegacyText.toAnsiString(consoleMsg));
+        .info(FabricAnsiText.toAnsiString(consoleMsg));
   }
 
   @Override
@@ -633,10 +949,43 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     return biomesGetter.apply(null);
   }
 
+  // Cached reflective accessor for MinecraftServer.getRunningThread(). Direct
+  // call gets remapped by Loom+officialMojangMappings to intermediary
+  // `method_3777` which is not present on the deobfuscated MC 26.1.2 runtime.
+  // The resulting NoSuchMethodError, thrown inside CompletableFuture.thenAccept,
+  // is silently swallowed and stalls the teleport pipeline between LOAD and
+  // TELEPORT phases. Resolve by name from the live instance to keep the
+  // intermediary descriptor out of this method's constant pool.
+  private static volatile java.lang.reflect.Method PRIMARY_THREAD_GETTER;
+
   @Override
   public boolean isPrimaryThread() {
     MinecraftServer s = server;
-    return s != null && Thread.currentThread() == s.getRunningThread();
+    if (s == null) return false;
+    // Prefer per-version adapter override (Phase 4 migration of the prior
+    // reflective patch). Falls through to reflective lookup for adapters
+    // that don't override (1.20 / 1.21 family).
+    try {
+      io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter =
+          io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
+      if (adapter != null) {
+        Thread t = adapter.getServerThread(s);
+        if (t != null) return Thread.currentThread() == t;
+      }
+    } catch (Throwable ignored) {
+      // fall through to reflective path
+    }
+    try {
+      java.lang.reflect.Method m = PRIMARY_THREAD_GETTER;
+      if (m == null) {
+        m = s.getClass().getMethod("getRunningThread");
+        m.setAccessible(true);
+        PRIMARY_THREAD_GETTER = m;
+      }
+      return Thread.currentThread() == m.invoke(s);
+    } catch (ReflectiveOperationException e) {
+      return false;
+    }
   }
 
   @Override
@@ -677,6 +1026,16 @@ public final class FabricServerAccessor implements RTPServerAccessor {
    */
   private volatile Map<String, Set<String>> blockTagSnapshot;
 
+  /**
+   * Sticky flag set after the first {@link #buildBlockTagSnapshot()} call that fails with a
+   * hard linkage error (e.g. {@code NoClassDefFoundError: net/minecraft/class_7923} on MC
+   * 26.1's deobfuscated runtime, where the intermediary {@code BuiltInRegistries} symbol is
+   * not exposed). Once set, subsequent rebuilds short-circuit to an empty map without
+   * re-attempting the registry walk and without re-logging — otherwise
+   * {@code SafetyTokenExpander.scheduleRetry} produces a per-2s WARNING storm.
+   */
+  private volatile boolean blockTagSnapshotPermanentlyUnavailable = false;
+
   @Override
   public Map<String, Set<String>> blockTagSnapshot() {
     Map<String, Set<String>> snap = this.blockTagSnapshot;
@@ -710,6 +1069,118 @@ public final class FabricServerAccessor implements RTPServerAccessor {
    * {@code #tag} tokens for a later retry pass.
    */
   private Map<String, Set<String>> buildBlockTagSnapshot() {
+    // Defer until SERVER_STARTED has bound a server. BuiltInRegistries.BLOCK
+    // is not fully populated at mod-init time (Configs.reloadConfigs →
+    // SafetyTokenExpander runs from FabricDatabaseHandler.setupDatabase
+    // inside onInitialize), and walking it then yields zero tags and a
+    // misleading WARNING. Return empty silently; bindServer() triggers a
+    // rebuild once the registry is live.
+    if (this.server == null) {
+      return Collections.emptyMap();
+    }
+    if (blockTagSnapshotPermanentlyUnavailable) {
+      // Sticky-failed earlier (e.g. BuiltInRegistries class_7923 unresolvable on MC 26.1).
+      // Return an empty snapshot silently — SafetyTokenExpander will preserve original
+      // #tag tokens, and we avoid the per-2s WARNING spam from its retry loop.
+      return Collections.emptyMap();
+    }
+    // ----------------------------------------------------------------------
+    // rtp-fabric-ADR-010: prefer the typed per-version adapter SPI over the
+    // reflective walk below. Each rtp-fabric-vXX_YY_RN module compiles against
+    // its own Loom-mapped MC types and can walk BuiltInRegistries.BLOCK without
+    // any reflection — bypassing the fragile Mojang-vs-intermediary method-name
+    // dispatch entirely. Returning null from the SPI means "adapter cannot
+    // resolve, fall through" so the legacy reflective path remains as a safety
+    // net for runtimes without a registered adapter or with a stub adapter
+    // (e.g. the v26_1_R1 deobf bring-up).
+    // ----------------------------------------------------------------------
+    try {
+      io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter =
+          io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
+      if (adapter != null) {
+        Map<String, Set<String>> typed = adapter.snapshotBlockTags();
+        if (typed != null) {
+          // Adapter returned a result (possibly empty). An empty result is
+          // valid — registry walked but yielded zero tags (data-pack bindings
+          // not yet attached); SafetyTokenExpander preserves original #tag
+          // tokens and a later /rtp reload picks up the populated registry.
+          if (!typed.isEmpty()) {
+            log(Level.FINE,
+                "[RTP][Fabric] Block-tag snapshot built via adapter (" + adapter.mcVersion()
+                    + "): " + typed.size() + " tags.");
+          }
+          return typed;
+        }
+        // null → adapter declined; fall through to reflective walk.
+      }
+    } catch (Throwable t) {
+      // Adapter threw (e.g. UnsupportedOperationException from the v26_1_R1
+      // stub adapter). Log at FINE and fall through — the reflective path
+      // below already handles all failure modes for the unmapped runtime.
+      log(Level.FINE,
+          "[RTP][Fabric] Adapter snapshotBlockTags() failed; falling back to reflection: "
+              + t.getClass().getSimpleName() + ": " + t.getMessage());
+    }
+    // Pre-probe BuiltInRegistries via Class.forName to detect deobfuscated 26.1+ runtimes
+    // where intermediary class_7923 is not resolvable, BEFORE the JVM verifier hits the
+    // direct reference below and produces a multi-frame NoClassDefFoundError stack trace.
+    // On a successful probe we fall through to the typed body; on failure we sticky-flag
+    // and emit a single concise WARNING (no throwable, no stack trace).
+    // Probe both the Mojang-mapped name AND the Fabric intermediary name
+    // (class_7923). On dev/deobfuscated runtimes only the Mojang name resolves;
+    // on a remapped production jar running against an intermediary-only runtime
+    // (or vice versa for MC 26.1.2 where the intermediary alias is absent),
+    // the bytecode-level reference below will fail with
+    // NoClassDefFoundError: net/minecraft/class_7923. Catch that here so we
+    // sticky-flag and emit a single concise WARNING instead of letting the
+    // verifier produce a multi-frame stack trace on every retry.
+    // Probe both the Mojang-mapped name AND the Fabric intermediary name
+    // (class_7923). Loom's officialMojangMappings() actually compiles to
+    // INTERMEDIARY bytecode (class_7923 etc.); the Mojang name is source-level
+    // only. So on deobfuscated MC 26.1.2 the intermediary alias is absent and
+    // the typed walk below would fail at JVM verification with a multi-frame
+    // NoClassDefFoundError. Pre-probe both: if the intermediary is missing
+    // but Mojang is available, fall through to a reflection-only walk that
+    // does NOT bake the intermediary name into bytecode.
+    boolean mojangAvailable;
+    try {
+      Class.forName("net.minecraft.core.registries.BuiltInRegistries",
+          false, FabricServerAccessor.class.getClassLoader());
+      mojangAvailable = true;
+    } catch (Throwable probeFailure) {
+      mojangAvailable = false;
+    }
+    boolean intermediaryAvailable;
+    try {
+      Class.forName("net.minecraft.class_7923",
+          false, FabricServerAccessor.class.getClassLoader());
+      intermediaryAvailable = true;
+    } catch (Throwable probeFailure) {
+      intermediaryAvailable = false;
+    }
+    if (!mojangAvailable && !intermediaryAvailable) {
+      // Neither registries class name resolves on this runtime — give up.
+      blockTagSnapshotPermanentlyUnavailable = true;
+      log(Level.WARNING,
+          "[RTP][Fabric] Block-tag snapshot disabled: BuiltInRegistries unavailable on this"
+              + " runtime (neither net.minecraft.core.registries.BuiltInRegistries nor"
+              + " net.minecraft.class_7923 resolved);"
+              + " #tag tokens in safety.airBlocks/unsafeBlocks will not be flattened.");
+      return Collections.emptyMap();
+    }
+    if (!mojangAvailable) {
+      // Intermediary-only production runtime (e.g. remapped 1.21.11 server):
+      // walk the registry via reflection on the intermediary class name. The
+      // Mojang-mapped typed body below cannot run because BuiltInRegistries
+      // is not resolvable.
+      return buildBlockTagSnapshotReflectively("net.minecraft.class_7923");
+    }
+    if (!intermediaryAvailable) {
+      // Deobfuscated MC 26.1+: walk the registry purely via reflection on
+      // Mojang names so no intermediary symbol is ever resolved by the
+      // verifier.
+      return buildBlockTagSnapshotReflectively("net.minecraft.core.registries.BuiltInRegistries");
+    }
     Map<String, Set<String>> out = new java.util.HashMap<>();
     int totalEntries = 0;
     try {
@@ -748,6 +1219,16 @@ public final class FabricServerAccessor implements RTPServerAccessor {
       log(Level.WARNING,
           "[RTP][Fabric] Failed to snapshot block tag registry: "
               + e.getClass().getName() + ": " + e.getMessage(), e);
+      // Hard linkage failures (e.g. NoClassDefFoundError on BuiltInRegistries / class_7923
+      // on MC 26.1's deobfuscated runtime) are permanent for the lifetime of this JVM:
+      // re-running the registry walk on every SafetyTokenExpander retry just re-throws
+      // and floods the log. Sticky-flag the failure so subsequent calls return silently.
+      if (e instanceof LinkageError) {
+        blockTagSnapshotPermanentlyUnavailable = true;
+        log(Level.WARNING,
+            "[RTP][Fabric] Block-tag snapshot disabled for this JVM (linkage error);"
+                + " #tag tokens in safety.airBlocks/unsafeBlocks will not be flattened.");
+      }
       return Collections.emptyMap();
     }
     if (out.isEmpty()) {
@@ -765,6 +1246,278 @@ public final class FabricServerAccessor implements RTPServerAccessor {
         "[RTP][Fabric] Block-tag snapshot built: "
             + immutable.size() + " tags, " + totalEntries + " entries.");
     return Collections.unmodifiableMap(immutable);
+  }
+
+  /**
+   * Reflection-only block-tag snapshot for deobfuscated MC 26.1+ runtimes
+   * where the Loom intermediary alias {@code net.minecraft.class_7923} is
+   * absent. Uses only Mojang names resolved at runtime via
+   * {@link Class#forName(String)}, so no intermediary symbol is ever baked
+   * into this method's bytecode by Loom's remapper.
+   *
+   * <p>Mirrors the typed walk semantically: invert each block's tags into a
+   * {@code namespace:path -> upper-case "namespace:path"} multimap. On any
+   * failure (missing class/method/field, partial registry, etc.) sticky-flag
+   * and return an empty map so {@code SafetyTokenExpander} preserves
+   * {@code #tag} tokens silently.
+   */
+  private Map<String, Set<String>> buildBlockTagSnapshotReflectively(String registriesClassName) {
+    Map<String, Set<String>> out = new java.util.HashMap<>();
+    int totalEntries = 0;
+    try {
+      ClassLoader cl = FabricServerAccessor.class.getClassLoader();
+      // Entry point: the registries class was already verified resolvable by
+      // the pre-probe above. Everything below is discovered dynamically from
+      // the actual runtime classes of the returned instances — we never load
+      // any hardcoded net.minecraft.* class name beyond this one. The class
+      // name is parameterised so the same body works for both the Mojang
+      // entry (net.minecraft.core.registries.BuiltInRegistries on
+      // deobfuscated runtimes) and the Fabric intermediary entry
+      // (net.minecraft.class_7923 on remapped production runtimes).
+      Class<?> builtInRegistriesCls = Class.forName(registriesClassName, true, cl);
+      Object blockRegistry = findBlockRegistry(builtInRegistriesCls);
+      if (blockRegistry == null) {
+        throw new NoSuchFieldException(
+            "BLOCK registry field on " + registriesClassName
+                + " (no static Iterable field whose elements expose builtInRegistryHolder)");
+      }
+      if (!(blockRegistry instanceof Iterable<?> registryIterable)) {
+        throw new IllegalStateException("BuiltInRegistries.BLOCK is not Iterable: "
+            + blockRegistry.getClass().getName());
+      }
+      // Method handles resolved lazily on first encountered instance, then cached.
+      // Each lookup tries Mojang names first, then 1.21.x intermediary aliases,
+      // then falls back to a signature-based scan so future intermediary
+      // renumbering doesn't break the path. NEVER bake an intermediary name
+      // into bytecode beyond the alias-string list inside findMethodAny.
+      java.lang.reflect.Method getKey = findMethodAny(
+          blockRegistry.getClass(), 1, new String[] { "getKey", "method_10221" });
+      if (getKey == null) {
+        throw new NoSuchMethodException(
+            "getKey(Object) on " + blockRegistry.getClass().getName());
+      }
+      java.lang.reflect.Method builtInHolder = null;
+      java.lang.reflect.Method tagsMethod = null;
+      java.lang.reflect.Method locationMethod = null;
+      java.lang.reflect.Method rlGetNamespace = null;
+      java.lang.reflect.Method rlGetPath = null;
+      for (Object block : registryIterable) {
+        if (block == null) continue;
+        Object blockId;
+        try {
+          blockId = getKey.invoke(blockRegistry, block);
+        } catch (Throwable t) {
+          continue;
+        }
+        if (blockId == null) continue;
+        if (rlGetNamespace == null) {
+          rlGetNamespace = findMethodAny(
+              blockId.getClass(), 0, new String[] { "getNamespace", "method_12836" });
+          rlGetPath = findMethodAny(
+              blockId.getClass(), 0, new String[] { "getPath", "method_12832" });
+          if (rlGetNamespace == null || rlGetPath == null) {
+            // Last-resort signature-based scan: ResourceLocation has exactly
+            // two zero-arg String getters (namespace, path). Pick them in
+            // declaration order — namespace is declared before path in both
+            // Mojang and intermediary ResourceLocation/class_2960.
+            java.lang.reflect.Method[] stringGetters =
+                findZeroArgStringMethods(blockId.getClass(), 2);
+            if (stringGetters.length >= 2) {
+              if (rlGetNamespace == null) rlGetNamespace = stringGetters[0];
+              if (rlGetPath == null) rlGetPath = stringGetters[1];
+            } else {
+              throw new NoSuchMethodException(
+                  "getNamespace/getPath on " + blockId.getClass().getName());
+            }
+          }
+        }
+        String bns = (String) rlGetNamespace.invoke(blockId);
+        String bpath = (String) rlGetPath.invoke(blockId);
+        String materialName = (bns + ":" + bpath).toUpperCase();
+        if (builtInHolder == null) {
+          builtInHolder = findMethodAny(
+              block.getClass(), 0, new String[] { "builtInRegistryHolder", "method_40142" });
+          if (builtInHolder == null) continue;
+        }
+        Object holder;
+        try {
+          holder = builtInHolder.invoke(block);
+        } catch (Throwable t) {
+          continue;
+        }
+        if (holder == null) continue;
+        if (tagsMethod == null) {
+          tagsMethod = findMethodAny(
+              holder.getClass(), 0, new String[] { "tags", "method_40228" });
+          if (tagsMethod == null) continue;
+        }
+        Object tagStream;
+        try {
+          tagStream = tagsMethod.invoke(holder);
+        } catch (Throwable t) {
+          continue;
+        }
+        if (!(tagStream instanceof java.util.stream.Stream<?> s)) continue;
+        java.util.Iterator<?> it = s.iterator();
+        while (it.hasNext()) {
+          Object tagKey = it.next();
+          if (tagKey == null) continue;
+          if (locationMethod == null) {
+            locationMethod = findMethodAny(
+                tagKey.getClass(), 0, new String[] { "location", "method_29177" });
+            if (locationMethod == null) break;
+          }
+          Object tagId;
+          try {
+            tagId = locationMethod.invoke(tagKey);
+          } catch (Throwable t) {
+            continue;
+          }
+          if (tagId == null) continue;
+          String ns = (String) rlGetNamespace.invoke(tagId);
+          String path = (String) rlGetPath.invoke(tagId);
+          String key = ns + ":" + path;
+          out.computeIfAbsent(key, k -> new HashSet<>()).add(materialName);
+          totalEntries++;
+        }
+      }
+    } catch (Throwable e) {
+      blockTagSnapshotPermanentlyUnavailable = true;
+      log(Level.WARNING,
+          "[RTP][Fabric] Block-tag snapshot disabled (reflection fallback failed): "
+              + e.getClass().getSimpleName() + ": " + e.getMessage()
+              + "; #tag tokens in safety.airBlocks/unsafeBlocks will not be flattened.");
+      return Collections.emptyMap();
+    }
+    if (out.isEmpty()) {
+      log(Level.WARNING,
+          "[RTP][Fabric] Block-tag registry yielded no usable tags via reflection"
+              + " (BuiltInRegistries.BLOCK may not be populated yet);"
+              + " #tag tokens in safety.airBlocks/unsafeBlocks will not be flattened.");
+      return Collections.emptyMap();
+    }
+    Map<String, Set<String>> immutable = new java.util.HashMap<>(out.size());
+    for (Map.Entry<String, Set<String>> e : out.entrySet()) {
+      immutable.put(e.getKey(), Collections.unmodifiableSet(e.getValue()));
+    }
+    log(Level.FINE,
+        "[RTP][Fabric] Block-tag snapshot built via reflection: "
+            + immutable.size() + " tags, " + totalEntries + " entries.");
+    return Collections.unmodifiableMap(immutable);
+  }
+
+  /**
+   * Locate the static BLOCK-registry field on the given registries class
+   * without baking either the Mojang field name ({@code BLOCK}) or any
+   * intermediary alias ({@code field_41175} on 1.21.x) into bytecode.
+   *
+   * <p>Strategy: prefer a static field literally named {@code BLOCK} (Mojang
+   * runtimes) or {@code field_41175} (the Fabric intermediary alias for
+   * {@code BuiltInRegistries.BLOCK} on 1.21.x). On miss, scan all
+   * {@code public static} fields whose value is an {@link Iterable} and
+   * return the first whose first-iterated element exposes a
+   * {@code builtInRegistryHolder} zero-arg method (which both Block and Item
+   * declare \u2014 the BLOCK registry is conventionally listed first in
+   * {@code BuiltInRegistries}, so the scan order accepts it).
+   */
+  private static Object findBlockRegistry(Class<?> registriesCls) {
+    String[] preferred = { "BLOCK", "field_41175" };
+    for (String name : preferred) {
+      try {
+        java.lang.reflect.Field f = registriesCls.getField(name);
+        Object v = f.get(null);
+        if (v != null) return v;
+      } catch (NoSuchFieldException ignored) {
+        // try next
+      } catch (Throwable t) {
+        // unexpected access failure; fall through to scan
+      }
+    }
+    for (java.lang.reflect.Field f : registriesCls.getFields()) {
+      if (!java.lang.reflect.Modifier.isStatic(f.getModifiers())) continue;
+      Object v;
+      try {
+        v = f.get(null);
+      } catch (Throwable t) {
+        continue;
+      }
+      if (!(v instanceof Iterable<?> iterable)) continue;
+      java.util.Iterator<?> it = iterable.iterator();
+      if (!it.hasNext()) continue;
+      Object first = it.next();
+      if (first == null) continue;
+      if (findMethod(first.getClass(), "builtInRegistryHolder", 0) != null) {
+        return v;
+      }
+    }
+    return null;
+  }
+
+  private static java.lang.reflect.Method findMethod(Class<?> cls, String name, int argCount) {
+    for (Class<?> c = cls; c != null; c = c.getSuperclass()) {
+      for (java.lang.reflect.Method m : c.getDeclaredMethods()) {
+        if (m.getName().equals(name) && m.getParameterCount() == argCount) {
+          try {
+            m.setAccessible(true);
+          } catch (Throwable ignored) {
+            // continue
+          }
+          return m;
+        }
+      }
+    }
+    for (Class<?> iface : cls.getInterfaces()) {
+      java.lang.reflect.Method m = findMethod(iface, name, argCount);
+      if (m != null) return m;
+    }
+    return null;
+  }
+
+  /**
+   * Try each candidate method name in order on {@code cls} (walking
+   * superclasses and interfaces) and return the first hit with the requested
+   * parameter count. Used by the reflective block-tag snapshot path so a
+   * single call can cover both the Mojang name (e.g. {@code getKey}) and the
+   * matching 1.21.x intermediary alias (e.g. {@code method_10221}) without
+   * baking a hardcoded NoSuchMethodException site into bytecode.
+   */
+  private static java.lang.reflect.Method findMethodAny(
+      Class<?> cls, int argCount, String[] candidateNames) {
+    for (String name : candidateNames) {
+      java.lang.reflect.Method m = findMethod(cls, name, argCount);
+      if (m != null) return m;
+    }
+    return null;
+  }
+
+  /**
+   * Last-resort signature-based scan for zero-arg {@link String}-returning
+   * methods on {@code cls}, walking superclasses then declared interfaces.
+   * Returned in declaration order, deduplicated by name. Used to recover
+   * {@code ResourceLocation#getNamespace} / {@code #getPath} when neither the
+   * Mojang nor known intermediary name resolves on a future remap.
+   *
+   * @param cls   class to scan
+   * @param limit cap on the number of methods returned
+   */
+  private static java.lang.reflect.Method[] findZeroArgStringMethods(Class<?> cls, int limit) {
+    java.util.LinkedHashMap<String, java.lang.reflect.Method> hits = new java.util.LinkedHashMap<>();
+    for (Class<?> c = cls; c != null && hits.size() < limit; c = c.getSuperclass()) {
+      for (java.lang.reflect.Method m : c.getDeclaredMethods()) {
+        if (m.getParameterCount() != 0) continue;
+        if (m.getReturnType() != String.class) continue;
+        if (java.lang.reflect.Modifier.isStatic(m.getModifiers())) continue;
+        if (hits.containsKey(m.getName())) continue;
+        try {
+          m.setAccessible(true);
+        } catch (Throwable ignored) {
+          // continue
+        }
+        hits.put(m.getName(), m);
+        if (hits.size() >= limit) break;
+      }
+    }
+    return hits.values().toArray(new java.lang.reflect.Method[0]);
   }
 
   @Override
@@ -803,6 +1556,27 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   protected @Nullable WorldBorder createNativeWorldBorder(String worldName) {
     return nativeWorldBorderCache.computeIfAbsent(worldName, s -> {
       RTPWorld<?> rtpWorld = getRTPWorld(s);
+      if (rtpWorld == null) return null;
+      // Per-version adapter route (v26_1_R1+): the adapter's compiled
+      // bytecode references Mojang names that link cleanly on the
+      // deobfuscated runtime, where the legacy FabricRTPWorld instanceof
+      // path can't even load. Try the SPI first; on null fall back to the
+      // legacy typed path (1.20 / 1.21 still go through here).
+      try {
+        var adapter = io.github.dailystruggle.rtp.fabric.version
+                .FabricVersionAdapterRegistry.peek();
+        if (adapter != null) {
+          Object payload = rtpWorld.world();
+          if (payload != null) {
+            WorldBorder fromAdapter = adapter.createNativeWorldBorder(payload);
+            if (fromAdapter != null) return fromAdapter;
+          }
+        }
+      } catch (Throwable t) {
+        RTP.log(Level.FINE,
+                "[RTP][Fabric] adapter.createNativeWorldBorder threw for world "
+                        + s + ": " + t);
+      }
       if (!(rtpWorld instanceof FabricRTPWorld fabricWorld)) return null;
       ServerLevel level = fabricWorld.level();
       net.minecraft.world.level.border.WorldBorder mcBorder = level.getWorldBorder();
@@ -1061,8 +1835,45 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     @Override public long delay() { return 0L; }
     @Override public void performCommand(@Nullable RTPPlayer player, String command) {
       MinecraftServer s = server;
-      if (s != null && command != null) {
-        s.getCommands().performPrefixedCommand(s.createCommandSourceStack(), command);
+      if (s == null || command == null) return;
+      // Phase 4 migration: prefer per-version adapter's typed dispatch.
+      // Falls through to the reflective path for adapters that don't override
+      // (1.20 / 1.21 family) — those bytecode descriptors link cleanly there.
+      try {
+        io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter =
+            io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
+        if (adapter != null && adapter.dispatchConsoleCommand(s, command)) {
+          return;
+        }
+      } catch (Throwable ignored) {
+        // fall through to reflective path
+      }
+      // Both s.getCommands() and s.createCommandSourceStack() are baked into
+      // common-module bytecode by Loom + officialMojangMappings as intermediary
+      // descriptors (method_3734 / method_3739). Those aliases don't exist on
+      // MC 26.1.2's deobfuscated runtime, so a direct typed call throws
+      // NoSuchMethodError. Resolve both reflectively from the live class
+      // instance — descriptors are computed at lookup time, not pinned in
+      // the constant pool. Same fix family as serverRunningThread / the
+      // FabricScheduler.serverRunningThread path.
+      try {
+        java.lang.reflect.Method getCommands = s.getClass().getMethod("getCommands");
+        java.lang.reflect.Method createSrc = s.getClass().getMethod("createCommandSourceStack");
+        Object commands = getCommands.invoke(s);
+        Object source = createSrc.invoke(s);
+        // performPrefixedCommand(CommandSourceStack, String) — resolve on the
+        // commands-instance class so the param type binds at lookup time too.
+        java.lang.reflect.Method perform = null;
+        for (java.lang.reflect.Method m : commands.getClass().getMethods()) {
+          if (!"performPrefixedCommand".equals(m.getName())) continue;
+          if (m.getParameterCount() != 2) continue;
+          if (m.getParameterTypes()[1] != String.class) continue;
+          perform = m;
+          break;
+        }
+        if (perform != null) perform.invoke(commands, source, command);
+      } catch (Throwable t) {
+        throw new RuntimeException(t);
       }
     }
 
@@ -1076,7 +1887,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
       // than relying on TerminalConsoleAppender to convert §-codes) avoids
       // mojibake on Windows consoles whose codepage isn't UTF-8: the raw §
       // (UTF-8 0xC2 0xA7) would otherwise render as "┬º".
-      String ansi = FabricLegacyText.toAnsiString(message);
+      String ansi = FabricAnsiText.toAnsiString(message);
       org.apache.logging.log4j.LogManager.getLogger("RTP").info(ansi);
     }
 

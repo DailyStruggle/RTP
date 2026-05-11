@@ -9,7 +9,7 @@ import io.github.dailystruggle.rtp.bukkit.events.TeleportCommandSuccessEvent;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.RTPCmd;
 import io.github.dailystruggle.rtp.common.commands.scan.ScanCmd;
-import io.github.dailystruggle.rtp.bukkit.commands.test.TestCmd;
+import io.github.dailystruggle.rtp.bukkit.commands.test.BukkitTestCmd;
 import io.github.dailystruggle.rtp.common.commands.help.HelpCmd;
 import io.github.dailystruggle.rtp.common.commands.info.InfoCmd;
 import io.github.dailystruggle.rtp.common.commands.parameters.RegionParameter;
@@ -148,7 +148,7 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
     addSubCommand(new ConfigCmd(this));
     addSubCommand(new ScanCmd(this));
     addSubCommand(new InfoCmd(this));
-    addSubCommand(new TestCmd(this));
+    addSubCommand(new BukkitTestCmd(this));
   }
 
   public void addSenderCheck(Predicate<CommandSender> senderCheck) {

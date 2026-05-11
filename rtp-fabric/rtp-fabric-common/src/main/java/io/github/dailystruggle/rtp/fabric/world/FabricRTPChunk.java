@@ -6,6 +6,8 @@ import io.github.dailystruggle.rtp.api.safety.CompiledUnsafeSet;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.fabric.anvil.FabricPaletteNormalizer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -19,9 +21,15 @@ import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.levelgen.Heightmap;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Fabric {@link RTPChunk}. Dual-mode:
@@ -215,20 +223,103 @@ public final class FabricRTPChunk extends RTPChunk<ChunkAccess> {
         }
     }
 
+    /**
+     * Process-wide cache of the reconciled {@code safety.airBlocks} set, mirroring
+     * {@code BukkitRTPChunk.AIR_BLOCKS_CACHE}. Invalidated by
+     * {@link RTPWorld#forgetChunks()} / {@code /rtp reload} via the same
+     * {@code rebuildBlockTagSnapshot()} hook used by the Spigot side
+     * (a fresh {@code reconciledAirBlocks()} call rebuilds eagerly because the
+     * config source is consulted on every miss).
+     *
+     * <p>Ports the Spigot fix that landed when air-block flattening was added —
+     * without this set the JumpAdjustor scan treats leaves, snow_layer,
+     * flowers, etc. as solid ground and lands the player on top of them
+     * (config-listed under {@code airBlocks} but invisible to vanilla
+     * {@code BlockState.isAir()}).</p>
+     */
+    private static final AtomicReference<Set<String>> AIR_BLOCKS_CACHE =
+            new AtomicReference<>(Collections.emptySet());
+
+    /**
+     * Resolve the {@code safety.airBlocks} config to a reconciled
+     * {@code namespace-stripped + UPPER_CASE} set with {@code #namespace:tag}
+     * tokens flattened through the server-supplied
+     * {@link io.github.dailystruggle.rtp.api.server.RTPServerAccessor#blockTagSnapshot()
+     * block-tag snapshot}. Mirrors {@code BukkitRTPChunk.reconciledAirBlocks()};
+     * see the comment block there for the rationale on tag-token preservation
+     * when the snapshot is empty.
+     *
+     * <p>Cheap: cached in {@link #AIR_BLOCKS_CACHE}; rebuilt on every miss
+     * (configurable lists change rarely; the cache absorbs the steady-state
+     * cost). On any failure the previous cached value is returned.</p>
+     */
+    @SuppressWarnings("unchecked")
+    private static Set<String> reconciledAirBlocks() {
+        Set<String> cached = AIR_BLOCKS_CACHE.get();
+        try {
+            if (RTP.configs == null) return cached;
+            ConfigParser<SafetyKeys> safety =
+                    (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+            if (safety == null) return cached;
+            Object value = safety.getConfigValue(SafetyKeys.airBlocks, new ArrayList<>());
+            if (!(value instanceof Collection<?> coll)) return cached;
+            Map<String, Set<String>> tagSnapshot = Collections.emptyMap();
+            if (RTP.serverAccessor != null) {
+                try {
+                    Map<String, Set<String>> s = RTP.serverAccessor.blockTagSnapshot();
+                    if (s != null) tagSnapshot = s;
+                } catch (Throwable ignoredTag) {
+                    // best-effort
+                }
+            }
+            Set<String> raw = new HashSet<>();
+            for (Object o : coll) {
+                if (o == null) continue;
+                String token = o.toString().trim();
+                if (token.isEmpty()) continue;
+                if (token.charAt(0) == '#') {
+                    String tagId = token.substring(1);
+                    if (tagId.indexOf(':') < 0) tagId = "minecraft:" + tagId;
+                    tagId = tagId.toLowerCase(Locale.ROOT);
+                    Set<String> members = tagSnapshot.get(tagId);
+                    if (members != null && !members.isEmpty()) {
+                        raw.addAll(members);
+                        continue;
+                    }
+                    // Snapshot empty / tag missing: preserve original token so
+                    // a later refresh can resolve it once the snapshot is populated.
+                    raw.add(token);
+                } else {
+                    raw.add(token);
+                }
+            }
+            Set<String> reconciled = FabricPaletteNormalizer.reconcileAll(raw);
+            AIR_BLOCKS_CACHE.set(reconciled);
+            return reconciled;
+        } catch (Throwable ignored) {
+            return cached;
+        }
+    }
+
     @Override
     public boolean isAir(int x, int y, int z) {
+        Set<String> airSet = reconciledAirBlocks();
         if (anvilView != null) {
-            // No reconciled-air set is plumbed in on Fabric (no JumpAdjustor
-            // refresh-ticker yet — see ADR-022); the AnvilChunkView's vanilla
-            // air check (AIR / CAVE_AIR / VOID_AIR) is sufficient for the
-            // pipeline's purposes. Commit-time recheck is authoritative.
-            return anvilView.isAir(x & 0xF, y, z & 0xF);
+            // Anvil-backed view: AnvilChunkView#isAir(x,y,z, reconciledAir)
+            // mirrors BukkitRTPChunk's anvil path — consults the reconciled
+            // air set in addition to the vanilla AIR/CAVE_AIR/VOID_AIR check.
+            return anvilView.isAir(x & 0xF, y, z & 0xF, airSet);
         }
         if (chunk == null) return true;
         try {
             BlockState state = chunk.getBlockState(new BlockPos(
                     (cx << 4) + (x & 0xF), y, (cz << 4) + (z & 0xF)));
-            return state.isAir();
+            if (state.isAir()) return true;
+            if (airSet.isEmpty()) return false;
+            Block block = state.getBlock();
+            ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block);
+            if (id == null) return false;
+            return FabricPaletteNormalizer.matches(id.toString(), airSet);
         } catch (Throwable t) {
             return false;
         }

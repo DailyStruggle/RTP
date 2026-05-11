@@ -150,24 +150,29 @@ class TestFullCmdTest {
   // -----------------------------------------------------------------
 
   @Test
-  @DisplayName("every subcommand registered on TestCmd is either shipped or deliberately excluded")
+  @DisplayName("every subcommand registered on BukkitTestCmd is either shipped or deliberately excluded")
   void testCmdRegistrationMatchesShippedOrExcluded() {
-    TestCmd real = new TestCmd(null);
+    // Must use BukkitTestCmd (the Bukkit-flavoured subclass), not the bare
+    // TestCmd — TestFullCmd / `stress` / `chunk-probe-perf` / `async-reply`
+    // are Bukkit-only and registered by BukkitTestCmd.registerPlatformSpecificChildren().
+    // See TestCmd Javadoc and TestCmdPlatformSplitTest for the cross-platform
+    // constructor split rationale.
+    BukkitTestCmd real = new BukkitTestCmd(null);
 
     TestFullCmd.CoverageReport r = TestFullCmd.auditShippedCoverage(real);
 
-    // Every shipped name MUST be registered on the real TestCmd; if not,
+    // Every shipped name MUST be registered on BukkitTestCmd; if not,
     // the sweep would log a runtime WARNING per S-004 on every invocation.
     assertTrue(
         r.missingFromParent.isEmpty(),
-        () -> "shipped names missing from TestCmd registration: " + r.missingFromParent);
+        () -> "shipped names missing from BukkitTestCmd registration: " + r.missingFromParent);
 
-    // No stragglers: if TestCmd.addSubCommand registered a name that is
-    // neither shipped nor excluded, the continuity contract is broken.
+    // No stragglers: if BukkitTestCmd registered a name that is neither
+    // shipped nor excluded, the continuity contract is broken.
     assertTrue(
         r.unexpectedOnParent.isEmpty(),
         () ->
-            "TestCmd registered subcommands not covered by SHIPPED_SUBCOMMAND_NAMES "
+            "BukkitTestCmd registered subcommands not covered by SHIPPED_SUBCOMMAND_NAMES "
                 + "or DELIBERATELY_EXCLUDED_SUBCOMMANDS: "
                 + r.unexpectedOnParent
                 + " — add them to the sweep (or to the excluded list) per "

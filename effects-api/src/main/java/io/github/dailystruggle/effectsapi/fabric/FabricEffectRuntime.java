@@ -11,6 +11,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
 
 /**
  * Fabric scheduler chokepoint for the effects API.
@@ -35,6 +36,42 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class FabricEffectRuntime {
 
     private static final AtomicReference<MinecraftServer> SERVER = new AtomicReference<>();
+
+    // ---------------------------------------------------------------------
+    // Log sink SPI. effects-api lives below rtp-core/rtp-api in the module
+    // graph and cannot reach RTP.log directly. Hosts (RTPFabricMod, tests)
+    // inject a sink at startup; default is a no-op so unhosted contexts
+    // (unit tests, classloading without a server) stay silent instead of
+    // printing diagnostics to stderr. All sites that previously used
+    // System.err.println for FINER-level diagnostics route through here.
+    // ---------------------------------------------------------------------
+
+    /**
+     * Receives diagnostic log messages from effects-api/fabric. Implementations
+     * typically forward to {@code RTP.log(level, msg, t)}.
+     */
+    @FunctionalInterface
+    public interface LogSink {
+        void log(@NotNull Level level, @NotNull String msg, @Nullable Throwable t);
+    }
+
+    private static final LogSink NOOP_LOG = (lvl, msg, t) -> { /* silent */ };
+    private static final AtomicReference<LogSink> LOG_SINK = new AtomicReference<>(NOOP_LOG);
+
+    /** Install a log sink. Pass {@code null} to revert to the silent default. */
+    public static void setLogSink(@Nullable LogSink sink) {
+        LOG_SINK.set(sink == null ? NOOP_LOG : sink);
+    }
+
+    /** Internal helper; always non-null sink. */
+    public static void log(@NotNull Level level, @NotNull String msg) {
+        LOG_SINK.get().log(level, msg, null);
+    }
+
+    /** Internal helper; always non-null sink. */
+    public static void log(@NotNull Level level, @NotNull String msg, @Nullable Throwable t) {
+        LOG_SINK.get().log(level, msg, t);
+    }
 
     /** Bind the MinecraftServer reference. Idempotent; called from SERVER_STARTED. */
     public static void bindServer(@NotNull MinecraftServer server) {
@@ -82,7 +119,7 @@ public final class FabricEffectRuntime {
             String msg = "[effects-api/fabric] FabricEffectRuntime.schedule called before SERVER_STARTED "
                     + "(or after SERVER_STOPPED). Task dropped.";
             if (strict) throw new IllegalStateException(msg);
-            System.err.println(msg);
+            log(Level.FINER, msg);
             return;
         }
         s.execute(task);
@@ -150,7 +187,7 @@ public final class FabricEffectRuntime {
     public static void registerSound(@Nullable SoundDispatcher dispatcher) {
         SoundDispatcher prev = SOUND_DISPATCHER.getAndSet(dispatcher);
         if (prev != null && dispatcher != null && prev != dispatcher) {
-            System.err.println("[effects-api] [FabricEffectRuntime] sound dispatcher overridden ("
+            log(Level.FINER, "[effects-api] [FabricEffectRuntime] sound dispatcher overridden ("
                     + prev.getClass().getName() + " -> " + dispatcher.getClass().getName() + ")");
         }
     }
@@ -164,7 +201,7 @@ public final class FabricEffectRuntime {
     public static void registerParticle(@Nullable ParticleDispatcher dispatcher) {
         ParticleDispatcher prev = PARTICLE_DISPATCHER.getAndSet(dispatcher);
         if (prev != null && dispatcher != null && prev != dispatcher) {
-            System.err.println("[effects-api] [FabricEffectRuntime] particle dispatcher overridden ("
+            log(Level.FINER, "[effects-api] [FabricEffectRuntime] particle dispatcher overridden ("
                     + prev.getClass().getName() + " -> " + dispatcher.getClass().getName() + ")");
         }
     }
@@ -202,7 +239,7 @@ public final class FabricEffectRuntime {
     public static void registerPotion(@Nullable PotionDispatcher dispatcher) {
         PotionDispatcher prev = POTION_DISPATCHER.getAndSet(dispatcher);
         if (prev != null && dispatcher != null && prev != dispatcher) {
-            System.err.println("[effects-api] [FabricEffectRuntime] potion dispatcher overridden ("
+            log(Level.FINER, "[effects-api] [FabricEffectRuntime] potion dispatcher overridden ("
                     + prev.getClass().getName() + " -> " + dispatcher.getClass().getName() + ")");
         }
     }

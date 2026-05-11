@@ -134,7 +134,16 @@ public final class FabricRTPPlayer implements RTPPlayer {
         } catch (Throwable ignored) {
             // Defensive: never let a perms lookup crash the pipeline.
         }
-        // SECONDARY: op-level fallback via stable APIs. ServerLevel#getServer()
+        // SECONDARY: consult the plugin.yml default table. perms-api returned
+        // DEFAULT (no implementer) or its jar is absent; mirror Bukkit's
+        // descriptor-driven behaviour so nodes like rtp.see / rtp.use (default
+        // true) work for non-ops and rtp.onevent.* (default false) stay denied
+        // even for ops, matching plugin.yml exactly.
+        FabricDefaultPermissions.Verdict verdict = FabricDefaultPermissions.resolve(permission);
+        if (verdict == FabricDefaultPermissions.Verdict.TRUE) return true;
+        if (verdict == FabricDefaultPermissions.Verdict.FALSE) return false;
+        // verdict == OP — fall through to the ops.json scan below.
+        // TERTIARY: op-level fallback via stable APIs. ServerLevel#getServer()
         // and PlayerList#isOp(GameProfile) are non-intermediary and stable
         // across MC patch releases (unlike ServerPlayer#hasPermissions(int),
         // ServerPlayer#server (field_13995), or Entity#getServer() (method_5682)

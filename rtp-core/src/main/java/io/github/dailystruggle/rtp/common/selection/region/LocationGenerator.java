@@ -7,6 +7,7 @@ import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.api.selection.ILocationGenerator;
 import io.github.dailystruggle.rtp.api.world.*;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.tools.CfDiag;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
@@ -183,6 +184,8 @@ public class LocationGenerator implements ILocationGenerator {
      */
     public static CompletableFuture<GenerationResult> getLocationFuture(
             Region region, @Nullable Set<String> biomeNames) {
+        CfDiag.locationGenPregenEntry.increment();
+        CfDiag.ensureStarted();
         CompletableFuture<GenerationResult> result = new CompletableFuture<>();
         try {
             PregenState state = PregenState.build(region, biomeNames);
@@ -218,6 +221,8 @@ public class LocationGenerator implements ILocationGenerator {
      */
     public static CompletableFuture<GenerationResult> getLocationFuture(
             Region region, RTPCommandSender sender, RTPPlayer player, @Nullable Set<String> biomeNames) {
+        CfDiag.locationGenQueueEntry.increment();
+        CfDiag.ensureStarted();
         CompletableFuture<GenerationResult> result = new CompletableFuture<>();
         try {
             new QueueTask(region, sender, player, biomeNames, result).start();

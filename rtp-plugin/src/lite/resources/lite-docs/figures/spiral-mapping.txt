@@ -1,0 +1,39 @@
+Archimedean spiral 1D mapping (ADR-001)
+=======================================
+
+RTP picks a candidate location by mapping a single integer index `n` to a
+(chunk_x, chunk_z) pair on an Archimedean spiral. This avoids unbounded
+"reroll until safe" loops (banned by REQ-RTP-F-002) and keeps the
+distribution bounded and reproducible.
+
+  Index n -> spiral coordinate (cx, cz)
+
+           ...                ___
+            \                /   \
+             \    7--6--5--4 8    \
+              \   |        | |    |
+               \  8        3 9    |
+                | |        | |    |
+                | 9   *    2-1    |    * = (centerX, centerZ)
+                | |              ...
+                | 10--11--12--13
+                 \                |
+                  \               /
+                   ...___________/
+
+  - "*" is the region centre.
+  - 1, 2, 3, ... are successive spiral cells.
+  - Each cell maps to one chunk (16x16 blocks).
+  - The spiral is bounded by `radius` (chunks); cells inside `centerRadius`
+    are skipped (the donut hole).
+
+For a region with shape `CIRCLE`, `radius=R`, `centerRadius=r`, the total
+number of usable spiral cells is approximately:
+
+    pi * (R^2 - r^2)
+
+Spatial memory (`/rtp scan`) walks every cell in this index range, evaluates
+safety once, and records the result so future `/rtp` calls can skip
+known-bad cells in O(1).
+
+Lite ships this algorithm unchanged from the full edition.

@@ -2,7 +2,22 @@
 
 A queue of incidental discoveries — suspected bugs, latent races, missing validations, stale comments — that were spotted while working on an **unrelated** task and deliberately **not** fixed in-line, per the *Stay-On-Task Policy* in [`.junie/AGENTS.md`](../../.junie/AGENTS.md).
 
-This file is a backlog, not a tracker. Promote an entry to a real issue (or fold it into a future task's `Effective Issue`) when it is ready to be worked on. Strike entries through (`~~…~~`) or remove them once resolved.
+This file is a backlog, not a tracker. Promote an entry to a real issue (or fold it into a future task's `Effective Issue`) when it is ready to be worked on. Once an entry is resolved, **delete it** — this file does not maintain a resolved-bug archive.
+
+## What this file is — and is not
+
+**Yes:** "I was doing X, I noticed Y looks broken, Y is *not* part of X, and I am walking away from Y. Recording it here so a future task can pick it up."
+
+**No** — do not use this file for any of:
+
+- Work you are doing or just finished as part of the current task. Use the `<UPDATE>` checklist, the `submit` summary, the commit message, and `CHANGELOG.md` for user-visible changes.
+- A diary of your own fix attempts, build outputs, packaging chains, or per-session follow-ups. If you opened the entry and resolved it in the same session, **delete the entry** — it never belonged here. Do not annotate it with `**Resolved:**` / `**Follow-up:**` bullets.
+- Durable engineering lore or repro recipes → [`LESSONS_LEARNED.md`](LESSONS_LEARNED.md).
+- Roadmap items or deferred design → the relevant plan doc or an ADR.
+- Session resumption state → your `<UPDATE>` checklist or `docs/dev/scratch/CHECKLIST-<slug>.md`.
+- Test failures or CI noise from the current change → fix them or escalate; not here.
+
+A correct entry describes **someone else's future problem** that the current task is choosing not to solve. If you catch yourself writing a multi-paragraph resolution log on an entry you authored this session, that is the misuse signature — remove the entry instead.
 
 ## How to add an entry
 
@@ -80,20 +95,4 @@ Append to the *Open* section below using the template. Keep entries short — on
 - **Impact:** Only when the recursive flat-fallback pattern is enabled. Currently disabled (only the root-level shadow remains). Without the recursion, `/rtp scan <TAB>` will continue to surface region-name suggestions like `default` instead of the Bukkit-parity `region:` prefix.
 - **Suggested next step:** investigate whether attaching the shadow as a `LiteralArgumentBuilder("__rtp_flat__")` (literal name, not RequiredArgument) avoids the displacement; or whether emitting subcommand-name tokens directly into the per-parameter `SuggestionProvider` (so `RegionParameter.relevantValues(...)` returns `["region:DEFAULT", "region:nether", ...]` rather than `["default", "nether"]`) is the cleaner fix. The latter aligns with Bukkit `TabCompleter` historical wire format.
 
-<!-- Append new entries above this comment, newest first. -->
-
-## Resolved
-
-<!-- Move entries here (or delete) once addressed. Keep last 10 for context. -->
-
-### 2026-05-06 — ~~`TicketType.UNKNOWN` auto-expiry on the 1.21.5+ Fabric kept-cache path~~
-
-- **Resolved:** confirmed via `javap` on the Mojmap-remapped 1.21.5 server jar that `TicketType.UNKNOWN` is registered with `timeout = 1L` (1-tick auto-expiry, not the historically rumoured 1 s) and `use = LOADING` only — both wrong for kept-cache pinning. `V1_21_R5FabricVersionAdapter` now allocates a static `RTP_TICKET_TYPE = new TicketType(TicketType.NO_TIMEOUT, /*persist=*/ false, TicketUse.LOADING_AND_SIMULATION)` (the public record constructor; no registry call) and uses it for both `addTicketWithRadius` / `removeTicketWithRadius`. Identity-equality matches across add/remove because a single static instance is reused. ADR-006 updated to record the type-instance decision; the radius-correctness portion is unchanged. Build: `:rtp-fabric:rtp-fabric-v1_21_R5:build` SUCCESSFUL.
-
-### 2026-05-06 — ~~`FabricScheduler.runTask` repeatedly invoked before server-started during early region dispatch~~
-
-- **Resolved:** `FabricScheduler` now buffers pre-`SERVER_STARTED` `runTask` submissions in a `preStartQueue` (a `ConcurrentLinkedQueue<Runnable>`) and drains them onto `MinecraftServer.execute` from `setServer(...)`. This mirrors Bukkit's always-queue `runTask` semantics (the user-requested "route through our own scheduler" behaviour) and eliminates the `IllegalStateException` cascade observed on Fabric 1.21.11. `clearServer()` clears the buffer on `SERVER_STOPPING`.
-
-### 2026-05-07 — ~~POTION effect token grammar diverges between Bukkit and Fabric parsers~~
-
-- **Resolved:** unified `KEY_ORDER` to `{TYPE, DURATION, AMPLIFIER, AMBIENT, PARTICLES, ICON}` in both `PotionEffect` (Bukkit) and `FabricPotionEffect`. Bukkit drops the legacy 5-arg `org.bukkit.potion.PotionEffect` ctor branch (min MC 1.20.1, per user direction); Fabric uses the 6-arg `MobEffectInstance(holder, duration, amplifier, ambient, visible, showIcon)` ctor. `FabricPotionKeys` enum extended with `AMBIENT, PARTICLES, ICON`. `default.yml` schema header + POTION catalog rewritten to a single grammar. Breaking change for any hand-tuned Bukkit `POTION.X.<amp>...` configs that had been working under the old 5-field order — to be called out in the next CHANGELOG bullet.
+<!-- Append new entries above this comment, newest first. Resolved entries are deleted, not archived. -->
