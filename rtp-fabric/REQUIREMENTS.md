@@ -21,6 +21,7 @@ For design and implementation details that satisfy these requirements, see [`doc
 - **REQ-FABRIC-F-008 — Tick-Driven Scheduling:** The adapter's scheduler queue shall advance on `ServerTickEvents.END_SERVER_TICK`.
 - **REQ-FABRIC-F-009 — World Cache Maintenance:** The adapter shall register `RTPWorld` entries on `ServerWorldEvents.LOAD` and remove them on `ServerWorldEvents.UNLOAD`.
 - **REQ-FABRIC-F-010 — Player Session Tracking:** The adapter shall create `RTPPlayer` wrappers on `ServerPlayConnectionEvents.JOIN` and release them on `ServerPlayConnectionEvents.DISCONNECT`.
+- **REQ-FABRIC-F-011 — Login Reserve Cache Wiring (ADR-023):** When `loginCacheEnabled` is `true`, the adapter shall allocate `RegionQueueManager.loginLocations` on the default-world region at server start (sized to `loginCacheCap`, or to `MinecraftServer.getMaxPlayers()` when `loginCacheCap` is `0`), dispatch the startup burst via `LoginCacheTask`, top up the buffer by one entry on every `ServerPlayConnectionEvents.DISCONNECT`, and at `ServerPlayConnectionEvents.JOIN` consume one entry into `fastLocations` for any player holding `rtp.onevent.firstjoin` (when the player has not joined before) or `rtp.onevent.join` (subject to cooldown), where "joined before" shall be determined by the presence of the player's `<worldRoot>/playerdata/<uuid>.dat` file.
 
 ## 2. Strict Architectural Requirements
 

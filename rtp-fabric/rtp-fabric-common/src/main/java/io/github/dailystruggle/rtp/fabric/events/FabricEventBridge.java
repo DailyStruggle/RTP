@@ -120,7 +120,18 @@ public final class FabricEventBridge {
                                 // proxy's synthetic class does not reference ServerPlayer
                                 // (intermediary class_3222), which is absent on MC 26.1.2's
                                 // deobfuscated runtime and would fail JVM verify on instanceof.
-                                if (player != null) accessor.registerPlayerObject(player);
+                                if (player != null) {
+                                    accessor.registerPlayerObject(player);
+                                    // ADR-023 — drive the join-time RTP path
+                                    // (cooldown / permission gate +
+                                    // primeFromLoginCache + teleportAction).
+                                    // Routed through an Object-typed bridge
+                                    // so this proxy's synthetic class does
+                                    // not pin ServerPlayer (intermediary
+                                    // class_3222) — see the JOIN proxy
+                                    // comment above.
+                                    dispatchJoinRtp(player);
+                                }
                             }
                         } catch (Throwable t) {
                             RTP.log(Level.WARNING, "[RTP] FabricEventBridge JOIN handler failed", t);
@@ -137,6 +148,11 @@ public final class FabricEventBridge {
                                 Object player = extractPlayerFromHandler(handler);
                                 if (player != null) accessor.unregisterPlayerObject(player);
                             }
+                            // ADR-023 — Login Reserve Cache refill on quit.
+                            // Mirror of OnPlayerQuit (Bukkit): for every region with a
+                            // login buffer, dispatch one async promotion to top it up.
+                            // Fail-soft: never throw from the disconnect handler.
+                            refillLoginReserveOnQuit();
                         } catch (Throwable t) {
                             RTP.log(Level.WARNING, "[RTP] FabricEventBridge DISCONNECT handler failed", t);
                         }
@@ -260,10 +276,248 @@ public final class FabricEventBridge {
             // Initialize the database now that the server is up; mirrors
             // BukkitDatabaseHandler being kicked from onEnable().
             FabricDatabaseHandler.setupDatabase(RTP.getInstance());
+
+            // ADR-023 — Login Reserve Cache: allocate the buffer on the
+            // default-world region and dispatch the startup burst. Mirrors
+            // RTPBukkitPlugin.initLoginReserveCache(); decoupled from
+            // Region.execute() per ADR-023.
+            initLoginReserveCache(server);
         } catch (Throwable t) {
             // Fail-loud per REQ-RTP-S-004; never silently swallow.
             RTP.log(Level.SEVERE, "[RTP] FabricEventBridge.onServerStarted failed", t);
         }
+    }
+
+    /**
+     * ADR-023 — initialise the Login Reserve Cache on the default-world
+     * (overworld) region when {@code PerformanceKeys.loginCacheEnabled=true}.
+     * Sized to {@code loginCacheCap} (or {@code MinecraftServer.getMaxPlayers()}
+     * when {@code loginCacheCap=0}). Mirror of
+     * {@code RTPBukkitPlugin.initLoginReserveCache()}; fail-soft on every
+     * failure path because join-time RTP must keep working even if the reserve
+     * cannot be allocated.
+     *
+     * <p>Default-world identification: uses the overworld dimension's resource
+     * location ({@code minecraft:overworld} on vanilla; modpacks may rename).
+     * The method name has drifted across MC versions ({@code overworld},
+     * intermediary {@code method_30002}) so the call is reflective.
+     *
+     * <p>Player count: {@code MinecraftServer.getMaxPlayers()} (mojmap) /
+     * intermediary {@code method_3802}. Resolved reflectively.
+     */
+    @SuppressWarnings("unchecked")
+    private void initLoginReserveCache(MinecraftServer server) {
+        try {
+            io.github.dailystruggle.rtp.common.configuration.ConfigParser<
+                    io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> perf =
+                    (io.github.dailystruggle.rtp.common.configuration.ConfigParser<
+                            io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys>)
+                            RTP.configs.getParser(
+                                    io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
+            if (perf == null) return;
+            Object enabledObj = perf.getConfigValue(
+                    io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.loginCacheEnabled,
+                    false);
+            boolean enabled = (enabledObj instanceof Boolean)
+                    ? (Boolean) enabledObj
+                    : Boolean.parseBoolean(String.valueOf(enabledObj));
+            if (!enabled) return;
+
+            long configuredCap = perf.getNumber(
+                    io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.loginCacheCap,
+                    0L).longValue();
+            int cap;
+            if (configuredCap > 0) {
+                cap = (int) Math.min(configuredCap, Integer.MAX_VALUE);
+            } else {
+                cap = resolveMaxPlayers(server);
+            }
+            if (cap <= 0) {
+                RTP.log(Level.WARNING,
+                        "[ADR-023] login cache enabled but resolved cap <= 0; skipping");
+                return;
+            }
+
+            String defaultWorldName = resolveOverworldName(server);
+            if (defaultWorldName == null) {
+                RTP.log(Level.WARNING,
+                        "[ADR-023] login cache enabled but overworld dimension could not"
+                                + " be resolved on this MC runtime; skipping");
+                return;
+            }
+
+            io.github.dailystruggle.rtp.common.selection.region.Region region =
+                    RTP.selectionAPI.permRegionLookup.values().stream()
+                            .filter(r -> r.getWorld() != null
+                                    && defaultWorldName.equals(r.getWorld().name()))
+                            .findFirst()
+                            .orElse(null);
+            if (region == null) {
+                RTP.log(Level.WARNING,
+                        "[ADR-023] login cache enabled but no region attached to default"
+                                + " world '" + defaultWorldName + "'; skipping");
+                return;
+            }
+
+            region.queueManager.enableLoginCache(cap);
+            RTP.log(Level.INFO,
+                    "[ADR-023] login reserve cache enabled on region '" + region.name
+                            + "' cap=" + cap + " (default world '" + defaultWorldName + "')");
+
+            // Startup burst: dispatch up to (cap - currentOnline) async promotions.
+            int online = resolveOnlinePlayerCount(server);
+            int target = Math.max(0, cap - online);
+            if (target > 0) {
+                new io.github.dailystruggle.rtp.common.selection.region.LoginCacheTask(region)
+                        .promoteUpTo(target);
+                RTP.log(Level.FINE,
+                        "[ADR-023] startup burst dispatched count=" + target);
+            }
+        } catch (Throwable t) {
+            RTP.log(Level.WARNING,
+                    "[ADR-023] login reserve cache init failed: "
+                            + t.getClass().getSimpleName() + ": " + t.getMessage(), t);
+        }
+    }
+
+    /**
+     * ADR-023 — Object-typed bridge into {@link FabricOnEventTeleports#onJoin}.
+     * Centralised here (rather than directly in the JOIN proxy) so the
+     * proxy's synthetic class does not pin {@code ServerPlayer} (intermediary
+     * {@code class_3222}) into its bytecode constant pool — same pattern as
+     * {@code FabricServerAccessor#registerPlayerObject}, see comment on the
+     * JOIN proxy. The {@code ServerPlayer} cast lives here, where
+     * {@code ServerPlayer} is already on the resolved-class set.
+     *
+     * <p>Fail-soft: any failure (cast miss, accessor not bound, perms-api
+     * error) must not prevent the player from completing JOIN.
+     */
+    private void dispatchJoinRtp(Object player) {
+        try {
+            if (!(player instanceof net.minecraft.server.level.ServerPlayer sp)) return;
+            MinecraftServer server = accessor.getServer();
+            if (server == null) return;
+            FabricOnEventTeleports.onJoin(server, sp);
+        } catch (Throwable t) {
+            RTP.log(Level.WARNING,
+                    "[RTP] FabricEventBridge.dispatchJoinRtp failed: "
+                            + t.getClass().getSimpleName() + ": " + t.getMessage(), t);
+        }
+    }
+
+    /**
+     * ADR-023 — refill the login reserve cache on player disconnect.
+     * Iterates {@code RTP.selectionAPI.permRegionLookup} and dispatches one
+     * async {@code LoginCacheTask.promoteUpTo(1)} per region whose
+     * {@code loginLocations} buffer is non-null. Mirror of the Bukkit
+     * {@code OnPlayerQuit} handler. Fail-soft per-region: a throw from one
+     * region must not stop refill of the others.
+     */
+    private static void refillLoginReserveOnQuit() {
+        try {
+            if (RTP.getInstance() == null || RTP.selectionAPI == null) return;
+            for (io.github.dailystruggle.rtp.common.selection.region.Region region
+                    : RTP.selectionAPI.permRegionLookup.values()) {
+                try {
+                    if (region == null) continue;
+                    if (region.queueManager == null) continue;
+                    if (region.queueManager.loginLocations == null) continue;
+                    new io.github.dailystruggle.rtp.common.selection.region.LoginCacheTask(region)
+                            .promoteUpTo(1);
+                } catch (Throwable t) {
+                    RTP.log(Level.WARNING,
+                            "[ADR-023] login reserve refill failed for region '"
+                                    + (region == null ? "null" : region.name) + "': "
+                                    + t.getClass().getSimpleName() + ": " + t.getMessage());
+                }
+            }
+        } catch (Throwable t) {
+            RTP.log(Level.WARNING,
+                    "[ADR-023] login reserve refill: outer failure "
+                            + t.getClass().getSimpleName() + ": " + t.getMessage());
+        }
+    }
+
+    /**
+     * Resolve the overworld dimension's resource location (e.g.
+     * {@code minecraft:overworld}) reflectively to tolerate mapping drift
+     * across MC versions ({@code overworld} mojmap vs. intermediary
+     * {@code method_30002}). Returns {@code null} if no candidate resolves.
+     */
+    private static String resolveOverworldName(MinecraftServer server) {
+        if (server == null) return null;
+        String[] candidates = { "overworld", "method_30002" };
+        for (String name : candidates) {
+            try {
+                java.lang.reflect.Method m = server.getClass().getMethod(name);
+                Object level = m.invoke(server);
+                if (level instanceof ServerLevel sl) {
+                    return sl.dimension().location().toString();
+                }
+                if (level != null) {
+                    // Some runtimes (26.1 deobf) may not link ServerLevel here.
+                    // Reflectively walk: level.dimension().location().toString().
+                    Object dim = level.getClass().getMethod("dimension").invoke(level);
+                    if (dim == null) continue;
+                    Object loc = dim.getClass().getMethod("location").invoke(dim);
+                    if (loc == null) continue;
+                    return loc.toString();
+                }
+            } catch (NoSuchMethodException ignored) {
+                // try next
+            } catch (Throwable t) {
+                RTP.log(Level.WARNING, "[ADR-023] resolveOverworldName: " + name + " threw "
+                        + t.getClass().getSimpleName() + ": " + t.getMessage());
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Resolve {@code MinecraftServer.getMaxPlayers()} reflectively
+     * (mojmap {@code getMaxPlayers}, intermediary {@code method_3802}).
+     * Returns {@code 0} when neither candidate resolves; the caller then
+     * skips bootstrap with a WARNING.
+     */
+    private static int resolveMaxPlayers(MinecraftServer server) {
+        if (server == null) return 0;
+        String[] candidates = { "getMaxPlayers", "method_3802" };
+        for (String name : candidates) {
+            try {
+                java.lang.reflect.Method m = server.getClass().getMethod(name);
+                Object result = m.invoke(server);
+                if (result instanceof Number n) return n.intValue();
+            } catch (NoSuchMethodException ignored) {
+                // try next
+            } catch (Throwable t) {
+                RTP.log(Level.WARNING, "[ADR-023] resolveMaxPlayers: " + name + " threw "
+                        + t.getClass().getSimpleName() + ": " + t.getMessage());
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * Resolve the current online player count reflectively
+     * (mojmap {@code getPlayerCount}, intermediary {@code method_3788}).
+     * Returns {@code 0} when neither candidate resolves; the caller treats
+     * the cap as the burst target.
+     */
+    private static int resolveOnlinePlayerCount(MinecraftServer server) {
+        if (server == null) return 0;
+        String[] candidates = { "getPlayerCount", "method_3788" };
+        for (String name : candidates) {
+            try {
+                java.lang.reflect.Method m = server.getClass().getMethod(name);
+                Object result = m.invoke(server);
+                if (result instanceof Number n) return n.intValue();
+            } catch (NoSuchMethodException ignored) {
+                // try next
+            } catch (Throwable ignored) {
+                // best-effort
+            }
+        }
+        return 0;
     }
 
     private void onServerStopping(MinecraftServer server) {

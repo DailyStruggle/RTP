@@ -297,7 +297,7 @@ This means **most of the parity gap closes for free** as soon as `RTP.scheduler`
 | `RTP.getInstance().startupTasks.execute(Long.MAX_VALUE)` (drain #3, sync, after console banner) | ❌ missing | **E3-6 (continued)** — third drain. |
 | PAPI registration | N/A (Bukkit-only) | — |
 | `JarUtils.extractDocs(getDataFolder(), version)` | ❌ missing | **E3-4: port `JarUtils.extractDocs` to a `FabricJarUtils` (no `JavaPlugin` dep), seed `<configDir>/rtp/docs/`.** |
-| `initLoginReserveCache()` (ADR-023) | ❌ missing | **E3-5: port to use `MinecraftServer#getMaxPlayers/getPlayerList/overworld()`.** |
+| `initLoginReserveCache()` (ADR-023) | ✅ landed 2026-05-11 — `FabricEventBridge.initLoginReserveCache(server)` + `refillLoginReserveOnQuit()` + `FabricOnEventTeleports.onJoin` (see ADR-023 *Fabric port*). | E3-5 closed. |
 | `metrics = new Metrics(this, 30865)` *(bStats)* | N/A (Bukkit-only — bStats has a separate Fabric module if pursued later) | Track separately; not blocking `/rtp`. |
 
 #### Required `RTPFabricMod.onInitialize()` changes (in order)
@@ -346,7 +346,7 @@ Some of this naturally moves to `FabricEventBridge.SERVER_STARTED` instead of `o
 - [x] **E3-2** — `FabricDatabaseHandler.setupDatabase(rtp)` is invoked from `onInitialize` immediately after `RTP.getInstance()`. The rtp-core constructor's 60-tick SQL flush timer + 6000-tick cached-locations rebuild are sufficient on Fabric — no `FabricDatabaseProcessing` shim required.
 - [x] **E3-3** — `RTP.scheduler.runTaskTimer(new ChunkUnloadProcessor(), 1, 1)` scheduled in `RTPFabricMod.onInitialize()` after Brigadier registration (non-Folia branch always applies on Fabric).
 - [ ] **E3-4** — `JarUtils.extractDocs` not yet ported to a `FabricJarUtils` (cosmetic; not blocking `/rtp`).
-- [ ] **E3-5** — `initLoginReserveCache()` (ADR-023) not yet ported (only matters if `loginCacheEnabled=true`).
+- [x] **E3-5** — `initLoginReserveCache()` (ADR-023) ported in `FabricEventBridge` (`initLoginReserveCache` bootstrap at `SERVER_STARTED`; `refillLoginReserveOnQuit` on the `Disconnect` proxy) and `FabricOnEventTeleports.onJoin` (perm gate via existing `FabricRTPPlayer.hasPermission` → `fabric-permissions-api` + `ops.json` fallback; first-join via `<worldRoot>/playerdata/<uuid>.dat` probe). Covered by `ReqFabricAdr023HasPlayedBeforeTest` (6/6 green). See ADR-023 *Fabric port* and `TODO.md` §3.
 - [x] **E3-6** — Three `startupTasks.execute(Long.MAX_VALUE)` drains added (sync, +1-tick deferred, sync post-banner) mirroring `RTPBukkitPlugin.onEnable` / `BootstrapSupport.drainStartupTasks`. Without this the region prefill never started, leaving `keptLocations`/`unkeptLocations` empty so `/rtp` could not produce a destination.
 - [ ] **E3-7** — Damage / move / respawn / teleport / changeworld listener parity in `FabricEventBridge` — tracked under E-tail; not blocking `/rtp` itself.
 - [x] `:rtp-plugin:compileJava` BUILD SUCCESSFUL after the E3-3 + E3-6 changes (2026-05-05).
