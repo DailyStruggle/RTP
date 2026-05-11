@@ -107,7 +107,9 @@ invalidCommand: "&c[P0] 無効なコマンド - [arg]"
   - "#58CCED  - 権限要求: [requirePermission]"
   - "#58CCED  - ワールドボーダー上書き: [worldBorderOverride]"
   - "#58CCED  - キャッシュ上限: [cacheCap]"
-  - "#58CCED  - 保持キャッシュ: [keptCache]"
+  - "#58CCED  - 保持キャッシュ (L1): [keptCache]"
+  - "#58CCED  - 解放キャッシュ (L2): [unkeptCache]"
+  - "#58CCED  - バックログキャッシュ (L3): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - キャッシュ済み: [cached]"
 
 ################################################################################

@@ -13,6 +13,7 @@ This document provides a detailed reference for all configuration options availa
 | `requirePermission` | Boolean | `false` | If true, players need `rtp.regions.<name>` permission to use this region. |
 | `override` | String | `"default"` | If a player lacks permission, they are redirected to this region instead. |
 | `cacheCap` | Integer | `50` | Maximum number of safe locations to pre-calculate and store in the background. |
+| `backlogCacheCap` | Integer | `1000` (lite: `0`) | Maximum number of **unverified** candidate locations to stage upstream of `cacheCap`. See *Backlog Cache (L3)* below. Set to `0` to disable. |
 | `activeChunkCap` | Integer | `10` | Maximum number of chunks to keep loaded for zero-latency teleports. |
 | `price` | Double | `0.0` | Economy cost to use this specific region (overrides global `price`). |
 | `spatialResolution` | Integer | `3` | Precision for spatial memory (bad location tracking). 1 is coarse, 5 is extremely fine. |
@@ -85,6 +86,30 @@ Places the player at a single configured Y level in **mid-air**, with no terrain
 - The destination cell `(x, y, z)` and the head cell `(x, y+1, z)` must both be air; any non-air block at either cell is treated as unsafe and the chunk is rejected so a different one is rolled.
 - Ignores `minY`, `maxY`, `direction`, `requireSkyLight`, and the `unsafeBlocks` ground sweep — none of those apply to mid-air placement.
 - **Enable a platform builder** when using `FIXED`. Without one the player will fall straight through air.
+
+---
+
+## Backlog Cache (L3)
+
+The backlog cache (controlled by `backlogCacheCap`) is an optional **unverified** staging buffer that sits upstream of the verified location queues (`cacheCap` / "kept" / "unkept"). It lets the region pre-pick spiral coordinates without paying chunk-I/O cost up front, then amortises verification across periodic pulses.
+
+### How it works
+
+- The spiral selector drops unverified candidates straight into the backlog — **no chunk load, no database write**.
+- Each region tick pulses the backlog: the oldest unverified entry is picked, the `.mca` file (32×32 chunk bin) it falls in is identified, and *every* unverified entry that shares that bin is classified in one pass via the anvil pre-filter. This amortises the per-bin cost over many candidates.
+- Entries are promoted into the verified queue **in insertion order**. An unverified head blocks promotion; an invalidated head is dropped silently and the next entry is considered. This preserves spiral order without stalling on failed candidates.
+- The backlog is **not** persisted across restarts by design — entries are re-selected fresh on startup, so the cost of dropping them is bounded.
+
+### When to enable or tune it
+
+- **Leave at the default `1000`** if you have a large radius and want `/rtp` to feel instantaneous over long sessions: the backlog absorbs spiral selection pressure so that `cacheCap` rarely empties.
+- **Lower or set to `0`** on very small radii (< 1000 chunks) where the spiral exhausts quickly and the backlog mostly duplicates work, or on memory-tight servers.
+- **The lite jar** ships with `backlogCacheCap` omitted from `regions/default.yml`, so the in-code fallback resolves to `0` (disabled). Add the key explicitly to opt in on a lite deployment.
+- The backlog holds no chunk tickets and no in-flight teleport tasks, so a high cap has minimal runtime memory cost beyond the raw coordinate records themselves.
+
+### Relationship to other caches
+
+`backlogCacheCap` (L3, unverified) → `unkeptLocations` (L2, verified, chunks released) → `keptLocations` (L1, verified, chunks held). `/rtp` polls L1 first, falls back to L2 (which re-loads chunks on use), and the L3 pulse keeps L2 supplied. See [ADR-028](../adr/ADR-028-l3-backlog-cache.md) for the full design.
 
 ---
 

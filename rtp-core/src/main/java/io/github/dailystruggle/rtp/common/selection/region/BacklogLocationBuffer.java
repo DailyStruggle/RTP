@@ -203,6 +203,35 @@ public final class BacklogLocationBuffer {
     return n;
   }
 
+  /**
+   * Eagerly removes every entry currently tagged {@link Validity#INVALIDATED}
+   * from anywhere in the buffer, not just the head. Intended to be called by
+   * {@code Region.processBacklog()} immediately after a bin-verification pass
+   * so explicit Anvil-pre-filter rejections are ejected (and the displayed L3
+   * occupancy reflects only candidates still in play) without waiting for the
+   * rejected entries to drift to the head via head-blocking drain.
+   *
+   * <p>Order of remaining entries is preserved. {@code WorldBacklogBinIndex}
+   * may still hold weak/list references to the removed entries; this is
+   * harmless because the verification loop skips any entry whose validity is
+   * no longer {@code UNVERIFIED}, and the bin list itself becomes
+   * GC-eligible once every contributing buffer has dropped its strong
+   * references.
+   *
+   * @return the number of entries removed
+   */
+  public int removeInvalidated() {
+    int removed = 0;
+    java.util.Iterator<BacklogEntry> it = entries.iterator();
+    while (it.hasNext()) {
+      if (it.next().validity() == Validity.INVALIDATED) {
+        it.remove();
+        removed++;
+      }
+    }
+    return removed;
+  }
+
   /** @return {@code true} if no entries are present. */
   public boolean isEmpty() {
     return entries.isEmpty();

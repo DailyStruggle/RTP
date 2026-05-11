@@ -81,26 +81,28 @@ Order and names come directly from the matching `*TypeNames` enum in `effects-ap
 
 **`FIREWORK`** — `FireworkTypeNames`
 
+Canonical positional order matches `FireworkEffect.KEY_ORDER` in `effects-api`. Since effects-api-ADR-002 (3.0.0-beta.2), `Effect.setData(String...)` walks `KEY_ORDER` with a non-rewinding cursor and assigns each token to the *first remaining key whose default type accepts it* — so trailing booleans land on `FLICKER` / `TRAIL` / `SAFE` even when given before the offsets. For predictability, supply tokens in the order below.
+
 | Pos | Variable | Typical values |
 |-----|----------|----------------|
 | 1 | `TYPE` | `BALL`, `BALL_LARGE`, `BURST`, `CREEPER`, `STAR` |
 | 2 | `NUMBER` | integer, fireworks to spawn |
 | 3 | `POWER` | 0–3 (flight duration) |
-| 4 | `DX` | x-offset from player |
-| 5 | `DY` | y-offset |
-| 6 | `DZ` | z-offset |
-| 7 | `COLOR` | Bukkit `Color` name or `#RRGGBB` |
-| 8 | `FADE` | fade-out `Color` |
-| 9 | `FLICKER` | `true` / `false` |
-| 10 | `TRAIL` | `true` / `false` |
-| 11 | `SAFE` | `true` disables damage (recommended) |
+| 4 | `COLOR` | Bukkit `Color` name or `#RRGGBB` |
+| 5 | `FADE` | fade-out `Color` |
+| 6 | `FLICKER` | `true` / `false` |
+| 7 | `TRAIL` | `true` / `false` |
+| 8 | `SAFE` | `true` disables damage (recommended) |
+| 9 | `DX` | x-offset from player |
+| 10 | `DY` | y-offset |
+| 11 | `DZ` | z-offset |
 
 **`NOTE`** — `NoteTypeNames`
 
 | Pos | Variable | Typical values |
 |-----|----------|----------------|
 | 1 | `TYPE` | instrument name (`PIANO`, `BASS_DRUM`, `SNARE_DRUM`, `STICKS`, `BASS_GUITAR`, …) |
-| 2 | `TONE` | note tone (`A`–`G`) |
+| 2 | `TONE` | integer `0`–`24` (Bukkit `Note` two-octave id, **not** a letter). Common references: `0` = F♯ low, `6` = C, `8` = D, `12` = F♯ middle, `18` = C high, `24` = F♯ high. |
 
 **`PARTICLE`** — `ParticleTypeNames`
 
@@ -152,8 +154,8 @@ permissions:
   # Celebratory firework at the destination (safe = no damage)
   rtp.effect.postteleport.FIREWORK.BALL.1.1.0.0.0.BLUE.WHITE.true.true.true: true
 
-  # Note blip when player enters a queue
-  rtp.effect.queuepush.NOTE.PIANO.A: true
+  # Note blip when player enters a queue (TONE is 0-24, see NoteTypeNames table above)
+  rtp.effect.queuepush.NOTE.PIANO.12: true
 
   # Audible cue when a teleport is cancelled
   rtp.effect.cancel.SOUND.BLOCK_ANVIL_LAND.80.100: true

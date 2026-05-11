@@ -586,3 +586,7 @@ If genuine simplification is desired, the path is to add a bytecode-scan test fo
 
 ---
 
+
+## 2026-05-11 - RTP.miscAsyncTasks is drained on Fabric via core's self-scheduled AsyncTaskProcessing, not via the platform mod
+
+A Fabric ⇄ Bukkit startup-parity audit briefly suspected that RTP.miscAsyncTasks was never drained on Fabric because a recursive search over tp-fabric/** and tp-plugin/.../fabric/ found zero references to the symbol. That was a false positive. The drain is in tp-core's RTP constructor: line 243 schedules a new AsyncTaskProcessing(25ms) on RTP.scheduler.runTaskTimerAsynchronously(...) every tick, and AsyncTaskProcessing.run calls RTP.getInstance().miscAsyncTasks.execute(...). On Fabric, FabricScheduler.runTaskTimerAsynchronously(task, delay, period) queues () -> ASYNC_EXECUTOR.execute(task) into the per-tick scheduled map, which FabricEventBridge drives from ServerTickEvents.END_SERVER_TICK. Net effect: once setServer(MinecraftServer) fires, every server tick dispatches an AsyncTaskProcessing instance onto the Fabric scheduler's ASYNC_EXECUTOR, which drains miscAsyncTasks exactly as it does on Bukkit/Paper/Folia. The takeaway: when auditing parity for a tp-core field, search tp-core first (specifically the RTP constructor and 	asks.tick package) before concluding the platform adapter is missing wiring.

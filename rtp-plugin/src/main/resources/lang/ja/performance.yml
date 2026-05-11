@@ -76,4 +76,5 @@
 visitorEnabled: true
 
 # バージョン番号は変更しないでください
+pregeneratedPreference: 0.0 # Probability [0.0, 1.0] of rejecting an ungenerated chunk per selection attempt. 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land. Generated chunks always pass.
 version: "1.0"

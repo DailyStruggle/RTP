@@ -7,6 +7,7 @@ shape: pounce_shape
 vert: vertical_pounce
 requirePermission: requires_pets
 cacheCap: kibble_jar_lid
+backlogCacheCap: kibble_stash_lid
 activeChunkCap: active_kibble_jar_lid
 price: treat_cost
 spatialResolution: whisker_resolution

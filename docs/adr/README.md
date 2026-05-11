@@ -29,7 +29,11 @@ An ADR captures a significant architectural decision: the context that forced it
 | [ADR-020](ADR-020-language-bootstrap-and-locale-aware-configparser.md) | Language Bootstrap and Locale-Aware ConfigParser | Accepted |
 | [ADR-021](ADR-021-legacy-mc-and-java-support-scope.md) | Legacy Minecraft and Java Support Are Out of Scope | Accepted |
 | [ADR-022](ADR-022-shape-cache-key-seed-plus-config-hash.md) | Region Shape Cache Key: Seed + Canonical Config Hash | Accepted |
+| [ADR-023](ADR-023-login-reserve-cache.md) | Login Reserve Cache for Join-Time RTP | Accepted |
+| [ADR-024](ADR-024-rtp-lite-assembly-variant.md) | RTP Lite Assembly Variant | Accepted |
 | [ADR-025](ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper.md) | Replace SimpleYaml with an Internal SnakeYAML-Backed YAML Wrapper | Proposed |
+| [ADR-026](ADR-026-external-hook-api-surface.md) | External Hook API Surface | Accepted |
+| [ADR-028](ADR-028-l3-backlog-cache.md) | L3 Backlog Cache (`backlogLocations`) | Accepted |
 | [ADR-032](ADR-032-teleport-pipeline-latency-histogram.md) | Teleport Pipeline Latency Histogram: 256-Sample Wait-Free Ring, Never Reset | Proposed |
 
 ## Subproject ADRs

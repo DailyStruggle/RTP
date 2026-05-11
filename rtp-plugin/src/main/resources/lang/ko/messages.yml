@@ -107,7 +107,9 @@ invalidCommand: "&c[P0] 잘못된 명령어 - [arg]"
   - "#58CCED  - 권한 요구: [requirePermission]"
   - "#58CCED  - 월드보더 오버라이드: [worldBorderOverride]"
   - "#58CCED  - 캐시 한도: [cacheCap]"
-  - "#58CCED  - 보존 캐시: [keptCache]"
+  - "#58CCED  - 보존 캐시 (L1): [keptCache]"
+  - "#58CCED  - 해제 캐시 (L2): [unkeptCache]"
+  - "#58CCED  - 백로그 캐시 (L3): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - 캐시됨: [cached]"
 
 ################################################################################

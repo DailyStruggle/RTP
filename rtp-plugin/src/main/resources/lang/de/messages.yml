@@ -95,7 +95,9 @@ regionInfo:
   - "#58CCED  - BerechtingungErforderlich: [requirePermission]"
   - "#58CCED  - WeltgrenzeUeberschreiben: [worldBorderOverride]"
   - "#58CCED  - Cache-Kapazitaet: [cacheCap]"
-  - "#58CCED  - GehaltenerCache: [keptCache]"
+  - "#58CCED  - GehaltenerCache (L1): [keptCache]"
+  - "#58CCED  - UngehaltenerCache (L2): [unkeptCache]"
+  - "#58CCED  - RueckstauCache (L3): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - ImCache: [cached]"
 ################################################################################
 # Abschnitt 8: Befehlsbeschreibungen

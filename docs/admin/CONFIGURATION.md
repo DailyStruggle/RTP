@@ -36,6 +36,7 @@ Each file in the `regions/` folder defines one teleport region. The filename (wi
 | `requirePermission` | Boolean | `false` | If `true`, players need `rtp.regions.<regionName>` to use this region. |
 | `override` | String | `"default"` | Region to redirect to if a player lacks permission for this region. |
 | `cacheCap` | Integer | `50` | Maximum pre-generated safe locations to hold in the queue. Set to `0` to disable background caching. |
+| `backlogCacheCap` | Integer | `1000` (lite: `0`) | Maximum **unverified** candidates staged upstream of `cacheCap`. Spiral picks land here without chunk I/O, then a per-region pulse verifies one `.mca` bin at a time and promotes in insertion order. Set to `0` to disable. See [REGIONS.md → Backlog Cache (L3)](REGIONS.md#backlog-cache-l3) and [ADR-028](../adr/ADR-028-l3-backlog-cache.md). |
 | `activeChunkCap` | Integer | `10` | Maximum chunks kept loaded simultaneously for zero-latency teleportation. |
 | `price` | Double | `0.0` | Economy cost override for this region (overrides the global `economy.yml` price). |
 | `spatialResolution` | Integer | `3` | Precision level for storing spatial memory in the database. Higher = more memory, finer detail. |

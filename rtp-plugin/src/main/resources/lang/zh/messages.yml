@@ -107,7 +107,9 @@ invalidCommand: "&c[P0] 无效命令 - [arg]"
   - "#58CCED  - 需要权限: [requirePermission]"
   - "#58CCED  - 覆盖世界边界: [worldBorderOverride]"
   - "#58CCED  - 缓存上限: [cacheCap]"
-  - "#58CCED  - 已保留缓存: [keptCache]"
+  - "#58CCED  - 已保留缓存 (L1): [keptCache]"
+  - "#58CCED  - 已释放缓存 (L2): [unkeptCache]"
+  - "#58CCED  - 积压缓存 (L3): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - 已缓存: [cached]"
 
 ################################################################################

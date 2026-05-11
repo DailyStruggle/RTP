@@ -697,6 +697,36 @@ public class PlaceholderProvider {
             return "0";
         });
 
+        // L2 — pre-verified locations whose chunks have been released ("cold" / "unkept").
+        placeholders.put("unkeptCache", uuid -> {
+            Region region = RTP.regionContext.get();
+            if (region != null) return String.valueOf(region.queueManager.unkeptLocations.size());
+            return "0";
+        });
+
+        // L3 — optional verified-pile size from the backlog buffer (ADR-028).
+        // Reports the number of Anvil-pre-filter VALIDATED entries currently
+        // waiting to be promoted into L2 (the "success" pile), not the raw
+        // buffer occupancy. INVALIDATED entries are ejected eagerly in
+        // Region.processBacklog (step 2b) and UNVERIFIED entries are still
+        // in flight, so neither contributes to this number. Resolves to 0
+        // when L3 is disabled (backlogCacheCap == 0, lite default;
+        // backlogLocations is null).
+        placeholders.put("backlogCache", uuid -> {
+            Region region = RTP.regionContext.get();
+            if (region != null && region.queueManager.backlogLocations != null) {
+                return String.valueOf(region.queueManager.backlogLocations.validatedSize());
+            }
+            return "0";
+        });
+
+        // L3 capacity (ADR-028). Mirrors %rtp_cacheCap%; 0 indicates L3 is disabled.
+        placeholders.put("backlogCacheCap", uuid -> {
+            Region region = RTP.regionContext.get();
+            if (region != null) return String.valueOf(region.getSettings().backlogCacheCap());
+            return "0";
+        });
+
         placeholders.put("locationQueue", uuid -> {
             Region region = RTP.regionContext.get();
             if (region != null) return String.valueOf(region.queueManager.keptLocations.size());

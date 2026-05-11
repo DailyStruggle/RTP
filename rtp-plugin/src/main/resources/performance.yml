@@ -18,6 +18,7 @@ checkOnChunkLoads: false # Check for safe spots in all loaded chunks
 visitorEnabled: false # Enable background data gathering
 loginCacheEnabled: false # Maintain a reserved cache of locations for join-time teleports (rtp.onevent.firstjoin / rtp.onevent.join). Sized by remaining empty player slots.
 loginCacheCap: 0 # Hard cap for the login cache. 0 = auto (server max-players, snapshotted at startup).
+pregeneratedPreference: 0.0 # Probability [0.0, 1.0] of rejecting an ungenerated chunk per selection attempt. 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land. Generated chunks always pass.
 
 # DO NOT TOUCH VERSION NUMBER
 version: "1.0"

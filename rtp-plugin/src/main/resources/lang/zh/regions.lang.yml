@@ -9,6 +9,7 @@ shape: 形状
 vert: 垂直
 requirePermission: 需要权限
 cacheCap: 缓存上限
+backlogCacheCap: 积压缓存上限
 activeChunkCap: 活动区块上限
 price: 价格
 spatialResolution: 空间分辨率

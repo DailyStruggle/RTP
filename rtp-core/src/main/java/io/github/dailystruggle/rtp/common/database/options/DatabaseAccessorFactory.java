@@ -139,22 +139,50 @@ public final class DatabaseAccessorFactory {
         if (!isDriverAvailable(driver)) {
             return null;
         }
+        // Reflective instantiation for JDBC-backed accessors so this method's bytecode
+        // carries no direct symbolic references to H2/SQLite/MySQL/PostgreSQL accessor
+        // classes. The lite assembly (ADR-024) excludes those accessor classes from the
+        // jar entirely; if `tryCreate` referenced them by name, the JVM's eager
+        // verification/resolution at frame-link time would raise NoClassDefFoundError
+        // up to the caller — bypassing this method's try/catch and breaking the
+        // requested -> H2 -> yaml fallback chain. YamlFileDatabase stays direct because
+        // lite always ships it.
         try {
+            if ("yaml".equals(type)) {
+                return new YamlFileDatabase(databaseDirectory);
+            }
+            ClassLoader cl = DatabaseAccessorFactory.class.getClassLoader();
             switch (type) {
-                case "yaml":
-                    return new YamlFileDatabase(databaseDirectory);
                 case "h2":
-                    return new H2DatabaseAccessor();
+                    return (DatabaseAccessor<?>) Class.forName(
+                            "io.github.dailystruggle.rtp.common.database.options.H2DatabaseAccessor",
+                            true, cl).getDeclaredConstructor().newInstance();
                 case "mysql":
-                    return new MySQLDatabaseAccessor(host, port, name, username, password);
+                    return (DatabaseAccessor<?>) Class.forName(
+                            "io.github.dailystruggle.rtp.common.database.options.MySQLDatabaseAccessor",
+                            true, cl).getDeclaredConstructor(String.class, int.class, String.class, String.class, String.class)
+                            .newInstance(host, port, name, username, password);
                 case "postgresql":
-                    return new PostgreSQLDatabaseAccessor(host, port, name, username, password);
+                    return (DatabaseAccessor<?>) Class.forName(
+                            "io.github.dailystruggle.rtp.common.database.options.PostgreSQLDatabaseAccessor",
+                            true, cl).getDeclaredConstructor(String.class, int.class, String.class, String.class, String.class)
+                            .newInstance(host, port, name, username, password);
                 case "sqlite":
                 case "":
                 default:
-                    return new SQLiteDatabaseAccessor(
-                            "jdbc:sqlite:" + databaseDirectory.getAbsolutePath() + File.separator + "RTP.db");
+                    return (DatabaseAccessor<?>) Class.forName(
+                            "io.github.dailystruggle.rtp.common.database.options.SQLiteDatabaseAccessor",
+                            true, cl).getDeclaredConstructor(String.class)
+                            .newInstance("jdbc:sqlite:" + databaseDirectory.getAbsolutePath() + File.separator + "RTP.db");
             }
+        } catch (ClassNotFoundException | NoClassDefFoundError e) {
+            // Accessor class excluded from this assembly (lite) — silent fall through.
+            return null;
+        } catch (java.lang.reflect.InvocationTargetException e) {
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            RTP.log(Level.WARNING,
+                    "DatabaseAccessorFactory: failed to construct '" + type + "' accessor: " + cause.getMessage(), cause);
+            return null;
         } catch (Throwable t) {
             RTP.log(Level.WARNING,
                     "DatabaseAccessorFactory: failed to construct '" + type + "' accessor: " + t.getMessage(), t);

@@ -106,7 +106,9 @@ regioGegevens:
   - "#58CCED  - toestemmingVereist: [requirePermission]"
   - "#58CCED  - wereldgrensOverschrijving: [worldBorderOverride]"
   - "#58CCED  - cacheCapaciteit: [cacheCap]"
-  - "#58CCED  - behoudCache: [keptCache]"
+  - "#58CCED  - behoudCache (L1): [keptCache]"
+  - "#58CCED  - vrijgegevenCache (L2): [unkeptCache]"
+  - "#58CCED  - achterstandCache (L3): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - inCache: [cached]"
 
 ################################################################################

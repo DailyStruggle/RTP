@@ -11,6 +11,7 @@ shape: 形状
 vert: 垂直
 requirePermission: 権限要求
 cacheCap: キャッシュ上限
+backlogCacheCap: バックログキャッシュ上限
 activeChunkCap: アクティブチャンク上限
 price: 価格
 spatialResolution: 空間解像度
