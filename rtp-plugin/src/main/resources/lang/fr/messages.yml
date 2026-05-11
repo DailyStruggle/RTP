@@ -95,7 +95,9 @@ regionInfo:
   - "#58CCED  - permissionRequise : [requirePermission]"
   - "#58CCED  - substitutionBordureMonde : [worldBorderOverride]"
   - "#58CCED  - capaciteCache : [cacheCap]"
-  - "#58CCED  - cacheConserve : [keptCache]"
+  - "#58CCED  - cacheConserve (L1) : [keptCache]"
+  - "#58CCED  - cacheLibere (L2) : [unkeptCache]"
+  - "#58CCED  - cacheArriere (L3) : [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - enCache : [cached]"
 ################################################################################
 # Section 8 : Descriptions des commandes

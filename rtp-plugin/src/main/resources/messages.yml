@@ -155,7 +155,7 @@ infoConsoleRegionHeader: "&7--- Regions ---"
 infoRegion: "  #52B2BF[region]"
 
 # sub-info listings
-# placeholders: [world], [region], [requirePermission], [override], [shape], [worldBorderOverride], [cacheCap], [cached], [keptCache]
+# placeholders: [world], [region], [requirePermission], [override], [shape], [worldBorderOverride], [cacheCap], [cached], [keptCache], [unkeptCache], [backlogCache], [backlogCacheCap]
 worldInfo:
   - "#21ADA8[world]:"
   - "#99EEBB  - region: [region]"
@@ -169,7 +169,9 @@ regionInfo:
   - "#58CCED  - requirePermission: [requirePermission]"
   - "#58CCED  - worldBorderOverride: [worldBorderOverride]"
   - "#58CCED  - cacheCap: [cacheCap]"
-  - "#58CCED  - keptCache: [keptCache]"
+  - "#58CCED  - keptCache (L1): [keptCache]"
+  - "#58CCED  - unkeptCache (L2): [unkeptCache]"
+  - "#58CCED  - backlogCache (L3): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - cached: [cached]"
 
 ################################################################################

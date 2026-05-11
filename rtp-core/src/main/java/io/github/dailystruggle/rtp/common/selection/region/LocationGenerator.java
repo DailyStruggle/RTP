@@ -98,6 +98,12 @@ public class LocationGenerator implements ILocationGenerator {
          * was outside {@code [minY, maxY]} or every Y-step failed the adjustor's
          * placement test). */
         prefilterRange,
+        /** Candidate chunk's column is not yet generated on disk and the
+         * configured {@code PerformanceKeys.pregeneratedPreference} weight
+         * drew a reject this attempt. Tracked separately so operators can see
+         * how often the pregenerated-area bias dropped a candidate vs. the
+         * other reject buckets. */
+        ungenerated,
         misc
     }
 

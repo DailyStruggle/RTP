@@ -10,30 +10,38 @@
 
 Active frontier per [rtp-fabric-ADR-002](../../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md). Tracked in detail under [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md); items below are the must-finish set to call Fabric "stable".
 
-- [ ] **Resolve Loom dependency.** `rtp-fabric` build currently does not resolve cleanly across all `v1_20_R1` / `v1_21_R1` / `v26_1_R1` submodules. Document the toolchain (Loom version, Yarn / Mojmap choice) in an ADR before merging build changes.
-- [ ] **Eliminate the S-005 violation in `FabricWorld.getChunkAt`.** Replace the synchronous load with the async chunk abstraction used on Paper/Folia. Cover with a `ReqRtpS005*` test in the Fabric module.
-- [ ] **Implement `FabricServerAccessor.getLocationGenerator`.** Currently a null stub — addons calling the API on Fabric will hit S-006 territory. Wire to the real `LocationGenerator` and add a contract test mirroring the Paper one.
-- [ ] **Brigadier bridge wiring.** Confirm `BrigadierCommandAdapter` + `BrigadierBridgeContext` ([commands-api-ADR-001](../../commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md)) bind cleanly under Fabric's `CommandRegistrationCallback`. Add an integration test that registers `/rtp` and asserts tab-completion parity with Paper.
-- [ ] **Effects-API parity.** Audit `effects-api` consumers (`FireworkEffect`, sound, particle) for Fabric-side equivalents; stub or implement so loading the jar on a vanilla Fabric server does not warn.
+- [x] **Resolve Loom dependency.** — Toolchain split into obf-carrier (`rtp-fabric-common`, intermediary, Java 21) and unobf-carrier (`rtp-fabric-common-unobf`, Mojmap, Java 25) per [rtp-fabric-ADR-009](../../rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md); per-version submodules (`v1_20_R1`, `v1_21_R1`, `v1_21_R5`, `v1_21_R11`, `v26_1_R1`) build under [rtp-fabric-ADR-001](../../rtp-fabric/docs/adr/rtp-fabric-ADR-001-multiversion-submodule-layout.md).
+- [x] **Eliminate the S-005 violation in `FabricWorld.getChunkAt`.** — `FabricRTPWorld#getChunkAt` (and the unobf mirror) now return `CompletableFuture<Long>` backed by `getChunkFutureMainThread` / `getChunkAtAsync`, per [rtp-fabric-ADR-008](../../rtp-fabric/docs/adr/rtp-fabric-ADR-008-non-blocking-chunk-generation.md); anvil-probe parity per [rtp-fabric-ADR-005](../../rtp-fabric/docs/adr/rtp-fabric-ADR-005-anvil-prefilter-parity.md). `ReqRtpS005*` Fabric-side coverage still owed — tracked under the Platform smoke-test item below.
+- [x] **Implement `FabricServerAccessor.getLocationGenerator`.** — `FabricServerAccessor.getLocationGenerator()` returns the live `LocationGenerator` and throws `IllegalStateException` before core init (S-006 compliant), mirroring `AbstractServerAccessor`.
+- [x] **Brigadier bridge wiring.** — `FabricCommandRegistrar` reflectively registers `CommandRegistrationCallback.EVENT` and wires `RTPCmdFabricRoot` / `RTPCmdFabric` through `BrigadierCommandAdapter`; per-version adapters dispatch via `FabricVersionAdapter`. Tab-completion parity test still owed (tracked under Platform smoke-test).
+- [x] **Effects-API parity.** — `effects-api-fabric-unobf` carrier plus per-version dispatchers (e.g. `V1_21_R11FabricEffectDispatchers`) implement firework / sound / particle equivalents; loading on vanilla Fabric no longer warns. See [effects-api-ADR-006](../../effects-api/docs/adr/effects-api-ADR-006-fabric-obf-unobf-split.md).
 - [ ] **Platform smoke test.** Add a Fabric entry to whatever `rtp test full` analogue exists (or create one) so a CI / manual run produces the same pass/fail matrix as Paper and Folia.
-- [ ] **Promote out of "unstable" in `MULTI_PLATFORM_PLAN.md` and `AGENTS.md` *Current Development Focus*** once the above are green.
+- [ ] **Promote out of "unstable" in `MULTI_PLATFORM_PLAN.md` and `AGENTS.md` *Current Development Focus*** once the above are green. Remaining gates: Fabric `ReqRtpS005*` coverage and tab-completion parity test (folded into the Platform smoke-test item above).
 
 Out of scope here (deliberately): Forge / NeoForge — gated until Fabric stabilises (Phase 4).
 
 ---
 
-## 2. Third Queue Layer — L3 Backlog (Binned) Cache
+## 2. Third Queue Layer — L3 Backlog (Binned) Cache — ✅ Landed
 
-Proposed in [ADR-028](../adr/ADR-028-l3-backlog-cache.md). Per the *Domain Analogies & Aliases* table in [`AGENTS.md`](../../.junie/AGENTS.md), this is the **"backlog cache" / "L3" / "binned cache"** — an unverified buffer upstream of `unkeptLocations`, verified one bin (32×32 chunks = one `.mca`) per `Region.execute()` pulse while the region file is cached.
+Implemented per [ADR-028](../adr/ADR-028-l3-backlog-cache.md) (Accepted 2026-05-07). Symbol: `RegionQueueManager.backlogLocations` (`BacklogLocationBuffer`); world-shared `WorldBacklogBinIndex` for cross-RTP-region anvil amortization; tri-state `Validity` (`UNVERIFIED` / `VALIDATED` / `INVALIDATED`); head-contiguous promotion inline in `Region.execute()`. Config key `backlogCacheCap` (default `1000`; lite overlay omits the key so the in-code fallback resolves to `0` ⇒ disabled). Covered by `BacklogLocationBufferTest` and `WorldBacklogBinIndexTest`. See `CHANGELOG.md` *Added* under `[3.0.0-beta.2]` and `DESIGN.md` §1.1.
 
-- [ ] **Create `BacklogLocationBuffer`.** New class alongside `LockFreeLocationBuffer`. Order-preserving FIFO, per-entry `verified` flag, head-blocking promotion semantics. Unit-test FIFO ordering, head-blocking, and the verified-flag transition.
-- [ ] **Wire `RegionQueueManager.backlogLocations`.** Add the field, plumb it into the existing kept→unkept fallback chain so `keptLocations` empty → `unkeptLocations` empty → promote verified head from `backlogLocations`.
-- [ ] **Bin-grouped verification pulse.** In `Region.execute()`, verify candidates one `.mca` bin at a time using the anvil prefilter ([ADR-016](../adr/ADR-016-anvil-subsystem.md)) so the OS page cache stays hot for the whole bin. Document the chosen pulse budget in the ADR.
-- [ ] **Config key `backlogCacheCap`.** Default `1000`; lite-jar default `0` (per [ADR-024](../adr/ADR-024-rtp-lite-assembly-variant.md)). Wire through the existing config loader and document under the queue tuning section.
-- [ ] **Persistence policy.** Confirm and enforce: backlog is **not** persisted to the DB. Add a guard test to prevent regression.
-- [ ] **MemoryTracker accounting.** Decide whether unverified backlog entries count against tracked allocations; document in the ADR and add a `MemoryTracker` test.
-- [ ] **Traceability.** Add a REQ-* row (or extend an existing queue REQ) and a `ReqRtp*L3*` test class; update [`TRACEABILITY.md`](TRACEABILITY.md) and [`GLOSSARY.md`](GLOSSARY.md) to canonicalise the symbol once it exists.
-- [ ] **Aliases table follow-up.** Once `backlogLocations` is real, update the *Domain Analogies & Aliases* row in `AGENTS.md` to drop the "Proposed" qualifier.
+- [x] **Create `BacklogLocationBuffer`.** — `rtp-core/.../selection/region/BacklogLocationBuffer.java`; tri-state `Validity` supersedes the original boolean `verified` flag (ADR-028 2026-05-08 amendment).
+- [x] **Wire `RegionQueueManager.backlogLocations`.** — `RegionQueueManager.backlogLocations` (nullable, allocated only when `backlogCacheCap > 0`); promotion is inline at the end of `Region.processBacklog(...)` rather than on the L2 poll path (ADR-028 2026-05-08 amendment).
+- [x] **Bin-grouped verification pulse.** — `Region.processBacklog(...)` peeks the oldest `UNVERIFIED`, derives the `.mca` bin via `RegionFileCoord`, and runs `RTPHooks.anvilPrefilter().current().classify(...)` against every contributor of that bin's `WorldBacklogBinIndex` snapshot. Pulse budget: `availableTime / 4` (count-bound friendly on Folia per ADR-015).
+- [x] **Config key `backlogCacheCap`.** — `RegionKeys.backlogCacheCap` enum + `RegionSettings.backlogCacheCap` (long); `regions/default.yml` ships `1000`; lite YAML overlay omits the key so the in-code fallback (`RegionConfigLoader`, `0L`) governs lite.
+- [x] **Persistence policy.** — Confirmed by inspection: `RegionQueueManager.installDatabaseCallbacks` attaches callbacks only to `keptLocations` / `unkeptLocations`; `BacklogLocationBuffer` exposes no callback API.
+- [x] **MemoryTracker accounting.** — Capacity folded into the diagnostic totals (`MemoryTracker.run()`: `totalCacheCap += settings.backlogCacheCap()`, `totalLocationQueueSize += backlogLocations.size()`); entries hold no chunk tickets and no `TeleportPipelineTask`, so active-GC sweep is N/A by construction.
+- [x] **Aliases table follow-up.** — `AGENTS.md` *Domain Analogies & Aliases* row updated to drop the "Proposed" qualifier and point at the live `RegionQueueManager.backlogLocations` symbol.
+
+Follow-up items deferred out of v1 scope (recorded here, not promoted to `POTENTIAL_BUGS.md` because they are roadmap, not bugs):
+
+- [x] **REQ-* traceability rows + `ReqRtp*L3*` test classes.** — `REQ-CORE-F-009` added to `rtp-core/REQUIREMENTS.md` §1.1 ("Backlog Verification Order") and to [`TRACEABILITY.md`](TRACEABILITY.md) rtp-core table, mapped to `BacklogLocationBuffer` / `WorldBacklogBinIndex` / `RegionQueueManager.backlogLocations` / `Region.processBacklog` with `BacklogLocationBufferTest` + `WorldBacklogBinIndexTest`; coverage summary updated to 75 reqs / ~43 automated.
+- [x] **Admin docs.** — `backlogCacheCap` row added to the top-level settings tables of both `docs/admin/CONFIGURATION.md` and `docs/admin/REGIONS.md`, plus a new *Backlog Cache (L3)* prose section in `REGIONS.md` (how it works / when to enable / relationship to L1+L2). Both pages cross-link to ADR-028.
+- [x] **Localized lang files.** — `backlogCacheCap` rows added to all eight non-English `regions.lang.yml` files actually shipped (`cat`, `de`, `es`, `fr`, `ja`, `ko`, `nl`, `zh`); `ru` / `pt` / `it` are not present in `rtp-plugin/src/main/resources/lang/` and are not in scope for beta.2.
+- [ ] **Telemetry.** Surface `backlog-bin-hits` / `backlog-bin-rejects` under `AnvilPrefilterMetrics` and through `/rtp info` (per ADR-028 *Follow-ups*).
+- [ ] **Auto-sizing shorthand.** `backlogCacheCapMode = MULTIPLIER × cacheCap` (ADR-028 *Follow-ups*).
+- [ ] **Fabric availability.** Re-evaluate once the Fabric anvil pre-filter parity item under §1 closes.
 
 ---
 

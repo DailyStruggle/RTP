@@ -23,7 +23,7 @@ The general-purpose location pool inside `RegionQueueManager` is layered into ti
 |---|---|---|---|---|---|
 | **L1 — hot / kept** | `keptLocations` (`LockFreeLocationBuffer`) | Fully verified; chunks currently held with `keep(true)` (plugin chunk ticket) | None — chunks already loaded | `activeChunkCap` | Yes |
 | **L2 — cold / unkept** | `unkeptLocations` (`LockFreeLocationBuffer`) | Fully verified through the teleport pipeline; chunk reservations released | One async chunk re-load on promotion to L1 | `cacheCap` | Yes |
-| **L3 — backlog / binned** *(proposed, [ADR-028](../adr/ADR-028-l3-backlog-cache.md))* | `backlogLocations` (new `BacklogLocationBuffer`, nullable) | **Unverified** spiral picks with a per-entry `verified` flag; head-blocking FIFO | None on L3 itself; verification is anvil-prefilter only ([ADR-016](../adr/ADR-016-anvil-subsystem.md)) | `backlogCacheCap` (default `1000`; lite default `0` ⇒ disabled) | No |
+| **L3 — backlog / binned** *(implemented, [ADR-028](../adr/ADR-028-l3-backlog-cache.md))* | `backlogLocations` (`BacklogLocationBuffer`, nullable) | **Unverified** spiral picks with a tri-state per-entry `Validity` (`UNVERIFIED` / `VALIDATED` / `INVALIDATED`); head-blocking FIFO | None on L3 itself; verification is anvil-prefilter only ([ADR-016](../adr/ADR-016-anvil-subsystem.md)) | `backlogCacheCap` (default `1000`; lite default `0` ⇒ disabled) | No |
 
 Refill / promotion flow:
 

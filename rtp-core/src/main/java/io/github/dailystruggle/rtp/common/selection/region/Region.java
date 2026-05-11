@@ -38,7 +38,12 @@ public class Region extends FactoryValue<RegionKeys> {
   public static final List<BiConsumer<Region, UUID>> onPlayerQueuePop = new ArrayList<>();
   private final AtomicBoolean isScanningCache = new AtomicBoolean(false);
 
-  public RegionQueueManager queueManager = new RegionQueueManager(this);
+  // Constructed in the Region(...) constructor body, after this.settings is
+  // assigned. A field initializer here would run before this.settings is set,
+  // making RegionQueueManager observe settings==null and fall into its
+  // fallback branch — which (per ADR-028) leaves backlogLocations null,
+  // permanently disabling the L3 cache regardless of backlogCacheCap.
+  public RegionQueueManager queueManager;
   public AtomicInteger inFlightCalculations =
       new AtomicInteger(0);
 
@@ -91,6 +96,10 @@ public class Region extends FactoryValue<RegionKeys> {
     this.settings = settings;
     this.worldFallbackBound = worldFallbackBound;
     this.configuredWorldName = configuredWorldName;
+    // Construct queueManager AFTER settings is assigned so RegionQueueManager
+    // sees the real cacheCap/backlogCacheCap/activeChunkCap and allocates
+    // backlogLocations when backlogCacheCap > 0 (ADR-028).
+    this.queueManager = new RegionQueueManager(this);
     this.set(RegionKeys.spatialResolution, settings.spatialResolution());
     this.cachePipeline = (RTPTaskPipe) RTP.serverAccessor.createCachePipe();
     this.miscPipeline = (RTPTaskPipe) RTP.serverAccessor.createTaskPipe();
@@ -807,13 +816,12 @@ public class Region extends FactoryValue<RegionKeys> {
     if (backlog == null) return;
     RTPWorld<?> world = getWorld();
     if (world == null) return;
-    // Gate L3 on scan completion: until the region's ScanTask has finished its
-    // full-load verification pass the world is not sufficiently pre-generated,
-    // and draining backlog entries into unkeptLocations would only feed the
-    // deficit loop's live-load path with cold coordinates — driving up
-    // RTPWorld.totalChunkLoads without producing successful attempts. Wait for
-    // pre-generation to settle before competing for tick-thread chunk I/O.
-    if (!scanCompleted) return;
+    // L3 refill + verify run regardless of scan state — both steps are S-005
+    // safe (shape pick has no chunk I/O; Anvil prefilter reads .mca off-thread).
+    // L3 is the highest-volume accumulator and benefits from running
+    // continuously so backlog is warm by the time scan completes. The drain
+    // step (Step 3 below) remains gated on scanCompleted to avoid feeding the
+    // deficit loop's live-load path before pre-generation has settled.
 
     // Step 1 — refill (shape-only, time-sliced). Cap the refill spend at a
     // small fraction of the pulse budget so the rest of execute() (deficit
@@ -829,6 +837,17 @@ public class Region extends FactoryValue<RegionKeys> {
     String worldName = world.name();
     WorldBacklogBinIndex binIndex = RegionQueueManager.binIndexFor(worldName);
     if (currentShape != null) {
+      // Bounded rejection sampling: cap *consecutive* pregenPref rejections per
+      // pulse so a sparsely-pregenerated world with a high pregeneratedPreference
+      // cannot endlessly spin the refill loop. After the cap is hit, we break
+      // out of the refill for this pulse — the next pulse will retry, giving
+      // the rest of execute() (deficit loop, player queue, pipelines) a fair
+      // share of the budget. The time-budget guard above already bounds total
+      // spin time; this additional cap shortens worst-case latency further and
+      // makes the bound explicit. Accepted picks reset the counter so the cap
+      // applies only to a "stuck" tail of consecutive ungenerated draws.
+      final int maxConsecutivePregenRejects = Math.max(16, backlog.capacity());
+      int consecutivePregenRejects = 0;
       while (backlog.size() < backlog.capacity()
           && (System.nanoTime() - startNanos) < refillBudget) {
         int[] sel;
@@ -838,6 +857,24 @@ public class Region extends FactoryValue<RegionKeys> {
           break;
         }
         if (sel == null || sel.length < 2) break;
+        // pregeneratedPreference gate at the L3 coordinate-generation site.
+        // Reject ungenerated columns with probability `pref` BEFORE we spend
+        // any validation effort on them (no anvil read, no buffer slot used).
+        // This is rejection sampling: a rejected pick just advances to the
+        // next shape draw; only accepted picks consume an L3 slot. Non-
+        // blocking (S-005 safe); shares the same helper as PregenTask's L1
+        // gate. Matches the user's intent that the weighted preference live
+        // at coordinate selection, not after locations have been validated.
+        if (pregenPrefRejects(world, sel[0], sel[1])) {
+          if (++consecutivePregenRejects >= maxConsecutivePregenRejects) {
+            // Bounded: give up on this pulse rather than spinning. The next
+            // pulse retries; the deficit loop and other consumers still get
+            // their slice of the budget.
+            break;
+          }
+          continue;
+        }
+        consecutivePregenRejects = 0;
         int blockX = (sel[0] << 4) + 8;
         int blockZ = (sel[1] << 4) + 8;
         RTPCoords coords = new RTPCoords(worldName, blockX, verticalY, blockZ);
@@ -889,6 +926,12 @@ public class Region extends FactoryValue<RegionKeys> {
         }
         e.setValidity(next);
       }
+      // Step 2b — eagerly eject explicit Anvil-pre-filter rejections from
+      // anywhere in this region's buffer, not just at the head. This keeps
+      // the L3 occupancy honest (the `/rtp info` line now reflects only
+      // in-play candidates) and prevents INVALIDATED entries from consuming
+      // capacity until they drift to the head via the natural drain path.
+      backlog.removeInvalidated();
     }
 
     // Step 3 — drain the contiguous-VALIDATED head into unkeptLocations,
@@ -908,6 +951,55 @@ public class Region extends FactoryValue<RegionKeys> {
         }
       }
     }
+  }
+
+  /**
+   * pregenPrefRejects — shared L2/L3 promotion gate for the
+   * {@code pregeneratedPreference} performance knob. Returns {@code true} when
+   * the candidate chunk's column is not yet generated on disk AND a uniform
+   * {@code [0,1)} draw falls below the configured weight. Always returns
+   * {@code false} when the weight is {@code 0.0} (default) or the column is
+   * already generated, preserving prior behavior.
+   *
+   * <p>The probe uses {@link RTPWorld#isChunkGenerated(int, int)}, which is
+   * non-blocking and never triggers generation (S-005 safe). Adapters that
+   * have not overridden it return {@code true} and the gate is a no-op on
+   * those platforms — by design.</p>
+   *
+   * <p>Mirrors the identical gate in {@code PregenTask.runAttempt()} so all
+   * three insertion paths (live spiral, L2→live, L3→L2) apply the same
+   * probabilistic policy. Fail attribution lives on the L1 path
+   * ({@code LocationGenerator.FailTypes.ungenerated}); L2/L3 rejections here
+   * are silent because the locations were already accounted for at L1 entry.</p>
+   */
+  private boolean pregenPrefRejects(RTPWorld<?> world, int cx, int cz) {
+    if (world == null) return false;
+    double pref;
+    try {
+      @SuppressWarnings("unchecked")
+      io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> perf =
+          (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys>)
+              RTP.configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
+      if (perf == null) return false;
+      Object o = perf.getConfigValue(
+          io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.pregeneratedPreference,
+          0.0d);
+      pref = (o instanceof Number n) ? n.doubleValue() : Double.parseDouble(o.toString());
+    } catch (Throwable t) {
+      return false;
+    }
+    if (pref <= 0.0d) return false;
+    boolean generated;
+    try {
+      generated = world.isChunkGenerated(cx, cz);
+    } catch (Throwable t) {
+      // Probe failure: do not block promotion — preserves prior behavior.
+      return false;
+    }
+    if (generated) return false;
+    double clamped = Math.min(1.0d, pref);
+    return clamped >= 1.0d
+        || java.util.concurrent.ThreadLocalRandom.current().nextDouble() < clamped;
   }
 
   /**

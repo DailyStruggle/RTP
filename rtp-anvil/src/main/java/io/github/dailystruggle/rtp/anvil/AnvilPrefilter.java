@@ -19,10 +19,9 @@ import java.util.logging.Logger;
  * all other outcomes ({@link Verdict#ACCEPT} / {@link Verdict#UNKNOWN}) fall through
  * to the live chunk load, where {@code RTPChunk.isSafe(...)} remains authoritative.
  *
- * <p>{@link #probe(World, int, int, Set)} schedules I/O + NBT walk on
+ * <p>The asynchronous {@code probeDetailed} entry point schedules I/O + NBT walk on
  * {@link ForkJoinPool#commonPool()}; do not block the returned future on a tick thread.
- * Only thread-safe Bukkit accessors are touched ({@code getWorldFolder},
- * {@code getEnvironment}, {@code getGenerator}).
+ * Only thread-safe platform accessors are touched (world folder, environment, generator).
  *
  * <p>Callers gate the probe behind the four checks from ADR-016 §3 (config flag,
  * chunk not loaded, no custom generator, structural cache miss). Internally the only
@@ -136,9 +135,9 @@ public final class AnvilPrefilter {
    * Synchronous probe entry point. Exposed for tests that want deterministic dispatch
    * without the {@link ForkJoinPool} hop. Not intended for production callers.
    *
-   * <p>Accepts the raw config-side unsafe list and reconciles it internally via
-   * {@link PaletteNormalizer#reconcileAll} so that tests and production callers
-   * follow the same canonical-form pipeline on both sides of the comparison.</p>
+   * <p>Accepts the raw config-side unsafe list and reconciles it internally via the
+   * platform reconciler so that tests and production callers follow the same
+   * canonical-form pipeline on both sides of the comparison.</p>
    */
   public static Verdict probeSync(
       Path worldFolder, String dimensionSubpath, int cx, int cz, Set<String> rawUnsafeBlocks) {

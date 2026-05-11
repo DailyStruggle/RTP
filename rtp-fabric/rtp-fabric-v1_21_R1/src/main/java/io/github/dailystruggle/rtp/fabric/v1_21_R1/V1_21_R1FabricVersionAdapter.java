@@ -57,8 +57,10 @@ import java.util.logging.Level;
  * <ul>
  *   <li>{@link ChunkStatus} is at {@code net.minecraft.world.level.chunk.ChunkStatus}
  *       on 1.21.1; the package move to {@code .chunk.status} happens in 1.21.3.</li>
- *   <li>Biome registry access uses {@link BuiltInRegistries#BIOME} via the
- *       {@link Holder} produced by {@code level.getBiome(pos)}.</li>
+ *   <li>Biome registry access goes through the {@link Holder} produced by
+ *       {@code level.getBiome(pos)} (the level's {@code registryAccess()} owns
+ *       the biome registry on 1.21.x; there is no static {@code BuiltInRegistries}
+ *       field for biomes).</li>
  *   <li>Block-id lookup goes through {@link BuiltInRegistries#BLOCK}; the
  *       {@code Registries} vs. {@code BuiltInRegistries} split is stable on
  *       1.21.x.</li>

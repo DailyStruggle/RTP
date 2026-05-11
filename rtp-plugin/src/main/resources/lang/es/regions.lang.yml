@@ -12,6 +12,7 @@ shape: forma
 vert: vertical
 requirePermission: requerirPermiso
 cacheCap: limiteCache
+backlogCacheCap: limiteCacheAcumulada
 activeChunkCap: limiteChunkActivo
 price: precio
 spatialResolution: resolucionEspacial

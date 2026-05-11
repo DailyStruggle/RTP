@@ -1,6 +1,9 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 
@@ -10,6 +13,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 
@@ -46,7 +50,33 @@ public final class RegionCacheKey {
    * Bumped whenever a new validity-affecting field is added to the hash inputs so that
    * older caches auto-invalidate on plugin upgrade.
    */
-  public static final int SCHEMA_VERSION = 1;
+  public static final int SCHEMA_VERSION = 2;
+
+  /**
+   * Safety-validity keys that participate in the cache hash. Editing any of these in
+   * {@code safety.yml} should invalidate every region's persisted shape data because
+   * the predicate that decided "known-bad" no longer applies.
+   *
+   * <p>Excluded:
+   * <ul>
+   *   <li>{@link SafetyKeys#invulnerabilityTime} — post-teleport cosmetic, irrelevant to
+   *       which candidate is "safe".</li>
+   *   <li>{@link SafetyKeys#staleChunkRetryLimit} — runtime budget, does not change the
+   *       predicate.</li>
+   *   <li>{@link SafetyKeys#version} — file-format marker.</li>
+   * </ul>
+   */
+  private static final EnumSet<SafetyKeys> SAFETY_HASH_KEYS = EnumSet.of(
+      SafetyKeys.safetyRadius,
+      SafetyKeys.platformRadius,
+      SafetyKeys.platformAirHeight,
+      SafetyKeys.platformDepth,
+      SafetyKeys.platformMaterial,
+      SafetyKeys.airBlocks,
+      SafetyKeys.unsafeBlocks,
+      SafetyKeys.anvilPrefilterEnabled,
+      SafetyKeys.biomeWhitelist,
+      SafetyKeys.biomes);
 
   /**
    * Compute the human-readable cache key suffix.
@@ -93,7 +123,61 @@ public final class RegionCacheKey {
     appendEnumMap(sb, "shape", shape.getData());
     sb.append("vert.class=").append(vert.getClass().getName()).append(';');
     appendEnumMap(sb, "vert", vert.getData());
+    appendSafetySnapshot(sb);
     return sb.toString();
+  }
+
+  /**
+   * Fold the validity-affecting subset of the shared {@code safety.yml} parser into
+   * the hash input. Iterates the allowlist {@link #SAFETY_HASH_KEYS} in enum
+   * declaration order (already deterministic across JVMs) and serializes each value
+   * via {@link #serializeSafetyValue}. Collections are sorted so list re-orderings
+   * are not treated as invalidating edits.
+   *
+   * <p>When the safety parser is unavailable (e.g., early-startup tests that have not
+   * loaded {@code Configs}), the snapshot is silently omitted — the resulting key still
+   * differs from a future call where the parser <i>is</i> available, so stale caches
+   * carried into a configured environment will still be flushed on first match.
+   */
+  private static void appendSafetySnapshot(StringBuilder sb) {
+    ConfigParser<SafetyKeys> safety = safetyParser();
+    if (safety == null) return;
+    for (SafetyKeys key : SAFETY_HASH_KEYS) {
+      Object value = safety.getConfigValue(key, null);
+      sb.append("safety.")
+          .append(key.name().toLowerCase())
+          .append('=')
+          .append(serializeSafetyValue(value))
+          .append(';');
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static ConfigParser<SafetyKeys> safetyParser() {
+    try {
+      if (RTP.configs == null) return null;
+      return (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+    } catch (RuntimeException e) {
+      return null;
+    }
+  }
+
+  /**
+   * Render a safety-key value into a stable, order-independent string form. Collections
+   * are sorted by their lowercase string form so {@code [STONE, DIRT]} and
+   * {@code [dirt, stone]} fold to the same digest. {@code null} maps to the empty string.
+   */
+  private static String serializeSafetyValue(Object value) {
+    if (value == null) return "";
+    if (value instanceof Iterable<?>) {
+      List<String> items = new ArrayList<>();
+      for (Object o : (Iterable<?>) value) {
+        items.add(o == null ? "" : o.toString().trim().toLowerCase());
+      }
+      Collections.sort(items);
+      return "[" + String.join(",", items) + "]";
+    }
+    return value.toString().trim().toLowerCase();
   }
 
   /** Append a sorted, lowercase, trimmed serialization of an EnumMap. */

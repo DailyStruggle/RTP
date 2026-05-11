@@ -8,6 +8,7 @@ For design and implementation details that satisfy these requirements, see [`doc
 ### 1.1 Queue Management and Teleport Execution
 - **REQ-CORE-F-001 — Asynchronous Pre-Generation:** The system shall maintain queues of pre-calculated, verified teleport locations.
 - **REQ-CORE-F-002 — Bounded Generation:** The system shall replenish queues within strictly bounded limits to prevent CPU and memory exhaustion.
+- **REQ-CORE-F-009 — Backlog Verification Order:** Where a pre-verification staging buffer is provided upstream of the verified location queues, the buffer shall preserve insertion order of candidate locations, shall not surface a candidate as ready until its destination has been classified as valid, shall not stall on a subsequent candidate when an earlier candidate has been classified as invalid, and shall amortize verification work across periodic pulses such that no single pulse blocks the server beyond the configured pulse budget.
 
 ### 1.2 Mathematical Determinism
 - **REQ-CORE-F-003 — Uniform Distribution:** Core algorithms shall guarantee uniform spatial distribution.

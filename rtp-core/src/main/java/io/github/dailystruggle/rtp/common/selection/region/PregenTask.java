@@ -222,6 +222,40 @@ final class PregenTask implements Runnable {
         int cz = select[1];
         final long finalL = l;
 
+        // --- pregenerated-area preference (PerformanceKeys.pregeneratedPreference) ---
+        //
+        // Probabilistically reject candidates whose chunk has not yet been
+        // generated on disk, biasing the selector toward pregenerated terrain
+        // without losing the ability to fall back to ungenerated land. The
+        // weight is a double in [0.0, 1.0]:
+        //   0.0 → never reject (no differentiation, default)
+        //   1.0 → always reject ungenerated chunks (hard preference)
+        //   x   → reject ungenerated with probability x
+        //
+        // Uses RTPWorld.isChunkGenerated, which is contracted to be
+        // non-blocking and never trigger generation (S-005 safe). Adapters
+        // that have not overridden it return true and the gate is a no-op.
+        // Generated chunks always pass.
+        double pregenPref;
+        try {
+            Object o = state.performance.getConfigValue(PerformanceKeys.pregeneratedPreference, 0.0d);
+            pregenPref = (o instanceof Number n) ? n.doubleValue() : Double.parseDouble(o.toString());
+        } catch (Throwable t) {
+            pregenPref = 0.0d;
+        }
+        if (pregenPref > 0.0d && !state.world.isChunkGenerated(cx, cz)) {
+            double clamped = Math.min(1.0d, pregenPref);
+            if (clamped >= 1.0d || java.util.concurrent.ThreadLocalRandom.current().nextDouble() < clamped) {
+                if (state.verbose) {
+                    state.failMap.get(LocationGenerator.FailTypes.ungenerated)
+                            .merge("UNGENERATED", 1L, Long::sum);
+                }
+                recordOutcome("ungenerated/UNGENERATED");
+                rescheduleNextAttempt();
+                return;
+            }
+        }
+
         // --- probe-first fast path (BIOME_LOOKUP_PERF_PLAN.md PR-3) ---
         //
         // Ask the world for a lean center-column probe covering the adjustor's Y window.

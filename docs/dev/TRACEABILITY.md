@@ -72,6 +72,7 @@ This document connects each requirement to the design decision that motivated it
 | REQ-CORE-F-006 | DB integration | DESIGN.md Â§4 | DatabaseAccessor | - |
 | REQ-CORE-F-007 | Task lifespan | DESIGN.md Â§6 | MemoryTracker | - |
 | REQ-CORE-F-008 | Orphaned chunk recovery | DESIGN.md Â§6 | ChunkUnloadProcessor | - |
+| REQ-CORE-F-009 | L3 backlog cache (order-preserving FIFO; head-blocking promotion on `UNVERIFIED`; head-drop on `INVALIDATED`; one `.mca` bin verified per `Region.execute()` pulse) | DESIGN.md Â§1.1, [ADR-028](../adr/ADR-028-l3-backlog-cache.md) | `BacklogLocationBuffer`, `WorldBacklogBinIndex`, `RegionQueueManager.backlogLocations`, `Region.processBacklog` | `BacklogLocationBufferTest`, `WorldBacklogBinIndexTest` |
 | REQ-CORE-ARCH-001 | Lock-free config | DESIGN.md Â§1 | FactoryValue | ConfigParserLanguageTest |
 | REQ-CORE-ARCH-002 | Data access pattern | DESIGN.md Â§1 | FactoryValue.getData() | MultiConfigParserIsolationTest |
 | REQ-CORE-ARCH-003 | Fault encapsulation | DESIGN.md Â§6 | TeleportPipelineTask | - |
@@ -145,11 +146,11 @@ This document connects each requirement to the design decision that motivated it
 |---|---|---|
 | Root / System | 24 | 12 (REQ-RTP-F-001 `SLATest`+`RegionPipelineTest`, REQ-RTP-F-006/007 `RegionPipelineTest`, REQ-RTP-F-008, REQ-RTP-F-012 `ScanCmdTest`+`ScanTaskProcessingTest`, REQ-RTP-F-013 `ConfigParserLanguageTest`, REQ-RTP-NF-002, REQ-RTP-NF-003 via `RTPArchitectureTest`, REQ-RTP-SYS-001 via build, REQ-RTP-S-004 `FailureModeTest`+`RegionPipelineTest`, REQ-RTP-S-005, REQ-RTP-S-006 `RTPAPIGuardTest`) |
 | rtp-api | 10 | 4 (REQ-API-NF-002, REQ-API-ARCH-002, REQ-API-ARCH-003 `RTPAPIGuardTest`, REQ-API-ARCH-004) |
-| rtp-core | 19 | 12 (REQ-CORE-F-001 `FailureModeTest`+`RegionPipelineTest`, REQ-CORE-F-003â€“005, REQ-CORE-ARCH-001â€“002, REQ-CORE-ARCH-009â€“010, REQ-CORE-NF-001 `MemoryShapeShutdownTest`+`CachedLocationRoundTripTest`; REQ-CORE-F-003/004 also covered end-to-end by `RegionPipelineTest`) |
+| rtp-core | 20 | 13 (REQ-CORE-F-001 `FailureModeTest`+`RegionPipelineTest`, REQ-CORE-F-003â€“005, REQ-CORE-F-009 `BacklogLocationBufferTest`+`WorldBacklogBinIndexTest`, REQ-CORE-ARCH-001â€“002, REQ-CORE-ARCH-009â€“010, REQ-CORE-NF-001 `MemoryShapeShutdownTest`+`CachedLocationRoundTripTest`; REQ-CORE-F-003/004 also covered end-to-end by `RegionPipelineTest`) |
 | rtp-spigot | 9 | 4 (REQ-SPIGOT-F-001, REQ-SPIGOT-ARCH-001/005 via `ChunkTicketLifecycleTest`, REQ-SPIGOT-ARCH-003/004 via `BukkitSchedulerImplTest`) |
 | rtp-paper | 9 | 5 (REQ-PAPER-F-002 via architecture rule, REQ-PAPER-F-003 and REQ-PAPER-ARCH-003 via `ServerAccessorImplTest`, REQ-PAPER-ARCH-001/005 via `ChunkTicketLifecycleTest`) |
 | rtp-folia | 14 | 1 (REQ-FOLIA-F-002 via architecture rule) |
-| **Total** | **74** | **~42** |
+| **Total** | **75** | **~43** |
 
 > **Deterministic RNG seam:** `MemoryShape.setRng(Random)`, `LocationGenerator.setRng(Random)`, and `RTPCmd.setRng(Random)` allow any test to inject a seeded `java.util.Random` and eliminate RNG as a source of flakiness. `DeterministicShapeTest` (12 tests) exercises this seam for `Circle`, `Square`, and `Rectangle`. The biome-recall path in `LocationGenerator` uses the same seam.
 

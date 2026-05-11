@@ -17,5 +17,7 @@ biomeRecallForced: false # Only use biomes already in cache
 checkOnChunkLoads: false # Check for safe spots in all loaded chunks
 visitorEnabled: true # Enable background data gathering
 
+pregeneratedPreference: 0.0 # Probability [0.0, 1.0] of rejecting an ungenerated chunk per selection attempt. 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land. Generated chunks always pass.
+
 # DO NOT TOUCH VERSION NUMBER
 version: "1.0"

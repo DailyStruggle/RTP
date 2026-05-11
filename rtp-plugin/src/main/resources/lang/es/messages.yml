@@ -113,7 +113,9 @@ datosRegion:
   - "#58CCED  - requierePermiso: [requirePermission]"
   - "#58CCED  - sobrescrituraDeBorde: [worldBorderOverride]"
   - "#58CCED  - capacidadCache: [cacheCap]"
-  - "#58CCED  - cacheRetenida: [keptCache]"
+  - "#58CCED  - cacheRetenida (L1): [keptCache]"
+  - "#58CCED  - cacheLiberada (L2): [unkeptCache]"
+  - "#58CCED  - cacheAcumulada (L3): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - enCache: [cached]"
 
 ################################################################################

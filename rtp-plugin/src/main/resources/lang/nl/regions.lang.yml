@@ -8,6 +8,7 @@ shape: vorm
 vert: verticaal
 requirePermission: toestemmingVereist
 cacheCap: cacheLimiet
+backlogCacheCap: achterstandCacheLimiet
 activeChunkCap: actiefChunkLimiet
 price: prijs
 spatialResolution: ruimtelijkeResolutie

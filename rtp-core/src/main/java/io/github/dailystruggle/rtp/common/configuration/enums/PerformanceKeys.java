@@ -18,5 +18,6 @@ public enum PerformanceKeys {
   visitorEnabled,
   loginCacheEnabled,
   loginCacheCap,
+  pregeneratedPreference,
   version
 }

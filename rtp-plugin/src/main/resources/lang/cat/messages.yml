@@ -151,7 +151,7 @@ tall_human_territory_header: "&7--- Territories ---"
 territory_meow: "  #52B2BF[region]"
 
 # sub-info listings
-# placeholders: [world], [region], [requirePermission], [override], [shape], [worldBorderOverride], [cacheCap], [cached], [keptCache]
+# placeholders: [world], [region], [requirePermission], [override], [shape], [worldBorderOverride], [cacheCap], [cached], [keptCache], [unkeptCache], [backlogCache], [backlogCacheCap]
 box_info:
   - "#21ADA8[world]:"
   - "#99EEBB  - territory: [region]"
@@ -165,7 +165,9 @@ territory_info:
   - "#58CCED  - requires_pets: [requirePermission]"
   - "#58CCED  - fence_override: [worldBorderOverride]"
   - "#58CCED  - kibble_jar_lid: [cacheCap]"
-  - "#58CCED  - hot_pile: [keptCache]"
+  - "#58CCED  - hot_pile (L1): [keptCache]"
+  - "#58CCED  - cold_pile (L2): [unkeptCache]"
+  - "#58CCED  - backlog_pile (L3): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - cached: [cached]"
 
 ################################################################################
