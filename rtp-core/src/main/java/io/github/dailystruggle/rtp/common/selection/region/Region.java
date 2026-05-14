@@ -86,6 +86,20 @@ public class Region extends FactoryValue<RegionKeys> {
    */
   public volatile boolean scanCompleted = false;
 
+  /**
+   * Hysteresis latch for the L3 backlog refill loop (see
+   * {@link #processBacklog}). When {@code true}, the refill loop will run on
+   * each pulse until the backlog reaches {@code capacity}; when
+   * {@code false}, the loop is skipped until the backlog drains below
+   * {@code backlogRefillThreshold * capacity}. This deliberate dead-band
+   * groups shape picks (and the eventual Anvil bin verification) into
+   * larger batches that share the same {@code .mca} files, improving CPU
+   * and memory locality versus refilling one-slot-at-a-time on every
+   * pulse. Default starting state is {@code true} so a fresh region fills
+   * the backlog once at startup.
+   */
+  private volatile boolean backlogRefillActive = true;
+
   public Region(String name, RegionSettings settings) {
     this(name, settings, false, null);
   }
@@ -836,7 +850,32 @@ public class Region extends FactoryValue<RegionKeys> {
     }
     String worldName = world.name();
     WorldBacklogBinIndex binIndex = RegionQueueManager.binIndexFor(worldName);
-    if (currentShape != null) {
+
+    // Hysteresis gate (PerformanceKeys.backlogRefillThreshold). Refill runs
+    // in bursts: once the backlog reaches capacity, refill is suspended
+    // until the buffer drains below `threshold * capacity`. This groups
+    // multiple shape picks (and their downstream Anvil bin verifications)
+    // into larger batches that share .mca files, improving CPU and memory
+    // efficiency versus a constant per-pulse refill of every drained slot.
+    // threshold == 1.0 reproduces the prior always-refill behaviour;
+    // threshold == 0.0 effectively disables refill after the initial fill.
+    final int currentBacklogSize = backlog.size();
+    final int backlogCapacity = backlog.capacity();
+    if (backlogRefillActive) {
+      if (currentBacklogSize >= backlogCapacity) {
+        backlogRefillActive = false;
+      }
+    } else {
+      double threshold = readBacklogRefillThreshold();
+      // Inactive until size strictly drops below threshold * capacity.
+      // Using strict-less so threshold==0.0 never re-arms refill (admin
+      // opt-out) and threshold==1.0 re-arms as soon as one slot drains.
+      if (currentBacklogSize < (long) Math.floor(threshold * backlogCapacity)) {
+        backlogRefillActive = true;
+      }
+    }
+
+    if (currentShape != null && backlogRefillActive) {
       // Bounded rejection sampling: cap *consecutive* pregenPref rejections per
       // pulse so a sparsely-pregenerated world with a high pregeneratedPreference
       // cannot endlessly spin the refill loop. After the cap is hit, we break
@@ -972,6 +1011,34 @@ public class Region extends FactoryValue<RegionKeys> {
    * ({@code LocationGenerator.FailTypes.ungenerated}); L2/L3 rejections here
    * are silent because the locations were already accounted for at L1 entry.</p>
    */
+  // (readBacklogRefillThreshold helper defined below)
+  /**
+   * readBacklogRefillThreshold — reads
+   * {@code PerformanceKeys.backlogRefillThreshold} clamped to {@code [0.0, 1.0]}.
+   * Defaults to {@code 0.5} when the parser is missing or the value cannot
+   * be parsed (cold-boot races, malformed admin input). The clamping is
+   * deliberate so out-of-range admin values silently degrade to the
+   * nearest valid behaviour rather than corrupting the hysteresis latch.
+   */
+  private double readBacklogRefillThreshold() {
+    try {
+      @SuppressWarnings("unchecked")
+      io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> perf =
+          (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys>)
+              RTP.configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
+      if (perf == null) return 0.5d;
+      Object o = perf.getConfigValue(
+          io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.backlogRefillThreshold,
+          0.5d);
+      double v = (o instanceof Number n) ? n.doubleValue() : Double.parseDouble(o.toString());
+      if (v < 0.0d) return 0.0d;
+      if (v > 1.0d) return 1.0d;
+      return v;
+    } catch (Throwable t) {
+      return 0.5d;
+    }
+  }
+
   private boolean pregenPrefRejects(RTPWorld<?> world, int cx, int cz) {
     if (world == null) return false;
     double pref;
@@ -1116,12 +1183,36 @@ public class Region extends FactoryValue<RegionKeys> {
   }
 
   /**
-   * queue - add a player to the queue for this region
+   * Open a personal coordinate bucket for {@code id} in this region (ADR-043).
+   * Bucket-only opt-in: schedules a push-on-open pregen fill but does NOT
+   * enroll {@code id} in the teleport waitlist.
    *
    * @param id player uuid
    */
-  public void queue(UUID id) {
-    queueManager.queue(id);
+  public void openPersonalQueue(UUID id) {
+    queueManager.openPersonalQueue(id);
+  }
+
+  /**
+   * Close the personal coordinate bucket for {@code id} in this region
+   * (ADR-043). Returns banked coordinates to {@code unkeptLocations} and
+   * clears the per-uuid push-on-open guard.
+   *
+   * @param id player uuid
+   */
+  public void closePersonalQueue(UUID id) {
+    queueManager.closePersonalQueue(id);
+  }
+
+  /**
+   * Enroll {@code id} on this region's teleport waitlist (ADR-043). The
+   * caller must already have populated {@code latestTeleportData}; stale
+   * entries are purged by {@link #execute(long)}.
+   *
+   * @param id player uuid
+   */
+  public void requestTeleport(UUID id) {
+    queueManager.requestTeleport(id);
   }
 
   /**

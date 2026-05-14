@@ -2,11 +2,11 @@
 
 This document outlines the plan for RTP's multi-server (proxy / network) expansion. It is **distinct from** [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md): that plan covers running on additional Minecraft server flavours (Spigot/Paper/Folia/Fabric); *this* plan covers coordinating RTP across **multiple concurrent backend servers** — and, as of 2026-05-07, **multiple concurrent proxy instances** — sitting in front of those backends (Velocity, BungeeCord, Waterfall).
 
-> Status: **Draft — Phase 0 (Scope Unlock) not yet started.** No code changes have been made; no ADR has been accepted. This document is gated by Rule D-005 (Propose Before Implementation, see [`AGENTS.md`](../../.junie/AGENTS.md)).
+> Status: **Draft — Phase 0 (Scope Unlock) partially complete; ADR-025 not yet drafted.** No code changes have been made. Requirements have been authored in `REQUIREMENTS.md` (REQ-RTP-NET-001…014) and traceability rows added; GLOSSARY entries and ADR-025 remain outstanding. This document is gated by Rule D-005 (Propose Before Implementation, see [`AGENTS.md`](../../.junie/AGENTS.md)).
 
-> Cross-references: [rtp-fabric-ADR-002 (Fabric in scope)](../../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) is **orthogonal** to this plan and is **not** superseded. A new ADR-025 (multi-server proxy support) is required before Phase 1 work begins.
+> Cross-references: [rtp-fabric-ADR-002 (Fabric in scope; formerly ADR-022)](../../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) is **orthogonal** to this plan and is **not** superseded. A new ADR-025 (multi-server proxy support) is required before Phase 1 work begins.
 
-> Veracity audit (2026-05-01): codebase-anchored claims in this plan have been spot-checked against the repo. Confirmed present: `AbstractSQLDatabaseAccessor` (+ `H2`/`SQLite`/`MySQL`/`PostgreSQL` concrete accessors), HikariCP 5.1.0, `RegionQueueManager`, `TeleportPipelineTask`, `MemoryTracker`, `RTP.scheduler.runTaskTimer` / `runTaskTimerAsynchronously`, `BrigadierBridgeContext` + `BrigadierCommandAdapter` in `commands-api/`, `messages.yml`, `REQ-RTP-F-013`. Unverifiable here (external APIs): Velocity `ServerPreConnectEvent`, Lettuce, Postgres `LISTEN/NOTIFY` / `SKIP LOCKED` semantics — these are documented as items for ADR-025. Note: `loadBalancer.backends.<serverId>.weight` is a *proposed* key, not yet drafted in the config surface; flagged inline.
+> Veracity audit (2026-05-01): codebase-anchored claims in this plan have been spot-checked against the repo. Confirmed present: `AbstractSQLDatabaseAccessor` (+ `H2`/`SQLite`/`MySQL`/`PostgreSQL` concrete accessors), HikariCP 5.1.0, `RegionQueueManager`, `TeleportPipelineTask`, `MemoryTracker`, `RTP.scheduler.runTaskTimer` / `runTaskTimerAsynchronously`, `BrigadierBridgeContext` + `BrigadierCommandAdapter` in `commands-api/`, `messages.yml`, `REQ-RTP-F-013`. Unverifiable here (external APIs): Velocity `ServerPreConnectEvent`, Lettuce, Postgres `LISTEN/NOTIFY` / `SKIP LOCKED` semantics — these are documented as items for ADR-025. Note: the once-flagged `loadBalancer.backends.<serverId>.weight` key has since been drafted into the *Config Surface* below.
 
 ---
 
@@ -26,7 +26,7 @@ The plan is designed around a single explicit operator workflow. Anything that c
 - **Multi-proxy by default.** Operators may run any number of proxy instances concurrently — for HA failover, geo-distributed front-doors, or capacity scaling — and the same `network.yml` (with a per-host `proxyId`, analogous to `serverId`) drops onto every proxy. Coordination between proxies is achieved entirely through the durable shared store (D2/D3); proxies do **not** talk to each other directly. See *Multi-Proxy Deployment* below.
 - **Minimal proxy-side configuration.** A proxy's job is to *route* RTP requests, not to own world data. Its configuration shall reduce to: a transport / database reference (Redis or JDBC URL), a shared secret, and the trigger / load-balancer policy. No region definitions, no world tables, no per-backend mirrors of backend-side config.
 - **Verbatim copy across backends and proxies.** An operator shall be able to author `network.yml` once, copy it byte-for-byte to every backend **and every proxy**, and only have to change a single per-host field — `network.serverId` on backends, `network.proxyId` on proxies. This rules out config sprawl: anything that *must* differ between hosts is either auto-derived (e.g. heartbeat timestamps), centralised (proxy-side trigger config per D1, replicated through the shared store so all proxies see the same view), or limited to that one identifying field.
-- **Zero behaviour change when disabled.** With `network.enabled: false` (the shipping default), the artifact behaves byte-identically to today's single-server build. This is REQ-RTP-NET-005 and is the gate for any release.
+- **Zero behaviour change when disabled.** With `network.enabled: false` (the shipping default), the artifact behaves byte-identically to today's single-server build. This is REQ-RTP-NET-002 (*Behavioural Parity When Disabled*) and is the gate for any release.
 
 ### What an operator does (target workflow)
 
@@ -91,7 +91,7 @@ For operators who require strict cross-proxy coordination (e.g. very low `staleA
 
 ### Reservation tokens under multiple proxies
 
-The state machine in *Reservation Tokens — Lifecycle ownership matrix* already covers the multi-proxy race: the `PENDING → CLAIMED` transition uses `UPDATE … WHERE state='PENDING'` row-count atomicity, so two proxies racing for the same token observe row-count `1` and row-count `0` respectively; the loser surfaces `messages.yml` failure (REQ-RTP-NET-003) and falls back to the next-lowest-score candidate via the existing capped-retry chain. The `claimReanimateMs` path, originally written for proxy *restart*, is the same primitive used for proxy *death* in a multi-proxy fleet — a token claimed by a dead proxy is re-opened to `PENDING` after the reanimation window so a surviving proxy can pick it up. No additional state is required.
+The state machine in *Reservation Tokens — Lifecycle ownership matrix* already covers the multi-proxy race (REQ-RTP-NET-014): the `PENDING → CLAIMED` transition uses `UPDATE … WHERE state='PENDING'` row-count atomicity, so two proxies racing for the same token observe row-count `1` and row-count `0` respectively; the loser surfaces `messages.yml` failure (REQ-RTP-NET-006) and falls back to the next-lowest-score candidate via the existing capped-retry chain. The `claimReanimateMs` path, originally written for proxy *restart*, is the same primitive used for proxy *death* in a multi-proxy fleet — a token claimed by a dead proxy is re-opened to `PENDING` after the reanimation window so a surviving proxy can pick it up. No additional state is required.
 
 ### Network wait queue under multiple proxies
 
@@ -125,7 +125,7 @@ In other words: the network-mode reservation token table is a **thin allocation 
 | Concern | Pre-resolve (chosen) | Post-arrival (rejected) |
 |--------|---------------------|------------------------|
 | S-001 / S-003 / S-005 obligations | Stay on destination's existing async pipeline. No re-litigation over the wire. | Run after transfer commits. Failure leaves the player on the wrong server with no clean recovery. |
-| S-004 attribution | Failure surfaces on origin via `messages.yml` (REQ-RTP-F-013 / REQ-RTP-NET-003) before any transfer. | Failure surfaces *after* a successful transfer; either silent (S-004 violation) or requires a second transfer to recover. |
+| S-004 attribution | Failure surfaces on origin via `messages.yml` (REQ-RTP-F-013 / REQ-RTP-NET-006) before any transfer. | Failure surfaces *after* a successful transfer; either silent (S-004 violation) or requires a second transfer to recover. |
 | Player UX | One transfer; spawn frame is the final location. | Spawn-flash at destination's spawn, then a teleport. |
 | Selector honesty | Selector pays the resolve cost on the chosen backend; mid-flight rejection retries the next-lowest-score candidate. | Selector commits before destination knows it can deliver; rejection means a re-transfer. |
 | Reservation tokens | Required (state machine: `PENDING → CLAIMED → CONSUMED`). | Avoidable, but only by paying the cost in failure UX. |
@@ -140,7 +140,7 @@ Behaviour:
 
 - Enrollment is idempotent on UUID — a player who re-issues `/rtp` while waiting does not double-queue.
 - The destination's region cache replenishes asynchronously through the existing deficit loop in `Region.execute()`; as new entries land in `keptLocations`/`unkeptLocations`, the network wait queue drains in FIFO order, each drain pulling a coordinate, issuing a reservation token, and transferring the player.
-- The proxy may surface a configurable "you are #N in the network queue" message (REQ-RTP-F-013 / REQ-RTP-NET-003), reusing the existing single-server queue-position UX.
+- The proxy may surface a configurable "you are #N in the network queue" message (REQ-RTP-F-013 / REQ-RTP-NET-006 / REQ-RTP-NET-008), reusing the existing single-server queue-position UX.
 - Bypass permission **reuses the existing `rtp.unqueued` node** (no new permission). When `true`, the player skips the network wait queue and the destination generates a fresh location immediately; if no backend can deliver immediately, the request fails fast with a configurable message. Use is expected to be rare — implementation is **low priority**, may land in Phase 2 or be deferred to Phase 3 without blocking acceptance.
 - The wait-queue table is **purely transient**: rows live as long as the player is connected and waiting; the reservation-token reaper also reaps stale wait-queue rows on the same TTL clock. This keeps it consistent with single-server semantics where the wait queue lives only in memory.
 
@@ -338,7 +338,7 @@ Special cases collapse cleanly:
 - *Least-loaded*: weight only `playerLoad` and/or `mspt`.
 - *Lowest-latency*: weight only `proxyLatency`.
 - *Sticky region*: weight `regionAffinity` heavily; everything else light.
-- *Weighted (admin-set per backend)*: not represented as a per-metric weight — admins set a per-backend multiplier (proposed key `loadBalancer.backends.<serverId>.weight`, **not yet drafted in the config surface below — to be added during Phase 1 design**) that divides the final score so a higher backend weight makes that backend preferred while keeping "lowest wins".
+- *Weighted (admin-set per backend)*: not represented as a per-metric weight — admins set a per-backend multiplier (`loadBalancer.backends.<serverId>.weight`, included in the *Config Surface* below) that divides the final score so a higher backend weight makes that backend preferred while keeping "lowest wins".
 
 #### Defaults shipped with v1
 
@@ -360,7 +360,7 @@ The example block above is the **shipped default**. Rationale per metric noted i
 
 Adapted from CFS / kernel load-balancer conventions — cheap to evaluate, expensive to mis-pick, biased toward stability over reactivity:
 
-- **Capped retries**: on chosen-backend rejection or timeout, retry with the next-lowest score, capped at `loadBalancer.maxRetries` (default `3`). Beyond the cap, fail fast with a configurable `messages.yml` entry (REQ-RTP-F-013 / REQ-RTP-NET-003).
+- **Capped retries**: on chosen-backend rejection or timeout, retry with the next-lowest score, capped at `loadBalancer.maxRetries` (default `3`). Beyond the cap, fail fast with a configurable `messages.yml` entry (REQ-RTP-F-013 / REQ-RTP-NET-006).
 - **Per-attempt timeout**: `loadBalancer.attemptTimeoutMs` (default `1500`). The selector treats a timeout identically to a rejection.
 - **Hysteresis on re-pick**: after a rejection, the rejected backend is excluded from selection for `loadBalancer.cooldownMs` (default `2000`) — the same idea as CFS's `imbalance_pct` / `nr_balance_failed` debounce. Prevents the proxy from re-picking the same struggling backend on the next request.
 - **Score sticking ('idle balance'-style)**: don't migrate already-pending requests to a freshly-cheaper backend mid-flight. Once a request is dispatched, it stays with the chosen backend until success, timeout, or rejection — mirrors how CFS prefers not to migrate a running task unless the imbalance is significant.
@@ -418,7 +418,7 @@ All counters are **snapshots**, not deltas — the consumer (selector) does the 
 ### Cadence and write strategy
 
 - Default heartbeat interval: **1 second** (configurable via `network.heartbeat.intervalTicks`, default `20`). Aligns with the heartbeat/staleness pattern already drafted under `NetworkSnapshot`.
-- Writes happen on `RTP.scheduler.runTaskTimerAsynchronously` — **never on a tick / region thread** (REQ-RTP-NET-004, S-005 spirit).
+- Writes happen on `RTP.scheduler.runTaskTimerAsynchronously` — **never on a tick / region thread** (REQ-RTP-NET-007, S-005 spirit).
 - Single-row UPSERT keyed on `serverId` (no historical retention by default — keeps the table tiny). A separate optional `BackendHeartbeatHistoryTable` is a Phase 4 hardening item if ops want longitudinal data.
 - On Folia, the publisher is async-only; per-region TPS is sampled via the platform's `RegionScheduler` API and folded into the row before write.
 - On graceful shutdown, the backend writes a final row with `pluginState=SHUTTING_DOWN` and `acceptingRequests=false` so the selector drops it immediately rather than waiting for the staleness window. Best-effort — a hard crash relies on the staleness filter.
@@ -458,7 +458,7 @@ JSON columns become `JSONB` on Postgres; TEXT/CSV on SQLite (which is dev-only a
 
 ### Module placement
 
-- The publisher (`BackendStatePublisher`) lives in **`rtp-core`** as part of the `NetworkBridge` optional subsystem. Default-disabled when `network.enabled: false` — REQ-RTP-NET-005 must remain green.
+- The publisher (`BackendStatePublisher`) lives in **`rtp-core`** as part of the `NetworkBridge` optional subsystem. Default-disabled when `network.enabled: false` — REQ-RTP-NET-002 must remain green.
 - The accessor member (per D3) exposes `writeBackendState(BackendStateRow)` and `readNetworkSnapshot()`. Concrete bindings (Redis / Postgres / generic SQL / in-memory) implement both.
 - No platform imports in the publisher — TPS/MSPT/heap/region data come through `RTP.serverAccessor` extensions (a small additive surface to spec in ADR-025; the *April 2026 gap analysis* in `MULTI_PLATFORM_PLAN.md` does **not** cover these new methods).
 
@@ -524,7 +524,7 @@ Per D2, tokens **must survive a proxy restart**, which is why `plugin-message` t
 | State transition | Initiator | Atomicity primitive | Failure handling |
 |------------------|-----------|---------------------|------------------|
 | `—` → `PENDING` | Destination backend (after pipeline produces safe location) | INSERT under unique `(playerUuid, state=PENDING)` partial index; conflict ⇒ reuse existing row | If conflict happens during a retry, the destination returns the existing token rather than minting a new one |
-| `PENDING` → `CLAIMED` | Proxy (just before issuing the transfer) | `UPDATE … SET state='CLAIMED', claimedAtEpochMs=now WHERE token=? AND state='PENDING'` returning row-count | row-count `= 0` ⇒ race lost (token expired or was claimed by a parallel proxy instance); proxy aborts the transfer and surfaces a `messages.yml` failure (REQ-RTP-NET-003) |
+| `PENDING` → `CLAIMED` | Proxy (just before issuing the transfer) | `UPDATE … SET state='CLAIMED', claimedAtEpochMs=now WHERE token=? AND state='PENDING'` returning row-count | row-count `= 0` ⇒ race lost (token expired or was claimed by a parallel proxy instance); proxy aborts the transfer and surfaces a `messages.yml` failure (REQ-RTP-NET-006) |
 | `CLAIMED` → `CONSUMED` | Destination backend (in the join handler) | `UPDATE … SET state='CONSUMED' WHERE token=? AND state='CLAIMED'` returning row-count | row-count `> 1` ⇒ replay attempt; reject the duplicate join, log under S-004 |
 | `PENDING` \| `CLAIMED` → `EXPIRED` | Reaper (each backend, async timer) | `UPDATE … SET state='EXPIRED' WHERE expiresAtEpochMs<now AND state IN ('PENDING','CLAIMED')` | Token is no longer valid; if it was `CLAIMED`, the destination releases the underlying `keptLocations` entry back to its source buffer and emits a `MemoryTracker` release; an audit row is logged |
 
@@ -609,22 +609,28 @@ Acceptance contract: with `network.enabled: false`, all single-server tests must
 
 ---
 
-## Requirements (Stubs — to be authored in REQUIREMENTS.md as part of Phase 0)
+## Requirements — Cross-Reference
 
-| ID | Statement |
-|----|-----------|
-| `REQ-RTP-NET-001` | Cross-server teleport shall preserve S-001 through S-006 end-to-end. |
-| `REQ-RTP-NET-002` | Reservation tokens shall expire deterministically; no orphaned `MemoryTracker` entries shall remain after expiry. |
-| `REQ-RTP-NET-003` | All proxy-mediated user-facing messages shall route through `messages.yml` (extends REQ-RTP-F-013). |
-| `REQ-RTP-NET-004` | Network transport shall not perform synchronous I/O on a tick or netty thread. |
-| `REQ-RTP-NET-005` | When `network.enabled` is false, behaviour shall be byte-identical to single-server operation. |
-| `REQ-RTP-NET-006` | Every transport packet shall carry a `schemaVersion` and an HMAC envelope; packets failing verification shall be dropped and audited under S-004. |
-| `REQ-RTP-NET-007` | A reservation token claim shall be exactly-once across the network; a duplicate `CLAIMED → CONSUMED` transition shall be refused and audited under S-004. |
-| `REQ-RTP-NET-008` | Backend telemetry shall be writable to *any* `AbstractSQLDatabaseAccessor` flavour the project ships (H2/SQLite/MySQL/PostgreSQL). |
-| `REQ-RTP-NET-009` | Multiple proxy instances shall be supported concurrently against a single shared store; no code path shall assume a singleton proxy, and no proxy-to-proxy direct communication shall be required for correctness. |
-| `REQ-RTP-NET-010` | A reservation token claimed by a proxy that subsequently dies shall become claimable by any surviving proxy after `claimReanimateMs`, without operator intervention. |
+The canonical wording for every `REQ-RTP-NET-NNN` requirement lives in [`REQUIREMENTS.md` §1.6 *Network / Proxy Support*](REQUIREMENTS.md). The table below maps the plan's internal topics to the authored requirement IDs so in-body citations elsewhere in this document have a single lookup. Traceability rows (currently all *unimplemented*) live in [`TRACEABILITY.md` — *Network / Proxy Requirements*](TRACEABILITY.md).
 
-Authoring rules: see [`docs/dev/RULES.md`](RULES.md) and the *Requirement Documentation Rules* section of [`AGENTS.md`](../../.junie/AGENTS.md). The statements above are placeholders — final wording must use `shall` / `shall not`, no implementation actions.
+| Authored ID | Topic | Plan section(s) that rely on it |
+|---|---|---|
+| `REQ-RTP-NET-001` | Optional network mode (off by default) | *Config Surface* (`network.enabled`) |
+| `REQ-RTP-NET-002` | Behavioural parity when disabled | *Non-Goals (v1)*; *Phase 1 no-op test*; *Risk & Pitfall Inventory* |
+| `REQ-RTP-NET-003` | Single distribution artifact (backend / proxy role auto-select) | *Intended Usage & Deployment Model* |
+| `REQ-RTP-NET-004` | Safety preservation across the network (S-001…S-006) | *Coordinate Resolution Timing*; *Why post-arrival was rejected* |
+| `REQ-RTP-NET-005` | Authoritative world state on backends | *Architecture Overview*; *Non-Goals (v1)* |
+| `REQ-RTP-NET-006` | Configurable network messaging (extends REQ-RTP-F-013) | *Reservation Tokens — Lifecycle ownership matrix*; *Network Wait Queue*; *Capped retries* |
+| `REQ-RTP-NET-007` | Non-blocking network I/O (extends REQ-RTP-F-008, REQ-RTP-S-005) | *Backend Telemetry Publication — Cadence*; *Risk & Pitfall Inventory* |
+| `REQ-RTP-NET-008` | Cross-network fairness (UUID wait queue, bypass semantics) | *Network Wait Queue*; queue-position message |
+| `REQ-RTP-NET-009` | Authenticated, versioned inter-server data relay | *Sufficiency Audit*; *Risk & Pitfall Inventory — Security* |
+| `REQ-RTP-NET-010` | Proxy load-balancing policy (configurable, with disable option) | *Load-Balancing Heuristics* (weights of `0` collapse to round-robin / fixed routing) |
+| `REQ-RTP-NET-011` | Reservation token deterministic expiry; no orphaned allocations | *Reservation Tokens — Lifecycle ownership matrix* (TTL/`EXPIRED` row); *Required regression coverage* |
+| `REQ-RTP-NET-012` | Exactly-once reservation claim | *Reservation Tokens — Lifecycle ownership matrix* (`CLAIMED → CONSUMED` row); *Sufficiency Audit* |
+| `REQ-RTP-NET-013` | Multi-flavour persistence compatibility | *Storage — Reuse `AbstractSQLDatabaseAccessor`*; *Sufficiency Audit* |
+| `REQ-RTP-NET-014` | Multi-proxy concurrency and reanimation | *Multi-Proxy Deployment*; *Reservation tokens under multiple proxies*; *Phase 2 acceptance* |
+
+> Authoring rules for any future amendments: see [`docs/dev/RULES.md`](RULES.md) and the *Requirement Documentation Rules* section of [`AGENTS.md`](../../.junie/AGENTS.md) (use `shall` / `shall not`, no implementation actions, no temporal framing).
 
 ---
 
@@ -634,13 +640,13 @@ Mirrors the structure of [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) so c
 
 ### Phase 0 — Scope Unlock *(docs only; D-005 gate)*
 
-- [ ] **ADR-025 — Multi-Server Proxy Support** — accept Velocity-first, load-balancing headline, durable-transport requirement (D2), reuse of `AbstractSQLDatabaseAccessor` (D3). Do not supersede ADR-022.
-- [ ] **`REQUIREMENTS.md`** — add REQ-RTP-NET-001…005 with final phrasing.
-- [ ] **`GLOSSARY.md`** — add: *backend*, *proxy*, *reservation token*, *transport*, *network snapshot*, *backend selector*.
-- [ ] **`AGENTS.md` Current Development Focus** — only after Phase 0 acceptance; until then, Fabric remains the active frontier.
-- [ ] **`INDEX.md`** — add ADR-025 row + this plan.
-- [ ] **Fill the load-balancing heuristics placeholder** in this document.
-- [ ] **Resolve D4** — pick HMAC key distribution mechanism.
+- [ ] **ADR-025 — Multi-Server Proxy Support** — accept Velocity-first, load-balancing headline, durable-transport requirement (D2), reuse of `AbstractSQLDatabaseAccessor` (D3). Do not supersede rtp-fabric-ADR-002 (formerly ADR-022). *Outstanding — file `docs/adr/ADR-025-*.md` not yet drafted.*
+- [x] **`REQUIREMENTS.md`** — REQ-RTP-NET-001…014 authored with `shall` phrasing (see `REQUIREMENTS.md` §1.6). Plan-internal citations re-threaded against canonical IDs; cross-reference table above replaces the prior stub table.
+- [ ] **`GLOSSARY.md`** — add: *backend*, *proxy*, *reservation token*, *transport*, *network snapshot*, *backend selector*. *Outstanding.*
+- [ ] **`AGENTS.md` Current Development Focus** — only after Phase 0 acceptance (ADR-025 + GLOSSARY); until then, Fabric remains the active frontier.
+- [x] **`INDEX.md`** — plan row present in [`docs/dev/INDEX.md`](INDEX.md) (Task router + doc catalog). ADR-025 row will be added when that ADR is drafted.
+- [x] **Fill the load-balancing heuristics placeholder** in this document — see *Load-Balancing Heuristics — Configurable Weighted Average* above (direction-locked, defaults serve as test fixture).
+- [x] **Resolve D4** — env-var `RTP_NET_SECRET` selected for v1 (see *Decisions Recorded* row D4 and *Open Items* for deferred alternatives).
 
 ### Phase 1 — Core SPI *(no proxy adapter yet)*
 
@@ -659,7 +665,7 @@ Mirrors the structure of [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) so c
 - [ ] `ServerPreConnectEvent` hook (Velocity) for backend rewrite.
 - [ ] `CommandTriggerSource` wired through dispatcher.
 - [ ] Resolve D4 (HMAC key distribution) before security review.
-- [ ] **Acceptance**: cross-server `/rtp` round-trip on **2× Velocity (behind L4) + 2× Paper** devstack with Redis. The two-proxy baseline exercises REQ-RTP-NET-009 / REQ-RTP-NET-010; single-proxy is the `N=1` degenerate case and remains green by construction.
+- [ ] **Acceptance**: cross-server `/rtp` round-trip on **2× Velocity (behind L4) + 2× Paper** devstack with Redis. The two-proxy baseline exercises REQ-RTP-NET-014 (multi-proxy concurrency + reanimation); single-proxy is the `N=1` degenerate case and remains green by construction.
 - [ ] **Acceptance (RESP compatibility)**: same cross-server `/rtp` round-trip green against **DragonflyDB** as the shared store, using the unmodified `RedisNetworkStateBinding`. One extra container in the devstack compose; no new code paths. Any observed RESP divergence (Lua/`EVAL`, Streams consumer groups, persistence semantics) is recorded in `LESSONS_LEARNED.md`, not branched on in code.
 - [ ] Regression suite for reservation token replay / TTL / orphaned-MemoryTracker scenarios.
 
@@ -703,7 +709,7 @@ Mirrors the structure of [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) so c
 - **Velocity vs. BungeeCord API divergence** — too large to share a runtime; share only the SPI. Don't water down the Velocity design to match Bungee.
 - **Version skew** — backend running RTP `X` talking to a proxy plugin running `X+1`. Requires `schemaVersion` negotiation on first packet, with graceful degrade ("falls back to single-server behaviour").
 - **Security** — Redis (and any RESP-compatible drop-in such as DragonflyDB / KeyDB) especially: any other plugin sharing the same store can spoof requests. HMAC + a kill switch in config are mandatory. D4 must be resolved before Phase 2 ships.
-- **Existing single-server tests must not regress** — REQ-RTP-NET-005 makes this explicit; the Phase 1 no-op test is the gate.
+- **Existing single-server tests must not regress** — REQ-RTP-NET-002 makes this explicit; the Phase 1 no-op test is the gate.
 - **Plugin-message transport is dev-only** (D2) — must be loudly documented and emit a startup warning when selected outside a dev profile.
 
 ---
@@ -714,9 +720,9 @@ This plan has been reviewed for implementer-sufficiency against `AGENTS.md`, `RU
 
 - **Reservation token state machine** — explicit ownership matrix added (who initiates each transition, atomicity primitive, failure handling, proxy-restart reanimation).
 - **Thread-context map** — added to *Risk & Pitfall Inventory* so each callback's expected thread is documented.
-- **Wire-protocol envelope** — captured as REQ-RTP-NET-006 (schemaVersion + HMAC). Final wire format (CBOR / JSON / length-prefixed bytes) deferred to ADR-025.
-- **Exactly-once claim semantics** — captured as REQ-RTP-NET-007.
-- **Multi-DB compatibility** — captured as REQ-RTP-NET-008 (any of H2/SQLite/MySQL/PostgreSQL must be acceptable for backend-side telemetry).
+- **Wire-protocol envelope** — captured as REQ-RTP-NET-009 (schemaVersion + HMAC). Final wire format (CBOR / JSON / length-prefixed bytes) deferred to ADR-025.
+- **Exactly-once claim semantics** — captured as REQ-RTP-NET-012.
+- **Multi-DB compatibility** — captured as REQ-RTP-NET-013 (any of H2/SQLite/MySQL/PostgreSQL must be acceptable for backend-side telemetry).
 - **Required regression coverage** — enumerated under *Reservation Tokens* (replay, TTL, orphan, reanimation, schema-version, HMAC reject) so the Phase 2 acceptance suite is unambiguous.
 - **Test fixture provenance** — the v1 default `loadBalancer` block is now explicitly the test fixture (no separate fixture file).
 

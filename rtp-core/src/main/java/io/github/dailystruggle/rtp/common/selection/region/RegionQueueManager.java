@@ -96,6 +96,16 @@ public class RegionQueueManager {
 
     public final ConcurrentLinkedQueue<UUID> playerQueue = new ConcurrentLinkedQueue<>();
 
+    /**
+     * Per-uuid in-flight guard for personal-bucket push-on-open fills (ADR-043).
+     * When {@link #openPersonalQueue(UUID)} schedules a {@link RegionCacheTask}
+     * for a uuid, the uuid is added to this set; the task removes it on
+     * completion. Re-opening an already-tracked uuid does not schedule a
+     * duplicate fill, preventing reservation amplification on flapping joins.
+     */
+    public final java.util.Set<UUID> perPlayerInFlight =
+            java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     public RegionQueueManager(Region region) {
         this.region = region;
         RegionSettings settings = region.getSettings();
@@ -203,14 +213,92 @@ public class RegionQueueManager {
     }
 
     /**
-     * queue - add a player to the queue for this region
+     * Open a personal coordinate bucket for {@code uuid} in this region (ADR-043).
      *
-     * @param id player uuid
+     * <p>Idempotent. This is the {@code rtp.personalqueue} opt-in proper: it
+     * declares "subsequent pregen output for this region MAY earmark a
+     * coordinate into a bucket dedicated to {@code uuid}, instead of (or in
+     * addition to) the shared {@code keptLocations} pool." It does
+     * <strong>NOT</strong> request a teleport, does NOT enroll {@code uuid} in
+     * {@link #playerQueue}, and does NOT add {@code uuid} to
+     * {@link RTP#queuedPlayers}.
+     *
+     * <p>Schedules a single push-on-open {@link RegionCacheTask} to fill the
+     * bucket when no fill is already in flight for {@code uuid} (per-uuid
+     * in-flight guard via {@link #perPlayerInFlight}).
+     *
+     * @param uuid player uuid
      */
-    public void queue(UUID id) {
-        playerQueue.add(id);
-        RTP.getInstance().queuedPlayers.add(id);
-        perPlayerLocationQueue.putIfAbsent(id, new ConcurrentLinkedQueue<>());
+    public void openPersonalQueue(UUID uuid) {
+        if (uuid == null) return;
+        // Idempotent bucket allocation.
+        perPlayerLocationQueue.putIfAbsent(uuid, new ConcurrentLinkedQueue<>());
+
+        // Push-on-open fill (ADR-043). Skip if a fill is already in flight
+        // for this uuid, or if the bucket already holds at least one
+        // coordinate (the player has nothing to gain from a second fill
+        // until they consume the first one).
+        ConcurrentLinkedQueue<RTPLocation> bucket = perPlayerLocationQueue.get(uuid);
+        if (bucket != null && !bucket.isEmpty()) return;
+        if (!perPlayerInFlight.add(uuid)) return;
+
+        long maxNanos = 50_000_000L; // 50ms cap mirrors other RegionCacheTask budgets
+        try {
+            RegionCacheTask fill = new RegionCacheTask(region, uuid, maxNanos);
+            RTP.scheduler.runTaskAsynchronously(fill);
+        } catch (Throwable t) {
+            // Never let listener wiring throw: release the guard and log.
+            perPlayerInFlight.remove(uuid);
+            RTP.log(java.util.logging.Level.WARNING,
+                    "[RTP] openPersonalQueue: failed to schedule personal fill for "
+                            + uuid + ": " + t, t);
+        }
+    }
+
+    /**
+     * Close the personal coordinate bucket for {@code uuid} in this region
+     * (ADR-043). Returns any banked coordinates to {@link #unkeptLocations}
+     * (closing their reservations first), so the pregen budget is not stranded
+     * by player churn. Called on disconnect / world change away from this
+     * region's world. Idempotent.
+     *
+     * @param uuid player uuid
+     */
+    public void closePersonalQueue(UUID uuid) {
+        if (uuid == null) return;
+        ConcurrentLinkedQueue<RTPLocation> bucket = perPlayerLocationQueue.remove(uuid);
+        if (bucket != null) {
+            RTPLocation loc;
+            while ((loc = bucket.poll()) != null) {
+                if (loc.reservation() != null) {
+                    try {
+                        loc.reservation().close();
+                    } catch (Throwable ignored) {
+                        // best-effort close
+                    }
+                }
+                unkeptLocations.offer(new RTPLocation(loc.coords(), loc.attempts(), null));
+            }
+        }
+        perPlayerInFlight.remove(uuid);
+        // A close call does NOT remove uuid from playerQueue or
+        // RTP.queuedPlayers — those are the teleport-intent state and have
+        // their own lifecycle in Region.execute / RTPTeleportCancel.
+    }
+
+    /**
+     * Enroll {@code uuid} at the tail of {@link #playerQueue} so
+     * {@link Region#execute(long)} pairs them with the next available
+     * coordinate (ADR-043 concern (2)+(3)). The caller must already have
+     * populated {@code latestTeleportData} for {@code uuid}; stale entries are
+     * purged defensively by {@code Region.execute}.
+     *
+     * @param uuid player uuid
+     */
+    public void requestTeleport(UUID uuid) {
+        if (uuid == null) return;
+        playerQueue.add(uuid);
+        RTP.getInstance().queuedPlayers.add(uuid);
     }
 
     /**

@@ -22,7 +22,7 @@ For specific code-level and platform-specific requirements, please refer to the 
 - Per-region configuration of shapes, statistical distributions, biome filters, and permission nodes.
 - Integration hooks for third-party land-protection plugins (GriefPrevention, WorldGuard, Towny) and economy plugins (Vault).
 - A stable, versioned public API (`rtp-api`) for addon developers to register custom shapes, vertical adjustors, and validation checks.
-- Platform adapters for Spigot, Paper, Folia, and Fabric ensuring correct thread-safety on each server type.
+- Platform adapters for Spigot, Paper, Folia, Fabric, and NeoForge ensuring correct thread-safety on each server type. NeoForge support is deferred until the Fabric adapter stabilizes; see [ADR-033](../adr/ADR-033-neoforge-platform-in-scope.md) and [MULTI_PLATFORM_PLAN.md](MULTI_PLATFORM_PLAN.md).
 
 ### Out of Scope
 - **World generation:** RTP does not generate or modify terrain. It selects locations within existing worlds only.
@@ -30,7 +30,7 @@ For specific code-level and platform-specific requirements, please refer to the 
 - **Anti-cheat:** RTP does not detect or prevent cheating. It is the responsibility of the server operator to configure compatible anti-cheat plugins.
 - **GUI / inventory menus:** RTP does not provide a graphical interface. All interaction is command- and config-based.
 - **Cross-server teleportation:** RTP operates within a single server instance. BungeeCord/Velocity network teleportation is out of scope.
-- **Non-Bukkit, non-Fabric platforms:** RTP shall target Bukkit-derived software (Spigot, Paper, Folia) and Fabric. Forge, NeoForge, and other mod loaders shall not be supported. Rationale and the phased Fabric adapter plan are recorded in [ADR-022](../adr/rtp-fabric-ADR-002-platform-in-scope.md) and [MULTI_PLATFORM_PLAN.md](MULTI_PLATFORM_PLAN.md).
+- **Unsupported platforms:** RTP shall target Bukkit-derived software (Spigot, Paper, Folia), Fabric, and NeoForge. Legacy Forge, Sponge, Minestom, hybrid servers (Mohist, Magma, Arclight), and Bedrock-native servers (PocketMine-MP, Nukkit, BDS) shall not be supported. Rationale and the phased adapter plans are recorded in [rtp-fabric-ADR-002](../../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md), [ADR-033](../adr/ADR-033-neoforge-platform-in-scope.md), and [MULTI_PLATFORM_PLAN.md](MULTI_PLATFORM_PLAN.md).
 - **Legacy Minecraft and Java versions:** RTP targets Java 21+ (REQ-RTP-SYS-001) and the Minecraft versions enumerated by the shipped versioned platform adapter submodules (ADR-010). Older Minecraft versions and older Java runtimes are out of scope; users on legacy servers shall be directed to the last RTP release that supported their server. Revisit conditions and rationale are recorded in [ADR-021](../adr/ADR-021-legacy-mc-and-java-support-scope.md).
 
 ## 1. Functional Requirements
@@ -82,13 +82,21 @@ These requirements establish the overarching contract for operating RTP across m
 
 - **REQ-RTP-NET-010 — Proxy Load-Balancing Policy:** The proxy coordinator shall offer operator-configurable load-balancing of teleport requests across participating backend servers. The available policies shall include at minimum a default round-robin or least-loaded strategy and shall allow operators to disable load-balancing in favour of a fixed routing rule.
 
+- **REQ-RTP-NET-011 — Reservation Token Deterministic Expiry:** Every cross-network teleport reservation shall carry a deterministic expiry. A reservation that is not consumed within its declared lifetime shall be released, and the resources it earmarked shall be returned to their originating buffer. No allocation tracked through resource bookkeeping shall remain attributable to an expired reservation.
+
+- **REQ-RTP-NET-012 — Exactly-Once Reservation Claim:** A cross-network reservation shall be consumed at most once. A second attempt to consume an already-consumed reservation shall be refused and audited under REQ-RTP-S-004; no player shall be teleported as a result of a duplicate consumption.
+
+- **REQ-RTP-NET-013 — Multi-Flavour Persistence Compatibility:** Backend telemetry, reservation state, and any other network-mode persistence shall be writable to every relational database flavour that the system supports for single-server persistence. Operators shall not be required to deploy a dedicated database technology in order to enable network mode.
+
+- **REQ-RTP-NET-014 — Multi-Proxy Concurrency and Reanimation:** The system shall support the concurrent operation of more than one proxy coordinator against a single shared coordination store. No correctness path shall depend on the participation of a specific proxy instance. A reservation claimed by a proxy that subsequently becomes unreachable shall, within a bounded interval, become claimable by another proxy without operator intervention.
+
 ## 2. Non-Functional Requirements
 
 ### 2.1 Fault Tolerance
 - **REQ-RTP-NF-001 — State Persistence:** The system shall maintain algorithmic efficiency across server restarts without rebuilding state from scratch.
 
 ### 2.2 Platform Compatibility
-- **REQ-RTP-NF-002 — Cross-Platform Thread Safety:** The concurrency model shall be adaptable to the underlying server platform (Spigot, Paper, Folia), ensuring strict thread safety and adherence to platform-specific asynchronous APIs or region-based multithreading constraints.
+- **REQ-RTP-NF-002 — Cross-Platform Thread Safety:** The concurrency model shall be adaptable to the underlying server platform (Spigot, Paper, Folia, Fabric, NeoForge), ensuring strict thread safety and adherence to platform-specific asynchronous APIs or region-based multithreading constraints.
 
 ### 2.3 Architectural Isolation
 - **REQ-RTP-NF-003 — Entry-Point Logic Isolation:** The plugin entry point shall not contain business logic. Database wiring, effects wiring, and server-accessor selection shall be delegated to dedicated handler classes, each with a single responsibility.
@@ -127,4 +135,4 @@ These requirements describe prohibited behaviours. Each maps to one or more haza
 
 ## 4. System Requirements
 - **REQ-RTP-SYS-001 — Runtime Environment:** The system shall require Java 21 or higher.
-- **REQ-RTP-SYS-002 — Server Software:** The system shall be compatible with Bukkit-derived server software (Spigot, Paper, and Folia) and with Fabric.
+- **REQ-RTP-SYS-002 — Server Software:** The system shall be compatible with Bukkit-derived server software (Spigot, Paper, and Folia), with Fabric, and with NeoForge. NeoForge compatibility shall be delivered through a dedicated platform adapter whose activation is gated on the stabilization of the Fabric adapter; rationale is recorded in [ADR-033](../adr/ADR-033-neoforge-platform-in-scope.md).

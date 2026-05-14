@@ -26,6 +26,7 @@ public class Square extends MemoryShape<GenericMemoryShapeParams> {
   static {
     defaults.put(GenericMemoryShapeParams.mode, Mode.ACCUMULATE);
     defaults.put(GenericMemoryShapeParams.radius, 256);
+    defaults.put(GenericMemoryShapeParams.radius2, 256);
     defaults.put(GenericMemoryShapeParams.centerRadius, 64);
     defaults.put(GenericMemoryShapeParams.centerX, 0);
     defaults.put(GenericMemoryShapeParams.centerZ, 0);
@@ -123,6 +124,23 @@ public class Square extends MemoryShape<GenericMemoryShapeParams> {
     long radius = getNumber(GenericMemoryShapeParams.radius, 256L).longValue();
     long cr = getNumber(GenericMemoryShapeParams.centerRadius, 64L).longValue();
     return (radius - cr) * (radius + cr) * 4;
+  }
+
+  /**
+   * Exact 1D offset between two cells at the same angle on adjacent rings,
+   * for the square-spiral parameterisation: the {@code R}-th ring spans
+   * {@code 8R + 4} indices ({@code 4·((R+1)² − R²)} from
+   * {@link #xzToLocation(long, long)}).
+   */
+  @Override
+  protected long neighbourRingOffset(int cx, int cz) {
+    long centerX = getNumber(GenericMemoryShapeParams.centerX, 0L).longValue();
+    long centerZ = getNumber(GenericMemoryShapeParams.centerZ, 0L).longValue();
+    long dx = Math.abs((long) cx - centerX);
+    long dz = Math.abs((long) cz - centerZ);
+    long R = Math.max(dx, dz);
+    if (R < 0L) return 0L;
+    return 8L * R + 4L;
   }
 
   @Override

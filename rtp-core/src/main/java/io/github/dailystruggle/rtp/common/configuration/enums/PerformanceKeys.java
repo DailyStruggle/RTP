@@ -19,5 +19,6 @@ public enum PerformanceKeys {
   loginCacheEnabled,
   loginCacheCap,
   pregeneratedPreference,
+  backlogRefillThreshold,
   version
 }

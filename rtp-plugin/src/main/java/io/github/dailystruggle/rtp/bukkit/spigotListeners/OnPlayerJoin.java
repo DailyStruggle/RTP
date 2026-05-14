@@ -16,7 +16,11 @@ public final class OnPlayerJoin implements Listener {
       Region region =
           RTP.selectionAPI.getRegion(RTP.serverAccessor.getPlayer(player.getUniqueId()));
       if (region == null) return;
-      region.queue(player.getUniqueId());
+      // ADR-043: bucket-only opt-in. Open the personal coordinate bucket
+      // and schedule the push-on-open pregen fill. Does NOT enroll the
+      // player on the teleport waitlist — they will only ever be enrolled
+      // when they actually invoke /rtp via QueueTask.fallback.
+      region.openPersonalQueue(player.getUniqueId());
     }
   }
 }

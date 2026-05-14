@@ -81,34 +81,53 @@ Reloads configuration files from disk without restarting the server. Sets a relo
 
 ## `/rtp config` — Edit Configuration at Runtime
 
-Dynamically reads and writes individual keys in any loaded configuration file. One child sub-command is registered for every loaded `ConfigParser` and `MultiConfigParser` (file names with `.yml` stripped). All file writes are dispatched asynchronously; a targeted reload is triggered automatically after each write.
+Reads and writes individual keys in any loaded configuration file. One child sub-command is registered for every loaded `ConfigParser` and `MultiConfigParser` (file names with `.yml` stripped); tab-complete at position 1 enumerates the live set. Each successful write is **atomic** (temp + fsync + rename) and the affected parser is reloaded automatically — `/rtp reload` is only needed after hand-edits on disk.
+
+> ⚠️ **Hardening in `3.0.0-beta.3`.** This section describes the **target** behavior per the normative spec [`docs/dev/CONFIG_COMMAND_SPEC.md`](../dev/CONFIG_COMMAND_SPEC.md) ([ADR-037](../adr/ADR-037-harden-rtp-config-commands.md) decision, [ADR-041](../adr/ADR-041-config-command-and-save-implementation.md) implementation). Pre-beta.3 builds may still silently ignore unknown keys or skip validation; for production use on those builds, prefer hand-editing the YAML files followed by `/rtp reload`.
 
 **Syntax**
 ```
-/rtp config <file> <key>:<value> [<key>:<value> …]
-/rtp config <file> <list-key> add:<value> [add:<value> …] [remove:<value> …]
+/rtp config <file> <key>:<value> [<key>:<value> …] [--dry-run]
+/rtp config <file> <list-key> add:<value> [add:<value> …] [remove:<value> …] [--dry-run]
+/rtp config <multifile> <subfile> <key>:<value> [--dry-run]
+/rtp config <file> view
+/rtp config <file> view <key> [<key> …]
 ```
 
-**Required permission:** `rtp.config`
+One invocation targets **exactly one** file. Multiple `<key>:<value>` pairs (or `add:` / `remove:` operators on the same list key) within that file form one all-or-nothing transaction. The `--dry-run` token (default literal, configurable via `commands.config.dryRunFlag`) runs validation and renders the would-be diff without touching disk.
 
-> ⚠️ **In progress.** `/rtp config` is under active development — key coverage, validation, and feedback messages are incomplete and behaviour may change. For production use, prefer hand-editing the YAML files followed by `/rtp reload`.
+**Required permissions** (additive; the most-specific node wins):
+
+| Node | Grants |
+|---|---|
+| `rtp.config` | Legacy alias retained for back-compat — equivalent to `rtp.config.view` + `rtp.config.set`. |
+| `rtp.config.view` | The `view` sub-form against any file. |
+| `rtp.config.set` | Any write against any file (umbrella). |
+| `rtp.config.set.<section>` | Writes against the named section only (e.g. `rtp.config.set.regions`, `rtp.config.set.performance`). `set` implies `view` for the same section. |
 
 | Form | Description |
 |---|---|
-| `/rtp config <file> <key>:<value>` | Set one or more scalar keys in the named config file and reload. Only keys present in the file's own parameter registry are accepted; unrecognised keys are silently ignored. |
-| `/rtp config <file> <list-key> add:<value>` | Append one or more values to a YAML list field. |
-| `/rtp config <file> <list-key> remove:<value>` | Remove one or more values from a YAML list field. |
+| `/rtp config <file> <key>:<value>` | Set one or more scalar keys in the named config file. Validation is uniform; unknown keys, type mismatches, out-of-range values, and unknown region / world names are rejected with a `reasonCode` (see below) before any state mutates. |
+| `/rtp config <file> <list-key> add:<value>` / `remove:<value>` | Append to / remove from a YAML list field. Duplicate `add:` and `remove:` of non-members are no-ops, not failures. |
+| `/rtp config <file> view` | Interactive read-only inspection of every key in the file. Each rendered entry carries hover-text (when YAML comments are available; this is a substrate-dependent best-effort) and a click-suggest action that pre-fills an update command. Degrades to plain text on consoles. |
+| `/rtp config <file> view <key>` | As above, but for one key (or one list-key's members). |
+| trailing `--dry-run` | Validate and compute the diff, but do not commit. The audit record is emitted with `outcome = DRY_RUN_OK`. |
 
-> **World-aware vertical clamping:** When updating a region config that targets a `_nether` world, `maxY` is automatically clamped to 128, `vert` is forced to `LINEAR`, and `requireskylight` is set to `false`. For `_the_end` worlds, `requireskylight` is set to `false`. In all cases `maxY`/`minY` are clamped to the world's actual height limits.
+**Audit & error reporting.** Every invocation — success or failure, live or dry-run — emits exactly one audit record at `INFO` (success) or `WARNING` (failure) via `RTP.log`, carrying `actor`, `command`, `targetFile`, the per-mutation `oldValue` / `newValue` diff, `outcome`, and (on failure) a `reasonCode`. Failure messages render from `messages.yml → config.error.<reasonCode>` (REQ-RTP-F-013); the closed set of codes is documented in [`CONFIG_COMMAND_SPEC.md` §5.2](../dev/CONFIG_COMMAND_SPEC.md#52-reasoncode-enumeration) and includes `UNKNOWN_FILE`, `UNKNOWN_KEY`, `WRONG_TYPE`, `OUT_OF_RANGE`, `UNKNOWN_REGION`, `UNKNOWN_WORLD`, `SCHEMA_INVARIANT`, `NO_PERMISSION`, `RELOAD_IN_PROGRESS`, `PERSIST_IO`, and others.
+
+> **World-aware vertical clamping** (applies on every write **and** every reload): when updating a region config that targets a `_nether` world, `maxY` is automatically clamped to 128, `vert` is forced to `LINEAR`, and `requireskylight` is set to `false`. For `_the_end` worlds, `requireskylight` is set to `false`. In all cases `maxY`/`minY` are clamped to the world's actual height limits. These run as composite schema invariants (see [ADR-034](../adr/ADR-034-memory-shape-catalog.md)); a violation aborts the transaction with `reasonCode = SCHEMA_INVARIANT` and the on-disk file is unchanged.
+
+> **`language.yml` is not addressable** through the generic `/rtp config language …` form because a locale change requires re-initializing every parser. The dedicated `LanguageCmd` path handles it (subject to the same audit, permission, and atomic-write contracts as this surface). Attempts via the generic path fail with `reasonCode = USE_DEDICATED_COMMAND`.
 
 **Examples**
 ```
 /rtp config performance maxAttempts:20
-/rtp config economy price:100
+/rtp config economy price:100 --dry-run
 /rtp config regions nether world:world_nether
 /rtp config regions nether maxY:128
-/rtp config regions default biomeWhitelist add:FOREST add:PLAINS
-/rtp config regions default biomeWhitelist remove:OCEAN
+/rtp config regions default biomeWhitelist add:FOREST add:PLAINS remove:OCEAN
+/rtp config regions default view shape
+/rtp config performance view
 ```
 
 ---
@@ -344,8 +363,11 @@ When PlaceholderAPI is installed, the following `%rtp_<key>%` placeholders are a
 | `rtp.other` | op | Teleport another player with `player:<name>` |
 | `rtp.notme` | op | Exclude yourself when others teleport players (`priceOther` exemption) |
 | `rtp.reload` | op | Use `/rtp reload` |
-| `rtp.config` | op | Use `/rtp config` to read/write configuration |
-| `rtp.update` | op | Write individual config keys or list items via `SubConfigCmd` |
+| `rtp.config` | op | Legacy alias — grants `rtp.config.view` + `rtp.config.set`. Retained for back-compat; new deployments should grant the more specific nodes below. |
+| `rtp.config.view` | op | Use `/rtp config <file> view` (read-only inspection). |
+| `rtp.config.set` | op | Use `/rtp config <file> …` to write any config file (umbrella). |
+| `rtp.config.set.<section>` | op | Write only the named section (e.g. `rtp.config.set.regions`, `rtp.config.set.performance`). `set` implies `view` for the same section. |
+| `rtp.update` | op | Write individual config keys or list items via `SubConfigCmd` (legacy node; subsumed by `rtp.config.set` per [`CONFIG_COMMAND_SPEC.md`](../dev/CONFIG_COMMAND_SPEC.md)). |
 | `rtp.info` | op | Use `/rtp info` |
 | `rtp.admin` | op | See DRM info in `/rtp info`; elevated admin access |
 | `rtp.support` | op | See DRM info in `/rtp info` |

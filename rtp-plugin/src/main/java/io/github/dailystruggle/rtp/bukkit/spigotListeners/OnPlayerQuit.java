@@ -35,6 +35,28 @@ public final class OnPlayerQuit implements Listener {
 
     new RTPTeleportCancel(uuid).run();
 
+    // ADR-043 — Close the player's personal coordinate bucket on every
+    // region. The bucket was opened by OnPlayerJoin / OnPlayerRespawn /
+    // OnPlayerChangeWorld under the `rtp.personalqueue` opt-in, and
+    // leaking it across a disconnect would strand banked coordinates'
+    // chunk reservations (S-002 adjacent) and grow
+    // `perPlayerLocationQueue` without bound under churn. Idempotent,
+    // best-effort, guarded — the quit listener must never throw.
+    try {
+      for (io.github.dailystruggle.rtp.common.selection.region.Region region :
+          RTP.selectionAPI.permRegionLookup.values()) {
+        try {
+          region.closePersonalQueue(uuid);
+        } catch (Throwable t) {
+          RTP.log(java.util.logging.Level.WARNING,
+              "[RTP] closePersonalQueue failed for " + uuid + " in region "
+                  + region.name + ": " + t, t);
+        }
+      }
+    } catch (Throwable ignored) {
+      // never let the quit listener throw
+    }
+
     // ADR-023 — Login Reserve Cache lazy refill: a slot just opened up, so
     // dispatch a single-entry promotion on every region that has the buffer
     // enabled (in practice only the default-world region per ADR-023).

@@ -298,6 +298,13 @@ public class RegionCacheTask extends RTPRunnable {
     private void releaseInFlight() {
         if (released.compareAndSet(false, true)) {
             region.inFlightCalculations.decrementAndGet();
+            // ADR-043: clear the per-uuid push-on-open guard on the personal
+            // fill path so a future openPersonalQueue(uuid) is allowed to
+            // schedule another fill once the previous one terminates
+            // (success, drop, or exception).
+            if (playerId != null) {
+                region.queueManager.perPlayerInFlight.remove(playerId);
+            }
             MemoryTracker.untrack(this);
         }
     }

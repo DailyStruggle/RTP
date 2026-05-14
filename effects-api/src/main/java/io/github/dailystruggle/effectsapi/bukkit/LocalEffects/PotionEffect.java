@@ -116,6 +116,7 @@ public class PotionEffect extends Effect<PotionTypeNames> {
 
     static void applyOnEntityThread(Player player, org.bukkit.potion.PotionEffect potionEffect) {
         org.bukkit.plugin.Plugin caller = EffectsAPI.getInstance();
+        if (caller == null) caller = Bukkit.getPluginManager().getPlugin("RTP");
         Runnable apply = () -> player.addPotionEffect(potionEffect);
         if (entityDispatcher.dispatch(player, caller, apply)) return;
         if (Bukkit.isPrimaryThread()) {

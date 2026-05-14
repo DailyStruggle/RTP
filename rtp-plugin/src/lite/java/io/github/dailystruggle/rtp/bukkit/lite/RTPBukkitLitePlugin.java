@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.bukkit.lite;
 import io.github.dailystruggle.rtp.bukkit.BootstrapSupport;
 import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import io.github.dailystruggle.rtp.bukkit.effects.BukkitEffectsHandler;
+import io.github.dailystruggle.rtp.bukkit.tools.softdepends.claims.ClaimIntegrations;
 import io.github.dailystruggle.rtp.bukkit.spigotListeners.OnPlayerJoin;
 import io.github.dailystruggle.rtp.bukkit.spigotListeners.OnPlayerQuit;
 import io.github.dailystruggle.rtp.bukkit.spigotListeners.OnEventTeleports;
@@ -29,11 +30,8 @@ import java.util.logging.Level;
  *   <li>{@code BukkitDatabaseHandler.setupDatabase} -- lite uses {@code YamlFileDatabase}
  *       (or an in-memory accessor) wired by {@link RTP}'s default constructor path.</li>
  *   <li>Login reserve cache initialization (ADR-023).</li>
- *   <li>{@code setupIntegrations()} -- claim plugin softdepends (ADR-019).</li>
  *   <li>{@code isFolia()} branching -- lite is Spigot/Paper only.</li>
  *   <li>PlaceholderAPI registration -- lite does not declare PAPI as a softdepend.</li>
- *   <li>Multilingual bootstrap (ADR-020) -- locale is hardcoded to English; the lite
- *       JAR contains no {@code lang/**} resources and no {@code language.yml}.</li>
  *   <li>Visitor / observation mode wiring ({@code PerformanceKeys.visitorEnabled}).</li>
  * </ol>
  *
@@ -100,9 +98,10 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
 
     if (RTP.getInstance() == null) {
       RTP.serverAccessor.start(this);
-      // Lite skips multilingual bootstrap (ADR-020). RTP() default-constructs with
-      // an English locale; no LanguageBootstrap call, no detectAndPreserveLocaleMismatch
-      // path is exercised at runtime because language.yml is not on disk.
+      // Multilingual bootstrap (ADR-020) ships in lite as of the 2026-05-11 ADR-024
+      // language-options amendment. No explicit call is needed here: Configs#reloadConfigs()
+      // invokes LanguageBootstrap.resolve(pluginDirectory) unconditionally, and the lite jar
+      // now ships lang/** plus language.yml so the locale resource lookups succeed.
       RTP rtp = new RTP();
 
       // Yaml-only persistence wiring (ADR-024). Mirrors the minimum subset of
@@ -178,9 +177,25 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
       BukkitEffectsHandler.setupEffects(null);
     }, 1);
 
+    // Step 10: bundled claim-plugin integrations (ADR-019). Lite registers the
+    // claim-plugin verifiers identically to the full bootstrap: each enabled
+    // soft-dep (Lands, GriefDefender, GriefPrevention, Towny, HuskTowns,
+    // Factions, RedProtect, WorldGuard) contributes a GlobalRegionVerifier.
+    // Vault/economy is intentionally NOT wired here -- lite still ships no
+    // economy.yml and the Vault soft-dep is Pro-only (ADR-024).
+    RTP.scheduler.runTaskLater(() -> {
+      try {
+        ClaimIntegrations.setup(this);
+      } catch (Throwable t) {
+        RTP.log(Level.WARNING,
+            "[LIFECYCLE-LITE] Failed to initialize claim-plugin integrations; continuing without them.",
+            t);
+      }
+    }, 1);
+
     // Lite OMITS:
     //   - initLoginReserveCache()                (ADR-023)
-    //   - setupIntegrations()                    (ADR-019 claim plugins)
+    //   - Vault/economy wiring                   (ADR-024; economy.yml not shipped)
     //   - PlaceholderAPI hook
     //   - Visitor-mode wiring                    (PerformanceKeys.visitorEnabled)
     //

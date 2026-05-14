@@ -1,6 +1,6 @@
 # ADR-007 — Per-User Isolated Queues Alongside the Global Queue
 
-**Status:** Accepted
+**Status:** Accepted (operational details superseded by [ADR-043](ADR-043-personal-queue-permission-semantics.md))
 **Date:** 2026-04-15
 
 ## Context

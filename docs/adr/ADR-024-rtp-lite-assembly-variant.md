@@ -1,7 +1,73 @@
 # ADR-024 — RTP-lite Assembly Variant
 
-**Status:** Accepted (amended 2026-05-07 — Fabric in scope for lite)
+**Status:** Accepted (amended 2026-05-11 — language options + claim-plugin integrations in scope for lite)
 **Date:** 2026-04-30
+
+## 2026-05-11(b) amendment — language options in scope for lite
+
+The original decision below scoped lite as **English-only** — `LanguageBootstrap`,
+`LanguageCmd`, `lang/**`, and `language.yml` were dropped from the lite assembly,
+and the locale-aware ConfigParser path (ADR-020) was unreachable on lite.
+Operators wanting non-English message strings, or wanting to use `/rtp lang` to
+hot-switch locales, were routed to the full edition. As of 2026-05-11 that scope
+is widened: **the multilingual bootstrap (ADR-020) ships in lite**.
+
+Concretely:
+
+- `lang/**` and `language.yml` ship in the lite jar.
+- `LanguageBootstrap.resolve(pluginDirectory)` is invoked unconditionally from
+  `Configs#reloadConfigs()`; no edition-specific bootstrap call is required, and
+  the lite bootstrap (`RTPBukkitLitePlugin.onEnable`) inherits the behavior the
+  moment the resources are on the classpath.
+- `LanguageCmd` (the user-facing `/rtp lang` subcommand) lives in `rtp-core` and
+  is registered through the shared command tree, so it is available on lite
+  identically to Pro.
+- The lite `messages.yml` is no longer trimmed: lite ships the full
+  `messages.yml` from `rtp-plugin/src/main/resources`. Lite-irrelevant keys
+  (e.g. `notEnoughMoney`, PAPI status, SQL-persistence messages) are simply
+  unreachable at runtime because the corresponding subsystems are not wired —
+  the keys' presence in the file is harmless and matches the "lite contains the
+  featureset, simply not configured by default" stance.
+- The `liteJarStructureCheck` audit no longer forbids `lang/**` or
+  `language.yml`.
+
+Bullets below referring to "Multilingual support (ADR-020)" as a lite drop,
+and to `lang/**` / `language.yml` / trimmed `messages.yml` as packaging drops,
+are superseded by this amendment. The remainder of the ADR (SQL/Redis drops,
+Folia drop, login cache, visitor mode, economy/Vault, etc.) still applies.
+
+---
+
+## 2026-05-11 amendment — claim-plugin integrations in scope for lite
+
+The original decision below scoped lite as having no claim-plugin softdepend
+integrations (ADR-019) — operators wanting GriefDefender, GriefPrevention,
+Lands, WorldGuard, Towny, Factions, HuskTowns, or RedProtect compatibility were
+routed to the full edition. As of 2026-05-11 that scope is widened: **the
+bundled claim-plugin integrations ship in lite**. Pro remains the superset
+target for large-scale deployments (proxy networks, Folia regionized servers,
+SQL/Redis persistence); claim-protection support is a baseline operator
+expectation on the small Spigot/Paper servers that lite primarily serves, and
+withholding it pushed those operators to Pro for an integration that has zero
+runtime cost when no claim plugin is installed.
+
+Concretely:
+
+- `ClaimIntegrations.setup` is invoked from `RTPBukkitLitePlugin.onEnable`
+  (deferred tick+1, mirroring the full bootstrap).
+- The lite `plugin.yml` declares `softdepend: [ GriefDefender, GriefPrevention,
+  Towny, HuskTowns, Factions, Lands, RedProtect, WorldGuard ]`.
+- `integrations.yml` ships in the lite jar so `ClaimIntegrations#buildParser`
+  can load its defaults from the classpath.
+- Vault/economy wiring stays Pro-only — lite still ships no `economy.yml` and
+  the Vault soft-dep is not declared in the lite descriptor.
+
+Bullets below referring to "claim-plugin softdepend integrations" as a lite
+drop, and to `integrations.yml` as a packaging drop, are superseded by this
+amendment. The remainder of the ADR (SQL/Redis drops, Folia drop, locale,
+login cache, visitor mode, etc.) still applies.
+
+---
 
 ## 2026-05-07 amendment — Fabric in scope for lite
 

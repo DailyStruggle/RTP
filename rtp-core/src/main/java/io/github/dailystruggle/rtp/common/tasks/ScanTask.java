@@ -48,15 +48,28 @@ public class ScanTask extends RTPRunnable {
   private long currentOffset = 0L;
 
   /**
-   * Two-pass scan phase: 0 = PRESCAN (anvil probe sweep; cheap rejects only,
-   * probe-accept trusted without full-load verification), 1 = FULLSCAN
-   * (classic full chunk-load sweep over positions not already marked bad by
-   * Pass 1, authoritative (2r+1)^3 safety scan). Persisted in the .scan
-   * progress file so a killed/resumed scan continues in the correct phase.
+   * Three-pass scan phase:
+   *   2 = GENSCAN (generation-pass; for every candidate ask
+   *       {@link RTPWorld#isChunkGenerated(int,int)}. Already-generated chunks
+   *       are skipped (PRESCAN will visit them via the anvil probe). Not-yet-
+   *       generated chunks are routed directly to {@code runFullLoadPath},
+   *       which loads/generates the chunk and authoritatively validates it in
+   *       a single I/O so we never load the same chunk twice. Short-lived:
+   *       not persisted to the .scan file — a resumed scan begins at the
+   *       persisted PRESCAN/FULLSCAN phase and skips GENSCAN entirely, since
+   *       chunks generated in the prior run are still generated on disk.
+   *   0 = PRESCAN (anvil probe sweep; cheap rejects only, probe-accept
+   *       trusted without full-load verification).
+   *   1 = FULLSCAN (classic full chunk-load sweep over positions not already
+   *       marked bad by GENSCAN/PRESCAN, authoritative (2r+1)^3 safety scan).
+   * The PRESCAN/FULLSCAN byte is persisted in the .scan progress file so a
+   * killed/resumed scan continues in the correct phase. GENSCAN is never
+   * persisted (collapsed to PRESCAN on save).
    */
   public static final int PHASE_PRESCAN = 0;
   public static final int PHASE_FULLSCAN = 1;
-  private final AtomicInteger scanPhase = new AtomicInteger(PHASE_PRESCAN);
+  public static final int PHASE_GENSCAN = 2;
+  private final AtomicInteger scanPhase = new AtomicInteger(PHASE_GENSCAN);
 
   /** Whether the task is currently paused */
   public AtomicBoolean pause = new AtomicBoolean(false);
@@ -146,6 +159,7 @@ public class ScanTask extends RTPRunnable {
   // a stalled fullscan. Logged once per run() entry when phase==PRESCAN.
   private final AtomicBoolean prescanAnnounced = new AtomicBoolean(false);
   private final AtomicBoolean fullscanAnnounced = new AtomicBoolean(false);
+  private final AtomicBoolean genscanAnnounced = new AtomicBoolean(false);
 
   private long lastSaveTime = 0;
 
@@ -168,6 +182,8 @@ public class ScanTask extends RTPRunnable {
     long[] progress = loadProgress(region.name, region.cacheKey());
     if (progress != null) {
       if (progress.length > 3) this.currentOffset = progress[3];
+      // Persisted phase byte only stores PRESCAN(0)/FULLSCAN(1); a resumed
+      // scan skips the transient GENSCAN pre-phase. See PHASE_GENSCAN docs.
       if (progress.length > 4) this.scanPhase.set((int) progress[4]);
     }
 
@@ -183,7 +199,7 @@ public class ScanTask extends RTPRunnable {
     // When resuming mid-FULLSCAN with scanIter persisted as 0 (fresh Pass 2),
     // the Pass 1 bad-location bitmap must be preserved so Pass 2 can skip
     // positions already marked bad.
-    if(start == 0 && scanPhase.get() == PHASE_PRESCAN) {
+    if(start == 0 && (scanPhase.get() == PHASE_PRESCAN || scanPhase.get() == PHASE_GENSCAN)) {
       if (region.shape instanceof MemoryShape<?> memoryShape) {
         memoryShape.clear();
       }
@@ -208,6 +224,8 @@ public class ScanTask extends RTPRunnable {
     this.cps.set(cpsVal);
     long[] progress = loadProgress(region.name, region.cacheKey());
     if (progress != null) {
+      // Persisted phase byte only stores PRESCAN(0)/FULLSCAN(1); a resumed
+      // scan skips the transient GENSCAN pre-phase. See PHASE_GENSCAN docs.
       if (progress.length > 4) this.scanPhase.set((int) progress[4]);
       if (progress.length > 3) this.currentOffset = progress[3];
     }
@@ -218,6 +236,12 @@ public class ScanTask extends RTPRunnable {
     } else {
       scanIncrement.set(scanIncrementVal);
     }
+  }
+
+  private static String phaseLabel(int phase) {
+    if (phase == PHASE_GENSCAN) return "genscan";
+    if (phase == PHASE_FULLSCAN) return "fullscan";
+    return "prescan";
   }
 
   /** Stop all running scan tasks */
@@ -240,21 +264,26 @@ public class ScanTask extends RTPRunnable {
     }
 
     RTP.log(Level.FINE, "[ScanTask] batch entry region=" + region.name
-            + " phase=" + (scanPhase.get() == PHASE_FULLSCAN ? "fullscan" : "prescan")
+            + " phase=" + phaseLabel(scanPhase.get())
             + " scanIter=" + scanIter.get()
             + " scanIncrement=" + scanIncrement.get()
             + " currentOffset=" + currentOffset);
 
     // Announce the active scan phase at the beginning so users are not
-    // confused by the two-pass design (PRESCAN -> FULLSCAN). The PRESCAN
-    // -> FULLSCAN transition already logs in wrapUpBatch; this covers the
-    // initial entry into either phase (fresh start, resume after pause,
-    // or resume after restart with persisted phase==FULLSCAN).
-    if (scanPhase.get() == PHASE_PRESCAN) {
+    // confused by the three-pass design (GENSCAN -> PRESCAN -> FULLSCAN).
+    // Phase transitions already log in wrapUpBatch; this covers the initial
+    // entry into a phase (fresh start, resume after pause, or resume after
+    // restart with a persisted phase).
+    int currentPhase = scanPhase.get();
+    if (currentPhase == PHASE_GENSCAN) {
+      if (genscanAnnounced.compareAndSet(false, true)) {
+        RTP.log(Level.INFO, "[RTP] starting genscan (chunk-generation sweep; anvil prefilter bypassed for ungenerated areas) for region=" + region.name);
+      }
+    } else if (currentPhase == PHASE_PRESCAN) {
       if (prescanAnnounced.compareAndSet(false, true)) {
         RTP.log(Level.INFO, "[RTP] starting prescan (anvil probe sweep) for region=" + region.name);
       }
-    } else if (scanPhase.get() == PHASE_FULLSCAN) {
+    } else if (currentPhase == PHASE_FULLSCAN) {
       if (fullscanAnnounced.compareAndSet(false, true)) {
         RTP.log(Level.INFO, "[RTP] starting fullscan (full-load verification pass) for region=" + region.name);
       }
@@ -551,9 +580,9 @@ public class ScanTask extends RTPRunnable {
         String gcSuffix = readGcDeltaMs();
         String fullLoadSuffix = readFullLoadStatsAndReset();
         String probeOutcomeSuffix = readProbeOutcomeStatsAndReset();
-        String phaseLabel = scanPhase.get() == PHASE_FULLSCAN ? "fullscan" : "prescan";
+        String phaseLabelStr = phaseLabel(scanPhase.get());
         RTP.log(Level.FINER, "[TRACE] ScanTask concurrency region=" + region.name
-            + " phase=" + phaseLabel
+            + " phase=" + phaseLabelStr
             + " cps=" + cps_local + " activeChecks=" + activeChecks + " peakInFlight=" + peak
             + " currentInFlight=" + inFlight.get() + " cap=" + MAX_PENDING_CHUNKS
             + cacheSuffix + gcSuffix + fullLoadSuffix + probeOutcomeSuffix);
@@ -598,6 +627,27 @@ public class ScanTask extends RTPRunnable {
         save();
         shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
         shape.exportDebugJson(region.name, region.getWorld().name());
+        isRunning.set(false);
+        if (!isCancelled() && !pause.get()) {
+          RTP.scheduler.runTaskAsynchronously(this);
+        }
+        return;
+      }
+
+      // GENSCAN complete -> flip to PRESCAN. GENSCAN has already paid the
+      // chunk-load cost for every previously-ungenerated chunk (and committed
+      // those verdicts), so PRESCAN only needs to sweep the remaining
+      // already-generated chunks via the cheap anvil probe.
+      if (scanPhase.get() == PHASE_GENSCAN) {
+        scanPhase.set(PHASE_PRESCAN);
+        currentOffset = 0L;
+        scanIter.set(0);
+        shape.flushAndRebuild(shape.spatialResolution);
+        save();
+        shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
+        shape.exportDebugJson(region.name, region.getWorld().name());
+        RTP.log(Level.INFO, "[RTP] genscan complete for region=" + region.name
+                + "; starting prescan (anvil probe sweep)");
         isRunning.set(false);
         if (!isCancelled() && !pause.get()) {
           RTP.scheduler.runTaskAsynchronously(this);
@@ -828,7 +878,12 @@ public class ScanTask extends RTPRunnable {
       if (shape instanceof MemoryShape<?> memoryShape) {buf.putLong(memoryShape.spatialResolution);}
       buf.putLong(currentOffset);
       buf.put((byte) 0);
-      buf.put((byte) (scanPhase.get() & 0xFF));
+      // GENSCAN is transient — collapse to PRESCAN on disk so a resumed scan
+      // does not re-run the chunk-generation pre-pass (chunks generated in
+      // the previous run are still generated). See PHASE_GENSCAN docs.
+      int persistedPhase = scanPhase.get();
+      if (persistedPhase == PHASE_GENSCAN) persistedPhase = PHASE_PRESCAN;
+      buf.put((byte) (persistedPhase & 0xFF));
       out.write(buf.array());
     } catch (java.io.IOException e) {
       RTP.log(Level.WARNING, e.getMessage(), e);
@@ -979,6 +1034,35 @@ public class ScanTask extends RTPRunnable {
       if (scanPhase.get() == PHASE_FULLSCAN) {
         runFullLoadPath(region, world, vert, shape, pos, blockX, blockZ, midY,
                 finalSafetyRadius, unsafeBlocks, defaultBiomes, biomeRecall, res);
+        return res;
+      }
+
+      // GENSCAN: ensure the chunk is generated on disk before the anvil
+      // prefilter sees it. If the chunk is already generated, skip — PRESCAN
+      // will handle it via the cheap anvil probe. If NOT generated, bypass
+      // the anvil prefilter entirely and run the full load path: chunk
+      // loading will generate the chunk and we authoritatively validate it
+      // in the same I/O so we never load the same chunk twice.
+      if (scanPhase.get() == PHASE_GENSCAN) {
+        boolean generated;
+        try {
+          generated = world.isChunkGenerated(cx, cz);
+        } catch (Throwable t) {
+          RTP.log(Level.FINE, "[ScanTask] isChunkGenerated threw for world=" + world.name()
+                  + " chunk=(" + cx + "," + cz + "): " + t);
+          // Conservative on error: treat as generated and defer to PRESCAN.
+          generated = true;
+        }
+        if (!generated) {
+          runFullLoadPath(region, world, vert, shape, pos, blockX, blockZ, midY,
+                  finalSafetyRadius, unsafeBlocks, defaultBiomes, biomeRecall, res);
+          return res;
+        }
+        // Already generated — defer to PRESCAN. Complete with `false` so the
+        // caller's gate is released and the position is not counted as good;
+        // crucially, do NOT mark the position bad on the shape so PRESCAN
+        // re-evaluates it via the anvil probe.
+        res.complete(false);
         return res;
       }
 

@@ -2,7 +2,7 @@
 
 This directory hosts admin-facing documentation for running RTP across **multiple backend servers behind a proxy** (Velocity primary, BungeeCord/Waterfall secondary).
 
-> Status: **Stub.** Proxy mode is not yet released. The design plan lives in [`../../dev/MULTI_SERVER_PLAN.md`](../../dev/MULTI_SERVER_PLAN.md) and is gated by Rule D-005 (see [`AGENTS.md`](../../../AGENTS.md)). This directory will be populated as Phase 2/3 of that plan lands.
+> Status: **Stub.** Proxy mode is not yet released. The design plan lives in [`../../dev/MULTI_SERVER_PLAN.md`](../../dev/MULTI_SERVER_PLAN.md) and is gated by Rule D-005 (see [`AGENTS.md`](../../../.junie/AGENTS.md)). This directory will be populated as Phase 2/3 of that plan lands.
 
 This is **distinct from** multi-platform support (Spigot/Paper/Folia/Fabric) — see [`../../dev/MULTI_PLATFORM_PLAN.md`](../../dev/MULTI_PLATFORM_PLAN.md) for that axis.
 

@@ -9,7 +9,8 @@
 |---|---|
 | `config.yml` | Top-level toggles (default world list, debug logging level, etc.). |
 | `performance.yml` | Queue tuning, scan task count, async/sync teleport scheduling. **Trimmed in lite** — no `visitorEnabled`, `loginCacheEnabled`, `loginCacheCap`, `effectParsing`, `onEventParsing`. |
-| `messages.yml` | All user-facing messages. REQ-RTP-F-013 — every player-visible string is configurable. Trimmed in lite to ~6 keys actually used. |
+| `messages.yml` | All user-facing messages. REQ-RTP-F-013 — every player-visible string is configurable. Lite ships the full `messages.yml` for Pro parity (2026-05-11 ADR-024 language-options amendment). |
+| `language.yml` | Active locale selector (ADR-020). Lite ships `lang/**` and the multilingual bootstrap for Pro parity. |
 | `safety.yml` | Flat material allow/deny list + biome blacklist. **No tag / state-predicate sections in lite** (see ADR-017 — Pro only). |
 | `logging.yml` | Logger threshold per category. |
 | `regions/<name>.yml` | One file per region (`default.yml` ships out of the box). |
@@ -19,9 +20,10 @@
 
 ## Files NOT shipped in lite
 
-`language.yml`, `lang/**`, `economy.yml`, `integrations.yml`. Lite is locked
-to English and does not call `LanguageBootstrap`, the Vault hook, or the
-claim-plugin softdepend integrations.
+`economy.yml`. Lite does not wire the Vault hook. (Claim-plugin softdepend
+integrations and `integrations.yml` ship in lite as of the 2026-05-11
+ADR-024 claim-plugin amendment; `lang/**` and `language.yml` ship as of the
+2026-05-11 ADR-024 language-options amendment.)
 
 ## `regions/<name>.yml` — key keys
 

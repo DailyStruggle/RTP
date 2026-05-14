@@ -720,10 +720,17 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
     exclude 'io/github/dailystruggle/rtp/hikari/**'
     exclude 'META-INF/maven/com.zaxxer/**'
     // Resources dropped from lite.
-    exclude 'lang/**'
-    exclude 'language.yml'
+    // lang/** and language.yml are INTENTIONALLY KEPT in lite as of 2026-05-11
+    // (ADR-024 language-options amendment): multilingual support / locale switching
+    // (ADR-020) ships in lite for Pro parity. The feature is dormant for operators
+    // who do not write a language.yml or do not run /rtp lang -- locale defaults to
+    // English. LanguageBootstrap.resolve() is invoked unconditionally from
+    // Configs#reloadConfigs(); shipping the resources is sufficient to activate it.
     exclude 'economy.yml'
-    exclude 'integrations.yml'
+    // integrations.yml is INTENTIONALLY KEPT in lite as of 2026-05-11 (ADR-024
+    // claim-plugin amendment): the bundled claim-plugin integrations (ADR-019)
+    // are wired in lite as well, and ClaimIntegrations#buildParser loads its
+    // defaults from integrations.yml on the classpath.
     // logging.yml is INTENTIONALLY KEPT in lite (src/lite/resources/logging.yml
     // overrides the full version via duplicatesStrategy = EXCLUDE). Without it,
     // no min_level filter loads and every FINE/FINER/FINEST log call prints.
@@ -823,10 +830,10 @@ tasks.register('liteJarStructureCheck') {
             ~'^com/zaxxer/hikari/.*$',
             ~'^io/github/dailystruggle/rtp/hikari/.*$',
             ~'^io/github/dailystruggle/rtp/common/selection/region/LoginCacheTask\\.class$',
-            ~'^lang/.*$',
-            ~'^language\\.yml$',
+            // lang/** and language.yml intentionally present in lite as of the
+            // 2026-05-11 ADR-024 language-options amendment -- see shadowLiteJar comment.
             ~'^economy\\.yml$',
-            ~'^integrations\\.yml$',
+//            ~'^integrations\\.yml$',
             // logging.yml intentionally present in lite -- see shadowLiteJar comment.
             // fabric.mod.json intentionally present in lite as of the 2026-05-07
             // ADR-024 amendment -- see shadowLiteJar comment.

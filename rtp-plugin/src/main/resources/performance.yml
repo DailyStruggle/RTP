@@ -19,6 +19,7 @@ visitorEnabled: false # Enable background data gathering
 loginCacheEnabled: false # Maintain a reserved cache of locations for join-time teleports (rtp.onevent.firstjoin / rtp.onevent.join). Sized by remaining empty player slots.
 loginCacheCap: 0 # Hard cap for the login cache. 0 = auto (server max-players, snapshotted at startup).
 pregeneratedPreference: 0.0 # Probability [0.0, 1.0] of rejecting an ungenerated chunk per selection attempt. 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land. Generated chunks always pass.
+backlogRefillThreshold: 0.5 # Fraction [0.0, 1.0] of L3 backlog capacity at which refill resumes (hysteresis). 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill continuously. Higher values group .mca-bin checks for better CPU/memory efficiency.
 
 # DO NOT TOUCH VERSION NUMBER
 version: "1.0"

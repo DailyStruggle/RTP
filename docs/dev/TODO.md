@@ -74,18 +74,33 @@ The April 2026 gap analysis confirmed `rtp-api` abstractions are sufficient for 
 
 ---
 
-## 5. Debug `/rtp config` Command
+## 5. Harden `/rtp config` Command and Save Mechanics
 
-The runtime config-edit command (`/rtp config <file> <key>:<value> …`, plus `add:` / `remove:` for list fields) is documented in [`docs/admin/COMMANDS.md`](../admin/COMMANDS.md) as **in progress** — key coverage, validation, and feedback are incomplete. This stream finishes the job.
+Promoted from "debug `/rtp config`" to a full hardening stream. **Specification, decision, and implementation strategy are now in place:**
 
-- [ ] **Reproduce and catalogue current failures.** Run each documented form (`scalar set`, `list add`, `list remove`, multi-pair, nested key) against `performance.yml`, `config.yml`, `economy.yml`, and at least one region file. Record symptom + expected vs. actual in a scratch note; promote durable findings to [`LESSONS_LEARNED.md`](LESSONS_LEARNED.md).
-- [ ] **Key-path resolution.** Verify dotted / nested keys resolve through `ConfigParser` correctly, including enum-valued and locale-sensitive keys (see [ADR-020](../adr/ADR-020-language-bootstrap-and-locale-aware-configparser.md)). Add unit tests under `rtp-core/.../commands/config/`.
-- [ ] **Type coercion + validation feedback.** Bad values (wrong type, out-of-range, unknown enum) must produce a configurable, actionable message — not a silent no-op or a stack trace. Cross-check S-007 (configurable "invalid command" messages) and REQ-RTP-F-013.
-- [ ] **List `add:` / `remove:` semantics.** Confirm dedupe behaviour, ordering, and case sensitivity. Decide and document whether `remove:` of an absent value is an error or a no-op; cover with tests.
-- [ ] **Reload safety.** After a successful edit, the in-memory config must be refreshed without leaking the old instance and without dropping live region state. Verify against `ConfigsTest` patterns; add a regression test if missing.
-- [ ] **Permission + tab-completion.** Confirm the `rtp.config` permission gate (existing tests: `SubConfigCmdTest`, `ViewSubConfigCmdTest`) and that Brigadier tab-completion suggests valid file names and known keys for the chosen file.
-- [ ] **Folia / threading audit.** Config writes must not happen on a region thread; route through the global / async scheduler. Add a Folia-context test or a `FoliaOwnershipTestJob` extension.
-- [ ] **Docs sync.** Once stable, drop the "⚠️ In progress" banner in `docs/admin/COMMANDS.md` and add a short troubleshooting section.
+- **Target behavior** (normative spec): [`CONFIG_COMMAND_SPEC.md`](CONFIG_COMMAND_SPEC.md). Read before changing anything in `rtp-core/.../commands/config/` or the YAML save path.
+- **Decision** (eight contracts, Accepted 2026-05-14): [ADR-037](../adr/ADR-037-harden-rtp-config-commands.md).
+- **Implementation strategy** (class layout, package, migration sequencing): [ADR-041](../adr/ADR-041-config-command-and-save-implementation.md).
+- **Write-path data flow** (Mermaid): [`../architecture/11-configuration-write-and-persist.md`](../architecture/11-configuration-write-and-persist.md).
+
+The boxes below mirror ADR-041's *Migration sequencing* in order. Each step lands its own commit / PR; later steps assume earlier ones are in. Tick a box only when the PR is merged **and** the named test class is green.
+
+- [ ] **Step 1 — Codes + messages.** Land `ConfigReasonCode` enum + `messages.yml → config.error.*` + `config.dryRun.*` keys. Green: `ReqRtpF013ConfigMessageCoverageTest` (bijection check).
+- [ ] **Step 2 — Validators (scalar) + audit-first intermediate state.** Land `ConfigParameterValidator` + range/type/enum implementations. Wire as additive pre-check in `SubConfigCmd#onCommand` that emits a `WARNING` audit record without blocking the legacy path. Closes spec gap A1 (partial).
+- [ ] **Step 3 — Atomic writer + startup cleanup.** Land `AtomicConfigWriter` (temp+fsync+rename) and `cleanupStaleTempFiles` startup hook. Swap `ConfigParser` save path through the writer. Green: `AtomicConfigWriterRenameAtomicityTest`. Closes spec gaps A9 + A11.
+- [ ] **Step 4 — Transaction + audit + executor.** Land `ConfigTransaction`, `ConfigAuditRecord`, `ConfigAuditFormatter`, `ConfigCommandExecutor`. Collapse `SubConfigCmd#onCommand` to delegate. Green: `ReqRtpS004ConfigCommandAuditTest`, `ConfigTransactionAtomicRollbackTest`. Closes spec gaps A1 + A2 + A4.
+- [ ] **Step 5 — Dry-run.** Add `--dry-run` to grammar + executor; render diff via `config.dryRun.*`. Green: `ConfigDryRunDiffTest`. Closes spec gap A3.
+- [ ] **Step 6 — Scoped permissions.** Add `rtp.config.set.<section>` resolution (umbrella still valid). Green: `ConfigPermissionScopeTest`. Closes spec gap A6.
+- [ ] **Step 7 — Grammar unification.** Replace hand-written `onTabComplete` branches with `ConfigParameterGrammar`. Green: `ConfigParameterGrammarParseCompleteParityTest`. Closes spec gap A8.
+- [ ] **Step 8 — Schema-checked reload.** Wire `ConfigParameterValidator.validateAll` into `ReloadCmd` / `SubReloadCmd`. Green: `ReloadCmdSchemaValidationTest`. Closes spec gap A7.
+- [ ] **Step 9 — `LanguageCmd` hardening.** Same lifecycle plus `reInitializeAllParsers` in §3.7. Closes spec gap A10.
+- [ ] **Step 10 — Composite invariants.** Register Polygon (`expand=false`, vertex validity), Rectangle / Ellipse extent positivity (ADR-034) as composite invariants run on every write **and** every reload.
+- [ ] **Admin docs final pass.** When all ten steps are green, remove the "⚠️ Hardening in 3.0.0-beta.3" banners from [`docs/admin/COMMANDS.md`](../admin/COMMANDS.md) §`/rtp config` and [`docs/admin/QUICK_START.md`](../admin/QUICK_START.md), and empty Appendix A of [`CONFIG_COMMAND_SPEC.md`](CONFIG_COMMAND_SPEC.md). When the appendix is empty, mark ADR-037 **Implemented** in [`docs/adr/README.md`](../adr/README.md).
+- [ ] **Traceability rows.** Each test class above gets a row in [`TRACEABILITY.md`](TRACEABILITY.md) keyed to REQ-RTP-S-004 / REQ-RTP-S-007 / REQ-RTP-F-013 / REQ-RTP-S-006 as appropriate.
+
+Deferred (not blocking beta.3, tracked here for visibility):
+
+- [ ] **YAML comment-preservation gap (spec Appendix A12).** Required for the `view` hover-text feature to render YAML comments faithfully. Needs either an upgrade of the current SnakeYAML wrapper ([ADR-025](../adr/ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper.md)) or an in-house round-trip-preserving parser. Open a follow-up ADR before implementation.
 
 ---
 

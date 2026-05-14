@@ -122,7 +122,10 @@ RTP uses a permission-based system. Assign these to your permission plugin (e.g.
 | `rtp.noCooldown` | Bypass cooldown |
 | `rtp.other` | Teleport another player (`/rtp player:<player>`) |
 | `rtp.reload` | Use `/rtp reload` |
-| `rtp.config` | Use `/rtp config` to read/write configuration |
+| `rtp.config.view` | Use `/rtp config <file> view` (read-only inspection) |
+| `rtp.config.set` | Use `/rtp config <file> …` to write any config file (umbrella) |
+| `rtp.config.set.<section>` | Write only the named section (e.g. `rtp.config.set.regions`); see [COMMANDS.md](COMMANDS.md) §`/rtp config` |
+| `rtp.config` | Legacy alias — grants `rtp.config.view` + `rtp.config.set` |
 | `rtp.info` | Use `/rtp info` |
 | `rtp.scan` | Use `/rtp scan` to pre-generate locations |
 | `rtp.test` | Use `/rtp test` runtime self-tests |
@@ -176,26 +179,33 @@ Players can now target it with `/rtp region:nether` (requires `rtp.region` + `rt
 
 ### Programmatic / In-Game Edits with `/rtp config`
 
-> ⚠️ **In progress.** `/rtp config` is under active development — coverage of keys, validation, and feedback messages is incomplete and behaviour may change. Prefer hand-editing the YAML files plus `/rtp reload` for production use until this notice is removed.
+> ⚠️ **Hardening in `3.0.0-beta.3`.** The `/rtp config` surface is being hardened against a normative spec ([`docs/dev/CONFIG_COMMAND_SPEC.md`](../dev/CONFIG_COMMAND_SPEC.md), decided in [ADR-037](../adr/ADR-037-harden-rtp-config-commands.md), implemented per [ADR-041](../adr/ADR-041-config-command-and-save-implementation.md)). Behavior described here is the **target**; earlier builds may still silently ignore unknown keys or skip validation. For production use on pre-beta.3 builds, prefer hand-editing the YAML files plus `/rtp reload`.
 
-Instead of editing files by hand, you can read or change any region key at runtime using the `/rtp config` command (requires `rtp.config`):
+Instead of editing files by hand, you can read or change any region key at runtime using the `/rtp config` command:
 
 ```
-/rtp config <file> <key>:<value>
-/rtp config <multifile> <subfile> <key>:<value>
+/rtp config <file> <key>:<value> [<key>:<value> …] [--dry-run]
+/rtp config <file> <list-key> add:<value> [remove:<value>] [--dry-run]
+/rtp config <multifile> <subfile> <key>:<value> [--dry-run]
+/rtp config <file> view              # inspect current state interactively
+/rtp config <file> view <key>
 ```
+
+Permissions are additive (see [COMMANDS.md](COMMANDS.md) §`/rtp config`): `rtp.config.set` grants all writes; `rtp.config.set.<section>` (e.g. `rtp.config.set.regions`) grants only that section; `rtp.config.view` grants the read-only `view` form; the legacy `rtp.config` continues to grant view + set.
 
 For example, to update the nether region's world after the file already exists:
 
 ```
 /rtp config regions nether world:world_nether
-/rtp config regions nether shape.radius:128
-/rtp config regions nether shape.centerRadius:16
+/rtp config regions nether shape.radius:128 --dry-run    # preview, no change
+/rtp config regions nether shape.radius:128              # commit
+/rtp config regions nether biomeWhitelist add:FOREST add:PLAINS remove:OCEAN
+/rtp config regions nether view shape                    # show the current shape block
 ```
 
-Each `/rtp config` write is saved to disk immediately. Follow it with `/rtp reload` (or `/rtp reload nether`) to rebuild the region queue using the new values.
+Each successful `/rtp config` write is **atomic** (write-to-temp → fsync → rename) and the affected parser is reloaded automatically — no `/rtp reload` is required after a `/rtp config` write. Use `/rtp reload` only when you have hand-edited YAML on disk. Every invocation — success or failure, live or dry-run — emits exactly one audit record (`INFO` on success, `WARNING` on failure) with a `reasonCode` you can match against [`messages.yml`](../dev/CONFIG_COMMAND_SPEC.md#5-validation-model-and-reasoncode-catalog) for translation.
 
-> **Tip for automation:** Scripts, RCON clients, and addon plugins can issue `/rtp config` commands programmatically to adjust region settings on the fly, with no manual file editing or server restart required. See [COMMANDS.md](COMMANDS.md) for the full syntax.
+> **Tip for automation:** Scripts, RCON clients, and addon plugins can issue `/rtp config` commands programmatically. Use `--dry-run` to preview the diff before committing; the audit record's `outcome` field (`COMMITTED` / `DRY_RUN_OK` / `REJECTED` / `ROLLED_BACK`) tells you what happened without parsing chat output. See [COMMANDS.md](COMMANDS.md) for the full syntax and the [spec](../dev/CONFIG_COMMAND_SPEC.md) for the error matrix.
 
 ---
 

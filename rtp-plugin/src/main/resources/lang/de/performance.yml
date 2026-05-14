@@ -18,6 +18,7 @@ checkOnChunkLoads: false # Check for safe spots in all loaded chunks
 visitorEnabled: true # Enable background data gathering
 
 pregeneratedPreference: 0.0 # Probability [0.0, 1.0] of rejecting an ungenerated chunk per selection attempt. 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land. Generated chunks always pass.
+backlogRefillThreshold: 0.5 # Fraction [0.0, 1.0] of L3 backlog capacity at which refill resumes (hysteresis). 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill continuously.
 
 # DO NOT TOUCH VERSION NUMBER
 version: "1.0"

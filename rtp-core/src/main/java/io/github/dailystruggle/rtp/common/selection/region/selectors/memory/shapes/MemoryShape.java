@@ -479,6 +479,184 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     badLocationsDirty = true;
   }
 
+  /** Shared empty result for {@link #chunkToLocations(int, int)} when a chunk has no preimage. */
+  protected static final long[] EMPTY_LONG_ARRAY = new long[0];
+
+  /**
+   * Maximum walk distance (in 1D index steps) used by the default
+   * {@link #chunkToLocations(int, int)} implementation when probing for the
+   * (≤ 1) twin spiral index that may also decode to the same chunk.
+   *
+   * <p>The spiral's chunk-unit parameterisation guarantees that the second
+   * preimage, if any, lies within a small constant offset of the representative
+   * index (angular neighbour {@code ±1}, or radial neighbour on the adjacent
+   * ring whose offset scales with ring circumference). Subclasses that have an
+   * exact ring-circumference formula may override
+   * {@link #neighbourRingOffset(int, int)} to short-circuit the walk.
+   */
+  protected static final int CHUNK_TO_LOCATIONS_WALK_BUDGET = 8;
+
+  /**
+   * Override hook: estimated number of 1D indices between two spiral cells at
+   * the same angle on adjacent rings, evaluated at the ring containing the
+   * given chunk. Shape-specific subclasses (notably {@code Circle} and
+   * {@code Square}) may return an exact value to let
+   * {@link #chunkToLocations(int, int)} probe the radial-twin candidate
+   * directly. The default returns {@code 0}, which causes the default
+   * implementation to skip the radial probe and rely on the angular walk only.
+   *
+   * @return non-negative offset, or {@code 0} to disable the radial probe.
+   */
+  protected long neighbourRingOffset(int cx, int cz) {
+    return 0L;
+  }
+
+  /**
+   * Inverse of {@link #xzToLocation(long, long)} at chunk granularity. Returns
+   * every 1D index {@code n} in {@code [0, getRange())} for which
+   * {@code locationToXZ(n)} decodes to the chunk {@code (cx, cz)}.
+   *
+   * <p>The result is bounded by <strong>≤ 2 elements</strong> for the
+   * spiral-based shapes ({@code CIRCLE}, {@code SQUARE}): the spiral's
+   * inter-turn radial spacing is one chunk, and a chunk's diagonal is
+   * {@code √2 &lt; 2}, so at most two consecutive turns of the curve can
+   * intersect a unit-square chunk. See ADR-001 and
+   * {@code docs/dev/scratch/CHECKLIST-chunk-to-locations-inverse.md}.
+   *
+   * <p>Returned indices are sorted ascending and distinct. May be empty for
+   * chunks outside the shape's annulus. Never {@code null}.
+   *
+   * <p>The default implementation is shape-agnostic and uses only
+   * {@link #xzToLocation(long, long)}, {@link #locationToXZ(long)} and
+   * {@link #contains(int, int)}. It is O(1) with a small constant.
+   *
+   * @param cx chunk x in the shape's chunk-unit coordinate system
+   * @param cz chunk z in the shape's chunk-unit coordinate system
+   * @return 0-, 1- or 2-element array of 1D indices; never {@code null}.
+   */
+  public long[] chunkToLocations(int cx, int cz) {
+    if (!contains(cx, cz)) return EMPTY_LONG_ARRAY;
+
+    final long range = getRange();
+    if (range <= 0L) return EMPTY_LONG_ARRAY;
+
+    final long representative = xzToLocation(cx, cz);
+    if (representative < 0L || representative >= range) return EMPTY_LONG_ARRAY;
+
+    // Collect up to 2 distinct indices that decode back to (cx, cz).
+    long first = -1L;
+    long second = -1L;
+
+    int[] decoded = locationToXZ(representative);
+    if (decoded[0] == cx && decoded[1] == cz) {
+      first = representative;
+    }
+
+    // Angular walk: ±1 .. ±CHUNK_TO_LOCATIONS_WALK_BUDGET. We stop in each
+    // direction as soon as the decoded coordinate leaves the chunk — the
+    // representative is on the curve so the chunk's intersection with the
+    // curve is contiguous in either direction.
+    for (int delta = 1; delta <= CHUNK_TO_LOCATIONS_WALK_BUDGET; delta++) {
+      long up = representative + delta;
+      if (up < range) {
+        decoded = locationToXZ(up);
+        if (decoded[0] == cx && decoded[1] == cz) {
+          if (first < 0L) first = up;
+          else if (second < 0L && up != first) { second = up; break; }
+        } else if (first >= 0L) {
+          // Left the chunk on the +delta side; don't probe further up.
+          break;
+        }
+      }
+    }
+    if (second < 0L) {
+      for (int delta = 1; delta <= CHUNK_TO_LOCATIONS_WALK_BUDGET; delta++) {
+        long down = representative - delta;
+        if (down >= 0L) {
+          decoded = locationToXZ(down);
+          if (decoded[0] == cx && decoded[1] == cz) {
+            if (first < 0L) first = down;
+            else if (down != first) { second = down; break; }
+          } else if (first >= 0L) {
+            break;
+          }
+        }
+      }
+    }
+
+    // Radial probe (twin on adjacent ring at roughly the same angle). Skip
+    // when subclass has no exact ring offset, or when we already have 2 hits.
+    // The candidate must be at least one ring away from any already-found
+    // index — otherwise the angular walk would already have found it and we
+    // would be double-counting a chunk that touches a single arc of the curve.
+    if (second < 0L) {
+      long ringOffset = neighbourRingOffset(cx, cz);
+      if (ringOffset > (long) CHUNK_TO_LOCATIONS_WALK_BUDGET) {
+        long base = (first >= 0L) ? first : representative;
+        long[] candidates = new long[] { base + ringOffset, base - ringOffset };
+        for (long cand : candidates) {
+          if (cand < 0L || cand >= range) continue;
+          // Reject candidates that fall within the angular-walk window of an
+          // already-found index — they aren't on the adjacent ring.
+          if (first >= 0L
+              && Math.abs(cand - first) <= (long) CHUNK_TO_LOCATIONS_WALK_BUDGET) {
+            continue;
+          }
+          decoded = locationToXZ(cand);
+          if (decoded[0] == cx && decoded[1] == cz) {
+            if (first < 0L) first = cand;
+            else if (cand != first) { second = cand; break; }
+          }
+        }
+      }
+    }
+
+    if (first < 0L) return EMPTY_LONG_ARRAY;
+    if (second < 0L) return new long[] { first };
+    return (first <= second) ? new long[] { first, second } : new long[] { second, first };
+  }
+
+  /**
+   * Marks the given 1D index plus every other 1D index that decodes to the
+   * same chunk as bad. Use only for <strong>chunk-attributable</strong>
+   * rejections (biome, claim/protection, force-load mask, world-border,
+   * anvil pre-filter, ocean). Do <strong>not</strong> use for per-column
+   * safety failures ({@code FailTypes.safety}, {@code FailTypes.vert}) or
+   * for the {@code uniqueplacements} bookkeeping — those would mark valid
+   * locations bad (false positives), shrinking the effective region.
+   *
+   * <p>By the ≤ 2 preimage bound on {@link #chunkToLocations(int, int)},
+   * this method marks at most 2 indices per call. The expected amplification
+   * over a circular annulus is {@code 1 + p₂ ≈ 1.57} (worst case 2.0 on
+   * pathologically narrow annuli) — see the scratch checklist for the
+   * derivation.
+   *
+   * @param location any 1D index that decodes to the target chunk.
+   * @return number of indices newly marked (0, 1 or 2). A return of 0 means
+   *         every preimage was already marked bad.
+   */
+  public int addBadChunk(long location) {
+    int[] xz = locationToXZ(location);
+    long[] preimage = chunkToLocations(xz[0], xz[1]);
+    if (preimage.length == 0) {
+      // FP slop at the boundary, or chunk outside shape: fall back to the
+      // single-index mark so the original rejection is at least recorded.
+      if (!isKnownBad(location)) {
+        addBadLocation(location);
+        return 1;
+      }
+      return 0;
+    }
+    int marked = 0;
+    for (long p : preimage) {
+      if (!isKnownBad(p)) {
+        addBadLocation(p);
+        marked++;
+      }
+    }
+    return marked;
+  }
+
   public void addBiomeLocation(Long location, long width, String biome) {
     pendingBiomeLocations
         .get()
