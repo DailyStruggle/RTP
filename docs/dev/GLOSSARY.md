@@ -19,6 +19,9 @@ The words below have common meanings in Java, Minecraft, or software engineering
 | **Adapter** | Generic design-pattern adapter | A *Platform Adapter module* (`rtp-spigot`, `rtp-paper`, `rtp-folia`, `rtp-fabric`). Refers specifically to module boundary, not the GoF adapter pattern. See *Platform Adapter* entry below. |
 | **Task** | Any `Runnable` or scheduled work | A `TeleportPipelineTask` — a stateful object that owns a `ChunkReservation` and must be registered with `MemoryTracker`. See *TeleportPipelineTask* entry (DESIGN.md). |
 | **Scan** | A generic word meaning "to examine sequentially" | The *administrative world-scan lifecycle* (`/rtp scan start`/`pause`/`resume`/`reset`/`cancel`) that pre-populates a region's spatial memory without teleporting any player. Supersedes the legacy term *Fill*. See *Scan Task* and *Scan Lifecycle* entries below. |
+| **Backend** | Any back-of-house server in generic web terminology | A *Minecraft server instance that hosts world data and runs the RTP teleport pipeline locally*, sitting behind a proxy in network mode. Not interchangeable with "the database" or "the rtp-core module". See *Backend* entry below. |
+| **Proxy** | A generic relay or stand-in | A *Velocity, BungeeCord, or Waterfall coordinator* that fronts one or more backends and dispatches `/rtp` requests across the network. Distinct from Bukkit's plugin-message "BungeeCord proxy" channel and from the GoF proxy pattern. See *Proxy* entry below. |
+| **Transport** | Any byte-level shipping channel | A *named binding for network-mode coordination state* (`RedisNetworkStateBinding`, `PostgresNetworkStateBinding`, `GenericSqlNetworkStateBinding`, `InMemoryNetworkStateBinding`). Not a Minecraft entity transport, vehicle, or plugin-message channel. See *Transport* entry below. |
 
 ---
 
@@ -45,6 +48,12 @@ The `BrigadierCommandAdapter` inside `commands-api` that converts the shared `co
 
 **Bundle Plugin**
 The `rtp-plugin` module — a dedicated bridge module that combines `rtp-core` logic, a `JavaPlugin` entry point, and the active platform adapter into the final shaded distribution JAR. It is the only module permitted to depend simultaneously on `rtp-core` and Bukkit-family server classes. See ADR-003.
+
+**Backend**
+In network mode, a Minecraft server instance running RTP that hosts world data, owns one or more `Region` configurations, and runs the local teleport pipeline. The proxy never owns world state (REQ-RTP-NET-005); coordinates are always produced on a backend. A network deployment typically has multiple backends fronted by one or more proxies. Identified by `network.serverId` in `network.yml`. See [`MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md).
+
+**Backend Selector**
+The `rtp-core` interface (`BackendSelector`) that, given an `RtpRequest` and a `NetworkSnapshot`, returns the backend that should serve the request. Implementations are **pure functions** of the snapshot — no I/O, no blocking — so the selector is safe to call from any thread and produces deterministic decisions for a given snapshot. The shipped v1 implementation is a configurable weighted average over published telemetry metrics; see *Load-Balancing Heuristics* in [`MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md). Governed by REQ-RTP-NET-010.
 
 ---
 
@@ -135,7 +144,17 @@ The in-memory representation of a teleport region's geometric boundary and its p
 
 ---
 
+## N
+
+**Network Snapshot**
+In network mode, the immutable value object (`NetworkSnapshot`) that aggregates the most recently observed backend telemetry rows readable by the proxy: per-backend availability fields (`pluginState`, `acceptingRequests`, `regionsAvailable[]`, `worldsLoaded[]`) and performance fields (`mspt`, `queueDepth`, `pendingTeleports`, `avgPipelineMs`, `chunkLoadBacklog`, `heapUsedMb`/`heapMaxMb`, `databaseLatencyMs`, `lastSeenEpochMs`). A `BackendSelector` consumes one snapshot per request and uses it for the entire capped-retry chain so retry decisions are internally consistent. Snapshots are *snapshots*, not deltas — the consumer does the math. See *Backend Telemetry Publication* in [`MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md).
+
+---
+
 ## P
+
+**Proxy**
+In network mode, a Velocity (primary), BungeeCord, or Waterfall instance that fronts one or more backends, receives `/rtp` requests, runs the `BackendSelector` against the latest `NetworkSnapshot`, claims a reservation token, and commits the player transfer. Proxies do not own world state, do not run the teleport pipeline, and do not talk to each other directly — all cross-proxy coordination flows through the durable shared store (REQ-RTP-NET-014). Multiple concurrent proxies are supported and identified by `network.proxyId` in `network.yml`. Distinct from the Bukkit *plugin-message "BungeeCord" channel* (a legacy backend-side relay) and from the GoF proxy pattern. See *Multi-Proxy Deployment* in [`MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md).
 
 **Paper**
 A high-performance fork of Spigot that provides additional async APIs (e.g., `getChunkAtAsync`). RTP's `rtp-paper` adapter uses these APIs for more efficient chunk pre-loading.
@@ -187,6 +206,9 @@ The abstraction over platform-specific task scheduling. Implementations live in 
 **RTPWorld**
 A platform-agnostic wrapper around a world reference. Defined in `rtp-api`.
 
+**Reservation Token**
+In network mode, a single durable row in the network-state member of `AbstractSQLDatabaseAccessor` that earmarks one already-resolved coordinate from a destination backend's `keptLocations` (fallback `unkeptLocations`) buffer as "promised to a cross-network player." Carries `token`, `playerUuid`, `targetServerId`, `worldKey`, `x/y/z/yaw/pitch`, `issuedAt`, `expiresAt`, and a lifecycle `state` ∈ {`PENDING`, `CLAIMED`, `CONSUMED`, `EXPIRED`}. The state machine is row-count atomic: `PENDING → CLAIMED` is owned by the proxy, `CLAIMED → CONSUMED` by the destination's join handler, and the reaper transitions stale rows to `EXPIRED` and releases the underlying buffer entry plus its `MemoryTracker` row. Tokens claimed by a dead proxy are reanimated to `PENDING` after `claimReanimateMs` so a surviving proxy can pick them up. Governed by REQ-RTP-NET-011 (deterministic expiry), REQ-RTP-NET-012 (exactly-once claim), and REQ-RTP-NET-014 (multi-proxy reanimation). See *Reservation Tokens* in [`MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md).
+
 ---
 
 ## S
@@ -224,6 +246,9 @@ The stateful object that drives a single player's teleport request through the p
 
 **Traceability Matrix**
 The document (`TRACEABILITY.md`) linking each requirement ID to its design reference, implementing class(es), and automated test(s).
+
+**Transport**
+In network mode, a named binding that implements the `NetworkTransport` SPI by writing the network-state tables (`backend_state`, `proxy_state`, reservation tokens, network cooldowns, network wait queue) to a concrete coordination store. Shipped bindings: `RedisNetworkStateBinding` (Lettuce; also covers RESP-compatible drop-ins such as DragonflyDB and KeyDB), `PostgresNetworkStateBinding` (`LISTEN/NOTIFY` + `SELECT … FOR UPDATE SKIP LOCKED`), `GenericSqlNetworkStateBinding` (MySQL/MariaDB polling), and `InMemoryNetworkStateBinding` (tests, and the no-op default when `network.enabled: false`). The `plugin-message` transport is dev-only and excluded from production (D2). All transports must be non-blocking on tick / region / netty threads (REQ-RTP-NET-007). Not to be confused with the Minecraft entity transport mechanic or with the plugin-message channel itself; here "transport" specifically names the coordination-state binding.
 
 ---
 

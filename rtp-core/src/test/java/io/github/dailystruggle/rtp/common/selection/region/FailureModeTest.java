@@ -73,8 +73,13 @@ class FailureModeTest {
     }
 
     /**
-     * FM-001 step 2: calling {@link RegionQueueManager#queue} when the queue is
-     * empty must add the player to the deferred {@code playerQueue}.
+     * FM-001 step 2 (post-ADR-043): calling
+     * {@link RegionQueueManager#requestTeleport} when the queue is empty
+     * must add the player to the deferred {@code playerQueue} and to the
+     * global awaiting-teleport flag, but must NOT create a personal bucket.
+     * Bucket creation is the strict preserve of
+     * {@link RegionQueueManager#openPersonalQueue} under the
+     * {@code rtp.personalqueue} opt-in.
      */
     @Test
     @Timeout(value = 1, unit = TimeUnit.SECONDS)
@@ -82,12 +87,12 @@ class FailureModeTest {
         RegionQueueManager qm = new RegionQueueManager(mockRegion);
 
         UUID player = UUID.randomUUID();
-        qm.queue(player);
+        qm.requestTeleport(player);
 
         assertTrue(qm.playerQueue.contains(player),
-                "FM-001: player UUID must appear in playerQueue after queue() with empty keptLocations");
-        assertTrue(qm.perPlayerLocationQueue.containsKey(player),
-                "FM-001: a (initially empty) per-player slot must be created by queue()");
+                "FM-001: player UUID must appear in playerQueue after requestTeleport() with empty keptLocations");
+        assertFalse(qm.perPlayerLocationQueue.containsKey(player),
+                "ADR-043: requestTeleport() must NOT create a personal bucket \u2014 that is openPersonalQueue's job");
         assertNull(qm.poll(player),
                 "FM-001: poll() must still return null — no location exists yet");
     }
@@ -103,7 +108,15 @@ class FailureModeTest {
         RegionQueueManager qm = new RegionQueueManager(mockRegion);
 
         UUID player = UUID.randomUUID();
-        qm.queue(player); // player deferred — queue was empty
+        qm.requestTeleport(player); // player deferred on waitlist (ADR-043)
+        // Personal-bucket opt-in for the replenishment path is a separate
+        // concern post-ADR-043. The full openPersonalQueue() path schedules
+        // a RegionCacheTask via RTP.scheduler against the mock region,
+        // which is out of scope for this failure-mode test — bypass the
+        // scheduling and just install the empty bucket directly so the
+        // replenishment cycle has somewhere to deliver into.
+        qm.perPlayerLocationQueue.putIfAbsent(
+                player, new java.util.concurrent.ConcurrentLinkedQueue<>());
 
         // Simulate the replenishment cycle delivering a location for this player
         RTPCoords coords = new RTPCoords("world", 100, 64, 200);

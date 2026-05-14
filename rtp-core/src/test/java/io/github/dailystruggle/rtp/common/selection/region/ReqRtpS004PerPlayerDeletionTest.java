@@ -78,7 +78,9 @@ public class ReqRtpS004PerPlayerDeletionTest {
         DatabaseAccessor db = mock(DatabaseAccessor.class);
         RTP.getInstance().databaseAccessor = db;
 
-        // Add to private queue
+        // Add to private queue. ADR-043: enqueuePlayerLocation creates the
+        // personal bucket as a side effect (it's a write into
+        // perPlayerLocationQueue), so the bucket is already open here.
         region.queueManager.enqueuePlayerLocation(playerId, loc);
 
         // Add Mock Player
@@ -87,7 +89,9 @@ public class ReqRtpS004PerPlayerDeletionTest {
         MockRTPPlayer player = new MockRTPPlayer(playerId, "TestPlayer", apiLoc);
         accessor.addPlayer(player);
 
-        region.queueManager.queue(playerId);
+        // ADR-043: enroll on the teleport waitlist explicitly via the named
+        // entry point (the old bundled queue(UUID) is retired).
+        region.queueManager.requestTeleport(playerId);
 
         // Setup teleport data
         TeleportData data = new TeleportData();
@@ -131,7 +135,11 @@ public class ReqRtpS004PerPlayerDeletionTest {
         MockRTPPlayer player = new MockRTPPlayer(playerId, "TestPlayer", apiLoc);
         accessor.addPlayer(player);
 
-        region.queueManager.queue(playerId);
+        // ADR-043: enroll on the teleport waitlist explicitly via the named
+        // entry point (the old bundled queue(UUID) is retired). No personal
+        // bucket is needed for the public-queue path — Region.execute will
+        // drain from keptLocations directly.
+        region.queueManager.requestTeleport(playerId);
 
         // Setup teleport data
         TeleportData data = new TeleportData();

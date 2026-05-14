@@ -20,10 +20,12 @@ main: io.github.dailystruggle.rtp.bukkit.lite.RTPBukkitLitePlugin
 api-version: 1.13
 prefix: 'RTP'
 authors: [ leaf26 ]
-description: 'Random teleport, lite edition (no SQL, no Folia, no integrations) -- see ADR-024'
-# Intentionally NO softdepend list. Lite does not link to Vault, claim plugins,
-# Chunky/ChunkyBorder, or PlaceholderAPI. Operators who need those should use
-# the full JAR.
+description: 'Random teleport, lite edition (no SQL, no Folia) -- see ADR-024'
+# Claim-plugin softdepends are included in lite as of 2026-05-11: lite is the
+# small-server target and claim-protection support is a baseline operator
+# expectation there. Vault/economy, Chunky/ChunkyBorder, and PlaceholderAPI
+# remain Pro-only. See ADR-024 (claim-plugin amendment).
+softdepend: [ GriefDefender, GriefPrevention, Towny, HuskTowns, Factions, Lands, RedProtect, WorldGuard ]
 folia-supported: false
 
 commands:

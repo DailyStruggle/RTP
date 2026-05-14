@@ -148,6 +148,29 @@ This document connects each requirement to the design decision that motivated it
 
 ---
 
+## Network / Proxy Requirements
+
+All rows below are **unimplemented**; the multi-server / proxy subsystem is gated by Rule D-005 and ADR-025 (not yet drafted). Design source: [`MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md). Rows exist so that implementing classes and tests can be filled in as Phase 1+ work lands.
+
+| Req ID | Summary | Design Ref | Implementing Class(es) | Test(s) |
+|---|---|---|---|---|
+| REQ-RTP-NET-001 | Optional network mode (disabled by default) | MULTI_SERVER_PLAN.md — *Config Surface*; ADR-025 (pending) | — (unimplemented) | — |
+| REQ-RTP-NET-002 | Behavioural parity when disabled | MULTI_SERVER_PLAN.md — *Non-Goals (v1)*, *Phase 1 no-op test*; ADR-025 (pending) | — (unimplemented) | — |
+| REQ-RTP-NET-003 | Single distribution artifact (backend / proxy role auto-select) | MULTI_SERVER_PLAN.md — *Intended Usage & Deployment Model*; ADR-025 (pending) | — (unimplemented) | — |
+| REQ-RTP-NET-004 | Safety preservation across the network (S-001…S-006 end-to-end) | MULTI_SERVER_PLAN.md — *Coordinate Resolution Timing*; ADR-025 (pending) | — (unimplemented) | — |
+| REQ-RTP-NET-005 | Authoritative world state on backends | MULTI_SERVER_PLAN.md — *Architecture Overview*, *Non-Goals (v1)*; ADR-025 (pending) | — (unimplemented) | — |
+| REQ-RTP-NET-006 | Configurable network messaging (extends REQ-RTP-F-013) | MULTI_SERVER_PLAN.md — *Network Wait Queue*, *Reservation Tokens*; ADR-025 (pending) | — (unimplemented) | — |
+| REQ-RTP-NET-007 | Non-blocking network I/O (extends REQ-RTP-F-008, REQ-RTP-S-005) | MULTI_SERVER_PLAN.md — *Backend Telemetry Publication*, *Risk & Pitfall Inventory*; ADR-025 (pending) | — (unimplemented) | — |
+| REQ-RTP-NET-008 | Cross-network fairness (UUID-keyed wait queue, bypass permission semantics) | MULTI_SERVER_PLAN.md — *Network Wait Queue*; ADR-025 (pending) | — (unimplemented) | — |
+| REQ-RTP-NET-009 | Authenticated, versioned inter-server data relay | MULTI_SERVER_PLAN.md — *Sufficiency Audit*, *Risk & Pitfall Inventory*; ADR-025 (pending) | — (unimplemented) | — |
+| REQ-RTP-NET-010 | Proxy load-balancing policy (configurable, with disable option) | MULTI_SERVER_PLAN.md — *Load-Balancing Heuristics*; ADR-025 (pending) | — (unimplemented) | — |
+| REQ-RTP-NET-011 | Reservation token deterministic expiry; no orphaned allocations | MULTI_SERVER_PLAN.md — *Reservation Tokens — Lifecycle ownership matrix*; ADR-025 (pending) | — (unimplemented) | — |
+| REQ-RTP-NET-012 | Exactly-once reservation claim across the network | MULTI_SERVER_PLAN.md — *Reservation Tokens — Lifecycle ownership matrix*; ADR-025 (pending) | — (unimplemented) | — |
+| REQ-RTP-NET-013 | Multi-flavour persistence compatibility (any shipped SQL accessor) | MULTI_SERVER_PLAN.md — *Storage — Reuse `AbstractSQLDatabaseAccessor`*; ADR-025 (pending) | — (unimplemented) | — |
+| REQ-RTP-NET-014 | Multi-proxy concurrency and reanimation (no singleton proxy assumption) | MULTI_SERVER_PLAN.md — *Multi-Proxy Deployment*; ADR-025 (pending) | — (unimplemented) | — |
+
+---
+
 ## Coverage Summary
 
 | Module | Total Reqs | Automated Test Coverage |
@@ -159,7 +182,8 @@ This document connects each requirement to the design decision that motivated it
 | rtp-paper | 9 | 5 (REQ-PAPER-F-002 via architecture rule, REQ-PAPER-F-003 and REQ-PAPER-ARCH-003 via `ServerAccessorImplTest`, REQ-PAPER-ARCH-001/005 via `ChunkTicketLifecycleTest`) |
 | rtp-folia | 14 | 1 (REQ-FOLIA-F-002 via architecture rule) |
 | rtp-fabric | 1 | 1 (REQ-FABRIC-F-011 via `ReqFabricAdr023HasPlayedBeforeTest`) |
-| **Total** | **76** | **~44** |
+| Network / Proxy | 14 | 0 (subsystem unimplemented; gated by ADR-025) |
+| **Total** | **90** | **~44** |
 
 > **Deterministic RNG seam:** `MemoryShape.setRng(Random)`, `LocationGenerator.setRng(Random)`, and `RTPCmd.setRng(Random)` allow any test to inject a seeded `java.util.Random` and eliminate RNG as a source of flakiness. `DeterministicShapeTest` (12 tests) exercises this seam for `Circle`, `Square`, and `Rectangle`. The biome-recall path in `LocationGenerator` uses the same seam.
 

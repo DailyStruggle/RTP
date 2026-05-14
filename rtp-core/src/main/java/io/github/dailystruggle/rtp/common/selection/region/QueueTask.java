@@ -718,8 +718,11 @@ final class QueueTask {
             for (int j = 0; j < Region.onPlayerQueuePush.size(); j++) {
                 Region.onPlayerQueuePush.get(j).accept(region, playerId);
             }
-            region.queueManager.playerQueue.add(playerId);
-            RTP.getInstance().queuedPlayers.add(playerId);
+            // ADR-043: enroll on the teleport waitlist via the named entry
+            // point. Equivalent to the old raw `playerQueue.add` +
+            // `queuedPlayers.add`, but the named method documents the intent
+            // and is the canonical teleport-intent enqueue path.
+            region.queueManager.requestTeleport(playerId);
             data.queueLocation = region.queueManager.playerQueue.size();
             RTP.log(Level.FINE,
                     "[ENQUEUE_TRACE] LocationGenerator ENQUEUED playerId=" + playerId

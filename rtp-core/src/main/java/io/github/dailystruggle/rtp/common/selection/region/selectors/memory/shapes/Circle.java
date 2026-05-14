@@ -34,6 +34,7 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
     try {
       defaults.put(GenericMemoryShapeParams.mode, Mode.ACCUMULATE);
       defaults.put(GenericMemoryShapeParams.radius, 256);
+      defaults.put(GenericMemoryShapeParams.radius2, 256);
       defaults.put(GenericMemoryShapeParams.centerRadius, 64);
       defaults.put(GenericMemoryShapeParams.centerX, 0);
       defaults.put(GenericMemoryShapeParams.centerZ, 0);
@@ -91,7 +92,22 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
     return (long) ((radius - cr) * (radius + cr) * Math.PI);
   }
 
-
+  /**
+   * Exact 1D offset between two spiral cells at the same angle on adjacent
+   * rings, for the Archimedean-spiral parameterisation: the {@code R}-th ring
+   * spans {@code π·(2R + 1)} indices ({@code (R+1)² − R²} area units, scaled
+   * by π by {@link #xzToLocation(long, long)}).
+   */
+  @Override
+  protected long neighbourRingOffset(int cx, int cz) {
+    long centerX = getNumber(GenericMemoryShapeParams.centerX, 0L).longValue();
+    long centerZ = getNumber(GenericMemoryShapeParams.centerZ, 0L).longValue();
+    long dx = (long) cx - centerX;
+    long dz = (long) cz - centerZ;
+    long R = (long) Math.sqrt((double) (dx * dx + dz * dz));
+    if (R < 0L) return 0L;
+    return Math.round(Math.PI * (2.0 * R + 1.0));
+  }
 
   @Override
   public long xzToLocation(long x, long z) {

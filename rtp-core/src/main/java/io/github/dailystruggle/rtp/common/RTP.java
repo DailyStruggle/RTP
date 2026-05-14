@@ -165,10 +165,12 @@ public class RTP {
     instance = this;
 
     RTPAPI.addShape(new Circle());
+    RTPAPI.addShape(new Ellipse());
     RTPAPI.addShape(new Square());
     RTPAPI.addShape(new Rectangle());
     RTPAPI.addShape(new Circle_Normal());
     RTPAPI.addShape(new Square_Normal());
+    RTPAPI.addShape(new Polygon());
     RTPAPI.addVerticalAdjustor(new LinearAdjustor(new ArrayList<>())); // todo: make this work
     RTPAPI.addVerticalAdjustor(new JumpAdjustor(new ArrayList<>()));
     RTPAPI.addVerticalAdjustor(new FixedAdjustor(new ArrayList<>()));

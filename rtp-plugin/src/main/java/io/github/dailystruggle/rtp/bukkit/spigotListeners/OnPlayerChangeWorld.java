@@ -20,7 +20,8 @@ public final class OnPlayerChangeWorld implements Listener {
       Region region =
           RTP.selectionAPI.getRegion(RTP.serverAccessor.getPlayer(player.getUniqueId()));
       if (region == null) return;
-      region.queue(player.getUniqueId());
+      // ADR-043: bucket-only opt-in (see OnPlayerJoin for the contract).
+      region.openPersonalQueue(player.getUniqueId());
     }
   }
 }

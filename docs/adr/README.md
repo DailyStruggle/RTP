@@ -14,7 +14,7 @@ An ADR captures a significant architectural decision: the context that forced it
 | [ADR-004](ADR-004-countbound-taskpipe-on-folia.md) | CountBoundTaskPipe Instead of TimeBoundTaskPipe on Folia Regional Threads | Accepted |
 | [ADR-005](ADR-005-paperlib-removal.md) | Removal of PaperLib in Favour of Native Paper APIs | Accepted |
 | [ADR-006](ADR-006-async-queue-pre-generation.md) | Async Queue Pre-Generation Over On-Demand Async Selection | Accepted |
-| [ADR-007](ADR-007-per-user-isolated-queues.md) | Per-User Isolated Queues Alongside the Global Queue | Accepted |
+| [ADR-007](ADR-007-per-user-isolated-queues.md) | Per-User Isolated Queues Alongside the Global Queue | Accepted (operational details superseded by ADR-043) |
 | [ADR-008](ADR-008-memory-tracker-active-gc.md) | MemoryTracker as Active Task GC with WeakReference Deallocation | Accepted |
 | [ADR-009](ADR-009-configurable-spatial-distributions.md) | Configurable Spatial Distributions: Flat, Normal, Exponential | Accepted |
 | [ADR-010](ADR-010-versioned-platform-adapter-submodules.md) | Versioned Platform Adapter Submodules | Accepted |
@@ -35,6 +35,15 @@ An ADR captures a significant architectural decision: the context that forced it
 | [ADR-026](ADR-026-external-hook-api-surface.md) | External Hook API Surface | Accepted |
 | [ADR-028](ADR-028-l3-backlog-cache.md) | L3 Backlog Cache (`backlogLocations`) | Accepted |
 | [ADR-032](ADR-032-teleport-pipeline-latency-histogram.md) | Teleport Pipeline Latency Histogram: 256-Sample Wait-Free Ring, Never Reset | Proposed |
+| [ADR-034](ADR-034-memory-shape-catalog.md) | Memory Shape Catalog and Polygon Shape | Accepted |
+| [ADR-035](ADR-035-interactive-menus-book-first.md) | Interactive Menus via Written Book (Book-First, Chat Fallback) | Proposed |
+| [ADR-036](ADR-036-network-mode-multi-server-multi-proxy.md) | Network Mode: Multi-Server, Multi-Proxy RTP | Proposed |
+| [ADR-037](ADR-037-harden-rtp-config-commands.md) | Harden RTP Config Commands (Prerequisite for `/rtpadmin` Setup Wizards) | Accepted |
+| [ADR-038](ADR-038-rtpadmin-setup-wizards.md) | `/rtpadmin` Setup Wizards (Book-Menu Driven, Config-Transaction Backed) | Proposed |
+| [ADR-039](ADR-039-rtpadmin-diagnostic-surfaces.md) | `/rtpadmin` Diagnostic Surfaces (Biome Map, Bad-Selection Heatmap, Metrics Readouts) | Proposed |
+| [ADR-040](ADR-040-cross-backend-metric-time-series-publication.md) | Cross-Backend Metric Time-Series Publication via `MemoryTracker` Tier Promotion | Proposed |
+| [ADR-041](ADR-041-config-command-and-save-implementation.md) | `/rtp config` Command and Save Mechanics: Implementation Strategy (companion to ADR-037) | Proposed |
+| [ADR-043](ADR-043-personal-queue-permission-semantics.md) | `rtp.personalqueue` Permission Semantics: Bucket-Only Opt-In (supersedes operational details of ADR-007) | Accepted |
 
 ## Subproject ADRs
 

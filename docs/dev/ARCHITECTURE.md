@@ -30,7 +30,7 @@ These modules implement platform-specific features to maximize performance on th
 * **rtp-fabric** (Planned): Acts as its own entry point for the Fabric modding environment.
 
 ### Addons
-* **addons**: A directory containing subprojects that integrate RTP with external plugins. These examples (e.g., `RTP_Glide`, `RTP_Iris_integration`) demonstrate how to utilize `rtp-api` to extend the plugin's capabilities. Note: Several common integrations (such as claim plugins) are now folded directly into the core plugin.
+* **addons**: A directory containing subprojects that integrate RTP with external plugins. The canonical template is `RTP_ExampleAddon`, which demonstrates how to utilize `rtp-api` to extend the plugin's capabilities. Note: Several common integrations (such as claim plugins) are now folded directly into the core plugin (ADR-019); the standalone `RTP_Glide` addon was folded into `effects-api` as the `GLIDE` effect (effects-api-ADR-001); the experimental `RTP_Iris_integration` addon has been removed (no dedicated integration is required to teleport into Iris-generated worlds).
 
 ## Module Dependency Graph
 

@@ -32,6 +32,8 @@ This is what the `mode: ACCUMULATE` setting does. At region load time, RTP preco
 
 The core insight — mapping a 2D annular teleport region bijectively onto a 1D Archimedean spiral curve — was worked out and published by the plugin's developer in a [detailed mathematical writeup on r/admincraft](https://www.reddit.com/r/admincraft/comments/owgvzz/too_much_math/). The full architectural rationale (including alternatives considered) is recorded in [ADR-001](../adr/ADR-001-archimedean-spiral-1d-mapping.md).
 
+The 1D ↔ 2D map is many-to-one in the chunk direction (multiple spiral indices can decode to the same chunk), but the **inverse is bounded by ≤ 2 results per chunk** for `CIRCLE`/`SQUARE`: the spiral's inter-turn radial spacing is 1 chunk while a chunk's diagonal is √2, so at most two consecutive turns can intersect a single unit-square chunk. This bound is what makes `MemoryShape.chunkToLocations` an O(1) inverse — implemented as an angular walk plus a single radial probe per shape, with no unbounded search.
+
 > **Analogy:** Imagine picking a random page from a book, but some pages are torn out. Instead of flipping to a random page and checking if it's there, you count how many intact pages remain and map your random number directly to an intact page — one step, no retries.
 >
 > **Analogy:** This is the same principle used in HDD data recovery: a hard drive marks physically damaged areas as "bad sectors" and the operating system maintains a map of them, routing all reads and writes around them without ever attempting to use them again. RTP's MemoryShape does the same thing — bad sectors are recorded persistently and mathematically excluded from future selections without ever being retried.

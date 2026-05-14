@@ -133,6 +133,91 @@ public class Rectangle extends MemoryShape<RectangleParams> {
     return input[1] * width + input[0];
   }
 
+  /**
+   * Rectangle-specific inverse of {@link #xzToLocation(long, long)}.
+   *
+   * <p>The row-major curve makes the unrotated case a strict bijection: every
+   * chunk in the rectangle has exactly one 1D index decode to it (so the
+   * preimage is a 1-element array). When {@code rotation} is non-zero the
+   * floating-point rotation matrix lets adjacent row indices round to the
+   * same integer chunk, capped at 2 by the unit-chunk √2-diagonal argument
+   * (the bound also held for the spiral shapes; the same upper bound applies
+   * to any 1-chunk-spaced curve).
+   *
+   * <p>This override bypasses the default {@code MemoryShape.chunkToLocations}
+   * angular-walk-with-{@code contains}-gate because {@link #contains(int, int)}
+   * here is parameterised in <em>blocks</em> (its {@code >>4} conversion is
+   * authored for the block-coordinate call sites), while the spiral curve and
+   * the inverse contract are in <em>chunk</em> units. We re-implement the
+   * gate using the row-major bounds directly.
+   *
+   * @param cx chunk x in the rectangle's chunk-unit coordinate system
+   * @param cz chunk z in the rectangle's chunk-unit coordinate system
+   * @return 0-, 1- or 2-element array of 1D indices; never {@code null}.
+   */
+  @Override
+  public long[] chunkToLocations(int cx, int cz) {
+    final long range = getRange();
+    if (range <= 0L) return EMPTY_LONG_ARRAY;
+
+    final long width = getNumber(RectangleParams.width, 256L).longValue();
+    final long height = getNumber(RectangleParams.height, 256L).longValue();
+    final long degrees = getNumber(RectangleParams.rotation, 0L).longValue();
+    final long ccx = getNumber(RectangleParams.centerX, 0L).longValue();
+    final long ccz = getNumber(RectangleParams.centerZ, 0L).longValue();
+
+    // Invert {@link #locationToXZ(long, long)} directly. The forward map is:
+    //   row = n / width, col = n % width
+    //   x' = col - width/2, z' = row - height/2
+    //   (x, z) = rotate((x', z'), degrees) + (centerX, centerZ)
+    // So:
+    //   (x', z') = rotateInverse((cx - centerX, cz - centerZ), degrees)
+    //   col = x' + width/2, row = z' + height/2
+    //   n = row * width + col
+    // {@link #xzToLocation(long, long)} omits the {@code width/2}/{@code height/2}
+    // shifts that {@code locationToXZ} subtracts, so it is *not* the true
+    // inverse of {@code locationToXZ}; we cannot use it here.
+    int[] centered = rotate(new int[]{(int) (cx - ccx), (int) (cz - ccz)}, -degrees);
+    long col = centered[0] + (width / 2);
+    long row = centered[1] + (height / 2);
+    long representative = -1L;
+    if (col >= 0 && col < width && row >= 0 && row < height) {
+      representative = row * width + col;
+    }
+
+    long first = -1L;
+    long second = -1L;
+    if (representative >= 0L && representative < range) {
+      int[] decoded = locationToXZ(representative);
+      if (decoded[0] == cx && decoded[1] == cz) first = representative;
+    }
+
+    if (degrees == 0L) {
+      // Unrotated: bijection. Either the representative is right, or the
+      // chunk is outside the rectangle. No second preimage by design.
+      return (first >= 0L) ? new long[]{first} : EMPTY_LONG_ARRAY;
+    }
+
+    // Rotated: probe row/column neighbours (±1, ±width). The floating-point
+    // rotation in {@link #locationToXZ(long, long)} can round two adjacent
+    // grid cells to the same integer chunk; ≤ 2 by the unit-chunk √2 bound.
+    long base = (first >= 0L) ? first : representative;
+    if (base >= 0L) {
+      for (long off : new long[]{1L, -1L, width, -width}) {
+        long cand = base + off;
+        if (cand < 0L || cand >= range) continue;
+        int[] decoded = locationToXZ(cand);
+        if (decoded[0] == cx && decoded[1] == cz) {
+          if (first < 0L) first = cand;
+          else if (cand != first) { second = cand; break; }
+        }
+      }
+    }
+    if (first < 0L) return EMPTY_LONG_ARRAY;
+    if (second < 0L) return new long[]{first};
+    return (first <= second) ? new long[]{first, second} : new long[]{second, first};
+  }
+
   @Override
   public int[] locationToXZ(long location) {
     MutableRTPCoords output = new MutableRTPCoords(0, 0);
