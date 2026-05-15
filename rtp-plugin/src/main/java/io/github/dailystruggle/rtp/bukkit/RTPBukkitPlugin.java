@@ -101,6 +101,17 @@ public final class RTPBukkitPlugin extends JavaPlugin {
       }
     }
 
+    // Phase 1.5 (CHECKLIST-fabric-rtp-test-full.md): install the Bukkit
+    // implementations of the /rtp test ... umbrella SPI onto RTP. Doing
+    // this once RTP.serverAccessor + RTP.scheduler are wired guarantees
+    // both adapter dependencies are usable. Idempotent: the field is
+    // volatile and may be overwritten on a hot reload.
+    RTP.testUmbrellaContext =
+        new io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaContext(
+            new io.github.dailystruggle.rtp.bukkit.commands.test.BukkitTestUmbrellaSender(),
+            new io.github.dailystruggle.rtp.bukkit.commands.test.BukkitTestUmbrellaScheduler(),
+            null);
+
     RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable ENTER -- initializing bStats Metrics(id=30865)");
     metrics = new Metrics(this, 30865);
     // Register the RTP cost-metrics chart catalogue. All chart lambdas read

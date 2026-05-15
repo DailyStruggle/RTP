@@ -1,0 +1,17 @@
+// rtp-proxy-common — host-independent proxy SPI + reference selector + in-memory binding.
+//
+// Architecture (rtp-proxy-ADR-001 §Package Boundary Rules):
+//   - May depend on: rtp-api, JDK.
+//   - Must NOT import: com.velocitypowered.*, net.md_5.bungee.*, org.bukkit.*,
+//     net.minecraft.*, net.fabricmc.*.
+// The package-boundary lint test (NoVendorImportsTest) enforces this on every build.
+//
+// Toolchain, java-library plugin, JUnit, and Checker-qual are inherited from
+// the root subprojects { } block. No shadow, no Loom, no platform deps.
+plugins {
+    id 'java-library'
+}
+
+dependencies {
+    api project(':rtp-api')
+}

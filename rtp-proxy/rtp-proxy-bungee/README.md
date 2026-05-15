@@ -1,6 +1,6 @@
 # `rtp-proxy-bungee/` — BungeeCord / Waterfall Adapter (secondary)
 
-> **Status: scaffolding only.** No code, no `build.gradle` yet. Gated by Rule D-005 and ADR-025 (outstanding). Phase 3 of [`docs/dev/MULTI_SERVER_PLAN.md`](../../docs/dev/MULTI_SERVER_PLAN.md).
+> **Status: scaffolding only.** No code, no `build.gradle` yet. Gated by Rule D-005 and ADR-036 (outstanding). Phase 3 of [`docs/dev/MULTI_SERVER_PLAN.md`](../../docs/dev/MULTI_SERVER_PLAN.md).
 
 The secondary proxy adapter. **One artifact covers both BungeeCord and Waterfall.** Waterfall-specific behaviour, if any, is detected at runtime — no separate distribution. Hexacord / FlameCord / Travertine are tolerated (BungeeCord-API compatible) but unsupported.
 

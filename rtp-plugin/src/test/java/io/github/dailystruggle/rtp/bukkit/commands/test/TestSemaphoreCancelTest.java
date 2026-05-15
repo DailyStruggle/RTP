@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.bukkit.commands.test;
 
+import io.github.dailystruggle.rtp.common.commands.test.TestSemaphore;
+import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;

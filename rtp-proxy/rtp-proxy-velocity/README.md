@@ -1,6 +1,6 @@
 # `rtp-proxy-velocity/` — Velocity Adapter (primary)
 
-> **Status: scaffolding only.** No code, no `build.gradle` yet. Gated by Rule D-005 and ADR-025 (outstanding). Phase 2 of [`docs/dev/MULTI_SERVER_PLAN.md`](../../docs/dev/MULTI_SERVER_PLAN.md).
+> **Status: scaffolding only.** No code, no `build.gradle` yet. Gated by Rule D-005 and ADR-036 (outstanding). Phase 2 of [`docs/dev/MULTI_SERVER_PLAN.md`](../../docs/dev/MULTI_SERVER_PLAN.md).
 
 The primary proxy adapter. Targets **Velocity 3.3.x or later on Java 21+**. Activates only when the Velocity runtime is detected on the classpath (`com.velocitypowered.api.proxy.ProxyServer`).
 

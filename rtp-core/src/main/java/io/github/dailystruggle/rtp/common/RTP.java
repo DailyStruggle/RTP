@@ -85,6 +85,20 @@ public class RTP {
   public static RTPEconomy economy = null;
 
   /**
+   * Platform-supplied carrier for the {@code /rtp test ...} umbrella SPI
+   * (sender + deferred scheduler + audit sink). Populated by each platform
+   * plugin during startup; remains {@code null} until then. Callers inside
+   * {@code rtp-core} should resolve this via
+   * {@link io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaContext#require()}
+   * which enforces S-006 (throws {@link IllegalStateException} rather than
+   * silently no-opping when the umbrella runs before core load).
+   *
+   * <p>See {@code docs/dev/scratch/CHECKLIST-fabric-rtp-test-full.md} Phase 1.
+   */
+  public static volatile io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaContext
+      testUmbrellaContext;
+
+  /**
    * Process-wide runtime metrics aggregator. Defaults to a {@link CoreMetrics} with a
    * {@link io.github.dailystruggle.rtp.common.metrics.MetricsBinding#NOOP NOOP} binding so
    * callers never have to null-check; platform adapters install a real binding via

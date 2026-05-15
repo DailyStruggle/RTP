@@ -503,7 +503,10 @@ public class ScanTask extends RTPRunnable {
           // Failsafe: Release the permit instantly if a synchronous error occurs
           inFlight.decrementAndGet();
           inFlightGate.release();
-          shape.addBadLocation(currentPos);
+          // addBadChunk: chunk-uniform — within a chunk the per-column selection order is
+          // deterministic, so re-rolling onto the same chunk produces the same placement and
+          // the same failure. Mark the twin spiral index too.
+          shape.addBadChunk(currentPos);
           RTP.log(Level.WARNING, "Synchronous calculation failure at " + currentPos, e);
         }
       }
@@ -1005,7 +1008,10 @@ public class ScanTask extends RTPRunnable {
       if (border != null && !border.isInside().apply(new RTPLocation(world, blockX, (vert.maxY() + vert.minY()) / 2, blockZ))) {
         RTP.log(Level.FINER, "[ScanTask] border-reject region=" + region.name
                 + " pos=" + pos + " block=(" + blockX + "," + blockZ + ")");
-        shape.addBadLocation(pos);
+        // addBadChunk: chunk-uniform — within a chunk the per-column selection order is
+        // deterministic, so re-rolling onto the same chunk yields the same picked column,
+        // which the border will reject again. Mark the twin spiral index too.
+        shape.addBadChunk(pos);
         return CompletableFuture.completedFuture(false);
       }
 
@@ -1239,7 +1245,11 @@ public class ScanTask extends RTPRunnable {
             // adjustNull tail into a zero-cost reject.
             probeOutcomeAdjustNullScan.incrementAndGet();
             probeOutcomeAdjustNullScanShortCircuit.incrementAndGet();
-            shape.addBadLocation(pos);
+            // addBadChunk: chunk-uniform — SCAN_MISS means the multi-column probe sweep
+            // iterated every testCoords column in this chunk and found no acceptable Y on
+            // any of them; the twin spiral index targets a column already covered by the
+            // sweep, so it is guaranteed to also reject.
+            shape.addBadChunk(pos);
             res.complete(false);
             return true;
           }
@@ -1260,7 +1270,9 @@ public class ScanTask extends RTPRunnable {
       String ub = probeBiome.toUpperCase();
       if (!defaultBiomes.contains(ub)) {
         probeOutcomeBiomeReject.incrementAndGet();
-        shape.addBadLocation(pos);
+        // addBadChunk: chunk-uniform — biome is a per-chunk property in the anvil probe;
+        // the twin spiral index decodes to the same chunk and is guaranteed to fail.
+        shape.addBadChunk(pos);
         if (biomeRecall) shape.addBiomeLocation(pos, 1, ub);
         res.complete(false);
         return true;
@@ -1271,7 +1283,10 @@ public class ScanTask extends RTPRunnable {
     String probeBlock = probe.blockAt(py);
     if (probeBlock != null && unsafeBlocks.contains(probeBlock.toUpperCase())) {
       probeOutcomeBlockReject.incrementAndGet();
-      shape.addBadLocation(pos);
+      // addBadChunk: chunk-uniform — within a chunk the per-column selection order is
+      // deterministic, so the twin spiral index resolves to the same picked column and the
+      // same unsafe block.
+      shape.addBadChunk(pos);
       res.complete(false);
       return true;
     }
@@ -1361,7 +1376,10 @@ public class ScanTask extends RTPRunnable {
                   if (resolvedChunk.isSelfContained()) {
                     String midBiome = resolvedChunk.getBiome(blockX, midY, blockZ).toUpperCase();
                     if (!defaultBiomes.contains(midBiome)) {
-                      shape.addBadLocation(pos);
+                      // addBadChunk: chunk-uniform — mid-Y biome read from the resolved
+                      // (anvil-backed self-contained) chunk; biome is per-chunk so the twin
+                      // spiral index in the same chunk is guaranteed to fail.
+                      shape.addBadChunk(pos);
                       if (biomeRecall) shape.addBiomeLocation(pos, 1, midBiome);
                       res.complete(false);
                       return;
@@ -1377,7 +1395,10 @@ public class ScanTask extends RTPRunnable {
                       localCursor.setWorldName(world.name());
 
                       if (!vert.adjust(chunk, localCursor)) {
-                        shape.addBadLocation(pos);
+                        // addBadChunk: chunk-uniform — within a chunk the per-column
+                        // selection order is deterministic, so the twin spiral index picks
+                        // the same column and vert.adjust fails identically.
+                        shape.addBadChunk(pos);
                         res.complete(false);
                         return;
                       }
@@ -1389,14 +1410,20 @@ public class ScanTask extends RTPRunnable {
                       String actualBiome = chunk.getBiome(localCursor.x, localCursor.y, localCursor.z);
 
                       if (!defaultBiomes.contains(actualBiome.toUpperCase())) {
-                        shape.addBadLocation(pos);
+                        // addBadChunk: chunk-uniform — authoritative biome read from the
+                        // loaded chunk; biome is per-chunk so the twin spiral index in the
+                        // same chunk is guaranteed to fail.
+                        shape.addBadChunk(pos);
                         res.complete(false);
                         return;
                       }
 
                       boolean pass = localCursor.y < vert.maxY();
                       if (!pass) {
-                        shape.addBadLocation(pos);
+                        // addBadChunk: chunk-uniform — within a chunk the per-column
+                        // selection order is deterministic, so the twin spiral index picks
+                        // the same column and the same picked Y > maxY.
+                        shape.addBadChunk(pos);
                         res.complete(false);
                         return;
                       }
@@ -1429,18 +1456,27 @@ public class ScanTask extends RTPRunnable {
                       if (pass) {
                         res.complete(true);
                       } else {
-                        shape.addBadLocation(pos);
+                        // addBadChunk: chunk-uniform — within a chunk the per-column
+                        // selection order is deterministic, so the twin spiral index picks
+                        // the same column and the same (2r+1)^3 safety scan rejects again.
+                        shape.addBadChunk(pos);
                         res.complete(false);
                       }
                     } catch (Throwable t) {
                       RTP.log(Level.SEVERE, "[ScanTask] Validation crashed on Region Thread at location " + pos, t);
-                      shape.addBadLocation(pos);
+                      // addBadChunk: chunk-uniform — within a chunk the per-column
+                      // selection order is deterministic, so re-rolling the same chunk
+                      // would crash the same way.
+                      shape.addBadChunk(pos);
                       res.complete(false);
                     }
                   });
                 } catch (Throwable t) {
                   RTP.log(Level.SEVERE, "[ScanTask] Async callback crashed at location " + pos, t);
-                  shape.addBadLocation(pos);
+                  // addBadChunk: chunk-uniform — within a chunk the per-column selection
+                  // order is deterministic, so re-rolling the same chunk would crash the
+                  // async callback identically.
+                  shape.addBadChunk(pos);
                   res.complete(false);
                 }
               });

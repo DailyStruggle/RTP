@@ -1,4 +1,4 @@
-package io.github.dailystruggle.rtp.bukkit.commands.test;
+package io.github.dailystruggle.rtp.common.commands.test;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -19,13 +19,13 @@ import org.jetbrains.annotations.Nullable;
  * can verify the pre-filter is doing useful work across every in-scope
  * Bukkit-family adapter: Spigot runs the probe in {@code
  * BukkitRTPWorld#getChunkAt}; Paper inherits the same path verbatim per
- * §13.2 (landed 2026-04-20); Folia re-implements the same orchestration in
- * {@code FoliaRTPWorld#getChunkAt} per §11. Counters staying at zero now
+ * Â§13.2 (landed 2026-04-20); Folia re-implements the same orchestration in
+ * {@code FoliaRTPWorld#getChunkAt} per Â§11. Counters staying at zero now
  * means either the pre-filter is disabled
  * ({@code SafetyKeys.anvilPrefilterEnabled}) or no teleport has triggered a
- * candidate chunk load since startup. Fabric is out of scope (§13.2).
+ * candidate chunk load since startup. Fabric is out of scope (Â§13.2).
  *
- * <p>See {@code ADR-016 §10} (Phase&nbsp;4)
+ * <p>See {@code ADR-016 Â§10} (Phase&nbsp;4)
  * and {@code docs/dev/RUNTIME_TEST_SUITE_PLAN.md} for the runtime-test
  * suite contract.
  *
@@ -120,10 +120,10 @@ public class TestAnvilPrefilterCmd extends BaseRTPCmdImpl {
 
     if (s.total() == 0L) {
       String note =
-          "[RTP test/anvil-prefilter] no probes observed yet — either the pre-filter is "
+          "[RTP test/anvil-prefilter] no probes observed yet â€” either the pre-filter is "
               + "disabled (SafetyKeys.anvilPrefilterEnabled) or no teleport has triggered "
-              + "a candidate chunk load since startup. Spigot, Paper (§13.2), and Folia "
-              + "all enter the prefilter; Fabric is out of scope (§13.2).";
+              + "a candidate chunk load since startup. Spigot, Paper (Â§13.2), and Folia "
+              + "all enter the prefilter; Fabric is out of scope (Â§13.2).";
       if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
         RTP.serverAccessor.sendMessage(callerId, note);
       }

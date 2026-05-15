@@ -1,6 +1,6 @@
 # `rtp-proxy-common/` — Requirements
 
-> **Status: draft, D-005 gated on ADR-025 (outstanding).** Module-scope requirements for the shared proxy-side SPI module. Complements [`../REQUIREMENTS.md`](../REQUIREMENTS.md) (umbrella) and [`../../docs/dev/REQUIREMENTS.md` §1.6](../../docs/dev/REQUIREMENTS.md) (system-level `REQ-RTP-NET-NNN`).
+> **Status: draft, D-005 gated on ADR-036 (outstanding).** Module-scope requirements for the shared proxy-side SPI module. Complements [`../REQUIREMENTS.md`](../REQUIREMENTS.md) (umbrella) and [`../../docs/dev/REQUIREMENTS.md` §1.6](../../docs/dev/REQUIREMENTS.md) (system-level `REQ-RTP-NET-NNN`).
 >
 > Authoring style: `shall` / `shall not`, absolute state, no implementation actions.
 
@@ -40,7 +40,7 @@ The reference selector's `recentPicks` decaying counter shall be evaluable from 
 
 ## Traceability
 
-Each requirement above shall receive a row in [`../../docs/dev/TRACEABILITY.md`](../../docs/dev/TRACEABILITY.md) at status *unimplemented* upon ratification of ADR-025.
+Each requirement above shall receive a row in [`../../docs/dev/TRACEABILITY.md`](../../docs/dev/TRACEABILITY.md) at status *unimplemented* upon ratification of ADR-036.
 
 ## Cross-References
 

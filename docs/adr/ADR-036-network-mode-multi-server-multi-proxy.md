@@ -1,7 +1,8 @@
 # ADR-036 — Network Mode: Multi-Server, Multi-Proxy RTP
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-05-13
+**Accepted:** 2026-05-14
 
 ## Context
 
@@ -84,7 +85,7 @@ Lowest score wins; ties broken by `serverIdAsc`. Supported curves: `linear`, `ex
 
 Fallback chain (Linux CFS-inspired): `maxRetries: 3`, `attemptTimeoutMs: 1500`, `cooldownMs: 2000` hysteresis on rejected backends, score-sticking on in-flight requests, single snapshot read per request.
 
-`playerCount` shall be published in telemetry but ship with `weight: 0`; the weight shall be re-evaluated after Phase 2 live testing. Concrete scoring math, curve plots, and tuning guide are deferred to a subproject ADR (`rtp-proxy-ADR-NNN-load-balancer-scoring`).
+`playerCount` shall be published in telemetry but ship with `weight: 0`; the weight shall be re-evaluated after Phase 2 live testing. Concrete scoring math, curve plots, and tuning guide are captured in subproject ADR `rtp-proxy-ADR-004-weighted-average-selector`.
 
 ### 7. Module Shape
 
@@ -106,10 +107,10 @@ Phases are inherited from `MULTI_SERVER_PLAN.md`; this ADR ratifies the *order* 
 | Phase | Scope | Subproject ADRs to author (under `rtp-proxy/docs/adr/`) |
 |---|---|---|
 | **0** | Scope unlock (docs only) | `rtp-proxy-ADR-001-spi-shape` |
-| **1** | Core SPI, in-memory binding, no-op contract test | `rtp-proxy-ADR-002-network-state-member-schema`, `rtp-proxy-ADR-003-reservation-token-state-machine` |
-| **2** | Velocity + Redis end-to-end | `rtp-proxy-ADR-004-redis-transport-binding`, `rtp-proxy-ADR-005-load-balancer-scoring`, `rtp-proxy-ADR-006-hmac-and-schema-version-negotiation` |
-| **3** | Postgres + join trigger + BungeeCord adapter | `rtp-proxy-ADR-007-postgres-transport-binding`, `rtp-proxy-ADR-008-bungee-adapter-divergence` |
-| **4** | Generic SQL + hardening + release | `rtp-proxy-ADR-009-generic-sql-polling-binding`, `rtp-proxy-ADR-010-security-audit-and-kill-switch` |
+| **1** | Core SPI, in-memory binding, weighted-average selector, no-op contract test | `rtp-proxy-ADR-002-network-yml-schema`, `rtp-proxy-ADR-003-in-memory-binding`, `rtp-proxy-ADR-004-weighted-average-selector` |
+| **2** | Velocity + Redis end-to-end | `rtp-proxy-ADR-005-redis-binding`, `rtp-proxy-ADR-006-velocity-bootstrap` |
+| **3** | Postgres + join trigger + BungeeCord adapter | `rtp-proxy-ADR-007-postgres-binding`, `rtp-proxy-ADR-008-bungee-bootstrap` |
+| **4** | Generic SQL + hardening + release | `rtp-proxy-ADR-009-generic-sql-binding`, `rtp-proxy-ADR-010-security-hardening` |
 
 Subproject ADR numbering restarts at `001` inside `rtp-proxy/docs/adr/` per the per-directory naming rule in `AGENTS.md > Self-Updating Protocol`. The global `docs/adr/` sequence shall not be used for narrower network-mode concerns once this umbrella ADR is accepted; only umbrella-level reversals or successors (e.g., a future ADR that supersedes this one) shall consume global ADR numbers.
 
@@ -134,7 +135,7 @@ Subproject ADR numbering restarts at `001` inside `rtp-proxy/docs/adr/` per the 
 - **Negative / Trade-offs:**
   - The umbrella becomes a single point of revision for headline-goal changes; reversing a locked decision (e.g., dropping Bungee) requires a superseding global ADR rather than a local subproject ADR.
   - Readers must traverse two levels (umbrella + subproject ADR) to understand a single concern end-to-end. Mitigated by a cross-reference table in `rtp-proxy/docs/adr/README.md` (to be created in Phase 1).
-  - Subproject ADRs that touch backend-side state (e.g., `rtp-proxy-ADR-002-network-state-member-schema`) live under `rtp-proxy/docs/adr/` for cohesion with the proxy story even though they technically describe a `rtp-core` member. The trade-off is consistency-of-narrative over strict directory-by-owner; documented here so future contributors don't re-litigate the placement.
+  - Subproject ADRs that touch backend-side state (e.g., the network-state member schema formalised under `rtp-proxy-ADR-003-in-memory-binding`) live under `rtp-proxy/docs/adr/` for cohesion with the proxy story even though they technically describe a `rtp-core` member. The trade-off is consistency-of-narrative over strict directory-by-owner; documented here so future contributors don't re-litigate the placement.
   - Acceptance of this ADR is *not* a green light for code: each phase still requires its subproject ADR(s) under D-005 before implementation in that phase begins.
 
 ## References

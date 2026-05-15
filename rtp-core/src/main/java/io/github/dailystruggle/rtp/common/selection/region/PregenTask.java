@@ -602,7 +602,10 @@ final class PregenTask implements Runnable {
         RTPCoords res = state.vert.adjust(chunk);
         if (res == null) {
             if (state.defaultBiomes && state.shape instanceof MemoryShape && state.biomeRecall) {
-                ((MemoryShape<?>) state.shape).addBadLocation(finalL);
+                // addBadChunk: chunk-uniform — within a chunk the per-column selection order
+                // is deterministic, so the twin spiral index picks the same column and
+                // vert.adjust returns null identically.
+                ((MemoryShape<?>) state.shape).addBadChunk(finalL);
             }
             if (state.verbose) {
                 state.failMap.get(LocationGenerator.FailTypes.vert)
@@ -623,7 +626,9 @@ final class PregenTask implements Runnable {
         if (state.biomeNames.contains(currBiome) != state.biomeWhitelist) {
             if (state.maxAttempts < state.maxAttemptsCeiling) state.maxAttempts++;
             if (state.defaultBiomes && state.shape instanceof MemoryShape && state.biomeRecall) {
-                ((MemoryShape<?>) state.shape).addBadLocation(finalL);
+                // addBadChunk: chunk-uniform — biome is a per-chunk property; the twin spiral
+                // index decodes to the same chunk and is guaranteed to fail the same biome check.
+                ((MemoryShape<?>) state.shape).addBadChunk(finalL);
             }
             if (state.verbose) {
                 String cb = currBiome;
@@ -780,7 +785,10 @@ final class PregenTask implements Runnable {
             }
             recordOutcome("safety/blockReject (" + finalX + "," + finalY + "," + finalZ + ")");
             if (state.shape instanceof MemoryShape) {
-                ((MemoryShape<?>) state.shape).addBadLocation(finalL);
+                // addBadChunk: chunk-uniform — within a chunk the per-column selection order
+                // is deterministic, so the twin spiral index picks the same column and the
+                // same (2r+1)^3 safety scan rejects it again.
+                ((MemoryShape<?>) state.shape).addBadChunk(finalL);
             }
             closeIfPresent(reservation);
             rescheduleNextAttempt();
@@ -800,7 +808,10 @@ final class PregenTask implements Runnable {
                         }
                         recordOutcome("safetyExternal/verifier ex=" + (verEx == null ? "null" : verEx.getClass().getSimpleName()));
                         if (state.shape instanceof MemoryShape) {
-                            ((MemoryShape<?>) state.shape).addBadLocation(finalL);
+                            // addBadChunk: chunk-uniform — within a chunk the per-column
+                            // selection order is deterministic, so the twin spiral index picks
+                            // the same column and the verifier rejects it identically.
+                            ((MemoryShape<?>) state.shape).addBadChunk(finalL);
                         }
                         closeIfPresent(reservation);
                         continueInline(this::rescheduleNextAttempt);

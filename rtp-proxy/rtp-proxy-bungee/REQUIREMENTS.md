@@ -1,6 +1,6 @@
 # `rtp-proxy-bungee/` — Requirements
 
-> **Status: draft, D-005 gated on ADR-025 (outstanding).** Module-scope requirements for the secondary proxy adapter, covering BungeeCord and Waterfall in a single artifact. Complements [`../REQUIREMENTS.md`](../REQUIREMENTS.md) (umbrella), [`../rtp-proxy-common/REQUIREMENTS.md`](../rtp-proxy-common/REQUIREMENTS.md), and [`../../docs/dev/REQUIREMENTS.md` §1.6](../../docs/dev/REQUIREMENTS.md).
+> **Status: draft, D-005 gated on ADR-036 (outstanding).** Module-scope requirements for the secondary proxy adapter, covering BungeeCord and Waterfall in a single artifact. Complements [`../REQUIREMENTS.md`](../REQUIREMENTS.md) (umbrella), [`../rtp-proxy-common/REQUIREMENTS.md`](../rtp-proxy-common/REQUIREMENTS.md), and [`../../docs/dev/REQUIREMENTS.md` §1.6](../../docs/dev/REQUIREMENTS.md).
 >
 > Authoring style: `shall` / `shall not`, absolute state, no implementation actions.
 
@@ -37,7 +37,7 @@ BungeeCord-API-compatible forks (notably Waterfall, which is explicitly supporte
 
 ## Traceability
 
-Each requirement above shall receive a row in [`../../docs/dev/TRACEABILITY.md`](../../docs/dev/TRACEABILITY.md) at status *unimplemented* upon ratification of ADR-025.
+Each requirement above shall receive a row in [`../../docs/dev/TRACEABILITY.md`](../../docs/dev/TRACEABILITY.md) at status *unimplemented* upon ratification of ADR-036.
 
 ## Cross-References
 

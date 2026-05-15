@@ -34,7 +34,6 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
     try {
       defaults.put(GenericMemoryShapeParams.mode, Mode.ACCUMULATE);
       defaults.put(GenericMemoryShapeParams.radius, 256);
-      defaults.put(GenericMemoryShapeParams.radius2, 256);
       defaults.put(GenericMemoryShapeParams.centerRadius, 64);
       defaults.put(GenericMemoryShapeParams.centerX, 0);
       defaults.put(GenericMemoryShapeParams.centerZ, 0);
@@ -327,7 +326,11 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
       u = Boolean.parseBoolean(String.valueOf(unique));
       data.put(GenericMemoryShapeParams.uniquePlacements, u);
     }
-    if (u) addBadLocation(location);
+    // addBadChunk: chunk-uniform (uniqueplacements knob) — within a chunk the per-column
+    // selection order is deterministic, so re-rolling onto the same chunk produces the
+    // same effective placement. Marking the twin spiral index prevents that chunk-level
+    // re-roll and is the correct semantics for "unique" placements.
+    if (u) addBadChunk(location);
 
     return location;
   }

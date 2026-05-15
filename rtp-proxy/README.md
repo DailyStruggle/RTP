@@ -1,6 +1,6 @@
 # `rtp-proxy/` — Proxy Adapters (umbrella)
 
-> **Status: scaffolding only.** No code, no `build.gradle`, no `settings.gradle` inclusion yet. This umbrella exists so the directory shape and per-module `REQUIREMENTS.md` documents can land **before** ADR-025 ratifies them. Gated by Rule D-005 (see [`.junie/AGENTS.md`](../.junie/AGENTS.md)).
+> **Status: scaffolding only.** No code, no `build.gradle`, no `settings.gradle` inclusion yet. This umbrella exists so the directory shape and per-module `REQUIREMENTS.md` documents can land **before** ADR-036 ratifies them. Gated by Rule D-005 (see [`.junie/AGENTS.md`](../.junie/AGENTS.md)).
 
 This directory hosts RTP's proxy-side adapters, per [`docs/dev/MULTI_SERVER_PLAN.md`](../docs/dev/MULTI_SERVER_PLAN.md). A "proxy" here means a server-list-rewriting Java proxy that sits in front of multiple Minecraft backends and routes RTP requests across them. Protocol translators (Geyser, ViaProxy) and library-based custom proxies (MCProtocolLib) are **out of scope** — see *Non-Goals (v1)* in the plan.
 
@@ -23,7 +23,7 @@ Single artifact, per REQ-RTP-NET-003. The proxy modules shade into the existing 
 | File | Purpose | Created when |
 |---|---|---|
 | `REQUIREMENTS.md` | Umbrella `REQ-RTP-PROXY-NNN` requirements covering all adapters | **Next step** |
-| `build.gradle` | Aggregator (no sources of its own) | Phase 1 (after ADR-025) |
+| `build.gradle` | Aggregator (no sources of its own) | Phase 1 (after ADR-036) |
 | `docs/adr/` | Subproject ADRs (`rtp-proxy-ADR-NNN-…`) | First ADR (Phase 1 SPI shape) |
 
 ## Optional further subdirectories (notes only)
@@ -37,7 +37,7 @@ The following are **not** created now — they are reserved structural slots so 
 
 ## Subproject ADRs (forthcoming)
 
-Per `AGENTS.md`, when an ADR is authored here it must also get a row in the *Subproject ADRs* table of [`docs/adr/README.md`](../docs/adr/README.md). The global `docs/adr/` keeps its own independent sequence (ADR-025 — multi-server proxy support — is global, not per-subproject).
+Per `AGENTS.md`, when an ADR is authored here it must also get a row in the *Subproject ADRs* table of [`docs/adr/README.md`](../docs/adr/README.md). The global `docs/adr/` keeps its own independent sequence (ADR-036 — multi-server proxy support — is global, not per-subproject).
 
 ## Cross-references
 

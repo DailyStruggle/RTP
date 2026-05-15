@@ -1,6 +1,7 @@
 # rtp-proxy-ADR-002 — Canonical `network.yml` Schema
 
-**Status:** Proposed
+**Status:** Accepted
+**Accepted:** 2026-05-14
 **Date:** 2026-05-13
 **Refines:** [ADR-036 — Network Mode (Multi-Server, Multi-Proxy)](../../../docs/adr/ADR-036-network-mode-multi-server-multi-proxy.md)
 **Depends on:** [rtp-proxy-ADR-001](rtp-proxy-ADR-001-spi-shape.md)

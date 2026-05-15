@@ -135,6 +135,16 @@ include 'rtp-fabric:rtp-fabric-v1_21_R11'
 // (or `org.gradle.java.installations.auto-download=true`).
 include 'rtp-fabric:rtp-fabric-v26_1_R1'
 
+// Multi-server proxy support — umbrella ADR-036 Accepted 2026-05-14.
+// Phase 1: rtp-proxy-common ships the host-independent SPI, the reference
+// weighted-average BackendSelector (rtp-proxy-ADR-004), and the reference
+// InMemoryNetworkStateBinding (rtp-proxy-ADR-003). Pure-Java, no proxy-vendor
+// or backend-platform imports (rtp-proxy-ADR-001 §Package Boundary Rules).
+// rtp-proxy-velocity (Phase 2) and rtp-proxy-bungee (Phase 3) remain
+// documentation-only until their respective subproject ADRs ratify
+// (rtp-proxy-ADR-006 / rtp-proxy-ADR-008 are still Proposed).
+include 'rtp-proxy:rtp-proxy-common'
+
 include 'addons:RTP_ExampleAddon'
 
 // Standalone helper plugins (no rtp-api / rtp-core dependency).

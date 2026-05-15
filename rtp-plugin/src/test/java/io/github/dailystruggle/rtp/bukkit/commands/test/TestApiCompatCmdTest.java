@@ -1,10 +1,11 @@
 package io.github.dailystruggle.rtp.bukkit.commands.test;
 
+import io.github.dailystruggle.rtp.common.commands.test.TestApiCompatCmd;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.github.dailystruggle.rtp.bukkit.commands.test.TestApiCompatCmd.ApiProbe;
-import io.github.dailystruggle.rtp.bukkit.commands.test.TestApiCompatCmd.ProbeReport;
+import io.github.dailystruggle.rtp.common.commands.test.TestApiCompatCmd.ApiProbe;
+import io.github.dailystruggle.rtp.common.commands.test.TestApiCompatCmd.ProbeReport;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;

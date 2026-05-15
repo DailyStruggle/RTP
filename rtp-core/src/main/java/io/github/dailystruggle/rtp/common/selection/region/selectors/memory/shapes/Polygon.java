@@ -222,7 +222,11 @@ public class Polygon extends Square {
         continue;
       }
       if (!pointInPolygon(coords.x, coords.z)) {
-        addBadLocation(i);
+        // addBadChunk: chunk-uniform — polygon membership is evaluated at chunk-unit coords,
+        // so marking the twin spiral index in the same chunk lets the walker skip the
+        // redundant pointInPolygon test when it later visits that index (isKnownBad
+        // short-circuits before the polygon test).
+        addBadChunk(i);
       }
 
       sinceYield++;
@@ -282,7 +286,12 @@ public class Polygon extends Square {
       return location;
     }
     if (!pointInPolygon(coords.x, coords.z)) {
-      addBadLocation(location);
+      // addBadChunk: chunk-uniform — polygon membership is evaluated at chunk-unit
+      // coords (locationToXZ output), so the twin spiral index decoding to the same
+      // chunk is guaranteed to also fail point-in-polygon. Unlike the bulk walker
+      // above, this is a single-shot reject in the hot rand() path so amplification
+      // is a net win.
+      addBadChunk(location);
       return -1;
     }
     return location;

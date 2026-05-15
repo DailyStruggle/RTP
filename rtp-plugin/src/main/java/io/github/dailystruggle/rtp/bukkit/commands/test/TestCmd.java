@@ -1,21 +1,125 @@
 package io.github.dailystruggle.rtp.bukkit.commands.test;
 
+import io.github.dailystruggle.rtp.common.commands.test.TestCancelCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestSchedulerCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestConfigSetCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestApiCompatCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestChunkTicketCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestAnvilPrefilterCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestSemaphore;
+import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
+import io.github.dailystruggle.rtp.common.commands.test.TestCancelCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestSchedulerCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestConfigSetCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestApiCompatCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestChunkTicketCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestAnvilPrefilterCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestSemaphore;
+import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
+import io.github.dailystruggle.rtp.common.commands.test.TestCancelCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestSchedulerCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestConfigSetCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestApiCompatCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestChunkTicketCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestAnvilPrefilterCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestSemaphore;
+import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.commands.test.TestCancelCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestSchedulerCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestConfigSetCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestApiCompatCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestChunkTicketCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestAnvilPrefilterCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestSemaphore;
+import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.test.TestCancelCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestSchedulerCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestConfigSetCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestApiCompatCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestChunkTicketCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestAnvilPrefilterCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestSemaphore;
+import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
 import java.util.List;
+import io.github.dailystruggle.rtp.common.commands.test.TestCancelCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestSchedulerCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestConfigSetCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestApiCompatCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestChunkTicketCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestAnvilPrefilterCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestSemaphore;
+import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
 import java.util.Map;
+import io.github.dailystruggle.rtp.common.commands.test.TestCancelCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestSchedulerCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestConfigSetCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestApiCompatCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestChunkTicketCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestAnvilPrefilterCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestSemaphore;
+import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
 import java.util.UUID;
+import io.github.dailystruggle.rtp.common.commands.test.TestCancelCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestSchedulerCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestConfigSetCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestApiCompatCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestChunkTicketCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestAnvilPrefilterCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestSemaphore;
+import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
 import java.util.concurrent.CompletableFuture;
+import io.github.dailystruggle.rtp.common.commands.test.TestCancelCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestSchedulerCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestConfigSetCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestApiCompatCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestChunkTicketCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestAnvilPrefilterCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestSemaphore;
+import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
 import java.util.function.Consumer;
+import io.github.dailystruggle.rtp.common.commands.test.TestCancelCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestSchedulerCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestConfigSetCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestApiCompatCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestChunkTicketCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestAnvilPrefilterCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestSemaphore;
+import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
 import java.util.function.Predicate;
+import io.github.dailystruggle.rtp.common.commands.test.TestCancelCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestSchedulerCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestConfigSetCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestApiCompatCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestChunkTicketCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestAnvilPrefilterCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestSemaphore;
+import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
 import java.util.logging.Level;
+import io.github.dailystruggle.rtp.common.commands.test.TestCancelCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestSchedulerCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestConfigSetCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestApiCompatCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestChunkTicketCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestAnvilPrefilterCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestSemaphore;
+import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
 import org.jetbrains.annotations.NotNull;
+import io.github.dailystruggle.rtp.common.commands.test.TestCancelCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestSchedulerCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestConfigSetCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestApiCompatCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestChunkTicketCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestAnvilPrefilterCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestSemaphore;
+import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Parent node for the {@code rtp test …} runtime test suite.
+ * Parent node for the {@code rtp test Ã¢â‚¬Â¦} runtime test suite.
  *
  * <p>See {@code docs/dev/RUNTIME_TEST_SUITE_PLAN.md} for the full design,
  * roadmap, and requirements traceability.
@@ -26,8 +130,8 @@ import org.jetbrains.annotations.Nullable;
  *
  * <p><b>Cross-platform constructor split.</b> The constructor registers only
  * the subcommands that are safe to class-load on every platform that ships
- * {@code rtp-plugin} — currently Bukkit and Fabric (the JAR is multi-loader
- * per ADR-022 §2). Subcommands that hard-import Bukkit / Spigot types
+ * {@code rtp-plugin} Ã¢â‚¬â€ currently Bukkit and Fabric (the JAR is multi-loader
+ * per ADR-022 Ã‚Â§2). Subcommands that hard-import Bukkit / Spigot types
  * ({@link TestStressCmd}, {@link TestChunkProbePerfCmd}, {@link TestFullCmd},
  * {@link AsyncReplyTestJob}) are registered by the {@link BukkitTestCmd}
  * subclass instead, so loading {@code TestCmd} on Fabric does not trigger
@@ -62,7 +166,7 @@ public class TestCmd extends BaseRTPCmdImpl {
     // Bukkit-bound subcommands and the `full`/`all` umbrella are registered
     // by BukkitTestCmd (see its Javadoc) so this class stays class-load-safe
     // on Fabric. `full` references SendMessage (rtp-spigot), so even the
-    // umbrella has to stay Bukkit-only for now — Fabric users still get every
+    // umbrella has to stay Bukkit-only for now Ã¢â‚¬â€ Fabric users still get every
     // platform-neutral subcommand individually.
     registerPlatformSpecificChildren();
   }
@@ -73,7 +177,7 @@ public class TestCmd extends BaseRTPCmdImpl {
    * is a no-op (Fabric path); {@link BukkitTestCmd} overrides it.
    */
   protected void registerPlatformSpecificChildren() {
-    // no-op by default — Fabric and any other non-Bukkit platform.
+    // no-op by default Ã¢â‚¬â€ Fabric and any other non-Bukkit platform.
   }
 
   @Override
@@ -99,14 +203,14 @@ public class TestCmd extends BaseRTPCmdImpl {
     return true;
   }
 
-  // --- Phase 1.3 — per-caller test-isolation semaphore wiring ---------------
+  // --- Phase 1.3 Ã¢â‚¬â€ per-caller test-isolation semaphore wiring ---------------
   //
   // Every dispatch through this parent acquires a per-caller permit
   // ({@link TestSemaphore}) before the child subcommand parses its
   // arguments. On contention (the same caller already has a test in
   // flight) the dispatch is rescheduled via
   // {@link io.github.dailystruggle.rtp.api.scheduling.RTPScheduler#runTaskLater}
-  // — never via thread parking — preserving REQ-RTP-S-005. The permit is
+  // Ã¢â‚¬â€ never via thread parking Ã¢â‚¬â€ preserving REQ-RTP-S-005. The permit is
   // released only after the child's args-form future completes AND the
   // caller's {@link ActiveTestJobs} entries have drained, so async tails
   // (e.g. {@code stress}, {@code queue-starvation}) cannot overlap with
@@ -128,7 +232,7 @@ public class TestCmd extends BaseRTPCmdImpl {
 
   /**
    * Maximum reschedules before giving up with an S-004 WARNING. Default
-   * 60 ≈ 60s wall-clock, matching {@code TestFullCmd.DRAIN_TIMEOUT_MILLIS}.
+   * 60 Ã¢â€°Ë† 60s wall-clock, matching {@code TestFullCmd.DRAIN_TIMEOUT_MILLIS}.
    * System-property overridable so operators can tune contention budget
    * without recompiling.
    */
@@ -144,7 +248,7 @@ public class TestCmd extends BaseRTPCmdImpl {
    * <p>The child's name is read from {@code args[i]} so the permit holder
    * is recorded as the actual subcommand the caller invoked (matching
    * {@code rtp test cancel} reporting). If {@code args[i]} is absent or
-   * doesn't resolve to a child, we delegate without acquiring — bare
+   * doesn't resolve to a child, we delegate without acquiring Ã¢â‚¬â€ bare
    * {@code rtp test} (which surfaces help) is not a test, and a malformed
    * subcommand path falls through to {@link
    * io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand#msgInvalidCommand
@@ -160,13 +264,13 @@ public class TestCmd extends BaseRTPCmdImpl {
       @Nullable Map<String, CommandParameter> tempParameters) {
     String subName = resolveSubName(args, i);
     if (subName == null) {
-      // Bare `rtp test` or unresolved subcommand — let the default
+      // Bare `rtp test` or unresolved subcommand Ã¢â‚¬â€ let the default
       // TreeCommand path handle help / msgInvalidCommand without taking
       // the permit. Bare invocations are not tests.
       return defaultOnCommand(
           callerId, permissionCheckMethod, messageMethod, args, i, tempParameters);
     }
-    // `cancel` is the in-band stop switch for stuck tests — it must
+    // `cancel` is the in-band stop switch for stuck tests Ã¢â‚¬â€ it must
     // never queue behind the very permit holder it's trying to abort.
     // Bypass the semaphore entirely and dispatch immediately, otherwise
     // the cancel itself would sit on the retry loop for ~60s waiting on
@@ -185,7 +289,7 @@ public class TestCmd extends BaseRTPCmdImpl {
     for (int j = i; j < args.length; j++) {
       String arg = args[j];
       if (arg == null) continue;
-      // Skip parameter tokens (e.g. iterations:5) — child names never contain delimiters.
+      // Skip parameter tokens (e.g. iterations:5) Ã¢â‚¬â€ child names never contain delimiters.
       if (arg.indexOf('=') >= 0 || arg.indexOf(':') >= 0) continue;
       CommandsAPICommand child = commandLookup.get(arg.toUpperCase());
       if (child != null) return child.name();
@@ -303,7 +407,7 @@ public class TestCmd extends BaseRTPCmdImpl {
           defaultOnCommand(
               callerId, permissionCheckMethod, messageMethod, args, i, tempParameters);
     } catch (Throwable t) {
-      // Synchronous failure inside dispatch — release immediately and
+      // Synchronous failure inside dispatch Ã¢â‚¬â€ release immediately and
       // surface the error per S-004.
       TestSemaphore.release(callerId, subName);
       RTP.log(

@@ -1,6 +1,6 @@
 # `rtp-proxy/` — Umbrella Requirements
 
-> **Status: draft, D-005 gated on ADR-025 (outstanding).** This document defines module-scope requirements that apply to **every** proxy adapter under `rtp-proxy/`. It complements the system-level `REQ-RTP-NET-NNN` requirements in [`../docs/dev/REQUIREMENTS.md` §1.6](../docs/dev/REQUIREMENTS.md) and the design narrative in [`../docs/dev/MULTI_SERVER_PLAN.md`](../docs/dev/MULTI_SERVER_PLAN.md).
+> **Status: draft, D-005 gated on ADR-036 (outstanding).** This document defines module-scope requirements that apply to **every** proxy adapter under `rtp-proxy/`. It complements the system-level `REQ-RTP-NET-NNN` requirements in [`../docs/dev/REQUIREMENTS.md` §1.6](../docs/dev/REQUIREMENTS.md) and the design narrative in [`../docs/dev/MULTI_SERVER_PLAN.md`](../docs/dev/MULTI_SERVER_PLAN.md).
 >
 > Authoring style: `shall` / `shall not`, absolute state, no implementation actions (per [`../docs/dev/RULES.md`](../docs/dev/RULES.md)).
 
@@ -49,7 +49,7 @@ Cross-network tab-completion shall be bounded in fan-out and shall be served fro
 
 ## Traceability
 
-Each requirement above shall receive a row in [`../docs/dev/TRACEABILITY.md`](../docs/dev/TRACEABILITY.md) at status *unimplemented* upon ratification of ADR-025.
+Each requirement above shall receive a row in [`../docs/dev/TRACEABILITY.md`](../docs/dev/TRACEABILITY.md) at status *unimplemented* upon ratification of ADR-036.
 
 ## Cross-References
 

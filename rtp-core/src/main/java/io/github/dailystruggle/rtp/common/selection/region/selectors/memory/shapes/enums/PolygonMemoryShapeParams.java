@@ -12,8 +12,9 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
  * the sampler past that boundary. The {@code Polygon} shape forces {@code expand=false}
  * internally regardless of any value carried in the underlying data map.
  *
- * <p>{@code radius}, {@code radius2}, and {@code centerRadius} are also omitted because
- * the polygon's bounding box is derived from {@link #vertices} at load time.
+ * <p>{@code radius}, the ellipse-specific {@code radius2} (see {@link EllipseMemoryShapeParams#radius2}),
+ * and {@code centerRadius} are also omitted because the polygon's bounding box is derived from
+ * {@link #vertices} at load time.
  *
  * <p>See ADR-034 for the full design.
  */
