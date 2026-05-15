@@ -1,5 +1,6 @@
 package io.github.dailystruggle.effectsapi.bukkit.LocalEffects;
 
+import io.github.dailystruggle.effectsapi.EffectsAPI;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -8,6 +9,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import java.lang.reflect.Field;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -33,17 +36,47 @@ class FoliaDispatchTest {
 
     private PotionEffect.EntityDispatcher savedEntityDispatcher;
     private FireworkEffect.RegionDispatcher savedRegionDispatcher;
+    private Plugin savedEffectsApiInstance;
 
     @BeforeEach
     void saveDefaults() {
         savedEntityDispatcher = PotionEffect.entityDispatcher;
         savedRegionDispatcher = FireworkEffect.regionDispatcher;
+        // EffectsAPI.getInstance() now throws IllegalStateException (S-006)
+        // when uninitialized. The production code under test calls it before
+        // consulting the dispatcher seam, so seed a mock Plugin for the test
+        // lifecycle and restore it in @AfterEach.
+        savedEffectsApiInstance = readEffectsApiInstance();
+        // Don't call EffectsAPI.init() — it registers Bukkit listeners which
+        // NPE without an initialized server. Just seed the static field.
+        writeEffectsApiInstance(mock(Plugin.class));
     }
 
     @AfterEach
     void restoreDefaults() {
         PotionEffect.entityDispatcher = savedEntityDispatcher;
         FireworkEffect.regionDispatcher = savedRegionDispatcher;
+        writeEffectsApiInstance(savedEffectsApiInstance);
+    }
+
+    private static Plugin readEffectsApiInstance() {
+        try {
+            Field f = EffectsAPI.class.getDeclaredField("instance");
+            f.setAccessible(true);
+            return (Plugin) f.get(null);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError(e);
+        }
+    }
+
+    private static void writeEffectsApiInstance(Plugin value) {
+        try {
+            Field f = EffectsAPI.class.getDeclaredField("instance");
+            f.setAccessible(true);
+            f.set(null, value);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError(e);
+        }
     }
 
     @Test
