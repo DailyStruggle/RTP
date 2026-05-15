@@ -466,40 +466,49 @@ public class Region extends FactoryValue<RegionKeys> {
           }
           // Second-pass safety verification at the unkept→kept transition must
           // run on the chunk's owning region thread on Folia (live-backed
-          // RTPChunk.isSafe reads Level.getBlockState, which is thread-local).
+          // RTPChunk reads Level.getBlockState, which is thread-local).
           // On Spigot/Paper, RTP.scheduler.runTask(world,cx,cz,..) hops to the
           // MAIN thread — which would unreasonably impact tick time per
           // promotion. Dispatch inline on non-Folia; region-hop on Folia only.
+          //
+          // Re-resolve Y by re-running the region's vertical adjustor against
+          // the loaded chunk (rather than trusting the stored coords.y and
+          // only block-testing that single feet-Y). The stored Y may be a
+          // placeholder from the L3 backlog refill path (ADR-028), which
+          // stamps a vert-window-derived Y *before* any ground check has
+          // run. Trusting that Y caused mid-air placements (S-001) because
+          // a single-block isSafe at mid-air air-feet returns true. The
+          // adjustor's adjust(chunk) sweep does the ground+headroom check
+          // every adjustor already enforces on the live-spiral path, so
+          // routing every L2→L1 promotion through it gives the same
+          // guarantees as a fresh spiral attempt — no separate ground
+          // predicate to keep in sync.
           Runnable verify = () -> {
             try {
-              boolean safe = false;
+              RTPCoords resolved = null;
               try {
                 long key = ((long) cx & 0xffffffffL) | ((long) cz << 32);
                 io.github.dailystruggle.rtp.api.world.RTPChunk<?> rtpChunk =
                     getWorld().getCachedChunk(key);
-                if (rtpChunk != null) {
-                  int localX = coldLoc.coords().x() - (cx << 4);
-                  int localZ = coldLoc.coords().z() - (cz << 4);
-                  localX = ((localX % 16) + 16) % 16;
-                  localZ = ((localZ % 16) + 16) % 16;
-                  int y = coldLoc.coords().y();
-                  safe = rtpChunk.isSafe(
-                      localX, y, localZ, LocationGenerator.unsafeBlocksCache);
+                VerticalAdjustor<?> v = getVert();
+                if (rtpChunk != null && v != null) {
+                  resolved = v.adjust(rtpChunk);
                 }
               } catch (Throwable verifyEx) {
                 // Fail CLOSED on verification error — never promote an
                 // unverified location (prior fail-open default caused
                 // lava-placement reports).
-                safe = false;
+                resolved = null;
                 RTP.log(
                     Level.FINE,
                     "[Region] unkept→kept safety re-verification failed: "
                         + verifyEx.getClass().getSimpleName() + ": " + verifyEx.getMessage());
               }
 
-              if (!safe) {
-                // Drop the now-unsafe location. pollSilently above skipped
-                // the delete callback; fire offer+poll so the DB row is purged.
+              if (resolved == null) {
+                // Drop the now-unsafe / placeholder-Y location. pollSilently
+                // above skipped the delete callback; fire offer+poll so the
+                // DB row is purged.
                 queueManager.unkeptLocations.offer(coldLoc);
                 queueManager.unkeptLocations.poll();
                 return;
@@ -507,7 +516,7 @@ public class Region extends FactoryValue<RegionKeys> {
 
               ChunkReservation reservation = new ChunkReservation(chunkSet, getWorld());
               boolean added = queueManager.keptLocations.offer(
-                      new RTPLocation(coldLoc.coords(), coldLoc.attempts(), reservation)
+                      new RTPLocation(resolved, coldLoc.attempts(), reservation)
               );
               if (!added) {
                 reservation.close();
@@ -844,9 +853,26 @@ public class Region extends FactoryValue<RegionKeys> {
     Shape<?> currentShape = this.shape;
     int verticalY;
     {
+      // Placeholder Y stored on L3 backlog entries until the L2→L1 promotion
+      // re-runs the vertical adjustor against a loaded chunk and overwrites
+      // it with a ground-verified Y (see deficit-loop verify above). Use the
+      // adjustor's floor (clamped to the world's [min, max-1] bounds) so the
+      // value is at least within the searchable window — never the midpoint,
+      // which previously masqueraded as a "placement" Y and caused mid-air
+      // teleports when a downstream consumer trusted it (S-001). Midpoint
+      // remains the right value for biome/border probes (PregenTask,
+      // ScanTask) which never become a player-facing coord.
       VerticalAdjustor<?> v = getVert();
-      if (v != null) verticalY = (v.maxY() + v.minY()) / 2;
-      else verticalY = 64;
+      if (v != null) {
+        int wMin = world.getMinHeight();
+        int wMax = world.getMaxHeight();
+        int floor = v.minY();
+        if (floor < wMin) floor = wMin;
+        if (floor > wMax - 1) floor = wMax - 1;
+        verticalY = floor;
+      } else {
+        verticalY = 64;
+      }
     }
     String worldName = world.name();
     WorldBacklogBinIndex binIndex = RegionQueueManager.binIndexFor(worldName);

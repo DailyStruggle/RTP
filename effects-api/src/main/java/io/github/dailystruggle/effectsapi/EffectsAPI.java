@@ -4,7 +4,7 @@ import io.github.dailystruggle.effectsapi.bukkit.SpigotListeners.FireworkSafetyL
 import io.github.dailystruggle.effectsapi.bukkit.SpigotListeners.GlideSafetyListener;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
-import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.logging.Level;
 import java.util.regex.Pattern;
@@ -24,10 +24,41 @@ public final class EffectsAPI {
     }
 
     /**
-     * @return instance of plugin if loaded, otherwise null
+     * @return instance of plugin set via {@link #init(Plugin)}; never null.
+     * @throws IllegalStateException if {@link #init(Plugin)} has not been called yet (S-006).
      */
-    @Nullable
+    @NotNull
     public static Plugin getInstance() {
+        Plugin local = instance;
+        if (local == null) {
+            throw new IllegalStateException(
+                    "EffectsAPI.getInstance() called before EffectsAPI.init(Plugin)");
+        }
+        return local;
+    }
+
+    /**
+     * Self-populating variant of {@link #getInstance()}. If {@link #init(Plugin)}
+     * has not been called yet, the supplied {@code fallback} is used to
+     * initialize the API (idempotent) and is then returned. Lets in-repo
+     * callers that already hold a {@link Plugin} reference (e.g. the RTP
+     * plugin instance) avoid the {@link IllegalStateException} thrown by the
+     * no-arg overload during early lifecycle windows, without {@code effects-api}
+     * having to take a hard dependency on RTP.
+     *
+     * @param fallback plugin to initialize with if {@code instance} is unset; may be {@code null}
+     * @return the resolved {@link Plugin} instance
+     * @throws IllegalStateException if {@code instance} is unset and {@code fallback} is {@code null}
+     */
+    @NotNull
+    public static Plugin getInstance(Plugin fallback) {
+        Plugin local = instance;
+        if (local != null) return local;
+        if (fallback == null) {
+            throw new IllegalStateException(
+                    "EffectsAPI.getInstance(fallback) called before init(Plugin) with null fallback");
+        }
+        init(fallback);
         return instance;
     }
 
