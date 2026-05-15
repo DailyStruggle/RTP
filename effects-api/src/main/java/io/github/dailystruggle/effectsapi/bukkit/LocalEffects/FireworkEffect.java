@@ -71,9 +71,19 @@ public class FireworkEffect extends Effect<FireworkTypeNames> {
         // required. Use the RegionScheduler keyed on the spawn location so the
         // firework spawn happens on the owning region thread. On Spigot/Paper
         // Bukkit.isPrimaryThread() works as before.
-        org.bukkit.plugin.Plugin caller = (EffectsAPI.fireworkSafetyListener != null)
-                ? EffectsAPI.fireworkSafetyListener.caller
-                : EffectsAPI.getInstance();
+        org.bukkit.plugin.Plugin caller;
+        if (EffectsAPI.fireworkSafetyListener != null) {
+            caller = EffectsAPI.fireworkSafetyListener.caller;
+        } else {
+            try {
+                caller = EffectsAPI.getInstance();
+            } catch (IllegalStateException pre) {
+                // S-006: getInstance() throws before init(). Dispatcher seam
+                // must still be consulted (Folia path / tests), so degrade to
+                // a null caller and let downstream guards handle it.
+                caller = null;
+            }
+        }
         Location loc = (Location) target;
         if (regionDispatcher.dispatch(caller, loc, () -> spawnFirework(loc))) {
             return;

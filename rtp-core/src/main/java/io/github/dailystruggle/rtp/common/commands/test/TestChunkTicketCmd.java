@@ -139,12 +139,12 @@ public class TestChunkTicketCmd extends BaseRTPCmdImpl {
 
   /** Structured probe result. Package-private so the unit test can assert on it. */
   public static final class Result {
-    int staleBaseline;
-    int afterUntrackById;
-    int afterUntrackByRef;
-    int afterDiagnosticsOnLive;
-    int finalResidual;
-    boolean pass;
-    String notes = "";
+    public int staleBaseline;
+    public int afterUntrackById;
+    public int afterUntrackByRef;
+    public int afterDiagnosticsOnLive;
+    public int finalResidual;
+    public boolean pass;
+    public String notes = "";
   }
 }

@@ -416,7 +416,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     Bukkit.getPluginManager().registerEvents(new OnPlayerTeleport(), this);
     Bukkit.getPluginManager().registerEvents(new OnWorldLoadUnload(), this);
 
-    if (RTP.serverAccessor.getServerIntVersion() > 12) EffectsAPI.init(this);
+    EffectsAPI.init(this);
     RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] setupBukkitEvents EXIT -- listeners registered");
   }
 
