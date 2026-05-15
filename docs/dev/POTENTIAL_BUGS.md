@@ -50,12 +50,4 @@ Append to the *Open* section below using the template. Keep entries short — on
 
 
 
-### 2026-05-11 — `MemoryShapeTest.TestShape` missing `radius2` default
-
-- **Discovered-during:** Adding `MemoryShape.chunkToLocations` + `addBadChunk` (issue update: amplify `addBadLocation` via the chunk preimage).
-- **Location:** `rtp-core/src/test/java/io/github/dailystruggle/rtp/common/selection/region/selectors/memory/shapes/MemoryShapeTest.java:29-40` — `TestShape.createDefaultData()` enum-map.
-- **Symptom / hypothesis:** `new TestShape()` throws `IllegalArgumentException: All values must be filled out on shape instantiation`. `GenericMemoryShapeParams.radius2` was added to the enum (and is required by `Shape.<init>:57`'s exhaustive validation), but `TestShape.createDefaultData()` was not updated — only `Circle.defaults` and `Square.defaults` were. Every test in `MemoryShapeTest` that constructs a `TestShape` now fails at the constructor.
-- **Impact:** All 9 tests in `MemoryShapeTest` fail. Pre-existing (working tree state before `chunkToLocations` work); not introduced by this change. Build remains green elsewhere because `MemoryShapeTest` is the only consumer of `TestShape`.
-- **Suggested next step:** Add `data.put(GenericMemoryShapeParams.radius2, 100L);` to `TestShape.createDefaultData()`. One-line fix; no other test class is affected.
-
 <!-- Append new entries above this comment, newest first. Resolved entries are deleted, not archived. -->

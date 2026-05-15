@@ -3,20 +3,17 @@
 **Scope:** A focused, scannable checklist of the remaining feature streams the maintainer wants to land. This file is a *task tracker*, not a design doc — for rationale, see the linked ADRs and plan documents. For full release planning (tiers, blockers, polish), see [`ROADMAP.md`](ROADMAP.md).
 
 > Keep items independently verifiable. Tick a box only when the work is merged and traceable (commit / ADR / test). Use `- [x]` and append `— <ref>` when closing.
+>
+> **Pruning policy:** completed (`[x]`) items are removed from this file once verified — the canonical record lives in `CHANGELOG.md`, the referenced ADRs, and `TRACEABILITY.md`. Only outstanding (`[ ]`) work remains below.
 
 ---
 
 ## 1. Fabric Support
 
-Active frontier per [rtp-fabric-ADR-002](../../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md). Tracked in detail under [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md); items below are the must-finish set to call Fabric "stable".
+Active frontier per [rtp-fabric-ADR-002](../../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md). Tracked in detail under [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md); items below are the must-finish set to call Fabric "stable". Loom resolution, the S-005 fix in `FabricWorld.getChunkAt`, `FabricServerAccessor.getLocationGenerator`, Brigadier bridge wiring, and effects-API parity have landed — see CHANGELOG `[3.0.0-beta.2]` and the linked rtp-fabric / effects-api ADRs.
 
-- [x] **Resolve Loom dependency.** — Toolchain split into obf-carrier (`rtp-fabric-common`, intermediary, Java 21) and unobf-carrier (`rtp-fabric-common-unobf`, Mojmap, Java 25) per [rtp-fabric-ADR-009](../../rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md); per-version submodules (`v1_20_R1`, `v1_21_R1`, `v1_21_R5`, `v1_21_R11`, `v26_1_R1`) build under [rtp-fabric-ADR-001](../../rtp-fabric/docs/adr/rtp-fabric-ADR-001-multiversion-submodule-layout.md).
-- [x] **Eliminate the S-005 violation in `FabricWorld.getChunkAt`.** — `FabricRTPWorld#getChunkAt` (and the unobf mirror) now return `CompletableFuture<Long>` backed by `getChunkFutureMainThread` / `getChunkAtAsync`, per [rtp-fabric-ADR-008](../../rtp-fabric/docs/adr/rtp-fabric-ADR-008-non-blocking-chunk-generation.md); anvil-probe parity per [rtp-fabric-ADR-005](../../rtp-fabric/docs/adr/rtp-fabric-ADR-005-anvil-prefilter-parity.md). `ReqRtpS005*` Fabric-side coverage still owed — tracked under the Platform smoke-test item below.
-- [x] **Implement `FabricServerAccessor.getLocationGenerator`.** — `FabricServerAccessor.getLocationGenerator()` returns the live `LocationGenerator` and throws `IllegalStateException` before core init (S-006 compliant), mirroring `AbstractServerAccessor`.
-- [x] **Brigadier bridge wiring.** — `FabricCommandRegistrar` reflectively registers `CommandRegistrationCallback.EVENT` and wires `RTPCmdFabricRoot` / `RTPCmdFabric` through `BrigadierCommandAdapter`; per-version adapters dispatch via `FabricVersionAdapter`. Tab-completion parity test still owed (tracked under Platform smoke-test).
-- [x] **Effects-API parity.** — `effects-api-fabric-unobf` carrier plus per-version dispatchers (e.g. `V1_21_R11FabricEffectDispatchers`) implement firework / sound / particle equivalents; loading on vanilla Fabric no longer warns. See [effects-api-ADR-006](../../effects-api/docs/adr/effects-api-ADR-006-fabric-obf-unobf-split.md).
-- [ ] **Platform smoke test.** Add a Fabric entry to whatever `rtp test full` analogue exists (or create one) so a CI / manual run produces the same pass/fail matrix as Paper and Folia.
-- [ ] **Promote out of "unstable" in `MULTI_PLATFORM_PLAN.md` and `AGENTS.md` *Current Development Focus*** once the above are green. Remaining gates: Fabric `ReqRtpS005*` coverage and tab-completion parity test (folded into the Platform smoke-test item above).
+- [ ] **Platform smoke test.** Add a Fabric entry to whatever `rtp test full` analogue exists (or create one) so a CI / manual run produces the same pass/fail matrix as Paper and Folia. Covers the still-owed Fabric `ReqRtpS005*` coverage and tab-completion parity test. **Implementation plan:** [`scratch/CHECKLIST-fabric-rtp-test-full.md`](scratch/CHECKLIST-fabric-rtp-test-full.md) (five phases — core SPI lift → leaf migration → Fabric registration → offline tab-completion parity test → docs).
+- [ ] **Promote out of "unstable" in `MULTI_PLATFORM_PLAN.md` and `AGENTS.md` *Current Development Focus*** once the smoke-test item is green.
 
 Out of scope here (deliberately): Forge / NeoForge — gated until Fabric stabilises (Phase 4).
 
@@ -24,21 +21,10 @@ Out of scope here (deliberately): Forge / NeoForge — gated until Fabric stabil
 
 ## 2. Third Queue Layer — L3 Backlog (Binned) Cache — ✅ Landed
 
-Implemented per [ADR-028](../adr/ADR-028-l3-backlog-cache.md) (Accepted 2026-05-07). Symbol: `RegionQueueManager.backlogLocations` (`BacklogLocationBuffer`); world-shared `WorldBacklogBinIndex` for cross-RTP-region anvil amortization; tri-state `Validity` (`UNVERIFIED` / `VALIDATED` / `INVALIDATED`); head-contiguous promotion inline in `Region.execute()`. Config key `backlogCacheCap` (default `1000`; lite overlay omits the key so the in-code fallback resolves to `0` ⇒ disabled). Covered by `BacklogLocationBufferTest` and `WorldBacklogBinIndexTest`. See `CHANGELOG.md` *Added* under `[3.0.0-beta.2]` and `DESIGN.md` §1.1.
+Implemented per [ADR-028](../adr/ADR-028-l3-backlog-cache.md) (Accepted 2026-05-07). Symbol: `RegionQueueManager.backlogLocations` (`BacklogLocationBuffer`); world-shared `WorldBacklogBinIndex`; tri-state `Validity`; head-contiguous promotion inline in `Region.execute()`. Config key `backlogCacheCap` (default `1000`; lite resolves to `0` ⇒ disabled). Covered by `BacklogLocationBufferTest` and `WorldBacklogBinIndexTest`. See `CHANGELOG.md` *Added* under `[3.0.0-beta.2]` and `DESIGN.md` §1.1.
 
-- [x] **Create `BacklogLocationBuffer`.** — `rtp-core/.../selection/region/BacklogLocationBuffer.java`; tri-state `Validity` supersedes the original boolean `verified` flag (ADR-028 2026-05-08 amendment).
-- [x] **Wire `RegionQueueManager.backlogLocations`.** — `RegionQueueManager.backlogLocations` (nullable, allocated only when `backlogCacheCap > 0`); promotion is inline at the end of `Region.processBacklog(...)` rather than on the L2 poll path (ADR-028 2026-05-08 amendment).
-- [x] **Bin-grouped verification pulse.** — `Region.processBacklog(...)` peeks the oldest `UNVERIFIED`, derives the `.mca` bin via `RegionFileCoord`, and runs `RTPHooks.anvilPrefilter().current().classify(...)` against every contributor of that bin's `WorldBacklogBinIndex` snapshot. Pulse budget: `availableTime / 4` (count-bound friendly on Folia per ADR-015).
-- [x] **Config key `backlogCacheCap`.** — `RegionKeys.backlogCacheCap` enum + `RegionSettings.backlogCacheCap` (long); `regions/default.yml` ships `1000`; lite YAML overlay omits the key so the in-code fallback (`RegionConfigLoader`, `0L`) governs lite.
-- [x] **Persistence policy.** — Confirmed by inspection: `RegionQueueManager.installDatabaseCallbacks` attaches callbacks only to `keptLocations` / `unkeptLocations`; `BacklogLocationBuffer` exposes no callback API.
-- [x] **MemoryTracker accounting.** — Capacity folded into the diagnostic totals (`MemoryTracker.run()`: `totalCacheCap += settings.backlogCacheCap()`, `totalLocationQueueSize += backlogLocations.size()`); entries hold no chunk tickets and no `TeleportPipelineTask`, so active-GC sweep is N/A by construction.
-- [x] **Aliases table follow-up.** — `AGENTS.md` *Domain Analogies & Aliases* row updated to drop the "Proposed" qualifier and point at the live `RegionQueueManager.backlogLocations` symbol.
+Follow-up items deferred out of v1 scope (roadmap, not bugs):
 
-Follow-up items deferred out of v1 scope (recorded here, not promoted to `POTENTIAL_BUGS.md` because they are roadmap, not bugs):
-
-- [x] **REQ-* traceability rows + `ReqRtp*L3*` test classes.** — `REQ-CORE-F-009` added to `rtp-core/REQUIREMENTS.md` §1.1 ("Backlog Verification Order") and to [`TRACEABILITY.md`](TRACEABILITY.md) rtp-core table, mapped to `BacklogLocationBuffer` / `WorldBacklogBinIndex` / `RegionQueueManager.backlogLocations` / `Region.processBacklog` with `BacklogLocationBufferTest` + `WorldBacklogBinIndexTest`; coverage summary updated to 75 reqs / ~43 automated.
-- [x] **Admin docs.** — `backlogCacheCap` row added to the top-level settings tables of both `docs/admin/CONFIGURATION.md` and `docs/admin/REGIONS.md`, plus a new *Backlog Cache (L3)* prose section in `REGIONS.md` (how it works / when to enable / relationship to L1+L2). Both pages cross-link to ADR-028.
-- [x] **Localized lang files.** — `backlogCacheCap` rows added to all eight non-English `regions.lang.yml` files actually shipped (`cat`, `de`, `es`, `fr`, `ja`, `ko`, `nl`, `zh`); `ru` / `pt` / `it` are not present in `rtp-plugin/src/main/resources/lang/` and are not in scope for beta.2.
 - [ ] **Telemetry.** Surface `backlog-bin-hits` / `backlog-bin-rejects` under `AnvilPrefilterMetrics` and through `/rtp info` (per ADR-028 *Follow-ups*).
 - [ ] **Auto-sizing shorthand.** `backlogCacheCapMode = MULTIPLIER × cacheCap` (ADR-028 *Follow-ups*).
 - [ ] **Fabric availability.** Re-evaluate once the Fabric anvil pre-filter parity item under §1 closes.
@@ -47,15 +33,14 @@ Follow-up items deferred out of v1 scope (recorded here, not promoted to `POTENT
 
 ## 3. Join Cache — Login Reserve
 
-Per [ADR-023](../adr/ADR-023-login-reserve-cache.md). Symbol: `RegionQueueManager.loginLocations` ("login cache" / "login reserve" / "join cache" in the aliases table).
+Per [ADR-023](../adr/ADR-023-login-reserve-cache.md). Symbol: `RegionQueueManager.loginLocations` ("login cache" / "login reserve" / "join cache" in the aliases table). Fabric port has landed (see `FabricEventBridge.initLoginReserveCache` / `FabricOnEventTeleports.onJoin`, covered by `ReqFabricAdr023HasPlayedBeforeTest`).
 
-- [ ] **Audit current implementation surface.** Confirm `loginLocations` is allocated only for the default world and only when `rtp.onevent.firstjoin` or `rtp.onevent.join` is enabled. Add a test if missing.
+- [ ] **Audit current implementation surface.** Confirm `loginLocations` is allocated only for the **default region** and only when `rtp.onevent.firstjoin` or `rtp.onevent.join` is enabled. (Current Bukkit impl in `RTPBukkitPlugin.initLoginReserveCache` picks "first region attached to the default world" — verify that resolves to the configured default region, and if not, fix it. Mirror in `FabricEventBridge.initLoginReserveCache`.) Add a test if missing.
 - [ ] **First-join vs. subsequent-join semantics.** Verify both event paths (`firstjoin`, `join`) consume from the reserve correctly and fall back cleanly when empty. Negative-path test required.
 - [ ] **Refill policy under load.** Document and test the refill cadence (does the scan task top it up? On a timer? On consume?). Capture answer in the ADR if not already there.
 - [ ] **Cross-server interaction.** When a player arrives via the proxy "network wait queue" (see [`MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md)), decide whether the login reserve still applies or is bypassed in favour of a reservation token. Record the decision in the ADR and `MULTI_SERVER_PLAN.md`.
 - [ ] **Lite-jar default.** Confirm default in lite assembly ([ADR-024](../adr/ADR-024-rtp-lite-assembly-variant.md)) — likely `0` to keep the trim small. Document.
 - [ ] **Operator docs.** Add a short section to `docs/admin/` describing when to enable / size this cache and the trade-off with `keptLocations` warmth.
-- [x] **Fabric port.** — `FabricEventBridge.initLoginReserveCache(server)` allocates the buffer on the overworld region at `SERVER_STARTED` (default-world gated; sized to `loginCacheCap` or `MinecraftServer.getMaxPlayers()` fallback) and dispatches the startup burst. The `Disconnect` proxy now refills via `LoginCacheTask.promoteUpTo(1)` per region with a non-null login buffer. New `FabricOnEventTeleports.onJoin(server, player)` mirrors the Bukkit `OnEventTeleports.onPlayerJoin` flow — permission gating routes through `FabricRTPPlayer.hasPermission` (already wired to `fabric-permissions-api` with op-level fallback), and the first-join branch detects fresh players via a `<worldRoot>/playerdata/<uuid>.dat` probe (`hasPlayedBefore`). Covered by `ReqFabricAdr023HasPlayedBeforeTest` (6/6 green). Closes MULTI_PLATFORM_PLAN.md E3-5 for the login-reserve path.
 
 ---
 
@@ -106,20 +91,39 @@ Deferred (not blocking beta.3, tracked here for visibility):
 
 ## 6. RTP Glide — Internalise as Effect (Bukkit landed; Fabric pending)
 
-Originally shipped as the standalone `addons/RTP_Glide` addon. Per [effects-api-ADR-001](../../effects-api/docs/adr/effects-api-ADR-001-glide-effect.md) (Accepted & Implemented 2026-05-05) the decomposition collapsed to a **single `GlideEffect` in `effects-api`** rather than the originally-planned "vertical adjustor + effect" pair — the drop-height knob (`STARTHEIGHT`) is exposed inside the effect's positional config (effects-api-ADR-002 type-driven reading order), so no `rtp-core` `VerticalAdjustor` was needed. The Bukkit-family implementation is live; Fabric parity remains outstanding. The standalone `addons/RTP_Glide` subproject has been removed from the build (settings.gradle, IDE module files, and addon-directory references all dropped); the `GLIDE` effect is the only supported path.
+Originally shipped as the standalone `addons/RTP_Glide` addon. Per [effects-api-ADR-001](../../effects-api/docs/adr/effects-api-ADR-001-glide-effect.md) (Accepted & Implemented 2026-05-05) the decomposition collapsed to a **single `GlideEffect` in `effects-api`**; the drop-height knob (`STARTHEIGHT`) is exposed inside the effect's positional config. The Bukkit-family implementation, config wiring, and the standalone addon removal have all landed (see CHANGELOG `[3.0.0-beta.2]`); Fabric parity and test/doc coverage remain outstanding.
 
-- [x] **Decompose the addon.** — Mapped end-to-end in [effects-api-ADR-001](../../effects-api/docs/adr/effects-api-ADR-001-glide-effect.md) §"Decision"; the entire addon folds into one `Effect` (no separate adjustor), with `PlayerGlideEvent` / `PlayerLandEvent` migrated into `effects-api/.../bukkit/events/`.
-- [x] ~~**`GlideVerticalAdjustor` in `rtp-core`.**~~ Superseded by effects-api-ADR-001: drop-height is the `STARTHEIGHT` positional key on `GlideEffect`, applied at effect-start rather than as a pre-teleport Y adjustor. No `rtp-core` change was required (Architecture Boundaries §3 — `effects-api` is the correct home).
-- [x] **`GlideEffect` in `effects-api`.** — `effects-api/.../bukkit/LocalEffects/GlideEffect.java` + `enums/GlideTypeNames.java` + `SpigotListeners/GlideSafetyListener.java`; registered in `EffectFactory` as `"GLIDE"` (server-version ≥ 9) and wired through `EffectsAPI.init` / `EffectsAPI.disable` with shutdown-time safe placement (effects-api-ADR-001 §"Shutdown handling").
-- [x] **Config wiring.** — Per-effect keys `landingTimeout`, `allowFireworks`, `placeOnShutdown`, `shutdownPlatformMaterial`, `startHeight`, world filter; positional parsing via effects-api-ADR-002. Lite-jar behaviour follows the standard effects-api wiring (no separate lite override is required because the effect is off-by-default unless configured).
 - [ ] **Platform parity.** Spigot / Paper / Folia covered via the Bukkit-family `GlideSafetyListener` (Folia: Entity Scheduler for the watchdog per effects-api-ADR-001 §"Behavioural contract"). **Fabric is explicitly deferred** to Phase 2 of [effects-api-ADR-003](../../effects-api/docs/adr/effects-api-ADR-003-platform-split-bukkit-fabric.md) — `FabricGlideEffect` needs elytra-equip + glide-state plumbing without a clean Fabric primitive. Cross-tracked with the Fabric effects-api parity item in §1.
 - [ ] **Safety interaction.** Confirm the start-height jump and the shutdown emergency-platform path (`shutdownPlatformMaterial`, AIR-only replacement) still terminate on S-001-safe blocks; add a regression test covering void-world misconfiguration and a chunk-unload-mid-glide race (the listener already logs the unload case, but there is no `ReqRtp*` test asserting attribution).
-- [x] **Deprecate the addon.** — `addons/RTP_Glide` subproject deleted; `settings.gradle` `include 'addons:RTP_Glide'` line removed; stale `.idea/modules/addons/RTP_Glide/` IDE descriptors and `.idea/gradle.xml` / `.idea/modules.xml` entries cleaned. `addons/REQUIREMENTS.md` and `helpers/PeriodicWorldSaver/README.md` references updated. The `GLIDE` effect in `effects-api` is now the only supported path. `EXTERNAL_HOOKS.md` unaffected (the addon registered no hook — events were addon-local). Historical references retained in CHANGELOG / ADRs per change-history immutability.
 - [ ] **Tests + traceability.** Add `ReqRtp*Glide*` (or `EffectsApiGlide*`) coverage for: timeout watchdog, firework-suppression listener, shutdown platform synthesis, and the `PlayerGlideEvent` / `PlayerLandEvent` lifecycle. Update [`TRACEABILITY.md`](TRACEABILITY.md). No `effects-api` tests reference these classes yet (`search_project ReqRtp` in `effects-api/` → no hits).
 - [ ] **Docs.** Add a `docs/admin/` section describing the `GLIDE` effect and its keys — `docs/admin/` currently has zero hits for "Glide". `CHANGELOG.md` already records the landing under `[3.0.0-beta.2]`.
 
 ---
 
+## 7. Interactive Menus (Book-First, Chat Fallback)
+
+Per [ADR-035](../adr/ADR-035-interactive-menus-book-first.md) (Proposed, target `3.0.0-beta.4`). Book renderer is primary; `tellraw` chat renderer is the fallback. Inventory-GUI renderer is **deferred** pending a secure design.
+
+- [ ] **Land the `rtp-api` menu model.** `MenuModel` / `MenuPage` / `MenuLine` / `MenuFragment` / sealed `MenuAction` + `MenuRenderer` + `MenuTokenRegistry` interface. No platform / Adventure / `org.bukkit.*` imports. S-006 throw-on-pre-core.
+- [ ] **`rtp-core` token registry + redeem subcommand.** `LocalMenuTokenRegistry` (in-memory, TTL'd, per-player bounded) and the `rtp menu:<token>` internal subcommand wired through `commands-api`. Atomic single-consume CAS. `ReqRtpS004` audit log on every redeem-failure path.
+- [ ] **`SharedMenuTokenRegistry` (cross-server).** SQL driver (reuses `AbstractSQLDatabaseAccessor`) + Redis driver (Lettuce, `SET NX PX` + Lua redeem). Atomic-consume regression test per driver (`SharedMenuTokenRegistryAtomicConsumeTest`).
+- [ ] **`BookMenuRenderer` (Paper / Folia / Spigot).** Adventure `Book` on Paper / Folia; `Player#openBook(ItemStack)` on Spigot with the 1.20.5 / 1.21 component-shift handled in the per-version `rtp-spigot-v*` subprojects per [ADR-010](../adr/ADR-010-versioned-platform-adapter-submodules.md).
+- [ ] **`ChatMenuRenderer` (all platforms incl. Fabric).** BungeeCord chat-api on Spigot, Adventure on Paper / Folia, native `Component` on Fabric (deobf + obf carriers per [rtp-fabric-ADR-009](../../rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md)).
+- [ ] **Fabric `BookMenuRenderer` follow-up.** `OpenWrittenBookS2CPacket` wiring; deferred from beta.4 per ADR-035 *Decision*. Tracks Fabric parity rule.
+- [ ] **First in-tree consumer: `/rtp` no-args region picker.** Page lists permitted regions with hover (distance / cooldown / queue depth); click dispatches `MenuAction.RunRtpCommand("--region", regionName)`. All strings via `messages.yml → menu:` per REQ-RTP-F-013.
+- [ ] **`messages.yml → menu:` section.** Keys per ADR-035 *Concrete first consumer* + redeem-failure messages (`menu.invalid`, `menu.expired`, `menu.unknownPlayer`, `menu.unknownRegion`, `menu.storeUnavailable`). REQ-RTP-S-007 / REQ-RTP-F-013 coverage.
+- [ ] **Traceability.** Add `MenuRedeemSubcommandTest`, `SharedMenuTokenRegistryAtomicConsumeTest` (one per driver), and the no-args region-picker test to [`TRACEABILITY.md`](TRACEABILITY.md) under REQ-RTP-F-013 / S-007 / NET-011 / 012 / 014.
+- [ ] **Admin docs.** Add a `docs/admin/` page describing renderer choice (`menu.renderer: book | chat | auto`), token store (`menu.tokenStore: local | shared`), TTL knobs, and lite-assembly defaults per [ADR-024](../adr/ADR-024-rtp-lite-assembly-variant.md).
+
+Deferred follow-ups (research-only, not blocking beta.4):
+
+- [ ] **`/rtp biomes` menu.** Follow-up ADR; reuses the same primitive.
+- [ ] **`/rtpadmin` setup wizards.** Highest-value consumer; deferred to a dedicated ADR ([ADR-038](../adr/ADR-038-rtpadmin-setup-wizards.md)).
+- [ ] **Public `MenuRenderer` SPI for addons.** Currently internal-public; lock the addon-facing surface only after the in-tree consumer settles.
+- [ ] **Inventory-backed (chest-GUI) renderer.** **Research-only**, gated by D-005 + a successor ADR. Tracked under [`docs/dev/scratch/CHECKLIST-inventory-menu-research.md`](scratch/CHECKLIST-inventory-menu-research.md) (research items R1–R10: `InventoryClickEvent` desync matrix, virtual-inventory wrapper feasibility, `MenuTokenRegistry` + `commands-api` reuse, Fabric parity strategy, lite-assembly impact, prior-art survey, D-005 gate, successor-ADR draft). No code lands until that checklist's R1–R9 are answered and R10 produces an accepted ADR.
+
+---
+
 ## Closing Out This File
 
-When **all six sections** are fully ticked, fold the residue into [`ROADMAP.md`](ROADMAP.md) (or `CHANGELOG.md` for shipped items) and delete this file. Until then, prefer ticking boxes here over rewriting the structure.
+When **all seven sections** are fully ticked, fold the residue into [`ROADMAP.md`](ROADMAP.md) (or `CHANGELOG.md` for shipped items) and delete this file. Until then, prefer ticking boxes here over rewriting the structure.

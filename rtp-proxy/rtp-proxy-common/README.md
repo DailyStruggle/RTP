@@ -1,6 +1,6 @@
 # `rtp-proxy-common/` — Proxy-Side Shared SPI
 
-> **Status: scaffolding only.** No code, no `build.gradle` yet. Gated by Rule D-005 and ADR-025 (outstanding).
+> **Status: scaffolding only.** No code, no `build.gradle` yet. Gated by Rule D-005 and ADR-036 (outstanding).
 
 The proxy-side analogue of `rtp-core`'s `NetworkBridge`: pure-Java, no proxy-vendor imports, no backend-platform imports. Hosts the SPI that every concrete proxy adapter (`rtp-proxy-velocity`, `rtp-proxy-bungee`) consumes, plus reference implementations of the load balancer, trigger sources, reservation client, and config schema.
 

@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.bukkit.commands.test;
 
+import io.github.dailystruggle.rtp.common.commands.test.TestSchedulerCmd;
+import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.common.RTP;

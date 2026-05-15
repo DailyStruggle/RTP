@@ -16,13 +16,6 @@ public enum GenericMemoryShapeParams {
    */
   radius,
   /**
-   * The second axis radius for shapes that derive from a circle but support two
-   * radii (e.g. the ellipse). The wider of {@code radius} and {@code radius2}
-   * sets the bounding circle for such shapes. Ignored by shapes that have only
-   * one radius.
-   */
-  radius2,
-  /**
    * The inner radius of the shape, defining a hollow area in the center where
    * teleports will not occur.
    */

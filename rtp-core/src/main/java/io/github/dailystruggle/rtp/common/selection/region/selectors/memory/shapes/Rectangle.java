@@ -354,7 +354,11 @@ public class Rectangle extends MemoryShape<RectangleParams> {
       u = Boolean.parseBoolean(String.valueOf(unique));
       data.put(RectangleParams.uniquePlacements, u);
     }
-    if (u) addBadLocation(location);
+    // addBadChunk: chunk-uniform (uniqueplacements knob) — within a chunk the per-column
+    // selection order is deterministic, so re-rolling onto the same chunk produces the
+    // same effective placement. Marking the twin spiral index prevents that chunk-level
+    // re-roll and is the correct semantics for "unique" placements.
+    if (u) addBadChunk(location);
 
     return location;
   }

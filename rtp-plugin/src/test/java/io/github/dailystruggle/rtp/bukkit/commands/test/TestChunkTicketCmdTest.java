@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.bukkit.commands.test;
 
+import io.github.dailystruggle.rtp.common.commands.test.TestChunkTicketCmd;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 

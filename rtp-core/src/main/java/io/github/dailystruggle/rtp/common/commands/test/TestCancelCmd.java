@@ -1,4 +1,4 @@
-package io.github.dailystruggle.rtp.bukkit.commands.test;
+package io.github.dailystruggle.rtp.common.commands.test;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -18,7 +18,7 @@ import org.jetbrains.annotations.Nullable;
  *
  * <p>This exists because a bad {@code iterations:1000 intervalTicks:10}
  * invocation currently has no in-band stop switch short of a server
- * restart. See {@code RUNTIME_TEST_SUITE_PLAN.md §3.3 (cancel)}.
+ * restart. See {@code RUNTIME_TEST_SUITE_PLAN.md Â§3.3 (cancel)}.
  *
  * <p>Safety compliance:
  * <ul>

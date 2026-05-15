@@ -84,14 +84,16 @@ public final class FabricLegacyText {
             Style style = mut.getStyle();
             if (hasHover) {
                 Component hoverComp = parse(hover);
-                style = style.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, hoverComp));
+                HoverEvent hoverEv = buildShowTextHover(hoverComp);
+                if (hoverEv != null) style = style.withHoverEvent(hoverEv);
             }
             if (hasClick) {
                 // Strip colour from the suggest-command target so § codes never leak
                 // into the player's chat input — mirrors the Spigot path which feeds
                 // the raw command string straight into ClickEvent.SUGGEST_COMMAND.
                 String suggestion = stripColor(click);
-                style = style.withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, suggestion));
+                ClickEvent clickEv = buildSuggestCommandClick(suggestion);
+                if (clickEv != null) style = style.withClickEvent(clickEv);
             }
             return mut.setStyle(style);
         } catch (Throwable t) {
@@ -342,6 +344,102 @@ public final class FabricLegacyText {
         // ChatFormatting.getByCode is case-sensitive on lowercase; normalise.
         ChatFormatting f = ChatFormatting.getByCode(Character.toLowerCase(c));
         return f;
+    }
+
+    // ------------------------------------------------------------------
+    // Cross-version HoverEvent / ClickEvent construction.
+    //
+    // Pre-1.21.5: `new HoverEvent(Action, Component)` / `new ClickEvent(Action, String)`.
+    // 1.21.5+ (and MC 26.x): HoverEvent / ClickEvent became sealed interfaces
+    // whose instances are per-action records:
+    //   net.minecraft.network.chat.HoverEvent$ShowText(Component)
+    //   net.minecraft.network.chat.ClickEvent$SuggestCommand(String)
+    // The Action enum was also retained on most runtimes but the two-arg
+    // constructor is gone, so direct construction throws NoSuchMethodError.
+    //
+    // We probe both shapes reflectively at first use and cache the resolution
+    // so steady-state cost is one volatile read per dispatch. Returning null
+    // signals "no compatible shape on this runtime"; callers degrade to the
+    // plain component rather than aborting the message.
+    // ------------------------------------------------------------------
+
+    private static volatile java.lang.reflect.Constructor<?> HOVER_CTOR_LEGACY;
+    private static volatile java.lang.reflect.Constructor<?> HOVER_CTOR_SHOWTEXT;
+    private static volatile boolean HOVER_PROBED;
+
+    private static volatile java.lang.reflect.Constructor<?> CLICK_CTOR_LEGACY;
+    private static volatile java.lang.reflect.Constructor<?> CLICK_CTOR_SUGGEST;
+    private static volatile boolean CLICK_PROBED;
+
+    private static HoverEvent buildShowTextHover(Component hoverComp) {
+        if (!HOVER_PROBED) probeHoverCtors();
+        try {
+            if (HOVER_CTOR_LEGACY != null) {
+                return (HoverEvent) HOVER_CTOR_LEGACY.newInstance(HoverEvent.Action.SHOW_TEXT, hoverComp);
+            }
+            if (HOVER_CTOR_SHOWTEXT != null) {
+                return (HoverEvent) HOVER_CTOR_SHOWTEXT.newInstance(hoverComp);
+            }
+        } catch (Throwable t) {
+            // fall through to null — caller will skip the hover decoration.
+        }
+        return null;
+    }
+
+    private static ClickEvent buildSuggestCommandClick(String suggestion) {
+        if (!CLICK_PROBED) probeClickCtors();
+        try {
+            if (CLICK_CTOR_LEGACY != null) {
+                return (ClickEvent) CLICK_CTOR_LEGACY.newInstance(ClickEvent.Action.SUGGEST_COMMAND, suggestion);
+            }
+            if (CLICK_CTOR_SUGGEST != null) {
+                return (ClickEvent) CLICK_CTOR_SUGGEST.newInstance(suggestion);
+            }
+        } catch (Throwable t) {
+            // fall through — caller skips the click decoration.
+        }
+        return null;
+    }
+
+    private static synchronized void probeHoverCtors() {
+        if (HOVER_PROBED) return;
+        // 1.21.x: ctor is generic `HoverEvent(Action<T>, T)` → erasure (Action, Object).
+        try {
+            HOVER_CTOR_LEGACY = HoverEvent.class.getConstructor(HoverEvent.Action.class, Object.class);
+        } catch (Throwable ignored) { /* not on this runtime */ }
+        // 1.20.x: ctor was `HoverEvent(Action, Component)` (pre-generification).
+        if (HOVER_CTOR_LEGACY == null) {
+            try {
+                HOVER_CTOR_LEGACY = HoverEvent.class.getConstructor(HoverEvent.Action.class, Component.class);
+            } catch (Throwable ignored) { /* not on this runtime */ }
+        }
+        if (HOVER_CTOR_LEGACY == null) {
+            try {
+                Class<?> showText = Class.forName("net.minecraft.network.chat.HoverEvent$ShowText");
+                HOVER_CTOR_SHOWTEXT = showText.getConstructor(Component.class);
+            } catch (Throwable ignored) {
+                try {
+                    // Some intermediate snapshots used a `Text` nested class instead of `ShowText`.
+                    Class<?> showText = Class.forName("net.minecraft.network.chat.HoverEvent$Text");
+                    HOVER_CTOR_SHOWTEXT = showText.getConstructor(Component.class);
+                } catch (Throwable ignored2) { /* nothing matched */ }
+            }
+        }
+        HOVER_PROBED = true;
+    }
+
+    private static synchronized void probeClickCtors() {
+        if (CLICK_PROBED) return;
+        try {
+            CLICK_CTOR_LEGACY = ClickEvent.class.getConstructor(ClickEvent.Action.class, String.class);
+        } catch (Throwable ignored) { /* not on this runtime */ }
+        if (CLICK_CTOR_LEGACY == null) {
+            try {
+                Class<?> suggest = Class.forName("net.minecraft.network.chat.ClickEvent$SuggestCommand");
+                CLICK_CTOR_SUGGEST = suggest.getConstructor(String.class);
+            } catch (Throwable ignored) { /* nothing matched */ }
+        }
+        CLICK_PROBED = true;
     }
 
     private static Style applyFormatting(Style style, ChatFormatting fmt) {

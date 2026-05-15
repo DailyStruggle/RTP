@@ -1,4 +1,4 @@
-package io.github.dailystruggle.rtp.bukkit.commands.test;
+package io.github.dailystruggle.rtp.common.commands.test;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -13,7 +13,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * {@link TestStressCmd} (and future subcommands) without each subcommand
  * needing its own bespoke cancellation channel.
  *
- * <p>Rationale (see {@code RUNTIME_TEST_SUITE_PLAN.md §4 &mdash; cancel}):
+ * <p>Rationale (see {@code RUNTIME_TEST_SUITE_PLAN.md Â§4 &mdash; cancel}):
  * today a mistyped {@code iterations:1000 intervalTicks:10} invocation has
  * no in-band stop switch. A single registry keeps the cancel semantics
  * uniform across subcommands and avoids a proliferation of static fields.
@@ -24,15 +24,15 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * important because timer callbacks run on the async scheduler while
  * {@code rtp test cancel} is typically invoked from a command thread.
  */
-final class ActiveTestJobs {
+public final class ActiveTestJobs {
 
   /** Description of a running test job and the hook used to cancel it. */
-  static final class Job {
-    final String subcommand; // e.g. "stress"
-    final long startedAtNanos;
-    final Runnable canceller;
+  public static final class Job {
+    public final String subcommand; // e.g. "stress"
+    public final long startedAtNanos;
+    public final Runnable canceller;
 
-    Job(String subcommand, Runnable canceller) {
+    public Job(String subcommand, Runnable canceller) {
       this.subcommand = subcommand;
       this.startedAtNanos = System.nanoTime();
       this.canceller = canceller;
@@ -49,7 +49,7 @@ final class ActiveTestJobs {
    * synchronously at registration time if the owner already has no jobs.
    *
    * <p>Listeners are removed from the map at fire time, and any throwable
-   * is swallowed — drain notification must be best-effort, mirroring the
+   * is swallowed â€” drain notification must be best-effort, mirroring the
    * cancel semantics in {@link #cancelOwned(UUID)}.
    */
   private static final Map<UUID, CopyOnWriteArrayList<Runnable>> ON_EMPTY_LISTENERS =
@@ -58,7 +58,7 @@ final class ActiveTestJobs {
   private ActiveTestJobs() {}
 
   /** Registers a job owned by {@code owner}. Returns an unregister hook. */
-  static Runnable register(UUID owner, Job job) {
+  public static Runnable register(UUID owner, Job job) {
     JOBS.computeIfAbsent(owner, k -> new CopyOnWriteArrayList<>()).add(job);
     return () -> {
       CopyOnWriteArrayList<Job> list = JOBS.get(owner);
@@ -87,9 +87,9 @@ final class ActiveTestJobs {
    * this hook, the umbrella sweep occupies one async worker for its full
    * wall-clock duration, starving other server async work.
    */
-  static void addOnEmptyListener(UUID owner, Runnable listener) {
+  public static void addOnEmptyListener(UUID owner, Runnable listener) {
     if (listener == null) return;
-    // Fast path: already drained → fire inline. We still take the listener
+    // Fast path: already drained â†’ fire inline. We still take the listener
     // through the registration map briefly to avoid racing with a concurrent
     // register() that observes JOBS empty between the two checks below.
     CopyOnWriteArrayList<Runnable> bucket =
@@ -121,7 +121,7 @@ final class ActiveTestJobs {
    * Used by the umbrella sweep's timeout watchdog to ensure the listener
    * cannot race the watchdog and double-advance the chain.
    */
-  static void removeOnEmptyListener(UUID owner, Runnable listener) {
+  public static void removeOnEmptyListener(UUID owner, Runnable listener) {
     if (listener == null) return;
     CopyOnWriteArrayList<Runnable> bucket = ON_EMPTY_LISTENERS.get(owner);
     if (bucket == null) return;
@@ -134,7 +134,7 @@ final class ActiveTestJobs {
    * cancelled. Each {@code canceller} is invoked inside a try/catch so
    * one misbehaving subcommand cannot block others from being stopped.
    */
-  static int cancelOwned(UUID owner) {
+  public static int cancelOwned(UUID owner) {
     CopyOnWriteArrayList<Job> list = JOBS.remove(owner);
     int n = 0;
     if (list != null) {
@@ -161,7 +161,7 @@ final class ActiveTestJobs {
   }
 
   /** Cancels every job across every owner and returns the count. */
-  static int cancelAll() {
+  public static int cancelAll() {
     int n = 0;
     for (UUID owner : JOBS.keySet().toArray(new UUID[0])) {
       n += cancelOwned(owner);
@@ -170,7 +170,7 @@ final class ActiveTestJobs {
   }
 
   /** Read-only snapshot of all active jobs, for {@code rtp test cancel} reporting. */
-  static Map<UUID, Collection<Job>> snapshot() {
+  public static Map<UUID, Collection<Job>> snapshot() {
     Map<UUID, Collection<Job>> out = new java.util.HashMap<>();
     for (Map.Entry<UUID, CopyOnWriteArrayList<Job>> e : JOBS.entrySet()) {
       out.put(e.getKey(), Collections.unmodifiableList(new java.util.ArrayList<>(e.getValue())));

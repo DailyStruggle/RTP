@@ -1,4 +1,4 @@
-package io.github.dailystruggle.rtp.bukkit.commands.test;
+package io.github.dailystruggle.rtp.common.commands.test;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -20,7 +20,7 @@ import org.jetbrains.annotations.Nullable;
 public class TestChunkTicketCmd extends BaseRTPCmdImpl {
 
   /** Sentinel label, distinct from any production tracker label. */
-  static final String SENTINEL_LABEL = "rtp-test-chunk-ticket-sentinel";
+  public static final String SENTINEL_LABEL = "rtp-test-chunk-ticket-sentinel";
 
   /** Sentinel lifespan for the drop-and-diagnose case. */
   static final long SENTINEL_LIFESPAN_MS = 50L;
@@ -55,7 +55,7 @@ public class TestChunkTicketCmd extends BaseRTPCmdImpl {
   }
 
   /** Core probe, extracted for unit-testing without a CommandsAPI dispatch. */
-  static Result runProbe() {
+  public static Result runProbe() {
     Result r = new Result();
 
     int baseline = MemoryTracker.trackedCountByLabel(SENTINEL_LABEL);
@@ -138,7 +138,7 @@ public class TestChunkTicketCmd extends BaseRTPCmdImpl {
   }
 
   /** Structured probe result. Package-private so the unit test can assert on it. */
-  static final class Result {
+  public static final class Result {
     int staleBaseline;
     int afterUntrackById;
     int afterUntrackByRef;

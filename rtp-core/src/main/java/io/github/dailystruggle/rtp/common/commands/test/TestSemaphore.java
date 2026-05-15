@@ -1,4 +1,4 @@
-package io.github.dailystruggle.rtp.bukkit.commands.test;
+package io.github.dailystruggle.rtp.common.commands.test;
 
 import java.util.Map;
 import java.util.UUID;
@@ -24,13 +24,13 @@ import java.util.concurrent.ConcurrentHashMap;
  * the &quot;before core load&quot; null-guard required of public
  * {@code rtp-api} entry points does not apply here.
  */
-final class TestSemaphore {
+public final class TestSemaphore {
 
   /** Description of the current permit holder. */
-  static final class Holder {
-    final UUID ownerCallerId;
-    final String subName;
-    final long acquiredAtNanos;
+  public static final class Holder {
+    public final UUID ownerCallerId;
+    public final String subName;
+    public final long acquiredAtNanos;
 
     Holder(UUID ownerCallerId, String subName) {
       this.ownerCallerId = ownerCallerId;
@@ -49,7 +49,7 @@ final class TestSemaphore {
    * {@code false} if another in-flight test already owns it for this
    * caller.
    */
-  static boolean tryAcquire(UUID callerId, String subName) {
+  public static boolean tryAcquire(UUID callerId, String subName) {
     if (callerId == null) throw new IllegalArgumentException("callerId");
     if (subName == null) throw new IllegalArgumentException("subName");
     Holder candidate = new Holder(callerId, subName);
@@ -64,7 +64,7 @@ final class TestSemaphore {
    *
    * @return {@code true} if the permit was released by this call.
    */
-  static boolean release(UUID expectedOwner, String expectedSubName) {
+  public static boolean release(UUID expectedOwner, String expectedSubName) {
     if (expectedOwner == null) return false;
     Holder current = HOLDERS.get(expectedOwner);
     if (current == null) return false;
@@ -80,19 +80,19 @@ final class TestSemaphore {
    *
    * @return {@code true} if a permit was released.
    */
-  static boolean releaseOwned(UUID owner) {
+  public static boolean releaseOwned(UUID owner) {
     if (owner == null) return false;
     return HOLDERS.remove(owner) != null;
   }
 
   /** Returns the current holder for {@code callerId}, or {@code null}. */
-  static Holder holderOf(UUID callerId) {
+  public static Holder holderOf(UUID callerId) {
     if (callerId == null) return null;
     return HOLDERS.get(callerId);
   }
 
   /** Test-only: clears every permit. */
-  static void clearAllForTesting() {
+  public static void clearAllForTesting() {
     HOLDERS.clear();
   }
 }

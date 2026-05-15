@@ -1,5 +1,8 @@
 package io.github.dailystruggle.rtp.bukkit.commands.test;
 
+import io.github.dailystruggle.rtp.common.commands.test.TestCancelCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestSchedulerCmd;
+import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;

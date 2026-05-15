@@ -2,11 +2,11 @@
 
 This document outlines the plan for RTP's multi-server (proxy / network) expansion. It is **distinct from** [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md): that plan covers running on additional Minecraft server flavours (Spigot/Paper/Folia/Fabric); *this* plan covers coordinating RTP across **multiple concurrent backend servers** — and, as of 2026-05-07, **multiple concurrent proxy instances** — sitting in front of those backends (Velocity, BungeeCord, Waterfall).
 
-> Status: **Draft — Phase 0 (Scope Unlock) partially complete; ADR-025 not yet drafted.** No code changes have been made. Requirements have been authored in `REQUIREMENTS.md` (REQ-RTP-NET-001…014) and traceability rows added; GLOSSARY entries and ADR-025 remain outstanding. This document is gated by Rule D-005 (Propose Before Implementation, see [`AGENTS.md`](../../.junie/AGENTS.md)).
+> Status: **Phase 0 (Scope Unlock) complete; Phase 1 unblocked.** Requirements have been authored in `REQUIREMENTS.md` (REQ-RTP-NET-001…014) with traceability rows; GLOSSARY entries added; the umbrella decision is captured in [ADR-036](../adr/ADR-036-network-mode-multi-server-multi-proxy.md) (Accepted 2026-05-14) and refined by ten subproject ADRs under [`rtp-proxy/docs/adr/`](../../rtp-proxy/docs/adr/). No production code has landed yet — Phase 1 implementation of `rtp-proxy-common` is gated only on subproject `rtp-proxy-ADR-001` (Accepted) per Rule D-005 (see [`AGENTS.md`](../../.junie/AGENTS.md)).
 
-> Cross-references: [rtp-fabric-ADR-002 (Fabric in scope; formerly ADR-022)](../../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) is **orthogonal** to this plan and is **not** superseded. A new ADR-025 (multi-server proxy support) is required before Phase 1 work begins.
+> Cross-references: [rtp-fabric-ADR-002 (Fabric in scope; formerly ADR-022)](../../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) is **orthogonal** to this plan and is **not** superseded. [ADR-036](../adr/ADR-036-network-mode-multi-server-multi-proxy.md) is the ratified umbrella for multi-server proxy support; subproject refinements live under [`rtp-proxy/docs/adr/`](../../rtp-proxy/docs/adr/).
 
-> Veracity audit (2026-05-01): codebase-anchored claims in this plan have been spot-checked against the repo. Confirmed present: `AbstractSQLDatabaseAccessor` (+ `H2`/`SQLite`/`MySQL`/`PostgreSQL` concrete accessors), HikariCP 5.1.0, `RegionQueueManager`, `TeleportPipelineTask`, `MemoryTracker`, `RTP.scheduler.runTaskTimer` / `runTaskTimerAsynchronously`, `BrigadierBridgeContext` + `BrigadierCommandAdapter` in `commands-api/`, `messages.yml`, `REQ-RTP-F-013`. Unverifiable here (external APIs): Velocity `ServerPreConnectEvent`, Lettuce, Postgres `LISTEN/NOTIFY` / `SKIP LOCKED` semantics — these are documented as items for ADR-025. Note: the once-flagged `loadBalancer.backends.<serverId>.weight` key has since been drafted into the *Config Surface* below.
+> Veracity audit (2026-05-01): codebase-anchored claims in this plan have been spot-checked against the repo. Confirmed present: `AbstractSQLDatabaseAccessor` (+ `H2`/`SQLite`/`MySQL`/`PostgreSQL` concrete accessors), HikariCP 5.1.0, `RegionQueueManager`, `TeleportPipelineTask`, `MemoryTracker`, `RTP.scheduler.runTaskTimer` / `runTaskTimerAsynchronously`, `BrigadierBridgeContext` + `BrigadierCommandAdapter` in `commands-api/`, `messages.yml`, `REQ-RTP-F-013`. Unverifiable here (external APIs): Velocity `ServerPreConnectEvent`, Lettuce, Postgres `LISTEN/NOTIFY` / `SKIP LOCKED` semantics — these are documented as items for ADR-036. Note: the once-flagged `loadBalancer.backends.<serverId>.weight` key has since been drafted into the *Config Surface* below.
 
 ---
 
@@ -49,7 +49,7 @@ The plan is designed around a single explicit operator workflow. Anything that c
 - The **Trigger Abstraction** keeps trigger configuration proxy-side (D1) so adding a new backend requires zero proxy-config changes.
 - The **load-balancer** consumes published telemetry rather than a static backend list — same rationale; copy-paste-friendly fleet management.
 
-These constraints are part of the acceptance criteria for ADR-025; any deviation must be justified there.
+These constraints are part of the acceptance criteria for ADR-036; any deviation must be justified there.
 
 ### Non-Goals (v1)
 
@@ -78,7 +78,7 @@ RTP's network mode treats **multiple concurrent proxy instances** as a first-cla
 2. **No proxy singleton assumption.** Anywhere this plan says "the proxy" it shall be read as "some proxy". A request enters one proxy, that proxy claims a reservation token, and the destination consumes it. No code path may assume the same proxy that issued a side effect is the proxy that observes its consequence.
 3. **Idempotent proxy operations.** Every proxy-initiated state mutation (token claim, wait-queue enroll, hot-spot decay update) shall be safe to retry from a *different* proxy without producing duplicate work. The `PENDING → CLAIMED` transition's `WHERE state='PENDING'` guard already enforces this for tokens; the wait queue's UUID-keyed FIFO already enforces it for enrollment.
 4. **Per-proxy local state is advisory only.** A proxy may keep local caches (tab-completion results, snapshot-freshness counters, the `recentPicks` decaying counter — see *Hot-Spot Avoidance Across Proxies* below) for performance, but those caches must never be load-bearing for correctness. Anything required for safety lives in the shared store.
-5. **Proxy heartbeat row.** Each proxy publishes its own row to a `proxy_state` table — the proxy-side analogue of `backend_state` — keyed by `proxyId` (see *Proxy Telemetry Publication* below). This lets operators observe the proxy fleet, lets the reservation reaper detect dead proxies for `claimReanimateMs`, and lets ADR-025-acceptance tests discover proxies dynamically rather than hard-coding an inventory.
+5. **Proxy heartbeat row.** Each proxy publishes its own row to a `proxy_state` table — the proxy-side analogue of `backend_state` — keyed by `proxyId` (see *Proxy Telemetry Publication* below). This lets operators observe the proxy fleet, lets the reservation reaper detect dead proxies for `claimReanimateMs`, and lets ADR-036-acceptance tests discover proxies dynamically rather than hard-coding an inventory.
 6. **Trigger config replication.** Per D1, proxy-side trigger / load-balancer config is authoritative over the backend equivalent. With multiple proxies, the *same* `network.yml` lands on each, so the trigger view is identical by construction. Operators who want runtime-mutable, network-wide trigger config (rather than file-and-restart) shall use the optional `ConfigVersionTable` member of the network-state accessor (D3) — already drafted in the storage section — and read it on each `/rtp` request rather than at startup. v1 ships file-only; runtime sync is a Phase 3 hardening item.
 
 ### Hot-Spot Avoidance Across Proxies
@@ -148,7 +148,7 @@ This preserves the single-server fairness model across the network without inven
 
 ### Summary
 
-- **Decision**: pre-resolve coordinates on destination, transfer with reservation token. ADR-025 acceptance criterion.
+- **Decision**: pre-resolve coordinates on destination, transfer with reservation token. ADR-036 acceptance criterion.
 - **Reservation token table**: thin allocation layer over the existing region kept-cache (`keptLocations`, fallback `unkeptLocations`). New code is bookkeeping, not safety-pipeline.
 - **Per-player caches stay local-only**: `fastLocations` and `loginLocations` (ADR-023) are not consumed by cross-network allocations.
 - **Cache miss + no bypass permission**: enroll into a UUID-keyed network wait queue mirroring the existing per-region `playerQueue`. Bypass permission skips the queue.
@@ -202,7 +202,7 @@ Additional locked-in decisions:
    (rtp-core, optional)                                                       unchanged)
 ```
 
-Module shape proposed (Phase 0 will formalise via ADR-025):
+Module shape proposed (Phase 0 will formalise via ADR-036):
 
 ```
 rtp-proxy/
@@ -352,7 +352,7 @@ The example block above is the **shipped default**. Rationale per metric noted i
 
 - **Hot-spot avoidance** — *confirmed*. Implemented as a per-proxy decaying counter of recent picks, added to the score as another metric row (`recentPicks`) with its own `weight`/`curve`. Lives in the same model; no special-case code path. **Default halflife: 10s** (decay constant `λ = ln(2) / 10s ≈ 0.0693 s⁻¹`); the counter is bumped by `+1` on each pick and decays exponentially between heartbeats. The 10s figure matches the operator-experience target (a single low-score backend stops being preferred within roughly two heartbeat windows after a stampede starts). Default weight ships at a moderate value so it tempers but does not dominate the cost signal.
 - **Tie-breaking** — *resolved*. `serverIdAsc` is final; ties between weighted-average scores are exceedingly rare and `serverId` ordering is sufficient for determinism. No tie-breaker enum.
-- **Curve param ranges** — *confirmed*. Validation at config load enforces sane bounds for `k`, `p`, `threshold` so a malformed config cannot produce NaN scores. Concrete bounds: `k ∈ [0.1, 20]`, `p ∈ [0.1, 8]`, `threshold ∈ [0.0, 1.0]` (subject to ratification in ADR-025).
+- **Curve param ranges** — *confirmed*. Validation at config load enforces sane bounds for `k`, `p`, `threshold` so a malformed config cannot produce NaN scores. Concrete bounds: `k ∈ [0.1, 20]`, `p ∈ [0.1, 8]`, `threshold ∈ [0.0, 1.0]` (subject to ratification in ADR-036).
 - **Per-backend weight key** — *added*. `loadBalancer.backends.<serverId>.weight` is now part of the config surface (see *Config Surface* below). Acts as a multiplier: final score is `rawScore / backendWeight`, so a higher weight makes a backend preferred while keeping "lowest wins".
 - **Player-count weighting** — *resolved as `weight: 0` for v1*. Player count is still **published** in telemetry (operators want it for dashboards) but is not consumed by the selector by default. Re-evaluate **after live-player testing** of the Phase 2 devstack — if `mspt` and `pendingTeleports` already capture the relevant strain under real load, the weight stays at zero permanently; if a population-driven signal proves additive, raise it then. No further design work is required before Phase 2.
 
@@ -403,7 +403,7 @@ These are intentionally separated so a healthy-but-overloaded backend can be fil
 ### What to publish — Performance / cost fields
 
 - `playerCount` / `softCap` — current population vs. configured comfortable capacity.
-- `tps1m` / `tps5m` / `tps15m` — rolling tick-rate. (Folia: per-region TPS aggregated; document the aggregation choice in ADR-025.)
+- `tps1m` / `tps5m` / `tps15m` — rolling tick-rate. (Folia: per-region TPS aggregated; document the aggregation choice in ADR-036.)
 - `mspt` — average milliseconds per tick over the last sample window.
 - `queueDepth` — pending entries in `RegionQueueManager`.
 - `pendingTeleports` — in-flight `TeleportPipelineTask` count.
@@ -424,7 +424,7 @@ All counters are **snapshots**, not deltas — the consumer (selector) does the 
 - On graceful shutdown, the backend writes a final row with `pluginState=SHUTTING_DOWN` and `acceptingRequests=false` so the selector drops it immediately rather than waiting for the staleness window. Best-effort — a hard crash relies on the staleness filter.
 - Failure to publish must **not** abort RTP operation locally; it shall log under S-004 attribution rules and the selector treats the backend as stale until publication resumes.
 
-### Table sketch (subject to ADR-025)
+### Table sketch (subject to ADR-036)
 
 ```
 backend_state                     -- one row per backend, UPSERT keyed by server_id
@@ -460,7 +460,7 @@ JSON columns become `JSONB` on Postgres; TEXT/CSV on SQLite (which is dev-only a
 
 - The publisher (`BackendStatePublisher`) lives in **`rtp-core`** as part of the `NetworkBridge` optional subsystem. Default-disabled when `network.enabled: false` — REQ-RTP-NET-002 must remain green.
 - The accessor member (per D3) exposes `writeBackendState(BackendStateRow)` and `readNetworkSnapshot()`. Concrete bindings (Redis / Postgres / generic SQL / in-memory) implement both.
-- No platform imports in the publisher — TPS/MSPT/heap/region data come through `RTP.serverAccessor` extensions (a small additive surface to spec in ADR-025; the *April 2026 gap analysis* in `MULTI_PLATFORM_PLAN.md` does **not** cover these new methods).
+- No platform imports in the publisher — TPS/MSPT/heap/region data come through `RTP.serverAccessor` extensions (a small additive surface to spec in ADR-036; the *April 2026 gap analysis* in `MULTI_PLATFORM_PLAN.md` does **not** cover these new methods).
 
 ### Open items folded into existing placeholders
 
@@ -474,7 +474,7 @@ JSON columns become `JSONB` on Postgres; TEXT/CSV on SQLite (which is dev-only a
 
 Per D3, the existing `AbstractSQLDatabaseAccessor` is the primary storage abstraction. Network-shared state (heartbeats, reservation tokens, network cooldowns, config versions) lives **as a member of, or adjacent to**, that accessor — not in a parallel tree.
 
-Sketch (subject to ADR-025 ratification):
+Sketch (subject to ADR-036 ratification):
 
 ```
 AbstractSQLDatabaseAccessor                        (existing — per-backend persistence)
@@ -493,14 +493,14 @@ Transport implementations bind to the same accessor:
 - `GenericSqlNetworkStateBinding` — MySQL/MariaDB with polling fallback. Universal but higher latency.
 - `InMemoryNetworkStateBinding` — single-JVM tests and the no-op default when `network.enabled: false`.
 
-### Postgres Analysis Items (for ADR-025)
+### Postgres Analysis Items (for ADR-036)
 
 - `LISTEN/NOTIFY` viability and payload-size limits in our heartbeat cadence.
 - `SKIP LOCKED` race characteristics under contention from N backends.
 - `JSONB` vs. normalised columns for the snapshot blob.
 - HikariCP reuse vs. dedicated pool.
 
-These items must be answered in ADR-025 before Phase 3.
+These items must be answered in ADR-036 before Phase 3.
 
 ---
 
@@ -540,7 +540,7 @@ A dedicated regression suite analogous to `ReqRtpS004NullChunkAttributionTest` i
 - TTL expiry: a `PENDING` token whose `expiresAt < now` must transition to `EXPIRED` and release its `MemoryTracker` entry within one reaper interval.
 - Orphaned-allocation prevention: a backend crash mid-issue (`PENDING` written but no proxy ever claims) must not leak a `keptLocations` entry beyond TTL.
 - Proxy-restart reanimation: a `CLAIMED` token whose proxy died is observed in `PENDING` again after `claimReanimateMs`, and the next proxy instance can claim it.
-- Schema-version mismatch: a token written under an older `schemaVersion` is rejected (or upgraded, depending on the version-skew policy ratified in ADR-025).
+- Schema-version mismatch: a token written under an older `schemaVersion` is rejected (or upgraded, depending on the version-skew policy ratified in ADR-036).
 - HMAC reject: a token whose envelope HMAC fails verification is dropped and an S-004 audit log is emitted; the player request fails through the configured `messages.yml` entry, not silently.
 
 ---
@@ -640,11 +640,11 @@ Mirrors the structure of [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) so c
 
 ### Phase 0 — Scope Unlock *(docs only; D-005 gate)*
 
-- [ ] **ADR-025 — Multi-Server Proxy Support** — accept Velocity-first, load-balancing headline, durable-transport requirement (D2), reuse of `AbstractSQLDatabaseAccessor` (D3). Do not supersede rtp-fabric-ADR-002 (formerly ADR-022). *Outstanding — file `docs/adr/ADR-025-*.md` not yet drafted.*
+- [x] **ADR-036 — Multi-Server Proxy Support** — accepted 2026-05-14: Velocity-first, load-balancing headline, durable-transport requirement (D2), reuse of `AbstractSQLDatabaseAccessor` (D3). Does not supersede rtp-fabric-ADR-002 (formerly ADR-022). See [`docs/adr/ADR-036-network-mode-multi-server-multi-proxy.md`](../adr/ADR-036-network-mode-multi-server-multi-proxy.md).
 - [x] **`REQUIREMENTS.md`** — REQ-RTP-NET-001…014 authored with `shall` phrasing (see `REQUIREMENTS.md` §1.6). Plan-internal citations re-threaded against canonical IDs; cross-reference table above replaces the prior stub table.
 - [ ] **`GLOSSARY.md`** — add: *backend*, *proxy*, *reservation token*, *transport*, *network snapshot*, *backend selector*. *Outstanding.*
-- [ ] **`AGENTS.md` Current Development Focus** — only after Phase 0 acceptance (ADR-025 + GLOSSARY); until then, Fabric remains the active frontier.
-- [x] **`INDEX.md`** — plan row present in [`docs/dev/INDEX.md`](INDEX.md) (Task router + doc catalog). ADR-025 row will be added when that ADR is drafted.
+- [ ] **`AGENTS.md` Current Development Focus** — flip to network mode only after Phase 1 (`rtp-proxy-common` SPI + `InMemoryNetworkStateBinding`) lands; Fabric remains the active frontier until then.
+- [x] **`INDEX.md`** — plan row present in [`docs/dev/INDEX.md`](INDEX.md) (Task router + doc catalog). ADR-036 row will be added in the same pass that adds the GLOSSARY entries above.
 - [x] **Fill the load-balancing heuristics placeholder** in this document — see *Load-Balancing Heuristics — Configurable Weighted Average* above (direction-locked, defaults serve as test fixture).
 - [x] **Resolve D4** — env-var `RTP_NET_SECRET` selected for v1 (see *Decisions Recorded* row D4 and *Open Items* for deferred alternatives).
 
@@ -720,7 +720,7 @@ This plan has been reviewed for implementer-sufficiency against `AGENTS.md`, `RU
 
 - **Reservation token state machine** — explicit ownership matrix added (who initiates each transition, atomicity primitive, failure handling, proxy-restart reanimation).
 - **Thread-context map** — added to *Risk & Pitfall Inventory* so each callback's expected thread is documented.
-- **Wire-protocol envelope** — captured as REQ-RTP-NET-009 (schemaVersion + HMAC). Final wire format (CBOR / JSON / length-prefixed bytes) deferred to ADR-025.
+- **Wire-protocol envelope** — captured as REQ-RTP-NET-009 (schemaVersion + HMAC). Final wire format (CBOR / JSON / length-prefixed bytes) deferred to ADR-036.
 - **Exactly-once claim semantics** — captured as REQ-RTP-NET-012.
 - **Multi-DB compatibility** — captured as REQ-RTP-NET-013 (any of H2/SQLite/MySQL/PostgreSQL must be acceptable for backend-side telemetry).
 - **Required regression coverage** — enumerated under *Reservation Tokens* (replay, TTL, orphan, reanimation, schema-version, HMAC reject) so the Phase 2 acceptance suite is unambiguous.
@@ -728,7 +728,7 @@ This plan has been reviewed for implementer-sufficiency against `AGENTS.md`, `RU
 
 **Items deliberately left open** (tracked in *Open Items / Follow-Ups* below):
 
-- Wire-format choice (CBOR vs. JSON vs. binary) — ADR-025.
+- Wire-format choice (CBOR vs. JSON vs. binary) — ADR-036.
 - Postgres-vs-Redis(/Dragonfly) benchmark — post-implementation.
 - `commands-api` proxy surface concrete shapes — early Phase 1 design.
 - HMAC distribution beyond env-var — deferred research.
@@ -741,8 +741,8 @@ This plan has been reviewed for implementer-sufficiency against `AGENTS.md`, `RU
 - **D4 — HMAC key distribution beyond env var** — v1 ships env-var (`RTP_NET_SECRET`). Research alternatives (config file with restrictive perms, per-backend keypair, OS keyring) before public release; not a Phase 2 blocker.
 - **Shared `recentPicks` across proxies** — v1 keeps `recentPicks` per-proxy and relies on backend telemetry to dampen inter-heartbeat stampedes (see *Hot-Spot Avoidance Across Proxies*). A v2 opt-in mode that writes `recentPicks` bumps to the network-state member would close the intra-heartbeat window at the cost of one round-trip per pick. Revisit only if Phase 2+ devstack data shows multi-proxy stampedes that telemetry feedback fails to absorb.
 - **Runtime-mutable proxy trigger/load-balancer config replication** — v1 is file-and-restart on every proxy. A Phase 3 hardening item is to read the optional `ConfigVersionTable` row on each `/rtp` request so a single edit propagates across the proxy fleet without a restart sweep.
-- **Proxy telemetry table (`proxy_state`)** — sketched under *Multi-Proxy Deployment* but not yet table-level specified the way `backend_state` is. Concrete column list lands in ADR-025 alongside the backend table; expected fields: `proxyId`, `schemaVersion`, `rtpVersion`, `proxyPlatform` (`velocity` | `bungee` | `waterfall`), `proxyState`, `connectedPlayers`, `lastSeenEpochMs`. No performance fields — proxies are not selection candidates.
-- **Postgres-vs-Redis comparative benchmark** — *to be performed after each transport's individual implementation and testing has stabilised*. Not a prerequisite for ADR-025 ratification (their selection rationale stands on responsiveness characteristics); benchmark drives ops guidance and the eventual `LESSONS_LEARNED.md` entry. **DragonflyDB is a third row in the same benchmark matrix** — same `RedisNetworkStateBinding`, different server — to give operators evidence-based guidance on when its multi-threaded single-node design beats vanilla Redis (typically: high reservation-claim contention, single large host) and when it doesn't (typically: small fleets, where the difference is in the noise).
+- **Proxy telemetry table (`proxy_state`)** — sketched under *Multi-Proxy Deployment* but not yet table-level specified the way `backend_state` is. Concrete column list lands in ADR-036 alongside the backend table; expected fields: `proxyId`, `schemaVersion`, `rtpVersion`, `proxyPlatform` (`velocity` | `bungee` | `waterfall`), `proxyState`, `connectedPlayers`, `lastSeenEpochMs`. No performance fields — proxies are not selection candidates.
+- **Postgres-vs-Redis comparative benchmark** — *to be performed after each transport's individual implementation and testing has stabilised*. Not a prerequisite for ADR-036 ratification (their selection rationale stands on responsiveness characteristics); benchmark drives ops guidance and the eventual `LESSONS_LEARNED.md` entry. **DragonflyDB is a third row in the same benchmark matrix** — same `RedisNetworkStateBinding`, different server — to give operators evidence-based guidance on when its multi-threaded single-node design beats vanilla Redis (typically: high reservation-claim contention, single large host) and when it doesn't (typically: small fleets, where the difference is in the noise).
 - **`commands-api` proxy-side surface** — **early TODO for Phase 1 design**. Concrete shapes needed: `ProxySender` (adapts Velocity `CommandSource` and Bungee `CommandSender`), `NetworkAwareCommand` mixin (routes execution through `RtpDispatcher`), tab-completion routing across the transport. Resolve before any proxy adapter module is opened.
 - **Player-count weighting** — published in telemetry; selector weight stays `0` until live-player testing on the Phase 2 devstack provides evidence either way. No design action required before Phase 2.
 - **`rtp.unqueued` bypass implementation** — low priority; expected use is rare. Acceptable to defer past Phase 2 acceptance.

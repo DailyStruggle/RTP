@@ -1,7 +1,7 @@
 # ADR-034 — Memory Shape Catalog and Polygon Shape
 
 **Status:** Accepted
-**Date:** 2026-05-11 (Proposed); 2026-05-12 (Accepted, implementation landed)
+**Date:** 2026-05-11 (Proposed); 2026-05-12 (Accepted, implementation landed); 2026-05-14 (Amended — `Ellipse` parameters moved off `GenericMemoryShapeParams` to a dedicated `EllipseMemoryShapeParams` enum; `Ellipse` no longer extends `Circle`; `Ellipse` gains `centerRadius2` and `rotation` for an elliptical inner exclusion and Rectangle-style rotation)
 
 ## Context
 
@@ -52,13 +52,13 @@ Adopt the following catalog of memory shapes. New shapes added after this ADR mu
    - Distribution: flat over the rectangle.
    - Notes: the natural generalization of `Square` when the world is not square-symmetric (e.g. corridor worlds, asymmetric border-aligned regions).
 
-6. **`Ellipse`** — Uniform-by-area axis-aligned ellipse with independent semi-axes.
-   - Params: `radius`, `radius2` (the two semi-axes; the wider sets the bounding circle), `centerX`, `centerZ`, `weight`, `uniquePlacements`, `expand`, `mode`.
-   - Distribution: flat over the ellipse.
-   - Notes: the natural generalization of `Circle` when world geometry is anisotropic.
+6. **`Ellipse`** — Uniform-by-area ellipse with independent semi-axes, optional elliptical inner exclusion, and an optional rotation.
+   - Params (`EllipseMemoryShapeParams`): `radius`, `radius2` (the two outer semi-axes; the wider sets the bounding circle used by the spiral 1D mapping), `centerRadius`, `centerRadius2` (the two inner semi-axes defining an elliptical hole; the wider sets the inner-circle floor of the spiral mapping), `rotation` (degrees, applied around (`centerX`, `centerZ`) — mirrors `RectangleParams.rotation`), `centerX`, `centerZ`, `weight`, `uniquePlacements`, `expand`, `mode`.
+   - Distribution: flat over the rotated elliptical annulus (outer ellipse minus inner ellipse).
+   - Notes: the natural generalization of `Circle` when world geometry is anisotropic. As of the 2026-05-14 amendment, `Ellipse` is parameterised over its own enum (`EllipseMemoryShapeParams`) rather than the shared `GenericMemoryShapeParams`, and is a direct subclass of `MemoryShape` rather than `Circle`. The split keeps the second semi-axis off the generic enum so that single-radius shapes (`Circle`, `Square`, their `_Normal` variants) are not forced to carry a meaningless `radius2` default to satisfy `Shape`'s "every enum constant present" invariant. A second 2026-05-14 amendment adds `centerRadius2` (for an elliptical — rather than circular — inner exclusion) and `rotation` (Rectangle-style); the spiral 1D mapping continues to use the wider of each radius pair as the bounding circle, and `contains` enforces the true rotated elliptical inner/outer shells.
 
 7. **`Polygon`** *(new — this ADR)* — Admin-authored closed polygon, optionally concave; self-intersection rejected at load.
-   - **Inheritance from `Square`.** `Polygon extends Square`, consistent with the established `MemoryShape` hierarchy (`Square_Normal extends Square`, `Circle_Normal extends Circle`, `Ellipse extends Circle`). The inherited `Square` sized to the polygon's axis-aligned bounding box carries the spiral index, the segmented bad-locations store, persistence, uniqueness, cache-key contribution ([ADR-022](ADR-022-shape-cache-key-seed-plus-config-hash.md)), and registry integration unchanged; `Polygon` adds the polygon predicate, the load-time mask population, and an `expand` override.
+   - **Inheritance from `Square`.** `Polygon extends Square`, consistent with the established `MemoryShape` hierarchy (`Square_Normal extends Square`, `Circle_Normal extends Circle`; `Ellipse` previously extended `Circle` and as of the 2026-05-14 amendment extends `MemoryShape<EllipseMemoryShapeParams>` directly — the precedent of "extend the closest primitive that shares your param enum" stands). The inherited `Square` sized to the polygon's axis-aligned bounding box carries the spiral index, the segmented bad-locations store, persistence, uniqueness, cache-key contribution ([ADR-022](ADR-022-shape-cache-key-seed-plus-config-hash.md)), and registry integration unchanged; `Polygon` adds the polygon predicate, the load-time mask population, and an `expand` override.
    - **Params (`PolygonMemoryShapeParams`):** `vertices` (Chunky-compatible list of `(x, z)` pairs), `centerX` / `centerZ` (optional override; defaults to AABB center), `weight`, `uniquePlacements`, `mode`. `expand` is **not** part of the declared param surface; the config layer does not surface it for `Polygon`, and `Polygon` overrides the expansion accessor to hard-return `false`. A warning is logged via `RTP.log(Level.WARNING, …)` if a config explicitly sets `expand=true` on a polygon region.
    - **Vertex format:** Chunky-parity. Admins paste the same vertex list they already use in `/chunky shape polygon`. Stored in YAML as a collection so it round-trips as a single value through the existing config layer.
    - **Validation at load:**
