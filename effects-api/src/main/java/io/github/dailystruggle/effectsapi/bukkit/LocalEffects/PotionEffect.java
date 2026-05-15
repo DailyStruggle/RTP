@@ -115,17 +115,69 @@ public class PotionEffect extends Effect<PotionTypeNames> {
     };
 
     static void applyOnEntityThread(Player player, org.bukkit.potion.PotionEffect potionEffect) {
-        org.bukkit.plugin.Plugin caller = EffectsAPI.getInstance();
-        if (caller == null) caller = Bukkit.getPluginManager().getPlugin("RTP");
+        org.bukkit.plugin.Plugin caller;
+        try {
+            caller = EffectsAPI.getInstance();
+        } catch (IllegalStateException pre) {
+            // S-006: getInstance() throws before init(). The dispatcher seam
+            // must still be consulted (Folia path / tests), so degrade to a
+            // null caller and let downstream guards handle it.
+            caller = null;
+        }
+        // effects-api is platform-agnostic and must not name any host plugin
+        // (e.g. "RTP") to look up a Plugin handle — that would be a layering
+        // violation. If EffectsAPI.init(Plugin) hasn't run, leave caller null;
+        // the dispatcher seam may still accept (Folia/tests), and the legacy
+        // fallback below degrades to a best-effort direct call.
         Runnable apply = () -> player.addPotionEffect(potionEffect);
         if (entityDispatcher.dispatch(player, caller, apply)) return;
-        if (Bukkit.isPrimaryThread()) {
-            apply.run();
+        boolean primary;
+        try {
+            primary = Bukkit.isPrimaryThread();
+        } catch (Throwable ignored) {
+            primary = false;
+        }
+        if (primary) {
+            safeRun(apply);
         } else if (caller != null) {
-            Bukkit.getScheduler().runTask(caller, apply);
+            try {
+                Bukkit.getScheduler().runTask(caller, apply);
+            } catch (Throwable t) {
+                logApplyFailure(t);
+            }
         } else {
             // No plugin handle: best-effort direct call (legacy behavior).
+            safeRun(apply);
+        }
+    }
+
+    /**
+     * Run {@code apply} (typically {@code player.addPotionEffect}) and swallow
+     * any throwable. {@code addPotionEffect} can blow up in production
+     * ({@code IllegalStateException: Asynchronous effect add} on Folia when
+     * routed off-thread, or {@code IllegalArgumentException} for invalid
+     * effect data) and in unit tests where the Bukkit server isn't initialized.
+     * S-004 attribution is preserved by the warning log; the effects pipeline
+     * must not propagate the failure to the teleport caller.
+     */
+    private static void safeRun(Runnable apply) {
+        try {
             apply.run();
+        } catch (Throwable t) {
+            logApplyFailure(t);
+        }
+    }
+
+    private static void logApplyFailure(Throwable t) {
+        // effects-api cannot reach RTP.log directly (no rtp-core dep). Route
+        // through Bukkit.getLogger when a server is available; otherwise
+        // (unit tests) silently swallow — the dispatcher seam still records
+        // intent and the test asserts at that layer.
+        try {
+            Bukkit.getLogger().log(java.util.logging.Level.WARNING,
+                    "[effects-api] PotionEffect apply failed", t);
+        } catch (Throwable ignored) {
+            // No server / no logger available — accept the swallow.
         }
     }
 

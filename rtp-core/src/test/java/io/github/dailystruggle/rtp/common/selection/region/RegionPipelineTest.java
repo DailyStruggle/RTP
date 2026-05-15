@@ -120,6 +120,47 @@ public class RegionPipelineTest {
                 "hasLocation(null) must return true after promotion");
     }
 
+    /**
+     * Regression for the mid-air placement bug (S-001).
+     *
+     * <p>The L3 backlog refill stamps a placeholder Y into unverified
+     * {@link RTPLocation} entries — historically {@code (vert.maxY+vert.minY)/2},
+     * a window midpoint that is almost certainly mid-air for any non-trivial
+     * vert window (e.g. {@code minY=32, maxY=255 → y=143}). The previous
+     * unkept→kept safety re-verification trusted that stored Y and only
+     * called {@code rtpChunk.isSafe(localX, y, localZ, ...)}, which passes
+     * trivially because the block at mid-air *is* air. Players ended up
+     * placed mid-air at the placeholder Y.
+     *
+     * <p>The fix routes promotion through {@code vert.adjust(rtpChunk)}, which
+     * performs the full ground+headroom sweep every adjustor enforces on the
+     * live-spiral path. After promotion the kept location's Y must be the
+     * vert-resolved Y, not the mid-air placeholder.
+     */
+    @Test
+    @Timeout(value = 2, unit = TimeUnit.SECONDS)
+    void execute_overwrites_placeholder_midair_Y_with_vert_resolved_Y() {
+        // Stuff unkept with a coord whose Y is the historical midpoint
+        // placeholder. LinearAdjustor defaults to minY=32, maxY=255 →
+        // midpoint=143. MockRTPWorld's chunk reports a flat ground column at
+        // y=64 (well within the [32,255] vert window) so vert.adjust must
+        // resolve to a ground Y of 64 (not 143).
+        int placeholderY = (region.getVert().maxY() + region.getVert().minY()) / 2;
+        RTPCoords midairCoords = new RTPCoords(world.name(), 8, placeholderY, 8);
+        region.queueManager.unkeptLocations.offer(new RTPLocation(midairCoords, 1L, null));
+
+        region.execute(Long.MAX_VALUE);
+
+        assertFalse(region.queueManager.keptLocations.isEmpty(),
+                "promotion must succeed when ground exists in the vert window");
+        RTPLocation kept = region.queueManager.keptLocations.peek();
+        assertNotNull(kept);
+        assertNotEquals(placeholderY, kept.coords().y(),
+                "promoted location must NOT retain the mid-air placeholder Y of "
+                        + placeholderY + " — vert.adjust(chunk) must overwrite it with "
+                        + "the ground-resolved Y (S-001 mid-air regression).");
+    }
+
     @Test
     @Timeout(value = 2, unit = TimeUnit.SECONDS)
     void public_queue_length_counts_both_kept_and_unkept() {

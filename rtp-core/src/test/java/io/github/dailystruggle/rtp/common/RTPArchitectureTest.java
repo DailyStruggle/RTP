@@ -98,6 +98,12 @@ public class RTPArchitectureTest {
      *       {@code FailTypes.timeout / reason=ticketApplyTimeout}. The method lives in
      *       {@code rtp-api} so it cannot be covered by the {@code LocationGenerator} name-
      *       match; it is exempted here explicitly.</li>
+     *   <li><b>TestSchedulerCmd</b> – {@code .get(PROBE_TIMEOUT_MS, MILLISECONDS)} at
+     *       line 171 inside {@code awaitAndReport()}. This is the {@code /rtp test
+     *       scheduler} diagnostic probe; the bounded wait runs on the async tier
+     *       ({@code scheduler.runTaskAsynchronously}) and never on a region/primary
+     *       tick thread, so S-005 is preserved. A timeout is reported as a tier
+     *       failure rather than swallowed (S-004 compliant).</li>
      * </ul>
      */
     @ArchTest
@@ -112,6 +118,7 @@ public class RTPArchitectureTest {
                     .and().haveSimpleNameNotContaining("MemoryTracker")
                     .and().haveSimpleNameNotContaining("PlaceholderProvider")
                     .and().haveSimpleNameNotContaining("ChunkReservation")
+                    .and().haveSimpleNameNotContaining("TestSchedulerCmd")
                     .should().callMethodWhere(
                             target(owner(assignableTo(CompletableFuture.class)))
                                     .and(target(nameMatching("get|join")))

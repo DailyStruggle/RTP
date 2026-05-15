@@ -72,6 +72,34 @@ declares `relocate 'org.yaml.snakeyaml', 'io.github.dailystruggle.rtp.snakeyaml'
 in both pro and lite variants, anticipating the case where SnakeYAML must
 be shaded.
 
+> **Context update (2026-05-15).** The paragraphs above describe the
+> shape of the problem as understood on 2026-05-01. Two facts surfaced
+> since then have made the original "wrap SnakeYAML" framing the wrong
+> one (preserved here so the reader can follow the reasoning; the
+> *Decision* section that follows acts on the updated understanding):
+>
+> 1. SnakeYAML's `processComments` API exposes comments on the AST but
+>    its emitter does **not** preserve their lexical position across a
+>    `set + save` cycle — the comment-attachment is node-keyed and
+>    heuristic. A comment-preserving save for the
+>    `CONFIG_COMMAND_SPEC.md` Appendix A12 contract therefore cannot be
+>    delegated to SnakeYAML; the surgical line-edit save layer has to
+>    be written in-house regardless of substrate.
+> 2. The proxy modules planned in
+>    [`MULTI_SERVER_PLAN.md`](../dev/MULTI_SERVER_PLAN.md) (Phase 1+,
+>    Velocity and BungeeCord) cannot rely on a runtime-provided
+>    SnakeYAML: Velocity does not export `org.yaml.snakeyaml` to
+>    plugins, and BungeeCord's bundled version is unpinned. Any
+>    SnakeYAML-based plan therefore needs to shade SnakeYAML into every
+>    proxy assembly variant, which contradicts the lite-variant
+>    footprint promise of ADR-024 by extension.
+>
+> Combined with the 2026-05-15 YAML feature audit (see
+> [`docs/dev/scratch/YAML_FEATURE_AUDIT_RESULTS.md`](../dev/scratch/YAML_FEATURE_AUDIT_RESULTS.md)),
+> which bounds the YAML subset RTP actually uses to a tractable
+> hand-rollable grammar, the conclusion is to replace simpleyaml with
+> an in-house parser rather than a SnakeYAML wrapper.
+
 ## Decision
 
 Remove the `me.carleslc.Simple-YAML` dependency entirely and replace it
@@ -368,19 +396,47 @@ Fabric mod jar gets the same in-house parser as every other variant.
 ## References
 
 - Issue: *"scope the refactor required to remove our dependency on
-  simpleyaml"* — May 2026.
-- `rtp-core/build.gradle` line 14 (dependency declaration).
-- `rtp-plugin/build.gradle` lines 185–186 (pro shadowJar relocations) and
-  386–387 (lite shadowJar relocations).
+  simpleyaml"* — May 2026. Follow-up issue updates (2026-05-14 /
+  2026-05-15) narrowed the comment-preservation scope to above-line
+  block comments and reversed the substrate decision from a SnakeYAML
+  wrapper to an in-house parser.
+- `rtp-core/build.gradle` line 14 (simpleyaml dependency declaration —
+  to be removed by this ADR's implementation PR).
+- `rtp-plugin/build.gradle` lines 185–186 (pro shadowJar simpleyaml
+  relocation) and 386–387 (lite shadowJar simpleyaml relocation) — all
+  four lines removed; the anticipatory `org.yaml.snakeyaml` relocations
+  are also removed since SnakeYAML is no longer shaded.
 - `rtp-core/.../configuration/ConfigParser.java` lines 857, 871, 879
   (`setComment` call sites).
 - `rtp-core/.../configuration/LanguageBootstrap.java` line 106
   (`setComment` call site).
 - ADR-020 — Language Bootstrap and Locale-Aware ConfigParser (the
   comment-preservation requirement originated here).
-- ADR-024 — RTP-lite Assembly Variant (lite continues to defer
-  SnakeYAML to the platform).
-- ADR-022 — Fabric Platform In Scope (Fabric SnakeYAML packaging deferred
-  to a follow-up ADR).
-- SnakeYAML 2.x comment APIs: `LoaderOptions#setProcessComments`,
-  `DumperOptions#setProcessComments`, `CommentLine`, `MappingNode`.
+- ADR-024 — RTP-lite Assembly Variant. Under this revised decision the
+  lite variant *also* drops simpleyaml; the previous platform-deferral
+  of SnakeYAML becomes irrelevant (no SnakeYAML dependency anywhere).
+  The lite footprint promise is **strengthened**, not relaxed.
+- [rtp-fabric-ADR-002](../../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md)
+  — Fabric Platform In Scope (renumbered from project-wide ADR-022 on
+  2026-05-05). The "Fabric YAML packaging is deferred to a follow-up
+  ADR" carve-out is **closed** by this revision: the in-house parser
+  ships on Fabric like every other variant.
+- [`CONFIG_COMMAND_SPEC.md`](../dev/CONFIG_COMMAND_SPEC.md) §2.4 +
+  Appendix A row A12 — the comment-preservation contract this ADR
+  enables. Block-only scope per 2026-05-14; inline comments tolerated
+  on input but not preserved across write-back.
+- [`MULTI_SERVER_PLAN.md`](../dev/MULTI_SERVER_PLAN.md) — proxy-axis
+  constraint that drove (alongside the A12 feature gap) the reversal
+  from a SnakeYAML wrapper to an in-house parser.
+- [`docs/dev/scratch/CONFIG_COMMENT_PRESERVATION_COMPARISON.md`](../dev/scratch/CONFIG_COMMENT_PRESERVATION_COMPARISON.md)
+  — v1/v2/v3 failure-mode analysis that motivated the surgical
+  line-edit save strategy.
+- [`docs/dev/scratch/YAML_FEATURE_AUDIT_RESULTS.md`](../dev/scratch/YAML_FEATURE_AUDIT_RESULTS.md)
+  — 2026-05-15 audit over 187 shipped `.yml` files; bounds the parser
+  subset.
+- SnakeYAML 2.x comment APIs (`LoaderOptions#setProcessComments`,
+  `DumperOptions#setProcessComments`, `CommentLine`, `MappingNode`) —
+  retained for reference because the *failure modes* of those APIs
+  (node-keyed, heuristic comment placement; emitter does not preserve
+  lexical position) are the technical motivation for not adopting
+  them.

@@ -101,27 +101,31 @@ public final class LoginCacheTask implements Runnable {
                 }
                 Runnable verify = () -> {
                     try {
-                        boolean safe = false;
+                        // Re-resolve Y via the region's vertical adjustor against the
+                        // loaded chunk. Mirrors Region.execute() unkept→kept promotion:
+                        // the stored coords.y may be an L3 placeholder (ADR-028), and a
+                        // single-block isSafe at a mid-air placeholder Y passes trivially
+                        // (S-001 mid-air placement bug). vert.adjust(chunk) performs the
+                        // ground+headroom sweep every adjustor already implements on the
+                        // live-spiral path.
+                        io.github.dailystruggle.rtp.api.world.RTPCoords resolved = null;
                         try {
                             long key = ((long) cx & 0xffffffffL) | ((long) cz << 32);
                             io.github.dailystruggle.rtp.api.world.RTPChunk<?> rtpChunk =
                                     region.getWorld().getCachedChunk(key);
-                            if (rtpChunk != null) {
-                                int localX = coldLoc.coords().x() - (cx << 4);
-                                int localZ = coldLoc.coords().z() - (cz << 4);
-                                localX = ((localX % 16) + 16) % 16;
-                                localZ = ((localZ % 16) + 16) % 16;
-                                int y = coldLoc.coords().y();
-                                safe = rtpChunk.isSafe(localX, y, localZ, LocationGenerator.unsafeBlocksCache);
+                            io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor<?> v =
+                                    region.getVert();
+                            if (rtpChunk != null && v != null) {
+                                resolved = v.adjust(rtpChunk);
                             }
                         } catch (Throwable verifyEx) {
-                            safe = false;
+                            resolved = null;
                             RTP.log(Level.FINE,
                                     "[LoginCacheTask] unkept→login safety re-verification failed: "
                                             + verifyEx.getClass().getSimpleName() + ": " + verifyEx.getMessage());
                         }
 
-                        if (!safe) {
+                        if (resolved == null) {
                             // Mirror Region.execute(): purge the now-unsafe DB row via offer+poll.
                             qm.unkeptLocations.offer(coldLoc);
                             qm.unkeptLocations.poll();
@@ -130,7 +134,7 @@ public final class LoginCacheTask implements Runnable {
 
                         ChunkReservation reservation = new ChunkReservation(chunkSet, region.getWorld());
                         boolean added = login.offer(
-                                new RTPLocation(coldLoc.coords(), coldLoc.attempts(), reservation));
+                                new RTPLocation(resolved, coldLoc.attempts(), reservation));
                         if (!added) {
                             reservation.close();
                             qm.unkeptLocations.offer(coldLoc);
