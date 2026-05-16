@@ -64,6 +64,8 @@ controleer_bijChunkLaden: false
 # de cache geen ruimte heeft voor standaard vullingen.
 bezoeker_ingeschakeld: true
 # WIJZIG HET VERSIENUMMER NIET
-pregeneratedPreference: 0.0 # Probability [0.0, 1.0] of rejecting an ungenerated chunk per selection attempt. 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land. Generated chunks always pass.
-backlogRefillThreshold: 0.5 # Fraction [0.0, 1.0] of L3 backlog capacity at which refill resumes (hysteresis). 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill continuously.
+# Probability [0.0, 1.0] of rejecting an ungenerated chunk per selection attempt. 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land. Generated chunks always pass.
+pregeneratedPreference: 0.0
+# Fraction [0.0, 1.0] of L3 backlog capacity at which refill resumes (hysteresis). 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill continuously.
+backlogRefillThreshold: 0.5
 version: "1.0"

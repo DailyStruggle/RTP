@@ -5,7 +5,7 @@ import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.simpleyaml.configuration.file.YamlFile;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 
 import java.io.File;
 import java.nio.file.Path;
@@ -47,7 +47,7 @@ class YamlFileDatabaseTest extends AbstractDatabaseAccessorTest {
 
     @Test
     void connect_emptyDirectory_returnsEmptyMap() {
-        Map<String, YamlFile> result = db.connect();
+        Map<String, RtpYamlConfig> result = db.connect();
         assertNotNull(result);
         assertTrue(result.isEmpty(), "connect on empty dir should return empty map");
     }
@@ -57,20 +57,20 @@ class YamlFileDatabaseTest extends AbstractDatabaseAccessorTest {
         File subDir = tempDir.resolve("subdir").toFile();
         assertFalse(subDir.exists());
         YamlFileDatabase subDb = new YamlFileDatabase(subDir);
-        Map<String, YamlFile> result = subDb.connect();
+        Map<String, RtpYamlConfig> result = subDb.connect();
         assertTrue(subDir.exists(), "connect should create the directory");
         assertTrue(result.isEmpty());
     }
 
     @Test
     void connect_withExistingYamlFile_loadsIt() throws Exception {
-        File yamlFile = tempDir.resolve("player.yml").toFile();
-        yamlFile.createNewFile();
-        org.simpleyaml.configuration.file.YamlFile yf = new YamlFile(yamlFile);
+        File RtpYamlConfig = tempDir.resolve("player.yml").toFile();
+        RtpYamlConfig.createNewFile();
+        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig yf = new RtpYamlConfig(RtpYamlConfig);
         yf.set("health", 20);
         yf.save();
 
-        Map<String, YamlFile> result = db.connect();
+        Map<String, RtpYamlConfig> result = db.connect();
         assertTrue(result.containsKey("player.yml"), "connect should load existing yaml files");
     }
 
@@ -80,22 +80,22 @@ class YamlFileDatabaseTest extends AbstractDatabaseAccessorTest {
         txtFile.createNewFile();
         java.nio.file.Files.writeString(txtFile.toPath(), "not yaml: [broken");
 
-        Map<String, YamlFile> result = db.connect();
+        Map<String, RtpYamlConfig> result = db.connect();
         assertFalse(result.containsKey("notes.txt"), "non-yaml files should be skipped");
     }
 
     @Test
     void disconnect_savesFilesToDisk() throws Exception {
-        File yamlFile = tempDir.resolve("data.yml").toFile();
-        YamlFile yf = new YamlFile(yamlFile);
+        File RtpYamlConfig = tempDir.resolve("data.yml").toFile();
+        RtpYamlConfig yf = new RtpYamlConfig(RtpYamlConfig);
         yf.createNewFile(true);
         yf.set("key", "value");
 
-        Map<String, YamlFile> database = Map.of("data.yml", yf);
+        Map<String, RtpYamlConfig> database = Map.of("data.yml", yf);
         db.disconnect(database);
 
-        assertTrue(yamlFile.exists(), "disconnect should save files to disk");
-        YamlFile reloaded = new YamlFile(yamlFile);
+        assertTrue(RtpYamlConfig.exists(), "disconnect should save files to disk");
+        RtpYamlConfig reloaded = new RtpYamlConfig(RtpYamlConfig);
         reloaded.load();
         assertEquals("value", reloaded.getString("key"));
     }
@@ -106,10 +106,10 @@ class YamlFileDatabaseTest extends AbstractDatabaseAccessorTest {
 
     @Test
     void write_thenRead_returnsRow() throws Exception {
-        File yamlFile = tempDir.resolve("locations.yml").toFile();
-        YamlFile yf = new YamlFile(yamlFile);
+        File RtpYamlConfig = tempDir.resolve("locations.yml").toFile();
+        RtpYamlConfig yf = new RtpYamlConfig(RtpYamlConfig);
         yf.createNewFile(true);
-        Map<String, YamlFile> database = new HashMap<>();
+        Map<String, RtpYamlConfig> database = new HashMap<>();
         database.put("locations.yml", yf);
 
         Map<DatabaseAccessor.TableObj, DatabaseAccessor.TableObj> row = new LinkedHashMap<>();
@@ -124,10 +124,10 @@ class YamlFileDatabaseTest extends AbstractDatabaseAccessorTest {
 
     @Test
     void write_emptyMap_isNoOp() throws Exception {
-        File yamlFile = tempDir.resolve("empty.yml").toFile();
-        YamlFile yf = new YamlFile(yamlFile);
+        File RtpYamlConfig = tempDir.resolve("empty.yml").toFile();
+        RtpYamlConfig yf = new RtpYamlConfig(RtpYamlConfig);
         yf.createNewFile(true);
-        Map<String, YamlFile> database = new HashMap<>();
+        Map<String, RtpYamlConfig> database = new HashMap<>();
         database.put("empty.yml", yf);
 
         // YamlFileDatabase.write iterates over the map; empty map is a no-op
@@ -136,7 +136,7 @@ class YamlFileDatabaseTest extends AbstractDatabaseAccessorTest {
 
     @Test
     void read_missingTable_returnsEmpty() {
-        Map<String, YamlFile> database = new HashMap<>();
+        Map<String, RtpYamlConfig> database = new HashMap<>();
         Optional<Map<String, Object>> result = db.read(database, "nonexistent.yml",
                 new AbstractMap.SimpleEntry<>("key", "val"));
         assertFalse(result.isPresent());
@@ -144,10 +144,10 @@ class YamlFileDatabaseTest extends AbstractDatabaseAccessorTest {
 
     @Test
     void delete_byUUID_removesEntry() throws Exception {
-        File yamlFile = tempDir.resolve("del.yml").toFile();
-        YamlFile yf = new YamlFile(yamlFile);
+        File RtpYamlConfig = tempDir.resolve("del.yml").toFile();
+        RtpYamlConfig yf = new RtpYamlConfig(RtpYamlConfig);
         yf.createNewFile(true);
-        Map<String, YamlFile> database = new HashMap<>();
+        Map<String, RtpYamlConfig> database = new HashMap<>();
         database.put("del.yml", yf);
 
         // Write a top-level key that delete() can remove via UUID lookup
@@ -161,14 +161,14 @@ class YamlFileDatabaseTest extends AbstractDatabaseAccessorTest {
         db.delete(database, "del.yml", new AbstractMap.SimpleEntry<>("UUID", "abc-123"));
 
         // delete() calls file.save(), so reload from disk and verify key is gone
-        YamlFile reloaded = new YamlFile(yamlFile);
+        RtpYamlConfig reloaded = new RtpYamlConfig(RtpYamlConfig);
         reloaded.loadWithComments();
         assertFalse(reloaded.contains("abc-123"), "key should be absent after delete");
     }
 
     @Test
     void delete_missingTable_doesNotThrow() {
-        Map<String, YamlFile> database = new HashMap<>();
+        Map<String, RtpYamlConfig> database = new HashMap<>();
         assertDoesNotThrow(() ->
                 db.delete(database, "ghost.yml", new AbstractMap.SimpleEntry<>("k", "v")));
     }
@@ -211,8 +211,8 @@ class YamlFileDatabaseTest extends AbstractDatabaseAccessorTest {
 
     @Test
     void connect_cacheHit_doesNotReloadUnchangedFile() throws Exception {
-        File yamlFile = tempDir.resolve("cached.yml").toFile();
-        YamlFile yf = new YamlFile(yamlFile);
+        File RtpYamlConfig = tempDir.resolve("cached.yml").toFile();
+        RtpYamlConfig yf = new RtpYamlConfig(RtpYamlConfig);
         yf.createNewFile(true);
         yf.set("x", 1);
         yf.save();

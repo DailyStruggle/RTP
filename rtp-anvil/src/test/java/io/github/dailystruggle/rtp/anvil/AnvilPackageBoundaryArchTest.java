@@ -65,7 +65,7 @@ class AnvilPackageBoundaryArchTest {
                 "io.github.dailystruggle.rtp.api..",
                 "io.github.dailystruggle.rtp.common..",
                 "io.github.dailystruggle.rtp.bukkit..",
-                "io.github.dailystruggle.rtp.spigot..",
+                "io.github.dailystruggle.rtp.bukkitplatform..",
                 "io.github.dailystruggle.rtp.paper..",
                 "io.github.dailystruggle.rtp.folia..",
                 "io.github.dailystruggle.rtp.fabric..",

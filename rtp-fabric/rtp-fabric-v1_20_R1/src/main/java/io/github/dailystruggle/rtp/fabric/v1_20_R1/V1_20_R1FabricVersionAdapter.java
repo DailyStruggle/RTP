@@ -26,7 +26,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
 // 1.20.1 ChunkStatus lives at .chunk.ChunkStatus (the package move to
-// .chunk.status happened in 1.21.3 â€” see V1_21_R1FabricVersionAdapter Javadoc).
+// .chunk.status happened in 1.21.3 — see V1_21_R1FabricVersionAdapter Javadoc).
 import net.minecraft.world.level.chunk.ChunkStatus;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.world.entity.Entity;
@@ -108,7 +108,7 @@ public final class V1_20_R1FabricVersionAdapter implements FabricVersionAdapter 
     }
 
     // -------------------------------------------------------------------------
-    // Non-blocking chunk-future dispatch â€” see rtp-fabric-ADR-008 and the
+    // Non-blocking chunk-future dispatch — see rtp-fabric-ADR-008 and the
     // crash-report 2026-05-08_01.22.29-server.txt deadlock analysis.
     //
     // Resolves ServerChunkCache#getChunkFuture(int, int, ChunkStatus, boolean)
@@ -156,7 +156,7 @@ public final class V1_20_R1FabricVersionAdapter implements FabricVersionAdapter 
      * future. The inner vanilla future yields {@code Either<ChunkAccess,
      * ChunkLoadingFailure>}; we treat the Right (failure) case as {@code null}
      * so callers can route it through {@code FailTypes.nullChunk} per
-     * REQ-RTP-S-004 â€” no silent discards.</p>
+     * REQ-RTP-S-004 — no silent discards.</p>
      */
     @Override
     public CompletableFuture<RTPChunkHandle> requestFullChunkAsync(RTPLevelHandle level, int cx, int cz) {
@@ -171,7 +171,7 @@ public final class V1_20_R1FabricVersionAdapter implements FabricVersionAdapter 
             // Add a temporary RTP-typed ticket on the chunk *before* requesting
             // generation. Without an explicit ticket, ServerChunkCache#getChunkFuture
             // (with create=true) allocates a chunk holder at a level too high
-            // (>33) for the chunk system to drive generation through to FULL â€”
+            // (>33) for the chunk system to drive generation through to FULL —
             // the future then completes with Either.right(ChunkLoadingFailure)
             // and we'd unwrap that to null, manifesting as the
             // nullChunk/asyncLoadNull burst seen on 1.20.1+C2ME runs.
@@ -179,7 +179,7 @@ public final class V1_20_R1FabricVersionAdapter implements FabricVersionAdapter 
             // The ticket is paired with a removeRegionTicket in whenComplete so
             // it is alive only for the load itself; the caller's later
             // setForceLoaded (when keeping the chunk) is a separate, longer-lived
-            // ticket of the same type â€” vanilla DistanceManager handles
+            // ticket of the same type — vanilla DistanceManager handles
             // overlapping tickets of the same TicketType correctly.
             ChunkPos cp = new ChunkPos(cx, cz);
             boolean ticketAdded = false;
@@ -221,7 +221,7 @@ public final class V1_20_R1FabricVersionAdapter implements FabricVersionAdapter 
     /**
      * Best-effort removal of the temporary load ticket added in
      * {@link #requestFullChunkAsync}. Failure here is logged but never
-     * propagated â€” the load itself has already produced its outcome and
+     * propagated — the load itself has already produced its outcome and
      * the caller's pipeline must not be re-failed by ticket cleanup.
      */
     private static void tryRemoveLoadTicket(ServerChunkCache cache, ChunkPos cp) {
@@ -239,7 +239,7 @@ public final class V1_20_R1FabricVersionAdapter implements FabricVersionAdapter 
      * Unwrap {@code com.mojang.datafixers.util.Either<L,R>} via reflection.
      * Returns {@code left().orElse(null)} if {@code left} is a {@link ChunkAccess},
      * otherwise {@code null} (treats the Right "failure" branch as a no-chunk
-     * outcome â€” see {@link #requestFullChunkAsync} Javadoc).
+     * outcome — see {@link #requestFullChunkAsync} Javadoc).
      */
     private static ChunkAccess unwrapEitherLeft(Object either) {
         try {
@@ -261,7 +261,7 @@ public final class V1_20_R1FabricVersionAdapter implements FabricVersionAdapter 
     }
 
     // -------------------------------------------------------------------------
-    // Non-persistent chunk-ticket support â€” see V1_21_R1FabricVersionAdapter
+    // Non-persistent chunk-ticket support — see V1_21_R1FabricVersionAdapter
     // Javadoc for the design rationale (rtp-fabric-ADR-006). Approach is
     // identical here; DistanceManager#addRegionTicket(TicketType, ChunkPos,
     // int distance, T value) is structurally identical on 1.20.1.
@@ -274,16 +274,16 @@ public final class V1_20_R1FabricVersionAdapter implements FabricVersionAdapter 
     private static volatile Method GET_DISTANCE_MANAGER_METHOD;
     private static volatile Field GET_DISTANCE_MANAGER_FIELD;
 
-    // 2026-05-08: dropped from 3 â†’ 1 (effective ticket level 33âˆ’1 = 32 / BORDER)
+    // 2026-05-08: dropped from 3 → 1 (effective ticket level 33−1 = 32 / BORDER)
     // to stop a 1.20.1-specific CF-graph leak where ENTITY_TICKING (level 30) chunks
     // accumulate vanilla-internal CompletableFuture chains (scheduled ticks, mob
     // spawning, weather, BE updates) that are reachable from the held ticket and
-    // therefore pinned forever. Symptom: memory grew ~13 MB/s â‰ˆ 400K CFs/s with all
+    // therefore pinned forever. Symptom: memory grew ~13 MB/s ≈ 400K CFs/s with all
     // RTP-side CFDIAG counters reading 0.00/s, scaling proportional to held tickets.
-    // 1.21.11 (R11) does not exhibit this â€” the bug is specific to 1.20.1's
+    // 1.21.11 (R11) does not exhibit this — the bug is specific to 1.20.1's
     // entity-ticking pipeline. Kept-cache locations only need block-read access
     // (RTPChunk#isSafe), which BORDER provides; entity ticking was unnecessary.
-    // Supersedes ADR-006 for R1 only â€” see follow-up ADR on the version-specific leak.
+    // Supersedes ADR-006 for R1 only — see follow-up ADR on the version-specific leak.
     private static final int RTP_TICKET_DISTANCE = 1;
 
     private static TicketType<ChunkPos> ticketType() {
@@ -546,7 +546,7 @@ public final class V1_20_R1FabricVersionAdapter implements FabricVersionAdapter 
     }
 
     /**
-     * Typed override â€” direct {@code MinecraftServer.getCommands().performPrefixedCommand(
+     * Typed override — direct {@code MinecraftServer.getCommands().performPrefixedCommand(
      * server.createCommandSourceStack(), command)}. Loom remaps the descriptors
      * to intermediary {@code class_3176#method_3734} / {@code method_3739} at
      * compile time, eliminating the reflective {@code getMethod("getCommands")}

@@ -41,16 +41,16 @@ import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 
 /**
- * MC 1.21.0â€“1.21.4 implementation of {@link FabricVersionAdapter} â€” the reference
+ * MC 1.21.0“1.21.4 implementation of {@link FabricVersionAdapter} — the reference
  * implementation per rtp-fabric-ADR-001.
  *
  * <p><b>Scope:</b> this adapter targets the {@code DistanceManager} API as
- * it existed before the 1.21.5 refactor â€” i.e. the 4-arg
+ * it existed before the 1.21.5 refactor — i.e. the 4-arg
  * {@code addRegionTicket(TicketType, ChunkPos, int, T)} /
  * {@code removeRegionTicket(...)} pair. From 1.21.5 onward Mojang replaced
  * that pair with {@code addTicket(long, Ticket)} on a value-object
  * {@code Ticket}; routing for 1.21.5+ goes to
- * {@code v1_21_R5} instead â€” see {@code rtp-fabric-ADR-004}.</p>
+ * {@code v1_21_R5} instead — see {@code rtp-fabric-ADR-004}.</p>
  *
  * <p>v1_20_R1 and v26_1_R1 will port from this class. Notable per-version
  * concerns this implementation captures:</p>
@@ -179,7 +179,7 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
     }
 
     // -------------------------------------------------------------------------
-    // Non-blocking chunk-future dispatch â€” see rtp-fabric-ADR-008.
+    // Non-blocking chunk-future dispatch — see rtp-fabric-ADR-008.
     // Structurally resolves ServerChunkCache#getChunkFuture(int, int,
     // ChunkStatus, boolean) so it works under both Mojmap and Fabric
     // intermediary mappings on 1.21.x.
@@ -227,10 +227,10 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
             ServerChunkCache cache = sl.getChunkSource();
             Method getter = resolveGetChunkFutureMethod(cache);
 
-            // Temporary load-ticket â€” see V1_20_R1FabricVersionAdapter#requestFullChunkAsync
+            // Temporary load-ticket — see V1_20_R1FabricVersionAdapter#requestFullChunkAsync
             // for the rationale (without an explicit ticket the chunk holder
             // sits at a level too high for FULL-status generation, so the
-            // future resolves to Either.right(ChunkLoadingFailure) â†’ null).
+            // future resolves to Either.right(ChunkLoadingFailure) → null).
             ChunkPos cp = new ChunkPos(cx, cz);
             boolean ticketAdded = false;
             try {
@@ -293,14 +293,14 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
     }
 
     // -------------------------------------------------------------------------
-    // Non-persistent chunk-ticket support â€” see FabricVersionAdapter Javadoc.
+    // Non-persistent chunk-ticket support — see FabricVersionAdapter Javadoc.
     //
     // We allocate a process-wide non-persistent TicketType ("rtp") and hand
     // it to DistanceManager#addRegionTicket. {@code TicketType.create(name,
     // comparator, /*timeout*/ 0)} produces a non-persistent type (the
     // PERSISTENT set in TicketType is opt-in via the deprecated
     // {@code #createPersistent} factory; the public {@code #create} factory
-    // never marks the type as such). Timeout 0 means "no auto-expiry â€”
+    // never marks the type as such). Timeout 0 means "no auto-expiry —
     // lives until removeRegionTicket is called", matching Bukkit's
     // addPluginChunkTicket lifetime contract.
     //
@@ -353,7 +353,7 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
      * distance and resolves to effective level {@code 30} = {@code ENTITY_TICKING},
      * the same end state Bukkit's {@code World#addPluginChunkTicket} produces.
      * Earlier revisions of this adapter passed {@code 31} into this slot under
-     * the mistaken belief it was the ticket level â€” that yielded effective
+     * the mistaken belief it was the ticket level — that yielded effective
      * level {@code 2} which the chunk system clamps/rejects, leaving kept-cache
      * entries unpinned and silently evicted. See
      * {@code rtp-fabric-ADR-006-ticket-radius-and-non-expiring-type.md}.</p>
@@ -366,7 +366,7 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
         synchronized (V1_21_R1FabricVersionAdapter.class) {
             t = RTP_TICKET_TYPE;
             if (t != null) return t;
-            // create(name, comparator, timeout) â€” non-persistent variant.
+            // create(name, comparator, timeout) — non-persistent variant.
             t = TicketType.create("rtp", Comparator.comparingLong(ChunkPos::toLong), 0);
             RTP_TICKET_TYPE = t;
             return t;
@@ -376,7 +376,7 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
     /**
      * Resolve a structural accessor (method or field) for the
      * {@link DistanceManager} on the given {@link ServerChunkCache}. Returns
-     * {@code null} when only a field accessor was found â€” in that case
+     * {@code null} when only a field accessor was found — in that case
      * {@link #GET_DISTANCE_MANAGER_FIELD} is populated as a side effect.
      */
     private static Method resolveDistanceManagerGetter(ServerChunkCache cache) throws ReflectiveOperationException {
@@ -425,7 +425,7 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
             // become e.g. `method_17290`).
             Class<?> dmClass = dm.getClass();
             // Signature-based scan. The 4th parameter is generic `T` which erases to Object,
-            // but some toolchains may surface it as the bound type â€” accept any reference type.
+            // but some toolchains may surface it as the bound type — accept any reference type.
             Method add = null;
             Method remove = null;
             for (Class<?> c = dmClass; c != null && (add == null || remove == null); c = c.getSuperclass()) {
@@ -451,7 +451,7 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
             }
             // Fallback: if name-based discrimination failed (e.g. obfuscated names like
             // method_17290 / method_17291), pick the two matching-signature methods in
-            // declaration order â€” addRegionTicket is declared before removeRegionTicket
+            // declaration order — addRegionTicket is declared before removeRegionTicket
             // in DistanceManager on 1.21.1.
             if (add == null || remove == null) {
                 java.util.List<Method> candidates = new java.util.ArrayList<>();
@@ -481,7 +481,7 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
             // Final fallback: relax parameter-type checks. Accept any 4-arg void
             // method declared on DistanceManager (or a superclass) where param[2]
             // is `int` and the other three are reference types. This survives
-            // remapped/reloaded TicketType/ChunkPos classes â€” at this point we
+            // remapped/reloaded TicketType/ChunkPos classes — at this point we
             // trust the structural shape because DistanceManager only declares
             // two such methods (the add/remove pair).
             if (add == null || remove == null) {
@@ -637,7 +637,7 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
     }
 
     /**
-     * Typed override â€” direct {@code MinecraftServer.getCommands().performPrefixedCommand(
+     * Typed override — direct {@code MinecraftServer.getCommands().performPrefixedCommand(
      * server.createCommandSourceStack(), command)}. Loom remaps the descriptors
      * to intermediary {@code class_3176#method_3734} / {@code method_3739} at
      * compile time, eliminating the reflective {@code getMethod("getCommands")}

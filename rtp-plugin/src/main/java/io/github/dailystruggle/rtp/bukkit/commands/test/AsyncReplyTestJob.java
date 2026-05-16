@@ -8,7 +8,7 @@ import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.RTPCmd;
-import io.github.dailystruggle.rtp.spigot.tools.SendMessage;
+import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;

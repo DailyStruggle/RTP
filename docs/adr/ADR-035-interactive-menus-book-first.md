@@ -1,8 +1,10 @@
 # ADR-035 — Interactive Menus via Written Book (Book-First, Chat Fallback)
 
-**Status:** Proposed
-**Date:** 2026-05-13
-**Target release:** `3.0.0-beta.4`
+**Status:** Accepted
+**Date:** 2026-05-13 (Proposed) / 2026-05-15 (Accepted, amended)
+**Target release:** `3.0.0-beta.3`
+
+> **Amendment 2026-05-15.** Cross-server menu scope (the `SharedMenuTokenRegistry`, SQL/Redis token-store drivers, and the `menu.tokenStore` config block) is **removed from this ADR**. The single source of truth for cross-server menu content is the live `commands-api` command tree, which RTP updates at runtime from database / network-state changes; menus re-reflect that tree on every open. Cross-server *dispatch* of the resulting command is the proxy layer's responsibility ([MULTI_SERVER_PLAN.md](../dev/MULTI_SERVER_PLAN.md)), not the menu's. Tokens therefore remain **local-only** (`LocalMenuTokenRegistry`); they protect the click round-trip against replay, nothing more. The first concrete consumer is **`/rtp config`** (per [`CONFIG_COMMAND_SPEC.md §2.4`](../dev/CONFIG_COMMAND_SPEC.md)), not the no-args region picker; the region picker is deferred to a follow-up consumer. Renderer scope in this release is Paper + Folia only; Spigot per-version book branches and the Fabric chat fallback are deferred. The command-tree → `MenuModel` reflection layer is specified in [ADR-044](ADR-044-command-tree-menu-reflector.md).
 
 ## Context
 
@@ -32,7 +34,7 @@ Adopt **written book as the primary menu medium**, with `tellraw` as a fallback 
 - **`rtp-paper` / `rtp-folia`** — `BookMenuRenderer` via Adventure `Book` (preferred) and the platform `Player#openBook` fallback. Adventure `Book` is already available on Paper and Folia and is the cleanest representation; no new dependency.
 - **`rtp-spigot`** — `BookMenuRenderer` via `Player#openBook(ItemStack)` constructed with the version-appropriate writable-book payload. Per-version branches live under existing `rtp-spigot-v*` subprojects ([ADR-010](ADR-010-versioned-platform-adapter-submodules.md)); the 1.20.5 / 1.21 component / data-component shift is handled there, not in core. `ChatMenuRenderer` via `net.md_5.bungee.api.chat.*` for the legacy fallback path.
 - **`rtp-fabric`** — `ChatMenuRenderer` via Mojang's native `Component` API in the deobf carrier and through the intermediary surface in the obf carrier ([rtp-fabric-ADR-009](../../rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md)). `BookMenuRenderer` follows in a later phase via `OpenWrittenBookS2CPacket`; explicitly deferred so this ADR's scope does not block on Fabric packet wiring.
-- **`rtp-plugin`** — registers the renderer chosen by config (`menu.renderer: book | chat | auto`). No business logic. `auto` selects `book` where the renderer is available and falls back to `chat` otherwise.
+- **`rtp-plugin`** — registers the renderer chosen by config. `menu.renderer` is an **ordered preference list** of renderer ids (e.g. `[book, chat]`); the framework instantiates the first entry whose adapter is registered and falls back to the next entry on instantiation or `render` exception. There is no `auto` value: every renderer will be implemented on every supported platform before release, so the list expresses operator preference, not capability detection. No business logic in `rtp-plugin`.
 
 The "no platform logic in `rtp-core` / `rtp-api`" boundary (`AGENTS.md` → Architecture Boundaries) is preserved: the menu model is platform-free, only the renderers are platform-aware, and the click round-trip uses the command pipeline that already crosses the boundary.
 
@@ -56,19 +58,9 @@ MenuAction       { sealed: RunRtpCommand(args) | ChangePage(int) | SuggestInput(
 4. Tokens TTL out (default 60 s, config key `menu.tokenTtlSeconds`) and are swept on a periodic async task. The registry is bounded per player (default 256 outstanding tokens; `menu.maxOutstandingTokensPerPlayer`) and on overflow evicts oldest-first to bound memory. The same bound limits the per-menu fragment count a renderer can mint.
 5. The redeem path obeys S-005: it does not load chunks. It enqueues through the existing teleport pipeline (`TeleportPipelineTask`, tracked by `MemoryTracker`) exactly like a direct `/rtp` invocation. No new release-on-failure paths are introduced.
 
-### Cross-server menus (in scope)
+### Cross-server menus (out of scope; see Amendment)
 
-A menu minted on backend **A** must be redeemable on backend **B** when the player crosses a proxy in the multi-server topology ([MULTI_SERVER_PLAN.md](../dev/MULTI_SERVER_PLAN.md)). The token registry therefore has two implementations behind the `MenuTokenRegistry` interface, selected by config (`menu.tokenStore: local | shared`; default `local`, auto-promoted to `shared` when a network transport is configured):
-
-- **`LocalMenuTokenRegistry`** — the in-memory `ConcurrentHashMap` described above. Used for single-backend installs; tokens minted here are not visible to other backends.
-- **`SharedMenuTokenRegistry`** — backed by an atomic shared store. Two drivers ship in beta.4:
-  - **SQL driver** — reuses `AbstractSQLDatabaseAccessor` (HikariCP-backed); supported on PostgreSQL and MySQL. Atomicity is enforced by `UPDATE rtp_menu_tokens SET consumed_at = ? WHERE token = ? AND consumed_at IS NULL AND expires_at > ?` returning row-count `1`; H2 / SQLite are usable for single-node testing but not advertised as production cross-server stores.
-  - **Redis driver** — `SET token payload NX PX <ttl>` for mint, and a Lua script (`GET` + conditional `DEL`) for atomic redeem. Used when `menu.tokenStore.driver: redis` is set; connection details live in the existing transport config block.
-- **Payload contract.** The shared row / Redis value carries everything the executing backend needs to redeem without calling back to the origin: `token`, `playerUuid`, `originBackendId`, `targetBackendId` (nullable; null = any backend that can serve the action), `menuAction` (serialized as the sealed `MenuAction` JSON; never a raw command string), `mintedAt`, `expiresAt`, `consumedAt` (null until claimed). The schema is intentionally minimal — it must not carry plaintext command strings, region geometry, or chunk references; the executing backend resolves region names and permissions against its own config.
-- **Action portability.** `MenuAction.RunRtpCommand` is serialized as `(subcommand, args[])`, not as a command line; the executing backend runs it through the same `commands-api` validation as a local invocation, so REQ-RTP-S-007 / S-004 / S-005 apply identically on both ends. Actions referencing regions that do not exist on the executing backend fail with the configurable `menu.unknownRegion` message (REQ-RTP-F-013).
-- **Reservation-token alignment.** When a `RunRtpCommand` would otherwise issue a *reservation token* (REQ-RTP-NET-011 / 012 / 014; see *reservation token* in [GLOSSARY.md](../dev/GLOSSARY.md)), the menu redeem mints the reservation token after the atomic consume of the menu token, never before — single failure point, no double allocation.
-- **Atomicity boundary.** "Atomic" here means single-statement compare-and-set semantics for token consume on the shared store. The menu redeem subcommand performs exactly one such CAS; if the CAS fails (already consumed, expired, foreign UUID), the redeem rejects with the appropriate configurable message and logs through `RTP.log` per S-004. The store is the authority on consume; backends do not gossip.
-- **Failure / store-down mode.** If the shared store is unreachable at redeem time, the redeem rejects with the configurable `menu.storeUnavailable` message and logs a `RTP.log(Level.WARNING, …)`. The redeem never falls through to a local-only check (that would defeat the single-consume guarantee).
+Per the 2026-05-15 amendment, cross-server menu content is delivered by the live `commands-api` command tree being updated at runtime from network-state changes; the menu re-reflects the tree on every open. No `SharedMenuTokenRegistry` ships with this ADR. Tokens are local-only: they protect the click round-trip against replay (single-use, TTL-bound, UUID-bound) and nothing more. Cross-server *dispatch* of the command produced by a redeem is the proxy layer's concern ([MULTI_SERVER_PLAN.md](../dev/MULTI_SERVER_PLAN.md)).
 
 ### Renderers (adapter layer)
 
@@ -77,13 +69,14 @@ A menu minted on backend **A** must be redeemable on backend **B** when the play
 
 ### Concrete first consumer
 
-To validate the design end-to-end while keeping blast radius small, the **only** consumer that ships with this ADR is **`/rtp` with no args → region picker**:
+Per the 2026-05-15 amendment, the **only** consumer that ships with this ADR is **`/rtp menu` → `/rtp config` browser**, driven by the command-tree reflector specified in [ADR-044](ADR-044-command-tree-menu-reflector.md):
 
-- Page 1 lists each region the player has permission for (one fragment per region; hover shows the region's distance / cooldown / queue depth as plain text).
-- Clicking a region mints a token bound to `MenuAction.RunRtpCommand("--region", regionName)` and the redeem path executes the equivalent of `/rtp <region>`.
-- All visible strings come from `messages.yml` under a new `menu:` section (`menu.regionPicker.title`, `menu.regionPicker.hover.distance`, `menu.regionPicker.empty`, `menu.invalid`, `menu.expired`, `menu.unknownPlayer`). REQ-RTP-F-013 applies to every one of them.
+- `/rtp menu` opens a `MenuModel` reflected from the root `/rtp` `commands-api` node, filtered to subcommands and parameters the player has permission for. `/rtp menu config` opens directly at the `config` subtree.
+- Each subcommand fragment carries a `MenuAction.RunRtpCommand` for the nested `/rtp menu …` path; each leaf parameter fragment carries `MenuAction.SuggestInput` with the corresponding `/rtp config <file> <key>:` prefix (matching [CONFIG_COMMAND_SPEC §2.4](../dev/CONFIG_COMMAND_SPEC.md)).
+- Hover text for a *parameter* fragment is the parameter's YAML block comment, read from the in-memory `RtpYamlSection#getComment` slot (block-comment preservation guaranteed by [ADR-042](ADR-042-yaml-comment-preservation-block-only.md)), with a fallback to declared type + bounds when the comment slot is empty. Hover text for a *command* fragment is the node's `CommandsAPICommand#description()` (resolved from `messages.yml`).
+- All chrome strings come from `messages.yml` under a new `menu:` section (`menu.title`, `menu.empty`, `menu.invalid`, `menu.expired`, `menu.unknownPlayer`, `menu.hoverFallback.type`, `menu.hoverFallback.bounds`). REQ-RTP-F-013 applies to every one of them.
 
-`/rtp biomes` and any `/rtpadmin` wizard refactor are explicitly **deferred to follow-up ADRs** so this change can land within the beta.4 window without coupling to admin UX work.
+The `/rtp` no-args region picker, `/rtp biomes`, and any `/rtpadmin` wizard refactor are explicitly **deferred to follow-up ADRs** so this change can land within the beta.3 window without coupling to player-UX or admin-UX work. The expected migration path is: each follow-up consumer plugs into the same reflector (ADR-044) — no per-consumer renderer or registry work is required.
 
 ### Out of scope (this ADR)
 
@@ -91,7 +84,8 @@ To validate the design end-to-end while keeping blast radius small, the **only**
 - Inventory-backed menus. Not pursued in beta.4 for the reasons in *Context* (inventory desync as an exploit vector, no Fabric analogue, conflict with S-005 / `MemoryTracker` discipline). Explicitly held open as a **future follow-up**: if a design surfaces that neutralizes the `InventoryClickEvent` desync class (e.g. a fully server-authoritative virtual-inventory wrapper that mediates every click variant — cursor, shift, number-key swap, drag, offhand swap, creative middle-click, bundles, the 1.21 rework — without exposing the underlying `Inventory` to mutation, and that routes all redeems through the same `MenuTokenRegistry` + `commands-api` path as the book/chat renderers so REQ-RTP-S-004 / S-005 / S-007 are inherited rather than re-implemented), a successor ADR may add an `InventoryMenuRenderer` alongside the existing renderers. Until such a design exists and passes D-005 review, inventory GUIs remain unsupported. A Fabric-side equivalent is also required before the renderer can ship, to preserve the cross-platform parity rule in *Decision*.
 - `/rtpadmin` setup wizards. Acknowledged as the highest-value future application; deferred so beta.4 ships the primitive without the full UX redesign attached.
 - A `MenuRenderer` exposed to addons. The interface is **internal-public** (lives in `rtp-api` for layering reasons only); addon-facing menu rendering is a later, deliberate API decision after the in-tree consumer settles.
-- Store drivers beyond PostgreSQL / MySQL / Redis in beta.4. H2 and SQLite are usable for single-node tests but explicitly **not** supported as production cross-server stores; cross-server installs that pick them on purpose receive a config-load warning.
+- Cross-server token storage. Per the 2026-05-15 amendment, no shared token store ships with this ADR; the command-tree reflection model makes it unnecessary.
+- Renderers beyond Paper / Folia in this release. Per the 2026-05-15 amendment, the Spigot per-version `BookMenuRenderer` branches and the Fabric `ChatMenuRenderer` are deferred to follow-up work within the beta.3 cycle once the design is exercised end-to-end on Paper / Folia.
 
 ### Security boundary
 
@@ -115,11 +109,7 @@ Adventure usage on Paper / Folia is unaffected by other plugins. The chat fallba
 | Sign-edit GUI for free-form input | Per-platform, only available for the writer-side `SignChangeEvent` flow which is in turn ill-suited to ephemeral menu input. Same inventory-adjacent risks. |
 | Web UI / out-of-game admin panel | Different audience and different deployment story. Not a replacement for an in-game player picker. Considered for the eventual `/rtpadmin` wizards line of work but deferred. |
 | Expose a public `MenuRenderer` SPI to addons in this ADR | Premature: the interface needs to be exercised by an in-tree consumer first. Locking the SPI before then risks a breaking revision against `rtp-api` consumers ([ADR-011](ADR-011-rtp-api-separate-module.md)). |
-| Tokens scoped per-server in a multi-server install (origin-backend-only) | Rejected: players cross servers between mint and click in the proxy topology ([MULTI_SERVER_PLAN.md](../dev/MULTI_SERVER_PLAN.md)). A menu minted on backend A and clicked from backend B would dead-redeem. The shared-store registry (SQL or Redis) carries the token across the network and remains atomic on consume. |
-| Backend-to-backend gossip / pub-sub for token visibility instead of a shared atomic store | Two backends consuming the same token must agree on "who got it first". Eventual-consistency gossip cannot guarantee single-consume without an arbiter — which is exactly what Postgres or Redis already provide. Adds a second consensus problem RTP does not need. |
-| Caller-backend RPC: redeeming backend calls origin backend to consume | Couples the redeem latency to origin backend availability and reintroduces a backend-graph dependency the proxy plan deliberately avoids. The shared store collapses both backends' interest into one row / one key. |
-| Store choice: only SQL, or only Redis | Operators with an existing SQL footprint pay nothing to add `rtp_menu_tokens`; operators with an existing Redis footprint get sub-millisecond CAS and TTL semantics for free. Shipping both, behind the same `MenuTokenRegistry` interface, costs little and avoids forcing a deployment choice. |
-| Store choice: H2 / SQLite as a production cross-server store | Neither is designed for concurrent writers across processes. Demoted to single-node testing only; config-load warns when selected with `menu.tokenStore: shared`. |
+| Cross-server menus via a shared token store (SQL / Redis `SharedMenuTokenRegistry`) | Rejected in the 2026-05-15 amendment. The live `commands-api` command tree — updated at runtime from network-state changes — is the single source of truth for cross-server menu *content*. Cross-server *dispatch* of a redeemed command is the proxy layer's job ([MULTI_SERVER_PLAN.md](../dev/MULTI_SERVER_PLAN.md)). Local tokens therefore suffice, and the second-consensus problem (gossip vs. atomic CAS vs. RPC) is avoided entirely. |
 | `runCommand` clicks carrying the literal user command (e.g. `/rtp goto worldname`) | A player can replay the same click string from any other context (alt account, macro, copy-paste from a screenshot) — turns the click event into a permanent unprotected command shortcut. Token indirection removes this. |
 | Skip tokens and validate by re-binding via player UUID in the click handler | The Minecraft click event does not authenticate beyond "this client claims to be that player on this connection"; a token guarantees freshness (TTL) and one-shot semantics that pure UUID binding cannot. |
 | Ship the book renderer only, with no chat fallback | Fabric's `openBook` path requires per-version packet work that is not ready in beta.4. The fallback exists specifically so the feature is usable on every supported platform on day one of beta.4. |
@@ -135,9 +125,8 @@ Adventure usage on Paper / Folia is unaffected by other plugins. The chat fallba
   - Discoverability win for `/rtp` with no args is delivered in beta.4 without coupling to the larger `/rtpadmin` UX redesign.
 
 - **Negative / Trade-offs:**
-  - Cross-server menus introduce an external dependency (Postgres / MySQL / Redis) on installs that opt in to the shared registry. Single-backend installs are unaffected (`menu.tokenStore: local` is the default).
-  - The shared store is on the redeem path; a store outage produces a clean per-click failure (configurable message + S-004 log) rather than a wrong result, but it does mean menu clicks are not available when the store is down. Acceptable: the same store backs reservation tokens (REQ-RTP-NET-011 / 012 / 014), so a store outage already implies the cross-server `/rtp` flow is degraded.
-  - Fabric ships only the chat fallback in beta.4; book parity on Fabric is a tracked follow-up. Acceptable because the chat fallback is functional, and the Fabric platform itself is still on the active frontier per `AGENTS.md → Current Development Focus`.
+  - Spigot and Fabric ship after Paper / Folia in this release. Acceptable because the chosen first consumer (`/rtp config`) is an admin-facing surface most often used on a single representative backend, and the platform-neutral `rtp-api` types are stable from day one.
+  - The reflector (ADR-044) couples the menu surface to the shape of the live `commands-api` tree. A command-tree refactor (e.g. parameter-registry rework) may force a reflector update; the cost is bounded by the small reflector surface.
   - Books are stateless from the client's perspective: a long-lived book showing stale state (region full, permission revoked) only learns about the change when the player clicks and the redeem path rejects. The token-redeem rejection message must be informative; this is captured in the `messages.yml` design.
   - Multi-step flows must re-open the book from the redeem-side handler because a `runCommand` click closes the book. Mechanically simple but adds one extra render call per step.
   - The token registry adds a small, bounded per-player map. Eviction is oldest-first under the per-player cap; the memory ceiling is `players × maxOutstandingTokensPerPlayer × sizeof(MenuSession)`, which is well below any realistic JVM heap on a backend that hosts a few hundred players.
@@ -145,10 +134,11 @@ Adventure usage on Paper / Folia is unaffected by other plugins. The chat fallba
 
 ## Migration / Rollout
 
-- Beta.4 ships the `rtp-api` model, the `rtp-core` token registry (both `LocalMenuTokenRegistry` and `SharedMenuTokenRegistry` with SQL + Redis drivers) and redeem subcommand, the Paper / Folia / Spigot `BookMenuRenderer`, the Fabric `ChatMenuRenderer`, the `/rtp` no-args region picker as the sole in-tree consumer, and the `menu:` section in `messages.yml`.
-- Default config: `menu.renderer: auto`, `menu.tokenStore: local` (auto-promoted to `shared` when a proxy transport is configured), `menu.tokenStore.driver: sql | redis` (driver picked from the existing database / transport config; no separate credentials block), `menu.tokenTtlSeconds: 60`, `menu.maxOutstandingTokensPerPlayer: 256`. The no-args `/rtp` behavior remains opt-out via the existing default-region resolution; admins can set `menu.regionPicker.enabled: false` to preserve the pre-beta.4 behavior.
-- Lite assembly ([ADR-024](ADR-024-rtp-lite-assembly-variant.md)): the menu renderers are not excluded by default. Per the lite cap-keys convention, an explicit `menu.renderer: chat` and `menu.tokenStore: local` are the safe lite defaults if disk footprint, Adventure pull-in, or Redis client pull-in is a concern; revisit during the lite assembly review for beta.4.
-- Traceability ([TRACEABILITY.md](../dev/TRACEABILITY.md)): the no-args region-picker tests, the local token-redeem tests, and a new `SharedMenuTokenRegistryAtomicConsumeTest` (one per driver) reference REQ-RTP-F-013, REQ-RTP-S-007, and the REQ-RTP-NET-011 / 012 / 014 row family; add `MenuRedeemSubcommandTest` and `SharedMenuTokenRegistryAtomicConsumeTest` rows.
+- Beta.3 ships the `rtp-api` model, the `rtp-core` `LocalMenuTokenRegistry` and `MenuRedeemSubcommand` (`/rtp menu:<token>`), the `CommandTreeMenuBuilder` reflector (ADR-044), the Paper / Folia `BookMenuRenderer` (Adventure `Book`), the `/rtp menu` entry-point subcommand, the `/rtp config` browser as the sole in-tree consumer, and the `menu:` section in `messages.yml`.
+- Spigot per-version `BookMenuRenderer` branches and the Fabric `ChatMenuRenderer` follow within the same beta.3 cycle as follow-up work once the Paper / Folia path is exercised end-to-end.
+- Default config: `menu.renderer: [book]` (ordered preference list; the chat renderer is added to the default list when it ships in the follow-up. On exception or missing adapter the framework walks the list and, if the list is exhausted, logs `Level.WARNING` and sends the configurable `menuInvalid` message — S-004 / S-007). `menu.tokenTtlSeconds: 60`, `menu.maxOutstandingTokensPerPlayer: 256`. No `menu.tokenStore` key ships; the registry is unconditionally local.
+- Lite assembly ([ADR-024](ADR-024-rtp-lite-assembly-variant.md)): the menu renderer is not excluded by default; the menu surface is small and shares the existing `messages.yml` resolution path. Revisit during the lite assembly review for beta.3 if disk footprint or Adventure pull-in is a concern.
+- Traceability ([TRACEABILITY.md](../dev/TRACEABILITY.md)): add `MenuRedeemSubcommandTest`, `LocalMenuTokenRegistryTest`, and `CommandTreeMenuBuilderTest` rows referencing REQ-RTP-F-013, REQ-RTP-S-007, REQ-RTP-S-006, and (for the hover-text path) REQ-RTP-F-013 again.
 
 ## References
 
@@ -162,5 +152,8 @@ Adventure usage on Paper / Folia is unaffected by other plugins. The chat fallba
 - [TRACEABILITY.md](../dev/TRACEABILITY.md) — REQ-RTP-F-013 row covers the new `messages.yml → menu:` strings; REQ-RTP-NET-011 / 012 / 014 rows cover the cross-server consume path.
 - [MULTI_SERVER_PLAN.md](../dev/MULTI_SERVER_PLAN.md) — Multi-server proxy plan; the shared `MenuTokenRegistry` reuses the same transport / database wiring as the network snapshot and reservation tokens.
 - [GLOSSARY.md](../dev/GLOSSARY.md) — *Backend*, *Proxy*, *Network Snapshot*, *Reservation Token*; menu tokens are a sibling concept to reservation tokens and follow the same atomicity contract.
+- [ADR-042](ADR-042-yaml-comment-preservation-block-only.md) — Block-comment preservation in the in-house YAML substrate. Unblocks parameter hover text from in-memory comments.
+- [ADR-044](ADR-044-command-tree-menu-reflector.md) — Command-tree → `MenuModel` reflector. The mechanism by which `/rtp menu` materializes its pages.
+- [CONFIG_COMMAND_SPEC §2.4](../dev/CONFIG_COMMAND_SPEC.md) — `view` sub-form contract; the menu is the GUI form of the same data contract.
 - [`docs/dev/scratch/CHECKLIST-inventory-menu-research.md`](../dev/scratch/CHECKLIST-inventory-menu-research.md) — tracked TODO for the deferred inventory-backed renderer follow-up referenced in *Out of scope*; research items R1–R10 gate any successor ADR.
-- External: Mojang `tellraw` component / book-page JSON; Adventure `Book` / `Component` APIs; PostgreSQL / MySQL `UPDATE … WHERE … RETURNING` / row-count semantics; Redis `SET NX PX` and Lua `EVAL` atomicity.
+- External: Mojang `tellraw` component / book-page JSON; Adventure `Book` / `Component` APIs.

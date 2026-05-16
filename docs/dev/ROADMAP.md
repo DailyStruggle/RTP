@@ -78,7 +78,7 @@ The Spatial Memory paragraph now cites a concrete ~45% Overworld-safe figure fro
   - [ ] Hot-reload on `safety.yml` file edit (currently requires `/rtp reload`).
 - [ ] **Claim-plugin integration audit.** The front page lists seven integrations. Audit each against current upstream releases (Factions forks, GriefDefender 2.x, Lands 7.x, HuskTowns 3.x, TownyAdvanced 0.x, WorldGuard 7.x, GriefPrevention 16.x) and publish `docs/admin/CLAIM_PLUGIN_COMPATIBILITY.md` with per-plugin version matrices. At least one integration is almost certainly lagging.
 - [ ] **CI matrix across platforms.** The Jenkinsfile builds, but `rtp test full` should run against Spigot + Paper + Folia (and eventually Fabric) in parallel matrix form, even with mock servers where necessary. This is the step that converts `TRACEABILITY.md` from "documented" to "continuously enforced".
-- [ ] **Addon-developer quickstart.** `docs/dev/FOR_ADDON_DEVELOPERS.md` is linked from the front page, but a one-page *"register a custom shape in 20 lines"* tutorial is the document that actually drives third-party adoption.
+- [ ] **Addon-developer quickstart.** `docs/FOR_ADDON_DEVELOPERS.md` is linked from the front page, but a one-page *"register a custom shape in 20 lines"* tutorial is the document that actually drives third-party adoption.
 
 ---
 

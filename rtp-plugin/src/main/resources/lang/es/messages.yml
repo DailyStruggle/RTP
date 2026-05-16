@@ -134,6 +134,38 @@ info_descripcion: "verificar el estado actual del plugin"
 prueba_descripcion: "probar funciones de RTP"
 
 ################################################################################
+# Sección 8b: Marco de menús generalizado (ADR-035 / ADR-044)
+################################################################################
+# Estas claves no se traducen en lang/es/messages.lang.yml, por lo que se usan
+# los nombres canónicos en inglés (fallback al baseline ADR-020).
+menuInvalid: "&c[P0] ese enlace de menú no es válido."
+menuExpired: "&c[P0] ese enlace de menú ha expirado. Vuelve a abrir el menú."
+menuUnknownPlayer: "&c[P0] los enlaces de menú solo pueden usarlos jugadores en el juego."
+# Plantilla de información emergente cuando no hay comentario YAML disponible para un parámetro. Marcador: [type] - el tipo declarado del parámetro.
+menuHoverFallbackType: "tipo: [type]"
+# Plantilla de información emergente cuando un parámetro expone un conjunto pequeño de valores. Marcador: [values] - valores aceptados separados por coma.
+menuHoverFallbackBounds: "aceptados: [values]"
+# Etiqueta de la fila de navegación "volver un nivel" en cada página de menú no raíz.
+menuBack: "&7« atrás"
+# Plantilla de la fila "ejecutar el comando ensamblado" en cada página de menú ejecutable no raíz. Marcador: [command] - la invocación /rtp ... ensamblada.
+menuExecute: "&a▶ ejecutar [command]"
+menuConstructed: "&7construyendo: &f/rtp [command]"
+# Título no interactivo en la parte superior del menú raíz /rtp menu (Etapa A.5).
+menuRootTitle: "&6&l⚡ menú de RTP"
+# Subtítulo/orientación no interactivo bajo menuRootTitle (Etapa A.5).
+menuRootHint: "&7haz clic en una opción para comenzar"
+# Filas de navegación añadidas a páginas de menú paginadas (Etapa A.6).
+# Marcador: [page] - número de página destino (base 1).
+menuPagePrev: "&7« página anterior ([page])"
+menuPageNext: "&7página siguiente ([page]) »"
+# Encabezado de una sub-página selector de valor de parámetro (Etapa A.2).
+# Marcadores: [param] - nombre del parámetro; [command] - la invocación /rtp ... ensamblada.
+menuPickValue: "&eelige un valor para [param] (ejecutará: /rtp [command] [param]:<valor>)"
+# Etiqueta de la fila "escribir valor personalizado" como alternativa en el selector.
+# Al hacer clic prellena el chat con el comando ensamblado hasta '<param>:'.
+menuTypeValue: "&7✎ escribir un valor personalizado..."
+
+################################################################################
 # Sección 9: Soporte de PlaceholderAPI
 ################################################################################
 JUGADOR_DISPONIBLE: "&aDISPONIBLE"

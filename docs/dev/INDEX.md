@@ -22,6 +22,7 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | REQ-* → class → test | [`TRACEABILITY.md`](TRACEABILITY.md) |
 | Prior pitfalls / reproduction notes | [`LESSONS_LEARNED.md`](LESSONS_LEARNED.md) |
 | Requirement-authoring style (`shall`, no temporal framing) | [`RULES.md`](RULES.md) |
+| Commenting an option in a shipped YAML config | [`CONFIG_COMMENT_STYLE.md`](CONFIG_COMMENT_STYLE.md) |
 | A decision (why something is the way it is) | [`../adr/README.md`](../adr/README.md) |
 | Fabric status / blockers | [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) |
 | Multi-server / proxy (Velocity, BungeeCord) plan | [`MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md) (D-005 gated; admin stub: [`../admin/proxies/INDEX.md`](../admin/proxies/INDEX.md)) |

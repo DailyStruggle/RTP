@@ -162,11 +162,11 @@ dependencies {
     effectsApiFabricUnobfBytecode project(':effects-api:effects-api-fabric-unobf')
 
     implementation project(':rtp-core')
-    implementation project(':rtp-spigot:rtp-spigot-v1_20_R1')
+    implementation project(':rtp-bukkit:rtp-bukkit-v1_20_R1')
     implementation project(':rtp-paper:rtp-paper-v1_20_R1')
-    implementation project(':rtp-spigot:rtp-spigot-v1_21_R1')
+    implementation project(':rtp-bukkit:rtp-bukkit-v1_21_R1')
     implementation project(':rtp-paper:rtp-paper-v1_21_R1')
-    implementation project(':rtp-spigot:rtp-spigot-v26_1_R1')
+    implementation project(':rtp-bukkit:rtp-bukkit-v26_1_R1')
     implementation project(':rtp-paper:rtp-paper-v26_1_R1')
     implementation project(':rtp-folia:rtp-folia-v26_1_R1')
     implementation project(':rtp-folia:rtp-folia-v1_21_R1')
@@ -329,8 +329,6 @@ shadowJar {
     relocate 'io.github.dailystruggle.commandsapi', 'io.github.dailystruggle.rtp.commandsapi'
     relocate 'io.github.dailystruggle.effectsapi', 'io.github.dailystruggle.rtp.effectsapi'
     relocate 'com.zaxxer.hikari', 'io.github.dailystruggle.rtp.hikari'
-    relocate 'org.yaml.snakeyaml', 'io.github.dailystruggle.rtp.snakeyaml'
-    relocate 'me.carleslc.Simple-YAML', 'io.github.dailystruggle.rtp.Simple-Yaml'
     // org.lz4:lz4-java exposes its API under net.jpountz.* (legacy package).
     // Required at runtime by rtp-anvil for LZ4-compressed chunk decode.
     // Relocate to avoid clashing with other plugins shading the same lib.
@@ -766,8 +764,6 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
     relocate 'org.bstats', 'io.github.dailystruggle.rtp.bstats'
     relocate 'io.github.dailystruggle.commandsapi', 'io.github.dailystruggle.rtp.commandsapi'
     relocate 'io.github.dailystruggle.effectsapi', 'io.github.dailystruggle.rtp.effectsapi'
-    relocate 'org.yaml.snakeyaml', 'io.github.dailystruggle.rtp.snakeyaml'
-    relocate 'me.carleslc.Simple-YAML', 'io.github.dailystruggle.rtp.Simple-Yaml'
     // org.lz4:lz4-java exposes its API under net.jpountz.* (legacy package).
     // Relocate to avoid clashing with any other plugin shading the same lib.
     relocate 'net.jpountz', 'io.github.dailystruggle.rtp.lz4'

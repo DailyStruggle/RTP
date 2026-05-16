@@ -12,10 +12,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.simpleyaml.configuration.ConfigurationSection;
-import org.simpleyaml.configuration.file.YamlFile;
 
 /**
  * Class for parsing configuration files
@@ -46,7 +46,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   public Map<String, String> reverse_language_mapping = new ConcurrentHashMap<>();
 
   /** Cached lookup for YAML files */
-  AtomicReference<Map<String, YamlFile>> cachedLookup;
+  AtomicReference<Map<String, RtpYamlConfig>> cachedLookup;
 
   private ClassLoader classLoader = this.getClass().getClassLoader();
 
@@ -197,7 +197,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     return name.replaceAll("[:\\\\/*?\"<>|]", "_");
   }
 
-  private static void setSection(ConfigurationSection section, Map<?, ?> map) {
+  private static void setSection(RtpYamlSection section, Map<?, ?> map) {
     Map<String, Object> mapValues = section.getMapValues(false);
     Map<?, ?> inputClone = new HashMap<>(map);
 
@@ -209,15 +209,15 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
         continue;
       }
       Object value = map.get(key);
-      if (o instanceof ConfigurationSection) {
+      if (o instanceof RtpYamlSection) {
         if (value instanceof FactoryValue<?>) {
           EnumMap<?, Object> data = ((FactoryValue<?>) value).getData();
           Map<String, Object> subMap = new HashMap<>();
           for (Map.Entry<? extends Enum<?>, ?> d : data.entrySet())
             subMap.put(d.getKey().name(), d.getValue());
-          setSection((ConfigurationSection) o, subMap);
+          setSection((RtpYamlSection) o, subMap);
         } else if (value instanceof Map) {
-          setSection((ConfigurationSection) o, (Map<String, Object>) value);
+          setSection((RtpYamlSection) o, (Map<String, Object>) value);
         } else throw new IllegalArgumentException();
       } else section.set(key, value);
       inputClone.remove(key);
@@ -257,7 +257,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       langFile = new File(langDir, name.replace(".yml", ".lang.yml"));
     }
 
-    YamlFile langYaml = new YamlFile(langFile.getPath());
+    RtpYamlConfig langYaml = new RtpYamlConfig(langFile.getPath());
     language_mapping.clear();
     reverse_language_mapping.clear();
     if (!langFile.exists()) {
@@ -343,7 +343,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     }
     if (!anyRename) return preserved;
 
-    YamlFile oldYaml = new YamlFile(f.getPath());
+    RtpYamlConfig oldYaml = new RtpYamlConfig(f.getPath());
     try {
       oldYaml.loadWithComments();
     } catch (IOException | RuntimeException e) {
@@ -401,7 +401,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     for (Map.Entry<String, E> e : recovered.entrySet()) {
       Object value = oldYaml.get(e.getKey());
       if (value == null) continue;
-      if (value instanceof ConfigurationSection) continue; // skip nested sections
+      if (value instanceof RtpYamlSection) continue; // skip nested sections
       Object englishDefault = englishDefaults.get(e.getValue());
       if (valuesEqual(value, englishDefault)) {
         // Unmodified English default → let the localized default win.
@@ -427,12 +427,12 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
 
     // Invalidate the file-database cache for this file. renameFiles() has just
     // replaced the on-disk content with the locale-specific JAR resource, but
-    // the cache may still hold the previous (foreign-locale) YamlFile loaded
+    // the cache may still hold the previous (foreign-locale) RtpYamlConfig loaded
     // at startup. Without eviction, the subsequent cachedLookup.containsKey
     // check in check() short-circuits the reconnect, and value lookups via the
     // active locale's key names all return null (the rtp info empty-line bug).
     try {
-      Map<String, YamlFile> cache = fileDatabase.cachedLookup.get();
+      Map<String, RtpYamlConfig> cache = fileDatabase.cachedLookup.get();
       if (cache != null) cache.remove(this.name);
       Map<String, Long> mtimes = fileDatabase.cachedLookupLastModified.get();
       if (mtimes != null) mtimes.remove(this.name);
@@ -486,14 +486,14 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
         int len;
         while ((len = in.read(buf)) > 0) out.write(buf, 0, len);
       }
-      YamlFile baseline = new YamlFile(tmp.getPath());
+      RtpYamlConfig baseline = new RtpYamlConfig(tmp.getPath());
       baseline.loadWithComments();
       for (String key : baseline.getKeys(false)) {
         E enumKey = enumLookup.get(key.toLowerCase(Locale.ROOT));
         if (enumKey == null) continue;
         Object value = baseline.get(key);
         if (value == null) continue;
-        if (value instanceof ConfigurationSection) continue;
+        if (value instanceof RtpYamlSection) continue;
         defaults.put(enumKey, value);
       }
     } catch (IOException | RuntimeException ex) {
@@ -548,7 +548,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
 
       // Evict cache before re-extraction so subsequent loads see the new file.
       try {
-        Map<String, YamlFile> cache = fileDatabase.cachedLookup.get();
+        Map<String, RtpYamlConfig> cache = fileDatabase.cachedLookup.get();
         if (cache != null) cache.remove(this.name);
         Map<String, Long> mtimes = fileDatabase.cachedLookupLastModified.get();
         if (mtimes != null) mtimes.remove(this.name);
@@ -654,9 +654,9 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
 
     cachedLookup = fileDatabase.cachedLookup;
     if (cachedLookup.get() == null || !cachedLookup.get().containsKey(name)) fileDatabase.connect();
-    YamlFile yamlFile = cachedLookup.get().get(name);
+    RtpYamlConfig RtpYamlConfig = cachedLookup.get().get(name);
 
-    if (yamlFile == null) {
+    if (RtpYamlConfig == null) {
       // The file-database failed to load this YAML (likely corrupt syntax).
       // Quarantine the file and re-extract defaults so the plugin self-heals
       // on the next reload, rather than silently running with empty data.
@@ -667,15 +667,15 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
             "[RTP] " + corrupt + " could not be parsed; quarantining and re-extracting defaults.");
         quarantineCorruptFile(pluginDirectory, corrupt);
         fileDatabase.connect();
-        yamlFile = cachedLookup.get().get(name);
+        RtpYamlConfig = cachedLookup.get().get(name);
       }
-      if (yamlFile == null) {
+      if (RtpYamlConfig == null) {
         data.clear();
         return;
       }
     }
 
-    String versionStr = yamlFile.getMapValues(false).getOrDefault("version", "1.0").toString();
+    String versionStr = RtpYamlConfig.getMapValues(false).getOrDefault("version", "1.0").toString();
 
     String[] versionArr = Objects.requireNonNull(versionStr).split("\\.");
 
@@ -711,7 +711,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     for (E v : myClass.getEnumConstants()) {
       Object name = language_mapping.get(v.name());
       if (name == null) name = v.name();
-      Object fromString = yamlFile.get(name.toString());
+      Object fromString = RtpYamlConfig.get(name.toString());
       if (fromString != null) {
         data.put(v, fromString);
       }
@@ -733,7 +733,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
         }
       }
       try {
-        YamlFile yf = cachedLookup.get().get(name);
+        RtpYamlConfig yf = cachedLookup.get().get(name);
         if (yf != null) yf.save();
       } catch (IOException e) {
         RTP.log(Level.WARNING, e.getMessage(), e);
@@ -799,8 +799,8 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
 
   public Map<String, Object> getMap(E key) {
     Object o = getData(key);
-    if (o instanceof ConfigurationSection) {
-      return ((ConfigurationSection) o).getMapValues(false);
+    if (o instanceof RtpYamlSection) {
+      return ((RtpYamlSection) o).getMapValues(false);
     }
     if (o instanceof Map) {
       return (Map<String, Object>) o;
@@ -849,11 +849,11 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
 
   /** Update the configuration */
   public void update() {
-    YamlFile yamlFile = cachedLookup.get().get(name);
-    if (yamlFile == null) return;
+    RtpYamlConfig RtpYamlConfig = cachedLookup.get().get(name);
+    if (RtpYamlConfig == null) return;
 
     // 1. Load existing config into memory to preserve it during rename
-    YamlFile oldYaml = new YamlFile(new File(pluginDirectory, name));
+    RtpYamlConfig oldYaml = new RtpYamlConfig(new File(pluginDirectory, name));
     try {
       if (oldYaml.exists()) {
         oldYaml.loadWithComments();
@@ -864,34 +864,34 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     renameFiles();
 
     try {
-      yamlFile.loadWithComments();
-      // Ensure yamlFile has comments from oldYaml if it lost them during rename/load
+      RtpYamlConfig.loadWithComments();
+      // Ensure RtpYamlConfig has comments from oldYaml if it lost them during rename/load
       for (String key : oldYaml.getKeys(true)) {
         String comment = oldYaml.getComment(key);
         if (comment != null && !comment.isEmpty()) {
-          yamlFile.setComment(key, comment);
+          RtpYamlConfig.setComment(key, comment);
         }
       }
       java.io.InputStream in = getDefaultsFromJar();
       if (in != null) {
-        YamlFile defaultYaml = new YamlFile();
+        RtpYamlConfig defaultYaml = new RtpYamlConfig();
         defaultYaml.loadConfiguration(in, true);
 
-        // 1. Ensure all keys from default are present in yamlFile
+        // 1. Ensure all keys from default are present in RtpYamlConfig
         for (String key : defaultYaml.getKeys(true)) {
-          if (!yamlFile.contains(key)) {
-            yamlFile.set(key, defaultYaml.get(key));
+          if (!RtpYamlConfig.contains(key)) {
+            RtpYamlConfig.set(key, defaultYaml.get(key));
             String comment = defaultYaml.getComment(key);
             if (comment != null) {
-              yamlFile.setComment(key, comment);
+              RtpYamlConfig.setComment(key, comment);
             }
           } else {
             // key exists, but maybe it needs a comment if it doesn't have one
-            String existingComment = yamlFile.getComment(key);
+            String existingComment = RtpYamlConfig.getComment(key);
             if (existingComment == null || existingComment.isEmpty()) {
               String defaultComment = defaultYaml.getComment(key);
               if (defaultComment != null) {
-                yamlFile.setComment(key, defaultComment);
+                RtpYamlConfig.setComment(key, defaultComment);
               }
             }
           }
@@ -901,11 +901,11 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
         for (String key : oldYaml.getKeys(true)) {
           if (key.equalsIgnoreCase("version")) continue;
           if (!oldYaml.isConfigurationSection(key)) {
-            yamlFile.set(key, oldYaml.get(key));
+            RtpYamlConfig.set(key, oldYaml.get(key));
           }
         }
 
-        yamlFile.save();
+        RtpYamlConfig.save();
       }
     } catch (IOException e) {
       RTP.log(Level.WARNING, e.getMessage(), e);
@@ -929,21 +929,21 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   public void set(@NotNull E key, @NotNull Object value) throws IllegalArgumentException {
     super.set(key, value);
 
-    YamlFile yamlFile = cachedLookup.get().get(name);
+    RtpYamlConfig RtpYamlConfig = cachedLookup.get().get(name);
     Object yamlKey = language_mapping.get(key.name());
     if (yamlKey == null) yamlKey = key.name();
     String yamlKeyStr = yamlKey.toString();
 
-    Object o = yamlFile.get(yamlKeyStr);
-    if (o instanceof ConfigurationSection) {
-      ConfigurationSection configurationSection = (ConfigurationSection) o;
+    Object o = RtpYamlConfig.get(yamlKeyStr);
+    if (o instanceof RtpYamlSection) {
+      RtpYamlSection RtpYamlSection = (RtpYamlSection) o;
 
-      if (configurationSection.getName().equalsIgnoreCase("shape") && value instanceof String) {
+      if (RtpYamlSection.getName().equalsIgnoreCase("shape") && value instanceof String) {
         String shapeName = (String) value;
         value = RTP.factoryMap.get(RTP.factoryNames.shape).getOrDefault(shapeName);
       }
 
-      if (configurationSection.getName().equalsIgnoreCase("vert") && value instanceof String) {
+      if (RtpYamlSection.getName().equalsIgnoreCase("vert") && value instanceof String) {
         String vertName = (String) value;
         value = RTP.factoryMap.get(RTP.factoryNames.vert).getOrDefault(vertName);
       }
@@ -953,17 +953,17 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
         Map<String, Object> map = new HashMap<>();
         for (Map.Entry<? extends Enum<?>, Object> d : data.entrySet())
           map.put(d.getKey().name(), d.getValue());
-        setSection((ConfigurationSection) o, map);
+        setSection((RtpYamlSection) o, map);
       } else if (value instanceof Map) {
-        setSection((ConfigurationSection) o, (Map<String, Object>) value);
+        setSection((RtpYamlSection) o, (Map<String, Object>) value);
       } else {
         IllegalArgumentException exception = new IllegalArgumentException();
         exception.printStackTrace();
         throw exception;
       }
-      yamlFile.set(yamlKeyStr, o);
+      RtpYamlConfig.set(yamlKeyStr, o);
     } else {
-      yamlFile.set(yamlKeyStr, value);
+      RtpYamlConfig.set(yamlKeyStr, value);
     }
   }
 
@@ -992,10 +992,10 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
    * @throws IOException if an I/O error occurs
    */
   public void save() throws IOException {
-    YamlFile yamlFile = cachedLookup.get().get(name);
-    yamlFile.options().copyDefaults(true);
-    yamlFile.options().indent(2);
-    yamlFile.save();
+    RtpYamlConfig RtpYamlConfig = cachedLookup.get().get(name);
+    RtpYamlConfig.options().copyDefaults(true);
+    RtpYamlConfig.options().indent(2);
+    RtpYamlConfig.save();
   }
 
   @Override

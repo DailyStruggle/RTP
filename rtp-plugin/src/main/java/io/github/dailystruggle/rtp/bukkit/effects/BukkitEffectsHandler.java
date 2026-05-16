@@ -16,7 +16,7 @@ import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import io.github.dailystruggle.rtp.effects.EffectsResolver;
-import io.github.dailystruggle.rtp.spigot.tools.SendMessage;
+import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;

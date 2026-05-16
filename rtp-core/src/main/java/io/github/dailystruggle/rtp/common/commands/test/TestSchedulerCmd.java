@@ -19,7 +19,7 @@ import org.jetbrains.annotations.Nullable;
  * {@code rtp test scheduler} &mdash; actively probes each tier exposed by
  * {@link RTPScheduler} (async, primary/sync, region) and reports
  * round-trip dispatch latency. Complements the passive {@code rtp test
- * platform} probe documented in {@code RUNTIME_TEST_SUITE_PLAN.md Â§4}:
+ * platform} probe documented in {@code RUNTIME_TEST_SUITE_PLAN.md §4}:
  * {@code platform} reports <i>what</i> is wired in, {@code scheduler}
  * proves each tier actually dispatches &mdash; which matters on Folia,
  * where a mis-routed task can stall a region thread silently.

@@ -36,7 +36,7 @@ Same throughput as the next-best plugin, **~17× lower worst-case tick spike, 35
 2. Start the server. A `default` region is generated for you.
 3. Type **`/rtp`**.
 
-That's it. Tune `plugins/RTP/config.yml` and `plugins/RTP/regions/*.yml` later. Full admin guide is auto-unpacked into `plugins/RTP/docs/` on first run, and lives online at the [**admin guide**](https://github.com/dailystruggle/RTP/blob/V3-beta/docs/admin/FOR_SERVER_ADMINS.md).
+That's it. Tune `plugins/RTP/config.yml` and `plugins/RTP/regions/*.yml` later. Full admin guide is auto-unpacked into `plugins/RTP/docs/` on first run, and lives online at the [**admin guide**](https://github.com/dailystruggle/RTP/blob/V3-beta/docs/FOR_SERVER_ADMINS.md).
 
 ---
 
@@ -135,7 +135,7 @@ Full methodology, raw CSVs, per-run analyses: [`helpers/StressTestRTP/`](https:/
 <details>
 <summary><b>📚 Commands, placeholders, soft-deps</b></summary>
 
-**Commands** (full reference: [admin guide](https://github.com/dailystruggle/RTP/blob/V3-beta/docs/admin/FOR_SERVER_ADMINS.md))
+**Commands** (full reference: [admin guide](https://github.com/dailystruggle/RTP/blob/V3-beta/docs/FOR_SERVER_ADMINS.md))
 
 - `/rtp` — teleport to the default region for your current world.
 - `/rtp [parameter]:[value]` — specify `region:`, `world:`, `player:`, or temporary overrides.
@@ -172,7 +172,7 @@ Run **Arclight** or **Mohist** (officially supported) and use this jar. A native
 RTP trades a bounded amount of RAM (the queue, bounded by cacheCap) for speed. TPS should not drop below ~19 from RTP alone on a healthy server; MSPT spikes during new-area generation are expected — that's the cost of generating chunks, not RTP.
 
 **How do I report a bug?**
-GitHub issue with server version, RTP version, platform, relevant config files, and the error log section. See the [admin guide](https://github.com/dailystruggle/RTP/blob/V3-beta/docs/admin/FOR_SERVER_ADMINS.md) for the full reproduction template.
+GitHub issue with server version, RTP version, platform, relevant config files, and the error log section. See the [admin guide](https://github.com/dailystruggle/RTP/blob/V3-beta/docs/FOR_SERVER_ADMINS.md) for the full reproduction template.
 
 </details>
 
@@ -219,8 +219,8 @@ Live list: [CHANGELOG](https://github.com/dailystruggle/RTP/blob/V3-beta/CHANGEL
 
 ### Links
 
-- [**Admin guide**](https://github.com/dailystruggle/RTP/blob/V3-beta/docs/admin/FOR_SERVER_ADMINS.md) — install, configure, command reference
-- [**Addon developer guide**](https://github.com/dailystruggle/RTP/blob/V3-beta/docs/dev/FOR_ADDON_DEVELOPERS.md) — API and examples
+- [**Admin guide**](https://github.com/dailystruggle/RTP/blob/V3-beta/docs/FOR_SERVER_ADMINS.md) — install, configure, command reference
+- [**Addon developer guide**](https://github.com/dailystruggle/RTP/blob/V3-beta/docs/FOR_ADDON_DEVELOPERS.md) — API and examples
 - [**Changelog & roadmap**](https://github.com/dailystruggle/RTP/blob/V3-beta/CHANGELOG.md)
 - [**Source on GitHub**](https://github.com/dailystruggle/RTP) — star, watch, contribute, file issues
 

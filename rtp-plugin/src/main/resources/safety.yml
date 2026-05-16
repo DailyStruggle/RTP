@@ -1,15 +1,68 @@
 # --- RTP Safety Configuration ---
 # Documentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/SAFETY.md
 
-invulnerabilityTime: 5 # Seconds of invulnerability after teleport
-safetyRadius: 0 # Block radius around landing to check for hazards
-staleChunkRetryLimit: 2 # Max retries for stale-chunk guard
-anvilPrefilterEnabled: true # Off-thread anvil prefilter
-platformRadius: -1 # Radius of emergency platform (-1 to disable)
-platformDepth: 1 # Depth of platform
-platformAirHeight: 2 # Air space above platform
-platformMaterial: GLASS # Material for platform
+# Seconds of invulnerability granted after a teleport completes.
+# 0 disables the post-teleport invulnerability window.
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 5
+invulnerabilityTime: 5
 
+# Block radius around the landing spot scanned for hazards.
+# 0 checks only the landing block + immediate vertical.
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 0
+safetyRadius: 0
+
+# Maximum retries for the stale-chunk guard before failing the attempt.
+# See ADR-015.
+# @type: integer
+# @range: [0, null]
+# @default: 2
+staleChunkRetryLimit: 2
+
+# Use the off-thread anvil NBT prefilter to reject candidates without
+# loading their chunks. See ADR-016.
+# @type: boolean
+# @default: true
+anvilPrefilterEnabled: true
+
+# Radius of the emergency landing platform built at the destination.
+# -1 disables the platform entirely.
+# @type: integer
+# @range: [-1, null]
+# @unit: blocks
+# @default: -1
+platformRadius: -1
+
+# Depth (vertical thickness) of the emergency platform.
+# @type: integer
+# @range: [1, null]
+# @unit: blocks
+# @default: 1
+platformDepth: 1
+
+# Air-space height cleared above the emergency platform.
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 2
+platformAirHeight: 2
+
+# Material used for the emergency landing platform.
+# @type: material
+# @source: material
+# @default: GLASS
+platformMaterial: GLASS
+
+# Blocks treated as passable air for landing-safety checks.
+# Accepts Bukkit Material names and "#minecraft:<tag>" tag references
+# (see ADR-017).
+# @type: list<material>
+# @source: material
 airBlocks:
   - AIR
   - CAVE_AIR
@@ -79,6 +132,11 @@ airBlocks:
   - LEAF_LITTER
   - "#minecraft:leaves"
 
+# Blocks that disqualify a landing spot (lava, hazards, etc.).
+# Accepts Bukkit Material names, "#minecraft:<tag>" tag references, and
+# state predicates such as "*[waterlogged=true]" (see ADR-017).
+# @type: list<material>
+# @source: material
 unsafeBlocks:
   - WATER
   - LAVA
@@ -109,7 +167,15 @@ unsafeBlocks:
   - KELP_PLANT
   - "#minecraft:logs"
 
-biomeWhitelist: false # If true, 'biomes' is a whitelist; otherwise a blacklist
+# If true, the biomes list is a whitelist (only these biomes are
+# allowed). If false, it is a blacklist (these biomes are excluded).
+# @type: boolean
+# @default: false
+biomeWhitelist: false
+
+# Biomes treated as whitelist or blacklist members per biomeWhitelist.
+# @type: list<biome>
+# @source: biome
 biomes:
   - OCEAN
   - DEEP_OCEAN

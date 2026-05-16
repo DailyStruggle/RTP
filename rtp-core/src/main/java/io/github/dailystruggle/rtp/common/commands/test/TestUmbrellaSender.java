@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.commands.test;
 
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 
 /**
@@ -10,7 +11,7 @@ import java.util.logging.Level;
  * {@code rtp-core}.
  *
  * <p>This is the Phase 1 SPI extracted from
- * {@code io.github.dailystruggle.rtp.spigot.tools.SendMessage} and
+ * {@code io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage} and
  * {@code TestFullCmd#resolveName(UUID)} so that the umbrella and its
  * cross-platform leaves can move into {@code rtp-core} unchanged. See
  * {@code docs/dev/scratch/CHECKLIST-fabric-rtp-test-full.md} Phase 1.
@@ -47,4 +48,42 @@ public interface TestUmbrellaSender {
    * @return a non-{@code null} display name or stable fallback string.
    */
   String resolveCallerName(UUID callerId);
+
+  /**
+   * Registers an interceptor that observes every caller-facing line emitted
+   * through this sender (regardless of {@link Level}) for the duration of an
+   * umbrella sweep. Used by {@code TestFullCmd}'s {@code FullAudit} to count
+   * warning-level lines across all dispatched subcommands without coupling
+   * {@code rtp-core} to the Bukkit {@code SendMessage} interceptor registry.
+   *
+   * <p>Implementations shall invoke the consumer on the same thread that
+   * produced the line (no marshalling) and shall tolerate concurrent
+   * registrations from independent callers. Must be paired with
+   * {@link #removeAuditInterceptor(Consumer)} on every exit path of the
+   * umbrella sweep (REQ-RTP-S-004 cleanup).
+   *
+   * <p>Default no-op implementation is provided so platform adapters that
+   * do not wire an audit channel (e.g. headless tests, future platforms
+   * without a console interceptor surface) need not implement it; in that
+   * case the umbrella's footer audited-warnings tally is empty, which is
+   * the correct degenerate behavior, not a silent failure.
+   *
+   * @param interceptor the observer of caller-facing lines; must not be
+   *                    {@code null}.
+   */
+  default void addAuditInterceptor(Consumer<String> interceptor) {
+    // no-op by default; see Javadoc
+  }
+
+  /**
+   * Removes an interceptor previously registered via
+   * {@link #addAuditInterceptor(Consumer)}. Idempotent; removing an
+   * unregistered interceptor is a no-op.
+   *
+   * @param interceptor the previously-registered observer; must not be
+   *                    {@code null}.
+   */
+  default void removeAuditInterceptor(Consumer<String> interceptor) {
+    // no-op by default; see Javadoc on addAuditInterceptor
+  }
 }

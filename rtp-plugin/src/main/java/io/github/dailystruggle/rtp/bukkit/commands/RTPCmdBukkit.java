@@ -44,7 +44,7 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
     // The default in BukkitTreeCommand is sender::sendMessage which bypasses
     // formatting entirely.
     this.messageMethodFactory =
-        sender -> msg -> io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(sender, msg);
+        sender -> msg -> io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(sender, msg);
 
     // region name parameter
     // filter by region exists and sender permission
@@ -228,7 +228,7 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
     // and the AGENTS.md "Color handling" guidance.
     final CommandSender finalSender = sender;
     java.util.function.Consumer<String> wrapped =
-        msg -> io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(finalSender, msg);
+        msg -> io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(finalSender, msg);
 
     return compute(senderId, parameterValues, nextCommand, wrapped);
   }

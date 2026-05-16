@@ -110,7 +110,15 @@ public class RegionQueueManager {
         this.region = region;
         RegionSettings settings = region.getSettings();
         if(settings!=null) {
-            this.unkeptLocations = new LockFreeLocationBuffer((int) settings.cacheCap());
+            // Size unkeptLocations to fit both kept+unkept rows on hydration: the database
+            // persists both queues' contents (kept is restored as unkept stubs since reservations
+            // can't be re-acquired synchronously per S-005), so a reboot can momentarily hold up
+            // to cacheCap+activeChunkCap rows here before steady-state promotion to keptLocations
+            // drains the surplus back below cacheCap. Sizing to only cacheCap caused dropped rows
+            // on every restart (default 10 lost).
+            long unkeptCapacity = (long) settings.cacheCap() + (long) settings.activeChunkCap();
+            if (unkeptCapacity > Integer.MAX_VALUE) unkeptCapacity = Integer.MAX_VALUE;
+            this.unkeptLocations = new LockFreeLocationBuffer((int) unkeptCapacity);
             this.keptLocations = new LockFreeLocationBuffer(settings.activeChunkCap());
             long backlogCap = settings.backlogCacheCap();
             this.backlogLocations = (backlogCap > 0)

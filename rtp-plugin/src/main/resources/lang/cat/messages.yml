@@ -22,7 +22,8 @@
 # list of additional placeholders
 # format: Pn - where n is the index in this list
 empty_bowls:
-  - "[RTP]" #P0
+  # P0
+  - "[RTP]"
 
 ################################################################################
 # Section 2: Pouncing

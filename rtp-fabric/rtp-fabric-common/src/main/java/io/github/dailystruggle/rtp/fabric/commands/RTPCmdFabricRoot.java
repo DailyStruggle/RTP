@@ -96,7 +96,7 @@ public final class RTPCmdFabricRoot extends BaseRTPCmdImpl implements RTPCmd {
             "world",
             new WorldParameter(
                 "rtp.params",
-                "modify xz selection",
+                "override teleport world for this region",
                 (uuid, s) ->
                     RTP.serverAccessor.getRTPWorld(s) != null
                         && RTP.serverAccessor.getSender(uuid).hasPermission("rtp.worlds." + s)));
@@ -104,7 +104,7 @@ public final class RTPCmdFabricRoot extends BaseRTPCmdImpl implements RTPCmd {
             "price",
             new FloatParameter(
                 "rtp.params",
-                "modify xz selection",
+                "override teleport cost for this region",
                 (uuid, s) -> {
                     try {
                         Double.parseDouble(s);
@@ -117,13 +117,13 @@ public final class RTPCmdFabricRoot extends BaseRTPCmdImpl implements RTPCmd {
             "worldborderoverride",
             new BooleanParameter(
                 "rtp.params",
-                "modify xz selection",
+                "override world-border respect for this region",
                 (uuid, s) -> s.equalsIgnoreCase("true") || s.equalsIgnoreCase("false")));
         regionParameter.put(
             "shape",
             new ShapeParameter(
                 "rtp.params",
-                "modify xz selection",
+                "override region shape",
                 (uuid, s) -> RTP.factoryMap.get(RTP.factoryNames.shape).contains(s)));
         regionParameter.put(
             "vert",

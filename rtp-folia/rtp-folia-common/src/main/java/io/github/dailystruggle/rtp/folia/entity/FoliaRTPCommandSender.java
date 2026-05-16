@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.folia.entity;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.spigot.tools.SendMessage;
+import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
 import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
 import java.util.Objects;
 import java.util.Set;

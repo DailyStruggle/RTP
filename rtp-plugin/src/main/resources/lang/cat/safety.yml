@@ -1,14 +1,22 @@
 # --- RTP Safety Configuration (cat dialect) ---
 # Where it is safe to land on four paws after a pounce.
 
-nine_lives_buffer: 5             # Tail flicks (seconds) of invulnerability after pouncing
-soft_landing_radius: 0           # Block radius around landing spot to sniff for danger
-staleChunkRetryLimit: 2          # Max retries for stale-kibble guard
-anvilPrefilterEnabled: true      # Off-thread anvil prefilter (smell from afar)
-paw_platform_radius: -1          # Radius of emergency paw platform (-1 to disable)
-paw_platform_depth: 1            # Depth of platform
-paw_platform_headroom: 2         # Air space above platform for tail
-paw_platform_material: GLASS     # Material for emergency paw platform
+# Tail flicks (seconds) of invulnerability after pouncing
+nine_lives_buffer: 5
+# Block radius around landing spot to sniff for danger
+soft_landing_radius: 0
+# Max retries for stale-kibble guard
+staleChunkRetryLimit: 2
+# Off-thread anvil prefilter (smell from afar)
+anvilPrefilterEnabled: true
+# Radius of emergency paw platform (-1 to disable)
+paw_platform_radius: -1
+# Depth of platform
+paw_platform_depth: 1
+# Air space above platform for tail
+paw_platform_headroom: 2
+# Material for emergency paw platform
+paw_platform_material: GLASS
 
 empty_air_for_zoomies:
   - AIR
@@ -109,7 +117,8 @@ scary_blocks:
   - KELP_PLANT
   - "#minecraft:logs"
 
-friendly_smells: false           # If true, 'smells' is a whitelist; otherwise a blacklist (boring smells)
+# If true, 'smells' is a whitelist; otherwise a blacklist (boring smells)
+friendly_smells: false
 smells:
   - OCEAN
   - DEEP_OCEAN

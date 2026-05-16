@@ -3,7 +3,7 @@ plugins {
 }
 
 dependencies {
-    api project(':rtp-spigot:rtp-spigot-common')
+    api project(':rtp-bukkit:rtp-bukkit-common')
     compileOnly 'io.papermc.paper:paper-api:1.20.1-R0.1-SNAPSHOT'
     compileOnly 'me.clip:placeholderapi:2.11.6'
     testImplementation testFixtures(project(':rtp-core'))

@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.paper_v1_20_R1.world;
 
-import io.github.dailystruggle.rtp.spigot.world.BukkitRTPWorld;
+import io.github.dailystruggle.rtp.bukkitplatform.world.BukkitRTPWorld;
 import org.bukkit.World;
 
 /**

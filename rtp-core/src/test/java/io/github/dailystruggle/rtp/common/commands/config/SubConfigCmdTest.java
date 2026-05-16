@@ -14,8 +14,8 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
-import org.simpleyaml.configuration.ConfigurationSection;
-import org.simpleyaml.configuration.MemorySection;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -203,11 +203,11 @@ public class SubConfigCmdTest {
         assertFalse(params.containsKey("version"), "'version' key must be skipped");
     }
 
-    // ── addParameters — MemorySection flattened into dotted-path parameters ──
+    // ── addParameters — RtpYamlSection flattened into dotted-path parameters ──
 
     @Test
     void subConfigCmd_addParameters_flattensMemorySectionIntoDottedParameters() {
-        ConfigurationSection section = mock(MemorySection.class);
+        RtpYamlSection section = mock(RtpYamlSection.class);
         LinkedHashSet<String> keys = new LinkedHashSet<>(Arrays.asList("host", "port", "enabled"));
         when(section.getKeys(false)).thenReturn(keys);
         when(section.get("host")).thenReturn("127.0.0.1");
@@ -231,17 +231,17 @@ public class SubConfigCmdTest {
         assertInstanceOf(BooleanParameter.class, params.get("viewdistanceselect.enabled"));
     }
 
-    // ── addParameters — nested MemorySection flattened recursively ────────────
+    // ── addParameters — nested RtpYamlSection flattened recursively ────────────
 
     @Test
     void subConfigCmd_addParameters_flattensNestedMemorySectionRecursively() {
-        ConfigurationSection inner = mock(MemorySection.class);
+        RtpYamlSection inner = mock(RtpYamlSection.class);
         LinkedHashSet<String> innerKeys = new LinkedHashSet<>(Arrays.asList("host", "port"));
         when(inner.getKeys(false)).thenReturn(innerKeys);
         when(inner.get("host")).thenReturn("127.0.0.1");
         when(inner.get("port")).thenReturn(6379);
 
-        ConfigurationSection outer = mock(MemorySection.class);
+        RtpYamlSection outer = mock(RtpYamlSection.class);
         LinkedHashSet<String> outerKeys = new LinkedHashSet<>(Collections.singletonList("redis"));
         when(outer.getKeys(false)).thenReturn(outerKeys);
         when(outer.get("redis")).thenReturn(inner);

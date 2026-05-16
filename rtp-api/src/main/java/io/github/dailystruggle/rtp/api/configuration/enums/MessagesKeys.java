@@ -208,5 +208,94 @@ public enum MessagesKeys {
   /** Version string shown in the plugin startup banner and {@code /rtp version}. */
   version,
   /** Whether to append the developer tag to relevant messages; controls a boolean display flag. */
-  showDevTag
+  showDevTag,
+  // --- Generalized menu framework (ADR-035 / ADR-044) ---
+  /** Sent when a menu token is unknown, malformed, or belongs to another player. */
+  menuInvalid,
+  /** Sent when a menu token has expired or was already consumed. */
+  menuExpired,
+  /** Sent when a menu redeem cannot resolve the calling player UUID. */
+  menuUnknownPlayer,
+  /**
+   * Hover-fallback template used by the menu reflector when no YAML block-comment is
+   * available for a parameter. The {@code [type]} placeholder is replaced with the
+   * declared parameter type (e.g. {@code boolean}, {@code integer}).
+   */
+  menuHoverFallbackType,
+  /**
+   * Hover-fallback template used by the menu reflector when a parameter exposes a
+   * small curated value set. The {@code [values]} placeholder is replaced with the
+   * comma-joined list of accepted values.
+   */
+  menuHoverFallbackBounds,
+  /**
+   * Label for the "go back one level" navigation row prepended to every non-root
+   * menu page. Configurable per REQ-RTP-F-013. No placeholders.
+   */
+  menuBack,
+  /**
+   * Label template for the "execute the assembled command" row prepended to
+   * every runnable non-root menu page. The {@code [command]} placeholder is
+   * replaced with the assembled {@code /rtp …} invocation. Configurable per
+   * REQ-RTP-F-013.
+   */
+  menuExecute,
+  /**
+   * Header row shown at the top of a parameter-value picker sub-page
+   * (Stage A.2). The {@code [param]} placeholder is replaced with the
+   * parameter name, and {@code [command]} with the assembled
+   * {@code /rtp …} invocation the chosen value will be appended to.
+   * Configurable per REQ-RTP-F-013.
+   */
+  menuPickValue,
+  /**
+   * Label for the "✎ type a custom value..." fallback row on a
+   * parameter-value picker page (Stage A.2). Clicking it pre-fills the
+   * player's chat with the assembled command up to {@code paramName:} so
+   * they can type any value, including ones not in the suggestion list.
+   * Configurable per REQ-RTP-F-013.
+   */
+  menuTypeValue,
+  /**
+   * Non-clickable header row prepended to every non-root menu page
+   * (Stage A.4). Surfaces the currently-constructed {@code /rtp …}
+   * invocation — including any staged {@code name:value} parameter
+   * assignments — so the player can see what is being assembled before
+   * pressing the Execute row. The {@code [command]} placeholder is
+   * replaced with the assembled invocation. Configurable per
+   * REQ-RTP-F-013.
+   */
+  menuConstructed,
+  /**
+   * Non-clickable title row prepended to the root {@code /rtp menu} page
+   * (Stage A.5). Provides a welcoming header so the menu has visible framing
+   * before the player begins descending into subcommands. No placeholders.
+   * Configurable per REQ-RTP-F-013.
+   */
+  menuRootTitle,
+  /**
+   * Non-clickable subtitle/hint row prepended to the root {@code /rtp menu}
+   * page below {@link #menuRootTitle} (Stage A.5). Short orientation text
+   * telling the player what to do next. No placeholders. Configurable per
+   * REQ-RTP-F-013.
+   */
+  menuRootHint,
+  /**
+   * Label template for the "previous page" navigation row appended to
+   * paginated menu pages (Stage A.6). Clicking it dispatches a
+   * {@link io.github.dailystruggle.rtp.api.menu.MenuAction.ChangePage}
+   * to the previous page of the same model. The {@code [page]} placeholder
+   * is replaced with the 1-based human-readable previous page number.
+   * Configurable per REQ-RTP-F-013.
+   */
+  menuPagePrev,
+  /**
+   * Label template for the "next page" navigation row appended to paginated
+   * menu pages (Stage A.6). Clicking it dispatches a
+   * {@link io.github.dailystruggle.rtp.api.menu.MenuAction.ChangePage}
+   * to the next page of the same model. The {@code [page]} placeholder is
+   * replaced with the 1-based human-readable next page number. Configurable
+   * per REQ-RTP-F-013.
+   */
+  menuPageNext
 }

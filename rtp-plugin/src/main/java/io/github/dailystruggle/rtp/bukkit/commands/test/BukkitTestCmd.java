@@ -10,7 +10,7 @@ import org.jetbrains.annotations.Nullable;
  * <ul>
  *   <li>{@link TestStressCmd} — uses {@code commandsapi.bukkit.OnlinePlayerParameter}.</li>
  *   <li>{@link TestChunkProbePerfCmd} — hard-imports {@code org.bukkit.Bukkit}/{@code World}/{@code Chunk}.</li>
- *   <li>{@link TestFullCmd} — uses {@code rtp.spigot.SendMessage} for child-output auditing.</li>
+ *   <li>{@link TestFullCmd} — uses {@code rtp.bukkitplatform.SendMessage} for child-output auditing.</li>
  *   <li>{@link AsyncReplyTestJob} — uses {@code SendMessage.addInterceptor} + {@code OnlinePlayerParameter}.</li>
  * </ul>
  *

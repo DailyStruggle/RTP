@@ -220,11 +220,11 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   public void sendMessage(UUID target, String message, String tag) {
     message = tagMessage(message, tag);
     if (target.equals(RTPAPI.serverId)) {
-      io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(Bukkit.getConsoleSender(), message);
+      io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(Bukkit.getConsoleSender(), message);
       return;
     }
     Player player = Bukkit.getPlayer(target);
-    if (player != null) io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(player, message);
+    if (player != null) io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(player, message);
   }
 
   @Override
@@ -233,7 +233,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
     // TODO: THREAD-VIOLATION - Requires async bridge; calls @GlobalRegionThread getSender() from @RegionThread context
     RTPCommandSender sender = getSender(target);
     // Routes the suggestion safely as a click event via your formatting pipeline
-    io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(sender, message, "", suggestion);
+    io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(sender, message, "", suggestion);
   }
 
 
@@ -242,38 +242,38 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
     message = tagMessage(message, tag);
 
     if (target1.equals(RTPAPI.serverId)) {
-      io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(Bukkit.getConsoleSender(), message);
+      io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(Bukkit.getConsoleSender(), message);
     } else {
       Player p1 = Bukkit.getPlayer(target1);
-      if (p1 != null) io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(p1, message);
+      if (p1 != null) io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(p1, message);
     }
 
     // Prevent double sending if target1 and target2 are the exact same entity
     if (target1.equals(target2)) return;
 
     if (target2.equals(RTPAPI.serverId)) {
-      io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(Bukkit.getConsoleSender(), message);
+      io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(Bukkit.getConsoleSender(), message);
     } else {
       Player p2 = Bukkit.getPlayer(target2);
-      if (p2 != null) io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(p2, message);
+      if (p2 != null) io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(p2, message);
     }
   }
 
   @Override
   public void sendMessage(RTPCommandSender target, String message, String hover, String click, String tag) {
-    io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(target, tagMessage(message, tag), hover, click);
+    io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(target, tagMessage(message, tag), hover, click);
   }
 
   @Override
   public String format(@Nullable UUID player, String text) { // @AnyThread — pure text formatting
     org.bukkit.OfflinePlayer bukkitPlayer = (player != null) ? Bukkit.getOfflinePlayer(player) : null;
-    return io.github.dailystruggle.rtp.spigot.tools.SendMessage.format(bukkitPlayer, text);
+    return io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.format(bukkitPlayer, text);
   }
 
   @Override
   public String formatNoColor(@Nullable UUID player, String text) { // @AnyThread — pure text formatting
     org.bukkit.OfflinePlayer bukkitPlayer = (player != null) ? Bukkit.getOfflinePlayer(player) : null;
-    return io.github.dailystruggle.rtp.spigot.tools.SendMessage.formatNoColor(bukkitPlayer, text);
+    return io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.formatNoColor(bukkitPlayer, text);
   }
 
   @Override
@@ -283,12 +283,12 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
     // printed to the console. Previously this delegated directly to
     // Bukkit.getLogger().log, causing raw "&e[P0] Successfully loaded ..." to
     // appear on Folia consoles.
-    io.github.dailystruggle.rtp.spigot.tools.SendMessage.log(level, msg);
+    io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.log(level, msg);
   }
 
   @Override
   public void log(Level level, String msg, Throwable throwable) { // @AnyThread — thread-safe logger
-    io.github.dailystruggle.rtp.spigot.tools.SendMessage.log(level, msg, throwable);
+    io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.log(level, msg, throwable);
   }
 
   @Override
@@ -296,12 +296,12 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
     msg = tagMessage(msg, tag);
     for (Player player : Bukkit.getOnlinePlayers()) {
       if (player.hasPermission(permission)) {
-        io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(player, msg);
+        io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(player, msg);
       }
     }
 
     // Route to console via the formatting pipeline
-    io.github.dailystruggle.rtp.spigot.tools.SendMessage.sendMessage(Bukkit.getConsoleSender(), msg);
+    io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage.sendMessage(Bukkit.getConsoleSender(), msg);
   }
 
   private String tagMessage(String message, @Nullable String tag) {

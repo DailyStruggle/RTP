@@ -73,12 +73,12 @@ Scans vertically using fixed steps. Efficient for finding the first safe surface
 
 #### `LINEAR`
 A thorough scan of every Y level in a specific order.
-- `direction`: The scan strategy:
-  - `0`: **DOWN** — Start at `maxY` and scan down to `minY`. Best for surface landings.
-  - `1`: **UP** — Start at `minY` and scan up to `maxY`. Best for underground/cave landings.
-  - `2`: **OUT_IN** — Start at both ends and meet in the middle.
-  - `3`: **IN_OUT** — Start at the middle and scan toward both ends.
-  - `4`: **SHUFFLE** — Scan all levels in a randomized order. Best for "anywhere in this range" logic.
+- `direction`: Integer scan strategy (default `0`):
+  - `0`: **Bottom-up** — Start at `minY` and scan up to `maxY`. Best for underground/cave landings.
+  - `1`: **Top-down** — Start at `maxY` and scan down to `minY`. Best for surface landings.
+  - `2`: **Middle-out** — Start at the middle of the range and scan outward toward both ends.
+  - `3`: **Edges-in** — Start at both ends of the range and meet in the middle.
+  - Any other integer: **Random** — Scan all Y levels in a randomized order. Best for "anywhere in this range" logic.
 
 #### `FIXED`
 Places the player at a single configured Y level in **mid-air**, with no terrain scan. Designed for skyblock-style worlds where the platform tool builds a foothold around the player after teleport.
@@ -116,6 +116,6 @@ The backlog cache (controlled by `backlogCacheCap`) is an optional **unverified*
 ## Tips for Customization
 
 1. **Nether Support**: Use `vert: JUMP` with `maxY: 120` and `requireSkyLight: false` to land on the nether floor rather than the roof.
-2. **Cave Teleports**: Use `vert: LINEAR` with `direction: 1` (UP) and a low `maxY` to favor underground locations.
+2. **Cave Teleports**: Use `vert: LINEAR` with `direction: 0` (bottom-up) and a low `maxY` to favor underground locations.
 3. **Massive Radii**: If your radius is > 50,000 blocks, use `mode: NONE` to avoid long pre-calculation times on startup.
 4. **Skyblock / Mid-Air Drops**: Use `vert: FIXED` with `y: 128` and a platform tool enabled. The platform spawns under the player so they don't fall through the void.

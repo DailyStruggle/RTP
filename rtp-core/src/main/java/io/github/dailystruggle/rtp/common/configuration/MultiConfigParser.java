@@ -11,7 +11,7 @@ import java.util.logging.Level;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import org.jetbrains.annotations.NotNull;
-import org.simpleyaml.configuration.file.YamlFile;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 
 public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implements ConfigLoader {
   public final File pluginDirectory;
@@ -21,7 +21,7 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
   public final YamlFileDatabase fileDatabase;
   protected final File langMap;
   public Factory<ConfigParser<E>> configParserFactory = new Factory<>();
-  AtomicReference<Map<String, YamlFile>> cachedLookup;
+  AtomicReference<Map<String, RtpYamlConfig>> cachedLookup;
   private ClassLoader classLoader = this.getClass().getClassLoader();
 
   public MultiConfigParser(
@@ -35,7 +35,7 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
 
     this.fileDatabase = new YamlFileDatabase(this.myDirectory);
     cachedLookup = fileDatabase.cachedLookup;
-    Map<String, YamlFile> connect = this.fileDatabase.connect();
+    Map<String, RtpYamlConfig> connect = this.fileDatabase.connect();
     this.fileDatabase.disconnect(connect);
 
     this.langMap =
@@ -89,7 +89,7 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
     this.myDirectory = new File(pluginDirectory.getAbsolutePath() + File.separator + name);
 
     this.fileDatabase = new YamlFileDatabase(this.myDirectory);
-    Map<String, YamlFile> connect = this.fileDatabase.connect();
+    Map<String, RtpYamlConfig> connect = this.fileDatabase.connect();
     this.fileDatabase.disconnect(connect);
 
     try {

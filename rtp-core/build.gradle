@@ -8,12 +8,17 @@ dependencies {
     api project(':rtp-api')
 
     // Core logic dependencies (platform agnostic)
-    // snakeyaml is provided by Spigot/Paper/Folia at runtime
+    // snakeyaml is provided at runtime by Spigot/Paper/Folia, but NOT by
+    // Fabric servers (no snakeyaml on the classpath) and NOT by Velocity
+    // (does not export org.yaml.snakeyaml to plugins; BungeeCord's version
+    // is also unpinned). RTP's own YAML I/O is therefore served by the
+    // in-house hand-rolled substrate under
+    // io.github.dailystruggle.rtp.common.configuration.yaml (ADR-025
+    // 2026-05-15 revision; zero third-party dep). These declarations remain
+    // only to satisfy compile-time references in tests and any residual
+    // Bukkit-side reflection probes — never to ship the library.
     compileOnly 'org.yaml:snakeyaml:2.3'
     testRuntimeOnly 'org.yaml:snakeyaml:2.3'
-    api('me.carleslc.Simple-YAML:Simple-Yaml:1.8.4') {
-        exclude group: 'org.yaml', module: 'snakeyaml'
-    }
     api project(':commands-api')
     api project(':effects-api')
     // guava is provided by Spigot/Paper/Folia at runtime

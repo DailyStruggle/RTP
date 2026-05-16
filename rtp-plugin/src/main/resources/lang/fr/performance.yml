@@ -1,24 +1,41 @@
 # --- RTP Performance Settings ---
 # Documentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/PERFORMANCE.md
 
-maxAttempts: 32 # Max search attempts before giving up
-viewDistanceSelect: 0 # Chunk radius to load during selection
-viewDistanceTeleport: 0 # Chunk radius to load before teleport
-period: 20 # Ticks between background cache cycles
-syncAllottedTime: 50 # Max ms per tick for sync tasks
-asyncAllottedTime: 50 # Max ms per tick for async tasks
-minTPS: 19.0 # Min TPS to continue background queueing
-postTeleportQueueing: false # Refill cache immediately after teleport
-syncLoading: false # Use sync chunk loading (NOT RECOMMENDED)
-onEventParsing: false # Parse permissions on every event
-effectParsing: true # Parse effect permissions on startup
-biomeRecall: true # Reuse found biome locations
-biomeRecallForced: false # Only use biomes already in cache
-checkOnChunkLoads: false # Check for safe spots in all loaded chunks
-visitorEnabled: true # Enable background data gathering
+# Max search attempts before giving up
+maxAttempts: 32
+# Chunk radius to load during selection
+viewDistanceSelect: 0
+# Chunk radius to load before teleport
+viewDistanceTeleport: 0
+# Ticks between background cache cycles
+period: 20
+# Max ms per tick for sync tasks
+syncAllottedTime: 50
+# Max ms per tick for async tasks
+asyncAllottedTime: 50
+# Min TPS to continue background queueing
+minTPS: 19.0
+# Refill cache immediately after teleport
+postTeleportQueueing: false
+# Use sync chunk loading (NOT RECOMMENDED)
+syncLoading: false
+# Parse permissions on every event
+onEventParsing: false
+# Parse effect permissions on startup
+effectParsing: true
+# Reuse found biome locations
+biomeRecall: true
+# Only use biomes already in cache
+biomeRecallForced: false
+# Check for safe spots in all loaded chunks
+checkOnChunkLoads: false
+# Enable background data gathering
+visitorEnabled: true
 
-pregeneratedPreference: 0.0 # Probability [0.0, 1.0] of rejecting an ungenerated chunk per selection attempt. 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land. Generated chunks always pass.
-backlogRefillThreshold: 0.5 # Fraction [0.0, 1.0] of L3 backlog capacity at which refill resumes (hysteresis). 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill continuously.
+# Probability [0.0, 1.0] of rejecting an ungenerated chunk per selection attempt. 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land. Generated chunks always pass.
+pregeneratedPreference: 0.0
+# Fraction [0.0, 1.0] of L3 backlog capacity at which refill resumes (hysteresis). 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill continuously.
+backlogRefillThreshold: 0.5
 
 # DO NOT TOUCH VERSION NUMBER
 version: "1.0"

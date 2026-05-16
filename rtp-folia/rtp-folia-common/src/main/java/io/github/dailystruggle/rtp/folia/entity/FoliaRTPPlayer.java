@@ -4,7 +4,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.spigot.tools.SendMessage;
+import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
 import io.github.dailystruggle.rtp.folia.world.FoliaRTPWorld;
 import java.util.Objects;
 import java.util.Set;

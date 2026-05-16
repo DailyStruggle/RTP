@@ -400,7 +400,7 @@ rtp-fabric/    -- FabricMetricsBinding (server tick callbacks)
 ### Phase M0 — SPI shape *(docs only; light D-005)*
 
 - [x] Define `Metrics`, `MetricsSnapshot`, `PipelineHistogram` in `rtp-core` — landed 2026-05-01 in `rtp-core/.../common/metrics/` (`Metrics`, `MetricsBinding`, `MetricsSnapshot`, `PipelineHistogram`, `HeapSampler`, `CoreMetrics`); covered by `MetricsSnapshotTest`, `PipelineHistogramTest`, `HeapSamplerTest`, `CoreMetricsTest`.
-- [ ] Confirm field catalogue against `rtp test full`'s current output so the new SPI is a strict superset.
+- [x] Confirm field catalogue against `rtp test full`'s current output so the new SPI is a strict superset — verified 2026-05-15: `rtp test full` (`rtp-plugin/.../bukkit/commands/test/TestFullCmd.java`) emits only per-subcommand audit pass/fail lines via `FullAudit`; it does not print any TPS / MSPT / heap / queue / pipeline numeric fields, so the v1 `MetricsSnapshot` catalogue is trivially a strict superset. No plan amendment needed.
 - [x] Add this plan to `INDEX.md` / `MAP.md` / `AGENTS.md` task router.
 
 ### Phase M1 — Core + Paper + Spigot fallback
@@ -445,14 +445,14 @@ rtp-fabric/    -- FabricMetricsBinding (server tick callbacks)
 
 ## Open Items / Follow-Ups
 
-- **`avgPipelineMs` window length and reset semantics** — resolved by [ADR-032](../adr/ADR-032-teleport-pipeline-latency-histogram.md): 256-sample wait-free ring, never resets, mean-only readout.
+- **`avgPipelineMs` window length and reset semantics** — *resolved (2026-05-15)* by [ADR-032](../adr/ADR-032-teleport-pipeline-latency-histogram.md): 256-sample wait-free ring, never resets, mean-only readout.
 - **`biomeRerolls` cap / top-N policy** — straw-man: no cap (vanilla biome cardinality is naturally bounded). Revisit if a modpack pushes the map past ~500 keys, at which point introduce `metrics.biomeRerolls.topN` (default 32). Confirm during M1.
 - **`biomeRerolls` reset semantics** — straw-man: cumulative since process start. Operators wanting deltas compute them from successive snapshots, consistent with the *Snapshot, not stream* goal.
 - **`biomeRerolls` window default** — straw-man: 300s. Short enough to attribute the next `/rtp` to dissatisfaction with the prior outcome, long enough to absorb a player looking around before deciding. Confirm during M1 from beta-server data.
-- **`databaseLatencyMs` measurement cadence** — sample on every write or only on a dedicated probe? Sampling on every write conflates pool-saturation with latency. Decide during M1.
+- **`databaseLatencyMs` measurement cadence** — *resolved (2026-05-15)*: sample on every write (Option 1) routed through a single function on `AbstractSQLDatabaseAccessor` so a dedicated probe can be substituted later without touching call sites. Accepted limitation: under pool saturation the reading conflates queue wait with wire RTT; that's surfaced in the field's Javadoc and in `/rtp info` colour-band guidance. Migration path to a dedicated probe (gated by a future `metrics.database.dedicatedProbe` key) stays open and does not require changing the `MetricsSnapshot` shape.
 - **`metrics.demand.overflowMinSamples` / `stressMsptThreshold` defaults** — straw-man `3` and `45.0` ms. Confirm during M1 from beta-server data; expect lite-assembly servers to want a higher MSPT threshold (lower-end hardware baseline).
 - **Auto-adjustment control loop** — deferred behind a dedicated ADR. Required before `metrics.demand.autoAdjust.enabled` does anything; the metric publishes the inputs in v1, but no closed-loop adjustment ships until the ADR specifies error term, safety interlocks (never tighten during `tickStressEvents` rise), and which control surfaces (`ScanTask` budget, pipeline parallelism, login-reserve cadence) are eligible.
-- **Folia per-region detail opt-in key** — straw-man `metrics.folia.includeRegions: false`. Confirm during M2.
+- **Folia per-region detail opt-in key** — *resolved (2026-05-15)*: `metrics.folia.includeRegions: true` by default. Folia operators are the audience that most wants per-region detail, and the snapshot memory cost is bounded by the region count (see the dedicated *Memory cost of `MetricsSnapshot`* open item). Operators on extreme-region-count Folia deployments can flip the key to `false`.
 - **Memory cost of `MetricsSnapshot`** — must stay small enough to be cheap to publish at 1Hz under proxy mode (multi-server consumer constraint).
 - **`sustainableRatePerMin` reservoir window & percentile** — straw-man 900-sample circular buffer (15 m at 1 Hz), p95. Confirm during M2 from beta-server data; very small fleets may want p90 to react faster, very large fleets p99 to absorb noise.
 - **`cacheServeRateLast60s` / `coldServeRatio` window length** — straw-man 60 s. Long enough to absorb a single quiet minute, short enough to react to a config change. Confirm during M2.
@@ -661,10 +661,10 @@ Reviewed for implementer-sufficiency against `AGENTS.md`, `RULES.md`, and existi
 
 - **Sufficient as-shipped**: SPI shape (records, package layout), Spigot-fallback algorithm, Folia aggregation defaults, `/rtp info` output groups, bStats catalogue with privacy guardrails, three-consumer model (publisher / bStats / `InfoCmd`).
 - **Filled in this pass**: explicit thread-context for each sampler (publisher async; tick-counted samplers via `RTP.scheduler.runTaskTimer`; `Metrics.snapshot()` callable from any thread). See *Acceptance Contract* (existing) and *Spigot TPS Fallback* — both already enumerate thread requirements.
-- **Carry-over open items** (already in *Open Items / Follow-Ups*): `avgPipelineMs` window length, `databaseLatencyMs` cadence, Folia per-region detail opt-in default, `MetricsSnapshot` memory cost. None block M1 implementation; each is annotated in the checklist file.
+- **Carry-over open items** (already in *Open Items / Follow-Ups*): `avgPipelineMs` window length *(resolved 2026-05-15 by ADR-032)*, `databaseLatencyMs` cadence *(resolved 2026-05-15 — every-write via a function, dedicated-probe migration path preserved)*, Folia per-region detail opt-in default *(resolved 2026-05-15 — `metrics.folia.includeRegions: true`)*, `MetricsSnapshot` memory cost *(still open; revisit during M2 once per-region rows + foliaRegions land)*. None block M1 implementation.
 - **Deferred to consumer plans**: anonymisation rules for the bStats catalogue (covered in this plan's *bStats Integration > Constraints*); colour-band thresholds for `/rtp info` (covered in `messages.yml` per REQ-RTP-F-013).
 
-**One unticked M0 box remains**: confirm the M1 metric catalogue is a strict superset of `rtp test full`'s current console output. This is mechanical and is the recommended first checklist row to execute (Section A row A1 in `docs/dev/scratch/CHECKLIST-metrics-and-multiserver.md`).
+**M0 fully closed (2026-05-15)**: the `rtp test full` superset confirmation (Section A row A1 in `docs/dev/scratch/CHECKLIST-metrics-and-multiserver.md`) is ticked. `MetricsSnapshot` shape D-005 review completed (Section A row A5) — the 16-field on-disk record (`tps{1,5,15}m`, `mspt`, `tickBudgetUtilisation`, `playerCount`, `softCap`, `heapUsed/MaxBytes`, `queueDepth`, `pendingTeleports`, `memoryTrackerEntries`, `chunkLoadBacklog`, `avgPipelineMs`, `databaseLatencyMs`, `takenAtEpochMs`) is the approved M0 SPI; later phases add fields via additive constructor changes contained to the single binding constructor.
 
 ---
 

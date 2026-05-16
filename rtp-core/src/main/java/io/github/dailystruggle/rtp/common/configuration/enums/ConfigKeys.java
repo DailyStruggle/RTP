@@ -16,6 +16,8 @@ public enum ConfigKeys {
   database,
   /** Network configuration */
   network,
+  /** Generalized menu framework configuration (ADR-035 / ADR-044). */
+  menu,
   /** Configuration version */
   version
 }

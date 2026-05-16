@@ -112,13 +112,15 @@ public class EffectsResolverTest {
     void fallsBackToDefaultWhenNoOtherGroupMatches() throws IOException {
         writeGroup("default.yml",
                 "when: postteleport\n" +
-                "effects: [SOUND.LEVELUP.1.0.1.0]\n" +
+                "effects:\n" +
+                "  - SOUND.LEVELUP.1.0.1.0\n" +
                 "version: \"1.0\"\n");
         // A non-default group that gates on a permission alice doesn't have.
         writeGroup("vip.yml",
                 "when: postteleport\n" +
                 "permission: rtp.vip\n" +
-                "effects: [SOUND.WITHER_SPAWN.1.0.1.0]\n" +
+                "effects:\n" +
+                "  - SOUND.WITHER_SPAWN.1.0.1.0\n" +
                 "version: \"1.0\"\n");
         rebuildParser();
 
@@ -136,13 +138,16 @@ public class EffectsResolverTest {
     void permissionGatedGroupPreemptsDefault() throws IOException {
         writeGroup("default.yml",
                 "when: postteleport\n" +
-                "effects: [SOUND.LEVELUP.1.0.1.0]\n" +
+                "effects:\n" +
+                "  - SOUND.LEVELUP.1.0.1.0\n" +
                 "version: \"1.0\"\n");
         writeGroup("vip.yml",
                 "when: postteleport\n" +
                 "permission: rtp.vip\n" +
-                "inherit: []\n" +
-                "effects: [SOUND.WITHER_SPAWN.1.0.1.0]\n" +
+                "inherit:\n" +
+                "  - DUMMY_NEVER_MATCHES\n" +
+                "effects:\n" +
+                "  - SOUND.WITHER_SPAWN.1.0.1.0\n" +
                 "version: \"1.0\"\n");
         rebuildParser();
 
@@ -164,14 +169,16 @@ public class EffectsResolverTest {
         UUID carolUuid = UUID.randomUUID();
         writeGroup("default.yml",
                 "when: postteleport\n" +
-                "effects: []\n" +
+                "effects:\n" +
                 "version: \"1.0\"\n");
         writeGroup("staff.yml",
                 "when: postteleport\n" +
                 "players:\n" +
                 "  - " + carolUuid + "\n" +
-                "inherit: []\n" +
-                "effects: [SOUND.STAFF.1.0.1.0]\n" +
+                "inherit:\n" +
+                "  - DUMMY_NEVER_MATCHES\n" +
+                "effects:\n" +
+                "  - SOUND.STAFF.1.0.1.0\n" +
                 "version: \"1.0\"\n");
         rebuildParser();
 
@@ -192,13 +199,16 @@ public class EffectsResolverTest {
     void playersAllowlistGatesByName() throws IOException {
         writeGroup("default.yml",
                 "when: postteleport\n" +
-                "effects: []\n" +
+                "effects:\n" +
                 "version: \"1.0\"\n");
         writeGroup("named.yml",
                 "when: postteleport\n" +
-                "players: [eve]\n" +
-                "inherit: []\n" +
-                "effects: [SOUND.EVE.1.0.1.0]\n" +
+                "players:\n" +
+                "  - eve\n" +
+                "inherit:\n" +
+                "  - DUMMY_NEVER_MATCHES\n" +
+                "effects:\n" +
+                "  - SOUND.EVE.1.0.1.0\n" +
                 "version: \"1.0\"\n");
         rebuildParser();
 
@@ -215,13 +225,16 @@ public class EffectsResolverTest {
     void inheritChainPrependsParentTokens() throws IOException {
         writeGroup("default.yml",
                 "when: postteleport\n" +
-                "effects: [SOUND.D.1.0.1.0]\n" +
+                "effects:\n" +
+                "  - SOUND.D.1.0.1.0\n" +
                 "version: \"1.0\"\n");
         writeGroup("child.yml",
                 "when: postteleport\n" +
                 "permission: rtp.child\n" +
-                "inherit: [default]\n" +
-                "effects: [SOUND.C.1.0.1.0]\n" +
+                "inherit:\n" +
+                "  - default\n" +
+                "effects:\n" +
+                "  - SOUND.C.1.0.1.0\n" +
                 "version: \"1.0\"\n");
         rebuildParser();
 
@@ -244,13 +257,17 @@ public class EffectsResolverTest {
         writeGroup("a.yml",
                 "when: postteleport\n" +
                 "permission: rtp.a\n" +
-                "inherit: [b]\n" +
-                "effects: [SOUND.A.1.0.1.0]\n" +
+                "inherit:\n" +
+                "  - b\n" +
+                "effects:\n" +
+                "  - SOUND.A.1.0.1.0\n" +
                 "version: \"1.0\"\n");
         writeGroup("b.yml",
                 "when: postteleport\n" +
-                "inherit: [a]\n" +
-                "effects: [SOUND.B.1.0.1.0]\n" +
+                "inherit:\n" +
+                "  - a\n" +
+                "effects:\n" +
+                "  - SOUND.B.1.0.1.0\n" +
                 "version: \"1.0\"\n");
         rebuildParser();
 
@@ -306,7 +323,8 @@ public class EffectsResolverTest {
     void hotReloadPicksUpNewGroupFile() throws IOException {
         writeGroup("default.yml",
                 "when: postteleport\n" +
-                "effects: [SOUND.OLD.1.0.1.0]\n" +
+                "effects:\n" +
+                "  - SOUND.OLD.1.0.1.0\n" +
                 "version: \"1.0\"\n");
         rebuildParser();
 
@@ -340,7 +358,8 @@ public class EffectsResolverTest {
     void resolveUnionedMergesPermissionAndConfigTokens() throws IOException {
         writeGroup("default.yml",
                 "when: postteleport\n" +
-                "effects: [SOUND.D.1.0.1.0]\n" +
+                "effects:\n" +
+                "  - SOUND.D.1.0.1.0\n" +
                 "version: \"1.0\"\n");
         rebuildParser();
 

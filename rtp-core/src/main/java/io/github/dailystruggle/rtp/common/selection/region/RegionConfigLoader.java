@@ -9,7 +9,7 @@ import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
-import org.simpleyaml.configuration.ConfigurationSection;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 
 import java.util.List;
 import java.util.Map;
@@ -67,8 +67,8 @@ public class RegionConfigLoader {
         if (rawShape instanceof Shape<?>) {
             shape = (Shape<?>) rawShape;
 //            System.out.println("[RTP-DEBUG] RegionLoader: Shape was already a valid Shape object.");
-        } else if (rawShape instanceof ConfigurationSection) {
-            ConfigurationSection section = (ConfigurationSection) rawShape;
+        } else if (rawShape instanceof RtpYamlSection) {
+            RtpYamlSection section = (RtpYamlSection) rawShape;
             shape = deserializeShape(section.getMapValues(false));
             if (shape != null) regionParser.set(RegionKeys.shape, shape);
         } else if (rawShape instanceof Map) {
@@ -88,8 +88,8 @@ public class RegionConfigLoader {
         if (rawVert instanceof VerticalAdjustor<?>) {
             vert = (VerticalAdjustor<?>) rawVert;
 //            System.out.println("[RTP-DEBUG] RegionLoader: Vert was already a valid VerticalAdjustor object.");
-        } else if (rawVert instanceof ConfigurationSection) {
-            ConfigurationSection section = (ConfigurationSection) rawVert;
+        } else if (rawVert instanceof RtpYamlSection) {
+            RtpYamlSection section = (RtpYamlSection) rawVert;
             vert = deserializeVert(section.getMapValues(false));
             if (vert != null) regionParser.set(RegionKeys.vert, vert);
         } else if (rawVert instanceof Map) {
