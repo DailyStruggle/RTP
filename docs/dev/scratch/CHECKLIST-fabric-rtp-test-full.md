@@ -1,4 +1,4 @@
-# CHECKLIST — Build the `rtp test full` umbrella on Fabric
+﻿# CHECKLIST — Build the `rtp test full` umbrella on Fabric
 
 **Effective Issue:** Build the `rtp test full` umbrella on Fabric (TODO.md §1, bullet 1).
 
@@ -51,7 +51,7 @@ Supporting infrastructure:
 
 Bukkit-specific dependencies the lift must abstract:
 
-1. `io.github.dailystruggle.rtp.spigot.tools.SendMessage` (caller output).
+1. `io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage` (caller output).
 2. `org.bukkit.Bukkit.getScheduler()` / `Bukkit.getServer()` direct calls
    inside individual `*TestJob` bodies (use sites surveyed during Phase 2).
 3. `org.bukkit.entity.Player` for resolving the caller name in
@@ -109,10 +109,40 @@ re-routed.
 
 ## Phase 2 — Move umbrella + leaf commands to `rtp-core`
 
-- [ ] **2.1** Move `TestFullCmd`, `TestCmd`, `TestSemaphore`,
-      `ActiveTestJobs` from `rtp-plugin/.../bukkit/commands/test/` to
+- [ ] **2.1** Move `TestFullCmd` and `TestCmd` from
+      `rtp-plugin/.../bukkit/commands/test/` to
       `rtp-core/.../common/commands/test/`. Replace direct `SendMessage.log`
       and `Bukkit.*` calls with `TestUmbrellaContext` SPI calls.
+      `TestSemaphore` and `ActiveTestJobs` are already in
+      `rtp-core/.../common/commands/test/` (verified 2026-05-16) — no
+      move needed for them.
+      - [x] **2.1.a** Extend `TestUmbrellaSender` with default no-op
+            `addAuditInterceptor(Consumer<String>)` /
+            `removeAuditInterceptor(Consumer<String>)`; override on
+            `BukkitTestUmbrellaSender` to delegate to
+            `SendMessage.addInterceptor` / `removeInterceptor`. This is the
+            precondition for `TestFullCmd`'s `FullAudit` to move into
+            `rtp-core` without importing `SendMessage`. Evidence: diff to
+            `rtp-core/.../TestUmbrellaSender.java` and
+            `rtp-plugin/.../BukkitTestUmbrellaSender.java` (2026-05-16);
+            non-Bukkit platforms get an empty audit tally (documented
+            degenerate behavior) until they implement the methods.
+      - [ ] **2.1.b** Move `TestFullCmd` to `rtp-core`: repackage to
+            `io.github.dailystruggle.rtp.common.commands.test`, replace
+            `SendMessage.addInterceptor(audit)` /
+            `SendMessage.removeInterceptor(audit)` with
+            `TestUmbrellaContext.require().sender().addAuditInterceptor` /
+            `removeAuditInterceptor`, replace `SendMessage.log` with
+            `sender().log`, and reroute the `resolveName(UUID)` Bukkit
+            `Player` lookup through `sender().resolveCallerName`. Keep the
+            hardcoded `SHIPPED_SUBCOMMAND_NAMES` list intact — dynamic
+            per-platform filtering is Phase 2.4. Update all import sites
+            in `rtp-plugin` leaf commands.
+      - [ ] **2.1.c** Move `TestCmd` to `rtp-core`: same SPI rerouting as
+            2.1.b. Note `TestCmd` currently has duplicated import lines
+            (cosmetic, legal Java) — the move naturally deduplicates them.
+            `BukkitTestCmd` in `rtp-plugin` stays as a thin registration
+            shim that subclasses the moved `TestCmd`.
 - [ ] **2.2** Move each shipped `Test*Cmd` leaf. Classify per leaf:
       - **Cross-platform:** `commands`, `api-compat`, `chunk-ticket`,
         `disconnect-midflight`, `anvil-prefilter`, `biome-source`,
@@ -189,6 +219,22 @@ None at time of writing — user pre-approved the four-phase shape on
 2026-05-14 (see chat transcript). Subsequent sessions should re-read this
 checklist first, re-verify the last `[x]` box still holds, then resume
 from the first `[ ]`.
+
+**Accepted carve-outs (user-confirmed 2026-05-16):** the lack of
+`folia-ownership` and `economy-isolation` on Fabric is **accepted as
+permanent platform-capability gaps**, not deferred work:
+
+- `folia-ownership` — Folia region-ownership is a Folia-only concept; no
+  equivalent exists on Fabric. Skipping is correct by definition, not a
+  shortcoming to revisit.
+- `economy-isolation` — Vault is Bukkit-family-only; Fabric has no
+  Vault analogue in scope for RTP. Skipping is correct by definition.
+
+Both are excluded from the Fabric `rtp test full` matrix and emit a
+configurable S-007 "skipped — not applicable on this platform" line.
+They do **not** count against the acceptance gate and shall not reopen
+this checklist for re-litigation. Tab-completion parity (Phase 4.2) and
+the matrix (below) already encode this as the documented exclusion list.
 
 ## Per-job platform-capability matrix (decision record)
 

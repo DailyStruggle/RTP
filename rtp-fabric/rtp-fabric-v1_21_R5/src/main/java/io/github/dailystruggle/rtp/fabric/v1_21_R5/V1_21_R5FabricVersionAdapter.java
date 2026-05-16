@@ -39,7 +39,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 
 /**
- * MC 1.21.5+ implementation of {@link FabricVersionAdapter} â€” covers the
+ * MC 1.21.5+ implementation of {@link FabricVersionAdapter} — covers the
  * post-refactor {@code DistanceManager}/{@code TicketStorage} API range
  * (1.21.5 through the next breaking change). See {@code rtp-fabric-ADR-004}.
  *
@@ -52,13 +52,13 @@ import java.util.logging.Level;
  * adapter cannot bridge that on a 1.21.5+ runtime because the old methods
  * literally do not exist.</p>
  *
- * <p><b>Implementation:</b> direct typed Mojang-mappings calls â€” no
- * reflection â€” using {@code addTicketWithRadius} / {@code removeTicketWithRadius}
+ * <p><b>Implementation:</b> direct typed Mojang-mappings calls — no
+ * reflection — using {@code addTicketWithRadius} / {@code removeTicketWithRadius}
  * with an RTP-owned {@link TicketType} ({@code timeout = NO_TIMEOUT},
- * {@code persist = false}, {@code use = LOADING_AND_SIMULATION} â€” the same
+ * {@code persist = false}, {@code use = LOADING_AND_SIMULATION} — the same
  * shape as vanilla {@code FORCED}, minus the {@code persist} flag) and a
  * radius of {@code 3}, which yields effective ticket level
- * {@code 33 - 3 = 30} = {@code ENTITY_TICKING} â€” parity with Bukkit's
+ * {@code 33 - 3 = 30} = {@code ENTITY_TICKING} — parity with Bukkit's
  * {@code addPluginChunkTicket} and with {@code TicketType.FORCED}. Because
  * explicit removal is supported and the type carries no auto-expiry, no
  * periodic refresh is needed; the {@link #tickRefresh()} SPI hook stays at
@@ -77,7 +77,7 @@ import java.util.logging.Level;
  * <p><b>S-002 / non-persistent guarantee:</b> we deliberately do not call
  * {@link ServerChunkCache#updateChunkForced} (which persists into
  * {@code level.dat}). The radius-based ticket created here lives only for
- * the JVM lifetime â€” same contract as Bukkit's {@code addPluginChunkTicket}
+ * the JVM lifetime — same contract as Bukkit's {@code addPluginChunkTicket}
  * and the v1_21_R1 adapter's behaviour.</p>
  */
 public final class V1_21_R5FabricVersionAdapter implements FabricVersionAdapter {
@@ -94,8 +94,8 @@ public final class V1_21_R5FabricVersionAdapter implements FabricVersionAdapter 
      * {@code TicketType.FORCED} uses.</p>
      *
      * <p>Earlier revisions of this adapter passed {@code 31} as the radius
-     * under the mistaken belief it was a ticket level â€” that would have
-     * force-loaded a {@code (2*31+1)Â² = 3969}-chunk square per kept
+     * under the mistaken belief it was a ticket level — that would have
+     * force-loaded a {@code (2*31+1)² = 3969}-chunk square per kept
      * location, which the chunk system clamps/rejects, leaving kept-cache
      * entries unpinned and silently evicted. See
      * {@code rtp-fabric-ADR-006-ticket-radius-and-non-expiring-type.md}.</p>
@@ -106,7 +106,7 @@ public final class V1_21_R5FabricVersionAdapter implements FabricVersionAdapter 
      * RTP-owned non-persistent, no-timeout {@link TicketType} used for both
      * {@code addTicketWithRadius} and the matching {@code removeTicketWithRadius}
      * call. Equivalent to {@code TicketType.FORCED}'s shape minus the
-     * {@code persist = true} flag â€” i.e.
+     * {@code persist = true} flag — i.e.
      * {@code (timeout = NO_TIMEOUT, persist = false, use = LOADING_AND_SIMULATION)}.
      *
      * <p>The public record constructor is sufficient; no registry call (and
@@ -118,7 +118,7 @@ public final class V1_21_R5FabricVersionAdapter implements FabricVersionAdapter 
      *
      * <p>This deliberately replaces an earlier use of {@link TicketType#UNKNOWN},
      * whose vanilla registration has {@code timeout = 1L} (1-tick auto-expiry)
-     * and {@code use = LOADING} only â€” both wrong for kept-cache pinning. See
+     * and {@code use = LOADING} only — both wrong for kept-cache pinning. See
      * {@code rtp-fabric-ADR-006-ticket-radius-and-non-expiring-type.md}.</p>
      */
     private static final TicketType RTP_TICKET_TYPE =
@@ -216,7 +216,7 @@ public final class V1_21_R5FabricVersionAdapter implements FabricVersionAdapter 
         }
     }
 
-    // Non-blocking chunk-future dispatch â€” see rtp-fabric-ADR-008.
+    // Non-blocking chunk-future dispatch — see rtp-fabric-ADR-008.
     private static volatile Method GET_CHUNK_FUTURE_METHOD;
 
     private static Method resolveGetChunkFutureMethod(ServerChunkCache cache) throws ReflectiveOperationException {
@@ -259,7 +259,7 @@ public final class V1_21_R5FabricVersionAdapter implements FabricVersionAdapter 
             ServerChunkCache cache = sl.getChunkSource();
             Method getter = resolveGetChunkFutureMethod(cache);
 
-            // Temporary load-ticket â€” see V1_20_R1FabricVersionAdapter#requestFullChunkAsync
+            // Temporary load-ticket — see V1_20_R1FabricVersionAdapter#requestFullChunkAsync
             // for the rationale. 1.21.5 uses the public addTicketWithRadius /
             // removeTicketWithRadius API.
             ChunkPos cp = new ChunkPos(cx, cz);
@@ -402,7 +402,7 @@ public final class V1_21_R5FabricVersionAdapter implements FabricVersionAdapter 
     }
 
     /**
-     * Typed override â€” direct {@code MinecraftServer.getCommands().performPrefixedCommand(
+     * Typed override — direct {@code MinecraftServer.getCommands().performPrefixedCommand(
      * server.createCommandSourceStack(), command)}. Loom remaps the descriptors
      * to intermediary {@code class_3176#method_3734} / {@code method_3739} at
      * compile time, eliminating the reflective {@code getMethod("getCommands")}

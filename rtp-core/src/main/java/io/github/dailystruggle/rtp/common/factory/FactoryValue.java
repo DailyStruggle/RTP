@@ -9,7 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 import org.jetbrains.annotations.NotNull;
-import org.simpleyaml.configuration.file.YamlFile;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 
 /**
  * this exists solely because java is so stubborn about constructors and generics. rather than
@@ -357,7 +357,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     String mapFileName = langDir + File.separator + name.replace(".yml", ".lang.yml");
     langFile = new File(mapFileName);
 
-    YamlFile langYaml = new YamlFile(langFile);
+    RtpYamlConfig langYaml = new RtpYamlConfig(langFile);
     if (!langFile.exists()) {
       try {
         java.io.InputStream in = RTP.class.getClassLoader().getResourceAsStream("lang/" + subDir + "/" + langFile.getName());

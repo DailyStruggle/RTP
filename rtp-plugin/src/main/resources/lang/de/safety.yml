@@ -1,14 +1,22 @@
 # --- RTP Safety Configuration ---
 # Documentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/SAFETY.md
 
-invulnerabilityTime: 5 # Seconds of invulnerability after teleport
-safetyRadius: 0 # Block radius around landing to check for hazards
-staleChunkRetryLimit: 2 # Max retries for stale-chunk guard
-anvilPrefilterEnabled: true # Off-thread anvil prefilter
-platformRadius: -1 # Radius of emergency platform (-1 to disable)
-platformDepth: 1 # Depth of platform
-platformAirHeight: 2 # Air space above platform
-platformMaterial: GLASS # Material for platform
+# Seconds of invulnerability after teleport
+invulnerabilityTime: 5
+# Block radius around landing to check for hazards
+safetyRadius: 0
+# Max retries for stale-chunk guard
+staleChunkRetryLimit: 2
+# Off-thread anvil prefilter
+anvilPrefilterEnabled: true
+# Radius of emergency platform (-1 to disable)
+platformRadius: -1
+# Depth of platform
+platformDepth: 1
+# Air space above platform
+platformAirHeight: 2
+# Material for platform
+platformMaterial: GLASS
 
 airBlocks:
   - AIR
@@ -107,7 +115,8 @@ unsafeBlocks:
   - KELP_PLANT
   - "#minecraft:logs"
 
-biomeWhitelist: false # If true, 'biomes' is a whitelist; otherwise a blacklist
+# If true, 'biomes' is a whitelist; otherwise a blacklist
+biomeWhitelist: false
 biomes:
   - OCEAN
   - DEEP_OCEAN

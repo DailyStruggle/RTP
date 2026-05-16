@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.paper_v1_20_R1.server;
 
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.paper_v1_20_R1.world.PaperRTPWorld;
-import io.github.dailystruggle.rtp.spigot.server.AbstractServerAccessor;
+import io.github.dailystruggle.rtp.bukkitplatform.server.AbstractServerAccessor;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.plugin.Plugin;

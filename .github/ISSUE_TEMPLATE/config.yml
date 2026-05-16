@@ -4,7 +4,7 @@ contact_links:
     url: https://github.com/DailyStruggle/RTP/discussions
     about: The issue tracker is for bugs. Ask usage questions and propose ideas in Discussions first.
   - name: How to get support (read before opening an issue)
-    url: https://github.com/DailyStruggle/RTP/blob/main/SUPPORT.md
+    url: https://github.com/DailyStruggle/RTP/blob/V3-beta/SUPPORT.md
     about: Where to ask, how to ask well, and what will be closed without a reply.
   - name: Security vulnerability (private)
     url: https://github.com/DailyStruggle/RTP/security/advisories/new
@@ -13,8 +13,8 @@ contact_links:
     url: https://www.spigotmc.org/resources/rtp.94812/
     about: Check for existing wiki answers, download the latest release, or leave a review.
   - name: Documentation — Server Admins
-    url: https://github.com/DailyStruggle/RTP/blob/main/docs/FOR_SERVER_ADMINS.md
+    url: https://github.com/DailyStruggle/RTP/blob/V3-beta/docs/FOR_SERVER_ADMINS.md
     about: Quick-start guide, command reference, configuration, FAQ, and runbook.
   - name: Documentation — Addon Developers
-    url: https://github.com/DailyStruggle/RTP/blob/main/docs/FOR_ADDON_DEVELOPERS.md
+    url: https://github.com/DailyStruggle/RTP/blob/V3-beta/docs/FOR_ADDON_DEVELOPERS.md
     about: API guide, architecture overview, and ADRs for extending RTP.

@@ -10,7 +10,7 @@ import io.github.dailystruggle.rtp.common.commands.reload.ReloadCmd;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.LanguageBootstrap;
 import org.jetbrains.annotations.Nullable;
-import org.simpleyaml.configuration.file.YamlFile;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 
 import java.io.File;
 import java.io.IOException;
@@ -90,7 +90,7 @@ public class LanguageCmd extends BaseRTPCmdImpl {
       File file = new File(pluginDir, LanguageBootstrap.FILE_NAME);
 
       try {
-        YamlFile yaml = new YamlFile(file.getPath());
+        RtpYamlConfig yaml = new RtpYamlConfig(file.getPath());
         if (file.exists()) {
           yaml.loadWithComments();
         }

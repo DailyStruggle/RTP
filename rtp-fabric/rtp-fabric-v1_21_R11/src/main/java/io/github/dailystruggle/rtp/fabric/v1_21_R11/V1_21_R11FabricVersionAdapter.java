@@ -38,7 +38,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 
 /**
- * MC 1.21.11+ implementation of {@link FabricVersionAdapter} â€” covers the
+ * MC 1.21.11+ implementation of {@link FabricVersionAdapter} — covers the
  * post-{@code TicketUse} refactor. See {@code rtp-fabric-ADR-007}.
  *
  * <p><b>Why a separate module from {@code v1_21_R5}:</b> Mojang refactored
@@ -56,13 +56,13 @@ import java.util.logging.Level;
  * net/minecraft/class_3230$class_10558}.</p>
  *
  * <p><b>Mojmap-name decoupling (ADR-007):</b> the SPI is now wrapper-typed
- * â€” {@code RTPLevelHandle}, {@code RTPBlockHandle}, etc. â€” so 1.21.11's
- * {@code ResourceLocation â†’ Identifier} rename does not affect the
+ * — {@code RTPLevelHandle}, {@code RTPBlockHandle}, etc. — so 1.21.11's
+ * {@code ResourceLocation → Identifier} rename does not affect the
  * interface. This adapter unwraps via {@code handle.as(MojmapType.class)}
  * on entry and wraps results on exit.</p>
  *
- * <p><b>Implementation:</b> direct typed Mojang-mappings calls â€” no
- * reflection â€” using {@link ServerChunkCache#addTicketWithRadius} /
+ * <p><b>Implementation:</b> direct typed Mojang-mappings calls — no
+ * reflection — using {@link ServerChunkCache#addTicketWithRadius} /
  * {@link ServerChunkCache#removeTicketWithRadius} with an RTP-owned
  * {@link TicketType} constructed as
  * {@code new TicketType(NO_TIMEOUT, FLAG_LOADING | FLAG_SIMULATION)}.
@@ -71,7 +71,7 @@ import java.util.logging.Level;
  * {@code FLAG_KEEP_DIMENSION_ACTIVE}, yielding a non-persistent (S-002
  * safe), no-expiry, fully-ticking ticket.
  * Radius {@code 3} resolves to effective ticket level {@code 33 - 3 = 30}
- * ({@code ENTITY_TICKING}) â€” parity with Bukkit's
+ * ({@code ENTITY_TICKING}) — parity with Bukkit's
  * {@code addPluginChunkTicket} on the Bukkit-family adapters. See
  * {@code rtp-fabric-ADR-006-ticket-radius-and-non-expiring-type.md}.</p>
  *
@@ -187,7 +187,7 @@ public final class V1_21_R11FabricVersionAdapter implements FabricVersionAdapter
         }
     }
 
-    // Non-blocking chunk-future dispatch â€” see rtp-fabric-ADR-008.
+    // Non-blocking chunk-future dispatch — see rtp-fabric-ADR-008.
     private static volatile Method GET_CHUNK_FUTURE_METHOD;
 
     private static Method resolveGetChunkFutureMethod(ServerChunkCache cache) throws ReflectiveOperationException {
@@ -230,7 +230,7 @@ public final class V1_21_R11FabricVersionAdapter implements FabricVersionAdapter
             ServerChunkCache cache = sl.getChunkSource();
             Method getter = resolveGetChunkFutureMethod(cache);
 
-            // Temporary load-ticket â€” see V1_20_R1FabricVersionAdapter#requestFullChunkAsync
+            // Temporary load-ticket — see V1_20_R1FabricVersionAdapter#requestFullChunkAsync
             // for the rationale.
             ChunkPos cp = new ChunkPos(cx, cz);
             boolean ticketAdded = false;
@@ -310,7 +310,7 @@ public final class V1_21_R11FabricVersionAdapter implements FabricVersionAdapter
 
     @Override
     public void installEffectsDispatchers() {
-        // Direct, mapped vanilla calls â€” see V1_21_R11FabricEffectDispatchers
+        // Direct, mapped vanilla calls — see V1_21_R11FabricEffectDispatchers
         // for rationale (Holder vs Holder.direct on 1.21.11; targeted
         // sendParticles overload for chunk-tracker bypass post-teleport).
         V1_21_R11FabricEffectDispatchers.install();
@@ -375,7 +375,7 @@ public final class V1_21_R11FabricVersionAdapter implements FabricVersionAdapter
     }
 
     /**
-     * Typed override â€” direct {@code MinecraftServer.getCommands().performPrefixedCommand(
+     * Typed override — direct {@code MinecraftServer.getCommands().performPrefixedCommand(
      * server.createCommandSourceStack(), command)}. Loom remaps the descriptors
      * to intermediary {@code class_3176#method_3734} / {@code method_3739} at
      * compile time, eliminating the reflective {@code getMethod("getCommands")}

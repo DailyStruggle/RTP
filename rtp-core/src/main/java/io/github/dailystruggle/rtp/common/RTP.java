@@ -34,8 +34,8 @@ import io.github.dailystruggle.rtp.common.tasks.TimeBoundTaskPipe;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tools.ChunkyChecker;
 import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
-import org.simpleyaml.configuration.ConfigurationSection;
-import org.simpleyaml.configuration.file.YamlFile;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 
 import java.io.File;
 import java.util.*;
@@ -210,7 +210,7 @@ public class RTP {
           this.networkManager = createRedisNetworkManager(host, port, password);
           if (this.networkManager != null) this.networkManager.initializeAsync();
         }
-      } else if (redisObj instanceof ConfigurationSection redisSection) {
+      } else if (redisObj instanceof RtpYamlSection redisSection) {
         boolean enabled = redisSection.getBoolean("enabled", false);
         if (enabled) {
           String host = redisSection.getString("host", "127.0.0.1");
@@ -297,15 +297,15 @@ public class RTP {
 
         // 1. Migrate teleportData.yml
         io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase yamlDb = new io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase(databaseDir);
-        Map<String, YamlFile> lookup = yamlDb.connect();
-        YamlFile teleportFile = lookup.get("teleportData.yml");
+        Map<String, RtpYamlConfig> lookup = yamlDb.connect();
+        RtpYamlConfig teleportFile = lookup.get("teleportData.yml");
         if (teleportFile != null) {
           Map<String, Object> mapValues = teleportFile.getMapValues(false);
           for (Map.Entry<String, Object> entry : mapValues.entrySet()) {
             Object val = entry.getValue();
             Map<String, Object> dataMap;
             if (val instanceof Map<?, ?> map) dataMap = (Map<String, Object>) map;
-            else if (val instanceof ConfigurationSection section) dataMap = section.getMapValues(false);
+            else if (val instanceof RtpYamlSection section) dataMap = section.getMapValues(false);
             else continue;
 
             try {
@@ -335,7 +335,7 @@ public class RTP {
           if (files != null) {
             for (File file : files) {
               try {
-                YamlFile yamlFile = new YamlFile(file);
+                RtpYamlConfig yamlFile = new RtpYamlConfig(file);
                 yamlFile.load();
                 Map<String, Object> mapValues = yamlFile.getMapValues(false);
 
@@ -346,7 +346,7 @@ public class RTP {
                 } else {
                   for (Object val : mapValues.values()) {
                     if (val instanceof Map<?, ?> map) records.add((Map<String, Object>) map);
-                    else if (val instanceof ConfigurationSection section) records.add(section.getMapValues(false));
+                    else if (val instanceof RtpYamlSection section) records.add(section.getMapValues(false));
                   }
                 }
 

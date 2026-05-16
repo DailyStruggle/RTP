@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.folia.tasks;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
-import io.github.dailystruggle.rtp.spigot.tools.SendMessage;
+import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
 import org.bukkit.plugin.Plugin;
 
 import io.github.dailystruggle.rtp.folia.thread.RegionThread;

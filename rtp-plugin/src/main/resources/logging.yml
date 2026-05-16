@@ -1,22 +1,34 @@
 # --- Plugin Logging Toggles ---
 # Documentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/CONFIGURATION.md#loggingyml--console-logging-verbosity
 
-detailed_reload: false # Log all files reloaded during /rtp reload
-detailed_region_init: false # Log region initialization details
+# Log all files reloaded during /rtp reload
+detailed_reload: false
+# Log region initialization details
+detailed_region_init: false
 
-command: false # Log player-executed RTP commands
-teleport: true # Log successful teleport events
+# Log player-executed RTP commands
+command: false
+# Log successful teleport events
+teleport: true
 
-event_changeworld: true # Log RTP triggered by world changes
-event_join: true # Log RTP triggered on join
-event_respawn: true # Log RTP triggered on respawn
-event_move: true # Log move event processing
-event_teleport: true # Log teleport event processing
+# Log RTP triggered by world changes
+event_changeworld: true
+# Log RTP triggered on join
+event_join: true
+# Log RTP triggered on respawn
+event_respawn: true
+# Log move event processing
+event_move: true
+# Log teleport event processing
+event_teleport: true
 
-selection_failure: true # Log info when location selection fails
+# Log info when location selection fails
+selection_failure: true
 
-system_memory_tracker: false # Debug logs for memory activity
-system_database: false # Debug logs for database activity
+# Debug logs for memory activity
+system_memory_tracker: false
+# Debug logs for database activity
+system_database: false
 
 # Plugin-scoped minimum log level. Effective filter is the finer of this and the
 # Bukkit logger's own level. Accepts: SEVERE, WARNING, INFO, CONFIG, FINE, FINER,

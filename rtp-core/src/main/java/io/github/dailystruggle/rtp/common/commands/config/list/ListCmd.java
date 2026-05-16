@@ -17,19 +17,19 @@ import java.util.logging.Level;
 
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import org.jetbrains.annotations.Nullable;
-import org.simpleyaml.configuration.file.YamlFile;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 
 public class ListCmd extends BaseRTPCmdImpl {
   private final String name;
   private final Supplier<Set<String>> values;
-  private final YamlFile file;
+  private final RtpYamlConfig file;
   private final String key;
 
   public ListCmd(
       String name,
       @Nullable CommandsAPICommand parent,
       Supplier<Set<String>> values,
-      YamlFile file,
+      RtpYamlConfig file,
       String key) {
     super(parent);
     this.name = name;

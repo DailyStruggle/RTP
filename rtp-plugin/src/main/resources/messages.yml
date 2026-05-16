@@ -20,7 +20,8 @@
 # list of additional placeholders
 # format: Pn - where n is the index in this list
 placeholders:
-  - "[RTP]" #P0
+  # P0
+  - "[RTP]"
 
 ################################################################################
 # Section 2: Teleportation
@@ -189,6 +190,49 @@ scan_description: "clear stored data and try all possible region placements"
 config_description: "update configuration files at runtime"
 info_description: "check the current state of the plugin"
 test_description: "test RTP functions"
+
+################################################################################
+# Section 8b: Generalized Menu Framework (ADR-035 / ADR-044)
+################################################################################
+# Sent when a menu token is unknown, malformed, or belongs to another player.
+menuInvalid: "&c[P0] that menu link is invalid."
+# Sent when a menu token has expired or was already consumed.
+menuExpired: "&c[P0] that menu link has expired. Please reopen the menu."
+# Sent when a menu redeem cannot resolve the calling player UUID.
+menuUnknownPlayer: "&c[P0] menu links can only be used by in-game players."
+# Hover-fallback template used by the menu reflector when no YAML block-comment
+# is available for a parameter. Placeholder: [type] - the declared parameter type.
+menuHoverFallbackType: "type: [type]"
+# Hover-fallback template used by the menu reflector when a parameter exposes a
+# small curated value set. Placeholder: [values] - comma-joined accepted values.
+menuHoverFallbackBounds: "accepted: [values]"
+# Label for the "go back one level" navigation row prepended to every non-root menu page.
+menuBack: "&7« back"
+# Label template for the "execute the assembled command" row prepended to every
+# runnable non-root menu page. Placeholder: [command] - the assembled /rtp ... invocation.
+menuExecute: "&a▶ run [command]"
+# Header row at the top of a parameter-value picker sub-page (Stage A.2).
+# Placeholders: [param] - parameter name; [command] - assembled /rtp ... invocation.
+menuPickValue: "&epick a value for [param] (will run: /rtp [command] [param]:<value>)"
+# Label for the "type a custom value" fallback row on a parameter-value picker page.
+# Clicking it prefills chat with the assembled command up to '<param>:' so the player
+# can type any value, including ones not in the suggestion list.
+menuTypeValue: "&7✎ type a custom value..."
+# Non-clickable header row at the top of every non-root menu page (Stage A.4).
+# Surfaces the currently-constructed /rtp invocation including any staged
+# parameter assignments (name:value). Placeholder: [command] - assembled args.
+menuConstructed: "&7building: &f/rtp [command]"
+# Non-clickable title row prepended to the root /rtp menu page (Stage A.5).
+# Provides a welcoming header before the player descends into any subcommand.
+menuRootTitle: "&6&l⚡ RTP menu"
+# Non-clickable subtitle/hint row prepended to the root /rtp menu page below
+# menuRootTitle (Stage A.5). Short orientation text for first-time users.
+menuRootHint: "&7click an option below to begin"
+# Navigation rows appended to paginated menu pages (Stage A.6) — clicking
+# them moves to the previous/next page of the same model. Placeholder:
+# [page] - the 1-based human-readable target page number.
+menuPagePrev: "&7« previous page ([page])"
+menuPageNext: "&7next page ([page]) »"
 
 ################################################################################
 # Section 9: PlaceholderAPI Support

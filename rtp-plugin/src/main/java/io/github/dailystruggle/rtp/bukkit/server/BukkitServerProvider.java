@@ -54,8 +54,8 @@ public class BukkitServerProvider {
                 accessorClassName = "io.github.dailystruggle.rtp.paper_v26_1_R1.server.ServerAccessorImpl";
                 schedulerClassName = "io.github.dailystruggle.rtp.paper_v26_1_R1.scheduling.BukkitSchedulerImpl";
             } else {
-                accessorClassName = "io.github.dailystruggle.rtp.spigot_v26_1_R1.server.ServerAccessorImpl";
-                schedulerClassName = "io.github.dailystruggle.rtp.spigot_v26_1_R1.scheduling.BukkitSchedulerImpl";
+                accessorClassName = "io.github.dailystruggle.rtp.bukkitplatform.v26_1_R1.server.ServerAccessorImpl";
+                schedulerClassName = "io.github.dailystruggle.rtp.bukkitplatform.v26_1_R1.scheduling.BukkitSchedulerImpl";
             }
         } else if (version.contains("1.21")) {
             if (isFolia()) {
@@ -65,8 +65,8 @@ public class BukkitServerProvider {
                 accessorClassName = "io.github.dailystruggle.rtp.paper_v1_21_R1.server.ServerAccessorImpl";
                 schedulerClassName = "io.github.dailystruggle.rtp.paper_v1_21_R1.scheduling.BukkitSchedulerImpl";
             } else {
-                accessorClassName = "io.github.dailystruggle.rtp.spigot_v1_21_R1.server.ServerAccessorImpl";
-                schedulerClassName = "io.github.dailystruggle.rtp.spigot_v1_21_R1.scheduling.BukkitSchedulerImpl";
+                accessorClassName = "io.github.dailystruggle.rtp.bukkitplatform.v1_21_R1.server.ServerAccessorImpl";
+                schedulerClassName = "io.github.dailystruggle.rtp.bukkitplatform.v1_21_R1.scheduling.BukkitSchedulerImpl";
             }
         } else if (version.contains("1.20")) {
             if (isFolia()) {
@@ -76,8 +76,8 @@ public class BukkitServerProvider {
                 accessorClassName = "io.github.dailystruggle.rtp.paper_v1_20_R1.server.ServerAccessorImpl";
                 schedulerClassName = "io.github.dailystruggle.rtp.paper_v1_20_R1.scheduling.BukkitSchedulerImpl";
             } else {
-                accessorClassName = "io.github.dailystruggle.rtp.spigot_v1_20_R1.server.ServerAccessorImpl";
-                schedulerClassName = "io.github.dailystruggle.rtp.spigot_v1_20_R1.scheduling.BukkitSchedulerImpl";
+                accessorClassName = "io.github.dailystruggle.rtp.bukkitplatform.v1_20_R1.server.ServerAccessorImpl";
+                schedulerClassName = "io.github.dailystruggle.rtp.bukkitplatform.v1_20_R1.scheduling.BukkitSchedulerImpl";
             }
         } else {
             if (isFolia()) {
@@ -87,8 +87,8 @@ public class BukkitServerProvider {
                 accessorClassName = "io.github.dailystruggle.rtp.paper_v1_20_R1.server.ServerAccessorImpl";
                 schedulerClassName = "io.github.dailystruggle.rtp.paper_v1_20_R1.scheduling.BukkitSchedulerImpl";
             } else {
-                accessorClassName = "io.github.dailystruggle.rtp.spigot_v1_20_R1.server.ServerAccessorImpl";
-                schedulerClassName = "io.github.dailystruggle.rtp.spigot_v1_20_R1.scheduling.BukkitSchedulerImpl";
+                accessorClassName = "io.github.dailystruggle.rtp.bukkitplatform.v1_20_R1.server.ServerAccessorImpl";
+                schedulerClassName = "io.github.dailystruggle.rtp.bukkitplatform.v1_20_R1.scheduling.BukkitSchedulerImpl";
             }
         }
         return new ServerModel(accessorClassName, schedulerClassName);

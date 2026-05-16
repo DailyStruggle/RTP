@@ -117,6 +117,7 @@ Per [ADR-035](../adr/ADR-035-interactive-menus-book-first.md) (Proposed, target 
 
 Deferred follow-ups (research-only, not blocking beta.4):
 
+- [ ] **`/rtp me` per-player status command.** New subcommand surfacing the *sender's* RTP state (current cooldown remaining, last destination world / coordinates, queue position if waiting, applicable per-world permission gates). Distinct from `/rtp info`, which inspects global system state. Surface this in the menu Quick Actions launcher (Stage B of the menu-navigation work) once it exists. One short ADR before implementation.
 - [ ] **`/rtp biomes` menu.** Follow-up ADR; reuses the same primitive.
 - [ ] **`/rtpadmin` setup wizards.** Highest-value consumer; deferred to a dedicated ADR ([ADR-038](../adr/ADR-038-rtpadmin-setup-wizards.md)).
 - [ ] **Public `MenuRenderer` SPI for addons.** Currently internal-public; lock the addon-facing surface only after the in-tree consumer settles.

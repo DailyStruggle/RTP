@@ -1,14 +1,14 @@
-﻿[CENTER]
+[CENTER]
 [SIZE=7][B][COLOR=#2C3E50]RTP[/COLOR][COLOR=#2980B9]-Pro[/COLOR][/B][/SIZE]
 [SIZE=4][B][COLOR=#555555]Deterministic, zero-latency Random Teleport for technical networks[/COLOR][/B][/SIZE]
-[I]Folia-ready � multi-server / proxy (beta.3+) � audited safety � same engine as the free RTP build, with the enterprise pieces turned on.[/I]
+[I]Folia-ready - multi-server / proxy (beta.3+) - audited safety - same engine as the free RTP build, with the enterprise pieces turned on.[/I]
 
-[SIZE=4][B][COLOR=#E67E22]3.0.0 � Early Access (beta.2)[/COLOR][/B][/SIZE]
-[SIZE=4][B][COLOR=#27AE60]Beta price $7.50[/COLOR][/B] � $15 at GA � Early buyers keep the resource at no extra cost.[/SIZE]
+[SIZE=4][B][COLOR=#E67E22]3.0.0 - Early Access (beta.2)[/COLOR][/B][/SIZE]
+[SIZE=4][B][COLOR=#27AE60]Beta price $7.50[/COLOR][/B] - $15 at GA - Early buyers keep the resource at no extra cost.[/SIZE]
 
 [URL='https://github.com/dailystruggle/RTP'][IMG]https://img.shields.io/github/v/release/dailystruggle/RTP?label=Version&style=for-the-badge&color=2980B9[/IMG][/URL] [URL='https://github.com/dailystruggle/RTP'][IMG]https://img.shields.io/github/license/dailystruggle/RTP?label=License&style=for-the-badge&color=2C3E50[/IMG][/URL]
 
-[COLOR=#D1D1D1]????????????????????????????????????????????????????????????[/COLOR]
+[COLOR=#D1D1D1]------------------------------------------------------------[/COLOR]
 [/CENTER]
 
 [SIZE=6][B][COLOR=#27AE60]Why operators buy Pro[/COLOR][/B][/SIZE]
@@ -16,107 +16,107 @@ On [B]Paper 1.21[/B], measured on the in-repo harness, 2 OPed clients spamming [
 
 [TABLE]
 [TR][TH]Plugin[/TH][TH]TP/s[/TH][TH]Worst tick (MSPT p99)[/TH][TH]CPU per teleport[/TH][/TR]
-[TR][TD][B]?? RTP-Pro[/B][/TD][TD][B]19.8[/B][/TD][TD][B]4 ms[/B][/TD][TD][B]16.9 ms[/B][/TD][/TR]
-[TR][TD]?? JakesRTP[/TD][TD]20.0[/TD][TD]70 ms[/TD][TD]26.0 ms[/TD][/TR]
-[TR][TD]?? BetterRTP[/TD][TD]7.1[/TD][TD]771 ms[/TD][TD]53.6 ms[/TD][/TR]
-[TR][TD]?? HuskHomes RTP[/TD][TD]6.2[/TD][TD]335 ms[/TD][TD]52.2 ms[/TD][/TR]
+[TR][TD][B]RTP-Pro[/B][/TD][TD][B]19.8[/B][/TD][TD][B]4 ms[/B][/TD][TD][B]16.9 ms[/B][/TD][/TR]
+[TR][TD]JakesRTP[/TD][TD]20.0[/TD][TD]70 ms[/TD][TD]26.0 ms[/TD][/TR]
+[TR][TD]BetterRTP[/TD][TD]7.1[/TD][TD]771 ms[/TD][TD]53.6 ms[/TD][/TR]
+[TR][TD]HuskHomes RTP[/TD][TD]6.2[/TD][TD]335 ms[/TD][TD]52.2 ms[/TD][/TR]
 [/TABLE]
 
-Same throughput as the next-best plugin at [B]~17� lower worst-case tick spike and 35% less CPU per teleport.[/B] On Folia, RTP-Pro is the only plugin in the field that hits double-digit TP/s (9.87 TP/s @ 99.97% success). Raw harness: [URL=https://github.com/dailystruggle/RTP/tree/main/helpers/StressTestRTP][I]helpers/StressTestRTP/[/I][/URL].
+Same throughput as the next-best plugin at [B]~17x lower worst-case tick spike and 35% less CPU per teleport.[/B] On Folia, RTP-Pro is the only plugin in the field that hits double-digit TP/s (9.87 TP/s @ 99.97% success). Raw harness: [URL=https://github.com/dailystruggle/RTP/tree/V3-beta/helpers/StressTestRTP][I]helpers/StressTestRTP/[/I][/URL].
 
-[CENTER][COLOR=#D1D1D1]????????????????????????????????????????????????????????????[/COLOR][/CENTER]
+[CENTER][COLOR=#D1D1D1]------------------------------------------------------------[/COLOR][/CENTER]
 
 [SIZE=6][B][COLOR=#2980B9]What Pro adds over the free RTP build[/COLOR][/B][/SIZE]
 [TABLE]
 [TR][TH] [/TH][TH]Free RTP[/TH][TH][B]RTP-Pro[/B][/TH][/TR]
-[TR][TD]Spigot + Paper engine, queues, spiral, Anvil pre-filter[/TD][TD]?[/TD][TD]?[/TD][/TR]
-[TR][TD]8 claim plugins bundled (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, Factions, HuskTowns, RedProtect)[/TD][TD]?[/TD][TD]?[/TD][/TR]
-[TR][TD][I]effects-api[/I], [I]rtp-api[/I], PlaceholderAPI, ProtocolLib[/TD][TD]?[/TD][TD]?[/TD][/TR]
-[TR][TD][B]Folia[/B] (Region Scheduler + off-tick pre-filter, no 1-tick stalls)[/TD][TD]?[/TD][TD]?[/TD][/TR]
-[TR][TD][B]Multi-server / proxy[/B] (Velocity, BungeeCord) � [I]planned 3.0.0-beta.3[/I][/TD][TD]?[/TD][TD]?[/TD][/TR]
-[TR][TD][B]SQL / Redis[/B] shared-state backends (H2, SQLite, MySQL, PostgreSQL, Jedis)[/TD][TD]?[/TD][TD]?[/TD][/TR]
-[TR][TD][B]Vault[/B] economy (charge for [I]/rtp[/I])[/TD][TD]?[/TD][TD]?[/TD][/TR]
-[TR][TD]Multilingual [I]lang/**[/I], login-reserve cache, visitor mode[/TD][TD]?[/TD][TD]?[/TD][/TR]
-[TR][TD][B][I]safety.yml[/I] token grammar[/B] � vanilla block tags, state predicates, wildcards[/TD][TD]?[/TD][TD]?[/TD][/TR]
-[TR][TD]Earliest release on each MC version + priority support[/TD][TD]?[/TD][TD]?[/TD][/TR]
+[TR][TD]Spigot + Paper engine, queues, spiral, Anvil pre-filter[/TD][TD]Yes[/TD][TD]Yes[/TD][/TR]
+[TR][TD]8 claim plugins bundled (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, Factions, HuskTowns, RedProtect)[/TD][TD]Yes[/TD][TD]Yes[/TD][/TR]
+[TR][TD][I]effects-api[/I], [I]rtp-api[/I], PlaceholderAPI, ProtocolLib[/TD][TD]Yes[/TD][TD]Yes[/TD][/TR]
+[TR][TD][B]Folia[/B] (Region Scheduler + off-tick pre-filter, no 1-tick stalls)[/TD][TD]No[/TD][TD]Yes[/TD][/TR]
+[TR][TD][B]Multi-server / proxy[/B] (Velocity, BungeeCord) - [I]planned 3.0.0-beta.3[/I][/TD][TD]No[/TD][TD]Yes[/TD][/TR]
+[TR][TD][B]SQL / Redis[/B] shared-state backends (H2, SQLite, MySQL, PostgreSQL, Jedis)[/TD][TD]No[/TD][TD]Yes[/TD][/TR]
+[TR][TD][B]Vault[/B] economy (charge for [I]/rtp[/I])[/TD][TD]No[/TD][TD]Yes[/TD][/TR]
+[TR][TD]Multilingual [I]lang/**[/I], login-reserve cache, visitor mode[/TD][TD]No[/TD][TD]Yes[/TD][/TR]
+[TR][TD][B][I]safety.yml[/I] token grammar[/B] - vanilla block tags, state predicates, wildcards[/TD][TD]No[/TD][TD]Yes[/TD][/TR]
+[TR][TD]Earliest release on each MC version + priority support[/TD][TD]No[/TD][TD]Yes[/TD][/TR]
 [/TABLE]
 
-Same configuration, same data files, same commands as the free build � [B]upgrade is drop-in.[/B]
+Same configuration, same data files, same commands as the free build - [B]upgrade is drop-in.[/B]
 
-[CENTER][COLOR=#D1D1D1]????????????????????????????????????????????????????????????[/COLOR][/CENTER]
+[CENTER][COLOR=#D1D1D1]------------------------------------------------------------[/COLOR][/CENTER]
 
 [SIZE=6][B][COLOR=#C0392B]Buyer fit (read before purchase)[/COLOR][/B][/SIZE]
 A few hard requirements. If any are a [B]no[/B], EssentialsX [I]/rtp[/I] or HuskHomes are solid free alternatives that will probably serve you better.
 
 [LIST]
-[*]? [B]Java 21+[/B] on your host (REQ-RTP-SYS-001, non-negotiable).
-[*]? [B]Paper, Folia, Spigot, or Fabric[/B] � or Arclight / Mohist for Forge / NeoForge.
-[*]? [B]You edit YAML.[/B] No GUI by design � plain files you can version and diff.
-[*]? [B]You read the admin guide before asking for help.[/B] Support Policy is enforced (see below).
-[*]? [B]Real server, not a 2-player LAN.[/B] For a friends-only SMP this is overkill � grab the free build.
+[*][B]Java 21+[/B] on your host (REQ-RTP-SYS-001, non-negotiable).
+[*][B]Paper, Folia, Spigot, or Fabric[/B] - or Arclight / Mohist for Forge / NeoForge.
+[*][B]You edit YAML.[/B] No GUI by design - plain files you can version and diff.
+[*][B]You read the admin guide before asking for help.[/B] Support Policy is enforced (see below).
+[*][B]Real server, not a 2-player LAN.[/B] For a friends-only SMP this is overkill - grab the free build.
 [/LIST]
 
-[CENTER][COLOR=#D1D1D1]????????????????????????????????????????????????????????????[/COLOR][/CENTER]
+[CENTER][COLOR=#D1D1D1]------------------------------------------------------------[/COLOR][/CENTER]
 
-[SPOILER='?? Full benchmark � Paper, Spigot, Folia head-to-head']
-[B]Confidence:[/B] ?? measured � ?? from plugin docs � ? inferred from architecture.
+[SPOILER='Full benchmark - Paper, Spigot, Folia head-to-head']
+[B]Confidence:[/B] measured; from plugin docs; inferred from architecture.
 
-[B]Metrics:[/B] Throughput (TP/s, higher better) � MSPT p99 (worst 1-in-100 main-thread tick in ms; <~50 ms = no dropped tick) � Min TPS (20.00 = no hiccup) � CPU / TP (main-thread CPU per successful teleport).
+[B]Metrics:[/B] Throughput (TP/s, higher better) - MSPT p99 (worst 1-in-100 main-thread tick in ms; <~50 ms = no dropped tick) - Min TPS (20.00 = no hiccup) - CPU / TP (main-thread CPU per successful teleport).
 
-[B]Paper 1.21.11[/B] � recommended platform.
+[B]Paper 1.21.11[/B] - recommended platform.
 [TABLE]
 [TR][TH]Plugin[/TH][TH]TP/s[/TH][TH]MSPT p99 (ms)[/TH][TH]Min TPS[/TH][TH]CPU / TP (ms)[/TH][/TR]
-[TR][TD][B]?? RTP-Pro[/B][/TD][TD][B]19.8[/B][/TD][TD][B]4[/B][/TD][TD][B]20.00[/B][/TD][TD][B]16.9[/B][/TD][/TR]
-[TR][TD]?? JakesRTP[/TD][TD]20.0[/TD][TD]70[/TD][TD]20.00[/TD][TD]26.0[/TD][/TR]
-[TR][TD]?? BetterRTP[/TD][TD]7.1[/TD][TD]771[/TD][TD]20.00[/TD][TD]53.6[/TD][/TR]
-[TR][TD]?? HuskHomes[/TD][TD]6.2[/TD][TD]335[/TD][TD]20.00[/TD][TD]52.2[/TD][/TR]
+[TR][TD][B]RTP-Pro[/B][/TD][TD][B]19.8[/B][/TD][TD][B]4[/B][/TD][TD][B]20.00[/B][/TD][TD][B]16.9[/B][/TD][/TR]
+[TR][TD]JakesRTP[/TD][TD]20.0[/TD][TD]70[/TD][TD]20.00[/TD][TD]26.0[/TD][/TR]
+[TR][TD]BetterRTP[/TD][TD]7.1[/TD][TD]771[/TD][TD]20.00[/TD][TD]53.6[/TD][/TR]
+[TR][TD]HuskHomes[/TD][TD]6.2[/TD][TD]335[/TD][TD]20.00[/TD][TD]52.2[/TD][/TR]
 [/TABLE]
 
-[B]Spigot 1.20.1[/B] � platform-wide chunk-gen ceiling caps everyone at 1�1.5 TP/s; the latency tail is what matters.
+[B]Spigot 1.20.1[/B] - platform-wide chunk-gen ceiling caps everyone at 1-1.5 TP/s; the latency tail is what matters.
 [TABLE]
 [TR][TH]Plugin[/TH][TH]TP/s[/TH][TH]MSPT p99 (ms)[/TH][TH]Min TPS[/TH][TH]CPU / TP (ms)[/TH][/TR]
-[TR][TD][B]?? RTP-Pro[/B][/TD][TD][B]1.52[/B][/TD][TD][B]3[/B][/TD][TD][B]6.4[/B][/TD][TD]572[/TD][/TR]
-[TR][TD]?? JakesRTP[/TD][TD]1.04[/TD][TD]2 252[/TD][TD]��[/TD][TD]��[/TD][/TR]
-[TR][TD]?? BetterRTP[/TD][TD]1.33[/TD][TD]3 790[/TD][TD]2.18[/TD][TD]584[/TD][/TR]
-[TR][TD]?? HuskHomes[/TD][TD]0.93[/TD][TD]4 939[/TD][TD]2.59[/TD][TD]868[/TD][/TR]
+[TR][TD][B]RTP-Pro[/B][/TD][TD][B]1.52[/B][/TD][TD][B]3[/B][/TD][TD][B]6.4[/B][/TD][TD]572[/TD][/TR]
+[TR][TD]JakesRTP[/TD][TD]1.04[/TD][TD]2 252[/TD][TD]--[/TD][TD]--[/TD][/TR]
+[TR][TD]BetterRTP[/TD][TD]1.33[/TD][TD]3 790[/TD][TD]2.18[/TD][TD]584[/TD][/TR]
+[TR][TD]HuskHomes[/TD][TD]0.93[/TD][TD]4 939[/TD][TD]2.59[/TD][TD]868[/TD][/TR]
 [/TABLE]
 
-[B]Folia 1.21.11[/B] � Region MSPT = per-region tick (a bad region doesn't stall the server).
+[B]Folia 1.21.11[/B] - Region MSPT = per-region tick (a bad region doesn't stall the server).
 [TABLE]
 [TR][TH]Plugin[/TH][TH]TP/s[/TH][TH]Region MSPT p99 (ms)[/TH][TH]Success[/TH][TH]CPU / TP (ms)[/TH][/TR]
-[TR][TD][B]?? RTP-Pro[/B][/TD][TD][B]9.87[/B][/TD][TD][B]157[/B][/TD][TD][B]99.97 %[/B][/TD][TD][B]18.0[/B][/TD][/TR]
-[TR][TD]?? BetterRTP[/TD][TD]3.82[/TD][TD]1 200[/TD][TD]100 %[/TD][TD]34.8[/TD][/TR]
-[TR][TD]?? HuskHomes[/TD][TD]3.32[/TD][TD]901[/TD][TD]100 %[/TD][TD]28.4[/TD][/TR]
+[TR][TD][B]RTP-Pro[/B][/TD][TD][B]9.87[/B][/TD][TD][B]157[/B][/TD][TD][B]99.97 %[/B][/TD][TD][B]18.0[/B][/TD][/TR]
+[TR][TD]BetterRTP[/TD][TD]3.82[/TD][TD]1 200[/TD][TD]100 %[/TD][TD]34.8[/TD][/TR]
+[TR][TD]HuskHomes[/TD][TD]3.32[/TD][TD]901[/TD][TD]100 %[/TD][TD]28.4[/TD][/TR]
 [/TABLE]
 
 [B]Architecture support matrix:[/B]
 [TABLE]
 [TR][TH]Plugin[/TH][TH]Spigot[/TH][TH]Paper (+ forks)[/TH][TH]Folia[/TH][/TR]
-[TR][TD][B]RTP-Pro[/B][/TD][TD]??? Off-tick Anvil pre-filter; rare bounded fallback[/TD][TD]??? Fully async via [I]getChunkAtAsync[/I][/TD][TD]??? Region Scheduler + off-tick pre-filter[/TD][/TR]
-[TR][TD]BetterRTP[/TD][TD]???? Sync chunk load on miss[/TD][TD]???? Paper async; no safety pre-filter[/TD][TD]??? p99 ~1.2 s[/TD][/TR]
-[TR][TD]EzRTP[/TD][TD]??? Paper-only API crashes on Spigot 1.20.1[/TD][TD]???[/TD][TD]???[/TD][/TR]
-[TR][TD]AsyRTP[/TD][TD]??? Fails to enable on Spigot 1.20.1[/TD][TD]???[/TD][TD]???[/TD][/TR]
-[TR][TD]SorekillRTP[/TD][TD]??? Redis-cross-server focus[/TD][TD]??? Same[/TD][TD]???[/TD][/TR]
-[TR][TD]AdvancedRTP[/TD][TD]???? Safety-first, sync chunk load[/TD][TD]???? Same[/TD][TD]???[/TD][/TR]
-[TR][TD]JakesRTP[/TD][TD]???? Async via flag; 10-slot cache[/TD][TD]??? Widely deployed[/TD][TD]???[/TD][/TR]
-[TR][TD]EssentialsX [I]/rtp[/I][/TD][TD]??? Main-thread chunk load[/TD][TD]??? Same[/TD][TD]???[/TD][/TR]
-[TR][TD]HuskHomes RTP[/TD][TD]???[/TD][TD]???? Same[/TD][TD]??? p99 ~900 ms[/TD][/TR]
+[TR][TD][B]RTP-Pro[/B][/TD][TD]Off-tick Anvil pre-filter; rare bounded fallback[/TD][TD]Fully async via [I]getChunkAtAsync[/I][/TD][TD]Region Scheduler + off-tick pre-filter[/TD][/TR]
+[TR][TD]BetterRTP[/TD][TD]Sync chunk load on miss[/TD][TD]Paper async; no safety pre-filter[/TD][TD]p99 ~1.2 s[/TD][/TR]
+[TR][TD]EzRTP[/TD][TD]Paper-only API crashes on Spigot 1.20.1[/TD][TD]N/A[/TD][TD]N/A[/TD][/TR]
+[TR][TD]AsyRTP[/TD][TD]Fails to enable on Spigot 1.20.1[/TD][TD]N/A[/TD][TD]N/A[/TD][/TR]
+[TR][TD]SorekillRTP[/TD][TD]Redis-cross-server focus[/TD][TD]Same[/TD][TD]N/A[/TD][/TR]
+[TR][TD]AdvancedRTP[/TD][TD]Safety-first, sync chunk load[/TD][TD]Same[/TD][TD]N/A[/TD][/TR]
+[TR][TD]JakesRTP[/TD][TD]Async via flag; 10-slot cache[/TD][TD]Widely deployed[/TD][TD]N/A[/TD][/TR]
+[TR][TD]EssentialsX [I]/rtp[/I][/TD][TD]Main-thread chunk load[/TD][TD]Same[/TD][TD]N/A[/TD][/TR]
+[TR][TD]HuskHomes RTP[/TD][TD]Supported[/TD][TD]Same[/TD][TD]p99 ~900 ms[/TD][/TR]
 [/TABLE]
 
 [B]Memory & TPS:[/B] queue bounded (bounded by [I]cacheCap[/I]); each entry is a small POJO. Server TPS held at [B]20.00[/B] across every Paper and Folia run. On Spigot, every plugin saturates to the same chunk-gen ceiling; RTP-Pro just spends those ticks doing fewer things.
 
-� Paper RTP-Pro row reproduced n=2; other rows are n=1 on a single rig. � JakesRTP Spigot row ran in slot 4 of a 4-phase chain � Min TPS / CPU-per-TP confounded by carry-over; dispatch-time numbers (throughput, p99) remain valid.
+- Paper RTP-Pro row reproduced n=2; other rows are n=1 on a single rig. - JakesRTP Spigot row ran in slot 4 of a 4-phase chain - Min TPS / CPU-per-TP confounded by carry-over; dispatch-time numbers (throughput, p99) remain valid.
 
-[B]Caveats.[/B] 2 clients only (the number is a floor, not a ceiling). Hardware, view distance, world state, and other plugins will move the numbers. Competitor plugins update frequently; corrections welcome via GitHub issue with a contradicting repro or doc link. Feature breadth, GUI, and claim-integration count are not benchmarked � several competitors trade speed for those, which is a legitimate choice.
+[B]Caveats.[/B] 2 clients only (the number is a floor, not a ceiling). Hardware, view distance, world state, and other plugins will move the numbers. Competitor plugins update frequently; corrections welcome via GitHub issue with a contradicting repro or doc link. Feature breadth, GUI, and claim-integration count are not benchmarked - several competitors trade speed for those, which is a legitimate choice.
 
-Full methodology, raw CSVs, per-run analyses: [URL=https://github.com/dailystruggle/RTP/tree/main/helpers/StressTestRTP][I]helpers/StressTestRTP/[/I][/URL].
+Full methodology, raw CSVs, per-run analyses: [URL=https://github.com/dailystruggle/RTP/tree/V3-beta/helpers/StressTestRTP][I]helpers/StressTestRTP/[/I][/URL].
 [/SPOILER]
 
-[SPOILER='??? Architecture � five pillars + chunk-loading by platform']
+[SPOILER='Architecture - five pillars + chunk-loading by platform']
 [B]Five pillars:[/B]
 [LIST]
 [*][B]Deterministic spiral selection.[/B] Bounded math, uniform player distribution even on massive worlds; no unbounded re-roll loops.
-[*][B]Platform-native performance.[/B] Spigot, Paper, and Folia each get the threading model that fits them � not the lowest-common-denominator.
+[*][B]Platform-native performance.[/B] Spigot, Paper, and Folia each get the threading model that fits them - not the lowest-common-denominator.
 [*][B]Active resource watchdog.[/B] Background sweep reclaims chunk tickets from abandoned teleports via WeakReferences; nothing stays force-loaded past its reservation window.
 [*][B]Direct region I/O pre-filter.[/B] [I].mca[/I] region files parsed off-tick on a background pool, including biomes (custom namespaced biomes like Iris included). Paper-grade safety evaluation on Spigot; skips per-candidate Region-Thread hops on Folia.
 [*][B]Admin-driven background mapping.[/B] [I]/rtp scan start|pause|resume|reset|cancel[/I] walks the spiral during idle periods so spatial memory accumulates without player traffic. Fully-automatic self-warming is on the roadmap for [I]3.0.0[/I] final.
@@ -124,54 +124,54 @@ Full methodology, raw CSVs, per-run analyses: [URL=https://github.com/dailystrug
 
 [B]Chunk loading, by platform:[/B]
 [LIST]
-[*][B][COLOR=#27AE60]Paper[/COLOR][/B] � [I]World#getChunkAtAsync[/I] used directly. No pre-filter, no main-thread fallback. Reference platform.
-[*][B][COLOR=#27AE60]Paper forks[/COLOR][/B] (Leaf, Leaves, Purpur, Pufferfish, Airplane, DivineMC, �) � inherit the Paper code path.
-[*][B][COLOR=#2980B9]Folia[/COLOR][/B] � Anvil read-only pre-filter on [I]ForkJoinPool.commonPool()[/I] [I]before[/I] the Region Scheduler; rejected candidates never hop a thread. Confirmed candidates load through Folia's native async API; teleports dispatch through the Entity Scheduler.
-[*][B][COLOR=#E67E22]Spigot[/COLOR][/B] � [I].mca[/I] region files parsed off-tick ([I]isAir[/I], [I]isSafe[/I], surface-height, sky-light, biome). Paper-class throughput on plain Spigot.
-[*][B][COLOR=#27AE60]Mohist / Arclight[/COLOR][/B] � officially supported. Spigot code path applies.
-[*][B][COLOR=#8E44AD]Fabric[/COLOR][/B] � in-tree adapter, functional (unstable frontier � see roadmap). Loom-remapped obf/unobf carriers cover 1.20.x, 1.21.x, and MC 26.x runtimes.
+[*][B][COLOR=#27AE60]Paper[/COLOR][/B] - [I]World#getChunkAtAsync[/I] used directly. No pre-filter, no main-thread fallback. Reference platform.
+[*][B][COLOR=#27AE60]Paper forks[/COLOR][/B] (Leaf, Leaves, Purpur, Pufferfish, Airplane, DivineMC, -) - inherit the Paper code path.
+[*][B][COLOR=#2980B9]Folia[/COLOR][/B] - Anvil read-only pre-filter on [I]ForkJoinPool.commonPool()[/I] [I]before[/I] the Region Scheduler; rejected candidates never hop a thread. Confirmed candidates load through Folia's native async API; teleports dispatch through the Entity Scheduler.
+[*][B][COLOR=#E67E22]Spigot[/COLOR][/B] - [I].mca[/I] region files parsed off-tick ([I]isAir[/I], [I]isSafe[/I], surface-height, sky-light, biome). Paper-class throughput on plain Spigot.
+[*][B][COLOR=#27AE60]Mohist / Arclight[/COLOR][/B] - officially supported. Spigot code path applies.
+[*][B][COLOR=#8E44AD]Fabric[/COLOR][/B] - in-tree adapter, functional (unstable frontier - see roadmap). Loom-remapped obf/unobf carriers cover 1.20.x, 1.21.x, and MC 26.x runtimes.
 [/LIST]
 
-[B]Honest fallback caveats.[/B] The Anvil pre-filter is a data source, not a universal gate. It falls through to the platform's native chunk API in two cases: (1) the chunk is already loaded (live data wins), or (2) the probe returns [I]unknown[/I] (no region file, unsupported data version, decode error, un-populated). On Spigot the fallback is one on-tick [I]getChunkAt[/I]. On Folia it's one Region-Scheduler hop. Custom generators (Iris, Terra, datapacks) do [B]not[/B] trigger the fallback � populated [I].mca[/I] palettes are read directly, preserving modded and namespaced IDs that the Bukkit enum would collapse.
+[B]Honest fallback caveats.[/B] The Anvil pre-filter is a data source, not a universal gate. It falls through to the platform's native chunk API in two cases: (1) the chunk is already loaded (live data wins), or (2) the probe returns [I]unknown[/I] (no region file, unsupported data version, decode error, un-populated). On Spigot the fallback is one on-tick [I]getChunkAt[/I]. On Folia it's one Region-Scheduler hop. Custom generators (Iris, Terra, datapacks) do [B]not[/B] trigger the fallback - populated [I].mca[/I] palettes are read directly, preserving modded and namespaced IDs that the Bukkit enum would collapse.
 
-[B]Upgrade-drift-proof biome filtering.[/B] When you bump your Paper or Folia server across MC versions, Mojang's seed-based biome assignment can change for already-written coordinates. The Anvil-first biome read keeps the [I].mca[/I] palette authoritative for populated chunks � the biome a player lands in is the biome your [I]biomes:[/I] allow-list was written against. No re-pregen, no re-tuning after an upgrade.
+[B]Upgrade-drift-proof biome filtering.[/B] When you bump your Paper or Folia server across MC versions, Mojang's seed-based biome assignment can change for already-written coordinates. The Anvil-first biome read keeps the [I].mca[/I] palette authoritative for populated chunks - the biome a player lands in is the biome your [I]biomes:[/I] allow-list was written against. No re-pregen, no re-tuning after an upgrade.
 
 [B]Operator takeaway:[/B] Paper and Folia run chunk I/O fully off-tick. On vanilla Spigot the Anvil pre-filter covers the common case; rare main-thread fallback is bounded by your configured tick-budget; no platform silently blocks the tick loop without reporting it.
 [/SPOILER]
 
-[SPOILER='?? Spatial memory � why the longer it runs, the faster it gets']
-Without spatial indexing, teleportation is a guessing game and the numbers are ugly. A typical Overworld is only [B]~45% safely teleportable[/B]� (oceans, rivers, ravines, steep terrain eat the rest); the Nether is dominated by lava seas and wall-to-wall stone; the End is [I]almost entirely[/I] void. Standard RTPs pay full chunk-load cost to rediscover this one candidate at a time, forever.
+[SPOILER='Spatial memory - why the longer it runs, the faster it gets']
+Without spatial indexing, teleportation is a guessing game and the numbers are ugly. A typical Overworld is only [B]~45% safely teleportable[/B]- (oceans, rivers, ravines, steep terrain eat the rest); the Nether is dominated by lava seas and wall-to-wall stone; the End is [I]almost entirely[/I] void. Standard RTPs pay full chunk-load cost to rediscover this one candidate at a time, forever.
 
-RTP-Pro plots your world's geometry as it evaluates candidates. When it hits a massive ocean or unsafe biome, it remembers that sector and shrinks the searchable area, so known bad sectors never get loaded again. The longer it runs, the faster it gets � and [I]/rtp scan[/I] keeps the learning going during idle periods.
+RTP-Pro plots your world's geometry as it evaluates candidates. When it hits a massive ocean or unsafe biome, it remembers that sector and shrinks the searchable area, so known bad sectors never get loaded again. The longer it runs, the faster it gets - and [I]/rtp scan[/I] keeps the learning going during idle periods.
 
-[B]Persistence across restarts:[/B] learned bad-sector state survives a JVM bounce � [I]MemoryShape.save[/I] / [I]load[/I] writes per-region spatial memory to disk on shutdown and reloads on startup, alongside the configuration cache (compiled safety sets, region geometry). H2, SQLite, MySQL, and PostgreSQL backends support shared multi-server state.
+[B]Persistence across restarts:[/B] learned bad-sector state survives a JVM bounce - [I]MemoryShape.save[/I] / [I]load[/I] writes per-region spatial memory to disk on shutdown and reloads on startup, alongside the configuration cache (compiled safety sets, region geometry). H2, SQLite, MySQL, and PostgreSQL backends support shared multi-server state.
 
-[SIZE=2][I]� Local-profile estimate from a vanilla 1.21 seed set; Nether and End are still qualitative. Anonymous opt-in telemetry is on the roadmap to source this number properly.[/I][/SIZE]
+[SIZE=2][I]- Local-profile estimate from a vanilla 1.21 seed set; Nether and End are still qualitative. Anonymous opt-in telemetry is on the roadmap to source this number properly.[/I][/SIZE]
 [/SPOILER]
 
-[SPOILER='??? safety.yml token grammar � Pro exclusive']
+[SPOILER='safety.yml token grammar - Pro exclusive']
 [I]safety.yml[/I] has a first-class token grammar. Five shapes can be mixed freely in [I]unsafeBlocks[/I] and [I]airBlocks[/I]:
 
 [LIST]
 [*][B]Plain material:[/B] [I]LAVA[/I], [I]MAGMA_BLOCK[/I].
 [*][B]Material + state predicate:[/B] [I]OAK_SLAB[waterlogged=true][/I]. Multiple predicates AND together: [I]OAK_SLAB[waterlogged=true,type=top][/I].
-[*][B]Vanilla block tag:[/B] [I]#minecraft:leaves[/I], [I]#minecraft:fire[/I], [I]#minecraft:campfires[/I]. Live-registry expansion at config-load lands in [I]3.0.0[/I] final � use explicit names alongside tag tokens during the beta.
-[*][B]Tag + state predicate:[/B] [I]#minecraft:slabs[waterlogged=true][/I] � "any slab, but only when waterlogged".
-[*][B]Wildcard + state predicate:[/B] [I]*[waterlogged=true][/I] � "any block, matched when waterlogged". One line replaces the entire waterloggable enumeration.
+[*][B]Vanilla block tag:[/B] [I]#minecraft:leaves[/I], [I]#minecraft:fire[/I], [I]#minecraft:campfires[/I]. Live-registry expansion at config-load lands in [I]3.0.0[/I] final - use explicit names alongside tag tokens during the beta.
+[*][B]Tag + state predicate:[/B] [I]#minecraft:slabs[waterlogged=true][/I] - "any slab, but only when waterlogged".
+[*][B]Wildcard + state predicate:[/B] [I]*[waterlogged=true][/I] - "any block, matched when waterlogged". One line replaces the entire waterloggable enumeration.
 [/LIST]
 
 [B]Properties:[/B]
 [LIST]
-[*][B]Fail-open on unknown tags/properties[/B] � missing tags on older MC versions silently reduce coverage rather than breaking startup. Configs stay portable.
-[*][B]Never silent on malformed tokens[/B] � typos like [I]OAK_SLAB[waterlogged=true[/I] surface as [I][WARNING] [safety.yml] rejected token '�': <reason>[/I].
-[*][B]Zero hot-path cost when unused[/B] � block-state extraction only fires when a token actually needs it; plain-material configs pay nothing.
-[*][B]Platform-portable tag resolution[/B] � Bukkit reads from [I]Bukkit.getTag[/I]; the standalone [I]rtp-tags[/I] module parses tag JSON directly from data packs and jars for future non-Bukkit platforms.
+[*][B]Fail-open on unknown tags/properties[/B] - missing tags on older MC versions silently reduce coverage rather than breaking startup. Configs stay portable.
+[*][B]Never silent on malformed tokens[/B] - typos like [I]OAK_SLAB[waterlogged=true[/I] surface as [I][WARNING] [safety.yml] rejected token '<token>': <reason>[/I].
+[*][B]Zero hot-path cost when unused[/B] - block-state extraction only fires when a token actually needs it; plain-material configs pay nothing.
+[*][B]Platform-portable tag resolution[/B] - Bukkit reads from [I]Bukkit.getTag[/I]; the standalone [I]rtp-tags[/I] module parses tag JSON directly from data packs and jars for future non-Bukkit platforms.
 [/LIST]
 
-[B]Default safety.yml is ~25% shorter:[/B] [I]FIRE[/I]+[I]SOUL_FIRE[/I] ? [I]#minecraft:fire[/I]; every waterloggable block ? [I]*[waterlogged=true][/I]; dozens of decorative plants ? [I]#minecraft:flowers[/I], [I]#minecraft:saplings[/I], [I]#minecraft:crops[/I], etc.
+[B]Default safety.yml is ~25% shorter:[/B] [I]FIRE[/I]+[I]SOUL_FIRE[/I] -> [I]#minecraft:fire[/I]; every waterloggable block -> [I]*[waterlogged=true][/I]; dozens of decorative plants -> [I]#minecraft:flowers[/I], [I]#minecraft:saplings[/I], [I]#minecraft:crops[/I], etc.
 [/SPOILER]
 
-[SPOILER='?? Full feature suite & integrations']
+[SPOILER='Full feature suite & integrations']
 [B]Engine:[/B]
 [LIST]
 [*]Any number of teleport regions per world; per-region shape (Square, Circle, Rectangle), radius, center, curve weighting, vertical bounds, world override, permission gates.
@@ -179,7 +179,7 @@ RTP-Pro plots your world's geometry as it evaluates candidates. When it hits a m
 [*]Multi-dimensional (Overworld, Nether, End, custom).
 [*]Hot-reloadable YAML; experimental [I]/rtp config[/I] editor.
 [*]Fully async chunk loading on Paper / Folia; off-tick Anvil pre-filter on Spigot.
-[*][B]Per-player isolated queues[/B] alongside a global queue � one player's bad luck never starves another's teleport.
+[*][B]Per-player isolated queues[/B] alongside a global queue - one player's bad luck never starves another's teleport.
 [*]Administrative scan lifecycle ([I]start[/I]/[I]pause[/I]/[I]resume[/I]/[I]reset[/I]/[I]cancel[/I]) to pre-populate spatial memory without teleporting players.
 [*]Persistent learned state via H2 / SQLite / MySQL / PostgreSQL.
 [*]Per-tick time budgets and (on Folia) per-tick task-count caps on the region-bound pipe.
@@ -192,7 +192,7 @@ RTP-Pro plots your world's geometry as it evaluates candidates. When it hits a m
 [*]Movement-cancel, damage-cancel, invulnerability-after-teleport timers.
 [*]Optional landing platform with configurable material and decay timer.
 [*]PlaceholderAPI: queue depth (total/public/personal), last-teleport coordinates, player status.
-[*]Public [I]rtp-api[/I] (same surface as Free) � trigger RTP from GUI, NPC, quest reward; build your own UX without forking.
+[*]Public [I]rtp-api[/I] (same surface as Free) - trigger RTP from GUI, NPC, quest reward; build your own UX without forking.
 [/LIST]
 
 [B]Bundled claim integrations[/B] (no extra download, folded in per ADR-019): Factions, GriefDefender, GriefPrevention, HuskTowns, Lands, RedProtect, TownyAdvanced, WorldGuard.
@@ -200,31 +200,31 @@ RTP-Pro plots your world's geometry as it evaluates candidates. When it hits a m
 [B]Pro-only configuration:[/B] Vault per-region pricing, complete localization ([I]lang/**[/I]), login-reserve cache, visitor mode.
 [/SPOILER]
 
-[SPOILER='?? Roadmap � known limitations and planned work in 3.0.0-beta.2']
+[SPOILER='Roadmap - known limitations and planned work in 3.0.0-beta.2']
 Rough edges I already know about, with direction:
 
 [LIST]
-[*][B]Spigot main-thread fallback[/B] � when the Anvil pre-filter can't resolve a chunk, one on-tick load fills the gap. Planned: per-minute fallback counters and an optional strict mode that skips the fallback entirely.
-[*][B]Folia scheduler hop[/B] for un-pre-resolvable candidates � cost currently unmeasured. Planned: publish p50/p95, look at amortising across adjacent candidates.
+[*][B]Spigot main-thread fallback[/B] - when the Anvil pre-filter can't resolve a chunk, one on-tick load fills the gap. Planned: per-minute fallback counters and an optional strict mode that skips the fallback entirely.
+[*][B]Folia scheduler hop[/B] for un-pre-resolvable candidates - cost currently unmeasured. Planned: publish p50/p95, look at amortising across adjacent candidates.
 [*][B]Un-populated chunks[/B] always fall through to a live load (correct by design). Planned: dedicated attribution bucket so operators can distinguish this from other fallbacks.
-[*][B]Multi-server / proxy[/B] (Velocity, BungeeCord) � planned for [I]3.0.0-beta.3[/I]. Cross-network UUID queue + reservation tokens in the network-state DB.
-[*][B]Fabric[/B] � functional first-class platform (unstable frontier). Stabilization work continues on scheduled-task processor parity, permissions, and full Brigadier tree. Native Forge/NeoForge remains lower priority than multi-server; Arclight/Mohist + the Spigot/Paper jar is the supported path there.
+[*][B]Multi-server / proxy[/B] (Velocity, BungeeCord) - planned for [I]3.0.0-beta.3[/I]. Cross-network UUID queue + reservation tokens in the network-state DB.
+[*][B]Fabric[/B] - functional first-class platform (unstable frontier). Stabilization work continues on scheduled-task processor parity, permissions, and full Brigadier tree. Native Forge/NeoForge remains lower priority than multi-server; Arclight/Mohist + the Spigot/Paper jar is the supported path there.
 [*][B]Telemetry-sourced marketing numbers.[/B] ~45% Overworld-safe is local-rig profiling; Nether/End are qualitative. Planned: anonymous opt-in telemetry + a published reference benchmark.
 [*][B]Demo videos predate this release.[/B] Underlying principles unchanged; numbers aren't current. Planned: fresh footage before [I]-beta[/I] comes off.
 [/LIST]
 
-[I]Everything above is a known issue with a plan � not a surprise. If you hit something not on this list, please open a GitHub issue.[/I]
+[I]Everything above is a known issue with a plan - not a surprise. If you hit something not on this list, please open a GitHub issue.[/I]
 [/SPOILER]
 
-[SPOILER='? FAQ']
+[SPOILER='FAQ']
 [B]Q: Why does this respond faster than other RTP plugins?[/B]
 A: Pre-warmed queue. In most cases a verified destination is ready before you type [I]/rtp[/I]. Two design choices keep that queue cheap to refill: a [B]persistent spatial memory[/B] per region (the plugin remembers which sectors failed safety checks, so the spiral selector skips known-bad ground instead of rerolling indefinitely) and an [B]off-tick async pre-filter[/B] (Anvil region files are read directly to reject unsafe biomes/blocks [I]before[/I] any chunk is loaded, so candidate verification never blocks the main thread).
 
 [B]Q: How do I set up teleportation between worlds?[/B]
-A: See the admin guide. Resolution order: player's current world (or [I]world:[/I] param) ? world's target region ? region's target world.
+A: See the admin guide. Resolution order: player's current world (or [I]world:[/I] param) -> world's target region -> region's target world.
 
 [B]Q: Iris / Terra / custom datapack generators?[/B]
-A: Yes � deliberate 3.0 design goal. The Anvil pre-filter reads [I].mca[/I] palette data directly, so populated custom-generator chunks evaluate off-tick like vanilla. That's [I]strictly more accurate[/I] than the live Bukkit view, which collapses modded IDs to vanilla cousins. Un-populated chunks fall through to a live load as the authoritative safety net.
+A: Yes - deliberate 3.0 design goal. The Anvil pre-filter reads [I].mca[/I] palette data directly, so populated custom-generator chunks evaluate off-tick like vanilla. That's [I]strictly more accurate[/I] than the live Bukkit view, which collapses modded IDs to vanilla cousins. Un-populated chunks fall through to a live load as the authoritative safety net.
 
 [B]Q: Existing safety.yml on upgrade?[/B]
 A: Plain-material entries keep working unchanged; the new grammar is strictly additive.
@@ -233,10 +233,10 @@ A: Plain-material entries keep working unchanged; the new grammar is strictly ad
 A: Paper, with memory to spare for the location cache. RTP works particularly well on pre-generated worlds.
 
 [B]Q: Can I downgrade to the free RTP build?[/B]
-A: Yes � same configuration, same data files, same commands. You lose Folia, proxy, SQL/Redis, Vault, multilingual, and the tag/state-predicate grammar.
+A: Yes - same configuration, same data files, same commands. You lose Folia, proxy, SQL/Redis, Vault, multilingual, and the tag/state-predicate grammar.
 [/SPOILER]
 
-[SPOILER='?? Demonstration videos (RTP 2.x � same principles, older numbers)']
+[SPOILER='Demonstration videos (RTP 2.x - same principles, older numbers)']
 [I]Recorded on earlier versions. Spatial learning and queue-paced throughput are unchanged in 3.0; on-screen numbers aren't current-release benchmarks.[/I]
 
 [B]Learning & deterministic-time test[/B]
@@ -245,33 +245,33 @@ A: Yes � same configuration, same data files, same commands. You lose Folia, p
 
 [B]Command-response & throughput test[/B]
 [media=youtube]l6KSvKxsKAQ[/media]
-[I]Pre-generated queue ? near-instant [I]/rtp[/I] response under load.[/I]
+[I]Pre-generated queue -> near-instant [I]/rtp[/I] response under load.[/I]
 [/SPOILER]
 
-[SPOILER='?? Support Policy (enforced � read before purchase)']
+[SPOILER='Support Policy (enforced - read before purchase)']
 [LIST]
 [*][B]Support covers bugs and configuration questions,[/B] after you've read the admin guide.
 [*][B]Bug reports need a reproduction:[/B] server version, plugin version, platform (Spigot/Paper/Folia), [I]config.yml[/I], [I]regions/[/I], [I]safety.yml[/I], and the relevant [I]server.log[/I] section. Reports without these are asked for them once, then closed.
 [*][B]"It doesn't work" is not a bug report.[/B] Tell me what you did, what you expected, and what actually happened.
 [*][B]Unsupported:[/B] native Forge/NeoForge (use Arclight/Mohist), plugin conflicts I can't reproduce, general MC-server admin questions. Fabric is supported on a best-effort basis as an unstable frontier.
-[*][B]Response time:[/B] solo maintainer. 24�72 h on weekdays for properly-filed reports. Critical safety issues (S-001�S-007 violations) jump the queue.
+[*][B]Response time:[/B] solo maintainer. 24-72 h on weekdays for properly-filed reports. Critical safety issues (S-001 through S-007 violations) jump the queue.
 [*][B]Feature requests[/B] via GitHub issues, not the resource thread. Priority follows the published roadmap, not ticket volume.
 [/LIST]
 
 This policy exists because focused engineering time is what keeps the plugin fast and current. Respecting it is how you get the most out of your purchase.
 [/SPOILER]
 
-[CENTER][COLOR=#D1D1D1]????????????????????????????????????????????????????????????[/COLOR][/CENTER]
+[CENTER][COLOR=#D1D1D1]------------------------------------------------------------[/COLOR][/CENTER]
 
 [SIZE=6][B][COLOR=#7F8C8D]Links[/COLOR][/B][/SIZE]
 [LIST]
-[*][URL='https://github.com/dailystruggle/RTP/blob/main/docs/admin/FOR_SERVER_ADMINS.md'][B]Admin guide[/B][/URL] � install, configure, command reference
-[*][URL='https://github.com/dailystruggle/RTP/blob/main/docs/dev/FOR_ADDON_DEVELOPERS.md'][B]Addon developer guide[/B][/URL] � API & examples
-[*][URL='https://github.com/dailystruggle/RTP/blob/main/CHANGELOG.md'][B]Changelog & roadmap[/B][/URL]
-[*][URL='https://github.com/dailystruggle/RTP'][B]Source on GitHub[/B][/URL] � star, watch, contribute, file issues
+[*][URL='https://github.com/dailystruggle/RTP/blob/V3-beta/docs/FOR_SERVER_ADMINS.md'][B]Admin guide[/B][/URL] - install, configure, command reference
+[*][URL='https://github.com/dailystruggle/RTP/blob/V3-beta/docs/FOR_ADDON_DEVELOPERS.md'][B]Addon developer guide[/B][/URL] - API & examples
+[*][URL='https://github.com/dailystruggle/RTP/blob/V3-beta/CHANGELOG.md'][B]Changelog & roadmap[/B][/URL]
+[*][URL='https://github.com/dailystruggle/RTP'][B]Source on GitHub[/B][/URL] - star, watch, contribute, file issues
 [/LIST]
 
-[CENTER][COLOR=#D1D1D1]????????????????????????????????????????????????????????????[/COLOR][/CENTER]
+[CENTER][COLOR=#D1D1D1]------------------------------------------------------------[/COLOR][/CENTER]
 
 [QUOTE]
 I'm a solo engineer maintaining a deterministic, high-performance teleport engine. Development time stays focused on Folia concurrency, proxy correctness, and zero-latency execution. Choose RTP-Pro if you care about engineering quality, RAM efficiency, and compounding TPS stability more than feature-padding or GUI gimmicks.

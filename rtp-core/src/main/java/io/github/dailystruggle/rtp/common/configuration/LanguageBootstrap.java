@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
 import io.github.dailystruggle.rtp.common.RTP;
-import org.simpleyaml.configuration.file.YamlFile;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 
 import java.io.File;
 import java.io.IOException;
@@ -57,7 +57,7 @@ public final class LanguageBootstrap {
 
     try {
       RTP.log(Level.FINER, "[RTP] LanguageBootstrap: reading " + file.getPath());
-      YamlFile yaml = new YamlFile(file.getPath());
+      RtpYamlConfig yaml = new RtpYamlConfig(file.getPath());
       yaml.loadWithComments();
       Object raw = yaml.get(KEY);
       String locale = (raw == null) ? DEFAULT_LOCALE : raw.toString().trim();
@@ -101,7 +101,7 @@ public final class LanguageBootstrap {
       RTP.log(Level.WARNING, "[RTP] Failed to extract bundled " + FILE_NAME + "; writing minimal default.", e);
     }
     try {
-      YamlFile yaml = new YamlFile(file.getPath());
+      RtpYamlConfig yaml = new RtpYamlConfig(file.getPath());
       yaml.set(KEY, DEFAULT_LOCALE);
       yaml.setComment(KEY,
           "Active locale for all configuration files. Bundled locales: en, de, es, fr.\n"

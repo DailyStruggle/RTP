@@ -431,7 +431,7 @@ public final class RTPFabricMod implements ModInitializer {
             // Register the `rtp test` runtime self-test subtree on Fabric.
             // We use the platform-neutral TestCmd directly (NOT BukkitTestCmd)
             // because four of its subcommands hard-import org.bukkit.* /
-            // commandsapi.bukkit.* / rtp.spigot.* and would NoClassDefFoundError
+            // commandsapi.bukkit.* / rtp.bukkitplatform.* and would NoClassDefFoundError
             // on a Fabric runtime. See TestCmd Javadoc for the constructor
             // split rationale; this path covers the Step G2 follow-up flagged
             // in MULTI_PLATFORM_PLAN.md and the RTPCmdFabricRoot Javadoc.

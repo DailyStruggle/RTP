@@ -10,7 +10,7 @@ import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.simpleyaml.configuration.file.YamlFile;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 
 import java.io.File;
 import java.io.IOException;
@@ -111,7 +111,7 @@ public class LanguageCmdTest {
         File langFile = new File(tempDir.toFile(), LanguageBootstrap.FILE_NAME);
         assertTrue(langFile.exists(), "language.yml should be created");
 
-        YamlFile yaml = new YamlFile(langFile.getPath());
+        RtpYamlConfig yaml = new RtpYamlConfig(langFile.getPath());
         yaml.loadWithComments();
         assertEquals("es", yaml.getString(LanguageBootstrap.KEY));
     }

@@ -138,7 +138,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
       String dim = dimensionRegionSubpath(world);
       return anvilProbeSupport
           .probeAndPublish(worldFolder, dim, cx, cz, key, rawUnsafe,
-              io.github.dailystruggle.rtp.spigot.anvil.PaletteNormalizer::reconcile)
+              io.github.dailystruggle.rtp.bukkitplatform.anvil.PaletteNormalizer::reconcile)
           .thenCompose(result -> {
             io.github.dailystruggle.rtp.anvil.AnvilChunkView view = result.view();
             if (view != null) {
@@ -214,7 +214,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
                 regionBytes, rx, rz, finalMinY, finalMaxY);
         if (probe == null) return null;
         return (io.github.dailystruggle.rtp.api.world.ChunkColumnProbe)
-            new io.github.dailystruggle.rtp.spigot.anvil.probe.AnvilColumnProbeAdapter(probe, cx, cz);
+            new io.github.dailystruggle.rtp.bukkitplatform.anvil.probe.AnvilColumnProbeAdapter(probe, cx, cz);
       } catch (Throwable t) {
         RTP.log(java.util.logging.Level.FINE,
             "[RTP] probeChunkColumn failed for world=" + name
@@ -547,7 +547,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
       int cx = (int) (key & 0xffffffffL);
       int cz = (int) (key >> 32);
       java.util.Set<String> reconciled =
-          io.github.dailystruggle.rtp.spigot.anvil.PaletteNormalizer.reconcileAll(
+          io.github.dailystruggle.rtp.bukkitplatform.anvil.PaletteNormalizer.reconcileAll(
               currentUnsafeBlocks());
       return new FoliaRTPChunk(view, cx, cz, id, reconciled);
     }

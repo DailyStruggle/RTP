@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.bukkit.utils;
 
-import io.github.dailystruggle.rtp.spigot.tools.SendMessage;
+import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
 import java.io.File;
 import java.io.InputStream;
 import java.net.URI;

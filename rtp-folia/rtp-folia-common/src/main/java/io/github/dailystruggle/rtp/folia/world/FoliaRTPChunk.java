@@ -9,7 +9,7 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.folia.thread.GlobalRegionThread;
 import io.github.dailystruggle.rtp.folia.thread.RegionThread;
-import io.github.dailystruggle.rtp.spigot.anvil.PaletteNormalizer;
+import io.github.dailystruggle.rtp.bukkitplatform.anvil.PaletteNormalizer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;

@@ -111,16 +111,16 @@ class ConfigParserUpdateTest {
         };
 
         // 3. Check preserved values
-        // Note: we need to access via yamlFile because ConfigParser uses an Enum-based Map for its own data
+        // Note: we need to access via RtpYamlConfig because ConfigParser uses an Enum-based Map for its own data
         // and we haven't defined shape/vert in TestKeys enum for this test.
-        // But the update() method operates on the YamlFile.
-        org.simpleyaml.configuration.file.YamlFile yamlFile = new org.simpleyaml.configuration.file.YamlFile(new File(pluginDir, "config.yml"));
-        yamlFile.load();
+        // But the update() method operates on the RtpYamlConfig.
+        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig RtpYamlConfig = new io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig(new File(pluginDir, "config.yml"));
+        RtpYamlConfig.load();
 
-        assertEquals("circle", yamlFile.getString("shape.name"), "Section value 'shape.name' should be preserved");
-        assertEquals(500, yamlFile.getInt("shape.radius"), "Section value 'shape.radius' should be preserved");
-        assertEquals(64, yamlFile.getInt("vert.min-y"), "Section value 'vert.min-y' should be preserved");
-        assertEquals(255, yamlFile.getInt("vert.max-y"), "New default value 'vert.max-y' should be added");
+        assertEquals("circle", RtpYamlConfig.getString("shape.name"), "Section value 'shape.name' should be preserved");
+        assertEquals(500, RtpYamlConfig.getInt("shape.radius"), "Section value 'shape.radius' should be preserved");
+        assertEquals(64, RtpYamlConfig.getInt("vert.min-y"), "Section value 'vert.min-y' should be preserved");
+        assertEquals(255, RtpYamlConfig.getInt("vert.max-y"), "New default value 'vert.max-y' should be added");
     }
 
     @Test
@@ -155,11 +155,11 @@ class ConfigParserUpdateTest {
         };
 
         // 3. Check if custom-param is preserved
-        org.simpleyaml.configuration.file.YamlFile yamlFile = new org.simpleyaml.configuration.file.YamlFile(new File(pluginDir, "config.yml"));
-        yamlFile.load();
+        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig RtpYamlConfig = new io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig(new File(pluginDir, "config.yml"));
+        RtpYamlConfig.load();
 
-        assertEquals("custom", yamlFile.getString("shape.custom-param"), "Custom key 'shape.custom-param' should be preserved");
-        assertEquals("square", yamlFile.getString("shape.name"), "Default key 'shape.name' should be added");
+        assertEquals("custom", RtpYamlConfig.getString("shape.custom-param"), "Custom key 'shape.custom-param' should be preserved");
+        assertEquals("square", RtpYamlConfig.getString("shape.name"), "Default key 'shape.name' should be added");
     }
 
     @Test
@@ -196,13 +196,13 @@ class ConfigParserUpdateTest {
         };
 
         // 3. Verify comments in the final file
-        org.simpleyaml.configuration.file.YamlFile yamlFile = new org.simpleyaml.configuration.file.YamlFile(new File(pluginDir, "config.yml"));
-        yamlFile.loadWithComments();
+        io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig RtpYamlConfig = new io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig(new File(pluginDir, "config.yml"));
+        RtpYamlConfig.loadWithComments();
 
-        String comment = yamlFile.getComment("teleportDelay");
+        String comment = RtpYamlConfig.getComment("teleportDelay");
         assertEquals("This is a preserved comment", comment.trim(), "User comment should be preserved");
 
-        String newComment = yamlFile.getComment("newKey");
+        String newComment = RtpYamlConfig.getComment("newKey");
         assertEquals("New key comment", newComment.trim(), "New comment from defaults should be added");
     }
 
@@ -229,11 +229,11 @@ class ConfigParserUpdateTest {
                 }
             };
 
-            org.simpleyaml.configuration.file.YamlFile yamlFile = new org.simpleyaml.configuration.file.YamlFile(file);
-            yamlFile.load();
-            assertEquals("2.0", yamlFile.getString("version"), "Version should be updated for " + fileName);
-            assertEquals("custom", yamlFile.getString("userValue"), "User value should be preserved for " + fileName);
-            assertEquals("default", yamlFile.getString("defaultValue"), "Default value should be added for " + fileName);
+            io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig RtpYamlConfig = new io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig(file);
+            RtpYamlConfig.load();
+            assertEquals("2.0", RtpYamlConfig.getString("version"), "Version should be updated for " + fileName);
+            assertEquals("custom", RtpYamlConfig.getString("userValue"), "User value should be preserved for " + fileName);
+            assertEquals("default", RtpYamlConfig.getString("defaultValue"), "Default value should be added for " + fileName);
         }
     }
 }

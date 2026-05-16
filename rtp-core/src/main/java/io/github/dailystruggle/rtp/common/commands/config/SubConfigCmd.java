@@ -24,9 +24,9 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.simpleyaml.configuration.ConfigurationSection;
-import org.simpleyaml.configuration.MemorySection;
-import org.simpleyaml.configuration.file.YamlFile;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
+
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 
 public class SubConfigCmd extends BaseRTPCmdImpl {
 
@@ -88,8 +88,8 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
           int minY = 0;
 
           Object o = regionParser.getConfigValue(RegionKeys.vert, null);
-          if (o instanceof ConfigurationSection) {
-            ConfigurationSection section = (ConfigurationSection) o;
+          if (o instanceof RtpYamlSection) {
+            RtpYamlSection section = (RtpYamlSection) o;
             name =
                 parameterValues.containsKey("vert")
                     ? parameterValues.get("vert").get(0)
@@ -173,11 +173,11 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
             subParams.put(entry.getKey().name(), entry.getValue());
           }
 
-          YamlFile yamlFile = configParser.fileDatabase.cachedLookup.get().get(configParser.name);
-          if (yamlFile != null) {
-            Object o = yamlFile.get(key);
-            if (o instanceof ConfigurationSection) {
-              ConfigurationSection section = (ConfigurationSection) o;
+          RtpYamlConfig RtpYamlConfig = configParser.fileDatabase.cachedLookup.get().get(configParser.name);
+          if (RtpYamlConfig != null) {
+            Object o = RtpYamlConfig.get(key);
+            if (o instanceof RtpYamlSection) {
+              RtpYamlSection section = (RtpYamlSection) o;
               Map<String, Object> mapValues = section.getMapValues(false);
               for (Map.Entry<String, Object> entry : mapValues.entrySet()) {
                 if (subParams.containsKey(entry.getKey()))
@@ -220,11 +220,11 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
             subParams.put(entry.getKey().name(), entry.getValue());
           }
 
-          YamlFile yamlFile = configParser.fileDatabase.cachedLookup.get().get(configParser.name);
-          if (yamlFile != null) {
-            Object o = yamlFile.get(key);
-            if (o instanceof ConfigurationSection) {
-              ConfigurationSection section = (ConfigurationSection) o;
+          RtpYamlConfig RtpYamlConfig = configParser.fileDatabase.cachedLookup.get().get(configParser.name);
+          if (RtpYamlConfig != null) {
+            Object o = RtpYamlConfig.get(key);
+            if (o instanceof RtpYamlSection) {
+              RtpYamlSection section = (RtpYamlSection) o;
               Map<String, Object> mapValues = section.getMapValues(false);
               for (Map.Entry<String, Object> entry : mapValues.entrySet()) {
                 if (subParams.containsKey(entry.getKey()))
@@ -251,8 +251,8 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
         }
 
         if (key.contains(".")) {
-          YamlFile yamlFile = configParser.fileDatabase.cachedLookup.get().get(configParser.name);
-          if (yamlFile != null) yamlFile.set(key, value);
+          RtpYamlConfig RtpYamlConfig = configParser.fileDatabase.cachedLookup.get().get(configParser.name);
+          if (RtpYamlConfig != null) RtpYamlConfig.set(key, value);
         } else {
           configParser.set(key, value);
         }
@@ -281,8 +281,8 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
         if (configParser == null) continue;
         parser.configParserFactory.map.remove(configName.toUpperCase());
         commandLookup.remove(target);
-        YamlFile yamlFile = configParser.fileDatabase.cachedLookup.get().get(configName);
-        if (yamlFile != null) yamlFile.getConfigurationFile().deleteOnExit();
+        RtpYamlConfig RtpYamlConfig = configParser.fileDatabase.cachedLookup.get().get(configName);
+        if (RtpYamlConfig != null) RtpYamlConfig.getConfigurationFile().deleteOnExit();
       }
 
       List<String> add = parameterValues.getOrDefault("add", new ArrayList<>());
@@ -311,22 +311,46 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
     return super.onTabComplete(callerId, permissionCheckMethod, args);
   }
 
-  private void addSectionParameters(String prefix, ConfigurationSection section) {
+  /**
+   * Resolve a one-line description for a YAML key by reading its block comment
+   * via {@link RtpYamlSection#getComment(String)} and returning the first
+   * non-blank, non-comment-marker line (leading {@code '#'} and surrounding
+   * whitespace stripped). Returns {@code ""} when no usable comment exists.
+   */
+  private static String descriptionFromComment(RtpYamlSection section, String key) {
+    if (section == null || key == null) return "";
+    String comment;
+    try {
+      comment = section.getComment(key);
+    } catch (RuntimeException ignored) {
+      return "";
+    }
+    if (comment == null || comment.isEmpty()) return "";
+    for (String line : comment.split("\n", -1)) {
+      String trimmed = line.trim();
+      while (trimmed.startsWith("#")) trimmed = trimmed.substring(1).trim();
+      if (!trimmed.isEmpty()) return trimmed;
+    }
+    return "";
+  }
+
+  private void addSectionParameters(String prefix, RtpYamlSection section) {
     for (String key : section.getKeys(false)) {
       String fullKey = prefix + "." + key;
       Object value = section.get(key);
-      if (value instanceof ConfigurationSection) {
-        addSectionParameters(fullKey, (ConfigurationSection) value);
+      String desc = descriptionFromComment(section, key);
+      if (value instanceof RtpYamlSection) {
+        addSectionParameters(fullKey, (RtpYamlSection) value);
       } else if (value instanceof Boolean) {
-        addParameter(fullKey, new BooleanParameter("rtp.update", "", (uuid, s1) -> true));
+        addParameter(fullKey, new BooleanParameter("rtp.update", desc, (uuid, s1) -> true));
       } else if (value instanceof Integer || value instanceof Long) {
-        addParameter(fullKey, new IntegerParameter("rtp.update", "", (uuid, s1) -> true));
+        addParameter(fullKey, new IntegerParameter("rtp.update", desc, (uuid, s1) -> true));
       } else if (value instanceof Double || value instanceof Float) {
-        addParameter(fullKey, new FloatParameter("rtp.update", "", (uuid, s1) -> true));
+        addParameter(fullKey, new FloatParameter("rtp.update", desc, (uuid, s1) -> true));
       } else {
         addParameter(
             fullKey,
-            new CommandParameter("rtp.update", "", (uuid, s1) -> true) {
+            new CommandParameter("rtp.update", desc, (uuid, s1) -> true) {
               @Override
               public Set<String> values() {
                 return new HashSet<>();
@@ -344,6 +368,14 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
     if (factoryValue instanceof ConfigParser) {
       ConfigParser<?> configParser = (ConfigParser<?>) this.factoryValue;
       addSubCommand(new ViewSubConfigCmd(this, configParser));
+      // Resolve the in-memory yaml backing this parser so that the per-key
+      // block comment can drive the parameter description (first comment line).
+      RtpYamlConfig parserYaml = null;
+      try {
+        parserYaml = configParser.fileDatabase.cachedLookup.get().get(configParser.name);
+      } catch (RuntimeException ignored) {
+        // Best-effort: a missing cached yaml just means descriptions stay empty.
+      }
       EnumMap<?, ?> data = configParser.getData();
       for (Map.Entry<? extends Enum<?>, ?> e : data.entrySet()) {
         String name = e.getKey().name();
@@ -352,40 +384,45 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
         Object nameObj = configParser.language_mapping.get(name);
         if (nameObj != null) s = nameObj.toString();
         Object o = e.getValue();
+        // Try the in-file display name first (s), then fall back to the enum
+        // name — the yaml is keyed by whichever the language_mapping points to.
+        String desc = descriptionFromComment(parserYaml, s);
+        if (desc.isEmpty() && !s.equals(name)) desc = descriptionFromComment(parserYaml, name);
 
         if (name.contains("world")) {
-          addParameter(s, new WorldParameter("rtp.update", "", (uuid, s1) -> true));
+          addParameter(s, new WorldParameter("rtp.update", desc, (uuid, s1) -> true));
         } else if (name.contains("region")) {
-          addParameter(s, new RegionParameter("rtp.update", "", (uuid, s1) -> true));
+          addParameter(s, new RegionParameter("rtp.update", desc, (uuid, s1) -> true));
         } else if (o instanceof String) {
+          final String desc_ = desc;
           addParameter(
               s,
-              new CommandParameter("rtp.update", "", (uuid, s1) -> true) {
+              new CommandParameter("rtp.update", desc_, (uuid, s1) -> true) {
                 @Override
                 public Set<String> values() {
                   return new HashSet<>();
                 }
               });
         } else if (o instanceof Boolean) {
-          addParameter(s, new BooleanParameter("rtp.update", "", (uuid, s1) -> true));
+          addParameter(s, new BooleanParameter("rtp.update", desc, (uuid, s1) -> true));
         } else if (o instanceof Integer || o instanceof Long) {
-          addParameter(s, new IntegerParameter("rtp.update", "", (uuid, s1) -> true));
+          addParameter(s, new IntegerParameter("rtp.update", desc, (uuid, s1) -> true));
         } else if (o instanceof Double || o instanceof Float) {
-          addParameter(s, new FloatParameter("rtp.update", "", (uuid, s1) -> true));
+          addParameter(s, new FloatParameter("rtp.update", desc, (uuid, s1) -> true));
         } else if (o instanceof Shape) {
-          addParameter(s, new ShapeParameter("rtp.update", "", (uuid, s1) -> true));
+          addParameter(s, new ShapeParameter("rtp.update", desc, (uuid, s1) -> true));
         } else if (o instanceof VerticalAdjustor) {
-          addParameter(s, new VertParameter("rtp.update", "", (uuid, s1) -> true));
+          addParameter(s, new VertParameter("rtp.update", desc, (uuid, s1) -> true));
         } else if (o instanceof Region) {
-          addParameter(s, new RegionParameter("rtp.update", "", (uuid, s1) -> true));
-        } else if (o instanceof MemorySection) {
+          addParameter(s, new RegionParameter("rtp.update", desc, (uuid, s1) -> true));
+        } else if (o instanceof RtpYamlSection) {
           if (s.equalsIgnoreCase("shape")) {
-            addParameter(s, new ShapeParameter("rtp.update", "", (uuid, s1) -> true));
+            addParameter(s, new ShapeParameter("rtp.update", desc, (uuid, s1) -> true));
           } else if (s.equalsIgnoreCase("vert")) {
-            VertParameter vertParameter = new VertParameter("rtp.update", "", (uuid, s1) -> true);
+            VertParameter vertParameter = new VertParameter("rtp.update", desc, (uuid, s1) -> true);
             addParameter(s, vertParameter);
           } else {
-            addSectionParameters(s, (ConfigurationSection) o);
+            addSectionParameters(s, (RtpYamlSection) o);
           }
         } else if (o instanceof List) {
           Supplier<Set<String>> values = HashSet::new;
@@ -402,8 +439,8 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
                   return res;
                 };
           }
-          YamlFile yamlFile = configParser.fileDatabase.cachedLookup.get().get(configParser.name);
-          if (yamlFile != null) addSubCommand(new ListCmd(name, this, values, yamlFile, s));
+          RtpYamlConfig RtpYamlConfig = configParser.fileDatabase.cachedLookup.get().get(configParser.name);
+          if (RtpYamlConfig != null) addSubCommand(new ListCmd(name, this, values, RtpYamlConfig, s));
         }
       }
     } else if (factoryValue instanceof MultiConfigParser<?> parser) {

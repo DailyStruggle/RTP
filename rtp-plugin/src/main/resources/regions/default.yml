@@ -1,8 +1,10 @@
 # --- RTP Region Configuration ---
 # Documentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/REGIONS.md
 
-world: "[0]" # Target world. [0] = main world.
-worldBorderOverride: false # Use vanilla /worldborder radius if true
+# Target world. [0] = main world.
+world: "[0]"
+# Use vanilla /worldborder radius if true
+worldBorderOverride: false
 
 shape:
   name: "CIRCLE"
@@ -22,13 +24,20 @@ vert:
   step: 16
   requireSkyLight: false
 
-requirePermission: false # If true, rtp.regions.<name> is required
-override: "default" # Region to redirect to if no permission
-cacheCap: 50 # Max pre-calculated safe locations
-backlogCacheCap: 1000 # L3 backlog cache capacity (ADR-028); unverified candidates pre-filtered by anvil one .mca-bin per pulse. 0 disables L3.
-activeChunkCap: 10 # Max chunks kept loaded for zero-latency
-price: 0.0 # Economy cost override for this region
-spatialResolution: 3 # Precision for bad-location tracking (1-5)
+# If true, rtp.regions.<name> is required
+requirePermission: false
+# Region to redirect to if no permission
+override: "default"
+# Max pre-calculated safe locations
+cacheCap: 50
+# L3 backlog cache capacity (ADR-028); unverified candidates pre-filtered by anvil one .mca-bin per pulse. 0 disables L3.
+backlogCacheCap: 1000
+# Max chunks kept loaded for zero-latency
+activeChunkCap: 10
+# Economy cost override for this region
+price: 0.0
+# Precision for bad-location tracking (1-5)
+spatialResolution: 3
 
 # DO NOT TOUCH VERSION NUMBER
 version: "1.0"

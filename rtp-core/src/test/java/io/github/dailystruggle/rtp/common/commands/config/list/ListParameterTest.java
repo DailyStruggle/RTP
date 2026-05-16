@@ -10,7 +10,7 @@ import java.util.function.Supplier;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.simpleyaml.configuration.file.YamlFile;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 
 import java.nio.file.Path;
 
@@ -25,7 +25,7 @@ public class ListParameterTest {
     void listAddParameter_values_returnsFromSupplier() {
         Set<String> expected = new HashSet<>(Arrays.asList("PLAINS", "DESERT", "FOREST"));
         Supplier<Set<String>> supplier = () -> new HashSet<>(expected);
-        YamlFile file = new YamlFile();
+        RtpYamlConfig file = new RtpYamlConfig();
         ListAddParameter param = new ListAddParameter(supplier, file, "someKey");
 
         Set<String> result = param.values();
@@ -35,7 +35,7 @@ public class ListParameterTest {
     @Test
     void listAddParameter_values_returnsEmptySetWhenSupplierEmpty() {
         Supplier<Set<String>> supplier = HashSet::new;
-        YamlFile file = new YamlFile();
+        RtpYamlConfig file = new RtpYamlConfig();
         ListAddParameter param = new ListAddParameter(supplier, file, "key");
 
         assertTrue(param.values().isEmpty());
@@ -48,7 +48,7 @@ public class ListParameterTest {
             callCount[0]++;
             return new HashSet<>();
         };
-        YamlFile file = new YamlFile();
+        RtpYamlConfig file = new RtpYamlConfig();
         ListAddParameter param = new ListAddParameter(supplier, file, "key");
 
         param.values();
@@ -58,19 +58,19 @@ public class ListParameterTest {
 
     @Test
     void listAddParameter_permission_isRtpUpdate() {
-        ListAddParameter param = new ListAddParameter(HashSet::new, new YamlFile(), "key");
+        ListAddParameter param = new ListAddParameter(HashSet::new, new RtpYamlConfig(), "key");
         assertEquals("rtp.update", param.permission());
     }
 
     @Test
     void listAddParameter_description_isNotNull() {
-        ListAddParameter param = new ListAddParameter(HashSet::new, new YamlFile(), "key");
+        ListAddParameter param = new ListAddParameter(HashSet::new, new RtpYamlConfig(), "key");
         assertNotNull(param.description());
     }
 
     @Test
     void listAddParameter_isRelevant_alwaysTrue() {
-        ListAddParameter param = new ListAddParameter(HashSet::new, new YamlFile(), "key");
+        ListAddParameter param = new ListAddParameter(HashSet::new, new RtpYamlConfig(), "key");
         assertTrue(param.isRelevant.apply(java.util.UUID.randomUUID(), "anything"));
     }
 
@@ -78,8 +78,8 @@ public class ListParameterTest {
 
     @Test
     void listRemoveParameter_values_returnsCurrentListFromYamlFile() throws Exception {
-        File yamlFile = tempDir.resolve("test.yml").toFile();
-        YamlFile file = new YamlFile(yamlFile);
+        File RtpYamlConfig = tempDir.resolve("test.yml").toFile();
+        RtpYamlConfig file = new RtpYamlConfig(RtpYamlConfig);
         file.createOrLoad();
         file.set("myList", Arrays.asList("alpha", "beta", "gamma"));
 
@@ -94,7 +94,7 @@ public class ListParameterTest {
 
     @Test
     void listRemoveParameter_values_returnsEmptySetForMissingKey() {
-        YamlFile file = new YamlFile();
+        RtpYamlConfig file = new RtpYamlConfig();
         ListRemoveParameter param = new ListRemoveParameter(file, "nonExistentKey");
 
         assertTrue(param.values().isEmpty());
@@ -102,8 +102,8 @@ public class ListParameterTest {
 
     @Test
     void listRemoveParameter_values_returnsEmptySetForEmptyList() throws Exception {
-        File yamlFile = tempDir.resolve("empty.yml").toFile();
-        YamlFile file = new YamlFile(yamlFile);
+        File RtpYamlConfig = tempDir.resolve("empty.yml").toFile();
+        RtpYamlConfig file = new RtpYamlConfig(RtpYamlConfig);
         file.createOrLoad();
         file.set("emptyList", Arrays.asList());
 
@@ -113,8 +113,8 @@ public class ListParameterTest {
 
     @Test
     void listRemoveParameter_values_reflectsYamlFileChanges() throws Exception {
-        File yamlFile = tempDir.resolve("dynamic.yml").toFile();
-        YamlFile file = new YamlFile(yamlFile);
+        File RtpYamlConfig = tempDir.resolve("dynamic.yml").toFile();
+        RtpYamlConfig file = new RtpYamlConfig(RtpYamlConfig);
         file.createOrLoad();
         file.set("items", Arrays.asList("one"));
 
@@ -128,13 +128,13 @@ public class ListParameterTest {
 
     @Test
     void listRemoveParameter_permission_isRtpUpdate() {
-        ListRemoveParameter param = new ListRemoveParameter(new YamlFile(), "key");
+        ListRemoveParameter param = new ListRemoveParameter(new RtpYamlConfig(), "key");
         assertEquals("rtp.update", param.permission());
     }
 
     @Test
     void listRemoveParameter_isRelevant_alwaysTrue() {
-        ListRemoveParameter param = new ListRemoveParameter(new YamlFile(), "key");
+        ListRemoveParameter param = new ListRemoveParameter(new RtpYamlConfig(), "key");
         assertTrue(param.isRelevant.apply(java.util.UUID.randomUUID(), "anything"));
     }
 
@@ -142,8 +142,8 @@ public class ListParameterTest {
 
     @Test
     void listCmd_addCommands_registersAddAndRemoveParameters() throws Exception {
-        File yamlFile = tempDir.resolve("listcmd.yml").toFile();
-        YamlFile file = new YamlFile(yamlFile);
+        File RtpYamlConfig = tempDir.resolve("listcmd.yml").toFile();
+        RtpYamlConfig file = new RtpYamlConfig(RtpYamlConfig);
         file.createOrLoad();
         file.set("myList", Arrays.asList("x", "y"));
 
@@ -164,7 +164,7 @@ public class ListParameterTest {
     @Test
     void listAddParameter_values_returnsIndependentSets() {
         Supplier<Set<String>> supplier = () -> new HashSet<>(Arrays.asList("a", "b"));
-        ListAddParameter param = new ListAddParameter(supplier, new YamlFile(), "k");
+        ListAddParameter param = new ListAddParameter(supplier, new RtpYamlConfig(), "k");
 
         Set<String> s1 = param.values();
         Set<String> s2 = param.values();
@@ -176,8 +176,8 @@ public class ListParameterTest {
 
     @Test
     void listRemoveParameter_values_returnsIndependentSets() throws Exception {
-        File yamlFile = tempDir.resolve("indep.yml").toFile();
-        YamlFile file = new YamlFile(yamlFile);
+        File RtpYamlConfig = tempDir.resolve("indep.yml").toFile();
+        RtpYamlConfig file = new RtpYamlConfig(RtpYamlConfig);
         file.createOrLoad();
         file.set("list", Arrays.asList("a", "b"));
 
@@ -194,7 +194,7 @@ public class ListParameterTest {
     void listAddParameter_values_handlesLargeSupplierSet() {
         Set<String> large = new HashSet<>();
         for (int i = 0; i < 1000; i++) large.add("item_" + i);
-        ListAddParameter param = new ListAddParameter(() -> new HashSet<>(large), new YamlFile(), "k");
+        ListAddParameter param = new ListAddParameter(() -> new HashSet<>(large), new RtpYamlConfig(), "k");
         assertEquals(1000, param.values().size());
     }
 
@@ -202,10 +202,10 @@ public class ListParameterTest {
 
     @Test
     void listRemoveParameter_values_keyWithDots() throws Exception {
-        File yamlFile = tempDir.resolve("dots.yml").toFile();
-        YamlFile file = new YamlFile(yamlFile);
+        File RtpYamlConfig = tempDir.resolve("dots.yml").toFile();
+        RtpYamlConfig file = new RtpYamlConfig(RtpYamlConfig);
         file.createOrLoad();
-        // YamlFile treats dots as path separators; use a simple key
+        // RtpYamlConfig treats dots as path separators; use a simple key
         file.set("section.subkey", Arrays.asList("val1", "val2"));
 
         ListRemoveParameter param = new ListRemoveParameter(file, "section.subkey");

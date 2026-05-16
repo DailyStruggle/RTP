@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.paper_v26_1_R1.server;
 
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.paper_v26_1_R1.world.PaperRTPWorld;
-import io.github.dailystruggle.rtp.spigot.server.AbstractServerAccessor;
+import io.github.dailystruggle.rtp.bukkitplatform.server.AbstractServerAccessor;
 import io.papermc.paper.registry.RegistryAccess;
 import io.papermc.paper.registry.RegistryKey;
 import org.bukkit.Bukkit;

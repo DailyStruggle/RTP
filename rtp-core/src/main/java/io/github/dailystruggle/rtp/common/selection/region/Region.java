@@ -372,11 +372,15 @@ public class Region extends FactoryValue<RegionKeys> {
 
         // Feed into the queues for the region execution loop to handle
         if (stored.getPlayerId() == null) {
-          if (this.queueManager.unkeptLocations.size() < settings.cacheCap()) {
-            this.queueManager.unkeptLocations.offer(recoveredLoc);
-          }
-          // Whether the row was consumed into the queue or dropped because the queue is
-          // already at cacheCap, the DB row must go — the in-memory state is authoritative.
+          // Restore every persisted row. The unkeptLocations buffer is sized to
+          // cacheCap+activeChunkCap precisely so that rows saved from BOTH kept and
+          // unkept queues fit on hydration; steady-state Region.execute() then promotes
+          // surplus into keptLocations (consuming activeChunkCap worth) and drains
+          // unkeptLocations back below its configured cacheCap. Previously this path
+          // gated on cacheCap and silently dropped activeChunkCap-worth of rows per
+          // restart (default 10 lost). See RegionQueueManager constructor.
+          this.queueManager.unkeptLocations.offer(recoveredLoc);
+          // The DB row must go regardless — the in-memory state is authoritative.
           if (db != null) db.removeCachedLocation(stored.getId());
         } else {
           this.queueManager.perPlayerLocationQueue.computeIfAbsent(stored.getPlayerId(), k -> new java.util.concurrent.ConcurrentLinkedQueue<>()).add(recoveredLoc);

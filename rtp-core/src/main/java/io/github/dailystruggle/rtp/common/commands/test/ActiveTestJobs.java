@@ -13,7 +13,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * {@link TestStressCmd} (and future subcommands) without each subcommand
  * needing its own bespoke cancellation channel.
  *
- * <p>Rationale (see {@code RUNTIME_TEST_SUITE_PLAN.md Â§4 &mdash; cancel}):
+ * <p>Rationale (see {@code RUNTIME_TEST_SUITE_PLAN.md §4 &mdash; cancel}):
  * today a mistyped {@code iterations:1000 intervalTicks:10} invocation has
  * no in-band stop switch. A single registry keeps the cancel semantics
  * uniform across subcommands and avoids a proliferation of static fields.
@@ -49,7 +49,7 @@ public final class ActiveTestJobs {
    * synchronously at registration time if the owner already has no jobs.
    *
    * <p>Listeners are removed from the map at fire time, and any throwable
-   * is swallowed â€” drain notification must be best-effort, mirroring the
+   * is swallowed — drain notification must be best-effort, mirroring the
    * cancel semantics in {@link #cancelOwned(UUID)}.
    */
   private static final Map<UUID, CopyOnWriteArrayList<Runnable>> ON_EMPTY_LISTENERS =
@@ -89,7 +89,7 @@ public final class ActiveTestJobs {
    */
   public static void addOnEmptyListener(UUID owner, Runnable listener) {
     if (listener == null) return;
-    // Fast path: already drained â†’ fire inline. We still take the listener
+    // Fast path: already drained → fire inline. We still take the listener
     // through the registration map briefly to avoid racing with a concurrent
     // register() that observes JOBS empty between the two checks below.
     CopyOnWriteArrayList<Runnable> bucket =

@@ -11,17 +11,18 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 import org.jetbrains.annotations.NotNull;
-import org.simpleyaml.configuration.ConfigurationSection;
-import org.simpleyaml.configuration.file.YamlFile;
 
 /**
- * a "database" that's just reading and writing yaml files, using SimpleYaml ( a server independent
- * yaml library that can preserve comments )
+ * a "database" that's just reading and writing yaml files, using the in-house
+ * {@code io.github.dailystruggle.rtp.common.configuration.yaml} substrate (per
+ * ADR-025). The substrate is comment-preserving and zero-dep.
  */
-public class YamlFileDatabase extends DatabaseAccessor<Map<String, YamlFile>> {
+public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig>> {
   /** container for map reference access, such set() will propagate changes where == would not */
-  public final AtomicReference<Map<String, YamlFile>> cachedLookup = new AtomicReference<>();
+  public final AtomicReference<Map<String, RtpYamlConfig>> cachedLookup = new AtomicReference<>();
 
   public final AtomicReference<Map<String, Long>> cachedLookupLastModified =
       new AtomicReference<>();
@@ -41,22 +42,22 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, YamlFile>> {
     this.directory = directory;
   }
 
-  private static void setSection(ConfigurationSection section, Map<String, Object> map) {
+  private static void setSection(RtpYamlSection section, Map<String, Object> map) {
     Map<String, Object> mapValues = section.getMapValues(false);
 
     for (Map.Entry<String, Object> e : mapValues.entrySet()) {
       Object o = e.getValue();
       if (!map.containsKey(e.getKey())) continue;
       Object value = map.get(e.getKey());
-      if (o instanceof ConfigurationSection) {
+      if (o instanceof RtpYamlSection) {
         if (value instanceof FactoryValue<?>) {
           EnumMap<?, Object> data = ((FactoryValue<?>) value).getData();
           Map<String, Object> subMap = new HashMap<>();
           for (Map.Entry<? extends Enum<?>, ?> d : data.entrySet())
             subMap.put(d.getKey().name(), d.getValue());
-          setSection((ConfigurationSection) o, subMap);
+          setSection((RtpYamlSection) o, subMap);
         } else if (value instanceof Map) {
-          setSection((ConfigurationSection) o, (Map<String, Object>) value);
+          setSection((RtpYamlSection) o, (Map<String, Object>) value);
         } else throw new IllegalArgumentException();
       } else {
         section.set(e.getKey(), value);
@@ -71,7 +72,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, YamlFile>> {
 
   @Override
   @NotNull
-  public Map<String, YamlFile> connect() {
+  public Map<String, RtpYamlConfig> connect() {
     if (!directory.exists()) {
       if (!directory.mkdirs())
         throw new IllegalStateException(
@@ -79,7 +80,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, YamlFile>> {
     }
 
     File[] files = directory.listFiles();
-    Map<String, YamlFile> res = new HashMap<>();
+    Map<String, RtpYamlConfig> res = new HashMap<>();
     if (files == null) return res;
     for (File file : files) {
       if (!file.isFile()) continue;
@@ -94,9 +95,9 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, YamlFile>> {
         continue;
       }
 
-      YamlFile yamlFile;
+      RtpYamlConfig yamlFile;
       try {
-        yamlFile = new YamlFile(file);
+        yamlFile = new RtpYamlConfig(file);
         yamlFile.loadWithComments();
         cachedLookupLastModified.get().put(file.getName(), lastModified);
         cachedLookup.get().put(file.getName(), yamlFile);
@@ -116,8 +117,8 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, YamlFile>> {
   }
 
   @Override
-  public void disconnect(Map<String, YamlFile> database) {
-    for (YamlFile file : database.values()) {
+  public void disconnect(Map<String, RtpYamlConfig> database) {
+    for (RtpYamlConfig file : database.values()) {
       try {
         if (!file.exists()) file.createNewFile(true);
         file.save();
@@ -129,12 +130,12 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, YamlFile>> {
 
   @Override
   public @NotNull Optional<Map<String, Object>> read(
-      Map<String, YamlFile> database, String tableName, Map.Entry<String, Object> lookup) {
+      Map<String, RtpYamlConfig> database, String tableName, Map.Entry<String, Object> lookup) {
     if (!(database instanceof Map)) throw new IllegalStateException();
 
     if (!tableName.endsWith(".yml")) tableName = tableName + ".yml";
 
-    YamlFile file = database.get(tableName);
+    RtpYamlConfig file = database.get(tableName);
     if (file == null || !file.exists()) return Optional.empty();
     String s = lookup.getKey();
     Object o = file.get(s, lookup.getValue());
@@ -146,10 +147,10 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, YamlFile>> {
 
   @Override
   public void write(
-      Map<String, YamlFile> database, String tableName, Map<TableObj, TableObj> keyValuePairs) {
+      Map<String, RtpYamlConfig> database, String tableName, Map<TableObj, TableObj> keyValuePairs) {
     if (!tableName.endsWith(".yml")) tableName = tableName + ".yml";
-    YamlFile file = database.get(tableName);
-    if (file == null) file = new YamlFile(directory.getAbsolutePath() + File.separator + tableName);
+    RtpYamlConfig file = database.get(tableName);
+    if (file == null) file = new RtpYamlConfig(directory.getAbsolutePath() + File.separator + tableName);
     if (!file.exists()) {
       String filePath = file.getFilePath();
       if (database.containsKey("default.yml")) {
@@ -182,8 +183,8 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, YamlFile>> {
       Object o = file.get(keyStr);
       Object value = entry.getValue().object;
 
-      if (o instanceof ConfigurationSection) {
-        ConfigurationSection configurationSection = (ConfigurationSection) o;
+      if (o instanceof RtpYamlSection) {
+        RtpYamlSection configurationSection = (RtpYamlSection) o;
 
         if (configurationSection.getName().equalsIgnoreCase("shape") && value instanceof String) {
           String shapeName = (String) value;
@@ -200,9 +201,9 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, YamlFile>> {
           Map<String, Object> map = new HashMap<>();
           for (Map.Entry<? extends Enum<?>, Object> d : data.entrySet())
             map.put(d.getKey().name(), d.getValue());
-          setSection((ConfigurationSection) o, map);
+          setSection((RtpYamlSection) o, map);
         } else if (value instanceof Map) {
-          setSection((ConfigurationSection) o, (Map<String, Object>) value);
+          setSection((RtpYamlSection) o, (Map<String, Object>) value);
         } else {
           throw new IllegalArgumentException("expected map or similar for " + keyStr);
         }
@@ -214,9 +215,9 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, YamlFile>> {
   }
 
   @Override
-  public void delete(Map<String, YamlFile> database, String tableName, Map.Entry<String, Object> lookup) {
+  public void delete(Map<String, RtpYamlConfig> database, String tableName, Map.Entry<String, Object> lookup) {
     if (!tableName.endsWith(".yml")) tableName = tableName + ".yml";
-    YamlFile file = database.get(tableName);
+    RtpYamlConfig file = database.get(tableName);
     if (file == null || !file.exists()) return;
 
     try {
@@ -245,7 +246,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, YamlFile>> {
     File file = new File(directory, "rtp_cached_locations.yml");
     if (!file.exists()) return;
     try {
-      YamlFile yamlFile = new YamlFile(file);
+      RtpYamlConfig yamlFile = new RtpYamlConfig(file);
       yamlFile.loadWithComments();
       for (String key : new ArrayList<>(yamlFile.getMapValues(false).keySet())) {
         yamlFile.set(key, null);
@@ -265,8 +266,8 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, YamlFile>> {
   @Override
   public List<StoredLocation> loadCachedLocations(String regionName) {
     List<StoredLocation> res = new ArrayList<>();
-    Map<String, YamlFile> db = connect();
-    YamlFile file = db.get("rtp_cached_locations.yml");
+    Map<String, RtpYamlConfig> db = connect();
+    RtpYamlConfig file = db.get("rtp_cached_locations.yml");
     if (file == null || !file.exists()) return res;
 
     try {
@@ -274,7 +275,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, YamlFile>> {
       Map<String, Object> values = file.getMapValues(false);
       for (Map.Entry<String, Object> entry : values.entrySet()) {
         String id = entry.getKey();
-        ConfigurationSection section = file.getConfigurationSection(id);
+        RtpYamlSection section = file.getConfigurationSection(id);
         if (section == null) continue;
 
         String rowRegion = section.getString("region");
@@ -323,10 +324,10 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, YamlFile>> {
 
   @Override
   public void startup() {
-    Map<String, YamlFile> lookup = connect();
+    Map<String, RtpYamlConfig> lookup = connect();
 
     // Purge stale locations
-    YamlFile cachedFile = lookup.get("rtp_cached_locations.yml");
+    RtpYamlConfig cachedFile = lookup.get("rtp_cached_locations.yml");
     if (cachedFile != null) {
       try {
         cachedFile.loadWithComments();
@@ -335,7 +336,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, YamlFile>> {
         List<String> toRemove = new ArrayList<>();
         for (Map.Entry<String, Object> entry : values.entrySet()) {
           Object obj = entry.getValue();
-          if (obj instanceof ConfigurationSection section) {
+          if (obj instanceof RtpYamlSection section) {
             String playerUuidStr = section.getString("player_uuid");
             if (playerUuidStr != null && !playerUuidStr.equalsIgnoreCase("shared")) {
               long timestamp = section.getLong("timestamp", 0L);
@@ -361,7 +362,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, YamlFile>> {
     Optional<Map<String, Object>> read =
         read(lookup, "referenceData", new AbstractMap.SimpleEntry<>("referenceTime", 0L));
     if (read.isPresent()) {
-      YamlFile yamlFile = lookup.get("teleportData.yml");
+      RtpYamlConfig yamlFile = lookup.get("teleportData.yml");
       try {
         long referenceTime = Long.parseLong(read.get().get("referenceTime").toString());
         Map<String, Object> mapValues = yamlFile.getMapValues(false);
@@ -372,8 +373,8 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, YamlFile>> {
           Map<String, Object> dataMap;
           if (value instanceof Map) {
             dataMap = (Map<String, Object>) value;
-          } else if (value instanceof ConfigurationSection) {
-            dataMap = ((ConfigurationSection) value).getMapValues(false);
+          } else if (value instanceof RtpYamlSection) {
+            dataMap = ((RtpYamlSection) value).getMapValues(false);
           } else throw new IllegalStateException();
 
           try {

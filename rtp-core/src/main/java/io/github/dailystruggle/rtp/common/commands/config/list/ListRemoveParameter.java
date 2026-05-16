@@ -4,15 +4,15 @@ import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Supplier;
-import org.simpleyaml.configuration.file.YamlFile;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 
 public class ListRemoveParameter extends CommandParameter {
   private final Supplier<Set<String>> values;
-  private final YamlFile file;
+  private final RtpYamlConfig file;
   private final String key;
 
-  public ListRemoveParameter(YamlFile file, String key) {
-    super("rtp.update", "add items to a list", (uuid, s) -> true);
+  public ListRemoveParameter(RtpYamlConfig file, String key) {
+    super("rtp.update", "remove items from a list", (uuid, s) -> true);
     this.values = () -> new HashSet<>(file.getStringList(key));
     this.file = file;
     this.key = key;

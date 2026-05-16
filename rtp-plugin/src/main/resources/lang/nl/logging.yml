@@ -12,11 +12,16 @@ opdracht: false
 teletransport: true
 # Automatische of gebeurtenisgestuurde RTP-logboeken
 # Logboeken voor door gebeurtenissen geactiveerde RTP:
-gebeurtenis_wereldWisseling: true # Wanneer de speler van wereld wisselt
-gebeurtenis_deelnemen: true       # Wanneer de speler de server betreedt
-gebeurtenis_herSpawn: true        # Wanneer de speler herSpawnt
-gebeurtenis_bewegen: true         # Wanneer de speler beweegt (als bewegings-RTP actief is)
-gebeurtenis_teletransport: true   # Wanneer de speler teletransporteert (als teletransport-RTP actief is)
+# Wanneer de speler van wereld wisselt
+gebeurtenis_wereldWisseling: true
+# Wanneer de speler de server betreedt
+gebeurtenis_deelnemen: true
+# Wanneer de speler herSpawnt
+gebeurtenis_herSpawn: true
+# Wanneer de speler beweegt (als bewegings-RTP actief is)
+gebeurtenis_bewegen: true
+# Wanneer de speler teletransporteert (als teletransport-RTP actief is)
+gebeurtenis_teletransport: true
 # Foutopsporing bij selectiemislukkingen
 # Registreert gedetailleerde informatie wanneer het selecteren van een veilige locatie mislukt,
 # inclusief mislukkingspercentages en zoekparameters.

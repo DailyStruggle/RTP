@@ -1,4 +1,4 @@
-﻿<!--
+<!--
 Markdown equivalent of FRONT_PAGE.bbcode (RTP-Pro front page).
 Kept in sync with the BBCode source by hand; update both when changing copy.
 Conversion-optimized: hook → benchmark proof → buyer fit → CTA → deep dive.
@@ -30,7 +30,7 @@ On **Paper 1.21**, measured on the in-repo harness, 2 OPed clients spamming `/rt
 | 🧪 BetterRTP     | 7.1      | 771 ms                | 53.6 ms          |
 | 🧪 HuskHomes RTP | 6.2     | 335 ms                | 52.2 ms          |
 
-Same throughput as the next-best plugin at **~17× lower worst-case tick spike and 35% less CPU per teleport.** On Folia, RTP-Pro is the only plugin in the field that hits double-digit TP/s (9.87 TP/s @ 99.97% success). Raw harness: [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/main/helpers/StressTestRTP).
+Same throughput as the next-best plugin at **~17× lower worst-case tick spike and 35% less CPU per teleport.** On Folia, RTP-Pro is the only plugin in the field that hits double-digit TP/s (9.87 TP/s @ 99.97% success). Raw harness: [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3-beta/helpers/StressTestRTP).
 
 ---
 
@@ -118,7 +118,7 @@ A few hard requirements. If any are a **no**, EssentialsX `/rtp` or HuskHomes ar
 
 **Caveats.** 2 clients only (number is a floor, not a ceiling). Hardware, view distance, world state, and other plugins will move the numbers. Competitor plugins update frequently; corrections welcome via GitHub issue with a contradicting repro or doc link. Feature breadth, GUI, and claim-integration count are not benchmarked — several competitors trade speed for those, which is a legitimate choice.
 
-Full methodology, raw CSVs, per-run analyses: [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/main/helpers/StressTestRTP).
+Full methodology, raw CSVs, per-run analyses: [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3-beta/helpers/StressTestRTP).
 
 </details>
 
@@ -283,9 +283,9 @@ This policy exists because focused engineering time is what keeps the plugin fas
 
 ### Links
 
-- [**Admin guide**](https://github.com/dailystruggle/RTP/blob/main/docs/admin/FOR_SERVER_ADMINS.md) — install, configure, command reference
-- [**Addon developer guide**](https://github.com/dailystruggle/RTP/blob/main/docs/dev/FOR_ADDON_DEVELOPERS.md) — API & examples
-- [**Changelog & roadmap**](https://github.com/dailystruggle/RTP/blob/main/CHANGELOG.md)
+- [**Admin guide**](https://github.com/dailystruggle/RTP/blob/V3-beta/docs/FOR_SERVER_ADMINS.md) — install, configure, command reference
+- [**Addon developer guide**](https://github.com/dailystruggle/RTP/blob/V3-beta/docs/FOR_ADDON_DEVELOPERS.md) — API & examples
+- [**Changelog & roadmap**](https://github.com/dailystruggle/RTP/blob/V3-beta/CHANGELOG.md)
 - [**Source on GitHub**](https://github.com/dailystruggle/RTP) — star, watch, contribute, file issues
 
 ---
