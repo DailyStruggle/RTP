@@ -1,4 +1,4 @@
-minY: minY
-maxY: maxY
-step: stap
-requireSkyLight: daglichtVereist
+minY: "minY"
+maxY: "maxY"
+step: "stap"
+requireSkyLight: "daglichtVereist"

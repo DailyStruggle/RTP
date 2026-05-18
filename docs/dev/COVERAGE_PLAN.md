@@ -1,7 +1,7 @@
 # rtp-core Coverage Plan: 49% → 80%
 
 > Updated: 2026-04-16 (rescanned from live JaCoCo run)
-> Scope: `rtp-core` only (rtp-folia-common has broken tests; rtp-spigot-common is a server impl layer)
+> Scope: `rtp-core` only (rtp-folia-common has broken tests; rtp-bukkit-common is a server impl layer)
 
 ## Current Baseline
 

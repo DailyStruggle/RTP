@@ -252,6 +252,7 @@ class TeleportPipelineTaskPhaseTest {
     // Phase M1 — pipeline histogram wiring
     // -----------------------------------------------------------------------
 
+    /** Regression guard for REQ-RTP-OBS-002 (Single-Sample Pipeline Recording). */
     @Test
     @Timeout(value = 1, unit = TimeUnit.SECONDS)
     void runCleanup_records_one_sample_into_pipeline_histogram() {

@@ -1,10 +1,10 @@
 # --- Mappage de langue : config.yml ---
-language: language
-teleportDelay: delaiTeleportation
-cancelDistance: distanceAnnulation
-teleportCooldown: refroidissementTeleportation
-consoleCommands: commandesConsole
-playerCommands: commandesJoueur
-database: baseDeDonnees
-network: reseau
-version: version
+language: "language"
+teleportDelay: "delaiTeleportation"
+cancelDistance: "distanceAnnulation"
+teleportCooldown: "refroidissementTeleportation"
+consoleCommands: "commandesConsole"
+playerCommands: "commandesJoueur"
+database: "baseDeDonnees"
+network: "reseau"
+version: "version"

@@ -200,7 +200,7 @@ Count-Bound-scheduled callback:
   - `rtp-folia`: `FoliaLocationGenerator` — inheritance-only subclass of
     `LocationGenerator`; scheduler routing is provided by the Folia
     platform adapter's `RTPScheduler` implementation.
-  - `rtp-spigot` / `rtp-folia`: `BukkitRTPWorld.isChunkLoaded` and
+  - `rtp-bukkit` / `rtp-folia`: `BukkitRTPWorld.isChunkLoaded` and
     `FoliaRTPWorld.isChunkLoaded` delegate to native
     `World#isChunkLoaded(int, int)`; `BukkitRTPWorld.setForceLoadedImpl`
     completes the apply future from inside the `Bukkit.getScheduler().runTask`

@@ -51,6 +51,19 @@ rootProject.name = 'RTP'
 include 'rtp-api'
 include 'commands-api'
 include 'effects-api'
+// maps-api — runtime cartography SPI (ADR-046, maps-api-ADR-001).
+// Pure Java SPI: no Bukkit / Fabric / Loom dependency. Concrete bindings
+// (BukkitMapBinding, FoliaMapBinding, FabricMapBinding) land in Stage 2/3
+// inside the platform adapters; this module ships only the platform-neutral
+// SPI + NoopMapBinding + HeatmapRenderer + ChartModel hierarchy.
+include 'maps-api'
+// metrics-api — platform-portable metrics SPI (PROPOSAL-metrics-api-extraction.md,
+// active 2026-05-17). Pure Java SPI: no Bukkit / Fabric / Loom dependency.
+// Designed for monorepo reuse — sibling plugins can consume without rtp-core
+// (per §1.1 of the proposal). Concrete bindings (PaperMetricsBinding,
+// BukkitTpsSampler, FoliaMetricsBinding + FoliaRegionTpsSampler,
+// FabricMetricsBinding) stay in their respective platform adapters.
+include 'metrics-api'
 // effects-api-fabric-unobf -- nested sibling Gradle module hosting the
 // Mojmap-unobfuscated carrier for effectsapi/fabric_unobf/*. Compiled under
 // unobfuscated 1.15 Loom (same regime as rtp-fabric-v26_1_R1 and

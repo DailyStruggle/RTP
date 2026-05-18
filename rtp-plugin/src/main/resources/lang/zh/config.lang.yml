@@ -2,12 +2,11 @@
 # 将内部配置键名（左侧）映射为 config.yml 中用户可见的键名（右侧）。
 # 仅可修改右侧以重命名或翻译选项；左侧为代码常量，请勿更改。
 # 若此文件缺失，插件会自动重新生成左右一致的英文默认映射。
-
-database: 数据库
-playerCommands: 玩家命令
-teleportCooldown: 传送冷却
-cancelDistance: 取消距离
-teleportDelay: 传送延迟
-consoleCommands: 控制台命令
-version: version
-network: 网络
+database: "数据库"
+playerCommands: "玩家命令"
+teleportCooldown: "传送冷却"
+cancelDistance: "取消距离"
+teleportDelay: "传送延迟"
+consoleCommands: "控制台命令"
+version: "version"
+network: "网络"

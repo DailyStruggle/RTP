@@ -140,7 +140,7 @@ Paper/Folia API differs from the compiled adapter, causing `ClassNotFoundExcepti
 `NoSuchMethodError`, or undefined behaviour at runtime.
 
 **Mitigation:** Platform adapters are compiled as separate versioned submodules
-(`rtp-spigot-v1_21_R1`, `rtp-paper-v26_1_R1`, etc.) so each binary is valid for exactly
+(`rtp-bukkit-v1_21_R1`, `rtp-paper-v26_1_R1`, etc.) so each binary is valid for exactly
 one API surface. There is no runtime reflection or version detection that can silently
 fall back to broken behaviour.
 

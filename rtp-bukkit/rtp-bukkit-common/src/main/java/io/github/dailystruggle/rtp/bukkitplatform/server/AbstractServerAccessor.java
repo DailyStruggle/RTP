@@ -552,6 +552,20 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   @Override
   public double getTPS(int ticks) {
+    // C6 (Section C of CHECKLIST-metrics-and-multiserver) — when a non-NOOP
+    // MetricsBinding is installed the canonical TPS source is the M2 metrics
+    // facade. Read the snapshot first; if the binding is the M0 NOOP (all
+    // scalars NaN) fall back to the reflective recentTps lookup that has
+    // shipped on Bukkit since pre-Metrics days.
+    try {
+      io.github.dailystruggle.metrics.api.MetricsSnapshot s =
+          io.github.dailystruggle.rtp.common.RTP.metrics.snapshot();
+      double v = (ticks >= 600) ? s.tps15m : (ticks >= 100 ? s.tps5m : s.tps1m);
+      if (!Double.isNaN(v)) return v;
+    } catch (Throwable ignored) {
+      // snapshot() is contract-bound non-throwing, but stay defensive on
+      // pre-bind classpath drift.
+    }
     try {
       Object server = Bukkit.getServer();
       java.lang.reflect.Field field = server.getClass().getField("recentTps");

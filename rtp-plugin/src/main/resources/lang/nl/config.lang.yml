@@ -2,11 +2,11 @@
 # Koppelt interne sleutels (links) aan de zichtbare namen in config.yml (rechts).
 # Wijzig alleen de rechterkant; de linkerkant is een codeconstante.
 # Als dit bestand ontbreekt, genereert de plugin het opnieuw met identieke paren.
-database: database
-playerCommands: spelerOpdrachten
-teleportCooldown: teletransportWachttijd
-cancelDistance: annuleerAfstand
-teleportDelay: teletransportVertraging
-consoleCommands: consoleOpdrachten
-version: version
-network: netwerk
+database: "database"
+playerCommands: "spelerOpdrachten"
+teleportCooldown: "teletransportWachttijd"
+cancelDistance: "annuleerAfstand"
+teleportDelay: "teletransportVertraging"
+consoleCommands: "consoleOpdrachten"
+version: "version"
+network: "netwerk"

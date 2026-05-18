@@ -68,4 +68,4 @@ bezoeker_ingeschakeld: true
 pregeneratedPreference: 0.0
 # Fraction [0.0, 1.0] of L3 backlog capacity at which refill resumes (hysteresis). 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill continuously.
 backlogRefillThreshold: 0.5
-version: "1.0"
+version: 1.0

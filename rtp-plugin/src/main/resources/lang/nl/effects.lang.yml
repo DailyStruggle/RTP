@@ -5,9 +5,9 @@
 # de linkerkolom is een codeconstante en mag niet worden gewijzigd.
 # Als dit bestand ontbreekt, hergenereert de plugin automatisch een
 # Engelse versie met identieke waarden aan beide kanten.
-when: wanneer
-permission: rechten
-players: spelers
-inherit: erft
-effects: effecten
-version: version
+when: "wanneer"
+permission: "rechten"
+players: "spelers"
+inherit: "erft"
+effects: "effecten"
+version: "version"

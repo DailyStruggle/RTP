@@ -3,15 +3,14 @@
 # オプション名を改名・翻訳する場合は右側のみを編集してください。
 # 左側はコード定数なので変更しないでください。
 # このファイルが存在しない場合、プラグインは左右が同一の英語版を再生成します。
-
-safetyRadius: 安全半径
-biomeWhitelist: バイオームホワイトリスト
-airBlocks: 空気ブロック
-biomes: バイオーム
-unsafeBlocks: 危険ブロック
-platformRadius: プラットフォーム半径
-platformAirHeight: プラットフォーム空気高さ
-platformMaterial: プラットフォーム素材
-invulnerabilityTime: 無敵時間
-version: version
-platformDepth: プラットフォーム深さ
+safetyRadius: "安全半径"
+biomeWhitelist: "バイオームホワイトリスト"
+airBlocks: "空気ブロック"
+biomes: "バイオーム"
+unsafeBlocks: "危険ブロック"
+platformRadius: "プラットフォーム半径"
+platformAirHeight: "プラットフォーム空気高さ"
+platformMaterial: "プラットフォーム素材"
+invulnerabilityTime: "無敵時間"
+version: "version"
+platformDepth: "プラットフォーム深さ"

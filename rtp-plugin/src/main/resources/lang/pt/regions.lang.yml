@@ -1,0 +1,19 @@
+# --- Mapeamento de Idioma: regions/*.yml ---
+# Mapeia as chaves internas de região (esquerda) para os nomes visíveis ao
+# usuário usados em todos os arquivos sob `regions/` (direita).
+# Edite apenas o lado direito para renomear ou traduzir uma opção;
+# o lado esquerdo é uma constante de código e não deve ser alterado.
+# Se este arquivo estiver ausente, o plugin o regenera com pares
+# idênticos esquerda/direita (os valores padrão em inglês).
+world: "mundo"
+worldBorderOverride: "sobrescreverBordaMundo"
+shape: "forma"
+vert: "vertical"
+requirePermission: "exigirPermissao"
+cacheCap: "limiteCache"
+backlogCacheCap: "limiteCacheAcumulada"
+activeChunkCap: "limiteChunkAtivo"
+price: "preco"
+spatialResolution: "resolucaoEspacial"
+override: "sobrescrever"
+version: "version"

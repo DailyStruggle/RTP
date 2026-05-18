@@ -10,17 +10,16 @@
 #   - Behoud de kleurcodes &a &e &c en hexadecimale codes (#2636ef).
 #
 # REQ-RTP-F-013 / ADR-020.
-
-################################################################################
+# ###############################################################################
 # Sectie 1: Algemene instellingen
-################################################################################
+# ###############################################################################
 plaatshouders:
   # P0
   - "[RTP]"
 
-################################################################################
+# ###############################################################################
 # Sectie 2: Teletransport
-################################################################################
+# ###############################################################################
 alTeletransporteert: "&e[P0] je wordt al geteletransporteerd!"
 teletransportGeweigerdHerladen: "&e[P0] teletransports zijn tijdelijk uitgeschakeld terwijl de plugin herlaadt. Probeer het over een ogenblik opnieuw."
 vertragingsBericht: "&e[P0] Teletransporteren over [delay]. Beweeg niet."
@@ -33,18 +32,18 @@ geenLocatiesInWachtrij: "#f5eb73[P0] er zijn momenteel geen locaties beschikbaar
 wachtrijUpdate: "#2636ef[P0] jouw positie in de wachtrij: [spot]"
 onvoldoendeSaldo: "&e[P0] je hebt minimaal $[money] nodig."
 
-################################################################################
+# ###############################################################################
 # Sectie 3: Tijdnotatie
-################################################################################
+# ###############################################################################
 dagen: "d"
 uren: "u"
 minuten: "m"
 seconden: "s"
 milliseconden: "ms"
 
-################################################################################
+# ###############################################################################
 # Sectie 4: Systeem en beheer
-################################################################################
+# ###############################################################################
 oudBestand: "&b[P0] een oud [filename] gevonden. Bijwerken"
 nieuweWereld: "&b[P0] nieuwe wereld '[world]' gedetecteerd"
 ongeldigeWereld: "&e[P0] wereld '[world]' kon niet worden gevonden"
@@ -58,15 +57,15 @@ busy: "&c[P0] bezig"
 invalidCommand: "&c[P0] ongeldig commando - [arg]"
 geenRechten: "&eSorry, maar je hebt geen toestemming om dit commando uit te voeren. Neem contact op met de serverbeheerders als je denkt dat dit een fout is."
 
-################################################################################
+# ###############################################################################
 # Sectie 5: Beheerderslogboeken
-################################################################################
+# ###############################################################################
 locatieOpgeslagen: "&e[P0] [amount] locaties succesvol opgeslagen voor [region]"
 locatieGeladen: "&e[P0] [amount] locaties succesvol geladen voor [region]"
 
-################################################################################
+# ###############################################################################
 # Sectie 6: Scan-opdracht
-################################################################################
+# ###############################################################################
 scanStarten: "&a[P0] scantaak gestart voor regio's: [scan_regions]"
 scanResetten: "&e[P0] scanwachtrij gereset voor regio's: [scan_regions]"
 scanAnnuleren: "&e[P0] scantaak geannuleerd voor regio's: [scan_regions]"
@@ -76,9 +75,9 @@ scanActief: "&c[P0] er is al een scantaak actief voor regio's: [scan_regions]"
 scanNietActief: "&c[P0] er is geen scantaak actief voor regio's: [scan_regions]"
 scanStatus: "&a[P0] [scan_chunks] / [scan_totalChunks] chunks voltooid voor regio's: [scan_regions]. [scan_cps] cps. Landpercentage: [scan_landPercentage]%. Resterende tijd: [scan_eta]"
 
-################################################################################
+# ###############################################################################
 # Sectie 7: Info-opdracht
-################################################################################
+# ###############################################################################
 titelInfo: "&a======RTP Informatie======"
 infoTickets: "&7Actieve globale chunk-tickets: &f[tickets]"
 infoTeletransports: "&7Actieve teletransport-toestandsmachines: &f[teleports]"
@@ -112,9 +111,9 @@ regioGegevens:
   - "#58CCED  - achterstandCache (L3): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - inCache: [cached]"
 
-################################################################################
+# ###############################################################################
 # Sectie 8: Opdrachtbeschrijvingen
-################################################################################
+# ###############################################################################
 rtp: "&b/rtp - teletransporteer naar een willekeurige locatie"
 rtp_beschrijving: "teletransporteer naar een willekeurige locatie"
 hulp: "&b/rtp help - deze hulp weergeven"
@@ -127,18 +126,18 @@ config_beschrijving: "configuratiebestanden tijdens uitvoering bijwerken"
 info_beschrijving: "huidige pluginstatus controleren"
 test_beschrijving: "RTP-functies testen"
 
-################################################################################
+# ###############################################################################
 # Sectie 9: PlaceholderAPI-ondersteuning
-################################################################################
+# ###############################################################################
 SPELER_BESCHIKBAAR: "&aBESCHIKBAAR"
 SPELER_WACHTTIJD: "&eWACHTTIJD"
 SPELER_INSTELLEN: "&bLOCATIE KIEZEN"
 SPELER_LAADT: "&bCHUNKS LADEN"
 SPELER_TELETRANSPORTEERT: "&bTELETRANSPORTEERT"
 
-################################################################################
+# ###############################################################################
 # Sectie 10: Visuele elementen
-################################################################################
+# ###############################################################################
 titel: "#FF6B6BG#FF7E63e#FF9155t#FFA447e#FFB739l#FFCA2Be#FFDD1Dp#F0F00Fo#C8F010r#A0F011t#78F012e#50F013e#38EF6Br#3BECC8d#38ECF0!"
 ondertitel: "#A78BFA#AF84F9V#B77DF7e#BF76F5e#C76FF3l#CF68F1 #D761EFp#DF5AEDl#E753EBe#EF4CE9z#E855D0i#E860B8e#E86BA0r!"
 infaden: 20
@@ -147,12 +146,12 @@ uitfaden: 20
 
 actiebalk: ""
 
-################################################################################
+# ###############################################################################
 # Sectie 11: Metadata
-################################################################################
-version: "1.0"
+# ###############################################################################
+version: 1.0
 
-################################################################################
+# ###############################################################################
 # Sectie 12: Ontwikkelaarsopties
-################################################################################
+# ###############################################################################
 devTagTonen: false

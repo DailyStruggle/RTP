@@ -5,8 +5,7 @@
 # el lado izquierdo es una constante de código y no debe cambiarse.
 # Si este archivo falta, el plugin lo regenera con pares idénticos
 # izquierda/derecha (los valores por defecto en inglés).
-
-region: region
-requirePermission: requerirPermiso
-override: sobrescribir
-version: version
+region: "region"
+requirePermission: "requerirPermiso"
+override: "sobrescribir"
+version: "version"

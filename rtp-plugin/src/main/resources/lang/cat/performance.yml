@@ -1,6 +1,5 @@
 # --- RTP Performance Settings (cat dialect) ---
 # How fast a kitty can stalk and pounce without knocking over the lamp.
-
 # Max pounce attempts before giving up
 max_pounces: 32
 # Kibble (chunk) radius to load while stalking
@@ -37,4 +36,4 @@ loginCacheEnabled: false
 loginCacheCap: 0
 
 # Do not bite the version number, sacred catnip
-meowsion: "1.0"
+meowsion: 1.0

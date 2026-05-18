@@ -1,8 +1,8 @@
 # --- Mappage de langue : economy.yml ---
-refundOnCancel: remboursementAnnulation
-price: prix
-priceOther: prixAutre
-paramsPrice: prixParametres
-biomePrice: prixBiome
-balanceFloor: soldeMinimum
-version: version
+refundOnCancel: "remboursementAnnulation"
+price: "prix"
+priceOther: "prixAutre"
+paramsPrice: "prixParametres"
+biomePrice: "prixBiome"
+balanceFloor: "soldeMinimum"
+version: "version"

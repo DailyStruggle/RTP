@@ -1,8 +1,6 @@
 # --- RTP Core Configuration ---
 # Documentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/CORE_CONFIG.md
-
 # Locale selection now lives in language.yml (loaded before config.yml).
-
 # Wait time before a queued teleport executes.
 # 0 teleports immediately (skips the cancel-on-move window).
 # Interacts with cancelDistance below.
@@ -96,7 +94,7 @@ menu:
   # @type: list<enum>
   # @options: ["book", "chat"]
   renderer:
-    - book
+    - "book"
 
 # DO NOT TOUCH VERSION NUMBER
-version: "3.0"
+version: 3.0

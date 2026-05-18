@@ -96,7 +96,7 @@ Custom shapes can be registered at runtime via the `rtp-api`. See the `addons/` 
 | `effects-api/` | Unified multi-platform visual/particle effects framework. |
 | `rtp-core/` | Platform-agnostic core logic: regions, shapes, queues, database, memory tracking. |
 | `rtp-plugin/` | Plugin entry point for Bukkit platforms. Bridges core with Spigot/Paper/Folia adapters. |
-| `rtp-spigot/` | Spigot platform adapter. |
+| `rtp-bukkit/` | Spigot platform adapter. |
 | `rtp-paper/` | Paper platform adapter (async chunk loading). |
 | `rtp-folia/` | Folia platform adapter (regional thread scheduling). |
 | `rtp-fabric/` | Fabric platform adapter and mod entry point (Planned). |

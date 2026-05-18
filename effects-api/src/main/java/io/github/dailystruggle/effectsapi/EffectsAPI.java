@@ -1,7 +1,7 @@
 package io.github.dailystruggle.effectsapi;
 
-import io.github.dailystruggle.effectsapi.bukkit.SpigotListeners.FireworkSafetyListener;
-import io.github.dailystruggle.effectsapi.bukkit.SpigotListeners.GlideSafetyListener;
+import io.github.dailystruggle.effectsapi.bukkit.BukkitListeners.FireworkSafetyListener;
+import io.github.dailystruggle.effectsapi.bukkit.BukkitListeners.GlideSafetyListener;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;

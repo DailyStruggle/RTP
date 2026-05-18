@@ -465,12 +465,21 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   }
 
   @Override
-  public double getTPS(int ticks) { // @AnyThread — returns constant
+  public double getTPS(int ticks) { // @AnyThread — reads M2 snapshot, falls back to nominal
+    // C6 (Section C of CHECKLIST-metrics-and-multiserver) — Folia exposes no
+    // first-class TPS field on its server object (regions tick independently)
+    // so the pre-M2 implementation simply returned the nominal 20. Once a
+    // FoliaMetricsBinding is installed the snapshot carries the EMA-blended
+    // global TPS; fall back to the nominal constant only on the M0 NOOP path.
     try {
-      return 20.0;
-    } catch (Exception e) {
-      return 20.0;
+      io.github.dailystruggle.metrics.api.MetricsSnapshot s =
+          io.github.dailystruggle.rtp.common.RTP.metrics.snapshot();
+      double v = (ticks >= 600) ? s.tps15m : (ticks >= 100 ? s.tps5m : s.tps1m);
+      if (!Double.isNaN(v)) return v;
+    } catch (Throwable ignored) {
+      // Defensive — snapshot() is non-throwing by contract.
     }
+    return 20.0;
   }
 
   @Override

@@ -42,7 +42,7 @@ Requirement style follows project rules: requirements state *what*, not *how*; o
 ### 2.1 Module Boundaries
 
 - **REQ-API-ARCH-001 — Platform Neutrality.** The `commands-api` module shall not import `org.bukkit.*`, Brigadier client-only types, or any other platform-specific symbol from its core interfaces. Bridge classes that necessarily reference a platform type (e.g. `BrigadierCommandAdapter` referencing `com.mojang.brigadier.*`) shall isolate that dependency to bridge-only files and shall declare it `compileOnly`.
-- **REQ-API-ARCH-002 — Thin Platform Shims.** Platform adapters (`rtp-spigot`, `rtp-paper`, `rtp-folia`, `rtp-fabric`, future `rtp-velocity`) shall delegate registration and dispatch to `commands-api` and shall not re-implement tree walking, permission gating, parameter parsing, help text rendering, or completion filtering.
+- **REQ-API-ARCH-002 — Thin Platform Shims.** Platform adapters (`rtp-bukkit`, `rtp-paper`, `rtp-folia`, `rtp-fabric`, future `rtp-velocity`) shall delegate registration and dispatch to `commands-api` and shall not re-implement tree walking, permission gating, parameter parsing, help text rendering, or completion filtering.
 
 ### 2.2 Bridge Contract
 

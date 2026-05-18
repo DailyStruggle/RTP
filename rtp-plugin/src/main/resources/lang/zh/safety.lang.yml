@@ -2,15 +2,14 @@
 # 将内部配置键名（左侧）映射为 safety.yml 中用户可见的键名（右侧）。
 # 仅可修改右侧以重命名或翻译选项；左侧为代码常量，请勿更改。
 # 若此文件缺失，插件会自动重新生成左右一致的英文默认映射。
-
-safetyRadius: 安全半径
-biomeWhitelist: 生物群系白名单
-airBlocks: 空气方块
-biomes: 生物群系
-unsafeBlocks: 不安全方块
-platformRadius: 平台半径
-platformAirHeight: 平台空气高度
-platformMaterial: 平台材质
-invulnerabilityTime: 无敌时间
-version: version
-platformDepth: 平台深度
+safetyRadius: "安全半径"
+biomeWhitelist: "生物群系白名单"
+airBlocks: "空气方块"
+biomes: "生物群系"
+unsafeBlocks: "不安全方块"
+platformRadius: "平台半径"
+platformAirHeight: "平台空气高度"
+platformMaterial: "平台材质"
+invulnerabilityTime: "无敌时间"
+version: "version"
+platformDepth: "平台深度"

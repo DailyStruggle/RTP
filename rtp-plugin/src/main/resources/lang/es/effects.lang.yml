@@ -5,9 +5,9 @@
 # la izquierda es una constante de código, no la modifiques.
 # Si este archivo no existe, el plugin lo regenerará automáticamente con una
 # versión en inglés con valores idénticos a ambos lados.
-when: cuando
-permission: permiso
-players: jugadores
-inherit: hereda
-effects: efectos
-version: version
+when: "cuando"
+permission: "permiso"
+players: "jugadores"
+inherit: "hereda"
+effects: "efectos"
+version: "version"

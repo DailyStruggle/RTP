@@ -1,6 +1,5 @@
 # --- Configuración económica de RTP ---
 # Configura los costes del teletransporte aleatorio usando la economía del servidor.
-
 # Política de reembolso
 # Indica si se reembolsa el precio y se reinicia el cooldown al cancelarse el teletransporte.
 reembolsoAlCancelar: true
@@ -23,4 +22,4 @@ precioBioma: 5000.0
 saldoMinimo: 0.0
 
 # NO MODIFIQUES EL NÚMERO DE VERSIÓN
-version: "1.0"
+version: 1.0

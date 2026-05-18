@@ -1,0 +1,223 @@
+# --- Mensagens do RTP (Português) ---
+# Tradução das mensagens visíveis ao jogador e ao console.
+#
+# IMPORTANTE:
+#   - Os nomes de chave deste arquivo correspondem à coluna direita de
+#     lang/pt/messages.lang.yml (a tradução dos nomes internos de chave do
+#     plugin). Se uma chave não aparecer em messages.lang.yml, é usada a
+#     chave em inglês do arquivo base (lang/messages.lang.yml).
+#   - Preserve os marcadores entre colchetes como estão: [P0], [delay],
+#     [attempts], [world], [region], [remainingCooldown], [scan_chunks], etc.
+#   - Preserve os códigos de cor &a &e &c e hexadecimais (#2636ef).
+#
+# REQ-RTP-F-013 / ADR-020.
+# ###############################################################################
+# Seção 1: Configuração geral
+# ###############################################################################
+marcadores:
+  - "\"[RTP]\" #P0"
+
+# ###############################################################################
+# Seção 2: Teletransporte
+# ###############################################################################
+jaTeletransportando: "&e[P0] você já está se teletransportando!"
+teletransporteNegadoRecarregando: "&e[P0] os teletransportes estão temporariamente desativados enquanto o plugin recarrega. Tente novamente em alguns instantes."
+mensagemAtraso: "&e[P0] Teletransportando em [delay]. Não se mova."
+carregamentoChunk: "&e[P0] Carregando chunks, por favor aguarde..."
+mensagemTeletransporte: "&e[P0] Teletransportado em [attempts] tentativas, em [processingTime]"
+cancelarTeletransporte: "&e[P0] Teletransporte cancelado!"
+inseguro: "&e[P0] nenhuma localização segura encontrada em [attempts] tentativas"
+mensagemEspera: "&e[P0] Você não pode teletransportar-se novamente por [remainingCooldown]"
+semLocalizacoesNaFila: "#f5eb73[P0] não há localizações prontas no momento"
+atualizarFila: "#2636ef[P0] sua posição na fila: [spot]"
+dinheiroInsuficiente: "&e[P0] você precisa de pelo menos $[money] para isso."
+
+# ###############################################################################
+# Seção 3: Formato de tempo
+# ###############################################################################
+dias: "d"
+horas: "h"
+minutos: "m"
+segundos: "s"
+milissegundos: "ms"
+
+# ###############################################################################
+# Seção 4: Sistema e administração
+# ###############################################################################
+arquivoAntigo: "&b[P0] [filename] antigo detectado. Atualizando"
+mundoNovo: "&b[P0] novo mundo '[world]' detectado"
+mundoInvalido: "&e[P0] não foi possível encontrar o mundo '[world]'"
+recarregando: "&b[P0] carregando [filename]..."
+recarregado: "&b[P0] [filename] carregado com sucesso."
+atualizando: "&a[P0] atualizando [filename]..."
+atualizado: "&a[P0] [filename] atualizado com sucesso."
+argumentoInvalido: "&c[P0] argumento de comando inválido [arg]"
+comandoConsoleNaoPermitido: "&c[P0] Você precisa ser um jogador no jogo para executar este comando."
+# busy e invalidCommand não são traduzidos em messages.lang.yml -> usam-se as chaves em inglês (fallback ao baseline).
+busy: "&c[P0] ocupado"
+invalidCommand: "&c[P0] comando inválido - [arg]"
+semPermissoes: "&eDesculpe, mas você não tem permissão para executar este comando. Contate os administradores do servidor se acredita que isso é um erro."
+
+# ###############################################################################
+# Seção 5: Registros administrativos
+# ###############################################################################
+localizacaoSalva: "&e[P0] [amount] localizações salvas com sucesso para [region]"
+localizacaoCarregada: "&e[P0] [amount] localizações carregadas com sucesso para [region]"
+
+# ###############################################################################
+# Seção 6: Comando Scan
+# ###############################################################################
+iniciarEscaneamento: "&a[P0] tarefa de escaneamento iniciada para as regiões: [scan_regions]"
+reiniciarEscaneamento: "&e[P0] fila de escaneamento reiniciada para as regiões: [scan_regions]"
+cancelarEscaneamento: "&e[P0] tarefa de escaneamento cancelada para as regiões: [scan_regions]"
+pausarEscaneamento: "#A020F0[P0] tarefa de escaneamento pausada para as regiões: [scan_regions]"
+retomarEscaneamento: "#10A5F5[P0] tarefa de escaneamento retomada para as regiões: [scan_regions]"
+escaneamentoAtivo: "&c[P0] já existe uma tarefa de escaneamento em andamento para as regiões: [scan_regions]"
+escaneamentoNaoAtivo: "&c[P0] não há tarefa de escaneamento em andamento para as regiões: [scan_regions]"
+estadoEscaneamento: "&a[P0] concluídos [scan_chunks] / [scan_totalChunks] chunks para as regiões: [scan_regions]. [scan_cps] cps. Porcentagem de terra: [scan_landPercentage]%. Tempo restante: [scan_eta]"
+
+# ###############################################################################
+# Seção 7: Comando Info
+# ###############################################################################
+tituloInfo: "&a======Informações do RTP======"
+infoTickets: "&7Tickets de chunk ativos globais: &f[tickets]"
+# infoTeletransportes: deduplicado com infoPendingTeleports no bloco Health (esvaziado por compatibilidade com sobrescritas de locale).
+infoTeletransportes: ""
+# infoMSPT: deduplicado com infoMSPTLive ("MSPT: x ms (orçamento do tick y%)"); a linha live carrega o indicador de orçamento.
+infoMSPT: ""
+infoCargasTotais: "&7Chunks carregados ao longo da vida: &f[loads]"
+infoCargasPorOrigem: "&7Cargas por origem: &f[loadsByOrigin]"
+infoTaxaVazamento: "&7Taxa atual de vazamento de chunks: &f[leakRate]"
+infoHealthPipelineHeader: "&7--- Saúde - Pipeline ---"
+infoTps: "&7TPS (1m / 5m / 15m): [tps1mColoured] &7/ [tps5mColoured] &7/ [tps15mColoured]"
+infoMSPTLive: "&7MSPT: [msptColoured] ms &7(orçamento do tick [tickBudgetUtilisationColoured]&7)"
+infoSoftCap: "&7Jogadores: &f[playerCount] &7/ &f[softCap]"
+infoQueueDepth: "&7Jogadores aguardando em filas de região: &f[queueDepth]"
+infoPendingTeleports: "&7Pipelines de teletransporte pendentes: &f[pendingTeleports]"
+infoAvgPipelineMs: "&7Latência média da pipeline: [avgPipelineMsColoured] ms"
+infoHeap: "&7Heap da JVM: &f[heapUsedMb] / [heapMaxMb] MiB"
+infoDatabaseLatencyMs: "&7Latência do banco de dados: &f[databaseLatencyMs] ms"
+infoFoliaRegionsHeader: "&7--- Regiões do Folia ---"
+infoFoliaRegion: "&7[regionId]: &ftps=[tps1m] mspt=[mspt] jogadores=[playerCount] fila=[queueDepth] orcamentoTick=[tickBudgetUtilisation]"
+# --- B12 limiares de faixas de cor (METRICS_PLAN.md > Health colour coding) ---
+infoThresholdTpsGreen: 19.5
+infoThresholdTpsYellow: 18.0
+infoThresholdMsptGreen: 30.0
+infoThresholdMsptYellow: 45.0
+infoThresholdCacheFillGreen: 0.50
+infoThresholdCacheFillYellow: 0.25
+infoThresholdNetworkAgeYellow: 5.0
+cabecalhoAvisoInfo: "&7--- Aviso de diagnóstico ---"
+avisoInfo: "&7Nota de diagnóstico: Se o número total de chunks órfãos do servidor exceder o total histórico de cargas deste plugin ([loads]), este plugin não é a única causa do vazamento de memória."
+cabecalhoMundoInfo: "#008080Mundos:"
+cabecalhoMundoConsoleInfo: "&7--- Mundos ---"
+infoMundo: "  #21ADA8[world]"
+cabecalhoRegiaoInfo: "#63C5DARegiões:"
+cabecalhoRegiaoConsoleInfo: "&7--- Regiões ---"
+infoRegiao: "  #52B2BF[region]"
+dadosMundo:
+  - "#21ADA8[world]:"
+  - "#99EEBB  - regiao: [region]"
+  - "#99EEBB  - exigirPermissao: [requirePermission]"
+  - "#99EEBB  - sobrescrever: [override]"
+dadosRegiao:
+  - "#52B2BF[region]:"
+  - "#58CCED  - mundo: [world]"
+  - "#58CCED  - forma: [shape]"
+  - "#58CCED  - exigirPermissao: [requirePermission]"
+  - "#58CCED  - sobrescritaDeBorda: [worldBorderOverride]"
+  - "#58CCED  - capacidadeCache: [cacheCap]"
+  - "#58CCED  - cacheRetida (L1): [keptCache]"
+  - "#58CCED  - cacheLiberada (L2): [unkeptCache]"
+  - "#58CCED  - cacheAcumulada (L3): [backlogCache] / [backlogCacheCap]"
+  - "#58CCED  - emCache: [cached]"
+
+# ###############################################################################
+# Seção 8: Descrições de comandos
+# ###############################################################################
+rtp: "&b/rtp - teletransporte-se para uma localização aleatória"
+rtp_descricao: "teletransporte-se para uma localização aleatória"
+ajuda: "&b/rtp help - mostrar esta ajuda"
+ajuda_descricao: "descrever comandos"
+recarregar: "&b/rtp reload - recarregar os arquivos de configuração"
+recarregar_descricao: "recarregar arquivos de configuração"
+escaneamento: "&b/rtp scan - testar todas as localizações possíveis da região para melhorar os tempos de carregamento"
+escaneamento_descricao: "apagar dados salvos e testar todas as localizações possíveis da região"
+config_descricao: "atualizar arquivos de configuração em tempo de execução"
+info_descricao: "verificar o estado atual do plugin"
+teste_descricao: "testar funcionalidades do RTP"
+
+# ###############################################################################
+# Seção 8b: Framework de menus generalizado (ADR-035 / ADR-044)
+# ###############################################################################
+# Estas chaves não são traduzidas em lang/pt/messages.lang.yml, portanto usam-se
+# os nomes canônicos em inglês (fallback ao baseline ADR-020).
+menuInvalid: "&c[P0] esse link de menu não é válido."
+menuExpired: "&c[P0] esse link de menu expirou. Reabra o menu."
+menuUnknownPlayer: "&c[P0] os links de menu só podem ser usados por jogadores no jogo."
+# Modelo de tooltip quando não há comentário YAML disponível para um parâmetro. Marcador: [type] - o tipo declarado do parâmetro.
+menuHoverFallbackType: "tipo: [type]"
+# Modelo de tooltip quando um parâmetro expõe um conjunto pequeno de valores. Marcador: [values] - valores aceitos separados por vírgula.
+menuHoverFallbackBounds: "aceitos: [values]"
+# Rótulo da linha de navegação "voltar um nível" em cada página de menu não raiz.
+menuBack: "&7<< voltar"
+# Modelo da linha "executar o comando montado" em cada página de menu executável não raiz. Marcador: [command] - a invocação /rtp ... montada.
+menuExecute: "&a> executar [command]"
+menuConstructed: "&7construindo: &f/rtp [command]"
+# Título não interativo no topo do menu raiz /rtp menu (Etapa A.5).
+menuRootTitle: "&6&l menu do RTP"
+# Subtítulo/orientação não interativo abaixo de menuRootTitle (Etapa A.5).
+menuRootHint: "&7clique em uma opção para começar"
+# Linhas de navegação adicionadas a páginas de menu paginadas (Etapa A.6).
+# Marcador: [page] - número de página de destino (base 1).
+menuPagePrev: "&7<< página anterior ([page])"
+menuPageNext: "&7página seguinte ([page]) >>"
+# Etapa B: rótulos da página principal curada (renderizada ao executar /rtp menu sem argumentos).
+menuFrontPageSectionTeleport: "&8-- &7Teletransporte&8 --"
+menuFrontPageSectionAdmin: "&8-- &cAdministração&8 --"
+menuFrontPageRowTeleport: "&aTeletransporte"
+menuFrontPageRowRegion: "&bEscolher uma região"
+menuFrontPageRowBiome: "&2Escolher um bioma"
+menuFrontPageRowHelp: "&7? Ajuda"
+menuFrontPageRowInfo: "&bi Informações do servidor"
+menuFrontPageRowConfig: "&#6A1B9AEditor de configuração"
+menuFrontPageRowScan: "&#00838FControle de escaneamento"
+menuFrontPageRowDiagnostics: "&6Diagnóstico completo"
+menuFrontPageRowReload: "&c! Recarregar"
+menuFrontPageHoverDiagnostics: "&#5D4037Executa a suíte completa de diagnóstico. Pode levar vários segundos e sobrecarregar o servidor."
+menuFrontPageHoverReload: "&cRecarrega todos os arquivos de configuração. Teletransportes em andamento podem ser cancelados."
+# Cabeçalho de uma subpágina seletora de valor de parâmetro (Etapa A.2).
+# Marcadores: [param] - nome do parâmetro; [command] - a invocação /rtp ... montada.
+menuPickValue: "&eescolha um valor para [param] (executará: /rtp [command] [param]:<valor>)"
+# Rótulo da linha "digitar valor personalizado" como alternativa no seletor.
+# Ao clicar, preenche o chat com o comando montado até '<param>:'.
+menuTypeValue: "&7digitar um valor personalizado..."
+
+# ###############################################################################
+# Seção 9: Suporte ao PlaceholderAPI
+# ###############################################################################
+JOGADOR_DISPONIVEL: "&aDISPONIVEL"
+JOGADOR_TEMPO_ESPERA: "&eEM ESPERA"
+JOGADOR_CONFIGURAR: "&bESCOLHENDO LOCALIZACAO"
+JOGADOR_CARREGANDO: "&bCARREGANDO CHUNKS"
+JOGADOR_TELETRANSPORTANDO: "&bTELETRANSPORTANDO"
+
+# ###############################################################################
+# Seção 10: Elementos visuais
+# ###############################################################################
+titulo: "#FF6B6BT#FF7E63e#FF9155l#FFA447e#FFB739t#FFCA2Br#FFDD1Da#F0F00Fn#C8F010s#A0F011p#78F012o#50F013r#38EF6Bt#3BECC8a#38ECF0d#35E9FFo#32E6FF!"
+subtitulo: "#A78BFAd#AF84F9i#B77DF7v#BF76F5i#C76FF3r#CF68F1t#D761EFa#DF5AEDi#E753EBs#EF4CE9!"
+aparecer: 20
+permanecer: 20
+desaparecer: 20
+barraAcao: ""
+
+# ###############################################################################
+# Seção 11: Metadados
+# ###############################################################################
+version: 1.0
+
+# ###############################################################################
+# Seção 12: Opções para desenvolvedores
+# ###############################################################################
+mostrarTagDev: false

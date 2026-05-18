@@ -5,15 +5,14 @@
 # código y no debe cambiarse.
 # Si este archivo falta, el plugin lo regenera con pares idénticos
 # izquierda/derecha (los valores por defecto en inglés).
-
-safetyRadius: radioSeguridad
-biomeWhitelist: listaPermitidaBiomas
-airBlocks: bloquesAire
-biomes: biomas
-unsafeBlocks: bloquesInseguros
-platformRadius: radioPlataforma
-platformAirHeight: alturaAirePlataforma
-platformMaterial: materialPlataforma
-invulnerabilityTime: tiempoInvulnerabilidad
-version: version
-platformDepth: profundidadPlataforma
+safetyRadius: "radioSeguridad"
+biomeWhitelist: "listaPermitidaBiomas"
+airBlocks: "bloquesAire"
+biomes: "biomas"
+unsafeBlocks: "bloquesInseguros"
+platformRadius: "radioPlataforma"
+platformAirHeight: "alturaAirePlataforma"
+platformMaterial: "materialPlataforma"
+invulnerabilityTime: "tiempoInvulnerabilidad"
+version: "version"
+platformDepth: "profundidadPlataforma"

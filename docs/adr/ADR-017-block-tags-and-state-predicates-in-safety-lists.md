@@ -104,7 +104,7 @@ a tag expands to.
 Tag expansion (`namespace:path` → `Set<String>` of material names) is a
 separate concern and lives in the platform adapter:
 
-- **`rtp-spigot-common`** provides a `TagResolver` that delegates to
+- **`rtp-bukkit-common`** provides a `TagResolver` that delegates to
   `Bukkit.getTag(registry, key, Material.class)` on plugin enable,
   snapshots the expansion into an immutable `Map<String, Set<String>>`,
   and hands the snapshot to `rtp-anvil` for off-tick use.
@@ -185,7 +185,7 @@ The `/rtp config set/add/remove` surface round-trips new tokens verbatim. Every 
 - **Negative / Trade-offs:**
   - A mini-grammar to document and teach: `safety.yml` header and `GLOSSARY.md` both carry entries so `OAK_SLAB[waterlogged=true]` is not opaque to new admins.
   - `AnvilChunkView.isSafe` consumes a second data source (NBT `Properties` compound), expanding the Anvil test matrix.
-  - Tag-expansion snapshot introduces a one-shot cross-module hand-off (`rtp-spigot-common` → `rtp-anvil`) at enable time. A null snapshot degrades to "no tag match" (fail-open, logged once).
+  - Tag-expansion snapshot introduces a one-shot cross-module hand-off (`rtp-bukkit-common` → `rtp-anvil`) at enable time. A null snapshot degrades to "no tag match" (fail-open, logged once).
   - The `airBlocks` key uses the same compiler; enabling the grammar there is a one-call wiring change.
   - Lowercase-string property comparison: the compiler lowercases both sides so `FACE=CEILING` matches the live `face=ceiling` property; documentation calls out the normalization.
 

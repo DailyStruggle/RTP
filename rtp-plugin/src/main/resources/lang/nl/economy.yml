@@ -16,4 +16,4 @@ bioomPrijs: 5000.0
 # Spelers kunnen hun saldo niet onder dit bedrag brengen met RTP.
 minimumSaldo: 0.0
 # WIJZIG HET VERSIENUMMER NIET
-version: "1.0"
+version: 1.0

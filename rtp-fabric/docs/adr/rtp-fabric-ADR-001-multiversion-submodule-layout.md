@@ -59,7 +59,7 @@ Out of scope. rtp-fabric-ADR-002 (formerly ADR-031) §2 keeps Forge / NeoForge d
 | Alternative | Why Rejected |
 |---|---|
 | **Pure-Java SPI common (zero MC types in common)** | Forces ~30 SPI methods to use `Object` + casts because the abstraction targets MC types like `ServerLevel`. Roughly doubles the code size for ~5% additional isolation, since the MC types we use are 95% mojmap-stable across 1.20 → 26.1. Cost greatly exceeds value. |
-| **Single common module, lift Loom to 1.15 + Java 25** | Forces every contributor (and every CI runner) to install JDK 25, including those only modifying `rtp-core` or `rtp-spigot`. Couples the project's overall Java baseline to Fabric's bleeding edge. |
+| **Single common module, lift Loom to 1.15 + Java 25** | Forces every contributor (and every CI runner) to install JDK 25, including those only modifying `rtp-core` or `rtp-bukkit`. Couples the project's overall Java baseline to Fabric's bleeding edge. |
 | **Defer 26.1 entirely; ship only v1_20_R1 + v1_21_R1** | User explicitly requested whole-MC-line support. A future-proof skeleton that can absorb 26.1 with one new submodule is cheaper than retrofitting later, even if v26_1_R1 ships initially as a stub. |
 | **Bytecode-rewriting / multi-release JARs** | Loom doesn't support multi-release JARs cleanly across mappings boundaries; pre-release Loom 1.15 changes its mod-remapping pipeline enough that mixing it with 1.11 in the same jar is fragile. |
 
@@ -68,7 +68,7 @@ Out of scope. rtp-fabric-ADR-002 (formerly ADR-031) §2 keeps Forge / NeoForge d
 ### Positive
 - Each MC version pin is isolated; updating fabric-api or porting a single MC line never touches the others.
 - 26.1's deobf / Java 25 / Loom 1.15 build prerequisites are confined to `rtp-fabric-v26_1_R1`, leaving the rest of the project on Java 21.
-- Symmetric with `rtp-spigot` / `rtp-paper` / `rtp-folia`, lowering the cognitive cost of adding a new MC version (one new `vXX_YY_R1` submodule).
+- Symmetric with `rtp-bukkit` / `rtp-paper` / `rtp-folia`, lowering the cognitive cost of adding a new MC version (one new `vXX_YY_R1` submodule).
 - The SPI surface is minimal (only the version-volatile bits), so future MC versions usually need no new SPI methods.
 
 ### Negative / Trade-offs

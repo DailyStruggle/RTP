@@ -46,4 +46,4 @@ netwerk:
     port: 6379
     password: ""
 # WIJZIG HET VERSIENUMMER NIET
-version: "3.0"
+version: 3.0

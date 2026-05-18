@@ -4,18 +4,17 @@
 # a config option; the left-hand side is a code constant and must not change.
 # If this file is missing, the plugin regenerates it with identical left/right
 # pairs (the English defaults).
-
-event_changeworld: event_changeworld
-event_respawn: event_respawn
-detailed_reload: detailed_reload
-teleport: teleport
-event_join: event_join
-selection_failure: selection_failure
-system_memory_tracker: system_memory_tracker
-system_database: system_database
-event_teleport: event_teleport
-version: version
-detailed_region_init: detailed_region_init
-command: command
-event_move: event_move
-min_level: min_level
+event_changeworld: "event_changeworld"
+event_respawn: "event_respawn"
+detailed_reload: "detailed_reload"
+teleport: "teleport"
+event_join: "event_join"
+selection_failure: "selection_failure"
+system_memory_tracker: "system_memory_tracker"
+system_database: "system_database"
+event_teleport: "event_teleport"
+version: "version"
+detailed_region_init: "detailed_region_init"
+command: "command"
+event_move: "event_move"
+min_level: "min_level"

@@ -16,7 +16,7 @@ The words below have common meanings in Java, Minecraft, or software engineering
 | **Shape** | A visual or geometric figure | A *pluggable spatial boundary and random-sampling algorithm* registered with `rtp-api`. Not just a geometry class. See *Shape* entry below. |
 | **World** | A Minecraft `World` object | Always wrapped as `RTPWorld` inside `rtp-core`/`rtp-api`. Never pass a raw Bukkit `World` across module boundaries. See *RTPWorld* entry below. |
 | **Ticket** | Generic token or pass | A *Plugin Chunk Ticket* (`world.addPluginChunkTicket`) tracked by `ChunkReservation`. Must be released after validation. See *Plugin Chunk Ticket* entry below. |
-| **Adapter** | Generic design-pattern adapter | A *Platform Adapter module* (`rtp-spigot`, `rtp-paper`, `rtp-folia`, `rtp-fabric`). Refers specifically to module boundary, not the GoF adapter pattern. See *Platform Adapter* entry below. |
+| **Adapter** | Generic design-pattern adapter | A *Platform Adapter module* (`rtp-bukkit`, `rtp-paper`, `rtp-folia`, `rtp-fabric`). Refers specifically to module boundary, not the GoF adapter pattern. See *Platform Adapter* entry below. |
 | **Task** | Any `Runnable` or scheduled work | A `TeleportPipelineTask` — a stateful object that owns a `ChunkReservation` and must be registered with `MemoryTracker`. See *TeleportPipelineTask* entry (DESIGN.md). |
 | **Scan** | A generic word meaning "to examine sequentially" | The *administrative world-scan lifecycle* (`/rtp scan start`/`pause`/`resume`/`reset`/`cancel`) that pre-populates a region's spatial memory without teleporting any player. Supersedes the legacy term *Fill*. See *Scan Task* and *Scan Lifecycle* entries below. |
 | **Backend** | Any back-of-house server in generic web terminology | A *Minecraft server instance that hosts world data and runs the RTP teleport pipeline locally*, sitting behind a proxy in network mode. Not interchangeable with "the database" or "the rtp-core module". See *Backend* entry below. |
@@ -163,7 +163,7 @@ A high-performance fork of Spigot that provides additional async APIs (e.g., `ge
 The ordered sequence of steps a candidate location passes through: (1) geometric sampling, (2) chunk loading, (3) surface/Y adjustment, (4) biome/claim validation, (5) queue insertion. Each step may reject the candidate.
 
 **Platform Adapter**
-A module (`rtp-spigot`, `rtp-paper`, `rtp-folia`) that implements platform-specific APIs while delegating all core logic to `rtp-core`. Adapters must not contain business logic.
+A module (`rtp-bukkit`, `rtp-paper`, `rtp-folia`) that implements platform-specific APIs while delegating all core logic to `rtp-core`. Adapters must not contain business logic.
 
 **Plugin Chunk Ticket**
 A Bukkit API mechanism (`world.addPluginChunkTicket`) that keeps a chunk loaded without forcing it permanently. RTP uses tickets during validation and removes them immediately after, preventing memory retention.
@@ -201,7 +201,7 @@ A platform-agnostic value object representing a teleport destination (world name
 A platform-agnostic wrapper around a player reference. Defined in `rtp-api` to decouple core logic from Bukkit's `Player` class.
 
 **RTPScheduler**
-The abstraction over platform-specific task scheduling. Implementations live in platform adapter modules (`rtp-spigot`, `rtp-paper`, `rtp-folia`) and must never reside in `rtp-core`.
+The abstraction over platform-specific task scheduling. Implementations live in platform adapter modules (`rtp-bukkit`, `rtp-paper`, `rtp-folia`) and must never reside in `rtp-core`.
 
 **RTPWorld**
 A platform-agnostic wrapper around a world reference. Defined in `rtp-api`.
@@ -226,7 +226,7 @@ A versioning scheme (`MAJOR.MINOR.PATCH`) where breaking API changes increment M
 A mathematical geometry (circle, square, rectangle, or custom) that defines the spatial boundary of a teleport region and the algorithm used to sample random points within it. Custom shapes can be registered via `rtp-api`.
 
 **Spigot**
-The baseline Bukkit-derived server software. RTP's `rtp-spigot` adapter targets Spigot and serves as the fallback for servers not running Paper or Folia.
+The baseline Bukkit-derived server software. RTP's `rtp-bukkit` adapter targets Spigot and serves as the fallback for servers not running Paper or Folia.
 
 **Surface Adjustor / Vertical Adjustor**
 A pluggable component that determines the correct Y coordinate for a candidate (x, z) location — e.g., finding the highest solid block, the lowest cave floor, or a custom elevation. Registered via `rtp-api`.

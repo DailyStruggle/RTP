@@ -243,6 +243,11 @@ public class Configs {
             new ConfigParser<>(PerformanceKeys.class, "performance.yml", "1.0", pluginDirectory, fileDatabase, locale);
     newConfigParserMap.put(PerformanceKeys.class, performance);
 
+    RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser metrics.yml");
+    ConfigParser<MetricsKeys> metrics =
+            new ConfigParser<>(MetricsKeys.class, "metrics.yml", "1.0", pluginDirectory, fileDatabase, locale);
+    newConfigParserMap.put(MetricsKeys.class, metrics);
+
     RTP.log(Level.FINER, "[RTP] reloadConfigs(): building parser safety/*.yml");
     ConfigParser<SafetyKeys> safety =
             new ConfigParser<>(SafetyKeys.class, "safety", "1.0", pluginDirectory, fileDatabase, locale);

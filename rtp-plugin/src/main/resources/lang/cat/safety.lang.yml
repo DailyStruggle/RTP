@@ -1,14 +1,13 @@
 # --- Language Mapping: safety.yml (cat dialect) ---
 # Where it is safe to land on four paws. Edit only the right side.
-
-safetyRadius: soft_landing_radius
-biomeWhitelist: friendly_smells
-airBlocks: empty_air_for_zoomies
-biomes: smells
-unsafeBlocks: scary_blocks
-platformRadius: paw_platform_radius
-platformAirHeight: paw_platform_headroom
-platformMaterial: paw_platform_material
-invulnerabilityTime: nine_lives_buffer
-version: meowsion
-platformDepth: paw_platform_depth
+safetyRadius: "soft_landing_radius"
+biomeWhitelist: "friendly_smells"
+airBlocks: "empty_air_for_zoomies"
+biomes: "smells"
+unsafeBlocks: "scary_blocks"
+platformRadius: "paw_platform_radius"
+platformAirHeight: "paw_platform_headroom"
+platformMaterial: "paw_platform_material"
+invulnerabilityTime: "nine_lives_buffer"
+version: "meowsion"
+platformDepth: "paw_platform_depth"

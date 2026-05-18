@@ -330,7 +330,17 @@ public final class FabricEventBridge {
             if (configuredCap > 0) {
                 cap = (int) Math.min(configuredCap, Integer.MAX_VALUE);
             } else {
-                cap = resolveMaxPlayers(server);
+                // C6 (Section C of CHECKLIST-metrics-and-multiserver) — prefer
+                // the M2 snapshot when a FabricMetricsBinding is installed; fall
+                // back to the reflective Mojang/intermediary probe (which the
+                // binding itself already uses internally) on the M0 NOOP path.
+                int snapCap = 0;
+                try {
+                    snapCap = RTP.metrics.snapshot().softCap;
+                } catch (Throwable ignored) {
+                    // snapshot() is non-throwing by contract; defensive.
+                }
+                cap = (snapCap > 0) ? snapCap : resolveMaxPlayers(server);
             }
             if (cap <= 0) {
                 RTP.log(Level.WARNING,
@@ -365,7 +375,18 @@ public final class FabricEventBridge {
                             + "' cap=" + cap + " (default world '" + defaultWorldName + "')");
 
             // Startup burst: dispatch up to (cap - currentOnline) async promotions.
-            int online = resolveOnlinePlayerCount(server);
+            // C6 — prefer the M2 snapshot when bound; fall back to the
+            // reflective intermediary lookup when the binding is the NOOP
+            // (snapshot.playerCount == 0 also matches the empty-server case
+            // a freshly-started Fabric runtime returns, so the two paths
+            // agree at bootstrap).
+            int online;
+            try {
+                int snapOnline = RTP.metrics.snapshot().playerCount;
+                online = (snapOnline > 0) ? snapOnline : resolveOnlinePlayerCount(server);
+            } catch (Throwable ignored) {
+                online = resolveOnlinePlayerCount(server);
+            }
             int target = Math.max(0, cap - online);
             if (target > 0) {
                 new io.github.dailystruggle.rtp.common.selection.region.LoginCacheTask(region)
@@ -542,6 +563,23 @@ public final class FabricEventBridge {
             ((FabricScheduler) accessor.getScheduler()).tick(server);
         } catch (Throwable t) {
             RTP.log(Level.WARNING, "[RTP] FabricEventBridge tick raised", t);
+        }
+        // Section C, C2 — drive the metrics sampler if a FabricMetricsBinding
+        // is installed. Best-effort; failures must not break the tick loop
+        // (observability is never allowed to take down the pipeline). The
+        // type probe is reflective so this module compiles without a hard
+        // dependency on the binding class name beyond its package.
+        try {
+            if (RTP.getInstance() != null && RTP.metrics != null) {
+                Object binding = RTP.metrics.getBinding();
+                if (binding instanceof io.github.dailystruggle.rtp.fabric.metrics.FabricMetricsBinding fmb) {
+                    fmb.tick();
+                }
+            }
+        } catch (Throwable t) {
+            RTP.log(Level.FINER,
+                    "[RTP] FabricEventBridge metrics tick raised "
+                            + t.getClass().getSimpleName() + ": " + t.getMessage());
         }
     }
 

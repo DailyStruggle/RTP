@@ -14,7 +14,6 @@
 # expanden al conjunto vacío (no-op, fail-open); los tokens malformados se
 # registran una vez en nivel WARN al recargar (REQ-RTP-S-004).
 # El orden dentro de una lista no importa.
-
 # Invulnerabilidad (segundos)
 # Duración de la invulnerabilidad concedida al jugador tras teletransportarse.
 # Evita daño por fuego, ahogamiento o caídas al llegar.
@@ -71,7 +70,7 @@ profundidadPlataforma: 1
 alturaAirePlataforma: 2
 
 # Tipo de bloque predeterminado para la plataforma si no hay un bloque sólido.
-materialPlataforma: GLASS
+materialPlataforma: "GLASS"
 
 # Bloques de aire
 # Tipos de materiales considerados como espacio transitable/no bloqueante sobre el aterrizaje.
@@ -80,12 +79,12 @@ materialPlataforma: GLASS
 # MC se recoge automáticamente mediante #minecraft:small_flowers sin editar la configuración).
 bloquesAire:
   # Variantes reales de aire (ninguna etiqueta las cubre todas a la vez)
-  - AIR
-  - CAVE_AIR
-  - VOID_AIR
-  - LEGACY_AIR
-  - STRUCTURE_VOID
-  - LIGHT
+  - "AIR"
+  - "CAVE_AIR"
+  - "VOID_AIR"
+  - "LEGACY_AIR"
+  - "STRUCTURE_VOID"
+  - "LIGHT"
 
   # Flores (cubre dientes de león, amapolas, tulipanes, eyeblossoms, torchflower, ...)
   - "#minecraft:flowers"
@@ -93,61 +92,61 @@ bloquesAire:
   - "#minecraft:tall_flowers"
 
   # Plantas similares a la hierba y arbustos no incluidos en las etiquetas de flores
-  - SHORT_GRASS
-  - TALL_GRASS
-  - SHORT_DRY_GRASS
-  - TALL_DRY_GRASS
-  - FERN
-  - LARGE_FERN
-  - DEAD_BUSH
-  - BUSH
-  - WILDFLOWERS
-  - FIREFLY_BUSH
-  - LEGACY_LONG_GRASS
-  - LEGACY_DEAD_BUSH
+  - "SHORT_GRASS"
+  - "TALL_GRASS"
+  - "SHORT_DRY_GRASS"
+  - "TALL_DRY_GRASS"
+  - "FERN"
+  - "LARGE_FERN"
+  - "DEAD_BUSH"
+  - "BUSH"
+  - "WILDFLOWERS"
+  - "FIREFLY_BUSH"
+  - "LEGACY_LONG_GRASS"
+  - "LEGACY_DEAD_BUSH"
 
   # Saplings, propágulos y hongos
   - "#minecraft:saplings"
-  - BROWN_MUSHROOM
-  - RED_MUSHROOM
-  - CRIMSON_FUNGUS
-  - WARPED_FUNGUS
+  - "BROWN_MUSHROOM"
+  - "RED_MUSHROOM"
+  - "CRIMSON_FUNGUS"
+  - "WARPED_FUNGUS"
 
   # Cultivos y flora de superficie sin una etiqueta conveniente
   - "#minecraft:crops"
-  - MELON_STEM
-  - PUMPKIN_STEM
-  - SUGAR_CANE
-  - BAMBOO_SAPLING
+  - "MELON_STEM"
+  - "PUMPKIN_STEM"
+  - "SUGAR_CANE"
+  - "BAMBOO_SAPLING"
 
   # Enredaderas y flora montada en paredes
-  - VINE
-  - GLOW_LICHEN
-  - WEEPING_VINES
-  - TWISTING_VINES
-  - HANGING_ROOTS
-  - PALE_HANGING_MOSS
-  - RESIN_CLUMP
+  - "VINE"
+  - "GLOW_LICHEN"
+  - "WEEPING_VINES"
+  - "TWISTING_VINES"
+  - "HANGING_ROOTS"
+  - "PALE_HANGING_MOSS"
+  - "RESIN_CLUMP"
 
   # Raíles
   - "#minecraft:rails"
 
   # Redstone y mecanismos (no existe una etiqueta que los agrupe)
-  - REDSTONE_WIRE
-  - COMPARATOR
-  - REPEATER
-  - LEVER
-  - STRING
-  - TRIPWIRE
+  - "REDSTONE_WIRE"
+  - "COMPARATOR"
+  - "REPEATER"
+  - "LEVER"
+  - "STRING"
+  - "TRIPWIRE"
 
   # Antorchas e iluminación (no hay etiqueta de grupo)
-  - TORCH
-  - WALL_TORCH
-  - SOUL_TORCH
-  - SOUL_WALL_TORCH
-  - REDSTONE_TORCH
-  - REDSTONE_WALL_TORCH
-  - END_ROD
+  - "TORCH"
+  - "WALL_TORCH"
+  - "SOUL_TORCH"
+  - "SOUL_WALL_TORCH"
+  - "REDSTONE_TORCH"
+  - "REDSTONE_WALL_TORCH"
+  - "END_ROD"
 
   # Botones (variantes de piedra y madera)
   - "#minecraft:buttons"
@@ -160,14 +159,14 @@ bloquesAire:
   - "#minecraft:wall_signs"
   - "#minecraft:ceiling_hanging_signs"
   - "#minecraft:wall_hanging_signs"
-  - LEGACY_SIGN
-  - LEGACY_WALL_SIGN
+  - "LEGACY_SIGN"
+  - "LEGACY_WALL_SIGN"
 
   # Cubierta del suelo
-  - SNOW
-  - MOSS_CARPET
-  - PALE_MOSS_CARPET
-  - LEAF_LITTER
+  - "SNOW"
+  - "MOSS_CARPET"
+  - "PALE_MOSS_CARPET"
+  - "LEAF_LITTER"
 
 # Bloques inseguros
 # Materiales o estados de bloque que el plugin rechazará como destino de aterrizaje,
@@ -175,9 +174,9 @@ bloquesAire:
 # estado y comodines (véase la gramática al principio del archivo).
 bloquesInseguros:
   # Fluidos
-  - WATER
-  - LAVA
-  - BUBBLE_COLUMN
+  - "WATER"
+  - "LAVA"
+  - "BUBBLE_COLUMN"
 
   # Cualquier bloque waterlogged (losas/escaleras/vallas/muros/letreros/cadenas/...) --
   # reemplaza al antiguo pseudo-token 'WATERLOGGED'. Usa el comodín de ADR-017.
@@ -185,38 +184,38 @@ bloquesInseguros:
 
   # Fuego y peligros de calor
   - "#minecraft:fire"
-  - POWDER_SNOW
-  - MAGMA_BLOCK
+  - "POWDER_SNOW"
+  - "MAGMA_BLOCK"
 
   # Hogueras (tanto encendidas como apagadas son inseguras -- los jugadores se hunden en ellas)
   - "#minecraft:campfires"
 
   # Daño por contacto / atrapamiento
-  - CACTUS
-  - SWEET_BERRY_BUSH
-  - WITHER_ROSE
-  - CHORUS_PLANT
-  - CHORUS_FLOWER
-  - POINTED_DRIPSTONE
-  - COBWEB
-  - CREAKING_HEART
+  - "CACTUS"
+  - "SWEET_BERRY_BUSH"
+  - "WITHER_ROSE"
+  - "CHORUS_PLANT"
+  - "CHORUS_FLOWER"
+  - "POINTED_DRIPSTONE"
+  - "COBWEB"
+  - "CREAKING_HEART"
 
   # Void / portal / inamovible
-  - BEDROCK
-  - NETHER_PORTAL
-  - END_PORTAL
-  - END_GATEWAY
+  - "BEDROCK"
+  - "NETHER_PORTAL"
+  - "END_PORTAL"
+  - "END_GATEWAY"
 
   # Explosivos
-  - TNT
-  - END_CRYSTAL
-  - RESPAWN_ANCHOR
+  - "TNT"
+  - "END_CRYSTAL"
+  - "RESPAWN_ANCHOR"
 
   # Flora acuática (riesgo de ahogamiento)
-  - SEAGRASS
-  - TALL_SEAGRASS
-  - KELP
-  - KELP_PLANT
+  - "SEAGRASS"
+  - "TALL_SEAGRASS"
+  - "KELP"
+  - "KELP_PLANT"
 
 # Filtro de biomas
 # biomeWhitelist: false -> la lista `biomes` es una lista negra (omite estos biomas)
@@ -226,35 +225,35 @@ bloquesInseguros:
 listaPermitidaBiomas: false
 biomas:
   # BIOMAS OCEÁNICOS
-  - OCEAN
-  - DEEP_OCEAN
-  - WARM_OCEAN
-  - LUKEWARM_OCEAN
-  - DEEP_LUKEWARM_OCEAN
-  - COLD_OCEAN
-  - DEEP_COLD_OCEAN
-  - FROZEN_OCEAN
-  - DEEP_FROZEN_OCEAN
+  - "OCEAN"
+  - "DEEP_OCEAN"
+  - "WARM_OCEAN"
+  - "LUKEWARM_OCEAN"
+  - "DEEP_LUKEWARM_OCEAN"
+  - "COLD_OCEAN"
+  - "DEEP_COLD_OCEAN"
+  - "FROZEN_OCEAN"
+  - "DEEP_FROZEN_OCEAN"
 
   # BIOMAS FLUVIALES
-  - RIVER
-  - FROZEN_RIVER
+  - "RIVER"
+  - "FROZEN_RIVER"
 
   # BIOMAS ADYACENTES Y COSTEROS
-  - BEACH
-  - SNOWY_BEACH
-  - STONY_SHORE
-  - SWAMP
-  - MANGROVE_SWAMP
+  - "BEACH"
+  - "SNOWY_BEACH"
+  - "STONY_SHORE"
+  - "SWAMP"
+  - "MANGROVE_SWAMP"
 
   # BIOMAS DEL END (sin aterrizaje sólido / adyacentes al void)
-  - SMALL_END_ISLANDS
+  - "SMALL_END_ISLANDS"
 
   # BIOMAS DEL NETHER (terreno peligroso/irregular)
-  - BASALT_DELTAS
+  - "BASALT_DELTAS"
 
   # BIOMAS TÉCNICOS
-  - THE_VOID
+  - "THE_VOID"
 
 # NO MODIFIQUES EL NÚMERO DE VERSIÓN
-version: "1.0"
+version: 1.0

@@ -4,7 +4,7 @@ import io.github.dailystruggle.effectsapi.EffectsAPI;
 import io.github.dailystruggle.rtp.bukkit.database.BukkitDatabaseHandler;
 import io.github.dailystruggle.rtp.bukkit.effects.BukkitEffectsHandler;
 import io.github.dailystruggle.rtp.bukkit.events.*;
-import io.github.dailystruggle.rtp.bukkit.spigotListeners.*;
+import io.github.dailystruggle.rtp.bukkit.bukkitListeners.*;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.ChunkyBorderChecker;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.PAPI_expansion;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.VaultChecker;
@@ -120,6 +120,12 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     // > bStats Integration and BStatsChartIds for the catalogue.
     io.github.dailystruggle.rtp.bukkit.metrics.RTPCostMetricsCharts.register(metrics, "full");
 
+    // CHECKLIST-metrics-and-multiserver.md row B9: install the platform-
+    // appropriate MetricsBinding so /rtp info, RTPCostMetricsCharts, and
+    // every other Metrics.snapshot() consumer report live values instead
+    // of UNSAMPLED sentinels. Best-effort; never aborts plugin enable.
+    io.github.dailystruggle.rtp.bukkit.metrics.MetricsBindingDispatcher.install();
+
     if (RTP.getInstance() == null) {
       RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] onEnable accessor/scheduler wired; starting accessor");
       RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable RTP.serverAccessor.start(plugin)");
@@ -171,7 +177,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     // registration), so dormant regions for those worlds are activated without
     // needing another WorldLoadEvent.
     RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable rebindFallbackRegionsForAllLoadedWorlds");
-    io.github.dailystruggle.rtp.bukkit.spigotListeners.OnWorldLoadUnload
+    io.github.dailystruggle.rtp.bukkit.bukkitListeners.OnWorldLoadUnload
         .rebindFallbackRegionsForAllLoadedWorlds();
     RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onEnable scheduling deferred setupIntegrations (tick+1)");
     RTP.scheduler.runTaskLater(() -> {
@@ -238,9 +244,15 @@ public final class RTPBukkitPlugin extends JavaPlugin {
       if (!enabled) return;
 
       long configuredCap = perf.getNumber(PerformanceKeys.loginCacheCap, 0L).longValue();
+      // C6 (Section C of CHECKLIST-metrics-and-multiserver) — read soft cap
+      // from the M2 metrics snapshot when a binding is installed; fall back
+      // to Bukkit.getMaxPlayers() only on the NOOP path (snapshot.softCap=0).
+      io.github.dailystruggle.metrics.api.MetricsSnapshot bootSnap =
+          RTP.metrics.snapshot();
+      int snapshotCap = bootSnap.softCap;
       int cap = (configuredCap > 0)
           ? (int) Math.min(configuredCap, Integer.MAX_VALUE)
-          : Bukkit.getMaxPlayers();
+          : (snapshotCap > 0 ? snapshotCap : Bukkit.getMaxPlayers());
       if (cap <= 0) return;
 
       if (Bukkit.getWorlds().isEmpty()) {
@@ -266,7 +278,15 @@ public final class RTPBukkitPlugin extends JavaPlugin {
               + "' cap=" + cap + " (default world '" + defaultWorldName + "')");
 
       // Startup burst: dispatch up to (cap - currentOnline) async promotions.
-      int online = Bukkit.getOnlinePlayers().size();
+      // C6 — prefer the M2 snapshot when bound; fall back to the Bukkit API
+      // on the NOOP path (snapshot.playerCount=0 on first boot before the
+      // sampler has run, which is also the value Bukkit returns at this
+      // lifecycle point, so the two paths are semantically aligned).
+      io.github.dailystruggle.metrics.api.MetricsSnapshot burstSnap =
+          RTP.metrics.snapshot();
+      int online = (burstSnap.playerCount > 0)
+          ? burstSnap.playerCount
+          : Bukkit.getOnlinePlayers().size();
       int target = Math.max(0, cap - online);
       if (target > 0) {
         new io.github.dailystruggle.rtp.common.selection.region.LoginCacheTask(region)
@@ -285,6 +305,13 @@ public final class RTPBukkitPlugin extends JavaPlugin {
   @Override
   public void onDisable() {
     RTP.log(java.util.logging.Level.FINE, "[LIFECYCLE] onDisable ENTER -- cancelling command timers");
+    // CHECKLIST-metrics-and-multiserver.md row B9: tear down the metrics
+    // binding and cancel the Spigot tick sampler (if installed) so a
+    // /reload cycle reinstalls cleanly. Idempotent.
+    try {
+      io.github.dailystruggle.rtp.bukkit.metrics.MetricsBindingDispatcher.uninstall();
+    } catch (NoClassDefFoundError ignored) {
+    }
     if (commandTimer != null) {
       RTP.log(java.util.logging.Level.FINER, "[LIFECYCLE] onDisable commandTimer.cancel()");
       commandTimer.cancel();

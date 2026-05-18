@@ -184,7 +184,7 @@ Place new code following this decision order:
 1. **`rtp-api`** — public interfaces and shared models for addon developers. No platform imports.
 2. **`rtp-core`** — core logic (regions, queues, spiral math, `MemoryTracker`). No platform imports; changes here affect every platform.
 3. **`commands-api` / `effects-api`** — unified frameworks. Extend these, don't fork per-platform.
-4. **Platform adapter** (`rtp-spigot`, `rtp-paper`, `rtp-folia`, `rtp-fabric`) — platform-specific only. Never push platform logic into core.
+4. **Platform adapter** (`rtp-bukkit`, `rtp-paper`, `rtp-folia`, `rtp-fabric`) — platform-specific only. Never push platform logic into core.
 5. **`rtp-plugin`** — Bukkit-family entry point. No business logic.
 6. **`addons/`** — third-party integrations that depend only on `rtp-api`.
 
@@ -264,6 +264,7 @@ Rules:
 4. **No BOM, no CRLF, no smart-quote autocorrect.** When creating new markdown via the `create` tool, write plain UTF-8. Do not prepend `\uFEFF`. Do not let an editor "auto-correct" straight quotes to curly quotes unless the surrounding file already uses curly quotes.
 5. **Verify before submit.** For any docs change that touched non-ASCII content, grep the diff for the common mojibake markers before `submit`: `search_project` for `â€` (covers em/en dash and curly quotes), `Â` (covers `§`, `°`, NBSP, and most Latin-1 punctuation), `Ã` (covers accented Latin letters), `âœ` / `âŒ` / `ðŸ` (covers emoji), and `�` (U+FFFD). Any hit in your diff is a defect — fix it before submitting. Pre-existing hits outside your diff are *not* in scope (record in `POTENTIAL_BUGS.md` if novel).
 6. **Don't "preserve" mojibake to minimise diff noise.** If your edit lands on a line that already contains mojibake, fix that line's encoding while you're there. Leaving `â€”` next to a freshly-written `—` is worse than fixing both.
+7. **Prefer ASCII punctuation over em/en dashes.** Em dashes (`—`, U+2014) and en dashes (`–`, U+2013) are an AI stylistic artifact, not a project convention; do not introduce them into new docs, ADRs, CHANGELOG entries, `messages.yml` values, code comments, or commit messages. Use ASCII hyphen (`-`), colon (`:`), or parentheses instead. This rule is **forward-only**: do not sweep existing occurrences just to swap punctuation — replace naturally as files are edited for substantive reasons. Rationale: ASCII punctuation is immune to the YAML-`\u2014`-literal bug (unquoted/single-quoted YAML scalars do not decode `\u….` escapes), survives every console encoding, and produces clean diffs regardless of editor settings.
 
 Common origin of these regressions: copying rendered text out of a terminal that displayed a UTF-8 file as if it were Windows-1252, then pasting that already-corrupted text back into a tool call. The fix is always to read the file's real bytes (via `open`) and re-type the canonical character, not to copy from the rendered view.
 
@@ -275,7 +276,7 @@ Common origin of these regressions: copying rendered text out of a terminal that
 - **Zero `printStackTrace()`** — always `RTP.log(Level.WARNING, "msg", e)`.
 - No `org.bukkit.*` imports in `rtp-core` or `rtp-api`. Route through `RTPServerAccessor`.
 - Platform-specific `msgInvalidCommand` / `msgBadParameter` overrides (e.g., `BukkitBaseRTPCmd`) **must** call `RTP.log(Level.WARNING, msg)` — required for REQ-RTP-S-004 auditing and `rtp test full`.
-- Color handling: `SendMessage.log` in `rtp-spigot` uses `Bukkit.getConsoleSender().sendMessage(msg)` to preserve color codes. Tests / auditors should use `SendMessage.addInterceptor(Consumer<String>)` rather than dual-logging.
+- Color handling: `SendMessage.log` in `rtp-bukkit` uses `Bukkit.getConsoleSender().sendMessage(msg)` to preserve color codes. Tests / auditors should use `SendMessage.addInterceptor(Consumer<String>)` rather than dual-logging.
 
 ---
 
@@ -286,6 +287,23 @@ Common origin of these regressions: copying rendered text out of a terminal that
 - **Bounded algorithms only** — no unbounded `while`-reroll loops. Use the Archimedean spiral 1D mapping; document complexity in an ADR if you add a new algorithm.
 - **Require-by-contract API entry points** — public `rtp-api` methods throw `IllegalStateException` (not null / no-op) when called before core is loaded.
 - **Tests must be traceable** — reference the REQ-* ID in the class name (e.g., `ReqRtpS005ChunkLoadingTest`) or a `@DisplayName` / Javadoc comment. Update [`TRACEABILITY.md`](../docs/dev/TRACEABILITY.md) when adding a REQ-traceable test.
+
+---
+
+## Locale Parity Maintenance
+
+User-facing strings ship under `rtp-plugin/src/main/resources/<file>.yml` (English baseline) and `rtp-plugin/src/main/resources/lang/<locale>/<file>.yml` (translated values, paired with a sibling `<file>.lang.yml` key-rename map). Drift between the baseline and shipped locales is the recurring failure mode this section prevents. See [REQ-RTP-F-013](../docs/dev/REQUIREMENTS.md), [ADR-020](../docs/adr/ADR-020-locale-bootstrap-and-yaml-baseline.md), and [`TRANSLATION_GUIDE.md`](../docs/dev/TRANSLATION_GUIDE.md) for the full contract.
+
+Hard rules:
+
+1. **Mirror every new baseline key into every shipped locale, in the same change.** If you add a top-level key to any `<file>.yml` under `rtp-plugin/src/main/resources/`, you must also add a row to `lang/<file>.lang.yml` (identity row is allowed) AND a corresponding entry in **every** `lang/<locale>/<file>.yml` under its effective translated name. Skipping a locale lets it silently fall back to English at runtime, which is the bug class [ADR-020](../docs/adr/ADR-020-locale-bootstrap-and-yaml-baseline.md) was written to eliminate.
+2. **Effective key name lookup chain** (used by `ConfigParser` and `LocaleParityTest`): `localeLangMap.get(key)` -> `baselineLangMap.get(key)` -> identity `key`. When in doubt about what name to write under in the locale's `<file>.yml`, run `LocaleParityTest` and read the assertion - it reports the expected name verbatim (e.g. `missing 'menuInvalid' (expected as 'menuInvalid')`).
+3. **CI guard**: `rtp-plugin` ships [`LocaleParityTest`](../rtp-plugin/src/test/java/io/github/dailystruggle/rtp/bukkit/configuration/LocaleParityTest.java) - a single consolidated suite with `@Nested ResourceParity` (no `.bak` leakage, lang-map / value-file lookup, placeholder fidelity) and `@Nested FullParity` (baseline lang-map coverage, every-locale-every-key, no stale rows). Run before submitting any change that touches `messages.yml`, `config.yml`, `safety.yml`, `economy.yml`, `effects.yml`, `logging.yml`, `performance.yml`, `regions.yml`, or `worlds.yml`:
+   ```powershell
+   .\gradlew :rtp-plugin:test --tests "*LocaleParityTest*"
+   ```
+4. **First-pass translation is acceptable** when adding a new locale or filling a gap in an existing one. Identity-mapped entries (left == right in `<file>.lang.yml`) carry no locale signal but pass parity per [`TRANSLATION_GUIDE.md`](../docs/dev/TRANSLATION_GUIDE.md) section 8. For known-stale locales (locales that lag far behind English), prefer appending the English baseline value under the identity key with a `# TODO(i18n):` comment block rather than machine-translating into a language whose native speakers will see the awkward output - leave the placeholder visible so contributor PRs can replace it.
+5. **Do not edit the Spanish content guards.** [`ReqRtpF013SpanishLocaleContentTest`](../rtp-plugin/src/test/java/io/github/dailystruggle/rtp/bukkit/configuration/ReqRtpF013SpanishLocaleContentTest.java) is the REQ-traceable Spanish-specific suite (Norway-problem guard, typed-key resolution, enum coverage) and intentionally lives outside `LocaleParityTest`. Its guarantees are Spanish-flavored and do not generalize.
 
 ---
 
@@ -330,7 +348,7 @@ When in doubt, run the full build. It is cheaper than a regression discovered af
 
 Active frontier: **Fabric (`rtp-fabric`)** — first-class, in-scope platform as of 2026-04-30 ([rtp-fabric-ADR-002](../rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md), renumbered from ADR-022 on 2026-05-05). Unstable — see [`MULTI_PLATFORM_PLAN.md`](../docs/dev/MULTI_PLATFORM_PLAN.md) for phase status and known blockers (S-005 violation in `FabricWorld.getChunkAt`; null stub in `FabricServerAccessor.getLocationGenerator`; unresolved Loom dependency).
 
-Do not backport Fabric-specific patterns into `rtp-core` or `rtp-api`. Safe-to-modify modules: `rtp-core`, `rtp-api`, `rtp-spigot`, `rtp-paper`, `rtp-folia`, `rtp-fabric`, `addons/`. Brigadier bridge rationale: [commands-api-ADR-001](../commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md). `rtp-api` abstractions were confirmed sufficient for Fabric (April 2026 gap analysis) — gaps are implementation gaps, not interface gaps. Forge / NeoForge remain out of scope until Fabric stabilizes (Phase 4).
+Do not backport Fabric-specific patterns into `rtp-core` or `rtp-api`. Safe-to-modify modules: `rtp-core`, `rtp-api`, `rtp-bukkit`, `rtp-paper`, `rtp-folia`, `rtp-fabric`, `addons/`. Brigadier bridge rationale: [commands-api-ADR-001](../commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md). `rtp-api` abstractions were confirmed sufficient for Fabric (April 2026 gap analysis) — gaps are implementation gaps, not interface gaps. Forge / NeoForge remain out of scope until Fabric stabilizes (Phase 4).
 
 ---
 
@@ -379,6 +397,7 @@ When you discover something durable, record it in the **correct** file:
 | Incidental potential bug found while doing unrelated work | [`docs/dev/POTENTIAL_BUGS.md`](../docs/dev/POTENTIAL_BUGS.md) (see *Stay-On-Task Policy*) |
 | New reflection / soft-depend / hook that accommodates a third-party plugin | [`docs/dev/EXTERNAL_HOOKS.md`](../docs/dev/EXTERNAL_HOOKS.md) (catalog row + `RTPHooks` registry; ADR-026) |
 | New mojibake pattern observed in AI-generated diffs | this file (*Markdown Encoding Hygiene* section, mojibake-marker list) |
+| New baseline user-facing key (or new locale) | every `lang/<locale>/<file>.yml` + `lang/<file>.lang.yml`; verify with `LocaleParityTest` (see *Locale Parity Maintenance* above and [`TRANSLATION_GUIDE.md`](../docs/dev/TRANSLATION_GUIDE.md)) |
 
 Do **not** add code-level optimizations, algorithm explanations, or per-feature narratives to this file — those belong in code comments, ADRs, or `CHANGELOG.md`.
 

@@ -34,6 +34,6 @@ systeem_database: false
 # dit niveau en dat van de Bukkit-logger. Accepteert: SEVERE, WARNING, INFO,
 # CONFIG, FINE, FINER, FINEST, ALL, OFF. De standaardwaarde ALL behoudt
 # hetzelfde gedrag als de Bukkit-logger.
-min_niveau: INFO
+min_niveau: "INFO"
 # WIJZIG HET VERSIENUMMER NIET
-version: "1.0"
+version: 1.0

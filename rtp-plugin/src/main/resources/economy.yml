@@ -1,6 +1,5 @@
 # --- RTP Economy Settings ---
 # Documentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/ECONOMY.md
-
 # Refund the deducted cost if the teleport is cancelled (move during
 # teleportDelay, pipeline failure, etc.).
 # @type: boolean
@@ -39,4 +38,4 @@ biomePrice: 5000.0
 balanceFloor: 0.0
 
 # DO NOT TOUCH VERSION NUMBER
-version: "1.0"
+version: 1.0

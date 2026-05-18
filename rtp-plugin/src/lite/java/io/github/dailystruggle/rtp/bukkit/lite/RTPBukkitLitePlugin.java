@@ -4,10 +4,10 @@ import io.github.dailystruggle.rtp.bukkit.BootstrapSupport;
 import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import io.github.dailystruggle.rtp.bukkit.effects.BukkitEffectsHandler;
 import io.github.dailystruggle.rtp.bukkit.tools.softdepends.claims.ClaimIntegrations;
-import io.github.dailystruggle.rtp.bukkit.spigotListeners.OnPlayerJoin;
-import io.github.dailystruggle.rtp.bukkit.spigotListeners.OnPlayerQuit;
-import io.github.dailystruggle.rtp.bukkit.spigotListeners.OnEventTeleports;
-import io.github.dailystruggle.rtp.bukkit.spigotListeners.OnWorldLoadUnload;
+import io.github.dailystruggle.rtp.bukkit.bukkitListeners.OnPlayerJoin;
+import io.github.dailystruggle.rtp.bukkit.bukkitListeners.OnPlayerQuit;
+import io.github.dailystruggle.rtp.bukkit.bukkitListeners.OnEventTeleports;
+import io.github.dailystruggle.rtp.bukkit.bukkitListeners.OnWorldLoadUnload;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.tasks.ChunkUnloadProcessor;
 import io.github.dailystruggle.rtp.bukkitplatform.server.AsyncTeleportProcessing;
@@ -95,6 +95,12 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
     // Same cost-metrics chart catalogue as the full assembly, with the
     // assembly_variant pie reporting "lite" so dashboards can split.
     io.github.dailystruggle.rtp.bukkit.metrics.RTPCostMetricsCharts.register(metrics, "lite");
+
+    // CHECKLIST-metrics-and-multiserver.md row B9: install the platform-
+    // appropriate MetricsBinding (Paper vs raw Spigot). Mirrors the full
+    // bootstrap; lite has no Folia branch, but the dispatcher's Paper
+    // probe is platform-symmetric so the same call works. Best-effort.
+    io.github.dailystruggle.rtp.bukkit.metrics.MetricsBindingDispatcher.install();
 
     if (RTP.getInstance() == null) {
       RTP.serverAccessor.start(this);
@@ -263,6 +269,12 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
   @Override
   public void onDisable() {
     RTP.log(Level.FINE, "[LIFECYCLE-LITE] onDisable ENTER");
+    // CHECKLIST-metrics-and-multiserver.md row B9: mirror the full bootstrap
+    // teardown so a /reload cycle reinstalls the binding cleanly. Idempotent.
+    try {
+      io.github.dailystruggle.rtp.bukkit.metrics.MetricsBindingDispatcher.uninstall();
+    } catch (Throwable ignored) {
+    }
     // Lite has no shutdown-flush phase (no SQL/Redis backend to drain).
     // Async/sync teleport processors are stopped via the same hooks the full bootstrap
     // uses; biomeRecall, MemoryTracker, and queue state are in-memory only and are

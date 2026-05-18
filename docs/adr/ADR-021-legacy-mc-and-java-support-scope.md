@@ -39,7 +39,7 @@ If revisited, the minimum plan is:
 
 | Alternative | Why Rejected |
 |-------------|--------------|
-| Add `rtp-spigot-legacy` adapter(s) for MC 1.16–1.19 on Java 17 now | Doubles the test matrix and shim surface while Fabric is still unstable; no committed owner. |
+| Add `rtp-bukkit-legacy` adapter(s) for MC 1.16–1.19 on Java 17 now | Doubles the test matrix and shim surface while Fabric is still unstable; no committed owner. |
 | Multi-release JAR with Java 8 core + Java 21 adapters | `rtp-core` uses Java 21 language features pervasively; the backport would permanently tax every core change and risk S-005/S-002 regressions in the legacy path. |
 | Reintroduce PaperLib to cover async chunk loading on older Paper | Explicitly reversed by ADR-005; would reopen a decision the project has already paid to close. |
 | Drop legacy support silently (no ADR) | Leaves the question open, invites repeated requests, and provides no revisit criteria. |

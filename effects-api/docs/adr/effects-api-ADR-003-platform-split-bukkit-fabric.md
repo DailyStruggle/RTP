@@ -15,7 +15,7 @@
 
 ## Context
 
-`effects-api` today is Bukkit-coupled at the **base class**: every effect extends `org.bukkit.scheduler.BukkitRunnable` and the abstract `Effect<T>` imports `org.bukkit.{Color, Location, NamespacedKey, Registry, Sound, entity.Entity}`. `EffectFactory` calls `Bukkit.getPluginManager()` / `Permission` / `PotionEffectType`. Every concrete effect under `LocalEffects/*` and every listener under `SpigotListeners/*` is Bukkit-typed.
+`effects-api` today is Bukkit-coupled at the **base class**: every effect extends `org.bukkit.scheduler.BukkitRunnable` and the abstract `Effect<T>` imports `org.bukkit.{Color, Location, NamespacedKey, Registry, Sound, entity.Entity}`. `EffectFactory` calls `Bukkit.getPluginManager()` / `Permission` / `PotionEffectType`. Every concrete effect under `LocalEffects/*` and every listener under `BukkitListeners/*` is Bukkit-typed.
 
 Net effect on Fabric: classloading `EffectFactory.buildEffects(...)` triggers `NoClassDefFoundError` on `BukkitRunnable`. Fabric cannot adopt any `rtp.effect.*` permission node, so `effectParsing` is silently a no-op on Fabric (Item 2 of `CHECKLIST-fabric-startup-parity.md`).
 
@@ -47,7 +47,7 @@ effects-api/                                       (existing module — unchange
     bukkit/                                        ← RENAMED from current top-level
       BukkitEffectRuntime.java                     (NEW — implements EffectRuntime via Bukkit)
       LocalEffects/{Sound,Particle,Note[, _1_12], Potion, Firework, Glide}Effect.java  (moved verbatim, retargeted onto EffectRuntime)
-      SpigotListeners/{Firework,Glide}SafetyListener.java                              (moved verbatim)
+      BukkitListeners/{Firework,Glide}SafetyListener.java                              (moved verbatim)
       commands/* (Bukkit /effects admin tree)                                          (moved verbatim)
       events/* (Bukkit-typed events)                                                   (moved verbatim)
     fabric/                                        ← NEW
@@ -138,7 +138,7 @@ public interface EffectRuntime {
 1. Update `effects-api/build.gradle`: apply `fabric-loom`, add Mojmap MC + Loader/API `modCompileOnly`, keep Spigot `compileOnly`. Confirm `:effects-api:build` still green before any code moves.
 2. Create `effectsapi/common/spi/{EffectRuntime,EffectTarget}.java`.
 3. Move `Effect.java` and `EffectFactory.java` into `effectsapi/common/`; de-Bukkit-ify them (drop `extends BukkitRunnable`, swap `org.bukkit.{Color,Location,NamespacedKey,Registry,Sound,Entity}` for neutral `String` keys + `RTPLocation`; replace `Bukkit.getPluginManager()` permission lookup with `RTPPlayer.getEffectivePermissions()`).
-4. Move `LocalEffects/*`, `SpigotListeners/*`, `commands/*`, `events/*` into `effectsapi/bukkit/...` (verbatim except the package declaration). Add `BukkitEffectRuntime`.
+4. Move `LocalEffects/*`, `BukkitListeners/*`, `commands/*`, `events/*` into `effectsapi/bukkit/...` (verbatim except the package declaration). Add `BukkitEffectRuntime`.
 5. Update `rtp-plugin/.../bukkit/effects/BukkitEffectsHandler.java`: 10 call sites switch from `effect.runTask(plugin)` to `runtime.schedule(effect, 0)`; import block updated to `effectsapi.bukkit.LocalEffects.*`.
 6. Add `effectsapi/fabric/` with `FabricEffectRuntime` + Phase-1 effects (`Sound`, `Particle`, `Title`, `Potion`).
 7. Wire `RTPFabricMod.onInitialize` to call `EffectFactory.buildEffects(...)` on each lifecycle hook (the seven `rtp.effect.*` perms — same shape as `BukkitEffectsHandler`).

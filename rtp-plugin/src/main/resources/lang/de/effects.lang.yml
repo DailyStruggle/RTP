@@ -5,9 +5,9 @@
 # die linke Seite ist eine Code-Konstante und darf nicht geändert werden.
 # Fehlt diese Datei, generiert das Plugin automatisch eine englische Fassung
 # mit identischen linken und rechten Werten neu.
-when: ausloeser
-permission: berechtigung
-players: spieler
-inherit: erbt
-effects: effekte
-version: version
+when: "ausloeser"
+permission: "berechtigung"
+players: "spieler"
+inherit: "erbt"
+effects: "effekte"
+version: "version"

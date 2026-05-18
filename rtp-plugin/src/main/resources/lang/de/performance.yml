@@ -1,6 +1,5 @@
 # --- RTP Performance Settings ---
 # Documentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/PERFORMANCE.md
-
 # Max search attempts before giving up
 maxAttempts: 32
 # Chunk radius to load during selection
@@ -38,4 +37,4 @@ pregeneratedPreference: 0.0
 backlogRefillThreshold: 0.5
 
 # DO NOT TOUCH VERSION NUMBER
-version: "1.0"
+version: 1.0

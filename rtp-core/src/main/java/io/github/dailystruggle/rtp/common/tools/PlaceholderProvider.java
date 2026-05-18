@@ -5,6 +5,8 @@ import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.metrics.api.MetricsSnapshot;
+import io.github.dailystruggle.rtp.common.metrics.RTPMetricsExtension;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
@@ -25,6 +27,67 @@ import java.util.regex.Pattern;
 
 public class PlaceholderProvider {
     public static final Map<String, Function<UUID, String>> placeholders = new ConcurrentHashMap<>();
+
+    /**
+     * Per-thread cache for a single {@link MetricsSnapshot} so that all metrics-backed
+     * placeholders in one message-formatting pass observe the same atomic snapshot and
+     * the underlying {@code RTP.metrics.snapshot()} (and its binding) is invoked exactly
+     * once per caller-defined scope (e.g. one {@code /rtp info} invocation).
+     *
+     * <p>Callers wrap their formatting block with {@link #withSnapshot(Runnable)}
+     * or {@link #pushSnapshot(MetricsSnapshot)} / {@link #popSnapshot()}. Placeholders that
+     * read metrics call {@link #currentSnapshot()}, which lazily falls back to
+     * {@code RTP.metrics.snapshot()} when no caller-supplied snapshot is in scope.
+     *
+     * <p>Plan reference: {@code docs/dev/METRICS_PLAN.md} — "one snapshot per
+     * {@code /rtp info} invocation" (Section M1 / row B11).
+     */
+    private static final ThreadLocal<MetricsSnapshot> METRICS_SNAPSHOT_CACHE = new ThreadLocal<>();
+
+    /** Install a snapshot for the current thread; pair with {@link #popSnapshot()}. */
+    public static void pushSnapshot(MetricsSnapshot snap) {
+        METRICS_SNAPSHOT_CACHE.set(snap);
+    }
+
+    /** Clear any snapshot installed for the current thread. */
+    public static void popSnapshot() {
+        METRICS_SNAPSHOT_CACHE.remove();
+    }
+
+    /**
+     * Return the snapshot in scope for the current thread, or a fresh
+     * {@code RTP.metrics.snapshot()} if none. Never returns {@code null}.
+     */
+    public static MetricsSnapshot currentSnapshot() {
+        MetricsSnapshot snap = METRICS_SNAPSHOT_CACHE.get();
+        if (snap != null) return snap;
+        return RTP.metrics.snapshot();
+    }
+
+    /**
+     * Return the RTP-specific extension on the current snapshot, or a zeroed
+     * fallback if absent (e.g. NOOP binding). Never returns {@code null}.
+     */
+    private static RTPMetricsExtension currentRtpExt() {
+        RTPMetricsExtension ext = currentSnapshot().extension(RTPMetricsExtension.class);
+        return (ext != null) ? ext : new RTPMetricsExtension(0, 0, 0, 0, Double.NaN, -1);
+    }
+
+    /**
+     * Run {@code body} with one freshly-captured snapshot installed for the current thread.
+     * Snapshot is captured by {@code RTP.metrics.snapshot()} exactly once at entry and
+     * is cleared on exit (even on exception).
+     */
+    public static void withSnapshot(Runnable body) {
+        MetricsSnapshot prior = METRICS_SNAPSHOT_CACHE.get();
+        METRICS_SNAPSHOT_CACHE.set(RTP.metrics.snapshot());
+        try {
+            body.run();
+        } finally {
+            if (prior == null) METRICS_SNAPSHOT_CACHE.remove();
+            else METRICS_SNAPSHOT_CACHE.set(prior);
+        }
+    }
 
     static {
         placeholders.put(
@@ -257,37 +320,145 @@ public class PlaceholderProvider {
                 });
 
         // --- Metrics SPI placeholders (METRICS_PLAN.md > /rtp info Surface) ---
-        // All read RTP.metrics.snapshot() exactly once per placeholder invocation.
-        // The snapshot itself is O(R) integer reads (R = configured regions) and
-        // never blocks. A future optimisation may cache one snapshot per message,
-        // but the current cost is well below the existing colour-code regex pass.
+        // All read a single MetricsSnapshot via currentSnapshot(): callers (e.g. InfoCmd)
+        // wrap their formatting pass in PlaceholderProvider.withSnapshot(...) so that one
+        // /rtp info invocation produces exactly one MetricsBinding round-trip. If no
+        // caller scope is active, currentSnapshot() falls back to RTP.metrics.snapshot()
+        // per call — safe, just slightly less efficient (B11 cleanup, METRICS_PLAN.md).
         placeholders.put(
                 "queueDepth",
-                uuid -> String.valueOf(RTP.metrics.snapshot().queueDepth));
+                uuid -> String.valueOf(currentRtpExt().queueDepth));
         placeholders.put(
                 "pendingTeleports",
-                uuid -> String.valueOf(RTP.metrics.snapshot().pendingTeleports));
+                uuid -> String.valueOf(currentRtpExt().pendingTeleports));
         placeholders.put(
                 "avgPipelineMs",
                 uuid -> {
-                    double v = RTP.metrics.snapshot().avgPipelineMs;
+                    double v = currentRtpExt().avgPipelineMs;
                     return Double.isNaN(v) ? "n/a" : String.format("%.2f", v);
                 });
         placeholders.put(
                 "heapUsedMb",
-                uuid -> String.valueOf(RTP.metrics.snapshot().heapUsedMb()));
+                uuid -> String.valueOf(currentSnapshot().heapUsedMb()));
         placeholders.put(
                 "heapMaxMb",
                 uuid -> {
-                    long mb = RTP.metrics.snapshot().heapMaxMb();
+                    long mb = currentSnapshot().heapMaxMb();
                     return (mb < 0) ? "unbounded" : String.valueOf(mb);
                 });
         placeholders.put(
                 "memoryEntries",
-                uuid -> String.valueOf(RTP.metrics.snapshot().memoryTrackerEntries));
+                uuid -> String.valueOf(currentRtpExt().memoryTrackerEntries));
         placeholders.put(
                 "chunkLoadBacklog",
-                uuid -> String.valueOf(RTP.metrics.snapshot().chunkLoadBacklog));
+                uuid -> String.valueOf(currentRtpExt().chunkLoadBacklog));
+        // Additional Metrics SPI placeholders (B11 scope) — TPS / MSPT / capacity /
+        // database latency / tick budget. Each renders the documented sentinel (NaN
+        // tps/mspt, -1 db latency, 0 softCap) as "n/a" / "unbounded" so locales can
+        // surface "metrics unavailable" deterministically when the NOOP binding is live.
+        placeholders.put(
+                "tps1m",
+                uuid -> {
+                    double v = currentSnapshot().tps1m;
+                    return Double.isNaN(v) ? "n/a" : String.format("%.2f", v);
+                });
+        placeholders.put(
+                "tps5m",
+                uuid -> {
+                    double v = currentSnapshot().tps5m;
+                    return Double.isNaN(v) ? "n/a" : String.format("%.2f", v);
+                });
+        placeholders.put(
+                "tps15m",
+                uuid -> {
+                    double v = currentSnapshot().tps15m;
+                    return Double.isNaN(v) ? "n/a" : String.format("%.2f", v);
+                });
+        placeholders.put(
+                "mspt",
+                uuid -> {
+                    double v = currentSnapshot().mspt;
+                    return Double.isNaN(v) ? "n/a" : String.format("%.2f", v);
+                });
+        placeholders.put(
+                "tickBudgetUtilisation",
+                uuid -> {
+                    double v = currentSnapshot().tickBudgetUtilisation;
+                    return Double.isNaN(v) ? "n/a" : String.format("%.1f%%", v * 100.0);
+                });
+        placeholders.put(
+                "softCap",
+                uuid -> {
+                    int v = currentSnapshot().softCap;
+                    return (v <= 0) ? "unbounded" : String.valueOf(v);
+                });
+        placeholders.put(
+                "playerCount",
+                uuid -> String.valueOf(currentSnapshot().playerCount));
+        placeholders.put(
+                "databaseLatencyMs",
+                uuid -> {
+                    int v = currentRtpExt().databaseLatencyMs;
+                    return (v < 0) ? "n/a" : String.valueOf(v);
+                });
+        // B12 (METRICS_PLAN.md > Health colour coding): coloured-wrapper variants of the
+        // numeric Health-Pipeline placeholders. Each prepends a legacy &-code chosen by
+        // ColourBands (green/yellow/red/grey) and trails &r so adjacent template text keeps
+        // its own colour. NaN / unavailable values render as "n/a" prefixed by &7 (grey) so
+        // operators do not see false-red on first start. Operators may opt out of colouring
+        // by switching templates back to the bare placeholders (e.g. [tps1m]); the coloured
+        // variants are additive and never replace the originals.
+        placeholders.put(
+                "tps1mColoured",
+                uuid -> {
+                    double v = currentSnapshot().tps1m;
+                    return ColourBands.forTps(v)
+                            + (Double.isNaN(v) ? "n/a" : String.format("%.2f", v))
+                            + "&r";
+                });
+        placeholders.put(
+                "tps5mColoured",
+                uuid -> {
+                    double v = currentSnapshot().tps5m;
+                    return ColourBands.forTps(v)
+                            + (Double.isNaN(v) ? "n/a" : String.format("%.2f", v))
+                            + "&r";
+                });
+        placeholders.put(
+                "tps15mColoured",
+                uuid -> {
+                    double v = currentSnapshot().tps15m;
+                    return ColourBands.forTps(v)
+                            + (Double.isNaN(v) ? "n/a" : String.format("%.2f", v))
+                            + "&r";
+                });
+        placeholders.put(
+                "msptColoured",
+                uuid -> {
+                    double v = currentSnapshot().mspt;
+                    return ColourBands.forMspt(v)
+                            + (Double.isNaN(v) ? "n/a" : String.format("%.2f", v))
+                            + "&r";
+                });
+        placeholders.put(
+                "tickBudgetUtilisationColoured",
+                uuid -> {
+                    double v = currentSnapshot().tickBudgetUtilisation;
+                    return ColourBands.forTickBudgetUtilisation(v)
+                            + (Double.isNaN(v) ? "n/a" : String.format("%.1f%%", v * 100.0))
+                            + "&r";
+                });
+        placeholders.put(
+                "avgPipelineMsColoured",
+                uuid -> {
+                    double v = currentRtpExt().avgPipelineMs;
+                    // avgPipelineMs is on the same lower-is-better axis as server MSPT, so
+                    // reuse the MSPT bands. A high average pipeline latency is the operator
+                    // signal that the teleport pipeline is starved or stalling.
+                    return ColourBands.forMspt(v)
+                            + (Double.isNaN(v) ? "n/a" : String.format("%.2f", v))
+                            + "&r";
+                });
 
         placeholders.put(
                 "attempts",

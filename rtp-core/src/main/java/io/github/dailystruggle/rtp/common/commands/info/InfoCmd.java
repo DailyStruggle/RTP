@@ -10,6 +10,7 @@ import io.github.dailystruggle.rtp.common.commands.parameters.RegionParameter;
 import io.github.dailystruggle.rtp.common.commands.parameters.WorldParameter;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.tools.PlaceholderProvider;
 import io.github.dailystruggle.rtp.api.DownloadInfo;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import java.util.*;
@@ -36,6 +37,16 @@ public class InfoCmd extends BaseRTPCmdImpl {
   @Override
   public String permission() {
     return "rtp.info";
+  }
+
+  /**
+   * Formats a double for the per-region table — two decimal places when finite,
+   * literal {@code NaN} when not sampled yet. Keeps the row layout stable across
+   * locales without dragging a {@code Locale}-sensitive formatter into core.
+   */
+  private static String formatDouble(double v) {
+    if (Double.isNaN(v) || Double.isInfinite(v)) return "NaN";
+    return String.format(java.util.Locale.ROOT, "%.2f", v);
   }
 
   private void sendWorldInfo(UUID callerId, RTPWorld world, ConfigParser<MessagesKeys> lang) {
@@ -71,6 +82,17 @@ public class InfoCmd extends BaseRTPCmdImpl {
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return nextCommand.onCommand(callerId, parameterValues, null);
 
+    // Capture exactly one MetricsSnapshot for the entire /rtp info invocation so
+    // every metrics-backed placeholder ([tps1m], [mspt], [queueDepth], …) reads
+    // from the same atomic view. See PlaceholderProvider.withSnapshot and
+    // METRICS_PLAN.md > /rtp info Surface (B11 cleanup).
+    final boolean[] result = {true};
+    PlaceholderProvider.withSnapshot(() -> result[0] = onCommandInner(callerId, parameterValues));
+    return result[0];
+  }
+
+  private boolean onCommandInner(
+      UUID callerId, Map<String, List<String>> parameterValues) {
     ConfigParser<MessagesKeys> lang =
         (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
 
@@ -132,6 +154,11 @@ public class InfoCmd extends BaseRTPCmdImpl {
       String infoPendingTeleports = lang.getConfigValue(MessagesKeys.infoPendingTeleports, "").toString();
       String infoAvgPipelineMs = lang.getConfigValue(MessagesKeys.infoAvgPipelineMs, "").toString();
       String infoHeap = lang.getConfigValue(MessagesKeys.infoHeap, "").toString();
+      String infoHealthPipelineHeader = lang.getConfigValue(MessagesKeys.infoHealthPipelineHeader, "").toString();
+      String infoTps = lang.getConfigValue(MessagesKeys.infoTps, "").toString();
+      String infoMSPTLive = lang.getConfigValue(MessagesKeys.infoMSPTLive, "").toString();
+      String infoSoftCap = lang.getConfigValue(MessagesKeys.infoSoftCap, "").toString();
+      String infoDatabaseLatencyMs = lang.getConfigValue(MessagesKeys.infoDatabaseLatencyMs, "").toString();
       String infoDisclaimerHeader = lang.getConfigValue(MessagesKeys.infoDisclaimerHeader, "").toString();
       String infoDisclaimer = lang.getConfigValue(MessagesKeys.infoDisclaimer, "").toString();
 
@@ -141,10 +168,44 @@ public class InfoCmd extends BaseRTPCmdImpl {
       if (!infoTotalLoads.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoTotalLoads);
       if (!infoLoadsByOrigin.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoLoadsByOrigin);
       if (!infoLeakRate.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoLeakRate);
+      // Health — pipeline group (METRICS_PLAN.md > /rtp info Surface). Header line
+      // is rendered ahead of the metrics group so operators can visually anchor it.
+      if (!infoHealthPipelineHeader.isEmpty())
+        RTP.serverAccessor.sendMessage(callerId, infoHealthPipelineHeader);
+      if (!infoTps.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoTps);
+      if (!infoMSPTLive.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoMSPTLive);
+      if (!infoSoftCap.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoSoftCap);
       if (!infoQueueDepth.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoQueueDepth);
       if (!infoPendingTeleports.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoPendingTeleports);
       if (!infoAvgPipelineMs.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoAvgPipelineMs);
       if (!infoHeap.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoHeap);
+      if (!infoDatabaseLatencyMs.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoDatabaseLatencyMs);
+
+      // Section C / METRICS_PLAN.md > Folia Aggregation — render the per-region
+      // table when the active MetricsBinding publishes per-region detail (Folia).
+      // foliaRegions() is structurally empty on Paper / Bukkit / Fabric (single
+      // region runtimes), so this whole block is a no-op there. Empty templates
+      // skip silently for locales that haven't merged the new keys.
+      List<io.github.dailystruggle.metrics.api.FoliaRegionSample> foliaRegions =
+          io.github.dailystruggle.rtp.common.tools.PlaceholderProvider.currentSnapshot().foliaRegions;
+      if (!foliaRegions.isEmpty()) {
+        String infoFoliaRegionsHeader = lang.getConfigValue(MessagesKeys.infoFoliaRegionsHeader, "").toString();
+        String infoFoliaRegion = lang.getConfigValue(MessagesKeys.infoFoliaRegion, "").toString();
+        if (!infoFoliaRegionsHeader.isEmpty())
+          RTP.serverAccessor.sendMessage(callerId, infoFoliaRegionsHeader);
+        if (!infoFoliaRegion.isEmpty()) {
+          for (io.github.dailystruggle.metrics.api.FoliaRegionSample sample : foliaRegions) {
+            String row = infoFoliaRegion
+                .replace("[regionId]", String.valueOf(sample.regionId))
+                .replace("[tps1m]", formatDouble(sample.tps1m))
+                .replace("[mspt]", formatDouble(sample.mspt))
+                .replace("[playerCount]", Integer.toString(sample.playerCount))
+                .replace("[queueDepth]", Integer.toString(sample.queueDepth))
+                .replace("[tickBudgetUtilisation]", formatDouble(sample.tickBudgetUtilisation()));
+            RTP.serverAccessor.sendMessage(callerId, row);
+          }
+        }
+      }
 
       if (!infoDisclaimerHeader.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoDisclaimerHeader);
       if (!infoDisclaimer.isEmpty()) RTP.serverAccessor.sendMessage(callerId, infoDisclaimer);

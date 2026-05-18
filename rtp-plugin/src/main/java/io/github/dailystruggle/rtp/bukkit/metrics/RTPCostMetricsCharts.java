@@ -1,7 +1,12 @@
 package io.github.dailystruggle.rtp.bukkit.metrics;
 
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.metrics.MetricsSnapshot;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.metrics.api.MetricsBinding;
+import io.github.dailystruggle.metrics.api.MetricsSnapshot;
+import io.github.dailystruggle.rtp.common.metrics.RTPMetricsExtension;
 import org.bstats.bukkit.Metrics;
 import org.bstats.charts.AdvancedPie;
 import org.bstats.charts.MultiLineChart;
@@ -9,8 +14,12 @@ import org.bstats.charts.SimplePie;
 import org.bstats.charts.SingleLineChart;
 import org.bukkit.Bukkit;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.TreeSet;
 import java.util.logging.Level;
 
 /**
@@ -58,6 +67,31 @@ public final class RTPCostMetricsCharts {
     metrics.addCustomChart(new SimplePie(BStatsChartIds.ASSEMBLY_VARIANT, () -> variant));
     metrics.addCustomChart(new SimplePie(BStatsChartIds.DATABASE_BACKEND, RTPCostMetricsCharts::detectDatabaseBackend));
 
+    // Region shapes in use: AdvancedPie of shape-class simple names tallied
+    // across all configured regions. Cardinality bounded by the Shape catalogue
+    // (Circle, Square, Ring, ...). No region names or world names leak.
+    metrics.addCustomChart(new AdvancedPie(BStatsChartIds.REGION_SHAPES_IN_USE,
+            RTPCostMetricsCharts::detectRegionShapesInUse));
+
+    // Safety features enabled: SimplePie of a stable, sorted slug
+    // (e.g. "anvil_prefilter+biome_whitelist" or "default"). Reads
+    // SafetyKeys booleans only; no list contents, no radii, no material names.
+    metrics.addCustomChart(new SimplePie(BStatsChartIds.SAFETY_FEATURES_ENABLED,
+            RTPCostMetricsCharts::detectSafetyFeaturesEnabled));
+
+    // Addons loaded: AdvancedPie tallying which known third-party integrations
+    // are *enabled* on this server. Limited to the hard-coded softdepend
+    // whitelist below (mirrors plugin.yml softdepend). Any plugin name not on
+    // this list is ignored — prevents fingerprinting via arbitrary plugin lists.
+    metrics.addCustomChart(new AdvancedPie(BStatsChartIds.ADDONS_LOADED,
+            RTPCostMetricsCharts::detectAddonsLoaded));
+
+    // Lite features dropped: SimplePie reporting whether the lite assembly is
+    // active. "none" on full builds; "lite" on lite builds. Mirror of
+    // ASSEMBLY_VARIANT inverted for dashboard convenience.
+    metrics.addCustomChart(new SimplePie(BStatsChartIds.LITE_FEATURES_DROPPED,
+            () -> "lite".equalsIgnoreCase(variant) ? "lite" : "none"));
+
     // --- Region count (single-line, configuration cost dimension) ---
     metrics.addCustomChart(new SingleLineChart(BStatsChartIds.REGION_COUNT,
             () -> safeRegionCount()));
@@ -95,29 +129,84 @@ public final class RTPCostMetricsCharts {
 
     metrics.addCustomChart(new AdvancedPie(BStatsChartIds.PIPELINE_LATENCY_BUCKETS, () -> {
       Map<String, Integer> b = new HashMap<>();
-      double avg = RTP.metrics.snapshot().avgPipelineMs;
+      double avg = rtpExt(RTP.metrics.snapshot()).avgPipelineMs;
       b.put(pipelineLatencyBucket(avg), 1);
       return b;
     }));
 
     metrics.addCustomChart(new AdvancedPie(BStatsChartIds.MEMORY_TRACKER_PRESSURE, () -> {
       Map<String, Integer> b = new HashMap<>();
-      int n = RTP.metrics.snapshot().memoryTrackerEntries;
+      int n = rtpExt(RTP.metrics.snapshot()).memoryTrackerEntries;
       b.put(memoryTrackerBucket(n), 1);
       return b;
     }));
 
     metrics.addCustomChart(new AdvancedPie(BStatsChartIds.CHUNK_LOAD_BACKLOG_PRESSURE, () -> {
       Map<String, Integer> b = new HashMap<>();
-      int n = RTP.metrics.snapshot().chunkLoadBacklog;
+      int n = rtpExt(RTP.metrics.snapshot()).chunkLoadBacklog;
       b.put(chunkBacklogBucket(n), 1);
       return b;
     }));
 
     metrics.addCustomChart(new AdvancedPie(BStatsChartIds.QUEUE_DEPTH_PRESSURE, () -> {
       Map<String, Integer> b = new HashMap<>();
-      int n = RTP.metrics.snapshot().queueDepth;
+      int n = rtpExt(RTP.metrics.snapshot()).queueDepth;
       b.put(queueDepthBucket(n), 1);
+      return b;
+    }));
+
+    // --- M2 Runtime health (additive, Section C / row C4) ---
+    // TPS trendlines: 1m / 5m / 15m EMA, reported as int *100 so bStats line
+    // charts (int-only) preserve sub-integer resolution (e.g. 19.87 -> 1987).
+    // Dashboards divide by 100 to render. NaN coerces to 0 to keep the line
+    // continuous when the binding hasn't seeded yet.
+    metrics.addCustomChart(new MultiLineChart(BStatsChartIds.TPS_TRENDLINES, () -> {
+      Map<String, Integer> map = new HashMap<>();
+      MetricsSnapshot snap = RTP.metrics.snapshot();
+      map.put("tps1m_x100", scaledTps(snap.tps1m));
+      map.put("tps5m_x100", scaledTps(snap.tps5m));
+      map.put("tps15m_x100", scaledTps(snap.tps15m));
+      return map;
+    }));
+
+    // Heap pressure: bucketised heapUsed / heapMax percentage. Single biggest
+    // RTP-cost dimension after TPS — caches and the pipeline both allocate.
+    metrics.addCustomChart(new AdvancedPie(BStatsChartIds.HEAP_PRESSURE, () -> {
+      Map<String, Integer> b = new HashMap<>();
+      MetricsSnapshot snap = RTP.metrics.snapshot();
+      b.put(heapPressureBucket(snap.heapUsedBytes, snap.heapMaxBytes), 1);
+      return b;
+    }));
+
+    // Tick-budget utilisation: meaningful on Folia (per-region tick budget
+    // headroom); on Paper/Bukkit/Fabric this is typically NaN and buckets
+    // into "unknown" — that is the correct answer for a single-region runtime.
+    metrics.addCustomChart(new AdvancedPie(BStatsChartIds.TICK_BUDGET_UTILISATION, () -> {
+      Map<String, Integer> b = new HashMap<>();
+      double u = RTP.metrics.snapshot().tickBudgetUtilisation;
+      b.put(tickBudgetBucket(u), 1);
+      return b;
+    }));
+
+    // Folia region count: bucketised list size from MetricsSnapshot.foliaRegions().
+    // Structurally 0 on non-Folia platforms (empty list default in MetricsBinding),
+    // so this also doubles as a "Folia adoption" signal without any platform
+    // branch. Bucketed for fingerprint resistance (no exact region counts).
+    metrics.addCustomChart(new AdvancedPie(BStatsChartIds.FOLIA_REGION_COUNT, () -> {
+      Map<String, Integer> b = new HashMap<>();
+      List<?> regions = RTP.metrics.snapshot().foliaRegions;
+      int n = (regions == null) ? 0 : regions.size();
+      b.put(foliaRegionCountBucket(n), 1);
+      return b;
+    }));
+
+    // Pending teleports: bucketised pendingTeleports — distinct from queueDepth
+    // (pre-verified location pool) in that it counts players actively awaiting
+    // a coordinate. Symmetric with QUEUE_DEPTH_PRESSURE.
+    metrics.addCustomChart(new AdvancedPie(BStatsChartIds.PENDING_TELEPORTS_PRESSURE, () -> {
+      Map<String, Integer> b = new HashMap<>();
+      int n = rtpExt(RTP.metrics.snapshot()).pendingTeleports;
+      b.put(pendingTeleportsBucket(n), 1);
       return b;
     }));
   }
@@ -165,6 +254,122 @@ public final class RTPCostMetricsCharts {
     }
   }
 
+  /**
+   * Hard-coded set of integration plugin names mirrored from
+   * {@code plugin.yml > softdepend}. Limiting the reported set to this fixed
+   * whitelist prevents the chart from leaking arbitrary plugin names on the
+   * host server, which would otherwise be a fingerprinting vector. Names are
+   * compared case-insensitively against {@code Bukkit.getPluginManager()}.
+   */
+  static final List<String> KNOWN_ADDON_PLUGINS =
+          Collections.unmodifiableList(Arrays.asList(
+                  "WorldGuard",
+                  "WorldEdit",
+                  "PlaceholderAPI",
+                  "Vault",
+                  "Chunky",
+                  "ChunkyBorder",
+                  "GriefDefender",
+                  "GriefPrevention",
+                  "Towny",
+                  "HuskTowns",
+                  "Factions",
+                  "Lands",
+                  "RedProtect"));
+
+  /**
+   * Tally of region shape simple-class-names across all configured regions.
+   * Falls back to {@code "unknown"} when the shape can't be resolved. Returns
+   * an empty map (no bStats entry) if the region table isn't ready yet.
+   */
+  static Map<String, Integer> detectRegionShapesInUse() {
+    Map<String, Integer> tally = new HashMap<>();
+    try {
+      if (RTP.selectionAPI == null || RTP.selectionAPI.permRegionLookup == null) return tally;
+      for (var region : RTP.selectionAPI.permRegionLookup.values()) {
+        if (region == null) continue;
+        String label = "unknown";
+        try {
+          Object shape = region.getData(RegionKeys.shape);
+          if (shape != null) {
+            label = shape.getClass().getSimpleName().toLowerCase();
+            if (label.isEmpty()) label = "unknown";
+          }
+        } catch (Throwable ignored) {
+          // label stays "unknown"
+        }
+        tally.merge(label, 1, Integer::sum);
+      }
+    } catch (Throwable ignored) {
+      // Defensive: chart must never throw.
+    }
+    return tally;
+  }
+
+  /**
+   * Stable, sorted slug describing which safety toggles are non-default.
+   * Returns {@code "default"} when every read boolean matches its documented
+   * default. Reads only enum-keyed booleans (no list contents, no numeric
+   * radii, no material names) so no per-server config detail leaks.
+   */
+  @SuppressWarnings("unchecked")
+  static String detectSafetyFeaturesEnabled() {
+    try {
+      if (RTP.getInstance() == null) return "unknown";
+      ConfigParser<SafetyKeys> safety =
+              (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+      if (safety == null) return "unknown";
+      TreeSet<String> on = new TreeSet<>();
+      // anvilPrefilterEnabled default: true; "default" means present, off means non-default.
+      Object anvil = safety.getConfigValue(SafetyKeys.anvilPrefilterEnabled, Boolean.TRUE);
+      if (!Boolean.parseBoolean(String.valueOf(anvil))) on.add("anvil_prefilter_off");
+      // biomeWhitelist default: false; on means non-default.
+      Object biome = safety.getConfigValue(SafetyKeys.biomeWhitelist, Boolean.FALSE);
+      if (Boolean.parseBoolean(String.valueOf(biome))) on.add("biome_whitelist");
+      if (on.isEmpty()) return "default";
+      return String.join("+", on);
+    } catch (Throwable t) {
+      return "unknown";
+    }
+  }
+
+  /**
+   * Tally of enabled integration plugins from {@link #KNOWN_ADDON_PLUGINS}.
+   * Reports each detected plugin by its canonical (capitalized) softdepend
+   * name and a {@code "none"} bucket when zero are present.
+   */
+  static Map<String, Integer> detectAddonsLoaded() {
+    Map<String, Integer> tally = new HashMap<>();
+    try {
+      var pm = Bukkit.getPluginManager();
+      if (pm == null) {
+        tally.put("none", 1);
+        return tally;
+      }
+      for (String name : KNOWN_ADDON_PLUGINS) {
+        try {
+          if (pm.isPluginEnabled(name)) tally.put(name, 1);
+        } catch (Throwable ignored) {
+          // skip — chart must never throw.
+        }
+      }
+      if (tally.isEmpty()) tally.put("none", 1);
+    } catch (Throwable ignored) {
+      tally.clear();
+      tally.put("none", 1);
+    }
+    return tally;
+  }
+
+  /**
+   * Look up RTP's plugin-specific counters on the snapshot, falling back to a
+   * zeroed extension if the NOOP binding is live. Never returns {@code null}.
+   */
+  private static RTPMetricsExtension rtpExt(MetricsSnapshot snap) {
+    RTPMetricsExtension ext = (snap == null) ? null : snap.extension(RTPMetricsExtension.class);
+    return (ext != null) ? ext : new RTPMetricsExtension(0, 0, 0, 0, Double.NaN, -1);
+  }
+
   private static int safeRegionCount() {
     try {
       if (RTP.selectionAPI == null || RTP.selectionAPI.permRegionLookup == null) return 0;
@@ -206,24 +411,15 @@ public final class RTPCostMetricsCharts {
   }
 
   private static double safeTps() {
-    double tps = RTP.metrics.snapshot().tps1m;
-    if (Double.isNaN(tps)) {
-      // Fall back to Paper's API directly if the metrics binding isn't wired
-      // yet (Phase M1 partial). This is the same probe a future PaperBinding
-      // would use.
-      try {
-        // Bukkit.getServer().getTPS() exists on Paper / Spigot 1.20+ but not on
-        // the lowest-common-denominator Bukkit API artifact this module compiles
-        // against. Reflective lookup keeps the classpath stable and degrades to
-        // NaN on hosts that don't expose the method.
-        var m = Bukkit.getServer().getClass().getMethod("getTPS");
-        Object api = m.invoke(Bukkit.getServer());
-        if (api instanceof double[] arr && arr.length > 0) tps = arr[0];
-      } catch (Throwable ignored) {
-        // tps stays NaN; bucket falls into "unknown".
-      }
-    }
-    return tps;
+    // C6 (Section C of CHECKLIST-metrics-and-multiserver, §1.6.4) — the
+    // metrics facade is the single TPS source. The previous reflective
+    // Bukkit.getServer().getTPS() fallback was redundant: when a
+    // BukkitTpsBinding is installed snapshot.tps1m is sampled, and when it
+    // is not the chart correctly degrades to the "unknown" bucket. The
+    // RTPServerAccessor#getTPS path (used elsewhere) already routes through
+    // this same snapshot per §1.6.1, so any reflective probe re-introduced
+    // here would only fingerprint stale data.
+    return RTP.metrics.snapshot().tps1m;
   }
 
   // --- Bucket functions (METRICS_PLAN.md ranges) ---
@@ -268,6 +464,61 @@ public final class RTPCostMetricsCharts {
 
   private static String queueDepthBucket(int n) {
     if (n == 0) return "0";
+    if (n <= 5) return "1-5";
+    if (n <= 20) return "6-20";
+    if (n <= 100) return "21-100";
+    return "100+";
+  }
+
+  // --- M2 Runtime health bucket helpers (Section C / row C4) ---
+
+  /**
+   * Scales a TPS double to int *100 for bStats line charts. NaN -> 0 so the
+   * line stays continuous when a binding hasn't seeded yet. Clamped to
+   * {@code [0, 2500]} (i.e. 0.00-25.00 TPS) to avoid runaway outliers from a
+   * mis-implemented binding skewing dashboards.
+   */
+  static int scaledTps(double tps) {
+    if (Double.isNaN(tps) || tps < 0.0) return 0;
+    int v = (int) Math.round(tps * 100.0);
+    return Math.min(v, 2500);
+  }
+
+  static String heapPressureBucket(long used, long max) {
+    if (max <= 0L || used < 0L) return "unknown";
+    double pct = 100.0 * used / (double) max;
+    if (pct < 25.0) return "<25";
+    if (pct < 50.0) return "25-50";
+    if (pct < 75.0) return "50-75";
+    if (pct < 90.0) return "75-90";
+    return "90+";
+  }
+
+  static String tickBudgetBucket(double u) {
+    if (Double.isNaN(u) || u < 0.0) return "unknown";
+    if (u < 0.25) return "<25";
+    if (u < 0.50) return "25-50";
+    if (u < 0.75) return "50-75";
+    if (u < 0.90) return "75-90";
+    return "90+";
+  }
+
+  /**
+   * Fingerprint-safe bucket for the number of Folia regions RTP has observed.
+   * Non-Folia platforms always bucket into {@code "0"} because the
+   * {@link MetricsBinding#foliaRegions()} default is an empty list.
+   */
+  static String foliaRegionCountBucket(int n) {
+    if (n <= 0) return "0";
+    if (n == 1) return "1";
+    if (n <= 4) return "2-4";
+    if (n <= 16) return "5-16";
+    if (n <= 64) return "17-64";
+    return "65+";
+  }
+
+  static String pendingTeleportsBucket(int n) {
+    if (n <= 0) return "0";
     if (n <= 5) return "1-5";
     if (n <= 20) return "6-20";
     if (n <= 100) return "21-100";

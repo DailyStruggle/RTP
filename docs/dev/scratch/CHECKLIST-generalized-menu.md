@@ -71,14 +71,14 @@ Goal: land the platform-neutral menu surface so downstream stages can be reviewe
 
 ## Stage 5 — Follow-ups deferred from this session (still beta.3 cycle)
 
-- [ ] 5.1 Spigot per-version `BookMenuRenderer` (`rtp-spigot-v*` branches for the 1.20.5 / 1.21 component/data-component shift).
+- [ ] 5.1 Spigot per-version `BookMenuRenderer` (`rtp-bukkit-v*` branches for the 1.20.5 / 1.21 component/data-component shift).
 - [ ] 5.2 Fabric `ChatMenuRenderer` (deobf carrier + obf carrier via `FabricVersionAdapter#installEffectsWiring`-style dispatch).
 - [ ] 5.3 `ChatMenuRenderer` on Paper/Folia/Spigot as the `menu.renderer: chat` fallback. **D-005 approved (2026-05-15):** `page:<n>` commands-api parameter (1-indexed); `pageBuilder` widened via new `MenuOpenRequest(UUID viewer, int pageIndex)` record + `BiFunction<TreeCommand, MenuOpenRequest, MenuModel>`; Spigot uses BungeeCord-Chat (`net.md_5.bungee.api.chat.*`). Sub-checklist:
   - [x] 5.3.a `MenuOpenRequest` record in `rtp-api/.../menu/`. — `MenuOpenRequest.java`: immutable `(UUID viewer, int pageIndex)`, non-null viewer, non-negative `pageIndex`, `firstPage(uuid)` factory. No package-info change (file doesn't enumerate types).
   - [x] 5.3.b `MenuRedeemSubcommand`: register `page` `CommandParameter`, parse 1-indexed int (default 1 → idx 0), switch `pageBuilder` field/ctor to new signature, plumb into `openPage`. — `PARAM_PAGE` constant + `CommandParameter` registered alongside `PARAM_TOKEN` (predicate accepts positive ints only). `MenuPageBuilder` SAM widened: third arg becomes `MenuOpenRequest` (replacing bare `UUID viewer`); `extractPageIndex` translates wire 1-indexed → 0-indexed (missing/non-numeric/<1 collapse to 0 as defensive backstop). `openPage`/`renderAt` plumb the index; `dispatchOpen` (token-bearing OpenMenu) currently passes 0 — to be widened in 5.3.c when `MenuAction.OpenMenu` itself gets a pageIndex slot. All 5 lambda call sites in `MenuStageTwoTest`, `MenuNavigationStageATest`, `MenuParamPickerStageA2Test` updated (`(node, viewer, ...)` → `(node, open, ...)`, with `open.viewer()` extraction where the UUID is needed). New test `openPagePlumbsOneIndexedPageParameterAsZeroBasedToBuilder` covers happy-path / missing / non-numeric / zero. 31/31 menu tests green via `run_test`.
   - [ ] 5.3.c `CommandTreeMenuBuilder.build(...)` — overload accepting `int pageIndex`; existing single-page output stays the default page-0 case.
   - [ ] 5.3.d `ChatMenuRenderer` in `rtp-paper-common` (Adventure; shared by Folia).
-  - [ ] 5.3.e `ChatMenuRenderer` in `rtp-spigot-common` (BungeeCord-Chat).
+  - [ ] 5.3.e `ChatMenuRenderer` in `rtp-bukkit-common` (BungeeCord-Chat).
   - [ ] 5.3.f `RTPCmdBukkit.selectMenuRenderer`: map `"chat"` to platform-appropriate renderer.
   - [ ] 5.3.g Tests: `ChatMenuRendererTest` in both modules (10 cases mirror Stage 4); `MenuStageTwoTest` adds `page` parameter coverage + `MenuOpenRequest` plumbing.
   - [ ] 5.3.h `CHANGELOG.md` bullet under `[3.0.0-beta.3] - Unreleased ### Added`.

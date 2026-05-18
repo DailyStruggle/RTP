@@ -1,11 +1,10 @@
 # --- Language Mapping: economy.yml (cat dialect) ---
 # Treats! Mrrow! Left side = code constant, do not chew.
 # Right side = how the kibble is counted by the human.
-
-balanceFloor: empty_bowl
-price: treat_cost
-priceOther: treat_cost_for_friend
-refundOnCancel: treats_back_if_napping
-biomePrice: territory_treat_cost
-paramsPrice: fancy_treat_cost
-version: meowsion
+balanceFloor: "empty_bowl"
+price: "treat_cost"
+priceOther: "treat_cost_for_friend"
+refundOnCancel: "treats_back_if_napping"
+biomePrice: "territory_treat_cost"
+paramsPrice: "fancy_treat_cost"
+version: "meowsion"

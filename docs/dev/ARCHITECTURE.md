@@ -20,7 +20,7 @@ The RTP (Random Teleport) plugin is built with a multi-module architecture to en
 
 ### Platform Adapters
 These modules implement platform-specific features to maximize performance on their respective servers while maintaining a unified core codebase.
-* **rtp-spigot**: The adapter for standard Spigot servers, implementing Bukkit/Spigot-specific event handling and chunk loading.
+* **rtp-bukkit**: The adapter for standard Spigot servers, implementing Bukkit/Spigot-specific event handling and chunk loading.
 * **rtp-paper**: The adapter for Paper servers, utilizing Paper-specific APIs for enhanced performance, such as asynchronous chunk loading.
 * **rtp-folia**: The adapter for Folia servers, handling Folia's unique region-based multithreading to ensure teleports and tasks run safely on the correct regional thread.
 * **rtp-fabric** (Planned): The adapter for Fabric servers, bridging the core logic to the Fabric modding environment and Minecraft's Brigadier command system.
@@ -40,7 +40,7 @@ graph TD
     commands-api --> rtp-core
     effects-api --> rtp-core
     rtp-core --> rtp-plugin
-    rtp-spigot --> rtp-plugin
+    rtp-bukkit --> rtp-plugin
     rtp-paper --> rtp-plugin
     rtp-folia --> rtp-plugin
     rtp-core -.-> rtp-fabric

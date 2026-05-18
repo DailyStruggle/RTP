@@ -1,3 +1,6 @@
+import com.github.spotbugs.snom.Effort
+import com.github.spotbugs.snom.Confidence
+
 plugins {
     id 'java-library'
     id 'java-test-fixtures'
@@ -21,6 +24,7 @@ dependencies {
     testRuntimeOnly 'org.yaml:snakeyaml:2.3'
     api project(':commands-api')
     api project(':effects-api')
+    api project(':metrics-api')
     // guava is provided by Spigot/Paper/Folia at runtime
     compileOnly 'com.google.guava:guava:33.2.1-jre'
     testRuntimeOnly 'com.google.guava:guava:33.2.1-jre'
@@ -75,8 +79,8 @@ check.dependsOn jacocoTestCoverageVerification
 // reportLevel='high' makes only HIGH-priority bugs block the build;
 // MEDIUM/LOW findings still appear in the HTML report for review.
 spotbugs {
-    effort = 'max'
-    reportLevel = 'high'
+    effort = Effort.valueOf('MAX')
+    reportLevel = Confidence.valueOf('HIGH')
     ignoreFailures = false
     excludeFilter = file('spotbugs-exclude.xml')
 }

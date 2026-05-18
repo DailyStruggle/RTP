@@ -1,5 +1,4 @@
 # --- Configuración principal de RTP ---
-
 # Idioma para los mensajes visibles al jugador.
 # Predeterminado: "en" (inglés base incluido en messages.yml).
 # Otras traducciones disponibles residen en lang/<locale>/messages.yml y se
@@ -56,4 +55,4 @@ red:
     password: ""
 
 # NO MODIFIQUES EL NÚMERO DE VERSIÓN
-version: "3.0"
+version: 3.0

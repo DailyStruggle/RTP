@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.bukkitplatform.metrics;
 
-import io.github.dailystruggle.rtp.common.metrics.MetricsSnapshot;
+import io.github.dailystruggle.metrics.api.MetricsSnapshot;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.atomic.AtomicLong;

@@ -6,7 +6,7 @@
 
 ## Scope
 
-These requirements bind any module under `rtp-proxy/` that ships an adapter for a Java proxy host (Velocity, BungeeCord, Waterfall, or any future addition). They do not bind backend platforms (`rtp-spigot`, `rtp-paper`, `rtp-folia`, `rtp-fabric`) and do not bind `rtp-core` directly.
+These requirements bind any module under `rtp-proxy/` that ships an adapter for a Java proxy host (Velocity, BungeeCord, Waterfall, or any future addition). They do not bind backend platforms (`rtp-bukkit`, `rtp-paper`, `rtp-folia`, `rtp-fabric`) and do not bind `rtp-core` directly.
 
 ## Namespace
 

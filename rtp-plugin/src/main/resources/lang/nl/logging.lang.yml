@@ -2,17 +2,17 @@
 # Koppelt interne sleutels (links) aan de zichtbare namen in logging.yml (rechts).
 # Wijzig alleen de rechterkant; de linkerkant is een codeconstante.
 # Als dit bestand ontbreekt, genereert de plugin het opnieuw met identieke paren.
-event_changeworld: gebeurtenis_wereldWisseling
-event_respawn: gebeurtenis_herSpawn
-detailed_reload: gedetailleerd_herladen
-teleport: teletransport
-event_join: gebeurtenis_deelnemen
-selection_failure: selectie_mislukking
-system_memory_tracker: systeem_geheugenTracker
-system_database: systeem_database
-event_teleport: gebeurtenis_teletransport
-version: version
-detailed_region_init: gedetailleerd_regioInit
-command: opdracht
-event_move: gebeurtenis_bewegen
-min_level: min_niveau
+event_changeworld: "gebeurtenis_wereldWisseling"
+event_respawn: "gebeurtenis_herSpawn"
+detailed_reload: "gedetailleerd_herladen"
+teleport: "teletransport"
+event_join: "gebeurtenis_deelnemen"
+selection_failure: "selectie_mislukking"
+system_memory_tracker: "systeem_geheugenTracker"
+system_database: "systeem_database"
+event_teleport: "gebeurtenis_teletransport"
+version: "version"
+detailed_region_init: "gedetailleerd_regioInit"
+command: "opdracht"
+event_move: "gebeurtenis_bewegen"
+min_level: "min_niveau"

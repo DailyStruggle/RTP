@@ -63,6 +63,21 @@ All platform-specific command handlers (e.g., `BukkitBaseRTPCmd`) must call `RTP
 
 When testing command feedback in `rtp-core` (e.g., `InvalidCommandTest`), use `Thread.sleep` or await the `CompletableFuture` returned by `onCommand` to ensure feedback has arrived before asserting.
 
+### `TreeCommand` subcommand dispatch hops the common pool when `whenCompleteAsync` is used (2026-05-17)
+
+`TreeCommand.onCommand` enqueues the parent on `CommandsAPI.commandPipeline` (REQ-API-ARCH-006, tick-driven drain) whenever the first parsed token is a sub-command, and chains the sub-command's `onCommand` off a continuation future `cont`. Until 2026-05-17 that continuation was attached with `cont.whenCompleteAsync(...)` (no explicit executor), which routes onto `ForkJoinPool.commonPool`.
+
+Combined with the pipeline enqueue, this means every multi-token `/rtp …` invocation paid:
+
+1. One `CommandsAPI.commandPipeline` pulse latency (up to ~50 ms, by REQ-API-ARCH-006), then
+2. A thread bounce onto `ForkJoinPool.commonPool` before the sub-command's logic ran.
+
+A player typing `/rtp` (zero args) doesn't hit this path — the parse loop is skipped and `compute()` runs inline on the chat thread. A player clicking a book-menu row, however, sends `/rtp menu token:<…>`, which parses as `menu` sub-command on the `/rtp` root — so every menu click ate the pulse + hop. The visible symptom is a brief but consistent delay between clicking the row and the teleport beginning ("scheduler hop on Teleport me now"), plus a latent Folia thread-context hazard: `MenuRedeemSubcommand.dispatchRun` (and ultimately the bare-root `compute()`) executed on a `commonPool` worker rather than the click thread.
+
+Fix: change `cont.whenCompleteAsync(...)` to `cont.whenComplete(...)` (no executor) at `commands-api/.../TreeCommand.java:259`. The continuation then runs on whatever thread completes `cont` — i.e. the platform-driven `CommandsAPI.execute()` drain thread, which the bridge owns and which is already main/region-correct. The pipeline-pulse latency is still present (architecturally intended), but the second thread hop is gone and the Folia hazard is closed.
+
+Note: removing the pipeline enqueue entirely is **not** the right fix — `REQ-API-ARCH-006` requires the tick-driven drain, and other root-command pre-processing in `RTPCmd.onCommand` relies on `nextCommand != null` short-circuiting which only fires via the executor path. If the residual one-pulse delay becomes user-visible, prefer pushing the menu redeem path off the `TreeCommand` parser entirely (dedicated listener that calls `MenuRedeemSubcommand` directly with the parsed token) over weakening the pipeline contract.
+
 ---
 
 ## Test Infrastructure
@@ -589,4 +604,9 @@ If genuine simplification is desired, the path is to add a bytecode-scan test fo
 
 ## 2026-05-11 - RTP.miscAsyncTasks is drained on Fabric via core's self-scheduled AsyncTaskProcessing, not via the platform mod
 
-A Fabric ⇄ Bukkit startup-parity audit briefly suspected that RTP.miscAsyncTasks was never drained on Fabric because a recursive search over tp-fabric/** and tp-plugin/.../fabric/ found zero references to the symbol. That was a false positive. The drain is in tp-core's RTP constructor: line 243 schedules a new AsyncTaskProcessing(25ms) on RTP.scheduler.runTaskTimerAsynchronously(...) every tick, and AsyncTaskProcessing.run calls RTP.getInstance().miscAsyncTasks.execute(...). On Fabric, FabricScheduler.runTaskTimerAsynchronously(task, delay, period) queues () -> ASYNC_EXECUTOR.execute(task) into the per-tick scheduled map, which FabricEventBridge drives from ServerTickEvents.END_SERVER_TICK. Net effect: once setServer(MinecraftServer) fires, every server tick dispatches an AsyncTaskProcessing instance onto the Fabric scheduler's ASYNC_EXECUTOR, which drains miscAsyncTasks exactly as it does on Bukkit/Paper/Folia. The takeaway: when auditing parity for a tp-core field, search tp-core first (specifically the RTP constructor and 	asks.tick package) before concluding the platform adapter is missing wiring.
+A Fabric ⇄ Bukkit startup-parity audit briefly suspected that RTP.miscAsyncTasks was never drained on Fabric because a recursive search over 
+tp-fabric/** and 
+tp-plugin/.../fabric/ found zero references to the symbol. That was a false positive. The drain is in 
+tp-core's RTP constructor: line 243 schedules a new AsyncTaskProcessing(25ms) on RTP.scheduler.runTaskTimerAsynchronously(...) every tick, and AsyncTaskProcessing.run calls RTP.getInstance().miscAsyncTasks.execute(...). On Fabric, FabricScheduler.runTaskTimerAsynchronously(task, delay, period) queues () -> ASYNC_EXECUTOR.execute(task) into the per-tick scheduled map, which FabricEventBridge drives from ServerTickEvents.END_SERVER_TICK. Net effect: once setServer(MinecraftServer) fires, every server tick dispatches an AsyncTaskProcessing instance onto the Fabric scheduler's ASYNC_EXECUTOR, which drains miscAsyncTasks exactly as it does on Bukkit/Paper/Folia. The takeaway: when auditing parity for a 
+tp-core field, search 
+tp-core first (specifically the RTP constructor and 	asks.tick package) before concluding the platform adapter is missing wiring.

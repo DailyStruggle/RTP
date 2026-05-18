@@ -2,8 +2,10 @@ package io.github.dailystruggle.rtp.folia.tasks;
 
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.metrics.api.MetricsBinding;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
+import io.github.dailystruggle.rtp.folia.metrics.FoliaMetricsBinding;
 import org.bukkit.plugin.Plugin;
 
 import io.github.dailystruggle.rtp.folia.thread.RegionThread;
@@ -33,6 +35,20 @@ public class FoliaRegionProcessor implements Runnable {
     @Override
     @RegionThread
     public void run() {
+        // C1.2b: per-region metrics attribution. Record one pulse for this
+        // region, carrying current queue depth. Best-effort; failures are
+        // swallowed so observability never breaks the pipeline.
+        try {
+            MetricsBinding b = RTP.metrics.getBinding();
+            if (b instanceof FoliaMetricsBinding) {
+                ((FoliaMetricsBinding) b).recordRegionTick(key, queue.size());
+            }
+        } catch (Throwable t) {
+            // Intentionally silent at FINER granularity to avoid spam.
+            RTP.log(Level.FINER, "FoliaRegionProcessor metrics tick failed: "
+                    + t.getClass().getSimpleName() + ": " + t.getMessage());
+        }
+
         for (int i = 0; i < maxTasksPerTick; i++) {
             RTPRunnable task = queue.poll();
             if (task == null) break;

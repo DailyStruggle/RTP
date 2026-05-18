@@ -4,19 +4,18 @@
 # translate a config option; the left-hand side is a code constant and must
 # not change. If this file is missing, the plugin regenerates it with
 # identical left/right pairs (the English defaults).
-
-period: period
-viewDistanceSelect: viewDistanceSelect
-biomeRecall: biomeRecall
-version: version
-maxAttempts: maxAttempts
-biomeRecallForced: biomeRecallForced
-onEventParsing: onEventParsing
-checkOnChunkLoads: checkOnChunkLoads
-postTeleportQueueing: postTeleportQueueing
-syncLoading: syncLoading
-effectParsing: effectParsing
-viewDistanceTeleport: viewDistanceTeleport
-minTPS: minTPS
-syncAllottedTime: syncAllottedTime
-asyncAllottedTime: asyncAllottedTime
+period: "period"
+viewDistanceSelect: "viewDistanceSelect"
+biomeRecall: "biomeRecall"
+version: "version"
+maxAttempts: "maxAttempts"
+biomeRecallForced: "biomeRecallForced"
+onEventParsing: "onEventParsing"
+checkOnChunkLoads: "checkOnChunkLoads"
+postTeleportQueueing: "postTeleportQueueing"
+syncLoading: "syncLoading"
+effectParsing: "effectParsing"
+viewDistanceTeleport: "viewDistanceTeleport"
+minTPS: "minTPS"
+syncAllottedTime: "syncAllottedTime"
+asyncAllottedTime: "asyncAllottedTime"

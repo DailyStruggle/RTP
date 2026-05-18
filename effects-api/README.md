@@ -17,7 +17,7 @@ effects-api/
       FireworkEffect, NoteEffect(_1_12), ParticleEffect, PotionEffect, SoundEffect
       enums/                   per-effect parameter keys (TYPE, NUMBER, DURATION, …)
   commands/                    CommandsAPI wrappers (one per effect + test/main)
-  SpigotListeners/
+  BukkitListeners/
       FireworkSafetyListener   cancels firework explosion damage for tagged entities
 ```
 

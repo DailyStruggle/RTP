@@ -1,6 +1,5 @@
 # --- Paramètres de journalisation du plugin ---
 # Documentation : https://github.com/DailyStruggle/RTP/blob/master/docs/admin/CONFIGURATION.md#loggingyml--console-logging-verbosity
-
 # Journaliser tous les fichiers rechargés lors de /rtp reload
 rechargementDetaille: false
 
@@ -41,7 +40,7 @@ systemeBaseDonnees: false
 # fin entre celui-ci et le logger de Bukkit. Valeurs : SEVERE, WARNING, INFO,
 # CONFIG, FINE, FINER, FINEST, ALL, OFF. Par défaut ALL : comportement identique
 # à celui du logger de Bukkit.
-niveauMinimum: INFO
+niveauMinimum: "INFO"
 
 # NE PAS MODIFIER LE NUMÉRO DE VERSION
-version: "1.0"
+version: 1.0

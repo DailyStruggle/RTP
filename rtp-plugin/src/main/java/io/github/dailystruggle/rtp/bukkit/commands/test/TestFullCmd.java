@@ -9,7 +9,9 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
+import io.github.dailystruggle.metrics.api.MetricsSnapshot;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -160,7 +162,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
     // bounded async-timer watchdog (REQ-RTP-S-004 timeout). No thread is
     // parked between subcommands.
     final FullAudit audit = new FullAudit();
-    SendMessage.addInterceptor(audit);
+    SendMessage.addInterceptor((java.util.function.BiConsumer<Level, String>) audit);
 
     String header = "[RTP test/full] begin (shipped subcommands only)";
     if (!callerId.equals(RTPAPI.serverId)) {
@@ -234,8 +236,18 @@ public class TestFullCmd extends BaseRTPCmdImpl {
         RTP.log(Level.INFO, notice);
       }
 
+      final int warnBefore = audit.warnCount;
       dispatchSubcommand(callerId, subName, argsFor(subName, callerId));
-      armAdvance(callerId, subName, () -> scheduleNext(callerId, index + 1, audit));
+      armAdvance(callerId, subName, () -> {
+        // Per-step pass/fail attribution: any audited warning that fired
+        // between dispatch and step-drain completion is attributed to this
+        // subcommand. Recorded here (in the advance hook) so the tally
+        // includes warnings produced by async tails that drained via
+        // ActiveTestJobs listeners, not just the synchronous dispatch.
+        int delta = Math.max(0, audit.warnCount - warnBefore);
+        audit.stepWarnDeltas.put(subName, delta);
+        scheduleNext(callerId, index + 1, audit);
+      });
     } catch (Throwable t) {
       // Defensive: an unexpected throwable in the step itself must not
       // strand the sweep with the audit interceptor still attached. Log
@@ -410,13 +422,54 @@ public class TestFullCmd extends BaseRTPCmdImpl {
    */
   private void finishSweep(UUID callerId, FullAudit audit) {
     try {
-      String footer = "[RTP test/full] end (total-audited-warnings=" + audit.warnCount + ")";
-      if (!callerId.equals(RTPAPI.serverId)) {
-        RTP.serverAccessor.sendMessage(callerId, footer);
+      // Build the per-step success-rate summary from the deltas captured
+      // in runStep. Each entry was the delta in audit.warnCount across
+      // one subcommand's dispatch + drain window; 0 delta == pass.
+      int total = audit.stepWarnDeltas.size();
+      int passed = 0;
+      StringBuilder rows = new StringBuilder();
+      for (Map.Entry<String, Integer> e : audit.stepWarnDeltas.entrySet()) {
+        int d = e.getValue();
+        boolean ok = d == 0;
+        if (ok) passed++;
+        rows.append("[RTP test/full]   ")
+            .append(ok ? "PASS " : "FAIL ")
+            .append(e.getKey())
+            .append(" (warnings=").append(d).append(')')
+            .append('\n');
       }
-      RTP.log(Level.INFO, footer);
+      String pct = (total == 0)
+          ? "n/a"
+          : String.format("%.1f%%", 100.0 * passed / total);
+      String summaryHeader =
+          "[RTP test/full] summary: " + passed + "/" + total
+              + " passed (" + pct + "), total-audited-warnings=" + audit.warnCount;
+
+      // Snapshot server metrics once for inclusion in the diagnostic dump.
+      // Read-only and cheap per Metrics SPI contract.
+      MetricsSnapshot snap = RTP.metrics.snapshot();
+      String metricsLine = "[RTP test/full] metrics: " + snap;
+
+      String footer = "[RTP test/full] end (total-audited-warnings=" + audit.warnCount + ")";
+
+      // Emit to both the caller and the server log so console operators
+      // and in-game admins see the same diagnostic block. Multi-line
+      // emit kept as discrete sendMessage / log calls to preserve the
+      // existing audit-interceptor capture semantics.
+      // NOTE: This is the plain-text rendering; once the book API
+      // stabilises, the same data will be re-emitted as a book page —
+      // see docs/dev/TODO.md section 7 (Interactive Menus) follow-up.
+      String[] lines = (summaryHeader + "\n" + rows + metricsLine + "\n" + footer)
+          .split("\n");
+      for (String line : lines) {
+        if (line.isEmpty()) continue;
+        if (!callerId.equals(RTPAPI.serverId)) {
+          RTP.serverAccessor.sendMessage(callerId, line);
+        }
+        RTP.log(Level.INFO, line);
+      }
     } finally {
-      SendMessage.removeInterceptor(audit);
+      SendMessage.removeInterceptor((java.util.function.BiConsumer<Level, String>) audit);
       isProcessing.set(false);
     }
   }
@@ -567,21 +620,40 @@ public class TestFullCmd extends BaseRTPCmdImpl {
   }
 
   /**
-   * Simple interceptor for the duration of the full sweep.
+   * Sweep-scoped audit interceptor. Subscribes to the level-aware
+   * {@code SendMessage.addInterceptor(BiConsumer<Level,String>)} channel so
+   * per-step PASS/FAIL attribution counts only true {@code WARNING}/
+   * {@code SEVERE} log events. Earlier revisions used the string-only
+   * interceptor channel and a fragile "contains [RTP" heuristic, which
+   * inflated the tally with benign {@code INFO} {@code [RTP test/...]}
+   * chatter and caused every step to be reported as FAIL on a healthy
+   * server (see the 2026-05-16 Paper devstack log).
+   *
+   * <p>{@code sendMessage(...)} (player chat / hover / click) paths invoke
+   * leveled interceptors with {@code level == null} and are intentionally
+   * not counted: a player-facing teleport-success line is not a sweep
+   * failure.
    */
-  private static final class FullAudit implements java.util.function.Consumer<String> {
+  private static final class FullAudit
+      implements java.util.function.BiConsumer<java.util.logging.Level, String> {
     volatile int warnCount = 0;
+    /**
+     * Per-subcommand audited-warning delta, captured in {@link #runStep}'s
+     * advance hook. Insertion-ordered so {@link #finishSweep}'s summary
+     * renders rows in the same order the sweep dispatched them. Skipped
+     * subcommands are intentionally absent (counted as neither pass nor
+     * fail; the summary's denominator reflects what actually ran).
+     */
+    final Map<String, Integer> stepWarnDeltas = new LinkedHashMap<>();
 
     @Override
-    public void accept(String s) {
-      // We rely on the convention that warnings/errors produced by our plugin
-      // include the "[RTP" tag or similar markers from SendMessage.
-      if (s != null && s.toUpperCase().contains("RTP")) {
-        // We only count it as a "warning" if it's not the start/end/notice logs
-        // from the test suite itself.
-        if (!s.contains("[RTP test/full]") && !s.contains("notice:")) {
-          warnCount++;
-        }
+    public void accept(java.util.logging.Level level, String s) {
+      if (s == null || level == null) return;
+      // Anything at WARNING or above (WARNING=900, SEVERE=1000) is a real
+      // audited fault; everything below (INFO/CONFIG/FINE/...) is sweep
+      // chatter and must not move the needle.
+      if (level.intValue() >= java.util.logging.Level.WARNING.intValue()) {
+        warnCount++;
       }
     }
   }

@@ -8,6 +8,7 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.MessagesKeys;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.metrics.api.MetricsSnapshot;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.mock.MockRTPCommandSender;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
@@ -196,6 +197,167 @@ public class InfoCmdTest {
 
         boolean result = infoCmd.onCommand(senderId, new HashMap<>(), null);
         assertTrue(result);
+    }
+
+    // ── metrics snapshot caching (B11 cleanup, METRICS_PLAN.md) ───────────────
+
+    /**
+     * One {@code /rtp info} invocation shall trigger exactly one
+     * {@link MetricsSnapshot} round-trip (i.e. one call into the installed
+     * {@link io.github.dailystruggle.metrics.api.MetricsBinding}), regardless
+     * of how many metrics-backed placeholders the rendered messages contain.
+     * Anchored in {@link io.github.dailystruggle.rtp.common.tools.PlaceholderProvider#withSnapshot}.
+     */
+    @Test
+    void onCommand_snapshotsMetricsExactlyOncePerInvocation() {
+        UUID senderId = UUID.randomUUID();
+        accessor.addPlayer(new MockRTPPlayer(senderId, "metrics-player", null));
+
+        java.util.concurrent.atomic.AtomicInteger tpsReads =
+                new java.util.concurrent.atomic.AtomicInteger();
+        io.github.dailystruggle.metrics.api.MetricsBinding counting =
+                new io.github.dailystruggle.metrics.api.MetricsBinding() {
+                    @Override public double tps1m() { tpsReads.incrementAndGet(); return 20.0; }
+                    @Override public double tps5m() { return 20.0; }
+                    @Override public double tps15m() { return 20.0; }
+                    @Override public double mspt()  { return 5.0; }
+                    @Override public int playerCount() { return 1; }
+                    @Override public int softCap() { return 0; }
+                    @Override public int chunkLoadBacklog() { return 0; }
+                    @Override public int databaseLatencyMs() { return -1; }
+                };
+        RTP.metrics.setBinding(counting);
+        try {
+            boolean result = infoCmd.onCommand(senderId, new HashMap<>(), null);
+            assertTrue(result);
+            assertEquals(
+                    1,
+                    tpsReads.get(),
+                    "InfoCmd must capture exactly one MetricsSnapshot per /rtp info "
+                            + "invocation (B11 cleanup); placeholders read the cached snapshot "
+                            + "via PlaceholderProvider.currentSnapshot().");
+        } finally {
+            RTP.metrics.setBinding(null);
+        }
+    }
+
+    // ── Folia per-region table (Section C / C3) ───────────────────────────────
+
+    /**
+     * When the active {@link io.github.dailystruggle.metrics.api.MetricsBinding}
+     * publishes per-region detail (Folia), {@code /rtp info} renders the
+     * {@code infoFoliaRegionsHeader} + per-row {@code infoFoliaRegion} template
+     * with row-local placeholders substituted. Asserts test-visibility of
+     * per-region metrics for {@code rtp test full}-style diagnostics.
+     */
+    @Test
+    void onCommand_rendersFoliaRegionTable_whenBindingPublishesRegions() {
+        UUID senderId = UUID.randomUUID();
+        MockRTPPlayer player = new MockRTPPlayer(senderId, "folia-player", null);
+        accessor.addPlayer(player);
+
+        io.github.dailystruggle.metrics.api.FoliaRegionSample r0 =
+                new io.github.dailystruggle.metrics.api.FoliaRegionSample(
+                        "region-0", 19.5, 12.5, 3, 4);
+        io.github.dailystruggle.metrics.api.FoliaRegionSample r1 =
+                new io.github.dailystruggle.metrics.api.FoliaRegionSample(
+                        "region-1", 18.0, 30.0, 1, 0);
+        java.util.List<io.github.dailystruggle.metrics.api.FoliaRegionSample> regions =
+                java.util.Arrays.asList(r0, r1);
+
+        io.github.dailystruggle.metrics.api.MetricsBinding folia =
+                new io.github.dailystruggle.metrics.api.MetricsBinding() {
+                    @Override public double tps1m() { return 19.0; }
+                    @Override public double tps5m() { return 19.0; }
+                    @Override public double tps15m() { return 19.0; }
+                    @Override public double mspt()  { return 20.0; }
+                    @Override public int playerCount() { return 4; }
+                    @Override public int softCap() { return 0; }
+                    @Override public int chunkLoadBacklog() { return 0; }
+                    @Override public int databaseLatencyMs() { return -1; }
+                    @Override public java.util.List<io.github.dailystruggle.metrics.api.FoliaRegionSample> foliaRegions() { return regions; }
+                };
+        RTP.metrics.setBinding(folia);
+        @SuppressWarnings("unchecked")
+        ConfigParser<MessagesKeys> lang =
+                (ConfigParser<MessagesKeys>) RTP.configs.getParser(MessagesKeys.class);
+        // Inject explicit templates — the test ConfigParser stub returns the
+        // enum name as default text, which would not exercise the row-token
+        // substitution. Setting the values directly is the minimal surface
+        // for verifying the rendering path.
+        java.util.EnumMap<MessagesKeys, Object> langData = lang.getData();
+        Object prevHeader = langData.get(MessagesKeys.infoFoliaRegionsHeader);
+        Object prevRow = langData.get(MessagesKeys.infoFoliaRegion);
+        langData.put(MessagesKeys.infoFoliaRegionsHeader, "--- Folia Regions ---");
+        langData.put(MessagesKeys.infoFoliaRegion,
+                "[regionId]: tps=[tps1m] mspt=[mspt] players=[playerCount] queue=[queueDepth] tickBudget=[tickBudgetUtilisation]");
+        lang.setData(langData);
+        try {
+            boolean result = infoCmd.onCommand(senderId, new HashMap<>(), null);
+            assertTrue(result);
+
+            java.util.List<String> sent = new java.util.ArrayList<>(player.sentMessages);
+            // Header line present
+            assertTrue(
+                    sent.stream().anyMatch(s -> s.contains("Folia Regions")),
+                    "Expected infoFoliaRegionsHeader in /rtp info output, got: " + sent);
+            // Both region rows present with substituted tokens
+            assertTrue(
+                    sent.stream().anyMatch(s ->
+                            s.contains("region-0") && s.contains("19.50")
+                                    && s.contains("players=3") && s.contains("queue=4")),
+                    "Expected region-0 row with substituted tokens, got: " + sent);
+            assertTrue(
+                    sent.stream().anyMatch(s ->
+                            s.contains("region-1") && s.contains("18.00")
+                                    && s.contains("players=1") && s.contains("queue=0")),
+                    "Expected region-1 row with substituted tokens, got: " + sent);
+        } finally {
+            RTP.metrics.setBinding(null);
+            java.util.EnumMap<MessagesKeys, Object> restore = lang.getData();
+            if (prevHeader == null) restore.remove(MessagesKeys.infoFoliaRegionsHeader);
+            else restore.put(MessagesKeys.infoFoliaRegionsHeader, prevHeader);
+            if (prevRow == null) restore.remove(MessagesKeys.infoFoliaRegion);
+            else restore.put(MessagesKeys.infoFoliaRegion, prevRow);
+            lang.setData(restore);
+        }
+    }
+
+    /**
+     * On non-Folia platforms (Paper / Bukkit / Fabric) the default
+     * {@code foliaRegions()} returns an empty list, so the table header and
+     * per-row template are suppressed entirely.
+     */
+    @Test
+    void onCommand_suppressesFoliaRegionTable_whenBindingReturnsEmptyList() {
+        UUID senderId = UUID.randomUUID();
+        MockRTPPlayer player = new MockRTPPlayer(senderId, "single-region-player", null);
+        accessor.addPlayer(player);
+
+        io.github.dailystruggle.metrics.api.MetricsBinding singleRegion =
+                new io.github.dailystruggle.metrics.api.MetricsBinding() {
+                    @Override public double tps1m() { return 20.0; }
+                    @Override public double tps5m() { return 20.0; }
+                    @Override public double tps15m() { return 20.0; }
+                    @Override public double mspt()  { return 5.0; }
+                    @Override public int playerCount() { return 1; }
+                    @Override public int softCap() { return 0; }
+                    @Override public int chunkLoadBacklog() { return 0; }
+                    @Override public int databaseLatencyMs() { return -1; }
+                    // foliaRegions() inherits the empty-list default
+                };
+        RTP.metrics.setBinding(singleRegion);
+        try {
+            boolean result = infoCmd.onCommand(senderId, new HashMap<>(), null);
+            assertTrue(result);
+
+            java.util.List<String> sent = new java.util.ArrayList<>(player.sentMessages);
+            assertTrue(
+                    sent.stream().noneMatch(s -> s.contains("Folia Regions")),
+                    "infoFoliaRegionsHeader must be suppressed when foliaRegions() is empty, got: " + sent);
+        } finally {
+            RTP.metrics.setBinding(null);
+        }
     }
 
     // ── parameters registered ─────────────────────────────────────────────────

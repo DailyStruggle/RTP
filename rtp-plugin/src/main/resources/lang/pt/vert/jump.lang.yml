@@ -1,0 +1,4 @@
+minY: "minY"
+maxY: "maxY"
+step: "passo"
+requireSkyLight: "exigirLuzCeu"

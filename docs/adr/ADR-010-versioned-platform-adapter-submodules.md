@@ -20,7 +20,7 @@ Two broad implementation strategies exist:
 
 RTP uses **compile-time versioned submodules** for all platform adapters:
 
-- `rtp-spigot-common`, `rtp-spigot-v1_20_R1`, `rtp-spigot-v1_21_R1`, `rtp-spigot-v26_1_R1`
+- `rtp-bukkit-common`, `rtp-bukkit-v1_20_R1`, `rtp-bukkit-v1_21_R1`, `rtp-bukkit-v26_1_R1`
 - `rtp-paper-common`, `rtp-paper-v1_20_R1`, `rtp-paper-v1_21_R1`, `rtp-paper-v26_1_R1`
 - `rtp-folia-common`, `rtp-folia-v1_20_R1`, `rtp-folia-v1_21_R1`, `rtp-folia-v26_1_R1`
 

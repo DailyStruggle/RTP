@@ -256,7 +256,15 @@ public interface TreeCommand extends CommandsAPICommand {
                 int finalI = i+1;
                 Map<String, CommandParameter> finalTempParameters = tempParameters;
                 CompletableFuture<Boolean> res = new CompletableFuture<>();
-                cont.whenCompleteAsync((aBoolean, throwable) -> {
+                // Use `whenComplete` (not `whenCompleteAsync`) so the
+                // sub-command continuation runs on the thread that
+                // completes `cont` — i.e. the platform-driven
+                // `CommandsAPI.execute()` drain thread (REQ-API-ARCH-006).
+                // The async variant would dispatch onto
+                // `ForkJoinPool.commonPool`, adding an extra thread hop
+                // and a Folia thread-context hazard on the menu-redeem
+                // path (`/rtp menu token:<...>` -> MenuRedeemSubcommand).
+                cont.whenComplete((aBoolean, throwable) -> {
                     if(aBoolean) {
                         CompletableFuture<Boolean> booleanCompletableFuture = subCommand.onCommand(callerId, permissionCheckMethod, messageMethod, args, finalI, finalTempParameters);
                         booleanCompletableFuture.whenComplete((aBoolean1, throwable1) -> res.complete(aBoolean1));

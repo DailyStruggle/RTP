@@ -1671,6 +1671,20 @@ public final class FabricServerAccessor implements RTPServerAccessor {
 
   @Override
   public double getTPS(int ticks) {
+    // C6 (Section C of CHECKLIST-metrics-and-multiserver) — when a
+    // FabricMetricsBinding is installed the canonical TPS source is the
+    // M2 metrics facade (the EMA-blended sampler driven from
+    // FabricEventBridge.onEndServerTick). Read the snapshot first; if the
+    // binding is the M0 NOOP the scalar is NaN and we fall back to the
+    // reflective Mojang-API probe documented below.
+    try {
+      io.github.dailystruggle.metrics.api.MetricsSnapshot snap =
+          RTP.metrics.snapshot();
+      double v = (ticks >= 600) ? snap.tps15m : (ticks >= 100 ? snap.tps5m : snap.tps1m);
+      if (!Double.isNaN(v)) return v;
+    } catch (Throwable ignored) {
+      // Defensive — snapshot() is non-throwing by contract.
+    }
     // Compute TPS from the server's recent average tick time. Mojang exposes
     // this via {@code MinecraftServer#getAverageTickTimeNanos()} on 1.21.x and
     // via {@code tickTimes} (long[] of ms*1000-ish) on older releases — we

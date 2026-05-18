@@ -3,11 +3,10 @@
 # 옵션 이름을 변경하거나 번역하려면 오른쪽만 편집하세요.
 # 왼쪽은 코드 상수이므로 변경하지 마세요.
 # 이 파일이 존재하지 않으면 플러그인은 좌우가 동일한 영어 버전을 다시 생성합니다.
-
-balanceFloor: 최소잔액
-price: 가격
-priceOther: 타인가격
-refundOnCancel: 취소시환불
-biomePrice: 바이옴가격
-paramsPrice: 매개변수가격
-version: version
+balanceFloor: "최소잔액"
+price: "가격"
+priceOther: "타인가격"
+refundOnCancel: "취소시환불"
+biomePrice: "바이옴가격"
+paramsPrice: "매개변수가격"
+version: "version"
