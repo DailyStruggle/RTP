@@ -1,0 +1,34 @@
+# --- Impostazioni delle metriche di RTP ---
+# Manopole di solo reporting per il SPI metriche della Fase M2. Le manopole di
+# throttling / tuning continuano a vivere in performance.yml.
+# Documentazione: docs/dev/METRICS_PLAN.md > Folia Aggregation
+# Popola MetricsSnapshot.foliaRegions() con il dettaglio per-regione su Folia.
+# Non ha effetto su Paper / Bukkit / Fabric (i runtime a regione singola restituiscono
+# sempre una lista vuota, che è la risposta corretta per quelle piattaforme).
+# @type: boolean
+# @default: true
+foliaIncludeRegions: true
+
+# Strategia di aggregazione usata per ridurre i campioni per-regione nei campi
+# scalari tps{1,5,15}m di MetricsSnapshot su Folia.
+# Valori accettati: mean | max
+# @type: enum
+# @default: mean
+foliaAggregationTps: "mean"
+
+# Strategia di aggregazione usata per ridurre i campioni per-regione nel campo
+# scalare mspt di MetricsSnapshot su Folia.
+# Valori accettati: mean | max
+# @type: enum
+# @default: max
+foliaAggregationMspt: "max"
+
+# Strategia di aggregazione usata per ridurre i campioni per-regione nel campo
+# scalare tickBudgetUtilisation di MetricsSnapshot su Folia.
+# Valori accettati: mean | max
+# @type: enum
+# @default: max
+foliaAggregationTickBudget: "max"
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.0

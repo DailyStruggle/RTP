@@ -1,17 +1,17 @@
-# --- Taalkaart: safety.yml ---
-# Koppelt interne sleutels (links) aan de zichtbare namen in safety.yml (rechts).
-# Wijzig alleen de rechterkant; de linkerkant is een codeconstante.
-# Als dit bestand ontbreekt, genereert de plugin het opnieuw met identieke paren.
-safetyRadius: "veiligheidsStraal"
-biomeWhitelist: "bioomWitlijst"
-airBlocks: "luchtBlokken"
-biomes: "biomen"
-unsafeBlocks: "onveiligBlokken"
-platformRadius: "platformStraal"
-platformAirHeight: "platformLuchtHoogte"
-platformMaterial: "platformMateriaal"
+# --- Language Mapping: safety.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# safety.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
 invulnerabilityTime: "onkwetsbaarheidstijd"
-version: "version"
-platformDepth: "platformDiepte"
+safetyRadius: "veiligheidsStraal"
 staleChunkRetryLimit: "staleChunkRetryLimit"
 anvilPrefilterEnabled: "anvilPrefilterEnabled"
+platformRadius: "platformStraal"
+platformDepth: "platformDiepte"
+platformAirHeight: "platformLuchtHoogte"
+platformMaterial: "platformMateriaal"
+airBlocks: "luchtBlokken"
+unsafeBlocks: "onveiligBlokken"
+biomeWhitelist: "bioomWitlijst"
+biomes: "biomen"
+version: "version"

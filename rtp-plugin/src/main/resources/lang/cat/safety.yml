@@ -2,21 +2,33 @@
 # Where it is safe to land on four paws after a pounce.
 # Tail flicks (seconds) of invulnerability after pouncing
 nine_lives_buffer: 5
+
 # Block radius around landing spot to sniff for danger
 soft_landing_radius: 0
+
 # Max retries for stale-kibble guard
 staleChunkRetryLimit: 2
+
 # Off-thread anvil prefilter (smell from afar)
 anvilPrefilterEnabled: true
+
 # Radius of emergency paw platform (-1 to disable)
 paw_platform_radius: -1
+
 # Depth of platform
 paw_platform_depth: 1
+
 # Air space above platform for tail
 paw_platform_headroom: 2
+
 # Material for emergency paw platform
 paw_platform_material: "GLASS"
 
+# Blocks treated as passable air for landing-safety checks.
+# Accepts Bukkit Material names and "#minecraft:<tag>" tag references
+# (see ADR-017).
+# @type: list<material>
+# @source: material
 empty_air_for_zoomies:
   - "AIR"
   - "CAVE_AIR"
@@ -86,6 +98,11 @@ empty_air_for_zoomies:
   - "LEAF_LITTER"
   - "#minecraft:leaves"
 
+# Blocks that disqualify a landing spot (lava, hazards, etc.).
+# Accepts Bukkit Material names, "#minecraft:<tag>" tag references, and
+# state predicates such as "*[waterlogged=true]" (see ADR-017).
+# @type: list<material>
+# @source: material
 scary_blocks:
   - "WATER"
   - "LAVA"
@@ -118,6 +135,10 @@ scary_blocks:
 
 # If true, 'smells' is a whitelist; otherwise a blacklist (boring smells)
 friendly_smells: false
+
+# Biomes treated as whitelist or blacklist members per biomeWhitelist.
+# @type: list<biome>
+# @source: biome
 smells:
   - "OCEAN"
   - "DEEP_OCEAN"

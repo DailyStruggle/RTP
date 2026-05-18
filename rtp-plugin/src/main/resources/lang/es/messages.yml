@@ -15,21 +15,40 @@
 # Sección 1: Configuración general
 # ###############################################################################
 marcadores:
-  - "\"[RTP]\" #P0"
+  # P0
+  - "[RTP]"
 
 # ###############################################################################
 # Sección 2: Teletransporte
 # ###############################################################################
 yaTeletransportando: "&e[P0] ¡ya te estás teletransportando!"
+
+# if the plugin is currently reloading
 teletransporteDenegadoRecargando: "&e[P0] los teletransportes están desactivados temporalmente mientras el plugin se recarga. Inténtalo de nuevo en unos instantes."
 mensajeRetraso: "&e[P0] Teletransportando en [delay]. No te muevas."
 cargaDeChunk: "&e[P0] Cargando chunks, por favor espera..."
 mensajeTeletransporte: "&e[P0] Teletransportado en [attempts] intentos, en [processingTime]"
+
+# if teleport is cancelled
 cancelarTeletransporte: "&e[P0] ¡Teletransporte cancelado!"
+
+# if no safe places after reaching max attempts
+# placeholder: [attempts] - the maximum number of attempts
 inseguro: "&e[P0] no se encontró una ubicación segura en [attempts] intentos"
+
+# when the player is on cooldown
+# placeholder: [remainingCooldown] - the remaining time
 mensajeEnfriamiento: "&e[P0] No puedes teletransportarte otra vez hasta dentro de [remainingCooldown]"
+
+# if the region doesn't have any locations queued and the player doesn't have rtp.unqueued permission
 sinUbicacionesEnCola: "#f5eb73[P0] no hay ubicaciones listas en este momento"
+
+# when the queue line shifts
+# placeholder: [spot] - the current position in line
 actualizarCola: "#2636ef[P0] tu puesto en la cola: [spot]"
+
+# if the player doesn't have enough money to teleport in the region
+# placeholder: [money] - how much money is required for the command
 dineroInsuficiente: "&e[P0] necesitas al menos $[money] para eso."
 
 # ###############################################################################
@@ -45,17 +64,37 @@ milisegundos: "ms"
 # Sección 4: Sistema y administración
 # ###############################################################################
 archivoAntiguo: "&b[P0] se detectó un [filename] antiguo. Actualizando"
+
+# detected a bukkit world that isn't in the config file
+# placeholder: [world] - the world detected
 mundoNuevo: "&b[P0] se detectó un nuevo mundo '[world]'"
+
+# world doesn't exist in bukkit
+# placeholder: [world] - the world name
 mundoInvalido: "&e[P0] no se pudo encontrar el mundo '[world]'"
+
+# plugin reload/update text
+# placeholder: [filename] - name of file
 recargando: "&b[P0] cargando [filename]..."
 recargado: "&b[P0] [filename] cargado correctamente."
 actualizando: "&a[P0] actualizando [filename]..."
 actualizado: "&a[P0] [filename] actualizado correctamente."
+
+# plugin doesn't have the command the user requested
+# placeholder: [arg] - the argument attempted
 argumentoInvalido: "&c[P0] argumento de comando no válido [arg]"
+
+# when the console tries to run a command meant only for players
 comandoConsolaNoPermitido: "&c[P0] Debes ser un jugador en el juego para ejecutar este comando."
+
 # busy y invalidCommand no se traducen en messages.lang.yml -> se usan las claves en inglés (fallback al baseline).
 busy: "&c[P0] ocupado"
+
+# plugin doesn't have the subcommand or parameter the user requested
+# placeholder: [arg] - the argument attempted
 invalidCommand: "&c[P0] comando no válido - [arg]"
+
+# user doesn't have permission for the command requested
 sinPermisos: "&eLo sentimos, pero no tienes permiso para ejecutar este comando. Contacta con los administradores del servidor si crees que esto es un error."
 
 # ###############################################################################
@@ -74,6 +113,7 @@ pausarEscaneo: "#A020F0[P0] tarea de escaneo pausada para las regiones: [scan_re
 reanudarEscaneo: "#10A5F5[P0] tarea de escaneo reanudada para las regiones: [scan_regions]"
 escaneoActivo: "&c[P0] ya hay una tarea de escaneo en curso para las regiones: [scan_regions]"
 escaneoNoActivo: "&c[P0] no hay ninguna tarea de escaneo en curso para las regiones: [scan_regions]"
+# placeholder: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
 estadoEscaneo: "&a[P0] completados [scan_chunks] / [scan_totalChunks] chunks para las regiones: [scan_regions]. [scan_cps] cps. Porcentaje de tierra: [scan_landPercentage]%. Tiempo restante: [scan_eta]"
 
 # ###############################################################################
@@ -86,10 +126,35 @@ infoMSPT: "&7MSPT actual del plugin: &f[mspt]"
 infoCargasTotales: "&7Chunks cargados de por vida: &f[loads]"
 infoCargasPorOrigen: "&7Cargas por origen: &f[loadsByOrigin]"
 infoTasaFuga: "&7Tasa actual de fuga de chunks: &f[leakRate]"
+# --- Metrics SPI health block (METRICS_PLAN.md > /rtp info Surface) ---
 infoQueueDepth: "&7Jugadores esperando en colas de región: &f[queueDepth]"
 infoPendingTeleports: "&7Tuberías de teletransporte pendientes: &f[pendingTeleports]"
 infoAvgPipelineMs: "&7Latencia media de la tubería: &f[avgPipelineMs] ms"
 infoHeap: "&7Heap de la JVM: &f[heapUsedMb] / [heapMaxMb] MiB"
+# Header line for the Health pipeline labelled block in /rtp info.
+infoHealthPipelineHeader: "&7--- Health: pipeline ---"
+# TPS readout for the 1m / 5m / 15m windows. Placeholders: [tps1m] [tps5m] [tps15m].
+infoTps: "&7TPS (1m/5m/15m): &f[tps1m] / [tps5m] / [tps15m]"
+# Live server MSPT and tick-budget utilisation. Placeholders: [mspt] [tickBudgetUtilisation].
+infoMSPTLive: "&7Server MSPT: &f[mspt] ms (&7tick budget: &f[tickBudgetUtilisation]&7)"
+# Configured player soft-cap vs current online count. Placeholders: [softCap] [playerCount].
+infoSoftCap: "&7Players: &f[playerCount] / [softCap]"
+# Most recent database round-trip latency in ms. Placeholder: [databaseLatencyMs].
+infoDatabaseLatencyMs: "&7Database Latency: &f[databaseLatencyMs] ms"
+# Health colour-band thresholds. Doubles consumed by ColourBands in rtp-core
+# to wrap coloured-variant placeholders (e.g. [tps1mColoured]) with &a/&e/&c.
+infoThresholdTpsGreen: 19.5
+infoThresholdTpsYellow: 18.0
+infoThresholdMsptGreen: 30.0
+infoThresholdMsptYellow: 45.0
+infoThresholdCacheFillGreen: 0.5
+infoThresholdCacheFillYellow: 0.25
+infoThresholdNetworkAgeYellow: 5.0
+# Header line introducing the per-Folia-region table (Folia runtime only).
+infoFoliaRegionsHeader: "&7--- Folia regions ---"
+# Per-row template for a single Folia region. Placeholders: [regionId] [tps1m]
+# [mspt] [playerCount] [queueDepth] [tickBudgetUtilisation].
+infoFoliaRegion: "  &f[regionId]&7: tps=&f[tps1m]&7 mspt=&f[mspt]&7 players=&f[playerCount]&7 queue=&f[queueDepth]&7 budget=&f[tickBudgetUtilisation]"
 cabeceraAvisoInfo: "&7--- Aviso de diagnóstico ---"
 avisoInfo: "&7Nota de diagnóstico: Si el número total de chunks huérfanos del servidor supera el total histórico de cargas de este plugin ([loads]), este plugin no es la única causa de la fuga de memoria."
 cabeceraMundoInfo: "#008080Mundos:"
@@ -99,6 +164,8 @@ cabeceraRegionInfo: "#63C5DARegiones:"
 cabeceraRegionConsolaInfo: "&7--- Regiones ---"
 infoRegion: "  #52B2BF[region]"
 
+# sub-info listings
+# placeholders: [world], [region], [requirePermission], [override], [shape], [worldBorderOverride], [cacheCap], [cached], [keptCache], [unkeptCache], [backlogCache], [backlogCacheCap]
 datosMundo:
   - "#21ADA8[world]:"
   - "#99EEBB  - región: [region]"
@@ -138,7 +205,9 @@ prueba_descripcion: "probar funciones de RTP"
 # Estas claves no se traducen en lang/es/messages.lang.yml, por lo que se usan
 # los nombres canónicos en inglés (fallback al baseline ADR-020).
 menuInvalid: "&c[P0] ese enlace de menú no es válido."
+# Sent when a menu token has expired or was already consumed.
 menuExpired: "&c[P0] ese enlace de menú ha expirado. Vuelve a abrir el menú."
+# Sent when a menu redeem cannot resolve the calling player UUID.
 menuUnknownPlayer: "&c[P0] los enlaces de menú solo pueden usarlos jugadores en el juego."
 # Plantilla de información emergente cuando no hay comentario YAML disponible para un parámetro. Marcador: [type] - el tipo declarado del parámetro.
 menuHoverFallbackType: "tipo: [type]"
@@ -148,6 +217,15 @@ menuHoverFallbackBounds: "aceptados: [values]"
 menuBack: "&7« atrás"
 # Plantilla de la fila "ejecutar el comando ensamblado" en cada página de menú ejecutable no raíz. Marcador: [command] - la invocación /rtp ... ensamblada.
 menuExecute: "&a▶ ejecutar [command]"
+# Encabezado de una sub-página selector de valor de parámetro (Etapa A.2).
+# Marcadores: [param] - nombre del parámetro; [command] - la invocación /rtp ... ensamblada.
+menuPickValue: "&eelige un valor para [param] (ejecutará: /rtp [command] [param]:<valor>)"
+# Etiqueta de la fila "escribir valor personalizado" como alternativa en el selector.
+# Al hacer clic prellena el chat con el comando ensamblado hasta '<param>:'.
+menuTypeValue: "&7✎ escribir un valor personalizado..."
+# Non-clickable header row at the top of every non-root menu page (Stage A.4).
+# Surfaces the currently-constructed /rtp invocation including any staged
+# parameter assignments (name:value). Placeholder: [command] - assembled args.
 menuConstructed: "&7construyendo: &f/rtp [command]"
 # Título no interactivo en la parte superior del menú raíz /rtp menu (Etapa A.5).
 menuRootTitle: "&6&l⚡ menú de RTP"
@@ -157,12 +235,24 @@ menuRootHint: "&7haz clic en una opción para comenzar"
 # Marcador: [page] - número de página destino (base 1).
 menuPagePrev: "&7« página anterior ([page])"
 menuPageNext: "&7página siguiente ([page]) »"
-# Encabezado de una sub-página selector de valor de parámetro (Etapa A.2).
-# Marcadores: [param] - nombre del parámetro; [command] - la invocación /rtp ... ensamblada.
-menuPickValue: "&eelige un valor para [param] (ejecutará: /rtp [command] [param]:<valor>)"
-# Etiqueta de la fila "escribir valor personalizado" como alternativa en el selector.
-# Al hacer clic prellena el chat con el comando ensamblado hasta '<param>:'.
-menuTypeValue: "&7✎ escribir un valor personalizado..."
+# Section divider on the front page above teleport rows (player view).
+menuFrontPageSectionTeleport: "&8--- &7teleport &8---"
+# Section divider on the front page above admin rows (admin view).
+menuFrontPageSectionAdmin: "&8--- &7admin &8---"
+# Front-page rows. No placeholders.
+menuFrontPageRowTeleport: "&a▶ /rtp &7- teleport to a random location"
+menuFrontPageRowRegion: "&a▶ /rtp region:&7... &7- pick a region"
+menuFrontPageRowBiome: "&a▶ /rtp biome:&7... &7- pick a biome"
+menuFrontPageRowHelp: "&a▶ /rtp help &7- list commands"
+menuFrontPageRowInfo: "&b▶ /rtp info &7- plugin diagnostics"
+menuFrontPageRowConfig: "&b▶ /rtp config &7- edit config files"
+menuFrontPageRowScan: "&b▶ /rtp scan &7- pre-fill region caches"
+menuFrontPageRowDiagnostics: "&c▶ /rtp test full &7- run full diagnostics"
+menuFrontPageRowReload: "&c▶ /rtp reload &7- reload config files"
+# Hover text for the diagnostics row warning about cost. No placeholders.
+menuFrontPageHoverDiagnostics: "&7runs full diagnostic suite; may be expensive"
+# Hover text for the reload row warning about side-effects. No placeholders.
+menuFrontPageHoverReload: "&7reloads all config files; in-flight teleports may be affected"
 
 # ###############################################################################
 # Sección 9: Soporte de PlaceholderAPI
@@ -182,6 +272,7 @@ aparecer: 20
 permanecer: 20
 desvanecer: 20
 
+# actionbar setting
 barraAccion: ""
 
 # ###############################################################################

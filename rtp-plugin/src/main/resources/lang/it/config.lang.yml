@@ -1,0 +1,13 @@
+# --- Language Mapping: config.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# config.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
+teleportDelay: "ritardoTeletrasporto"
+cancelDistance: "distanzaAnnullamento"
+teleportCooldown: "raffreddamentoTeletrasporto"
+consoleCommands: "comandiConsole"
+playerCommands: "comandiGiocatore"
+database: "database"
+network: "rete"
+menu: "menu"
+version: "versione"

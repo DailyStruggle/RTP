@@ -307,6 +307,48 @@ Hard rules:
 
 ---
 
+## Locale Config TSV Pipeline (translate before regenerating)
+
+The per-locale YAML tree under `rtp-plugin/src/main/resources/` is **derived output**. The editable source of truth for locale maintenance is a set of tab-separated files under `scripts/out/` (one `baseline.tsv` + one `locale-<lang>.tsv` per shipped locale). Each `locale-<lang>.tsv` is the **single source of truth** for that locale's translated keys, values, **and** comments — there is no separate overlay file. Whenever you add, rename, or remove a user-facing config key (or touch a baseline value or comment), the workflow is:
+
+1. **Edit the baseline only.** Add or update the key in `rtp-plugin/src/main/resources/<file>.yml` with its English value and leading comment block. Do not hand-edit any `lang/<locale>/*.yml` or `lang/<locale>/*.lang.yml` file — they will be regenerated.
+2. **Export the tree to TSV.**
+   ```powershell
+   .\scripts\locale-files-to-csv.ps1
+   ```
+   This rewrites `scripts/out/baseline.tsv` and every `scripts/out/locale-<lang>.tsv` from the on-disk YAML. Existing native translations of values **and comments** are preserved in the locale TSVs at this stage.
+3. **Reconcile to enforce structural parity.**
+   ```powershell
+   .\scripts\reconcile-locale-csvs.ps1
+   ```
+   Every locale TSV is forced to match baseline's `(relpath, base_key, index)` sequence: new baseline keys seed from English (value AND comment) under the locale's translated key name, stale keys are dropped, and stale-placeholder drift is healed.
+4. **Translate before regenerating.** This is the step that is easy to skip and must not be. Any locale row whose `value` or `preceding_comment` column is still English after step 3 is a freshly-seeded placeholder. Translate all three columns directly in `scripts/out/locale-<lang>.tsv`:
+   - `key` column: the per-locale translated key name (mirrored into the synthesized `<file>.lang.yml` on regen). Translate from the English baseline (`base_key` column) — **do not pivot through another locale's translated key**, that is a double-translation hazard.
+   - `value` column: the player-visible / config string.
+   - `preceding_comment` column: the leading comment block for that row. Embed newlines as `\n` and tabs as `\t` (same escape rules as `baseline.tsv`). Include the leading `#` on every comment line. Empty cells fall through to baseline English on regen, so partial passes are safe.
+   - Mask `[placeholders]`, `&a` / `#hex` color codes, `§` section markers, and `@type`/`@range`/`@unit`/`@default`/`@options` doc-tags to sentinels before machine-translating; unmask after. Doc-tags, URLs, and version banners stay verbatim regardless.
+   - Per [`TRANSLATION_GUIDE.md`](../docs/dev/TRANSLATION_GUIDE.md) §8: prefer native-speaker review one locale at a time over machine-translating ten languages in one shot. Mark known-stale rows with a `# TODO(i18n):` comment block so contributors can replace them.
+5. **Regenerate the YAML tree.**
+   ```powershell
+   .\scripts\locale-files-from-csv.ps1
+   ```
+   This rewrites every `lang/<locale>/<file>.yml` and synthesizes every `<file>.lang.yml` from the TSV's `(base_key, key)` columns. Never edit a `.lang.yml` by hand.
+6. **Verify.**
+   ```powershell
+   .\gradlew :rtp-plugin:test --tests "*LocaleParityTest*"
+   .\gradlew build
+   ```
+
+Notes:
+
+- The TSV is the **only** place that mass renames, mass comment edits, or mass translations are tractable; hand-editing dozens of locale YAMLs is forbidden because the next reconcile pass will overwrite undocumented hand-edits.
+- New baseline files are picked up automatically (the to-csv scanner globs `*.yml`). No script change is needed when adding a `network.yml` or similar.
+- The `shape/<x>.lang.yml` and `vert/<x>.lang.yml` rename-map files have no sibling value file and are **not** synthesized — their rows live in each locale TSV directly.
+- **Adding a new locale**: do not copy an existing `lang/<other-locale>/` directory as a seed — that carries the other locale's translated keys/values/comments into the new TSV and forces a double-translation. Instead, add an empty `lang/<new-locale>/` directory (or just add the locale name to `reconcile-locale-csvs.ps1`'s known list if it iterates a fixed list), run the pipeline once so `reconcile` seeds every row from English baseline, then translate the resulting `scripts/out/locale-<new>.tsv` directly.
+- Skipping step 4 (translation) is the documented anti-pattern: it ships English values under every locale's translated key name. That passes `LocaleParityTest` but degrades the user experience and is not the intended endpoint of a config change.
+
+---
+
 ## Environment & Execution
 
 - **Shell**: PowerShell on Windows. Use `.\gradlew`, chain with `;` (never `&&`).
@@ -397,7 +439,7 @@ When you discover something durable, record it in the **correct** file:
 | Incidental potential bug found while doing unrelated work | [`docs/dev/POTENTIAL_BUGS.md`](../docs/dev/POTENTIAL_BUGS.md) (see *Stay-On-Task Policy*) |
 | New reflection / soft-depend / hook that accommodates a third-party plugin | [`docs/dev/EXTERNAL_HOOKS.md`](../docs/dev/EXTERNAL_HOOKS.md) (catalog row + `RTPHooks` registry; ADR-026) |
 | New mojibake pattern observed in AI-generated diffs | this file (*Markdown Encoding Hygiene* section, mojibake-marker list) |
-| New baseline user-facing key (or new locale) | every `lang/<locale>/<file>.yml` + `lang/<file>.lang.yml`; verify with `LocaleParityTest` (see *Locale Parity Maintenance* above and [`TRANSLATION_GUIDE.md`](../docs/dev/TRANSLATION_GUIDE.md)) |
+| New baseline user-facing key (or new locale) | run the [*Locale Config TSV Pipeline*](#locale-config-tsv-pipeline-translate-before-regenerating): edit baseline, `locale-files-to-csv` -> `reconcile-locale-csvs` -> translate keys/values/comments in `scripts/out/locale-<lang>.tsv` -> `locale-files-from-csv` -> `LocaleParityTest` + full build. Never hand-edit `lang/<locale>/*.yml` or `*.lang.yml` (see [`TRANSLATION_GUIDE.md`](../docs/dev/TRANSLATION_GUIDE.md)) |
 
 Do **not** add code-level optimizations, algorithm explanations, or per-feature narratives to this file — those belong in code comments, ADRs, or `CHANGELOG.md`.
 

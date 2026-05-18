@@ -1,15 +1,13 @@
-# --- Mapeo de Idioma: config.yml ---
-# Asigna las claves internas (izquierda) a los nombres visibles para el
-# usuario en config.yml (derecha). Modifica únicamente el lado derecho para
-# renombrar o traducir una opción; el lado izquierdo es una constante de
-# código y no debe cambiarse.
-# Si este archivo falta, el plugin lo regenera con pares idénticos
-# izquierda/derecha (los valores por defecto en inglés).
-database: "baseDeDatos"
-playerCommands: "comandosJugador"
-teleportCooldown: "enfriamientoTeletransporte"
-cancelDistance: "distanciaCancelar"
+# --- Language Mapping: config.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# config.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
 teleportDelay: "retrasoTeletransporte"
+cancelDistance: "distanciaCancelar"
+teleportCooldown: "enfriamientoTeletransporte"
 consoleCommands: "comandosConsola"
-version: "version"
+playerCommands: "comandosJugador"
+database: "baseDeDatos"
 network: "red"
+menu: "menu"
+version: "version"

@@ -1,21 +1,18 @@
-# --- Mapeo de Idioma: logging.yml ---
-# Asigna las claves internas (izquierda) a los nombres visibles para el
-# usuario en logging.yml (derecha). Modifica únicamente el lado derecho para
-# renombrar o traducir una opción; el lado izquierdo es una constante de
-# código y no debe cambiarse.
-# Si este archivo falta, el plugin lo regenera con pares idénticos
-# izquierda/derecha (los valores por defecto en inglés).
-event_changeworld: "evento_cambioMundo"
-event_respawn: "evento_reaparicion"
+# --- Language Mapping: logging.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# logging.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
 detailed_reload: "recarga_detallada"
+detailed_region_init: "inicio_region_detallado"
+command: "comando"
 teleport: "teletransporte"
+event_changeworld: "evento_cambioMundo"
 event_join: "evento_union"
+event_respawn: "evento_reaparicion"
+event_move: "evento_movimiento"
+event_teleport: "evento_teletransporte"
 selection_failure: "fallo_seleccion"
 system_memory_tracker: "sistema_rastreoMemoria"
 system_database: "sistema_baseDeDatos"
-event_teleport: "evento_teletransporte"
-version: "version"
-detailed_region_init: "inicio_region_detallado"
-command: "comando"
-event_move: "evento_movimiento"
 min_level: "nivel_minimo"
+version: "version"

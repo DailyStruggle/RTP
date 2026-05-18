@@ -10,6 +10,13 @@ intentosMaximos: 10
 # Número de chunks cargados = ( 1 + 2 * radio )^2.
 # Impacto: ALTO — un valor demasiado alto puede causar caídas de TPS al teletransportar.
 distanciaVistaSeleccion: 0
+
+# Chunk radius loaded around the final location immediately before
+# teleport. 0 loads only the destination chunk.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
 distanciaVistaTeletransporte: 0
 
 # Frecuencia de selección (ticks de juego)
@@ -23,6 +30,12 @@ periodo: 20
 # Rango: 0 - 50.
 # Impacto: MEDIO — valores altos permiten procesar más rápido a riesgo del tiempo de tick.
 tiempoAsignadoSincrono: 50
+
+# Maximum milliseconds per tick spent in asynchronous tasks.
+# @type: integer
+# @range: [1, null]
+# @unit: ms
+# @default: 50
 tiempoAsignadoAsincrono: 50
 
 # Requisito mínimo de TPS
@@ -45,6 +58,10 @@ cargaSincrona: false
 # onEventParsing: Incompatible con permisos amplios tipo *.*.
 # Impacto: MEDIO (onEvent) / BAJO (effect)
 analisisAlEvento: false
+
+# Parse effect permission nodes at startup.
+# @type: boolean
+# @default: true
 analisisEfectos: true
 
 # Caché de selección de biomas
@@ -52,6 +69,11 @@ analisisEfectos: true
 # biomeRecallForced: Usar únicamente biomas ya descubiertos y almacenados en caché.
 # Impacto: BAJO a MEDIO
 recuerdoBioma: true
+
+# When set, only serve biome-filtered requests from cache (never
+# generate new biome searches). Requires biomeRecall.
+# @type: boolean
+# @default: false
 recuerdoBiomaForzado: false
 
 # Comprobación pasiva de chunks
@@ -75,7 +97,31 @@ verificarEnCargaChunk: false
 # la caché no tiene margen para rellenos en modo predeterminado.
 visitorEnabled: true
 
+# Maintain a reserved cache of locations for join-time teleports
+# (rtp.onevent.firstjoin / rtp.onevent.join). Sized by remaining empty
+# player slots. See ADR-023.
+# @type: boolean
+# @default: false
+loginCacheEnabled: false
+
+# Hard cap for the login cache. 0 = auto (server max-players,
+# snapshotted at startup).
+# @type: integer
+# @range: [0, null]
+# @default: 0
+loginCacheCap: 0
+
 # NO MODIFIQUES EL NÚMERO DE VERSIÓN
 pregeneratedPreference: "0.0 # Probability [0.0, 1.0] of rejecting an ungenerated chunk per selection attempt. 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land. Generated chunks always pass."
+
+# Fraction of L3 backlog capacity at which refill resumes (hysteresis).
+# 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill
+# continuously. Higher values group .mca-bin checks for better
+# CPU/memory efficiency. See ADR-028.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.5
 backlogRefillThreshold: "0.5 # Fraction [0.0, 1.0] of L3 backlog capacity at which refill resumes (hysteresis). 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill continuously."
+
+# DO NOT TOUCH VERSION NUMBER
 version: 1.0

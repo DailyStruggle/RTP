@@ -1,16 +1,18 @@
-# --- Language Mapping: logging.yml (cat dialect) ---
-# The diary of every hiss and purr. Edit only the right side.
-event_changeworld: "hopped_to_new_box"
-event_respawn: "nine_lives_used"
+# --- Language Mapping: logging.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# logging.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
 detailed_reload: "long_grooming_session"
+detailed_region_init: "territory_marking"
+command: "human_trick"
 teleport: "pounce"
+event_changeworld: "hopped_to_new_box"
 event_join: "new_kitty_arrived"
+event_respawn: "nine_lives_used"
+event_move: "prowl"
+event_teleport: "pounce_event"
 selection_failure: "missed_the_pounce"
 system_memory_tracker: "snack_inventory"
 system_database: "scratching_post"
-event_teleport: "pounce_event"
-version: "meowsion"
-detailed_region_init: "territory_marking"
-command: "human_trick"
-event_move: "prowl"
 min_level: "minimum_meow_volume"
+version: "meowsion"

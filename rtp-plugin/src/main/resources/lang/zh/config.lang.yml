@@ -1,12 +1,13 @@
-# --- 语言映射: config.yml ---
-# 将内部配置键名（左侧）映射为 config.yml 中用户可见的键名（右侧）。
-# 仅可修改右侧以重命名或翻译选项；左侧为代码常量，请勿更改。
-# 若此文件缺失，插件会自动重新生成左右一致的英文默认映射。
-database: "数据库"
-playerCommands: "玩家命令"
-teleportCooldown: "传送冷却"
-cancelDistance: "取消距离"
+# --- Language Mapping: config.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# config.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
 teleportDelay: "传送延迟"
+cancelDistance: "取消距离"
+teleportCooldown: "传送冷却"
 consoleCommands: "控制台命令"
-version: "version"
+playerCommands: "玩家命令"
+database: "数据库"
 network: "网络"
+menu: "menu"
+version: "version"

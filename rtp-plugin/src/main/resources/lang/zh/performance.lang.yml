@@ -1,19 +1,24 @@
-# --- 语言映射: performance.yml ---
-# 将内部配置键名（左侧）映射为 performance.yml 中用户可见的键名（右侧）。
-# 仅可修改右侧以重命名或翻译选项；左侧为代码常量，请勿更改。
-# 若此文件缺失，插件会自动重新生成左右一致的英文默认映射。
-period: "周期"
-viewDistanceSelect: "视距_选择"
-biomeRecall: "生物群系记忆"
-version: "version"
+# --- Language Mapping: performance.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# performance.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
 maxAttempts: "最大尝试次数"
-biomeRecallForced: "生物群系记忆_强制"
-onEventParsing: "事件时解析"
-checkOnChunkLoads: "区块加载时检查"
-postTeleportQueueing: "传送后排队"
-syncLoading: "同步加载"
-effectParsing: "效果解析"
+viewDistanceSelect: "视距_选择"
 viewDistanceTeleport: "视距_传送"
-minTPS: "最低TPS"
+period: "周期"
 syncAllottedTime: "分配时间_同步"
 asyncAllottedTime: "分配时间_异步"
+minTPS: "最低TPS"
+postTeleportQueueing: "传送后排队"
+syncLoading: "同步加载"
+onEventParsing: "事件时解析"
+effectParsing: "效果解析"
+biomeRecall: "生物群系记忆"
+biomeRecallForced: "生物群系记忆_强制"
+checkOnChunkLoads: "区块加载时检查"
+visitorEnabled: "visitorEnabled"
+loginCacheEnabled: "loginCacheEnabled"
+loginCacheCap: "loginCacheCap"
+pregeneratedPreference: "pregeneratedPreference"
+backlogRefillThreshold: "backlogRefillThreshold"
+version: "version"

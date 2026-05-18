@@ -1,0 +1,100 @@
+# --- RTP Core Configuration ---
+# Documentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/CORE_CONFIG.md
+# Locale selection now lives in language.yml (loaded before config.yml).
+# Wait time before a queued teleport executes.
+# 0 teleports immediately (skips the cancel-on-move window).
+# Interacts with cancelDistance below.
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 2
+teleportDelay: 2
+
+# Maximum distance a player may move during teleportDelay before the
+# queued teleport is cancelled.
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 2
+cancelDistance: 2
+
+# Wait time between successful uses of /rtp by the same player.
+# Bypassed by rtp.nocooldown.
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 300
+teleportCooldown: 300
+
+# Console commands executed on successful teleport. Use [player] for the
+# target player's name. Empty string entries are ignored.
+# @type: list<string>
+consoleCommands:
+  - "say [player] has just randomly teleported!"
+
+# Commands executed as the teleporting player on successful teleport.
+# Use [player] for the target player's name. Empty string entries are ignored.
+# @type: list<string>
+playerCommands:
+  - ""
+
+# Database backend used for persistence.
+# yaml/sqlite are file-backed and require no extra config; mysql and
+# postgresql use the host/port/name/username/password fields below.
+database:
+  # Backend type.
+  # @type: enum
+  # @options: ["yaml", "sqlite", "mysql", "postgresql"]
+  # @default: "sqlite"
+  type: "sqlite"
+  # Database host. Used by mysql/postgresql only.
+  # @type: string
+  host: "127.0.0.1"
+  # Database port. Used by mysql/postgresql only.
+  # @type: integer
+  # @range: [1, 65535]
+  port: 3306
+  # Database / schema name. Used by mysql/postgresql only.
+  # @type: string
+  name: "rtp"
+  # Database username. Used by mysql/postgresql only.
+  # @type: string
+  username: "root"
+  # Database password. Used by mysql/postgresql only.
+  # @type: string
+  password: "password"
+
+# Cross-server / proxy transport settings. See docs/dev/MULTI_SERVER_PLAN.md.
+network:
+  redis:
+    # Enable Redis-backed network state binding.
+    # @type: boolean
+    # @default: false
+    enabled: false
+    # Redis host.
+    # @type: string
+    host: "127.0.0.1"
+    # Redis port.
+    # @type: integer
+    # @range: [1, 65535]
+    port: 6379
+    # Redis password. Empty string disables auth.
+    # @type: string
+    password: ""
+
+# Generalized menu framework (ADR-035 / ADR-044).
+# `renderer` is an ordered preference list of renderer ids. On exception or
+# missing adapter the framework walks the list and falls back to the next
+# entry. If the list is exhausted the no-token open-page path falls back to
+# the configurable `menuInvalid` message. Available ids: book. (The chat
+# renderer ships in a follow-up and will be added to the default list at
+# that point.)
+menu:
+  # Ordered preference list of renderer ids.
+  # @type: list<enum>
+  # @options: ["book", "chat"]
+  renderer:
+    - "book"
+
+# DO NOT TOUCH VERSION NUMBER
+version: 3.0

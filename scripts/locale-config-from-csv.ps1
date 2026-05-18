@@ -57,6 +57,9 @@ if (-not $InputCsv) {
 }
 
 function Test-IsBareScalar([string]$v) {
+    # Emit numerics and booleans bare (the Spanish content guard expects
+    # numeric YAML for keys like fadeIn/stay/fadeOut/version). The plugin
+    # config layer coerces string<->numeric on load, so this is safe.
     if ($null -eq $v) { return $false }
     if ($v -eq '') { return $false }
     if ($v -match '^-?\d+$')                 { return $true }   # integer
@@ -82,12 +85,14 @@ function Format-Scalar([string]$v) {
 }
 
 function Emit-Comment([System.Text.StringBuilder]$sb, [string]$comment, [string]$indent) {
+    # Comments are stored verbatim in the CSV (including the leading '#'),
+    # so we re-emit them as-is under the current indent without re-prefixing.
     if ([string]::IsNullOrEmpty($comment)) { return }
     foreach ($line in ($comment -split "`n")) {
         if ($line -eq '') {
-            [void]$sb.Append($indent).Append("#`n")
+            [void]$sb.Append("`n")
         } else {
-            [void]$sb.Append($indent).Append('# ').Append($line).Append("`n")
+            [void]$sb.Append($indent).Append($line).Append("`n")
         }
     }
 }

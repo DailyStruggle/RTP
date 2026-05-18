@@ -1,11 +1,3 @@
-# --- RTP 主配置 ---
-# 玩家可见消息所使用的语言。
-# 默认值: "en" (内置于 messages.yml 的英文基线)。
-# 其他翻译位于 lang/<locale>/messages.yml，并作为一层覆盖在英文基线之上加载。
-# 缺失的键会静默回退为英文。未知的语言代码会触发警告并同样回退为英文。
-# 参见 ADR-020 与 REQ-RTP-F-013。
-language: "en"
-
 # 传送延迟（秒）
 # 玩家在实际执行传送之前必须等待的时间。
 # 有时会让服务器有时间预加载目标区块。
@@ -24,6 +16,10 @@ language: "en"
 # 占位符 [player] 表示玩家名。
 控制台命令:
   - "say [player] 刚刚被随机传送了！"
+
+# Commands executed as the teleporting player on successful teleport.
+# Use [player] for the target player's name. Empty string entries are ignored.
+# @type: list<string>
 玩家命令:
   - ""
 
@@ -34,22 +30,54 @@ language: "en"
   # - yaml/sqlite: 本地文件（无需额外配置）
   # - mysql/postgresql: 远程数据库（需要下方的凭据）
   type: "sqlite"
-
   # 网络数据库凭据（本地类型会忽略）
   host: "127.0.0.1"
+  # Database port. Used by mysql/postgresql only.
+  # @type: integer
+  # @range: [1, 65535]
   port: 3306
+  # Database / schema name. Used by mysql/postgresql only.
+  # @type: string
   name: "rtp"
+  # Database username. Used by mysql/postgresql only.
+  # @type: string
   username: "root"
+  # Database password. Used by mysql/postgresql only.
+  # @type: string
   password: "password"
 
 # --- 网络与同步 ---
 # Redis 用于在多台服务器之间同步缓存的位置。
 网络:
   redis:
+    # Enable Redis-backed network state binding.
+    # @type: boolean
+    # @default: false
     enabled: false
+    # Redis host.
+    # @type: string
     host: "127.0.0.1"
+    # Redis port.
+    # @type: integer
+    # @range: [1, 65535]
     port: 6379
+    # Redis password. Empty string disables auth.
+    # @type: string
     password: ""
+
+# Generalized menu framework (ADR-035 / ADR-044).
+# `renderer` is an ordered preference list of renderer ids. On exception or
+# missing adapter the framework walks the list and falls back to the next
+# entry. If the list is exhausted the no-token open-page path falls back to
+# the configurable `menuInvalid` message. Available ids: book. (The chat
+# renderer ships in a follow-up and will be added to the default list at
+# that point.)
+menu:
+  # Ordered preference list of renderer ids.
+  # @type: list<enum>
+  # @options: ["book", "chat"]
+  renderer:
+    - "book"
 
 # 请勿修改版本号
 version: 3.0

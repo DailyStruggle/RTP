@@ -1,20 +1,24 @@
-# --- Taalkaart: performance.yml ---
-# Koppelt interne sleutels (links) aan de zichtbare namen in performance.yml (rechts).
-# Wijzig alleen de rechterkant; de linkerkant is een codeconstante.
-# Als dit bestand ontbreekt, genereert de plugin het opnieuw met identieke paren.
-period: "periode"
-viewDistanceSelect: "zichtafstandSelectie"
-biomeRecall: "bioomHerinnering"
-version: "version"
+# --- Language Mapping: performance.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# performance.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
 maxAttempts: "maximaalPogingen"
-biomeRecallForced: "bioomHerinnering_geforceerd"
-onEventParsing: "verwerking_bijGebeurtenis"
-checkOnChunkLoads: "controleer_bijChunkLaden"
-postTeleportQueueing: "wachtrij_naTeletransport"
-syncLoading: "synchroonLaden"
-effectParsing: "effectVerwerking"
+viewDistanceSelect: "zichtafstandSelectie"
 viewDistanceTeleport: "zichtafstandTeletransport"
-minTPS: "minimaalTPS"
+period: "periode"
 syncAllottedTime: "synchroonToegewezenTijd"
 asyncAllottedTime: "asynchroonToegewezenTijd"
+minTPS: "minimaalTPS"
+postTeleportQueueing: "wachtrij_naTeletransport"
+syncLoading: "synchroonLaden"
+onEventParsing: "verwerking_bijGebeurtenis"
+effectParsing: "effectVerwerking"
+biomeRecall: "bioomHerinnering"
+biomeRecallForced: "bioomHerinnering_geforceerd"
+checkOnChunkLoads: "controleer_bijChunkLaden"
 visitorEnabled: "bezoeker_ingeschakeld"
+loginCacheEnabled: "loginCacheEnabled"
+loginCacheCap: "loginCacheCap"
+pregeneratedPreference: "pregeneratedPreference"
+backlogRefillThreshold: "backlogRefillThreshold"
+version: "version"

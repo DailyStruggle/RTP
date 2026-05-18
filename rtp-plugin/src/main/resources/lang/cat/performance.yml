@@ -2,38 +2,71 @@
 # How fast a kitty can stalk and pounce without knocking over the lamp.
 # Max pounce attempts before giving up
 max_pounces: 32
+
 # Kibble (chunk) radius to load while stalking
 stalking_distance: 0
+
 # Kibble (chunk) radius to load just before pouncing
 pounce_distance: 0
+
 # Tail flicks (ticks) between background sniff cycles
 tail_swish_period: 20
+
 # Max whisker-twitches per tick for sync errands
 sync_nap_time: 50
+
 # Max whisker-twitches per tick for async errands
 async_nap_time: 50
+
 # Minimum purrs/sec (TPS) to keep sniffing in the background
 minimum_purrs_per_second: 19.0
+
 # Refill the warm-spot pile right after a pounce
 line_up_after_pounce: false
+
 # Use sync chunk loading (NOT RECOMMENDED, may pull tail)
 synced_kibble: false
+
 # Re-sniff permissions on every event
 sniff_on_event: false
+
 # Parse sparkle (effect) permissions at startup
 sparkle_parsing: true
+
 # Reuse already-known biome warm-spots
 smell_memory: true
+
 # Only use biomes already remembered (no new sniffing)
 forced_smell_memory: false
+
 # Check for warm-spots in every loaded kibble (chunk)
 check_when_kibble_arrives: false
+
 # Enable background data gathering by visiting kitties
 visitorEnabled: false
+
 # Keep a reserved warm-spot pile for join-time pounces (rtp.onevent.firstjoin / rtp.onevent.join). Sized by remaining empty kitty slots.
 loginCacheEnabled: false
+
 # Hard lid for the join warm-spot pile. 0 = auto (server max-kitties at startup).
 loginCacheCap: 0
+
+# Probability of rejecting an ungenerated chunk per selection attempt.
+# 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land.
+# Generated chunks always pass.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.0
+pregeneratedPreference: 0.0
+
+# Fraction of L3 backlog capacity at which refill resumes (hysteresis).
+# 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill
+# continuously. Higher values group .mca-bin checks for better
+# CPU/memory efficiency. See ADR-028.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.5
+backlogRefillThreshold: 0.5
 
 # Do not bite the version number, sacred catnip
 meowsion: 1.0

@@ -4,19 +4,25 @@
 # detailed_reload: 리로드된 모든 파일/섹션을 로그
 # detailed_region_init: 각 리전의 초기화를 로그
 상세_리로드: false
+# Log region initialization details
 상세_리전초기화: false
 
 # 기본 활동 로그
 # command: 플레이어가 실행한 RTP 명령어를 로그
 # teleport: 실제 텔레포트 이벤트를 로그
 명령어: false
+# Log successful teleport events
 텔레포트: true
 
 # 이벤트 기반 자동 RTP 로그
 이벤트_월드변경: "true # 플레이어가 월드를 변경할 때"
+# Log RTP triggered on join
 이벤트_접속: "true     # 플레이어가 서버에 접속할 때"
+# Log RTP triggered on respawn
 이벤트_리스폰: "true    # 플레이어가 리스폰할 때"
+# Log move event processing
 이벤트_이동: "true     # 플레이어가 이동할 때(이동 기반 RTP 활성화 시)"
+# Log teleport event processing
 이벤트_텔레포트: "true  # 플레이어가 텔레포트할 때(텔레포트 기반 RTP 활성화 시)"
 
 # 선택 실패 디버그
@@ -26,6 +32,7 @@
 # 시스템 로그
 # 백그라운드 작업과 데이터베이스 작업에 관련됩니다.
 시스템_메모리추적기: false
+# Debug logs for database activity
 시스템_데이터베이스: false
 
 # 플러그인 레벨의 최소 로그 레벨. 실제 필터는 이 값과 Bukkit logger 중

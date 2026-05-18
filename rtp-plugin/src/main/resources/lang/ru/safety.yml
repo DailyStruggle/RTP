@@ -62,6 +62,12 @@ anvilPrefilterEnabled: true
 # Увеличьте до 0 или больше, только если по-прежнему наблюдаете
 # небезопасные приземления и хотите вернуть старую опцию fallback.
 радиусПлатформы: -1
+
+# Depth (vertical thickness) of the emergency platform.
+# @type: integer
+# @range: [1, null]
+# @unit: blocks
+# @default: 1
 глубинаПлатформы: 1
 
 # Высота воздуха, которую нужно гарантировать над платформой.
@@ -86,6 +92,9 @@ anvilPrefilterEnabled: true
   # Цветы
   - "#minecraft:flowers"
   - "#minecraft:small_flowers"
+  # Note: #minecraft:tall_flowers is an item-only tag in vanilla; its members
+  # (LILAC, PEONY, ROSE_BUSH, SUNFLOWER, PITCHER_PLANT) are already covered by
+  # #minecraft:flowers above.
   - "#minecraft:tall_flowers"
   # Растения вроде травы и кусты, не покрытые тегами цветов
   - "SHORT_GRASS"
@@ -195,6 +204,7 @@ anvilPrefilterEnabled: true
   - "TALL_SEAGRASS"
   - "KELP"
   - "KELP_PLANT"
+  - "#minecraft:logs"
 
 # Фильтр биомов
 # biomeWhitelist: false -> список `biomes` это чёрный список (пропускает эти биомы)
@@ -202,6 +212,10 @@ anvilPrefilterEnabled: true
 # Чёрный список по умолчанию исключает океаны, реки, void и другие биомы, где
 # твёрдое и безопасное приземление маловероятно или невозможно.
 белыйСписокБиомов: false
+
+# Biomes treated as whitelist or blacklist members per biomeWhitelist.
+# @type: list<biome>
+# @source: biome
 биомы:
   # БИОМЫ ОКЕАНОВ
   - "OCEAN"
@@ -227,6 +241,9 @@ anvilPrefilterEnabled: true
   # БИОМЫ NETHERа (опасный/неровный рельеф)
   - "BASALT_DELTAS"
   # ТЕХНИЧЕСКИЕ БИОМЫ
+  - "THE_VOID"
+  - "LUSH_CAVES"
+  - "DEEP_DARK"
   - "THE_VOID"
 
 # НЕ ИЗМЕНЯЙТЕ НОМЕР ВЕРСИИ

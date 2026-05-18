@@ -1,0 +1,313 @@
+# --- Messaggi visibili agli utenti di RTP ---
+# Tutte le stringhe visibili ai giocatori e alla console.
+#
+# Formattazione:
+#   - Codici colore legacy di Bukkit (es. &a, &e, &c)
+#   - Codici colore esadecimali (es. #2636ef)
+#   - Segnaposto di PlaceholderAPI (quando PAPI è installato)
+#
+# Segnaposto:
+#   - I segnaposto condivisi "[Pn]" sono definiti nella lista `placeholders` qui sotto.
+#     [P0] è il prefisso RTP per impostazione predefinita.
+#   - I segnaposto specifici per messaggio (es. [attempts], [world]) sono documentati
+#     in linea sopra ogni messaggio che li usa.
+#
+# REQ-RTP-F-013: ogni messaggio visibile all'utente è configurabile qui.
+# ###############################################################################
+# Sezione 1: Configurazione generale
+# ###############################################################################
+# lista di segnaposto aggiuntivi
+# formato: Pn - dove n è l'indice in questa lista
+segnaposto:
+  # P0
+  - "[RTP]"
+
+# ###############################################################################
+# Sezione 2: Teletrasporto
+# ###############################################################################
+# durante il teletrasporto, mostra questo
+giàTeletrasporto: "&e[P0] ti stai già teletrasportando!"
+
+# se il plugin si sta attualmente ricaricando
+teletrasportoNegatoRicaricamento: "&e[P0] i teletrasporti sono temporaneamente disattivati mentre il plugin si ricarica. Riprova tra poco."
+messaggioRitardo: "&e[P0] Teletrasporto in [delay]. Non muoverti"
+caricamentoChunk: "&e[P0] Caricamento dei chunk! attendere..."
+messaggioTeletrasporto: "&e[P0] Teletrasportato in [attempts] tentativi, in [processingTime]"
+
+# se il teletrasporto viene annullato
+teletrasportoAnnullato: "&e[P0] Teletrasporto annullato!"
+
+# se non ci sono posizioni sicure dopo aver raggiunto il numero massimo di tentativi
+# segnaposto: [attempts] - il numero massimo di tentativi
+nonSicuro: "&e[P0] impossibile trovare una posizione sicura entro [attempts] tentativi"
+
+# quando il giocatore è in cooldown
+# segnaposto: [remainingCooldown] - il tempo rimanente
+messaggioRaffreddamento: "&e[P0] Non puoi teletrasportarti di nuovo per [remainingCooldown]"
+
+# se la regione non ha posizioni in coda e il giocatore non ha il permesso rtp.unqueued
+nessunaPosizioneInCoda: "#f5eb73[P0] nessuna posizione pronta in questo momento"
+
+# quando la fila in coda si sposta
+# segnaposto: [spot] - la posizione attuale in coda
+aggiornamentoCoda: "#2636ef[P0] il tuo posto in coda: [spot]"
+
+# se il giocatore non ha abbastanza denaro per teletrasportarsi nella regione
+# segnaposto: [money] - quanto denaro è richiesto per il comando
+denaroInsufficiente: "&e[P0] ti servono almeno $[money] per questo."
+
+# ###############################################################################
+# Sezione 3: Formattazione del tempo
+# ###############################################################################
+# per i segnaposto temporali, come chiamare giorni, ore, minuti, secondi e millisecondi
+giorni: "g"
+ore: "h"
+minuti: "m"
+secondi: "s"
+millisecondi: "ms"
+
+# ###############################################################################
+# Sezione 4: Sistema e gestione
+# ###############################################################################
+# la 'version' di un file di configurazione è inferiore all'ultima
+# segnaposto: [filename] - nome del file, inclusa l'estensione
+fileVecchio: "&b[P0] rilevato [filename] vecchio. Aggiornamento in corso"
+
+# rilevato un mondo di Bukkit che non è nel file di configurazione
+# segnaposto: [world] - il mondo rilevato
+nuovoMondo: "&b[P0] rilevato un nuovo mondo '[world]'"
+
+# il mondo non esiste in Bukkit
+# segnaposto: [world] - il nome del mondo
+mondoNonValido: "&e[P0] impossibile trovare il mondo '[world]'"
+
+# testo di ricaricamento/aggiornamento del plugin
+# segnaposto: [filename] - nome del file
+ricaricamento: "&b[P0] caricamento di [filename]..."
+ricaricato: "&b[P0] [filename] caricato con successo."
+aggiornamento: "&a[P0] aggiornamento di [filename]..."
+aggiornato: "&a[P0] [filename] aggiornato con successo."
+
+# il plugin non ha il comando richiesto dall'utente
+# segnaposto: [arg] - l'argomento tentato
+argomentoNonValido: "&c[P0] argomento di comando non valido [arg]"
+
+# quando la console prova a eseguire un comando destinato solo ai giocatori
+comandoConsoleNonPermesso: "&c[P0] Devi essere un giocatore in gioco per eseguire questo comando."
+
+# il plugin è occupato a ricaricare
+busy: "&c[P0] occupato"
+
+# il plugin non ha il sottocomando o parametro richiesto dall'utente
+# segnaposto: [arg] - l'argomento tentato
+invalidCommand: "&c[P0] comando non valido - [arg]"
+
+# l'utente non ha il permesso per il comando richiesto
+senzaPermessi: "&eMi dispiace, ma non hai il permesso di eseguire questo comando. Contatta gli amministratori del server se ritieni che sia un errore."
+
+# ###############################################################################
+# Sezione 5: Log amministrativi
+# ###############################################################################
+# registrato quando le posizioni vengono salvate/caricate dal database
+# segnaposto: [amount] - numero di posizioni
+# segnaposto: [region] - nome della regione
+posizioneSalvata: "&e[P0] Salvate con successo [amount] posizioni per [region]"
+posizioneCaricata: "&e[P0] Caricate con successo [amount] posizioni per [region]"
+
+# ###############################################################################
+# Sezione 6: Comando di scansione
+# ###############################################################################
+# messaggi relativi al comando di scansione
+# segnaposto: [scan_regions] - lista delle regioni
+avvioScansione: "&a[P0] scansione avviata per le regioni: [scan_regions]"
+resetScansione: "&e[P0] coda di scansione azzerata per le regioni: [scan_regions]"
+annullaScansione: "&e[P0] scansione annullata per le regioni: [scan_regions]"
+pausaScansione: "#A020F0[P0] scansione in pausa per le regioni: [scan_regions]"
+riprendiScansione: "#10A5F5[P0] scansione ripresa per le regioni: [scan_regions]"
+scansioneInCorso: "&c[P0] scansione già in corso per le regioni: [scan_regions]"
+scansioneNonInCorso: "&c[P0] scansione non in corso per le regioni: [scan_regions]"
+# segnaposto: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
+statoScansione: "&a[P0] completati [scan_chunks] / [scan_totalChunks] chunk per le regioni: [scan_regions]. [scan_cps] cps. Percentuale di terra: [scan_landPercentage]%. ETA: [scan_eta]"
+
+# ###############################################################################
+# Sezione 7: Comando Info
+# ###############################################################################
+# messaggi relativi al comando info
+titoloInfo: "&a======Informazioni RTP======"
+infoTicket: "&7Ticket di chunk globali attivi: &f[tickets]"
+infoTeletrasporti: "&7Macchine a stati di teletrasporto attive: &f[teleports]"
+infoMSPT: "&7MSPT attuale del plugin: &f[mspt]"
+infoCaricamentiTotali: "&7Chunk caricati totali: &f[loads]"
+infoCaricamentiPerOrigine: "&7Caricamenti per origine: &f[loadsByOrigin]"
+infoTassoFughe: "&7Tasso attuale di fughe di chunk: &f[leakRate]"
+# --- Blocco di salute del SPI metriche (METRICS_PLAN.md > /rtp info Surface) ---
+infoProfonditaCoda: "&7Giocatori in attesa nelle code di regione: &f[queueDepth]"
+infoTeletrasportiInAttesa: "&7Pipeline di teletrasporto in attesa: &f[pendingTeleports]"
+infoMediaPipelineMs: "&7Latenza media pipeline: &f[avgPipelineMs] ms"
+infoHeap: "&7Heap JVM: &f[heapUsedMb] / [heapMaxMb] MiB"
+# Riga di intestazione per il blocco etichettato Salute pipeline in /rtp info.
+infoIntestazioneSalutePipeline: "&7--- Salute: pipeline ---"
+# Lettura TPS per le finestre 1m / 5m / 15m. Segnaposto: [tps1m] [tps5m] [tps15m].
+infoTps: "&7TPS (1m/5m/15m): &f[tps1m] / [tps5m] / [tps15m]"
+# MSPT del server live e utilizzo del budget tick. Segnaposto: [mspt] [tickBudgetUtilisation].
+infoMSPTLive: "&7MSPT del server: &f[mspt] ms (&7budget tick: &f[tickBudgetUtilisation]&7)"
+# Soft-cap configurato dei giocatori vs il conteggio online attuale. Segnaposto: [softCap] [playerCount].
+infoSoftCap: "&7Giocatori: &f[playerCount] / [softCap]"
+# Latenza più recente di andata e ritorno del database in ms. Segnaposto: [databaseLatencyMs].
+infoLatenzaDatabaseMs: "&7Latenza database: &f[databaseLatencyMs] ms"
+# Soglie delle fasce colore di salute. Double consumati da ColourBands in rtp-core
+# per avvolgere i segnaposto di varianti colorate (es. [tps1mColoured]) con &a/&e/&c.
+infoSogliaTpsVerde: 19.5
+infoSogliaTpsGialla: 18.0
+infoSogliaMsptVerde: 30.0
+infoSogliaMsptGialla: 45.0
+infoSogliaRiempCacheVerde: 0.5
+infoSogliaRiempCacheGialla: 0.25
+infoSogliaEtaReteGialla: 5.0
+# Riga di intestazione che introduce la tabella per-regione-Folia (solo runtime Folia).
+infoIntestazioneRegioniFolia: "&7--- Regioni Folia ---"
+# Modello di riga per una singola regione Folia. Segnaposto: [regionId] [tps1m]
+# [mspt] [playerCount] [queueDepth] [tickBudgetUtilisation].
+infoRegioneFolia: "  &f[regionId]&7: tps=&f[tps1m]&7 mspt=&f[mspt]&7 giocatori=&f[playerCount]&7 coda=&f[queueDepth]&7 budget=&f[tickBudgetUtilisation]"
+infoIntestazioneDisclaimer: "&7--- Disclaimer diagnostico ---"
+infoDisclaimer: "&7Nota diagnostica: se il conteggio totale dei chunk orfani del server supera i caricamenti totali di questo plugin ([loads]), questo plugin non è l'unica fonte del leak di memoria."
+infoIntestazioneMondo: "#008080Mondi:"
+infoIntestazioneMondoConsole: "&7--- Mondi ---"
+infoMondo: "  #21ADA8[world]"
+infoIntestazioneRegione: "#63C5DARegioni:"
+infoIntestazioneRegioneConsole: "&7--- Regioni ---"
+infoRegione: "  #52B2BF[region]"
+
+# sotto-elenchi di info
+# segnaposto: [world], [region], [requirePermission], [override], [shape], [worldBorderOverride], [cacheCap], [cached], [keptCache], [unkeptCache], [backlogCache], [backlogCacheCap]
+infoMondoDati:
+  - "#21ADA8[world]:"
+  - "#99EEBB  - regione: [region]"
+  - "#99EEBB  - richiediPermesso: [requirePermission]"
+  - "#99EEBB  - sovrascrivi: [override]"
+
+infoRegioneDati:
+  - "#52B2BF[region]:"
+  - "#58CCED  - mondo: [world]"
+  - "#58CCED  - forma: [shape]"
+  - "#58CCED  - richiediPermesso: [requirePermission]"
+  - "#58CCED  - sovrascriviBordiMondo: [worldBorderOverride]"
+  - "#58CCED  - limiteCache: [cacheCap]"
+  - "#58CCED  - cacheConservata (L1): [keptCache]"
+  - "#58CCED  - cacheNonConservata (L2): [unkeptCache]"
+  - "#58CCED  - cacheArretrata (L3): [backlogCache] / [backlogCacheCap]"
+  - "#58CCED  - inCache: [cached]"
+
+# ###############################################################################
+# Sezione 8: Descrizioni dei comandi
+# ###############################################################################
+# mostrato nel comando help
+rtp: "&b/rtp - teletrasportati in una posizione casuale"
+rtp_descrizione: "teletrasportati in una posizione casuale"
+aiuto: "&b/rtp help - vedi questo"
+aiuto_descrizione: "descrivi i comandi"
+ricarica: "&b/rtp reload - ricarica i file di configurazione"
+ricarica_descrizione: "ricarica i file di configurazione"
+scansione: "&b/rtp scan - prova tutte le posizioni possibili della regione per migliorare i tempi di caricamento"
+scansione_descrizione: "cancella i dati memorizzati e prova tutte le posizioni possibili della regione"
+config_descrizione: "aggiorna i file di configurazione a runtime"
+info_descrizione: "controlla lo stato attuale del plugin"
+test_descrizione: "testa le funzioni di RTP"
+
+# ###############################################################################
+# Sezione 8b: Framework di menù generalizzato (ADR-035 / ADR-044)
+# ###############################################################################
+# Inviato quando un token di menù è sconosciuto, malformato o appartiene a un altro giocatore.
+menuInvalid: "&c[P0] quel collegamento del menù non è valido."
+# Inviato quando un token di menù è scaduto o già consumato.
+menuExpired: "&c[P0] quel collegamento del menù è scaduto. Riapri il menù."
+# Inviato quando un riscatto del menù non può risolvere l'UUID del giocatore chiamante.
+menuUnknownPlayer: "&c[P0] i collegamenti del menù possono essere usati solo da giocatori in gioco."
+# Modello di tooltip di fallback usato dal riflettore del menù quando nessun commento
+# di blocco YAML è disponibile per un parametro. Segnaposto: [type] - il tipo di parametro dichiarato.
+menuHoverFallbackType: "tipo: [type]"
+# Modello di tooltip di fallback usato dal riflettore del menù quando un parametro espone
+# un piccolo insieme curato di valori. Segnaposto: [values] - valori accettati separati da virgola.
+menuHoverFallbackBounds: "accettati: [values]"
+# Etichetta della riga di navigazione "torna indietro di un livello" anteposta a ogni pagina di menù non radice.
+menuBack: "&7« indietro"
+# Modello di etichetta della riga "esegui il comando assemblato" anteposta a ogni
+# pagina di menù eseguibile non radice. Segnaposto: [command] - l'invocazione /rtp ... assemblata.
+menuExecute: "&a▶ esegui [command]"
+# Riga di intestazione in cima a una sotto-pagina selettore di valore di parametro (Fase A.2).
+# Segnaposto: [param] - nome del parametro; [command] - invocazione /rtp ... assemblata.
+menuPickValue: "&escegli un valore per [param] (eseguirà: /rtp [command] [param]:<valore>)"
+# Etichetta della riga di fallback "digita un valore personalizzato" in una pagina selettore di valore.
+# Cliccandola si precompila la chat con il comando assemblato fino a '<param>:' così che il giocatore
+# possa digitare qualsiasi valore, anche quelli non nella lista dei suggerimenti.
+menuTypeValue: "&7✎ digita un valore personalizzato..."
+# Riga di intestazione non cliccabile in cima a ogni pagina di menù non radice (Fase A.4).
+# Mostra l'invocazione /rtp attualmente costruita inclusi gli assegnamenti di parametri
+# in attesa (nome:valore). Segnaposto: [command] - argomenti assemblati.
+menuConstructed: "&7costruendo: &f/rtp [command]"
+# Riga del titolo non cliccabile anteposta alla pagina del menù radice /rtp (Fase A.5).
+# Fornisce un'intestazione di benvenuto prima che il giocatore entri in qualsiasi sottocomando.
+menuRootTitle: "&6&l⚡ menù RTP"
+# Riga di sottotitolo/suggerimento non cliccabile anteposta alla pagina del menù radice /rtp sotto
+# menuRootTitle (Fase A.5). Breve testo di orientamento per utenti nuovi.
+menuRootHint: "&7clicca un'opzione qui sotto per iniziare"
+# Righe di navigazione aggiunte alle pagine di menù paginate (Fase A.6) - cliccandole
+# ci si sposta alla pagina precedente/successiva dello stesso modello. Segnaposto:
+# [page] - il numero di pagina di destinazione leggibile (base 1).
+menuPagePrev: "&7« pagina precedente ([page])"
+menuPageNext: "&7pagina successiva ([page]) »"
+# Divisore di sezione nella pagina iniziale sopra le righe di teletrasporto (vista giocatore).
+menuFrontPageSectionTeleport: "&8--- &7teletrasporto &8---"
+# Divisore di sezione nella pagina iniziale sopra le righe di amministrazione (vista admin).
+menuFrontPageSectionAdmin: "&8--- &7admin &8---"
+# Righe della pagina iniziale. Nessun segnaposto.
+menuFrontPageRowTeleport: "&a▶ /rtp &7- teletrasportati in una posizione casuale"
+menuFrontPageRowRegion: "&a▶ /rtp region:&7... &7- scegli una regione"
+menuFrontPageRowBiome: "&a▶ /rtp biome:&7... &7- scegli un bioma"
+menuFrontPageRowHelp: "&a▶ /rtp help &7- elenca i comandi"
+menuFrontPageRowInfo: "&b▶ /rtp info &7- diagnostica del plugin"
+menuFrontPageRowConfig: "&b▶ /rtp config &7- modifica i file di configurazione"
+menuFrontPageRowScan: "&b▶ /rtp scan &7- pre-riempie le cache delle regioni"
+menuFrontPageRowDiagnostics: "&c▶ /rtp test full &7- esegui la diagnostica completa"
+menuFrontPageRowReload: "&c▶ /rtp reload &7- ricarica i file di configurazione"
+# Testo tooltip per la riga di diagnostica che avverte del costo. Nessun segnaposto.
+menuFrontPageHoverDiagnostics: "&7esegue la suite di diagnostica completa; potrebbe essere costosa"
+# Testo tooltip per la riga di ricaricamento che avverte degli effetti collaterali. Nessun segnaposto.
+menuFrontPageHoverReload: "&7ricarica tutti i file di configurazione; i teletrasporti in corso potrebbero esserne influenzati"
+
+# ###############################################################################
+# Sezione 9: Supporto PlaceholderAPI
+# ###############################################################################
+# segnaposto di stato per i giocatori
+GIOCATORE_DISPONIBILE: "&aDISPONIBILE"
+GIOCATORE_RAFFREDDAMENTO: "&eIN ATTESA"
+GIOCATORE_PREPARAZIONE: "&bSCELTA DELLA POSIZIONE"
+GIOCATORE_CARICAMENTO: "&bCARICAMENTO CHUNK"
+GIOCATORE_TELETRASPORTO: "&bTELETRASPORTO IN CORSO"
+
+# ###############################################################################
+# Sezione 10: Elementi visivi
+# ###############################################################################
+# impostazioni del titolo
+# rimuovi o imposta title a "" per disattivare
+# PlaceholderAPI è consigliato per le coordinate
+titolo: "#FF6B6BT#FF8560e#FF9F55l#FFBA4Ae#FFD53Ft#E8E040r#BFED41a#96F542s#6DF543p#44F2A0o#3BEFC8r#38ECF0t#35E9FFa#32E6FFt#2FE3FFo#2CE0FF!"
+sottotitolo: "#A78BFAd#B47EF8i#C171F6v#CE64F4e#DB57F2r#E84AF0t#E855D8i#E860C0t#E86BA8i!#E876A0"
+dissolvenzaEntrata: 20
+rimani: 20
+dissolvenzaUscita: 20
+
+# impostazione actionbar
+barraAzione: ""
+
+# ###############################################################################
+# Sezione 11: Metadati
+# ###############################################################################
+# NON MODIFICARE IL NUMERO DI VERSIONE
+versione: 1.0
+
+# ###############################################################################
+# Sezione 12: Opzioni per sviluppatori
+# ###############################################################################
+# imposta a true per aggiungere un'etichetta dev (es. §8(RTP:ClassName)) a ogni messaggio
+mostraEtichettaDev: false

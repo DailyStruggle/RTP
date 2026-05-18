@@ -1,17 +1,17 @@
 # --- Language Mapping: safety.yml ---
-# Maps internal config keys (left) to the user-visible key names used in
-# safety.yml (right). Edit only the right-hand side to rename or translate
-# a config option; the left-hand side is a code constant and must not change.
-# If this file is missing, the plugin regenerates it with identical left/right
-# pairs (the English defaults).
+# Maps internal baseline keys (left) to user-visible key names used in
+# safety.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
+invulnerabilityTime: "invulnerabilityTime"
 safetyRadius: "safetyRadius"
-biomeWhitelist: "biomeWhitelist"
-airBlocks: "airBlocks"
-biomes: "biomes"
-unsafeBlocks: "unsafeBlocks"
+staleChunkRetryLimit: "staleChunkRetryLimit"
+anvilPrefilterEnabled: "anvilPrefilterEnabled"
 platformRadius: "platformRadius"
+platformDepth: "platformDepth"
 platformAirHeight: "platformAirHeight"
 platformMaterial: "platformMaterial"
-invulnerabilityTime: "invulnerabilityTime"
+airBlocks: "airBlocks"
+unsafeBlocks: "unsafeBlocks"
+biomeWhitelist: "biomeWhitelist"
+biomes: "biomes"
 version: "version"
-platformDepth: "platformDepth"

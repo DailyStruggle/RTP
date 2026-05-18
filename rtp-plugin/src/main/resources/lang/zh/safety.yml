@@ -47,6 +47,12 @@ anvilPrefilterEnabled: true
 # 稳固落点，因此默认关闭这种应急平台（玻璃方块）。
 # 仅当仍出现不安全落点且需要旧版兜底方案时才将其调高到 0 或更大。
 平台半径: -1
+
+# Depth (vertical thickness) of the emergency platform.
+# @type: integer
+# @range: [1, null]
+# @unit: blocks
+# @default: 1
 平台深度: 1
 
 # 平台上方需要保证的空气高度。
@@ -67,12 +73,13 @@ anvilPrefilterEnabled: true
   - "LEGACY_AIR"
   - "STRUCTURE_VOID"
   - "LIGHT"
-
   # 花朵 (覆盖蒲公英、虞美人、郁金香、眼花、火炬花……)
   - "#minecraft:flowers"
   - "#minecraft:small_flowers"
+  # Note: #minecraft:tall_flowers is an item-only tag in vanilla; its members
+  # (LILAC, PEONY, ROSE_BUSH, SUNFLOWER, PITCHER_PLANT) are already covered by
+  # #minecraft:flowers above.
   - "#minecraft:tall_flowers"
-
   # 类草植物与未被花标签包含的灌木
   - "SHORT_GRASS"
   - "TALL_GRASS"
@@ -86,21 +93,18 @@ anvilPrefilterEnabled: true
   - "FIREFLY_BUSH"
   - "LEGACY_LONG_GRASS"
   - "LEGACY_DEAD_BUSH"
-
   # 树苗、繁殖芽与菌类
   - "#minecraft:saplings"
   - "BROWN_MUSHROOM"
   - "RED_MUSHROOM"
   - "CRIMSON_FUNGUS"
   - "WARPED_FUNGUS"
-
   # 农作物及无方便标签的地表植物
   - "#minecraft:crops"
   - "MELON_STEM"
   - "PUMPKIN_STEM"
   - "SUGAR_CANE"
   - "BAMBOO_SAPLING"
-
   # 藤蔓与挂壁植物
   - "VINE"
   - "GLOW_LICHEN"
@@ -109,10 +113,8 @@ anvilPrefilterEnabled: true
   - "HANGING_ROOTS"
   - "PALE_HANGING_MOSS"
   - "RESIN_CLUMP"
-
   # 铁轨
   - "#minecraft:rails"
-
   # 红石与机械（无统一分组标签）
   - "REDSTONE_WIRE"
   - "COMPARATOR"
@@ -120,7 +122,6 @@ anvilPrefilterEnabled: true
   - "LEVER"
   - "STRING"
   - "TRIPWIRE"
-
   # 火把与照明（无分组标签）
   - "TORCH"
   - "WALL_TORCH"
@@ -129,13 +130,10 @@ anvilPrefilterEnabled: true
   - "REDSTONE_TORCH"
   - "REDSTONE_WALL_TORCH"
   - "END_ROD"
-
   # 按钮（石头与木质变体）
   - "#minecraft:buttons"
-
   # 压力板
   - "#minecraft:pressure_plates"
-
   # 告示牌 -- 站立/壁挂/吊挂的全部变体共四个标签
   - "#minecraft:standing_signs"
   - "#minecraft:wall_signs"
@@ -143,7 +141,6 @@ anvilPrefilterEnabled: true
   - "#minecraft:wall_hanging_signs"
   - "LEGACY_SIGN"
   - "LEGACY_WALL_SIGN"
-
   # 地面覆盖物
   - "SNOW"
   - "MOSS_CARPET"
@@ -158,19 +155,15 @@ anvilPrefilterEnabled: true
   - "WATER"
   - "LAVA"
   - "BUBBLE_COLUMN"
-
   # 任何含水方块（半砖/楼梯/栅栏/墙/告示牌/锁链/……）—— 替代旧的伪令牌
   # 'WATERLOGGED'。使用 ADR-017 的通配符。
   - "*[waterlogged=true]"
-
   # 火焰与高温危险
   - "#minecraft:fire"
   - "POWDER_SNOW"
   - "MAGMA_BLOCK"
-
   # 营火（点燃和熄灭都不安全 -- 玩家会陷进去）
   - "#minecraft:campfires"
-
   # 接触伤害 / 卡住
   - "CACTUS"
   - "SWEET_BERRY_BUSH"
@@ -180,29 +173,31 @@ anvilPrefilterEnabled: true
   - "POINTED_DRIPSTONE"
   - "COBWEB"
   - "CREAKING_HEART"
-
   # 虚空 / 传送门 / 不可移动
   - "BEDROCK"
   - "NETHER_PORTAL"
   - "END_PORTAL"
   - "END_GATEWAY"
-
   # 爆炸物
   - "TNT"
   - "END_CRYSTAL"
   - "RESPAWN_ANCHOR"
-
   # 水生植物（窒息风险）
   - "SEAGRASS"
   - "TALL_SEAGRASS"
   - "KELP"
   - "KELP_PLANT"
+  - "#minecraft:logs"
 
 # 生物群系筛选
 # biomeWhitelist: false -> `biomes` 列表为黑名单（跳过这些群系）
 #                  true  -> `biomes` 列表为白名单（仅允许这些群系）
 # 默认黑名单排除海洋、河流、虚空以及其他难以或无法获得稳固安全落点的群系。
 生物群系白名单: false
+
+# Biomes treated as whitelist or blacklist members per biomeWhitelist.
+# @type: list<biome>
+# @source: biome
 生物群系:
   # 海洋类
   - "OCEAN"
@@ -214,25 +209,23 @@ anvilPrefilterEnabled: true
   - "DEEP_COLD_OCEAN"
   - "FROZEN_OCEAN"
   - "DEEP_FROZEN_OCEAN"
-
   # 河流类
   - "RIVER"
   - "FROZEN_RIVER"
-
   # 邻接与海岸群系
   - "BEACH"
   - "SNOWY_BEACH"
   - "STONY_SHORE"
   - "SWAMP"
   - "MANGROVE_SWAMP"
-
   # 末地群系（无固体落点 / 邻接虚空）
   - "SMALL_END_ISLANDS"
-
   # 下界群系（地形危险/崎岖）
   - "BASALT_DELTAS"
-
   # 技术性群系
+  - "THE_VOID"
+  - "LUSH_CAVES"
+  - "DEEP_DARK"
   - "THE_VOID"
 
 # 请勿修改版本号

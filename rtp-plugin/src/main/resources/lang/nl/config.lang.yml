@@ -1,12 +1,13 @@
-# --- Taalkaart: config.yml ---
-# Koppelt interne sleutels (links) aan de zichtbare namen in config.yml (rechts).
-# Wijzig alleen de rechterkant; de linkerkant is een codeconstante.
-# Als dit bestand ontbreekt, genereert de plugin het opnieuw met identieke paren.
-database: "database"
-playerCommands: "spelerOpdrachten"
-teleportCooldown: "teletransportWachttijd"
-cancelDistance: "annuleerAfstand"
+# --- Language Mapping: config.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# config.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
 teleportDelay: "teletransportVertraging"
+cancelDistance: "annuleerAfstand"
+teleportCooldown: "teletransportWachttijd"
 consoleCommands: "consoleOpdrachten"
-version: "version"
+playerCommands: "spelerOpdrachten"
+database: "database"
 network: "netwerk"
+menu: "menu"
+version: "version"

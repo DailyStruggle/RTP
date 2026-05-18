@@ -4,51 +4,83 @@
 # Hoe vaak de plugin een veilige locatie zoekt voordat hij stopt.
 # Impact: HOOG — hoge waarden kunnen het CPU-gebruik per verzoek sterk verhogen.
 maximaalPogingen: 10
+
 # Voorlaadafstand bestemming (chunks)
 # Straal van chunks die rondom de bestemming worden voorgeladen.
 # Aantal geladen chunks = ( 1 + 2 * straal )^2.
 # Impact: HOOG — een te hoge waarde kan TPS-dalingen veroorzaken bij teletransport.
 zichtafstandSelectie: 0
+
+# Chunk radius loaded around the final location immediately before
+# teleport. 0 loads only the destination chunk.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
 zichtafstandTeletransport: 0
+
 # Selectiefrequentie (spelticks)
 # Tijd tussen zoekopdrachten naar nieuwe locaties om regiocaches te vullen.
 # ( 20 ticks = 1 seconde ).
 # Impact: GEMIDDELD — lagere waarden vullen de cache sneller maar gebruiken meer CPU.
 periode: 20
+
 # Toegewezen tijd per taak (milliseconden)
 # Maximale tijd (ms) besteed aan RTP-taken per tick.
 # Bereik: 0 - 50.
 # Impact: GEMIDDELD — hoge waarden verwerken sneller maar riskeren ticktijd.
 synchroonToegewezenTijd: 50
+
+# Maximum milliseconds per tick spent in asynchronous tasks.
+# @type: integer
+# @range: [1, null]
+# @unit: ms
+# @default: 50
 asynchroonToegewezenTijd: 50
+
 # Minimale TPS-vereiste
 # Minimale server-TPS voordat een nieuwe locatie in de cache wordt geplaatst.
 # Bereik: 0.0 - 20.0.
 # Impact: LAAG — voorkomt dat de plugin lag toevoegt wanneer de server het moeilijk heeft.
 minimaalTPS: 19.0
+
 # Wachtrij na teletransport
 # Als true probeert de plugin de locatiecache direct na een RTP te vullen.
 # Impact: GEMIDDELD
 wachtrij_naTeletransport: false
+
 # Synchroon laden
 # Gebruik synchroon chunkladen voor locatieselectie.
 # Impact: HOOG — NIET AANBEVOLEN! Kan ernstige serverblokkades veroorzaken.
 synchroonLaden: false
+
 # Rechtenparsering (opstarten)
 # verwerking_bijGebeurtenis: Incompatibel met brede rechten zoals *.*.
 # Impact: GEMIDDELD (bijGebeurtenis) / LAAG (effect)
 verwerking_bijGebeurtenis: false
+
+# Parse effect permission nodes at startup.
+# @type: boolean
+# @default: true
 effectVerwerking: true
+
 # Bioomselektiecache
 # bioomHerinnering: Eerder gevonden locaties per bioom hergebruiken.
 # bioomHerinnering_geforceerd: Alleen al ontdekte en gecachte biomen gebruiken.
 # Impact: LAAG tot GEMIDDELD
 bioomHerinnering: true
+
+# When set, only serve biome-filtered requests from cache (never
+# generate new biome searches). Requires biomeRecall.
+# @type: boolean
+# @default: false
 bioomHerinnering_geforceerd: false
+
 # Passieve chunkcontrole
 # Zoekt naar veilige locaties in alle geladen chunks binnen het bereik van een regio.
 # Impact: HOOG — kan de serverbelasting bij chunklaadgebeurtenissen aanzienlijk verhogen.
 controleer_bijChunkLaden: false
+
 # Achtergrondgegevensverzameling (Region Data Visitor)
 # Wanneer de voorgenereercache vol is, wordt per regio één observerende
 # RegionCacheTask gepland met dezelfde `periode`. Hergebruikt dezelfde
@@ -63,9 +95,27 @@ controleer_bijChunkLaden: false
 # Impact: LAAG — begrensd door de bestaande `periode`; werk alleen wanneer
 # de cache geen ruimte heeft voor standaard vullingen.
 bezoeker_ingeschakeld: true
+
+# Maintain a reserved cache of locations for join-time teleports
+# (rtp.onevent.firstjoin / rtp.onevent.join). Sized by remaining empty
+# player slots. See ADR-023.
+# @type: boolean
+# @default: false
+loginCacheEnabled: false
+
+# Hard cap for the login cache. 0 = auto (server max-players,
+# snapshotted at startup).
+# @type: integer
+# @range: [0, null]
+# @default: 0
+loginCacheCap: 0
+
 # WIJZIG HET VERSIENUMMER NIET
 # Probability [0.0, 1.0] of rejecting an ungenerated chunk per selection attempt. 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land. Generated chunks always pass.
 pregeneratedPreference: 0.0
+
 # Fraction [0.0, 1.0] of L3 backlog capacity at which refill resumes (hysteresis). 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill continuously.
 backlogRefillThreshold: 0.5
+
+# DO NOT TOUCH VERSION NUMBER
 version: 1.0

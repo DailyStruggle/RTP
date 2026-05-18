@@ -1,4 +1,7 @@
-# --- Mappage de langue : logging.yml ---
+# --- Language Mapping: logging.yml ---
+# Maps internal baseline keys (left) to user-visible key names used in
+# logging.yml (right). Generated from the per-locale TSV; edit the TSV's
+# base_key/key columns and regenerate, do not hand-edit this file.
 detailed_reload: "rechargementDetaille"
 detailed_region_init: "initialisationRegionDetaillee"
 command: "commande"
