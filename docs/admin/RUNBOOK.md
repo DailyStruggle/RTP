@@ -85,9 +85,9 @@ air, or into a claimed region they cannot build in.
 
 | Server software | Supported version | Required jar suffix |
 |-----------------|------------------|---------------------|
-| Spigot | 1.20.x | `rtp-spigot-v1_20_R1` |
-| Spigot | 1.21.x | `rtp-spigot-v1_21_R1` |
-| Paper / Spigot | 26.1 | `rtp-spigot-v26_1_R1` |
+| Spigot | 1.20.x | `rtp-bukkit-v1_20_R1` |
+| Spigot | 1.21.x | `rtp-bukkit-v1_21_R1` |
+| Paper / Spigot | 26.1 | `rtp-bukkit-v26_1_R1` |
 | Paper | 1.20.x | `rtp-paper-v1_20_R1` |
 | Paper | 1.21.x | `rtp-paper-v1_21_R1` |
 | Paper | 26.1 | `rtp-paper-v26_1_R1` |

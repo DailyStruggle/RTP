@@ -31,8 +31,8 @@ java {
 
 repositories {
     mavenCentral()
-    maven { url 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
-    maven { url 'https://repo.papermc.io/repository/maven-public/' }
+    maven { url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
+    maven { url = 'https://repo.papermc.io/repository/maven-public/' }
 }
 
 dependencies {

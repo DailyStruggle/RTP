@@ -5,12 +5,11 @@
 # código y no debe cambiarse.
 # Si este archivo falta, el plugin lo regenera con pares idénticos
 # izquierda/derecha (los valores por defecto en inglés).
-
-database: baseDeDatos
-playerCommands: comandosJugador
-teleportCooldown: enfriamientoTeletransporte
-cancelDistance: distanciaCancelar
-teleportDelay: retrasoTeletransporte
-consoleCommands: comandosConsola
-version: version
-network: red
+database: "baseDeDatos"
+playerCommands: "comandosJugador"
+teleportCooldown: "enfriamientoTeletransporte"
+cancelDistance: "distanciaCancelar"
+teleportDelay: "retrasoTeletransporte"
+consoleCommands: "comandosConsola"
+version: "version"
+network: "red"

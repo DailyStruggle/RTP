@@ -1,6 +1,5 @@
 # --- RTP Kernkonfiguration ---
 # Dokumentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/CORE_CONFIG.md
-
 # Sprache für spielerorientierte Nachrichten
 language: "en"
 
@@ -37,4 +36,4 @@ netzwerk:
     password: ""
 
 # ÄNDERE NICHT DIE VERSIONSNUMMER
-version: "3.0"
+version: 3.0

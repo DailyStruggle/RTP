@@ -77,7 +77,7 @@ Reconciliation is symmetric:
 - Palette entries shaped `minecraft:lava` are resolved via the platform registry (Bukkit `Material.matchMaterial(...)`, `Registry.BIOME`) to the canonical enum `.name()` (`LAVA`). Unresolved entries (modded identifiers on Mohist, Arclight) fall back to namespace-strip + `Locale.ROOT` upper-case.
 - User-supplied `SafetyKeys.unsafeBlocks` and biome lists go through the identical normalization once at config load, so `LAVA`, `minecraft:lava`, and `MINECRAFT:LAVA` compare equal.
 
-`rtp-anvil` ships a platform-neutral `DEFAULT_RECONCILER` (namespace-strip + upper-case). Platform adapters needing a registry-aware reconciler (`PaletteNormalizer` in `rtp-spigot-common`) supply it as a `UnaryOperator<String>` on the reconciler-aware overloads of `probeDetailed` / `probeSyncDetailed`.
+`rtp-anvil` ships a platform-neutral `DEFAULT_RECONCILER` (namespace-strip + upper-case). Platform adapters needing a registry-aware reconciler (`PaletteNormalizer` in `rtp-bukkit-common`) supply it as a `UnaryOperator<String>` on the reconciler-aware overloads of `probeDetailed` / `probeSyncDetailed`.
 
 ### 8. Shared module layout
 
@@ -90,7 +90,7 @@ The decode stack lives in `rtp-anvil` (peer of `commands-api` and `effects-api`)
 
 Public types exchange only platform-neutral values: `byte[]`, `java.nio.file.Path`, `java.util.Optional`, primitives, and the module's own decode types. Enforced at the bytecode level by `AnvilPackageBoundaryArchTest`.
 
-Contents: `AnvilReader`, `AnvilChunkView`, `AnvilPrefilter`, `AnvilPrefilterMetrics`, `BiomeSourceMetrics`, `PackedPaletteDecoder`, `PaletteSection`, `BiomePaletteSection`, `DataVersionSupport`, `Verdict`, `Nbt`, `UnsupportedAnvilFormatException`, `AnvilRegionScanner` (diagnostic), plus test fixtures (`r.X.Z.mca`) for 1.20.1 / 1.21.1 / 26.1. `PaletteNormalizer` and `dimensionRegionSubpath(World)` stay in `rtp-spigot-common` (Bukkit-coupled).
+Contents: `AnvilReader`, `AnvilChunkView`, `AnvilPrefilter`, `AnvilPrefilterMetrics`, `BiomeSourceMetrics`, `PackedPaletteDecoder`, `PaletteSection`, `BiomePaletteSection`, `DataVersionSupport`, `Verdict`, `Nbt`, `UnsupportedAnvilFormatException`, `AnvilRegionScanner` (diagnostic), plus test fixtures (`r.X.Z.mca`) for 1.20.1 / 1.21.1 / 26.1. `PaletteNormalizer` and `dimensionRegionSubpath(World)` stay in `rtp-bukkit-common` (Bukkit-coupled).
 
 ### 9. Thread placement
 
@@ -125,7 +125,7 @@ Fabric is out of scope for this ADR; an equivalent contract for `rtp-fabric` sha
 
 #### 11.2 Enforcement
 
-New code introducing a live `world.getBiome(...)` or equivalent from `rtp-spigot-common`, `rtp-paper-*`, or `rtp-folia-*` shall be rejected at review unless gated on the §11.1 exemption **and** on an `AnvilProbeSupport` `UNKNOWN` outcome. Any ADR that narrows §11 shall explicitly supersede this section. Regression guard: `ReqRtpAnvilFirstTest` under `rtp-paper-v1_20_R1` asserts `PaperRTPWorld` does not re-declare `getChunkAt` / `getBiome`.
+New code introducing a live `world.getBiome(...)` or equivalent from `rtp-bukkit-common`, `rtp-paper-*`, or `rtp-folia-*` shall be rejected at review unless gated on the §11.1 exemption **and** on an `AnvilProbeSupport` `UNKNOWN` outcome. Any ADR that narrows §11 shall explicitly supersede this section. Regression guard: `ReqRtpAnvilFirstTest` under `rtp-paper-v1_20_R1` asserts `PaperRTPWorld` does not re-declare `getChunkAt` / `getBiome`.
 
 ### 12. Biome-filter evaluation model
 

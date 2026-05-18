@@ -1,0 +1,14 @@
+# --- Mapeamento de Idioma: economy.yml ---
+# Mapeia as chaves internas (esquerda) para os nomes visíveis ao usuário
+# em economy.yml (direita). Edite apenas o lado direito para renomear ou
+# traduzir uma opção; o lado esquerdo é uma constante de código e não
+# deve ser alterado.
+# Se este arquivo estiver ausente, o plugin o regenera com pares
+# idênticos esquerda/direita (os valores padrão em inglês).
+balanceFloor: "saldoMinimo"
+price: "preco"
+priceOther: "precoOutro"
+refundOnCancel: "reembolsoAoCancelar"
+biomePrice: "precoBioma"
+paramsPrice: "precoParametros"
+version: "version"

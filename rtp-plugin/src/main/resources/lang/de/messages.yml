@@ -8,15 +8,15 @@
 #   - Fehlende Schlüssel werden automatisch mit dem englischen Text gefüllt.
 #
 # REQ-RTP-F-013 / ADR-020.
-################################################################################
+# ###############################################################################
 # Abschnitt 1: Allgemeine Konfiguration
-################################################################################
+# ###############################################################################
 platzhalter:
   # P0
   - "[RTP]"
-################################################################################
+# ###############################################################################
 # Abschnitt 2: Teleportation
-################################################################################
+# ###############################################################################
 bereitsAmTeleportieren: "&e[P0] du wirst bereits teleportiert!"
 teleportVerweigertNeuLaden: "&e[P0] Teleporte sind vorübergehend deaktiviert, während das Plugin neu geladen wird. Bitte versuche es gleich erneut."
 verzoegerungNachricht: "&e[P0] Teleportiere in [delay]. Nicht bewegen."
@@ -28,17 +28,17 @@ abkuehlungNachricht: "&e[P0] Du kannst dich erst in [remainingCooldown] wieder t
 keineOrteInWarteschlange: "#f5eb73[P0] derzeit keine Orte bereit"
 warteschlangeAktualisierung: "#2636ef[P0] dein Platz in der Warteschlange: [spot]"
 nichtGenugGeld: "&e[P0] du brauchst mindestens $[money] dafür."
-################################################################################
+# ###############################################################################
 # Abschnitt 3: Zeitformatierung
-################################################################################
+# ###############################################################################
 tage: "T"
 stunden: "Std"
 minuten: "Min"
 sekunden: "Sek"
 millisekunden: "ms"
-################################################################################
+# ###############################################################################
 # Abschnitt 4: System & Verwaltung
-################################################################################
+# ###############################################################################
 alteDatei: "&b[P0] alte [filename] erkannt. Wird aktualisiert"
 neueWelt: "&b[P0] neue Welt '[world]' erkannt"
 ungueltigeWelt: "&e[P0] Welt '[world]' wurde nicht gefunden"
@@ -51,14 +51,14 @@ konsolBefehlNichtErlaubt: "&c[P0] Du musst ein Spieler im Spiel sein, um diesen 
 busy: "&c[P0] beschäftigt"
 invalidCommand: "&c[P0] ungültiger Befehl - [arg]"
 keineBerechtigungen: "&eEs tut uns leid, aber du hast keine Berechtigung, diesen Befehl auszuführen. Wende dich an die Serveradministratoren, wenn du glaubst, dass dies ein Fehler ist."
-################################################################################
+# ###############################################################################
 # Abschnitt 5: Verwaltungsprotokolle
-################################################################################
+# ###############################################################################
 ortGespeichert: "&e[P0] [amount] Orte für [region] erfolgreich gespeichert"
 ortGeladen: "&e[P0] [amount] Orte für [region] erfolgreich geladen"
-################################################################################
+# ###############################################################################
 # Abschnitt 6: Scan-Befehl
-################################################################################
+# ###############################################################################
 scanStarten: "&a[P0] Scan-Aufgabe für Regionen gestartet: [scan_regions]"
 scanZuruecksetzen: "&e[P0] Scan-Warteschlange für Regionen zurückgesetzt: [scan_regions]"
 scanAbbrechen: "&e[P0] Scan-Aufgabe für Regionen abgebrochen: [scan_regions]"
@@ -67,9 +67,9 @@ scanFortsetzten: "#10A5F5[P0] Scan-Aufgabe für Regionen fortgesetzt: [scan_regi
 scanLaeuft: "&c[P0] Scan-Aufgabe läuft bereits für Regionen: [scan_regions]"
 scanLaeuftNicht: "&c[P0] Scan-Aufgabe läuft nicht für Regionen: [scan_regions]"
 scanStatus: "&a[P0] [scan_chunks] / [scan_totalChunks] Chunks für Regionen abgeschlossen: [scan_regions]. [scan_cps] cps. Landanteil: [scan_landPercentage]%. ETA: [scan_eta]"
-################################################################################
+# ###############################################################################
 # Abschnitt 7: Info-Befehl
-################################################################################
+# ###############################################################################
 infoTitel: "&a======RTP-Info======"
 infoTickets: "&7Globale aktive Chunk-Tickets: &f[tickets]"
 infoTeleporte: "&7Aktive Teleport-Zustandsmaschinen: &f[teleports]"
@@ -100,9 +100,9 @@ regionInfo:
   - "#58CCED  - UngehaltenerCache (L2): [unkeptCache]"
   - "#58CCED  - RueckstauCache (L3): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - ImCache: [cached]"
-################################################################################
+# ###############################################################################
 # Abschnitt 8: Befehlsbeschreibungen
-################################################################################
+# ###############################################################################
 rtp: "&b/rtp - zu einem zufälligen Ort teleportieren"
 rtp_beschreibung: "zu einem zufälligen Ort teleportieren"
 hilfe: "&b/rtp help - diese Hilfe anzeigen"
@@ -114,28 +114,28 @@ scan_beschreibung: "gespeicherte Daten löschen und alle möglichen Regionsplatz
 config_beschreibung: "Konfigurationsdateien zur Laufzeit aktualisieren"
 info_beschreibung: "aktuellen Zustand des Plugins prüfen"
 test_beschreibung: "RTP-Funktionen testen"
-################################################################################
+# ###############################################################################
 # Abschnitt 9: PlaceholderAPI-Unterstützung
-################################################################################
+# ###############################################################################
 SPIELER_VERFUEGBAR: "&aVERFÜGBAR"
 SPIELER_ABKUEHLUNG: "&eIN ABKÜHLUNG"
 SPIELER_EINRICHTEN: "&bORT WIRD GEWÄHLT"
 SPIELER_LADEN: "&bCHUNKS WERDEN GELADEN"
 SPIELER_TELEPORTIEREN: "&bTELEPORTIERT"
-################################################################################
+# ###############################################################################
 # Abschnitt 10: Visuelle Elemente
-################################################################################
+# ###############################################################################
 titel: "#FF6B6BT#FF8057e#FF9549l#FFAA3Be#FFBF2Dp#FFD41Fo#E8E011r#BFED12t#96F513i#6DF514e#44F271r#3BEFC8t#38ECF0!"
 untertitel: "#A78BFAV#B47EF8i#C171F6e#CE64F4l#DB57F2 #E84AF0S#E855D8p#E860C0a#E86BA8ß#E876A0!"
 einblenden: 20
 anzeigen: 20
 ausblenden: 20
 aktionsleiste: ""
-################################################################################
+# ###############################################################################
 # Abschnitt 11: Metadaten
-################################################################################
-version: "1.0"
-################################################################################
+# ###############################################################################
+version: 1.0
+# ###############################################################################
 # Abschnitt 12: Entwickleroptionen
-################################################################################
+# ###############################################################################
 entwicklerTagAnzeigen: false

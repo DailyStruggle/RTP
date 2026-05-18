@@ -42,7 +42,7 @@ Symptom → start here:
 The dependency graph (source: [`ARCHITECTURE.md`](ARCHITECTURE.md#module-dependency-graph)) tells you the *only* legal direction code may flow:
 
 ```
-rtp-api ──► rtp-core ──► rtp-plugin ◄── rtp-spigot / rtp-paper / rtp-folia
+rtp-api ──► rtp-core ──► rtp-plugin ◄── rtp-bukkit / rtp-paper / rtp-folia
    │                                    (and rtp-core ──► rtp-fabric)
    └──► addons/
 ```
@@ -76,7 +76,7 @@ Walk the diagram with repair eyes:
 5. **`ReqTicket` — LOAD stage.** Here the platform adapter is called to asynchronously acquire a chunk ticket. This is the single highest-risk step in the whole plugin:
    - **S-005** — no synchronous chunk I/O on the main thread.
    - **S-002** — no permanently force-loaded chunks (use plugin chunk tickets, not `Chunk.setForceLoaded(true)`).
-   - On pure Spigot, `BukkitRTPWorld.loadChunkFuture` may bounce to tick; see [`DESIGN.md §rtp-spigot Implementation Notes`](DESIGN.md) and [ADR-016](../adr/ADR-016-anvil-subsystem.md) for the Anvil pre-filter that avoids a load.
+   - On pure Spigot, `BukkitRTPWorld.loadChunkFuture` may bounce to tick; see [`DESIGN.md §rtp-bukkit Implementation Notes`](DESIGN.md) and [ADR-016](../adr/ADR-016-anvil-subsystem.md) for the Anvil pre-filter that avoids a load.
 
 6. **`EvalBlocks` — TELEPORT-prep safety.** Runs on the region-owning thread (Folia) or main thread (Paper/Spigot). *Break:* if a "safe" spot turns out to be in lava or a claim, inspect `Region.isSafe` plus the verticalAdjustor and the `badLocation` predicates — see [ADR-017](../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists.md). S-001 forbids *unsafe-block destinations*; S-003 forbids *claim-protected land*. Never add a "second" block check in an adapter — keep all checks in `rtp-core`.
 

@@ -12,7 +12,6 @@
 # 알 수 없는 태그는 빈 집합으로 확장됩니다 (no-op, fail-open). 형식이 잘못된
 # 토큰은 리로드 시 WARN 레벨로 한 번만 로그에 출력됩니다 (REQ-RTP-S-004).
 # 리스트 내 순서는 중요하지 않습니다.
-
 # 무적 시간(초)
 # 텔레포트 후 플레이어가 무적이 되는 시간. 도착 직후 화재·질식·낙하 피해로 죽는 것을 방지합니다.
 무적시간: 5
@@ -60,7 +59,7 @@ anvilPrefilterEnabled: true
 플랫폼공기높이: 2
 
 # 목적지에 고체 블록이 없을 때 플랫폼에 사용할 기본 재질.
-플랫폼재질: GLASS
+플랫폼재질: "GLASS"
 
 # 공기 블록
 # 통과 가능/플레이어 신체를 막지 않는 것으로 간주되는 재질. 전방 호환성을 위해
@@ -68,12 +67,12 @@ anvilPrefilterEnabled: true
 # (예: 향후 MC 가 추가하는 꽃은 #minecraft:small_flowers 에서 자동으로 선택됨).
 공기블록:
   # 진정한 air 변형 (이 모두를 커버하는 태그는 없음)
-  - AIR
-  - CAVE_AIR
-  - VOID_AIR
-  - LEGACY_AIR
-  - STRUCTURE_VOID
-  - LIGHT
+  - "AIR"
+  - "CAVE_AIR"
+  - "VOID_AIR"
+  - "LEGACY_AIR"
+  - "STRUCTURE_VOID"
+  - "LIGHT"
 
   # 꽃 (민들레, 양귀비, 튤립, 아이블로섬, 횃불꽃…)
   - "#minecraft:flowers"
@@ -81,61 +80,61 @@ anvilPrefilterEnabled: true
   - "#minecraft:tall_flowers"
 
   # 풀 종류와 꽃 태그에 포함되지 않는 관목
-  - SHORT_GRASS
-  - TALL_GRASS
-  - SHORT_DRY_GRASS
-  - TALL_DRY_GRASS
-  - FERN
-  - LARGE_FERN
-  - DEAD_BUSH
-  - BUSH
-  - WILDFLOWERS
-  - FIREFLY_BUSH
-  - LEGACY_LONG_GRASS
-  - LEGACY_DEAD_BUSH
+  - "SHORT_GRASS"
+  - "TALL_GRASS"
+  - "SHORT_DRY_GRASS"
+  - "TALL_DRY_GRASS"
+  - "FERN"
+  - "LARGE_FERN"
+  - "DEAD_BUSH"
+  - "BUSH"
+  - "WILDFLOWERS"
+  - "FIREFLY_BUSH"
+  - "LEGACY_LONG_GRASS"
+  - "LEGACY_DEAD_BUSH"
 
   # 묘목, 번식 새싹, 버섯
   - "#minecraft:saplings"
-  - BROWN_MUSHROOM
-  - RED_MUSHROOM
-  - CRIMSON_FUNGUS
-  - WARPED_FUNGUS
+  - "BROWN_MUSHROOM"
+  - "RED_MUSHROOM"
+  - "CRIMSON_FUNGUS"
+  - "WARPED_FUNGUS"
 
   # 작물과 편리한 태그가 없는 지표 식물
   - "#minecraft:crops"
-  - MELON_STEM
-  - PUMPKIN_STEM
-  - SUGAR_CANE
-  - BAMBOO_SAPLING
+  - "MELON_STEM"
+  - "PUMPKIN_STEM"
+  - "SUGAR_CANE"
+  - "BAMBOO_SAPLING"
 
   # 덩굴과 벽걸이 식물
-  - VINE
-  - GLOW_LICHEN
-  - WEEPING_VINES
-  - TWISTING_VINES
-  - HANGING_ROOTS
-  - PALE_HANGING_MOSS
-  - RESIN_CLUMP
+  - "VINE"
+  - "GLOW_LICHEN"
+  - "WEEPING_VINES"
+  - "TWISTING_VINES"
+  - "HANGING_ROOTS"
+  - "PALE_HANGING_MOSS"
+  - "RESIN_CLUMP"
 
   # 레일
   - "#minecraft:rails"
 
   # 레드스톤 회로 (통합 태그 없음)
-  - REDSTONE_WIRE
-  - COMPARATOR
-  - REPEATER
-  - LEVER
-  - STRING
-  - TRIPWIRE
+  - "REDSTONE_WIRE"
+  - "COMPARATOR"
+  - "REPEATER"
+  - "LEVER"
+  - "STRING"
+  - "TRIPWIRE"
 
   # 횃불 및 조명 (통합 태그 없음)
-  - TORCH
-  - WALL_TORCH
-  - SOUL_TORCH
-  - SOUL_WALL_TORCH
-  - REDSTONE_TORCH
-  - REDSTONE_WALL_TORCH
-  - END_ROD
+  - "TORCH"
+  - "WALL_TORCH"
+  - "SOUL_TORCH"
+  - "SOUL_WALL_TORCH"
+  - "REDSTONE_TORCH"
+  - "REDSTONE_WALL_TORCH"
+  - "END_ROD"
 
   # 버튼 (석재/목재의 모든 변형)
   - "#minecraft:buttons"
@@ -148,23 +147,23 @@ anvilPrefilterEnabled: true
   - "#minecraft:wall_signs"
   - "#minecraft:ceiling_hanging_signs"
   - "#minecraft:wall_hanging_signs"
-  - LEGACY_SIGN
-  - LEGACY_WALL_SIGN
+  - "LEGACY_SIGN"
+  - "LEGACY_WALL_SIGN"
 
   # 지표 카펫
-  - SNOW
-  - MOSS_CARPET
-  - PALE_MOSS_CARPET
-  - LEAF_LITTER
+  - "SNOW"
+  - "MOSS_CARPET"
+  - "PALE_MOSS_CARPET"
+  - "LEAF_LITTER"
 
 # 위험 블록
 # 플러그인이 착지점으로 거부할 재질 또는 블록 상태. `safetyRadius` 범위 내에
 # 있는 경우에도 거부됩니다. 상태 술어와 와일드카드를 지원합니다 (파일 상단 구문 참조).
 위험블록:
   # 유체
-  - WATER
-  - LAVA
-  - BUBBLE_COLUMN
+  - "WATER"
+  - "LAVA"
+  - "BUBBLE_COLUMN"
 
   # 침수 블록 (반/계단/울타리/벽/표지판/체인/…) — 구식 의사 토큰
   # 'WATERLOGGED' 를 대체합니다. ADR-017 의 와일드카드를 사용합니다.
@@ -172,38 +171,38 @@ anvilPrefilterEnabled: true
 
   # 화염 및 고온 위험물
   - "#minecraft:fire"
-  - POWDER_SNOW
-  - MAGMA_BLOCK
+  - "POWDER_SNOW"
+  - "MAGMA_BLOCK"
 
   # 모닥불 (점화/미점화 모두 플레이어가 빠지므로 위험)
   - "#minecraft:campfires"
 
   # 접촉 피해 / 걸림
-  - CACTUS
-  - SWEET_BERRY_BUSH
-  - WITHER_ROSE
-  - CHORUS_PLANT
-  - CHORUS_FLOWER
-  - POINTED_DRIPSTONE
-  - COBWEB
-  - CREAKING_HEART
+  - "CACTUS"
+  - "SWEET_BERRY_BUSH"
+  - "WITHER_ROSE"
+  - "CHORUS_PLANT"
+  - "CHORUS_FLOWER"
+  - "POINTED_DRIPSTONE"
+  - "COBWEB"
+  - "CREAKING_HEART"
 
   # 공허 / 포털 / 이동 불가
-  - BEDROCK
-  - NETHER_PORTAL
-  - END_PORTAL
-  - END_GATEWAY
+  - "BEDROCK"
+  - "NETHER_PORTAL"
+  - "END_PORTAL"
+  - "END_GATEWAY"
 
   # 폭발물
-  - TNT
-  - END_CRYSTAL
-  - RESPAWN_ANCHOR
+  - "TNT"
+  - "END_CRYSTAL"
+  - "RESPAWN_ANCHOR"
 
   # 수중 식물 (질식 위험)
-  - SEAGRASS
-  - TALL_SEAGRASS
-  - KELP
-  - KELP_PLANT
+  - "SEAGRASS"
+  - "TALL_SEAGRASS"
+  - "KELP"
+  - "KELP_PLANT"
 
 # 바이옴 필터
 # biomeWhitelist: false -> `biomes` 리스트는 블랙리스트 (이들을 건너뜀)
@@ -213,35 +212,35 @@ anvilPrefilterEnabled: true
 바이옴화이트리스트: false
 바이옴:
   # 해양 계열
-  - OCEAN
-  - DEEP_OCEAN
-  - WARM_OCEAN
-  - LUKEWARM_OCEAN
-  - DEEP_LUKEWARM_OCEAN
-  - COLD_OCEAN
-  - DEEP_COLD_OCEAN
-  - FROZEN_OCEAN
-  - DEEP_FROZEN_OCEAN
+  - "OCEAN"
+  - "DEEP_OCEAN"
+  - "WARM_OCEAN"
+  - "LUKEWARM_OCEAN"
+  - "DEEP_LUKEWARM_OCEAN"
+  - "COLD_OCEAN"
+  - "DEEP_COLD_OCEAN"
+  - "FROZEN_OCEAN"
+  - "DEEP_FROZEN_OCEAN"
 
   # 강 계열
-  - RIVER
-  - FROZEN_RIVER
+  - "RIVER"
+  - "FROZEN_RIVER"
 
   # 인접/해안 바이옴
-  - BEACH
-  - SNOWY_BEACH
-  - STONY_SHORE
-  - SWAMP
-  - MANGROVE_SWAMP
+  - "BEACH"
+  - "SNOWY_BEACH"
+  - "STONY_SHORE"
+  - "SWAMP"
+  - "MANGROVE_SWAMP"
 
   # 엔드 바이옴 (고체 착지점 없음 / 공허 인접)
-  - SMALL_END_ISLANDS
+  - "SMALL_END_ISLANDS"
 
   # 네더 바이옴 (위험/기복이 큰 지형)
-  - BASALT_DELTAS
+  - "BASALT_DELTAS"
 
   # 기술적 바이옴
-  - THE_VOID
+  - "THE_VOID"
 
 # 버전 번호는 변경하지 마세요
-version: "1.0"
+version: 1.0

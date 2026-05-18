@@ -5,9 +5,9 @@
 # les options ; la gauche est une constante du code, ne la modifiez pas.
 # Si ce fichier est absent, le plugin le régénérera automatiquement avec
 # une version anglaise dont les deux côtés sont identiques.
-when: quand
-permission: permission
-players: joueurs
-inherit: herite
-effects: effets
-version: version
+when: "quand"
+permission: "permission"
+players: "joueurs"
+inherit: "herite"
+effects: "effets"
+version: "version"

@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.paper.metrics;
 
-import io.github.dailystruggle.rtp.common.metrics.MetricsSnapshot;
+import io.github.dailystruggle.metrics.api.MetricsSnapshot;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -24,7 +24,8 @@ class PaperMetricsBindingTest {
                 () -> 19.80,
                 () -> 19.50,
                 () -> 50.25,
-                () -> 7
+                () -> 7,
+                () -> 20
         );
 
         assertEquals(19.95, b.tps1m(),  1e-9);
@@ -32,6 +33,7 @@ class PaperMetricsBindingTest {
         assertEquals(19.50, b.tps15m(), 1e-9);
         assertEquals(50.25, b.mspt(),   1e-9);
         assertEquals(7,     b.playerCount());
+        assertEquals(20,    b.softCap());
     }
 
     @Test
@@ -41,6 +43,7 @@ class PaperMetricsBindingTest {
                 () -> MetricsSnapshot.UNSAMPLED,
                 () -> MetricsSnapshot.UNSAMPLED,
                 () -> MetricsSnapshot.UNSAMPLED,
+                () -> 0,
                 () -> 0
         );
 
@@ -54,13 +57,13 @@ class PaperMetricsBindingTest {
 
     @Test
     void inheritedDefaults_unchangedForUnimplementedFields() {
-        // PaperMetricsBinding intentionally does not override softCap / chunkLoadBacklog /
-        // databaseLatencyMs — they must keep MetricsBinding's documented sentinels.
+        // PaperMetricsBinding intentionally does not override chunkLoadBacklog /
+        // databaseLatencyMs - they must keep MetricsBinding's documented sentinels.
+        // softCap is now wired (see softCap_isPlumbedThroughSupplier).
         PaperMetricsBinding b = new PaperMetricsBinding(
-                () -> 20.0, () -> 20.0, () -> 20.0, () -> 0.0, () -> 0
+                () -> 20.0, () -> 20.0, () -> 20.0, () -> 0.0, () -> 0, () -> 0
         );
 
-        assertEquals(0,  b.softCap());
         assertEquals(0,  b.chunkLoadBacklog());
         assertEquals(-1, b.databaseLatencyMs());
     }

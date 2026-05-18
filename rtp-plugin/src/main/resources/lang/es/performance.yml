@@ -1,6 +1,5 @@
 # --- Configuración de rendimiento de RTP ---
 # Ajusta con precisión el plugin para el rendimiento del servidor.
-
 # Intentos máximos de búsqueda
 # Cuántas veces buscará el plugin una ubicación segura antes de detenerse.
 # Impacto: ALTO — valores elevados pueden aumentar mucho el uso de CPU por petición.
@@ -77,6 +76,6 @@ verificarEnCargaChunk: false
 visitorEnabled: true
 
 # NO MODIFIQUES EL NÚMERO DE VERSIÓN
-pregeneratedPreference: 0.0 # Probability [0.0, 1.0] of rejecting an ungenerated chunk per selection attempt. 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land. Generated chunks always pass.
-backlogRefillThreshold: 0.5 # Fraction [0.0, 1.0] of L3 backlog capacity at which refill resumes (hysteresis). 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill continuously.
-version: "1.0"
+pregeneratedPreference: "0.0 # Probability [0.0, 1.0] of rejecting an ungenerated chunk per selection attempt. 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land. Generated chunks always pass."
+backlogRefillThreshold: "0.5 # Fraction [0.0, 1.0] of L3 backlog capacity at which refill resumes (hysteresis). 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill continuously."
+version: 1.0

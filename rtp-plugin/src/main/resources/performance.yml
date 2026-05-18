@@ -1,6 +1,5 @@
 # --- RTP Performance Settings ---
 # Documentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/PERFORMANCE.md
-
 # Maximum search attempts per /rtp invocation before giving up.
 # @type: integer
 # @range: [1, null]
@@ -126,4 +125,4 @@ pregeneratedPreference: 0.0
 backlogRefillThreshold: 0.5
 
 # DO NOT TOUCH VERSION NUMBER
-version: "1.0"
+version: 1.0

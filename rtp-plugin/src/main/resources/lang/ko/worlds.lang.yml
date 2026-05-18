@@ -4,8 +4,7 @@
 # 이름을 변경하거나 번역하려면 오른쪽만 편집하세요.
 # 왼쪽은 코드 상수이므로 변경하지 마세요.
 # 이 파일이 존재하지 않으면 플러그인은 좌우가 동일한 영어 버전을 다시 생성합니다.
-
-region: 리전
-requirePermission: 권한요구
-override: 오버라이드
-version: version
+region: "리전"
+requirePermission: "권한요구"
+override: "오버라이드"
+version: "version"

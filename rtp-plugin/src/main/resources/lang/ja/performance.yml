@@ -1,6 +1,5 @@
 # --- RTP パフォーマンス設定 ---
 # サーバーパフォーマンスに合わせてプラグインの挙動を細かく調整します。
-
 # 最大検索試行回数
 # 1 回のリクエストで安全な位置を探す最大試行回数。これを超えると諦めます。
 # 影響: 高 — 大きな値はリクエストごとの CPU 使用を大きく増やします。
@@ -76,6 +75,6 @@
 visitorEnabled: true
 
 # バージョン番号は変更しないでください
-pregeneratedPreference: 0.0 # Probability [0.0, 1.0] of rejecting an ungenerated chunk per selection attempt. 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land. Generated chunks always pass.
-backlogRefillThreshold: 0.5 # Fraction [0.0, 1.0] of L3 backlog capacity at which refill resumes (hysteresis). 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill continuously.
-version: "1.0"
+pregeneratedPreference: "0.0 # Probability [0.0, 1.0] of rejecting an ungenerated chunk per selection attempt. 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land. Generated chunks always pass."
+backlogRefillThreshold: "0.5 # Fraction [0.0, 1.0] of L3 backlog capacity at which refill resumes (hysteresis). 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill continuously."
+version: 1.0

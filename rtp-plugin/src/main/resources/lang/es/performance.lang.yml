@@ -5,19 +5,18 @@
 # código y no debe cambiarse.
 # Si este archivo falta, el plugin lo regenera con pares idénticos
 # izquierda/derecha (los valores por defecto en inglés).
-
-period: periodo
-viewDistanceSelect: distanciaVistaSeleccion
-biomeRecall: recuerdoBioma
-version: version
-maxAttempts: intentosMaximos
-biomeRecallForced: recuerdoBiomaForzado
-onEventParsing: analisisAlEvento
-checkOnChunkLoads: verificarEnCargaChunk
-postTeleportQueueing: encolarPostTeletransporte
-syncLoading: cargaSincrona
-effectParsing: analisisEfectos
-viewDistanceTeleport: distanciaVistaTeletransporte
-minTPS: tpsMinimo
-syncAllottedTime: tiempoAsignadoSincrono
-asyncAllottedTime: tiempoAsignadoAsincrono
+period: "periodo"
+viewDistanceSelect: "distanciaVistaSeleccion"
+biomeRecall: "recuerdoBioma"
+version: "version"
+maxAttempts: "intentosMaximos"
+biomeRecallForced: "recuerdoBiomaForzado"
+onEventParsing: "analisisAlEvento"
+checkOnChunkLoads: "verificarEnCargaChunk"
+postTeleportQueueing: "encolarPostTeletransporte"
+syncLoading: "cargaSincrona"
+effectParsing: "analisisEfectos"
+viewDistanceTeleport: "distanciaVistaTeletransporte"
+minTPS: "tpsMinimo"
+syncAllottedTime: "tiempoAsignadoSincrono"
+asyncAllottedTime: "tiempoAsignadoAsincrono"

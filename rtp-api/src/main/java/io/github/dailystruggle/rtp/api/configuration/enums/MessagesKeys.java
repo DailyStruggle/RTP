@@ -137,6 +137,68 @@ public enum MessagesKeys {
    * (the {@code [heapUsedMb]} / {@code [heapMaxMb]} placeholders).
    */
   infoHeap,
+  /**
+   * Header line for the {@code Health — pipeline} group in {@code /rtp info}
+   * (operator-facing labelled block, METRICS_PLAN.md > /rtp info Surface).
+   */
+  infoHealthPipelineHeader,
+  /**
+   * Info line showing TPS (1m / 5m / 15m windows)
+   * (the {@code [tps1m]} / {@code [tps5m]} / {@code [tps15m]} placeholders).
+   */
+  infoTps,
+  /**
+   * Info line showing the live server MSPT contribution
+   * (the {@code [mspt]} / {@code [tickBudgetUtilisation]} placeholders).
+   */
+  infoMSPTLive,
+  /**
+   * Info line showing the configured player soft-cap and current player count
+   * (the {@code [softCap]} / {@code [playerCount]} placeholders).
+   */
+  infoSoftCap,
+  /**
+   * Info line showing the most recent database round-trip latency in milliseconds
+   * (the {@code [databaseLatencyMs]} placeholder).
+   */
+  infoDatabaseLatencyMs,
+  // --- /rtp info colour-band thresholds (B12 / METRICS_PLAN.md > Health colour coding) ---
+  // Doubles stored as YAML scalars; consumed by ColourBands in rtp-core to wrap
+  // coloured-variant placeholders (e.g. [tps1mColoured]) with &a/&e/&c codes.
+  // Missing or malformed keys silently fall back to the documented defaults so
+  // operators never see a thrown exception when downgrading from a customised
+  // messages.yml; see ColourBands#parseDouble for the resolution policy.
+  /** Lower bound for the green band on TPS (1m/5m/15m). Default {@code 19.5}. */
+  infoThresholdTpsGreen,
+  /** Lower bound for the yellow band on TPS (1m/5m/15m). Default {@code 18.0}. */
+  infoThresholdTpsYellow,
+  /** Upper bound (inclusive) for the green band on server MSPT in ms. Default {@code 30.0}. */
+  infoThresholdMsptGreen,
+  /** Upper bound (inclusive) for the yellow band on server MSPT in ms. Default {@code 45.0}. */
+  infoThresholdMsptYellow,
+  /** Lower bound for the green band on L1 cache fill (fraction in {@code [0.0, 1.0]}). Default {@code 0.50}. */
+  infoThresholdCacheFillGreen,
+  /** Lower bound for the yellow band on L1 cache fill (fraction in {@code [0.0, 1.0]}). Default {@code 0.25}. */
+  infoThresholdCacheFillYellow,
+  /** Lower bound (inclusive) in seconds for the yellow band on network-transport last-success age. Default {@code 5.0}. */
+  infoThresholdNetworkAgeYellow,
+  /**
+   * Header line introducing the per-Folia-region table in {@code /rtp info}.
+   * Rendered only when {@code MetricsSnapshot.foliaRegions()} is non-empty
+   * (Folia runtime). Empty template skips silently — non-Folia locales and
+   * locales without the new key continue to work unchanged. See
+   * {@code docs/dev/METRICS_PLAN.md > Folia Aggregation} and
+   * {@code docs/dev/scratch/PROPOSAL-section-c-folia-fabric-metrics.md §1.3}.
+   */
+  infoFoliaRegionsHeader,
+  /**
+   * Per-row template for a single Folia region's metrics in {@code /rtp info},
+   * substituted once per entry in {@code MetricsSnapshot.foliaRegions()}.
+   * Supports the row-local tokens {@code [regionId]}, {@code [tps1m]},
+   * {@code [mspt]}, {@code [playerCount]}, {@code [queueDepth]}, and
+   * {@code [tickBudgetUtilisation]}. Empty template skips silently.
+   */
+  infoFoliaRegion,
   /** Header for the diagnostic disclaimer block in {@code /rtp info} output. */
   infoDisclaimerHeader,
   /** Disclaimer text reminding server operators to include info output in bug reports. */
@@ -297,5 +359,32 @@ public enum MessagesKeys {
    * replaced with the 1-based human-readable next page number. Configurable
    * per REQ-RTP-F-013.
    */
-  menuPageNext
+  menuPageNext,
+  // --- Stage B front-page row labels (curated landing page) ---
+  /** Section divider on the front page above teleport rows (player view). */
+  menuFrontPageSectionTeleport,
+  /** Section divider on the front page above admin rows (admin view). */
+  menuFrontPageSectionAdmin,
+  /** Front-page row: instant teleport. No placeholders. */
+  menuFrontPageRowTeleport,
+  /** Front-page row: open the region parameter-value picker. No placeholders. */
+  menuFrontPageRowRegion,
+  /** Front-page row: open the biome parameter-value picker. No placeholders. */
+  menuFrontPageRowBiome,
+  /** Front-page row: show help. No placeholders. */
+  menuFrontPageRowHelp,
+  /** Front-page row (admin): show /rtp info. No placeholders. */
+  menuFrontPageRowInfo,
+  /** Front-page row (admin): open config sub-menu. No placeholders. */
+  menuFrontPageRowConfig,
+  /** Front-page row (admin): open scan sub-menu. No placeholders. */
+  menuFrontPageRowScan,
+  /** Front-page row (admin): run full diagnostics. No placeholders. */
+  menuFrontPageRowDiagnostics,
+  /** Front-page row (admin): reload config files. Destructive — hover warns. No placeholders. */
+  menuFrontPageRowReload,
+  /** Hover text for the diagnostics row warning about cost. No placeholders. */
+  menuFrontPageHoverDiagnostics,
+  /** Hover text for the reload row warning about side-effects. No placeholders. */
+  menuFrontPageHoverReload
 }

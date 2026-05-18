@@ -12,7 +12,7 @@ REQUIREMENTS_FILES=(
   "docs/dev/REQUIREMENTS.md"
   "rtp-api/REQUIREMENTS.md"
   "rtp-core/REQUIREMENTS.md"
-  "rtp-spigot/REQUIREMENTS.md"
+  "rtp-bukkit/REQUIREMENTS.md"
   "rtp-paper/REQUIREMENTS.md"
   "rtp-folia/REQUIREMENTS.md"
 )

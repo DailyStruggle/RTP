@@ -1,0 +1,22 @@
+# --- Mapeamento de Idioma: performance.yml ---
+# Mapeia as chaves internas (esquerda) para os nomes visíveis ao usuário
+# em performance.yml (direita). Edite apenas o lado direito para renomear
+# ou traduzir uma opção; o lado esquerdo é uma constante de código e não
+# deve ser alterado.
+# Se este arquivo estiver ausente, o plugin o regenera com pares
+# idênticos esquerda/direita (os valores padrão em inglês).
+period: "periodo"
+viewDistanceSelect: "distanciaVisaoSelecao"
+biomeRecall: "lembrancaBioma"
+version: "version"
+maxAttempts: "tentativasMaximas"
+biomeRecallForced: "lembrancaBiomaForcada"
+onEventParsing: "analiseAoEvento"
+checkOnChunkLoads: "verificarNoCarregamentoChunk"
+postTeleportQueueing: "enfileirarPosTeletransporte"
+syncLoading: "carregamentoSincrono"
+effectParsing: "analiseEfeitos"
+viewDistanceTeleport: "distanciaVisaoTeletransporte"
+minTPS: "tpsMinimo"
+syncAllottedTime: "tempoAlocadoSincrono"
+asyncAllottedTime: "tempoAlocadoAssincrono"

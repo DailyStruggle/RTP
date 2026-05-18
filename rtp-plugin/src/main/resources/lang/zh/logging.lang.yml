@@ -2,18 +2,17 @@
 # 将内部配置键名（左侧）映射为 logging.yml 中用户可见的键名（右侧）。
 # 仅可修改右侧以重命名或翻译选项；左侧为代码常量，请勿更改。
 # 若此文件缺失，插件会自动重新生成左右一致的英文默认映射。
-
-event_changeworld: 事件_切换世界
-event_respawn: 事件_重生
-detailed_reload: 详细_重载
-teleport: 传送
-event_join: 事件_加入
-selection_failure: 选择失败
-system_memory_tracker: 系统_内存追踪
-system_database: 系统_数据库
-event_teleport: 事件_传送
-version: version
-detailed_region_init: 详细_区域初始化
-command: 命令
-event_move: 事件_移动
-min_level: 最低级别
+event_changeworld: "事件_切换世界"
+event_respawn: "事件_重生"
+detailed_reload: "详细_重载"
+teleport: "传送"
+event_join: "事件_加入"
+selection_failure: "选择失败"
+system_memory_tracker: "系统_内存追踪"
+system_database: "系统_数据库"
+event_teleport: "事件_传送"
+version: "version"
+detailed_region_init: "详细_区域初始化"
+command: "命令"
+event_move: "事件_移动"
+min_level: "最低级别"

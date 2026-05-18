@@ -1,5 +1,4 @@
 # --- RTP メイン設定 ---
-
 # プレイヤーに表示されるメッセージの言語。
 # デフォルト: "en" (messages.yml に同梱された英語ベースライン)。
 # 他の翻訳は lang/<locale>/messages.yml にあり、英語ベースラインの上に
@@ -56,4 +55,4 @@ language: "en"
     password: ""
 
 # バージョン番号は変更しないでください
-version: "3.0"
+version: 3.0

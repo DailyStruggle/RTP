@@ -4,8 +4,7 @@
 # 名前を改名・翻訳する場合は右側のみを編集してください。
 # 左側はコード定数なので変更しないでください。
 # このファイルが存在しない場合、プラグインは左右が同一の英語版を再生成します。
-
-region: リージョン
-requirePermission: 権限要求
-override: 上書き
-version: version
+region: "リージョン"
+requirePermission: "権限要求"
+override: "上書き"
+version: "version"

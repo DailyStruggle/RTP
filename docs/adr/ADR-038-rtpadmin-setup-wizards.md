@@ -24,7 +24,7 @@ Add a `/rtpadmin wizard <flow>` command surface in `rtp-core` that renders book-
 ### Module placement (Architecture Boundaries)
 
 - **`rtp-core`** — wizard flow definitions, page-flow state machine, `WizardSession` registry, and the `/rtpadmin wizard` subcommand tree. No platform imports. The state machine is a pure function over `(WizardSession, ClickToken) → (NextPage, ConfigTransaction?)`.
-- **Adapter layer (`rtp-paper`/`rtp-folia`/`rtp-spigot`/`rtp-fabric`)** — none. Rendering is delegated entirely to ADR-035's `MenuRenderer`; the wizard never constructs a `Book` or `Component` directly.
+- **Adapter layer (`rtp-paper`/`rtp-folia`/`rtp-bukkit`/`rtp-fabric`)** — none. Rendering is delegated entirely to ADR-035's `MenuRenderer`; the wizard never constructs a `Book` or `Component` directly.
 - **`rtp-api`** — no surface change. Wizard flows are not extensible by addons in beta.4 (deferred; see *What this ADR is not*).
 - **`commands-api`** — no surface change. `/rtpadmin wizard <flow>` is an ordinary subcommand routed through the Brigadier bridge ([commands-api-ADR-001](../../commands-api/docs/adr/commands-api-ADR-001-brigadier-bridge.md)).
 

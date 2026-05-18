@@ -1,4 +1,4 @@
-minY: minY
-maxY: maxY
-step: paso
-requireSkyLight: requerirLuzCielo
+minY: "minY"
+maxY: "maxY"
+step: "paso"
+requireSkyLight: "requerirLuzCielo"

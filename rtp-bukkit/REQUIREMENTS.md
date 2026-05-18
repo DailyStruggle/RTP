@@ -1,5 +1,5 @@
 # RTP Spigot Adapter Requirements
-This document outlines the requirements for the `rtp-spigot` module. This adapter serves standard Bukkit/Spigot server implementations where advanced asynchronous features or region-based multithreading are unavailable.
+This document outlines the requirements for the `rtp-bukkit` module. This adapter serves standard Bukkit/Spigot server implementations where advanced asynchronous features or region-based multithreading are unavailable.
 
 For design and implementation details that satisfy these requirements, see [`docs/dev/DESIGN.md`](../docs/dev/DESIGN.md).
 

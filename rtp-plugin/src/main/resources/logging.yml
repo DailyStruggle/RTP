@@ -1,6 +1,5 @@
 # --- Plugin Logging Toggles ---
 # Documentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/CONFIGURATION.md#loggingyml--console-logging-verbosity
-
 # Log all files reloaded during /rtp reload
 detailed_reload: false
 # Log region initialization details
@@ -33,7 +32,7 @@ system_database: false
 # Plugin-scoped minimum log level. Effective filter is the finer of this and the
 # Bukkit logger's own level. Accepts: SEVERE, WARNING, INFO, CONFIG, FINE, FINER,
 # FINEST, ALL, OFF. Default ALL keeps behavior identical to the Bukkit logger.
-min_level: INFO
+min_level: "INFO"
 
 # DO NOT TOUCH VERSION NUMBER
-version: "1.0"
+version: 1.0

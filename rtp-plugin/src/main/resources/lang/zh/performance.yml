@@ -1,6 +1,5 @@
 # --- RTP 性能设置 ---
 # 针对服务器性能精细调节插件行为。
-
 # 最大查找尝试次数
 # 在放弃前为单次请求查找安全位置的最大尝试次数。
 # 影响: 高 — 数值过大会显著增加每次请求的 CPU 占用。
@@ -74,6 +73,6 @@
 visitorEnabled: true
 
 # 请勿修改版本号
-pregeneratedPreference: 0.0 # Probability [0.0, 1.0] of rejecting an ungenerated chunk per selection attempt. 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land. Generated chunks always pass.
-backlogRefillThreshold: 0.5 # Fraction [0.0, 1.0] of L3 backlog capacity at which refill resumes (hysteresis). 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill continuously.
-version: "1.0"
+pregeneratedPreference: "0.0 # Probability [0.0, 1.0] of rejecting an ungenerated chunk per selection attempt. 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land. Generated chunks always pass."
+backlogRefillThreshold: "0.5 # Fraction [0.0, 1.0] of L3 backlog capacity at which refill resumes (hysteresis). 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill continuously."
+version: 1.0

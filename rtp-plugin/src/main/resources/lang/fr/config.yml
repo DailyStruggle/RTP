@@ -1,6 +1,5 @@
 # --- Configuration principale de RTP ---
 # Documentation : https://github.com/DailyStruggle/RTP/blob/master/docs/admin/CORE_CONFIG.md
-
 # Langue pour les messages destinés aux joueurs
 language: "en"
 
@@ -37,4 +36,4 @@ reseau:
     password: ""
 
 # NE PAS MODIFIER LE NUMÉRO DE VERSION
-version: "3.0"
+version: 3.0

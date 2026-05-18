@@ -4,15 +4,14 @@
 # a config option; the left-hand side is a code constant and must not change.
 # If this file is missing, the plugin regenerates it with identical left/right
 # pairs (the English defaults).
-
-safetyRadius: safetyRadius
-biomeWhitelist: biomeWhitelist
-airBlocks: airBlocks
-biomes: biomes
-unsafeBlocks: unsafeBlocks
-platformRadius: platformRadius
-platformAirHeight: platformAirHeight
-platformMaterial: platformMaterial
-invulnerabilityTime: invulnerabilityTime
-version: version
-platformDepth: platformDepth
+safetyRadius: "safetyRadius"
+biomeWhitelist: "biomeWhitelist"
+airBlocks: "airBlocks"
+biomes: "biomes"
+unsafeBlocks: "unsafeBlocks"
+platformRadius: "platformRadius"
+platformAirHeight: "platformAirHeight"
+platformMaterial: "platformMaterial"
+invulnerabilityTime: "invulnerabilityTime"
+version: "version"
+platformDepth: "platformDepth"

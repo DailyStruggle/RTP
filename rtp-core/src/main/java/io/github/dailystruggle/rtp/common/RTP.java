@@ -100,7 +100,7 @@ public class RTP {
 
   /**
    * Process-wide runtime metrics aggregator. Defaults to a {@link CoreMetrics} with a
-   * {@link io.github.dailystruggle.rtp.common.metrics.MetricsBinding#NOOP NOOP} binding so
+   * {@link io.github.dailystruggle.metrics.api.MetricsBinding#NOOP NOOP} binding so
    * callers never have to null-check; platform adapters install a real binding via
    * {@link CoreMetrics#setBinding} during startup. See {@code METRICS_PLAN.md}.
    */

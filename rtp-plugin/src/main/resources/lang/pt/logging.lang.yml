@@ -1,0 +1,21 @@
+# --- Mapeamento de Idioma: logging.yml ---
+# Mapeia as chaves internas (esquerda) para os nomes visíveis ao usuário
+# em logging.yml (direita). Edite apenas o lado direito para renomear ou
+# traduzir uma opção; o lado esquerdo é uma constante de código e não
+# deve ser alterado.
+# Se este arquivo estiver ausente, o plugin o regenera com pares
+# idênticos esquerda/direita (os valores padrão em inglês).
+event_changeworld: "evento_mudancaMundo"
+event_respawn: "evento_renascimento"
+detailed_reload: "recarga_detalhada"
+teleport: "teletransporte"
+event_join: "evento_entrada"
+selection_failure: "falha_selecao"
+system_memory_tracker: "sistema_rastreioMemoria"
+system_database: "sistema_bancoDeDados"
+event_teleport: "evento_teletransporte"
+version: "version"
+detailed_region_init: "inicio_regiao_detalhado"
+command: "comando"
+event_move: "evento_movimento"
+min_level: "nivel_minimo"

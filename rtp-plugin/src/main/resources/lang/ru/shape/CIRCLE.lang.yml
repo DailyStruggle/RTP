@@ -1,0 +1,8 @@
+mode: "режим"
+radius: "радиус"
+centerRadius: "радиусЦентра"
+centerX: "центрX"
+centerZ: "центрZ"
+weight: "вес"
+uniquePlacements: "уникальныеПозиции"
+expand: "расширить"

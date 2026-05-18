@@ -9,6 +9,7 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.tools.PlaceholderProvider;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.logging.Level;
@@ -34,6 +35,20 @@ public class SendMessage {
   private static final Pattern hexColorPattern2 =
       Pattern.compile("(&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F])");
   private static final List<Consumer<String>> interceptors = new CopyOnWriteArrayList<>();
+  /**
+   * Level-aware interceptors. Receive the same formatted message that
+   * string-only {@link #interceptors} receive, plus the {@link Level} the
+   * caller supplied to {@link #log(Level, String)} / {@link #log(Level, String, Throwable)}.
+   * For non-log {@code sendMessage} paths (player chat, hover/click), the
+   * level is {@code null} — leveled interceptors should treat that as
+   * "unknown / not a warning".
+   *
+   * <p>This is the channel {@code rtp test full}'s {@code FullAudit} subscribes
+   * to so that per-step PASS/FAIL attribution counts only {@code WARNING}+ log
+   * events, not benign {@code INFO} {@code [RTP test/...]} chatter.
+   */
+  private static final List<BiConsumer<Level, String>> leveledInterceptors =
+      new CopyOnWriteArrayList<>();
   private static ConfigParser<MessagesKeys> lang = null;
 
   public static void addInterceptor(Consumer<String> interceptor) {
@@ -44,9 +59,32 @@ public class SendMessage {
     interceptors.remove(interceptor);
   }
 
+  /**
+   * Registers a level-aware interceptor. Required for callers (e.g. the
+   * {@code rtp test full} audit) that need to distinguish a real
+   * {@code WARNING}/{@code SEVERE} log event from a benign {@code INFO}
+   * line that merely contains an {@code [RTP}-tagged marker.
+   */
+  public static void addInterceptor(BiConsumer<Level, String> interceptor) {
+    leveledInterceptors.add(interceptor);
+  }
+
+  public static void removeInterceptor(BiConsumer<Level, String> interceptor) {
+    leveledInterceptors.remove(interceptor);
+  }
+
   private static void intercept(String message) {
+    intercept(null, message);
+  }
+
+  private static void intercept(Level level, String message) {
     for (Consumer<String> interceptor : interceptors) {
       interceptor.accept(message);
+    }
+    if (!leveledInterceptors.isEmpty()) {
+      for (BiConsumer<Level, String> interceptor : leveledInterceptors) {
+        interceptor.accept(level, message);
+      }
     }
   }
 
@@ -385,7 +423,7 @@ public class SendMessage {
     // here so the literal '&c' never reaches the console sender on Folia.
     // This addresses the F4 finding in RTP_TEST_FULL_RELEASE_PLAN.md.
     message = ChatColor.translateAlternateColorCodes('&', message);
-    intercept(message);
+    intercept(level, message);
 
     if (RTP.serverAccessor.getServerIntVersion() <= 12) message = ChatColor.stripColor(message);
 
@@ -418,7 +456,7 @@ public class SendMessage {
     // See log(Level, String): defensive second pass against '&' codes
     // re-introduced by placeholder substitution. Idempotent.
     formatted = ChatColor.translateAlternateColorCodes('&', formatted);
-    intercept(formatted);
+    intercept(level, formatted);
 
     ChatColor color = colorFor(level);
     if (color == null) {

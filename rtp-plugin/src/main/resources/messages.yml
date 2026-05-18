@@ -13,19 +13,18 @@
 #     above each message that uses them.
 #
 # REQ-RTP-F-013: every user-facing message is configurable here.
-
-################################################################################
+# ###############################################################################
 # Section 1: General Configuration
-################################################################################
+# ###############################################################################
 # list of additional placeholders
 # format: Pn - where n is the index in this list
 placeholders:
   # P0
   - "[RTP]"
 
-################################################################################
+# ###############################################################################
 # Section 2: Teleportation
-################################################################################
+# ###############################################################################
 # when teleporting, say this
 alreadyTeleporting: "&e[P0] you're already teleporting!"
 
@@ -57,9 +56,9 @@ queueUpdate: "#2636ef[P0] your spot in line: [spot]"
 # placeholder: [money] - how much money is required for the command
 notEnoughMoney: "&e[P0] you need at least $[money] for that."
 
-################################################################################
+# ###############################################################################
 # Section 3: Time Formatting
-################################################################################
+# ###############################################################################
 # for time placeholders, what to call days, hours, minutes, seconds, and milliseconds
 days: "d"
 hours: "h"
@@ -67,9 +66,9 @@ minutes: "m"
 seconds: "s"
 millis: "ms"
 
-################################################################################
+# ###############################################################################
 # Section 4: System & Management
-################################################################################
+# ###############################################################################
 # a configuration file 'version' is lower than the latest
 # placeholder: [filename] - name of file, including file extension
 oldFile: "&b[P0] old [filename] detected. Updating"
@@ -106,18 +105,18 @@ invalidCommand: "&c[P0] invalid command - [arg]"
 # user doesn't have permission for the command requested
 noPerms: "&eI'm sorry, but you do not have permission to perform this command. Please contact the server administrators if you believe that this is in error."
 
-################################################################################
+# ###############################################################################
 # Section 5: Administrative Logs
-################################################################################
+# ###############################################################################
 # logged when locations are saved/loaded from database
 # placeholder: [amount] - number of locations
 # placeholder: [region] - name of region
 locationSaved: "&e[P0] Successfully saved [amount] locations for [region]"
 locationLoaded: "&e[P0] Successfully loaded [amount] locations for [region]"
 
-################################################################################
+# ###############################################################################
 # Section 6: Scan Command
-################################################################################
+# ###############################################################################
 # messages related to the scan command
 # placeholder: [scan_regions] - list of regions
 scanStart: "&a[P0] scan task started for regions: [scan_regions]"
@@ -130,9 +129,9 @@ scanNotRunning: "&c[P0] scan task not running for regions: [scan_regions]"
 # placeholder: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
 scanStatus: "&a[P0] completed [scan_chunks] / [scan_totalChunks] chunks for regions: [scan_regions]. [scan_cps] cps. Land Percentage: [scan_landPercentage]%. ETA: [scan_eta]"
 
-################################################################################
+# ###############################################################################
 # Section 7: Info Command
-################################################################################
+# ###############################################################################
 # messages related to the info command
 infoTitle: "&a======RTP Info======"
 infoTickets: "&7Global Active Chunk Tickets: &f[tickets]"
@@ -175,9 +174,9 @@ regionInfo:
   - "#58CCED  - backlogCache (L3): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - cached: [cached]"
 
-################################################################################
+# ###############################################################################
 # Section 8: Command Descriptions
-################################################################################
+# ###############################################################################
 # shown in help command
 rtp: "&b/rtp - teleport to a random location"
 rtp_description: "teleport to a random location"
@@ -191,9 +190,9 @@ config_description: "update configuration files at runtime"
 info_description: "check the current state of the plugin"
 test_description: "test RTP functions"
 
-################################################################################
+# ###############################################################################
 # Section 8b: Generalized Menu Framework (ADR-035 / ADR-044)
-################################################################################
+# ###############################################################################
 # Sent when a menu token is unknown, malformed, or belongs to another player.
 menuInvalid: "&c[P0] that menu link is invalid."
 # Sent when a menu token has expired or was already consumed.
@@ -234,9 +233,9 @@ menuRootHint: "&7click an option below to begin"
 menuPagePrev: "&7« previous page ([page])"
 menuPageNext: "&7next page ([page]) »"
 
-################################################################################
+# ###############################################################################
 # Section 9: PlaceholderAPI Support
-################################################################################
+# ###############################################################################
 # status placeholders for players
 PLAYER_AVAILABLE: "&aAVAILABLE"
 PLAYER_COOLDOWN: "&eON COOLDOWN"
@@ -244,9 +243,9 @@ PLAYER_SETUP: "&bPICKING A LOCATION"
 PLAYER_LOADING: "&bLOADING CHUNKS"
 PLAYER_TELEPORTING: "&bTELEPORTING"
 
-################################################################################
+# ###############################################################################
 # Section 10: Visuals
-################################################################################
+# ###############################################################################
 # title settings
 # remove or set title to "" to disable
 # PlaceholderAPI is recommended for coordinates
@@ -259,14 +258,14 @@ fadeOut: 20
 # actionbar setting
 actionbar: ""
 
-################################################################################
+# ###############################################################################
 # Section 11: Metadata
-################################################################################
+# ###############################################################################
 # DO NOT TOUCH VERSION NUMBER
-version: "1.0"
+version: 1.0
 
-################################################################################
+# ###############################################################################
 # Section 12: Developer Options
-################################################################################
+# ###############################################################################
 # set to true to append a dev tag (e.g. §8(RTP:ClassName)) to every message
 showDevTag: false

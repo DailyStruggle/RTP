@@ -11,16 +11,15 @@
 #   - Conservar los códigos de color &a &e &c y hexadecimales (#2636ef).
 #
 # REQ-RTP-F-013 / ADR-020.
-
-################################################################################
+# ###############################################################################
 # Sección 1: Configuración general
-################################################################################
+# ###############################################################################
 marcadores:
-  - "[RTP]" #P0
+  - "\"[RTP]\" #P0"
 
-################################################################################
+# ###############################################################################
 # Sección 2: Teletransporte
-################################################################################
+# ###############################################################################
 yaTeletransportando: "&e[P0] ¡ya te estás teletransportando!"
 teletransporteDenegadoRecargando: "&e[P0] los teletransportes están desactivados temporalmente mientras el plugin se recarga. Inténtalo de nuevo en unos instantes."
 mensajeRetraso: "&e[P0] Teletransportando en [delay]. No te muevas."
@@ -33,18 +32,18 @@ sinUbicacionesEnCola: "#f5eb73[P0] no hay ubicaciones listas en este momento"
 actualizarCola: "#2636ef[P0] tu puesto en la cola: [spot]"
 dineroInsuficiente: "&e[P0] necesitas al menos $[money] para eso."
 
-################################################################################
+# ###############################################################################
 # Sección 3: Formato de tiempo
-################################################################################
+# ###############################################################################
 dias: "d"
 horas: "h"
 minutos: "m"
 segundos: "s"
 milisegundos: "ms"
 
-################################################################################
+# ###############################################################################
 # Sección 4: Sistema y administración
-################################################################################
+# ###############################################################################
 archivoAntiguo: "&b[P0] se detectó un [filename] antiguo. Actualizando"
 mundoNuevo: "&b[P0] se detectó un nuevo mundo '[world]'"
 mundoInvalido: "&e[P0] no se pudo encontrar el mundo '[world]'"
@@ -59,15 +58,15 @@ busy: "&c[P0] ocupado"
 invalidCommand: "&c[P0] comando no válido - [arg]"
 sinPermisos: "&eLo sentimos, pero no tienes permiso para ejecutar este comando. Contacta con los administradores del servidor si crees que esto es un error."
 
-################################################################################
+# ###############################################################################
 # Sección 5: Registros administrativos
-################################################################################
+# ###############################################################################
 ubicacionGuardada: "&e[P0] Se guardaron correctamente [amount] ubicaciones para [region]"
 ubicacionCargada: "&e[P0] Se cargaron correctamente [amount] ubicaciones para [region]"
 
-################################################################################
+# ###############################################################################
 # Sección 6: Comando Scan
-################################################################################
+# ###############################################################################
 iniciarEscaneo: "&a[P0] tarea de escaneo iniciada para las regiones: [scan_regions]"
 reiniciarEscaneo: "&e[P0] cola de escaneo reiniciada para las regiones: [scan_regions]"
 cancelarEscaneo: "&e[P0] tarea de escaneo cancelada para las regiones: [scan_regions]"
@@ -77,9 +76,9 @@ escaneoActivo: "&c[P0] ya hay una tarea de escaneo en curso para las regiones: [
 escaneoNoActivo: "&c[P0] no hay ninguna tarea de escaneo en curso para las regiones: [scan_regions]"
 estadoEscaneo: "&a[P0] completados [scan_chunks] / [scan_totalChunks] chunks para las regiones: [scan_regions]. [scan_cps] cps. Porcentaje de tierra: [scan_landPercentage]%. Tiempo restante: [scan_eta]"
 
-################################################################################
+# ###############################################################################
 # Sección 7: Comando Info
-################################################################################
+# ###############################################################################
 tituloInfo: "&a======Información de RTP======"
 infoTickets: "&7Tickets de chunks activos globales: &f[tickets]"
 infoTeletransportes: "&7Máquinas de estado de teletransporte activas: &f[teleports]"
@@ -118,9 +117,9 @@ datosRegion:
   - "#58CCED  - cacheAcumulada (L3): [backlogCache] / [backlogCacheCap]"
   - "#58CCED  - enCache: [cached]"
 
-################################################################################
+# ###############################################################################
 # Sección 8: Descripciones de comandos
-################################################################################
+# ###############################################################################
 rtp: "&b/rtp - teletranspórtate a una ubicación aleatoria"
 rtp_descripcion: "teletranspórtate a una ubicación aleatoria"
 ayuda: "&b/rtp help - mostrar esta ayuda"
@@ -133,9 +132,9 @@ config_descripcion: "actualizar archivos de configuración en tiempo de ejecuci�
 info_descripcion: "verificar el estado actual del plugin"
 prueba_descripcion: "probar funciones de RTP"
 
-################################################################################
+# ###############################################################################
 # Sección 8b: Marco de menús generalizado (ADR-035 / ADR-044)
-################################################################################
+# ###############################################################################
 # Estas claves no se traducen en lang/es/messages.lang.yml, por lo que se usan
 # los nombres canónicos en inglés (fallback al baseline ADR-020).
 menuInvalid: "&c[P0] ese enlace de menú no es válido."
@@ -165,18 +164,18 @@ menuPickValue: "&eelige un valor para [param] (ejecutará: /rtp [command] [param
 # Al hacer clic prellena el chat con el comando ensamblado hasta '<param>:'.
 menuTypeValue: "&7✎ escribir un valor personalizado..."
 
-################################################################################
+# ###############################################################################
 # Sección 9: Soporte de PlaceholderAPI
-################################################################################
+# ###############################################################################
 JUGADOR_DISPONIBLE: "&aDISPONIBLE"
 JUGADOR_ENFRIAMIENTO: "&eEN ESPERA"
 JUGADOR_CONFIGURAR: "&bELIGIENDO UBICACIÓN"
 JUGADOR_CARGANDO: "&bCARGANDO CHUNKS"
 JUGADOR_TELETRANSPORTANDO: "&bTELETRANSPORTANDO"
 
-################################################################################
+# ###############################################################################
 # Sección 10: Elementos visuales
-################################################################################
+# ###############################################################################
 titulo: "#FF6B6B¡#FF7E63T#FF9155e#FFA447l#FFB739e#FFCA2Bt#FFDD1Dr#F0F00Fa#C8F010n#A0F011s#78F012p#50F013o#38EF6Br#3BECC8t#38ECF0a#35E9FFd#32E6FFo#2FE3FF!"
 subtitulo: "#A78BFA¡#AF84F9d#B77DF7i#BF76F5v#C76FF3i#CF68F1é#D761EFr#DF5AEDt#E753EBe#EF4CE9t#E855D0e#E860B8!"
 aparecer: 20
@@ -185,12 +184,12 @@ desvanecer: 20
 
 barraAccion: ""
 
-################################################################################
+# ###############################################################################
 # Sección 11: Metadatos
-################################################################################
-version: "1.0"
+# ###############################################################################
+version: 1.0
 
-################################################################################
+# ###############################################################################
 # Sección 12: Opciones para desarrolladores
-################################################################################
+# ###############################################################################
 mostrarEtiquetaDev: false

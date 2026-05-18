@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.paper.metrics;
 
-import io.github.dailystruggle.rtp.common.metrics.MetricsBinding;
-import io.github.dailystruggle.rtp.common.metrics.MetricsSnapshot;
+import io.github.dailystruggle.metrics.api.MetricsBinding;
+import io.github.dailystruggle.metrics.api.MetricsSnapshot;
 import org.bukkit.Bukkit;
 import org.bukkit.Server;
 
@@ -16,14 +16,17 @@ import java.util.function.IntSupplier;
  * {@code Server#getAverageTickTime()}, so {@code rtp-core} no longer needs a
  * sampler thread on this platform. Players-online is a cheap snapshot.
  *
- * <p>The remaining {@link MetricsBinding} fields ({@code softCap},
- * {@code chunkLoadBacklog}, {@code databaseLatencyMs}) are intentionally left at
- * their inherited sentinels: those values originate from {@code rtp-core} state
- * and are folded in by {@link io.github.dailystruggle.rtp.common.metrics.CoreMetrics}
- * directly, not by the platform binding.
+ * <p>{@code softCap} is sourced from {@link Bukkit#getMaxPlayers()} so the
+ * {@code /rtp info} "Players: N / cap" row mirrors the value the proxy-side
+ * backend-selector menu observes. The remaining {@link MetricsBinding} fields
+ * ({@code chunkLoadBacklog}, {@code databaseLatencyMs}) are intentionally left
+ * at their inherited sentinels: those values originate from {@code rtp-core}
+ * state and are folded in by
+ * {@link io.github.dailystruggle.rtp.common.metrics.CoreMetrics} directly, not
+ * by the platform binding.
  *
  * <p>This class is testable without MockBukkit: the protected
- * {@link #PaperMetricsBinding(DoubleSupplier, DoubleSupplier, DoubleSupplier, DoubleSupplier, IntSupplier)}
+ * {@link #PaperMetricsBinding(DoubleSupplier, DoubleSupplier, DoubleSupplier, DoubleSupplier, IntSupplier, IntSupplier)}
  * constructor accepts pluggable suppliers so callers can drive deterministic
  * values from a unit test. Production code uses the public no-arg constructor
  * which binds to {@link Bukkit#getServer()}.
@@ -40,6 +43,7 @@ public final class PaperMetricsBinding implements MetricsBinding {
     private final DoubleSupplier tps15m;
     private final DoubleSupplier mspt;
     private final IntSupplier playerCount;
+    private final IntSupplier softCap;
 
     /**
      * Production constructor. Binds to the live {@link Bukkit#getServer()}.
@@ -52,7 +56,8 @@ public final class PaperMetricsBinding implements MetricsBinding {
                 () -> safeTpsIndex(1),
                 () -> safeTpsIndex(2),
                 PaperMetricsBinding::safeMspt,
-                PaperMetricsBinding::safePlayerCount
+                PaperMetricsBinding::safePlayerCount,
+                PaperMetricsBinding::safeMaxPlayers
         );
     }
 
@@ -64,12 +69,14 @@ public final class PaperMetricsBinding implements MetricsBinding {
                         DoubleSupplier tps5m,
                         DoubleSupplier tps15m,
                         DoubleSupplier mspt,
-                        IntSupplier playerCount) {
+                        IntSupplier playerCount,
+                        IntSupplier softCap) {
         this.tps1m = tps1m;
         this.tps5m = tps5m;
         this.tps15m = tps15m;
         this.mspt = mspt;
         this.playerCount = playerCount;
+        this.softCap = softCap;
     }
 
     @Override
@@ -86,6 +93,9 @@ public final class PaperMetricsBinding implements MetricsBinding {
 
     @Override
     public int playerCount() { return playerCount.getAsInt(); }
+
+    @Override
+    public int softCap() { return softCap.getAsInt(); }
 
     private static double safeTpsIndex(int idx) {
         try {
@@ -114,6 +124,16 @@ public final class PaperMetricsBinding implements MetricsBinding {
             Server s = Bukkit.getServer();
             if (s == null) return 0;
             return s.getOnlinePlayers().size();
+        } catch (Throwable ignored) {
+            return 0;
+        }
+    }
+
+    private static int safeMaxPlayers() {
+        try {
+            Server s = Bukkit.getServer();
+            if (s == null) return 0;
+            return s.getMaxPlayers();
         } catch (Throwable ignored) {
             return 0;
         }

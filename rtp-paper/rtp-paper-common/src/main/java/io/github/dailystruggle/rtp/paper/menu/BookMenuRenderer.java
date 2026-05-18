@@ -7,11 +7,14 @@ import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
 import io.github.dailystruggle.rtp.api.menu.MenuTokenRegistry;
+import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
 import net.kyori.adventure.inventory.Book;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
 
@@ -132,8 +135,9 @@ public final class BookMenuRenderer implements MenuRenderer {
         for (MenuPage page : model.pages()) {
             pages.add(renderPage(playerId, page));
         }
+        OfflinePlayer viewer = resolveViewer(playerId);
         return Book.book(
-                Component.text(model.title()),
+                toComponent(viewer, model.title()),
                 Component.text("RTP"),
                 pages);
     }
@@ -164,16 +168,55 @@ public final class BookMenuRenderer implements MenuRenderer {
     }
 
     private Component renderFragment(UUID playerId, MenuFragment fragment) {
-        Component text = Component.text(fragment.text());
+        OfflinePlayer viewer = resolveViewer(playerId);
+        Component text = toComponent(viewer, fragment.text());
         String hover = fragment.hover();
         if (hover != null && !hover.isEmpty()) {
-            text = text.hoverEvent(HoverEvent.showText(Component.text(hover)));
+            text = text.hoverEvent(HoverEvent.showText(toComponent(viewer, hover)));
         }
         ClickEvent click = toClickEvent(playerId, fragment.action());
         if (click != null) {
             text = text.clickEvent(click);
         }
         return text;
+    }
+
+    /**
+     * Runs {@code raw} through the project's standard {@link SendMessage#format}
+     * pipeline (placeholders, PAPI, legacy {@code &} color codes, hex) and then
+     * deserializes the resulting {@code §}-coded string into an Adventure
+     * {@link Component}. Mirrors how {@link SendMessage} renders chat output so
+     * menu text obeys the same color/placeholder conventions as everywhere else
+     * in the plugin.
+     */
+    private static Component toComponent(@Nullable OfflinePlayer viewer, @Nullable String raw) {
+        if (raw == null || raw.isEmpty()) return Component.empty();
+        String formatted;
+        try {
+            formatted = SendMessage.format(viewer, raw);
+        } catch (Throwable t) {
+            // Defensive: in unit-test contexts where Bukkit.getServer() is not
+            // wired up, SendMessage.format may NPE on placeholder lookups. Fall
+            // back to the raw legacy-ampersand string so colors still render.
+            formatted = raw;
+        }
+        // `SendMessage.format` converts '&' to '§'; on the test-bypass path
+        // the string may still contain '&' codes. Prefer the section-style
+        // deserializer (it's the normal production path), then fall through
+        // to the ampersand-style if the input still has '&' markers.
+        if (formatted.indexOf('\u00a7') >= 0) {
+            return LegacyComponentSerializer.legacySection().deserialize(formatted);
+        }
+        return LegacyComponentSerializer.legacyAmpersand().deserialize(formatted);
+    }
+
+    private static @Nullable OfflinePlayer resolveViewer(UUID playerId) {
+        try {
+            if (Bukkit.getServer() == null) return null;
+            return Bukkit.getOfflinePlayer(playerId);
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     private @Nullable ClickEvent toClickEvent(UUID playerId, @Nullable MenuAction action) {

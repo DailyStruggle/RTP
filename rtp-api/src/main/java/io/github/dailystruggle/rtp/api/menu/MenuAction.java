@@ -44,8 +44,15 @@ public sealed interface MenuAction
                 MenuAction.OpenExternalUrl {
 
     /**
-     * Invoke {@code /rtp <args>} as the clicking player. The argument array is
-     * defensively copied; callers cannot mutate the stored action.
+     * Invoke {@code /rtp <args>} as the clicking player. {@code args} is the
+     * sub-command path <i>below</i> the {@code /rtp} root, mirroring the
+     * convention used by {@link OpenMenu#path()}: do not include a leading
+     * {@code "rtp"} token. An empty array executes the bare {@code /rtp}
+     * (root) command. Server-side dispatch feeds {@code args} directly into
+     * the root {@code TreeCommand} starting at index {@code 0}, so a leading
+     * {@code "rtp"} would be parsed as a non-existent sub-command and rejected
+     * via the configurable {@code msgInvalidCommand} path. The argument array
+     * is defensively copied; callers cannot mutate the stored action.
      */
     record RunRtpCommand(String[] args) implements MenuAction {
         public RunRtpCommand {

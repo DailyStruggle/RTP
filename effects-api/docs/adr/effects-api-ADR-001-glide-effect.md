@@ -4,7 +4,7 @@
 
 **Status:** Accepted
 **Date:** 2026-05-05
-**Implemented:** 2026-05-05 — `effects-api/src/main/java/io/github/dailystruggle/effectsapi/LocalEffects/GlideEffect.java` + `enums/GlideTypeNames.java` + `SpigotListeners/GlideSafetyListener.java` + `events/{PlayerGlideEvent,PlayerLandEvent}.java`; registered in `EffectFactory` and wired through `EffectsAPI.init/disable`.
+**Implemented:** 2026-05-05 — `effects-api/src/main/java/io/github/dailystruggle/effectsapi/LocalEffects/GlideEffect.java` + `enums/GlideTypeNames.java` + `BukkitListeners/GlideSafetyListener.java` + `events/{PlayerGlideEvent,PlayerLandEvent}.java`; registered in `EffectFactory` and wired through `EffectsAPI.init/disable`.
 
 ## Context
 
@@ -50,7 +50,7 @@ We will introduce a `GlideEffect` as a first-class entry in
 - New command: `effects-api/.../commands/GlideCommand.java`, mirroring
   `FireworkCommand` etc., for `/effectsapi glide ...` administration.
 - New listener (optional, for safety): extend the pattern of
-  `SpigotListeners/FireworkSafetyListener` to police the glide-vs-rocket rule
+  `BukkitListeners/FireworkSafetyListener` to police the glide-vs-rocket rule
   (`GlideSafetyListener`), gated by the `allowFireworks` setting.
 - The existing `addons/RTP_Glide` becomes deprecated once parity is reached;
   its `PlayerGlideEvent` / `PlayerLandEvent` are migrated into
@@ -234,7 +234,7 @@ Configuration:
   `customEvents/PlayerGlideEvent.java`, `customEvents/PlayerLandEvent.java`).
 - Effect framework: `effects-api/src/main/java/io/github/dailystruggle/effectsapi/Effect.java`,
   `EffectFactory.java`, `LocalEffects/FireworkEffect.java`,
-  `SpigotListeners/FireworkSafetyListener.java`.
+  `BukkitListeners/FireworkSafetyListener.java`.
 - Safety rules: `.junie/AGENTS.md` → *Prohibition Requirements (S-00x)*,
   in particular S-004 (no silent failure) and S-005 (no main-thread chunk I/O).
 - Folia threading constraints: `.junie/AGENTS.md` → *Folia Threading*.

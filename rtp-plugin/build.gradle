@@ -13,13 +13,13 @@ plugins {
 }
 repositories {
     // Soft-dep repos for bundled claim-plugin integrations (see ADR-019).
-    maven { url 'https://maven.enginehub.org/repo/' }
-    maven { url 'https://jitpack.io' }
-    maven { url 'https://repo.glaremasters.me/repository/bloodshot/' }
-    maven { url 'https://raw.githubusercontent.com/FabioZumbi12/RedProtect/mvn-repo/' }
-    maven { url 'https://repo.spongepowered.org/maven/' }
-    maven { url 'https://ci.ender.zone/plugin/repository/everything/' }
-    maven { url 'https://repo.dmulloy2.net/repository/public/' }
+    maven { url = 'https://maven.enginehub.org/repo/' }
+    maven { url = 'https://jitpack.io' }
+    maven { url = 'https://repo.glaremasters.me/repository/bloodshot/' }
+    maven { url = 'https://raw.githubusercontent.com/FabioZumbi12/RedProtect/mvn-repo/' }
+    maven { url = 'https://repo.spongepowered.org/maven/' }
+    maven { url = 'https://ci.ender.zone/plugin/repository/everything/' }
+    maven { url = 'https://repo.dmulloy2.net/repository/public/' }
 }
 
 // Bytecode-only configuration for the Java-25 v26_1_R1 adapter (2026-05-07).
@@ -115,7 +115,7 @@ dependencies {
     // rtp-fabric-ADR-001 — version-specific Fabric adapters. RTPFabricMod.installVersionAdapter()
     // resolves these by FQN at runtime via Class.forName, so the bytecode must
     // be present in the shaded jar but is never compile-time imported here.
-    // Mirrors the rtp-spigot/-paper/-folia v-submodule inclusion pattern above.
+    // Mirrors the rtp-bukkit/-paper/-folia v-submodule inclusion pattern above.
     implementation project(':rtp-fabric:rtp-fabric-v1_20_R1')
     implementation project(':rtp-fabric:rtp-fabric-v1_21_R1')
     implementation project(':rtp-fabric:rtp-fabric-v1_21_R5')
@@ -185,6 +185,12 @@ dependencies {
     testImplementation 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
     testImplementation testFixtures(project(':rtp-core'))
     testImplementation project(':rtp-folia:rtp-folia-common')
+    // C6 (CHECKLIST-metrics-and-multiserver §1.6.5) — ArchUnit guard pinning
+    // raw TPS / player-count / max-players reads to the *MetricsBinding and
+    // *TpsSampler classes. rtp-plugin is the only module that aggregates
+    // every platform-common bytecode on its classpath, so the guard lives
+    // here even though sibling guards live in :rtp-core's RTPArchitectureTest.
+    testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'
 
     // Optional/Soft dependencies
     compileOnly 'com.github.MilkBowl:VaultAPI:1.7.1'
@@ -377,10 +383,12 @@ remapJar {
 //
 // `editionLabel` flows into the log line so build output identifies whether the merge
 // ran for Pro or lite.
-ext.mergeFabricUnobfBytecodeIntoJar = { File out, String editionLabel ->
-    def v26 = project.configurations.fabric26Bytecode.singleFile
-    def commonUnobf = project.configurations.fabricCommonUnobfBytecode.singleFile
-    def effectsUnobf = project.configurations.effectsApiFabricUnobfBytecode.singleFile
+// Note: takes the carrier jars as explicit File args so the closure does not
+// reach back to Task.project at execution time (deprecated in Gradle 9, fatal
+// in Gradle 10 and incompatible with the configuration cache). Callers must
+// resolve the configurations at *configuration* time (outside doLast) and
+// pass the singleFile results in.
+ext.mergeFabricUnobfBytecodeIntoJar = { File out, String editionLabel, File v26, File commonUnobf, File effectsUnobf ->
     def tmp = new File(out.parentFile, out.name + '.v26merge.tmp')
     def skipPatterns = [
         ~'^fabric\\.mod\\.json$',
@@ -495,17 +503,23 @@ remapJar {
     dependsOn ':rtp-fabric:rtp-fabric-v26_1_R1:jar'
     dependsOn ':rtp-fabric:rtp-fabric-common-unobf:jar'
     dependsOn ':effects-api:effects-api-fabric-unobf:jar'
+    // Resolve carrier jars and capture the merge closure at configuration
+    // time so doLast does not invoke Task.project at execution time
+    // (deprecated in Gradle 9, fatal in Gradle 10).
+    def v26Jar = project.configurations.fabric26Bytecode
+    def commonUnobfJar = project.configurations.fabricCommonUnobfBytecode
+    def effectsUnobfJar = project.configurations.effectsApiFabricUnobfBytecode
+    def mergeFn = project.ext.mergeFabricUnobfBytecodeIntoJar
     doLast {
-        project.ext.mergeFabricUnobfBytecodeIntoJar(remapJar.archiveFile.get().asFile, 'Pro')
+        mergeFn(remapJar.archiveFile.get().asFile, 'Pro',
+                v26Jar.singleFile, commonUnobfJar.singleFile, effectsUnobfJar.singleFile)
     }
 }
 
 
-artifacts {
-    archives shadowJar
-    archives remapJar
-}
-
+// `archives` configuration is deprecated for artifact declaration in Gradle 9
+// (removed in Gradle 10). Wiring these tasks directly into `assemble` is the
+// supported replacement -- see upgrading_version_9.html#sec:archives-configuration.
 assemble.dependsOn shadowJar
 assemble.dependsOn remapJar
 
@@ -541,9 +555,13 @@ tasks.named('compileLiteJava') {
 // ships plugin.yml with literal `${version}`, causing Bukkit to log
 // `Enabling RTP v${version}` on enable. Mirror the root config here.
 tasks.named('processLiteResources') {
-    inputs.property "version", project.version
+    // Capture project.version at configuration time so the filesMatching
+    // closure does not reach Task.project at execution time
+    // (deprecated in Gradle 9, fatal in Gradle 10).
+    def projectVersion = project.version
+    inputs.property "version", projectVersion
     filesMatching(["plugin.yml", "fabric.mod.json"]) {
-        expand "version": project.version
+        expand "version": projectVersion
     }
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
     exclude '**/*.bak'
@@ -795,8 +813,17 @@ tasks.register('remapLiteJar', net.fabricmc.loom.task.RemapJarTask) {
     archiveClassifier.set('')
     archiveVersion.set(project.version.toString())
 
+    // Resolve carrier jars and capture the merge closure at configuration time
+    // so doLast does not reach Task.project at execution time
+    // (deprecated in Gradle 9, fatal in Gradle 10).
+    def v26Jar = project.configurations.fabric26Bytecode
+    def commonUnobfJar = project.configurations.fabricCommonUnobfBytecode
+    def effectsUnobfJar = project.configurations.effectsApiFabricUnobfBytecode
+    def mergeFn = project.ext.mergeFabricUnobfBytecodeIntoJar
+
     doLast {
-        project.ext.mergeFabricUnobfBytecodeIntoJar(remapLiteJar.archiveFile.get().asFile, 'lite')
+        mergeFn(remapLiteJar.archiveFile.get().asFile, 'lite',
+                v26Jar.singleFile, commonUnobfJar.singleFile, effectsUnobfJar.singleFile)
     }
 }
 
@@ -892,7 +919,7 @@ tasks.register('liteJarStructureCheck') {
 
 tasks.named('check') { dependsOn 'liteJarStructureCheck' }
 
-artifacts {
-    archives tasks.named('remapLiteJar')
-}
+// `archives` configuration is deprecated for artifact declaration in Gradle 9
+// (removed in Gradle 10). The `assemble.dependsOn` wiring below is the
+// supported replacement -- see upgrading_version_9.html#sec:archives-configuration.
 assemble.dependsOn tasks.named('remapLiteJar')

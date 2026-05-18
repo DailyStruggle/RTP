@@ -105,7 +105,7 @@ public class TestDisconnectMidflightCmd extends BaseRTPCmdImpl {
     s.latestTeleportData.put(probeId, data);
 
     // --- cleanup: mirror OnPlayerQuit exactly -------------------------
-    // (see rtp-plugin/.../spigotListeners/OnPlayerQuit.java). If the
+    // (see rtp-plugin/.../bukkitListeners/OnPlayerQuit.java). If the
     // production listener is ever refactored, update this mirror in the
     // same change.
     try {

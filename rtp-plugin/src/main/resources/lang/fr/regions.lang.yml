@@ -4,16 +4,15 @@
 # rename or translate a config option; the left-hand side is a code constant
 # and must not change. If this file is missing, the plugin regenerates it
 # with identical left/right pairs (the English defaults).
-
-world: world
-worldBorderOverride: worldBorderOverride
-shape: shape
-vert: vert
-requirePermission: requirePermission
-cacheCap: cacheCap
-backlogCacheCap: backlogCacheCap
-activeChunkCap: activeChunkCap
-price: price
-spatialResolution: spatialResolution
-override: override
-version: version
+world: "world"
+worldBorderOverride: "worldBorderOverride"
+shape: "shape"
+vert: "vert"
+requirePermission: "requirePermission"
+cacheCap: "cacheCap"
+backlogCacheCap: "backlogCacheCap"
+activeChunkCap: "activeChunkCap"
+price: "price"
+spatialResolution: "spatialResolution"
+override: "override"
+version: "version"

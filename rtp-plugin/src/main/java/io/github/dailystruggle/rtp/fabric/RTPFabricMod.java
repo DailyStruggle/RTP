@@ -115,6 +115,35 @@ public final class RTPFabricMod implements ModInitializer {
             // after the server is fully constructed and registries are
             // populated.
 
+            // ----------------------------------------------------------------
+            // Section C, C2 — install the Fabric metrics binding (single-region
+            // EMA sampler). The binding is ticked from FabricEventBridge's
+            // END_SERVER_TICK callback via an instanceof probe (so the bridge
+            // module need not hard-depend on this install path). Suppliers
+            // resolve playerCount / softCap reflectively against the bound
+            // MinecraftServer so the binding has no net.minecraft imports.
+            //
+            // Safe to call before SERVER_STARTED: suppliers return 0 until the
+            // accessor.getServer() != null, and the first END_SERVER_TICK that
+            // fires after server start seeds the EMA. Idempotent — overwriting
+            // a prior binding (if any) is the documented dispatcher behaviour.
+            // ----------------------------------------------------------------
+            try {
+                io.github.dailystruggle.rtp.fabric.metrics.FabricMetricsBinding fabricMetrics =
+                        new io.github.dailystruggle.rtp.fabric.metrics.FabricMetricsBinding(
+                                () -> reflectIntZeroArg(accessor.getServer(),
+                                        new String[] { "getPlayerCount", "method_3788" }),
+                                () -> reflectIntZeroArg(accessor.getServer(),
+                                        new String[] { "getMaxPlayers", "method_3802" }));
+                io.github.dailystruggle.rtp.common.RTP.metrics.setBinding(fabricMetrics);
+                io.github.dailystruggle.rtp.common.RTP.log(Level.INFO,
+                        "[RTP] Fabric metrics binding installed (FabricMetricsBinding).");
+            } catch (Throwable t) {
+                io.github.dailystruggle.rtp.common.RTP.log(Level.WARNING,
+                        "[RTP] FabricMetricsBinding install failed: "
+                                + t.getClass().getSimpleName() + ": " + t.getMessage(), t);
+            }
+
             new FabricEventBridge(accessor).register();
 
             // ----------------------------------------------------------------
@@ -719,6 +748,33 @@ public final class RTPFabricMod implements ModInitializer {
             return "io.github.dailystruggle.rtp.fabric.v26_1_R1.V26_1_R1FabricVersionAdapter";
         }
         return null;
+    }
+
+    /**
+     * Section C, C2 helper — invoke a zero-arg {@code int}-returning method
+     * on {@code target} by trying each candidate name in order. Used by the
+     * {@code FabricMetricsBinding} suppliers to resolve mojmap /
+     * intermediary aliases for {@code MinecraftServer.getPlayerCount()} and
+     * {@code getMaxPlayers()} without a hard compile-time pin on either
+     * mapping. Returns {@code 0} when {@code target} is {@code null} (the
+     * server has not yet bound — pre-SERVER_STARTED state) or when no
+     * candidate resolves; throws are swallowed and the next candidate is
+     * tried. Callers (the binding) clamp negative results to {@code 0}.
+     */
+    static int reflectIntZeroArg(Object target, String[] candidates) {
+        if (target == null) return 0;
+        for (String name : candidates) {
+            try {
+                java.lang.reflect.Method m = target.getClass().getMethod(name);
+                Object v = m.invoke(target);
+                if (v instanceof Number n) return n.intValue();
+            } catch (NoSuchMethodException ignored) {
+                // try next candidate
+            } catch (Throwable ignored) {
+                // best-effort: a single failing candidate must not block the binding
+            }
+        }
+        return 0;
     }
 
     /**

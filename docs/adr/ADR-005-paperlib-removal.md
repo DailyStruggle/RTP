@@ -5,7 +5,7 @@
 
 ## Context
 
-[PaperLib](https://github.com/PaperMC/PaperLib) is a cross-platform compatibility shim (async chunk loading, etc.) intended for plugins that run on both Paper and plain Spigot. RTP maintains separate adapter modules (`rtp-spigot`, `rtp-paper`) for each platform, so the Paper adapter has no Spigot code path to shim and a cross-platform compatibility library adds no value there.
+[PaperLib](https://github.com/PaperMC/PaperLib) is a cross-platform compatibility shim (async chunk loading, etc.) intended for plugins that run on both Paper and plain Spigot. RTP maintains separate adapter modules (`rtp-bukkit`, `rtp-paper`) for each platform, so the Paper adapter has no Spigot code path to shim and a cross-platform compatibility library adds no value there.
 
 ## Decision
 

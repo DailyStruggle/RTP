@@ -4,7 +4,7 @@ import io.github.dailystruggle.effectsapi.common.Effect;
 import io.github.dailystruggle.effectsapi.EffectsAPI;
 import io.github.dailystruggle.effectsapi.bukkit.LocalEffects.enums.FireworkTypeNames;
 import io.github.dailystruggle.effectsapi.bukkit.LocalEffects.enums.PotionTypeNames;
-import io.github.dailystruggle.effectsapi.bukkit.SpigotListeners.FireworkSafetyListener;
+import io.github.dailystruggle.effectsapi.bukkit.BukkitListeners.FireworkSafetyListener;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
 import org.bukkit.Location;

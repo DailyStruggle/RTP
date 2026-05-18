@@ -39,7 +39,7 @@
 param(
     [string[]] $Roots = @(
         'rtp-core', 'rtp-api', 'rtp-plugin',
-        'rtp-spigot', 'rtp-paper', 'rtp-folia', 'rtp-fabric',
+        'rtp-bukkit', 'rtp-paper', 'rtp-folia', 'rtp-fabric',
         'rtp-anvil', 'commands-api', 'effects-api', 'rtp-tags', 'addons'
     ),
     [int]    $MinLines = 6,

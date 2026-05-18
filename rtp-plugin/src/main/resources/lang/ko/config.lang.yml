@@ -3,12 +3,11 @@
 # 옵션 이름을 변경하거나 번역하려면 오른쪽만 편집하세요.
 # 왼쪽은 코드 상수이므로 변경하지 마세요.
 # 이 파일이 존재하지 않으면 플러그인은 좌우가 동일한 영어 버전을 다시 생성합니다.
-
-database: 데이터베이스
-playerCommands: 플레이어명령어
-teleportCooldown: 텔레포트쿨다운
-cancelDistance: 취소거리
-teleportDelay: 텔레포트지연
-consoleCommands: 콘솔명령어
-version: version
-network: 네트워크
+database: "데이터베이스"
+playerCommands: "플레이어명령어"
+teleportCooldown: "텔레포트쿨다운"
+cancelDistance: "취소거리"
+teleportDelay: "텔레포트지연"
+consoleCommands: "콘솔명령어"
+version: "version"
+network: "네트워크"

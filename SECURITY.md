@@ -42,7 +42,7 @@ Alternatively, contact the maintainer directly via the SpigotMC resource page pr
 
 ## Scope
 
-This policy covers the `rtp-api`, `rtp-core`, `rtp-spigot`, `rtp-paper`, and `rtp-folia` modules.
+This policy covers the `rtp-api`, `rtp-core`, `rtp-bukkit`, `rtp-paper`, and `rtp-folia` modules.
 
 The `addons/` directory contains example integrations. Vulnerabilities in third-party plugins integrated via the addon API (GriefPrevention, WorldGuard, Vault, etc.) should be reported to their respective maintainers.
 

@@ -1,7 +1,9 @@
 package io.github.dailystruggle.rtp.bukkitplatform.metrics;
 
-import io.github.dailystruggle.rtp.common.metrics.MetricsBinding;
-import io.github.dailystruggle.rtp.common.metrics.MetricsSnapshot;
+import io.github.dailystruggle.metrics.api.MetricsBinding;
+import io.github.dailystruggle.metrics.api.MetricsSnapshot;
+import org.bukkit.Bukkit;
+import org.bukkit.Server;
 
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
@@ -90,9 +92,29 @@ public final class BukkitTpsSampler implements MetricsBinding {
     public double mspt() {
         double v = ema1m;
         if (Double.isNaN(v) || v <= 0.0) return MetricsSnapshot.UNSAMPLED;
-        // Raw 1-minute EMA delta in milliseconds. No cap — overruns surface as
+        // Raw 1-minute EMA delta in milliseconds. No cap - overruns surface as
         // tickBudgetUtilisation > 1.0 via the snapshot derivation.
         return v / 1e6;
+    }
+
+    @Override
+    public int playerCount() {
+        try {
+            Server s = Bukkit.getServer();
+            return s == null ? 0 : s.getOnlinePlayers().size();
+        } catch (Throwable ignored) {
+            return 0;
+        }
+    }
+
+    @Override
+    public int softCap() {
+        try {
+            Server s = Bukkit.getServer();
+            return s == null ? 0 : s.getMaxPlayers();
+        } catch (Throwable ignored) {
+            return 0;
+        }
     }
 
     /**

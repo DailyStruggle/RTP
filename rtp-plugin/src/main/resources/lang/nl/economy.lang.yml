@@ -2,10 +2,10 @@
 # Koppelt interne sleutels (links) aan de zichtbare namen in economy.yml (rechts).
 # Wijzig alleen de rechterkant; de linkerkant is een codeconstante.
 # Als dit bestand ontbreekt, genereert de plugin het opnieuw met identieke paren.
-balanceFloor: minimumSaldo
-price: prijs
-priceOther: prijsAnder
-refundOnCancel: terugbetalingBijAnnulering
-biomePrice: bioomPrijs
-paramsPrice: parametersPrijs
-version: version
+balanceFloor: "minimumSaldo"
+price: "prijs"
+priceOther: "prijsAnder"
+refundOnCancel: "terugbetalingBijAnnulering"
+biomePrice: "bioomPrijs"
+paramsPrice: "parametersPrijs"
+version: "version"

@@ -1,0 +1,66 @@
+# --- Configuração principal do RTP ---
+# Idioma das mensagens visíveis ao jogador.
+# Padrão: "en" (inglês base incluído em messages.yml).
+# Outras traduções disponíveis residem em lang/<locale>/messages.yml e são
+# carregadas como uma camada sobre o inglês base. Chaves ausentes no arquivo
+# de idioma silenciosamente recaem para o inglês. Um idioma desconhecido
+# gera um aviso e também recai para o inglês.
+# Consulte ADR-020 e REQ-RTP-F-013.
+language: "en"
+
+# Atraso de teletransporte (segundos)
+# Tempo que o jogador deve esperar antes que o teletransporte seja realizado.
+# Às vezes dá tempo ao servidor para pré-carregar os chunks de destino.
+atrasoTeletransporte: 2
+
+# Cancelamento por movimento (blocos)
+# Se o jogador se mover mais que esta distância durante o atraso, o
+# teletransporte é cancelado. Defina como -1 para desativar.
+distanciaCancelamento: 2
+
+# Tempo de espera entre teletransportes (segundos)
+# Tempo que o jogador deve esperar entre usos bem-sucedidos do RTP.
+tempoDeEsperaTeletransporte: 300
+
+# Comandos pós-teletransporte
+# Lista de comandos a serem executados após um teletransporte bem-sucedido.
+# O marcador [player] representa o nome do jogador.
+comandosConsole:
+  - "say [player] acabou de teletransportar-se aleatoriamente!"
+comandosJogador:
+  - ""
+
+# --- Configuração do banco de dados ---
+# Onde armazenar localizações em cache e dados dos jogadores.
+bancoDeDados:
+  # Tipos disponíveis: yaml, sqlite, mysql, postgresql
+  # - yaml/sqlite: arquivos locais (sem configuração adicional)
+  # - mysql/postgresql: banco de dados remoto (requer credenciais abaixo)
+  type: "sqlite"
+
+  # Credenciais de banco de dados em rede (ignoradas para tipos locais)
+  host: "127.0.0.1"
+  port: 3306
+  name: "rtp"
+  username: "root"
+  password: "password"
+
+# --- Rede e sincronização ---
+# Redis é usado para sincronizar localizações em cache entre vários servidores.
+rede:
+  redis:
+    enabled: false
+    host: "127.0.0.1"
+    port: 6379
+    password: ""
+
+# NAO MODIFIQUE O NUMERO DE VERSAO
+version: 3.0
+# --- parity-repair: identity entries appended to satisfy LocaleFullParityTest
+# --- values copied verbatim from English baseline; translate as needed.
+menu:
+  # Ordered preference list of renderer ids.
+  # @type: list<enum>
+  # @options: ["book", "chat"]
+  renderer:
+    - "book"

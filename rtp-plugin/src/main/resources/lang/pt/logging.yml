@@ -1,0 +1,40 @@
+# --- Registros do plugin ---
+# Ativa ou desativa os registros das diversas atividades do plugin.
+# Registros detalhados do sistema
+# detailed_reload: registrar todos os arquivos/seções recarregados
+# detailed_region_init: registrar a inicialização de cada região
+recarga_detalhada: false
+inicio_regiao_detalhado: false
+
+# Registros de atividade básica
+# command: registrar os comandos do RTP executados pelos jogadores
+# teleport: registrar os eventos reais de teletransporte
+comando: false
+teletransporte: true
+
+# Registros de RTP automáticos ou por evento
+# Registros para RTP acionados por eventos:
+evento_mudancaMundo: "true # Quando o jogador muda de mundo"
+evento_entrada: "true       # Quando o jogador entra no servidor"
+evento_renascimento: "true # Quando o jogador renasce"
+evento_movimento: "true  # Quando o jogador se move (se o RTP por movimento estiver ativo)"
+evento_teletransporte: "true # Quando o jogador teletransporta (se o RTP por teletransporte estiver ativo)"
+
+# Depuração de falhas de seleção
+# Registra informações detalhadas quando a seleção de uma localização segura
+# falha, incluindo taxas de falha e parâmetros de busca.
+falha_selecao: true
+
+# Registros do sistema
+# Relacionados a tarefas em segundo plano e operações de banco de dados.
+sistema_rastreioMemoria: false
+sistema_bancoDeDados: false
+
+# Nível mínimo de registro do plugin. O filtro efetivo é o mais restritivo
+# entre este e o do logger do Bukkit. Aceita: SEVERE, WARNING, INFO, CONFIG,
+# FINE, FINER, FINEST, ALL, OFF. O valor padrão ALL mantém o comportamento
+# idêntico ao do logger do Bukkit.
+nivel_minimo: "INFO"
+
+# NAO MODIFIQUE O NUMERO DE VERSAO
+version: 1.0

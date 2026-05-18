@@ -1,0 +1,18 @@
+# --- Mapeamento de Idioma: safety.yml ---
+# Mapeia as chaves internas (esquerda) para os nomes visíveis ao usuário
+# em safety.yml (direita). Edite apenas o lado direito para renomear ou
+# traduzir uma opção; o lado esquerdo é uma constante de código e não
+# deve ser alterado.
+# Se este arquivo estiver ausente, o plugin o regenera com pares
+# idênticos esquerda/direita (os valores padrão em inglês).
+safetyRadius: "raioSeguranca"
+biomeWhitelist: "listaPermitidaBiomas"
+airBlocks: "blocosAr"
+biomes: "biomas"
+unsafeBlocks: "blocosInseguros"
+platformRadius: "raioPlataforma"
+platformAirHeight: "alturaArPlataforma"
+platformMaterial: "materialPlataforma"
+invulnerabilityTime: "tempoInvulnerabilidade"
+version: "version"
+platformDepth: "profundidadePlataforma"

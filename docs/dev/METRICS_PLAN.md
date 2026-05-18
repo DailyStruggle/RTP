@@ -10,7 +10,7 @@ This document is the canonical plan for **runtime metrics** in RTP — the platf
 
 ## Goals
 
-- **Platform-portable metrics SPI.** A single `Metrics` (working name) facade in `rtp-core` that every safety-critical or ops-relevant signal flows through. Concrete sources are platform adapters (`rtp-spigot`, `rtp-paper`, `rtp-folia`, `rtp-fabric`); core never imports platform types.
+- **Platform-portable metrics SPI.** A single `Metrics` (working name) facade in `rtp-core` that every safety-critical or ops-relevant signal flows through. Concrete sources are platform adapters (`rtp-bukkit`, `rtp-paper`, `rtp-folia`, `rtp-fabric`); core never imports platform types.
 - **Snapshot, not stream.** Each query returns a current value. Callers (telemetry publisher in the multi-server plan, `rtp test full`, `MemoryTracker` audits) compute deltas themselves. Keeps the surface trivially mockable.
 - **No tick-thread blocking.** Sampling shall be either lock-free (in-memory counters) or run on the platform's async scheduler. S-005 spirit applies.
 - **Already-published values reused.** Where the platform exposes a metric (Paper `Bukkit.getTPS()`, Folia per-region tick samplers), wrap it. Do not re-implement what the platform offers.
@@ -347,7 +347,7 @@ A dedicated project-wide ADR (`docs/adr/ADR-NNN-rtp-per-tick-cpu-budget-contract
 
 ## Spigot TPS Fallback (1.20.1+ minimum)
 
-Raw Spigot's `Bukkit.Server` does **not** expose `getTPS()` on the lowest-supported MC version (1.20.1). It is a Paper-only addition. The `rtp-spigot` adapter therefore ships a local sampler:
+Raw Spigot's `Bukkit.Server` does **not** expose `getTPS()` on the lowest-supported MC version (1.20.1). It is a Paper-only addition. The `rtp-bukkit` adapter therefore ships a local sampler:
 
 - Schedule a 1-tick-period repeating task on `RTP.scheduler` that records `System.nanoTime()` per fire.
 - Maintain three exponential moving averages over the inter-fire deltas (1m / 5m / 15m windows).
@@ -383,7 +383,7 @@ rtp-core/
       ├── MetricsSnapshot      (immutable record)
       ├── PipelineHistogram    (rolling stats for avgPipelineMs)
       └── HeapSampler          (java.lang.management wrapper)
-rtp-spigot/    -- SpigotTpsSampler (local 1-tick averager) + AbstractServerAccessor extension
+rtp-bukkit/    -- BukkitTpsSampler (local 1-tick averager) + AbstractServerAccessor extension
 rtp-paper/     -- PaperMetricsBinding (delegates to Bukkit.getTPS / getAverageTickTime)
 rtp-folia/     -- FoliaMetricsBinding (per-region samplers + configurable aggregation)
 rtp-fabric/    -- FabricMetricsBinding (server tick callbacks)
@@ -408,7 +408,7 @@ rtp-fabric/    -- FabricMetricsBinding (server tick callbacks)
 - [x] Implement `Metrics` and `MetricsSnapshot` in `rtp-core`. *(landed in M0; carried forward.)*
 - [x] `PipelineHistogram` integrated into `TeleportPipelineTask` completion path (additive; no behaviour change) — wired into `runCleanup` (single-shot via `pipelineHistogramRecorded` guard) on 2026-05-01; covered by `TeleportPipelineTaskPhaseTest#runCleanup_records_one_sample_into_pipeline_histogram` and `…_is_idempotent_for_pipeline_histogram`. Process-wide aggregator exposed as `RTP.metrics` (`CoreMetrics` instance, NOOP binding by default).
 - [x] `PaperMetricsBinding` wraps `Bukkit.getTPS()` / `getAverageTickTime()` — landed 2026-05-01 in `rtp-paper/rtp-paper-common/.../paper/metrics/PaperMetricsBinding.java`; supplier-injection seam allows non-MockBukkit testing; Bukkit-bound production constructor returns documented sentinels (`MetricsSnapshot.UNSAMPLED` / `0`) when `Bukkit.getServer()` is null or the call throws. Covered by `PaperMetricsBindingTest` (3/3 green: supplier delegation, NaN-sentinel propagation, inherited-default preservation for the un-overridden `softCap`/`chunkLoadBacklog`/`databaseLatencyMs` fields). Plugin-enable wiring (`RTP.metrics.setBinding(new PaperMetricsBinding())`) deferred to the platform-bring-up slice that also wires `rtp test full` output.
-- [x] `SpigotTpsSampler` for Spigot 1.20.1 fallback — landed 2026-05-01 in `rtp-spigot/rtp-spigot-common/.../spigot/metrics/SpigotTpsSampler.java`. Implements `MetricsBinding`; `tick()` is invoked once per server tick from a 1-tick repeating task on `RTP.scheduler` and feeds three EMAs (1m / 5m / 15m windows in ticks at nominal 20 TPS). TPS is clamped to `[0.0, 20.0]`; MSPT is the raw 1m EMA in ms; pre-tick / single-tick / non-progressing-clock paths return `MetricsSnapshot.UNSAMPLED`. Covered by `SpigotTpsSamplerTest` (7/7 green: pre-tick sentinel, seed-only first call, steady-50ms→20 TPS / 50 MSPT, slow-100ms→10 TPS / 100 MSPT, faster-than-20-clamp, non-progressing clock, 1m-vs-15m EMA divergence). Plugin-enable wiring (instantiate, `RTP.metrics.setBinding(sampler)`, `RTP.scheduler.runTaskTimer(sampler::tick, 1L, 1L)`) deferred to the same platform-bring-up slice as `PaperMetricsBinding` and `rtp test full`.
+- [x] `BukkitTpsSampler` for Spigot 1.20.1 fallback — landed 2026-05-01 in `rtp-bukkit/rtp-bukkit-common/.../spigot/metrics/BukkitTpsSampler.java`. Implements `MetricsBinding`; `tick()` is invoked once per server tick from a 1-tick repeating task on `RTP.scheduler` and feeds three EMAs (1m / 5m / 15m windows in ticks at nominal 20 TPS). TPS is clamped to `[0.0, 20.0]`; MSPT is the raw 1m EMA in ms; pre-tick / single-tick / non-progressing-clock paths return `MetricsSnapshot.UNSAMPLED`. Covered by `BukkitTpsSamplerTest` (7/7 green: pre-tick sentinel, seed-only first call, steady-50ms→20 TPS / 50 MSPT, slow-100ms→10 TPS / 100 MSPT, faster-than-20-clamp, non-progressing clock, 1m-vs-15m EMA divergence). Plugin-enable wiring (instantiate, `RTP.metrics.setBinding(sampler)`, `RTP.scheduler.runTaskTimer(sampler::tick, 1L, 1L)`) deferred to the same platform-bring-up slice as `PaperMetricsBinding` and `rtp test full`.
 - [x] `HeapSampler` via `ManagementFactory`. *(landed in M0; carried forward.)*
 - [ ] Wire `rtp test full` to print `MetricsSnapshot.toString()` (replace the ad-hoc dump).
 - [ ] **Amend `InfoCmd` to render the M1 health groups** (*server*, *pipeline*, *demand*) from a single `Metrics.snapshot()` call per invocation. Compact view by default; `verbose` / `-v` flag expands to the full per-region cache table (deferred to M2 for Folia detail). Reuse `rtp.info` permission. New `InfoCmdTest` rows: (a) snapshot is read exactly once per invocation, (b) demand block is suppressed when `metrics.demand` is disabled, (c) compact-vs-verbose output divergence.

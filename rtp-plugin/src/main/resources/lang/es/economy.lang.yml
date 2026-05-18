@@ -5,11 +5,10 @@
 # código y no debe cambiarse.
 # Si este archivo falta, el plugin lo regenera con pares idénticos
 # izquierda/derecha (los valores por defecto en inglés).
-
-balanceFloor: saldoMinimo
-price: precio
-priceOther: precioOtro
-refundOnCancel: reembolsoAlCancelar
-biomePrice: precioBioma
-paramsPrice: precioParametros
-version: version
+balanceFloor: "saldoMinimo"
+price: "precio"
+priceOther: "precioOtro"
+refundOnCancel: "reembolsoAlCancelar"
+biomePrice: "precioBioma"
+paramsPrice: "precioParametros"
+version: "version"

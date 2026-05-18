@@ -1,5 +1,4 @@
 # --- RTP 메인 설정 ---
-
 # 플레이어에게 표시되는 메시지의 언어.
 # 기본값: "en" (messages.yml 에 포함된 영어 기준선).
 # 다른 번역은 lang/<locale>/messages.yml 에 있으며 영어 기준선 위에
@@ -56,4 +55,4 @@ language: "en"
     password: ""
 
 # 버전 번호는 변경하지 마세요
-version: "3.0"
+version: 3.0

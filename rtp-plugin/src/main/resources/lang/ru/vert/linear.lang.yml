@@ -1,0 +1,4 @@
+minY: "minY"
+maxY: "maxY"
+direction: "направление"
+requireSkyLight: "требоватьНебесныйСвет"

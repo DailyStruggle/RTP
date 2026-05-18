@@ -3,7 +3,7 @@ package io.github.dailystruggle.effectsapi.bukkit.LocalEffects;
 import io.github.dailystruggle.effectsapi.common.Effect;
 import io.github.dailystruggle.effectsapi.EffectsAPI;
 import io.github.dailystruggle.effectsapi.bukkit.LocalEffects.enums.GlideTypeNames;
-import io.github.dailystruggle.effectsapi.bukkit.SpigotListeners.GlideSafetyListener;
+import io.github.dailystruggle.effectsapi.bukkit.BukkitListeners.GlideSafetyListener;
 import io.github.dailystruggle.effectsapi.bukkit.events.PlayerGlideEvent;
 import io.github.dailystruggle.effectsapi.bukkit.events.PlayerLandEvent;
 import org.bukkit.Bukkit;

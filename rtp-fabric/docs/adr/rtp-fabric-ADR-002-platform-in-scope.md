@@ -17,7 +17,7 @@ java.lang.NoClassDefFoundError: net/minecraft/class_2561
   at io.github.dailystruggle.rtp.fabric.RTPFabricMod.onInitialize
 ```
 
-Root cause: the adapter was compiled against MC `1.21.1` Mojang mappings. Fabric Loader's intermediary→runtime remap is **per-MC-version**: a JAR remapped against the `1.21.1` intermediary table is not loadable on a `26.2` runtime, because the intermediary class name space (`class_2561` etc.) is not stable across MC releases. This is structurally identical to the Bukkit-family NMS-version problem — and was already solved there by per-version adapter submodules (`rtp-spigot/rtp-spigot-v1_20_R1`, `rtp-paper/rtp-paper-v1_21_R1`, `rtp-folia/rtp-folia-v26_1_R1`, etc.).
+Root cause: the adapter was compiled against MC `1.21.1` Mojang mappings. Fabric Loader's intermediary→runtime remap is **per-MC-version**: a JAR remapped against the `1.21.1` intermediary table is not loadable on a `26.2` runtime, because the intermediary class name space (`class_2561` etc.) is not stable across MC releases. This is structurally identical to the Bukkit-family NMS-version problem — and was already solved there by per-version adapter submodules (`rtp-bukkit/rtp-bukkit-v1_20_R1`, `rtp-paper/rtp-paper-v1_21_R1`, `rtp-folia/rtp-folia-v26_1_R1`, etc.).
 
 Four facts inform the rewritten decision:
 
@@ -92,7 +92,7 @@ RTP shall ship as a **single JAR** that loads on both Bukkit-family servers and 
 The following hard lines remain unchanged and shall be enforced by existing ArchUnit guards:
 
 - `rtp-core`, `rtp-api`, `commands-api`, `effects-api` shall contain zero platform imports.
-- `rtp-spigot`, `rtp-paper`, `rtp-folia` shall contain Bukkit-family imports only.
+- `rtp-bukkit`, `rtp-paper`, `rtp-folia` shall contain Bukkit-family imports only.
 - `rtp-fabric/rtp-fabric-common` shall not import `net.minecraft.*` (only stable Fabric-Loader API and `rtp-api`/`rtp-core`).
 - `rtp-fabric/rtp-fabric-<ver>` modules shall contain Fabric imports and MC-mapping imports for that version only; they shall not import `org.bukkit.*` and shall not cross-reference each other.
 - The `RTPBukkitPlugin` package and the `RTPFabricMod` package within `rtp-plugin` shall not import each other and shall not transitively reach the other platform's classes. `RTPFabricMod` additionally shall not import any `net.minecraft.*` symbol.
@@ -148,6 +148,6 @@ A **named maintainer** shall own the Fabric adapter end-to-end (build, mappings,
 - ADR-021 — Legacy Minecraft and Java support out of scope (untouched by this ADR; Fabric ≠ legacy)
 - REQ-RTP-S-005 — No synchronous chunk I/O on the main thread (Step A acceptance gate)
 - REQ-RTP-S-006 — No undefined behaviour on early API access (Step B acceptance gate)
-- External precedent: Geyser, LuckPerms, ViaVersion, Floodgate — single-JAR multi-loader bootstrap in production. Per-MC-version Bukkit-family adapters in this project (`rtp-spigot/rtp-spigot-v*`, `rtp-paper/rtp-paper-v*`, `rtp-folia/rtp-folia-v*`) — internal precedent for the per-version submodule structure now extended to Fabric.
+- External precedent: Geyser, LuckPerms, ViaVersion, Floodgate — single-JAR multi-loader bootstrap in production. Per-MC-version Bukkit-family adapters in this project (`rtp-bukkit/rtp-bukkit-v*`, `rtp-paper/rtp-paper-v*`, `rtp-folia/rtp-folia-v*`) — internal precedent for the per-version submodule structure now extended to Fabric.
 - Mojang version-numbering change (2026): https://www.minecraft.net/en-us/article/minecraft-new-version-numbering-system
 - 2026-05-01 deployment crash log demonstrating the single-version structural flaw: `NoClassDefFoundError: net.minecraft.class_2561` at `RTPFabricMod.onInitialize:52` on a `26.2` Fabric server when JAR was built against `1.21.1`.

@@ -1,4 +1,4 @@
-﻿# RTP Requirements Traceability Matrix
+# RTP Requirements Traceability Matrix
 
 This document connects each requirement to the design decision that motivated it and the source code that implements it. Where automated tests exist, they are linked as well.
 
@@ -31,13 +31,21 @@ This document connects each requirement to the design decision that motivated it
 | REQ-RTP-NF-002 | Thread safety | DESIGN.md §2 | `RTPTaskPipe` | `RTPArchitectureTest` |
 | REQ-RTP-NF-003 | Logic isolation | ADR-003 | `RTPBukkitPlugin` | `RTPArchitectureTest` |
 | REQ-RTP-SYS-001 | Java 21+ | build.gradle | — | — |
-| REQ-RTP-SYS-002 | Platform compatibility | ARCHITECTURE.md | `rtp-spigot`, `rtp-paper`, `rtp-folia` | `TestApiCompatCmdTest` |
+| REQ-RTP-SYS-002 | Platform compatibility | ARCHITECTURE.md | `rtp-bukkit`, `rtp-paper`, `rtp-folia` | `TestApiCompatCmdTest` |
 | REQ-RTP-S-001 | No lethal destination | DESIGN.md §3 | `SafetyCheck` | — |
 | REQ-RTP-S-002 | No chunk leaks | DESIGN.md §6 | `ChunkReservation`, `MemoryTracker` | `ChunkTicketLifecycleTest` |
 | REQ-RTP-S-003 | Respect claims | ADR-019 | `GlobalRegionVerifiers` | — |
 | REQ-RTP-S-004 | No silent failure | DESIGN.md �1 | TeleportPipelineTask | FailureModeTest, RegionPipelineTest |
 | REQ-RTP-S-005 | No sync chunk I/O | ADR-015/016 | RTPTaskPipe, adapters | AnvilPrefilterTest, RTPArchitectureTest |
 | REQ-RTP-S-006 | No undefined behaviour on early API access | ARCHITECTURE.md — rtp-api | `RTPAPI.addShape()`, `RTPAPI.addVerticalAdjustor()`, `RTPAPI.setServerAccessor()` | `RTPAPIGuardTest` (pre-init ISE, write-once guard) |
+| REQ-RTP-MAP-001 | Require-by-contract `MapBinding` (extends REQ-RTP-S-006 to maps surface) | [ADR-046](../adr/ADR-046-maps-api-module.md), `maps-api/docs/adr/maps-api-ADR-001-bootstrap.md` | `NoopMapBinding` (`maps-api`) | `ReqRtpMap001RequireByContractTest` (Stage 1) |
+| REQ-RTP-MAP-002 | No chunk I/O / no blocking `.get()` / `.join()` in `ChartRenderer` (extends REQ-RTP-F-008, REQ-RTP-S-005 to maps surface) | [ADR-046](../adr/ADR-046-maps-api-module.md) | `ChartRenderer`, `HeatmapRenderer` (`maps-api`) | `ReqRtpMap002NoChunkIoTest` (Stage 1; ArchUnit) |
+| REQ-RTP-MAP-003 | `MemoryTracker` release on cancel / viewer disconnect / plugin disable | [ADR-046](../adr/ADR-046-maps-api-module.md) | `BukkitMapBinding`, `FoliaMapBinding` (Stage 2) | `BukkitMapBindingTest` (Stage 2) |
+| REQ-RTP-MAP-004 | Lite assembly ships `NoopMapBinding` only | [ADR-046](../adr/ADR-046-maps-api-module.md), [ADR-024](../adr/ADR-024-rtp-lite-assembly-variant.md) | `NoopMapBinding` (`maps-api`); lite assembly exclusion | Lite-assembly audit (Stage 2) |
+| REQ-RTP-MAP-005 | Mermaid subset acceptance + no external runtime / scripting / layout library | [ADR-046](../adr/ADR-046-maps-api-module.md) *Mermaid output* | `MermaidRenderer`, `MermaidParser`, `MermaidLayout`, `MermaidRasterizer` (Stage 4) | `MermaidParserTest`, `MermaidRasterizerTest` (Stage 4) |
+| REQ-RTP-OBS-001 | Non-blocking metrics snapshot (extends REQ-RTP-F-008 to metrics surface; M2 adds `FoliaRegionSample` per-region detail) | [METRICS_PLAN.md](METRICS_PLAN.md) | `Metrics`, `CoreMetrics`, `MetricsSnapshot`, `MetricsBinding`, `FoliaRegionSample` | `ReqRtpObs001CoreMetricsTest`, `ReqRtpObs001MetricsSnapshotTest`, `FoliaRegionSampleTest`, `InfoCmdTest` (Folia-table render/suppress cases) |
+| REQ-RTP-OBS-002 | Single-sample pipeline recording (one sample per `TeleportPipelineTask` on every exit path) | [METRICS_PLAN.md](METRICS_PLAN.md) | `PipelineHistogram`, `TeleportPipelineTask.runCleanup` | `ReqRtpObs002PipelineHistogramTest`, `TeleportPipelineTaskPhaseTest#runCleanup_records_one_sample_into_pipeline_histogram` |
+| REQ-RTP-OBS-003 | Bounded heap / TPS / MSPT sampling cost (M2 extends to Folia per-region samplers and Fabric server-tick sampler; bStats *Runtime health* charts consume the same snapshot) | [METRICS_PLAN.md](METRICS_PLAN.md) | `HeapSampler`, `PaperMetricsBinding`, `BukkitTpsSampler`, `FoliaMetricsBinding`, `FoliaRegionTpsSampler`, `FabricMetricsBinding`, `MetricsBindingDispatcher`, `RTPCostMetricsCharts` (bStats *Runtime health* chart group) | `ReqRtpObs003HeapSamplerTest`, `PaperMetricsBindingTest`, `BukkitTpsSamplerTest`, `FoliaMetricsBindingTest`, `FabricMetricsBindingTest`, `RuntimeHealthBucketsTest` |
 
 ---
 
@@ -87,18 +95,18 @@ This document connects each requirement to the design decision that motivated it
 
 ---
 
-## rtp-spigot Requirements
+## rtp-bukkit Requirements
 
 | Req ID | Summary | Design Ref | Implementing Class(es) | Test(s) |
 |---|---|---|---|---|
-| REQ-SPIGOT-F-001 | Synchronous chunk loading | DESIGN.md §2 — rtp-spigot | `rtp-spigot` adapter (Bukkit chunk API) | `BukkitSchedulerImplTest` (`runTask_onPrimaryThread_executesImmediately`, `runTaskAsynchronously_dispatchesTask_andCompletes`) |
+| REQ-SPIGOT-F-001 | Synchronous chunk loading | DESIGN.md §2 — rtp-bukkit | `rtp-bukkit` adapter (Bukkit chunk API) | `BukkitSchedulerImplTest` (`runTask_onPrimaryThread_executesImmediately`, `runTaskAsynchronously_dispatchesTask_andCompletes`) |
 | REQ-SPIGOT-F-002 | Rate-limited sync tasks | DESIGN.md §1 — Bounded Computation Overhead | `TimeBoundTaskPipe` (spigot binding) | Manual verification required (TimeBoundTaskPipe core logic covered by `SLATest`) |
-| REQ-SPIGOT-F-003 | Platform event routing | ARCHITECTURE.md — rtp-spigot | Spigot event listeners → `rtp-core` handlers | Manual verification required |
-| REQ-SPIGOT-ARCH-001 | `addPluginChunkTicket` over `setForceLoaded` | DESIGN.md §6 — Chunk Allocation Management | `rtp-spigot` chunk reservation impl | `ChunkTicketLifecycleTest` (`ticket_is_held_during_reservation_and_released_on_close`) |
-| REQ-SPIGOT-ARCH-002 | Plugin-owned ticket leak prevention | DESIGN.md §6 — Chunk Allocation Management | `rtp-spigot` chunk reservation impl | Manual verification required |
+| REQ-SPIGOT-F-003 | Platform event routing | ARCHITECTURE.md — rtp-bukkit | Spigot event listeners → `rtp-core` handlers | Manual verification required |
+| REQ-SPIGOT-ARCH-001 | `addPluginChunkTicket` over `setForceLoaded` | DESIGN.md §6 — Chunk Allocation Management | `rtp-bukkit` chunk reservation impl | `ChunkTicketLifecycleTest` (`ticket_is_held_during_reservation_and_released_on_close`) |
+| REQ-SPIGOT-ARCH-002 | Plugin-owned ticket leak prevention | DESIGN.md §6 — Chunk Allocation Management | `rtp-bukkit` chunk reservation impl | Manual verification required |
 | REQ-SPIGOT-ARCH-003 | `TimeBoundTaskPipe` for main-thread ops | DESIGN.md §1 — Bounded Computation Overhead | `TimeBoundTaskPipe` | `BukkitSchedulerImplTest` (`runTask_onPrimaryThread_executesImmediately`) |
 | REQ-SPIGOT-ARCH-004 | Wall-clock time bounding | DESIGN.md §1 — Bounded Computation Overhead | `TimeBoundTaskPipe` (nanosecond budget) | `BukkitSchedulerImplTest` (`runTaskTimer_returnsNonNullBukkitTaskHandle`, `cancelTask_preventsScheduledTaskFromRunning`) |
-| REQ-SPIGOT-ARCH-005 | Ticket lifecycle pairing | DESIGN.md §6 — Chunk Allocation Management | `rtp-spigot` `removePluginChunkTicket` call sites | `ChunkTicketLifecycleTest` (`ticket_is_held_during_reservation_and_released_on_close`, `ticket_is_released_even_when_validator_throws`) |
+| REQ-SPIGOT-ARCH-005 | Ticket lifecycle pairing | DESIGN.md §6 — Chunk Allocation Management | `rtp-bukkit` `removePluginChunkTicket` call sites | `ChunkTicketLifecycleTest` (`ticket_is_held_during_reservation_and_released_on_close`, `ticket_is_released_even_when_validator_throws`) |
 | REQ-SPIGOT-ARCH-006 | Forced reclamation on disconnect | DESIGN.md §6 — Orphaned Allocation Recovery | `MemoryTracker` + spigot cleanup listener | Manual verification required |
 
 ---
@@ -247,7 +255,7 @@ All rows below are **unimplemented**. Subproject ADR `rtp-proxy-ADR-008-bungee-b
 | Root / System | 24 | 12 (REQ-RTP-F-001 `SLATest`+`RegionPipelineTest`, REQ-RTP-F-006/007 `RegionPipelineTest`, REQ-RTP-F-008, REQ-RTP-F-012 `ScanCmdTest`+`ScanTaskProcessingTest`, REQ-RTP-F-013 `ConfigParserLanguageTest`, REQ-RTP-NF-002, REQ-RTP-NF-003 via `RTPArchitectureTest`, REQ-RTP-SYS-001 via build, REQ-RTP-S-004 `FailureModeTest`+`RegionPipelineTest`, REQ-RTP-S-005, REQ-RTP-S-006 `RTPAPIGuardTest`) |
 | rtp-api | 10 | 4 (REQ-API-NF-002, REQ-API-ARCH-002, REQ-API-ARCH-003 `RTPAPIGuardTest`, REQ-API-ARCH-004) |
 | rtp-core | 20 | 13 (REQ-CORE-F-001 `FailureModeTest`+`RegionPipelineTest`, REQ-CORE-F-003–005, REQ-CORE-F-009 `BacklogLocationBufferTest`+`WorldBacklogBinIndexTest`, REQ-CORE-ARCH-001–002, REQ-CORE-ARCH-009–010, REQ-CORE-NF-001 `MemoryShapeShutdownTest`+`CachedLocationRoundTripTest`; REQ-CORE-F-003/004 also covered end-to-end by `RegionPipelineTest`) |
-| rtp-spigot | 9 | 4 (REQ-SPIGOT-F-001, REQ-SPIGOT-ARCH-001/005 via `ChunkTicketLifecycleTest`, REQ-SPIGOT-ARCH-003/004 via `BukkitSchedulerImplTest`) |
+| rtp-bukkit | 9 | 4 (REQ-SPIGOT-F-001, REQ-SPIGOT-ARCH-001/005 via `ChunkTicketLifecycleTest`, REQ-SPIGOT-ARCH-003/004 via `BukkitSchedulerImplTest`) |
 | rtp-paper | 9 | 5 (REQ-PAPER-F-002 via architecture rule, REQ-PAPER-F-003 and REQ-PAPER-ARCH-003 via `ServerAccessorImplTest`, REQ-PAPER-ARCH-001/005 via `ChunkTicketLifecycleTest`) |
 | rtp-folia | 14 | 1 (REQ-FOLIA-F-002 via architecture rule) |
 | rtp-fabric | 1 | 1 (REQ-FABRIC-F-011 via `ReqFabricAdr023HasPlayedBeforeTest`) |
@@ -263,8 +271,8 @@ All rows below are **unimplemented**. Subproject ADR `rtp-proxy-ADR-008-bungee-b
 > **Real-region pipeline tests (`RegionPipelineTest`, 12 tests):** Exercises the full `LocationGenerator.getLocation(Region, biomeNames)` pipeline using actual `Region`/`MockRTPWorld`/`MockRTPChunk` mock components — no `MockLocationGenerator` stub. Covers: queue promotion (`unkeptLocations` → `keptLocations`), `hasLocation` state transitions, queue-length APIs, biome filter acceptance (PLAINS) and rejection (DEEP_OCEAN), coords-inside-shape bounds assertion, and end-to-end determinism (same/different seed). `RTPTestSetup.install()` now calls `Configs.reloadConfigs()` so all core parsers (`SafetyKeys`, `PerformanceKeys`, `LoggingKeys`) are available to every test that needs them. `MockRTPChunk` (new testFixture) provides an all-safe, all-air chunk; `MockRTPWorld` now encodes chunk coords into the cache key so `getCachedChunk()` returns the correct chunk at any (cx, cz). `MockRTPServerAccessor.getWorldBorder()` now returns an always-inside `WorldBorder` and exposes `setLocationGenerator()` to swap in the real pipeline.
 
 > **Gap:** The adapter modules (spigot, paper, folia) have low but growing automated test coverage.
-> MockBukkit is now integrated into `rtp-spigot-common` and `rtp-paper-v1_20_R1`; the mock support classes have been promoted to a shared `java-test-fixtures` source set in `rtp-core`.
+> MockBukkit is now integrated into `rtp-bukkit-common` and `rtp-paper-v1_20_R1`; the mock support classes have been promoted to a shared `java-test-fixtures` source set in `rtp-core`.
 > The remaining highest-value automation steps are:
 > 1. ~~Automate chunk ticket lifecycle (REQ-SPIGOT-ARCH-001/005, REQ-PAPER-ARCH-001/005)~~ **Done** — `ChunkTicketLifecycleTest` (2 tests) uses `TrackedMockWorld` to assert tickets are held during validation and released (including on exception) via `ChunkReservation` try-with-resources.
-> 2. Extend MockBukkit coverage to `rtp-spigot-v1_20_R1`, `rtp-paper-v1_21_R1`, and `rtp-paper-v26_1_R1` using the same `testFixtures` pattern.
+> 2. Extend MockBukkit coverage to `rtp-bukkit-v1_20_R1`, `rtp-paper-v1_21_R1`, and `rtp-paper-v26_1_R1` using the same `testFixtures` pattern.
 > 3. Folia mock infrastructure and economy delegation (REQ-FOLIA-ARCH-007–009) require a dedicated Folia mock server or a Folia-compatible MockBukkit fork.

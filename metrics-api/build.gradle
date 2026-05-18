@@ -1,0 +1,38 @@
+// metrics-api — platform-portable metrics SPI. Pure-Java module: no Bukkit /
+// Fabric / Loom dependency. Concrete platform bindings (PaperMetricsBinding,
+// BukkitTpsSampler, FoliaMetricsBinding + FoliaRegionTpsSampler,
+// FabricMetricsBinding) live in their respective platform adapters and
+// depend on this module via `api project(':metrics-api')`.
+//
+// Per PROPOSAL-metrics-api-extraction.md §1.1, this module is designed for
+// **monorepo reuse**: sibling plugins in the same monorepo can consume the
+// SPI without depending on rtp-core. The package root is therefore neutral
+// (io.github.dailystruggle.metrics.api.*), not RTP-scoped.
+//
+// Shape mirrors maps-api / rtp-api: java-library, JUnit Jupiter + Mockito
+// inherited from the root subprojects {} block, ArchUnit added locally for
+// the cross-module drift guard re-authored from C6 §1.6.5
+// (MetricsConsolidationArchTest).
+plugins {
+    id 'java-library'
+}
+
+dependencies {
+    compileOnly 'org.jetbrains:annotations:24.1.0'
+
+    // ArchUnit — bytecode-level enforcement that no metrics-api type
+    // imports org.bukkit.* / net.minecraft.* / Folia internals. Same
+    // artifact + version as rtp-core, rtp-anvil, rtp-bukkit-common,
+    // rtp-folia-common, maps-api.
+    testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'
+}
+
+java {
+    withJavadocJar()
+    withSourcesJar()
+}
+
+javadoc {
+    options.encoding = 'UTF-8'
+    options.addStringOption('Xdoclint:syntax,html', '-quiet')
+}

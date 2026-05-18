@@ -7,7 +7,14 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.events.TeleportCommandFailEvent;
 import io.github.dailystruggle.rtp.bukkit.events.TeleportCommandSuccessEvent;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.api.menu.MenuConsumerProfile;
+import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
+import io.github.dailystruggle.rtp.api.menu.MenuTokenRegistry;
 import io.github.dailystruggle.rtp.common.commands.RTPCmd;
+import io.github.dailystruggle.rtp.common.commands.menu.CommandTreeMenuBuilder;
+import io.github.dailystruggle.rtp.common.commands.menu.FrontPageBuilder;
+import io.github.dailystruggle.rtp.common.commands.menu.LocalMenuTokenRegistry;
+import io.github.dailystruggle.rtp.common.commands.menu.MenuRedeemSubcommand;
 import io.github.dailystruggle.rtp.common.commands.scan.ScanCmd;
 import io.github.dailystruggle.rtp.bukkit.commands.test.BukkitTestCmd;
 import io.github.dailystruggle.rtp.common.commands.help.HelpCmd;
@@ -17,6 +24,10 @@ import io.github.dailystruggle.rtp.common.commands.parameters.ShapeParameter;
 import io.github.dailystruggle.rtp.common.commands.parameters.VertParameter;
 import io.github.dailystruggle.rtp.common.commands.reload.ReloadCmd;
 import io.github.dailystruggle.rtp.common.commands.config.ConfigCmd;
+import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
+import java.util.Locale;
+import java.util.function.Function;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -149,6 +160,142 @@ public class RTPCmdBukkit extends BukkitBaseRTPCmd implements RTPCmd {
     addSubCommand(new ScanCmd(this));
     addSubCommand(new InfoCmd(this));
     addSubCommand(new BukkitTestCmd(this));
+
+    // /rtp menu — generalized menu subcommand (ADR-035 / ADR-044).
+    // Restores the Stage 3.1 / 4.2.d / nav-5b wiring that
+    // CHECKLIST-generalized-menu.md and CHECKLIST-menu-navigation.md describe.
+    // The page builder reflects the live /rtp tree via CommandTreeMenuBuilder
+    // (filtered by the viewer's permissions, so inaccessible rows are hidden,
+    // not greyed). The renderer is resolved per `menu.renderer` config order,
+    // reflectively (rtp-plugin does not link rtp-paper-common at compile
+    // time — see build.gradle). If no renderer can be constructed the
+    // subcommand stays registered and rejects with the configurable
+    // `menuInvalid` message so /rtp menu is at least *recognised* on every
+    // platform (REQ-RTP-S-007 / F-013).
+    final MenuTokenRegistry menuTokenRegistry = new LocalMenuTokenRegistry();
+    final Function<UUID, Predicate<String>> menuPermissionProbe =
+        viewer -> perm -> {
+          if (perm == null || perm.isEmpty()) return true;
+          if (viewer.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+            return true;
+          }
+          Player p = Bukkit.getPlayer(viewer);
+          return p != null && p.hasPermission(perm);
+        };
+    final MenuRenderer menuRenderer = selectMenuRenderer(menuTokenRegistry);
+    final FrontPageBuilder frontPageBuilder = new FrontPageBuilder(menuTokenRegistry);
+    final MenuRedeemSubcommand.MenuPageBuilder menuPageBuilder =
+        (node, open, assembledPath) -> {
+          // Stage B: the root /rtp menu page is the curated front page, not
+          // the flat reflector. Any descended node (assembledPath non-empty)
+          // or any node that isn't this command root falls through to the
+          // existing CommandTreeMenuBuilder reflector. Visibility / row
+          // selection is handled inside FrontPageBuilder via the viewer's
+          // permission probe.
+          if (node == this && assembledPath.isEmpty()) {
+            return frontPageBuilder.build(
+                node, open.viewer(), menuPermissionProbe.apply(open.viewer()));
+          }
+          return new CommandTreeMenuBuilder(menuTokenRegistry)
+              .build(
+                  node,
+                  open.viewer(),
+                  menuPermissionProbe.apply(open.viewer()),
+                  MenuConsumerProfile.defaultProfile(),
+                  assembledPath);
+        };
+    addSubCommand(
+        new MenuRedeemSubcommand(
+            this,
+            menuTokenRegistry,
+            menuPermissionProbe,
+            menuRenderer,
+            menuPageBuilder));
+  }
+
+  /**
+   * Resolves the {@link MenuRenderer} from the {@code menu.renderer} config
+   * list (first-wins; unknown / failing ids logged at WARNING and skipped).
+   * Returns {@code null} if the list is empty, missing, or no listed id could
+   * be instantiated — callers must tolerate {@code null} (the redeem path
+   * degrades to the configurable {@code menuInvalid} message in that case).
+   *
+   * <p>Reflection-based on purpose: {@code rtp-plugin} does not declare a
+   * compile-time dependency on {@code rtp-paper-common} (see this module's
+   * {@code build.gradle}); the Paper {@code BookMenuRenderer} class is only
+   * present transitively on the runtime classpath when a {@code rtp-paper-*}
+   * adapter is loaded.
+   */
+  private static @org.jetbrains.annotations.Nullable MenuRenderer selectMenuRenderer(
+      MenuTokenRegistry registry) {
+    Object raw = null;
+    try {
+      @SuppressWarnings("unchecked")
+      ConfigParser<ConfigKeys> menuConfig =
+          (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
+      if (menuConfig != null) {
+        Object menuBlock = menuConfig.getConfigValue(ConfigKeys.menu, null);
+        if (menuBlock instanceof Map<?, ?> map) {
+          raw = map.get("renderer");
+        } else {
+          raw = menuBlock;
+        }
+      }
+    } catch (RuntimeException ignored) {
+      // Config not yet initialised (early-boot) or parser absent — fall
+      // through to the default below.
+    }
+    List<String> ids = new ArrayList<>();
+    if (raw instanceof List<?> list) {
+      for (Object o : list) {
+        if (o != null) ids.add(String.valueOf(o).trim().toLowerCase(Locale.ROOT));
+      }
+    } else if (raw instanceof String s && !s.isBlank()) {
+      ids.add(s.trim().toLowerCase(Locale.ROOT));
+    }
+    if (ids.isEmpty()) {
+      // Default-of-defaults: try `book`. Operators who explicitly want no
+      // renderer can set `menu.renderer: []`.
+      ids.add("book");
+    }
+    for (String id : ids) {
+      MenuRenderer r = tryInstantiateRenderer(id, registry);
+      if (r != null) return r;
+    }
+    RTP.log(
+        Level.WARNING,
+        "menu.renderer list exhausted (" + ids + "); /rtp menu open-page disabled");
+    return null;
+  }
+
+  private static @org.jetbrains.annotations.Nullable MenuRenderer tryInstantiateRenderer(
+      String id, MenuTokenRegistry registry) {
+    final String className;
+    switch (id) {
+      case "book":
+        className = "io.github.dailystruggle.rtp.paper.menu.BookMenuRenderer";
+        break;
+      default:
+        RTP.log(Level.WARNING, "unknown menu.renderer id: " + id);
+        return null;
+    }
+    try {
+      Class<?> cls = Class.forName(className);
+      return (MenuRenderer) cls
+          .getConstructor(MenuTokenRegistry.class)
+          .newInstance(registry);
+    } catch (ClassNotFoundException cnfe) {
+      RTP.log(
+          Level.WARNING,
+          "menu.renderer '" + id + "' unavailable on this platform (" + className + ")");
+      return null;
+    } catch (ReflectiveOperationException roe) {
+      RTP.log(
+          Level.WARNING,
+          "failed to instantiate menu.renderer '" + id + "': " + roe.getMessage(),
+          roe);
+      return null;
+    }
   }
 
   public void addSenderCheck(Predicate<CommandSender> senderCheck) {

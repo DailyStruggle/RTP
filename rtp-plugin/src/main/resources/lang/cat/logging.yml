@@ -1,6 +1,5 @@
 # --- Plugin Logging Toggles (cat dialect) ---
 # The diary of every hiss and purr the kitty wants to remember.
-
 # Log all files re-licked during /rtp reload
 long_grooming_session: false
 # Log territory (region) initialisation details
@@ -33,7 +32,7 @@ scratching_post: false
 # Minimum meow volume. Effective filter is the finer of this and the
 # tall-human logger's own level. Accepts: SEVERE, WARNING, INFO, CONFIG,
 # FINE, FINER, FINEST, ALL, OFF. Default ALL behaves like the tall-human logger.
-minimum_meow_volume: INFO
+minimum_meow_volume: "INFO"
 
 # Do not bite the version number, sacred catnip
-meowsion: "1.0"
+meowsion: 1.0

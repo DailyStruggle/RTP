@@ -5,18 +5,17 @@
 # código y no debe cambiarse.
 # Si este archivo falta, el plugin lo regenera con pares idénticos
 # izquierda/derecha (los valores por defecto en inglés).
-
-event_changeworld: evento_cambioMundo
-event_respawn: evento_reaparicion
-detailed_reload: recarga_detallada
-teleport: teletransporte
-event_join: evento_union
-selection_failure: fallo_seleccion
-system_memory_tracker: sistema_rastreoMemoria
-system_database: sistema_baseDeDatos
-event_teleport: evento_teletransporte
-version: version
-detailed_region_init: inicio_region_detallado
-command: comando
-event_move: evento_movimiento
-min_level: nivel_minimo
+event_changeworld: "evento_cambioMundo"
+event_respawn: "evento_reaparicion"
+detailed_reload: "recarga_detallada"
+teleport: "teletransporte"
+event_join: "evento_union"
+selection_failure: "fallo_seleccion"
+system_memory_tracker: "sistema_rastreoMemoria"
+system_database: "sistema_baseDeDatos"
+event_teleport: "evento_teletransporte"
+version: "version"
+detailed_region_init: "inicio_region_detallado"
+command: "comando"
+event_move: "evento_movimiento"
+min_level: "nivel_minimo"

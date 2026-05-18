@@ -196,7 +196,7 @@ Additional locked-in decisions:
    ┌────────────────────────┬───────────────┼───────────────┬────────────────────────┐
    ▼                        ▼               ▼               ▼                        ▼
  backend-1               backend-2       backend-3       backend-N            (each runs
- rtp-spigot/paper/       …               …               …                   the existing
+ rtp-bukkit/paper/       …               …               …                   the existing
  folia/fabric                                                                 single-server
  + NetworkBridge                                                              pipeline,
    (rtp-core, optional)                                                       unchanged)
@@ -465,7 +465,7 @@ JSON columns become `JSONB` on Postgres; TEXT/CSV on SQLite (which is dev-only a
 ### Open items folded into existing placeholders
 
 - The **Load-Balancing Heuristics — Configurable Weighted Average** section is the single place that decides *how* these fields are weighted. The publisher commits to providing them; the selector decides which it uses.
-- **Spigot TPS source** — *resolved*. Minimum supported Spigot is 1.20.1; raw Spigot's `Bukkit.Server` does not expose `getTPS()` on that version (it is a Paper-only addition). For Spigot-only stacks, sample tick duration locally via a 1-tick scheduled task and compute MSPT/TPS from the elapsed-nanos differential. On Paper/Folia, use `Bukkit.getTPS()` directly. Module: `rtp-spigot` adapter for the fallback sampler; see also the new metrics plan (`METRICS_PLAN.md`) for the canonical implementation.
+- **Spigot TPS source** — *resolved*. Minimum supported Spigot is 1.20.1; raw Spigot's `Bukkit.Server` does not expose `getTPS()` on that version (it is a Paper-only addition). For Spigot-only stacks, sample tick duration locally via a 1-tick scheduled task and compute MSPT/TPS from the elapsed-nanos differential. On Paper/Folia, use `Bukkit.getTPS()` directly. Module: `rtp-bukkit` adapter for the fallback sampler; see also the new metrics plan (`METRICS_PLAN.md`) for the canonical implementation.
 - **Per-region TPS aggregation on Folia** — lives in [`METRICS_PLAN.md`](METRICS_PLAN.md), not this plan. Player-count-weighting is **out** (D-confirmed 2026-05-01); the choice is between `max` and `mean`, with leaning toward `max` so a single struggling region surfaces. Final call deferred to the metrics plan.
 
 ---
