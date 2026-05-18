@@ -14,17 +14,16 @@ comando: false
 # Log successful teleport events
 teletransporte: true
 
-# Registros de RTP automáticos ou por evento
-# Registros para RTP acionados por eventos:
-evento_mudancaMundo: "true # Quando o jogador muda de mundo"
-# Log RTP triggered on join
-evento_entrada: "true       # Quando o jogador entra no servidor"
-# Log RTP triggered on respawn
-evento_renascimento: "true # Quando o jogador renasce"
-# Log move event processing
-evento_movimento: "true  # Quando o jogador se move (se o RTP por movimento estiver ativo)"
-# Log teleport event processing
-evento_teletransporte: "true # Quando o jogador teletransporta (se o RTP por teletransporte estiver ativo)"
+# Quando o jogador muda de mundo
+evento_mudancaMundo: true
+# Quando o jogador entra no servidor
+evento_entrada: true
+# Quando o jogador renasce
+evento_renascimento: true
+# Quando o jogador se move (se o RTP por movimento estiver ativo)
+evento_movimento: true
+# Quando o jogador teletransporta (se o RTP por teletransporte estiver ativo)
+evento_teletransporte: true
 
 # Depuração de falhas de seleção
 # Registra informações detalhadas quando a seleção de uma localização segura

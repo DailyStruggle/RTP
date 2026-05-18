@@ -275,6 +275,9 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
       MultiConfigParser<?> parser = (MultiConfigParser<?>) this.factoryValue;
       List<String> remove = parameterValues.getOrDefault("remove", new ArrayList<>());
       for (String target : remove) {
+        // `default` is required by MultiConfigParser (re-extracted from jar
+        // on construction); never remove it via the command.
+        if (target != null && target.equalsIgnoreCase("default")) continue;
         String configName = target;
         if (!configName.endsWith(".yml")) configName = configName + ".yml";
         ConfigParser<?> configParser = (ConfigParser<?>) parser.configParserFactory.get(configName);
@@ -458,14 +461,33 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
               return new HashSet<>();
             }
           });
-      addParameter(
-          "remove",
-          new CommandParameter("rtp.update", "remove a file", (uuid, s) -> true) {
-            @Override
-            public Set<String> values() {
-              return parser.listParsers();
-            }
-          });
+      // `remove`: never offer `default` as a removable entry — the
+      // default.yml is required (MultiConfigParser re-extracts it from the
+      // jar on construction). When the filtered set is empty (only default
+      // exists), omit the `remove` parameter entirely so the menu doesn't
+      // render a picker with zero valid answers.
+      Set<String> removable = new HashSet<>();
+      for (String n : parser.listParsers()) {
+        if (n == null) continue;
+        if (n.equalsIgnoreCase("default")) continue;
+        removable.add(n);
+      }
+      if (!removable.isEmpty()) {
+        addParameter(
+            "remove",
+            new CommandParameter("rtp.update", "remove a file", (uuid, s) -> true) {
+              @Override
+              public Set<String> values() {
+                Set<String> res = new HashSet<>();
+                for (String n : parser.listParsers()) {
+                  if (n == null) continue;
+                  if (n.equalsIgnoreCase("default")) continue;
+                  res.add(n);
+                }
+                return res;
+              }
+            });
+      }
     }
   }
 }

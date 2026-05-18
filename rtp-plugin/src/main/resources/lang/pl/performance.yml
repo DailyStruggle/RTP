@@ -93,15 +93,12 @@ checkOnChunkLoads: false
 # @default: false
 visitorEnabled: false
 
-# Maintain a reserved cache of locations for join-time teleports
-# (rtp.onevent.firstjoin / rtp.onevent.join). Sized by remaining empty
-# player slots. See ADR-023.
+# Zachowuj zarezerwowaną pamięć podręczną dla teleportów przy dołączaniu (rtp.onevent.firstjoin / rtp.onevent.join). Rozmiar według wolnych slotów. Zobacz
 # @type: boolean
 # @default: false
 loginCacheEnabled: false
 
-# Hard cap for the login cache. 0 = auto (server max-players,
-# snapshotted at startup).
+# Twardy limit pamięci podręcznej dołączania. 0 = automatycznie (max-players serwera przy starcie).
 # @type: integer
 # @range: [0, null]
 # @default: 0
@@ -118,7 +115,7 @@ pregeneratedPreference: 0.0
 # Fraction of L3 backlog capacity at which refill resumes (hysteresis).
 # 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill
 # continuously. Higher values group .mca-bin checks for better
-# CPU/memory efficiency. See ADR-028.
+# CPU/memory efficiency.
 # @type: number
 # @range: [0.0, 1.0]
 # @default: 0.5

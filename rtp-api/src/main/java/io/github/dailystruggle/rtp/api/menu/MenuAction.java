@@ -31,6 +31,10 @@ import java.util.Objects;
  *   <li>{@link SuggestInput} — pre-fill the caller's chat with the given
  *       prefix (e.g. {@code "/rtp config performance ASYNC:"}); the player
  *       types the value (CONFIG_COMMAND_SPEC §2.4).</li>
+ *   <li>{@link PromptAnvilInput} — on supported platforms (Paper/Folia), open
+ *       an anvil GUI so the player can type a free-form value into the rename
+ *       field without leaving the menu flow. Falls back to {@link SuggestInput}
+ *       semantics on renderers that do not support anvil input (ADR-045).</li>
  *   <li>{@link OpenExternalUrl} — open a URL on the client; useful for help
  *       links. Renderers may refuse this variant in restricted environments.</li>
  * </ul>
@@ -41,7 +45,11 @@ public sealed interface MenuAction
                 MenuAction.OpenParamPicker,
                 MenuAction.ChangePage,
                 MenuAction.SuggestInput,
-                MenuAction.OpenExternalUrl {
+                MenuAction.PromptAnvilInput,
+                MenuAction.OpenExternalUrl,
+                MenuAction.OpenConfigSelector,
+                MenuAction.OpenConfigFile,
+                MenuAction.OpenConfigKey {
 
     /**
      * Invoke {@code /rtp <args>} as the clicking player. {@code args} is the
@@ -193,10 +201,119 @@ public sealed interface MenuAction
         }
     }
 
+    /**
+     * Open an anvil GUI on the clicking player so they can type a free-form
+     * value into the anvil rename field. On confirmation (clicking the right
+     * output slot) the platform synthesizes
+     * {@code /rtp <parentPath...> <paramName>:<typed>} as the player and runs
+     * it through the normal command pipeline. Closing the inventory without
+     * confirming cancels the input.
+     *
+     * <p>{@code parentPath} is the args from the {@code /rtp} root down to (and
+     * including) the parent {@code TreeCommand} node that owns the parameter,
+     * matching the convention used by {@link OpenParamPicker#parentPath()}.
+     * {@code prefill} is the initial text shown in the anvil's left slot item
+     * name; empty string is allowed.
+     *
+     * <p>Resolved entirely on the renderer side (Paper/Folia); never enters
+     * the {@code MenuRedeemSubcommand} dispatch path. Renderers that cannot
+     * open an anvil GUI (Spigot without Adventure, Fabric) shall fall back to
+     * the {@link SuggestInput} chat-prefill behavior. See ADR-045.
+     */
+    record PromptAnvilInput(String[] parentPath, String paramName, String prefill) implements MenuAction {
+        public PromptAnvilInput {
+            Objects.requireNonNull(parentPath, "parentPath");
+            Objects.requireNonNull(paramName, "paramName");
+            Objects.requireNonNull(prefill, "prefill");
+            parentPath = parentPath.clone();
+            for (int i = 0; i < parentPath.length; i++) {
+                Objects.requireNonNull(parentPath[i], "parentPath[" + i + "]");
+            }
+            if (paramName.isEmpty()) {
+                throw new IllegalArgumentException("paramName must not be empty");
+            }
+        }
+
+        @Override
+        public String[] parentPath() {
+            return parentPath.clone();
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof PromptAnvilInput other
+                    && paramName.equals(other.paramName)
+                    && prefill.equals(other.prefill)
+                    && Arrays.equals(parentPath, other.parentPath);
+        }
+
+        @Override
+        public int hashCode() {
+            int h = Arrays.hashCode(parentPath);
+            h = 31 * h + paramName.hashCode();
+            h = 31 * h + prefill.hashCode();
+            return h;
+        }
+
+        @Override
+        public String toString() {
+            return "PromptAnvilInput[" + paramName + "=" + prefill
+                    + "@" + Arrays.toString(parentPath) + "]";
+        }
+    }
+
     /** Open an external URL on the client. */
     record OpenExternalUrl(URI uri) implements MenuAction {
         public OpenExternalUrl {
             Objects.requireNonNull(uri, "uri");
+        }
+    }
+
+    /**
+     * Open the curated config-selector page (page 1 of the 3-page config
+     * subtree: selector -> per-file key list -> per-key picker).
+     * Server-resolved by {@code MenuRedeemSubcommand.dispatchOpenConfigSelector};
+     * rows list every known config file. Permission-gated by
+     * {@code rtp.config.view}. See PROPOSAL-config-view-as-book.md v3.7.
+     */
+    record OpenConfigSelector() implements MenuAction {
+    }
+
+    /**
+     * Open the per-file config page (page 2) for the named config file.
+     * Rows enumerate the file's typed {@code CommandParameter} keys; each row
+     * descends into {@link OpenConfigKey} for its key. Server-resolved by
+     * {@code MenuRedeemSubcommand.dispatchOpenConfigFile}; permission-gated by
+     * {@code rtp.config.view}. See PROPOSAL-config-view-as-book.md v3.7.
+     */
+    record OpenConfigFile(String fileName) implements MenuAction {
+        public OpenConfigFile {
+            Objects.requireNonNull(fileName, "fileName");
+            if (fileName.isEmpty()) {
+                throw new IllegalArgumentException("fileName must not be empty");
+            }
+        }
+    }
+
+    /**
+     * Open the per-key picker page (page 3) for {@code paramName} on the named
+     * config file. Delegates to the existing {@code buildParamPicker} flow over
+     * the typed {@code CommandParameter}; shape/vert keys expand to a two-step
+     * type-then-sub-param page (stateless writes per Q13).
+     * Server-resolved by {@code MenuRedeemSubcommand.dispatchOpenConfigKey};
+     * permission-gated by {@code rtp.config.view}. See
+     * PROPOSAL-config-view-as-book.md v3.7.
+     */
+    record OpenConfigKey(String fileName, String paramName) implements MenuAction {
+        public OpenConfigKey {
+            Objects.requireNonNull(fileName, "fileName");
+            Objects.requireNonNull(paramName, "paramName");
+            if (fileName.isEmpty()) {
+                throw new IllegalArgumentException("fileName must not be empty");
+            }
+            if (paramName.isEmpty()) {
+                throw new IllegalArgumentException("paramName must not be empty");
+            }
         }
     }
 }

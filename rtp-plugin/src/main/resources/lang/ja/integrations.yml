@@ -1,5 +1,5 @@
-# --- RTP Integration Settings ---
-# If true, RTP will reroll the location if it lands within a claim/region from the respective plugin.
+# --- RTP 連携設定 ---
+# true の場合、該当プラグインの claim/region 内に着地したときに RTP は位置を引き直します。
 rerollFactions: false
 rerollGriefDefender: false
 rerollGriefPrevention: false

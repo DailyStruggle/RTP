@@ -105,6 +105,18 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * absent.
      */
     private final @Nullable MenuParamPickerBuilder paramPickerBuilder;
+    /**
+     * ADR-045 (optional): platform-side hook to open an anvil GUI for the
+     * "type a custom value..." picker row. When present, an inbound
+     * {@link MenuAction.PromptAnvilInput} token is dispatched here; on confirm
+     * the platform synthesizes
+     * {@code /rtp <parentPath...> <paramName>:<typed>} as the player. When
+     * {@code null} (Spigot without Adventure, Fabric, test scaffolds), an
+     * inbound {@code PromptAnvilInput} is treated as a protocol error
+     * (S-004 reject + WARN) — same fallback shape as the absent
+     * {@link #paramPickerBuilder}.
+     */
+    private final @Nullable AnvilInputOpener anvilInputOpener;
 
     /**
      * SAM signature for {@link #pageBuilder}; declared at the class level so
@@ -140,6 +152,29 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                         UUID viewer,
                         java.util.List<String> parentPath,
                         String paramName);
+    }
+
+    /**
+     * SAM signature for {@link #anvilInputOpener} (ADR-045). Implementations
+     * open an anvil GUI on the {@code viewer} player, prefill the rename slot
+     * with {@code prefill}, and on confirm submit
+     * {@code /rtp <parentPath...> <paramName>:<typed>} as the player. On
+     * cancel (inventory closed without confirm) the implementation is a no-op.
+     *
+     * <p>Must be S-005-safe: no synchronous chunk I/O. On Folia the
+     * implementation shall dispatch player-affecting operations via the
+     * player's {@code EntityScheduler}.
+     *
+     * @return {@code true} if the anvil GUI was opened, {@code false} if the
+     *         platform refused (player offline, no inventory subsystem, etc).
+     *         The caller treats {@code false} as an S-004 reject path.
+     */
+    @FunctionalInterface
+    public interface AnvilInputOpener {
+        boolean open(UUID viewer,
+                     java.util.List<String> parentPath,
+                     String paramName,
+                     String prefill);
     }
 
     /**
@@ -204,6 +239,22 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                                 @Nullable MenuRenderer renderer,
                                 @Nullable MenuPageBuilder pageBuilder,
                                 @Nullable MenuParamPickerBuilder paramPickerBuilder) {
+        this(parent, tokenRegistry, permissionProbeFactory,
+                renderer, pageBuilder, paramPickerBuilder, null);
+    }
+
+    /**
+     * ADR-045 constructor: adds an optional {@link AnvilInputOpener} for the
+     * "type a custom value..." picker row. Pass {@code null} to keep the
+     * pre-ADR-045 behaviour (inbound {@link MenuAction.PromptAnvilInput}
+     * tokens reject with {@code menuInvalid} + WARN).
+     */
+    public MenuRedeemSubcommand(TreeCommand parent, MenuTokenRegistry tokenRegistry,
+                                java.util.function.Function<UUID, Predicate<String>> permissionProbeFactory,
+                                @Nullable MenuRenderer renderer,
+                                @Nullable MenuPageBuilder pageBuilder,
+                                @Nullable MenuParamPickerBuilder paramPickerBuilder,
+                                @Nullable AnvilInputOpener anvilInputOpener) {
         super(parent);
         this.rtpRoot = Objects.requireNonNull(parent, "parent");
         this.tokenRegistry = Objects.requireNonNull(tokenRegistry, "tokenRegistry");
@@ -218,10 +269,14 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             // Param picker can only function when a renderer is also wired;
             // collapse the half-configured case to null for consistency.
             this.paramPickerBuilder = paramPickerBuilder;
+            // Same for the anvil opener: only meaningful when a renderer is
+            // wired (the action is renderer-emitted from a rendered picker).
+            this.anvilInputOpener = anvilInputOpener;
         } else {
             this.renderer = null;
             this.pageBuilder = null;
             this.paramPickerBuilder = null;
+            this.anvilInputOpener = null;
         }
         // Register a hidden curated parameter so commands-api recognises
         //   /rtp menu token:<v>    → subcommand "menu" + param "token=<v>"
@@ -345,6 +400,14 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         // pattern as OpenMenu) and hands off to paramPickerBuilder.
         if (action instanceof MenuAction.OpenParamPicker picker) {
             return dispatchOpenParamPicker(senderId, picker, messageMethod);
+        }
+        // PromptAnvilInput → open an anvil GUI on the clicking player and
+        // let them type a free-form value (ADR-045). Hand off to the
+        // platform-side AnvilInputOpener when wired; otherwise reject as a
+        // protocol error (renderer should have fallen back to SuggestInput
+        // before emitting this action on an unsupported platform).
+        if (action instanceof MenuAction.PromptAnvilInput prompt) {
+            return dispatchPromptAnvilInput(senderId, prompt, messageMethod);
         }
         // Renderer click effects (SuggestInput / ChangePage / OpenExternalUrl)
         // must never reach redeem per ADR-035 §3. If one does, the renderer
@@ -539,6 +602,90 @@ public final class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                     "menu param-picker rejected: renderer failure", messageMethod);
             return false;
         }
+    }
+
+    /**
+     * ADR-045 dispatch for {@link MenuAction.PromptAnvilInput}. Walks
+     * {@code parentPath} against the live {@link TreeCommand} graph to
+     * confirm the parameter exists (defensive — the renderer should never
+     * mint this for an unknown parameter, but a stale token after a config
+     * reload could land here), then hands off to the platform-side
+     * {@link AnvilInputOpener}. The opener is responsible for opening the
+     * anvil GUI on the player and, on confirm, submitting
+     * {@code /rtp <parentPath...> <paramName>:<typed>} as the player.
+     *
+     * <p>Failure paths log WARN and reject with {@code menuInvalid} (S-004):
+     * opener absent, unknown path segment, unknown parameter, or opener
+     * threw / returned {@code false}.
+     */
+    private boolean dispatchPromptAnvilInput(UUID senderId,
+                                             MenuAction.PromptAnvilInput prompt,
+                                             @Nullable Consumer<String> messageMethod) {
+        if (anvilInputOpener == null) {
+            RTP.log(Level.WARNING,
+                    "menu anvil-input received with anvil-input disabled for " + senderId);
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu anvil-input rejected: anvil-input disabled", messageMethod);
+            return false;
+        }
+        String[] parentPath = prompt.parentPath();
+        TreeCommand target = rtpRoot;
+        for (String segment : parentPath) {
+            if (segment != null && segment.indexOf(':') >= 0) {
+                continue;
+            }
+            CommandsAPICommand next = target.getCommandLookup()
+                    .get(segment.toUpperCase(java.util.Locale.ROOT));
+            if (!(next instanceof TreeCommand tc)) {
+                RTP.log(Level.WARNING,
+                        "menu anvil-input path segment '" + segment
+                                + "' did not resolve to a TreeCommand under "
+                                + target.name() + " for " + senderId);
+                reject(senderId, MessagesKeys.menuInvalid,
+                        "menu anvil-input rejected: unknown path segment '" + segment + "'",
+                        messageMethod);
+                return false;
+            }
+            target = tc;
+        }
+        String paramName = prompt.paramName();
+        Map<String, CommandParameter> paramLookup = target.getParameterLookup();
+        boolean known = false;
+        if (paramLookup != null) {
+            if (paramLookup.containsKey(paramName)) known = true;
+            else if (paramLookup.containsKey(paramName.toUpperCase(java.util.Locale.ROOT))) known = true;
+        }
+        if (!known) {
+            RTP.log(Level.WARNING,
+                    "menu anvil-input unknown parameter '" + paramName
+                            + "' on " + target.name() + " for " + senderId);
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu anvil-input rejected: unknown parameter '" + paramName + "'",
+                    messageMethod);
+            return false;
+        }
+        boolean opened;
+        try {
+            opened = anvilInputOpener.open(senderId,
+                    java.util.List.of(parentPath), paramName, prompt.prefill());
+        } catch (RuntimeException e) {
+            RTP.log(Level.WARNING,
+                    "menu anvil-input opener failed for " + senderId
+                            + " node=" + target.name() + " param=" + paramName
+                            + ": " + e.getMessage(), e);
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu anvil-input rejected: opener failure", messageMethod);
+            return false;
+        }
+        if (!opened) {
+            RTP.log(Level.WARNING,
+                    "menu anvil-input opener refused for " + senderId
+                            + " node=" + target.name() + " param=" + paramName);
+            reject(senderId, MessagesKeys.menuInvalid,
+                    "menu anvil-input rejected: opener refused", messageMethod);
+            return false;
+        }
+        return true;
     }
 
     /**

@@ -90,7 +90,7 @@ class MenuParamPickerStageA2Test {
         List<MenuLine> lines = model.pages().get(0).lines();
 
         // Row 0 = Back, Row 1 = header (no action), Row 2 = type-a-value
-        // (SuggestInput), Row 3+ = value rows. Stage A.3: value rows carry
+        // (PromptAnvilInput per ADR-045), Row 3+ = value rows. Stage A.3: value rows carry
         // MenuAction.OpenMenu(parentPath..., paramName:value) so clicking
         // *stages* the assignment into the assembled path (re-opens the
         // parent command page) rather than executing immediately. The
@@ -114,13 +114,19 @@ class MenuParamPickerStageA2Test {
         assertTrue(header.text().contains("ASYNC"),
                 "header text must reference the parameter name");
 
-        // "Type a value" row → SuggestInput
+        // "Type a value" row → PromptAnvilInput (ADR-045). Free-form entry
+        // opens an anvil GUI on Paper/Folia; renderers without anvil support
+        // are expected to fall back to SuggestInput at render time. The
+        // surface action carries parentPath + paramName so the redeem path
+        // can validate the parameter still exists on the target node.
         MenuFragment type = lines.get(2).fragments().get(0);
-        assertInstanceOf(MenuAction.SuggestInput.class, type.action(),
-                "type-a-value row must carry SuggestInput");
-        String prefix = ((MenuAction.SuggestInput) type.action()).prefix();
-        assertTrue(prefix.endsWith("ASYNC:"),
-                "SuggestInput prefix must end with '<param>:' for free-form entry; was: " + prefix);
+        assertInstanceOf(MenuAction.PromptAnvilInput.class, type.action(),
+                "type-a-value row must carry PromptAnvilInput");
+        MenuAction.PromptAnvilInput prompt = (MenuAction.PromptAnvilInput) type.action();
+        assertEquals("ASYNC", prompt.paramName(),
+                "PromptAnvilInput must reference the picker's parameter");
+        assertArrayEqualsLocal(new String[]{"config", "performance"}, prompt.parentPath(),
+                "PromptAnvilInput parentPath must match the picker's parentPath");
 
         // Value rows — Stage A.3: OpenMenu carrying parentPath + paramName:value
         // tail. The click re-opens the parent command page with the value
@@ -166,7 +172,7 @@ class MenuParamPickerStageA2Test {
         assertInstanceOf(MenuAction.OpenMenu.class,
                 lines.get(0).fragments().get(0).action(),
                 "Back row still present");
-        assertInstanceOf(MenuAction.SuggestInput.class,
+        assertInstanceOf(MenuAction.PromptAnvilInput.class,
                 lines.get(2).fragments().get(0).action(),
                 "type-a-value fallback still present so the player can enter free-form");
     }
@@ -210,9 +216,9 @@ class MenuParamPickerStageA2Test {
             assertEquals(null,
                     pageLines.get(1).fragments().get(0).action(),
                     "page " + p + ": row 1 must be header (non-clickable)");
-            assertInstanceOf(MenuAction.SuggestInput.class,
+            assertInstanceOf(MenuAction.PromptAnvilInput.class,
                     pageLines.get(2).fragments().get(0).action(),
-                    "page " + p + ": row 2 must be type-a-value (SuggestInput)");
+                    "page " + p + ": row 2 must be type-a-value (PromptAnvilInput, ADR-045)");
         }
 
         // Page 0: 3 scaffold rows + 10 values + 1 next nav row = 14 rows;

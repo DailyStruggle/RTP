@@ -2,7 +2,7 @@
 # This file is loaded BEFORE every other RTP configuration file so that
 # config.yml, messages.yml, economy.yml, performance.yml, safety.yml, and
 # logging.yml are all read directly from lang/<language>/ when a non-English
-# locale is active. See ADR-020 for design rationale.
+# locale is active.
 #
 # Bundled locales: en, de, es, fr, ja, ko, nl, zh
 # To add your own: drop a folder under <pluginDir>/lang/<code>/ containing the

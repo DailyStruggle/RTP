@@ -1,43 +1,58 @@
 # --- Veiligheidsconfiguratie van RTP ---
 # Configureert hoe de plugin bepaalt of een teletransportlocatie "veilig" is.
-#
-# Token-grammatica (ADR-017):
-#   MATERIAAL                         -- enkel materiaal, bijv. LAVA
-#   MATERIAAL[eigenschap=waarde]      -- materiaal alleen als ALLE blokeigenschappen overeenkomen
-#   #namespace:tag                    -- uitgebreid naar alle materialen van die tag
-#   #namespace:tag[eigenschap=waarde] -- tagleden alleen als eigenschappen overeenkomen
-#   *[eigenschap=waarde]              -- ELK materiaal wanneer eigenschappen overeenkomen (wildcard)
-#
+# Token-grammatica:
+# MATERIAAL -- enkel materiaal, bijv. LAVA
+# MATERIAAL[eigenschap=waarde] -- materiaal alleen als ALLE blokeigenschappen overeenkomen
+# #namespace:tag -- uitgebreid naar alle materialen van die tag
+# #namespace:tag[eigenschap=waarde] -- tagleden alleen als eigenschappen overeenkomen
+# *[eigenschap=waarde] -- ELK materiaal wanneer eigenschappen overeenkomen (wildcard)
 # Eigenschapswaarden worden hoofdletterongevoelig vergeleken met de
 # tekenreeksvorm van Bukkit BlockData. Onbekende tags worden uitgebreid
 # naar de lege verzameling (no-op, fail-open); misvormde tokens worden
-# eenmalig geregistreerd op WARN-niveau bij herladen (REQ-RTP-S-004).
+# eenmalig geregistreerd op WARN-niveau bij herladen .
 # De volgorde binnen een lijst maakt niet uit.
 # Onkwetsbaarheid (seconden)
 # Duur van de onkwetsbaarheid die aan de speler wordt verleend na teletransport.
 # Voorkomt schade door vuur, verdrinking of vallen bij aankomst.
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 5
 onkwetsbaarheidstijd: 5
 
 # Veiligheidscontrolestraal (blokken)
 # Straal rondom het doelblok om te controleren op gevaarlijke omstandigheden.
 # Hogere waarden geven meer veiligheid maar maken het moeilijker een plek te vinden.
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 0
 veiligheidsStraal: 0
 
 # Maximaal aantal pogingen voor verouderde chunk (telling)
 # Begrensd pogingsbudget voor de verouderde-chunk-bewaker
-# (ADR-015 / REQ-RTP-S-005). Standaard: 2.
+# . Standaard: 2.
+# @type: integer
+# @range: [0, null]
+# @default: 2
 staleChunkRetryLimit: 2
 
 # Anvil-alleen-lezen-voorfilter (alleen Spigot vanilla)
 # Off-thread veiligheidssonde die het opgeslagen regiobestand analyseert
 # en duidelijk onveilige kandidaten afwijst vóór het opvragen van de
-# autoritatieve live-chunk. Zie ADR-016 / REQ-RTP-S-005.
+# autoritatieve live-chunk. Zie
 # Standaard: true. Stel in op false om de sonde uit te schakelen.
+# @type: boolean
+# @default: true
 anvilPrefilterEnabled: true
 
 # Landingsplatforms
 # Maakt een landingsplatform op de teletransportbestemming.
 # Stel platformStraal in op -1 om platforms uit te schakelen.
+# @type: integer
+# @range: [-1, null]
+# @unit: blocks
+# @default: -1
 platformStraal: -1
 
 # Depth (vertical thickness) of the emergency platform.
@@ -62,7 +77,7 @@ platformMateriaal: "GLASS"
 
 # Blocks treated as passable air for landing-safety checks.
 # Accepts Bukkit Material names and "#minecraft:<tag>" tag references
-# (see ADR-017).
+#.
 # @type: list<material>
 # @source: material
 luchtBlokken:
@@ -74,9 +89,9 @@ luchtBlokken:
   - "LIGHT"
   - "#minecraft:flowers"
   - "#minecraft:small_flowers"
-  # Note: #minecraft:tall_flowers is an item-only tag in vanilla; its members
-  # (LILAC, PEONY, ROSE_BUSH, SUNFLOWER, PITCHER_PLANT) are already covered by
-  # #minecraft:flowers above.
+  # Opmerking: #minecraft:tall_flowers is in vanilla alleen een item-tag; zijn leden
+  # (LILAC, PEONY, ROSE_BUSH, SUNFLOWER, PITCHER_PLANT) zijn al gedekt door
+  # #minecraft:flowers hierboven.
   - "#minecraft:tall_flowers"
   - "SHORT_GRASS"
   - "TALL_GRASS"
@@ -136,7 +151,7 @@ luchtBlokken:
 
 # Blocks that disqualify a landing spot (lava, hazards, etc.).
 # Accepts Bukkit Material names, "#minecraft:<tag>" tag references, and
-# state predicates such as "*[waterlogged=true]" (see ADR-017).
+# state predicates such as "*[waterlogged=true]".
 # @type: list<material>
 # @source: material
 onveiligBlokken:

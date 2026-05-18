@@ -1,15 +1,12 @@
 # --- RTP メッセージ（日本語） ---
 # プレイヤーとコンソールに表示されるメッセージの日本語翻訳。
-#
 # 重要事項:
-#   - このファイルのキー名は lang/ja/messages.lang.yml の右列 (内部キー名の
-#     日本語訳) と一致させてください。messages.lang.yml に無いキーは英語
-#     ベースライン (lang/messages.lang.yml) の英語キー名にフォールバックします。
-#   - 角括弧プレースホルダはそのまま残してください: [P0], [delay], [attempts],
-#     [world], [region], [remainingCooldown], [scan_chunks] など。
-#   - カラーコード &a &e &c と HEX カラー (#2636ef) はそのまま残してください。
-#
-# REQ-RTP-F-013 / ADR-020。
+# - このファイルのキー名は lang/ja/messages.lang.yml の右列 (内部キー名の
+# 日本語訳) と一致させてください。messages.lang.yml に無いキーは英語
+# ベースライン (lang/messages.lang.yml) の英語キー名にフォールバックします。
+# - 角括弧プレースホルダはそのまま残してください: [P0], [delay], [attempts],
+# [world], [region], [remainingCooldown], [scan_chunks] など。
+# - カラーコード &a &e &c と HEX カラー (#2636ef) はそのまま残してください。
 # ###############################################################################
 # セクション 1: 一般設定
 # ###############################################################################
@@ -22,7 +19,7 @@
 # ###############################################################################
 既にテレポート中: "&e[P0] あなたは既にテレポート中です！"
 
-# if the plugin is currently reloading
+# プラグインが現在リロード中のとき
 テレポート拒否_リロード中: "&e[P0] プラグインがリロード中のため、テレポートは一時的に無効です。後ほど再試行してください。"
 遅延メッセージ: "&e[P0] [delay] 後にテレポートします。動かないでください。"
 チャンクロード中: "&e[P0] チャンクをロード中です。お待ちください……"
@@ -31,23 +28,23 @@
 # if teleport is cancelled
 テレポート取消: "&e[P0] テレポートをキャンセルしました！"
 
-# if no safe places after reaching max attempts
-# placeholder: [attempts] - the maximum number of attempts
+# 最大試行回数に達しても安全な場所が見つからなかったとき
+# プレースホルダー: [attempts] - 最大試行回数
 危険: "&e[P0] [attempts] 回試行しても安全な位置を見つけられませんでした"
 
-# when the player is on cooldown
-# placeholder: [remainingCooldown] - the remaining time
+# プレイヤーがクールダウン中のとき
+# プレースホルダー: [remainingCooldown] - 残り時間
 クールダウンメッセージ: "&e[P0] 再びテレポートするには [remainingCooldown] 待つ必要があります"
 
-# if the region doesn't have any locations queued and the player doesn't have rtp.unqueued permission
+# リージョンに位置のキューがなく、プレイヤーが rtp.unqueued 権限を持っていないとき
 利用可能な位置なし: "#f5eb73[P0] 現在利用可能な位置がありません"
 
-# when the queue line shifts
-# placeholder: [spot] - the current position in line
+# 待機列が動いたとき
+# プレースホルダー: [spot] - 現在の待機位置
 キュー更新: "#2636ef[P0] キュー内のあなたの順番: [spot]"
 
-# if the player doesn't have enough money to teleport in the region
-# placeholder: [money] - how much money is required for the command
+# プレイヤーがそのリージョンでテレポートするのに十分なお金がないとき
+# プレースホルダー: [money] - コマンドに必要な金額
 残高不足: "&e[P0] この操作には少なくとも $[money] が必要です。"
 
 # ###############################################################################
@@ -64,26 +61,26 @@
 # ###############################################################################
 旧ファイル: "&b[P0] 古い [filename] を検出しました。更新中"
 
-# detected a bukkit world that isn't in the config file
-# placeholder: [world] - the world detected
+# 設定ファイルにない bukkit ワールドを検出しました
+# プレースホルダー: [world] - 検出されたワールド
 新ワールド: "&b[P0] 新ワールド '[world]' を検出しました"
 
-# world doesn't exist in bukkit
-# placeholder: [world] - the world name
+# bukkit にそのワールドが存在しません
+# プレースホルダー: [world] - ワールド名
 無効なワールド: "&e[P0] ワールド '[world]' は見つかりません"
 
-# plugin reload/update text
-# placeholder: [filename] - name of file
+# プラグインのリロード / 更新メッセージ
+# プレースホルダー: [filename] - ファイル名
 リロード中: "&b[P0] [filename] をロード中……"
 リロード完了: "&b[P0] [filename] のロードが完了しました。"
 更新中: "&a[P0] [filename] を更新中……"
 更新済み: "&a[P0] [filename] を正常に更新しました。"
 
-# plugin doesn't have the command the user requested
-# placeholder: [arg] - the argument attempted
+# プラグインに該当するコマンドがありません
+# プレースホルダー: [arg] - 試行された引数
 無効な引数: "&c[P0] コマンド引数が無効です [arg]"
 
-# when the console tries to run a command meant only for players
+# プレイヤー専用のコマンドをコンソールが実行しようとしたとき
 コンソール不可: "&c[P0] このコマンドはゲーム内プレイヤーとして実行する必要があります。"
 
 # busy と invalidCommand は messages.lang.yml で翻訳されていない -> 英語キー名 (英語ベースラインへフォールバック)。
@@ -93,7 +90,7 @@ busy: "&c[P0] 取り込み中"
 # placeholder: [arg] - the argument attempted
 invalidCommand: "&c[P0] 無効なコマンド - [arg]"
 
-# user doesn't have permission for the command requested
+# ユーザーに要求されたコマンドの権限がありません
 権限なし: "&e申し訳ありません。このコマンドを実行する権限がありません。これが誤りだと思う場合はサーバー管理者に連絡してください。"
 
 # ###############################################################################
@@ -130,15 +127,15 @@ infoQueueDepth: "&7Players Waiting In Region Queues: &f[queueDepth]"
 infoPendingTeleports: "&7Pending Teleport Pipelines: &f[pendingTeleports]"
 infoAvgPipelineMs: "&7Avg Pipeline Latency: &f[avgPipelineMs] ms"
 infoHeap: "&7JVM Heap: &f[heapUsedMb] / [heapMaxMb] MiB"
-# Header line for the Health pipeline labelled block in /rtp info.
+# /rtp info の Health pipeline ラベルブロックのヘッダー行。
 infoHealthPipelineHeader: "&7--- Health: pipeline ---"
-# TPS readout for the 1m / 5m / 15m windows. Placeholders: [tps1m] [tps5m] [tps15m].
+# 1m / 5m / 15m ウィンドウの TPS 表示。プレースホルダー: [tps1m] [tps5m] [tps15m]。
 infoTps: "&7TPS (1m/5m/15m): &f[tps1m] / [tps5m] / [tps15m]"
-# Live server MSPT and tick-budget utilisation. Placeholders: [mspt] [tickBudgetUtilisation].
+# サーバーのリアルタイム MSPT と tick バジェット使用率。プレースホルダー: [mspt] [tickBudgetUtilisation]。
 infoMSPTLive: "&7Server MSPT: &f[mspt] ms (&7tick budget: &f[tickBudgetUtilisation]&7)"
 # Configured player soft-cap vs current online count. Placeholders: [softCap] [playerCount].
 infoSoftCap: "&7Players: &f[playerCount] / [softCap]"
-# Most recent database round-trip latency in ms. Placeholder: [databaseLatencyMs].
+# データベースの最新ラウンドトリップレイテンシ（ms）。プレースホルダー: [databaseLatencyMs]。
 infoDatabaseLatencyMs: "&7Database Latency: &f[databaseLatencyMs] ms"
 # Health colour-band thresholds. Doubles consumed by ColourBands in rtp-core
 # to wrap coloured-variant placeholders (e.g. [tps1mColoured]) with &a/&e/&c.
@@ -199,13 +196,13 @@ rtp_説明: "ランダムな場所にテレポートする"
 テスト_説明: "RTP 機能をテストする"
 
 # ###############################################################################
-# Section 8b: Generalized Menu Framework (ADR-035 / ADR-044)
+# Section 8b: Generalized Menu Framework
 # ###############################################################################
 # Sent when a menu token is unknown, malformed, or belongs to another player.
 menuInvalid: "&c[P0] that menu link is invalid."
 # Sent when a menu token has expired or was already consumed.
 menuExpired: "&c[P0] that menu link has expired. Please reopen the menu."
-# Sent when a menu redeem cannot resolve the calling player UUID.
+# メニューの引き換え時に呼び出し元プレイヤーの UUID を解決できなかった場合に送信されます。
 menuUnknownPlayer: "&c[P0] menu links can only be used by in-game players."
 # Hover-fallback template used by the menu reflector when no YAML block-comment
 # is available for a parameter. Placeholder: [type] - the declared parameter type.
@@ -254,9 +251,9 @@ menuFrontPageRowConfig: "&b▶ /rtp config &7- edit config files"
 menuFrontPageRowScan: "&b▶ /rtp scan &7- pre-fill region caches"
 menuFrontPageRowDiagnostics: "&c▶ /rtp test full &7- run full diagnostics"
 menuFrontPageRowReload: "&c▶ /rtp reload &7- reload config files"
-# Hover text for the diagnostics row warning about cost. No placeholders.
+# コスト警告付き診断行のホバーテキスト。プレースホルダーなし。
 menuFrontPageHoverDiagnostics: "&7runs full diagnostic suite; may be expensive"
-# Hover text for the reload row warning about side-effects. No placeholders.
+# 副作用警告付きリロード行のホバーテキスト。プレースホルダーなし。
 menuFrontPageHoverReload: "&7reloads all config files; in-flight teleports may be affected"
 
 # ###############################################################################

@@ -1,31 +1,31 @@
-# --- RTP Metrics Settings ---
-# Reporting-only knobs for the Phase M2 metrics SPI. Throttle / tuning
-# knobs continue to live in performance.yml.
-# Documentation: docs/dev/METRICS_PLAN.md > Folia Aggregation
-# Populate MetricsSnapshot.foliaRegions() with per-region detail on Folia.
-# Has no effect on Paper / Bukkit / Fabric (single-region runtimes always
-# return an empty list, which is the correct answer for those platforms).
+# --- RTP メトリクス設定 ---
+# Phase M2 メトリクス SPI のレポート専用つまみ。スロットル / チューニング
+# つまみは引き続き performance.yml に置かれます。
+# ドキュメント: docs/dev/METRICS_PLAN.md > Folia Aggregation
+# Folia で MetricsSnapshot.foliaRegions() にリージョン別詳細を格納します。
+# Paper / Bukkit / Fabric では効果なし (単一リージョン環境では常に空の
+# リストを返し、それがこれらのプラットフォームでは正しい挙動です)。
 # @type: boolean
 # @default: true
 foliaIncludeRegions: true
 
-# Aggregation strategy used to fold per-region samples into the scalar
-# tps{1,5,15}m fields of MetricsSnapshot on Folia.
-# Accepted values: mean | max
+# Folia 上で MetricsSnapshot のスカラー tps{1,5,15}m フィールドに
+# リージョン別サンプルを集約する方式。
+# 受け付ける値: mean | max
 # @type: enum
 # @default: mean
 foliaAggregationTps: "mean"
 
-# Aggregation strategy used to fold per-region samples into the scalar
-# mspt field of MetricsSnapshot on Folia.
-# Accepted values: mean | max
+# Folia 上で MetricsSnapshot のスカラー mspt フィールドにリージョン別
+# サンプルを集約する方式。
+# 受け付ける値: mean | max
 # @type: enum
 # @default: max
 foliaAggregationMspt: "max"
 
-# Aggregation strategy used to fold per-region samples into the scalar
-# tickBudgetUtilisation field of MetricsSnapshot on Folia.
-# Accepted values: mean | max
+# Folia 上で MetricsSnapshot のスカラー tickBudgetUtilisation
+# フィールドにリージョン別サンプルを集約する方式。
+# 受け付ける値: mean | max
 # @type: enum
 # @default: max
 foliaAggregationTickBudget: "max"

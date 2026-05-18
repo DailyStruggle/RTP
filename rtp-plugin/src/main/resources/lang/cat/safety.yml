@@ -1,32 +1,60 @@
 # --- RTP Safety Configuration (cat dialect) ---
 # Where it is safe to land on four paws after a pounce.
 # Tail flicks (seconds) of invulnerability after pouncing
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 5
 nine_lives_buffer: 5
 
 # Block radius around landing spot to sniff for danger
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 0
 soft_landing_radius: 0
 
 # Max retries for stale-kibble guard
+# @type: integer
+# @range: [0, null]
+# @default: 2
 staleChunkRetryLimit: 2
 
 # Off-thread anvil prefilter (smell from afar)
+# @type: boolean
+# @default: true
 anvilPrefilterEnabled: true
 
 # Radius of emergency paw platform (-1 to disable)
+# @type: integer
+# @range: [-1, null]
+# @unit: blocks
+# @default: -1
 paw_platform_radius: -1
 
 # Depth of platform
+# @type: integer
+# @range: [1, null]
+# @unit: blocks
+# @default: 1
 paw_platform_depth: 1
 
 # Air space above platform for tail
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 2
 paw_platform_headroom: 2
 
 # Material for emergency paw platform
+# @type: material
+# @source: material
+# @default: GLASS
 paw_platform_material: "GLASS"
 
 # Blocks treated as passable air for landing-safety checks.
 # Accepts Bukkit Material names and "#minecraft:<tag>" tag references
-# (see ADR-017).
+#.
 # @type: list<material>
 # @source: material
 empty_air_for_zoomies:
@@ -38,9 +66,9 @@ empty_air_for_zoomies:
   - "LIGHT"
   - "#minecraft:flowers"
   - "#minecraft:small_flowers"
-  # Note: #minecraft:tall_flowers is an item-only tag in vanilla; its members
+  # Mrrow: #minecraft:tall_flowers is an item-only tag in vanilla; its members
   # (LILAC, PEONY, ROSE_BUSH, SUNFLOWER, PITCHER_PLANT) are already covered by
-  # #minecraft:flowers above.
+  # #minecraft:flowers above (cats already pounced through 'em).
   - "SHORT_GRASS"
   - "TALL_GRASS"
   - "SHORT_DRY_GRASS"
@@ -100,7 +128,7 @@ empty_air_for_zoomies:
 
 # Blocks that disqualify a landing spot (lava, hazards, etc.).
 # Accepts Bukkit Material names, "#minecraft:<tag>" tag references, and
-# state predicates such as "*[waterlogged=true]" (see ADR-017).
+# state predicates such as "*[waterlogged=true]".
 # @type: list<material>
 # @source: material
 scary_blocks:
@@ -134,6 +162,8 @@ scary_blocks:
   - "#minecraft:logs"
 
 # If true, 'smells' is a whitelist; otherwise a blacklist (boring smells)
+# @type: boolean
+# @default: false
 friendly_smells: false
 
 # Biomes treated as whitelist or blacklist members per biomeWhitelist.

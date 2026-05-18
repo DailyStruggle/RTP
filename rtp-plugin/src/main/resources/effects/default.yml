@@ -1,7 +1,6 @@
 # --- effects/default.yml — unconditional fallback group ---
 #
 # One file per effect group. Filename (minus .yml) is the group name.
-# See effects-api-ADR-005 for the full schema.
 #
 # Schema (fixed inner keys):
 #   when:        pipeline stage that fires this group (REQUIRED)
@@ -142,9 +141,9 @@ effects:
   #- FIREWORK.CREEPER.1.1.GREEN.BLACK.false.false.true.0.0.0
 
   # --- GLIDE (built-in via effects-api; registered on Bukkit servers >= 1.9) ---
-  # Folded from the legacy `addons/RTP_Glide` plugin into `effects-api`
-  # by effects-api-ADR-001; the standalone addon is deprecated and
-  # scheduled for removal. No addon install is required to use GLIDE.
+  # Folded from the legacy `addons/RTP_Glide` plugin into `effects-api`;
+  # the standalone addon is deprecated and scheduled for removal.
+  # No addon install is required to use GLIDE.
   # TYPE: ELYTRA  (single-arg toggle that gives the player a one-shot
   #                temporary elytra glide on teleport arrival)
   #- GLIDE.ELYTRA

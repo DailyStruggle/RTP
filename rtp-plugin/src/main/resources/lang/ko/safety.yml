@@ -1,28 +1,34 @@
 # --- RTP 안전 설정 ---
 # 플러그인이 텔레포트 목적지를 "안전"하다고 판단하는 기준을 설정합니다.
-#
-# 토큰 구문 (ADR-017):
-#   MATERIAL                          -- 단순 재질, 예: LAVA
-#   MATERIAL[prop=val,prop2=val2]     -- 모든 블록 상태 속성이 일치할 때만
-#   #namespace:tag                    -- 해당 태그 아래의 모든 재질로 확장
-#   #namespace:tag[prop=val]          -- 속성이 일치할 때만 태그 멤버로 카운트
-#   *[prop=val]                       -- 속성이 일치할 때 임의의 재질에 매칭(와일드카드)
-#
+# 토큰 구문:
+# MATERIAL -- 단순 재질, 예: LAVA
+# MATERIAL[prop=val,prop2=val2] -- 모든 블록 상태 속성이 일치할 때만
+# #namespace:tag -- 해당 태그 아래의 모든 재질로 확장
+# #namespace:tag[prop=val] -- 속성이 일치할 때만 태그 멤버로 카운트
+# *[prop=val] -- 속성이 일치할 때 임의의 재질에 매칭(와일드카드)
 # 속성 값은 Bukkit BlockData 의 문자열 형식과 대소문자를 무시하여 비교됩니다.
 # 알 수 없는 태그는 빈 집합으로 확장됩니다 (no-op, fail-open). 형식이 잘못된
-# 토큰은 리로드 시 WARN 레벨로 한 번만 로그에 출력됩니다 (REQ-RTP-S-004).
+# 토큰은 리로드 시 WARN 레벨로 한 번만 로그에 출력됩니다 .
 # 리스트 내 순서는 중요하지 않습니다.
 # 무적 시간(초)
 # 텔레포트 후 플레이어가 무적이 되는 시간. 도착 직후 화재·질식·낙하 피해로 죽는 것을 방지합니다.
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 5
 무적시간: 5
 
 # 안전 검사 반경(블록)
 # 대상 블록 주변의 위험 검사 반경.
 # 클수록 안전하지만 적절한 착지점을 찾기 어려워집니다.
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 0
 안전반경: 0
 
 # 오래된 청크 재시도 한도(횟수)
-# ADR-015 / REQ-RTP-S-005 에서 오래된 청크 가드의 유한 재시도 예산. 비동기 청크 로드
+# 에서 오래된 청크 가드의 유한 재시도 예산. 비동기 청크 로드
 # 완료 후, 후속 블록 평가 작업은 Count-Bound 작업 파이프라인 (Folia 의 Region Thread
 # 스케줄러) 에 큐잉됩니다. 파이프라인이 포화 상태인 경우, 네이티브 청크 GC 가 해당
 # 작업이 실행되기 전에 청크를 언로드할 수 있으며, 방치 시 Region Thread 에서 동기
@@ -30,6 +36,9 @@
 # 최대 이 횟수만큼 비동기 로드를 재큐잉합니다. 모두 소진되면 이 후보는 일반 "unsafe"
 # 경로로 거부됩니다 (WARN 로그를 출력. 조용히 폐기하지 않습니다).
 # 기본값: 2. 매우 공격적인 청크 GC 를 가진 포크에서만 증가시키세요.
+# @type: integer
+# @range: [0, null]
+# @default: 2
 staleChunkRetryLimit: 2
 
 # 읽기 전용 Anvil 사전 필터 (Vanilla Spigot 만 해당)
@@ -40,9 +49,11 @@ staleChunkRetryLimit: 2
 # 네이티브 비동기 API 가 청크 로드 경로를 대체하여 사전 필터에 도달하지 않으므로
 # 효과가 없습니다.
 # ACCEPT 시에는 chunk.isSafe(...) 의 라이브 재검사가 권위로 남습니다. REJECT 만이
-# 단축 경로입니다. ADR-016 / REQ-RTP-S-005 참조.
+# 단축 경로입니다. 참조.
 # 기본값: true. 이국적인 리전 형식을 사용하는 포크에서는 사전 필터를 비활성화하기 위해
 # false 로 설정하세요.
+# @type: boolean
+# @default: true
 anvilPrefilterEnabled: true
 
 # 착지 플랫폼
@@ -51,6 +62,10 @@ anvilPrefilterEnabled: true
 # 기본값: -1 (비활성화) — 최신 안전 검사 (chunk.isSafe + 수직 조정) 가 신뢰할 수 있는
 # 착지점을 안정적으로 제공하므로, 이 비상용 플랫폼 (유리 블록) 은 기본적으로 비활성화됩니다.
 # 구식 폴백이 필요할 만큼 안전하지 않은 착지가 발생할 때만 0 이상으로 설정하세요.
+# @type: integer
+# @range: [-1, null]
+# @unit: blocks
+# @default: -1
 플랫폼반경: -1
 
 # Depth (vertical thickness) of the emergency platform.
@@ -62,15 +77,24 @@ anvilPrefilterEnabled: true
 
 # 플랫폼 위에 보장할 공기의 높이.
 # 너무 높으면 광원 환경이 이상해질 수 있습니다.
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 2
 플랫폼공기높이: 2
 
 # 목적지에 고체 블록이 없을 때 플랫폼에 사용할 기본 재질.
+# @type: material
+# @source: material
+# @default: GLASS
 플랫폼재질: "GLASS"
 
 # 공기 블록
 # 통과 가능/플레이어 신체를 막지 않는 것으로 간주되는 재질. 전방 호환성을 위해
 # 가능한 한 바닐라 블록 태그를 우선하세요
 # (예: 향후 MC 가 추가하는 꽃은 #minecraft:small_flowers 에서 자동으로 선택됨).
+# @type: list<material>
+# @source: material
 공기블록:
   # 진정한 air 변형 (이 모두를 커버하는 태그는 없음)
   - "AIR"
@@ -82,9 +106,9 @@ anvilPrefilterEnabled: true
   # 꽃 (민들레, 양귀비, 튤립, 아이블로섬, 횃불꽃…)
   - "#minecraft:flowers"
   - "#minecraft:small_flowers"
-  # Note: #minecraft:tall_flowers is an item-only tag in vanilla; its members
-  # (LILAC, PEONY, ROSE_BUSH, SUNFLOWER, PITCHER_PLANT) are already covered by
-  # #minecraft:flowers above.
+  # 참고: #minecraft:tall_flowers 는 바닐라에서 아이템 전용 태그입니다. 그 구성원
+  # (LILAC, PEONY, ROSE_BUSH, SUNFLOWER, PITCHER_PLANT) 은 이미 위의
+  # #minecraft:flowers 에 포함되어 있습니다.
   - "#minecraft:tall_flowers"
   # 풀 종류와 꽃 태그에 포함되지 않는 관목
   - "SHORT_GRASS"
@@ -156,13 +180,15 @@ anvilPrefilterEnabled: true
 # 위험 블록
 # 플러그인이 착지점으로 거부할 재질 또는 블록 상태. `safetyRadius` 범위 내에
 # 있는 경우에도 거부됩니다. 상태 술어와 와일드카드를 지원합니다 (파일 상단 구문 참조).
+# @type: list<material>
+# @source: material
 위험블록:
   # 유체
   - "WATER"
   - "LAVA"
   - "BUBBLE_COLUMN"
   # 침수 블록 (반/계단/울타리/벽/표지판/체인/…) — 구식 의사 토큰
-  # 'WATERLOGGED' 를 대체합니다. ADR-017 의 와일드카드를 사용합니다.
+  # 'WATERLOGGED' 를 대체합니다. 의 와일드카드를 사용합니다.
   - "*[waterlogged=true]"
   # 화염 및 고온 위험물
   - "#minecraft:fire"
@@ -200,6 +226,8 @@ anvilPrefilterEnabled: true
 #                  true  -> `biomes` 리스트는 화이트리스트 (이들만 허용)
 # 기본 블랙리스트는 해양·강·공허, 기타 견고한 안전 착지점을 얻기
 # 어렵거나 불가능한 바이옴을 제외합니다.
+# @type: boolean
+# @default: false
 바이옴화이트리스트: false
 
 # Biomes treated as whitelist or blacklist members per biomeWhitelist.

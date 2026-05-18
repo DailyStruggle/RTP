@@ -1,27 +1,43 @@
 # Отсрочка телепорта (секунды)
 # Время, которое игрок должен ждать перед выполнением телепорта.
 # Иногда даёт серверу время предзагрузить целевые чанки.
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 2
 отсрочкаТелепорта: 2
 
 # Отмена при движении (блоки)
 # Если игрок переместится дальше этой дистанции во время отсрочки,
 # телепорт отменяется. Установите -1, чтобы отключить.
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 2
 дистанцияОтмены: 2
 
 # Перезарядка между телепортами (секунды)
 # Время, которое игрок должен ждать между успешными использованиями RTP.
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 300
 задержкаТелепорта: 300
 
 # Команды после телепорта
 # Список команд для выполнения после успешного телепорта.
 # Маркер [player] представляет имя игрока.
+# @type: list<string>
 командыКонсоли:
   - "say [player] только что телепортировался случайно!"
 
-# Commands executed as the teleporting player on successful teleport.
-# Use [player] for the target player's name. Empty string entries are ignored.
+# Команды, выполняемые от имени телепортированного игрока после успешного телепорта.
+# Используйте [player] для имени игрока. Пустые записи игнорируются.
 # @type: list<string>
 командыИгрока:
+  # Команды, выполняемые от имени телепортированного игрока после успешного телепорта.
+  # Используйте [player] для имени игрока. Пустые записи игнорируются.
+  # @type: list<string>
   - ""
 
 # --- Конфигурация базы данных ---
@@ -30,20 +46,24 @@
   # Доступные типы: yaml, sqlite, mysql, postgresql
   # - yaml/sqlite: локальные файлы (без дополнительной настройки)
   # - mysql/postgresql: удалённая база данных (требуются учётные данные ниже)
+  # @type: enum
+  # @options: ["yaml", "sqlite", "mysql", "postgresql"]
+  # @default: "sqlite"
   type: "sqlite"
   # Учётные данные сетевой базы данных (игнорируются для локальных типов)
+  # @type: string
   host: "127.0.0.1"
-  # Database port. Used by mysql/postgresql only.
+  # Порт базы данных. Используется только mysql/postgresql.
   # @type: integer
   # @range: [1, 65535]
   port: 3306
-  # Database / schema name. Used by mysql/postgresql only.
+  # Имя базы данных / схемы. Используется только mysql/postgresql.
   # @type: string
   name: "rtp"
-  # Database username. Used by mysql/postgresql only.
+  # Имя пользователя базы данных. Используется только mysql/postgresql.
   # @type: string
   username: "root"
-  # Database password. Used by mysql/postgresql only.
+  # Пароль базы данных. Используется только mysql/postgresql.
   # @type: string
   password: "password"
 
@@ -66,13 +86,25 @@
     # @type: string
     password: ""
 
-# --- parity-repair: identity entries appended to satisfy LocaleFullParityTest
-# --- values copied verbatim from English baseline; translate as needed.
+# Обобщённый каркас меню.
+# `renderer` — упорядоченный список предпочтений идентификаторов
+# рендереров. При исключении или отсутствии адаптера каркас перебирает
+# список и переходит к следующей записи. Когда список исчерпан, путь
+# открытия страницы без токена возвращается к настраиваемому сообщению
+# `menuInvalid`. Доступные id: book. (Чат-рендерер появится в одном из
+# следующих выпусков и тогда будет добавлен в список по умолчанию.)
 menu:
   # Ordered preference list of renderer ids.
   # @type: list<enum>
   # @options: ["book", "chat"]
   renderer:
+    # Обобщённый каркас меню.
+    # `renderer` — упорядоченный список предпочтений идентификаторов
+    # рендереров. При исключении или отсутствии адаптера каркас перебирает
+    # список и переходит к следующей записи. Когда список исчерпан, путь
+    # открытия страницы без токена возвращается к настраиваемому сообщению
+    # `menuInvalid`. Доступные id: book. (Чат-рендерер появится в одном из
+    # следующих выпусков и тогда будет добавлен в список по умолчанию.)
     - "book"
 
 # НЕ ИЗМЕНЯЙТЕ НОМЕР ВЕРСИИ

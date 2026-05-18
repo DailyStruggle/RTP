@@ -1,31 +1,31 @@
-# --- RTP Metrics Settings ---
-# Reporting-only knobs for the Phase M2 metrics SPI. Throttle / tuning
-# knobs continue to live in performance.yml.
-# Documentation: docs/dev/METRICS_PLAN.md > Folia Aggregation
-# Populate MetricsSnapshot.foliaRegions() with per-region detail on Folia.
-# Has no effect on Paper / Bukkit / Fabric (single-region runtimes always
-# return an empty list, which is the correct answer for those platforms).
+# --- RTP-Metrik-Einstellungen ---
+# Reine Reporting-Schalter für die Phase-M2-Metrik-SPI. Drossel-/Tuning-
+# Schalter bleiben in performance.yml.
+# Dokumentation: docs/dev/METRICS_PLAN.md > Folia Aggregation
+# Füllt MetricsSnapshot.foliaRegions() auf Folia mit Details pro Region.
+# Keine Wirkung auf Paper / Bukkit / Fabric (Single-Region-Runtimes geben
+# stets eine leere Liste zurück, was für diese Plattformen korrekt ist).
 # @type: boolean
 # @default: true
 foliaIncludeRegions: true
 
-# Aggregation strategy used to fold per-region samples into the scalar
-# tps{1,5,15}m fields of MetricsSnapshot on Folia.
-# Accepted values: mean | max
+# Aggregationsstrategie, um Pro-Region-Stichproben in die skalaren
+# tps{1,5,15}m-Felder von MetricsSnapshot auf Folia zusammenzufassen.
+# Zulässige Werte: mean | max
 # @type: enum
 # @default: mean
 foliaAggregationTps: "mean"
 
-# Aggregation strategy used to fold per-region samples into the scalar
-# mspt field of MetricsSnapshot on Folia.
-# Accepted values: mean | max
+# Aggregationsstrategie, um Pro-Region-Stichproben in das skalare
+# mspt-Feld von MetricsSnapshot auf Folia zusammenzufassen.
+# Zulässige Werte: mean | max
 # @type: enum
 # @default: max
 foliaAggregationMspt: "max"
 
-# Aggregation strategy used to fold per-region samples into the scalar
-# tickBudgetUtilisation field of MetricsSnapshot on Folia.
-# Accepted values: mean | max
+# Aggregationsstrategie, um Pro-Region-Stichproben in das skalare
+# tickBudgetUtilisation-Feld von MetricsSnapshot auf Folia zusammenzufassen.
+# Zulässige Werte: mean | max
 # @type: enum
 # @default: max
 foliaAggregationTickBudget: "max"

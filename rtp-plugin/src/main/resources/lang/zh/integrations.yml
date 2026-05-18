@@ -1,5 +1,5 @@
-# --- RTP Integration Settings ---
-# If true, RTP will reroll the location if it lands within a claim/region from the respective plugin.
+# --- RTP 集成设置 ---
+# 若为 true，当位置落在对应插件的圈地/区域内时，RTP 将重新选择位置。
 rerollFactions: false
 rerollGriefDefender: false
 rerollGriefPrevention: false

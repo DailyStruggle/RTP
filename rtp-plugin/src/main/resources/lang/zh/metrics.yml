@@ -1,31 +1,31 @@
-# --- RTP Metrics Settings ---
-# Reporting-only knobs for the Phase M2 metrics SPI. Throttle / tuning
-# knobs continue to live in performance.yml.
-# Documentation: docs/dev/METRICS_PLAN.md > Folia Aggregation
-# Populate MetricsSnapshot.foliaRegions() with per-region detail on Folia.
-# Has no effect on Paper / Bukkit / Fabric (single-region runtimes always
-# return an empty list, which is the correct answer for those platforms).
+# --- RTP 指标设置 ---
+# Phase M2 指标 SPI 的仅报告类开关。节流 / 调优开关仍位于
+# performance.yml 中。
+# 文档: docs/dev/METRICS_PLAN.md > Folia Aggregation
+# 在 Folia 上以每区域明细填充 MetricsSnapshot.foliaRegions()。
+# 对 Paper / Bukkit / Fabric 无效 (单区域运行时始终返回空列表，
+# 这是这些平台的正确答案)。
 # @type: boolean
 # @default: true
 foliaIncludeRegions: true
 
-# Aggregation strategy used to fold per-region samples into the scalar
-# tps{1,5,15}m fields of MetricsSnapshot on Folia.
-# Accepted values: mean | max
+# 在 Folia 上将每个区域的采样合并为 MetricsSnapshot 标量
+# tps{1,5,15}m 字段的聚合策略。
+# 可选值: mean | max
 # @type: enum
 # @default: mean
 foliaAggregationTps: "mean"
 
-# Aggregation strategy used to fold per-region samples into the scalar
-# mspt field of MetricsSnapshot on Folia.
-# Accepted values: mean | max
+# 在 Folia 上将每个区域的采样合并为 MetricsSnapshot 标量 mspt
+# 字段的聚合策略。
+# 可选值: mean | max
 # @type: enum
 # @default: max
 foliaAggregationMspt: "max"
 
-# Aggregation strategy used to fold per-region samples into the scalar
-# tickBudgetUtilisation field of MetricsSnapshot on Folia.
-# Accepted values: mean | max
+# 在 Folia 上将每个区域的采样合并为 MetricsSnapshot 标量
+# tickBudgetUtilisation 字段的聚合策略。
+# 可选值: mean | max
 # @type: enum
 # @default: max
 foliaAggregationTickBudget: "max"

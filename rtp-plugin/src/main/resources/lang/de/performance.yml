@@ -1,68 +1,113 @@
 # --- RTP Performance Settings ---
 # Documentation: https://github.com/DailyStruggle/RTP/blob/master/docs/admin/PERFORMANCE.md
 # Max search attempts before giving up
+# @type: integer
+# @range: [1, null]
+# @default: 32
 maxAttempts: 32
 
 # Chunk radius to load during selection
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
 viewDistanceSelect: 0
 
 # Chunk radius to load before teleport
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
 viewDistanceTeleport: 0
 
 # Ticks between background cache cycles
+# @type: integer
+# @range: [1, null]
+# @unit: ticks
+# @default: 20
 period: 20
 
 # Max ms per tick for sync tasks
+# @type: integer
+# @range: [1, null]
+# @unit: ms
+# @default: 50
 syncAllottedTime: 50
 
 # Max ms per tick for async tasks
+# @type: integer
+# @range: [1, null]
+# @unit: ms
+# @default: 50
 asyncAllottedTime: 50
 
 # Min TPS to continue background queueing
+# @type: number
+# @range: [0.0, 20.0]
+# @default: 19.0
 minTPS: 19.0
 
 # Refill cache immediately after teleport
+# @type: boolean
+# @default: false
 postTeleportQueueing: false
 
 # Use sync chunk loading (NOT RECOMMENDED)
+# @type: boolean
+# @default: false
 syncLoading: false
 
 # Parse permissions on every event
+# @type: boolean
+# @default: false
 onEventParsing: false
 
 # Parse effect permissions on startup
+# @type: boolean
+# @default: true
 effectParsing: true
 
 # Reuse found biome locations
+# @type: boolean
+# @default: true
 biomeRecall: true
 
 # Only use biomes already in cache
+# @type: boolean
+# @default: false
 biomeRecallForced: false
 
 # Check for safe spots in all loaded chunks
+# @type: boolean
+# @default: false
 checkOnChunkLoads: false
 
 # Enable background data gathering
+# @type: boolean
+# @default: false
 visitorEnabled: true
 
-# Maintain a reserved cache of locations for join-time teleports
-# (rtp.onevent.firstjoin / rtp.onevent.join). Sized by remaining empty
-# player slots. See ADR-023.
+# Reservierten Cache für Beitritts-Teleports vorhalten (rtp.onevent.firstjoin / rtp.onevent.join). Größe richtet sich nach verbleibenden freien Spieler-Slots. Siehe
 # @type: boolean
 # @default: false
 loginCacheEnabled: false
 
-# Hard cap for the login cache. 0 = auto (server max-players,
-# snapshotted at startup).
+# Harte Obergrenze für den Beitritts-Cache. 0 = automatisch (max-players des Servers beim Start).
 # @type: integer
 # @range: [0, null]
 # @default: 0
 loginCacheCap: 0
 
 # Probability [0.0, 1.0] of rejecting an ungenerated chunk per selection attempt. 0.0 = no bias (default), 1.0 = strictly avoid ungenerated land. Generated chunks always pass.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.0
 pregeneratedPreference: 0.0
 
 # Fraction [0.0, 1.0] of L3 backlog capacity at which refill resumes (hysteresis). 0.5 = refill only after L3 drains to 50% (default). 1.0 = refill continuously.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.5
 backlogRefillThreshold: 0.5
 
 # DO NOT TOUCH VERSION NUMBER

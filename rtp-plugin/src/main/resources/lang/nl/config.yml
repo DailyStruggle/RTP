@@ -1,27 +1,43 @@
 # Teletransportvertraging (seconden)
 # Tijd die de speler moet wachten voordat het teletransport plaatsvindt.
 # Geeft de server soms tijd om bestemmingschunks voor te laden.
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 2
 teletransportVertraging: 2
 
 # Annuleerdrempel (blokken)
 # Als de speler meer dan deze afstand beweegt tijdens de vertraging,
 # wordt het teletransport geannuleerd. Stel in op -1 om uit te schakelen.
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 2
 annuleerAfstand: 2
 
 # Wachttijd tussen teletransports (seconden)
 # Tijd die de speler moet wachten tussen succesvolle RTP-gebruiken.
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 300
 teletransportWachttijd: 300
 
 # Opdrachten na teletransport
 # Lijst van opdrachten die worden uitgevoerd na een succesvol teletransport.
 # De plaatshouder [player] staat voor de spelernaam.
+# @type: list<string>
 consoleOpdrachten:
   - "say [player] is zojuist willekeurig geteletransporteerd!"
 
-# Commands executed as the teleporting player on successful teleport.
-# Use [player] for the target player's name. Empty string entries are ignored.
+# Commando's uitgevoerd als de geteleporteerde speler bij geslaagde teleport.
+# Gebruik [player] voor de spelersnaam. Lege invoer wordt genegeerd.
 # @type: list<string>
 spelerOpdrachten:
+  # Commando's uitgevoerd als de geteleporteerde speler bij geslaagde teleport.
+  # Gebruik [player] voor de spelersnaam. Lege invoer wordt genegeerd.
+  # @type: list<string>
   - ""
 
 # --- Databaseconfiguratie ---
@@ -30,20 +46,24 @@ database:
   # Beschikbare typen: yaml, sqlite, mysql, postgresql
   # - yaml/sqlite: lokale bestanden (geen extra configuratie nodig)
   # - mysql/postgresql: externe database (vereist onderstaande gegevens)
+  # @type: enum
+  # @options: ["yaml", "sqlite", "mysql", "postgresql"]
+  # @default: "sqlite"
   type: "sqlite"
   # Netwerkdatabasegegevens (genegeerd voor lokale typen)
+  # @type: string
   host: "127.0.0.1"
-  # Database port. Used by mysql/postgresql only.
+  # Database-poort. Alleen gebruikt door mysql/postgresql.
   # @type: integer
   # @range: [1, 65535]
   port: 3306
-  # Database / schema name. Used by mysql/postgresql only.
+  # Database- / schemanaam. Alleen gebruikt door mysql/postgresql.
   # @type: string
   name: "rtp"
-  # Database username. Used by mysql/postgresql only.
+  # Database-gebruikersnaam. Alleen gebruikt door mysql/postgresql.
   # @type: string
   username: "root"
-  # Database password. Used by mysql/postgresql only.
+  # Database-wachtwoord. Alleen gebruikt door mysql/postgresql.
   # @type: string
   password: "password"
 
@@ -66,18 +86,25 @@ netwerk:
     # @type: string
     password: ""
 
-# Generalized menu framework (ADR-035 / ADR-044).
-# `renderer` is an ordered preference list of renderer ids. On exception or
-# missing adapter the framework walks the list and falls back to the next
-# entry. If the list is exhausted the no-token open-page path falls back to
-# the configurable `menuInvalid` message. Available ids: book. (The chat
-# renderer ships in a follow-up and will be added to the default list at
-# that point.)
+# Algemeen menu-framework.
+# `renderer` is een geordende voorkeurlijst van renderer-ids. Bij een
+# uitzondering of ontbrekende adapter loopt het framework de lijst door en
+# valt terug op de volgende ingang. Is de lijst uitgeput, dan valt het
+# token-loze openings-pad terug op het instelbare `menuInvalid`-bericht.
+# Beschikbare ids: book. (De chat-renderer komt in een vervolg-release en
+# wordt dan aan de standaardlijst toegevoegd.)
 menu:
   # Ordered preference list of renderer ids.
   # @type: list<enum>
   # @options: ["book", "chat"]
   renderer:
+    # Algemeen menu-framework.
+    # `renderer` is een geordende voorkeurlijst van renderer-ids. Bij een
+    # uitzondering of ontbrekende adapter loopt het framework de lijst door en
+    # valt terug op de volgende ingang. Is de lijst uitgeput, dan valt het
+    # token-loze openings-pad terug op het instelbare `menuInvalid`-bericht.
+    # Beschikbare ids: book. (De chat-renderer komt in een vervolg-release en
+    # wordt dan aan de standaardlijst toegevoegd.)
     - "book"
 
 # WIJZIG HET VERSIENUMMER NIET

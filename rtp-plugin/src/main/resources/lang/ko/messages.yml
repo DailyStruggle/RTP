@@ -1,15 +1,12 @@
 # --- RTP 메시지(한국어) ---
 # 플레이어와 콘솔에 표시되는 메시지의 한국어 번역.
-#
 # 중요 사항:
-#   - 이 파일의 키 이름은 lang/ko/messages.lang.yml 의 오른쪽 열(내부 키 이름의
-#     한국어 번역)과 일치해야 합니다. messages.lang.yml 에 없는 키는 영어
-#     기준선(lang/messages.lang.yml)의 영어 키 이름으로 폴백합니다.
-#   - 대괄호 자리표시자는 그대로 두세요: [P0], [delay], [attempts],
-#     [world], [region], [remainingCooldown], [scan_chunks] 등.
-#   - 색상 코드 &a &e &c 와 HEX 색상 (#2636ef) 은 그대로 두세요.
-#
-# REQ-RTP-F-013 / ADR-020.
+# - 이 파일의 키 이름은 lang/ko/messages.lang.yml 의 오른쪽 열(내부 키 이름의
+# 한국어 번역)과 일치해야 합니다. messages.lang.yml 에 없는 키는 영어
+# 기준선(lang/messages.lang.yml)의 영어 키 이름으로 폴백합니다.
+# - 대괄호 자리표시자는 그대로 두세요: [P0], [delay], [attempts],
+# [world], [region], [remainingCooldown], [scan_chunks] 등.
+# - 색상 코드 &a &e &c 와 HEX 색상 (#2636ef) 은 그대로 두세요.
 # ###############################################################################
 # 섹션 1: 일반 설정
 # ###############################################################################
@@ -22,7 +19,7 @@
 # ###############################################################################
 이미텔레포트중: "&e[P0] 이미 텔레포트 중입니다!"
 
-# if the plugin is currently reloading
+# 플러그인이 현재 리로드 중일 때
 텔레포트거부_리로드중: "&e[P0] 플러그인 리로드 중이므로 텔레포트가 일시적으로 비활성화되었습니다. 잠시 후 다시 시도해 주세요."
 지연메시지: "&e[P0] [delay] 후에 텔레포트합니다. 움직이지 마세요."
 청크로딩중: "&e[P0] 청크를 로딩 중입니다. 잠시 기다려 주세요……"
@@ -31,23 +28,23 @@
 # if teleport is cancelled
 텔레포트취소: "&e[P0] 텔레포트가 취소되었습니다!"
 
-# if no safe places after reaching max attempts
-# placeholder: [attempts] - the maximum number of attempts
+# 최대 시도 횟수에 도달해도 안전한 장소를 찾지 못한 경우
+# 자리표시자: [attempts] - 최대 시도 횟수
 위험: "&e[P0] [attempts] 회 시도해도 안전한 위치를 찾지 못했습니다"
 
-# when the player is on cooldown
-# placeholder: [remainingCooldown] - the remaining time
+# 플레이어가 쿨다운 중일 때
+# 자리표시자: [remainingCooldown] - 남은 시간
 쿨다운메시지: "&e[P0] 다시 텔레포트하려면 [remainingCooldown] 기다려야 합니다"
 
-# if the region doesn't have any locations queued and the player doesn't have rtp.unqueued permission
+# 리전에 대기 중인 위치가 없고 플레이어가 rtp.unqueued 권한을 가지고 있지 않을 때
 가능한위치없음: "#f5eb73[P0] 현재 사용 가능한 위치가 없습니다"
 
-# when the queue line shifts
-# placeholder: [spot] - the current position in line
+# 대기열이 이동했을 때
+# 자리표시자: [spot] - 현재 대기열 위치
 큐업데이트: "#2636ef[P0] 큐에서 당신의 순서: [spot]"
 
-# if the player doesn't have enough money to teleport in the region
-# placeholder: [money] - how much money is required for the command
+# 플레이어가 해당 리전에서 텔레포트하기에 충분한 돈이 없을 때
+# 자리표시자: [money] - 명령어에 필요한 금액
 잔액부족: "&e[P0] 이 작업에는 최소 $[money] 이(가) 필요합니다."
 
 # ###############################################################################
@@ -64,26 +61,26 @@
 # ###############################################################################
 구파일: "&b[P0] 오래된 [filename] 을(를) 감지했습니다. 업데이트 중"
 
-# detected a bukkit world that isn't in the config file
-# placeholder: [world] - the world detected
+# 설정 파일에 없는 bukkit 월드를 감지했습니다
+# 자리표시자: [world] - 감지된 월드
 신규월드: "&b[P0] 새 월드 '[world]' 을(를) 감지했습니다"
 
-# world doesn't exist in bukkit
-# placeholder: [world] - the world name
+# bukkit 에 해당 월드가 존재하지 않습니다
+# 자리표시자: [world] - 월드 이름
 잘못된월드: "&e[P0] 월드 '[world]' 을(를) 찾을 수 없습니다"
 
-# plugin reload/update text
-# placeholder: [filename] - name of file
+# 플러그인 리로드 / 업데이트 메시지
+# 자리표시자: [filename] - 파일 이름
 리로드중: "&b[P0] [filename] 을(를) 로딩 중……"
 리로드완료: "&b[P0] [filename] 로딩이 완료되었습니다."
 업데이트중: "&a[P0] [filename] 업데이트 중……"
 업데이트완료: "&a[P0] [filename] 업데이트가 정상적으로 완료되었습니다."
 
-# plugin doesn't have the command the user requested
-# placeholder: [arg] - the argument attempted
+# 플러그인에 사용자가 요청한 명령어가 없습니다
+# 자리표시자: [arg] - 시도된 인수
 잘못된인수: "&c[P0] 잘못된 명령어 인수입니다 [arg]"
 
-# when the console tries to run a command meant only for players
+# 콘솔이 플레이어 전용 명령어를 실행하려 할 때
 콘솔불가: "&c[P0] 이 명령어는 게임 내 플레이어로 실행해야 합니다."
 
 # busy 와 invalidCommand 는 messages.lang.yml 에서 번역되지 않음 -> 영어 키 이름 (영어 기준선으로 폴백).
@@ -93,7 +90,7 @@ busy: "&c[P0] 처리 중"
 # placeholder: [arg] - the argument attempted
 invalidCommand: "&c[P0] 잘못된 명령어 - [arg]"
 
-# user doesn't have permission for the command requested
+# 사용자가 요청한 명령어에 대한 권한이 없습니다
 권한없음: "&e죄송합니다. 이 명령어를 실행할 권한이 없습니다. 오류라고 생각되시면 서버 관리자에게 문의하세요."
 
 # ###############################################################################
@@ -130,15 +127,15 @@ infoQueueDepth: "&7Players Waiting In Region Queues: &f[queueDepth]"
 infoPendingTeleports: "&7Pending Teleport Pipelines: &f[pendingTeleports]"
 infoAvgPipelineMs: "&7Avg Pipeline Latency: &f[avgPipelineMs] ms"
 infoHeap: "&7JVM Heap: &f[heapUsedMb] / [heapMaxMb] MiB"
-# Header line for the Health pipeline labelled block in /rtp info.
+# /rtp info 의 Health pipeline 라벨 블록 헤더 줄.
 infoHealthPipelineHeader: "&7--- Health: pipeline ---"
-# TPS readout for the 1m / 5m / 15m windows. Placeholders: [tps1m] [tps5m] [tps15m].
+# 1m / 5m / 15m 윈도우의 TPS 표시. 자리표시자: [tps1m] [tps5m] [tps15m].
 infoTps: "&7TPS (1m/5m/15m): &f[tps1m] / [tps5m] / [tps15m]"
-# Live server MSPT and tick-budget utilisation. Placeholders: [mspt] [tickBudgetUtilisation].
+# 서버 실시간 MSPT 및 tick 예산 사용률. 자리표시자: [mspt] [tickBudgetUtilisation].
 infoMSPTLive: "&7Server MSPT: &f[mspt] ms (&7tick budget: &f[tickBudgetUtilisation]&7)"
 # Configured player soft-cap vs current online count. Placeholders: [softCap] [playerCount].
 infoSoftCap: "&7Players: &f[playerCount] / [softCap]"
-# Most recent database round-trip latency in ms. Placeholder: [databaseLatencyMs].
+# 데이터베이스의 최근 왕복 지연 시간 (ms). 자리표시자: [databaseLatencyMs].
 infoDatabaseLatencyMs: "&7Database Latency: &f[databaseLatencyMs] ms"
 # Health colour-band thresholds. Doubles consumed by ColourBands in rtp-core
 # to wrap coloured-variant placeholders (e.g. [tps1mColoured]) with &a/&e/&c.
@@ -199,13 +196,13 @@ rtp_설명: "무작위 위치로 텔레포트합니다"
 테스트_설명: "RTP 기능을 테스트합니다"
 
 # ###############################################################################
-# Section 8b: Generalized Menu Framework (ADR-035 / ADR-044)
+# Section 8b: Generalized Menu Framework
 # ###############################################################################
 # Sent when a menu token is unknown, malformed, or belongs to another player.
 menuInvalid: "&c[P0] that menu link is invalid."
 # Sent when a menu token has expired or was already consumed.
 menuExpired: "&c[P0] that menu link has expired. Please reopen the menu."
-# Sent when a menu redeem cannot resolve the calling player UUID.
+# 메뉴 사용 시 호출 플레이어의 UUID 를 확인할 수 없을 때 전송됩니다.
 menuUnknownPlayer: "&c[P0] menu links can only be used by in-game players."
 # Hover-fallback template used by the menu reflector when no YAML block-comment
 # is available for a parameter. Placeholder: [type] - the declared parameter type.
@@ -254,9 +251,9 @@ menuFrontPageRowConfig: "&b▶ /rtp config &7- edit config files"
 menuFrontPageRowScan: "&b▶ /rtp scan &7- pre-fill region caches"
 menuFrontPageRowDiagnostics: "&c▶ /rtp test full &7- run full diagnostics"
 menuFrontPageRowReload: "&c▶ /rtp reload &7- reload config files"
-# Hover text for the diagnostics row warning about cost. No placeholders.
+# 비용 경고가 포함된 진단 행의 호버 텍스트. 자리표시자 없음.
 menuFrontPageHoverDiagnostics: "&7runs full diagnostic suite; may be expensive"
-# Hover text for the reload row warning about side-effects. No placeholders.
+# 부작용 경고가 포함된 리로드 행의 호버 텍스트. 자리표시자 없음.
 menuFrontPageHoverReload: "&7reloads all config files; in-flight teleports may be affected"
 
 # ###############################################################################
@@ -272,7 +269,8 @@ menuFrontPageHoverReload: "&7reloads all config files; in-flight teleports may b
 # 섹션 10: 시각 요소
 # ###############################################################################
 타이틀: "#FF6B6B랜#FF7E63덤#FF9155 텔#FFA447레#FFB739포트!"
-서브타이틀: "#A78BFA자#AF84F9, #B77DF7가#BF76F5보자!"
+# B77DF7가#BF76F5보자!
+서브타이틀: "#A78BFA자#AF84F9,"
 페이드인: 20
 표시시간: 20
 페이드아웃: 20

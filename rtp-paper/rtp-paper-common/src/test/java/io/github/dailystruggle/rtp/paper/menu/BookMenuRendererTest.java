@@ -148,6 +148,33 @@ final class BookMenuRendererTest {
     }
 
     @Test
+    void buildBook_promptAnvilInput_emitsRunMenuTokenCommand() {
+        // ADR-045: PromptAnvilInput is server-resolved like RunRtpCommand /
+        // OpenMenu / OpenParamPicker — the renderer mints a fresh token and
+        // emits a /rtp menu token:<t> runCommand click, which the redeem
+        // path dispatches to the platform-side AnvilInputOpener.
+        CapturingRegistry registry = new CapturingRegistry();
+        BookMenuRenderer renderer = new BookMenuRenderer(registry, Duration.ofSeconds(30),
+                (uuid, model) -> null);
+        UUID viewer = UUID.randomUUID();
+
+        MenuAction.PromptAnvilInput prompt = new MenuAction.PromptAnvilInput(
+                new String[]{"regions"}, "add", "");
+        Book book = renderer.buildBook(viewer,
+                singleLineModel(new MenuFragment("type a value", null, prompt)));
+
+        ClickEvent click = firstClickEvent(book.pages().get(0));
+        assertNotNull(click);
+        assertEquals(ClickEvent.Action.RUN_COMMAND, click.action());
+        assertTrue(click.value().startsWith("/rtp menu token:"),
+                "PromptAnvilInput must round-trip through /rtp menu token:<t>; was: " + click.value());
+        assertEquals(1, registry.mintedFor.size(),
+                "exactly one mint per PromptAnvilInput fragment");
+        assertEquals(viewer, registry.mintedFor.get(0));
+        assertEquals(prompt, registry.mintedActions.get(0));
+    }
+
+    @Test
     void buildBook_openExternalUrl_emitsOpenUrl() {
         CapturingRegistry registry = new CapturingRegistry();
         BookMenuRenderer renderer = new BookMenuRenderer(registry, Duration.ofSeconds(30),

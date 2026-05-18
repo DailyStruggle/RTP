@@ -37,12 +37,22 @@ class MenuModelSurfaceTest {
     // ---- MenuAction ----
 
     @Test
-    @DisplayName("MenuAction is sealed to exactly the six declared variants")
+    @DisplayName("MenuAction is sealed to exactly the ten declared variants")
     void menuActionSealedShape() {
         Class<?>[] permitted = MenuAction.class.getPermittedSubclasses();
-        assertEquals(6, permitted.length);
+        assertEquals(10, permitted.length);
         List<String> names = Arrays.stream(permitted).map(Class::getSimpleName).sorted().toList();
-        assertEquals(List.of("ChangePage", "OpenExternalUrl", "OpenMenu", "OpenParamPicker", "RunRtpCommand", "SuggestInput"), names);
+        assertEquals(List.of(
+                "ChangePage",
+                "OpenConfigFile",
+                "OpenConfigKey",
+                "OpenConfigSelector",
+                "OpenExternalUrl",
+                "OpenMenu",
+                "OpenParamPicker",
+                "PromptAnvilInput",
+                "RunRtpCommand",
+                "SuggestInput"), names);
     }
 
     @Test
@@ -109,6 +119,40 @@ class MenuModelSurfaceTest {
     }
 
     @Test
+    @DisplayName("PromptAnvilInput defensively copies parentPath; equality by contents; rejects nulls + empty name")
+    void promptAnvilInputDefensiveCopy() {
+        String[] in = {"regions"};
+        MenuAction.PromptAnvilInput a = new MenuAction.PromptAnvilInput(in, "add", "");
+        in[0] = "MUTATED";
+        assertArrayEquals(new String[]{"regions"}, a.parentPath());
+        String[] out = a.parentPath();
+        out[0] = "ALSO_MUTATED";
+        assertArrayEquals(new String[]{"regions"}, a.parentPath());
+        assertEquals("add", a.paramName());
+        assertEquals("", a.prefill());
+
+        MenuAction.PromptAnvilInput b = new MenuAction.PromptAnvilInput(
+                new String[]{"regions"}, "add", "");
+        assertEquals(a, b);
+        assertEquals(a.hashCode(), b.hashCode());
+
+        MenuAction.PromptAnvilInput different = new MenuAction.PromptAnvilInput(
+                new String[]{"regions"}, "add", "seed");
+        assertFalse(a.equals(different));
+
+        assertThrows(NullPointerException.class,
+                () -> new MenuAction.PromptAnvilInput(null, "add", ""));
+        assertThrows(NullPointerException.class,
+                () -> new MenuAction.PromptAnvilInput(new String[]{null}, "add", ""));
+        assertThrows(NullPointerException.class,
+                () -> new MenuAction.PromptAnvilInput(new String[0], null, ""));
+        assertThrows(NullPointerException.class,
+                () -> new MenuAction.PromptAnvilInput(new String[0], "add", null));
+        assertThrows(IllegalArgumentException.class,
+                () -> new MenuAction.PromptAnvilInput(new String[0], "", ""));
+    }
+
+    @Test
     @DisplayName("Pattern-matching switch over MenuAction compiles exhaustively without default")
     void menuActionSwitchExhaustive() {
         // Compilation alone is the assertion: if a variant is added without updating callers
@@ -120,7 +164,11 @@ class MenuModelSurfaceTest {
             case MenuAction.OpenParamPicker p -> "pick:" + p.parentPath().length + ":" + p.paramName();
             case MenuAction.ChangePage c -> "page:" + c.pageIndex();
             case MenuAction.SuggestInput s -> "suggest:" + s.prefix();
+            case MenuAction.PromptAnvilInput pa -> "anvil:" + pa.paramName();
             case MenuAction.OpenExternalUrl u -> "url:" + u.uri();
+            case MenuAction.OpenConfigSelector cs -> "cfgsel";
+            case MenuAction.OpenConfigFile cf -> "cfgfile:" + cf.fileName();
+            case MenuAction.OpenConfigKey ck -> "cfgkey:" + ck.fileName() + ":" + ck.paramName();
         };
         assertEquals("run:1", tag);
     }

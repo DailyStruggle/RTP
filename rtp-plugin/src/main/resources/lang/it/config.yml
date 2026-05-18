@@ -50,14 +50,14 @@ database:
   # Host del database. Usato solo da mysql/postgresql.
   # @type: string
   host: "127.0.0.1"
-  # Database port. Used by mysql/postgresql only.
+  # Porta del database. Usata solo da mysql/postgresql.
   # @type: integer
   # @range: [1, 65535]
   port: 3306
-  # Database / schema name. Used by mysql/postgresql only.
+  # Nome del database / schema. Usato solo da mysql/postgresql.
   # @type: string
   name: "rtp"
-  # Database username. Used by mysql/postgresql only.
+  # Nome utente del database. Usato solo da mysql/postgresql.
   # @type: string
   username: "root"
   # Password del database. Usata solo da mysql/postgresql.
@@ -82,7 +82,7 @@ rete:
     # @type: string
     password: ""
 
-# Framework di menù generalizzato (ADR-035 / ADR-044).
+# Framework di menù generalizzato.
 # `renderer` è una lista ordinata di preferenze di id di renderer. In caso di
 # eccezione o di adattatore mancante il framework percorre la lista e ripiega
 # sulla voce successiva. Se la lista è esaurita, il percorso di apertura di pagina

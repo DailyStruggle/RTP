@@ -251,6 +251,17 @@ public final class BookMenuRenderer implements MenuRenderer {
                 String token = tokenRegistry.mint(playerId, picker, tokenTtl);
                 yield ClickEvent.runCommand("/rtp menu token:" + token);
             }
+            case MenuAction.PromptAnvilInput prompt -> {
+                // ADR-045 anvil-input click. Adventure has no client-driven
+                // "open inventory" click event, so the click round-trips
+                // through the same /rtp menu token:<token> redeem path the
+                // other server-resolved variants use; MenuRedeemSubcommand
+                // dispatches to the platform-side AnvilInputOpener which
+                // opens the anvil GUI on the player and submits the typed
+                // value back through the /rtp pipeline on confirm.
+                String token = tokenRegistry.mint(playerId, prompt, tokenTtl);
+                yield ClickEvent.runCommand("/rtp menu token:" + token);
+            }
             case MenuAction.ChangePage change ->
                     // Adventure pages are 1-based; MenuPage indices are 0-based.
                     ClickEvent.changePage(change.pageIndex() + 1);
@@ -258,6 +269,29 @@ public final class BookMenuRenderer implements MenuRenderer {
                     ClickEvent.suggestCommand(suggest.prefix());
             case MenuAction.OpenExternalUrl url ->
                     ClickEvent.openUrl(safeUrlString(url.uri()));
+            case MenuAction.OpenConfigSelector selector -> {
+                // Curated config-subtree page 1 (PROPOSAL-config-view-as-book.md v3.7).
+                // Server-resolved through the same /rtp menu token:<token> redeem
+                // path the other navigation variants use; MenuRedeemSubcommand
+                // dispatches to dispatchOpenConfigSelector.
+                String token = tokenRegistry.mint(playerId, selector, tokenTtl);
+                yield ClickEvent.runCommand("/rtp menu token:" + token);
+            }
+            case MenuAction.OpenConfigFile fileAction -> {
+                // Curated config-subtree page 2 (PROPOSAL-config-view-as-book.md v3.7).
+                // Server-resolved through the /rtp menu token:<token> redeem path;
+                // MenuRedeemSubcommand dispatches to dispatchOpenConfigFile.
+                String token = tokenRegistry.mint(playerId, fileAction, tokenTtl);
+                yield ClickEvent.runCommand("/rtp menu token:" + token);
+            }
+            case MenuAction.OpenConfigKey keyAction -> {
+                // Curated config-subtree page 3 (PROPOSAL-config-view-as-book.md v3.7).
+                // Server-resolved through the /rtp menu token:<token> redeem path;
+                // MenuRedeemSubcommand dispatches to dispatchOpenConfigKey, which
+                // delegates to the existing buildParamPicker flow.
+                String token = tokenRegistry.mint(playerId, keyAction, tokenTtl);
+                yield ClickEvent.runCommand("/rtp menu token:" + token);
+            }
         };
     }
 

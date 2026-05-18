@@ -1,20 +1,36 @@
 # Temps d'attente (secondes) avant la téléportation
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 2
 delaiTeleportation: 2
 
 # Distance de mouvement maximale pendant le délai avant annulation
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 2
 distanceAnnulation: 2
 
 # Temps d'attente (secondes) entre les utilisations réussies
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 300
 refroidissementTeleportation: 300
 
 # Commandes exécutées après la téléportation
+# @type: list<string>
 commandesConsole:
   - "say [player] vient de se téléporter aléatoirement !"
 
-# Commands executed as the teleporting player on successful teleport.
-# Use [player] for the target player's name. Empty string entries are ignored.
+# Commandes exécutées en tant que joueur téléporté lors d'une téléportation réussie.
+# Utilisez [player] pour le nom du joueur. Les entrées vides sont ignorées.
 # @type: list<string>
 commandesJoueur:
+  # Commandes exécutées en tant que joueur téléporté lors d'une téléportation réussie.
+  # Utilisez [player] pour le nom du joueur. Les entrées vides sont ignorées.
+  # @type: list<string>
   - ""
 
 # Configuration de la base de données
@@ -27,17 +43,17 @@ baseDeDonnees:
   # Database host. Used by mysql/postgresql only.
   # @type: string
   host: "127.0.0.1"
-  # Database port. Used by mysql/postgresql only.
+  # Port de la base de données. Utilisé uniquement par mysql/postgresql.
   # @type: integer
   # @range: [1, 65535]
   port: 3306
-  # Database / schema name. Used by mysql/postgresql only.
+  # Nom de la base de données / schéma. Utilisé uniquement par mysql/postgresql.
   # @type: string
   name: "rtp"
-  # Database username. Used by mysql/postgresql only.
+  # Nom d'utilisateur de la base de données. Utilisé uniquement par mysql/postgresql.
   # @type: string
   username: "root"
-  # Database password. Used by mysql/postgresql only.
+  # Mot de passe de la base de données. Utilisé uniquement par mysql/postgresql.
   # @type: string
   password: "password"
 
@@ -59,18 +75,27 @@ reseau:
     # @type: string
     password: ""
 
-# Generalized menu framework (ADR-035 / ADR-044).
-# `renderer` is an ordered preference list of renderer ids. On exception or
-# missing adapter the framework walks the list and falls back to the next
-# entry. If the list is exhausted the no-token open-page path falls back to
-# the configurable `menuInvalid` message. Available ids: book. (The chat
-# renderer ships in a follow-up and will be added to the default list at
-# that point.)
+# Cadre de menu généralisé.
+# `renderer` est une liste ordonnée de préférences d'identifiants de
+# renderer. En cas d'exception ou d'adaptateur manquant, le framework
+# parcourt la liste et bascule sur l'entrée suivante. Si la liste est
+# épuisée, la voie d'ouverture sans jeton retombe sur le message
+# configurable `menuInvalid`. Identifiants disponibles : book. (Le
+# renderer chat arrivera dans une livraison ultérieure et sera ajouté à la
+# liste par défaut à ce moment-là.)
 menu:
   # Ordered preference list of renderer ids.
   # @type: list<enum>
   # @options: ["book", "chat"]
   renderer:
+    # Cadre de menu généralisé.
+    # `renderer` est une liste ordonnée de préférences d'identifiants de
+    # renderer. En cas d'exception ou d'adaptateur manquant, le framework
+    # parcourt la liste et bascule sur l'entrée suivante. Si la liste est
+    # épuisée, la voie d'ouverture sans jeton retombe sur le message
+    # configurable `menuInvalid`. Identifiants disponibles : book. (Le
+    # renderer chat arrivera dans une livraison ultérieure et sera ajouté à la
+    # liste par défaut à ce moment-là.)
     - "book"
 
 # NE PAS MODIFIER LE NUMÉRO DE VERSION

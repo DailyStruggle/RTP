@@ -30,7 +30,7 @@ requirePermission: false
 override: "default"
 # Max pre-calculated safe locations
 cacheCap: 50
-# L3 backlog cache capacity (ADR-028); unverified candidates pre-filtered by anvil one .mca-bin per pulse. 0 disables L3.
+# L3 backlog cache capacity; unverified candidates pre-filtered by anvil one .mca-bin per pulse. 0 disables L3.
 backlogCacheCap: 1000
 # Max chunks kept loaded for zero-latency
 activeChunkCap: 10
